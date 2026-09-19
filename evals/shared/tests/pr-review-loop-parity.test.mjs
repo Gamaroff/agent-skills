@@ -1289,9 +1289,9 @@ test("5c's two banner firing points are instructed, and belong to 5c", () => {
 test("Step 0's 5c completeness condition lives on the QA-loop row", () => {
   // Gate 11: the condition could be deleted from develop-task's progress table, or MOVED to the
   // Step 7 row, with the suite green — an ownership claim that was never asserted as one.
-  const step0 = read(
-    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
-  );
+  // task.124 moved the report templates out of step-0 §0e into the one template file that
+  // report-lint.js also reads; the progress rows live there now.
+  const step0 = read("shared/resources/implementation-report-template.md");
   const condition = "`**PR Review**` row on the highest `### QA Cycle {N}`";
   for (const loop of ["qa-story / qa-fix loop", "qa-task / qa-fix loop"]) {
     const row = step0
@@ -1366,9 +1366,8 @@ test("the 5c resume check reads the report, not the filesystem", () => {
   // The deleted predicate had TWO homes. Removing it from the resume contract while it survived
   // in Step 0's progress table left two documents defining Step 5-6 completeness differently at
   // the same resume moment — the cycle-1-to-3 pattern (fix the sentence, not the contract) again.
-  const step0 = read(
-    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
-  );
+  // The progress rows moved to the template file with task.124 (see the test above).
+  const step0 = read("shared/resources/implementation-report-template.md");
   assert.doesNotMatch(
     step0,
     /pr-review\.\{n\}\.\*\.md` \(Step 5c\)/,

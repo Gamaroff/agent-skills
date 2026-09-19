@@ -1,0 +1,64 @@
+{
+  "name": "develop-task-resume-stale-snapshot-after-merge-deleted",
+  "skill": "develop-task",
+  "description": "Stale halt snapshot after merge (task.124 / obs #88): a run of task.42 that predates task.124 halted once, completed later, was accepted and its PR merged \u2014 and its `last-halt.json` outlived it. Re-invoking /develop-task on task.42 finds no lock and the snapshot; the detector sees the snapshot's PR is MERGED (the document's `status: accepted` alone would NOT fire the rule \u2014 finalise writes it before Step 8; QA cycle 2, CR-1), reports `stale-snapshot \u2026 deleted`, DELETES the file, and reports source `none` rather than offering a resume of merged work. The orchestrator surfaces the deletion and treats the run as a fresh start prompt (the operator declines \u2014 nothing to develop).",
+  "prompt": "Invoke /develop-task for task.42.example. The task is accepted and its PR merged, but a halt snapshot from an earlier run is still on disk.",
+  "assertions": [
+    {
+      "fn": "fileAbsent",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.last-halt.json"
+      ]
+    },
+    {
+      "fn": "fileAbsent",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.example.md",
+        "status: accepted"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.eval/detector-output.json",
+        "\"source\": \"none\""
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.eval/detector-output.json",
+        "stale-snapshot: \\.claude/state/develop-pipeline\\.last-halt\\.json"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.eval/detector-output.json",
+        "\"blocking_issues\": \\[\\]"
+      ]
+    },
+    {
+      "fn": "pipelineStepsRan",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        [
+          "resume-detector"
+        ]
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.eval/detector-output.json",
+        "PR merged; deleted"
+      ]
+    }
+  ]
+}

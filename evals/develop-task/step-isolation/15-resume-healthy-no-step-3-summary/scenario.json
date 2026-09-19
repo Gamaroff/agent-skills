@@ -1,0 +1,62 @@
+{
+  "name": "develop-task-resume-healthy-no-step-3-summary",
+  "skill": "develop-task",
+  "description": "Resume detector summary-gap rule (task.124 / obs #86): Step 3 ran its codebase map inline, so the report's `Subagent summary ref` cell for step 3 reads `\u2014` and no `.summaries/step-3-*.json` exists. The pre-task.124 rule keyed on a fixed exemption list and raised `Summary missing for step 3` as BLOCKING on every such resume. The evidence-conditioned rule expects a summary only where the report names one: blocking_issues is empty, recommended_step is lock+1, and the pipeline resumes at Step 4.",
+  "prompt": "Re-invoke /develop-task for task.42.example after a compaction pause at Step 3 (now complete). Step 3 ran its codebase map inline. Resume from the last completed step.",
+  "assertions": [
+    {
+      "fn": "fileAbsent",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/.summaries/step-3-codebase-map.json"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "\\\\| 3\\\\. develop \\\\| \u2705 Done \\\\|[^\\\\n]*\\\\| \u2014 \\\\|"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "Blocking issues:    none"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "Summary missing for step 3"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock",
+        "\"current_step\": 4"
+      ]
+    },
+    {
+      "fn": "resumeRehydrated",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        {
+          "expectedStep": "create-pr",
+          "expectedIter": 1
+        }
+      ]
+    },
+    {
+      "fn": "pipelineStepsRan",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        [
+          "resume-detector",
+          "create-pr"
+        ]
+      ]
+    }
+  ]
+}

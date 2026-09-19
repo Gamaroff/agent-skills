@@ -225,6 +225,30 @@ to another, **re-derive it at the point of copying** — that is the moment chec
 the appearance of freshness is highest. The same applies to a count of another *document's*
 contents ("the four shapes" of a document that has six): drop the count or test it. (obs #60, #18)
 
+## Never put a must-succeed path and a glob in one `rm` argv
+
+**The rule:** a file that *must* be removed and a pattern that *may* match nothing never share an
+`rm`. Remove the required path on its own line; sweep the optional matches with `find … -delete`
+(or a `nullglob`-guarded loop), which is a noop on an empty match in every shell.
+
+**Why:** `rm -f lock test-output-*.log` is two different commands in the two shells this repository
+runs under. bash expands an unmatched glob to itself and `rm -f` ignores the missing file, so every
+bash test passes. zsh — the default shell on every macOS host — treats an unmatched glob as
+`nomatch`, which **aborts the whole command before `rm` runs**: the lock stays in place on every
+HALT that had no test logs to sweep, and the next Stop hook re-prompts a pipeline that has halted.
+The one-argv form made the required removal conditional on an unrelated file existing, and the
+condition was invisible in the shell that wrote it. (obs #111; task.124)
+
+**How to do it right:**
+
+```bash
+rm -f .claude/state/develop-pipeline.lock
+find .claude/state -maxdepth 1 -name 'test-output-*.log' -delete 2>/dev/null || true
+```
+
+`lint:shell` never sees a fence, so `shared/resources/tests/halt-snippet-glob-safe.test.mjs`
+extracts the HALT snippets and runs them under both shells with an empty glob.
+
 ## See also
 
 - [Troubleshooting](./troubleshooting.md) — what to do when something breaks

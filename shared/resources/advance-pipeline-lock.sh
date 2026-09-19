@@ -14,9 +14,20 @@
 #   advance-pipeline-lock.sh <next_step_number>     # advance to specific step (1..8)
 #   advance-pipeline-lock.sh --complete             # remove lock (Step 8 done)
 #   advance-pipeline-lock.sh --skill <skill-name>   # advance based on sub-skill that just returned
+#   advance-pipeline-lock.sh --restore <doc-dir>    # rebuild the lock from the halt snapshot or an
+#                                                   # orphaned PreCompact claim (task.124, Phase 4)
 #
 # Behaviour:
-#   • No lock file  → exit 0, silent noop (no active pipeline)
+#   • No lock file  → depends on the mode, and the split is deliberate (task.124):
+#       <n>          → exit 1, message names --restore. A numeric advance is only ever issued
+#                      by an orchestrator that believes a pipeline is running; an exit-0
+#                      silence here hid a whole session in which every advance and the Stop
+#                      hook were inert after a PreCompact pause removed the lock (obs #123).
+#       --skill      → exit 0, silent noop. The self-advance is the last action of nine
+#                      sub-skills that legitimately run outside any pipeline (a standalone
+#                      /review-task is one).
+#       --complete   → exit 0. It must stay able to clear a corrupt or absent lock.
+#       --restore    → rebuilds the lock (below).
 #   • jq missing    → exit 0, warn to stderr (degraded mode, same as on-stop.sh)
 #   • lock that is not a JSON OBJECT (empty, whitespace-only, bare null/array/
 #                     scalar, or malformed) → exit 1, lock untouched, no success
@@ -42,11 +53,41 @@
 #   commit-changes  → remove lock ONLY when current_step >= 8 (terminal commit);
 #                     nested invocations (create-pr Step 4, qa-fix Steps 5–6) preserve the lock
 #
-# Always exits 0 on safe paths. Non-zero only on argument error or jq failure.
+# --restore <doc-dir> (task.124, Phase 4). The ONE restore path — grant-qa-cycles.sh
+# used to carry its own (task.123) and now calls this. A terminal HALT and the
+# PreCompact hook both REMOVE the lock and leave a superset of it behind:
+#   • .claude/state/develop-pipeline.last-halt.json — written by a terminal HALT
+#     (halted_at / halt_reason / halt_step) or by the PreCompact hook
+#     (paused_at / pause_reason), and, before this task, never consumed;
+#   • .claude/state/develop-pipeline.lock.pausing.<pid> — an orphaned claim, the lock
+#     byte for byte, left by a PreCompact hook killed between its rename and its snapshot.
+# A session that CONTINUES IN PLACE after a pause — rather than re-invoking the skill,
+# whose Step 1 is the lock's only ordinary writer — had no step that put the lock back.
+#   • lock present                    → exit 0, noop ("lock present — nothing to restore")
+#   • no candidate at either path     → exit 1, names both paths
+#   • every candidate is for another document (its task_or_story_directory, canonicalised,
+#     is not <doc-dir>, canonicalised; an ABSENT directory is the pre-task.123 shape and
+#     matches)                        → exit 1, nothing written, the candidate is left alone
+#   • otherwise → of the candidates for this document, the NEWEST by mtime wins (the
+#     detector's rule, task.120 bug.5); the lock is rebuilt from it with current_step =
+#     halt_step (fallback: its own current_step), the five halt/pause fields AND any
+#     `waiting_on` stripped (a rebuilt lock waits on nothing this session dispatched), via
+#     mktemp + mv; the source is DELETED — a snapshot that outlives its run is offered as a
+#     resume for merged work (obs #88), so the restore consumes it — and so is every OTHER
+#     candidate for this document (an older snapshot losing to a newer claim); prints
+#     `advance-pipeline-lock: lock restored from <source> at step N`
+#   • mtimes are read GNU-form first (`stat -c %Y`), BSD-form second (`stat -f %m`), and a
+#     non-numeric read is 0 with a warning — `stat -f` is filesystem mode on GNU coreutils,
+#     which made the first candidate win unconditionally on Linux (task.124 QA cycle 1, CR-1)
+#
+# Exit codes: 0 on every safe path listed above; 1 on argument error, a numeric advance
+# with no lock, a --restore with nothing usable, a non-object lock, or a jq failure.
 
 set -uo pipefail
 
 LOCK="${PIPELINE_LOCK:-.claude/state/develop-pipeline.lock}"
+
+SNAPSHOT="${PIPELINE_HALT_SNAPSHOT:-$(dirname "$LOCK")/develop-pipeline.last-halt.json}"
 
 usage() {
   cat <<USAGE >&2
@@ -54,18 +95,133 @@ Usage:
   $0 <next_step_number>     # 1..8
   $0 --complete             # remove lock (pipeline finished)
   $0 --skill <skill-name>   # advance based on returning sub-skill name
+  $0 --restore <doc-dir>    # rebuild the lock from the halt snapshot / orphaned claim
 USAGE
   exit 1
 }
 
 [ $# -ge 1 ] || usage
 
-[ -f "$LOCK" ] || exit 0
+# The no-lock behaviour is decided PER MODE below, not here. A single `|| exit 0`
+# ahead of the parse was the silent no-op that made every numeric advance and the
+# Stop hook inert for a whole session after a PreCompact pause (task.124, obs #123).
+if [ ! -f "$LOCK" ]; then
+  case "$1" in
+    --restore) ;;                       # the one mode that exists FOR a missing lock
+    --skill|--complete) exit 0 ;;       # standalone sub-skill runs; clearable lock
+    --help|-h) usage ;;
+    *)
+      echo "advance-pipeline-lock: no lock at '$LOCK' — nothing to advance to step '$1'. If this session is continuing after a PreCompact pause or a HALT, rebuild the lock first: advance-pipeline-lock.sh --restore <doc-dir>" >&2
+      exit 1
+      ;;
+  esac
+fi
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "advance-pipeline-lock: jq not installed; cannot advance lock" >&2
   exit 0
 fi
+
+# canon DIR → the resolved physical path, or the ./- and slash-stripped string when
+# the directory does not exist. Both sides of every directory comparison go through
+# it: the lock records the relative path the pipeline wrote (docs/tasks/…) while an
+# orchestrator often passes the resolver's absolute one (task.123 QA cycle 4, CR-4).
+canon() {
+  local stripped
+  stripped=$(printf '%s' "$1" | sed -E 's#^\./##; s#/+$##')
+  (cd "$stripped" 2>/dev/null && pwd -P) || printf '%s' "$stripped"
+}
+
+# restore_lock DOC_DIR — the --restore mode. See the header for the contract.
+# mtime_of FILE → seconds since the epoch, or 0 with a stderr warning when neither stat
+# form yields a number. GNU first: on GNU coreutils `stat -f` is FILE-SYSTEM mode — it
+# prints filesystem fields and exits 0 or 1 depending on the build — so the BSD form
+# cannot be tried first with `||` (task.124 QA cycle 1, CR-1: the first candidate always
+# won on Linux). `stat -c` is an illegal option on BSD, which fails cleanly to the BSD
+# form. The digits guard is what makes a bad read a 0, never a `[ x -gt y ]` abort that
+# silently keeps the first candidate.
+mtime_of() {
+  local m
+  m=$(stat -c %Y "$1" 2>/dev/null) || m=$(stat -f %m "$1" 2>/dev/null) || m=""
+  case "$m" in
+    ''|*[!0-9]*)
+      echo "advance-pipeline-lock: could not read the mtime of '$1' (got '${m:-nothing}') — treating as 0" >&2
+      m=0 ;;
+  esac
+  printf '%s' "$m"
+}
+
+restore_lock() {
+  local doc_dir="$1" want candidates=() mine=() c c_dir chosen="" newest=-1 m step tmp
+  [ -d "$doc_dir" ] || { echo "advance-pipeline-lock: --restore needs an existing <doc-dir>, got '$doc_dir'" >&2; exit 1; }
+  if [ -f "$LOCK" ]; then
+    echo "advance-pipeline-lock: lock present at '$LOCK' — nothing to restore"
+    exit 0
+  fi
+  want=$(canon "$doc_dir")
+  [ -f "$SNAPSHOT" ] && candidates+=("$SNAPSHOT")
+  # `find`, not a glob: this file is run under zsh as well as bash (the test suite's
+  # interpreter pass), and zsh's nomatch aborts the whole function on an unmatched
+  # pattern — the same defect task.124 Phase 2 removes from the HALT snippets.
+  while IFS= read -r c; do
+    [ -n "$c" ] && candidates+=("$c")
+  done < <(find "$(dirname "$LOCK")" -maxdepth 1 -name "$(basename "$LOCK").pausing.*" -type f 2>/dev/null)
+  if [ ${#candidates[@]} -eq 0 ]; then
+    echo "advance-pipeline-lock: no lock at '$LOCK', no halt snapshot at '$SNAPSHOT' and no orphaned claim at '$LOCK.pausing.*' — nothing to restore" >&2
+    exit 1
+  fi
+  for c in "${candidates[@]}"; do
+    jq -e 'type == "object"' "$c" >/dev/null 2>&1 || { echo "advance-pipeline-lock: '$c' is not a JSON object — skipped" >&2; continue; }
+    c_dir=$(jq -r '.task_or_story_directory // ""' "$c")
+    if [ -n "$c_dir" ] && [ "$(canon "$c_dir")" != "$want" ]; then
+      echo "advance-pipeline-lock: '$c' is for '$c_dir', not '$doc_dir' — refusing to restore from it" >&2
+      continue
+    fi
+    mine+=("$c")
+    m=$(mtime_of "$c")
+    if [ "$m" -gt "$newest" ]; then chosen="$c"; newest="$m"; fi
+  done
+  if [ -z "$chosen" ]; then
+    echo "advance-pipeline-lock: no halt snapshot or orphaned claim is for '$doc_dir' — nothing restored" >&2
+    exit 1
+  fi
+  mkdir -p "$(dirname "$LOCK")"
+  tmp=$(mktemp "$(dirname "$LOCK")/.advance-pipeline-lock.XXXXXX") || {
+    echo "advance-pipeline-lock: could not create temp file beside '$LOCK'" >&2
+    exit 1
+  }
+  # current_step = halt_step when the snapshot carries one (a HALT records the step it
+  # halted IN, which is the step still to run), else the candidate's own current_step.
+  # `tonumber?`: a HALT snippet that wrote halt_step through `--arg` stored a string, and
+  # every reader of current_step compares it numerically.
+  # `waiting_on` is dropped too: a rebuilt lock is not waiting on anything THIS session
+  # dispatched, and a `--clear` issued in the no-lock window was a no-op — a wait carried
+  # over from the snapshot would keep the Stop hook allowing every stop, a real stall
+  # included, until its recorded budget elapsed (task.124 QA cycle 2, CR-3).
+  if ! jq '(.current_step = ((.halt_step // .current_step) | (tonumber? // .)))
+           | del(.halted_at, .halt_reason, .halt_step, .paused_at, .pause_reason, .waiting_on)' "$chosen" > "$tmp"; then
+    rm -f "$tmp"
+    echo "advance-pipeline-lock: could not rebuild the lock from '$chosen'" >&2
+    exit 1
+  fi
+  mv "$tmp" "$LOCK"
+  # Consume EVERY candidate for this document, not only the winner: a losing same-document
+  # snapshot left behind is the stale-snapshot-after-merge leftover this mode exists to end
+  # (task.124 QA cycle 1, CR-8). Candidates for other documents were never in `mine`.
+  local losers=()
+  for c in "${mine[@]}"; do
+    [ "$c" = "$chosen" ] && continue
+    rm -f "$c" && losers+=("$c")
+  done
+  rm -f "$chosen"
+  step=$(jq -r '.current_step // "?"' "$LOCK")
+  if [ ${#losers[@]} -gt 0 ]; then
+    echo "advance-pipeline-lock: lock restored from $chosen at step $step (also removed ${#losers[@]} older candidate(s) for this document: ${losers[*]})"
+  else
+    echo "advance-pipeline-lock: lock restored from $chosen at step $step"
+  fi
+  exit 0
+}
 
 # Fail closed on an empty or whitespace-only lock, at every site that reads or
 # writes the lock JSON.
@@ -123,6 +279,10 @@ case "$1" in
     rm -f "$LOCK"
     echo "advance-pipeline-lock: pipeline complete, lock removed"
     exit 0
+    ;;
+  --restore)
+    [ $# -ge 2 ] || usage
+    restore_lock "$2"
     ;;
   --skill)
     [ $# -ge 2 ] || usage

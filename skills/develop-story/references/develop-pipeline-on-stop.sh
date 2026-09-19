@@ -29,6 +29,13 @@
 #   • `current_step < 1` (lock malformed)
 #   • `stop_hook_active: true` in input (Claude Code's anti-loop signal)
 #   • jq is missing (degraded mode)
+#   • `waiting_on` is set and its budget has not elapsed (task.124, Phase 2): the
+#     step is WAITING on a background agent or task it dispatched, not stalled.
+#     `set-waiting-on.sh` is the field's one writer; this hook reads
+#     `since + budget_minutes` with jq's own clock and never opens the config.
+#     A `waiting_on` older than its budget is a step that crashed while waiting,
+#     and the hook re-prompts as it always did — the field protects a wait, not a
+#     stall wearing a wait's label.
 #
 # The orchestrator's terminal-HALT protocol removes the lock file before
 # stopping, so legitimate halts pass this hook naturally.
@@ -84,6 +91,26 @@ if [ "$CURRENT_STEP" -gt 8 ] 2>/dev/null; then
   emit_allow
 fi
 if [ "$CURRENT_STEP" -lt 1 ] 2>/dev/null; then
+  emit_allow
+fi
+
+# A step legitimately waiting on something it dispatched is not a stall. The
+# whole check is one jq predicate so the arithmetic has no shell-date portability
+# surface (macOS `date -j` vs GNU `date -d`): `fromdateiso8601` parses the `since`
+# the writer stored, `now` is jq's clock. An unparseable `since` or a non-numeric
+# budget makes the predicate false, which falls through to the re-prompt — the
+# loud, recoverable side.
+WAITING=$(jq -r '
+  .waiting_on as $w
+  | if ($w | type) == "object"
+       and (($w.since | type) == "string")
+       and (($w.budget_minutes | type) == "number")
+       and ((($w.since | try fromdateiso8601 catch null) // null) != null)
+       and ((($w.since | fromdateiso8601) + ($w.budget_minutes * 60)) > now)
+    then "waiting on \($w.label // "?") since \($w.since) (budget \($w.budget_minutes) min)"
+    else "" end' "$LOCK" 2>/dev/null)
+if [ -n "$WAITING" ]; then
+  echo "on-stop: $WAITING — allowing the stop; clear with set-waiting-on.sh --clear once the result is read" >&2
   emit_allow
 fi
 

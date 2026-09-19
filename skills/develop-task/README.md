@@ -425,7 +425,7 @@ Every Explore subagent dispatched by `develop-task`. Each row is meant to anchor
 
 - `test-failure-triage`: **bias rule** — when unsure between `real` and `flaky`, classify as `real`. Eval target: failure-classification regression suite.
 - `lite-mode detector`: all three conditions must be true; any `false` ⇒ `pipeline_mode=standard`.
-- `resume detector`: summary-exempt steps `[1, 2, 4, 8]` are never treated as gaps. Eval target: gap-detection unit tests.
+- `resume detector`: a step summary is expected only where the implementation report's `Subagent summary ref` column names one — a `—` cell expects nothing, so a step that ran its subagent work inline is never a gap (task 124; the fixed exemption list `[1, 2, 4, 8]` it replaces fired on every healthy resume). Eval target: `evals/develop-task/step-isolation/15-resume-healthy-no-step-3-summary`.
 - All Explore subagents: **read-only** — no writes, no git mutations beyond `git branch --list` / `git log`.
 
 ---

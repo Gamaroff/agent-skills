@@ -43,6 +43,11 @@
 #      PATCHes it in place instead of posting a second one.
 #  15. (task.120 CR-1 / bug.2) a kill between the claim and the snapshot leaves the
 #      full state in the orphaned claim file — what the resume detector's fallback reads.
+#  16. (task.124, obs #115) the appended report is read back through report-lint.js
+#      before the commit — lint call site (3): a well-formed report is committed; a
+#      corrupt one is appended to but NOT committed, the signal says so, and the pause
+#      itself (snapshot, lock removal) still completes. The signal also names
+#      `advance-pipeline-lock.sh --restore <doc-dir>` for an in-session continuation.
 
 PASS=0
 FAIL=0
@@ -526,6 +531,47 @@ elif [ "$(jq -r '.current_step' "$CLAIMS15")" != "6" ] || [ "$(jq -r '.tracker_i
   fail "kill in window: the orphaned claim carries the lock's full state" "$(cat "$CLAIMS15")"
 else
   pass "kill in window (claim → snapshot): lock and snapshot both absent, the orphaned claim carries the full state (current_step=6) for the resume detector's fallback"
+fi
+
+# ── Scenario 16: report-lint gates the pause commit (task.124) ───────────────
+# Real git this time (the shim is removed for the scenario), so "committed" means a
+# commit object exists. `git push` fails harmlessly (no remote) — it is best-effort.
+rm -f "$SHIM_BIN/git"
+run_precompact_in_repo() { # $1 = dir, $2 = report body file
+  local dir="$1"
+  mkdir -p "$dir/.claude/state" "$dir/stdin" "$dir/docs/tasks/task.42.x"
+  ( cd "$dir" && git init -q && git config user.email t@t && git config user.name t && git config commit.gpgsign false ) >/dev/null 2>&1
+  cp "$2" "$dir/report.md"
+  ( cd "$dir" && git add report.md && git commit -qm init ) >/dev/null 2>&1
+  printf '{"skill":"develop-task","current_step":5,"branch":"feature/x","report_path":"report.md","task_or_story_directory":"docs/tasks/task.42.x","pr_url":"","tracker":"","tracker_issue":""}\n' \
+    > "$dir/.claude/state/develop-pipeline.lock"
+  (cd "$dir" && PATH="$SHIM_BIN:$PATH" GH_LOG="$dir/gh.log" GH_STDIN_DIR="$dir/stdin" \
+     PIPELINE_LOCK="$dir/.claude/state/develop-pipeline.lock" \
+     "$BASH_BIN" "$HOOK" 2>"$dir/stderr.log")
+}
+GREEN_REPORT="$(cd "$(dirname "$0")" && pwd)/tests/fixtures/report-lint/green/task.123.md"
+CORRUPT_REPORT="$(cd "$(dirname "$0")" && pwd)/tests/fixtures/report-lint/corrupt-task117.md"
+S16A="$TMPDIR_TEST/s16a"
+OUT=$(run_precompact_in_repo "$S16A" "$GREEN_REPORT")
+if [ "$(cd "$S16A" && git rev-list --count HEAD)" = "2" ] && grep -q '^## Pipeline Paused' "$S16A/report.md" \
+   && echo "$OUT" | grep -q 'committed, and pushed' && ! echo "$OUT" | grep -q 'NOT committed'; then
+  pass "lint ok: pause entry appended AND committed; signal says committed"
+else
+  fail "lint ok → committed" "commits=$(cd "$S16A" && git rev-list --count HEAD) stderr=$(cat "$S16A/stderr.log" | head -3) out=$(echo "$OUT" | grep -o 'Implementation report appended[^\\]*' | head -1)"
+fi
+if echo "$OUT" | grep -q 'advance-pipeline-lock.sh --restore docs/tasks/task.42.x'; then
+  pass "signal names --restore <doc-dir> for an in-session continuation (task.124 Phase 4)"
+else
+  fail "signal names --restore" "$(echo "$OUT" | grep -o 'restore[^\\]*' | head -2)"
+fi
+S16B="$TMPDIR_TEST/s16b"
+OUT=$(run_precompact_in_repo "$S16B" "$CORRUPT_REPORT")
+if [ "$(cd "$S16B" && git rev-list --count HEAD)" = "1" ] && grep -q '^## Pipeline Paused' "$S16B/report.md" \
+   && echo "$OUT" | grep -q 'NOT committed' && grep -q 'report failed lint' "$S16B/stderr.log" \
+   && [ -f "$S16B/.claude/state/develop-pipeline.last-halt.json" ] && [ ! -f "$S16B/.claude/state/develop-pipeline.lock" ]; then
+  pass "lint fails: pause entry appended but NOT committed; signal and stderr say so; snapshot written, lock removed"
+else
+  fail "lint fails → not committed" "commits=$(cd "$S16B" && git rev-list --count HEAD) stderr=$(head -2 "$S16B/stderr.log") signal=$(echo "$OUT" | grep -o 'Implementation report appended[^\\]*' | head -1)"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

@@ -7,7 +7,11 @@
 # left to prose:
 #   1. the budget is relative to the highest gate on disk, never 5 + k
 #   2. the lock is restored from the halt snapshot when the HALT removed it,
-#      minus the halt-only fields
+#      minus the halt-only fields — through `advance-pipeline-lock.sh --restore`
+#      since task.124, which also CONSUMES the snapshot; the restore matrix itself
+#      (candidate choice, other-document refusal, orphaned claims) is pinned in
+#      advance-pipeline-lock.test.sh, and the cases here prove the grant still
+#      lands on a lock that path restored
 #   3. the write is atomic and leaves no temp file, on success or failure
 # and the refusals: bad k, no gates, no lock and no snapshot, non-object lock.
 
@@ -69,8 +73,9 @@ elif ! echo "$ERR" | grep -q "lock restored from"; then
 else
   pass "no lock → restored from snapshot (halt fields dropped, pipeline fields kept, qa_phase 5b → 5a), grant written: 6 + 2 = 8"
 fi
-# The snapshot itself is untouched.
-[ "$(jq -r '.halt_reason' "$S")" = "loop-limit" ] && pass "snapshot untouched by the restore" || fail "snapshot untouched" "$(cat "$S")"
+# The snapshot is consumed by the restore (task.124): a snapshot that outlives its run is
+# offered as a resume for merged work on the next invocation (obs #88).
+[ ! -f "$S" ] && pass "snapshot consumed by the restore (task.124)" || fail "snapshot consumed" "still present: $(cat "$S")"
 
 # A PreCompact snapshot's pause fields are dropped too.
 D="$T/restore-pause"; L="$D/lock.json"; S="$D/snap.json"; mkdir -p "$D"; mkdoc "$D/doc" 5
