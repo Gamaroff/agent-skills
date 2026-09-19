@@ -6,8 +6,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
-- **The QA loop gains two exits, a lock position that can go backwards, and a re-entry rule
-  (task 123).** Four loop shapes the step-5-6 doc had no route for, each observed burning cycles on
+- **The QA loop gains two exits, a lock sub-position that expresses its 5b → 5a re-entry without
+  moving `current_step` backwards, and a re-entry rule (task 123).** Four loop shapes the step-5-6 doc had no route for, each observed burning cycles on
   a real task, now have one. `classifyLoopRoute()` in `qa-diminishing-returns.js` is the loop's
   route classifier — the Diminishing-returns exit is one arm of it — and returns
   `diminishing-returns | cosmetic-residue | gate-the-last-fix | continue` from a 19-row fixture table

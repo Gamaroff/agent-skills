@@ -319,8 +319,14 @@ function readTopIssues(gateContent) {
   return entries;
 }
 
+// `id` is anchored to the KEY POSITION — the start of the text readKeysInto is
+// given (a dash line's remainder, or a key line) or an inline-map separator —
+// while the four enumeration keys keep the looser `[{,\s]` prefix they always
+// had. With the loose prefix, a scalar that mentions " id: 42" on the dash line
+// BEFORE the real `id:` key was captured under the first-wins rule and carried
+// into recommendations.future by route 2b (task.123 QA cycle 1, CR-7).
 const KEY_RE =
-  /(?:^|[{,\s])(id|severity|file|category|status)[ \t]*:[ \t]*([^,}]*)/g;
+  /(?:(?:^|[{,])[ \t]*(id)|(?:^|[{,\s])(severity|file|category|status))[ \t]*:[ \t]*([^,}]*)/g;
 
 // Three of the four keys are ENUMERATIONS, where case carries no information and
 // folding makes the comparison robust. The fourth, `file:`, is a FILESYSTEM
@@ -347,12 +353,12 @@ function readKeysInto(entry, text) {
   KEY_RE.lastIndex = 0;
   let m;
   while ((m = KEY_RE.exec(text)) !== null) {
-    const key = m[1];
+    const key = m[1] || m[2];
     // FIRST wins, as in review-report-freshness.js: a later stray occurrence
     // should not override the real field, and "later" is the half an author is
     // least likely to be looking at.
     if (entry[key] !== null) continue;
-    const v = scalarValue(m[2]);
+    const v = scalarValue(m[3]);
     if (v === "") {
       entry[key] = null;
       continue;

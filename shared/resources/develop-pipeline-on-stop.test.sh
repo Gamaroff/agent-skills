@@ -168,8 +168,8 @@ while IFS='|' read -r skill phase must_contain must_not_contain label; do
     fail "$label" "did not name '$must_contain'. Got: $(echo "$R" | head -1)"
   elif echo "$R" | grep -q -- "invoke $must_not_contain"; then
     fail "$label" "named '$must_not_contain' — a sub-step the loop is not at"
-  elif ! echo "$R" | grep -q "advance the lock to 7"; then
-    fail "$label" "end-of-loop advance must be 5 → 7, got: $(echo "$R" | grep -o 'advance the lock to [0-9]*')"
+  elif echo "$R" | grep -q "advance the lock to 6"; then
+    fail "$label" "the loop must never be told to advance to 6"
   elif ! echo "$R" | grep -q "STEP 5/8"; then
     fail "$label" "banner must still say STEP 5/8 inside the loop"
   else
@@ -185,6 +185,42 @@ develop-story|5b|/qa-fix|/qa-story|qa_phase 5b (story) → /qa-fix, not /qa-stor
 develop-story|5c|/review-pr|/qa-story|qa_phase 5c (story) → /review-pr, not /qa-story
 develop-story||/qa-story|/qa-fix|qa_phase absent (story) → /qa-story (loud default), not /qa-fix
 EOF2
+
+# CR-3 (task.123 QA cycle 1): the completion sentence must not tell a 5a or 5b stall to
+# leave the loop. Only 5c's sentence may say "advance the lock to 7", and it must
+# condition it on APPROVE or CONCERNS; 5a and 5b must say the lock stays at 5 and
+# must NOT say "mark Step 5 ✅".
+for phase in 5a 5b; do
+  d="$TMPDIR_TEST/qaphase-completion-$phase"
+  mklock "$d" "{\"skill\":\"develop-task\",\"current_step\":5,\"qa_phase\":\"$phase\",\"report_path\":\"r.md\"}"
+  R=$(reason_of "$(run_hook "$d")")
+  if echo "$R" | grep -q "advance the lock to 7"; then
+    fail "qa_phase $phase never says 'advance the lock to 7'" "an unconditional exit instruction on a mid-loop stall"
+  elif echo "$R" | grep -q "mark Step 5 ✅ in"; then
+    fail "qa_phase $phase never says 'mark Step 5 ✅'" "the loop is not complete at $phase"
+  elif ! echo "$R" | grep -q "lock stays at 5"; then
+    fail "qa_phase $phase says the lock stays at 5" "got: $(echo "$R" | grep -i 'only once' | head -1)"
+  elif ! echo "$R" | grep -q "set-qa-phase.sh"; then
+    fail "qa_phase $phase names the qa_phase writer" "got: $(echo "$R" | grep -i 'only once' | head -1)"
+  else
+    pass "qa_phase $phase completion sentence keeps the run inside the loop (no advance, no ✅, writer named)"
+  fi
+done
+d="$TMPDIR_TEST/qaphase-completion-5c"
+mklock "$d" '{"skill":"develop-story","current_step":5,"qa_phase":"5c","report_path":"r.md"}'
+R=$(reason_of "$(run_hook "$d")")
+if echo "$R" | grep -q "on APPROVE or CONCERNS mark Step 5 ✅ in \`r.md\` and advance the lock to 7" && echo "$R" | grep -q "on REQUEST CHANGES write"; then
+  pass "qa_phase 5c completion sentence conditions the 5 → 7 advance on APPROVE/CONCERNS and routes REQUEST CHANGES to 5b"
+else
+  fail "qa_phase 5c completion sentence" "got: $(echo "$R" | grep -i 'only once' | head -1)"
+fi
+# Outside the loop the generic sentence is unchanged.
+d="$TMPDIR_TEST/generic-completion"
+mklock "$d" '{"skill":"develop-task","current_step":3,"report_path":"r.md"}'
+R=$(reason_of "$(run_hook "$d")")
+echo "$R" | grep -q "Only once /develop has actually completed: mark Step 3 ✅ in \`r.md\` and advance the lock to 4" \
+  && pass "step 3 keeps the generic completion sentence (mark ✅, advance to 4)" \
+  || fail "step 3 generic completion sentence" "got: $(echo "$R" | grep -i 'only once' | head -1)"
 
 # The hook must never name /finalise from inside the loop, whatever qa_phase says —
 # scenario 4's property, re-pinned on the new field. And develop-bug's map is untouched:

@@ -127,8 +127,9 @@ A `gate.yml` written manually (without running the QA skill) does NOT satisfy St
 > | `APPROVE` or `CONCERNS` | 5c cleared — Step 5–6 is complete, go to Step 7 |
 > | `REQUEST CHANGES` | 5c ran and routed back — set the counter to `N`, re-enter at **5b** |
 > | `review failed` | 5c could not run (usually the PR state). Set the counter to `N` and re-enter at **5c** — **once**. Its usual cause is not self-healing, so an unattended driver would otherwise re-run `/review-pr`, HALT, and repeat forever. On a **second consecutive** `review failed` for the same cycle `N`, do not re-enter: escalate to Loop Escalation with the review's own error text. |
-> | `pending — 5c not yet run` | 5a wrote its placeholder on a gate that routed to 5c and the run died before 5c overwrote it. **Same action as `not reached`**: if the entry's `**Action**` row reads `Proceeding to 5c` (gate `{N}` reached 5c by any of §5c's three routes), re-enter at **5c**; otherwise at **5a**. This is the narrowest window in the loop — it opens when 5a writes the `### QA Cycle {N}` entry and closes when 5c records its verdict — and it is the value the artifact tables above will actually be reading on a run killed inside it |
-> | `not reached`, blank, or no row | The gate did not exit the loop, or the run died before 5c. If the entry's `**Action**` row reads `Proceeding to 5c` (same signal as the row above), re-enter at **5c**; otherwise at **5a** |
+> | `pending — 5c not yet run` | 5a wrote its placeholder on a gate that routed to 5c and the run died before 5c overwrote it. **Same action as `not reached`**: if the entry's `**Action**` row reads `Proceeding to 5c` (gate `{N}` reached 5c by any of §5c's five routes), re-enter at **5c**; otherwise at **5a**. This is the narrowest window in the loop — it opens when 5a writes the `### QA Cycle {N}` entry and closes when 5c records its verdict — and it is the value the artifact tables above will actually be reading on a run killed inside it |
+> | `not reached`, blank, or no row (an `**Action**` of `Running qa-fix` or `Proceeding to 5c`) | The gate did not exit the loop, or the run died before 5c. If the entry's `**Action**` row reads `Proceeding to 5c` (same signal as the row above), re-enter at **5c**; otherwise at **5a** |
+> | an `**Action**` of `Escalating — loop not converging` or `Escalating — loop limit reached` (whatever the PR Review row says) | The run **left the loop through Loop Escalation**; there is no cycle to re-enter. Do not re-enter at 5a. Apply **Re-entry after a QA loop escalation** (below): reconstruct from disk, back-fill, and offer the grant — or, if the halt snapshot's `halt_reason` is neither `loop-limit` nor `not-converging`, surface the mismatch to the user rather than resuming |
 >
 > **Why this reads the report rather than the filesystem.** An earlier version of this check compared
 > `gate.{N}` against `pr-review.{n}` on disk. That was wrong twice over — the two indices count
@@ -160,6 +161,7 @@ Examples:
 - `gate.2` highest, 2 entries → `NEXT_CYCLE=3` (cycles 1 + 2 complete, attempting 3 next)
 - `gate.5` highest, 5 entries → `NEXT_CYCLE=6` → exceeds `QA_MAX_CYCLES` → the **Re-entry** rule below decides between the grant and **Loop Escalation**
 - `gate.6` highest, 5 entries → `CYCLES_OUTSIDE_LOOP=1`: the operator ran a cycle by hand between halt and re-invocation — back-fill it (below), then `NEXT_CYCLE=7`
+- `gate.3` highest, 5 entries → `CYCLES_OUTSIDE_LOOP=-2`: the report claims two cycles that have **no gate on disk** (a gate never committed, or deleted). The cross-check has failed in the other direction — the report is the only record of those cycles. Do not back-fill and do not delete the entries: log `"⚠️ 2 QA Cycle entries have no gate on disk — resuming from the report's count"` in the Issues Log and set `NEXT_CYCLE = COMPLETED + 1`, the pre-task.123 rule, so a cycle is never re-run against a gate that no longer exists
 
 This convention ensures the cycle budget is respected across resumes.
 
@@ -188,18 +190,32 @@ This convention ensures the cycle budget is respected across resumes.
    Phase 0b's prompt — which lives in `skills/develop-task/SKILL.md` and `skills/develop-story/SKILL.md`,
    not here — is the halt message's own three options plus **"Resume at 5a with {k} more cycles"**.
    On accept, write the grant into the **lock** (the orchestrator recreates the lock from the
-   snapshot at Step 1 of the resume; this is one more field on it):
+   snapshot at Step 1 of the resume) as **two** fields — the grant, and the absolute budget it
+   produces:
 
    ```bash
-   jq --argjson k "{k}" '.extra_cycles_granted = $k' .claude/state/develop-pipeline.lock > "$TMP" && mv "$TMP" .claude/state/develop-pipeline.lock
+   # QA_CYCLE is the count reconstructed from disk in step 1 — NOT the original budget of 5.
+   TMP=$(mktemp .claude/state/.grant.XXXXXX) && jq --argjson k "{k}" --argjson c "$QA_CYCLE" \
+     '.extra_cycles_granted = $k | .qa_max_cycles = ($c + $k)' \
+     .claude/state/develop-pipeline.lock > "$TMP" && mv "$TMP" .claude/state/develop-pipeline.lock
    ```
 
-   and set **`QA_MAX_CYCLES = 5 + extra_cycles_granted`** for this run. The field is
-   `extra_cycles_granted` in the lock, the halt snapshot (a superset of the lock), the step-5-6 doc
-   and both SKILL.md — one name, and `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails
-   when any of the four disagrees. **Do not reuse `MAX_ITER`**: that is the Step 3 develop-loop
-   bound (below), a different budget over a different loop.
-4. **Re-enter at 5a as cycle `NEXT_CYCLE`** with `set_qa_phase 5a`. A resume with
+   The loop then runs with **`QA_MAX_CYCLES` = the lock's `qa_max_cycles`** (absent → 5). The
+   budget is **relative to the reconstructed count, not to 5**: a grant of `k` must deliver `k`
+   cycles from the point of re-entry, and every gate written since the original budget — a route-2c
+   half-cycle's `gate.6`, an operator's standalone cycle, a previous grant's cycles — has already
+   consumed cycle numbers that `5 + k` would count against the grant. On a halt at 5 with an
+   operator cycle 6 on disk, `k = 2` gives `qa_max_cycles = 8` and cycles 7–8 run; `5 + 2 = 7`
+   would have delivered one. It is written to the lock as an **absolute** number, rather than
+   recomputed from disk on every read, so a compaction pause and resume inside the granted run
+   does not creep the budget upward by re-adding `k` to a larger count. The names are
+   `extra_cycles_granted` and `qa_max_cycles` in the lock, the halt snapshot (a superset of the
+   lock), the step-5-6 doc and both SKILL.md — one spelling each, and
+   `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails when any file disagrees. **Do not
+   reuse `MAX_ITER`**: that is the Step 3 develop-loop bound (below), a different budget over a
+   different loop.
+4. **Re-enter at 5a as cycle `NEXT_CYCLE`** with
+   `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a`. A resume with
    `NEXT_CYCLE > QA_MAX_CYCLES` and no grant goes straight to **Loop Escalation** as before.
 
 The lock's `qa_phase` (`5a|5b|5c`, written by the loop as it moves) corroborates the 5c sub-state
@@ -228,7 +244,7 @@ If the branch or PR no longer matches, warn the user before proceeding: "Pipelin
 ## Develop Loop — Stall Semantics and MAX_ITER Bound
 
 > `MAX_ITER` bounds the **Step 3 develop loop** and nothing else. The QA loop's budget is
-> `QA_MAX_CYCLES` (step-5-6 doc, Loop Setup; extended by `extra_cycles_granted` above).
+> `QA_MAX_CYCLES` (step-5-6 doc, Loop Setup; the lock's `qa_max_cycles`, set by the grant above).
 
 Before iteration 1: dispatch an Explore subagent (read-only) to capture initial loop state, using the **shared loop-audit prompt** (`references/loop-audit-prompt.md`).
 

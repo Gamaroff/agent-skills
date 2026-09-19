@@ -10,7 +10,7 @@
 
 ## Decisions Log
 
-- QA loop re-entry: 2 extra cycles granted; 1 cycle(s) run outside the loop back-filled from disk. QA_MAX_CYCLES = 7.
+- QA loop re-entry: 2 extra cycles granted; 1 cycle(s) run outside the loop back-filled from disk. qa_max_cycles = 8 (QA_CYCLE 6 at resume + 2).
 
 ## Issues Log
 
@@ -73,7 +73,7 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 **MEDIUM findings**: 1
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
-**Action**: Running qa-fix (cycle 6 of 7)
+**Action**: Running qa-fix (cycle 6 of 8)
 
 ### QA Cycle 7 — 2026-09-18
 **Gate Result**: CONCERNS
@@ -82,7 +82,7 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 **MEDIUM findings**: 1
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
-**Action**: Running qa-fix (cycle 7 of 7)
+**Action**: Running qa-fix (cycle 7 of 8)
 
 ### QA Cycle 8 — 2026-09-18
 **Gate Result**: PASS

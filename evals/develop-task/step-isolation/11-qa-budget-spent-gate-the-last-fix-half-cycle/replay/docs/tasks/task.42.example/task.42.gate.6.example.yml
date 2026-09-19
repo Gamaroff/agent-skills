@@ -1,5 +1,4 @@
 schema: 1
-half-cycle: gate-the-last-fix
 gate: PASS
 status_reason: "Half-cycle gate on cycle 5's fix — clean. Route 2c hands to 5c."
 reviewer: "QA Engineer"

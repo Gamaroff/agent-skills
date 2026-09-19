@@ -10,5 +10,6 @@
   "current_step": 5,
   "qa_phase": "5c",
   "extra_cycles_granted": 2,
-  "started_at": "2026-09-18T12:00:00Z"
+  "started_at": "2026-09-18T12:00:00Z",
+  "qa_max_cycles": 8
 }

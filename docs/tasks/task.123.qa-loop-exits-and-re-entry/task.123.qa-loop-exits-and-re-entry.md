@@ -131,7 +131,8 @@ resume contract            Re-entry after a QA loop escalation:
                            each missing entry back-filled, marked `run outside the loop (operator)`
                            Phase 0b on halt_reason ∈ {loop-limit, not-converging} → the halt's own three options
                            + "Resume at 5a with {k} more cycles"; k written to the LOCK as extra_cycles_granted;
-                           QA_MAX_CYCLES = 5 + extra_cycles_granted for this run (not MAX_ITER — that is Step 3's bound)
+                           qa_max_cycles = QA_CYCLE at resume + k written beside it (QA cycle 1, CR-1: never 5 + k);
+                           the loop reads QA_MAX_CYCLES from the lock (not MAX_ITER — that is Step 3's bound)
 ```
 
 ### Important Clarifications
@@ -264,8 +265,10 @@ the develop-task / develop-story HALT messages in the step-5-6 doc
       loop (operator)`). The report count becomes the cross-check, not the source.
 - [x] Phase 0b (both SKILL.md): when `halt_reason` ∈ {loop-limit, not-converging}, present the halt
       message's own three options plus "Resume at 5a with {k} more cycles"; on accept, write
-      `extra_cycles_granted: k` into the **lock**; `QA_MAX_CYCLES = 5 + extra_cycles_granted` for this
-      run. Do not reuse `MAX_ITER` — that is the Step 3 develop-loop bound.
+      `extra_cycles_granted: k` and `qa_max_cycles: QA_CYCLE + k` into the **lock**; the loop reads
+      `QA_MAX_CYCLES` from the lock (absent → 5). *(QA cycle 1, CR-1: the original `5 + k` counted every
+      gate written since the budget against the grant.)* Do not reuse `MAX_ITER` — that is the Step 3
+      develop-loop bound.
 - [x] The HALT messages name the re-entry option ("re-run /develop-task to resume with more cycles").
 - [x] Detector prompt reads `extra_cycles_granted` from the lock/snapshot and reports it in `deltas_since_pause`.
 - [x] Contract test: the resume contract, the step doc and both SKILL.md agree on the field name.
@@ -288,7 +291,7 @@ the develop-task / develop-story HALT messages in the step-5-6 doc
 
 ### Files to Modify (Tests)
 
-8. ✅ `shared/resources/tests/qa-loop-route.test.mjs` (new — the engine's suite lives under `tests/`, not beside it) + 6 gate fixtures under `tests/fixtures/qa-diminishing-returns/` — route fixture table
+8. ✅ `shared/resources/tests/qa-loop-route.test.mjs` (new — the engine's suite lives under `tests/`, not beside it) + 6 gate fixtures under `tests/fixtures/qa-diminishing-returns/` — route fixture table; `shared/resources/set-qa-phase.sh` + `set-qa-phase.test.sh` (new, QA cycle 1 CR-2)
 9. ✅ `shared/resources/advance-pipeline-lock.test.sh` — monotonic pin; `qa_phase` is a valid lock field
 10. ✅ `evals/develop-task/step-isolation/`, `evals/develop-story/step-isolation/` — three new replay fixtures each
 11. ✅ `evals/shared/tests/pr-review-loop-parity.test.mjs` — accepting-route set now includes 2b/2c; `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` (new) — `qa_phase` / `extra_cycles_granted` spelled once across eight files
@@ -351,7 +354,7 @@ Not applicable.
 - [x] The accepting-route set is still stated once (§5c) — consumers point, do not restate.
 
 ### Migration
-- [ ] Observations #72, #77, #95, #100, #112 close naming the PR.
+- [x] Observations #72, #77, #95, #100, #112 close naming the PR. *(actioned 2026-09-19 — PR #435)*
 
 ## 10. Risk Assessment
 
@@ -406,8 +409,10 @@ loop-limit halt reconstructs the cycle count from the gates on disk, back-fills 
 - **Phase 1 (option B).** `develop-pipeline-on-stop.sh` gains a `case 5)` that reads `qa_phase`
   (`5b → /qa-fix`, `5c → /review-pr`, else `/qa-task|/qa-story` — the loud default) and asks for the
   end-of-loop advance as `5 → 7`; `case 6)` stays for a pre-task.123 lock; develop-bug's map is
-  untouched. The step-5-6 doc's new **Lock position for the loop** subsection defines `set_qa_phase`
-  (mktemp + mv, never `current_step`) and each of 5a/5b/5c calls it first. `advance-pipeline-lock.sh`
+  untouched. The step-5-6 doc's new **Lock position for the loop** subsection names the writer —
+  `shared/resources/set-qa-phase.sh`, a script since QA cycle 1 (CR-2: a function defined in one
+  fenced block is unreachable from the next), mktemp + mv, never `current_step` — and each of
+  5a/5b/5c invokes it first. `advance-pipeline-lock.sh`
   is unchanged — the test suite now pins that `6 → 5` is still refused and that `qa_phase` survives
   noop, advance and `--skill` paths.
 - **Phase 2 (routes).** `readTopIssues` now carries `id`; `readGateToken` and `countRaised`
@@ -450,13 +455,62 @@ loop-limit halt reconstructs the cycle count from the gates on disk, back-fills 
   | Stop hook ignores `qa_phase` | on-stop.test.sh | 4 |
   | Stop hook advances 5 → 6 instead of 5 → 7 | on-stop.test.sh | 8 |
 
+### QA Fix Cycle 1 — 2026-09-19
+
+Gate 1 FAIL (50): five `top_issues[]` entries, all fixed; four advisory findings and the negative-count
+note also taken.
+
+- **CR-1 (HIGH)** — the budget is an absolute `qa_max_cycles` on the lock, written by the grant as
+  `QA_CYCLE at resume + k`; Loop Setup reads it (absent → 5). Resume contract, both SKILL.md Phase 0b
+  blocks, detector prompt, hooks doc updated; the parity test forbids `5 + extra_cycles_granted`
+  and pins the two-field write; fixture 12 (both sides) is legal under the rule (budget 8, cycles 7–8).
+- **CR-2 (MEDIUM)** — `shared/resources/set-qa-phase.sh` + `set-qa-phase.test.sh` (19, in `npm test`);
+  every call site invokes the bundled script from the repository root; the parity test forbids a bare
+  `set_qa_phase` and locates the four call sites by section.
+- **CR-3 (MEDIUM)** — the Stop hook's step-5 completion sentence is per sub-step (`THEN_WHAT`): 5a/5b
+  keep the run in the loop and name the writer; only 5c's conditions the `5 → 7` advance on
+  APPROVE/CONCERNS. Scenario 10 gains four rows (27 total).
+- **CR-4 (MEDIUM)** — seven "three routes" restatements fixed; `pr-review-loop-parity` reads §5c's count
+  and fails any of 15 restaters that disagrees (mutation-proven).
+- **CR-5 (LOW)** — fixture 11 asserts the report's `**Half-cycle**` row and Action; the gate carries no
+  invented key.
+- Advisory: CR-6 (escalation Action values get their own 5c sub-state row → the re-entry rule), CR-7
+  (`id` anchored to the key position; fixture row; mutation-proven), CR-8 (CHANGELOG headline), CR-9
+  (row label); negative `CYCLES_OUTSIDE_LOOP` defined (report entries with no gate → resume from the
+  report's count, warn).
+- Verification: `ci:fast` green (3488 node + 7 bash suites incl. the new one); `eval:all` 34 green;
+  bundle:check / check:generated / lint:shell / format:check exit 0. One unrelated hang
+  (`security-probe.test.mjs` "runProbeSpec validates timeoutMs itself", 60 min under load) re-ran
+  green alone, 22/22 — untouched by this diff.
+
 ### Deferred Work
 
-- Success criterion **Migration** ("Observations #72, #77, #95, #100, #112 close naming the PR") — needs
-  the PR number, so it is done by the orchestrator after Step 4 opens the PR, not here.
+- Success criterion **Migration** — deferred out of `/develop` because it needs the PR number; done by the
+  orchestrator after Step 4: observations #72, #77, #95, #100, #112 set `actioned` naming PR #435 (2026-09-19).
 - Consumer test ("next multi-cycle pipeline run") — a future run, by definition.
 - The banner doc's `cycle {CYCLE}/5` strings keep the literal; Loop Setup states that the `5` reads
   `QA_MAX_CYCLES` on a granted re-entry. Rewriting the banner catalogue was out of scope.
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-19
+**Quality Score**: 50/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.123.qa.1.qa-loop-exits-and-re-entry.md](./task.123.qa.1.qa-loop-exits-and-re-entry.md)
+- **Gate File**: [task.123.gate.1.qa-loop-exits-and-re-entry.yml](./task.123.gate.1.qa-loop-exits-and-re-entry.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3488 node + 6 bash suites + 34 replay scenarios
+- **Phases Verified**: 3/3 (1 PASS, 1 CONCERNS, 1 FAIL)
+- **Critical Issues**: 1 HIGH, 3 MEDIUM (5 entries in `top_issues[]` incl. one high-confidence LOW)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+The engine and hook are green and mutation-proven; the defects are in the contracts: `QA_MAX_CYCLES = 5 + k` under-delivers a grant reconstructed from disk (CR-1, HIGH — fixture 12 contradicts its own rule); `set_qa_phase` is unreachable across fenced blocks (CR-2); the Stop hook's step-5 reason says "advance to 7" unconditionally (CR-3); seven consumers still say "three routes" (CR-4); fixture 11 asserts an invented gate key (CR-5).
 
 ## Change Log
 <!-- change-log-start -->
@@ -468,6 +522,7 @@ loop-limit halt reconstructs the cycle count from the gates on disk, back-fills 
 | 2026-09-18 | 1.1 | Review 1 (6/10 → revised): Problem 4 rewritten around report-vs-disk cycle count (no `qa_cycles_completed` field exists); route 2c relocated to the loop-limit pre-escalation step; lock option B decided; predicates extend `qa-diminishing-returns.js`; Files Summary corrected; story-side fixtures scoped; title shortened | review-task |
 | 2026-09-18 |  | Status → ready-for-development | review-task |
 | 2026-09-19 |  | Implemented — 14 source files modified, 8 new (engine routes, qa_phase hook, re-entry contract, 6 replay fixtures ×2 sides); 3488 node tests + bash suites green; 8 mutants caught | develop |
+| 2026-09-19 |  | QA gate FAIL (50/100) — 1 HIGH, 3 MEDIUM, 5 LOW (cycle 1) | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

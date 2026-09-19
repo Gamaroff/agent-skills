@@ -197,7 +197,7 @@ const ROWS = [
   // ── route 2c — gate the last fix ──
   {
     label:
-      "2c fires: budget spent, last cycle routed to 5b, HIGH 0 throughout, MEDIUM 4,3,2 → 1 (task.117)",
+      "2c fires: budget spent, last cycle routed to 5b, HIGH 0 throughout, MEDIUM 3,2 → 1 (task.117)",
     input: {
       cycle: 5,
       highCounts: [0, 0, 0, 0, 0],
@@ -352,6 +352,34 @@ test("route 2b returns the open LOW ids, in gate order", () => {
     latestGateContent: fixture("pass-low-only.yml"),
   });
   assert.deepEqual(r.lowIds, ["COSM-001", "COSM-002"]);
+});
+
+test("the entry id is read from the key position only — prose that says ' id:' before the real key is not the id (CR-7)", () => {
+  // First-wins would otherwise carry "42 is lost" into recommendations.future.
+  const issues = readTopIssues(
+    'top_issues:\n  - finding: "the user id: 42 is lost"\n    id: "X-1"\n    severity: low\n    status: open\n',
+  );
+  assert.deepEqual(
+    issues.map((e) => e.id),
+    ["X-1"],
+  );
+  // The inline-map form still reads id after "{" and after ",".
+  const inline = readTopIssues(
+    "top_issues:\n  - {severity: high, id: I-1, file: a.ts}\n  - { id: I-2 , severity: low }\n",
+  );
+  assert.deepEqual(
+    inline.map((e) => e.id),
+    ["I-1", "I-2"],
+  );
+  // And an id in a following key line is read as before.
+  const r = classifyLoopRoute({
+    cycle: 2,
+    highCounts: [0, 0],
+    latestGateContent:
+      'gate: PASS\ntop_issues:\n  - finding: "id: not this one"\n    id: "REAL-1"\n    severity: low\n    file: "x.md"\n',
+  });
+  assert.equal(r.route, ROUTES.COSMETIC_RESIDUE);
+  assert.deepEqual(r.lowIds, ["REAL-1"]);
 });
 
 test("readTopIssues now carries the entry id, case-preserved", () => {

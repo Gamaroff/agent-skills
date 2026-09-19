@@ -1,7 +1,7 @@
 {
   "name": "develop-story-step-05-reentry-after-loop-limit-grant",
   "skill": "develop-story",
-  "description": "Phase 0b re-entry after a loop-limit halt (task.123 / obs #95): the halt snapshot records halt_reason loop-limit at 5 cycles; the operator then ran a standalone qa-story that wrote gate.6 and qa.6 but no QA Cycle entry. Re-invocation reconstructs the count from disk (6), back-fills cycle 6 as run outside the loop, offers \"Resume at 5a with {k} more cycles\", writes extra_cycles_granted: 2 to the lock, and resumes at 5a as cycle 7 under QA_MAX_CYCLES 7. Fixture records the resume detector, then qa-story (cycle 7) → qa-fix → qa-story (cycle 8, PASS) → review-pr.",
+  "description": "Phase 0b re-entry after a loop-limit halt (task.123 / obs #95): the halt snapshot records halt_reason loop-limit at 5 cycles; the operator then ran a standalone qa-story that wrote gate.6 and qa.6 but no QA Cycle entry. Re-invocation reconstructs the count from disk (6), back-fills cycle 6 as run outside the loop, offers \"Resume at 5a with {k} more cycles\", writes extra_cycles_granted: 2 and qa_max_cycles: 8 (= QA_CYCLE 6 at resume + 2, never 5 + 2) to the lock, and resumes at 5a as cycle 7 under a budget of 8 — cycles 7 and 8 both run, which is what a grant of 2 means. Fixture records the resume detector, then qa-story (cycle 7) → qa-fix → qa-story (cycle 8, PASS) → review-pr.",
   "prompt": "Re-invoke /develop-story for story.5.1.example after a QA loop-limit halt. A standalone /qa-story was run by hand between the halt and this re-invocation. Accept the recommended grant.",
   "assertions": [
     {
@@ -21,6 +21,20 @@
       "args": [
         "$SANDBOX/.claude/state/develop-pipeline.lock",
         "\"extra_cycles_granted\": 2"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock",
+        "\"qa_max_cycles\": 8"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock",
+        "\"qa_max_cycles\": 7"
       ]
     },
     {
@@ -94,6 +108,20 @@
         "$SANDBOX/.eval/pipeline-events.json",
         "qa-story",
         2
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.implementation.1.example.md",
+        "qa_max_cycles = 8"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.implementation.1.example.md",
+        "QA_MAX_CYCLES = 7"
       ]
     }
   ]

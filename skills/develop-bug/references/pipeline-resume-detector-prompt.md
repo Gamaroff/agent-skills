@@ -97,7 +97,7 @@ Snapshot-specific fields (when the winner is `last-halt.json`):
 
 QA-loop fields (lock or snapshot, both optional — absent on a run that predates task.123):
 - `qa_phase` (`5a|5b|5c`) → the loop's sub-position when the run stopped; report it in `deltas_since_pause` as "lock qa_phase: 5b" when `LOCK_STEP` is 5
-- `extra_cycles_granted` (integer) → a grant recorded by a previous re-entry; report it in `deltas_since_pause` as "extra_cycles_granted: {k} (QA_MAX_CYCLES = 5 + k)" so the operator sees the budget the run will resume under. When `halt_reason` matches `loop-limit|not-converging`, also report the highest `gate.{N}` on disk against the count of `### QA Cycle` entries in the implementation report — a difference is a cycle the operator ran outside the loop, and the resume contract's **Re-entry after a QA loop escalation** back-fills it
+- `extra_cycles_granted` / `qa_max_cycles` (integers) → a grant recorded by a previous re-entry and the absolute budget it set; report both in `deltas_since_pause` as "extra_cycles_granted: {k}; qa_max_cycles: {n}" so the operator sees the budget the run will resume under. When `halt_reason` matches `loop-limit|not-converging`, also report the highest `gate.{N}` on disk against the count of `### QA Cycle` entries in the implementation report — a difference is a cycle the operator ran outside the loop, and the resume contract's **Re-entry after a QA loop escalation** back-fills it
 
 > A snapshot tagged `pause_reason: "precompact"` was left by the PreCompact hook before it removed the lock — surface it to the user as "resume from the compaction pause at step X?" rather than a hard terminal halt.
 

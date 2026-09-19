@@ -181,7 +181,7 @@ Tasks follow the same pattern under `docs/tasks/task.{N}.{name}/`. See [Story do
 - `qa-planning` → `qa-story`: risk profile and test design feed into review assessments.
 - `qa-story` → `qa-gate`: NFR validation, trace data, and issues feed into gate decisions.
 - `qa-planning` → `qa-gate`: risk summary directly influences gate status (≥9 → FAIL, ≥6 → CONCERNS).
-- `qa-story` / `qa-task` → `review-pr`: a gate in the accepting-route set (any of §5c's three routes) hands to Step 5c, which reads the gate and the rest of the artifact trail as the evidence it audits.
+- `qa-story` / `qa-task` → `review-pr`: a gate in the accepting-route set (any of §5c's five routes) hands to Step 5c, which reads the gate and the rest of the artifact trail as the evidence it audits.
 - `review-pr` → `qa-fix`: a `REQUEST CHANGES` verdict re-enters the fix cycle with the review's findings.
 
 ## See also

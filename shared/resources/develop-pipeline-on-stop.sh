@@ -165,13 +165,18 @@ else
     4) NEXT_NAME="CREATE PR";       NEXT_SKILL_STORY="/create-pr";     NEXT_SKILL_TASK="/create-pr" ;;
     5)
       # The loop exits to Step 7 — never to a "step 6" — and only when 5c returns
-      # APPROVE or CONCERNS. So the advance this hook asks for at the end of the
-      # loop is 5 → 7, and the sub-skill it names comes from `qa_phase`.
-      ADVANCE_TO=7
+      # APPROVE or CONCERNS; the sub-skill this arm names comes from `qa_phase`.
+      # THEN_WHAT is the completion sentence for this sub-step. It replaces the
+      # generic "mark Step N ✅ and advance" line, which on a 5a or 5b stall told the
+      # orchestrator to leave the loop after the current sub-skill — skipping 5c, or
+      # 5b and 5c (task.123 QA cycle 1, CR-3). Only 5c's APPROVE/CONCERNS advances.
       case "$QA_PHASE" in
-        5b) NEXT_NAME="QA FIX (qa_phase 5b)";                  NEXT_SKILL_STORY="/qa-fix";    NEXT_SKILL_TASK="/qa-fix" ;;
-        5c) NEXT_NAME="PR CONFORMANCE REVIEW (qa_phase 5c)";   NEXT_SKILL_STORY="/review-pr"; NEXT_SKILL_TASK="/review-pr" ;;
-        *)  NEXT_NAME="QA REVIEW (qa_phase 5a)";               NEXT_SKILL_STORY="/qa-story";  NEXT_SKILL_TASK="/qa-task" ;;
+        5b) NEXT_NAME="QA FIX (qa_phase 5b)";                  NEXT_SKILL_STORY="/qa-fix";    NEXT_SKILL_TASK="/qa-fix"
+            THEN_WHAT="Only once /qa-fix has actually completed: commit and push per 5b, write \`qa_phase\` 5a via \`bash .agents/skills/${SKILL}/references/set-qa-phase.sh 5a\` and return to 5a for the next gate — or, if the counter reads QA_MAX_CYCLES, go to Loop Escalation. Do NOT mark Step 5 ✅ and do NOT advance the lock here; the lock stays at 5 inside the loop." ;;
+        5c) NEXT_NAME="PR CONFORMANCE REVIEW (qa_phase 5c)";   NEXT_SKILL_STORY="/review-pr"; NEXT_SKILL_TASK="/review-pr"
+            THEN_WHAT="Only once /review-pr has actually completed: on APPROVE or CONCERNS mark Step 5 ✅ in \`${REPORT}\` and advance the lock to 7; on REQUEST CHANGES write \`qa_phase\` 5b and re-enter 5b — the lock stays at 5." ;;
+        *)  NEXT_NAME="QA REVIEW (qa_phase 5a)";               NEXT_SKILL_STORY="/qa-story";  NEXT_SKILL_TASK="/qa-task"
+            THEN_WHAT="Only once the QA review has actually completed: read the gate per the Outcome branching, write \`qa_phase\` 5c (a gate that reaches 5c) or 5b (an open finding) via \`bash .agents/skills/${SKILL}/references/set-qa-phase.sh\`, and continue the loop. Do NOT mark Step 5 ✅ and do NOT advance the lock here; the lock stays at 5 inside the loop." ;;
       esac
       ;;
     6) NEXT_NAME="QA FIX (if needed)"; NEXT_SKILL_STORY="/qa-fix";     NEXT_SKILL_TASK="/qa-fix" ;;
@@ -189,9 +194,12 @@ else
   fi
 fi
 
-QA_LOOP_NOTE=""
+# The completion sentence. Inside the story/task QA loop it is the sub-step's own
+# (THEN_WHAT, above); everywhere else it is the generic advance.
 if [ "$NEXT" = "5" ] && [ "$SKILL" != "develop-bug" ]; then
-  QA_LOOP_NOTE=" Inside the QA loop the lock stays at 5: write \`qa_phase\` (5a/5b/5c) as the loop moves, and advance to 7 only when 5c returns APPROVE or CONCERNS."
+  COMPLETION_LINE="$THEN_WHAT"
+else
+  COMPLETION_LINE="Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to ${ADVANCE_TO} (or \`--complete\` if that was Step 8)."
 fi
 
 REASON=$(cat <<EOF
@@ -203,7 +211,7 @@ That call is an idempotent re-assert (the lock already reads ${NEXT}); it exists
 
 Then: emit the Remaining Work Status block (position \`Step $((NEXT - 1))/8 ✅ complete\`, then the steps still ahead through Step 8) → banner \`═══ ${BANNER_PREFIX} PIPELINE: STEP ${NEXT}/8 — ${NEXT_NAME} ═══\` → invoke ${NEXT_SKILL}. Status block and banner are one contiguous output, no prose around them.
 
-Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to ${ADVANCE_TO} (or \`--complete\` if that was Step 8).${QA_LOOP_NOTE}
+${COMPLETION_LINE}
 
 ⚠️ This hook names the step the lock says is PENDING. It cannot tell whether you stalled during that step or just after it, so it always assumes during — repeating a step is recoverable, skipping one is not. **If Step ${NEXT} has genuinely already finished, do NOT skip ahead on the strength of this message**: advance the lock yourself and continue from the real next step.
 

@@ -6,7 +6,7 @@
 //
 //   qa_phase              5a|5b|5c — the QA loop's sub-position while
 //                         current_step stays 5. WRITTEN by the step-5-6 doc
-//                         (set_qa_phase), READ by the Stop hook.
+//                         (set-qa-phase.sh), READ by the Stop hook.
 //   extra_cycles_granted  integer — cycles granted at a re-entry after a
 //                         loop-limit halt. WRITTEN by both develop-* SKILL.md
 //                         (Phase 0b), READ by the step-5-6 doc (QA_MAX_CYCLES),
@@ -41,6 +41,7 @@ const FILES = {
   taskSkill: "skills/develop-task/SKILL.md",
   storySkill: "skills/develop-story/SKILL.md",
   stopHook: "shared/resources/develop-pipeline-on-stop.sh",
+  setQaPhase: "shared/resources/set-qa-phase.sh",
   lockHelper: "shared/resources/advance-pipeline-lock.sh",
   detectorPrompt: "shared/resources/pipeline-resume-detector-prompt.md",
   hooksDoc: "shared/resources/develop-pipeline-hooks.md",
@@ -53,13 +54,19 @@ const text = Object.fromEntries(
 // forbidden everywhere; a file that uses one has stopped talking to the others.
 const MISSPELLINGS = [
   /\bqaPhase\b/,
-  /\bqa-phase\b(?!\.XXXXXX)/, // the mktemp template `.qa-phase.XXXXXX` is a filename, not a field
+  /(?<!set-)\bqa-phase\b(?!\.XXXXXX)/, // `set-qa-phase.sh` is the writer's filename, not a field
   /\bqa_sub_step\b/,
   /\bextraCyclesGranted\b/,
   /\bextra-cycles-granted\b/,
   /\bcycles_granted\b(?<!extra_cycles_granted)/,
   /\bextra_cycles\b(?!_granted)/,
   /\bcycles_outside_loop:/, // a snapshot FIELD — the value is derived, never stored
+  /\bqaMaxCycles\b/,
+  /\bqa-max-cycles\b/,
+  /\bmax_qa_cycles\b/,
+  // CR-1 (QA cycle 1): the budget was "5 + extra_cycles_granted", which counts every gate written
+  // since the original budget against the grant. It is an absolute qa_max_cycles now.
+  /5 \+ extra_cycles_granted/,
 ];
 
 test("every participant spells `qa_phase` and `extra_cycles_granted` the same way", () => {
@@ -72,6 +79,7 @@ test("every participant spells `qa_phase` and `extra_cycles_granted` the same wa
   for (const name of [
     "loopDoc",
     "stopHook",
+    "setQaPhase",
     "taskSkill",
     "storySkill",
     "hooksDoc",
@@ -98,11 +106,74 @@ test("every participant spells `qa_phase` and `extra_cycles_granted` the same wa
 });
 
 test("qa_phase has exactly the three values, and the writer and the reader agree on them", () => {
-  // The doc's writer validates the value set; the hook's case arms consume it.
+  // The script writer validates the value set; the hook's case arms consume it.
   assert.match(
+    text.setQaPhase,
+    /^\s+5a\|5b\|5c\) ;;/m,
+    "set-qa-phase.sh must validate against 5a|5b|5c",
+  );
+  assert.match(
+    text.setQaPhase,
+    /jq --arg p "\$PHASE" '\.qa_phase = \$p'/,
+    "set-qa-phase.sh must write qa_phase through jq",
+  );
+  // Code lines only — the header comment SAYS it never touches current_step.
+  const setQaPhaseCode = text.setQaPhase
+    .split(/\r?\n/)
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+  assert.doesNotMatch(
+    setQaPhaseCode,
+    /current_step/,
+    "set-qa-phase.sh writes one field and never touches current_step",
+  );
+  // CR-2 (QA cycle 1): the writer must be a SCRIPT every call site reaches from the repository
+  // root — a function defined in one fenced block does not exist in the block that calls it.
+  assert.doesNotMatch(
     text.loopDoc,
-    /case "\$1" in 5a\|5b\|5c\)/,
-    "set_qa_phase must validate against 5a|5b|5c",
+    /\bset_qa_phase\b/,
+    "the step doc must not define or call a set_qa_phase shell function",
+  );
+  assert.doesNotMatch(
+    text.resumeContract,
+    /\bset_qa_phase\b/,
+    "the resume contract must call the script, not a bare function",
+  );
+  const CALL =
+    /bash \.agents\/skills\/\{develop-story\|develop-task\}\/references\/set-qa-phase\.sh 5[abc]/g;
+  // Four call sites, each located by the section it belongs to — not a bare count, which
+  // could be satisfied by four calls in one section.
+  const section = (from, to) => {
+    const i = text.loopDoc.indexOf(from);
+    const j = text.loopDoc.indexOf(to, i + 1);
+    assert.ok(i > -1 && j > i, `sections ${from} … ${to} must exist in order`);
+    return text.loopDoc.slice(i, j);
+  };
+  const SITES = [
+    ["### 5a. Run QA Review", "### Change Log (shared", "5a"],
+    [
+      "### 5b. Run QA Fix (shared)",
+      "#### Signal the `changes-requested` stage",
+      "5b",
+    ],
+    [
+      "### 5c. PR Conformance Review (shared)",
+      "#### Assert the trail is on the branch",
+      "5c",
+    ],
+    ["### Gate-the-last-fix half-cycle (shared)", "**On `continue`:**", "5a"],
+  ];
+  for (const [from, to, ph] of SITES) {
+    const calls = section(from, to).match(CALL) || [];
+    assert.ok(
+      calls.some((c) => c.endsWith(ph)),
+      `the section starting ${from} must invoke set-qa-phase.sh ${ph} (found: ${calls.join(", ") || "none"})`,
+    );
+  }
+  assert.match(
+    text.resumeContract,
+    /set-qa-phase\.sh 5a/,
+    "the re-entry step must write 5a through the script",
   );
   assert.match(
     text.stopHook,
@@ -143,11 +214,6 @@ test("the helper stays monotonic and the loop never advances the lock to 6", () 
     /jq[^\n]*\.current_step\s*=/,
     "the step-5-6 doc must never hand-edit current_step",
   );
-  assert.match(
-    text.loopDoc,
-    /jq --arg p "\$1" '\.qa_phase = \$p'/,
-    "set_qa_phase must write qa_phase through jq",
-  );
   for (const name of ["taskSkill", "storySkill"]) {
     assert.match(
       text[name],
@@ -162,14 +228,28 @@ test("the helper stays monotonic and the loop never advances the lock to 6", () 
   }
 });
 
-test("QA_MAX_CYCLES is 5 + extra_cycles_granted in every file that states the budget", () => {
+test("QA_MAX_CYCLES is the lock's qa_max_cycles — reconstructed count plus the grant — in every file that states the budget", () => {
   for (const name of ["loopDoc", "resumeContract", "taskSkill", "storySkill"]) {
     assert.match(
       text[name],
-      /QA_MAX_CYCLES\*{0,2} = 5 \+ extra_cycles_granted|5 \+ extra_cycles_granted/,
-      `${name} must state the budget as 5 + extra_cycles_granted`,
+      /\bqa_max_cycles\b/,
+      `${name} must name qa_max_cycles`,
     );
   }
+  // The two writers write both fields in one jq, from the reconstructed count.
+  for (const name of ["resumeContract", "taskSkill", "storySkill"]) {
+    assert.match(
+      text[name],
+      /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\)'/,
+      `${name} must write qa_max_cycles as the reconstructed count plus the grant`,
+    );
+  }
+  // The reader reads the lock, defaulting to 5.
+  assert.match(
+    text.loopDoc,
+    /jq -r '\.qa_max_cycles \/\/ 5'/,
+    "Loop Setup must read qa_max_cycles from the lock with a default of 5",
+  );
   // And nobody reuses the Step 3 bound for it.
   for (const name of ["loopDoc", "taskSkill", "storySkill"]) {
     assert.doesNotMatch(
@@ -180,7 +260,7 @@ test("QA_MAX_CYCLES is 5 + extra_cycles_granted in every file that states the bu
   }
   assert.match(
     text.resumeContract,
-    /Do not reuse `MAX_ITER`/,
+    /Do not\s+reuse `MAX_ITER`/,
     "the resume contract must say MAX_ITER is not the QA budget",
   );
 });

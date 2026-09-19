@@ -85,7 +85,8 @@ loop escalation**:
    `skills/develop-task/SKILL.md` (≈ line 273, "Resume from {halt_step} / Start fresh") and its
    develop-story twin, not in the step doc — is the halt message's own three options plus
    `Resume at 5a with {k} more cycles`. The chosen k is written into the **lock** as
-   `extra_cycles_granted`; `QA_MAX_CYCLES = 5 + extra_cycles_granted` for this run. Do not name it
+   `extra_cycles_granted`, beside `qa_max_cycles = QA_CYCLE at resume + k` — the budget the loop reads
+   (QA cycle 1, CR-1: `5 + k` counted every later gate against the grant). Do not name it
    `MAX_ITER`: that is the Step 3 develop-loop bound at resume-contract line ~184.
 
 The terminal-HALT snapshot writer (`skills/develop-task/SKILL.md` ≈ line 266, the `jq --arg reason`

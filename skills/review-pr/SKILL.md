@@ -552,7 +552,7 @@ After editing, run `npm run bundle`.
 ## Relationship to the develop pipelines
 
 `/develop-story` and `/develop-task` **do** call `/review-pr`, as **Step 5c** — the exit gate of
-their Steps 5–6 QA loop. It runs once a QA gate reaches it by any of §5c's three routes — the cycle entry's `**Action**` row reads `Proceeding to 5c` — and nothing leaves that
+their Steps 5–6 QA loop. It runs once a QA gate reaches it by any of §5c's five routes — the cycle entry's `**Action**` row reads `Proceeding to 5c` — and nothing leaves that
 loop without passing through it. The full routing lives in the pipelines' Steps 5–6 QA loop step
 file, §5c — deliberately not linked by path, because the bundler follows such a reference and would
 copy that file and its transitive dependencies into this skill, which does not need them to run.

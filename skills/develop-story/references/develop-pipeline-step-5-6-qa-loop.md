@@ -14,7 +14,13 @@ Loaded by `/develop-story` and `/develop-task` during Steps 5–6. Story/task va
 
 ## Loop Setup (shared)
 
-This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **`QA_MAX_CYCLES` complete cycles** — **5** on a fresh run, and `5 + extra_cycles_granted` on a run re-invoked after a loop-limit halt with a grant recorded in the lock (see the resume contract's **Re-entry after a QA loop escalation**). Every "of 5" and "/5" in the strings below reads `QA_MAX_CYCLES`; the literal is the default, not the rule.
+This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **`QA_MAX_CYCLES` complete cycles** — the lock's `qa_max_cycles` field when present, else **5**. The field is written only by a granted re-entry after a loop-limit halt (resume contract, **Re-entry after a QA loop escalation**), as `QA_CYCLE at resume + extra_cycles_granted` — relative to the count reconstructed from disk, never to 5, so a grant of `k` delivers `k` cycles whatever gates already exist:
+
+```bash
+QA_MAX_CYCLES=$(jq -r '.qa_max_cycles // 5' .claude/state/develop-pipeline.lock 2>/dev/null || echo 5)
+```
+
+Every "of 5" and "/5" in the strings below reads `QA_MAX_CYCLES`; the literal is the default, not the rule.
 
 **A gate in the accepting-route set does not exit the loop — it hands to 5c.** A gate that reaches
 5c (any of §5c's five routes) means the work is ready to be *reviewed as a PR*, not that the loop is over. 5c
@@ -66,24 +72,21 @@ goes `4 → 5` at the Step 4 → 5 transition and `5 → 7` at the Step 5–6 �
 the orchestrator's ordinary Step Transition Protocol. Option A — teaching the helper a backward
 move — was rejected because it would have given the lock two meanings for one field.
 
-Each sub-step writes `qa_phase` as its **first action**, through the same `mktemp` + `mv` pattern
-the helper uses, and never touches `current_step`:
+Each sub-step writes `qa_phase` as its **first action**, through the bundled writer — a **script**,
+not a shell function, because every orchestrator Bash call is a fresh shell and a function defined
+in one fenced block does not exist in the next (task.123 QA cycle 1, CR-2). It is the sibling of
+`advance-pipeline-lock.sh`, uses the same `mktemp` + `mv` write, validates its one argument
+against `5a|5b|5c`, fails closed on a non-object lock, noops with no lock, and never touches
+`current_step`. Source: `references/set-qa-phase.sh`; suite: `set-qa-phase.test.sh`.
 
 ```bash
-# set_qa_phase 5a|5b|5c — idempotent; noops when no lock is present (standalone invocation).
-set_qa_phase() {
-  LOCK=".claude/state/develop-pipeline.lock"
-  [ -f "$LOCK" ] || return 0
-  case "$1" in 5a|5b|5c) ;; *) echo "set_qa_phase: expected 5a|5b|5c, got '$1'" >&2; return 1 ;; esac
-  TMP=$(mktemp "$(dirname "$LOCK")/.qa-phase.XXXXXX") || return 1
-  if jq --arg p "$1" '.qa_phase = $p' "$LOCK" > "$TMP"; then mv "$TMP" "$LOCK"; else rm -f "$TMP"; return 1; fi
-}
+bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a   # or 5b, 5c
 ```
 
 The Stop hook (`develop-pipeline-on-stop.sh`) reads `qa_phase` on a step-5 lock to name `/qa-task`
 (or `/qa-story`), `/qa-fix` or `/review-pr`; an **absent** `qa_phase` names 5a, the loud re-entrant
-default. The halt snapshot is a superset of the lock, so `qa_phase` — and `extra_cycles_granted`
-below — travel into `develop-pipeline.last-halt.json` without a second writer.
+default. The halt snapshot is a superset of the lock, so `qa_phase` — and `extra_cycles_granted` /
+`qa_max_cycles` above — travel into `develop-pipeline.last-halt.json` without a second writer.
 
 Separately, several **HALT** paths end the run without reaching escalation: the no-code-change HALT
 and the mid-loop PR MERGED/CLOSED HALT (both in 5b), the twice-red fast-gate bail-out (5b step 0a),
@@ -162,7 +165,7 @@ Read the gate file to determine the gate result.
 
 ### 5a. Run QA Review
 
-**Lock**: `set_qa_phase 5a` (Loop Setup) before anything else in this sub-step. `current_step` stays `5`.
+**Lock**: `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a` before anything else in this sub-step. `current_step` stays `5`.
 
 > **When the work item's deliverable is runnable prose, the QA skill executes it.** A change set that
 > adds or modifies a `SKILL.md` or a `shared/resources/*.md` prompt containing fenced ```bash blocks
@@ -722,7 +725,7 @@ was expensive, and the expense bought nothing 5c would not have seen anyway.
 
 ### 5b. Run QA Fix (shared)
 
-**Lock**: `set_qa_phase 5b` (Loop Setup) before anything else in this sub-step. `current_step` stays `5`.
+**Lock**: `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5b` before anything else in this sub-step. `current_step` stays `5`.
 
 #### Signal the `changes-requested` stage (when `TRACKER_ISSUE` is set)
 
@@ -1044,7 +1047,7 @@ After fixes are applied:
 
 ### 5c. PR Conformance Review (shared)
 
-**Lock**: `set_qa_phase 5c` (Loop Setup) before anything else in this sub-step. `current_step` stays `5`;
+**Lock**: `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5c` before anything else in this sub-step. `current_step` stays `5`;
 it advances to `7` only at the Step 7 transition, on `APPROVE` or `CONCERNS`.
 
 Perform this step **before Step 7**, on any of the **five routes out of 5a**:
@@ -1342,8 +1345,8 @@ The route fires — `gate-the-last-fix` — only when **all** of:
 1. Write `describeLoopRoute(r)` on cycle `N`'s `**Loop exit**` row — it begins
    `Gate-the-last-fix half-cycle granted —` and says in words that this is neither an exit nor an
    escalation.
-2. Run **one ordinary 5a** — `set_qa_phase 5a`, then invoke `/qa-task` / `/qa-story` exactly as a
-   cycle does, on the head cycle `N`'s fix left. It writes `gate.{N+1}` and `qa.{N+1}` and a
+2. Run **one ordinary 5a** — `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a`,
+   then invoke `/qa-task` / `/qa-story` exactly as a cycle does, on the head cycle `N`'s fix left. It writes `gate.{N+1}` and `qa.{N+1}` and a
    `### QA Cycle {N+1}` entry carrying the `**Half-cycle**: gate-the-last-fix` row (template above).
    Cost: half a cycle — no fix, no suite re-run beyond the gate's own. **There is no 5b**, whatever
    the gate says.

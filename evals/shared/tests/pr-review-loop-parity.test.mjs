@@ -377,6 +377,49 @@ test("the accepting-route set is stated once: consumers point at §5c and read t
     "task-development runbook": read("docs/runbooks/task-development.md"),
     "review-pr skill": read("skills/review-pr/SKILL.md"),
   };
+  // task.123 QA cycle 1, CR-4: §5c grew from three routes to five and the count was edited
+  // where the diff happened to look — seven consumers still said "three". The cardinality is
+  // a restatement of the set, and a stale count is the same drift as a stale token pair. The
+  // §5c count is read from the doc so the next growth cannot leave a consumer behind.
+  const routeCount = (section5c().match(/\*\*(\w+) routes out of 5a\*\*/) ||
+    [])[1];
+  assert.ok(
+    routeCount,
+    "§5c must state its route count as '**N routes out of 5a**'",
+  );
+  const STALE_COUNTS = [
+    /\b(one|two|three|four|six|seven) (accepting )?routes\b/i,
+    /§5c'?s? (one|two|three|four|six|seven) routes/i,
+    /routes 1–3\b/,
+  ].filter((re) => !re.test(`${routeCount} routes`));
+  // A wider population than `consumers`: these need not point at §5c, but if they state a
+  // count it must be the current one.
+  const restaters = {
+    ...consumers,
+    "loop doc itself": loopDoc,
+    "develop-task skill": read("skills/develop-task/SKILL.md"),
+    "develop-story skill": read("skills/develop-story/SKILL.md"),
+    "step-4 create-pr doc": read(
+      "shared/resources/develop-pipeline-step-4-create-pr.md",
+    ),
+    "step-7 finalise doc": read(
+      "shared/resources/develop-pipeline-step-7-finalise.md",
+    ),
+    "remaining-work banner": read(
+      "shared/resources/develop-pipeline-remaining-work-banner.md",
+    ),
+    "finalise skill": read("skills/finalise/SKILL.md"),
+    "qa-fix skill": read("skills/qa-fix/SKILL.md"),
+  };
+  for (const [name, text] of Object.entries(restaters)) {
+    for (const re of STALE_COUNTS) {
+      assert.doesNotMatch(
+        text,
+        re,
+        `${name} states a route count that is not §5c's (${routeCount}): ${re}`,
+      );
+    }
+  }
   const PARAPHRASES = [
     /reads `PASS`\/`WAIVED`/,
     /gate is not PASS or WAIVED/,
