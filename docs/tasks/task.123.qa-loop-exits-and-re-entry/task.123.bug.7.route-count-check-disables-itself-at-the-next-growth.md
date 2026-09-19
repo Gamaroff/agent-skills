@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-7
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 2 — refute pass, CR-3 — verified)
 **Date Found**: 2026-09-19
 
@@ -59,3 +59,4 @@ Build one regex from `NUMBER_WORDS.filter(w => w !== routeCount)`; add a mutatio
 
 **Verification Steps for QA**:
 1. Change §5c to `**six routes out of 5a**` locally; the consumers still saying `five` go red (by design) and `three` stays forbidden.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 3: fix present on `18b5328f`, re-executed (grant restore, stale-count guard, escalation row, CHANGELOG) |

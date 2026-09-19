@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-8
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 2 — refute pass, CR-4 — verified)
 **Date Found**: 2026-09-19
 
@@ -59,3 +59,4 @@ Make the Loop-limit escalation overwrite cycle N's `**Action**` with `Escalating
 
 **Verification Steps for QA**:
 1. Read fixture 12's report: cycle 5's Action row is the escalation value, so the resume contract's escalation row matches it.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 3: fix present on `18b5328f`, re-executed (grant restore, stale-count guard, escalation row, CHANGELOG) |

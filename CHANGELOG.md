@@ -28,7 +28,7 @@ All notable changes to this project will be documented in this file. Format foll
   `qa_max_cycles` — the reconstructed cycle count plus the grant, never `5 + k` — on the lock,
   restoring the lock from the halt snapshot first when the HALT removed it (obs #95).
   Guards: the on-stop and lock-helper bash suites pin the hook's `qa_phase` arms and the monotonic
-  refusal; `qa-loop-lock-fields-parity.test.mjs` fails when any of eight files spells either field
+  refusal; `qa-loop-lock-fields-parity.test.mjs` fails when any participating file spells either field
   differently or the step doc ever advances the lock to 6; `pr-review-loop-parity` now pins §5c's five
   routes; six replay fixtures (routes 2b, 2c, re-entry × task/story) run under `eval:all`.
 

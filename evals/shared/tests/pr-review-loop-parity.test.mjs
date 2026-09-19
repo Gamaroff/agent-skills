@@ -531,8 +531,25 @@ test("the Action row the consumers read has a writer on every route: post-guard 
   );
   assert.match(
     branching,
-    /Loop limit\*\* trigger on \*\*every\*\* path[^.]*`\*\*Action\*\*: Escalating — loop limit reached` and `\*\*PR Review\*\*: not reached — gate\s+did not exit the loop`/,
-    "the post-guard write must name the loop-limit resolution on EVERY escalation path (C2-CR-4): Action 'Escalating — loop limit reached' and PR Review 'not reached'",
+    /Loop limit\*\* trigger on \*\*every\*\* path[^.]*`\*\*Action\*\*: Escalating — loop limit reached`/,
+    "the post-guard write must name the loop-limit resolution on EVERY escalation path (C2-CR-4): Action 'Escalating — loop limit reached'",
+  );
+  // C3-CR-1: the loop-limit write is Action-ONLY — a real REQUEST CHANGES on cycle N's PR Review
+  // row (loop-limit-via-review) must survive it. The "On continue" step must say so, and must not
+  // pair the Action value with the not-reached PR Review value as one write.
+  const onContinue = sectionBetween(
+    "**On `continue`:**",
+    "Before halting, write a thorough escalation entry",
+  );
+  assert.match(
+    onContinue,
+    /overwrite cycle `N`'s `\*\*Action\*\*` row[^.]*\*\*and only that row\*\*/,
+    "the loop-limit 'On continue' write must name the Action row and only that row (C3-CR-1)",
+  );
+  assert.doesNotMatch(
+    onContinue,
+    /`\*\*Action\*\*: Escalating — loop limit reached`\s+and `\*\*PR Review\*\*: not reached/,
+    "the loop-limit write must not blank the PR Review row alongside the Action row (C3-CR-1)",
   );
   // Cycle 5: the rule named the 5c and 5b values only. The third resolution — the Convergence
   // check trips and the run leaves the loop without reaching 5c — had a value in the closed set
@@ -589,7 +606,8 @@ function staleRouteCountPatterns(current) {
   ).join("|");
   return [
     new RegExp(`\\b(${stale}) (accepting )?routes\\b`, "i"),
-    new RegExp(`§5c'?s? (${stale}) routes`, "i"),
+    // The ASCII-hyphen spelling of the ordinal form; the en-dash one is below.
+    /routes 1-3\b/,
     /routes 1–3\b/,
   ];
 }

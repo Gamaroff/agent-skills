@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-6
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 2 — refute pass, CR-2 — verified)
 **Date Found**: 2026-09-19
 
@@ -59,3 +59,4 @@ Same script as bug 5 (`grant-qa-cycles.sh` reads the highest gate itself and rem
 
 **Verification Steps for QA**:
 1. `grep -rn 'grant-qa-cycles.sh' shared/resources/develop-pipeline-resume-contract.md skills/develop-*/SKILL.md` → one call each.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 3: fix present on `18b5328f`, re-executed (grant restore, stale-count guard, escalation row, CHANGELOG) |

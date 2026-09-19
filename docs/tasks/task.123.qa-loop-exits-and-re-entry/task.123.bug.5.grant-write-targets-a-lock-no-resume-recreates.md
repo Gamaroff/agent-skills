@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-5
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 2 — refute pass, CR-1 — verified)
 **Date Found**: 2026-09-19
 
@@ -63,3 +63,4 @@ Fold the grant into a script beside `set-qa-phase.sh` — `grant-qa-cycles.sh <d
 **Verification Steps for QA**:
 1. Remove the lock, leave a `last-halt.json`, run `bash .agents/skills/develop-task/references/grant-qa-cycles.sh <dir with gate.6> 2` → lock exists with `qa_max_cycles: 8`, no `halt_reason`.
 2. `grep -rn 'recreates the lock from the' shared skills` → no hits.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 3: fix present on `18b5328f`, re-executed (grant restore, stale-count guard, escalation row, CHANGELOG) |

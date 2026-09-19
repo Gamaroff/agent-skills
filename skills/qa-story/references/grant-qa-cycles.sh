@@ -27,16 +27,33 @@
 #      mktemp + mv, and removes the temp file on any failure.
 #
 # Usage:
-#   bash .agents/skills/{develop-story|develop-task}/references/grant-qa-cycles.sh <doc-dir> <k>
+#   bash .agents/skills/{develop-story|develop-task}/references/grant-qa-cycles.sh <doc-dir> <k> [<implementation-report>]
+#
+# The BASE the grant is added to is max(highest gate on disk, `### QA Cycle` entries in
+# the implementation report) — the same number the resume contract's reconstruction
+# resumes from on BOTH of its paths (gates ahead of the report: cycles the operator ran
+# by hand; report ahead of the gates: a gate never committed or deleted, resume from the
+# report's count). A base of the highest gate alone granted nothing on the second path
+# (task.123 QA cycle 3, CR-2). The report is optional: with no third argument the base
+# is the highest gate, which is right whenever the report is not ahead.
 #
 # Behaviour:
-#   • <k> not a positive integer, or <doc-dir> not a directory → exit 1, usage, nothing written
+#   • <k> not a positive integer without a leading zero, or <doc-dir> not a directory
+#                                                              → exit 1, usage, nothing written
+#     (a leading zero is octal to the shell and decimal to jq — refused rather than parsed twice)
 #   • no gate.{N} file in <doc-dir>                            → exit 1 ("no gate on disk"), nothing written
 #   • no lock AND no snapshot                                  → exit 1, nothing written
+#   • snapshot present but for another document (its task_or_story_directory is not <doc-dir>)
+#                                                              → exit 1, nothing restored, nothing written
 #   • jq missing                                               → exit 1 (this write cannot be skipped silently)
 #   • lock present but not a JSON object                       → exit 1, lock untouched
-#   • otherwise → prints `grant-qa-cycles: QA_CYCLE=<n> extra_cycles_granted=<k> qa_max_cycles=<n+k>`
-#     and, when the lock was restored, `grant-qa-cycles: lock restored from <snapshot>` on stderr
+#   • the lock already carries a HIGHER qa_max_cycles          → exit 1, lock untouched (a grant never lowers a budget)
+#   • otherwise → writes extra_cycles_granted, qa_max_cycles AND qa_phase = 5a (an accepted grant is a
+#     5a re-entry, and a Stop between this write and a separate set-qa-phase call would name /qa-fix
+#     for an already-fixed cycle — task.123 QA cycle 3, CR-3), then prints
+#     `grant-qa-cycles: QA_CYCLE=<base> extra_cycles_granted=<k> qa_max_cycles=<n>` with <n> read
+#     BACK from the written lock, and, when the lock was restored,
+#     `grant-qa-cycles: lock restored from <snapshot>` on stderr
 #
 # Paths honour PIPELINE_LOCK and PIPELINE_HALT_SNAPSHOT for tests; defaults are the pipeline's.
 
@@ -46,17 +63,22 @@ LOCK="${PIPELINE_LOCK:-.claude/state/develop-pipeline.lock}"
 SNAPSHOT="${PIPELINE_HALT_SNAPSHOT:-.claude/state/develop-pipeline.last-halt.json}"
 
 usage() {
-  echo "Usage: grant-qa-cycles.sh <doc-dir> <k>   (k = positive integer of extra cycles)" >&2
+  echo "Usage: grant-qa-cycles.sh <doc-dir> <k> [<implementation-report>]   (k = positive integer, no leading zero)" >&2
   exit 1
 }
 
 DOC_DIR="${1:-}"
 K="${2:-}"
+REPORT="${3:-}"
 [ -d "$DOC_DIR" ] || usage
 case "$K" in
-  ''|*[!0-9]*) usage ;;
+  ''|*[!0-9]*|0*) usage ;;
 esac
 [ "$K" -ge 1 ] 2>/dev/null || usage
+if [ -n "$REPORT" ] && [ ! -f "$REPORT" ]; then
+  echo "grant-qa-cycles: implementation report '$REPORT' not found" >&2
+  exit 1
+fi
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "grant-qa-cycles: jq not found — the grant cannot be recorded" >&2
@@ -75,6 +97,16 @@ if [ -z "$QA_CYCLE" ]; then
   echo "grant-qa-cycles: no *.gate.{N}.*.yml in '$DOC_DIR' — nothing to grant against" >&2
   exit 1
 fi
+# The report's entry count is the other half of the reconstruction. `|| true`, not
+# `|| echo 0`: grep -c prints 0 AND exits 1 on no match, so the latter yields "0\n0".
+if [ -n "$REPORT" ]; then
+  COMPLETED=$(grep -c '^### QA Cycle' "$REPORT" 2>/dev/null || true)
+  COMPLETED=${COMPLETED:-0}
+  if [ "$COMPLETED" -gt "$QA_CYCLE" ] 2>/dev/null; then
+    echo "grant-qa-cycles: report has $COMPLETED QA Cycle entries, disk has gate.$QA_CYCLE — base is the report's count" >&2
+    QA_CYCLE="$COMPLETED"
+  fi
+fi
 
 # 2. Restore the lock from the halt snapshot when the HALT removed it.
 RESTORED=""
@@ -85,6 +117,16 @@ if [ ! -f "$LOCK" ]; then
   fi
   if ! jq -e 'type == "object"' "$SNAPSHOT" >/dev/null 2>&1; then
     echo "grant-qa-cycles: halt snapshot is not a JSON object — refusing to restore the lock from it" >&2
+    exit 1
+  fi
+  # A stale snapshot for ANOTHER document persists by design (the detector drops it; it
+  # is never deleted). Restoring it here would resurrect the other task's branch, pr_url
+  # and report_path as this task's lock (task.123 QA cycle 3, CR-5). Compare directories
+  # with trailing slashes and a leading ./ normalised away.
+  SNAP_DIR=$(jq -r '.task_or_story_directory // ""' "$SNAPSHOT")
+  norm() { printf '%s' "$1" | sed -E 's#^\./##; s#/+$##'; }
+  if [ -n "$SNAP_DIR" ] && [ "$(norm "$SNAP_DIR")" != "$(norm "$DOC_DIR")" ]; then
+    echo "grant-qa-cycles: halt snapshot is for '$SNAP_DIR', not '$DOC_DIR' — refusing to restore the lock from it" >&2
     exit 1
   fi
   mkdir -p "$(dirname "$LOCK")"
@@ -103,15 +145,29 @@ if ! jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1; then
   exit 1
 fi
 
-# 3. Write both fields atomically.
+# A grant never LOWERS a budget: a second re-entry, or a compaction pause inside a granted
+# run, must not shrink what an earlier grant set (task.123 QA cycle 3, CR-2).
+EXISTING=$(jq -r '.qa_max_cycles // 0' "$LOCK")
+NEW_MAX=$((QA_CYCLE + K))
+if [ "$EXISTING" -gt "$NEW_MAX" ] 2>/dev/null; then
+  echo "grant-qa-cycles: lock already carries qa_max_cycles=$EXISTING, higher than $NEW_MAX — refusing to lower the budget" >&2
+  exit 1
+fi
+
+# 3. Write the three fields atomically. qa_phase = 5a in the SAME write: an accepted grant
+# is by definition a 5a re-entry, and a Stop hook firing between this write and a separate
+# set-qa-phase call would read the snapshot's 5b and name /qa-fix for an already-fixed cycle.
 TMP=$(mktemp "$(dirname "$LOCK")/.grant-qa-cycles.XXXXXX") || exit 1
 if ! jq --argjson k "$K" --argjson c "$QA_CYCLE" \
-     '.extra_cycles_granted = $k | .qa_max_cycles = ($c + $k)' "$LOCK" > "$TMP"; then
+     '.extra_cycles_granted = $k | .qa_max_cycles = ($c + $k) | .qa_phase = "5a"' "$LOCK" > "$TMP"; then
   rm -f "$TMP"
   echo "grant-qa-cycles: jq write failed" >&2
   exit 1
 fi
 mv "$TMP" "$LOCK"
 [ -n "$RESTORED" ] && echo "grant-qa-cycles: lock restored from $RESTORED" >&2
-echo "grant-qa-cycles: QA_CYCLE=$QA_CYCLE extra_cycles_granted=$K qa_max_cycles=$((QA_CYCLE + K))"
+# Read the budget BACK from the lock — one source, not a shell recomputation that can
+# disagree with what jq wrote (task.123 QA cycle 3, CR-4).
+WRITTEN=$(jq -r '.qa_max_cycles' "$LOCK")
+echo "grant-qa-cycles: QA_CYCLE=$QA_CYCLE extra_cycles_granted=$K qa_max_cycles=$WRITTEN"
 exit 0

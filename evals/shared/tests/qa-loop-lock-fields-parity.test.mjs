@@ -246,8 +246,8 @@ test("QA_MAX_CYCLES is the lock's qa_max_cycles — reconstructed count plus the
   // restoring the lock from the halt snapshot when the HALT removed it (C2-CR-1).
   assert.match(
     text.grantScript,
-    /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\)'/,
-    "grant-qa-cycles.sh must write qa_max_cycles as the reconstructed count plus the grant",
+    /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\) \| \.qa_phase = "5a"'/,
+    "grant-qa-cycles.sh must write qa_max_cycles as the reconstructed count plus the grant, and qa_phase 5a, in one write (C3-CR-3)",
   );
   assert.match(
     text.grantScript,
@@ -258,7 +258,7 @@ test("QA_MAX_CYCLES is the lock's qa_max_cycles — reconstructed count plus the
   for (const name of ["resumeContract", "taskSkill", "storySkill"]) {
     assert.match(
       text[name],
-      /references\/grant-qa-cycles\.sh \{[a-z-]+\} \{k\}/,
+      /references\/grant-qa-cycles\.sh \{[a-z-]+\} \{k\} \{implementation-report-path\}/,
       `${name} must record the grant through grant-qa-cycles.sh`,
     );
     assert.doesNotMatch(

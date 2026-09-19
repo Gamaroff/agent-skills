@@ -191,20 +191,28 @@ This convention ensures the cycle budget is respected across resumes.
    On accept, record the grant with **one call** to the bundled writer:
 
    ```bash
-   bash .agents/skills/{develop-story|develop-task}/references/grant-qa-cycles.sh {doc-directory} {k}
+   bash .agents/skills/{develop-story|develop-task}/references/grant-qa-cycles.sh {doc-directory} {k} {implementation-report-path}
    ```
 
-   Source: `shared/resources/grant-qa-cycles.sh`; suite: `grant-qa-cycles.test.sh`. It does three
-   things in one invocation, and each was a defect when the prose left it to the caller
-   (task.123 QA cycle 2, CR-1 and CR-2): it **reconstructs** the cycle count from the gates on disk
-   itself — never from a `$QA_CYCLE` bound in a neighbouring fenced block, which does not exist in
-   this one; it **restores the lock from the halt snapshot when no lock exists** — a terminal HALT
-   removes the lock, and the only ordinary writer of it (the end of `/create-branch`) is a step a
-   resume skips, so without this the grant had no file to land on; and it **writes two fields
-   atomically** — `extra_cycles_granted = k` (the record) and `qa_max_cycles = QA_CYCLE + k` (the
-   budget) — via `mktemp` + `mv`, removing its temp file on every failure. The restore drops the
-   snapshot's halt-only fields (`halted_at`, `halt_reason`, `halt_step`) and PreCompact's
-   (`paused_at`, `pause_reason`) and keeps everything else, the snapshot being a superset of the lock.
+   Source: `shared/resources/grant-qa-cycles.sh`; suite: `grant-qa-cycles.test.sh`. Everything it
+   does was a defect when the prose left it to the caller (task.123 QA cycles 2 and 3):
+
+   - It **reconstructs the base** as `max(highest gate on disk, `### QA Cycle` entries in the
+     report)` — the same number step 1 resumes from on either of its paths — and never from a
+     `$QA_CYCLE` bound in a neighbouring fenced block, which does not exist in this one.
+   - It **restores the lock from the halt snapshot when no lock exists**: a terminal HALT removes
+     the lock, and the only ordinary writer of it (the end of `/create-branch`) is a step a resume
+     skips, so without this the grant had no file to land on. The restore drops the snapshot's
+     halt-only fields (`halted_at`, `halt_reason`, `halt_step`) and PreCompact's (`paused_at`,
+     `pause_reason`) and keeps everything else, the snapshot being a superset of the lock. It
+     **refuses a snapshot for another document** — one whose `task_or_story_directory` is not
+     `{doc-directory}` — because a stale snapshot persists by design.
+   - It **never lowers** a `qa_max_cycles` the lock already carries.
+   - It **writes three fields atomically** — `extra_cycles_granted = k` (the record),
+     `qa_max_cycles = base + k` (the budget) and `qa_phase = 5a` (an accepted grant *is* a 5a
+     re-entry; a Stop between the grant and a separate `set-qa-phase.sh` call would otherwise name
+     `/qa-fix`) — via `mktemp` + `mv`, removing its temp file on every failure, and prints the
+     budget back from the written lock.
 
    The loop then runs with **`QA_MAX_CYCLES` = the lock's `qa_max_cycles`** (absent → 5). The
    budget is **relative to the reconstructed count, not to 5**: a grant of `k` must deliver `k`
@@ -220,9 +228,11 @@ This convention ensures the cycle budget is respected across resumes.
    `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails when any file disagrees. **Do not
    reuse `MAX_ITER`**: that is the Step 3 develop-loop bound (below), a different budget over a
    different loop.
-4. **Re-enter at 5a as cycle `NEXT_CYCLE`** with
-   `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a`. A resume with
-   `NEXT_CYCLE > QA_MAX_CYCLES` and no grant goes straight to **Loop Escalation** as before.
+4. **Re-enter at 5a as cycle `NEXT_CYCLE`**. The grant already wrote `qa_phase: 5a`;
+   `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a` here is an
+   idempotent re-assert, kept so 5a's own first action holds on a resume that declined the grant.
+   A resume with `NEXT_CYCLE > QA_MAX_CYCLES` and no grant goes straight to **Loop Escalation** as
+   before.
 
 The lock's `qa_phase` (`5a|5b|5c`, written by the loop as it moves) corroborates the 5c sub-state
 table above — a snapshot at `qa_phase: 5c` with `**PR Review**: pending` is the narrow window that

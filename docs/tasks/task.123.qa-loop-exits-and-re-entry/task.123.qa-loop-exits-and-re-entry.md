@@ -494,6 +494,15 @@ Gate 2 FAIL (50) — the refute pass found four defects in cycle 1's fixes; all 
 - **C2-CR-6** — the hook's 5a sentence spells both invocations.
 - Verification: `ci:fast` green (3490 node + 8 bash suites); `eval:all` 34; bundle:check / check:generated / lint:shell / format:check exit 0. Mutation proofs: restore disabled → 2 red; `5 + k` in the script → 6 red + parity red.
 
+### QA Fix Cycle 3 — 2026-09-19
+
+Gate 3 CONCERNS (80) — three `top_issues[]` entries fixed, plus the four advisories.
+
+- **C3-CR-1** — the loop-limit escalation writes the `**Action**` row only, on both paths; a real REQUEST CHANGES verdict survives. Parity pins the Action-only wording and forbids the paired write.
+- **C3-CR-2** — `grant-qa-cycles.sh` takes the implementation report; base = max(highest gate, report entries); never lowers an existing `qa_max_cycles`. **C3-CR-4** leading-zero `k` refused, budget printed from the lock. **C3-CR-3** `qa_phase: 5a` in the same write. **C3-CR-5** a snapshot for another document refused. Suite 23 → 34.
+- **C3-CR-6/7** — subsumed regex replaced by the ASCII-hyphen ordinal; CHANGELOG count fixed.
+- Verification: `ci:fast` green (3490 node + 8 bash suites); `eval:all` 34; bundle/format/lint/check:generated exit 0. Mutation proofs: never-lower removed → 1 red; report base ignored → 1 red; paired write restored → parity red.
+
 ### Deferred Work
 
 - Success criterion **Migration** — deferred out of `/develop` because it needs the PR number; done by the
@@ -504,24 +513,24 @@ Gate 2 FAIL (50) — the refute pass found four defects in cycle 1's fixes; all 
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-19
-**Quality Score**: 50/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.123.qa.2.qa-loop-exits-and-re-entry.md](./task.123.qa.2.qa-loop-exits-and-re-entry.md)
-- **Gate File**: [task.123.gate.2.qa-loop-exits-and-re-entry.yml](./task.123.gate.2.qa-loop-exits-and-re-entry.yml)
+- **Full Report**: [task.123.qa.3.qa-loop-exits-and-re-entry.md](./task.123.qa.3.qa-loop-exits-and-re-entry.md)
+- **Gate File**: [task.123.gate.3.qa-loop-exits-and-re-entry.yml](./task.123.gate.3.qa-loop-exits-and-re-entry.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3489 node + 7 bash suites + 34 replay scenarios
-- **Phases Verified**: 3/3 (2 PASS, 1 FAIL)
-- **Critical Issues**: 1 HIGH, 3 MEDIUM (5 entries in `top_issues[]` incl. one high-confidence LOW); cycle-1 bugs 1–4 Closed
+- **Tests Executed**: 3490 node + 8 bash suites + 34 replay scenarios
+- **Phases Verified**: 3/3 (2 PASS, 1 CONCERNS)
+- **Critical Issues**: 0 HIGH, 2 MEDIUM (3 entries in `top_issues[]` incl. one high-confidence LOW); bugs 5–8 Closed
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 2 (refute pass): all five cycle-1 findings verified FIXED. New: the grant is written to a lock no resume path recreates (C2-CR-1, HIGH); the grant block reads `$QA_CYCLE` from another fenced block (C2-CR-2); the route-count guard disables itself at the next growth (C2-CR-3); the escalation sub-state row is keyed on a value only the half-cycle writes (C2-CR-4); CHANGELOG still says `5 + k` (C2-CR-5).
+Cycle 3 (scoped to files changed since gate 2): all cycle-2 findings verified FIXED. Remaining: the loop-limit escalation write also blanks a real REQUEST CHANGES verdict (C3-CR-1); the grant's base is the highest gate while the contract's negative-count rule resumes from the report count, and an existing budget can be lowered (C3-CR-2); leading-zero `k` is octal in shell (C3-CR-4). HIGH 1, 1, 0 — converging.
 
 ## Change Log
 <!-- change-log-start -->
@@ -535,6 +544,7 @@ Cycle 2 (refute pass): all five cycle-1 findings verified FIXED. New: the grant 
 | 2026-09-19 |  | Implemented — 14 source files modified, 8 new (engine routes, qa_phase hook, re-entry contract, 6 replay fixtures ×2 sides); 3488 node tests + bash suites green; 8 mutants caught | develop |
 | 2026-09-19 |  | QA gate FAIL (50/100) — 1 HIGH, 3 MEDIUM, 5 LOW (cycle 1) | qa-task |
 | 2026-09-19 |  | QA gate FAIL (50/100) — 1 HIGH, 3 MEDIUM, 2 LOW (cycle 2, refute pass; cycle-1 bugs 1–4 closed) | qa-task |
+| 2026-09-19 |  | QA gate CONCERNS (80/100) — 0 HIGH, 2 MEDIUM, 3 LOW (cycle 3, scoped; cycle-2 bugs 5–8 closed) | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

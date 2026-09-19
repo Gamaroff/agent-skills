@@ -322,13 +322,17 @@ without reaching 5c, and the same write puts `**Action**: Escalating — loop no
 `**PR Review**: not reached — gate did not exit the loop` on the row. The Diminishing-returns exit's
 own `On exit` list repeats this as its first step so a run that takes route 2 cannot leave the row at
 its 5b value, and the Cosmetic-residue exit's does the same for route 2b. The arm has a fourth
-resolution, written by Loop Escalation's **Loop limit** trigger on **every** path it takes: the
-same write puts `**Action**: Escalating — loop limit reached` and `**PR Review**: not reached — gate
-did not exit the loop` on the entry of the **last cycle that ran** — cycle `{N}` when the half-cycle
-was declined, cycle `{N+1}` when the half-cycle ran and its gate has an open entry. A loop-limit
-escalation therefore always leaves the same signal the Convergence trip leaves, and a resume reads
-either from the last entry's Action row rather than from which route happened to run (task.123 QA
-cycle 2, CR-4). The row's value set is exactly `{Proceeding to 5c
+resolution, written by Loop Escalation's **Loop limit** trigger on **every** path it takes: it puts
+`**Action**: Escalating — loop limit reached` on the entry of the **last cycle that ran** — cycle
+`{N}` when the half-cycle was declined, cycle `{N+1}` when the half-cycle ran and its gate has an
+open entry — and **touches the `**PR Review**` row only on an entry whose gate never reached 5c**
+(where it reads `not reached — gate did not exit the loop` already). On the loop-limit-via-review
+path cycle `{N}`'s gate *did* reach 5c and its row holds a real `REQUEST CHANGES`; that verdict is
+what the escalation template's "Step 5c returned REQUEST CHANGES on cycle(s) {list}" line and the
+resume contract's escalation row read, and the Action write must not blank it (task.123 QA cycle 3,
+CR-1). A loop-limit escalation therefore always leaves the same Action signal the Convergence trip
+leaves, and a resume reads it from the last entry's Action row rather than from which route happened
+to run (task.123 QA cycle 2, CR-4). The row's value set is exactly `{Proceeding to 5c
 (PR conformance review), Running qa-fix (cycle {N} of {QA_MAX_CYCLES}), Escalating — loop not converging, Escalating — loop limit reached}`.
 
 - `PASS` with **no open entry in `top_issues[]`** → **proceed to 5c** (the loop's exit gate), not straight to Step 7
@@ -1359,14 +1363,16 @@ The route fires — `gate-the-last-fix` — only when **all** of:
      conformance review)` and `**PR Review**: pending — 5c not yet run` on cycle `{N+1}`'s entry,
      commit the gate and QA report (path 1), and **hand to 5c** — route 2c of §5c's set. The run
      leaves the loop through its exit gate like any other.
-   - **any open entry** → write `**Action**: Escalating — loop limit reached` and `**PR Review**:
-     not reached — gate did not exit the loop` on that entry, and continue into the escalation
-     below **with gate `{N+1}` in its table**: it is the last gate, and the head it read is the
-     head being handed over.
+   - **any open entry** → write `**Action**: Escalating — loop limit reached` on that entry (its
+     `**PR Review**` row already reads `not reached — gate did not exit the loop`, written when the
+     half-cycle's entry was opened; leave it), and continue into the escalation below **with gate
+     `{N+1}` in its table**: it is the last gate, and the head it read is the head being handed
+     over.
 
-**On `continue`:** overwrite cycle `N`'s routing rows — `**Action**: Escalating — loop limit reached`
-and `**PR Review**: not reached — gate did not exit the loop` — then write the escalation entry as
-today. Put `ROUTE_JSON`'s `reason` in the entry's **What was attempted per cycle** so the reader
+**On `continue`:** overwrite cycle `N`'s `**Action**` row with `Escalating — loop limit reached` —
+**and only that row**: cycle `N`'s `**PR Review**` stays as written, which on the
+loop-limit-via-review path is a real `REQUEST CHANGES` the escalation entry quotes — then write the
+escalation entry as today. Put `ROUTE_JSON`'s `reason` in the entry's **What was attempted per cycle** so the reader
 knows the half-cycle was considered and why it was declined (`last-cycle-not-a-fix`,
 `high-findings-seen`, `medium-not-falling`, …). The Action overwrite is not optional: the resume
 contract's 5c sub-state table keys the "left the loop through escalation" row on it, and the
