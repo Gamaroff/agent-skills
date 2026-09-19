@@ -503,6 +503,17 @@ Gate 3 CONCERNS (80) — three `top_issues[]` entries fixed, plus the four advis
 - **C3-CR-6/7** — subsumed regex replaced by the ASCII-hyphen ordinal; CHANGELOG count fixed.
 - Verification: `ci:fast` green (3490 node + 8 bash suites); `eval:all` 34; bundle/format/lint/check:generated exit 0. Mutation proofs: never-lower removed → 1 red; report base ignored → 1 red; paired write restored → parity red.
 
+### QA Fix Cycle 4 — 2026-09-19
+
+Gate 4 CONCERNS (60) — four MEDIUMs, all fixed, plus C4-CR-5/6/7.
+
+- **C4-CR-1** — never-lower guard before the restore, against the lock or the snapshot; `undo_restore` on any later failure; refusal message names the accepted `k` (C4-CR-5); non-integer budget warned (C4-CR-7).
+- **C4-CR-2** — one declined-grant statement in the contract's step 4 (no lock, no cycle, halt options); SKILL.md points at it.
+- **C4-CR-3** — precedence sentence above the 5c sub-state table; `REQUEST CHANGES` row qualified by its Action; parity pins both.
+- **C4-CR-4** — `canon()` resolves both paths with `cd && pwd -P`; absent field accepted; suite rows both ways + prefix-sharing refusal. Suite 34 → 41.
+- **C4-CR-6** — preamble says the loop-limit write never touches PR Review.
+- Verification: `ci:fast` green (3490 + 8 bash suites); `eval:all` 34; gates exit 0. Mutations: guard disabled → 2 red; string-compare canon → 2 red.
+
 ### Deferred Work
 
 - Success criterion **Migration** — deferred out of `/develop` because it needs the PR number; done by the
@@ -516,21 +527,21 @@ Gate 3 CONCERNS (80) — three `top_issues[]` entries fixed, plus the four advis
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-19
-**Quality Score**: 80/100
+**Quality Score**: 60/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.123.qa.3.qa-loop-exits-and-re-entry.md](./task.123.qa.3.qa-loop-exits-and-re-entry.md)
-- **Gate File**: [task.123.gate.3.qa-loop-exits-and-re-entry.yml](./task.123.gate.3.qa-loop-exits-and-re-entry.yml)
+- **Full Report**: [task.123.qa.4.qa-loop-exits-and-re-entry.md](./task.123.qa.4.qa-loop-exits-and-re-entry.md)
+- **Gate File**: [task.123.gate.4.qa-loop-exits-and-re-entry.yml](./task.123.gate.4.qa-loop-exits-and-re-entry.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 3490 node + 8 bash suites + 34 replay scenarios
 - **Phases Verified**: 3/3 (2 PASS, 1 CONCERNS)
-- **Critical Issues**: 0 HIGH, 2 MEDIUM (3 entries in `top_issues[]` incl. one high-confidence LOW); bugs 5–8 Closed
+- **Critical Issues**: 0 HIGH, 4 MEDIUM; bugs 9–10 Closed
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 3 (scoped to files changed since gate 2): all cycle-2 findings verified FIXED. Remaining: the loop-limit escalation write also blanks a real REQUEST CHANGES verdict (C3-CR-1); the grant's base is the highest gate while the contract's negative-count rule resumes from the report count, and an existing budget can be lowered (C3-CR-2); leading-zero `k` is octal in shell (C3-CR-4). HIGH 1, 1, 0 — converging.
+Cycle 4 (scoped since gate 3): cycle-3 findings verified FIXED. Remaining, all in the grant script's refusal paths and the re-entry contract: a refused grant leaves a restored lock (C4-CR-1); the declined-grant path is described three ways (C4-CR-2); two 5c sub-state rows match a loop-limit-via-review entry (C4-CR-3); absolute vs relative doc-dir refused (C4-CR-4). HIGH 1, 1, 0, 0.
 
 ## Change Log
 <!-- change-log-start -->
@@ -545,6 +556,7 @@ Cycle 3 (scoped to files changed since gate 2): all cycle-2 findings verified FI
 | 2026-09-19 |  | QA gate FAIL (50/100) — 1 HIGH, 3 MEDIUM, 5 LOW (cycle 1) | qa-task |
 | 2026-09-19 |  | QA gate FAIL (50/100) — 1 HIGH, 3 MEDIUM, 2 LOW (cycle 2, refute pass; cycle-1 bugs 1–4 closed) | qa-task |
 | 2026-09-19 |  | QA gate CONCERNS (80/100) — 0 HIGH, 2 MEDIUM, 3 LOW (cycle 3, scoped; cycle-2 bugs 5–8 closed) | qa-task |
+| 2026-09-19 |  | QA gate CONCERNS (60/100) — 0 HIGH, 4 MEDIUM, 1 LOW (cycle 4, scoped; bugs 9–10 closed) | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

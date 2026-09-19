@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-9
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 3, CR-1 — verified)
 **Date Found**: 2026-09-19
 
@@ -59,3 +59,4 @@ Overwrite `**Action**` only, on both the `continue` path and the half-cycle open
 
 **Verification Steps for QA**:
 1. `grep -n 'and only that row' shared/resources/develop-pipeline-step-5-6-qa-loop.md` → the On-continue step.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 4: fix present on `d96554cf`, re-executed |

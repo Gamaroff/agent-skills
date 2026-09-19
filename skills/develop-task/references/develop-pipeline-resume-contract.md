@@ -120,12 +120,17 @@ A `gate.yml` written manually (without running the QA skill) does NOT satisfy St
 > soon as the gate is read, so a run killed *inside* 5c already has N headings and naive
 > reconstruction would set `NEXT_CYCLE=N+1` and re-run the whole QA review against an unchanged tree
 > — burning a cycle to re-derive the gate that just passed. Detect the 5c sub-state instead: read the
-> highest `### QA Cycle {N}` entry's `**PR Review**` row.
+> highest `### QA Cycle {N}` entry's `**PR Review**` row — **after** its `**Action**` row. **Precedence:
+> an `**Action**` that begins `Escalating —` wins over every PR Review value**, because a run that
+> left the loop through Loop Escalation has no cycle to re-enter whatever its last verdict was
+> (a loop-limit-via-review entry carries a real `REQUEST CHANGES` *and* the escalation Action —
+> task.123 QA cycle 4, CR-3). Only when the Action is not an escalation does the PR Review row
+> select a row below. Exactly one row matches any entry.
 >
 > | `**PR Review**` reads | Resume action |
 > | --- | --- |
 > | `APPROVE` or `CONCERNS` | 5c cleared — Step 5–6 is complete, go to Step 7 |
-> | `REQUEST CHANGES` | 5c ran and routed back — set the counter to `N`, re-enter at **5b** |
+> | `REQUEST CHANGES` (an `**Action**` of `Proceeding to 5c` or `Running qa-fix`) | 5c ran and routed back — set the counter to `N`, re-enter at **5b** |
 > | `review failed` | 5c could not run (usually the PR state). Set the counter to `N` and re-enter at **5c** — **once**. Its usual cause is not self-healing, so an unattended driver would otherwise re-run `/review-pr`, HALT, and repeat forever. On a **second consecutive** `review failed` for the same cycle `N`, do not re-enter: escalate to Loop Escalation with the review's own error text. |
 > | `pending — 5c not yet run` | 5a wrote its placeholder on a gate that routed to 5c and the run died before 5c overwrote it. **Same action as `not reached`**: if the entry's `**Action**` row reads `Proceeding to 5c` (gate `{N}` reached 5c by any of §5c's five routes), re-enter at **5c**; otherwise at **5a**. This is the narrowest window in the loop — it opens when 5a writes the `### QA Cycle {N}` entry and closes when 5c records its verdict — and it is the value the artifact tables above will actually be reading on a run killed inside it |
 > | `not reached`, blank, or no row (an `**Action**` of `Running qa-fix` or `Proceeding to 5c`) | The gate did not exit the loop, or the run died before 5c. If the entry's `**Action**` row reads `Proceeding to 5c` (same signal as the row above), re-enter at **5c**; otherwise at **5a** |
@@ -229,11 +234,14 @@ This convention ensures the cycle budget is respected across resumes.
    `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails when any file disagrees. **Do not
    reuse `MAX_ITER`**: that is the Step 3 develop-loop bound (below), a different budget over a
    different loop.
-4. **Re-enter at 5a as cycle `NEXT_CYCLE`**. The grant already wrote `qa_phase: 5a`;
-   `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a` here is an
-   idempotent re-assert, kept so 5a's own first action holds on a resume that declined the grant.
-   A resume with `NEXT_CYCLE > QA_MAX_CYCLES` and no grant goes straight to **Loop Escalation** as
-   before.
+4. **Re-enter at 5a as cycle `NEXT_CYCLE`.** The grant already wrote `qa_phase: 5a` and restored
+   the lock; 5a's own first action (`set-qa-phase.sh 5a`) then runs as on any cycle and is a noop
+   here. **A declined grant, or a grant the script refused (exit 1 — surface its stderr line to the
+   user), does not re-enter the loop at all**: no lock is restored, no cycle runs, and the run
+   returns to the halt message's own three options. That is the one statement of the declined path;
+   the step-5-6 HALT messages and both SKILL.md Phase 0b blocks point here rather than restating it
+   (task.123 QA cycle 4, CR-2). A resume with `NEXT_CYCLE > QA_MAX_CYCLES` and no grant is the same
+   case — it is the halt, re-surfaced.
 
 The lock's `qa_phase` (`5a|5b|5c`, written by the loop as it moves) corroborates the 5c sub-state
 table above — a snapshot at `qa_phase: 5c` with `**PR Review**: pending` is the narrow window that

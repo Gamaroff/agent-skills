@@ -1429,6 +1429,21 @@ test("the 5c resume check reads the report, not the filesystem", () => {
     );
   }
 
+  // C4-CR-3 (task.123): an Escalating Action wins over every PR Review value, and the REQUEST
+  // CHANGES row is qualified by its Action so a loop-limit-via-review entry matches one row only.
+  assert.match(
+    resume,
+    /\*\*Precedence:\s*(?:>\s*)?an `\*\*Action\*\*` that begins `Escalating —` wins over every PR Review value\*\*/,
+    "the 5c sub-state preamble must state that an Escalating Action takes precedence",
+  );
+  const rcRow = subStateRows.find((r) => r.key.includes("`REQUEST CHANGES`"));
+  assert.ok(rcRow, "the REQUEST CHANGES row must exist");
+  assert.match(
+    rcRow.key,
+    /an `\*\*Action\*\*` of `Proceeding to 5c` or `Running qa-fix`/,
+    "the REQUEST CHANGES row must be qualified by a non-escalating Action",
+  );
+
   const claimedBy = new Map();
   for (const v of [
     "pending — 5c not yet run",

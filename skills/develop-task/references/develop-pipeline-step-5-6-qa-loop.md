@@ -325,8 +325,8 @@ its 5b value, and the Cosmetic-residue exit's does the same for route 2b. The ar
 resolution, written by Loop Escalation's **Loop limit** trigger on **every** path it takes: it puts
 `**Action**: Escalating — loop limit reached` on the entry of the **last cycle that ran** — cycle
 `{N}` when the half-cycle was declined, cycle `{N+1}` when the half-cycle ran and its gate has an
-open entry — and **touches the `**PR Review**` row only on an entry whose gate never reached 5c**
-(where it reads `not reached — gate did not exit the loop` already). On the loop-limit-via-review
+open entry — and **never touches the `**PR Review**` row** (on an entry whose gate never reached 5c
+it already reads `not reached — gate did not exit the loop`, written when the entry was opened). On the loop-limit-via-review
 path cycle `{N}`'s gate *did* reach 5c and its row holds a real `REQUEST CHANGES`; that verdict is
 what the escalation template's "Step 5c returned REQUEST CHANGES on cycle(s) {list}" line and the
 resume contract's escalation row read, and the Action write must not blank it (task.123 QA cycle 3,

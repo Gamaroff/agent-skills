@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-10
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 3, CR-2 — verified)
 **Date Found**: 2026-09-19
 
@@ -61,3 +61,4 @@ Give the script the implementation report path (or the report entry count) as an
 **Verification Steps for QA**:
 1. `bash …/grant-qa-cycles.sh <dir with gate.3> 2 <report with 5 entries>` → `qa_max_cycles=7`; run again with the lock at 7 and k=2 → refused.
 2. `bash …/grant-qa-cycles.sh <dir> 010` → usage, exit 1.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 4: fix present on `d96554cf`, re-executed |

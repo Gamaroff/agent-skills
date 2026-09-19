@@ -145,6 +145,45 @@ printf '{"skill":"develop-task","current_step":5,"task_or_story_directory":"./%s
 PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$D/doc" 1 >/dev/null 2>&1; RC=$?
 [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "4" ] && pass "snapshot for this document (path normalised): restored" || fail "matching snapshot" "rc=$RC"
 
+# ── C4 (QA cycle 4): a refusal writes NOTHING; paths canonicalised; absent field; bad budget ──
+# A never-lower refusal on a run that has no lock must not leave a restored lock behind.
+D="$T/refuse-after-restore"; L="$D/lock.json"; S="$D/snap.json"; mkdir -p "$D"; mkdoc "$D/doc" 1 2 3 4 5 6
+printf '{"skill":"develop-task","current_step":5,"qa_phase":"5b","task_or_story_directory":"%s","qa_max_cycles":9,"halt_reason":"loop-limit"}\n' "$D/doc" > "$S"
+ERR=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$D/doc" 2 2>&1 >/dev/null); RC=$?
+if [ "$RC" -ne 0 ] && [ ! -f "$L" ] && echo "$ERR" | grep -q "k must be at least 4"; then
+  pass "never-lower refusal from a snapshot: no lock restored, message names the accepted k (C4-CR-1/CR-5)"
+else
+  fail "refusal after restore" "rc=$RC lock exists=$([ -f "$L" ] && echo yes || echo no) err=$ERR"
+fi
+LEFT=$(find "$D" -name '.grant-qa-cycles.*' | wc -l | tr -d ' '); [ "$LEFT" = "0" ] && pass "no temp file after a refused grant" || fail "temp after refusal" "$LEFT"
+
+# Relative snapshot directory vs absolute <doc-dir> (the real pipeline's shapes), both ways.
+D="$T/canon"; mkdir -p "$D/repo/docs/tasks/x"; : > "$D/repo/docs/tasks/x/task.9.gate.1.x.yml"
+printf '{"skill":"develop-task","current_step":5,"task_or_story_directory":"docs/tasks/x","halt_reason":"loop-limit"}\n' > "$D/snap.json"
+( cd "$D/repo" && PIPELINE_LOCK="$D/lock.json" PIPELINE_HALT_SNAPSHOT="$D/snap.json" bash "$SCRIPT" "$D/repo/docs/tasks/x" 1 >/dev/null 2>&1 ); RC=$?
+[ "$RC" -eq 0 ] && [ "$(jq -r '.qa_max_cycles' "$D/lock.json")" = "2" ] && pass "relative snapshot dir vs absolute doc-dir: same directory, restored (C4-CR-4)" || fail "relative vs absolute" "rc=$RC"
+rm -f "$D/lock.json"
+printf '{"skill":"develop-task","current_step":5,"task_or_story_directory":"%s","halt_reason":"loop-limit"}\n' "$D/repo/docs/tasks/x" > "$D/snap.json"
+( cd "$D/repo" && PIPELINE_LOCK="$D/lock.json" PIPELINE_HALT_SNAPSHOT="$D/snap.json" bash "$SCRIPT" docs/tasks/x 1 >/dev/null 2>&1 ); RC=$?
+[ "$RC" -eq 0 ] && [ -f "$D/lock.json" ] && pass "absolute snapshot dir vs relative doc-dir: restored" || fail "absolute vs relative" "rc=$RC"
+# A different directory that merely shares a prefix is still refused.
+rm -f "$D/lock.json"; mkdir -p "$D/repo/docs/tasks/xy"
+printf '{"skill":"develop-task","current_step":5,"task_or_story_directory":"docs/tasks/xy","halt_reason":"loop-limit"}\n' > "$D/snap.json"
+( cd "$D/repo" && PIPELINE_LOCK="$D/lock.json" PIPELINE_HALT_SNAPSHOT="$D/snap.json" bash "$SCRIPT" docs/tasks/x 1 >/dev/null 2>&1 ); RC=$?
+[ "$RC" -ne 0 ] && [ ! -f "$D/lock.json" ] && pass "prefix-sharing other directory still refused" || fail "prefix-sharing dir" "rc=$RC"
+
+# A snapshot with no task_or_story_directory (pre-task.123 shape) is accepted.
+D="$T/nofield"; L="$D/lock.json"; S="$D/snap.json"; mkdir -p "$D"; mkdoc "$D/doc" 2
+printf '{"skill":"develop-task","current_step":5,"halt_reason":"loop-limit"}\n' > "$S"
+PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$D/doc" 1 >/dev/null 2>&1; RC=$?
+[ "$RC" -eq 0 ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "3" ] && pass "snapshot without task_or_story_directory (pre-task.123) is accepted (C4-CR-7)" || fail "absent field" "rc=$RC"
+
+# A non-integer qa_max_cycles on the lock is warned about and treated as 0, not swallowed.
+D="$T/badbudget"; L="$D/lock.json"; mkdir -p "$D"; mkdoc "$D/doc" 2
+printf '{"current_step":5,"qa_max_cycles":"abc"}\n' > "$L"
+ERR=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$D/none" bash "$SCRIPT" "$D/doc" 1 2>&1 >/dev/null); RC=$?
+[ "$RC" -eq 0 ] && echo "$ERR" | grep -q "not an integer" && [ "$(jq -r '.qa_max_cycles' "$L")" = "3" ] && pass "non-integer qa_max_cycles warned and overwritten (C4-CR-7)" || fail "non-integer budget" "rc=$RC err=$ERR"
+
 # ── refusals ─────────────────────────────────────────────────────────────────
 D="$T/refuse"; L="$D/lock.json"; mkdir -p "$D"; mkdoc "$D/doc" 5; printf '{"current_step":5}\n' > "$L"
 for BAD in "" 0 -1 2.5 two "2 3"; do
