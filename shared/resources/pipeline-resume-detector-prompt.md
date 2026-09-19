@@ -84,10 +84,13 @@ ls -t .claude/state/develop-pipeline.last-halt.json .claude/state/develop-pipeli
 1. Read every candidate listed. Drop any whose `task_or_story_directory` is not the directory of the document being resumed — and **report each one dropped** in `deltas_since_pause` ("stale snapshot for `<other dir>` ignored"); a leftover for another task is itself worth the operator's attention.
 2. **Stale snapshot after merge (task.124, obs #88).** For a `last-halt.json` that *is* for this document, check whether the run it records has already **finished**: the snapshot's `pr_url` is set and `gh pr view <pr_url> --json state --jq .state` returns `MERGED`. If so, the snapshot outlived its run — a completed run deletes its own snapshot at Step 8 since task.124, so one that survives is a leftover from before that, or from a run that completed outside the pipeline. Report it in `deltas_since_pause` as `"stale-snapshot: <path> — PR merged; deleted"`, **delete the file** (`rm -f` — the one write this read-only prompt makes, and only on this evidence), and drop it from the candidates. Never offer a resume of merged work.
 
-   **This check is `gh`-only.** A `pr_url` that is not a github.com pull request (Bitbucket, via
-   `create-pr`'s auto-detection) makes `gh pr view` fail, and a failed read is **not** evidence of
-   MERGED: keep the snapshot as an ordinary candidate and note `"stale-snapshot check skipped —
-   pr_url is not a GitHub PR"` in `deltas_since_pause` (task.124 QA cycle 3, CR-5). Step 8's
+   **This check is `gh`-only, and a failed read is never evidence of MERGED.** Branch on the URL
+   host first: a `pr_url` that is not a github.com pull request (Bitbucket, via `create-pr`'s
+   auto-detection) skips the check with `"stale-snapshot check skipped — pr_url is not a GitHub
+   PR"`; a github.com `pr_url` whose `gh pr view` fails (offline, unauthenticated, rate-limited)
+   skips it with `"stale-snapshot check skipped — gh pr view failed: <first stderr line>"`. Either
+   way the snapshot stays an ordinary candidate and the note goes in `deltas_since_pause` (task.124
+   QA cycle 3 CR-5; cycle 4 CR-3 — one label per cause, never one label for both). Step 8's
    same-document deletion covers the completed-run case on every platform.
 
    **`status: accepted` is not finished, and must not fire this rule** (task.124 QA cycle 2, CR-1). `/finalise` writes `accepted` at its Step 7 action 6a — *before* its second CI reading, whose `ci-not-green-on-acceptance-head` HALT is a documented outcome, and before Step 8 runs. A snapshot for an accepted document is therefore the most likely shape of a **live** post-acceptance halt or pause, and deleting it destroys exactly the resume record the halt wrote. An accepted document with an OPEN (or unknown, or no) PR is an ordinary candidate.

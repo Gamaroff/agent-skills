@@ -163,8 +163,9 @@ porcelain afterwards (a pathspec-filtered re-read is satisfied vacuously by an e
 probe mis-parsed), because a probe that prints "discarded" over an entry it did not discard is the
 task.116 failure with a success line in front of it (cycle 1 CR-4, cycle 2 CR-4). Renames are
 split by `--no-renames` and a quoted path is (c) for the same reason: the probe acts only on paths
-it can address. Cost: one `git status --porcelain --no-renames`, plus one `git diff` / `cmp` per
-entry for (a), plus one full porcelain re-read.
+it can address. Cost: one `git status --porcelain --no-renames`, plus one `git cat-file -e` and one
+`git diff --quiet` (tracked) or `git show | cmp` (untracked) per entry for (a), plus one full
+porcelain re-read.
 
 **Halt snapshot for another document.** When Phase 0a's detector reports a `last-halt.json` whose
 `task_or_story_directory` is not this document's, it is **refused, not resumed** — and when a
@@ -181,7 +182,11 @@ that reaches this point is either this run's live one or a leftover the detector
 it — a session that continues in place after a pause **and** a re-invocation that chooses Resume
 in Phase 0b — so neither has a step that puts the lock back unless it is stated, and
 `advance-pipeline-lock.sh <n>` with no lock is now an **error naming the fix**, not a silent no-op
-(obs #123; QA cycle 2, CR-2). Restore first, then continue:
+(obs #123; QA cycle 2, CR-2). **Who restores is stated once — under Phase 0a, "Restore the lock
+(both resume paths)"** — and this paragraph defers to it: on a `loop-limit|not-converging` snapshot
+the grant restores (after its never-lower guard), and on every other snapshot or pause the command
+below runs first, then the run continues (QA cycle 4, CR-1 — an earlier revision of this paragraph
+said "restore first" unconditionally, which was the bug-9 ordering restated one section down):
 
 ```bash
 bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --restore {doc-directory}

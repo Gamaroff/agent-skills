@@ -461,23 +461,22 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-19
-**Quality Score**: 80/100
+**Quality Score**: 85/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.124.qa.3.pipeline-resume-lifecycle-hygiene.md](./task.124.qa.3.pipeline-resume-lifecycle-hygiene.md)
-- **Gate File**: [task.124.gate.3.pipeline-resume-lifecycle-hygiene.yml](./task.124.gate.3.pipeline-resume-lifecycle-hygiene.yml)
+- **Full Report**: [task.124.qa.4.pipeline-resume-lifecycle-hygiene.md](./task.124.qa.4.pipeline-resume-lifecycle-hygiene.md)
+- **Gate File**: [task.124.gate.4.pipeline-resume-lifecycle-hygiene.yml](./task.124.gate.4.pipeline-resume-lifecycle-hygiene.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3512 (fast gate) + 16 replay scenarios + targeted reproductions/mutations
+- **Tests Executed**: 3512 (fast gate) + reproductions
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH; 2 MEDIUM
+- **Critical Issues**: 0 HIGH; 2 MEDIUM (prose consistency)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Cycle-2 CR-1..CR-4 verified FIXED.
-- CR-1 (MEDIUM): Phase 0b's restore precedes the grant's refusal ([bug 9](./task.124.bug.9.restore-before-grant-defeats-refusal.md)); CR-2 (MEDIUM): a deleted branch-added file is re-created by the probe ([bug 10](./task.124.bug.10.probe-recreates-deleted-branch-added-file.md)).
-- CR-3..CR-6 (LOW): three stale sentences and a GitHub-only MERGED check.
+- Cycle-3 CR-1..CR-6 verified FIXED.
+- CR-1 (MEDIUM): the resume contract states who restores twice; the Phase 0b one is unconditional ([bug 11](./task.124.bug.11.two-restore-statements-in-resume-contract.md)). CR-2 (MEDIUM): develop-bug carries the grant exception without a grant ([bug 12](./task.124.bug.12.develop-bug-carries-grant-exception-without-a-grant.md)).
 
 ## Bug Reports
 
@@ -493,13 +492,17 @@ None.
 - [Bug 124.7: `--restore` carries a stale `waiting_on`](./task.124.bug.7.restore-carries-stale-waiting-on.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
 - [Bug 124.8: probe mis-parses renames and quoted paths](./task.124.bug.8.probe-mishandles-renames-and-quoted-paths.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
 
-- [Bug 124.9: restore before the grant defeats a refused re-entry](./task.124.bug.9.restore-before-grant-defeats-refusal.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
-- [Bug 124.10: probe re-creates a deleted branch-added file](./task.124.bug.10.probe-recreates-deleted-branch-added-file.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.9: restore before the grant defeats a refused re-entry](./task.124.bug.9.restore-before-grant-defeats-refusal.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.10: probe re-creates a deleted branch-added file](./task.124.bug.10.probe-recreates-deleted-branch-added-file.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+
+- [Bug 124.11: two restore statements in the resume contract](./task.124.bug.11.two-restore-statements-in-resume-contract.md) - 🔍 Ready for QA - Severity: MEDIUM
+- [Bug 124.12: develop-bug carries the grant exception without a grant](./task.124.bug.12.develop-bug-carries-grant-exception-without-a-grant.md) - 🔍 Ready for QA - Severity: MEDIUM
 
 ### Closed Bugs
 
 - Bugs 124.1–124.4 — verified FIXED in QA cycle 2 (2026-09-19)
 - Bugs 124.5–124.8 — verified FIXED in QA cycle 3 (2026-09-19)
+- Bugs 124.9–124.10 — verified FIXED in QA cycle 4 (2026-09-19)
 
 ## Change Log
 <!-- change-log-start -->
@@ -515,6 +518,7 @@ None.
 | 2026-09-19 |  | QA gate FAIL (70/100) — 1 HIGH (CR-1 GNU stat), 3 MEDIUM (CR-2..CR-4), 3 LOW; 4 bug reports | qa-task |
 | 2026-09-19 |  | QA gate 2 FAIL (70/100) — cycle-1 findings verified fixed; refute pass: 2 HIGH (CR-1 accepted≠finished, CR-2 re-invocation never restores), 2 MEDIUM; bugs 5–8 | qa-task |
 | 2026-09-19 |  | QA gate 3 CONCERNS (80/100) — cycle-2 findings verified fixed; 0 HIGH, 2 MEDIUM (restore/grant order; deleted branch-added file), 3 LOW; bugs 9–10 | qa-task |
+| 2026-09-19 |  | QA gate 4 CONCERNS (85/100) — cycle-3 findings verified fixed; 0 HIGH, 2 MEDIUM (duplicate restore statement; develop-bug exception), 2 LOW; bugs 11–12 | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

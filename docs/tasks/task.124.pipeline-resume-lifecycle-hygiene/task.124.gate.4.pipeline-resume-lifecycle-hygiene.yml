@@ -1,0 +1,98 @@
+schema: 1
+task: 'task.124.pipeline-resume-lifecycle-hygiene'
+task_title: 'Resume trusts what it finds on disk'
+gate: CONCERNS
+status_reason: 'Cycle-3 findings CR-1..CR-6 verified FIXED (cat-file precondition reproduced; the halt_reason branch present in three files). The narrowed cycle-4 review found no HIGH and no new mechanism defect: two MEDIUM consistency defects left by the cycle-3 prose fix itself — the resume contract now states who restores twice, and the second statement is the old unconditional one; and the grant exception was copied into develop-bug, which has no grant — plus two low cleanups. Reliability CONCERNS narrows to documentation ordering.'
+reviewer: 'QA Engineer'
+updated: '2026-09-19T14:52:51Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The Phase 0b paragraph "Restoring the lock — on either resume path" still says "Restore first, then continue" unconditionally, contradicting the halt_reason branch cycle 3 added under Phase 0a and re-creating the bug-9 ordering for a reader who follows Phase 0b.'
+    suggested_action: 'One statement of who restores: make the Phase 0b paragraph defer to the Phase 0a section and state the loop-escalation exception inline.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.11.two-restore-statements-in-resume-contract.md'
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'skills/develop-bug/SKILL.md'
+    finding: 'The grant-restores exception was copied into develop-bug, which has no re-entry grant, so a bug snapshot whose halt_reason reads loop-limit would be restored by neither path.'
+    suggested_action: 'Drop the exception from develop-bug (--restore on every halt snapshot) and say why.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.12.develop-bug-carries-grant-exception-without-a-grant.md'
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/pipeline-resume-detector-prompt.md'
+    finding: 'Any gh pr view failure on a github.com pr_url is labelled "not a GitHub PR"; an offline or unauthenticated gh is mislabelled.'
+    suggested_action: 'Branch on the URL host first; name the actual failure for a github.com URL.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The contract Cost sentence omits the cat-file -e added to the tracked arm; the task doc §9 line names it, so the two cost statements disagree.'
+    suggested_action: 'Update the Cost sentence.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 3512
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'No mechanism defect remains; the two mediums are ordering statements in executed prose (a reader following the second statement re-creates bug 9; a develop-bug resume with a loop-limit halt_reason would not restore). Both are one-paragraph fixes.'
+  maintainability:
+    status: PASS
+    notes: 'The mechanisms are single-definition and tested; the residue is two duplicated statements and two labels.'
+
+bug_resolution:
+  cycle_3_findings_verified:
+    - { id: 'CR-1 (cycle 3)', status: FIXED, evidence: 'halt_reason branch present in the resume contract (Phase 0a section), step-0 §0b and the three orchestrators — but see cycle-4 CR-1/CR-2' }
+    - { id: 'CR-2 (cycle 3)', status: FIXED, evidence: 'reproduction: branch-added file deleted uncommitted → class (c) with the cat-file precondition' }
+    - { id: 'CR-3..CR-6 (cycle 3)', status: FIXED, evidence: 'sentences rewritten; gh-only note present' }
+
+code_review:
+  reviewed: '7 files changed since gate 3 (1213 diff lines), narrowed'
+  findings_total: 4
+  bugs: 2
+  cleanups: 2
+  promoted_to_gate: 1
+  code_review_blocking: true
+
+recommendations:
+  immediate:
+    - action: 'CR-1: one statement of who restores in the resume contract'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-2: drop the grant exception from develop-bug'
+      refs: ['skills/develop-bug/SKILL.md']
+    - action: 'CR-3 / CR-4: the two labels'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/develop-pipeline-resume-contract.md']
+  future:
+    - action: 'Carried: cycle-1 CR-5 (guard vs chosen candidate), cycle-1 CR-7 (inline lint exit-code split)'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed']
