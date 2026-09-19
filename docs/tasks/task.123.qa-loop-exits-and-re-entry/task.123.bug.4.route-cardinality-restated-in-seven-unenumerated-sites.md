@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 1, diff code review CR-4 — verified)
 **Date Found**: 2026-09-19
 
@@ -60,3 +60,4 @@ Fix every hit; add `assert.doesNotMatch(text, /three (accepting )?routes|routes 
 
 **Verification Steps for QA**:
 1. `grep -rn "three routes\|routes 1–3" shared skills docs --exclude-dir=references` → no hits outside historical task.116 artifacts.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 2 (refute pass): fix present on `b9c32281`, suites green |

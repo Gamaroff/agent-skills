@@ -123,6 +123,13 @@
         "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.implementation.1.example.md",
         "QA_MAX_CYCLES = 7"
       ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.implementation.1.example.md",
+        "### QA Cycle 5[\\s\\S]*?\\*\\*Action\\*\\*: Escalating — loop limit reached"
+      ]
     }
   ]
 }

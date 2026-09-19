@@ -45,6 +45,8 @@ const FILES = {
   lockHelper: "shared/resources/advance-pipeline-lock.sh",
   detectorPrompt: "shared/resources/pipeline-resume-detector-prompt.md",
   hooksDoc: "shared/resources/develop-pipeline-hooks.md",
+  grantScript: "shared/resources/grant-qa-cycles.sh",
+  changelog: "CHANGELOG.md",
 };
 const text = Object.fromEntries(
   Object.entries(FILES).map(([k, p]) => [k, read(p)]),
@@ -67,6 +69,7 @@ const MISSPELLINGS = [
   // CR-1 (QA cycle 1): the budget was "5 + extra_cycles_granted", which counts every gate written
   // since the original budget against the grant. It is an absolute qa_max_cycles now.
   /5 \+ extra_cycles_granted/,
+  /QA_MAX_CYCLES = 5 \+ k\b/, // C2-CR-5: the CHANGELOG spelling of the same rule
 ];
 
 test("every participant spells `qa_phase` and `extra_cycles_granted` the same way", () => {
@@ -88,14 +91,16 @@ test("every participant spells `qa_phase` and `extra_cycles_granted` the same wa
   ]) {
     assert.match(text[name], /\bqa_phase\b/, `${name} must name qa_phase`);
   }
-  // extra_cycles_granted: the two writers + the three readers.
+  // extra_cycles_granted: the writer script, its two call sites, the readers, and the CHANGELOG.
   for (const name of [
+    "grantScript",
     "taskSkill",
     "storySkill",
     "loopDoc",
     "resumeContract",
     "detectorPrompt",
     "hooksDoc",
+    "changelog",
   ]) {
     assert.match(
       text[name],
@@ -236,12 +241,35 @@ test("QA_MAX_CYCLES is the lock's qa_max_cycles — reconstructed count plus the
       `${name} must name qa_max_cycles`,
     );
   }
-  // The two writers write both fields in one jq, from the reconstructed count.
+  // ONE writer — the script — writes both fields in one jq, from the count it reconstructs
+  // itself (C2-CR-2: a `$QA_CYCLE` bound in another fenced block is empty in this one), after
+  // restoring the lock from the halt snapshot when the HALT removed it (C2-CR-1).
+  assert.match(
+    text.grantScript,
+    /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\)'/,
+    "grant-qa-cycles.sh must write qa_max_cycles as the reconstructed count plus the grant",
+  );
+  assert.match(
+    text.grantScript,
+    /del\(\.halted_at, \.halt_reason, \.halt_step, \.paused_at, \.pause_reason\)/,
+    "grant-qa-cycles.sh must restore the lock from the snapshot minus the halt-only fields",
+  );
+  // Every call site is the script, and none inlines the jq or reads $QA_CYCLE across fences.
   for (const name of ["resumeContract", "taskSkill", "storySkill"]) {
     assert.match(
       text[name],
-      /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\)'/,
-      `${name} must write qa_max_cycles as the reconstructed count plus the grant`,
+      /references\/grant-qa-cycles\.sh \{[a-z-]+\} \{k\}/,
+      `${name} must record the grant through grant-qa-cycles.sh`,
+    );
+    assert.doesNotMatch(
+      text[name],
+      /\.qa_max_cycles = \(/,
+      `${name} must not inline the grant's jq — the script is the one writer`,
+    );
+    assert.doesNotMatch(
+      text[name],
+      /--argjson c "\$QA_CYCLE"/,
+      `${name} must not read \$QA_CYCLE across fenced blocks`,
     );
   }
   // The reader reads the lock, defaulting to 5.

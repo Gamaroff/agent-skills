@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-2
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 1, diff code review CR-2 — verified)
 **Date Found**: 2026-09-19
 
@@ -64,3 +64,4 @@ Ship the writer as a script — `shared/resources/set-qa-phase.sh 5a|5b|5c`, sib
 **Verification Steps for QA**:
 1. `grep -rn set_qa_phase shared skills --exclude-dir=references` → no hits.
 2. From two separate shells run `PIPELINE_LOCK=/tmp/l.json bash shared/resources/set-qa-phase.sh 5b` then `… 5a` → the lock reads `5a`.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 2 (refute pass): fix present on `b9c32281`, suites green |

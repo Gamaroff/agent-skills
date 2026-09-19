@@ -77,6 +77,7 @@ The pause flow is therefore: a shell hook (independent execution budget, runs ev
 - **Created**: at the *end of Step 1*, after the feature branch exists. Not earlier — between Phase 0 and end-of-Step-1, the implementation report is either uncommitted on the base branch (`develop`/`main`) or sitting in a `git stash`. A hook firing during that window has no safe place to commit, so the lock-absent path (hook = noop) is intentional.
 - **Updated**: at every step banner from Step 2 onward (`current_step` field) and after PR creation (`pr_url` field).
 - **Removed**: at the end of Step 8 (clean completion); at every terminal HALT (Error Recovery rule); by the hook itself when it fires.
+- **Restored**: by `grant-qa-cycles.sh` at a granted re-entry after a QA loop-limit halt — from the halt snapshot, minus the halt-only fields (task.123). No other resume path restores the lock today; a resumed run that skips Step 1 otherwise proceeds without one, which is a pre-existing gap the task.123 QA cycle 2 gate names as a follow-up.
 
 **Format**:
 

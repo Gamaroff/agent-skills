@@ -291,7 +291,7 @@ the develop-task / develop-story HALT messages in the step-5-6 doc
 
 ### Files to Modify (Tests)
 
-8. ✅ `shared/resources/tests/qa-loop-route.test.mjs` (new — the engine's suite lives under `tests/`, not beside it) + 6 gate fixtures under `tests/fixtures/qa-diminishing-returns/` — route fixture table; `shared/resources/set-qa-phase.sh` + `set-qa-phase.test.sh` (new, QA cycle 1 CR-2)
+8. ✅ `shared/resources/tests/qa-loop-route.test.mjs` (new — the engine's suite lives under `tests/`, not beside it) + 6 gate fixtures under `tests/fixtures/qa-diminishing-returns/` — route fixture table; `shared/resources/set-qa-phase.sh` + `set-qa-phase.test.sh` (new, QA cycle 1 CR-2); `shared/resources/grant-qa-cycles.sh` + `grant-qa-cycles.test.sh` (new, QA cycle 2 C2-CR-1/2)
 9. ✅ `shared/resources/advance-pipeline-lock.test.sh` — monotonic pin; `qa_phase` is a valid lock field
 10. ✅ `evals/develop-task/step-isolation/`, `evals/develop-story/step-isolation/` — three new replay fixtures each
 11. ✅ `evals/shared/tests/pr-review-loop-parity.test.mjs` — accepting-route set now includes 2b/2c; `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` (new) — `qa_phase` / `extra_cycles_granted` spelled once across eight files
@@ -483,6 +483,17 @@ note also taken.
   (`security-probe.test.mjs` "runProbeSpec validates timeoutMs itself", 60 min under load) re-ran
   green alone, 22/22 — untouched by this diff.
 
+### QA Fix Cycle 2 — 2026-09-19
+
+Gate 2 FAIL (50) — the refute pass found four defects in cycle 1's fixes; all five `top_issues[]` entries fixed, plus C2-CR-6.
+
+- **C2-CR-1 (HIGH) + C2-CR-2** — `shared/resources/grant-qa-cycles.sh` (23-assertion suite, in `npm test`): reconstructs the highest gate on disk, restores the lock from the halt snapshot when the HALT removed it (halt/pause fields dropped), writes both fields atomically with cleanup. Every call site is one line; the parity test forbids inline `jq` and cross-fence `$QA_CYCLE`. The pause doc's lock lifecycle names the restore and the pre-existing general gap.
+- **C2-CR-3** — `staleRouteCountPatterns()` derives the forbidden words from a list minus the current one; mutation row over four hypothetical counts.
+- **C2-CR-4** — the loop-limit escalation writes `Escalating — loop limit reached` on the last cycle's Action row on every path; fixture 12 snapshots updated.
+- **C2-CR-5** — CHANGELOG names `qa_max_cycles`; parity pin now covers CHANGELOG and the `5 + k` spelling.
+- **C2-CR-6** — the hook's 5a sentence spells both invocations.
+- Verification: `ci:fast` green (3490 node + 8 bash suites); `eval:all` 34; bundle:check / check:generated / lint:shell / format:check exit 0. Mutation proofs: restore disabled → 2 red; `5 + k` in the script → 6 red + parity red.
+
 ### Deferred Work
 
 - Success criterion **Migration** — deferred out of `/develop` because it needs the PR number; done by the
@@ -500,17 +511,17 @@ note also taken.
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.123.qa.1.qa-loop-exits-and-re-entry.md](./task.123.qa.1.qa-loop-exits-and-re-entry.md)
-- **Gate File**: [task.123.gate.1.qa-loop-exits-and-re-entry.yml](./task.123.gate.1.qa-loop-exits-and-re-entry.yml)
+- **Full Report**: [task.123.qa.2.qa-loop-exits-and-re-entry.md](./task.123.qa.2.qa-loop-exits-and-re-entry.md)
+- **Gate File**: [task.123.gate.2.qa-loop-exits-and-re-entry.yml](./task.123.gate.2.qa-loop-exits-and-re-entry.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3488 node + 6 bash suites + 34 replay scenarios
-- **Phases Verified**: 3/3 (1 PASS, 1 CONCERNS, 1 FAIL)
-- **Critical Issues**: 1 HIGH, 3 MEDIUM (5 entries in `top_issues[]` incl. one high-confidence LOW)
+- **Tests Executed**: 3489 node + 7 bash suites + 34 replay scenarios
+- **Phases Verified**: 3/3 (2 PASS, 1 FAIL)
+- **Critical Issues**: 1 HIGH, 3 MEDIUM (5 entries in `top_issues[]` incl. one high-confidence LOW); cycle-1 bugs 1–4 Closed
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The engine and hook are green and mutation-proven; the defects are in the contracts: `QA_MAX_CYCLES = 5 + k` under-delivers a grant reconstructed from disk (CR-1, HIGH — fixture 12 contradicts its own rule); `set_qa_phase` is unreachable across fenced blocks (CR-2); the Stop hook's step-5 reason says "advance to 7" unconditionally (CR-3); seven consumers still say "three routes" (CR-4); fixture 11 asserts an invented gate key (CR-5).
+Cycle 2 (refute pass): all five cycle-1 findings verified FIXED. New: the grant is written to a lock no resume path recreates (C2-CR-1, HIGH); the grant block reads `$QA_CYCLE` from another fenced block (C2-CR-2); the route-count guard disables itself at the next growth (C2-CR-3); the escalation sub-state row is keyed on a value only the half-cycle writes (C2-CR-4); CHANGELOG still says `5 + k` (C2-CR-5).
 
 ## Change Log
 <!-- change-log-start -->
@@ -523,6 +534,7 @@ The engine and hook are green and mutation-proven; the defects are in the contra
 | 2026-09-18 |  | Status → ready-for-development | review-task |
 | 2026-09-19 |  | Implemented — 14 source files modified, 8 new (engine routes, qa_phase hook, re-entry contract, 6 replay fixtures ×2 sides); 3488 node tests + bash suites green; 8 mutants caught | develop |
 | 2026-09-19 |  | QA gate FAIL (50/100) — 1 HIGH, 3 MEDIUM, 5 LOW (cycle 1) | qa-task |
+| 2026-09-19 |  | QA gate FAIL (50/100) — 1 HIGH, 3 MEDIUM, 2 LOW (cycle 2, refute pass; cycle-1 bugs 1–4 closed) | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

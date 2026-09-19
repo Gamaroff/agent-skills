@@ -188,16 +188,23 @@ This convention ensures the cycle budget is respected across resumes.
 3. **Offer the grant.** When the halt snapshot's `halt_reason` matches `loop-limit|not-converging`,
    Phase 0b's prompt — which lives in `skills/develop-task/SKILL.md` and `skills/develop-story/SKILL.md`,
    not here — is the halt message's own three options plus **"Resume at 5a with {k} more cycles"**.
-   On accept, write the grant into the **lock** (the orchestrator recreates the lock from the
-   snapshot at Step 1 of the resume) as **two** fields — the grant, and the absolute budget it
-   produces:
+   On accept, record the grant with **one call** to the bundled writer:
 
    ```bash
-   # QA_CYCLE is the count reconstructed from disk in step 1 — NOT the original budget of 5.
-   TMP=$(mktemp .claude/state/.grant.XXXXXX) && jq --argjson k "{k}" --argjson c "$QA_CYCLE" \
-     '.extra_cycles_granted = $k | .qa_max_cycles = ($c + $k)' \
-     .claude/state/develop-pipeline.lock > "$TMP" && mv "$TMP" .claude/state/develop-pipeline.lock
+   bash .agents/skills/{develop-story|develop-task}/references/grant-qa-cycles.sh {doc-directory} {k}
    ```
+
+   Source: `shared/resources/grant-qa-cycles.sh`; suite: `grant-qa-cycles.test.sh`. It does three
+   things in one invocation, and each was a defect when the prose left it to the caller
+   (task.123 QA cycle 2, CR-1 and CR-2): it **reconstructs** the cycle count from the gates on disk
+   itself — never from a `$QA_CYCLE` bound in a neighbouring fenced block, which does not exist in
+   this one; it **restores the lock from the halt snapshot when no lock exists** — a terminal HALT
+   removes the lock, and the only ordinary writer of it (the end of `/create-branch`) is a step a
+   resume skips, so without this the grant had no file to land on; and it **writes two fields
+   atomically** — `extra_cycles_granted = k` (the record) and `qa_max_cycles = QA_CYCLE + k` (the
+   budget) — via `mktemp` + `mv`, removing its temp file on every failure. The restore drops the
+   snapshot's halt-only fields (`halted_at`, `halt_reason`, `halt_step`) and PreCompact's
+   (`paused_at`, `pause_reason`) and keeps everything else, the snapshot being a superset of the lock.
 
    The loop then runs with **`QA_MAX_CYCLES` = the lock's `qa_max_cycles`** (absent → 5). The
    budget is **relative to the reconstructed count, not to 5**: a grant of `k` must deliver `k`
@@ -209,7 +216,7 @@ This convention ensures the cycle budget is respected across resumes.
    recomputed from disk on every read, so a compaction pause and resume inside the granted run
    does not creep the budget upward by re-adding `k` to a larger count. The names are
    `extra_cycles_granted` and `qa_max_cycles` in the lock, the halt snapshot (a superset of the
-   lock), the step-5-6 doc and both SKILL.md — one spelling each, and
+   lock), the writer script, the step-5-6 doc and both SKILL.md — one spelling each, and
    `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails when any file disagrees. **Do not
    reuse `MAX_ITER`**: that is the Step 3 develop-loop bound (below), a different budget over a
    different loop.

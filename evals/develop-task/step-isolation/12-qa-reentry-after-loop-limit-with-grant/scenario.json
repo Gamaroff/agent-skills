@@ -123,6 +123,13 @@
         "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
         "QA_MAX_CYCLES = 7"
       ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "### QA Cycle 5[\\s\\S]*?\\*\\*Action\\*\\*: Escalating — loop limit reached"
+      ]
     }
   ]
 }

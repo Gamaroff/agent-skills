@@ -177,7 +177,7 @@ else
         5c) NEXT_NAME="PR CONFORMANCE REVIEW (qa_phase 5c)";   NEXT_SKILL_STORY="/review-pr"; NEXT_SKILL_TASK="/review-pr"
             THEN_WHAT="Only once /review-pr has actually completed: on APPROVE or CONCERNS mark Step 5 ✅ in \`${REPORT}\` and advance the lock to 7; on REQUEST CHANGES write \`qa_phase\` 5b and re-enter 5b — the lock stays at 5." ;;
         *)  NEXT_NAME="QA REVIEW (qa_phase 5a)";               NEXT_SKILL_STORY="/qa-story";  NEXT_SKILL_TASK="/qa-task"
-            THEN_WHAT="Only once the QA review has actually completed: read the gate per the Outcome branching, write \`qa_phase\` 5c (a gate that reaches 5c) or 5b (an open finding) via \`bash .agents/skills/${SKILL}/references/set-qa-phase.sh\`, and continue the loop. Do NOT mark Step 5 ✅ and do NOT advance the lock here; the lock stays at 5 inside the loop." ;;
+            THEN_WHAT="Only once the QA review has actually completed: read the gate per the Outcome branching, write \`qa_phase\` via \`bash .agents/skills/${SKILL}/references/set-qa-phase.sh 5c\` (a gate that reaches 5c) or \`… set-qa-phase.sh 5b\` (an open finding), and continue the loop. Do NOT mark Step 5 ✅ and do NOT advance the lock here; the lock stays at 5 inside the loop." ;;
       esac
       ;;
     6) NEXT_NAME="QA FIX (if needed)"; NEXT_SKILL_STORY="/qa-fix";     NEXT_SKILL_TASK="/qa-fix" ;;

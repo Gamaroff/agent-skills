@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 1, diff code review CR-3 — verified)
 **Date Found**: 2026-09-19
 
@@ -60,3 +60,4 @@ Branch the completion sentence on `NEXT=5` (story/task only): 5a → 'then write
 
 **Verification Steps for QA**:
 1. Render the hook against `{"skill":"develop-task","current_step":5,"qa_phase":"5b"}` → the reason's "Only once …" line says "return to 5a" and "lock stays at 5", never "advance the lock to 7".
+| 2026-09-19 | Closed | QA | Verified in QA cycle 2 (refute pass): fix present on `b9c32281`, suites green |

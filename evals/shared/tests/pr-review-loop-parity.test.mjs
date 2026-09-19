@@ -387,11 +387,21 @@ test("the accepting-route set is stated once: consumers point at §5c and read t
     routeCount,
     "§5c must state its route count as '**N routes out of 5a**'",
   );
-  const STALE_COUNTS = [
-    /\b(one|two|three|four|six|seven) (accepting )?routes\b/i,
-    /§5c'?s? (one|two|three|four|six|seven) routes/i,
-    /routes 1–3\b/,
-  ].filter((re) => !re.test(`${routeCount} routes`));
+  // QA cycle 2 (C2-CR-3): the first form filtered three hard-coded regexes with the current
+  // count, and the alternation omitted "five" — so at "six routes" the whole alternation was
+  // dropped and "three routes" passed again. Derive the stale words from a full list minus the
+  // current one, so the regex survives every future count and the current word becomes stale
+  // the moment it is superseded.
+  const STALE_COUNTS = staleRouteCountPatterns(routeCount);
+  assert.ok(
+    STALE_COUNTS.some((re) => re.test("three routes")) &&
+      STALE_COUNTS.some((re) => re.test("routes 1–3")),
+    "the stale-count patterns must catch the historical spellings at any current count",
+  );
+  assert.ok(
+    !STALE_COUNTS.some((re) => re.test(`${routeCount} routes`)),
+    "the stale-count patterns must not catch the current count",
+  );
   // A wider population than `consumers`: these need not point at §5c, but if they state a
   // count it must be the current one.
   const restaters = {
@@ -460,6 +470,33 @@ test("the accepting-route set is stated once: consumers point at §5c and read t
   );
 });
 
+test("the route-count guard survives the next growth (C2-CR-3 mutation row)", () => {
+  // At any hypothetical count the historical words stay forbidden and only the current word
+  // is allowed. Cycle 1's guard dropped its whole alternation at "six".
+  for (const current of ["five", "six", "seven", "nine"]) {
+    const pats = staleRouteCountPatterns(current);
+    for (const stale of [
+      "three routes",
+      "three accepting routes",
+      "§5c's three routes",
+      "routes 1–3",
+      "five routes",
+      "four routes",
+    ]) {
+      const shouldCatch = !stale.startsWith(current);
+      assert.equal(
+        pats.some((re) => re.test(stale)),
+        shouldCatch,
+        `at "${current}", "${stale}" must ${shouldCatch ? "" : "NOT "}be caught`,
+      );
+    }
+    assert.ok(
+      !pats.some((re) => re.test(`${current} routes`)),
+      `"${current} routes" is the current count`,
+    );
+  }
+});
+
 test("the Action row the consumers read has a writer on every route: post-guard write, On-exit step 1, closed value set (task.116 cycle 4)", () => {
   // Cycle 3 made "reached 5c" the cycle entry's Action row. Cycle 4 found nothing told the
   // Diminishing-returns exit to WRITE it — the entry is opened before the guards run, so a
@@ -494,8 +531,8 @@ test("the Action row the consumers read has a writer on every route: post-guard 
   );
   assert.match(
     branching,
-    /half-cycle's own gate[^.]*`\*\*Action\*\*: Escalating — loop limit reached` and `\*\*PR Review\*\*: not reached — gate did not exit the loop`/,
-    "the post-guard write must name the half-cycle resolution: Action 'Escalating — loop limit reached' and PR Review 'not reached'",
+    /Loop limit\*\* trigger on \*\*every\*\* path[^.]*`\*\*Action\*\*: Escalating — loop limit reached` and `\*\*PR Review\*\*: not reached — gate\s+did not exit the loop`/,
+    "the post-guard write must name the loop-limit resolution on EVERY escalation path (C2-CR-4): Action 'Escalating — loop limit reached' and PR Review 'not reached'",
   );
   // Cycle 5: the rule named the 5c and 5b values only. The third resolution — the Convergence
   // check trips and the run leaves the loop without reaching 5c — had a value in the closed set
@@ -527,6 +564,35 @@ test("the Action row the consumers read has a writer on every route: post-guard 
     "On-exit step 1 must also reset the PR Review placeholder",
   );
 });
+
+/**
+ * The stale route-count patterns for a given current count word. Every number word that is not
+ * the current one is forbidden, in the three spellings consumers have used; "routes 1–3" is the
+ * ordinal form of the original three. Built from a full list minus the current word — never a
+ * hard-coded alternation filtered by the current word — so the guard survives every growth.
+ */
+function staleRouteCountPatterns(current) {
+  const NUMBER_WORDS = [
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+  ];
+  const stale = NUMBER_WORDS.filter(
+    (w) => w !== String(current).toLowerCase(),
+  ).join("|");
+  return [
+    new RegExp(`\\b(${stale}) (accepting )?routes\\b`, "i"),
+    new RegExp(`§5c'?s? (${stale}) routes`, "i"),
+    /routes 1–3\b/,
+  ];
+}
 
 // ── 3. Verdict routing — the graph, not just the vocabulary ──────────────────
 

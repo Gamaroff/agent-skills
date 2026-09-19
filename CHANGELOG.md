@@ -24,7 +24,9 @@ All notable changes to this project will be documented in this file. Format foll
   monotonic and `6 → 5` stays refused (obs #72). A re-invocation after a loop-limit halt reconstructs
   the cycle count from `gate.{N}` files on disk, back-fills any `### QA Cycle` entry a standalone
   `/qa-task` did not write (marked `run outside the loop (operator)`), offers "Resume at 5a with {k}
-  more cycles", and records `extra_cycles_granted` on the lock so `QA_MAX_CYCLES = 5 + k` (obs #95).
+  more cycles", and `grant-qa-cycles.sh` records `extra_cycles_granted` and an absolute
+  `qa_max_cycles` — the reconstructed cycle count plus the grant, never `5 + k` — on the lock,
+  restoring the lock from the halt snapshot first when the HALT removed it (obs #95).
   Guards: the on-stop and lock-helper bash suites pin the hook's `qa_phase` arms and the monotonic
   refusal; `qa-loop-lock-fields-parity.test.mjs` fails when any of eight files spells either field
   differently or the step doc ever advances the lock to 6; `pr-review-loop-parity` now pins §5c's five

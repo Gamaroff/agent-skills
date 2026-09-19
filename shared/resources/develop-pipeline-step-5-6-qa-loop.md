@@ -13,7 +13,7 @@ Loaded by `/develop-story` and `/develop-task` during Steps 5–6. Story/task va
 
 ## Loop Setup (shared)
 
-This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **`QA_MAX_CYCLES` complete cycles** — the lock's `qa_max_cycles` field when present, else **5**. The field is written only by a granted re-entry after a loop-limit halt (resume contract, **Re-entry after a QA loop escalation**), as `QA_CYCLE at resume + extra_cycles_granted` — relative to the count reconstructed from disk, never to 5, so a grant of `k` delivers `k` cycles whatever gates already exist:
+This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **`QA_MAX_CYCLES` complete cycles** — the lock's `qa_max_cycles` field when present, else **5**. The field is written only by a granted re-entry after a loop-limit halt (resume contract, **Re-entry after a QA loop escalation**; writer: `shared/resources/grant-qa-cycles.sh`), as `QA_CYCLE at resume + extra_cycles_granted` — relative to the count reconstructed from disk, never to 5, so a grant of `k` delivers `k` cycles whatever gates already exist:
 
 ```bash
 QA_MAX_CYCLES=$(jq -r '.qa_max_cycles // 5' .claude/state/develop-pipeline.lock 2>/dev/null || echo 5)
@@ -321,9 +321,13 @@ without reaching 5c, and the same write puts `**Action**: Escalating — loop no
 `**PR Review**: not reached — gate did not exit the loop` on the row. The Diminishing-returns exit's
 own `On exit` list repeats this as its first step so a run that takes route 2 cannot leave the row at
 its 5b value, and the Cosmetic-residue exit's does the same for route 2b. The arm has a fourth
-resolution, reached only from Loop Escalation: the gate-the-last-fix half-cycle's own gate (cycle
-`{N+1}`) has an open entry, and the same write puts `**Action**: Escalating — loop limit reached` and
-`**PR Review**: not reached — gate did not exit the loop` on that row. The row's value set is exactly `{Proceeding to 5c
+resolution, written by Loop Escalation's **Loop limit** trigger on **every** path it takes: the
+same write puts `**Action**: Escalating — loop limit reached` and `**PR Review**: not reached — gate
+did not exit the loop` on the entry of the **last cycle that ran** — cycle `{N}` when the half-cycle
+was declined, cycle `{N+1}` when the half-cycle ran and its gate has an open entry. A loop-limit
+escalation therefore always leaves the same signal the Convergence trip leaves, and a resume reads
+either from the last entry's Action row rather than from which route happened to run (task.123 QA
+cycle 2, CR-4). The row's value set is exactly `{Proceeding to 5c
 (PR conformance review), Running qa-fix (cycle {N} of {QA_MAX_CYCLES}), Escalating — loop not converging, Escalating — loop limit reached}`.
 
 - `PASS` with **no open entry in `top_issues[]`** → **proceed to 5c** (the loop's exit gate), not straight to Step 7
@@ -1359,9 +1363,13 @@ The route fires — `gate-the-last-fix` — only when **all** of:
      below **with gate `{N+1}` in its table**: it is the last gate, and the head it read is the
      head being handed over.
 
-**On `continue`:** write the escalation entry as today. Put `ROUTE_JSON`'s `reason` in the entry's
-**What was attempted per cycle** so the reader knows the half-cycle was considered and why it was
-declined (`last-cycle-not-a-fix`, `high-findings-seen`, `medium-not-falling`, …).
+**On `continue`:** overwrite cycle `N`'s routing rows — `**Action**: Escalating — loop limit reached`
+and `**PR Review**: not reached — gate did not exit the loop` — then write the escalation entry as
+today. Put `ROUTE_JSON`'s `reason` in the entry's **What was attempted per cycle** so the reader
+knows the half-cycle was considered and why it was declined (`last-cycle-not-a-fix`,
+`high-findings-seen`, `medium-not-falling`, …). The Action overwrite is not optional: the resume
+contract's 5c sub-state table keys the "left the loop through escalation" row on it, and the
+Convergence trip already writes its own value the same way.
 
 Before halting, write a thorough escalation entry in the Issues Log. Use the template for the
 work item type, substituting the heading and opening sentence for the trigger that fired, and

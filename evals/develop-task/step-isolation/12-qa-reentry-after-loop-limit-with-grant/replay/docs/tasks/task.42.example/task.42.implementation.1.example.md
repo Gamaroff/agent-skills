@@ -63,7 +63,7 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 **MEDIUM findings**: 1
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
-**Action**: Running qa-fix (cycle 5 of 5)
+**Action**: Escalating — loop limit reached
 
 ### QA Cycle 6 — 2026-09-18
 **Origin**: run outside the loop (operator)

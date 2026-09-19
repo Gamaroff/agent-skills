@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 1, diff code review CR-1 — verified)
 **Date Found**: 2026-09-19
 
@@ -65,3 +65,4 @@ Define the extended budget relative to the reconstructed count — `QA_MAX_CYCLE
 **Verification Steps for QA**:
 1. `grep -rn '5 + extra_cycles_granted' shared skills evals` → no hits.
 2. Fixture 12's lock reads `qa_max_cycles: 8` with `extra_cycles_granted: 2` and gates 1–6 on disk.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 2 (refute pass): fix present on `b9c32281`, suites green |
