@@ -55,11 +55,21 @@ If `blocking_issues` is non-empty: **HALT** — display each issue to the user a
 ### Restore the lock (both resume paths)
 
 When `source` is `halt_snapshot` or `orphaned_claim` and the operator chooses Resume, the lock does
-not exist — a HALT or pause removed it, and a resume skips Step 1, its only ordinary writer. Run
-`advance-pipeline-lock.sh --restore {doc-directory}` **here**, before Phase 0b, on the re-invocation
-path exactly as the in-session continuation does (task.124 QA cycle 2, CR-2; the step-0 doc's
-Shared Resume Logic states the call). A numeric advance with no lock is an error, so a resume that
-skips this fails at its first transition.
+not exist — a HALT or pause removed it, and a resume skips Step 1, its only ordinary writer. **Who
+restores depends on the snapshot's `halt_reason`** (task.124 QA cycle 3, CR-1):
+
+- `halt_reason` matches `loop-limit|not-converging` → **do not restore here.** The Phase 0b prompt
+  is the grant prompt (**Re-entry after a QA loop escalation**, below), and `grant-qa-cycles.sh`
+  restores through `--restore` **only after its never-lower guard passes**. A declined or refused
+  grant therefore restores nothing and consumes nothing — the task.123 CR-1 rule — and the run
+  returns to the halt message's own three options with the snapshot still on disk.
+- any other `halt_reason`, or a PreCompact `pause_reason` → run
+  `advance-pipeline-lock.sh --restore {doc-directory}` **here**, before Phase 0b, on the
+  re-invocation path exactly as the in-session continuation does (QA cycle 2, CR-2; the step-0
+  doc's Shared Resume Logic states the call).
+
+A numeric advance with no lock is an error, so a resume that skips whichever of these applies
+fails at its first transition.
 
 ### Narrow Phase 0b Scope
 
@@ -80,7 +90,7 @@ bundled copy the run had produced. So the probe runs **first**, and it **classif
 
 | Class | What it is | Action |
 | --- | --- | --- |
-| **(a) overlay** | every entry is byte-identical to the base branch — a tracked file whose content equals `$BASE_REF`'s, or an untracked file the base **has** with the same bytes (a stray checkout/copy, not work) | discard, path by path, **from `HEAD` into both the index and the working tree**: `git checkout HEAD -- <tracked paths>`, `git clean -f -- <untracked paths>`; then re-read `git status --porcelain` over those paths and HALT if any survived; list every discarded path in the Decisions Log |
+| **(a) overlay** | every entry is byte-identical to the base branch — a tracked file whose content equals `$BASE_REF`'s, or an untracked file the base **has** with the same bytes (a stray checkout/copy, not work) | discard, path by path, **from `HEAD` into both the index and the working tree**: `git checkout HEAD -- <tracked paths>`, `git clean -f -- <untracked paths>`; then re-read the **full** `git status --porcelain --no-renames` and HALT if anything remains; list every discarded path in the Decisions Log |
 | **(b) bundle drift** | every entry is under `skills/*/references/` — bundled copies out of date with their sources | `npm run bundle -- --check \|\| npm run bundle`, then continue |
 | **(c) anything else** | an entry the probe cannot classify — real uncommitted work, an untracked file the base does not have, a mix | **HALT**: print the entries and stop. A resume that guesses here is the task.116 overlay again |
 
@@ -106,7 +116,10 @@ if [ -n "$DIRTY" ]; then
         UNTRACKED+=("$p")
       else OVERLAY=false; break; fi
     else
-      if git diff --quiet "$BASE_REF" -- "$p" 2>/dev/null; then TRACKED+=("$p"); else OVERLAY=false; break; fi
+      # The base must HAVE the path: `git diff --quiet` is 0 for a path absent on BOTH sides, so
+      # an uncommitted deletion of a file the branch added would otherwise read as "identical
+      # to base" and the discard would re-create it (task.124 QA cycle 3, CR-2).
+      if git cat-file -e "$BASE_REF:$p" 2>/dev/null && git diff --quiet "$BASE_REF" -- "$p" 2>/dev/null; then TRACKED+=("$p"); else OVERLAY=false; break; fi
     fi
   done <<< "$DIRTY"
   if [ "$OVERLAY" = true ]; then
@@ -142,7 +155,9 @@ rather than broken work (the step-3 doc's "Never revert or clean by directory" r
 `git diff --quiet $BASE_REF -- <path>` **never reports an untracked path**, so the tracked-file
 test alone passes every `??` entry as "identical to base" and `git clean` then deletes a file the
 base never had. The `cat-file -e` + `cmp` pair is what makes an untracked file identical-to-base
-*provably* so; anything else is (c). And `git checkout -- <path>` restores the working tree **from
+*provably* so; anything else is (c). The tracked arm needs the same `cat-file -e` precondition,
+because `git diff --quiet` is also silent for a path absent on both sides — an uncommitted deletion
+of a branch-added file (cycle 3 CR-2). And `git checkout -- <path>` restores the working tree **from
 the index**, so a *staged* overlay survives it — the discard names `HEAD` and re-reads the **whole**
 porcelain afterwards (a pathspec-filtered re-read is satisfied vacuously by an entry whose path the
 probe mis-parsed), because a probe that prints "discarded" over an entry it did not discard is the

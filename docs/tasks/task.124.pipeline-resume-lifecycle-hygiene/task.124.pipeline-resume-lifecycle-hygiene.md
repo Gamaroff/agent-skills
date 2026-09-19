@@ -106,7 +106,7 @@ Phase 0b     git status --porcelain non-empty → classify EVERY entry, then act
                (c) anything else, or any entry the probe cannot classify         → HALT naming the files
              summary-gap rule: raise only when the report's `Subagent summary ref` for that step names a missing path
 Step 8       on success: delete last-halt.json when its task_or_story_directory is this run's (writer owns cleanup);
-             detector: refuse a snapshot whose document reads status: accepted or whose PR is merged, and delete it
+             detector: refuse and delete a snapshot whose PR is MERGED (gh-only); `status: accepted` alone never fires the rule
 Lock         waiting_on: {kind: agent|task, label, since, budget_minutes} — written ONLY by set-waiting-on.sh
              (sibling of set-qa-phase.sh): `set-waiting-on.sh "<label>"` at dispatch, `--clear` on result
 Stop hook    waiting_on set and younger than budget_minutes → allow the stop with "waiting on {label} since {since}";
@@ -215,7 +215,10 @@ its restore moves behind `--restore`.
       `git checkout HEAD -- <paths>` for tracked overlay entries (index and worktree — the bare
       index-restoring form leaves a staged overlay in place, QA cycle 1 CR-4), `git clean -f --
       <paths>` for untracked ones — never `git checkout -- .` or a directory-wide `git clean` — and
-      a porcelain re-read of the discarded paths before the success line. A `??` entry is
+      a re-read of the full `git status --porcelain --no-renames` before the success line (a path-scoped
+      re-read is satisfied vacuously by an entry the probe mis-parsed — QA cycle 2 CR-4); the tracked
+      arm also requires `git cat-file -e "$BASE_REF:$p"` so a deleted branch-added file is never (a)
+      (QA cycle 3 CR-2). A `??` entry is
       identical-to-base only when `git cat-file -e "$BASE_REF:$p"` succeeds **and** the content
       matches (`git diff <commit> -- <path>` never reports an untracked path, so the tracked-file
       test alone passes every untracked file). Any entry the probe cannot classify → (c) HALT.
@@ -411,7 +414,7 @@ Not applicable.
 - [x] An in-session continuation after a PreCompact pause restores the lock with one documented command; advancing with no lock is an error, not silence.
 
 ### Performance
-- [x] The tree probe adds one `git status --porcelain` and, for (a), one `git diff --stat` against the base.
+- [x] The tree probe adds one `git status --porcelain --no-renames`, one `git cat-file -e` plus one `git diff --quiet` / `cmp` per entry for (a), and one full porcelain re-read after the discard.
 
 ### Code Quality
 - [x] `report-lint.js` is pure with a thin CLI; one reader for all call sites.
@@ -455,27 +458,26 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-19
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.124.qa.2.pipeline-resume-lifecycle-hygiene.md](./task.124.qa.2.pipeline-resume-lifecycle-hygiene.md)
-- **Gate File**: [task.124.gate.2.pipeline-resume-lifecycle-hygiene.yml](./task.124.gate.2.pipeline-resume-lifecycle-hygiene.yml)
+- **Full Report**: [task.124.qa.3.pipeline-resume-lifecycle-hygiene.md](./task.124.qa.3.pipeline-resume-lifecycle-hygiene.md)
+- **Gate File**: [task.124.gate.3.pipeline-resume-lifecycle-hygiene.yml](./task.124.gate.3.pipeline-resume-lifecycle-hygiene.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3512 (fast gate) + 16 replay scenarios + GNU-coreutils container suites
+- **Tests Executed**: 3512 (fast gate) + 16 replay scenarios + targeted reproductions/mutations
 - **Phases Verified**: 4/4
-- **Critical Issues**: 2 (HIGH) + 2 MEDIUM
+- **Critical Issues**: 0 HIGH; 2 MEDIUM
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Cycle-1 CR-1..CR-4 verified FIXED by reproduction.
-- CR-1 (HIGH, cycle 2): the stale-snapshot rule deletes a live post-acceptance snapshot ([bug 5](./task.124.bug.5.stale-snapshot-rule-fires-on-accepted.md)).
-- CR-2 (HIGH): the re-invocation resume path never restores the lock ([bug 6](./task.124.bug.6.reinvocation-resume-never-restores-lock.md)).
-- CR-3/CR-4 (MEDIUM): stale `waiting_on` through a restore ([bug 7](./task.124.bug.7.restore-carries-stale-waiting-on.md)); porcelain parsing of renames/quoted paths ([bug 8](./task.124.bug.8.probe-mishandles-renames-and-quoted-paths.md)).
+- Cycle-2 CR-1..CR-4 verified FIXED.
+- CR-1 (MEDIUM): Phase 0b's restore precedes the grant's refusal ([bug 9](./task.124.bug.9.restore-before-grant-defeats-refusal.md)); CR-2 (MEDIUM): a deleted branch-added file is re-created by the probe ([bug 10](./task.124.bug.10.probe-recreates-deleted-branch-added-file.md)).
+- CR-3..CR-6 (LOW): three stale sentences and a GitHub-only MERGED check.
 
 ## Bug Reports
 
@@ -486,14 +488,18 @@ None.
 - [Bug 124.3: dispatch population hand-listed; QA-skill dispatches unmarked](./task.124.bug.3.dispatch-population-hand-listed.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
 - [Bug 124.4: staged overlay entry survives the probe](./task.124.bug.4.staged-overlay-not-discarded.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
 
-- [Bug 124.5: stale-snapshot rule fires on `status: accepted`](./task.124.bug.5.stale-snapshot-rule-fires-on-accepted.md) - ✅ Ready for QA - Severity: HIGH (Fixed 2026-09-19)
-- [Bug 124.6: re-invocation resume never restores the lock](./task.124.bug.6.reinvocation-resume-never-restores-lock.md) - ✅ Ready for QA - Severity: HIGH (Fixed 2026-09-19)
-- [Bug 124.7: `--restore` carries a stale `waiting_on`](./task.124.bug.7.restore-carries-stale-waiting-on.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
-- [Bug 124.8: probe mis-parses renames and quoted paths](./task.124.bug.8.probe-mishandles-renames-and-quoted-paths.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.5: stale-snapshot rule fires on `status: accepted`](./task.124.bug.5.stale-snapshot-rule-fires-on-accepted.md) - ✅ Closed - Severity: HIGH (Fixed 2026-09-19)
+- [Bug 124.6: re-invocation resume never restores the lock](./task.124.bug.6.reinvocation-resume-never-restores-lock.md) - ✅ Closed - Severity: HIGH (Fixed 2026-09-19)
+- [Bug 124.7: `--restore` carries a stale `waiting_on`](./task.124.bug.7.restore-carries-stale-waiting-on.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.8: probe mis-parses renames and quoted paths](./task.124.bug.8.probe-mishandles-renames-and-quoted-paths.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+
+- [Bug 124.9: restore before the grant defeats a refused re-entry](./task.124.bug.9.restore-before-grant-defeats-refusal.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.10: probe re-creates a deleted branch-added file](./task.124.bug.10.probe-recreates-deleted-branch-added-file.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
 
 ### Closed Bugs
 
 - Bugs 124.1–124.4 — verified FIXED in QA cycle 2 (2026-09-19)
+- Bugs 124.5–124.8 — verified FIXED in QA cycle 3 (2026-09-19)
 
 ## Change Log
 <!-- change-log-start -->
@@ -508,6 +514,7 @@ None.
 | 2026-09-19 |  | Implemented — 4 phases; 3 new engines (report-lint.js, set-waiting-on.sh, advance-pipeline-lock.sh --restore) + implementation-report-template.md; 7 shell/JS suites extended (+81 assertions), 4 replay fixtures; docs swept | develop |
 | 2026-09-19 |  | QA gate FAIL (70/100) — 1 HIGH (CR-1 GNU stat), 3 MEDIUM (CR-2..CR-4), 3 LOW; 4 bug reports | qa-task |
 | 2026-09-19 |  | QA gate 2 FAIL (70/100) — cycle-1 findings verified fixed; refute pass: 2 HIGH (CR-1 accepted≠finished, CR-2 re-invocation never restores), 2 MEDIUM; bugs 5–8 | qa-task |
+| 2026-09-19 |  | QA gate 3 CONCERNS (80/100) — cycle-2 findings verified fixed; 0 HIGH, 2 MEDIUM (restore/grant order; deleted branch-added file), 3 LOW; bugs 9–10 | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-124-BUG-8
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-19
 **Source**: QA cycle 2 (refute pass), code review finding CR-
@@ -63,3 +63,4 @@ The re-read added for CR-4 (cycle 1) can be satisfied vacuously.
 | 2026-09-19 | New | QA Engineer | Found in QA cycle 2 (refute pass) |
 | 2026-09-19 | In Progress | qa-fix | Investigation started |
 | 2026-09-19 | Ready for QA | qa-fix | Fix implemented |
+| 2026-09-19 | Closed | QA Engineer | Verified fixed in QA cycle 3 |
