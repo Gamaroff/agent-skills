@@ -46,7 +46,8 @@
 #                                                              → exit 1, usage, nothing written
 #     (a leading zero is octal to the shell and decimal to jq — refused rather than parsed twice)
 #   • no gate.{N} file in <doc-dir>                            → exit 1 ("no gate on disk"), nothing written
-#   • no lock AND no snapshot                                  → exit 1, nothing written
+#   • no lock AND no candidate (snapshot or orphaned claim)   → exit 1, nothing written (relayed from --restore)
+#   • no lock AND advance-pipeline-lock.sh missing beside it    → exit 1, named message, nothing written
 #   • snapshot present but for another document (its task_or_story_directory, canonicalised,
 #     is not <doc-dir>, canonicalised — relative and absolute spellings of one directory match;
 #     a snapshot with NO task_or_story_directory is a pre-task.123 shape and is accepted)
@@ -75,6 +76,9 @@ set -uo pipefail
 LOCK="${PIPELINE_LOCK:-.claude/state/develop-pipeline.lock}"
 SNAPSHOT="${PIPELINE_HALT_SNAPSHOT:-.claude/state/develop-pipeline.last-halt.json}"
 export PIPELINE_LOCK="$LOCK" PIPELINE_HALT_SNAPSHOT="$SNAPSHOT"
+# The restore lives in the sibling lock helper. Declared for the bundler on its own line, so
+# every skill that bundles this script also gets the sibling (QA cycle 2, CR-6):
+# bundle-dependency: shared/resources/advance-pipeline-lock.sh
 ADVANCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/advance-pipeline-lock.sh"
 
 usage() {
@@ -155,8 +159,10 @@ fi
 # the snapshot. Its stderr is relayed verbatim so the operator sees which rule refused.
 RESTORED=""
 if [ ! -f "$LOCK" ]; then
-  if [ ! -f "$SNAPSHOT" ]; then
-    echo "grant-qa-cycles: no lock at '$LOCK' and no halt snapshot at '$SNAPSHOT' — cannot record a grant" >&2
+  # No snapshot-only pre-check here (QA cycle 2, CR-7): --restore also accepts an orphaned
+  # `.lock.pausing.<pid>` claim, and its own "nothing to restore" refusal is relayed below.
+  if [ ! -f "$ADVANCE" ]; then
+    echo "grant-qa-cycles: advance-pipeline-lock.sh not found beside this script ($ADVANCE) — the restore cannot run; re-bundle the skill" >&2
     exit 1
   fi
   if ! RESTORE_OUT=$(bash "$ADVANCE" --restore "$DOC_DIR" 2>&1); then

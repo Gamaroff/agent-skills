@@ -40,7 +40,8 @@
 #        claim is a candidate and the newest candidate wins (and the losing
 #        same-document snapshot is consumed with it); a string halt_step is
 #        stored as a number; a GNU-shaped `stat` (shimmed) still picks the newest
-#        candidate, and a non-numeric mtime read degrades to 0 with a warning.
+#        candidate, and a non-numeric mtime read degrades to 0 with a warning; a
+#        snapshot's `waiting_on` is dropped by the restore.
 #   14.  No-lock split (task.124): `<n>` with no lock → exit 1 naming --restore
 #        (the silent exit 0 hid an inert Stop hook for a whole session, obs #123);
 #        `--skill <name>` and `--complete` with no lock keep exit 0 — the
@@ -334,6 +335,18 @@ run_restore_scenarios() {
   else
     pass "[$SH] --restore: no lock + snapshot → lock at halt_step 5 (numeric), halt fields stripped, snapshot consumed"
   fi
+
+  # a waiting_on captured in a PreCompact snapshot does not survive the restore (QA cycle 2, CR-3)
+  printf '{"task_or_story_directory":"%s","current_step":3,"paused_at":"t","pause_reason":"precompact","waiting_on":{"kind":"agent","label":"stale","since":"2026-01-01T00:00:00Z","budget_minutes":10}}\n' "$R/doc" > "$S"
+  rm -f "$L"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -c '[has("waiting_on"), .current_step, (.pause_reason // "absent")]' "$L")" = '[false,3,"absent"]' ]; then
+    pass "[$SH] --restore: a snapshot's waiting_on is dropped (a rebuilt lock waits on nothing)"
+  else
+    fail "[$SH] --restore: waiting_on dropped" "rc=$RC lock=$(jq -c . "$L" 2>/dev/null)"
+  fi
+  printf '{"skill":"develop-task","task_or_story_directory":"%s","branch":"feature/x","current_step":5,"qa_phase":"5b","halted_at":"t","halt_reason":"loop-limit","halt_step":"5"}\n' "$R/doc" > "$S"
+  rm -f "$L"; PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1
 
   # lock present → exit 0 no-op; a snapshot beside it is left alone
   printf '{"task_or_story_directory":"%s","halt_step":2}\n' "$R/doc" > "$S"

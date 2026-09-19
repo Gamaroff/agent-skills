@@ -394,8 +394,8 @@ test("QA_MAX_CYCLES is the lock's qa_max_cycles — reconstructed count plus the
   // The field stripping lives there; the grant script must call it and must not carry its own.
   assert.match(
     text.lockHelper,
-    /del\(\.halted_at, \.halt_reason, \.halt_step, \.paused_at, \.pause_reason\)/,
-    "advance-pipeline-lock.sh --restore must rebuild the lock from the snapshot minus the halt-only fields",
+    /del\(\.halted_at, \.halt_reason, \.halt_step, \.paused_at, \.pause_reason, \.waiting_on\)/,
+    "advance-pipeline-lock.sh --restore must rebuild the lock from the snapshot minus the halt-only fields and any waiting_on (task.124 QA cycle 2, CR-3)",
   );
   assert.match(
     text.grantScript,

@@ -18,8 +18,8 @@ All notable changes to this project will be documented in this file. Format foll
   detector's **summary-gap rule is evidence-conditioned**: a `.summaries/step-N-*.json` is expected
   only where the report's `Subagent summary ref` column names one, so a healthy resume whose Step 3
   ran inline is no longer blocked. A **halt snapshot that outlives its run** is deleted by Step 8
-  (same document only) and refused-and-deleted by the detector when the document is `accepted` or
-  the PR is `MERGED`. The lock gains **`waiting_on`** — `{kind, label, since, budget_minutes}`,
+  (same document only) and refused-and-deleted by the detector when the PR is `MERGED` — never on
+  `status: accepted` alone, which `/finalise` writes before Step 8. The lock gains **`waiting_on`** — `{kind, label, since, budget_minutes}`,
   written only by the new `set-waiting-on.sh` (`"<label>" [--kind agent|task] [--budget-minutes N]` /
   `--clear`, budget from `subagents.wallClockMinutes` read once by the writer, or the caller's own
   bound for a wait that outlives it — the finalise CI poll passes `FINALISE_CI_MAX_WAIT`) — and the Stop hook allows a stop while

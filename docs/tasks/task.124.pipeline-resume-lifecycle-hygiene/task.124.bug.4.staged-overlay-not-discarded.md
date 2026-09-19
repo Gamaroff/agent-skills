@@ -4,7 +4,7 @@
 **Bug ID**: TASK-124-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-19
 **Source**: QA cycle 1, code review finding CR-4
@@ -65,3 +65,4 @@ The probe discards with `git checkout HEAD -- <paths>` (index and worktree from 
 | 2026-09-19 | New | QA Engineer | Found in QA cycle 1 |
 | 2026-09-19 | In Progress | qa-fix | Investigation started |
 | 2026-09-19 | Ready for QA | qa-fix | Fix implemented |
+| 2026-09-19 | Closed | QA Engineer | Verified fixed in QA cycle 2 |

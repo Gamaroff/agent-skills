@@ -462,31 +462,38 @@ None.
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.124.qa.1.pipeline-resume-lifecycle-hygiene.md](./task.124.qa.1.pipeline-resume-lifecycle-hygiene.md)
-- **Gate File**: [task.124.gate.1.pipeline-resume-lifecycle-hygiene.yml](./task.124.gate.1.pipeline-resume-lifecycle-hygiene.yml)
+- **Full Report**: [task.124.qa.2.pipeline-resume-lifecycle-hygiene.md](./task.124.qa.2.pipeline-resume-lifecycle-hygiene.md)
+- **Gate File**: [task.124.gate.2.pipeline-resume-lifecycle-hygiene.yml](./task.124.gate.2.pipeline-resume-lifecycle-hygiene.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3512 (fast gate) + 16 replay scenarios + 4 mutation proofs re-run
+- **Tests Executed**: 3512 (fast gate) + 16 replay scenarios + GNU-coreutils container suites
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1 (HIGH) + 3 MEDIUM
+- **Critical Issues**: 2 (HIGH) + 2 MEDIUM
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR-1 (HIGH): `--restore` reads mtimes with `stat -f %m`, which is filesystem mode on GNU coreutils — the lock-helper suite is red on Linux ([bug 1](./task.124.bug.1.restore-mtime-gnu-stat.md)).
-- CR-2..CR-4 (MEDIUM): finalise CI-poll budget shorter than the poll ([bug 2](./task.124.bug.2.ci-poll-wait-outlives-budget.md)); dispatch population hand-listed, two QA-skill dispatches unmarked ([bug 3](./task.124.bug.3.dispatch-population-hand-listed.md)); staged overlay survives the probe ([bug 4](./task.124.bug.4.staged-overlay-not-discarded.md)).
+- Cycle-1 CR-1..CR-4 verified FIXED by reproduction.
+- CR-1 (HIGH, cycle 2): the stale-snapshot rule deletes a live post-acceptance snapshot ([bug 5](./task.124.bug.5.stale-snapshot-rule-fires-on-accepted.md)).
+- CR-2 (HIGH): the re-invocation resume path never restores the lock ([bug 6](./task.124.bug.6.reinvocation-resume-never-restores-lock.md)).
+- CR-3/CR-4 (MEDIUM): stale `waiting_on` through a restore ([bug 7](./task.124.bug.7.restore-carries-stale-waiting-on.md)); porcelain parsing of renames/quoted paths ([bug 8](./task.124.bug.8.probe-mishandles-renames-and-quoted-paths.md)).
 
 ## Bug Reports
 
 ### In QA Verification
 
-- [Bug 124.1: `--restore` picks the wrong candidate on GNU coreutils](./task.124.bug.1.restore-mtime-gnu-stat.md) - ✅ Ready for QA - Severity: HIGH (Fixed 2026-09-19)
-- [Bug 124.2: finalise CI-poll wait budget shorter than the poll](./task.124.bug.2.ci-poll-wait-outlives-budget.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
-- [Bug 124.3: dispatch population hand-listed; QA-skill dispatches unmarked](./task.124.bug.3.dispatch-population-hand-listed.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
-- [Bug 124.4: staged overlay entry survives the probe](./task.124.bug.4.staged-overlay-not-discarded.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.1: `--restore` picks the wrong candidate on GNU coreutils](./task.124.bug.1.restore-mtime-gnu-stat.md) - ✅ Closed - Severity: HIGH (Fixed 2026-09-19)
+- [Bug 124.2: finalise CI-poll wait budget shorter than the poll](./task.124.bug.2.ci-poll-wait-outlives-budget.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.3: dispatch population hand-listed; QA-skill dispatches unmarked](./task.124.bug.3.dispatch-population-hand-listed.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.4: staged overlay entry survives the probe](./task.124.bug.4.staged-overlay-not-discarded.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+
+- [Bug 124.5: stale-snapshot rule fires on `status: accepted`](./task.124.bug.5.stale-snapshot-rule-fires-on-accepted.md) - ✅ Ready for QA - Severity: HIGH (Fixed 2026-09-19)
+- [Bug 124.6: re-invocation resume never restores the lock](./task.124.bug.6.reinvocation-resume-never-restores-lock.md) - ✅ Ready for QA - Severity: HIGH (Fixed 2026-09-19)
+- [Bug 124.7: `--restore` carries a stale `waiting_on`](./task.124.bug.7.restore-carries-stale-waiting-on.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.8: probe mis-parses renames and quoted paths](./task.124.bug.8.probe-mishandles-renames-and-quoted-paths.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
 
 ### Closed Bugs
 
-_Moved here by QA after verification._
+- Bugs 124.1–124.4 — verified FIXED in QA cycle 2 (2026-09-19)
 
 ## Change Log
 <!-- change-log-start -->
@@ -500,6 +507,7 @@ _Moved here by QA after verification._
 | 2026-09-19 |  | Status → ready-for-development | review-task |
 | 2026-09-19 |  | Implemented — 4 phases; 3 new engines (report-lint.js, set-waiting-on.sh, advance-pipeline-lock.sh --restore) + implementation-report-template.md; 7 shell/JS suites extended (+81 assertions), 4 replay fixtures; docs swept | develop |
 | 2026-09-19 |  | QA gate FAIL (70/100) — 1 HIGH (CR-1 GNU stat), 3 MEDIUM (CR-2..CR-4), 3 LOW; 4 bug reports | qa-task |
+| 2026-09-19 |  | QA gate 2 FAIL (70/100) — cycle-1 findings verified fixed; refute pass: 2 HIGH (CR-1 accepted≠finished, CR-2 re-invocation never restores), 2 MEDIUM; bugs 5–8 | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

@@ -251,6 +251,14 @@ ls {task-directory}/task.{id}.implementation.*.md 2>/dev/null
 
 If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. Skip upfront questions already recorded in the Decisions Log.
 
+**Restore the lock before anything advances it (task.124 QA cycle 2, CR-2).** A resume skips Step 1, which is the lock's only ordinary writer, and every terminal HALT and PreCompact pause removed the lock and left a superset of it behind. When the resume detector's `source` is `halt_snapshot` or `orphaned_claim` and the operator chooses **Resume**, run — before Phase 0b verification, before any step banner:
+
+```bash
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --restore {doc-directory}
+```
+
+It rebuilds the lock from the newest candidate for this document, keeps `current_step` at the halted step, strips the halt/pause fields and any `waiting_on`, and consumes the candidates. `source: lock` needs nothing (the lock survived); `source: none` is a fresh start. Without this call the first `advance-pipeline-lock.sh <n>` of the resumed run is an **error naming `--restore`** and the `Stop` hook is inert until then — the same gap the in-session continuation closes with the Context Compression Recovery's Step 0-lock. Log in the Decisions Log: "Lock restored from {source} via `--restore` at step {N}."
+
 **Resume artifact verification**: see `references/develop-pipeline-resume-contract.md` for the full contract — per-step verification table, plan freshness check, gate file conflation warning, QA cycle count reconstruction, branch/PR cross-check, and MAX_ITER=5 stall semantics.
 
 If starting fresh: continue to 0c.

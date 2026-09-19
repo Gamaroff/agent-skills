@@ -93,12 +93,12 @@ write_lock 7
 SKILLS_CONFIG_FILE="$CFG" PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" "step-7 CI poll" --kind task --budget-minutes 26 >/dev/null 2>&1; RC=$?
 [ "$RC" -eq 0 ] && [ "$(jq -c '[.waiting_on.kind, .waiting_on.budget_minutes]' "$LOCK_FILE")" = '["task",26]' ] \
   && pass "--budget-minutes 26 overrides wallClockMinutes 25 for this wait (stored as a number)" || fail "--budget-minutes override" "rc=$RC $(jq -c .waiting_on "$LOCK_FILE")"
-BEFORE=$(cat "$LOCK_FILE")
+BEFORE=$(cat "$LOCK_FILE"); BAD_OK=true
 for BAD in 0 07 ten -5 ""; do
   SKILLS_CONFIG_FILE="$CFG" PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" "x" --budget-minutes "$BAD" >/dev/null 2>&1; RC=$?
-  [ "$RC" -ne 0 ] && [ "$(cat "$LOCK_FILE")" = "$BEFORE" ] || fail "--budget-minutes '$BAD' refused" "rc=$RC"
+  if [ "$RC" -eq 0 ] || [ "$(cat "$LOCK_FILE")" != "$BEFORE" ]; then fail "--budget-minutes '$BAD' refused" "rc=$RC"; BAD_OK=false; fi
 done
-pass "--budget-minutes refuses 0, a leading zero, a word, a negative and an empty value; lock byte-identical"
+[ "$BAD_OK" = true ] && pass "--budget-minutes refuses 0, a leading zero, a word, a negative and an empty value; lock byte-identical"
 
 # ── 5. no lock → exit 0, nothing created ─────────────────────────────────────
 LOCK_FILE="$TMPDIR_TEST/absent.lock"

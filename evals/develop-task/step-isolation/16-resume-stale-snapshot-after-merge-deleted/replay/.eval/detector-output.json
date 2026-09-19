@@ -10,7 +10,7 @@
       "path": ".claude/state/develop-pipeline.last-halt.json",
       "old_mtime": "2026-09-17T10:00:00Z",
       "new_mtime": "2026-09-17T10:00:00Z",
-      "concern": "stale-snapshot: .claude/state/develop-pipeline.last-halt.json \u2014 document accepted / PR merged; deleted"
+      "concern": "stale-snapshot: .claude/state/develop-pipeline.last-halt.json \u2014 PR merged; deleted"
     }
   ],
   "blocking_issues": []

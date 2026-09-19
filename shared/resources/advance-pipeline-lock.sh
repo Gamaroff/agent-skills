@@ -70,7 +70,8 @@
 #     matches)                        → exit 1, nothing written, the candidate is left alone
 #   • otherwise → of the candidates for this document, the NEWEST by mtime wins (the
 #     detector's rule, task.120 bug.5); the lock is rebuilt from it with current_step =
-#     halt_step (fallback: its own current_step), the five halt/pause fields stripped, via
+#     halt_step (fallback: its own current_step), the five halt/pause fields AND any
+#     `waiting_on` stripped (a rebuilt lock waits on nothing this session dispatched), via
 #     mktemp + mv; the source is DELETED — a snapshot that outlives its run is offered as a
 #     resume for merged work (obs #88), so the restore consumes it — and so is every OTHER
 #     candidate for this document (an older snapshot losing to a newer claim); prints
@@ -193,8 +194,12 @@ restore_lock() {
   # halted IN, which is the step still to run), else the candidate's own current_step.
   # `tonumber?`: a HALT snippet that wrote halt_step through `--arg` stored a string, and
   # every reader of current_step compares it numerically.
+  # `waiting_on` is dropped too: a rebuilt lock is not waiting on anything THIS session
+  # dispatched, and a `--clear` issued in the no-lock window was a no-op — a wait carried
+  # over from the snapshot would keep the Stop hook allowing every stop, a real stall
+  # included, until its recorded budget elapsed (task.124 QA cycle 2, CR-3).
   if ! jq '(.current_step = ((.halt_step // .current_step) | (tonumber? // .)))
-           | del(.halted_at, .halt_reason, .halt_step, .paused_at, .pause_reason)' "$chosen" > "$tmp"; then
+           | del(.halted_at, .halt_reason, .halt_step, .paused_at, .pause_reason, .waiting_on)' "$chosen" > "$tmp"; then
     rm -f "$tmp"
     echo "advance-pipeline-lock: could not rebuild the lock from '$chosen'" >&2
     exit 1

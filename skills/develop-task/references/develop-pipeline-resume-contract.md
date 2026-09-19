@@ -53,6 +53,15 @@ Wait for user confirmation before proceeding to Phase 0b. If the user disputes `
 
 If `blocking_issues` is non-empty: **HALT** — display each issue to the user and require manual resolution before resuming. Do not proceed to Phase 0b.
 
+### Restore the lock (both resume paths)
+
+When `source` is `halt_snapshot` or `orphaned_claim` and the operator chooses Resume, the lock does
+not exist — a HALT or pause removed it, and a resume skips Step 1, its only ordinary writer. Run
+`advance-pipeline-lock.sh --restore {doc-directory}` **here**, before Phase 0b, on the re-invocation
+path exactly as the in-session continuation does (task.124 QA cycle 2, CR-2; the step-0 doc's
+Shared Resume Logic states the call). A numeric advance with no lock is an error, so a resume that
+skips this fails at its first transition.
+
 ### Narrow Phase 0b Scope
 
 Pass `recommended_step` to Phase 0b. Phase 0b only verifies artifacts for steps **up to `recommended_step - 1`** (i.e., steps the detector considers completed). Steps at or after `recommended_step` are treated as ⏳ Pending.
@@ -77,7 +86,11 @@ bundled copy the run had produced. So the probe runs **first**, and it **classif
 | **(c) anything else** | an entry the probe cannot classify — real uncommitted work, an untracked file the base does not have, a mix | **HALT**: print the entries and stop. A resume that guesses here is the task.116 overlay again |
 
 ```bash
-DIRTY=$(git status --porcelain)
+# `--no-renames`: a staged rename would otherwise print as one `R  old -> new` entry whose
+# "path" is the whole arrow expression — a pathspec that matches nothing, is quiet under `git
+# diff`, and is "discarded" without effect (task.124 QA cycle 2, CR-4). Split, it is a `D` and
+# an `A`, each a real path; the `A` is not in the base and so is class (c).
+DIRTY=$(git status --porcelain --no-renames)
 if [ -n "$DIRTY" ]; then
   BASE_REF="origin/${BASE_BRANCH:-develop}"
   # Classify EVERY entry first; act only on the classified paths (never `checkout -- .`, never a
@@ -86,6 +99,9 @@ if [ -n "$DIRTY" ]; then
   TRACKED=(); UNTRACKED=(); OVERLAY=true
   while IFS= read -r line; do
     st=${line:0:2}; p=${line:3}
+    # A quoted path (a space, a tab, a non-ASCII byte) is printed with its C-style escapes; the
+    # probe does not unescape, so it cannot address the file — class (c), never (a).
+    case "$p" in \"*) OVERLAY=false; break ;; esac
     if [ "$st" = "??" ]; then
       if git cat-file -e "$BASE_REF:$p" 2>/dev/null && git show "$BASE_REF:$p" | cmp -s - "$p"; then
         UNTRACKED+=("$p")
@@ -102,9 +118,12 @@ if [ -n "$DIRTY" ]; then
     # index and worktree alike from the branch's own committed state.
     [ ${#TRACKED[@]} -gt 0 ]   && git checkout HEAD -- "${TRACKED[@]}"
     [ ${#UNTRACKED[@]} -gt 0 ] && git clean -f -- "${UNTRACKED[@]}"
-    # Re-read what was claimed discarded. A discard that succeeded and left the entry behind is
-    # the failure the probe exists to stop, so it is a HALT, not a warning.
-    LEFT=$(git status --porcelain -- "${TRACKED[@]}" "${UNTRACKED[@]}" 2>/dev/null)
+    # Re-read the WHOLE tree, not the discarded pathspecs: every entry was classified (a), so
+    # after the discard the porcelain must be empty, and a pathspec-filtered re-read would be
+    # satisfied vacuously by the very entry a bad pathspec never addressed (QA cycle 2, CR-4).
+    # A discard that succeeded and left anything behind is the failure the probe exists to
+    # stop, so it is a HALT, not a warning.
+    LEFT=$(git status --porcelain --no-renames)
     if [ -n "$LEFT" ]; then
       echo "HALT: overlay discard left entries behind — classify by hand before resuming:"; printf '%s\n' "$LEFT"; exit 1
     fi
@@ -125,31 +144,37 @@ rather than broken work (the step-3 doc's "Never revert or clean by directory" r
 test alone passes every `??` entry as "identical to base" and `git clean` then deletes a file the
 base never had. The `cat-file -e` + `cmp` pair is what makes an untracked file identical-to-base
 *provably* so; anything else is (c). And `git checkout -- <path>` restores the working tree **from
-the index**, so a *staged* overlay survives it — the discard names `HEAD` and re-reads porcelain
-afterwards, because a probe that prints "discarded" over an entry it did not discard is the
-task.116 failure with a success line in front of it (CR-4). Cost: one `git status --porcelain`,
-plus one `git diff` / `cmp` per entry for (a), plus one porcelain re-read of the discarded paths.
+the index**, so a *staged* overlay survives it — the discard names `HEAD` and re-reads the **whole**
+porcelain afterwards (a pathspec-filtered re-read is satisfied vacuously by an entry whose path the
+probe mis-parsed), because a probe that prints "discarded" over an entry it did not discard is the
+task.116 failure with a success line in front of it (cycle 1 CR-4, cycle 2 CR-4). Renames are
+split by `--no-renames` and a quoted path is (c) for the same reason: the probe acts only on paths
+it can address. Cost: one `git status --porcelain --no-renames`, plus one `git diff` / `cmp` per
+entry for (a), plus one full porcelain re-read.
 
 **Halt snapshot for another document.** When Phase 0a's detector reports a `last-halt.json` whose
-`task_or_story_directory` is not this document's, it is **refused, not resumed** — and when that
-snapshot's document reads `status: accepted` or its `pr_url` is `MERGED`, the detector reports it
-as `stale-snapshot` and **deletes it** rather than offering a resume of merged work (obs #88; the
-detector prompt's Step 1). A completed run also deletes its own snapshot at Step 8, so a snapshot
+`task_or_story_directory` is not this document's, it is **refused, not resumed** — and when a
+snapshot for *this* document names a `pr_url` that is `MERGED`, the detector reports it as
+`stale-snapshot` and **deletes it** rather than offering a resume of merged work (obs #88; the
+detector prompt's Step 1). A document that reads `status: accepted` is **not** evidence the run
+finished — `/finalise` writes it before its second CI reading and before Step 8 — so an accepted
+document with an unmerged PR keeps its snapshot (task.124 QA cycle 2, CR-1). A completed run also deletes its own snapshot at Step 8, so a snapshot
 that reaches this point is either this run's live one or a leftover the detector names.
 
-**Continuing in the same session after a pause.** The PreCompact hook and every terminal HALT
+**Restoring the lock — on either resume path.** The PreCompact hook and every terminal HALT
 **remove the lock** and leave a superset of it behind (`last-halt.json`, or an orphaned
-`.lock.pausing.<pid>` claim). A session that continues in place — rather than re-invoking the
-skill, whose Step 1 is the lock's only ordinary writer — has no step that puts the lock back, and
+`.lock.pausing.<pid>` claim). Step 1 is the lock's only ordinary writer and *every* resume skips
+it — a session that continues in place after a pause **and** a re-invocation that chooses Resume
+in Phase 0b — so neither has a step that puts the lock back unless it is stated, and
 `advance-pipeline-lock.sh <n>` with no lock is now an **error naming the fix**, not a silent no-op
-(obs #123). Restore first, then continue:
+(obs #123; QA cycle 2, CR-2). Restore first, then continue:
 
 ```bash
 bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --restore {doc-directory}
 ```
 
-It rebuilds the lock from the newest candidate for this document, strips the halt/pause fields,
-keeps `current_step` at the halted step, and **consumes** the snapshot. `grant-qa-cycles.sh`'s own
+It rebuilds the lock from the newest candidate for this document, strips the halt/pause fields and
+any `waiting_on`, keeps `current_step` at the halted step, and **consumes** the candidates. `grant-qa-cycles.sh`'s own
 restore (task.123) is this same call — one restore path, one document-match rule, one consumption
 policy (the resume contract's **Re-entry after a QA loop escalation**, below, is unchanged from the
 caller's side).

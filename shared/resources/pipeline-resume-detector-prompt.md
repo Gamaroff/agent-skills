@@ -82,7 +82,9 @@ ls -t .claude/state/develop-pipeline.last-halt.json .claude/state/develop-pipeli
 ```
 
 1. Read every candidate listed. Drop any whose `task_or_story_directory` is not the directory of the document being resumed — and **report each one dropped** in `deltas_since_pause` ("stale snapshot for `<other dir>` ignored"); a leftover for another task is itself worth the operator's attention.
-2. **Stale snapshot after merge (task.124, obs #88).** For a `last-halt.json` that *is* for this document, check whether the run it records has already finished: the document's frontmatter reads `status: accepted`, **or** the snapshot's `pr_url` is set and `gh pr view <pr_url> --json state --jq .state` returns `MERGED`. If either holds, the snapshot outlived its run — a completed run deletes its own snapshot at Step 8 since task.124, so one that survives is a leftover from before that, or from a run that completed outside the pipeline. Report it in `deltas_since_pause` as `"stale-snapshot: <path> — document accepted / PR merged; deleted"`, **delete the file** (`rm -f` — the one write this read-only prompt makes, and only on this evidence), and drop it from the candidates. Never offer a resume of merged work.
+2. **Stale snapshot after merge (task.124, obs #88).** For a `last-halt.json` that *is* for this document, check whether the run it records has already **finished**: the snapshot's `pr_url` is set and `gh pr view <pr_url> --json state --jq .state` returns `MERGED`. If so, the snapshot outlived its run — a completed run deletes its own snapshot at Step 8 since task.124, so one that survives is a leftover from before that, or from a run that completed outside the pipeline. Report it in `deltas_since_pause` as `"stale-snapshot: <path> — PR merged; deleted"`, **delete the file** (`rm -f` — the one write this read-only prompt makes, and only on this evidence), and drop it from the candidates. Never offer a resume of merged work.
+
+   **`status: accepted` is not finished, and must not fire this rule** (task.124 QA cycle 2, CR-1). `/finalise` writes `accepted` at its Step 7 action 6a — *before* its second CI reading, whose `ci-not-green-on-acceptance-head` HALT is a documented outcome, and before Step 8 runs. A snapshot for an accepted document is therefore the most likely shape of a **live** post-acceptance halt or pause, and deleting it destroys exactly the resume record the halt wrote. An accepted document with an OPEN (or unknown, or no) PR is an ordinary candidate.
 3. Of the candidates that remain, take the **newest by mtime** (the `ls -t` order above).
 4. `source` is `"halt_snapshot"` when the winner is `last-halt.json`, `"orphaned_claim"` when it is a `.pausing.*` file.
 
@@ -197,7 +199,8 @@ Emit the result object with all fields. Do NOT emit any other text.
 | Report without the `Subagent summary ref` column | LOCK_STEP + 1 (nothing expected) + a `deltas_since_pause` note |
 | Report missing or unreadable | LOCK_STEP (conservative) + blocking_issue |
 | Branch missing | Same as above + blocking_issue |
-| A `last-halt.json` for this document whose document is `accepted` / PR is `MERGED` | not a candidate — reported as `stale-snapshot`, deleted |
+| A `last-halt.json` for this document whose PR is `MERGED` | not a candidate — reported as `stale-snapshot`, deleted |
+| A `last-halt.json` for this document whose document is `accepted` but whose PR is not MERGED | an ordinary candidate — a live post-acceptance halt/pause (Step 7 6a → Step 8) |
 
 ---
 
@@ -205,7 +208,7 @@ Emit the result object with all fields. Do NOT emit any other text.
 
 The orchestrator dispatches this as an **Explore subagent**. Key constraints:
 
-- **Read-only** — with one named exception: no writes, no git operations beyond `git branch --list` and the `gh pr view … --json state` read in Step 1; the only write is the `rm -f` of a `last-halt.json` proven stale by an `accepted` document or a `MERGED` PR (Step 1, item 2)
+- **Read-only** — with one named exception: no writes, no git operations beyond `git branch --list` and the `gh pr view … --json state` read in Step 1; the only write is the `rm -f` of a `last-halt.json` proven stale by a `MERGED` PR (Step 1, item 2)
 - **Return JSON only**: the orchestrator parses the output with `jq`
 - **No fallback prose**: if a field cannot be determined, use a safe default and record in `blocking_issues`
 - **macOS/Linux portable**: use the dual-form `stat` commands above
