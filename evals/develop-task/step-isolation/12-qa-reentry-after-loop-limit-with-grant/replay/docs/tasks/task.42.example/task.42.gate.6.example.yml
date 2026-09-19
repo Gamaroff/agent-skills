@@ -1,0 +1,23 @@
+schema: 1
+gate: CONCERNS
+status_reason: "Cycle 6 — run by the operator by hand after the loop-limit halt; no orchestrator entry was written."
+reviewer: "QA Engineer"
+updated: "2026-09-18T12:00:00Z"
+
+top_issues:
+  - id: "EX-601"
+    severity: medium
+    file: "src/example.ts"
+    finding: "MEDIUM of cycle 6."
+    suggested_owner: dev
+    status: closed
+
+waiver:
+  active: false
+
+quality_score: 80
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

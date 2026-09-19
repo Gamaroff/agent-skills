@@ -1,0 +1,121 @@
+schema: 1
+task: 'task.123.qa-loop-exits-and-re-entry'
+task_title: 'The QA loop''s guards read only the HIGH count and the lock cannot go backwards'
+gate: CONCERNS
+status_reason: 'Cycle 4, scoped to the 18 files changed since gate 3. All cycle-3 findings FIXED and verified (bugs 9–10 Closed). No HIGH. Four MEDIUMs, all in the grant script''s refusal paths and the re-entry contract: a refused grant leaves a restored lock; the declined-grant path claims a re-assert that cannot run; two 5c sub-state rows match a loop-limit-via-review entry; an absolute doc-dir is refused against the lock''s relative path. One LOW, two cleanups. HIGH 1, 1, 0, 0.'
+reviewer: 'QA Engineer'
+updated: '2026-09-19T08:43:53Z'
+
+top_issues:
+  - id: 'TASK123-C4-CR-1'
+    severity: medium
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: >-
+      The never-lower guard runs after the snapshot restore, so a refused grant (reproduced:
+      snapshot qa_max_cycles 9, base 6, k=2) exits 1 but leaves a freshly restored lock carrying
+      the snapshot's qa_phase 5b and no grant — the Stop hook names /qa-fix and the next resume
+      sees an active lock instead of the halt snapshot.
+    suggested_action: >-
+      Evaluate the guard against the snapshot's qa_max_cycles before restoring, and remove a
+      restored lock on any later refusal; suite row.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.11.refused-grant-leaves-a-restored-lock.md'
+    status: open
+  - id: 'TASK123-C4-CR-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: >-
+      Step 4 says the set-qa-phase.sh 5a re-assert "holds on a resume that declined the grant",
+      but after a HALT the lock exists only if the grant script restored it — on a declined grant
+      the call noops; step 4, its next sentence and SKILL.md describe three different declined
+      paths.
+    suggested_action: >-
+      A declined grant never reaches 5a: it returns to the halt's own options with no lock; the
+      grant writes qa_phase 5a itself. State it once; align SKILL.md.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.12.declined-grant-path-claims-a-re-assert-that-cannot-run.md'
+    status: open
+  - id: 'TASK123-C4-CR-3'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: >-
+      A loop-limit-via-review entry (PR Review REQUEST CHANGES, Action Escalating — loop limit
+      reached) matches both the REQUEST CHANGES row (re-enter at 5b) and the escalation row with
+      no precedence, so a mechanical reader re-runs qa-fix on an escalated run.
+    suggested_action: >-
+      State that an Escalating Action is checked first, qualify the REQUEST CHANGES row by its
+      Action, and extend the parity row parse.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.13.substate-table-two-rows-match-a-loop-limit-via-review-entry.md'
+    status: open
+  - id: 'TASK123-C4-CR-4'
+    severity: medium
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: >-
+      The ownership check compares strings after stripping ./ and trailing slashes only; an
+      absolute <doc-dir> against the lock's relative task_or_story_directory for the same
+      directory is refused as "for another document" (reproduced). Reviewer confidence medium; QA
+      reproduced.
+    suggested_action: >-
+      Canonicalise both paths (cd && pwd -P) before comparing; suite rows in both directions.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.14.snapshot-ownership-check-refuses-absolute-doc-dir.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 3490
+  phases_verified: '3/3 — cycle 3 findings FIXED; remaining findings are the grant script''s refusal paths and the re-entry contract'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged. boundary: false.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'The grant script''s refusal paths (C4-CR-1, C4-CR-4) leave state or refuse legitimate input; the contract''s declined path and sub-state precedence (C4-CR-2, C4-CR-3) are ambiguous. The happy path is correct and mutation-proven.'
+  maintainability:
+    status: PASS
+    notes: 'Two descriptions of one write (C4-CR-6 cleanup); absent-field default undocumented (C4-CR-7).'
+
+recommendations:
+  immediate:
+    - action: 'C4-CR-1 — guard before restore; rm a restored lock on refusal; suite row'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/grant-qa-cycles.test.sh']
+    - action: 'C4-CR-2 — one declined-grant path (halt options, no lock); drop the re-assert justification; align SKILL.md'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md']
+    - action: 'C4-CR-3 — precedence sentence above the 5c sub-state table; qualify the REQUEST CHANGES row'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'evals/shared/tests/pr-review-loop-parity.test.mjs']
+    - action: 'C4-CR-4 — canonicalise both paths; suite rows'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/grant-qa-cycles.test.sh']
+  future:
+    - action: 'C4-CR-5 — name the orchestrator''s action when the grant script exits 1 (surface stderr, stay at the halt''s options); make the never-lower message state the accepted k'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/grant-qa-cycles.sh']
+    - action: 'C4-CR-6 — preamble says "touches PR Review only on an entry whose gate never reached 5c"; On-continue says "never" — make the preamble say never'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'C4-CR-7 — document the absent task_or_story_directory default; warn on a non-integer qa_max_cycles'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 4
+  fix_date: '2026-09-19'
+  total_iterations: 3
+  verification_method: 'Scoped diff review + re-execution of each cycle-3 fix on d96554cf; bugs 9–10 Closed'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['C4-CR-1 through C4-CR-4 fixed and re-gated']

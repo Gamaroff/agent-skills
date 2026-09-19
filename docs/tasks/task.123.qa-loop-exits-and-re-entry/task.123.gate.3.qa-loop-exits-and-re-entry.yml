@@ -1,0 +1,109 @@
+schema: 1
+task: 'task.123.qa-loop-exits-and-re-entry'
+task_title: 'The QA loop''s guards read only the HIGH count and the lock cannot go backwards'
+gate: CONCERNS
+status_reason: 'Cycle 3, scoped to the files changed since gate 2. All five cycle-2 findings FIXED and verified (bugs 5–8 Closed). No HIGH. Two MEDIUMs in cycle 2''s fixes: the loop-limit escalation write also blanks a real REQUEST CHANGES verdict, and the grant''s base (highest gate) disagrees with the contract''s negative-count rule (resume from the report count) and can lower an existing budget. Three LOWs on the grant script (octal k, qa_phase not reset in the same write, stale snapshot for another document restored) and two cleanups. HIGH sequence 1, 1, 0 — the loop is converging.'
+reviewer: 'QA Engineer'
+updated: '2026-09-19T08:27:07Z'
+
+top_issues:
+  - id: 'TASK123-C3-CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: >-
+      The C2-CR-4 "On continue" write overwrites cycle N's **PR Review** with "not reached" on
+      every loop-limit path, but on the loop-limit-via-review path that gate DID reach 5c and the
+      write destroys the recorded REQUEST CHANGES verdict the escalation template ("Step 5c
+      returned REQUEST CHANGES on cycle(s) {list}") and the resume contract's escalation row read.
+    suggested_action: >-
+      Overwrite only the **Action** row on the loop-limit paths; leave **PR Review** as written;
+      reword the Outcome-branching preamble; extend the parity pin to assert Action alone.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.9.loop-limit-write-clobbers-request-changes-verdict.md'
+    status: open
+  - id: 'TASK123-C3-CR-2'
+    severity: medium
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: >-
+      The script's base is always the highest gate on disk, but the resume contract's
+      negative-count rule resumes from the report entry count when that is higher; on that path a
+      grant lands below the re-entry cycle (gate.3 highest, 5 entries, k=2 → qa_max_cycles 5,
+      NEXT_CYCLE 6) and delivers zero cycles. Verified: it also silently lowers an existing
+      qa_max_cycles (7 → 5). Reviewer confidence medium; QA reproduced both.
+    suggested_action: >-
+      Take max(highest gate, report entry count) as the base — pass the implementation report
+      path — and refuse to write a budget lower than the lock's existing one; add both rows to
+      the suite.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.10.grant-base-disagrees-with-the-contract-negative-count-rule.md'
+    status: open
+  - id: 'TASK123-C3-CR-4'
+    severity: low
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: >-
+      A leading-zero k is octal in 0 and decimal in jq --argjson: k=010 prints
+      qa_max_cycles=11 with 13 in the lock; k=08 prints a bash error and still exits 0. QA
+      reproduced k=010.
+    suggested_action: >-
+      Reject a leading zero in the k guard and print the value back from the written lock rather
+      than recomputing it in shell.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3490
+  phases_verified: '3/3 — cycle 2 findings all FIXED; remaining findings are refinements of the grant script and the escalation write'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'grant-qa-cycles.sh validates k as digits and doc-dir as a directory; arguments reach jq only via --argjson/--arg; no shell interpolation. boundary: false. The stale-snapshot restore (C3-CR-5, advisory) is a correctness gap, not a trust-boundary one — the snapshot is pipeline-authored.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'C3-CR-1 loses a recorded verdict on one escalation path; C3-CR-2 can lower a budget or grant nothing on the negative-count path. Both are bounded, documented and pinned by tests once fixed; the restore and the loop mechanics are correct and mutation-proven.'
+  maintainability:
+    status: PASS
+    notes: 'One subsumed regex (C3-CR-6) and a stale count in the CHANGELOG (C3-CR-7) — cleanups.'
+
+recommendations:
+  immediate:
+    - action: 'C3-CR-1 — loop-limit write names Action only; preamble + parity pin'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'evals/shared/tests/pr-review-loop-parity.test.mjs']
+    - action: 'C3-CR-2 — base = max(highest gate, report entries); never lower an existing budget; suite rows'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/grant-qa-cycles.test.sh', 'shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'C3-CR-4 — reject leading-zero k; print from the lock'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+  future:
+    - action: 'C3-CR-3 — set qa_phase 5a in the grant''s own atomic write (an accepted grant is a 5a re-entry); keep the separate set-qa-phase call as an idempotent re-assert'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'C3-CR-5 — refuse to restore from a snapshot whose task_or_story_directory is not <doc-dir> (a stale snapshot for another document persists by design)'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+    - action: 'C3-CR-6 — the second stale-count regex is subsumed by the first; drop it or cover the ASCII-hyphen "routes 1-3"'
+      refs: ['evals/shared/tests/pr-review-loop-parity.test.mjs']
+    - action: 'C3-CR-7 — CHANGELOG says the lock-fields test checks "eight files"; it lists eleven'
+      refs: ['CHANGELOG.md']
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 2
+  fix_date: '2026-09-19'
+  total_iterations: 2
+  verification_method: 'Scoped diff review (files changed since gate 2) + independent re-execution of each cycle-2 fix on 18b5328f; bugs 5–8 Closed'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['C3-CR-1, C3-CR-2 and C3-CR-4 fixed and re-gated']

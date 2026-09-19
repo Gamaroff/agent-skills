@@ -213,13 +213,24 @@ test("5b is entered on an open finding, never on the verdict token", () => {
   const s5c = section5c();
   assert.match(
     s5c,
-    /three routes out of 5a/,
-    "5c must state that three routes reach it — the accepting-route set is stated once, in 5c",
+    /five routes out of 5a/,
+    "5c must state that five routes reach it — the accepting-route set is stated once, in 5c",
   );
   assert.match(
     s5c,
     /3\. a gate that reads \*\*`CONCERNS` with no open entry in `top_issues\[\]`\*\*/,
     "5c must enumerate route 3 (CONCERNS with no open top_issues[] entry) in its numbered list",
+  );
+  // task.123: routes 2b and 2c join the set in the same list, not as a paraphrase elsewhere.
+  assert.match(
+    s5c,
+    /4\. \*\*\(route 2b\)\*\* a gate that took the \*\*Cosmetic-residue exit\*\*/,
+    "5c must enumerate route 2b (the Cosmetic-residue exit) as item 4 of its numbered list",
+  );
+  assert.match(
+    s5c,
+    /5\. \*\*\(route 2c\)\*\* the gate written by the \*\*Gate-the-last-fix half-cycle\*\*/,
+    "5c must enumerate route 2c (the Gate-the-last-fix half-cycle's gate) as item 5 of its numbered list",
   );
 });
 
@@ -366,6 +377,59 @@ test("the accepting-route set is stated once: consumers point at §5c and read t
     "task-development runbook": read("docs/runbooks/task-development.md"),
     "review-pr skill": read("skills/review-pr/SKILL.md"),
   };
+  // task.123 QA cycle 1, CR-4: §5c grew from three routes to five and the count was edited
+  // where the diff happened to look — seven consumers still said "three". The cardinality is
+  // a restatement of the set, and a stale count is the same drift as a stale token pair. The
+  // §5c count is read from the doc so the next growth cannot leave a consumer behind.
+  const routeCount = (section5c().match(/\*\*(\w+) routes out of 5a\*\*/) ||
+    [])[1];
+  assert.ok(
+    routeCount,
+    "§5c must state its route count as '**N routes out of 5a**'",
+  );
+  // QA cycle 2 (C2-CR-3): the first form filtered three hard-coded regexes with the current
+  // count, and the alternation omitted "five" — so at "six routes" the whole alternation was
+  // dropped and "three routes" passed again. Derive the stale words from a full list minus the
+  // current one, so the regex survives every future count and the current word becomes stale
+  // the moment it is superseded.
+  const STALE_COUNTS = staleRouteCountPatterns(routeCount);
+  assert.ok(
+    STALE_COUNTS.some((re) => re.test("three routes")) &&
+      STALE_COUNTS.some((re) => re.test("routes 1–3")),
+    "the stale-count patterns must catch the historical spellings at any current count",
+  );
+  assert.ok(
+    !STALE_COUNTS.some((re) => re.test(`${routeCount} routes`)),
+    "the stale-count patterns must not catch the current count",
+  );
+  // A wider population than `consumers`: these need not point at §5c, but if they state a
+  // count it must be the current one.
+  const restaters = {
+    ...consumers,
+    "loop doc itself": loopDoc,
+    "develop-task skill": read("skills/develop-task/SKILL.md"),
+    "develop-story skill": read("skills/develop-story/SKILL.md"),
+    "step-4 create-pr doc": read(
+      "shared/resources/develop-pipeline-step-4-create-pr.md",
+    ),
+    "step-7 finalise doc": read(
+      "shared/resources/develop-pipeline-step-7-finalise.md",
+    ),
+    "remaining-work banner": read(
+      "shared/resources/develop-pipeline-remaining-work-banner.md",
+    ),
+    "finalise skill": read("skills/finalise/SKILL.md"),
+    "qa-fix skill": read("skills/qa-fix/SKILL.md"),
+  };
+  for (const [name, text] of Object.entries(restaters)) {
+    for (const re of STALE_COUNTS) {
+      assert.doesNotMatch(
+        text,
+        re,
+        `${name} states a route count that is not §5c's (${routeCount}): ${re}`,
+      );
+    }
+  }
   const PARAPHRASES = [
     /reads `PASS`\/`WAIVED`/,
     /gate is not PASS or WAIVED/,
@@ -393,10 +457,10 @@ test("the accepting-route set is stated once: consumers point at §5c and read t
       `${name} must decide "reached 5c" from the cycle entry's Action row, not from the gate`,
     );
   }
-  // And the set itself lives in exactly one enumerated list: §5c's "three routes out of 5a".
+  // And the set itself lives in exactly one enumerated list: §5c's "five routes out of 5a".
   assert.match(
     section5c(),
-    /three routes out of 5a/,
+    /five routes out of 5a/,
     "§5c must be the one enumerated statement of the set",
   );
   assert.doesNotMatch(
@@ -404,6 +468,33 @@ test("the accepting-route set is stated once: consumers point at §5c and read t
     /hands to 5c \(`PASS` \/ `WAIVED`\)/,
     "the Convergence check preamble must not carry the two-route premise",
   );
+});
+
+test("the route-count guard survives the next growth (C2-CR-3 mutation row)", () => {
+  // At any hypothetical count the historical words stay forbidden and only the current word
+  // is allowed. Cycle 1's guard dropped its whole alternation at "six".
+  for (const current of ["five", "six", "seven", "nine"]) {
+    const pats = staleRouteCountPatterns(current);
+    for (const stale of [
+      "three routes",
+      "three accepting routes",
+      "§5c's three routes",
+      "routes 1–3",
+      "five routes",
+      "four routes",
+    ]) {
+      const shouldCatch = !stale.startsWith(current);
+      assert.equal(
+        pats.some((re) => re.test(stale)),
+        shouldCatch,
+        `at "${current}", "${stale}" must ${shouldCatch ? "" : "NOT "}be caught`,
+      );
+    }
+    assert.ok(
+      !pats.some((re) => re.test(`${current} routes`)),
+      `"${current} routes" is the current count`,
+    );
+  }
 });
 
 test("the Action row the consumers read has a writer on every route: post-guard write, On-exit step 1, closed value set (task.116 cycle 4)", () => {
@@ -424,8 +515,41 @@ test("the Action row the consumers read has a writer on every route: post-guard 
   );
   assert.match(
     branching,
-    /value set is exactly `\{Proceeding to 5c \(PR conformance review\), Running qa-fix \(cycle \{N\} of 5\), Escalating — loop not converging\}`/,
-    "the preamble must state the closed value set of the Action row",
+    /value set is exactly `\{Proceeding to 5c \(PR conformance review\), Running qa-fix \(cycle \{N\} of \{QA_MAX_CYCLES\}\), Escalating — loop not converging, Escalating — loop limit reached\}`/,
+    "the preamble must state the closed value set of the Action row (task.123: 'of {QA_MAX_CYCLES}', plus the half-cycle's 'Escalating — loop limit reached')",
+  );
+  // task.123: the Cosmetic-residue exit writes the row as its first step too, and the
+  // half-cycle's fourth resolution has a writer sentence.
+  const onExit2b = sectionBetween(
+    "### Cosmetic-residue exit (shared)",
+    "### 5b. Run QA Fix (shared)",
+  );
+  assert.match(
+    onExit2b,
+    /^1\. \*\*Overwrite the cycle entry's routing rows first\*\*/m,
+    "the Cosmetic-residue On-exit list must write the Action / PR Review rows as its FIRST step",
+  );
+  assert.match(
+    branching,
+    /Loop limit\*\* trigger on \*\*every\*\* path[^.]*`\*\*Action\*\*: Escalating — loop limit reached`/,
+    "the post-guard write must name the loop-limit resolution on EVERY escalation path (C2-CR-4): Action 'Escalating — loop limit reached'",
+  );
+  // C3-CR-1: the loop-limit write is Action-ONLY — a real REQUEST CHANGES on cycle N's PR Review
+  // row (loop-limit-via-review) must survive it. The "On continue" step must say so, and must not
+  // pair the Action value with the not-reached PR Review value as one write.
+  const onContinue = sectionBetween(
+    "**On `continue`:**",
+    "Before halting, write a thorough escalation entry",
+  );
+  assert.match(
+    onContinue,
+    /overwrite cycle `N`'s `\*\*Action\*\*` row[^.]*\*\*and only that row\*\*/,
+    "the loop-limit 'On continue' write must name the Action row and only that row (C3-CR-1)",
+  );
+  assert.doesNotMatch(
+    onContinue,
+    /`\*\*Action\*\*: Escalating — loop limit reached`\s+and `\*\*PR Review\*\*: not reached/,
+    "the loop-limit write must not blank the PR Review row alongside the Action row (C3-CR-1)",
   );
   // Cycle 5: the rule named the 5c and 5b values only. The third resolution — the Convergence
   // check trips and the run leaves the loop without reaching 5c — had a value in the closed set
@@ -457,6 +581,36 @@ test("the Action row the consumers read has a writer on every route: post-guard 
     "On-exit step 1 must also reset the PR Review placeholder",
   );
 });
+
+/**
+ * The stale route-count patterns for a given current count word. Every number word that is not
+ * the current one is forbidden, in the three spellings consumers have used; "routes 1–3" is the
+ * ordinal form of the original three. Built from a full list minus the current word — never a
+ * hard-coded alternation filtered by the current word — so the guard survives every growth.
+ */
+function staleRouteCountPatterns(current) {
+  const NUMBER_WORDS = [
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+  ];
+  const stale = NUMBER_WORDS.filter(
+    (w) => w !== String(current).toLowerCase(),
+  ).join("|");
+  return [
+    new RegExp(`\\b(${stale}) (accepting )?routes\\b`, "i"),
+    // The ASCII-hyphen spelling of the ordinal form; the en-dash one is below.
+    /routes 1-3\b/,
+    /routes 1–3\b/,
+  ];
+}
 
 // ── 3. Verdict routing — the graph, not just the vocabulary ──────────────────
 
@@ -1274,6 +1428,21 @@ test("the 5c resume check reads the report, not the filesystem", () => {
       `every sub-state row needs both a key and an action; got key=${JSON.stringify(r.key)} action=${JSON.stringify(r.action)}`,
     );
   }
+
+  // C4-CR-3 (task.123): an Escalating Action wins over every PR Review value, and the REQUEST
+  // CHANGES row is qualified by its Action so a loop-limit-via-review entry matches one row only.
+  assert.match(
+    resume,
+    /\*\*Precedence:\s*(?:>\s*)?an `\*\*Action\*\*` that begins `Escalating —` wins over every PR Review value\*\*/,
+    "the 5c sub-state preamble must state that an Escalating Action takes precedence",
+  );
+  const rcRow = subStateRows.find((r) => r.key.includes("`REQUEST CHANGES`"));
+  assert.ok(rcRow, "the REQUEST CHANGES row must exist");
+  assert.match(
+    rcRow.key,
+    /an `\*\*Action\*\*` of `Proceeding to 5c` or `Running qa-fix`/,
+    "the REQUEST CHANGES row must be qualified by a non-escalating Action",
+  );
 
   const claimedBy = new Map();
   for (const v of [

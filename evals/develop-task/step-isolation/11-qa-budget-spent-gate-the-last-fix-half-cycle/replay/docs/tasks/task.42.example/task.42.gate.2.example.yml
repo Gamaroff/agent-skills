@@ -1,0 +1,41 @@
+schema: 1
+gate: CONCERNS
+status_reason: "Cycle 2 — HIGH 0, MEDIUM 4 raised (falling), all fixed by cycle 2's qa-fix."
+reviewer: "QA Engineer"
+updated: "2026-09-18T12:00:00Z"
+
+top_issues:
+  - id: "EX-200"
+    severity: medium
+    file: "src/example.ts"
+    finding: "MEDIUM 1 of cycle 2."
+    suggested_owner: dev
+    status: closed
+  - id: "EX-201"
+    severity: medium
+    file: "src/example.ts"
+    finding: "MEDIUM 2 of cycle 2."
+    suggested_owner: dev
+    status: closed
+  - id: "EX-202"
+    severity: medium
+    file: "src/example.ts"
+    finding: "MEDIUM 3 of cycle 2."
+    suggested_owner: dev
+    status: closed
+  - id: "EX-203"
+    severity: medium
+    file: "src/example.ts"
+    finding: "MEDIUM 4 of cycle 2."
+    suggested_owner: dev
+    status: closed
+
+waiver:
+  active: false
+
+quality_score: 80
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

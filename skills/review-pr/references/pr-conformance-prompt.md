@@ -62,9 +62,10 @@ C. TRAIL (category: trail) — the evidence is missing, stale, or contradicts it
    - no implementation report
    - the highest-numbered gate did not reach 5c. Read this from the implementation report, not from
      the gate: the `### QA Cycle {N}` entry for that gate carries `**Action**: Proceeding to 5c` on
-     every accepting route (the QA loop's §5c routes 1–3 — no open finding; the Diminishing-returns
-     exit, whose open residue is test machinery; a CONCERNS with no open entry) and `Running qa-fix`
-     otherwise. Do NOT flag a gate for its token, and do NOT flag open entries on a gate whose entry
+     every accepting route (the QA loop's §5c routes 1, 2, 2b, 2c and 3 — no open finding; the
+     Diminishing-returns exit, whose open residue is test machinery; the Cosmetic-residue exit, whose
+     LOWs were carried to `recommendations.future` and closed; the gate-the-last-fix half-cycle's
+     own clean gate; a CONCERNS with no open entry) and `Running qa-fix` otherwise. Do NOT flag a gate for its token, and do NOT flag open entries on a gate whose entry
      reads `Proceeding to 5c` — on route 2 they are the residue the exit declined to fix. Only when
      no implementation report is available fall back to the gate itself: FAIL, or an open entry
      (status absent or `open`) that no active waiver covers, is the trail defect

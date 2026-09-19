@@ -1,0 +1,69 @@
+{
+  "name": "develop-story-step-05-route-2b-cosmetic-residue-routes-to-5c",
+  "skill": "develop-story",
+  "description": "Steps 5–6, route 2b (task.123 / obs #100): a PASS gate whose open top_issues[] are all LOW, after two HIGH-0 gates, hands to 5c (/review-pr) — no qa-fix cycle for nits. Fixture records qa-story for cycles 1–2 with one qa-fix after cycle 1 (HIGH 0, a MEDIUM), then review-pr straight after cycle 2's PASS+LOW gate; the LOWs are carried to recommendations.future and closed in top_issues[].",
+  "prompt": "Run steps 5–6 (qa loop) of the develop-story pipeline for story.5.1.example. Cycle 2's gate reads PASS with two open LOW entries and HIGH 0 for cycles 1 and 2.",
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.1.example.yml"
+      ]
+    },
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.2.example.yml"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.2.example.yml",
+        "gate: PASS"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.2.example.yml",
+        "carried_from: top_issues \\(route 2b, cycle 2\\)"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.2.example.yml",
+        "severity: high"
+      ]
+    },
+    {
+      "fn": "pipelineStepsRan",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        [
+          "qa-story",
+          "qa-fix",
+          "qa-story",
+          "review-pr"
+        ]
+      ]
+    },
+    {
+      "fn": "loopBoundedAt",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        "qa-fix",
+        1
+      ]
+    },
+    {
+      "fn": "loopBoundedAt",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        "qa-story",
+        2
+      ]
+    }
+  ]
+}

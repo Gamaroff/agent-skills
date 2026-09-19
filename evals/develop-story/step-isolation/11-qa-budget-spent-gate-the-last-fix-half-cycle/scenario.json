@@ -1,0 +1,112 @@
+{
+  "name": "develop-story-step-05-route-2c-gate-the-last-fix-half-cycle",
+  "skill": "develop-story",
+  "description": "Steps 5–6, route 2c (task.123 / obs #112): five CONCERNS gates with HIGH 0 throughout and MEDIUM falling 4, 3, 2, 1 — the budget is spent on cycle 5's fix, which no gate has read. Loop Escalation evaluates the half-cycle before writing an entry: one ordinary qa-story (no qa-fix) writes gate.6 (PASS) and a `### QA Cycle 6` entry carrying the `**Half-cycle**: gate-the-last-fix` row the step doc specifies — the gate itself carries no half-cycle key — and hands to 5c. Fixture records qa-story×6, qa-fix×5, review-pr×1 — never six qa-fix, never a halt.",
+  "prompt": "Run steps 5–6 (qa loop) of the develop-story pipeline for story.5.1.example. Cycles 1–5 read CONCERNS with HIGH 0 and MEDIUM 5, 4, 3, 2, 1; cycle 5's qa-fix lands and the budget is spent.",
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.5.example.yml"
+      ]
+    },
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.6.example.yml"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.5.example.yml",
+        "gate: CONCERNS"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.6.example.yml",
+        "gate: PASS"
+      ]
+    },
+    {
+      "fn": "pipelineStepsRan",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        [
+          "qa-story",
+          "qa-fix",
+          "qa-story",
+          "qa-fix",
+          "qa-story",
+          "qa-fix",
+          "qa-story",
+          "qa-fix",
+          "qa-story",
+          "qa-fix",
+          "qa-story",
+          "review-pr"
+        ]
+      ]
+    },
+    {
+      "fn": "loopBoundedAt",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        "qa-fix",
+        5
+      ]
+    },
+    {
+      "fn": "loopBoundedAt",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        "qa-story",
+        6
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.6.example.yml",
+        "half-cycle:"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.implementation.1.example.md",
+        "### QA Cycle 6"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.implementation.1.example.md",
+        "\\*\\*Half-cycle\\*\\*: gate-the-last-fix"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.implementation.1.example.md",
+        "\\*\\*Loop exit\\*\\*: Gate-the-last-fix half-cycle granted"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.implementation.1.example.md",
+        "### QA Cycle 6[\\s\\S]*\\*\\*Action\\*\\*: Proceeding to 5c \\(PR conformance review\\)"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.implementation.1.example.md",
+        "### QA Cycle 7"
+      ]
+    }
+  ]
+}

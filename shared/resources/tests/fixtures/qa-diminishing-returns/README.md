@@ -24,3 +24,15 @@ is why these files are named for what they exercise rather than for their proven
 | `missing-file.yml` | a finding carrying no `file:` at all |
 | `product-defect-nfr.yml` | condition 3 — a product defect signalled through `nfr_validation` while every `file:` is machinery |
 | `empty-residue.yml` | a gate with no `top_issues[]` — must not fire (absence is not evidence) |
+
+## Route classifier fixtures (task.123 — `classifyLoopRoute`)
+
+| Fixture | Exercises |
+| :--- | :--- |
+| `pass-low-only.yml` | route 2b — a PASS gate whose open entries are all LOW (task.110 cycle 12, obs #100); the wrapped `finding:` carries a `severity: high` decoy |
+| `concerns-low-only.yml` | route 2b's PASS-only exclusion — the same queue under a CONCERNS token must go to 5b |
+| `pass-mixed-open.yml` | a PASS gate with an open MEDIUM beside the LOW — not cosmetic |
+| `pass-low-closed.yml` | a PASS gate whose LOWs are all closed — route 1's, and 2b must not fire on an empty open set |
+| `medium-falling-cycle5.yml` | route 2c — cycle 5 of a HIGH-0 loop whose MEDIUM fell 4, 3, 2 and now raises 1 (task.117, obs #112) |
+| `medium-flat-cycle5.yml` | route 2c's negative — MEDIUM 2, 2, 2 at the budget: not falling, escalate as today |
+

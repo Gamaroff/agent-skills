@@ -1,0 +1,143 @@
+schema: 1
+task: 'task.123.qa-loop-exits-and-re-entry'
+task_title: 'The QA loop''s guards read only the HIGH count and the lock cannot go backwards'
+gate: FAIL
+status_reason: 'Diff code review (code_review_blocking=true) found one high-confidence HIGH: the re-entry budget is 5 + k while the cycle counter is reconstructed from gates on disk, so a grant delivers fewer than k cycles and fixture 12 contradicts its own rule. Three MEDIUMs (set_qa_phase unreachable across fenced blocks; the Stop hook''s step-5 reason instructs an unconditional 5 → 7; seven consumers still say "three routes") and one LOW (fixture 11 asserts a gate key no contract writes). Tests, evals and bundle checks are green; the defects are in the contracts, not the engine.'
+reviewer: 'QA Engineer'
+updated: '2026-09-18T20:23:02Z'
+
+top_issues:
+  - id: 'TASK123-CR-1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: >-
+      QA_MAX_CYCLES = 5 + extra_cycles_granted while NEXT_CYCLE = highest gate on disk + 1, so a
+      grant of k delivers fewer than k cycles whenever a half-cycle gate, an operator-run gate or a
+      previous grant exists (k=1 after a half-cycle re-escalates immediately; a second re-entry can
+      never extend past the first); fixture 12 runs QA Cycle 8 under QA_MAX_CYCLES = 7 after
+      "Running qa-fix (cycle 7 of 7)", which 5b step 7 sends to Loop Escalation.
+    suggested_action: >-
+      Define the budget relative to the reconstructed count (QA_MAX_CYCLES = QA_CYCLE at resume +
+      extra_cycles_granted) in the resume contract, both SKILL.md Phase 0b blocks and the step-5-6
+      doc; update the lock-fields parity pin; fix fixture 12 on both sides so its trace is legal.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.1.grant-budget-counts-from-five-not-from-disk.md'
+    status: open
+  - id: 'TASK123-CR-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: >-
+      set_qa_phase is defined only inside the Loop Setup fenced block and invoked bare at 5a, 5b,
+      5c, the route-2c half-cycle and the resume contract's re-entry step; each orchestrator Bash
+      call is a fresh shell, so the function is unreachable at every call site and qa_phase is never
+      written — the Stop hook's default arm then names /qa-task on a 5b or 5c stall.
+    suggested_action: >-
+      Ship the writer as shared/resources/set-qa-phase.sh (sibling of advance-pipeline-lock.sh,
+      cited from the step doc so it bundles), invoke it from the repository root at each call site,
+      test it, and update the parity test's set_qa_phase pins.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.2.set-qa-phase-defined-in-one-fence-called-in-others.md'
+    status: open
+  - id: 'TASK123-CR-3'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-on-stop.sh'
+    finding: >-
+      For a step-5 lock the reason text reads "Only once /qa-fix has actually completed: mark Step 5
+      ✅ … and advance the lock to 7" — an unconditional instruction to leave the loop after the
+      current sub-skill; only the appended QA_LOOP_NOTE contradicts it. An orchestrator following
+      the first sentence on a 5a/5b stall skips 5c. (Reviewer confidence medium; verified by QA by
+      rendering the hook against a qa_phase: 5b lock.)
+    suggested_action: >-
+      Branch the completion sentence on NEXT=5 so it says what to do after the sub-step (write the
+      next qa_phase, continue the loop) and states 5 → 7 only as 5c's APPROVE/CONCERNS outcome; add
+      scenario-10 rows asserting 5a/5b reasons carry no unconditional "advance the lock to 7".
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.3.stop-hook-step5-reason-tells-orchestrator-to-leave-loop.md'
+    status: open
+  - id: 'TASK123-CR-4'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: >-
+      "three routes" / "routes 1–3" survives in seven consumers after §5c grew to five: the resume
+      contract's own 5c sub-state table (line 129), docs/runbooks/qa-flow.md:184,
+      skills/review-pr/SKILL.md:555, shared/resources/pr-conformance-prompt.md:64,
+      shared/resources/qa-findings-ingester-prompt.md:28 and :172, docs/runbooks/story-development.md:298,
+      docs/runbooks/task-development.md:180 — the population was edited where the diff looked, never
+      enumerated.
+    suggested_action: >-
+      Fix every hit and add doesNotMatch(/three (accepting )?routes|routes 1–3/) to the consumers
+      loop in pr-review-loop-parity.test.mjs (adding the missing consumers to that loop) so the
+      population is checked rather than listed by hand.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.4.route-cardinality-restated-in-seven-unenumerated-sites.md'
+    status: open
+  - id: 'TASK123-CR-5'
+    severity: low
+    file: 'evals/develop-task/step-isolation/11-qa-budget-spent-gate-the-last-fix-half-cycle/scenario.json'
+    finding: >-
+      Fixture 11 (task and story twins) asserts "half-cycle: gate-the-last-fix" inside gate.6.yml,
+      but no contract writes that key into a gate — the step doc puts the marker on the
+      implementation report's **Half-cycle** row — so the assertion is vacuous under replay and
+      would fail under a live driver, while the row the contract specifies is not asserted.
+    suggested_action: >-
+      Assert the implementation report's **Half-cycle**: gate-the-last-fix row instead (add the
+      report to the replay tree on both sides) and drop the invented gate key from gate.6.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 3488
+  phases_verified: '3/3 (files changed per phase verified against origin/develop; deliberately-untouched files untouched)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No security boundary delivered: classifyLoopRoute is a pure predicate over pipeline-authored gate text and report rows; no network, no shell interpolation (set_qa_phase validates its one argument against 5a|5b|5c and writes via mktemp+mv). boundary: false for the probe rule — none of the corpus sinks (url-authority, sql-orm, path, …) is an input domain of this change.'
+  performance:
+    status: PASS
+    notes: 'Route 2c costs one 5a (review + gate, no 5b, no suite re-run beyond the gate''s) — success criterion met by construction; the engine is O(entries) per gate.'
+  reliability:
+    status: CONCERNS
+    notes: 'The re-entry budget arithmetic (CR-1) under-delivers the grant in exactly the case the rule exists for; the qa_phase writer is unreachable across fenced blocks (CR-2). Both are contract defects, not engine defects; the engine and hook behaviour is pinned by 64 node tests, 8 mutants and 2 bash suites.'
+  maintainability:
+    status: PASS
+    notes: 'Fixture-first engine with a 19-row table; one spelling of both lock fields pinned across eight files; consumers point at §5c — except the seven cardinality restatements CR-4 names.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1 — budget relative to the reconstructed count; fix fixture 12 (both sides)'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'evals/shared/tests/qa-loop-lock-fields-parity.test.mjs']
+    - action: 'CR-2 — set-qa-phase.sh script, bundled, tested, invoked from the root at every call site'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-3 — step-5 reason branches on qa_phase; scenario-10 rows'
+      refs: ['shared/resources/develop-pipeline-on-stop.sh', 'shared/resources/develop-pipeline-on-stop.test.sh']
+    - action: 'CR-4 — fix seven restatements; enumerate the population in the parity test'
+      refs: ['evals/shared/tests/pr-review-loop-parity.test.mjs']
+    - action: 'CR-5 — assert the report row, not an invented gate key'
+      refs: ['evals/develop-task/step-isolation/11-qa-budget-spent-gate-the-last-fix-half-cycle/scenario.json', 'evals/develop-story/step-isolation/11-qa-budget-spent-gate-the-last-fix-half-cycle/scenario.json']
+  future:
+    - action: 'CR-6 — give the two "Escalating —" Action values their own row in the 5c sub-state table, pointing at the Re-entry rule'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-7 — anchor uid=501(gamaroff) gid=20(staff) groups=20(staff),12(everyone),61(localaccounts),79(_appserverusr),80(admin),81(_appserveradm),701(com.apple.sharepoint.group.1),33(_appstore),98(_lpadmin),100(_lpoperator),204(_developer),250(_analyticsusers),395(com.apple.access_ftp),398(com.apple.access_screensharing),399(com.apple.access_ssh),400(com.apple.access_remote_ae) in KEY_RE to the key position so prose containing " id:" before the real key is not captured (verified: readTopIssues yields the prose fragment); add a fixture row'
+      refs: ['shared/resources/qa-diminishing-returns.js']
+    - action: 'CR-8 — CHANGELOG headline says "a lock position that can go backwards"; the design is the opposite'
+      refs: ['CHANGELOG.md']
+    - action: 'CR-9 — route-2c positive row label reads "4,3,2 → 1"; the engine evaluates 3 → 2 → 1'
+      refs: ['shared/resources/tests/qa-loop-route.test.mjs']
+    - action: 'Resume contract: state what a negative CYCLES_OUTSIDE_LOOP means (report entries with no gate on disk) — QA found the snippet yields −2 on a report with two entries and no gates'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR-1 through CR-5 fixed and re-gated']

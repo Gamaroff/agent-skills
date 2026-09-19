@@ -131,6 +131,59 @@ for SKILL in qa-story qa-task qa-fix review-pr; do
   done
 done
 
+# ── Scenario 7b: the QA loop's position is `qa_phase`, and the helper stays monotonic (task.123) ──
+#
+# Inside the loop the lock reads `current_step: 5` throughout and a `qa_phase`
+# field names 5a/5b/5c. The helper gains nothing for this: it must (a) accept a
+# lock carrying `qa_phase` as a valid object, (b) preserve the field on every
+# path — noop, advance and --skill — and (c) still refuse a backward move, which
+# is the monotonic pin that makes `qa_phase` necessary in the first place.
+write_phase_lock() { # $1 = step, $2 = qa_phase
+  printf '{"current_step": %s, "qa_phase": "%s", "story": "demo"}\n' "$1" "$2" > "$LOCK_FILE"
+}
+
+LOCK_FILE="$TMPDIR_TEST/qa-phase-noop.lock"
+write_phase_lock 5 5b
+OUT=$(PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" 5 2>/dev/null); RC=$?
+if [ "$RC" -ne 0 ]; then
+  fail "advance 5 on a step-5 lock with qa_phase noops" "exit $RC"
+elif [ "$(jq -r '.current_step' "$LOCK_FILE")" != "5" ] || [ "$(jq -r '.qa_phase' "$LOCK_FILE")" != "5b" ]; then
+  fail "advance 5 on a step-5 lock with qa_phase noops" "lock changed: $(cat "$LOCK_FILE")"
+else
+  pass "advance 5 on a step-5 lock with qa_phase noops (step 5, qa_phase 5b preserved)"
+fi
+
+LOCK_FILE="$TMPDIR_TEST/qa-phase-backward.lock"
+write_phase_lock 6 5a
+PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" 5 >/dev/null 2>&1; RC=$?
+if [ "$RC" -ne 0 ] || [ "$(jq -r '.current_step' "$LOCK_FILE")" != "6" ]; then
+  fail "advance still refuses 6 → 5 (monotonic pin)" "rc=$RC, current_step=$(jq -r '.current_step' "$LOCK_FILE")"
+else
+  pass "advance still refuses 6 → 5 (monotonic pin — the reason qa_phase exists)"
+fi
+
+LOCK_FILE="$TMPDIR_TEST/qa-phase-exit.lock"
+write_phase_lock 5 5c
+PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" 7 >/dev/null 2>&1; RC=$?
+if [ "$RC" -ne 0 ] || [ "$(jq -r '.current_step' "$LOCK_FILE")" != "7" ]; then
+  fail "advance 5 → 7 on loop exit" "rc=$RC, current_step=$(jq -r '.current_step' "$LOCK_FILE")"
+elif [ "$(jq -r '.qa_phase' "$LOCK_FILE")" != "5c" ]; then
+  fail "advance 5 → 7 preserves qa_phase" "qa_phase was rewritten: $(cat "$LOCK_FILE")"
+else
+  pass "advance 5 → 7 on loop exit (qa_phase 5c preserved — only the Stop hook's case 5 reads it)"
+fi
+
+for SKILL in qa-story qa-task qa-fix review-pr; do
+  LOCK_FILE="$TMPDIR_TEST/qa-phase-skill-$SKILL.lock"
+  write_phase_lock 5 5b
+  PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" --skill "$SKILL" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -ne 0 ] || [ "$(jq -r '.current_step' "$LOCK_FILE")" != "5" ] || [ "$(jq -r '.qa_phase' "$LOCK_FILE")" != "5b" ]; then
+    fail "--skill $SKILL on a qa_phase lock noops" "rc=$RC, lock: $(cat "$LOCK_FILE")"
+  else
+    pass "--skill $SKILL on a qa_phase lock noops (step and qa_phase untouched)"
+  fi
+done
+
 # ── Scenarios 8–11: malformed-lock fail-closed + temp-write hardening ────────
 #
 # Parameterised on the interpreter so the same four assertions run under bash and

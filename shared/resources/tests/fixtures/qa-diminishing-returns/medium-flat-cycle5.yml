@@ -1,0 +1,30 @@
+schema: 1
+task: "task.RECON.medium-flat"
+gate: CONCERNS
+status_reason: "Budget spent with HIGH 0 throughout, but MEDIUM is flat — 2, 2, and this gate raises 2. Not falling, so no evidence one more gate would clear; the escalation is written as today."
+reviewer: "QA Engineer"
+updated: "2026-09-17T11:05:00Z"
+
+top_issues:
+  - id: "FLAT-001"
+    severity: medium
+    file: "src/pipeline/gate.ts"
+    finding: "Still here."
+    suggested_owner: dev
+    status: open
+  - id: "FLAT-002"
+    severity: medium
+    file: "src/pipeline/guard.ts"
+    finding: "Still here too."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

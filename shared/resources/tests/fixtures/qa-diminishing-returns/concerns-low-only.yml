@@ -1,0 +1,35 @@
+schema: 1
+task: "task.RECON.cosmetic-residue-concerns"
+gate: CONCERNS
+status_reason: "Same two LOW nits as pass-low-only.yml, but QA raised a reservation — the token is CONCERNS. Route 2b must NOT fire: a reservation is something 5c must see raised, not carried."
+reviewer: "QA Engineer"
+updated: "2026-09-17T10:05:00Z"
+
+top_issues:
+  - id: "COSM-001"
+    severity: low
+    file: "src/pipeline/guard.ts"
+    finding: "A comment still names the pre-fix variable."
+    suggested_action: "Rename in the comment."
+    suggested_owner: dev
+    status: open
+  - id: "COSM-002"
+    severity: low
+    file: "docs/runbooks/qa-flow.md"
+    finding: "A stale link anchor."
+    suggested_action: "Fix the anchor."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."
+  maintainability:
+    status: CONCERNS
+    notes: "The reservation route 2b must not carry past 5c."

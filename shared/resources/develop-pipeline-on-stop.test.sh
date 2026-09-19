@@ -27,6 +27,9 @@
 #   7. stop_hook_active                   → allow stop (anti-loop signal honoured)
 #   8. develop-task / develop-bug variants name their own skills
 #   9. out-of-range and malformed locks   → allow stop, never crash
+#  10. lock=5 + qa_phase (task.123)       → names the SUB-step's skill, never a
+#                                            neighbour's; absent qa_phase names 5a;
+#                                            the end-of-loop advance is 5 → 7
 
 PASS=0
 FAIL=0
@@ -141,6 +144,103 @@ done <<'EOF'
 {"skill":"develop-story"}|missing current_step → allow
 not json at all|unparseable lock → allow
 EOF
+
+# ── Scenario 10: qa_phase names the QA loop's sub-step (task.123) ────────────
+#
+# The lock reads `current_step: 5` for the whole loop; `qa_phase` says where in
+# it. Each row asserts BOTH halves: the sub-step's skill is named AND a
+# neighbour's is not — a hook that named every loop skill at once would pass the
+# first half. The absent-qa_phase row pins the loud default (5a), and every row
+# pins that the advance the hook asks for at the end of the loop is 5 → 7, never
+# 5 → 6: a "step 6" is not a place the loop can go.
+while IFS='|' read -r skill phase must_contain must_not_contain label; do
+  [ -z "$skill" ] && continue
+  d="$TMPDIR_TEST/qaphase-$skill-${phase:-absent}"
+  if [ -n "$phase" ]; then
+    mklock "$d" "{\"skill\":\"$skill\",\"current_step\":5,\"qa_phase\":\"$phase\",\"report_path\":\"r.md\"}"
+  else
+    mklock "$d" "{\"skill\":\"$skill\",\"current_step\":5,\"report_path\":\"r.md\"}"
+  fi
+  R=$(reason_of "$(run_hook "$d")")
+  if [ -z "$R" ]; then
+    fail "$label" "hook allowed stop; expected a block"
+  elif ! echo "$R" | grep -q -- "invoke $must_contain"; then
+    fail "$label" "did not name '$must_contain'. Got: $(echo "$R" | head -1)"
+  elif echo "$R" | grep -q -- "invoke $must_not_contain"; then
+    fail "$label" "named '$must_not_contain' — a sub-step the loop is not at"
+  elif echo "$R" | grep -q "advance the lock to 6"; then
+    fail "$label" "the loop must never be told to advance to 6"
+  elif ! echo "$R" | grep -q "STEP 5/8"; then
+    fail "$label" "banner must still say STEP 5/8 inside the loop"
+  else
+    pass "$label"
+  fi
+done <<'EOF2'
+develop-task|5a|/qa-task|/qa-fix|qa_phase 5a (task) → /qa-task, not /qa-fix
+develop-task|5b|/qa-fix|/qa-task|qa_phase 5b (task) → /qa-fix, not /qa-task
+develop-task|5c|/review-pr|/qa-fix|qa_phase 5c (task) → /review-pr, not /qa-fix
+develop-task||/qa-task|/review-pr|qa_phase absent (task) → /qa-task (loud default), not /review-pr
+develop-story|5a|/qa-story|/qa-fix|qa_phase 5a (story) → /qa-story, not /qa-fix
+develop-story|5b|/qa-fix|/qa-story|qa_phase 5b (story) → /qa-fix, not /qa-story
+develop-story|5c|/review-pr|/qa-story|qa_phase 5c (story) → /review-pr, not /qa-story
+develop-story||/qa-story|/qa-fix|qa_phase absent (story) → /qa-story (loud default), not /qa-fix
+EOF2
+
+# CR-3 (task.123 QA cycle 1): the completion sentence must not tell a 5a or 5b stall to
+# leave the loop. Only 5c's sentence may say "advance the lock to 7", and it must
+# condition it on APPROVE or CONCERNS; 5a and 5b must say the lock stays at 5 and
+# must NOT say "mark Step 5 ✅".
+for phase in 5a 5b; do
+  d="$TMPDIR_TEST/qaphase-completion-$phase"
+  mklock "$d" "{\"skill\":\"develop-task\",\"current_step\":5,\"qa_phase\":\"$phase\",\"report_path\":\"r.md\"}"
+  R=$(reason_of "$(run_hook "$d")")
+  if echo "$R" | grep -q "advance the lock to 7"; then
+    fail "qa_phase $phase never says 'advance the lock to 7'" "an unconditional exit instruction on a mid-loop stall"
+  elif echo "$R" | grep -q "mark Step 5 ✅ in"; then
+    fail "qa_phase $phase never says 'mark Step 5 ✅'" "the loop is not complete at $phase"
+  elif ! echo "$R" | grep -q "lock stays at 5"; then
+    fail "qa_phase $phase says the lock stays at 5" "got: $(echo "$R" | grep -i 'only once' | head -1)"
+  elif ! echo "$R" | grep -q "set-qa-phase.sh"; then
+    fail "qa_phase $phase names the qa_phase writer" "got: $(echo "$R" | grep -i 'only once' | head -1)"
+  else
+    pass "qa_phase $phase completion sentence keeps the run inside the loop (no advance, no ✅, writer named)"
+  fi
+done
+d="$TMPDIR_TEST/qaphase-completion-5c"
+mklock "$d" '{"skill":"develop-story","current_step":5,"qa_phase":"5c","report_path":"r.md"}'
+R=$(reason_of "$(run_hook "$d")")
+if echo "$R" | grep -q "on APPROVE or CONCERNS mark Step 5 ✅ in \`r.md\` and advance the lock to 7" && echo "$R" | grep -q "on REQUEST CHANGES write"; then
+  pass "qa_phase 5c completion sentence conditions the 5 → 7 advance on APPROVE/CONCERNS and routes REQUEST CHANGES to 5b"
+else
+  fail "qa_phase 5c completion sentence" "got: $(echo "$R" | grep -i 'only once' | head -1)"
+fi
+# Outside the loop the generic sentence is unchanged.
+d="$TMPDIR_TEST/generic-completion"
+mklock "$d" '{"skill":"develop-task","current_step":3,"report_path":"r.md"}'
+R=$(reason_of "$(run_hook "$d")")
+echo "$R" | grep -q "Only once /develop has actually completed: mark Step 3 ✅ in \`r.md\` and advance the lock to 4" \
+  && pass "step 3 keeps the generic completion sentence (mark ✅, advance to 4)" \
+  || fail "step 3 generic completion sentence" "got: $(echo "$R" | grep -i 'only once' | head -1)"
+
+# The hook must never name /finalise from inside the loop, whatever qa_phase says —
+# scenario 4's property, re-pinned on the new field. And develop-bug's map is untouched:
+# its step 5 is its own verify step and reads no qa_phase.
+d="$TMPDIR_TEST/qaphase-5c-no-finalise"
+mklock "$d" '{"skill":"develop-story","current_step":5,"qa_phase":"5c","report_path":"r.md"}'
+R=$(reason_of "$(run_hook "$d")")
+if echo "$R" | grep -q "invoke /finalise"; then
+  fail "qa_phase 5c never names /finalise" "the hook skipped past the loop's exit gate"
+else
+  pass "qa_phase 5c never names /finalise (5c decides the exit, not the hook)"
+fi
+d="$TMPDIR_TEST/qaphase-bug"
+mklock "$d" '{"skill":"develop-bug","current_step":5,"qa_phase":"5b","report_path":"r.md"}'
+R=$(reason_of "$(run_hook "$d")")
+if echo "$R" | grep -q "Step 5 per develop-bug SKILL.md (verify)" && echo "$R" | grep -q "advance the lock to 6"; then
+  pass "develop-bug ignores qa_phase (own map: step 5 = verify, advance 5 → 6)"
+else
+  fail "develop-bug ignores qa_phase" "got: $(echo "$R" | head -1) / $(echo "$R" | grep -o 'advance the lock to [0-9]*')"
+fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""

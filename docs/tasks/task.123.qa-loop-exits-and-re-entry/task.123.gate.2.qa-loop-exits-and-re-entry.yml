@@ -1,0 +1,140 @@
+schema: 1
+task: 'task.123.qa-loop-exits-and-re-entry'
+task_title: 'The QA loop''s guards read only the HIGH count and the lock cannot go backwards'
+gate: FAIL
+status_reason: 'Cycle 2 refute pass over the whole branch. Cycle 1''s five findings are FIXED and verified. The refute found one HIGH in cycle 1''s own fix: the grant is written to a lock that no resume path recreates (a HALT removes it; only create-branch writes it), so on the real re-entry path the write fails and the budget stays 5. Three MEDIUMs, each a fix of the fix: the grant block reads a variable bound in another fenced block (the CR-2 class again), the route-count guard disables itself at the next growth, and the new escalation sub-state row is keyed on a value only the half-cycle writes. Tests, evals, bundle checks green.'
+reviewer: 'QA Engineer'
+updated: '2026-09-19T08:08:20Z'
+
+top_issues:
+  - id: 'TASK123-C2-CR-1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: >-
+      The grant write targets .claude/state/develop-pipeline.lock on the strength of "the
+      orchestrator recreates the lock from the snapshot at Step 1 of the resume", but no such
+      procedure exists (the lock is written only at the end of create-branch, which a resume
+      skips; every terminal HALT removes it); on the real re-entry path jq fails on a missing
+      file, the grant is never persisted, set-qa-phase.sh noops, Loop Setup reads 5, and
+      NEXT_CYCLE > 5 escalates again. Fixture 12 pre-seeds the lock and cannot see it.
+    suggested_action: >-
+      A grant-qa-cycles.sh script beside set-qa-phase.sh that reconstructs the cycle count from
+      disk, restores the lock from the halt snapshot when absent (minus halt-only fields), and
+      writes both fields atomically; state the restore rule in the resume contract; pin the
+      restore in the script's own suite (replay fixtures execute nothing).
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.5.grant-write-targets-a-lock-no-resume-recreates.md'
+    status: open
+  - id: 'TASK123-C2-CR-2'
+    severity: medium
+    file: 'skills/develop-task/SKILL.md'
+    finding: >-
+      The grant block reads "$QA_CYCLE", bound in a different fenced block — the cross-fence
+      defect cycle 1's CR-2 was raised for, reintroduced by cycle 1's fix; in a fresh shell jq
+      --argjson c "" exits 2 and the && chain leaves an empty .claude/state/.grant.XXXXXX
+      behind (same block in develop-story/SKILL.md and the resume contract). Reviewer
+      confidence medium; verified by QA by reading all three blocks.
+    suggested_action: >-
+      Same script as C2-CR-1 — it derives the highest gate itself and removes its temp file on
+      every failure path; each call site becomes one line.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.6.grant-block-reads-qa-cycle-from-another-fence.md'
+    status: open
+  - id: 'TASK123-C2-CR-3'
+    severity: medium
+    file: 'evals/shared/tests/pr-review-loop-parity.test.mjs'
+    finding: >-
+      STALE_COUNTS filters three hard-coded regexes with !re.test(routeCount + " routes"); the
+      alternation omits "five", so at six the whole (one|two|three|four|six|seven) regex is
+      dropped (verified with node: 3 kept at five, 2 at six) and "three routes" passes; "five"
+      can never be flagged once superseded.
+    suggested_action: >-
+      Build one regex from NUMBER_WORDS minus the current word; add a mutation row that sets
+      the count to six and asserts "three routes" is still caught.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.7.route-count-check-disables-itself-at-the-next-growth.md'
+    status: open
+  - id: 'TASK123-C2-CR-4'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: >-
+      The new 5c sub-state row is keyed on Action = "Escalating — loop limit reached", which the
+      step doc writes only on the half-cycle's gate {N+1} with an open entry; an ordinary
+      loop-limit halt (fixture 12's own snapshot) leaves cycle N at "Running qa-fix (cycle N of
+      N)" and matches the "re-enter at 5a" row instead — opposite instructions for the same
+      halt_reason. Reviewer confidence medium; verified by QA against fixture 12's report.
+    suggested_action: >-
+      Have the Loop-limit escalation overwrite cycle N's Action with "Escalating — loop limit
+      reached" on every path (as the Convergence trip already does), state it in the
+      post-guard paragraph, and fix fixture 12's snapshot report.
+    suggested_owner: dev
+    bug_ref: 'task.123.bug.8.escalation-substate-row-keyed-on-a-value-only-the-half-cycle-writes.md'
+    status: open
+  - id: 'TASK123-C2-CR-5'
+    severity: low
+    file: 'CHANGELOG.md'
+    finding: >-
+      The entry still states the rule cycle 1 replaced — "records extra_cycles_granted on the
+      lock so QA_MAX_CYCLES = 5 + k" — and names neither qa_max_cycles nor the
+      reconstructed-count budget; the parity pin does not cover CHANGELOG.md.
+    suggested_action: >-
+      Reword to name qa_max_cycles as the reconstructed count plus the grant; add CHANGELOG.md
+      to the parity test's file set with a "5 + k" pin.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 3489
+  phases_verified: '3/3 — cycle 1 findings all FIXED; new findings are in cycle 1''s fixes (Phase 3 and the CR-4 guard)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged from cycle 1: no trust boundary; set-qa-phase.sh validates its argument and writes via mktemp+mv. boundary: false.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'The re-entry path still does not work end to end (C2-CR-1/CR-2): the mechanism is right, the file it writes to is absent. Engine, hook and writer script are pinned by 64 node tests, 7 bash suites and 12 mutants.'
+  maintainability:
+    status: PASS
+    notes: 'The route-count guard (C2-CR-3) is the one self-disabling check; everything else is fixture-first and pinned.'
+
+recommendations:
+  immediate:
+    - action: 'C2-CR-1 + C2-CR-2 — grant-qa-cycles.sh (reconstruct, restore lock from snapshot, atomic two-field write) + suite; one-line call sites; resume contract restore rule'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md']
+    - action: 'C2-CR-3 — derive STALE_COUNTS from a number-word list minus the current word; mutation row at six'
+      refs: ['evals/shared/tests/pr-review-loop-parity.test.mjs']
+    - action: 'C2-CR-4 — loop-limit escalation overwrites cycle N''s Action on every path; fixture 12 report'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'C2-CR-5 — CHANGELOG wording; parity pin over CHANGELOG.md'
+      refs: ['CHANGELOG.md', 'evals/shared/tests/qa-loop-lock-fields-parity.test.mjs']
+  future:
+    - action: 'C2-CR-6 (cleanup) — the Stop hook''s 5a sentence names set-qa-phase.sh with no argument; spell both invocations (5c / 5b)'
+      refs: ['shared/resources/develop-pipeline-on-stop.sh']
+    - action: 'Pre-existing gap surfaced by C2-CR-1: no resume path of any kind recreates the lock, so every resumed run (not only a granted one) runs its remaining steps without the Stop/PreCompact hooks — worth its own task if the restore is not generalised here'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 4
+  fix_date: '2026-09-19'
+  total_iterations: 1
+  verification_method: 'Refute pass over the whole branch diff + independent re-execution of each fix (grep, hook render, bundled copy diff, fixture replay); all four cycle-1 bugs Closed'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['C2-CR-1 through C2-CR-5 fixed and re-gated']

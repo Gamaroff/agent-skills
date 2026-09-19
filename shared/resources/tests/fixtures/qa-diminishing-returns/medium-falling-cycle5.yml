@@ -1,0 +1,28 @@
+schema: 1
+task: "task.RECON.gate-the-last-fix"
+gate: CONCERNS
+status_reason: "Reconstruction of task.117 cycle 5 — HIGH 0 throughout, MEDIUM fell 4, 3, 2, and this gate raises 1 (obs #112). The 5b fix for this gate landed on the head and no gate has read it."
+reviewer: "QA Engineer"
+updated: "2026-09-17T11:00:00Z"
+
+top_issues:
+  - id: "GLF-005"
+    severity: medium
+    file: "src/pipeline/gate.ts"
+    finding: "The last remaining MEDIUM — one more gate would clear it."
+    suggested_action: "Fix and re-gate."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 82
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."
+  performance:
+    status: PASS
+    notes: "Unchanged."

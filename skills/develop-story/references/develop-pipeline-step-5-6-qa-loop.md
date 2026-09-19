@@ -1,6 +1,6 @@
 ---
 name: develop-pipeline-step-5-6-qa-loop
-description: Steps 5–6 (QA loop) shared by develop-story and develop-task. Covers QA cycle counter setup, gate file location, qa-story/qa-task invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, **Step 5c (the PR conformance review, `/review-pr`) as the loop's exit gate and its APPROVE/CONCERNS/REQUEST CHANGES verdict routing**, no-code-change HALT, qa-fix invocation, the convergence check (HIGH-count stall guard) and third-strike replace-don't-patch rule, one-commit-one-push-per-cycle, escalation entry template, and the loop-limit / not-converging HALT messages. Story vs task variants called out where they differ (skill names, file patterns, gate sort field, commit message format, escalation text).
+description: Steps 5–6 (QA loop) shared by develop-story and develop-task. Covers QA cycle counter setup, gate file location, qa-story/qa-task invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, **Step 5c (the PR conformance review, `/review-pr`) as the loop's exit gate and its APPROVE/CONCERNS/REQUEST CHANGES verdict routing**, no-code-change HALT, qa-fix invocation, the convergence check (HIGH-count stall guard) and third-strike replace-don't-patch rule, the route classifier's Diminishing-returns (2), Cosmetic-residue (2b) and Gate-the-last-fix (2c) routes, the lock's `qa_phase` field (current_step stays 5 for the whole loop), one-commit-one-push-per-cycle, escalation entry template, and the loop-limit / not-converging HALT messages. Story vs task variants called out where they differ (skill names, file patterns, gate sort field, commit message format, escalation text).
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/develop-pipeline-step-5-6-qa-loop.md. Regenerate via `npm run bundle`. -->
 
@@ -14,28 +14,79 @@ Loaded by `/develop-story` and `/develop-task` during Steps 5–6. Story/task va
 
 ## Loop Setup (shared)
 
-This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **5 complete cycles**.
+This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **`QA_MAX_CYCLES` complete cycles** — the lock's `qa_max_cycles` field when present, else **5**. The field is written only by a granted re-entry after a loop-limit halt (resume contract, **Re-entry after a QA loop escalation**; writer: `references/grant-qa-cycles.sh`), as `QA_CYCLE at resume + extra_cycles_granted` — relative to the count reconstructed from disk, never to 5, so a grant of `k` delivers `k` cycles whatever gates already exist:
+
+```bash
+QA_MAX_CYCLES=$(jq -r '.qa_max_cycles // 5' .claude/state/develop-pipeline.lock 2>/dev/null || echo 5)
+```
+
+Every "of 5" and "/5" in the strings below reads `QA_MAX_CYCLES`; the literal is the default, not the rule.
 
 **A gate in the accepting-route set does not exit the loop — it hands to 5c.** A gate that reaches
-5c (any of §5c's three routes) means the work is ready to be *reviewed as a PR*, not that the loop is over. 5c
+5c (any of §5c's five routes) means the work is ready to be *reviewed as a PR*, not that the loop is over. 5c
 (`/review-pr`) is the loop's exit gate, and its verdict can send the run back to 5b.
 
-There are **three routes by which the loop reaches Step 7**, and all go through 5c — they are
+There are **five routes by which the loop reaches Step 7**, and all go through 5c — they are
 §5c's accepting-route set: a gate with no open finding (route 1; `PASS`, or an active `WAIVED`, or —
-route 3 — a `CONCERNS` whose queue is empty or all closed), and — from cycle 3 onward — the
+route 3 — a `CONCERNS` whose queue is empty or all closed); from cycle 3 onward the
 **Diminishing-returns exit** (route 2), which ends a loop whose HIGH findings are gone and whose
-residue is entirely test machinery. The second is still an
-exit *to 5c*, not around it: `APPROVE` or `CONCERNS` from 5c remains the only thing that opens
+residue is entirely test machinery; from cycle 2 onward the **Cosmetic-residue exit** (route 2b),
+which ends a loop whose HIGH findings are gone and whose `PASS` gate carries nothing but open LOW
+entries; and, at the budget, the **Gate-the-last-fix half-cycle** (route 2c), which grants one
+review + gate to a fix the last budgeted cycle landed and no gate has read — its gate reaches 5c
+by the shape of route 1 or 3, and is named as its own route because of the moment it fires. None
+of these is an exit *around* 5c: `APPROVE` or `CONCERNS` from 5c remains the only thing that opens
 Step 7.
 
 There are **two ways it escalates** instead: the 5-cycle limit, and — from cycle 3 onward — the
 **Convergence check**, which halts the moment the loop stops reducing HIGH findings. The convergence
 check usually fires first; see its section below. Both land in the same **Loop Escalation** block.
 
-**The two cycle-3 rules are opposites and must not be confused.** The Convergence check fires when
-HIGH findings *remain and stop falling* and it **escalates**; the Diminishing-returns exit fires when
-HIGH findings are *gone* and it **exits cleanly**. One says the loop stopped working, the other says
-it finished working.
+**The loop's four guards answer four different questions and must not be confused.** Two say the
+loop *stopped* or *finished* working; one says what is left is not worth a cycle; one says the budget
+ran out a gate too early. All four are predicates the engine evaluates
+(`classifyLoopRoute()` in `qa-diminishing-returns.js` — the Convergence check is the one exception,
+kept as the awk that predates the engine); none is evaluated by eye.
+
+| Guard | Fires when | Outcome | Says |
+| :-- | :-- | :-- | :-- |
+| **Convergence check** (stall) | HIGH findings **remain and stop falling** for two cycles (cycle ≥ 3) | **Escalate** | the loop stopped working |
+| **Diminishing-returns exit** (finished, route 2) | HIGH is 0 for two consecutive gates and the residue is **entirely test machinery** (cycle ≥ 3) | **Exit to 5c** | the loop finished working |
+| **Cosmetic-residue exit** (cosmetic, route 2b) | HIGH is 0 for two consecutive gates and a **`PASS` gate's only open entries are LOW** (cycle ≥ 2) | **Exit to 5c** | what is left is not worth a fix cycle |
+| **Gate-the-last-fix half-cycle** (budget, route 2c) | the budget is spent, HIGH was 0 throughout, MEDIUM fell strictly for three cycles, and the last cycle's fix has **no gate** | **One 5a, then 5c or escalate** | the budget ended one gate too early |
+
+The stall and finished rows are the original pair and are still opposites: a run with HIGH
+remaining can only stall; a run with HIGH gone can only finish. The cosmetic row is the finished
+row's sibling for a residue that is not machinery but is also not work. The budget row is the only
+one that fires *after* 5b rather than after 5a, and the only one that is not an exit.
+
+### Lock position for the loop (option B — decided in task.123 review 1, Q2)
+
+The pipeline lock's `current_step` reads **`5` for the whole loop** — 5a, 5b and 5c alike — and a
+separate **`qa_phase: 5a|5b|5c`** field names the sub-step. `advance-pipeline-lock.sh` is
+monotonic by design (`6 → 5` is refused, and must stay refused: the Stop hook's whole contract is
+that the lock never points behind the work), and the loop's `5b → 5a` re-entry is a backward move,
+so a step number cannot express it. A label can. **`advance-pipeline-lock.sh 6` is never called
+inside the loop**, and no step of this document instructs a hand `jq` on `current_step`: the lock
+goes `4 → 5` at the Step 4 → 5 transition and `5 → 7` at the Step 5–6 → 7 transition, both through
+the orchestrator's ordinary Step Transition Protocol. Option A — teaching the helper a backward
+move — was rejected because it would have given the lock two meanings for one field.
+
+Each sub-step writes `qa_phase` as its **first action**, through the bundled writer — a **script**,
+not a shell function, because every orchestrator Bash call is a fresh shell and a function defined
+in one fenced block does not exist in the next (task.123 QA cycle 1, CR-2). It is the sibling of
+`advance-pipeline-lock.sh`, uses the same `mktemp` + `mv` write, validates its one argument
+against `5a|5b|5c`, fails closed on a non-object lock, noops with no lock, and never touches
+`current_step`. Source: `references/set-qa-phase.sh`; suite: `set-qa-phase.test.sh`.
+
+```bash
+bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a   # or 5b, 5c
+```
+
+The Stop hook (`develop-pipeline-on-stop.sh`) reads `qa_phase` on a step-5 lock to name `/qa-task`
+(or `/qa-story`), `/qa-fix` or `/review-pr`; an **absent** `qa_phase` names 5a, the loud re-entrant
+default. The halt snapshot is a superset of the lock, so `qa_phase` — and `extra_cycles_granted` /
+`qa_max_cycles` above — travel into `develop-pipeline.last-halt.json` without a second writer.
 
 Separately, several **HALT** paths end the run without reaching escalation: the no-code-change HALT
 and the mid-loop PR MERGED/CLOSED HALT (both in 5b), the twice-red fast-gate bail-out (5b step 0a),
@@ -113,6 +164,8 @@ Read the gate file to determine the gate result.
 ## Each Cycle
 
 ### 5a. Run QA Review
+
+**Lock**: `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a` before anything else in this sub-step. `current_step` stays `5`.
 
 > **When the work item's deliverable is runnable prose, the QA skill executes it.** A change set that
 > adds or modifies a `SKILL.md` or a `shared/resources/*.md` prompt containing fenced ```bash blocks
@@ -257,19 +310,30 @@ entry** when the list is empty **or** every entry reads `status: closed`. The ar
 other document that needs the set points at §5c rather than restating the tokens. **The mechanical
 record that a gate reached 5c** is the cycle's `### QA Cycle {N}` entry in QA Iteration History: 5a
 writes `**Action**: Proceeding to 5c (PR conformance review)` on every accepting route and
-`Running qa-fix (cycle {N} of 5)` on the road to 5b, so a consumer that must decide "did gate N reach
+`Running qa-fix (cycle {N} of {QA_MAX_CYCLES})` on the road to 5b, so a consumer that must decide "did gate N reach
 5c?" reads that row rather than re-deriving the set from the gate. **The row is written when the
 route is known, not when the entry is opened**: the entry is created as soon as the gate is read, but
-arms 4–5 run the Convergence check and the Diminishing-returns exit first, and only their outcome
-decides between 5c and 5b. So the rule is a **post-guard write**: once the arm resolves — directly for
+arms 4–5 run the Convergence check and then the route classifier (the Diminishing-returns exit and
+the Cosmetic-residue exit) first, and only their outcome decides between 5c and 5b. So the rule is a **post-guard write**: once the arm resolves — directly for
 arms 1–3, after both guards for arms 4–5 — overwrite `**Action**` with the destination and `**PR
 Review**` with `pending — 5c not yet run` (for 5c) or `not reached — gate did not exit the loop` (for
 5b). The arm has a third resolution: when the Convergence check trips, the run leaves the loop
 without reaching 5c, and the same write puts `**Action**: Escalating — loop not converging` and
 `**PR Review**: not reached — gate did not exit the loop` on the row. The Diminishing-returns exit's
 own `On exit` list repeats this as its first step so a run that takes route 2 cannot leave the row at
-its 5b value. The row's value set is exactly `{Proceeding to 5c
-(PR conformance review), Running qa-fix (cycle {N} of 5), Escalating — loop not converging}`.
+its 5b value, and the Cosmetic-residue exit's does the same for route 2b. The arm has a fourth
+resolution, written by Loop Escalation's **Loop limit** trigger on **every** path it takes: it puts
+`**Action**: Escalating — loop limit reached` on the entry of the **last cycle that ran** — cycle
+`{N}` when the half-cycle was declined, cycle `{N+1}` when the half-cycle ran and its gate has an
+open entry — and **never touches the `**PR Review**` row** (on an entry whose gate never reached 5c
+it already reads `not reached — gate did not exit the loop`, written when the entry was opened). On the loop-limit-via-review
+path cycle `{N}`'s gate *did* reach 5c and its row holds a real `REQUEST CHANGES`; that verdict is
+what the escalation template's "Step 5c returned REQUEST CHANGES on cycle(s) {list}" line and the
+resume contract's escalation row read, and the Action write must not blank it (task.123 QA cycle 3,
+CR-1). A loop-limit escalation therefore always leaves the same Action signal the Convergence trip
+leaves, and a resume reads it from the last entry's Action row rather than from which route happened
+to run (task.123 QA cycle 2, CR-4). The row's value set is exactly `{Proceeding to 5c
+(PR conformance review), Running qa-fix (cycle {N} of {QA_MAX_CYCLES}), Escalating — loop not converging, Escalating — loop limit reached}`.
 
 - `PASS` with **no open entry in `top_issues[]`** → **proceed to 5c** (the loop's exit gate), not straight to Step 7
 - `WAIVED` with `waiver.active: true` and a documented reason/approver → **proceed to 5c** (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
@@ -280,12 +344,16 @@ its 5b value. The row's value set is exactly `{Proceeding to 5c
   "fine, with reservations" (task.105, obs #51).
 - `FAIL`, or `CONCERNS` with an **open entry in `top_issues[]`** (an entry whose `status:` is absent
   or reads `open`) → run the **Convergence check** (below); if it does not trip, run the
-  **Diminishing-returns exit** (below that). Proceed to 5b only when neither fires — the
-  Convergence check escalates, the Diminishing-returns exit hands to 5c.
+  **route classifier** (below that — the **Diminishing-returns exit**, then the **Cosmetic-residue
+  exit**). Proceed to 5b only when none fires — the Convergence check escalates, the two exits hand
+  to 5c. (The Cosmetic-residue exit is PASS-only, so on this arm only the Diminishing-returns exit
+  can fire; the classifier is still asked once, as one call, so the arm cannot drift from the next.)
 - **Any other gate — read by its queue.** With an open entry in `top_issues[]` — a `PASS` carrying open LOW entries
   (legal under gate rule 5, which lets LOW findings ride on a passing verdict), or a `WAIVED` whose
   `waiver.active` is not `true` and whose queue has an open entry → the same road as the `FAIL` arm:
-  Convergence check, then Diminishing-returns exit, then 5b. The queue is what `/qa-fix` consumes,
+  Convergence check, then the route classifier, then 5b. **This is the arm the Cosmetic-residue exit
+  (route 2b) lives on**: a `PASS` whose open entries are all LOW, after two HIGH-0 gates, hands to 5c
+  from here instead of spending a fix cycle on nits (task.110 ran cycles 12–13 for two; obs #100). The queue is what `/qa-fix` consumes,
   and an open LOW is still open work; a waiver that is not active has waived nothing, so its gate is
   read by its queue like any other — which also means a `WAIVED` whose `waiver.active` is not `true`
   **and** whose queue has no open entry → **proceed to 5c**, exactly as a `PASS` with no open entry
@@ -322,26 +390,38 @@ Log the result in the QA Iteration History section:
 **Gate Result**: {PASS / CONCERNS / FAIL / WAIVED}
 **Issues Found**: {count and brief descriptions, or "none"}
 **HIGH findings**: {HIGH_N}
+**MEDIUM findings**: {MEDIUM_N}
 **PR Review**: {pending — 5c not yet run / APPROVE / CONCERNS / REQUEST CHANGES / review failed / not reached — gate did not exit the loop}
-**Loop exit**: {n/a — this exit not taken / the `describeDiminishingReturns()` message verbatim}
-**Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of 5) / Escalating — loop not converging}
+**Loop exit**: {n/a — this exit not taken / the `describeLoopRoute()` message verbatim}
+**Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of {QA_MAX_CYCLES}) / Escalating — loop not converging / Escalating — loop limit reached}
 ```
+
+A cycle written by the **gate-the-last-fix half-cycle** (route 2c, Loop Escalation) uses the same
+template with one extra row directly under the heading — `**Half-cycle**: gate-the-last-fix (review +
+gate on cycle {N}'s fix; no 5b)` — and an entry back-filled on resume for a cycle the operator ran
+outside the loop carries `**Origin**: run outside the loop (operator)` in the same position (resume
+contract, **Re-entry after a QA loop escalation**). Neither row appears on an ordinary cycle.
 
 The `**HIGH findings**` line is not decoration: it is the persisted sequence the **Convergence
 check** below compares across cycles, and the only place a resumed run can read the earlier counts
-back from. Write it on every cycle, including one that found none (`0`).
+back from. Write it on every cycle, including one that found none (`0`). `**MEDIUM findings**` is
+the same kind of row for the **Gate-the-last-fix half-cycle** (route 2c), which needs three MEDIUM
+readings to see a strictly falling sequence; it is the engine's count (`countRaised()`, Convergence
+check step 2), written every cycle, `0` included.
 
 `**PR Review**` follows the same rule for the same reason, but note **who writes it and when**: 5a
 writes the row when it writes the entry, and at that moment no 5c verdict exists. On any gate that
-routes to 5c (any of §5c's three routes) 5a writes `pending — 5c not yet run`, and **5c overwrites it** with its verdict. A cycle whose gate never
+routes to 5c (any of §5c's five routes) 5a writes `pending — 5c not yet run`, and **5c overwrites it** with its verdict. A cycle whose gate never
 reached 5c keeps `not reached — gate did not exit the loop`. It is never omitted. An omitted row is
 indistinguishable from a review that was skipped, and on resume the two must not be confused.
 
-`**Loop exit**` is the **Diminishing-returns exit**'s record, and it exists for one reader: whoever
-opens this history six months from now and has to tell a clean early exit from a stall. On every
-cycle that did not take that exit it reads `n/a — this exit not taken`, which is a claim rather than
-a gap. On the cycle that did, write `describeDiminishingReturns(r)` **verbatim** — the message is a
-function precisely so that what lands here is assertable rather than composed afresh each time.
+`**Loop exit**` is the record of the **route classifier**'s exits — the Diminishing-returns exit
+(route 2), the Cosmetic-residue exit (route 2b) and the Gate-the-last-fix half-cycle (route 2c) —
+and it exists for one reader: whoever opens this history six months from now and has to tell a
+clean early exit from a stall. On every cycle that took none of them it reads `n/a — this exit not
+taken`, which is a claim rather than a gap. On the cycle that did, write `describeLoopRoute(r)`
+**verbatim** (for route 2 that is the `describeDiminishingReturns()` text, unchanged) — the message
+is a function precisely so that what lands here is assertable rather than composed afresh each time.
 
 > **The default says "this exit not taken", not "loop continued".** Those are different claims, and
 > the second is false on the cycle where a clean `PASS` gate hands to 5c and 5c returns APPROVE: the
@@ -371,7 +451,7 @@ Steps 5–6 emit.
 ### Convergence check (shared) — the QA loop's stall guard
 
 Perform this check **after the cycle's gate file has been written and read (5a), before entering
-5b**. A gate that hands to 5c (any arm of the accepting-route set above, §5c routes 1–3) skips it — the gate is accept-eligible, so there is
+5b**. A gate that hands to 5c (any arm of the accepting-route set above, §5c routes 1 and 3 — routes 2 and 2b are decided *after* it) skips it — the gate is accept-eligible, so there is
 nothing for a stall guard to act on. (Note this is *not* because the HIGH count is zero: a `WAIVED`
 gate carries its HIGH `top_issues[]` with `waiver.active: true`, so that cycle's
 `**HIGH findings**` line is still a real, usually non-zero, count.)
@@ -432,7 +512,21 @@ the pipeline noticed.
 
 2. **Keep the sequence across cycles.** Record `HIGH_N` in this cycle's QA Iteration History entry
    as `**HIGH findings**: {HIGH_N}` — that entry is what a resume reads the earlier counts back
-   out of, and what the escalation entry tabulates.
+   out of, and what the escalation entry tabulates. Record `MEDIUM_N` beside it as
+   `**MEDIUM findings**: {MEDIUM_N}`, from the engine rather than a second awk:
+
+   ```bash
+   MEDIUM_N=$(command node -e '
+     const { countRaised } = require("./.agents/skills/{develop-story|develop-task}/references/qa-diminishing-returns.js");
+     const c = countRaised(require("fs").readFileSync(process.argv[1], "utf8"));
+     console.log(c === null ? 0 : c.medium);
+   ' "$LATEST_GATE")
+   ```
+
+   `countRaised` applies the awk's own rules — count what the gate *raised*, `status: closed`
+   included, entry boundaries at the first entry's indent, `severity:` at the entry's key indent —
+   and deliberately does not count HIGH: the HIGH count stays the awk's (engine property 2), so the
+   two guards can never disagree about it.
 
 3. **From cycle 3 onward, if `HIGH_N > 0` AND `HIGH_N >= HIGH_{N-1}` AND `HIGH_{N-1} >= HIGH_{N-2}`
    — i.e. HIGH findings *remain* and the count has failed to strictly decrease across two
@@ -487,9 +581,12 @@ The two guards answer opposite questions and must never both claim the same run:
 Escalating a run with zero HIGH would misreport finished work as stalled, and the Fail Loudly rule
 cuts the other way here: what is loud is the *record*, not the halt.
 
-**The conditions.** Ask the engine; do not evaluate them by eye. Its four inputs are bound as follows
-— an orchestrator that cannot resolve one of them has not met the precondition for running the check
-at all, and should continue into 5b rather than guess:
+**The conditions.** Ask the engine; do not evaluate them by eye. This one call is the **route
+classifier** for the whole post-Convergence moment: it evaluates the Diminishing-returns exit
+(route 2) first and the Cosmetic-residue exit (route 2b, next section) second, and returns **one**
+route, so the two exits cannot be asked in different orders by different readers. Its inputs are
+bound as follows — an orchestrator that cannot resolve one of them has not met the precondition for
+running the check at all, and should continue into 5b rather than guess:
 
 | Variable | Where it comes from |
 | :--- | :--- |
@@ -499,27 +596,35 @@ at all, and should continue into 5b rather than guess:
 | `$TEST_ARTIFACT_GLOBS_JSON` | `qa.testArtifactGlobs` from the consumer's `skills-config.yaml`, as a JSON array. **Absent ⇒ `[]`**, which matches nothing and is why an unconfigured project never takes this exit |
 
 ```bash
-command node -e '
+ROUTE_JSON=$(command node -e '
   const fs = require("fs");
-  const { classifyDiminishingReturns, describeDiminishingReturns } =
+  const { classifyLoopRoute, describeLoopRoute } =
     require("./.agents/skills/{develop-story|develop-task}/references/qa-diminishing-returns.js");
-  const r = classifyDiminishingReturns({
+  const r = classifyLoopRoute({
     cycle:              Number(process.argv[1]),
     highCounts:         JSON.parse(process.argv[2]),
     latestGateContent:  fs.readFileSync(process.argv[3], "utf8"),
     testArtifactGlobs:  JSON.parse(process.argv[4]),
+    budgetSpent:        false,
   });
-  console.log(JSON.stringify({ ...r, message: describeDiminishingReturns(r) }));
-' "$CYCLE" "$HIGH_SEQUENCE_JSON" "$LATEST_GATE" "$TEST_ARTIFACT_GLOBS_JSON"
+  console.log(JSON.stringify({ ...r, message: describeLoopRoute(r) }));
+' "$CYCLE" "$HIGH_SEQUENCE_JSON" "$LATEST_GATE" "$TEST_ARTIFACT_GLOBS_JSON")
+ROUTE=$(printf '%s' "$ROUTE_JSON" | jq -r '.route')
 ```
 
 Engine source: `references/qa-diminishing-returns.js` (bundled into each skill as
 `references/qa-diminishing-returns.js`). It is a **library, not a CLI** — deliberately, on the same
-reasoning as `review-report-freshness.js`: its only caller is this gate, and a CLI would be a second
-interface to keep honest.
+reasoning as `review-report-freshness.js`: its only callers are this gate and Loop Escalation, and a
+CLI would be a second interface to keep honest. `classifyDiminishingReturns` is still exported and
+still the predicate for route 2; `classifyLoopRoute` wraps it. Its fixture table —
+`qa-loop-route.test.mjs`, beside the engine's own suite under `tests/` — is the spec these sections are written from.
 
-It returns `{verdict, reason, detail, findings}` with `verdict ∈ {exit, continue}`. **Only `exit`
-exits.** Every other answer continues into 5b exactly as today.
+It returns `{route, reason, detail, findings, …}` with
+`route ∈ {diminishing-returns, cosmetic-residue, gate-the-last-fix, continue}`. Here, with
+`budgetSpent: false`, only the first two exits and `continue` can come back (`gate-the-last-fix`
+is Loop Escalation's, and the engine returns it only when told the budget is spent). **Only an exit
+route exits.** `continue` continues into 5b exactly as today; its `reason` names which condition
+stopped each exit, and is what to write in the Issues Log if the loop later escalates.
 
 What it evaluates, stated so the JSON's `reason` values are readable:
 
@@ -578,7 +683,57 @@ default rather than as an opt-out. See [`configuration.md`](https://github.com/G
 > The run it was derived from spent cycles 3 and 4 examining the repairs to cycle 2's repairs, and
 > reached this conclusion by hand at cycle 4; the rule reaches it at cycle 3.
 
+### Cosmetic-residue exit (shared) — route 2b, the loop's exit for a PASS gate that carries only nits
+
+Evaluated by the **same** `classifyLoopRoute` call as the Diminishing-returns exit, after it and only
+when it declined. It fires on the **"Any other gate — read by its queue"** arm of the Outcome
+branching — the arm a `PASS` gate with open LOW entries lands on — and nowhere else.
+
+**Why it exists.** Gate rule 5 lets LOW findings ride on a passing verdict, and the Outcome branching
+routes on the open queue rather than the token, so a `PASS` + open-LOW gate went to 5b like any
+other. task.110 ran cycles 12 and 13 — a full `/qa-fix`, commit, push, CI round and a fresh gate —
+to close two nits that a reviewer would have waved through (obs #100). The loop was not wrong, it
+was expensive, and the expense bought nothing 5c would not have seen anyway.
+
+**The conditions**, as the fixture table states them (`qa-loop-route.test.mjs`, "route 2b" rows):
+
+1. The gate token reads **`PASS` — and only `PASS`, stated as an exclusion.** A `CONCERNS` gate
+   whose queue is all LOW does **not** take this exit: a `CONCERNS` token is a *reservation* QA
+   raised about the work, and 5c must see it raised, not carried. It goes to 5b as today.
+2. **Every open entry** in `top_issues[]` reads `severity: low` (open = `status:` absent or
+   `open`). An open MEDIUM beside the LOWs is not cosmetic. A queue whose entries are all closed is
+   route 1's clean gate and never reaches the classifier; the rule is stated so it cannot fire on an
+   empty open set.
+3. `HIGH_N == 0` **and** `HIGH_{N-1} == 0` — the same two-quiet-gates floor route 2 uses, read from
+   the same recorded sequence. So it fires from **cycle 2** onward: unlike route 2 it needs no third
+   adversarial pass, because a PASS gate is QA's own statement that nothing is blocked.
+
+#### On exit
+
+1. **Overwrite the cycle entry's routing rows first**: `**Action**: Proceeding to 5c (PR conformance
+   review)` and `**PR Review**: pending — 5c not yet run` — the same post-guard write route 2 makes,
+   for the same reason.
+2. **Do not run 5b.**
+3. **Move the open LOWs to the gate's `recommendations.future`, by id** — `ROUTE_JSON`'s `lowIds`
+   names them in gate order. Each entry keeps its finding text and `suggested_action`, and gains
+   `carried_from: top_issues (route 2b, cycle {N})`. The `top_issues[]` entries themselves are stamped
+   `status: closed` with `resolution: carried to recommendations.future (route 2b)`, so the gate
+   still records what QA raised and a later reader can tell a carried LOW from a fixed one. Record the
+   same ids on the work item under **Deferred Work**.
+4. **Hand to 5c**, exactly as a `PASS` gate with no open entry does. Commit the gate and QA report
+   first (5b's **Where the gate and QA report get committed**, path 1) — the gate was just edited.
+5. Write `describeLoopRoute(r)` verbatim on this cycle's `**Loop exit**` row. The message begins
+   `Cosmetic-residue exit taken —` and names the ids it carried.
+
+> **Route 2b is PASS-only, and route 2 is what handles a `CONCERNS` residue.** The two exits are
+> deliberately not one rule with a looser token check: route 2 demands positive evidence that every
+> finding is machinery, route 2b demands positive evidence that the verdict was PASS. Loosening
+> either to "PASS or CONCERNS with only LOWs" is the mutation the fixture table's
+> `concerns-low-only` row exists to catch.
+
 ### 5b. Run QA Fix (shared)
+
+**Lock**: `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5b` before anything else in this sub-step. `current_step` stays `5`.
 
 #### Signal the `changes-requested` stage (when `TRACKER_ISSUE` is set)
 
@@ -723,7 +878,7 @@ three together:
 | `…implementation.{name}.md`                 | **deferred to Step 8** (`docs(...)`)     |
 
 **There is exactly one `git push origin HEAD` per cycle** — at step 3 below on a cycle that enters 5b
-from 5a, or **before 5c** on a cycle whose gate reached 5c from 5a (path 1 above — §5c routes 1–3), never both. Do not create a separate
+from 5a, or **before 5c** on a cycle whose gate reached 5c from 5a (path 1 above — §5c routes 1, 2, 2b and 3), never both. Do not create a separate
 `docs(...): QA cycle {N} gate + report` commit, and do not push twice in a cycle. The rule is about
 the **push**, not the commit: a review-driven cycle legitimately makes two commits (the pre-5c
 gate+report, then 5b's `fix(...)`), and still pushes once.
@@ -743,7 +898,7 @@ touches it. Nor does it move anything the resume contract reads — cycle recons
 gate and QA report — the evidence for a cycle that ran belongs on the branch, not only in the
 working tree, where a branch switch loses it and no reader of the PR ever sees it:**
 
-1. **Any gate that reaches 5c from 5a — §5c routes 1–3** (Outcome branching, above) — the cycle reaches 5c without entering
+1. **Any gate that reaches 5c from 5a — §5c routes 1, 2, 2b and 3** — and the half-cycle gate of route 2c (Outcome branching, above) — the cycle reaches 5c without entering
    5b, so no `fix(...)` commit exists. Commit the gate `.yml` and QA report `.md` **before invoking
    `/review-pr` at 5c**, and push once. This is the single stated commit point for this path.
    Committing here rather than at the Step 7 transition is load-bearing twice over: 5c reads the
@@ -889,15 +1044,21 @@ After fixes are applied:
 
    This is a no-op in all production runs where `EVAL_MODE` is unset.
 
-7. Increment the cycle counter and return to 5a. The **Convergence check** runs again after the
-   next gate is written — it, not this step, is what ends a loop that has stopped reducing HIGH
-   findings before the 5-cycle limit does.
+7. **If the counter reads `QA_MAX_CYCLES`, the budget is spent: do not return to 5a.** Go to
+   **Loop Escalation** with the *Loop limit* trigger — which evaluates the **Gate-the-last-fix
+   half-cycle** (route 2c) *before* writing any escalation entry. Otherwise increment the cycle
+   counter and return to 5a. The **Convergence check** runs again after the next gate is written —
+   it, not this step, is what ends a loop that has stopped reducing HIGH findings before the budget
+   does.
 
 ---
 
 ### 5c. PR Conformance Review (shared)
 
-Perform this step **before Step 7**, on any of the **three routes out of 5a**:
+**Lock**: `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5c` before anything else in this sub-step. `current_step` stays `5`;
+it advances to `7` only at the Step 7 transition, on `APPROVE` or `CONCERNS`.
+
+Perform this step **before Step 7**, on any of the **five routes out of 5a**:
 
 1. a gate with **no open finding** — `PASS` with no open `top_issues[]` entry, or `WAIVED` with
    `waiver.active: true` (its HIGH entries are waived, not open); an inactive `WAIVED` with no open
@@ -912,9 +1073,19 @@ Perform this step **before Step 7**, on any of the **three routes out of 5a**:
    5c directly from the Outcome branching above without passing the Convergence check or the
    Diminishing-returns exit, because both of those reason about a queue this gate does not have.
    Before this route existed the gate fell through to 5b, whose no-code-change HALT then ended a
-   run on a gate that said "fine, with reservations" (task.105, obs #51).
+   run on a gate that said "fine, with reservations" (task.105, obs #51); or
+4. **(route 2b)** a gate that took the **Cosmetic-residue exit** above. That gate is `PASS` by
+   construction — the exit is PASS-only — and arrives with its LOW entries carried to
+   `recommendations.future` and closed in `top_issues[]`, after no HIGH finding across two
+   consecutive cycles (task.110, obs #100); or
+5. **(route 2c)** the gate written by the **Gate-the-last-fix half-cycle** in Loop Escalation, when
+   it reads `PASS` or `CONCERNS` with no open entry. By its shape this is route 1 or route 3 on the
+   half-cycle's own gate (cycle `{N+1}`); it is named here because of the moment it fires — the
+   budget was spent, and this gate was granted to the last budgeted cycle's fix so the run could
+   leave through 5c rather than escalate an ungated head (task.117, obs #112). A half-cycle gate
+   with an open entry never reaches 5c; it goes to the escalation as written.
 
-A gate that routes to **5b** never reaches this step, and none of the three routes above routes to
+A gate that routes to **5b** never reaches this step, and none of the five routes above routes to
 5b — 5b is entered only on an open finding (see the Outcome branching). This is the loop's **exit
 gate**: 5a and 5b can cycle without it, but nothing leaves the loop except through here.
 
@@ -1014,7 +1185,7 @@ gate.
 | ✅ **APPROVE** | Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
 | ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
 
-> **Why the failure arm is spelled out.** A gate that reaches 5c from 5a (routes 1–3) does so without entering 5b, so
+> **Why the failure arm is spelled out.** A gate that reaches 5c from 5a (§5c routes 1, 2, 2b and 3) does so without entering 5b, so
 > it skips 5b step 5's mid-loop PR-state poll — which means a PR closed or merged underneath the run
 > is first discovered *by* `/review-pr`, and `/review-pr` HALTs with text addressed to a human. Without
 > this row the orchestrator has no arm for that state, and the likeliest improvisation is the one
@@ -1120,12 +1291,97 @@ commit-and-HALT shape, one set of templates.
 
 | Trigger               | Entry heading           | Fires when                                                                                                             |
 | --------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Loop limit**        | `QA Loop Limit Reached` | 5 complete cycles finished without reaching Step 7 — whether because no gate read clean, or because 5c returned REQUEST CHANGES and sent the run back to 5b. |
+| **Loop limit**        | `QA Loop Limit Reached` | `QA_MAX_CYCLES` complete cycles finished without reaching Step 7 — whether because no gate read clean, or because 5c returned REQUEST CHANGES and sent the run back to 5b. **The Gate-the-last-fix half-cycle (route 2c, below) is evaluated first, and the entry is written only if it declines or its gate has an open entry.** |
 | **Convergence stall** | `QA Loop Not Converging` | The **Convergence check** above tripped — cycle ≥ 3, and the HIGH count failed to strictly decrease across two consecutive cycles. |
+
+### Gate-the-last-fix half-cycle (shared) — route 2c, the loop-limit trigger's pre-escalation step
+
+Runs **only on the Loop limit trigger**, after 5b of cycle `N = QA_MAX_CYCLES` has committed and
+pushed its fix, and **before** the escalation entry is written. The Convergence stall never reaches
+it: a stall has HIGH remaining, and this route requires HIGH 0 throughout.
+
+**Why it exists.** The loop's shape is *gate → fix → gate*, and a budget of N cycles ends on a
+**fix**: cycle N's 5b lands a commit that no gate ever reads. On task.117 the loop ran five
+`CONCERNS` gates with HIGH 0 throughout and MEDIUM strictly falling — a loop that was *working*, one
+gate from clean — and escalated a fix nobody had gated (obs #112). The defect is at the budget
+boundary, not in the fixes. This route grants that fix the gate it is owed, and nothing more: one 5a,
+no 5b, and the gate decides.
+
+**The conditions**, as the fixture table states them (`qa-loop-route.test.mjs`, "route 2c" rows).
+Ask the engine with `budgetSpent: true`; do not evaluate them by eye:
+
+```bash
+ROUTE_JSON=$(command node -e '
+  const fs = require("fs");
+  const { classifyLoopRoute, describeLoopRoute } =
+    require("./.agents/skills/{develop-story|develop-task}/references/qa-diminishing-returns.js");
+  const r = classifyLoopRoute({
+    cycle:              Number(process.argv[1]),
+    highCounts:         JSON.parse(process.argv[2]),
+    mediumCounts:       JSON.parse(process.argv[3]),
+    latestGateContent:  fs.readFileSync(process.argv[4], "utf8"),
+    budgetSpent:        true,
+    lastCycleAction:    process.argv[5],
+  });
+  console.log(JSON.stringify({ ...r, message: describeLoopRoute(r) }));
+' "$CYCLE" "$HIGH_SEQUENCE_JSON" "$MEDIUM_SEQUENCE_JSON" "$LATEST_GATE" "$LAST_CYCLE_ACTION")
+ROUTE=$(printf '%s' "$ROUTE_JSON" | jq -r '.route')
+```
+
+| Variable | Where it comes from |
+| :--- | :--- |
+| `$CYCLE` | `QA_MAX_CYCLES` — the last budgeted cycle |
+| `$HIGH_SEQUENCE_JSON` | the `**HIGH findings**` rows, oldest first, as for the Diminishing-returns exit |
+| `$MEDIUM_SEQUENCE_JSON` | the `**MEDIUM findings**` rows, oldest first, as a JSON array — cycles `1..N-1` are what the engine reads; cycle `N`'s reading it takes from the gate itself |
+| `$LATEST_GATE` | cycle `N`'s gate (`…gate.{N}.{name}.yml`) |
+| `$LAST_CYCLE_ACTION` | the `**Action**` row of the `### QA Cycle {N}` entry, verbatim |
+
+The route fires — `gate-the-last-fix` — only when **all** of:
+
+1. cycle `N`'s `**Action**` row reads `Running qa-fix …` — so a fix exists on the head that no gate
+   has read. A cycle `N` that reached 5c and was sent back by `REQUEST CHANGES` does **not**
+   qualify (fixture row "2c negative: the last cycle reached 5c"): the review's findings are outside
+   the gate sequence this route reasons over, and it is 5c, not 5a, that would have to re-read that
+   fix — which the spent budget does not allow.
+2. `HIGH_k == 0` for **every** `k ≤ N` — a loop that raised a blocker at any cycle escalates with
+   its evidence.
+3. `MEDIUM_N < MEDIUM_{N-1} < MEDIUM_{N-2}` — strictly falling across the last three gates. Flat, or
+   fell-then-plateaued, is not evidence that one more gate would clear.
+
+**On `gate-the-last-fix`:**
+
+1. Write `describeLoopRoute(r)` on cycle `N`'s `**Loop exit**` row — it begins
+   `Gate-the-last-fix half-cycle granted —` and says in words that this is neither an exit nor an
+   escalation.
+2. Run **one ordinary 5a** — `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a`,
+   then invoke `/qa-task` / `/qa-story` exactly as a cycle does, on the head cycle `N`'s fix left. It writes `gate.{N+1}` and `qa.{N+1}` and a
+   `### QA Cycle {N+1}` entry carrying the `**Half-cycle**: gate-the-last-fix` row (template above).
+   Cost: half a cycle — no fix, no suite re-run beyond the gate's own. **There is no 5b**, whatever
+   the gate says.
+3. Read gate `{N+1}` by the Outcome branching's own definition of "open":
+   - `PASS`, or `CONCERNS` with **no open entry** → write `**Action**: Proceeding to 5c (PR
+     conformance review)` and `**PR Review**: pending — 5c not yet run` on cycle `{N+1}`'s entry,
+     commit the gate and QA report (path 1), and **hand to 5c** — route 2c of §5c's set. The run
+     leaves the loop through its exit gate like any other.
+   - **any open entry** → write `**Action**: Escalating — loop limit reached` on that entry (its
+     `**PR Review**` row already reads `not reached — gate did not exit the loop`, written when the
+     half-cycle's entry was opened; leave it), and continue into the escalation below **with gate
+     `{N+1}` in its table**: it is the last gate, and the head it read is the head being handed
+     over.
+
+**On `continue`:** overwrite cycle `N`'s `**Action**` row with `Escalating — loop limit reached` —
+**and only that row**: cycle `N`'s `**PR Review**` stays as written, which on the
+loop-limit-via-review path is a real `REQUEST CHANGES` the escalation entry quotes — then write the
+escalation entry as today. Put `ROUTE_JSON`'s `reason` in the entry's **What was attempted per cycle** so the reader
+knows the half-cycle was considered and why it was declined (`last-cycle-not-a-fix`,
+`high-findings-seen`, `medium-not-falling`, …). The Action overwrite is not optional: the resume
+contract's 5c sub-state table keys the "left the loop through escalation" row on it, and the
+Convergence trip already writes its own value the same way.
 
 Before halting, write a thorough escalation entry in the Issues Log. Use the template for the
 work item type, substituting the heading and opening sentence for the trigger that fired, and
-listing the cycles that actually ran (`{N}`, which is 5 on the loop limit and usually 3 on a
+listing the cycles that actually ran (`{N}`, which is `QA_MAX_CYCLES` on the loop limit — or
+`QA_MAX_CYCLES + 1` when the half-cycle ran and its gate had an open entry — and usually 3 on a
 convergence stall).
 
 **5c adds no third trigger.** A REQUEST CHANGES verdict routes back to 5b and consumes a cycle from
@@ -1140,8 +1396,8 @@ a contradiction to whoever picks it up.
 ```
 ### {QA Loop Limit Reached | QA Loop Not Converging} — {YYYY-MM-DD}
 
-{Loop limit:        The pipeline completed 5 qa-story/qa-fix cycles without a clean PASS.}
-{Loop limit via review: The pipeline completed 5 cycles. The final gate read {status},
+{Loop limit:        The pipeline completed {QA_MAX_CYCLES} qa-story/qa-fix cycles without a clean PASS.}
+{Loop limit via review: The pipeline completed {QA_MAX_CYCLES} cycles. The final gate read {status},
                     but Step 5c returned REQUEST CHANGES on cycle(s) {list}, so the run never
                     cleared the loop's exit gate.}
 {Convergence stall: The pipeline stopped after {N} qa-story/qa-fix cycles: the HIGH finding
@@ -1176,8 +1432,8 @@ working}
 ```
 ### {QA Loop Limit Reached | QA Loop Not Converging} — {YYYY-MM-DD}
 
-{Loop limit:        The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.}
-{Loop limit via review: The pipeline completed 5 cycles. The final gate read {status},
+{Loop limit:        The pipeline completed {QA_MAX_CYCLES} qa-task/qa-fix cycles without a clean PASS.}
+{Loop limit via review: The pipeline completed {QA_MAX_CYCLES} cycles. The final gate read {status},
                     but Step 5c returned REQUEST CHANGES on cycle(s) {list}, so the run never
                     cleared the loop's exit gate.}
 {Convergence stall: The pipeline stopped after {N} qa-task/qa-fix cycles: the HIGH finding
@@ -1244,6 +1500,8 @@ Options:
 1. Fix remaining issues manually, then re-run /qa-story
 2. Accept the current gate status and proceed manually with /finalise
 3. Update the story requirements if issues reflect unintended scope
+4. Re-run /develop-story to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
+   more cycles"; any /qa-story you run by hand in between is counted from its gate on disk
 ```
 
 #### develop-task HALT message
@@ -1264,4 +1522,6 @@ Options:
 1. Fix remaining issues manually, then re-run /qa-task
 2. Accept the current gate status and proceed manually with /finalise
 3. Update the task requirements if issues reflect unintended scope
+4. Re-run /develop-task to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
+   more cycles"; any /qa-task you run by hand in between is counted from its gate on disk
 ```

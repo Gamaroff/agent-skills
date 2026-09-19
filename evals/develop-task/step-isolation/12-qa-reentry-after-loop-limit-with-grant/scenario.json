@@ -1,0 +1,135 @@
+{
+  "name": "develop-task-step-05-reentry-after-loop-limit-grant",
+  "skill": "develop-task",
+  "description": "Phase 0b re-entry after a loop-limit halt (task.123 / obs #95): the halt snapshot records halt_reason loop-limit at 5 cycles; the operator then ran a standalone qa-task that wrote gate.6 and qa.6 but no QA Cycle entry. Re-invocation reconstructs the count from disk (6), back-fills cycle 6 as run outside the loop, offers \"Resume at 5a with {k} more cycles\", writes extra_cycles_granted: 2 and qa_max_cycles: 8 (= QA_CYCLE 6 at resume + 2, never 5 + 2) to the lock, and resumes at 5a as cycle 7 under a budget of 8 — cycles 7 and 8 both run, which is what a grant of 2 means. Fixture records the resume detector, then qa-task (cycle 7) → qa-fix → qa-task (cycle 8, PASS) → review-pr.",
+  "prompt": "Re-invoke /develop-task for task.42.example after a QA loop-limit halt. A standalone /qa-task was run by hand between the halt and this re-invocation. Accept the recommended grant.",
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.gate.6.example.yml"
+      ]
+    },
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock",
+        "\"extra_cycles_granted\": 2"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock",
+        "\"qa_max_cycles\": 8"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock",
+        "\"qa_max_cycles\": 7"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock",
+        "\"current_step\": 5"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock",
+        "\"qa_phase\": \"5c\""
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock",
+        "cycles_outside_loop"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "### QA Cycle 6"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "\\*\\*Origin\\*\\*: run outside the loop \\(operator\\)"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "### QA Cycle 8"
+      ]
+    },
+    {
+      "fn": "resumeRehydrated",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        {
+          "expectedStep": "qa-task",
+          "expectedIter": 2
+        }
+      ]
+    },
+    {
+      "fn": "pipelineStepsRan",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        [
+          "resume-detector",
+          "qa-task",
+          "qa-fix",
+          "qa-task",
+          "review-pr"
+        ]
+      ]
+    },
+    {
+      "fn": "loopBoundedAt",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        "qa-task",
+        2
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "qa_max_cycles = 8"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "QA_MAX_CYCLES = 7"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "### QA Cycle 5[\\s\\S]*?\\*\\*Action\\*\\*: Escalating — loop limit reached"
+      ]
+    }
+  ]
+}

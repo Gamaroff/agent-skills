@@ -95,6 +95,10 @@ Snapshot-specific fields (when the winner is `last-halt.json`):
 - `halt_reason` (terminal HALT) **or** `pause_reason` (PreCompact, value `"precompact"`) → human-readable cause (include in `deltas_since_pause` for the user surface)
 - `halted_at` (terminal HALT) **or** `paused_at` (PreCompact) → ISO-8601 timestamp of the halt/pause
 
+QA-loop fields (lock or snapshot, both optional — absent on a run that predates task.123):
+- `qa_phase` (`5a|5b|5c`) → the loop's sub-position when the run stopped; report it in `deltas_since_pause` as "lock qa_phase: 5b" when `LOCK_STEP` is 5
+- `extra_cycles_granted` / `qa_max_cycles` (integers) → a grant recorded by a previous re-entry and the absolute budget it set; report both in `deltas_since_pause` as "extra_cycles_granted: {k}; qa_max_cycles: {n}" so the operator sees the budget the run will resume under. When `halt_reason` matches `loop-limit|not-converging`, also report the highest `gate.{N}` on disk against the count of `### QA Cycle` entries in the implementation report — a difference is a cycle the operator ran outside the loop, and the resume contract's **Re-entry after a QA loop escalation** back-fills it
+
 > A snapshot tagged `pause_reason: "precompact"` was left by the PreCompact hook before it removed the lock — surface it to the user as "resume from the compaction pause at step X?" rather than a hard terminal halt.
 
 An orphaned claim carries no `halt_step`, `pause_reason` or `paused_at` — treat it like a `cp`-degraded snapshot, and surface it as "a compaction pause was interrupted before it could save its snapshot; resume from step X?".

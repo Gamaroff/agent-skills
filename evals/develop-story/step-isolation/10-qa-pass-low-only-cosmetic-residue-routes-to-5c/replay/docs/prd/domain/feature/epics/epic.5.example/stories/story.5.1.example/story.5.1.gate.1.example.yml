@@ -1,0 +1,23 @@
+schema: 1
+gate: CONCERNS
+status_reason: "Cycle 1 — HIGH 0, one MEDIUM, fixed by qa-fix."
+reviewer: "QA Engineer"
+updated: "2026-09-18T12:00:00Z"
+
+top_issues:
+  - id: "EX-001"
+    severity: medium
+    file: "src/example.ts"
+    finding: "A MEDIUM fixed in cycle 1."
+    suggested_owner: dev
+    status: closed
+
+waiver:
+  active: false
+
+quality_score: 80
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

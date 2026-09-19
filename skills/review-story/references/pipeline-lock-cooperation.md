@@ -20,7 +20,7 @@ fi
 
 Replace `<this-skill-name>` with the unprefixed skill name (e.g. `create-pr`, `review-story`, `develop`, `finalise`, `commit-changes`, `create-branch`).
 
-The helper's `--skill` mode looks up the next step in its built-in mapping. Iterative loop skills (`qa-story`, `qa-task`, `qa-fix`) are intentionally noops in `--skill` mode — the orchestrator manages the QA loop and must advance the lock manually when it transitions out of the loop.
+The helper's `--skill` mode looks up the next step in its built-in mapping. Iterative loop skills (`qa-story`, `qa-task`, `qa-fix`, `review-pr`) are intentionally noops in `--skill` mode — the orchestrator manages the QA loop and advances the lock `5 → 7` itself when it transitions out of the loop. Inside the loop `current_step` stays `5` and the sub-position is the lock's `qa_phase` field (`5a|5b|5c`), which the orchestrator writes through the same `mktemp` + `mv` pattern and which the Stop hook reads (task.123). The helper never writes `qa_phase` and never moves `current_step` backwards.
 
 `commit-changes` is special: it is invoked at multiple steps in one run (Step 4 by `create-pr`, Steps 5–6 by each `qa-fix` cycle, and the terminal Step 8 commit). Its `--skill` branch self-guards on the lock's `current_step` — it removes the lock **only** when `current_step >= 8` (the terminal commit) and otherwise preserves it. So callers can run `commit-changes`' lock cooperation unconditionally at every step; the nested invocations leave the lock intact for the PreCompact/Stop hooks.
 

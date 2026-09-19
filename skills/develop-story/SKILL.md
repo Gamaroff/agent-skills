@@ -168,6 +168,15 @@ bash .agents/skills/develop-story/references/advance-pipeline-lock.sh {N+1}
 
 For Step 8 → completion: `... advance-pipeline-lock.sh --complete` (removes the lock).
 
+**Steps 5–6 are one step to the lock.** `current_step` goes `4 → 5` when the QA loop is entered and
+`5 → 7` when 5c returns APPROVE or CONCERNS; `advance-pipeline-lock.sh 6` is **never** issued. Inside
+the loop the sub-position is the lock's `qa_phase` field (`5a|5b|5c`), which
+`references/set-qa-phase.sh` writes as each sub-step's first action and the `Stop` hook reads to name `/qa-story`,
+`/qa-fix` or `/review-pr`. The helper is monotonic and must stay so; `qa_phase` is how the loop's
+`5b → 5a` re-entry is expressed without moving `current_step` backwards (task.123, option B). The
+loop's budget is `QA_MAX_CYCLES` — the lock's `qa_max_cycles` when present, else 5; a granted re-entry
+writes it as the reconstructed cycle count plus `extra_cycles_granted` (Phase 0b below).
+
 Skip this for Step 1 (the lock is created at the _end_ of Step 1, after the feature branch exists — see Step 1 below).
 
 After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠️ Needs Attention / ⏸️ Paused — see Graceful Pause section) and log any decisions or issues before moving on.
@@ -285,6 +294,14 @@ If a situation arises that is not in the shared defaults table and the stakes ar
 
   Removing the active lock prevents a future PreCompact firing in this same session from re-running the pause flow, and stops accumulation of transient Step 3 test logs. The **halt snapshot** (`develop-pipeline.last-halt.json`) preserves resume context so the next `/develop-story` invocation can re-enter Phase 0b artifact verification: the resume detector subagent reads the snapshot when no active lock is present, surfaces it to the user, and offers "Resume from {halt_step}" or "Start fresh" (latter deletes the snapshot). The graceful-pause hook also removes the active lock itself if it runs — this rule covers the non-hook halt paths.
 
+  **Re-entry after a QA loop escalation** (`halt_reason` matches `loop-limit|not-converging`): the Phase 0b prompt is the halt message's own three options plus a fourth — **"Resume at 5a with {k} more cycles"** (AskUserQuestion; recommended `k` = 2; "Other" takes a number). Before asking, reconstruct the cycle count **from the gates on disk** and back-fill any `### QA Cycle` entry a cycle the operator ran by hand did not write — the procedure, and why the report count cannot be the source, is the resume contract's **Re-entry after a QA loop escalation**. On accept, record the grant with **one call** — the bundled script reconstructs the base as max(highest gate on disk, report entries), restores the lock from the halt snapshot when the HALT removed it (refusing a snapshot for another document), never lowers an existing budget, and writes `extra_cycles_granted`, `qa_max_cycles` and `qa_phase: 5a` atomically:
+
+  ```bash
+  bash .agents/skills/develop-story/references/grant-qa-cycles.sh {story-directory} {k} {implementation-report-path}
+  ```
+
+  Then run the loop with `QA_MAX_CYCLES` = the lock's `qa_max_cycles` — the reconstructed count plus the grant, **never `5 + k`**: gates written since the original budget (a half-cycle's `gate.6`, an operator's cycle) would otherwise be counted against the grant, and a second grant could never extend past the first. Do not inline the `jq`: a `$QA_CYCLE` bound in another fenced block does not exist in this one, and the lock the write targets does not exist after a HALT until the script restores it (task.123 QA cycle 2). The field names are `extra_cycles_granted` and `qa_max_cycles` everywhere they appear — lock, snapshot, writer script, step-5-6 doc, resume contract, this file — and `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails on another spelling. Log the grant in the Decisions Log: "QA loop re-entry: {k} extra cycles granted; {m} cycle(s) run outside the loop back-filled from disk." A declined grant — or one the script refuses with exit 1 (surface its stderr line) — restores no lock and runs no cycle: the run returns to the halt message's own three options, per the resume contract's re-entry step 4.
+
 - **Signal `blocked` on a terminal HALT** (when `TRACKER=jira` and `TRACKER_ISSUE` is set). After the snapshot above, before surfacing the HALT:
 
   ```bash
@@ -317,7 +334,7 @@ If a situation arises that is not in the shared defaults table and the stakes ar
 - `/develop` — Step 3
 - `/create-pr` — Step 4
 - `/qa-story` — Step 5
-- `/qa-fix` — Step 6
+- `/qa-fix` — Step 6 (5b — the lock stays at `current_step: 5`, `qa_phase: 5b`)
 - `/review-pr` — Step 5c (the QA loop's exit gate; advisory — the orchestrator acts on its verdict)
 - `/finalise` — Step 7
 - `/commit-changes` — Step 8
