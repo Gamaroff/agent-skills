@@ -36,9 +36,9 @@ Add routes 2b (cosmetic residue) and 2c (gate the last fix) to the step-5-6 QA l
 | 2. review-task             | ✅ Done    | `task.123.review.{N}.{name}.md` exists (or skip logged)               | Pre-existing `task.123.review.1.qa-loop-exits-and-re-entry.md` (2026-09-18, 11/11 recommendations implemented); task status `ready-for-development`; adopted on resume | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 18/18 phases; `ci:fast` 3488 pass / 0 fail + bash suites; `eval:all` 34 green; bundle:check / check:generated / validate:all / lint:shell exit 0; 8 mutants caught; status `ready-for-review`; 65 files in working tree (uncommitted — Step 4 commits) | `.summaries/step-3-iteration-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #435: https://github.com/Gamaroff/agent-skills/pull/435 (base develop); commit `c6fdba3e` (153 files); in-review comment posted on #423; leak check OK | — |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.123.qa.{N}.*.md`; `task.123.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.123.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Complete (5 cycles, route 2b → 5c CONCERNS) | `task.123.qa.{N}.*.md`; `task.123.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 7. finalise                | ✅ Complete | `task.123.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
+| 8. commit-changes          | ✅ Complete | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -105,8 +105,29 @@ Add routes 2b (cosmetic residue) and 2c (gate the last fix) to the step-5-6 QA l
 - 5b cycle 4: `Skill(qa-fix, args="gate=…/task.123.gate.4.qa-loop-exits-and-re-entry.yml")`. All fixed; commit `0610f64a`; PR OPEN. Cycle 5 is the last budgeted cycle; HIGH was 1 at cycles 1–2, so route 2c cannot fire at the budget (high-findings-seen) — cycle 5's gate must reach 5c on its own.
 - Cycle counter → 5 (QA_MAX_CYCLES 5). Lock `qa_phase: 5a`.
 - 5a cycle 5: `Skill(qa-task, args="code_review_blocking=true")` — scoped to files changed since gate 4.
+- 5a cycle 5 result: gate 5 PASS (100) — HIGH 0, MEDIUM 0, four LOW open (C5-CR-1..4, all on `grant-qa-cycles.sh`; the reviewer rated C5-CR-1 medium, QA rated it LOW with the reason on the gate). Bugs 11–14 Closed. PR comment (qa-gate-5 lead) + issue #423 comment posted.
+- **PreCompact hook fired after 5a** (commit `e3e8d338`, pushed; lock removed, snapshot `last-halt.json` at `current_step: 5`, `qa_phase: 5a`). Post-compaction recovery per SKILL.md: Steps 1–4 verified on disk, resumed at cycle 5's Outcome branching. The orchestrator restored the lock from the snapshot with the same `del(.halted_at,.halt_reason,.halt_step,.paused_at,.pause_reason)` shape `grant-qa-cycles.sh` uses — the pause doc names this a pre-existing gap (no resume path restores the lock except the grant); recorded, not fixed here.
+- Outcome branching cycle 5: Convergence check no trip (HIGH 1, 1, 0, 0, 0); `classifyLoopRoute` → **`cosmetic-residue` (route 2b)**: PASS token, every open entry LOW, HIGH_5 = HIGH_4 = 0, cycle ≥ 2. On-exit applied: Action/PR Review rows overwritten; 5b not run; C5-CR-1..4 moved to gate 5 `recommendations.future` by id (`carried_from: top_issues (route 2b, cycle 5)`), `top_issues[]` stamped `status: closed` + `resolution: carried to recommendations.future (route 2b)`; ids recorded under the task doc's Deferred Work; `describeLoopRoute(r)` on the Loop exit row. Lock `qa_phase: 5c` via `set-qa-phase.sh 5c` — the loop's own exit, dogfooded on the last budgeted cycle.
+- Gate 5 + qa.5 + bugs 11–14 closures + task doc committed before 5c (5b's "path 1"); report excluded; one push for cycle 5.
+- 5c: `Skill(review-pr, args="--effort medium --comment")` on PR #435 — both lenses as read-only Explore subagents over the diff excluding `*/references/*` (158 files). Verdict **CONCERNS**: CR-1 medium/high — after the route-2c half-cycle (cycle N+1) a 5c REQUEST CHANGES returns to 5b and every loop-limit trigger tests *equality* with `QA_MAX_CYCLES`, so that path is unbounded (orchestrator spot-checked the cited lines: confirmed). CR-2 low (absent `task_or_story_directory` silently accepted), PC-1 low (Progress Tracking QA/Gate rows unticked), CR-3/4 cleanups. CONCERNS → recorded, not blocking, per the verdict branching; CR-1 filed under the task's Deferred Work as follow-up work with the suggested fix. Report `task.123.pr-review.1.qa-loop-exits-and-re-entry.md`; comment posted (marker `<!-- agent-skills-pr-review -->`, in-review lead).
+- Loop exit: five cycles (FAIL 50 → FAIL 50 → CONCERNS 80 → CONCERNS 60 → PASS 100); HIGH 1, 1, 0, 0, 0; MEDIUM 3, 3, 2, 4, 0; 14 bugs Closed; four LOWs carried (route 2b). `ready-for-merge` signalled (below). Lock → 7.
 
 ---
+
+### Step 7 — Finalise — 2026-09-19
+
+- `Skill(finalise, args="<task path>")`, standard mode. DoD running summary `task.123.dod.1.qa-loop-exits-and-re-entry.md`; four DoD Explore agents dispatched in parallel: AC traceability PASS (8/8, each with code + per-PR-lane test citation; AC8 process-verified against the observation log), security PASS (`boundary: false` with explicit reasoning; no probes), compliance NOT_APPLICABLE, docs PASS (CHANGELOG task 123; bundles fresh; catalog N/A).
+- PR review decision: none on GitHub (single-maintainer repo); the 5c `/review-pr` CONCERNS is the review of record — advisory, CR-1 recorded under Deferred Work.
+- CI reading 1: `SUCCESS @ 78cc088e` over 5 checks (allowed-branch, link-check, shellcheck, test, validate). Decision: **ACCEPTED**.
+- Local writes: frontmatter `status: accepted`, `completed_date: 2026-09-19`, `pr_number: 435`; Change Log rows — the loop-exit `qa-fix` row (orchestrator, at the Step 7 transition) and `1.2 — DoD passed — accepted (PR #435)` via `change-log.js`; DoD PASSED section; Progress Tracking QA/Gate rows ticked (PC-1); `registry-tick.js` → `ticked` (row 123 `planned` → `accepted`); sprint-review-summary.md.
+- Publish boundary 6a/6b: acceptance commit `c5566aee` (task doc, DoD, sprint review, PR review report, registry; report excluded) pushed; all three artefacts asserted tracked and on `origin/feature/task.123.qa-loop-exits-and-re-entry`; pushed doc reads `status: accepted`; PR head = `c5566aee` (first read was stale by seconds; re-read matched).
+- 6c CI reading 2: `SUCCESS @ c5566aee` over 5 checks after 120s (background poll; sampled head = pushed acceptance head). Publish boundary crossed.
+- Side-effects (after the boundary): canonical PR comment posted (marker `<!-- finalise-canonical-summary -->`, done lead) — https://github.com/Gamaroff/agent-skills/pull/435#issuecomment-5740753215; issue #423 document link re-pointed to `develop`; `tracker-comment.js --stage done` → `posted`; `tracker-issue.js --kind close` → CLOSED (confirmed by `gh issue view`); `gh-stage.js --stage done` → `already` (card already in Done). Task completed.
+- 6d CHANGELOG citation: `(task 123)` present under `[Unreleased]` ✅.
+
+### Step 8 — Commit Changes — 2026-09-19
+
+- Terminal commit: implementation report only (`docs(task.123): implementation report — pipeline complete`), pushed; `advance-pipeline-lock.sh --complete` removes the lock. Working tree clean; `verify-push-state.sh` run before the completion banner.
 
 ## Issues Log
 
@@ -182,15 +203,32 @@ _Track each QA review/fix cycle._
 
 ---
 
+### QA Cycle 5 — 2026-09-19
+**Gate Result**: PASS
+**Issues Found**: 4 in top_issues[] — C5-CR-1 LOW (never-lower refusal's "no grant is needed" clause false on the snapshot path; reviewer medium, QA LOW), C5-CR-2 LOW (budget read before ownership check), C5-CR-3 LOW (`./` doc-dir under bash 5), C5-CR-4 LOW (`CDPATH` in `canon()`); cleanups C5-CR-5/6/7. Cycle-4 findings all FIXED; bugs 11–14 Closed
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — task.123.pr-review.1.qa-loop-exits-and-re-entry.md; CR-1 medium/high (route-2c half-cycle → 5c REQUEST CHANGES re-enters 5b past the budget: loop-limit trigger is an equality test), CR-2 low, PC-1 low, CR-3/4 cleanups; comment https://github.com/Gamaroff/agent-skills/pull/435#issuecomment-5740706436
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 5 with HIGH 0 for cycles 4 and 5; all 4 open findings are LOW and are carried to the gate's recommendations.future by id (TASK123-C5-CR-1, TASK123-C5-CR-2, TASK123-C5-CR-3, TASK123-C5-CR-4). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+**Route classifier**: cosmetic-residue (route 2b) — Convergence check: HIGH_N = 0, no trip (1, 1, 0, 0, 0); MEDIUM 3, 3, 2, 4, 0
+**Scope**: since gate 4 (16 files); SAFETY_REPROBE=false
+**QA artifacts**: task.123.qa.5.qa-loop-exits-and-re-entry.md, task.123.gate.5.qa-loop-exits-and-re-entry.yml; PR comment posted (qa-gate-5 lead); issue #423 comment posted (reason: posted)
+**Fixes Applied**: none — 5b not run (route 2b); C5-CR-1..4 carried to gate 5 `recommendations.future` by id and recorded under the task doc's Deferred Work
+**Commit**: `78cc088e` (gate.5 + qa.5 + bugs 11–14 closures + task doc; report excluded) — pushed once
+**Fix comment**: n/a — no fix cycle
+
+---
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-19T10:05:00Z
+**Final Status**: Completed
 **Branch**: `feature/task.123.qa-loop-exits-and-re-entry`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/435
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 5 (FAIL 50 → FAIL 50 → CONCERNS 80 → CONCERNS 60 → PASS 100; HIGH 1, 1, 0, 0, 0; 14 bugs closed; four LOWs carried by route 2b); PR review 5c CONCERNS
+**DoD Summary**: `task.123.dod.1.qa-loop-exits-and-re-entry.md` — ACCEPTED (8/8 criteria; security PASS; compliance N/A; docs PASS; CI reading 1 SUCCESS @ 78cc088e, reading 2 SUCCESS @ c5566aee)
+**Tracker debt**: none — issue #423 closed and confirmed; board card already Done; in-review / changes-requested / ready-for-merge stages are `stage-disabled` on this board by configuration (not debt)
 
 ---
 
