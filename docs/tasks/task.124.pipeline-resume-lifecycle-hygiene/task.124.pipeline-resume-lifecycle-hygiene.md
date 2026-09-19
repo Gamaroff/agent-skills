@@ -465,19 +465,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.124.qa.4.pipeline-resume-lifecycle-hygiene.md](./task.124.qa.4.pipeline-resume-lifecycle-hygiene.md)
-- **Gate File**: [task.124.gate.4.pipeline-resume-lifecycle-hygiene.yml](./task.124.gate.4.pipeline-resume-lifecycle-hygiene.yml)
+- **Full Report**: [task.124.qa.5.pipeline-resume-lifecycle-hygiene.md](./task.124.qa.5.pipeline-resume-lifecycle-hygiene.md)
+- **Gate File**: [task.124.gate.5.pipeline-resume-lifecycle-hygiene.yml](./task.124.gate.5.pipeline-resume-lifecycle-hygiene.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3512 (fast gate) + reproductions
+- **Tests Executed**: 3512 (fast gate) + 16 replay fixtures + 5 runnable blocks × 2 shells (Step 4b)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH; 2 MEDIUM (prose consistency)
+- **Critical Issues**: 0 HIGH; 2 MEDIUM (cross-file exception statement; probe base never bound)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Cycle-3 CR-1..CR-6 verified FIXED.
-- CR-1 (MEDIUM): the resume contract states who restores twice; the Phase 0b one is unconditional ([bug 11](./task.124.bug.11.two-restore-statements-in-resume-contract.md)). CR-2 (MEDIUM): develop-bug carries the grant exception without a grant ([bug 12](./task.124.bug.12.develop-bug-carries-grant-exception-without-a-grant.md)).
-
+- Cycle-4 CR-1..CR-4 verified FIXED.
+- CR-1 (MEDIUM): the two shared sources develop-bug bundles still state the loop-limit exception for all three pipelines ([bug 13](./task.124.bug.13.shared-sources-state-grant-exception-for-develop-bug.md)). CR-2 (MEDIUM): the working-tree probe classifies against `${BASE_BRANCH:-develop}` and nothing binds it ([bug 14](./task.124.bug.14.probe-base-branch-never-bound.md)).
 ## Bug Reports
 
 ### In QA Verification
@@ -495,14 +494,18 @@ None.
 - [Bug 124.9: restore before the grant defeats a refused re-entry](./task.124.bug.9.restore-before-grant-defeats-refusal.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
 - [Bug 124.10: probe re-creates a deleted branch-added file](./task.124.bug.10.probe-recreates-deleted-branch-added-file.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
 
-- [Bug 124.11: two restore statements in the resume contract](./task.124.bug.11.two-restore-statements-in-resume-contract.md) - 🔍 Ready for QA - Severity: MEDIUM
-- [Bug 124.12: develop-bug carries the grant exception without a grant](./task.124.bug.12.develop-bug-carries-grant-exception-without-a-grant.md) - 🔍 Ready for QA - Severity: MEDIUM
+- [Bug 124.11: two restore statements in the resume contract](./task.124.bug.11.two-restore-statements-in-resume-contract.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.12: develop-bug carries the grant exception without a grant](./task.124.bug.12.develop-bug-carries-grant-exception-without-a-grant.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+
+- [Bug 124.13: shared sources state the grant exception for develop-bug](./task.124.bug.13.shared-sources-state-grant-exception-for-develop-bug.md) - 🔍 Ready for QA - Severity: MEDIUM
+- [Bug 124.14: probe base branch never bound](./task.124.bug.14.probe-base-branch-never-bound.md) - 🔍 Ready for QA - Severity: MEDIUM
 
 ### Closed Bugs
 
 - Bugs 124.1–124.4 — verified FIXED in QA cycle 2 (2026-09-19)
 - Bugs 124.5–124.8 — verified FIXED in QA cycle 3 (2026-09-19)
 - Bugs 124.9–124.10 — verified FIXED in QA cycle 4 (2026-09-19)
+- Bugs 124.11–124.12 — verified FIXED in QA cycle 5 (2026-09-19)
 
 ## Change Log
 <!-- change-log-start -->
@@ -519,6 +522,7 @@ None.
 | 2026-09-19 |  | QA gate 2 FAIL (70/100) — cycle-1 findings verified fixed; refute pass: 2 HIGH (CR-1 accepted≠finished, CR-2 re-invocation never restores), 2 MEDIUM; bugs 5–8 | qa-task |
 | 2026-09-19 |  | QA gate 3 CONCERNS (80/100) — cycle-2 findings verified fixed; 0 HIGH, 2 MEDIUM (restore/grant order; deleted branch-added file), 3 LOW; bugs 9–10 | qa-task |
 | 2026-09-19 |  | QA gate 4 CONCERNS (85/100) — cycle-3 findings verified fixed; 0 HIGH, 2 MEDIUM (duplicate restore statement; develop-bug exception), 2 LOW; bugs 11–12 | qa-task |
+| 2026-09-19 |  | QA gate 5 CONCERNS (85/100) — cycle-4 findings verified fixed; 0 HIGH, 2 MEDIUM (shared sources state the exception for develop-bug; probe base never bound), 0 LOW; bugs 13–14 | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

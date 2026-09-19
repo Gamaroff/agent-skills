@@ -1,0 +1,83 @@
+schema: 1
+task: 'task.124.pipeline-resume-lifecycle-hygiene'
+task_title: 'Resume trusts what it finds on disk'
+gate: CONCERNS
+status_reason: 'Cycle-4 findings CR-1..CR-4 verified FIXED in isolation (one restore statement in the contract; develop-bug exception dropped; two labels; Cost sentence). The narrowed cycle-5 review found no HIGH and no mechanism regression, but two MEDIUM defects remain in the executed prose: the develop-bug fix moved the contradiction one file over — the two shared sources develop-bug bundles (resume contract Phase 0a, step-0 §0b) still state the loop-limit exception for all three pipelines while develop-bug now says it has none; and the working-tree probe classifies against `origin/${BASE_BRANCH:-develop}` although nothing in any pipeline ever binds BASE_BRANCH, so a hotfix off main or an epic-integration branch is classified against develop. Reliability CONCERNS.'
+reviewer: 'QA Engineer'
+updated: '2026-09-19T15:09:44Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The loop-limit|not-converging → do-not-restore exception is stated unconditionally for all three pipelines in the two shared sources develop-bug bundles (resume contract "Restore the lock (both resume paths)"; step-0 §0b, whose command line names develop-bug), while develop-bug/SKILL.md:69 now says it has no grant and restores on every snapshot — a develop-bug run that follows the shared text after its 5-cycle "not converging" HALT waits for a grant prompt that does not exist and fails at its first numeric advance.'
+    suggested_action: 'Scope the exception to develop-task/develop-story in the same sentence that states it, in both shared sources, and name develop-bug as the pipeline that restores on every snapshot.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.13.shared-sources-state-grant-exception-for-develop-bug.md'
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The working-tree probe sets BASE_REF="origin/${BASE_BRANCH:-develop}" but no pipeline binds BASE_BRANCH (the Q1 base lives only as prose in Phase 0d, which a resume skips, and the lock carries no base field), so on a hotfix off main or an epic-integration branch an uncommitted file whose bytes equal develop is class (a) and discarded by git checkout HEAD, while a genuine overlay of the real base falls to (c) and HALTs.'
+    suggested_action: 'Derive the base from recorded state — gh pr view --json baseRefName when the lock has pr_url, else record base_branch in the lock at Step 1 and read it — and never from an unbound shell variable with a develop default.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.14.probe-base-branch-never-bound.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 3512
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged — no boundary in the cycle-4 delta; no corpus sink fits a Markdown contract.'
+  performance:
+    status: PASS
+    notes: 'Unchanged; the Cost sentence now matches the shipped probe.'
+  reliability:
+    status: CONCERNS
+    notes: 'Two medium defects in executed prose: a develop-bug loop-limit resume is told two different things by its own SKILL.md and the shared sources it bundles; the probe base defaults to develop for every pipeline. Neither is a regression of a mechanism this task shipped; both are one-paragraph/one-line fixes, and CR-2 is the first finding in five cycles against the probe that is not about the probe text itself.'
+  maintainability:
+    status: PASS
+    notes: 'Single-definition mechanisms and tests unchanged; residue is prose consistency across bundled copies.'
+
+bug_resolution:
+  cycle_4_findings_verified:
+    - { id: 'CR-1 (cycle 4)', status: FIXED, evidence: 'grep "Restore first, then continue" → 0; Phase 0b paragraph defers to Phase 0a — but see cycle-5 CR-1 for the cross-file residue' }
+    - { id: 'CR-2 (cycle 4)', status: FIXED, evidence: 'grep loop-limit|not-converging develop-bug/SKILL.md → 0; the no-grant sentence is present — but the shared sources it cites still state the exception (cycle-5 CR-1)' }
+    - { id: 'CR-3 (cycle 4)', status: FIXED, evidence: 'two skip labels, branched on the URL host' }
+    - { id: 'CR-4 (cycle 4)', status: FIXED, evidence: 'Cost sentence names cat-file -e and the per-arm compare' }
+
+code_review:
+  reviewed: '3 canonical files changed since gate 4 (361 diff lines full-branch; 79-line cycle-4 delta read first), narrowed; 18 bundled copies verified in sync'
+  findings_total: 2
+  bugs: 2
+  cleanups: 0
+  promoted_to_gate: 2
+  code_review_blocking: true
+
+recommendations:
+  immediate:
+    - action: 'CR-1: scope the loop-limit exception to develop-task/develop-story in the resume contract and step-0 §0b'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'CR-2: bind the probe base from pr_url (gh pr view baseRefName) or a recorded lock field, not ${BASE_BRANCH:-develop}'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+  future:
+    - action: 'Carried: cycle-1 CR-5 (guard vs chosen candidate), cycle-1 CR-7 (inline lint exit-code split)'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed']

@@ -59,12 +59,16 @@ When `source` is `halt_snapshot` or `orphaned_claim` and the operator chooses Re
 not exist — a HALT or pause removed it, and a resume skips Step 1, its only ordinary writer. **Who
 restores depends on the snapshot's `halt_reason`** (task.124 QA cycle 3, CR-1):
 
-- `halt_reason` matches `loop-limit|not-converging` → **do not restore here.** The Phase 0b prompt
-  is the grant prompt (**Re-entry after a QA loop escalation**, below), and `grant-qa-cycles.sh`
-  restores through `--restore` **only after its never-lower guard passes**. A declined or refused
-  grant therefore restores nothing and consumes nothing — the task.123 CR-1 rule — and the run
-  returns to the halt message's own three options with the snapshot still on disk.
-- any other `halt_reason`, or a PreCompact `pause_reason` → run
+- `halt_reason` matches `loop-limit|not-converging` **in `develop-task` or `develop-story`** →
+  **do not restore here.** The Phase 0b prompt is the grant prompt (**Re-entry after a QA loop
+  escalation**, below), and `grant-qa-cycles.sh` restores through `--restore` **only after its
+  never-lower guard passes**. A declined or refused grant therefore restores nothing and consumes
+  nothing — the task.123 CR-1 rule — and the run returns to the halt message's own three options
+  with the snapshot still on disk. **`develop-bug` has no grant prompt**: its verify loop's
+  limit HALT is escalated, not re-entered, so a `develop-bug` snapshot takes the next bullet
+  whatever its `halt_reason` reads (task.124 QA cycle 5, CR-1 — an earlier revision stated this
+  bullet for all three pipelines while develop-bug's own Step 0-lock said the opposite).
+- any other `halt_reason`, or a PreCompact `pause_reason`, or **any `develop-bug` snapshot** → run
   `advance-pipeline-lock.sh --restore {doc-directory}` **here**, before Phase 0b, on the
   re-invocation path exactly as the in-session continuation does (QA cycle 2, CR-2; the step-0
   doc's Shared Resume Logic states the call).
@@ -102,7 +106,18 @@ bundled copy the run had produced. So the probe runs **first**, and it **classif
 # an `A`, each a real path; the `A` is not in the base and so is class (c).
 DIRTY=$(git status --porcelain --no-renames)
 if [ -n "$DIRTY" ]; then
-  BASE_REF="origin/${BASE_BRANCH:-develop}"
+  # The base is RECORDED STATE, never a bare shell variable with a `develop` default: nothing in
+  # any pipeline binds BASE_BRANCH, so `${BASE_BRANCH:-develop}` probed every hotfix off `main`
+  # and every epic-integration branch against develop — and the one outcome that deletes bytes,
+  # the (a) discard, keyed on that comparison (task.124 QA cycle 5, CR-2). Order: the PR's own
+  # base when the branch has one (Steps 4+); else the Q1 answer in the report's Pipeline
+  # Configuration row (Steps 1–3); else `develop`, SAID ALOUD, never assumed silently.
+  BASE_BRANCH=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || true)
+  [ -n "$BASE_BRANCH" ] || BASE_BRANCH=$(sed -nE 's/^\| *Feature branch base *\| *`?([^ |`]+).*/\1/p' \
+    {implementation-report-path} 2>/dev/null | head -1)
+  [ -n "$BASE_BRANCH" ] || { BASE_BRANCH=develop
+    echo "probe: no PR on this branch and no 'Feature branch base' row in the report — classifying against origin/develop" >&2; }
+  BASE_REF="origin/$BASE_BRANCH"
   # Classify EVERY entry first; act only on the classified paths (never `checkout -- .`, never a
   # directory-wide `clean`). `git diff <commit> -- <path>` does not see an untracked path, so `??`
   # entries need their own test: base must HAVE the path and the bytes must match.
@@ -164,7 +179,8 @@ porcelain afterwards (a pathspec-filtered re-read is satisfied vacuously by an e
 probe mis-parsed), because a probe that prints "discarded" over an entry it did not discard is the
 task.116 failure with a success line in front of it (cycle 1 CR-4, cycle 2 CR-4). Renames are
 split by `--no-renames` and a quoted path is (c) for the same reason: the probe acts only on paths
-it can address. Cost: one `git status --porcelain --no-renames`, plus one `git cat-file -e` and one
+it can address. Cost: one `gh pr view` (or one `sed` over the report) to bind the base, one `git
+status --porcelain --no-renames`, plus one `git cat-file -e` and one
 `git diff --quiet` (tracked) or `git show | cmp` (untracked) per entry for (a), plus one full
 porcelain re-read.
 
@@ -184,9 +200,10 @@ it — a session that continues in place after a pause **and** a re-invocation t
 in Phase 0b — so neither has a step that puts the lock back unless it is stated, and
 `advance-pipeline-lock.sh <n>` with no lock is now an **error naming the fix**, not a silent no-op
 (obs #123; QA cycle 2, CR-2). **Who restores is stated once — under Phase 0a, "Restore the lock
-(both resume paths)"** — and this paragraph defers to it: on a `loop-limit|not-converging` snapshot
-the grant restores (after its never-lower guard), and on every other snapshot or pause the command
-below runs first, then the run continues (QA cycle 4, CR-1 — an earlier revision of this paragraph
+(both resume paths)"** — and this paragraph defers to it: on a `develop-task`/`develop-story`
+`loop-limit|not-converging` snapshot the grant restores (after its never-lower guard), and on every
+other snapshot or pause — every `develop-bug` snapshot included — the command below runs first,
+then the run continues (QA cycle 4, CR-1 — an earlier revision of this paragraph
 said "restore first" unconditionally, which was the bug-9 ordering restated one section down):
 
 ```bash
