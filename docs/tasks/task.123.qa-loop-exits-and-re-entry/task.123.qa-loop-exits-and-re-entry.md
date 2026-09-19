@@ -5,7 +5,7 @@ type: task
 description: "Four QA-loop shapes the step-5-6 doc has no route for, each observed burning cycles on a real task: a PASS gate whose open entries are all LOW re-enters a full qa-fix cycle (task.110 ran cycles 12–13 for two nits); a converging medium-only loop with HIGH 0 throughout exhausts the budget and escalates an ungated fix (task.117, five CONCERNS gates); advance-pipeline-lock.sh is monotonic so every 5b→5a re-entry needed a hand-rolled jq (task.108); and a re-invocation after a loop-limit halt has no re-entry rule, so a standalone cycle 6 run by the operator was invisible to the resumed pipeline (task.110). One task, one document to change, one lock helper, one resume-contract subsection. Observations #72, #77, #95, #100, #112."
 tags: [develop-task, develop-story, qa-loop, pipeline]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-17
@@ -13,11 +13,13 @@ updated: 2026-09-19
 assignee:
 estimated_effort_hours: 8
 github_issue: 423
+pr_number: 435
+completed_date: 2026-09-19
 ---
 
 # Technical Task: The QA loop's guards read only the HIGH count and the lock cannot go backwards
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.123.review.1.qa-loop-exits-and-re-entry.md` implemented 2026-09-18
 **GitHub Issue**: [#423](https://github.com/Gamaroff/agent-skills/issues/423)
 
@@ -526,6 +528,12 @@ Gate 4 CONCERNS (60) — four MEDIUMs, all fixed, plus C4-CR-5/6/7.
   snapshot path; ownership check after `read_budget`; `./` doc-dir under bash 5; `CDPATH` in `canon()`), moved to
   the gate's `recommendations.future` by id with their finding text and `suggested_action`. Cleanups C5-CR-5..7
   sit beside them. None changes what the script writes; each is a one-line change for a follow-up.
+- **PR review CR-1 (5c, CONCERNS)** — the route-2c half-cycle runs as cycle `N+1 = QA_MAX_CYCLES+1`; if 5c then returns
+  REQUEST CHANGES, the verdict row re-enters 5b unconditionally and every loop-limit trigger (5b step 7, the Stop hook's
+  5b/5c sentences) tests *equality* with `QA_MAX_CYCLES`, so the loop runs past its budget until a gate clears or the
+  Convergence check trips. Fix: `>=` on every trigger, an explicit escalation arm in the half-cycle section for a 5c
+  REQUEST CHANGES on gate `N+1` (no 5b), and a route-2c eval branch for that verdict. Also CR-2 (refuse or warn on a
+  snapshot with no `task_or_story_directory`), CR-3/CR-4 cleanups — `task.123.pr-review.1.qa-loop-exits-and-re-entry.md`.
 
 ## QA Testing Results
 
@@ -549,6 +557,34 @@ Gate 4 CONCERNS (60) — four MEDIUMs, all fixed, plus C4-CR-5/6/7.
 Cycle 5 (scoped since gate 4): cycle-4 findings verified FIXED; no HIGH or MEDIUM remains (HIGH 1, 1, 0, 0, 0). Four LOWs in `grant-qa-cycles.sh` — a misleading clause in the no-lock refusal message (reviewer medium → QA LOW: behaviour correct, remedy adjacent), foreign-snapshot diagnosis order, `./` under bash 5, `CDPATH` in `canon()` — plus three wording cleanups.
 
 ## Change Log
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.123.qa.1..5.qa-loop-exits-and-re-entry.md` (five cycles)
+**Gate File**: `task.123.gate.5.qa-loop-exits-and-re-entry.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (5c)**: ⚠️ CONCERNS — `task.123.pr-review.1.qa-loop-exits-and-re-entry.md` (CR-1 medium, recorded under Deferred Work; advisory)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** All 8 met — each traced to code and to a test in a per-PR lane (`npm test` incl. the four hand-listed bash suites; `eval:all` replay fixtures 10/11/12 on both pipeline sides); AC8 verified against the observation log
+✅ **Tests:** `qa-loop-route.test.mjs` (30), `set-qa-phase.test.sh` (19), `grant-qa-cycles.test.sh` (41), `develop-pipeline-on-stop.test.sh` (27), `qa-loop-lock-fields-parity.test.mjs` (5), `pr-review-loop-parity.test.mjs` (31); `ci:fast` 3490 node + 8 bash suites; 17+ mutation proofs recorded across five QA cycles
+✅ **PR Review:** PR #435 → develop; five QA cycles (FAIL 50 → FAIL 50 → CONCERNS 80 → CONCERNS 60 → PASS 100), 14 bugs Closed, four LOWs carried by the Cosmetic-residue exit; Step 5c conformance review CONCERNS (advisory)
+✅ **CI:** reading 1 `SUCCESS @ 78cc088e` over 5 checks; reading 2 taken on the acceptance commit (recorded on the PR canonical comment and in the implementation report)
+✅ **Documentation:** CHANGELOG (task 123); step-5-6 loop doc, resume contract, hooks/pause/lock docs, develop-task / develop-story / review-pr SKILL.md, three runbooks; bundled `references/` copies fresh
+✅ **Security Review:** ✅ PASS — no secrets, no eval/exec, argv reaches jq only via `--arg`/`--argjson`, mktemp+mv writes with rollback; `boundary: false` recorded with reasoning
+✅ **Compliance Review:** NOT_APPLICABLE — no data, payments, UI or PHI in scope
+
+**Deployment Readiness:** Staging ✅ APPROVED · Production ✅ APPROVED (gate 5)
+
+**Task marked as ACCEPTED on:** 2026-09-19
+
+**Detailed Verification Log:** See `task.123.dod.1.qa-loop-exits-and-re-entry.md` for complete verification evidence and timestamps.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -563,6 +599,8 @@ Cycle 5 (scoped since gate 4): cycle-4 findings verified FIXED; no HIGH or MEDIU
 | 2026-09-19 |  | QA gate CONCERNS (80/100) — 0 HIGH, 2 MEDIUM, 3 LOW (cycle 3, scoped; cycle-2 bugs 5–8 closed) | qa-task |
 | 2026-09-19 |  | QA gate CONCERNS (60/100) — 0 HIGH, 4 MEDIUM, 1 LOW (cycle 4, scoped; bugs 9–10 closed) | qa-task |
 | 2026-09-19 |  | QA gate PASS (100/100) — 0 HIGH, 0 MEDIUM, 4 LOW carried (cycle 5, scoped; bugs 11–14 closed) | qa-task |
+| 2026-09-19 |  | QA findings fixed — gate PASS (100/100), 4 iterations; 14 bugs closed, 4 LOW carried (route 2b) | qa-fix |
+| 2026-09-19 | 1.2 | DoD passed — accepted (PR #435) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -570,8 +608,8 @@ Cycle 5 (scoped since gate 4): cycle-4 findings verified FIXED; no HIGH or MEDIU
 - [x] Phase 1: lock position
 - [x] Phase 2: routes 2b / 2c
 - [x] Phase 3: re-entry
-- [ ] QA: `task.123.qa.[N].qa-loop-exits-and-re-entry.md`
-- [ ] Gate: `task.123.gate.[N].qa-loop-exits-and-re-entry.yml`
+- [x] QA: `task.123.qa.[N].qa-loop-exits-and-re-entry.md`
+- [x] Gate: `task.123.gate.[N].qa-loop-exits-and-re-entry.yml`
 
 ## References
 
