@@ -1,7 +1,7 @@
 {
   "name": "develop-task-resume-overlay-discarded-path-scoped",
   "skill": "develop-task",
-  "description": "Phase 0b working-tree probe (task.124 / obs #85): a resume finds the tree dirty with two tracked files whose content equals origin/develop's and one untracked file the base has byte-for-byte (a stray copy). Every entry classifies as (a) overlay; the probe discards them PATH BY PATH (`git checkout -- <paths>`, `git clean -f -- <paths>` \u2014 never `checkout -- .`), records every discarded path in the Decisions Log, and only then trusts the artifacts. Fixture records the resume detector, the probe's Decisions Log line, and the pipeline continuing at Step 4.",
+  "description": "Phase 0b working-tree probe (task.124 / obs #85): a resume finds the tree dirty with two tracked files whose content equals origin/develop's and one untracked file the base has byte-for-byte (a stray copy). Every entry classifies as (a) overlay; the probe discards them PATH BY PATH (`git checkout -- <paths>`, `git clean -f -- <paths>` \u2014 never `checkout -- .`), records every discarded path in the Decisions Log, and only then trusts the artifacts. Fixture records the resume detector, the probe's Decisions Log line, and the pipeline continuing at Step 4. One tracked entry is STAGED: the discard names HEAD (index + worktree), and the probe re-reads porcelain over the discarded paths before it prints the success line (task.124 QA cycle 1, CR-4).",
   "prompt": "Re-invoke /develop-task for task.42.example after a HALT. The working tree carries an overlay identical to origin/develop. Resume from the last completed step.",
   "assertions": [
     {
@@ -15,7 +15,7 @@
       "fn": "fileMatches",
       "args": [
         "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
-        "git checkout -- skills/develop-task/references/change-log.js docs/README.md"
+        "git checkout HEAD -- skills/develop-task/references/change-log.js docs/README.md"
       ]
     },
     {
@@ -30,6 +30,20 @@
       "args": [
         "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
         "git checkout -- \\\\."
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "porcelain re-read: clean"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "git checkout -- "
       ]
     },
     {

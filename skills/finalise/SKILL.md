@@ -1141,7 +1141,10 @@ standalone.
    # The poll is a background TASK the orchestrator waits on across turns: mark the wait on the
    # pipeline lock so the Stop hook allows the yielded turns (task.124, obs #89), and clear it on
    # the later turn that reads $RESULT. Both are silent no-ops without a lock (standalone run).
-   bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 CI poll (reading 2)" --kind task
+   # The budget is the POLL'S OWN bound, not the subagent default: a 10-minute mark on a 25-minute
+   # poll re-prompted the last 15 minutes of every legitimate wait (task.124 QA cycle 1, CR-2).
+   bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 CI poll (reading 2)" --kind task \
+     --budget-minutes "$(( ${FINALISE_CI_MAX_WAIT:-1500} / 60 + 1 ))"
    POLL=.claude/state/finalise-ci-poll.sh
    RESULT=.claude/state/finalise-ci-result.txt
    PIDFILE=.claude/state/finalise-ci-poll.pid

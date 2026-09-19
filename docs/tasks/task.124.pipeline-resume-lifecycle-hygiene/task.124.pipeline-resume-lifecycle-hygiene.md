@@ -212,8 +212,10 @@ its restore moves behind `--restore`.
 **Changes**:
 - [x] Phase 0b dirty-tree probe with the three classifications and their actions. **Classify every
       `git status --porcelain` entry before acting, and act only on the classified paths**:
-      `git checkout -- <paths>` for tracked overlay entries, `git clean -f -- <paths>` for untracked
-      ones — never `git checkout -- .` or a directory-wide `git clean`. A `??` entry is
+      `git checkout HEAD -- <paths>` for tracked overlay entries (index and worktree — the bare
+      index-restoring form leaves a staged overlay in place, QA cycle 1 CR-4), `git clean -f --
+      <paths>` for untracked ones — never `git checkout -- .` or a directory-wide `git clean` — and
+      a porcelain re-read of the discarded paths before the success line. A `??` entry is
       identical-to-base only when `git cat-file -e "$BASE_REF:$p"` succeeds **and** the content
       matches (`git diff <commit> -- <path>` never reports an untracked path, so the tracked-file
       test alone passes every untracked file). Any entry the probe cannot classify → (c) HALT.
@@ -250,8 +252,9 @@ while it runs. Re-run the grep before implementing; list the result in the imple
 **Changes**:
 - [x] `waiting_on: {kind, label, since, budget_minutes}` in the lock schema. **One writer**:
       `set-waiting-on.sh "<label>"` at dispatch (reads `subagents.wallClockMinutes` once and stores
-      it as `budget_minutes`, so the hook needs no config read), `set-waiting-on.sh --clear` when
-      the result is read. Mirrors `set-qa-phase.sh`: never touches `current_step`; exit 0 no-op
+      it as `budget_minutes`, so the hook needs no config read; `--budget-minutes N` for a wait whose
+      own bound the caller knows, e.g. the finalise CI poll — QA cycle 1, CR-2), `set-waiting-on.sh
+      --clear` when the result is read. Mirrors `set-qa-phase.sh`: never touches `current_step`; exit 0 no-op
       without a lock. Add `waiting_on` to `qa-loop-lock-fields-parity.test.mjs`.
 - [x] Stop hook allows the stop when set and `since` + `budget_minutes` is in the future; hook test
       covers set / cleared / stale (older than budget → re-prompt, a crashed step).
@@ -450,6 +453,41 @@ None.
 - **Critical**: a HALT that leaves the lock; a resume that discards non-overlay work; `grant-qa-cycles.sh` refusing a grant it accepted before (its restore now runs through `--restore`, so a `--restore` regression also breaks QA re-entry).
 - **Non-critical**: message wording, anti-pattern text.
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-19
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.124.qa.1.pipeline-resume-lifecycle-hygiene.md](./task.124.qa.1.pipeline-resume-lifecycle-hygiene.md)
+- **Gate File**: [task.124.gate.1.pipeline-resume-lifecycle-hygiene.yml](./task.124.gate.1.pipeline-resume-lifecycle-hygiene.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3512 (fast gate) + 16 replay scenarios + 4 mutation proofs re-run
+- **Phases Verified**: 4/4
+- **Critical Issues**: 1 (HIGH) + 3 MEDIUM
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- CR-1 (HIGH): `--restore` reads mtimes with `stat -f %m`, which is filesystem mode on GNU coreutils — the lock-helper suite is red on Linux ([bug 1](./task.124.bug.1.restore-mtime-gnu-stat.md)).
+- CR-2..CR-4 (MEDIUM): finalise CI-poll budget shorter than the poll ([bug 2](./task.124.bug.2.ci-poll-wait-outlives-budget.md)); dispatch population hand-listed, two QA-skill dispatches unmarked ([bug 3](./task.124.bug.3.dispatch-population-hand-listed.md)); staged overlay survives the probe ([bug 4](./task.124.bug.4.staged-overlay-not-discarded.md)).
+
+## Bug Reports
+
+### In QA Verification
+
+- [Bug 124.1: `--restore` picks the wrong candidate on GNU coreutils](./task.124.bug.1.restore-mtime-gnu-stat.md) - ✅ Ready for QA - Severity: HIGH (Fixed 2026-09-19)
+- [Bug 124.2: finalise CI-poll wait budget shorter than the poll](./task.124.bug.2.ci-poll-wait-outlives-budget.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.3: dispatch population hand-listed; QA-skill dispatches unmarked](./task.124.bug.3.dispatch-population-hand-listed.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.4: staged overlay entry survives the probe](./task.124.bug.4.staged-overlay-not-discarded.md) - ✅ Ready for QA - Severity: MEDIUM (Fixed 2026-09-19)
+
+### Closed Bugs
+
+_Moved here by QA after verification._
+
 ## Change Log
 <!-- change-log-start -->
 ## Change Log
@@ -461,6 +499,7 @@ None.
 | 2026-09-19 | 1.2 | Review 1 (7/10, NEEDS REVISION → fixes applied): `--restore` replaces `grant-qa-cycles.sh`'s inline restore; `set-waiting-on.sh` is the one `waiting_on` writer; report template extracted to `implementation-report-template.md` with `Tracker Actions Required` optional; lint runs after every report Edit and at each commit site; overlay discard path-scoped with a `??` check; `--skill`/`--complete` keep exit 0; dispatch sites and HALT `rm` locations corrected from grep | review-task |
 | 2026-09-19 |  | Status → ready-for-development | review-task |
 | 2026-09-19 |  | Implemented — 4 phases; 3 new engines (report-lint.js, set-waiting-on.sh, advance-pipeline-lock.sh --restore) + implementation-report-template.md; 7 shell/JS suites extended (+81 assertions), 4 replay fixtures; docs swept | develop |
+| 2026-09-19 |  | QA gate FAIL (70/100) — 1 HIGH (CR-1 GNU stat), 3 MEDIUM (CR-2..CR-4), 3 LOW; 4 bug reports | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

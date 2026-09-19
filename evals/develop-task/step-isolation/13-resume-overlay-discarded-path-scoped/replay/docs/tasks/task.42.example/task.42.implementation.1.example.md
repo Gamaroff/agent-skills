@@ -45,7 +45,7 @@ Resume fixture — task.124 Phase 1.
 
 ### Resume — 2026-09-19
 
-- Working-tree probe: 3 dirty entries, every one byte-identical to `origin/develop` → classification (a) overlay. Discarded path by path: `git checkout -- skills/develop-task/references/change-log.js docs/README.md`; `git clean -f -- shared/resources/stray-copy.md` (untracked, present in base with the same bytes). overlay discarded: 2 tracked, 1 untracked paths.
+- Working-tree probe: 3 dirty entries, every one byte-identical to `origin/develop` → classification (a) overlay — one of them STAGED (`M  docs/README.md`, first porcelain column). Discarded path by path from HEAD into index and worktree: `git checkout HEAD -- skills/develop-task/references/change-log.js docs/README.md`; `git clean -f -- shared/resources/stray-copy.md` (untracked, present in base with the same bytes). Porcelain re-read over the three paths: clean. overlay discarded: 2 tracked, 1 untracked paths (porcelain re-read: clean).
 - Resume detector: recommended_step 4, lock step 4, summaries seen: none, deltas since pause: none, blocking issues: none. Lock restored from the halt snapshot via `advance-pipeline-lock.sh --restore docs/tasks/task.42.example` (snapshot consumed).
 - Steps 1–3 verified from artifacts (branch exists; review skip logged; task status Ready for Review). Resuming at Step 4.
 

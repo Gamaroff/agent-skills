@@ -72,7 +72,7 @@ bundled copy the run had produced. So the probe runs **first**, and it **classif
 
 | Class | What it is | Action |
 | --- | --- | --- |
-| **(a) overlay** | every entry is byte-identical to the base branch — a tracked file whose content equals `$BASE_REF`'s, or an untracked file the base **has** with the same bytes (a stray checkout/copy, not work) | discard, path by path: `git checkout -- <tracked paths>`, `git clean -f -- <untracked paths>`; list every discarded path in the Decisions Log |
+| **(a) overlay** | every entry is byte-identical to the base branch — a tracked file whose content equals `$BASE_REF`'s, or an untracked file the base **has** with the same bytes (a stray checkout/copy, not work) | discard, path by path, **from `HEAD` into both the index and the working tree**: `git checkout HEAD -- <tracked paths>`, `git clean -f -- <untracked paths>`; then re-read `git status --porcelain` over those paths and HALT if any survived; list every discarded path in the Decisions Log |
 | **(b) bundle drift** | every entry is under `skills/*/references/` — bundled copies out of date with their sources | `npm run bundle -- --check \|\| npm run bundle`, then continue |
 | **(c) anything else** | an entry the probe cannot classify — real uncommitted work, an untracked file the base does not have, a mix | **HALT**: print the entries and stop. A resume that guesses here is the task.116 overlay again |
 
@@ -95,9 +95,20 @@ if [ -n "$DIRTY" ]; then
     fi
   done <<< "$DIRTY"
   if [ "$OVERLAY" = true ]; then
-    [ ${#TRACKED[@]} -gt 0 ]   && git checkout -- "${TRACKED[@]}"
+    # `git checkout HEAD -- <paths>`, never `git checkout -- <paths>`: the bare form restores the
+    # WORKING TREE FROM THE INDEX, and a staged overlay (`M ` in the first porcelain column) is
+    # in the index — the checkout is a no-op, the entry survives, and the success line below
+    # would be printed over nothing discarded (task.124 QA cycle 1, CR-4). Naming HEAD restores
+    # index and worktree alike from the branch's own committed state.
+    [ ${#TRACKED[@]} -gt 0 ]   && git checkout HEAD -- "${TRACKED[@]}"
     [ ${#UNTRACKED[@]} -gt 0 ] && git clean -f -- "${UNTRACKED[@]}"
-    echo "overlay discarded: ${#TRACKED[@]} tracked, ${#UNTRACKED[@]} untracked paths"   # list every path in the Decisions Log
+    # Re-read what was claimed discarded. A discard that succeeded and left the entry behind is
+    # the failure the probe exists to stop, so it is a HALT, not a warning.
+    LEFT=$(git status --porcelain -- "${TRACKED[@]}" "${UNTRACKED[@]}" 2>/dev/null)
+    if [ -n "$LEFT" ]; then
+      echo "HALT: overlay discard left entries behind — classify by hand before resuming:"; printf '%s\n' "$LEFT"; exit 1
+    fi
+    echo "overlay discarded: ${#TRACKED[@]} tracked, ${#UNTRACKED[@]} untracked paths (porcelain re-read: clean)"   # list every path in the Decisions Log
   elif ! printf '%s\n' "$DIRTY" | grep -qv 'skills/[^/]*/references/'; then
     npm run bundle -- --check || npm run bundle
   else
@@ -106,14 +117,18 @@ if [ -n "$DIRTY" ]; then
 fi
 ```
 
-**Why (a) is path-scoped and why `??` has its own test.** `git checkout -- .` and a directory-wide
-`git clean` cannot tell "the overlay" from "the work this step authored" — both succeed, both report
-success, and `git status` afterwards shows *less* work rather than broken work (the step-3 doc's
-"Never revert or clean by directory" rule, obs #38). And `git diff --quiet $BASE_REF -- <path>`
-**never reports an untracked path**, so the tracked-file test alone passes every `??` entry as
-"identical to base" and `git clean` then deletes a file the base never had. The `cat-file -e` +
-`cmp` pair is what makes an untracked file identical-to-base *provably* so; anything else is (c).
-Cost: one `git status --porcelain`, plus one `git diff` / `cmp` per entry for (a).
+**Why (a) is path-scoped, why `??` has its own test, and why the discard names `HEAD`.**
+`git checkout -- .` and a directory-wide `git clean` cannot tell "the overlay" from "the work this
+step authored" — both succeed, both report success, and `git status` afterwards shows *less* work
+rather than broken work (the step-3 doc's "Never revert or clean by directory" rule, obs #38).
+`git diff --quiet $BASE_REF -- <path>` **never reports an untracked path**, so the tracked-file
+test alone passes every `??` entry as "identical to base" and `git clean` then deletes a file the
+base never had. The `cat-file -e` + `cmp` pair is what makes an untracked file identical-to-base
+*provably* so; anything else is (c). And `git checkout -- <path>` restores the working tree **from
+the index**, so a *staged* overlay survives it — the discard names `HEAD` and re-reads porcelain
+afterwards, because a probe that prints "discarded" over an entry it did not discard is the
+task.116 failure with a success line in front of it (CR-4). Cost: one `git status --porcelain`,
+plus one `git diff` / `cmp` per entry for (a), plus one porcelain re-read of the discarded paths.
 
 **Halt snapshot for another document.** When Phase 0a's detector reports a `last-halt.json` whose
 `task_or_story_directory` is not this document's, it is **refused, not resumed** — and when that

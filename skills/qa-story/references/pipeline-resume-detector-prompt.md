@@ -150,11 +150,15 @@ Build `EXPECTED` = the set of `(step, path)` pairs the table names. Then:
 - **An expected summary for an earlier step is missing**: add to `blocking_issues`:
   - `"Summary missing for step {N} — the report names {path} and it is absent; the step may have been skipped or corrupted"`
   - Still set `recommended_step = LOCK_STEP` (conservative)
-- **The report cannot be read, or has no `Subagent summary ref` column** (a run that predates the
-  column): treat every cell as `—` — nothing is expected — and note `"report has no Subagent
-  summary ref column; summary-gap check skipped"` in `deltas_since_pause`. A missing column is a
-  report shape, not a gap; the pre-task.124 exemption list is **not** the fallback, because it is
-  the rule that fired on every healthy resume.
+- **The report has no `Subagent summary ref` column** (a run that predates the column): treat
+  every cell as `—` — nothing is expected — and note `"report has no Subagent summary ref column;
+  summary-gap check skipped"` in `deltas_since_pause`. A missing column is a report shape, not a
+  gap; the pre-task.124 exemption list is **not** the fallback, because it is the rule that fired
+  on every healthy resume.
+- **The report cannot be read at all** (the lock's `report_path` is absent or unparseable): that is
+  "could not look", not "nothing expected", and the two must not resolve to the same step (QA cycle
+  1, CR-6). Add `"Implementation report at {report_path} is missing or unreadable — cannot verify
+  step summaries"` to `blocking_issues` and set `recommended_step = LOCK_STEP` (conservative).
 
 Steps 1, 2, 4 and 8 never dispatch a subagent and their cells are always `—`; Step 5c dispatches
 no summary-writing subagent of its own (`/review-pr` runs its lenses internally). None of that is
@@ -191,7 +195,8 @@ Emit the result object with all fields. Do NOT emit any other text.
 | Every summary the report's `Subagent summary ref` column names is present and valid (a `—` cell expects nothing) | LOCK_STEP + 1 |
 | The report names a summary for LOCK_STEP and it is absent | LOCK_STEP (re-execute) |
 | The report names a summary for an earlier step and it is absent | LOCK_STEP (conservative) + blocking_issue |
-| Report unreadable or without the column | LOCK_STEP + 1 (nothing expected) + a `deltas_since_pause` note |
+| Report without the `Subagent summary ref` column | LOCK_STEP + 1 (nothing expected) + a `deltas_since_pause` note |
+| Report missing or unreadable | LOCK_STEP (conservative) + blocking_issue |
 | Branch missing | Same as above + blocking_issue |
 | A `last-halt.json` for this document whose document is `accepted` / PR is `MERGED` | not a candidate — reported as `stale-snapshot`, deleted |
 

@@ -72,8 +72,12 @@
 #     detector's rule, task.120 bug.5); the lock is rebuilt from it with current_step =
 #     halt_step (fallback: its own current_step), the five halt/pause fields stripped, via
 #     mktemp + mv; the source is DELETED — a snapshot that outlives its run is offered as a
-#     resume for merged work (obs #88), so the restore consumes it; prints
+#     resume for merged work (obs #88), so the restore consumes it — and so is every OTHER
+#     candidate for this document (an older snapshot losing to a newer claim); prints
 #     `advance-pipeline-lock: lock restored from <source> at step N`
+#   • mtimes are read GNU-form first (`stat -c %Y`), BSD-form second (`stat -f %m`), and a
+#     non-numeric read is 0 with a warning — `stat -f` is filesystem mode on GNU coreutils,
+#     which made the first candidate win unconditionally on Linux (task.124 QA cycle 1, CR-1)
 #
 # Exit codes: 0 on every safe path listed above; 1 on argument error, a numeric advance
 # with no lock, a --restore with nothing usable, a non-object lock, or a jq failure.
@@ -128,8 +132,26 @@ canon() {
 }
 
 # restore_lock DOC_DIR — the --restore mode. See the header for the contract.
+# mtime_of FILE → seconds since the epoch, or 0 with a stderr warning when neither stat
+# form yields a number. GNU first: on GNU coreutils `stat -f` is FILE-SYSTEM mode — it
+# prints filesystem fields and exits 0 or 1 depending on the build — so the BSD form
+# cannot be tried first with `||` (task.124 QA cycle 1, CR-1: the first candidate always
+# won on Linux). `stat -c` is an illegal option on BSD, which fails cleanly to the BSD
+# form. The digits guard is what makes a bad read a 0, never a `[ x -gt y ]` abort that
+# silently keeps the first candidate.
+mtime_of() {
+  local m
+  m=$(stat -c %Y "$1" 2>/dev/null) || m=$(stat -f %m "$1" 2>/dev/null) || m=""
+  case "$m" in
+    ''|*[!0-9]*)
+      echo "advance-pipeline-lock: could not read the mtime of '$1' (got '${m:-nothing}') — treating as 0" >&2
+      m=0 ;;
+  esac
+  printf '%s' "$m"
+}
+
 restore_lock() {
-  local doc_dir="$1" want candidates=() c c_dir chosen="" newest=0 m step tmp
+  local doc_dir="$1" want candidates=() mine=() c c_dir chosen="" newest=-1 m step tmp
   [ -d "$doc_dir" ] || { echo "advance-pipeline-lock: --restore needs an existing <doc-dir>, got '$doc_dir'" >&2; exit 1; }
   if [ -f "$LOCK" ]; then
     echo "advance-pipeline-lock: lock present at '$LOCK' — nothing to restore"
@@ -154,8 +176,9 @@ restore_lock() {
       echo "advance-pipeline-lock: '$c' is for '$c_dir', not '$doc_dir' — refusing to restore from it" >&2
       continue
     fi
-    m=$(stat -f %m "$c" 2>/dev/null || stat -c %Y "$c" 2>/dev/null || echo 0)
-    if [ -z "$chosen" ] || [ "$m" -gt "$newest" ]; then chosen="$c"; newest="$m"; fi
+    mine+=("$c")
+    m=$(mtime_of "$c")
+    if [ "$m" -gt "$newest" ]; then chosen="$c"; newest="$m"; fi
   done
   if [ -z "$chosen" ]; then
     echo "advance-pipeline-lock: no halt snapshot or orphaned claim is for '$doc_dir' — nothing restored" >&2
@@ -177,9 +200,21 @@ restore_lock() {
     exit 1
   fi
   mv "$tmp" "$LOCK"
+  # Consume EVERY candidate for this document, not only the winner: a losing same-document
+  # snapshot left behind is the stale-snapshot-after-merge leftover this mode exists to end
+  # (task.124 QA cycle 1, CR-8). Candidates for other documents were never in `mine`.
+  local losers=()
+  for c in "${mine[@]}"; do
+    [ "$c" = "$chosen" ] && continue
+    rm -f "$c" && losers+=("$c")
+  done
   rm -f "$chosen"
   step=$(jq -r '.current_step // "?"' "$LOCK")
-  echo "advance-pipeline-lock: lock restored from $chosen at step $step"
+  if [ ${#losers[@]} -gt 0 ]; then
+    echo "advance-pipeline-lock: lock restored from $chosen at step $step (also removed ${#losers[@]} older candidate(s) for this document: ${losers[*]})"
+  else
+    echo "advance-pipeline-lock: lock restored from $chosen at step $step"
+  fi
   exit 0
 }
 

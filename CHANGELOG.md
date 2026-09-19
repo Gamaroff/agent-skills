@@ -10,7 +10,9 @@ All notable changes to this project will be documented in this file. Format foll
   resume and halt lifecycle (task 124; obs #85, #86, #88, #89, #111, #115, #123).** Phase 0b now
   opens with a **working-tree probe** that classifies every `git status --porcelain` entry before
   acting and acts only on the classified paths — an overlay byte-identical to the base is discarded
-  path by path (`git checkout -- <paths>`, `git clean -f -- <paths>`, never `checkout -- .`), bundle
+  path by path from `HEAD` (`git checkout HEAD -- <paths>`, `git clean -f -- <paths>`, never
+  `checkout -- .`, and never the bare index-restoring form, which leaves a staged overlay in place)
+  with a porcelain re-read before the success line, bundle
   drift under `skills/*/references/` is re-bundled, and anything else is a HALT; an untracked file
   the base does not have is never an overlay, because `git diff` cannot see it. The resume
   detector's **summary-gap rule is evidence-conditioned**: a `.summaries/step-N-*.json` is expected
@@ -18,8 +20,9 @@ All notable changes to this project will be documented in this file. Format foll
   ran inline is no longer blocked. A **halt snapshot that outlives its run** is deleted by Step 8
   (same document only) and refused-and-deleted by the detector when the document is `accepted` or
   the PR is `MERGED`. The lock gains **`waiting_on`** — `{kind, label, since, budget_minutes}`,
-  written only by the new `set-waiting-on.sh` (`"<label>" [--kind agent|task]` / `--clear`, budget
-  from `subagents.wallClockMinutes` read once by the writer) — and the Stop hook allows a stop while
+  written only by the new `set-waiting-on.sh` (`"<label>" [--kind agent|task] [--budget-minutes N]` /
+  `--clear`, budget from `subagents.wallClockMinutes` read once by the writer, or the caller's own
+  bound for a wait that outlives it — the finalise CI poll passes `FINALISE_CI_MAX_WAIT`) — and the Stop hook allows a stop while
   the budget lasts, so a step waiting on a background agent or CI poll is no longer re-prompted as a
   stall; every dispatch site marks its wait, enumerated by grep and pinned by
   `qa-loop-lock-fields-parity.test.mjs`. The three HALT snippets and the Step 8 cleanup are the
@@ -36,7 +39,9 @@ All notable changes to this project will be documented in this file. Format foll
   of inlining — one definition, two readers. And **`advance-pipeline-lock.sh --restore <doc-dir>`**
   is the one lock-restore path: it rebuilds the lock from the halt snapshot or an orphaned
   `.pausing.<pid>` claim (newest candidate for this document; another document's is refused),
-  strips the halt/pause fields, and consumes the source; `grant-qa-cycles.sh` delegates to it. A
+  strips the halt/pause fields, and consumes the source and every other same-document candidate;
+  mtimes are read GNU-form first with a numeric guard (`stat -f` is filesystem mode on GNU
+  coreutils); `grant-qa-cycles.sh` delegates to it. A
   numeric advance with no lock is now `exit 1` naming `--restore` — the silent `exit 0` had left
   every advance and the Stop hook inert for a whole session after a compaction pause — while
   `--skill` and `--complete` keep `exit 0` (standalone sub-skill runs; clearable lock).

@@ -18,8 +18,14 @@
 # re-prompts as it does today.
 #
 # Usage:
-#   bash .agents/skills/{develop-story|develop-task|develop-bug}/references/set-waiting-on.sh "<label>" [--kind agent|task]
+#   bash .agents/skills/{develop-story|develop-task|develop-bug}/references/set-waiting-on.sh "<label>" [--kind agent|task] [--budget-minutes N]
 #   bash .agents/skills/{develop-story|develop-task|develop-bug}/references/set-waiting-on.sh --clear
+#
+# `--budget-minutes N` overrides the config budget for ONE wait whose own bound is known to the
+# caller and longer than the subagent default — the finalise CI poll runs to FINALISE_CI_MAX_WAIT
+# (25 min by default), and a 10-minute mark on it re-prompted the last 15 minutes of every
+# legitimate wait as a stall (task.124 QA cycle 1, CR-2). A positive integer without a leading
+# zero; anything else is a usage error, never a silent fallback to the config value.
 #
 # Call the first form as the dispatch's own next action and `--clear` as the first
 # action after the result is read. The dispatch sites are enumerated by grep, not by
@@ -30,12 +36,14 @@
 #   • jq missing               → exit 0, warn to stderr (degraded, same as set-qa-phase.sh)
 #   • no label and no --clear  → exit 1, usage to stderr, lock untouched
 #   • --kind not agent|task    → exit 1, usage to stderr, lock untouched
+#   • --budget-minutes not a positive integer → exit 1, usage to stderr, lock untouched
 #   • lock not a JSON object   → exit 1, lock untouched, no success line
 #   • "<label>"                → atomic write via mktemp + mv; `current_step` preserved verbatim;
 #                                prints `set-waiting-on: waiting on <label> (agent, 10 min)`
 #   • --clear                  → removes the field (a lock without it is not waiting);
 #                                prints `set-waiting-on: cleared`; a lock that has no field
-#                                is left byte-identical and still prints `cleared`
+#                                is left semantically unchanged (rewritten through jq, so
+#                                its formatting may normalise) and still prints `cleared`
 #
 # Reader: develop-pipeline-on-stop.sh allows the stop while the budget has not
 # elapsed and prints `waiting on <label> since <since>`.
@@ -46,19 +54,24 @@ LOCK="${PIPELINE_LOCK:-.claude/state/develop-pipeline.lock}"
 _here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
-  echo 'Usage: set-waiting-on.sh "<label>" [--kind agent|task]   |   set-waiting-on.sh --clear' >&2
+  echo 'Usage: set-waiting-on.sh "<label>" [--kind agent|task] [--budget-minutes N]   |   set-waiting-on.sh --clear' >&2
   exit 1
 }
 
 LABEL=""
 KIND="agent"
 CLEAR=""
+BUDGET_ARG=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --clear) CLEAR=1 ;;
     --kind)
       [ $# -ge 2 ] || usage
       KIND="$2"; shift ;;
+    --budget-minutes)
+      [ $# -ge 2 ] || usage
+      BUDGET_ARG="$2"; shift
+      case "$BUDGET_ARG" in ''|*[!0-9]*|0*) usage ;; esac ;;
     --help|-h) usage ;;
     --*) usage ;;
     *)
@@ -106,10 +119,11 @@ if [ -n "$CLEAR" ]; then
   exit 0
 fi
 
-# The budget: subagents.wallClockMinutes, read once, stored on the lock. The reader
-# is sourced in a subshell so its function namespace never leaks into this script.
-BUDGET=""
-if [ -f "$_here/read-config.sh" ]; then
+# The budget: --budget-minutes when the caller knows the wait's own bound, else
+# subagents.wallClockMinutes, read once, stored on the lock. The reader is sourced in a
+# subshell so its function namespace never leaks into this script.
+BUDGET="$BUDGET_ARG"
+if [ -z "$BUDGET" ] && [ -f "$_here/read-config.sh" ]; then
   # The reader is a bundled sibling, resolved beside this script at runtime.
   # shellcheck disable=SC1091
   BUDGET=$( ( source "$_here/read-config.sh" >/dev/null 2>&1 && read_nested_config_key subagents wallClockMinutes ) 2>/dev/null )

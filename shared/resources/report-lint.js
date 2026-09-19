@@ -86,7 +86,6 @@ function parseTemplate(text) {
   const out = {};
   let offset = 0;
   let current = null; // variant name whose fence we are waiting for / inside
-  let insideVariantFence = false;
   for (const line of lines) {
     const lineStart = offset;
     offset += line.length + 1;
@@ -96,16 +95,12 @@ function parseTemplate(text) {
       if (m) {
         current = m[1].toLowerCase();
         out[current] = out[current] || [];
-        insideVariantFence = false;
       }
       continue;
     }
     if (!current) continue;
     // The fence's own opening line is inside the range; skip fence markers.
-    if (/^ {0,3}(`{3,}|~{3,})/.test(line)) {
-      insideVariantFence = !insideVariantFence;
-      continue;
-    }
+    if (/^ {0,3}(`{3,}|~{3,})/.test(line)) continue;
     const h = /^## (.+?)\s*$/.exec(line);
     if (!h) continue;
     const optional = /<!--\s*optional\s*-->/i.test(h[1]);

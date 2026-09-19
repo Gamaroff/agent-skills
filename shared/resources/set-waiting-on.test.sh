@@ -11,7 +11,9 @@
 #   2. --clear removes the field and nothing else; is a noop on a lock without it
 #   3. --kind task is stored; --kind anything-else is refused, lock byte-identical
 #   4. budget_minutes comes from subagents.wallClockMinutes when configured,
-#      else 10 — read once here, stored on the lock, never read by the hook
+#      else 10 — read once here, stored on the lock, never read by the hook;
+#      --budget-minutes N overrides it for one wait and refuses anything that is
+#      not a positive integer (QA cycle 1, CR-2)
 #   5. noops silently with no lock (standalone invocation)
 #   6. fails closed on a non-object lock; leaves no temp file behind
 #   7. a label with spaces and shell metacharacters round-trips verbatim
@@ -84,6 +86,19 @@ printf 'subagents:\n  wallClockMinutes: soon\n' > "$CFG"
 write_lock 5
 SKILLS_CONFIG_FILE="$CFG" PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" "x" >/dev/null 2>&1
 [ "$(jq -r '.waiting_on.budget_minutes' "$LOCK_FILE")" = "10" ] && pass "a non-numeric wallClockMinutes falls back to 10" || fail "non-numeric budget" "$(jq -c .waiting_on "$LOCK_FILE")"
+
+# ── 4b. --budget-minutes overrides the config for one wait (QA cycle 1, CR-2) ─
+printf 'subagents:\n  wallClockMinutes: 25\n' > "$CFG"
+write_lock 7
+SKILLS_CONFIG_FILE="$CFG" PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" "step-7 CI poll" --kind task --budget-minutes 26 >/dev/null 2>&1; RC=$?
+[ "$RC" -eq 0 ] && [ "$(jq -c '[.waiting_on.kind, .waiting_on.budget_minutes]' "$LOCK_FILE")" = '["task",26]' ] \
+  && pass "--budget-minutes 26 overrides wallClockMinutes 25 for this wait (stored as a number)" || fail "--budget-minutes override" "rc=$RC $(jq -c .waiting_on "$LOCK_FILE")"
+BEFORE=$(cat "$LOCK_FILE")
+for BAD in 0 07 ten -5 ""; do
+  SKILLS_CONFIG_FILE="$CFG" PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" "x" --budget-minutes "$BAD" >/dev/null 2>&1; RC=$?
+  [ "$RC" -ne 0 ] && [ "$(cat "$LOCK_FILE")" = "$BEFORE" ] || fail "--budget-minutes '$BAD' refused" "rc=$RC"
+done
+pass "--budget-minutes refuses 0, a leading zero, a word, a negative and an empty value; lock byte-identical"
 
 # ── 5. no lock → exit 0, nothing created ─────────────────────────────────────
 LOCK_FILE="$TMPDIR_TEST/absent.lock"

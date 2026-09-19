@@ -37,8 +37,10 @@
 #        snapshot for another document → exit 1, nothing written, snapshot kept;
 #        relative vs absolute spellings of one directory match; a snapshot with
 #        no directory (pre-task.123) is accepted; an orphaned `.pausing.<pid>`
-#        claim is a candidate and the newest candidate wins; a string halt_step
-#        is stored as a number.
+#        claim is a candidate and the newest candidate wins (and the losing
+#        same-document snapshot is consumed with it); a string halt_step is
+#        stored as a number; a GNU-shaped `stat` (shimmed) still picks the newest
+#        candidate, and a non-numeric mtime read degrades to 0 with a warning.
 #   14.  No-lock split (task.124): `<n>` with no lock → exit 1 naming --restore
 #        (the silent exit 0 hid an inert Stop hook for a whole session, obs #123);
 #        `--skill <name>` and `--complete` with no lock keep exit 0 — the
@@ -382,7 +384,8 @@ run_restore_scenarios() {
   fi
   rm -f "$L" "$S"
 
-  # an orphaned .pausing.<pid> claim is a candidate; the newest candidate wins
+  # an orphaned .pausing.<pid> claim is a candidate; the newest candidate wins, and the
+  # losing same-document snapshot is consumed with it (QA cycle 1, CR-8)
   printf '{"task_or_story_directory":"%s","halt_step":4}\n' "$R/doc" > "$S"
   touch -t 202601010000 "$S"
   printf '{"task_or_story_directory":"%s","current_step":6}\n' "$R/doc" > "$L.pausing.4242"
@@ -391,6 +394,54 @@ run_restore_scenarios() {
     pass "[$SH] --restore: newer orphaned claim outranks an older snapshot; the claim is consumed"
   else
     fail "[$SH] --restore: orphaned claim" "rc=$RC lock=$([ -f "$L" ] && jq -c . "$L" || echo absent) claim=$([ -f "$L.pausing.4242" ] && echo kept || echo gone) out=$OUT"
+  fi
+  if [ ! -f "$S" ] && echo "$OUT" | grep -q "also removed 1 older candidate"; then
+    pass "[$SH] --restore: the losing same-document snapshot is consumed too, and named"
+  else
+    fail "[$SH] --restore: losing candidate consumed" "snapshot=$([ -f "$S" ] && echo kept || echo gone) out=$OUT"
+  fi
+  rm -f "$L" "$S" "$L".pausing.*
+
+  # GNU-shaped stat on every host (QA cycle 1, CR-1). A shim that behaves like GNU coreutils —
+  # `-f` is FILE-SYSTEM mode (prints text, exits 0), `-c %Y` prints the mtime — is put first on
+  # PATH. The pre-fix `stat -f %m || stat -c %Y` read text, `[ text -gt n ]` aborted, and the
+  # first candidate (the snapshot) won regardless of age: this is the scenario that was red
+  # under Linux CI while green on macOS. The shim delegates the real read to the host's stat
+  # through an absolute path, so it runs on BSD and GNU hosts alike.
+  local SHIM="$R/gnu-shim" REAL_STAT
+  REAL_STAT=$(command -v stat)
+  mkdir -p "$SHIM"
+  cat > "$SHIM/stat" <<SHIMEOF
+#!/usr/bin/env bash
+case "\$1" in
+  -f) echo "  File: \"\$2\"  ID: 0  Namelen: 255  Type: apfs"; exit 0 ;;
+  -c) [ "\$2" = "%Y" ] || exit 1; shift 2
+      if "$REAL_STAT" -c %Y "\$1" >/dev/null 2>&1; then "$REAL_STAT" -c %Y "\$1"; else "$REAL_STAT" -f %m "\$1"; fi ;;
+  *) exec "$REAL_STAT" "\$@" ;;
+esac
+SHIMEOF
+  chmod +x "$SHIM/stat"
+  printf '{"task_or_story_directory":"%s","halt_step":4}\n' "$R/doc" > "$S"
+  touch -t 202601010000 "$S"
+  printf '{"task_or_story_directory":"%s","current_step":6}\n' "$R/doc" > "$L.pausing.7"
+  OUT=$(PATH="$SHIM:$PATH" PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r '.current_step' "$L")" = "6" ] && ! echo "$OUT" | grep -q "could not read the mtime"; then
+    pass "[$SH] --restore: newest candidate still wins under a GNU-shaped stat (CR-1)"
+  else
+    fail "[$SH] --restore: GNU-shaped stat" "rc=$RC step=$(jq -r '.current_step' "$L" 2>/dev/null) out=$OUT"
+  fi
+  rm -f "$L" "$S" "$L".pausing.*
+  # …and a stat that yields nothing numeric at all degrades to 0 with a warning, never an abort.
+  cat > "$SHIM/stat" <<'SHIMEOF'
+#!/usr/bin/env bash
+echo "garbage"; exit 0
+SHIMEOF
+  printf '{"task_or_story_directory":"%s","halt_step":4}\n' "$R/doc" > "$S"
+  OUT=$(PATH="$SHIM:$PATH" PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ -f "$L" ] && echo "$OUT" | grep -q "could not read the mtime"; then
+    pass "[$SH] --restore: a non-numeric mtime read is 0 with a warning, and the restore still completes"
+  else
+    fail "[$SH] --restore: non-numeric mtime guard" "rc=$RC out=$OUT"
   fi
   rm -f "$L" "$S" "$L".pausing.*
 }

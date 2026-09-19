@@ -563,7 +563,8 @@ Before running independent NFR and risk analysis, check the story directory for 
 
 **Step 1a: Map changed files using Explore subagent (CRITICAL — do this first)**
 
-Before reading any implementation files, use the Agent tool with subagent_type="Explore" to:
+Before reading any implementation files, use the Agent tool with subagent_type="Explore" to
+(marking the wait on the pipeline lock beside the dispatch — `bash .agents/skills/qa-story/references/set-waiting-on.sh "5a qa-story changed-files map"` — and clearing it with `… set-waiting-on.sh --clear` once the table is read; source `references/set-waiting-on.sh`, task.124 QA cycle 1, CR-3; silent no-ops standalone):
 
 - Find all files changed in this PR: resolve the PR base first — `BASE="origin/$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)"` — then run `git diff --name-only "$BASE...HEAD"` (resolve the PR's actual base branch rather than hardcoding `origin/develop`, in case a story PR targets a non-default base such as `main`)
 - For each changed file, return: file path + module it belongs to + whether a co-located `.spec.ts` exists
@@ -916,6 +917,8 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    defect that had been present in the *original* commit and surfaced only at cycle 5.
 
 2. **Dispatch a read-only Explore subagent** with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context.
+
+   **Mark the wait on the pipeline lock** beside this dispatch — `bash .agents/skills/qa-story/references/set-waiting-on.sh "5a qa-story code review"` — and clear it (`… set-waiting-on.sh --clear`) as the first action after the `code_review:` block is read (source: `references/set-waiting-on.sh`; task.124 QA cycle 1, CR-3). Inside a `/develop-*` pipeline this skill runs as Step 5a, and a turn yielded while the reviewer runs is a wait the Stop hook would otherwise re-prompt as a stall; standalone there is no lock and both calls are silent no-ops.
 
    **Cycle 2 only (`REFUTE_PASS=true`) — refute, do not review.** Append this directive to the
    subagent prompt. It is the one pass in the loop performed by an agent that did not write the
