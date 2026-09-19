@@ -113,6 +113,19 @@ inline list, so nothing in the toolchain pushes you into the wrapped form — ve
 - The **stdout-drain premise test is not flaky any more** (fixed 2026-09-04; the payload is now sized
   from the pipe buffer). A failure there is real. Do not re-run it away.
 
+### zsh `nomatch` aborts a command with an unmatched glob — before it runs
+
+On macOS the login shell is zsh, and zsh's default `nomatch` turns an unmatched glob into an error
+that aborts the **whole** command line, not just the glob's argument. `rm -f lock test-output-*.log`
+removes nothing under zsh when no log matches; `for f in state/*.pausing.*` errors instead of
+iterating zero times; `ls dir/*.log | grep -q .` reports the error, not an empty list. bash expands
+the unmatched pattern to itself and carries on, so every bash test is green and the failure appears
+only in the shell an operator actually types into. Any snippet or script this repository runs under
+both shells (the HALT snippets, `advance-pipeline-lock.sh --restore`, the Step 8 cleanup) uses
+`find` for the optional matches and keeps the required path on its own line —
+[anti-patterns § Never put a must-succeed path and a glob in one `rm` argv](../reference/anti-patterns.md).
+Fences are invisible to `lint:shell`; `halt-snippet-glob-safe.test.mjs` runs them under zsh.
+
 ### A git pathspec `**` is `*` unless you say otherwise
 
 `git ls-files 'shared/resources/**/*.md'` and `git grep -- 'skills/**/SKILL.md'` do **not**

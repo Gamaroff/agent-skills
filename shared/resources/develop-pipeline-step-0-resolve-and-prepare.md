@@ -644,193 +644,31 @@ Decisions Log entry after the call must list every question that was asked and i
 
 Determine the implementation report number: scan the document directory for existing `*.implementation.*.md` files, find the highest N, new report is N+1 (or 1 if none exist). Derive `{descriptive-name}`: N=1 → `{name}-initial-run`; N>1 → append context (e.g. `{name}-post-escalation`, `{name}-retry-{N}`).
 
-#### develop-story implementation report template
+The report's sections are defined **once**, in
+[`shared/resources/implementation-report-template.md`](implementation-report-template.md) — the
+story variant and the task variant, each a fenced `markdown` block, with `## Tracker Actions
+Required` marked `<!-- optional -->`. Create the report from the matching variant, filling the
+`{placeholders}`:
 
-Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the story directory:
+#### develop-story
 
-```markdown
-# Implementation Report: {story title}
+Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the story directory from
+the template's **Story variant**.
 
-**Story**: `{story filename}`
-**Run Number**: {N}
-**Started**: {YYYY-MM-DD HH:MM}
-**Status**: In Progress
+#### develop-task
 
----
+Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task directory from the
+template's **Task variant**.
 
-## Summary
-
-{One-line description derived from the story name and what this run is attempting}
-
----
-
-## Pipeline Configuration
-
-| Setting             | Value                                                                      |
-| ------------------- | -------------------------------------------------------------------------- |
-| Feature branch base | {feature branch base — default `develop`}                                  |
-| PR target           | {PR target — default `develop`}                                            |
-| qa-planning gate    | skipped (auto)                                                             |
-| Story risk level    | {risk_level value or not set}                                              |
-| Pipeline mode       | {lite / standard}                                                          |
-| Always-load files   | {N} files — {comma-separated paths, or "defaults (no skills-config.yaml)"} |
-| Board status        | {In Progress ✅ / ⚠️ update failed / N/A (no issue linked)}                |
-
----
-
-## Pipeline Progress
-
-| Step                        | Status     | Required Artifacts                                                                           | Notes | Subagent summary ref |
-| --------------------------- | ---------- | -------------------------------------------------------------------------------------------- | ----- | -------------------- |
-| 1. create-story-branch      | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git                                        |       | —                    |
-| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{N}.{name}.md` exists (or skip logged)                          |       | —                    |
-| 3. develop                  | ⏳ Pending | Story status == `Ready for Review`                                                           |       | —                    |
-| 4. create-pr                | ⏳ Pending | PR URL targets `develop` (or chosen base); issue/tracker comment posted                      |       | —                    |
-| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted`                                |       | —                    |
-| 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed                                                           |       | —                    |
-
-> The `Subagent summary ref` column points to the JSON artifact described in `shared/resources/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
-
----
-
-## Decisions Log
-
-### Pipeline Startup — {YYYY-MM-DD}
-
-- Feature branch base: {answer} — default `develop`
-- PR target branch: {answer} — default `develop`
-- qa-planning gate: skipped (auto — no prompt)
-
----
-
-## Issues Log
-
-_Problems encountered and how they were resolved or escalated._
-
----
-
-## Tracker Actions Required
-
-_Tracker mutations this run wanted but did not perform — because `access.tracker` restricts this
-run, or because the call failed. Rendered from `.claude/state/tracker-actions.jsonl` by
-`handover-render.js --format summary`; the committed checklist, script and JSON sidecar are the
-`*.handover.{n}.{name}.{md,sh,json}` artifacts beside this report. **Omit this section entirely when
-the journal is empty** — an empty heading reads as "nothing was deferred" in the same shape it would
-read as "the renderer broke"._
-
----
-
-## QA Iteration History
-
-_Track each QA review/fix cycle._
-
----
-
-## Completion
-
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
-```
-
-#### develop-task implementation report template
-
-Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task directory:
-
-```markdown
-# Implementation Report: {task title}
-
-**Task**: `{task filename}`
-**Run Number**: {N}
-**Started**: {YYYY-MM-DD HH:MM}
-**Status**: In Progress
-
----
-
-## Summary
-
-{One-line description derived from the task name and what this run is attempting}
-
----
-
-## Pipeline Configuration
-
-| Setting             | Value                                                                      |
-| ------------------- | -------------------------------------------------------------------------- |
-| Feature branch base | {Q1 answer}                                                                |
-| PR target           | {Q2 answer}                                                                |
-| qa-planning gate    | skipped (auto)                                                             |
-| Task risk level     | {risk_level value or not set}                                              |
-| Pipeline mode       | {lite / standard}                                                          |
-| Always-load files   | {N} files — {comma-separated paths, or "defaults (no skills-config.yaml)"} |
-| Board status        | {In Progress ✅ / ⚠️ update failed / N/A (no issue linked)}                |
-
----
-
-## Pipeline Progress
-
-| Step                       | Status     | Required Artifacts                                                     | Notes | Subagent summary ref |
-| -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- |
-| 1. create-branch           | ⏳ Pending | Branch `feature/task.{id}.*` exists in git                             |       | —                    |
-| 2. review-task             | ⏳ Pending | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               |       | —                    |
-| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
-
-> The `Subagent summary ref` column points to the JSON artifact described in `shared/resources/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
-
----
-
-## Decisions Log
-
-### Pipeline Startup — {YYYY-MM-DD}
-
-- Feature branch base: {Q1 answer} — {rationale}
-- PR target branch: {Q2 answer} — {rationale}
-- qa-planning gate: skipped (auto — no prompt)
-
----
-
-## Issues Log
-
-_Problems encountered and how they were resolved or escalated._
-
----
-
-## Tracker Actions Required
-
-_Tracker mutations this run wanted but did not perform — because `access.tracker` restricts this
-run, or because the call failed. Rendered from `.claude/state/tracker-actions.jsonl` by
-`handover-render.js --format summary`; the committed checklist, script and JSON sidecar are the
-`*.handover.{n}.{name}.{md,sh,json}` artifacts beside this report. **Omit this section entirely when
-the journal is empty** — an empty heading reads as "nothing was deferred" in the same shape it would
-read as "the renderer broke"._
-
----
-
-## QA Iteration History
-
-_Track each QA review/fix cycle._
-
----
-
-## Completion
-
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
-```
+**Why the template is not inlined here.** `shared/resources/report-lint.js` derives the sections a
+report must carry — exactly once, in order, the optional one at most once — from the same fences,
+and it runs after every report Edit (Step Transition Protocol action 2), before the HALT commit, in
+the PreCompact hook and at Step 8. A second copy of the section list in this file would be a second
+definition, and two definitions of "what sections a report has" drift silently and in the worst
+direction — the authoring copy accepting a shape the lint then refuses at the next boundary. The
+marker on the optional section is what makes its documented omission ("omit this section entirely
+when the journal is empty") a non-finding rather than a `section-missing`.
+`report-lint.test.mjs` (beside the engine, under `tests/`) asserts this file inlines no template.
 
 ---
 

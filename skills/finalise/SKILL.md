@@ -336,6 +336,8 @@ superseded)`). If it is not, that is itself a finding: an unmarked stale PASS ba
 
 **Overview**: Dispatch four read-only Explore subagents in a **single parallel message** (4 simultaneous Agent tool calls). Each agent performs one DoD domain check and returns a structured YAML result. Main context writes the DoD running summary in **one consolidated append per section** after aggregation.
 
+**Mark the wait on the pipeline lock** beside the dispatch — `bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 DoD checks (4 agents)"` — and `… --clear` once all four results are aggregated (source: `references/set-waiting-on.sh`; task.124, obs #89). Inside a `/develop-*` pipeline a turn yielded while the agents run is a wait the Stop hook would otherwise re-prompt as a stall; standalone there is no lock and both calls are silent no-ops.
+
 **QA report integration**: If QA reports were found in Step 2, include their findings as supplementary context when building the prompts below (paste relevant QA YAML sections). The subagents use QA findings to inform citations.
 
 ---
@@ -1136,6 +1138,10 @@ standalone.
    # host's timeout and reports nothing — the `gh pr checks --watch` failure, observed three times
    # on one PR (task.115 QA cycle 1, CR-2).
    mkdir -p .claude/state          # gitignored; absent in a fresh worktree or a standalone run
+   # The poll is a background TASK the orchestrator waits on across turns: mark the wait on the
+   # pipeline lock so the Stop hook allows the yielded turns (task.124, obs #89), and clear it on
+   # the later turn that reads $RESULT. Both are silent no-ops without a lock (standalone run).
+   bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 CI poll (reading 2)" --kind task
    POLL=.claude/state/finalise-ci-poll.sh
    RESULT=.claude/state/finalise-ci-result.txt
    PIDFILE=.claude/state/finalise-ci-poll.pid
@@ -1206,6 +1212,8 @@ POLLEOF
      fi
    else
      read -r CI_ROLLUP_2 CI_HEAD_READ CI_CHECKS_2 WAITED < "$RESULT"
+     # The wait is over — clear the mark before anything below can HALT (task.124).
+     bash .agents/skills/finalise/references/set-waiting-on.sh --clear
      # CI_HEAD_READ is the head the poll SAMPLED from the PR, so this catches a push that landed
      # mid-poll ("unknown" when the poll could not read it — a HALT, not a pass).
      [ "${CI_HEAD_READ:0:12}" = "${CI_HEAD_2:0:12}" ] \

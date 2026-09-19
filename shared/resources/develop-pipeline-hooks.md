@@ -102,11 +102,31 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 | `current_step >= 8` | Pipeline is finishing on step 8 (commit-changes); end of run |
 | `current_step < 1` or `null` | Lock is malformed; bail gracefully |
 | `jq` missing | Degraded mode — refuse to parse, allow stop |
+| `waiting_on` set and `since + budget_minutes` is still in the future | The step is **waiting**, not stalled — it dispatched a background agent or task and yielded the turn to let it run (task.124, obs #89). See "waiting_on" below |
 | Orchestrator removes the lock | Legitimate terminal HALT path in SKILL.md (commit report → snapshot to `develop-pipeline.last-halt.json` → `rm lock`) — next stop attempt sails through |
 
 **Loop protection in practice**: Claude Code passes `stop_hook_active: true` to the hook on the second consecutive block within a single stop attempt. The hook honours this and exits 0. If the orchestrator genuinely cannot continue, the documented terminal-HALT protocol removes the lock, satisfying the hook permanently.
 
-> **Expected behaviour — the hook re-prompts on every pause; this is not a bug.** `stop_hook_active` only suppresses a *second* block within the **same** stop attempt — it does **not** persist across separate stops. So every time the orchestrator genuinely yields the turn mid-step (most commonly while **waiting on background subagents**, or pausing for any reason while `current_step` is still in `[1, 7]`), that is a *fresh* stop attempt: the lock is unchanged, so the hook fires again and re-issues its "advance the lock now, no prose" block. During a single long step you will therefore see the same continue-prompt **several times**, once per pause. This is the hook doing its job — it has no signal for "background work is in flight," so it cannot tell a premature yield apart from a legitimate mid-step wait, and it treats both as premature. **The correct response is to ignore the re-prompt and hold the step until its own work and gates have genuinely completed** — only then perform the Bash → Edit → banner → invoke transition. Do not let the repeated prompt stampede you into advancing early; advancing before the step's work lands is the actual failure mode (see [`pipeline-lock-cooperation.md`](pipeline-lock-cooperation.md)). The prompt never *forces* the wrong action — it cannot advance the lock itself — so a step that needs more time is safe to keep working.
+> **`stop_hook_active` suppresses only a *second* block within the same stop attempt** — it does not persist across separate stops. Every time the orchestrator yields the turn mid-step while `current_step` is in `[1, 7]`, that is a fresh stop attempt and the hook fires again. Before task.124 the hook had no signal for "background work is in flight", so it re-prompted on every legitimate wait as well as on every stall, and the guidance was to ignore the repeated prompt. That guidance is retired: **a step that waits on something it dispatched marks the wait on the lock** (`waiting_on`, below), and the hook allows the stop for as long as the budget lasts. A re-prompt during a wait now means one of two things — the wait was never marked, or it outlived its budget (a crashed step) — and both are worth acting on rather than ignoring. Where a re-prompt does arrive mid-step, the response is unchanged: hold the step until its own work and gates have genuinely completed, then perform the Bash → Edit → banner → invoke transition. The prompt never *forces* the wrong action — it cannot advance the lock itself (see [`pipeline-lock-cooperation.md`](pipeline-lock-cooperation.md)).
+
+### `waiting_on` — waiting is not stalling (task.124)
+
+A step that dispatches a background agent (`Agent` tool, `subagent_type="Explore"`) or a background task (`run_in_background`, `gh pr checks --watch`) and then yields the turn looks, from the hook's side, exactly like a step that stalled: the lock is present and unchanged. The lock now carries the distinction:
+
+```json
+"waiting_on": { "kind": "agent", "label": "step-3 codebase map", "since": "2026-09-19T12:45:20Z", "budget_minutes": 10 }
+```
+
+**One writer**, `set-waiting-on.sh`, a sibling of `set-qa-phase.sh` — a script, not a function, so it exists in every fenced block; atomic `mktemp` + `mv`; never touches `current_step` or `qa_phase`; exit 0 no-op without a lock. Two forms, and the dispatch site issues both:
+
+```bash
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/set-waiting-on.sh "<label>" [--kind agent|task]   # as the dispatch's own next action
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/set-waiting-on.sh --clear                        # as the first action after the result is read
+```
+
+`budget_minutes` is `subagents.wallClockMinutes` from `skills-config.yaml` (default 10), read **once by the writer** and stored on the lock, so the hook needs no config read — and a `waiting_on` older than its budget does **not** protect the step: the hook re-prompts as it always did, because a step that crashed while waiting is a stall wearing a wait's label. The hook's check is one `jq` predicate over `since + budget_minutes > now` (no shell-date portability surface); on an unparseable `since` or a non-numeric budget it falls through to the re-prompt, the loud side.
+
+**Which sites mark a wait.** The dispatch sites are enumerated by grep, never by hand — `subagent_type=`, `dispatch an Explore subagent`, `run_in_background`, `gh pr checks --watch` over `develop-pipeline-step-*.md` (the step docs beside this file), `skills/develop-*/SKILL.md`, `skills/develop-bug/references/*.md` and the sub-skills the loop invokes (`qa-task`, `qa-story`, `review-pr`, `finalise`). Each such site calls `set-waiting-on.sh` beside its dispatch and `--clear` where it reads the result. **Phase 0a's resume detector is exempt** — no lock exists while it runs. Foreground `sleep` loops as a way of "holding the turn open" while a background task runs are retired by this field: yield the turn with the wait marked, and let the notification wake the orchestrator.
 
 **Output**: either empty stdout (allow stop) or JSON:
 ```json
@@ -178,7 +198,9 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | Stop hook seems to loop forever | `stop_hook_active` not honoured | Update to latest `on-stop.sh` (must read stdin and check the flag) |
-| Stop hook re-prompts to advance several times during one step | Orchestrator yielded the turn more than once mid-step (e.g. waiting on background subagents) — each pause is a fresh stop attempt | **Expected, not a bug.** Ignore the re-prompt and keep working; only do the Bash → Edit → banner → invoke transition once the step's work and gates have completed (see the "Expected behaviour" note under the Stop hook section) |
+| Stop hook re-prompts to advance while a background agent or task is running | The wait was not marked on the lock, or it outlived `budget_minutes` | Mark it: `set-waiting-on.sh "<label>"` at the dispatch, `--clear` when the result is read (see "`waiting_on`" under the Stop hook section). A re-prompt on a marked wait means the budget elapsed — check whether the dispatch actually died |
+| Stop hook re-prompts several times during one long step (no background work) | Each mid-step yield is a fresh stop attempt; `stop_hook_active` does not persist across stops | Hold the step until its work and gates have completed, then do the Bash → Edit → banner → invoke transition once |
+| `advance-pipeline-lock.sh <n>` exits 1 with "no lock … --restore" | The lock was removed by a PreCompact pause or a HALT and this session is continuing in place | `bash .agents/skills/<skill>/references/advance-pipeline-lock.sh --restore <doc-dir>` first — it rebuilds the lock from the halt snapshot or orphaned claim and consumes it (task.124) |
 | Hook never fires | Not registered in settings.json | Run `bash .agents/skills/develop-story/scripts/install-hooks.sh` |
 | Hook fires but nothing happens | No lock file (correct noop) | Confirm a `/develop-*` pipeline is active — lock is created at end of Step 1 |
 | Stop hook blocks but orchestrator stops anyway | Hook returned invalid JSON, or Claude Code rejected the block | Check stderr of the hook; verify `jq` produces valid output |

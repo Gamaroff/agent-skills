@@ -264,6 +264,8 @@ Empty diff → say so and stop.
 
 One message, two `Agent` calls, both `subagent_type="Explore"`, both read-only. Never read the raw diff into main context.
 
+**Mark the wait on the pipeline lock** beside the dispatch and clear it once both lenses have returned — `bash .agents/skills/review-pr/references/set-waiting-on.sh "5c review-pr lenses"`, then `… --clear` (source: `references/set-waiting-on.sh`). Inside a `/develop-*` pipeline this is Step 5c, and a turn yielded while the lenses run is a wait the Stop hook would otherwise re-prompt as a stall (task.124, obs #89); standalone there is no lock and both calls are silent no-ops.
+
 **Lens A — code** (skip under `--no-code`): pass the **Prompt Template** from [`references/code-review-prompt.md`](references/code-review-prompt.md) verbatim, substituting `<DIFF_FILE>` and `<WORKING_DIR>`. Do not paraphrase it inline — it is shared with `/qa-story` and `/qa-task`, and paraphrasing forks it. Returns `code_review:`.
 
 **Lens B — conformance** (skip under `--no-docs`): pass the **Prompt Template** from [`references/pr-conformance-prompt.md`](references/pr-conformance-prompt.md) verbatim, substituting `<DOC_FILE>`, `<ARTIFACTS>`, `<DIFF_FILE>`, `<TRACKER_SNAPSHOT>`, `<PR_STATE>` and `<WORKING_DIR>`. Returns `pr_conformance:`.

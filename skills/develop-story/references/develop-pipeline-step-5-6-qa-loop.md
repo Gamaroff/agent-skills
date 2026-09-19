@@ -182,7 +182,7 @@ Read the gate file to determine the gate result.
 
 **Pre-step: Dispatch traceability mapper (standard mode only)**
 
-Before invoking `/qa-story`, dispatch the QA traceability mapper as an Explore subagent (see `references/qa-traceability-mapper-prompt.md` for the full execution protocol):
+Before invoking `/qa-story`, dispatch the QA traceability mapper as an Explore subagent (see `references/qa-traceability-mapper-prompt.md` for the full execution protocol). Mark the wait beside the dispatch — `bash .agents/skills/develop-story/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its confirmation is read (task.124):
 
 ```
 Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (references/qa-traceability-mapper-prompt.md).
@@ -238,7 +238,7 @@ Conditions to dispatch the mapper for tasks (all must be true):
 1. `PIPELINE_MODE = standard` (lite mode skips the mapper)
 2. `HAS_SUCCESS_CRITERIA_TABLE = true` (set by Phase 0a Agent 3 — the lite-mode/always-load detector)
 
-If both are true, dispatch the mapper as an Explore subagent — same prompt as develop-story, but pass the **task** file/directory as the values for `STORY_FILE`/`STORY_DIR` (the mapper accepts both doc types — see `qa-traceability-mapper-prompt.md` "Doc type" note):
+If both are true, dispatch the mapper as an Explore subagent — same prompt as develop-story, but pass the **task** file/directory as the values for `STORY_FILE`/`STORY_DIR` (the mapper accepts both doc types — see `qa-traceability-mapper-prompt.md` "Doc type" note). Mark the wait beside the dispatch — `bash .agents/skills/develop-task/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its confirmation is read (task.124):
 
 ```
 Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (references/qa-traceability-mapper-prompt.md).

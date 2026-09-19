@@ -14,13 +14,17 @@
 #      that "5 + k" would count against the grant (QA cycle 1, CR-1). Reading it
 #      HERE, not in a neighbouring fenced block, is what makes the value exist:
 #      every orchestrator Bash call is a fresh shell (QA cycle 2, CR-2).
-#   2. RESTORES the lock from the halt snapshot when no lock exists. A terminal
-#      HALT removes the lock and leaves develop-pipeline.last-halt.json (a
-#      superset of the lock plus halted_at / halt_reason / halt_step); a resume
-#      skips Step 1, which is the only ordinary writer of the lock. Without this
-#      the grant had nowhere to go and jq failed on a missing file (QA cycle 2,
-#      CR-1). The halt-only fields are dropped; PreCompact's paused_at /
-#      pause_reason likewise.
+#   2. RESTORES the lock from the halt snapshot when no lock exists — by calling
+#      `advance-pipeline-lock.sh --restore <doc-dir>`, the ONE restore path (task.124,
+#      Phase 4; this script carried its own until then). A terminal HALT removes the
+#      lock and leaves develop-pipeline.last-halt.json (a superset of the lock plus
+#      halted_at / halt_reason / halt_step); a resume skips Step 1, which is the
+#      only ordinary writer of the lock. Without this the grant had nowhere to go
+#      and jq failed on a missing file (QA cycle 2, CR-1). The document-match
+#      check, the field stripping and the consumption policy (the snapshot is
+#      deleted once restored) all live in --restore, so the two callers cannot
+#      drift. The never-lower guard below runs BEFORE the restore, so a refusal
+#      restores nothing and consumes nothing.
 #   3. WRITES both fields atomically — extra_cycles_granted = k (the record) and
 #      qa_max_cycles = QA_CYCLE + k (the absolute budget Loop Setup reads) — via
 #      mktemp + mv, and removes the temp file on any failure.
@@ -46,6 +50,7 @@
 #     is not <doc-dir>, canonicalised — relative and absolute spellings of one directory match;
 #     a snapshot with NO task_or_story_directory is a pre-task.123 shape and is accepted)
 #                                                              → exit 1, nothing restored, nothing written
+#     (the check is --restore's; this script surfaces its stderr line)
 #   • jq missing                                               → exit 1 (this write cannot be skipped silently)
 #   • lock present but not a JSON object                       → exit 1, lock untouched
 #   • the lock (or the snapshot it would be restored from) already carries a HIGHER
@@ -59,14 +64,17 @@
 #     for an already-fixed cycle — task.123 QA cycle 3, CR-3), then prints
 #     `grant-qa-cycles: QA_CYCLE=<base> extra_cycles_granted=<k> qa_max_cycles=<n>` with <n> read
 #     BACK from the written lock, and, when the lock was restored,
-#     `grant-qa-cycles: lock restored from <snapshot>` on stderr
+#     `grant-qa-cycles: lock restored from <snapshot>` on stderr (relaying --restore's line)
 #
 # Paths honour PIPELINE_LOCK and PIPELINE_HALT_SNAPSHOT for tests; defaults are the pipeline's.
+# Both are passed through to --restore unchanged.
 
 set -uo pipefail
 
 LOCK="${PIPELINE_LOCK:-.claude/state/develop-pipeline.lock}"
 SNAPSHOT="${PIPELINE_HALT_SNAPSHOT:-.claude/state/develop-pipeline.last-halt.json}"
+export PIPELINE_LOCK="$LOCK" PIPELINE_HALT_SNAPSHOT="$SNAPSHOT"
+ADVANCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/advance-pipeline-lock.sh"
 
 usage() {
   echo "Usage: grant-qa-cycles.sh <doc-dir> <k> [<implementation-report>]   (k = positive integer, no leading zero)" >&2
@@ -139,44 +147,23 @@ if [ "$EXISTING" -gt "$NEW_MAX" ]; then
   exit 1
 fi
 
-# 3. Restore the lock from the halt snapshot when the HALT removed it.
+# 3. Restore the lock from the halt snapshot when the HALT removed it — via the one
+# restore path. --restore refuses a snapshot for another document (task.123 QA cycle 3,
+# CR-5), strips the halt/pause fields, matches directories canonicalised (QA cycle 4,
+# CR-4), accepts a snapshot with no directory (pre-task.123 shape, CR-7), and CONSUMES
+# the snapshot. Its stderr is relayed verbatim so the operator sees which rule refused.
 RESTORED=""
 if [ ! -f "$LOCK" ]; then
   if [ ! -f "$SNAPSHOT" ]; then
     echo "grant-qa-cycles: no lock at '$LOCK' and no halt snapshot at '$SNAPSHOT' — cannot record a grant" >&2
     exit 1
   fi
-  if ! jq -e 'type == "object"' "$SNAPSHOT" >/dev/null 2>&1; then
-    echo "grant-qa-cycles: halt snapshot is not a JSON object — refusing to restore the lock from it" >&2
+  if ! RESTORE_OUT=$(bash "$ADVANCE" --restore "$DOC_DIR" 2>&1); then
+    printf '%s\n' "$RESTORE_OUT" | sed 's/^advance-pipeline-lock:/grant-qa-cycles:/' >&2
     exit 1
   fi
-  # A stale snapshot for ANOTHER document persists by design (the detector drops it; it
-  # is never deleted). Restoring it here would resurrect the other task's branch, pr_url
-  # and report_path as this task's lock (task.123 QA cycle 3, CR-5). Compare directories
-  # with trailing slashes and a leading ./ normalised away.
-  # Canonicalise BOTH sides: the lock's task_or_story_directory is the relative path the
-  # pipeline wrote (docs/tasks/…) while an orchestrator often passes the resolver's absolute
-  # path (task.123 QA cycle 4, CR-4). A snapshot with no directory at all is the pre-task.123
-  # shape; it is accepted, because refusing it would strand every run that predates the field.
-  SNAP_DIR=$(jq -r '.task_or_story_directory // ""' "$SNAPSHOT")
-  canon() { # strip ./ and trailing slashes, then resolve; fall back to the stripped string
-    local stripped
-    stripped=$(printf '%s' "$1" | sed -E 's#^\./##; s#/+$##')
-    (cd "$stripped" 2>/dev/null && pwd -P) || printf '%s' "$stripped"
-  }
-  if [ -n "$SNAP_DIR" ] && [ "$(canon "$SNAP_DIR")" != "$(canon "$DOC_DIR")" ]; then
-    echo "grant-qa-cycles: halt snapshot is for '$SNAP_DIR', not '$DOC_DIR' — refusing to restore the lock from it" >&2
-    exit 1
-  fi
-  mkdir -p "$(dirname "$LOCK")"
-  TMP=$(mktemp "$(dirname "$LOCK")/.grant-qa-cycles.XXXXXX") || exit 1
-  if ! jq 'del(.halted_at, .halt_reason, .halt_step, .paused_at, .pause_reason)' "$SNAPSHOT" > "$TMP"; then
-    rm -f "$TMP"
-    echo "grant-qa-cycles: could not restore the lock from the snapshot" >&2
-    exit 1
-  fi
-  mv "$TMP" "$LOCK"
-  RESTORED="$SNAPSHOT"
+  RESTORED=$(printf '%s\n' "$RESTORE_OUT" | sed -nE 's/^advance-pipeline-lock: lock restored from (.*) at step .*/\1/p')
+  [ -n "$RESTORED" ] || RESTORED="$SNAPSHOT"
 fi
 
 if ! jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1; then
@@ -184,12 +171,15 @@ if ! jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1; then
   exit 1
 fi
 
-# 4. Write the three fields atomically. A lock this call restored is removed again on any
-# failure from here on, so a refusal never leaves a half-made lock behind.
+# 4. Write the three fields atomically. Every REFUSAL (bad k, no gates, never-lower) has
+# already exited above, before the restore; the only failure left is a jq write failure,
+# and after a restore that CONSUMED its snapshot the lock is now the only copy of the
+# run's state — so it is kept, not removed. A lock at halt_step with no grant is a
+# resumable state; no lock and no snapshot is not.
 # qa_phase = 5a in the SAME write: an accepted grant is by definition a 5a re-entry, and a
 # Stop hook firing between this write and a separate set-qa-phase call would read the
 # snapshot's 5b and name /qa-fix for an already-fixed cycle.
-undo_restore() { [ -n "$RESTORED" ] && rm -f "$LOCK"; return 0; }
+undo_restore() { [ -n "$RESTORED" ] && echo "grant-qa-cycles: lock restored from $RESTORED is kept (its snapshot was consumed); the grant was not written" >&2; return 0; }
 TMP=$(mktemp "$(dirname "$LOCK")/.grant-qa-cycles.XXXXXX") || { undo_restore; exit 1; }
 if ! jq --argjson k "$K" --argjson c "$QA_CYCLE" \
      '.extra_cycles_granted = $k | .qa_max_cycles = ($c + $k) | .qa_phase = "5a"' "$LOCK" > "$TMP"; then

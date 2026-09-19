@@ -60,6 +60,86 @@ Pass `recommended_step` to Phase 0b. Phase 0b only verifies artifacts for steps 
 
 ## Phase 0b — Resume Artifact Verification (CRITICAL)
 
+### Working-tree probe — before any artifact is trusted (task.124, obs #85)
+
+A resume inherits whatever the working tree holds, and the pipeline's own steps assume a clean
+tree: Step 3's `/develop` commits with `git add -u`, Step 8's `/commit-changes --scope` sweeps the
+work-item directory, and every `✅` verification below reads files that an uncommitted overlay may
+have rewritten. On task.116 a resume inherited a dirty tree unseen and an overlay reverted every
+bundled copy the run had produced. So the probe runs **first**, and it **classifies every
+`git status --porcelain` entry before acting, and acts only on the classified paths**:
+
+| Class | What it is | Action |
+| --- | --- | --- |
+| **(a) overlay** | every entry is byte-identical to the base branch — a tracked file whose content equals `$BASE_REF`'s, or an untracked file the base **has** with the same bytes (a stray checkout/copy, not work) | discard, path by path: `git checkout -- <tracked paths>`, `git clean -f -- <untracked paths>`; list every discarded path in the Decisions Log |
+| **(b) bundle drift** | every entry is under `skills/*/references/` — bundled copies out of date with their sources | `npm run bundle -- --check \|\| npm run bundle`, then continue |
+| **(c) anything else** | an entry the probe cannot classify — real uncommitted work, an untracked file the base does not have, a mix | **HALT**: print the entries and stop. A resume that guesses here is the task.116 overlay again |
+
+```bash
+DIRTY=$(git status --porcelain)
+if [ -n "$DIRTY" ]; then
+  BASE_REF="origin/${BASE_BRANCH:-develop}"
+  # Classify EVERY entry first; act only on the classified paths (never `checkout -- .`, never a
+  # directory-wide `clean`). `git diff <commit> -- <path>` does not see an untracked path, so `??`
+  # entries need their own test: base must HAVE the path and the bytes must match.
+  TRACKED=(); UNTRACKED=(); OVERLAY=true
+  while IFS= read -r line; do
+    st=${line:0:2}; p=${line:3}
+    if [ "$st" = "??" ]; then
+      if git cat-file -e "$BASE_REF:$p" 2>/dev/null && git show "$BASE_REF:$p" | cmp -s - "$p"; then
+        UNTRACKED+=("$p")
+      else OVERLAY=false; break; fi
+    else
+      if git diff --quiet "$BASE_REF" -- "$p" 2>/dev/null; then TRACKED+=("$p"); else OVERLAY=false; break; fi
+    fi
+  done <<< "$DIRTY"
+  if [ "$OVERLAY" = true ]; then
+    [ ${#TRACKED[@]} -gt 0 ]   && git checkout -- "${TRACKED[@]}"
+    [ ${#UNTRACKED[@]} -gt 0 ] && git clean -f -- "${UNTRACKED[@]}"
+    echo "overlay discarded: ${#TRACKED[@]} tracked, ${#UNTRACKED[@]} untracked paths"   # list every path in the Decisions Log
+  elif ! printf '%s\n' "$DIRTY" | grep -qv 'skills/[^/]*/references/'; then
+    npm run bundle -- --check || npm run bundle
+  else
+    echo "HALT: dirty tree on resume — classify by hand before resuming:"; printf '%s\n' "$DIRTY" | head -20; exit 1
+  fi
+fi
+```
+
+**Why (a) is path-scoped and why `??` has its own test.** `git checkout -- .` and a directory-wide
+`git clean` cannot tell "the overlay" from "the work this step authored" — both succeed, both report
+success, and `git status` afterwards shows *less* work rather than broken work (the step-3 doc's
+"Never revert or clean by directory" rule, obs #38). And `git diff --quiet $BASE_REF -- <path>`
+**never reports an untracked path**, so the tracked-file test alone passes every `??` entry as
+"identical to base" and `git clean` then deletes a file the base never had. The `cat-file -e` +
+`cmp` pair is what makes an untracked file identical-to-base *provably* so; anything else is (c).
+Cost: one `git status --porcelain`, plus one `git diff` / `cmp` per entry for (a).
+
+**Halt snapshot for another document.** When Phase 0a's detector reports a `last-halt.json` whose
+`task_or_story_directory` is not this document's, it is **refused, not resumed** — and when that
+snapshot's document reads `status: accepted` or its `pr_url` is `MERGED`, the detector reports it
+as `stale-snapshot` and **deletes it** rather than offering a resume of merged work (obs #88; the
+detector prompt's Step 1). A completed run also deletes its own snapshot at Step 8, so a snapshot
+that reaches this point is either this run's live one or a leftover the detector names.
+
+**Continuing in the same session after a pause.** The PreCompact hook and every terminal HALT
+**remove the lock** and leave a superset of it behind (`last-halt.json`, or an orphaned
+`.lock.pausing.<pid>` claim). A session that continues in place — rather than re-invoking the
+skill, whose Step 1 is the lock's only ordinary writer — has no step that puts the lock back, and
+`advance-pipeline-lock.sh <n>` with no lock is now an **error naming the fix**, not a silent no-op
+(obs #123). Restore first, then continue:
+
+```bash
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --restore {doc-directory}
+```
+
+It rebuilds the lock from the newest candidate for this document, strips the halt/pause fields,
+keeps `current_step` at the halted step, and **consumes** the snapshot. `grant-qa-cycles.sh`'s own
+restore (task.123) is this same call — one restore path, one document-match rule, one consumption
+policy (the resume contract's **Re-entry after a QA loop escalation**, below, is unchanged from the
+caller's side).
+
+### Artifact verification
+
 **Scope**: Verify only steps **up to `recommended_step - 1`** (as determined by Phase 0a). Steps at or after `recommended_step` are ⏳ Pending — do not verify. If Phase 0a failed validation, fall back to verifying all steps using `current_step` from the lock as the upper bound.
 
 For each step marked ✅ in the implementation report (within the Phase 0a scope), verify the expected artifact exists. If verification fails, **do not skip the step** — re-run it and log: "Resume verification failed for Step {N} — artifact missing, re-running."
@@ -205,7 +285,9 @@ This convention ensures the cycle budget is respected across resumes.
    - It **reconstructs the base** as `max(highest gate on disk, `### QA Cycle` entries in the
      report)` — the same number step 1 resumes from on either of its paths — and never from a
      `$QA_CYCLE` bound in a neighbouring fenced block, which does not exist in this one.
-   - It **restores the lock from the halt snapshot when no lock exists**: a terminal HALT removes
+   - It **restores the lock from the halt snapshot when no lock exists** — through
+     `advance-pipeline-lock.sh --restore`, the one restore path since task.124, which also
+     consumes the snapshot: a terminal HALT removes
      the lock, and the only ordinary writer of it (the end of `/create-branch`) is a step a resume
      skips, so without this the grant had no file to land on. The restore drops the snapshot's
      halt-only fields (`halted_at`, `halt_reason`, `halt_step`) and PreCompact's (`paused_at`,
@@ -270,7 +352,7 @@ If the branch or PR no longer matches, warn the user before proceeding: "Pipelin
 > `MAX_ITER` bounds the **Step 3 develop loop** and nothing else. The QA loop's budget is
 > `QA_MAX_CYCLES` (step-5-6 doc, Loop Setup; the lock's `qa_max_cycles`, set by the grant above).
 
-Before iteration 1: dispatch an Explore subagent (read-only) to capture initial loop state, using the **shared loop-audit prompt** (`shared/resources/loop-audit-prompt.md`).
+Before iteration 1: dispatch an Explore subagent (read-only) to capture initial loop state, using the **shared loop-audit prompt** (`shared/resources/loop-audit-prompt.md`). Mark the wait on the lock beside the dispatch — `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "step-3 initial loop audit"` — and `… --clear` once its JSON is read (task.124; the Stop hook otherwise reads the yielded turn as a stall).
 
 Substitute: `<DOC_TYPE>` = `story` or `task` (per orchestrator); `<DOC_PATH>` = absolute story/task file path; `<TASKS_SECTION>` = `## Tasks` (story) or `## Implementation Plan` (task). Pass the resulting prompt verbatim.
 

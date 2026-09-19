@@ -1,0 +1,1 @@
+[{"skill": "resume-detector", "args": null, "status": "started", "timestamp": 1000}, {"skill": "resume-detector", "args": null, "status": "completed", "timestamp": 1500}, {"skill": "create-pr", "args": "--base develop --issue 1", "status": "started", "timestamp": 2000}, {"skill": "create-pr", "args": "--base develop --issue 1", "status": "completed", "timestamp": 2500}]

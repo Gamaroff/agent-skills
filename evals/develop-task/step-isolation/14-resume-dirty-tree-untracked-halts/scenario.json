@@ -1,0 +1,70 @@
+{
+  "name": "develop-task-resume-dirty-tree-untracked-halts",
+  "skill": "develop-task",
+  "description": "Phase 0b working-tree probe (task.124 / obs #85, review Q5): the tree carries one tracked file identical to origin/develop AND one untracked file the base does not have. `git diff --quiet $BASE_REF -- <path>` never reports an untracked path, so the tracked-file test alone would pass it as overlay and `git clean` would delete real work. The `??` entry fails `git cat-file -e $BASE_REF:<path>` \u2192 classification (c) \u2192 HALT with the entries printed. Nothing is discarded; the halt snapshot records halt_reason dirty-tree; the lock is removed (two-command form); the pipeline does not proceed.",
+  "prompt": "Re-invoke /develop-task for task.42.example after a HALT. The working tree carries an untracked file origin/develop does not have. Resume from the last completed step.",
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/scratch/notes.md"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "HALT: dirty tree on resume"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "\\\\?\\\\? scratch/notes.md"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "overlay discarded"
+      ]
+    },
+    {
+      "fn": "fileAbsent",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock"
+      ]
+    },
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.last-halt.json"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.last-halt.json",
+        "\"halt_reason\": \"dirty-tree\""
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.last-halt.json",
+        "\"halt_step\": \"4\""
+      ]
+    },
+    {
+      "fn": "pipelineStepsRan",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        [
+          "resume-detector"
+        ]
+      ]
+    }
+  ]
+}

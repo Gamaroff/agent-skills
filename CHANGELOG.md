@@ -6,6 +6,41 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **Resume trusts what it finds on disk — seven small mechanisms in the develop pipelines'
+  resume and halt lifecycle (task 124; obs #85, #86, #88, #89, #111, #115, #123).** Phase 0b now
+  opens with a **working-tree probe** that classifies every `git status --porcelain` entry before
+  acting and acts only on the classified paths — an overlay byte-identical to the base is discarded
+  path by path (`git checkout -- <paths>`, `git clean -f -- <paths>`, never `checkout -- .`), bundle
+  drift under `skills/*/references/` is re-bundled, and anything else is a HALT; an untracked file
+  the base does not have is never an overlay, because `git diff` cannot see it. The resume
+  detector's **summary-gap rule is evidence-conditioned**: a `.summaries/step-N-*.json` is expected
+  only where the report's `Subagent summary ref` column names one, so a healthy resume whose Step 3
+  ran inline is no longer blocked. A **halt snapshot that outlives its run** is deleted by Step 8
+  (same document only) and refused-and-deleted by the detector when the document is `accepted` or
+  the PR is `MERGED`. The lock gains **`waiting_on`** — `{kind, label, since, budget_minutes}`,
+  written only by the new `set-waiting-on.sh` (`"<label>" [--kind agent|task]` / `--clear`, budget
+  from `subagents.wallClockMinutes` read once by the writer) — and the Stop hook allows a stop while
+  the budget lasts, so a step waiting on a background agent or CI poll is no longer re-prompted as a
+  stall; every dispatch site marks its wait, enumerated by grep and pinned by
+  `qa-loop-lock-fields-parity.test.mjs`. The three HALT snippets and the Step 8 cleanup are the
+  **two-command form** (`rm -f <lock>` then `find … -delete`): under zsh `nomatch` the old one-argv
+  `rm` aborted before removing the lock whenever no test log matched;
+  `halt-snippet-glob-safe.test.mjs` extracts the snippets and runs them under bash and zsh with an
+  empty glob. **`report-lint.js`** reads an implementation report back at the four boundaries that
+  write or commit it — the Step Transition Protocol's post-Edit check, the HALT rule, the PreCompact
+  hook and Step 8 — and refuses a doubled or spliced one (`section-duplicated`,
+  `section-out-of-order`, `header-block-duplicated`, `qa-cycle-duplicated`, `multiple-h1`,
+  `section-missing`, `trailing-duplicate-body`; task.117's corrupt report is the fixture); its
+  section list is read from the new **`implementation-report-template.md`** (story, task and bug
+  variants; `## Tracker Actions Required` marked optional), which step-0 §0e now references instead
+  of inlining — one definition, two readers. And **`advance-pipeline-lock.sh --restore <doc-dir>`**
+  is the one lock-restore path: it rebuilds the lock from the halt snapshot or an orphaned
+  `.pausing.<pid>` claim (newest candidate for this document; another document's is refused),
+  strips the halt/pause fields, and consumes the source; `grant-qa-cycles.sh` delegates to it. A
+  numeric advance with no lock is now `exit 1` naming `--restore` — the silent `exit 0` had left
+  every advance and the Stop hook inert for a whole session after a compaction pause — while
+  `--skill` and `--complete` keep `exit 0` (standalone sub-skill runs; clearable lock).
+
 - **The QA loop gains two exits, a lock sub-position that expresses its 5b → 5a re-entry without
   moving `current_step` backwards, and a re-entry rule (task 123).** Four loop shapes the step-5-6 doc had no route for, each observed burning cycles on
   a real task, now have one. `classifyLoopRoute()` in `qa-diminishing-returns.js` is the loop's
