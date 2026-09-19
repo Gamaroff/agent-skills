@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-14
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 4, CR-4 — verified)
 **Date Found**: 2026-09-19
 
@@ -58,3 +58,4 @@ Canonicalise both paths; add a suite row with a relative snapshot value and an a
 
 **Verification Steps for QA**:
 1. From the repo root with a snapshot holding `docs/tasks/x`, run the script with the absolute path of that directory → restored.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 5: fix present on `0610f64a`, re-executed |

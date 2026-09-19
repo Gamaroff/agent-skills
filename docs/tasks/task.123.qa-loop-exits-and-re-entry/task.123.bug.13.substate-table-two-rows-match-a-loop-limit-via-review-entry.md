@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-13
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 4, CR-3 — verified)
 **Date Found**: 2026-09-19
 
@@ -58,3 +58,4 @@ State above the table that an `Escalating —` Action is checked first, and qual
 
 **Verification Steps for QA**:
 1. Build the loop-limit-via-review entry (PR Review REQUEST CHANGES, Action Escalating — loop limit reached): the preamble routes it to the escalation row; the REQUEST CHANGES row's qualifier excludes it.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 5: fix present on `0610f64a`, re-executed |

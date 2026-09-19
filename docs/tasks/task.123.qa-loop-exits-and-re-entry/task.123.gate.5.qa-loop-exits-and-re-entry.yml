@@ -1,0 +1,159 @@
+schema: 1
+task: 'task.123.qa-loop-exits-and-re-entry'
+task_title: 'The QA loop''s guards read only the HIGH count and the lock cannot go backwards'
+gate: PASS
+status_reason: 'Cycle 5 (the last budgeted cycle), scoped to the 16 files changed since gate 4. All cycle-4 findings FIXED and verified (bugs 11–14 Closed). No HIGH, no MEDIUM. Four LOW findings ride on this PASS (gate rule 5), all in the grant script''s refusal-message wording and path edge cases: a misleading clause in the never-lower refusal on the no-lock path (the reviewer rated it medium; QA rates it LOW — the same line already names the k that is needed, and the script''s behaviour is correct: it refuses and writes nothing), a foreign snapshot diagnosed by its budget before its ownership, a doc-dir of "./" under bash 5, and CDPATH leaking into canon(). HIGH 1, 1, 0, 0, 0 — the loop converged. Every suite green.'
+reviewer: 'QA Engineer'
+updated: '2026-09-19T09:01:35Z'
+
+top_issues:
+  - id: 'TASK123-C5-CR-1'
+    severity: low
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: >-
+      On the no-lock path the never-lower refusal's clause "no grant is needed to run cycles up to
+      EXISTING" is false — nothing restores the lock, so Loop Setup would read 5; the same line's
+      "k must be at least N" is the correct remedy. Reviewer severity medium; QA severity LOW: a
+      wrong clause in a message whose behaviour and adjacent remedy are correct.
+    suggested_action: >-
+      Emit the "no grant is needed" clause only when the budget was read from an existing lock;
+      on the snapshot path say "grant k >= N to restore the lock and run cycles up to EXISTING".
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK123-C5-CR-2'
+    severity: low
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: >-
+      The never-lower guard reads the snapshot's budget before the ownership check, so a foreign
+      snapshot with a higher budget is refused for its budget rather than diagnosed as "for
+      another document"; the header's bullet order promises the opposite.
+    suggested_action: >-
+      Hoist the ownership comparison ahead of read_budget on the snapshot branch.
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK123-C5-CR-3'
+    severity: low
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: >-
+      platform-variance: canon() strips "./" to the empty string; cd "" fails on bash 5.x and
+      succeeds on bash 3.2, so a doc-dir of "./" is falsely refused under bash 5 (reproduced on
+      bash 5.3.9).
+    suggested_action: >-
+      Map an empty stripped string to "." before the cd (or strip the prefix only when something
+      follows it).
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK123-C5-CR-4'
+    severity: low
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: >-
+      canon() runs a bare cd inside a command substitution; with an exported CDPATH bash prints
+      the resolved directory to stdout, so a relative snapshot dir canonicalises to two lines and
+      the comparison fails. Reviewer reproduced on bash 3.2 and 5.3 with CDPATH set; QA's probe
+      with CDPATH=/tmp did not trigger it — kept as reported.
+    suggested_action: >-
+      Use (CDPATH= cd -- "$stripped" >/dev/null 2>&1 && pwd -P).
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3490
+  phases_verified: '3/3 — cycle 4 findings FIXED; the four LOW entries are message wording and path edge cases in one script'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged. boundary: false. CDPATH (C5-CR-4) is an environment influence on a path comparison, not an injection: the value never reaches a shell string.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'A refused grant writes nothing (mutation-proven); the restore, the base and the budget arithmetic are correct on every probed path. The four LOWs are diagnostics and two path edge cases that do not change what is written.'
+  maintainability:
+    status: PASS
+    notes: 'Header/test-label off-by-one on "smallest accepted k" (C5-CR-5), an unreachable-today undo gap (C5-CR-6), and "three options" now being four (C5-CR-7) — cleanups.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK123-C5-CR-1'
+      severity: low
+      file: 'shared/resources/grant-qa-cycles.sh'
+      finding: >-
+        On the no-lock path the never-lower refusal's clause "no grant is needed to run cycles up to
+        EXISTING" is false — nothing restores the lock, so Loop Setup would read 5; the same line's
+        "k must be at least N" is the correct remedy. Reviewer severity medium; QA severity LOW: a
+        wrong clause in a message whose behaviour and adjacent remedy are correct.
+      suggested_action: >-
+        Emit the "no grant is needed" clause only when the budget was read from an existing lock;
+        on the snapshot path say "grant k >= N to restore the lock and run cycles up to EXISTING".
+      carried_from: 'top_issues (route 2b, cycle 5)'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+    - id: 'TASK123-C5-CR-2'
+      severity: low
+      file: 'shared/resources/grant-qa-cycles.sh'
+      finding: >-
+        The never-lower guard reads the snapshot's budget before the ownership check, so a foreign
+        snapshot with a higher budget is refused for its budget rather than diagnosed as "for
+        another document"; the header's bullet order promises the opposite.
+      suggested_action: >-
+        Hoist the ownership comparison ahead of read_budget on the snapshot branch.
+      carried_from: 'top_issues (route 2b, cycle 5)'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+    - id: 'TASK123-C5-CR-3'
+      severity: low
+      file: 'shared/resources/grant-qa-cycles.sh'
+      finding: >-
+        platform-variance: canon() strips "./" to the empty string; cd "" fails on bash 5.x and
+        succeeds on bash 3.2, so a doc-dir of "./" is falsely refused under bash 5 (reproduced on
+        bash 5.3.9).
+      suggested_action: >-
+        Map an empty stripped string to "." before the cd (or strip the prefix only when something
+        follows it).
+      carried_from: 'top_issues (route 2b, cycle 5)'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+    - id: 'TASK123-C5-CR-4'
+      severity: low
+      file: 'shared/resources/grant-qa-cycles.sh'
+      finding: >-
+        canon() runs a bare cd inside a command substitution; with an exported CDPATH bash prints
+        the resolved directory to stdout, so a relative snapshot dir canonicalises to two lines and
+        the comparison fails. Reviewer reproduced on bash 3.2 and 5.3 with CDPATH set; QA's probe
+        with CDPATH=/tmp did not trigger it — kept as reported.
+      suggested_action: >-
+        Use (CDPATH= cd -- "$stripped" >/dev/null 2>&1 && pwd -P).
+      carried_from: 'top_issues (route 2b, cycle 5)'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+    - action: 'C5-CR-5 — header/test label: "the smallest k that extends the budget" (k = EXISTING − QA_CYCLE is accepted and leaves the budget unchanged)'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/grant-qa-cycles.test.sh']
+    - action: 'C5-CR-6 — define undo_restore right after the restore block and call it on the post-restore object check'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+    - action: 'C5-CR-7 — "the halt message''s own three options" → "options 1–3" in the resume contract and both SKILL.md (the HALT messages now list four)'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-09-19'
+  total_iterations: 4
+  verification_method: 'Scoped diff review + re-execution of each cycle-4 fix on 0610f64a; bugs 11–14 Closed; 14 bugs Closed across five cycles'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

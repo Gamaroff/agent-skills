@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-12
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 4, CR-2 — verified)
 **Date Found**: 2026-09-19
 
@@ -58,3 +58,4 @@ Rewrite step 4: the grant writes `qa_phase: 5a` itself; the re-entry needs no se
 
 **Verification Steps for QA**:
 1. Read step 4: one declined-path statement; SKILL.md's sentence references it.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 5: fix present on `0610f64a`, re-executed |

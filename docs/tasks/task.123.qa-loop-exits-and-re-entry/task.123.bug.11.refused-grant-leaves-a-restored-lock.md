@@ -4,7 +4,7 @@
 **Bug ID**: TASK-123-BUG-11
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 4, CR-1 — verified)
 **Date Found**: 2026-09-19
 
@@ -58,3 +58,4 @@ Evaluate the never-lower guard against the snapshot's `qa_max_cycles` before res
 
 **Verification Steps for QA**:
 1. Snapshot with `qa_max_cycles: 9`, no lock, gate.6, k=2 → exit 1, no lock on disk, message says `k must be at least 4`.
+| 2026-09-19 | Closed | QA | Verified in QA cycle 5: fix present on `0610f64a`, re-executed |
