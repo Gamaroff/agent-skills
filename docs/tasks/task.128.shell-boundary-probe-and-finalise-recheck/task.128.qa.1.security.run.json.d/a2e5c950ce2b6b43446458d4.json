@@ -1,0 +1,15 @@
+{
+  "sink": "filename",
+  "entry": "shell:shared/resources/qa-cycle.sh",
+  "name": "qa-cycle-shell-form",
+  "call_site": "shared/resources/qa-cycle.sh:42",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 28,
+  "passed": 28,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "ran_at": "2026-09-20T18:31:29.077Z"
+}

@@ -1997,7 +1997,7 @@ cat > .claude/state/finalise-fix-finding.json <<'JSON'
   "commits": 1,
   "touched": ["{every path the fix will change, repo-relative}"],
   "filesSummary": [{every path in the work item's Files Summary (task §7) / File List (story), as strings}],
-  "mutationProof": { "test": "{the test that must go red on revert}", "redOnRevert": false },
+  "mutationProof": { "test": "{the test that must go red on revert}", "redOnRevert": false, "run": ".claude/state/finalise-mutation-proof.log" },
   "otherFindingsOpen": [{every medium-or-higher finding in any section, and every other section that is FAIL — as strings; [] when none}]
 }
 JSON
@@ -2016,9 +2016,13 @@ line `Fix-and-recheck refused: {ids}` in the gap report's Blocking Issues Summar
 - Run the fast gate (`develop.fastGateCommand`, default `npm run ci:fast`) to a file; it must be
   green.
 - Run the mutation proof per `references/mutation-proving.md`: snapshot the fixed file with `cp`,
-  revert the behaviour, run the named test, confirm it is **red**, restore from the snapshot, confirm
-  green. Set `mutationProof.redOnRevert` to `true` in the finding record and re-run the evaluator —
-  **exit 0 is the licence for the commit; exit 1 is Step 8.**
+  revert the behaviour, run the named test **with its output captured to the file named in
+  `mutationProof.run`** (`node --test <test> > .claude/state/finalise-mutation-proof.log 2>&1`),
+  confirm it is **red**, restore from the snapshot, confirm green. Set `mutationProof.redOnRevert`
+  to `true` in the finding record and re-run the evaluator — it opens the run file and requires
+  it to be non-empty, to name the test, and to carry a red marker (`not ok` / `✖` / `ℹ fail N`);
+  a flipped boolean with no recorded run halts on `mutation-proved`. **Exit 0 is the licence for
+  the commit; exit 1 is Step 8.**
 - `git commit` — one commit, message `fix(<stem>): finalise DoD <section> — <finding, one line>`.
   Then `git push origin HEAD`.
 

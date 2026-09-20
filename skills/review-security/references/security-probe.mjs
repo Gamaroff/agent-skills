@@ -85,6 +85,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -238,6 +239,16 @@ export function defaultRepoRoot() {
 export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
   if (typeof entry !== "string" || entry.trim() === "") {
     return { ok: false, reason: "bad-entry", detail: "entry is empty" };
+  }
+  // A NUL is never part of a path. For the JS form it fails at import (declined);
+  // for the shell form it reached spawnSync, which THROWS on a NUL in argv — out
+  // of runProbeSpec, whose contract is to return a verdict (task.128 BUG-3).
+  if (entry.includes("\0")) {
+    return {
+      ok: false,
+      reason: "bad-entry",
+      detail: "entry contains a NUL byte",
+    };
   }
   const isShell = entry.startsWith(SHELL_PREFIX);
   let rawPath;
@@ -710,6 +721,20 @@ function runShellCase(
     );
     return;
   }
+  // The script must be a readable regular file BEFORE anything is compared.
+  // Without this a missing path made every run exit 127, every case mismatch
+  // `expected`, and the verdict read `absent` with executed = cases × shells —
+  // "could not look" scored as "the control is absent", with a count behind it
+  // (task.128 QA cycle 1, BUG-2). The JS form declines the same condition as
+  // entry-not-probeable; so does this now, through the all-errored collapse.
+  try {
+    const st = statSync(entryPath);
+    if (!st.isFile()) throw new Error("not a regular file");
+    accessSync(entryPath, fsConstants.R_OK);
+  } catch (e) {
+    decline(`script is not a readable regular file: ${e.message}`);
+    return;
+  }
 
   for (const shell of shells) {
     // One directory per (case, shell): a side effect from the bash run must
@@ -766,6 +791,13 @@ function runShellCase(
     if (neverRan(child)) {
       outcome = "errored";
       detail = child.signal ? `timed out after ${timeoutMs}ms` : "never ran";
+    } else if (child.status === 126 || child.status === 127) {
+      // bash could not run the script at all (126 not executable / 127 not
+      // found — a shebang interpreter missing, a race with the stat above).
+      // That is the harness failing to reach the target, not the target
+      // answering, so it is DECLINED and never compared against `expected`.
+      outcome = "errored";
+      detail = `bash could not run the script (exit ${child.status}): ${(child.stderr ?? "").trim().slice(0, 160)}`;
     } else {
       const mismatches = compareExpected(c.expected, child, fixtureDir);
       const matched = mismatches.length === 0;

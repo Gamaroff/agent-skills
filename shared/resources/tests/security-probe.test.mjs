@@ -18,7 +18,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -643,6 +643,71 @@ test("shell entry: an out-of-root script is refused before anything spawns", () 
     "no case may run against an out-of-root script",
   );
   assert.equal(r.shells, null);
+});
+
+test("shell entry: a missing or non-file script is DECLINED, never scored absent (BUG-2)", () => {
+  // Before the fix a missing path made every run exit 127, every case mismatch
+  // expected, and the verdict read absent with executed = cases × shells —
+  // "could not look" scored as "the control is absent", with a count behind it.
+  for (const entry of [
+    "shell:shared/resources/does-not-exist.sh",
+    "shell:shared/resources", // a directory
+  ]) {
+    const r = runProbeSpec({ sink: "filename", entry });
+    assert.equal(r.verdict, "unverifiable", entry);
+    assert.equal(r.reason, "entry-not-probeable", entry);
+    assert.equal(r.executed, 0, `${entry}: nothing may count as executed`);
+    assert.equal(r.reproduced.length, 0);
+    assert.match(r.declined[0].detail, /not a readable regular file/);
+  }
+});
+
+test("shell entry: a 126/127 exit is errored, not compared (BUG-2)", () => {
+  // 126 / 127 are bash's own "could not run" codes (not executable / not
+  // found). The stat check above catches a missing or unreadable file before
+  // launch; this branch is the backstop for anything that reaches bash and
+  // still cannot run — and, by the same convention, a script that exits 127
+  // itself is reporting "command not found", which is the harness's problem,
+  // not an answer about the names. Either way it is DECLINED, never compared.
+  const dir = mkdtempSync(
+    join(REPO_ROOT, "shared/resources/tests/.t128-launch-"),
+  );
+  try {
+    const script = join(dir, "cannot-run.sh");
+    writeFileSync(script, "#!/usr/bin/env bash\nexit 127\n", { mode: 0o755 });
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${relative(REPO_ROOT, script)}`,
+    });
+    assert.equal(r.executed, 0, JSON.stringify(r.cases[0]));
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.match(
+      r.declined[0].detail,
+      /could not run the script \(exit 12[67]\)/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a NUL byte in an entry is bad-entry for BOTH forms, and the shell form never throws (BUG-3)", () => {
+  assert.equal(
+    resolveEntry("shell:shared/resources/qa-cycle\u0000.sh", REPO_ROOT).reason,
+    "bad-entry",
+  );
+  assert.equal(
+    resolveEntry("shared/resources/x\u0000.mjs#f", REPO_ROOT).reason,
+    "bad-entry",
+  );
+  let r;
+  assert.doesNotThrow(() => {
+    r = runProbeSpec({
+      sink: "filename",
+      entry: "shell:shared/resources/qa-cycle\u0000.sh",
+    });
+  });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "bad-entry");
 });
 
 test("shell entry: a sink that is not materialised is declined, never executed", () => {

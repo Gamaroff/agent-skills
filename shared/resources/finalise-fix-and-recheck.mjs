@@ -12,7 +12,8 @@
  *     "commits": 1,                             // commits the fix takes
  *     "touched": ["lib/x.sh"],                  // paths the fix changes
  *     "filesSummary": ["lib/x.sh"],             // the work item's Files Summary / File List
- *     "mutationProof": { "test": "tests/x.test.js", "redOnRevert": true },
+ *     "mutationProof": { "test": "tests/x.test.js", "redOnRevert": true,
+ *                        "run": ".claude/state/mutation-proof.log" },   // the recorded red run
  *     "otherFindingsOpen": []                   // medium+ findings, or other FAIL sections
  *   }
  *
@@ -30,7 +31,8 @@
  * decides. A missing input is a failed precondition, never a pass.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // bundle-dependency: shared/resources/finalise-fix-and-recheck-preconditions.json
@@ -47,6 +49,10 @@ export const PRECONDITIONS = Object.freeze(
 );
 
 const isList = (v) => Array.isArray(v);
+
+/** What a recorded red run looks like from node:test, bash test harnesses, or a
+ *  hand-run assertion: a TAP `not ok`, the runner's ✖, or a `fail` count > 0. */
+const RED_MARKER = /(^|\n)\s*(not ok\b|✖|ℹ fail [1-9]|FAIL\b)/;
 
 /**
  * One check per precondition id. The keys of this map ARE the evaluator's
@@ -81,9 +87,30 @@ const CHECKS = Object.freeze({
     if (typeof m.test !== "string" || m.test.trim() === "") {
       return "mutationProof names no test";
     }
-    return m.redOnRevert === true
-      ? null
-      : `${m.test} did not go red on revert (redOnRevert: ${m.redOnRevert})`;
+    if (m.redOnRevert !== true) {
+      return `${m.test} did not go red on revert (redOnRevert: ${m.redOnRevert})`;
+    }
+    // The statement says "the run that showed it is recorded". A boolean the
+    // agent flips by hand is not a record (task.128 QA cycle 1, BUG-4): the run
+    // is a file this check opens, and it must be non-empty, name the test, and
+    // carry a red marker. Absent, empty or silent → not proved.
+    if (typeof m.run !== "string" || m.run.trim() === "") {
+      return "mutationProof names no `run` — the red run must be recorded to a file";
+    }
+    let text;
+    try {
+      text = readFileSync(m.run, "utf8");
+    } catch (e) {
+      return `mutationProof.run ${m.run} cannot be read (${e.code ?? e.message})`;
+    }
+    if (text.trim() === "") return `mutationProof.run ${m.run} is empty`;
+    if (!text.includes(m.test)) {
+      return `mutationProof.run ${m.run} does not mention ${m.test}`;
+    }
+    if (!RED_MARKER.test(text)) {
+      return `mutationProof.run ${m.run} shows no failing test (no "not ok" / ✖ / fail line)`;
+    }
+    return null;
   },
   "no-other-finding-open": (f) =>
     !isList(f.otherFindingsOpen)
@@ -180,6 +207,23 @@ export function main(argv = process.argv.slice(2)) {
   return result.proceed ? 0 : 1;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+// Resolve BOTH sides through realpath: `.agents/skills` is a symlink to
+// `../skills` here and in every consumer install, so argv[1] arrives symlinked
+// while import.meta.url is already real. Compared raw, main() never ran through
+// the documented path — no output, exit 0, which Step 8a reads as "proceed"
+// (task.128 QA cycle 1, BUG-1; same class as bug.4 in qa-execute-snippets.mjs).
+function isInvokedDirectly() {
+  if (!process.argv[1]) return false;
+  try {
+    return (
+      realpathSync(process.argv[1]) ===
+      realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  }
+}
+
+if (isInvokedDirectly()) {
   process.exitCode = main();
 }

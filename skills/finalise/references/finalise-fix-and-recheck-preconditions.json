@@ -22,8 +22,8 @@
     },
     {
       "id": "mutation-proved",
-      "statement": "a named test goes red when the fix is reverted, and the run that showed it is recorded",
-      "input": "mutationProof",
+      "statement": "a named test goes red when the fix is reverted, and the run that showed it is recorded to a file the evaluator opens (mutationProof.run: non-empty, names the test, carries a red marker)",
+      "input": "mutationProof (test, redOnRevert, run)",
       "why": "A fix with no red-on-revert test is a change nothing holds; the next edit can undo it silently."
     },
     {

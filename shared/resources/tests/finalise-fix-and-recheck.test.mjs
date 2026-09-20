@@ -12,7 +12,13 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,6 +45,20 @@ const PINNED = Object.freeze([
   "no-other-finding-open",
 ]);
 
+/** A recorded red run, as node:test prints one — written once for the suite. */
+const RUN_DIR = mkdtempSync(join(tmpdir(), "fix-recheck-run-"));
+const RED_RUN = join(RUN_DIR, "mutation-proof.log");
+writeFileSync(
+  RED_RUN,
+  "test at tests/qa-cycle.test.js:142\n✖ a filename with an embedded newline is un-numbered (3ms)\nℹ fail 1\n",
+);
+const GREEN_RUN = join(RUN_DIR, "green.log");
+writeFileSync(
+  GREEN_RUN,
+  "test at tests/qa-cycle.test.js:142\n✔ all good\nℹ pass 12\nℹ fail 0\n",
+);
+process.on("exit", () => rmSync(RUN_DIR, { recursive: true, force: true }));
+
 const GOOD = Object.freeze({
   severity: "low",
   commits: 1,
@@ -48,7 +68,11 @@ const GOOD = Object.freeze({
     "tests/qa-cycle.test.js",
     "skills/qa-task/SKILL.md",
   ],
-  mutationProof: { test: "tests/qa-cycle.test.js", redOnRevert: true },
+  mutationProof: {
+    test: "tests/qa-cycle.test.js",
+    redOnRevert: true,
+    run: RED_RUN,
+  },
   otherFindingsOpen: [],
 });
 
@@ -91,7 +115,11 @@ const FALSIFY = Object.freeze({
     touched: ["shared/resources/qa-cycle.sh", "docs/README.md"],
   },
   "mutation-proved": {
-    mutationProof: { test: "tests/qa-cycle.test.js", redOnRevert: false },
+    mutationProof: {
+      test: "tests/qa-cycle.test.js",
+      redOnRevert: false,
+      run: RED_RUN,
+    },
   },
   "no-other-finding-open": {
     otherFindingsOpen: ["docs: FAIL — CHANGELOG entry missing"],
@@ -159,8 +187,8 @@ test("fail closed: a missing input never reads as held", () => {
 });
 
 test("the first evaluation of a real run halts on mutation-proved alone — the documented shape", () => {
-  // Step 8a writes redOnRevert: false before the proof runs; the doc says the
-  // first evaluation must name mutation-proved and nothing else.
+  // Step 8a writes redOnRevert: false and no run before the proof runs; the doc
+  // says the first evaluation must name mutation-proved and nothing else.
   const r = evaluateFixAndRecheck({
     ...GOOD,
     mutationProof: { test: "tests/qa-cycle.test.js", redOnRevert: false },
@@ -169,6 +197,71 @@ test("the first evaluation of a real run halts on mutation-proved alone — the 
     r.failed.map((f) => f.id),
     ["mutation-proved"],
   );
+});
+
+test("mutation-proved reads the RECORDED run, not the boolean (BUG-4)", () => {
+  const proof = (extra) => ({
+    ...GOOD,
+    mutationProof: {
+      test: "tests/qa-cycle.test.js",
+      redOnRevert: true,
+      run: RED_RUN,
+      ...extra,
+    },
+  });
+  // The boolean alone is a self-report and is not enough.
+  let r = evaluateFixAndRecheck(proof({ run: undefined }));
+  assert.equal(r.proceed, false);
+  assert.match(r.failed[0].detail, /names no `run`/);
+  // A run file that does not exist.
+  r = evaluateFixAndRecheck(proof({ run: join(RUN_DIR, "nope.log") }));
+  assert.match(r.failed[0].detail, /cannot be read/);
+  // A run that never went red.
+  r = evaluateFixAndRecheck(proof({ run: GREEN_RUN }));
+  assert.match(r.failed[0].detail, /shows no failing test/);
+  // A red run about a DIFFERENT test.
+  r = evaluateFixAndRecheck(proof({ test: "tests/other.test.js" }));
+  assert.match(r.failed[0].detail, /does not mention tests\/other\.test\.js/);
+  // An empty file.
+  const empty = join(RUN_DIR, "empty.log");
+  writeFileSync(empty, "   \n");
+  r = evaluateFixAndRecheck(proof({ run: empty }));
+  assert.match(r.failed[0].detail, /is empty/);
+  // The real thing.
+  assert.equal(evaluateFixAndRecheck(GOOD).proceed, true);
+});
+
+test("CLI: invoked through a SYMLINKED path it still runs and exits per the verdict (BUG-1)", () => {
+  // .agents/skills → ../skills in every install; a raw argv[1] compare made
+  // main() never run — no output, exit 0, read by Step 8a as "proceed".
+  const dir = mkdtempSync(join(tmpdir(), "fix-recheck-link-"));
+  try {
+    const link = join(dir, "resources");
+    symlinkSync(join(REPO_ROOT, "shared/resources"), link, "dir");
+    const finding = join(dir, "finding.json");
+    writeFileSync(finding, JSON.stringify({ ...GOOD, commits: 2 }));
+    const r = spawnSync(
+      process.execPath,
+      [
+        join(link, "finalise-fix-and-recheck.mjs"),
+        "--finding",
+        finding,
+        "--json",
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(r.status, 1, `stdout=${r.stdout} stderr=${r.stderr}`);
+    assert.ok(
+      r.stdout.trim().length > 0,
+      "the symlinked invocation must print its verdict",
+    );
+    assert.deepEqual(
+      JSON.parse(r.stdout).failed.map((f) => f.id),
+      ["single-commit"],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("a non-object finding is a TypeError, not a halt", () => {
