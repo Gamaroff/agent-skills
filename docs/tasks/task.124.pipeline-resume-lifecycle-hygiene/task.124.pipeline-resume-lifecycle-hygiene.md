@@ -5,7 +5,7 @@ type: task
 description: "Six defects in the develop pipelines' resume and halt lifecycle, all observed on tasks 109–117. Phase 0b inherits a dirty tree instead of classifying it (an overlay reverted every bundled task.116 copy unseen); the resume detector flags a missing step-3 summary as blocking on every resume that never dispatched one; a completed run leaves the earlier halt snapshot on disk and the next run is offered a resume for merged work; the Stop hook re-prompts a step that is legitimately waiting on a background task; the HALT snippet's `rm` pairs the lock with a glob that zsh's nomatch aborts, leaving the lock in place; and the HALT commit shipped a doubled, mid-line-spliced implementation report because no boundary reads the report back. One task: each is a small mechanism in the resume contract, the detector prompt, the hooks, or a new report-lint.js. A seventh (task.121): after a PreCompact pause the hook removes the lock by design, and a session that continues in place — rather than re-invoking the skill — has no step that puts it back; advance-pipeline-lock.sh is a silent exit-0 no-op without a lock, so the Stop hook and every advance were inert until the run rebuilt the lock from the snapshot by hand. Observations #85, #86, #88, #89, #111, #115, #123."
 tags: [develop-task, develop-story, develop-bug, resume, hooks, pipeline, precompact]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-17
@@ -13,11 +13,13 @@ updated: 2026-09-20
 assignee:
 estimated_effort_hours: 9
 github_issue: 424
+pr_number: 436
+completed_date: 2026-09-20
 ---
 
 # Technical Task: Resume trusts what it finds on disk
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.124.review.1.pipeline-resume-lifecycle-hygiene.md` implemented 2026-09-19
 **GitHub Issue**: [#424](https://github.com/Gamaroff/agent-skills/issues/424)
 
@@ -300,7 +302,7 @@ the Step Transition Protocol in the three orchestrator `SKILL.md` files (action 
       report Edit, HALT on failure with nothing committed (the protocol edits; it does not commit);
       **(2)** the HALT rule — lint before "commit the report before any halt"; **(3)**
       `develop-pipeline-on-precompact.sh` between its append (`:189`) and `git add` (`:192`); **(4)**
-      Step 8 before the terminal commit. Each: `command node …/report-lint.js --file "$REPORT" --json || { echo "HALT: report failed lint"; exit 1; }`.
+      Step 8 before the terminal commit. Sites (1) and (4): `command node …/report-lint.js --file "$REPORT" --json || { echo "HALT: report failed lint"; exit 1; }`. Site (2) — the three orchestrator HALT rules — and the PreCompact hook call the same reader but **skip only the report commit and proceed with the halt** on a lint failure, so a corrupt report never strands the lock (QA cycle 2, CR-5).
 - [x] Test: the task.117 corrupt report (`329b4a65`, 366 lines) as a fixture. It has **one** H1 —
       the duplicate begins at its `**Task**:` header block (line 218) and repeats seven `## `
       sections (226–358) — so the assertion names the codes: `section-duplicated` ×7,
@@ -421,7 +423,7 @@ Not applicable.
 - [x] Every mechanism has a mutation proof recorded.
 
 ### Migration
-- [x] Observations #85, #86, #88, #89, #111, #115, #123 close naming the PR.
+- [ ] Observations #85, #86, #88, #89, #111, #115, #123 close naming the PR — **post-merge action**: all seven are `parked` with `parked_until: task.124 merged to develop`; resolve them naming PR #436 once it lands (PR review PC-1).
 
 ## 10. Risk Assessment
 
@@ -508,6 +510,33 @@ None.
 - Bugs 124.11–124.12 — verified FIXED in QA cycle 5 (2026-09-19)
 - Bugs 124.13–124.14 — verified FIXED in QA cycle 6 (2026-09-20)
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.124.qa.6.pipeline-resume-lifecycle-hygiene.md` (6 cycles: qa.1–qa.6)
+**Gate File**: `task.124.gate.6.pipeline-resume-lifecycle-hygiene.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+**PR Review (5c)**: ⚠️ CONCERNS — `task.124.pr-review.1.pipeline-resume-lifecycle-hygiene.md` (advisory; 3 medium findings carried as follow-ups)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 10/10 verified with code and per-PR test citations (F1–F3 via the L4 replay evals in `test.yml`); M1 (observations close naming the PR) is a post-merge action recorded as a condition
+✅ **Tests:** 3512 tests (0 fail) + 16 replay fixtures; CI reading 1 SUCCESS over 5 checks @ `a727d7306e55`
+✅ **PR Review:** PR #436 — 6 QA cycles (FAIL 70 → FAIL 70 → CONCERNS 80 → CONCERNS 85 → CONCERNS 85 → PASS 95), 14 bugs closed, Step 5c review CONCERNS (non-blocking)
+✅ **Documentation:** CHANGELOG `[Unreleased]`, hooks/pause references, anti-patterns, traps, skill READMEs; bundles in sync
+✅ **Security Review:** PASS by operator decision — no hardcoded secrets, no unsafe patterns, no new dependencies; `report-lint.js#lintReport` classed a boundary with no fitting probe sink (`probes_executed: 0`, `evidence: reasoned`, consistent with all six QA gates); follow-up: add a `markdown-structure` sink
+⚠️ **Compliance Review:** NOT_APPLICABLE (developer tooling — no personal data, payments, UI or health data)
+
+**Follow-ups carried (non-blocking):** M1 post-merge closure of obs #85/#86/#88/#89/#111/#115/#123; PR review CR-1 (bug-variant report base line), CR-2 (develop-bug Step 3 dispatch unmarked), CR-3 (self-reported stale-snapshot delete); security probe corpus gap; gate 6 `recommendations.future`.
+
+**Task marked as ACCEPTED on:** 2026-09-20
+
+**Detailed Verification Log:** See `task.124.dod.1.pipeline-resume-lifecycle-hygiene.md` for complete verification evidence and timestamps.
+
 ## Change Log
 <!-- change-log-start -->
 ## Change Log
@@ -525,6 +554,9 @@ None.
 | 2026-09-19 |  | QA gate 4 CONCERNS (85/100) — cycle-3 findings verified fixed; 0 HIGH, 2 MEDIUM (duplicate restore statement; develop-bug exception), 2 LOW; bugs 11–12 | qa-task |
 | 2026-09-19 |  | QA gate 5 CONCERNS (85/100) — cycle-4 findings verified fixed; 0 HIGH, 2 MEDIUM (shared sources state the exception for develop-bug; probe base never bound), 0 LOW; bugs 13–14 | qa-task |
 | 2026-09-20 |  | QA gate 6 PASS (95/100) — granted cycle; cycle-5 findings verified fixed by corpus execution; 0 HIGH, 0 MEDIUM, 1 LOW advisory; bugs 13–14 closed | qa-task |
+| 2026-09-20 |  | QA findings fixed — gate PASS (95/100), 5 iterations (+1 granted verification cycle); 14 bugs closed | qa-fix |
+| 2026-09-20 |  | PR review 1 CONCERNS (5c) — 3 medium code findings recorded in task.124.pr-review.1; Migration criterion marked post-merge, Phase 3 lint bullet corrected, Progress Tracking ticked | review-pr |
+| 2026-09-20 | 1.3 | DoD passed — accepted (PR #436); security probe classification accepted by operator (not-probeable Markdown validator); 6 follow-ups carried | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -533,8 +565,8 @@ None.
 - [x] Phase 2: waiting_on + HALT rm
 - [x] Phase 3: report-lint.js
 - [x] Phase 4: lock restore
-- [ ] QA: `task.124.qa.[N].pipeline-resume-lifecycle-hygiene.md`
-- [ ] Gate: `task.124.gate.[N].pipeline-resume-lifecycle-hygiene.yml`
+- [x] QA: `task.124.qa.6.pipeline-resume-lifecycle-hygiene.md` (6 cycles)
+- [x] Gate: `task.124.gate.6.pipeline-resume-lifecycle-hygiene.yml` (PASS 95/100)
 
 ## References
 
