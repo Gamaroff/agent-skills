@@ -5,19 +5,21 @@ type: task
 description: "On task.121 five QA cycles reached PASS 100/100 with "No boundary delivered" in every gate's security notes, and the finalise DoD security agent then reproduced two fail-closed defects in the very script the task delivered — a gate filename with an embedded newline made qa-cycle.sh exit 0 with a lower cycle, and isKnownStage admitted qa-gate-0. The QA probe never ran because security-probe.mjs imports JS entry points only, so a bash script that says 'refuses, never guesses' is unverifiable to it and the boundary rule read it as not a boundary; and finalise, having found the defect, had two exits — accept, or halt a hands-free pipeline for a human — so the run fixed it inline as an undocumented deviation. Three mechanisms: a `filename` sink in the input corpus and a `shell` entry form in the probe engine (bash <script> <arg>, both shells, count engine-written); the probe-boundary rule names a refusing script as a boundary by its own header; and finalise Step 8 gains a bounded fix-and-recheck path for a low-severity, single-commit, mutation-provable finding inside the task's own file set, with everything else still halting. Observation #121."
 tags: [qa-task, qa-story, finalise, security-probe, boundary, review-security]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-18
 updated: 2026-09-20
+completed_date: 2026-09-20
 assignee:
 estimated_effort_hours: 8
 github_issue: 431
+pr_number: 446
 ---
 
 # Technical Task: A refusing shell script is a boundary the probe engine cannot reach, and finalise can only accept or halt
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.128.review.1.shell-boundary-probe-and-finalise-recheck.md` implemented 2026-09-20
 **GitHub Issue**: [#431](https://github.com/Gamaroff/agent-skills/issues/431)
 
@@ -161,7 +163,7 @@ None. `--entry path#export` is unchanged; a corpus without `filename` cases fail
 - [x] Header signal added; "not importable" routed to the shell entry; §5 "v1 probes importable entry points only" bullet and §5.1 rewritten so the document does not contradict itself.
 - [x] `probe-boundary-signals.mjs` exports the phrase list once; the rule's prose cites it.
 - [x] Every site that names `--entry '<path>#<export>'` also names `--entry shell:<path>`.
-- [x] Test: the task.121 gate-5 security `notes` ("No boundary delivered — … the helper reads filenames and prints a bounded integer") and the `qa-cycle.sh` header as fixtures `classifyBoundaryText` classifies as a boundary; a header with none of the phrases as the negative fixture. The test calls the function — never greps the prose.
+- [x] Test: the `qa-cycle.sh` header ("refuses rather than guesses") as the positive fixture `classifyBoundaryText` classifies as a boundary, and the task.121 gate-5 security `notes` ("No boundary delivered — … the helper reads filenames and prints a bounded integer") as the negative fixture that carries no signal (§9); a header with none of the phrases as the negative fixture. The test calls the function — never greps the prose.
 
 **Dependencies**: Phase 1.
 
@@ -205,6 +207,7 @@ not exist and is not in `package.json`'s hand-listed globs)
 ### Files to Modify (Tests)
 
 5. ✅ `shared/resources/tests/security-input-corpus.test.mjs`, `security-probe.test.mjs` (+ BUG-2/BUG-3 regression tests), `probe-boundary-signals.test.mjs` (new), `finalise-fix-and-recheck.test.mjs` (+ BUG-1 symlinked-invocation and BUG-4 recorded-run tests)
+6. ✅ `evals/shared/tests/probes-executed-population.test.mjs` (allowlist entry for the boundary-rule prose "against a script that says it refuses") and `skills/review-security/tests/review-security.test.js` (transitive sibling-import walk for the nested engine copy; limits assertion now `neither form reaches`) — consequential updates to the Phase 2 prose changes (BUG-10, QA cycles 1 and 3).
 
 ### Files to Modify (Documentation)
 
@@ -252,7 +255,7 @@ None.
 - [x] Each mechanism has a mutation proof recorded.
 
 ### Migration
-- [x] Observation #121 closes naming the PR.
+- [x] Observation #121 closes naming the PR — set `actioned` at `/finalise`, resolution names PR #446.
 
 ## 10. Risk Assessment
 
@@ -265,6 +268,12 @@ None.
 
 ### Low Risk
 1. zsh absent on CI — the engine runs bash only and records `shells: [bash]` in the record.
+
+### Known limits at acceptance (recorded by Step 5c, PR review 1 — follow-up task candidates)
+1. **`mutation-proved` is tied to the proof's file, not the test** (`finalise-fix-and-recheck.mjs` `redNamesTest`, PR-review CR-1, medium): `mutationProof.test` is a file path and node:test prints every failing test's location within `RED_WINDOW` of its ✖, so a log where the named test is green and an unrelated test in the same file is red satisfies the precondition. Fix: require the test's title and match it on the ✖ line itself, keeping the file for the `test at <file>` cross-check.
+2. `severity-low` is self-reported and not cross-checked against the run record's `escaped` count (CR-2; cycle-3 CR-5 names the same derivation).
+3. `listDirStamps` stamps sibling directories, so a write into one during a run reads as an escape (CR-3); the inline non-object `expected` guard duplicates `expectedProblem` (CR-4).
+4. A case-variant of an engine-created fixture name slips the string collision check on case-folding filesystems (QA cycle 5 CR-1); the CR-3 test fixture should `exec` its sleep (QA cycle 5 CR-2).
 
 ## 11. Rollback Plan
 
@@ -317,6 +326,33 @@ _None._
 ### Key Findings
 BUG-13, CR-2, CR-3, CR-4 verified FIXED by execution; no open entry. Advisory (future): CR-1 case-folded fixture names slip the string collision check (APFS) — eligible for finalise fix-and-recheck; CR-2 the CR-3 test fixture should `exec sleep`.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.128.qa.5.shell-boundary-probe-and-finalise-recheck.md` (cycle 5 of 5)
+**Gate File**: `task.128.gate.5.shell-boundary-probe-and-finalise-recheck.yml`
+**Gate Status**: ⚠️ CONCERNS — `top_issues: []` (no open entry)
+**Quality Score**: 95/100
+**PR Review (Step 5c)**: `task.128.pr-review.1.shell-boundary-probe-and-finalise-recheck.md` — CONCERNS, findings applied or recorded
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** All 7 met — shell entry form under bash+zsh with the newline case reproduced on the pre-fix script; `classifyBoundaryText` header signal with the gate-5 note as the negative fixture; fix-and-recheck evaluator halts unless all five pinned preconditions hold; JS entry path unchanged; one record shape; every mechanism mutation-proved; obs #121 actioned naming PR #446
+✅ **Tests:** 3,579 in the per-PR `npm test` lane; 31 mutants killed across develop and four QA cycles; CI reading 1 SUCCESS @ `01a0b475` over 5 checks
+✅ **PR Review:** PR #446 — Step 5c conformance + code lenses (5 conformance findings applied; CR-1 recorded under §10 Known limits)
+✅ **Documentation:** CHANGELOG `(task 128; obs #121)`; finalise Step 6 row + Step 8a; DoD checklist matrix row; probe-boundary-rule §5/§5.1/§5.2; corpus filename sink; dod-security-prompt shell command + severity; qa-task/qa-story 3b; review-security; anti-patterns; bundles regenerated
+✅ **Security Review:** PASS — boundary probed with the engine-recorded run `task.128.dod.security.run.json` (39 executed; only the known pre-existing `resolveEntry` symlink-escape reproduced); evaluator refused 11/11 hostile records; no secrets, no shell-string interpolation of case input
+⚠️ **Compliance Review:** NOT_APPLICABLE — agent tooling only
+
+**Known limits carried** (§10, follow-up task candidates): mutation-proved keyed on the proof's file; severity-low self-reported; `listDirStamps` stamps directories; case-folded fixture names; `resolveEntry` symlink-escape.
+
+**Task marked as ACCEPTED on:** 2026-09-20
+
+**Detailed Verification Log:** See `task.128.dod.1.shell-boundary-probe-and-finalise-recheck.md` for complete verification evidence and timestamps.
+
 ## Change Log
 <!-- change-log-start -->
 ## Change Log
@@ -336,6 +372,8 @@ BUG-13, CR-2, CR-3, CR-4 verified FIXED by execution; no open entry. Advisory (f
 | 2026-09-20 |  | QA gate CONCERNS (90/100), cycle 4 — BUG-9..12 verified fixed; 0 HIGH, 1 MEDIUM, 2 LOW | qa-task |
 | 2026-09-20 |  | QA findings fixed — BUG-13 (absent . / .. / collisions rejected), CR-2 (case-insensitive launch message), CR-3 (escapes/shells through the collapse), CR-4; cycle 4 (4 iterations so far) | qa-fix |
 | 2026-09-20 |  | QA gate CONCERNS (95/100), cycle 5 — BUG-13, CR-2..4 verified fixed; 0 HIGH, 0 MEDIUM, 2 LOW advisory; no open entry → 5c | qa-task |
+| 2026-09-20 |  | PR review 1 (Step 5c) CONCERNS — 5 conformance findings applied (pr_number, Migration checkbox, Phase 2 fixture polarity, §7 test files, paused block); CR-1 mutation-proved file-vs-test recorded under Known limits | review-pr |
+| 2026-09-20 | 1.2 | DoD passed — accepted (PR #446); obs #121 actioned | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
