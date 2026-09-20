@@ -186,8 +186,11 @@ test("waiting_on: one writer, one reader, and every describer spells the field a
   // resume detector (no lock exists while it runs) and commentary about a dispatch (a comment, a
   // quote, a "do NOT re-dispatch"). Adding a dispatch anywhere in the population without a
   // set-waiting-on call within 12 lines is red.
+  // Three wordings the corpus uses that the verb form misses (task.130 Phase 2; PR #436 review
+  // CR-2): develop-bug step 3's "via a read-only Explore subagent (…)", a bare "Explore subagent ("
+  // and the tool-call spelling "Agent(subagent_type". Each was a real dispatch outside the count.
   const DISPATCH =
-    /subagent_type=|\bdispatch(?:es|ed)?\s+(?:an?|four|both|the|two)\s+[^\n.]{0,40}?\b(?:subagents?|lenses|mapper)\b|run_in_background|gh pr checks --watch/i;
+    /subagent_type=|\bdispatch(?:es|ed)?\s+(?:an?|four|both|the|two)\s+[^\n.]{0,40}?\b(?:subagents?|lenses|mapper)\b|run_in_background|gh pr checks --watch|via a read-only Explore subagent|Explore subagent \(|Agent\(subagent_type/i;
   const EXEMPT =
     /^\s*#|^\s*>|pipeline-resume-detector-prompt|not re-dispatch|Do NOT re-dispatch|observed three times|forbidden for the same reason|Follow this systematic workflow|Conditions to dispatch|This skill dispatches/i;
   const listDir = (dir, re) =>
@@ -237,10 +240,34 @@ test("waiting_on: one writer, one reader, and every describer spells the field a
       );
     });
   }
+  // Non-vacuity for the widened pattern (task.130 Phase 2): develop-bug step 3's root-cause
+  // dispatch is in the directory-derived population already — it is NOT hand-listed — but only
+  // matches once the pattern reads its wording. The check is anchored to THAT line ("Localise
+  // the root cause"), not to "any line of the file": the file's test-triage dispatch spells
+  // `subagent_type=` and matched before this task, so a file-level count was satisfied with the
+  // root-cause dispatch still outside the population. Narrowing the regex back is red here.
+  {
+    const rel =
+      "skills/develop-bug/references/develop-bug-step-3-investigate-fix.md";
+    const rootCause = read(rel)
+      .split(/\r?\n/)
+      .filter((l) => /Localise the root cause/.test(l));
+    assert.equal(
+      rootCause.length,
+      1,
+      `${rel}: expected one root-cause step line`,
+    );
+    assert.ok(
+      DISPATCH.test(rootCause[0]) && !EXEMPT.test(rootCause[0]),
+      `${rel}: the root-cause dispatch line does not match DISPATCH — it is outside the population again`,
+    );
+  }
   // Non-vacuity: the two QA skills' own dispatches are in the count (the ones the hand-list missed).
+  // Floor = the measured count with the task.130 pattern (17: 12 before + develop-bug step 3's
+  // two lines + the three wordings elsewhere). Raise it when a dispatch is added; never lower it.
   assert.ok(
-    sites >= 12,
-    `expected ≥12 dispatch sites across the population, found ${sites} — the pattern drifted`,
+    sites >= 17,
+    `expected ≥17 dispatch sites across the population, found ${sites} — the pattern drifted`,
   );
   for (const rel of ["skills/qa-task/SKILL.md", "skills/qa-story/SKILL.md"]) {
     assert.match(

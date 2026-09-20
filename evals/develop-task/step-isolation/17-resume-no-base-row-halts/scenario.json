@@ -1,0 +1,22 @@
+{
+  "name": "develop-task-resume-no-base-row-halts",
+  "skill": "develop-task",
+  "description": "Phase 0b working-tree probe (task.130 Phase 1 / Breaking Change 1; PR #436 review CR-1): a develop-task resume finds the tree dirty, the branch has no PR, and the recorded implementation report predates task.124's template — no `| Feature branch base |` row — and, being a task-variant report, carries no `**Branch model:**` line either. The probe cannot bind the base it would classify against and HALTs naming the report path and both shapes tried, instead of guessing `develop` (the pre-task.130 default). Nothing is discarded, no `git checkout` runs, the lock is snapshotted and removed. This fixture is a recording — the executed proof is shared/resources/tests/probe-base-binding.test.mjs.",
+  "prompt": "Re-invoke /develop-task for task.42.example after a HALT. The working tree carries one untracked file; the branch has no PR; the implementation report has no Feature branch base row. Resume from the last completed step.",
+  "assertions": [
+    { "fn": "fileExists", "args": ["$SANDBOX/scratch/notes.md"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md", "HALT: cannot bind the probe base"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md", "\\\\| Feature branch base \\\\|"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md", "\\\\*\\\\*Branch model:\\\\*\\\\*"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md", "probe: no PR on this branch"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md", "Nothing was discarded"] },
+    { "fn": "fileDoesNotMatch", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md", "git checkout HEAD"] },
+    { "fn": "fileDoesNotMatch", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md", "overlay discarded"] },
+    { "fn": "fileDoesNotMatch", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md", "classifying against origin/develop"] },
+    { "fn": "fileAbsent", "args": ["$SANDBOX/.claude/state/develop-pipeline.lock"] },
+    { "fn": "fileExists", "args": ["$SANDBOX/.claude/state/develop-pipeline.last-halt.json"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/.claude/state/develop-pipeline.last-halt.json", "\"halt_reason\": \"probe-base-unbound\""] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/.claude/state/develop-pipeline.last-halt.json", "\"halt_step\": \"4\""] },
+    { "fn": "pipelineStepsRan", "args": ["$SANDBOX/.eval/pipeline-events.json", ["resume-detector"]] }
+  ]
+}

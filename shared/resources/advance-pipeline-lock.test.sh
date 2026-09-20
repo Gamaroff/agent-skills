@@ -36,7 +36,8 @@
 #        exit 0 no-op, nothing touched; neither → exit 1 naming both paths;
 #        snapshot for another document → exit 1, nothing written, snapshot kept;
 #        relative vs absolute spellings of one directory match; a snapshot with
-#        no directory (pre-task.123) is accepted; an orphaned `.pausing.<pid>`
+#        no directory (pre-task.123) is REFUSED as `legacy-snapshot` unless
+#        --accept-legacy is passed (task.130); an orphaned `.pausing.<pid>`
 #        claim is a candidate and the newest candidate wins (and the losing
 #        same-document snapshot is consumed with it); a string halt_step is
 #        stored as a number; a GNU-shaped `stat` (shimmed) still picks the newest
@@ -387,13 +388,129 @@ run_restore_scenarios() {
   fi
   rm -f "$L" "$S"
 
-  # a snapshot with no directory (pre-task.123 shape) is accepted
+  # a snapshot with no directory (pre-task.123 shape) is REFUSED by name unless --accept-legacy
+  # is passed: it can belong to any document, and a match by absence is a guess (task.130,
+  # PR #436 review CR-5).
   printf '{"current_step":7,"halt_step":7}\n' > "$S"
-  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC=$?
-  if [ "$RC" -eq 0 ] && [ "$(jq -r '.current_step' "$L")" = "7" ]; then
-    pass "[$SH] --restore: snapshot without task_or_story_directory (pre-task.123) accepted"
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 1 ] && [ ! -f "$L" ] && [ -f "$S" ] && printf '%s' "$OUT" | grep -q "legacy-snapshot"; then
+    pass "[$SH] --restore: snapshot without task_or_story_directory → exit 1 'legacy-snapshot', nothing written, snapshot kept"
   else
-    fail "[$SH] --restore: pre-task.123 snapshot" "rc=$RC"
+    fail "[$SH] --restore: legacy snapshot refused" "rc=$RC lock=$([ -f "$L" ] && echo present || echo absent) snap=$([ -f "$S" ] && echo kept || echo gone) out=$OUT"
+  fi
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --accept-legacy "$R/doc" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r '.current_step' "$L")" = "7" ] && [ ! -f "$S" ]; then
+    pass "[$SH] --restore --accept-legacy: the legacy snapshot is restored and consumed"
+  else
+    fail "[$SH] --restore --accept-legacy" "rc=$RC"
+  fi
+  # …and the restored lock CARRIES the directory the operator asserted, so the recovery sticks:
+  # the next pause or HALT snapshots a matched candidate, not a legacy one (task.130 5c CR-1).
+  # Proven end to end — a second --restore WITHOUT the flag from a snapshot of that lock succeeds.
+  if [ "$(jq -r '.task_or_story_directory // ""' "$L")" = "$R/doc" ]; then
+    pass "[$SH] --restore --accept-legacy: the rebuilt lock is stamped with task_or_story_directory"
+  else
+    fail "[$SH] --restore --accept-legacy: directory stamp" "lock=$(jq -c . "$L")"
+  fi
+  jq '. + {halted_at:"t", halt_reason:"x", halt_step:7}' "$L" > "$S"; rm -f "$L"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ -f "$L" ] && [ ! -f "$S" ]; then
+    pass "[$SH] --restore --accept-legacy: a snapshot of the rebuilt lock restores again WITHOUT the flag"
+  else
+    fail "[$SH] --restore --accept-legacy: recovery sticks" "rc=$RC"
+  fi
+  rm -f "$L" "$S"
+  # A candidate that already names a directory keeps its own under the flag — the stamp
+  # fills an absence, it never overwrites.
+  printf '{"task_or_story_directory":"%s","current_step":4}\n' "$R/doc" > "$S"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --accept-legacy "$R/doc" >/dev/null 2>&1
+  if [ "$(jq -r '.task_or_story_directory' "$L")" = "$R/doc" ] && [ "$(jq -r '.current_step' "$L")" = "4" ]; then
+    pass "[$SH] --restore --accept-legacy: a matched candidate keeps its own directory"
+  else
+    fail "[$SH] --restore --accept-legacy: no overwrite" "lock=$(jq -c . "$L")"
+  fi
+  rm -f "$L" "$S"
+
+  # --restore --which prints the path --restore would consume, writes nothing, consumes nothing
+  # (task.130): same selection function, so the two cannot disagree. Set up a snapshot AND a
+  # newer orphaned claim for this document; --which must name the claim, --restore must then
+  # consume that same claim.
+  printf '{"task_or_story_directory":"%s","halt_step":5,"qa_max_cycles":5}\n' "$R/doc" > "$S"
+  touch -t 202601010000 "$S"
+  printf '{"task_or_story_directory":"%s","current_step":5,"qa_max_cycles":7}\n' "$R/doc" > "$L.pausing.4242"
+  WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --which "$R/doc" 2>/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$WHICH" = "$L.pausing.4242" ] && [ ! -f "$L" ] && [ -f "$S" ] && [ -f "$L.pausing.4242" ]; then
+    pass "[$SH] --restore --which: names the newest same-document candidate; no writes, nothing consumed"
+  else
+    fail "[$SH] --restore --which" "rc=$RC which='$WHICH' lock=$([ -f "$L" ] && echo present || echo absent) snap=$([ -f "$S" ] && echo kept || echo gone) claim=$([ -f "$L.pausing.4242" ] && echo kept || echo gone)"
+  fi
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  RESTORED_FROM=$(printf '%s\n' "$OUT" | sed -nE 's/^advance-pipeline-lock: lock restored from (.*) at step .*/\1/p')
+  if [ "$RC" -eq 0 ] && [ "$RESTORED_FROM" = "$WHICH" ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "7" ]; then
+    pass "[$SH] --restore consumes exactly the candidate --which named (budget read from the claim: 7)"
+  else
+    fail "[$SH] --restore vs --which agreement" "rc=$RC restored_from='$RESTORED_FROM' which='$WHICH' out=$OUT"
+  fi
+  rm -f "$L" "$S" "$L.pausing.4242"
+
+  # A TRAILING flag is a usage error, never a consuming restore (task.130 QA cycle 1, bug 1):
+  # `--restore <dir> --which` used to drop the flag and restore.
+  printf '{"task_or_story_directory":"%s","halt_step":5}\n' "$R/doc" > "$S"
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" --which 2>&1); RC=$?
+  if [ "$RC" -eq 1 ] && [ ! -f "$L" ] && [ -f "$S" ] && printf '%s' "$OUT" | grep -q "flags BEFORE"; then
+    pass "[$SH] --restore <dir> --which (trailing flag) → exit 1 usage, no lock, snapshot kept"
+  else
+    fail "[$SH] --restore trailing flag" "rc=$RC lock=$([ -f "$L" ] && echo CREATED || echo absent) snap=$([ -f "$S" ] && echo kept || echo CONSUMED) out=$(printf '%s' "$OUT" | head -1)"
+  fi
+  rm -f "$L" "$S"
+
+  # --which with a lock present: stdout is EMPTY (the notice goes to stderr), exit 0 (CR-4).
+  printf '{"current_step":5}\n' > "$L"
+  WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --which "$R/doc" 2>/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ -z "$WHICH" ]; then
+    pass "[$SH] --restore --which with a lock present → empty stdout, exit 0 (notice on stderr)"
+  else
+    fail "[$SH] --which with lock present" "rc=$RC stdout='$WHICH'"
+  fi
+  rm -f "$L"
+
+  # An exported ACCEPT_LEGACY in the environment must NOT accept a legacy snapshot (CR-6).
+  printf '{"current_step":7,"halt_step":7}\n' > "$S"
+  ACCEPT_LEGACY=1 PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 1 ] && [ ! -f "$L" ] && [ -f "$S" ]; then
+    pass "[$SH] --restore ignores an exported ACCEPT_LEGACY=1 — only the flag raises it"
+  else
+    fail "[$SH] env ACCEPT_LEGACY ignored" "rc=$RC lock=$([ -f "$L" ] && echo CREATED || echo absent)"
+  fi
+  rm -f "$L" "$S"
+
+  # Provenance over mtime (task.130 QA cycle 3, CR-6; cycle 4, CR-4): under --accept-legacy a
+  # directory-MATCHED claim is chosen over a NEWER legacy snapshot, and — because the legacy file
+  # is MINE under the flag and lost — a consuming --restore removes it as a loser. Both halves
+  # are asserted: the selection via --which, the consume via --restore.
+  printf '{"task_or_story_directory":"%s","current_step":5,"qa_max_cycles":7}\n' "$R/doc" > "$L.pausing.4343"
+  touch -t 202601010000 "$L.pausing.4343"
+  printf '{"current_step":3,"halt_step":3}\n' > "$S"     # legacy, NEWER
+  WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --accept-legacy --which "$R/doc" 2>/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$WHICH" = "$L.pausing.4343" ]; then
+    pass "[$SH] --restore --accept-legacy --which: a directory-matched claim outranks a newer legacy snapshot"
+  else
+    fail "[$SH] provenance-first ranking" "rc=$RC which='$WHICH'"
+  fi
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --accept-legacy "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "7" ] && [ ! -f "$L.pausing.4343" ] && [ ! -f "$S" ]; then
+    pass "[$SH] --restore --accept-legacy: restores from the matched claim and consumes the losing legacy snapshot"
+  else
+    fail "[$SH] provenance-first consume" "rc=$RC lock=$([ -f "$L" ] && jq -c . "$L" || echo absent) legacy=$([ -f "$S" ] && echo KEPT || echo consumed) out=$OUT"
+  fi
+  rm -f "$L" "$S" "$L.pausing.4343"
+
+  # --which with nothing usable → exit 1, same stderr as --restore, nothing written
+  WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --which "$R/doc" 2>/dev/null); RC=$?
+  if [ "$RC" -eq 1 ] && [ -z "$WHICH" ] && [ ! -f "$L" ]; then
+    pass "[$SH] --restore --which: nothing usable → exit 1, empty stdout, no lock fabricated"
+  else
+    fail "[$SH] --restore --which with nothing usable" "rc=$RC which='$WHICH'"
   fi
   rm -f "$L" "$S"
 

@@ -135,6 +135,124 @@ test(
   },
 );
 
+// ── F — step-8's legacy-snapshot count is glob-safe and deletes only a SOLE legacy snapshot ──
+//
+// task.130 Phase 5: a snapshot with no `task_or_story_directory` (pre-task.123) is deleted at
+// Step 8 when it is the only candidate on disk. The claims are counted with `find`, never a
+// glob — under zsh an unmatched claim glob is `nomatch` and aborts `ls <path> <glob> | wc -l`
+// and a `for f in <path> <glob>` loop alike (the loop form was the first draft; this test's F1
+// caught it aborting under zsh with "no matches found"). Extracted and executed
+// under both shells: (1) sole legacy snapshot, no claims → deleted; (2) legacy snapshot beside
+// a `.pausing.*` claim → kept; (3) a snapshot FOR this work item → deleted by the same-document
+// arm, as before.
+
+function step8Cleanup() {
+  const md = fs.readFileSync(STEP8, "utf8");
+  const blocks = extractBlocks(md).filter(
+    (b) =>
+      /legacy snapshot \(no directory\) removed/.test(b.code) &&
+      /rm -f \.claude\/state\/develop-pipeline\.lock/.test(b.code),
+  );
+  assert.equal(
+    blocks.length,
+    1,
+    `step-8: expected one cleanup block carrying the legacy arm, found ${blocks.length}`,
+  );
+  return blocks[0].code;
+}
+
+function runStep8(shell, { snapshot, claim, rawSnapshot }) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "step8-cleanup-"));
+  const state = path.join(dir, ".claude", "state");
+  fs.mkdirSync(state, { recursive: true });
+  fs.mkdirSync(path.join(dir, "docs", "tasks", "task.1.x"), {
+    recursive: true,
+  });
+  fs.writeFileSync(
+    path.join(state, "develop-pipeline.lock"),
+    '{"current_step":8}\n',
+  );
+  fs.writeFileSync(
+    path.join(state, "develop-pipeline.last-halt.json"),
+    rawSnapshot !== undefined ? rawSnapshot : JSON.stringify(snapshot) + "\n",
+  );
+  if (claim)
+    fs.writeFileSync(
+      path.join(state, "develop-pipeline.lock.pausing.99"),
+      '{"current_step":5}\n',
+    );
+  const script = step8Cleanup().replace(
+    /\{work-item-dir\}/g,
+    "docs/tasks/task.1.x",
+  );
+  const argv =
+    shell === "zsh"
+      ? ["-f", "-c", script]
+      : ["--noprofile", "--norc", "-c", script];
+  const r = spawnSync(shell, argv, { cwd: dir, encoding: "utf8" });
+  const out = {
+    status: r.status,
+    stdout: r.stdout,
+    stderr: r.stderr,
+    snapshot: fs.existsSync(
+      path.join(state, "develop-pipeline.last-halt.json"),
+    ),
+    lock: fs.existsSync(path.join(state, "develop-pipeline.lock")),
+  };
+  fs.rmSync(dir, { recursive: true, force: true });
+  return out;
+}
+
+for (const sh of SHELLS) {
+  test(`F1 [${sh}] — step-8: a SOLE legacy snapshot (no directory, no claims) is removed`, () => {
+    const r = runStep8(sh, { snapshot: { current_step: 5, halt_reason: "x" } });
+    assert.equal(
+      r.snapshot,
+      false,
+      `legacy snapshot still present — stderr: ${r.stderr}`,
+    );
+    assert.match(r.stdout, /legacy snapshot \(no directory\) removed/);
+    assert.equal(r.lock, false, "lock not removed at the end of cleanup");
+  });
+  test(`F2 [${sh}] — step-8: a legacy snapshot beside a .pausing.* claim is KEPT and the kept case is NAMED`, () => {
+    const r = runStep8(sh, {
+      snapshot: { current_step: 5, halt_reason: "x" },
+      claim: true,
+    });
+    assert.equal(
+      r.snapshot,
+      true,
+      "legacy snapshot deleted although a claim sits beside it",
+    );
+    assert.doesNotMatch(r.stdout, /legacy snapshot \(no directory\) removed/);
+    // CR-7: the kept case prints its outcome like every sibling branch.
+    assert.match(
+      r.stdout,
+      /legacy snapshot \(no directory\) left in place beside 1 orphaned claim/,
+    );
+  });
+  test(`F4 [${sh}] — step-8: an UNPARSABLE sole snapshot is left in place and named (not treated as legacy)`, () => {
+    const r = runStep8(sh, { rawSnapshot: "{not json\n" });
+    assert.equal(
+      r.snapshot,
+      true,
+      "an unparsable snapshot was deleted as if legacy — stderr: " + r.stderr,
+    );
+    assert.match(r.stdout, /not a JSON object — left in place/);
+    assert.doesNotMatch(r.stdout, /legacy snapshot/);
+  });
+  test(`F3 [${sh}] — step-8: a snapshot for THIS work item is removed by the same-document arm`, () => {
+    const r = runStep8(sh, {
+      snapshot: {
+        current_step: 5,
+        task_or_story_directory: "docs/tasks/task.1.x",
+      },
+    });
+    assert.equal(r.snapshot, false);
+    assert.match(r.stdout, /halt snapshot for this run removed/);
+  });
+}
+
 test("D — no canonical source puts the test-output glob in an `rm` argv", () => {
   for (const file of [...SKILLS, STEP8]) {
     const md = fs.readFileSync(file, "utf8");

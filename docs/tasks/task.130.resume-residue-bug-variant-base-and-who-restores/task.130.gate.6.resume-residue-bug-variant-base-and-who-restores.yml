@@ -1,0 +1,64 @@
+schema: 1
+task: 'task.130.resume-residue-bug-variant-base-and-who-restores'
+task_title: 'Resume residue from task.124 — bug-variant base, dispatch population, self-reported delete, who-restores enumeration'
+gate: CONCERNS
+status_reason: 'Granted cycle (2 of 2 extra; budget 7). Bug 12 verified fixed — the three orchestrator citations name the exact delete label and test D reads the citation content (red under three independent mutations). The scoped re-review of the 72-line fix found no bug and one low cleanup (test D''s negative regex is an ordered word-list heuristic; the positive exact-label match is the real floor). No open entry: the CONCERNS token is the maintainability axis carrying the five advisories gate 5 documented for follow-up, and it is a reservation 5c must see raised, not a fix cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T12:05:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3574
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  re_review: 'Bug 12 FIXED — 0 prefix hits across the three SKILL.md; the exact label at all three citations; test D green on the committed tree and red under (1) the prefix wording restored, (2) a different exact label (stale-snapshot: merged), (3) a "carries the prefix" phrasing. The population is exactly the three files test D lists (reviewer enumeration of every SKILL.md mentioning stale-snapshot). Contract :135 and detector prompt :87 attribute the prefix to the skip notes, consistent with the citations.'
+  step_4b: 'Not applicable — the cycle-6 diff touches three prose sentences and one test file; no runnable prose changed (the contract and detector prompt are unchanged since gate 5, where they read 0 attributable).'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-20'
+  total_iterations: 5
+  verification_method: 'grep population check; test D under three QA mutations; ci:fast 3574/3574 and eval:develop-task 13/13 on the tree at a9bccb13 (unchanged since)'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'The delete boundary is unchanged since gate 5, where it was executed at 42 inputs across QA and the reviewer under both shells; the one gate-5 item was a description wider than the boundary and is now the boundary''s own label at every citing site. No JS entry for the probe engine.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged since gate 5 (PASS).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Advisory residue documented at gate 5 and unchanged by design (the last budgeted fix was kept one finding wide): CR-2 conditional main clause at the four --restore citation sites; CR-3 the detector prompt''s Step 1 candidate selection is a second derivation of choose_candidate(); CR-5 silent skip of an unrecognised stale-snapshot-prefixed label; CR-6 one rc=2 message for the four lint sites; CR-7 quote the doc-directory placeholder; detector prompt :80 glob under zsh (pre-existing). Cycle 6 adds CR-1: narrow or drop test D''s negative regex. None gates; all belong in a follow-up task.'
+
+code_review:
+  reviewed: 'scoped to the 4 files cycle 5 touched (72 lines); reviewer ran the suite twice and enumerated the citation population'
+  findings: 1
+  promoted_to_gate: []
+  advisory:
+    - 'CR-1 cleanup: test D''s negative guard /(starts|start with|starting with|prefix|startswith)[^\n]*stale-snapshot/i misses phrasings without a listed word and would reject an accurate "share the prefix `stale-snapshot`" clause (confirmed); the positive exactly-`stale-snapshot: PR merged` match is the floor — narrow the negative match to a bare backticked stale-snapshot not followed by ": PR merged" inside the whose-concern clause, or drop it'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Follow-up task: CR-1 (test D negative regex), CR-2, CR-3, CR-5, CR-6, CR-7 and the detector :80 zsh glob — none gates this PR.'
+      refs: ['shared/resources/tests/stale-snapshot-delete.test.mjs', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md', 'shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

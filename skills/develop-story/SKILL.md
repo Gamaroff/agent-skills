@@ -65,7 +65,7 @@ The PreCompact hook and every terminal HALT **remove the lock**. A session that 
 bash .agents/skills/develop-story/references/advance-pipeline-lock.sh --restore {story-directory}
 ```
 
-It rebuilds the lock from the halt snapshot (`.claude/state/develop-pipeline.last-halt.json`) or an orphaned `.lock.pausing.<pid>` claim — newest candidate **for this document** wins; one for another document is refused — keeps `current_step` at the halted step, strips the halt/pause fields and any `waiting_on`, and consumes the candidates. **The same call belongs on the re-invocation path**: Phase 0b's "Resume from last completed step" also skips Step 1, so when the detector's `source` is `halt_snapshot` or `orphaned_claim` run `--restore {story-directory}` before Phase 0b verification (step-0 §0b Shared Resume Logic; task.124 QA cycle 2, CR-2) — **except on a `loop-limit|not-converging` snapshot**, where the grant restores (`grant-qa-cycles.sh` → `--restore`, only after its never-lower guard passes) so a declined or refused grant leaves nothing behind (QA cycle 3, CR-1). "lock present — nothing to restore" (exit 0) means the lock survived and nothing was needed. Exit 1 with "no halt snapshot … and no orphaned claim" means there is nothing to restore from: treat the run as Phase 0b's fresh-start case.
+It rebuilds the lock from the halt snapshot (`.claude/state/develop-pipeline.last-halt.json`) or an orphaned `.lock.pausing.<pid>` claim — newest candidate **for this document** wins; one for another document is refused — keeps `current_step` at the halted step, strips the halt/pause fields and any `waiting_on`, and consumes the candidates. **The same call belongs on the re-invocation path**: Phase 0b's "Resume from last completed step" also skips Step 1, so when the detector's `source` is `halt_snapshot` or `orphaned_claim` run `--restore {story-directory}` before Phase 0b verification (step-0 §0b Shared Resume Logic; task.124 QA cycle 2, CR-2). Which snapshots restore here and which wait — who restores, and when: resume contract § Restore the lock (both resume paths); this paragraph carries no copy of that rule (task.130). "lock present — nothing to restore" (exit 0) means the lock survived and nothing was needed. Exit 1 with "no halt snapshot … and no orphaned claim" means there is nothing to restore from: treat the run as Phase 0b's fresh-start case. Exit 1 with `legacy-snapshot: …` is a **different** state — a pre-task.123 snapshot with no directory that the helper refuses to guess about; restore it deliberately with `--restore --accept-legacy` or delete it (hooks reference, troubleshooting), never a fresh start.
 
 **Step 0a — Dispatch stale-context detector (Phase 0a):**
 
@@ -73,7 +73,7 @@ Dispatch a read-only Explore subagent using `references/pipeline-resume-detector
 
 Surface the detector output to the user and wait for confirmation. If `blocking_issues` is non-empty: **HALT** — require manual resolution before resuming. Use `recommended_step` to narrow Step 1 verification scope.
 
-See `references/develop-pipeline-resume-contract.md` — Phase 0a for the full dispatch, output validation, and blocking-issues protocol.
+See `references/develop-pipeline-resume-contract.md` — Phase 0a for the full dispatch, output validation, and blocking-issues protocol. Stale snapshots the detector reports (a `deltas_since_pause` object whose `concern` is exactly `stale-snapshot: PR merged` — the two `stale-snapshot check skipped …` notes share the prefix and are never deleted on) are deleted **here**, by the orchestrator, and verified absent before Phase 0b — the loop is the resume contract § Consume Output; do not copy it (task.130).
 
 **Step 1 — Recover pipeline state from the implementation report:**
 
@@ -140,8 +140,13 @@ Every step ends with the same four actions, executed _in order, with no text out
 2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`), then **read it back** — this is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
 
    ```bash
-   command node .agents/skills/develop-story/references/report-lint.js --file "{implementation-report-path}" --json \
-     || { echo "HALT: report failed lint — the Edit above corrupted it; repair by hand (see the problems listed), nothing has been committed"; exit 1; }
+   command node .agents/skills/develop-story/references/report-lint.js --file "{implementation-report-path}" --json; rc=$?
+   case $rc in
+     0) ;;
+     1) echo "HALT: report failed lint — the Edit above corrupted it; repair by hand (see the problems listed), nothing has been committed"; exit 1 ;;
+     2) echo "HALT: report-lint usage error — the call site is wrong, not the report"; exit 1 ;;
+     *) echo "HALT: report-lint.js not runnable (rc $rc) — check the bundled path"; exit 1 ;;
+   esac
    ```
 
    A `problems` result is a HALT with nothing committed — the protocol edits, it does not commit, so the corruption is caught where the Edit introduced it rather than at the next commit boundary. task.117's report was doubled and spliced mid-line by exactly such an Edit and shipped in the HALT commit because nothing read it back (obs #115). The linter never repairs.
@@ -295,7 +300,7 @@ If a situation arises that is not in the shared defaults table and the stakes ar
 
 - **Never silently continue past a failed step.** Every failure is logged and surfaced to the user.
 - **Always use `/commit-changes` to commit** — never raw `git commit`. This ensures consistent commit quality, conventional messages, and proper staging.
-- **Commit the report before any halt.** Invoke `/commit-changes` for the report before surfacing any HALT so the audit trail is in git even when the pipeline doesn't complete — and **lint it first** (call site (2) of four): `command node .agents/skills/develop-story/references/report-lint.js --file "{implementation-report-path}" --json || echo "⚠️ report failed lint — HALT commit skipped; repair {implementation-report-path} by hand"`. A report that fails the linter is **not committed** by this rule, and the HALT **still proceeds** to the snapshot and lock removal below — the same decision the PreCompact hook makes, because the snapshot and the lock removal are what resume depends on and a lint failure must not strand the lock (task.124 QA cycle 2, CR-5). The corruption stays in the working tree, named, for a human to repair before the next commit. The HALT commit is the one most likely to carry a half-written report, because it is written under the pressure that caused the halt (task.117, obs #115).
+- **Commit the report before any halt.** Invoke `/commit-changes` for the report before surfacing any HALT so the audit trail is in git even when the pipeline doesn't complete — and **lint it first** (call site (2) of four): `command node .agents/skills/develop-story/references/report-lint.js --file "{implementation-report-path}" --json; rc=$?; case $rc in 0) ;; 1) echo "⚠️ report failed lint — HALT commit skipped; repair {implementation-report-path} by hand" ;; 2) echo "⚠️ report-lint usage error — the call site is wrong, not the report; HALT commit skipped" ;; *) echo "⚠️ report-lint.js not runnable (rc $rc) — HALT commit skipped" ;; esac`. A report that fails the linter is **not committed** by this rule, and the HALT **still proceeds** to the snapshot and lock removal below — the same decision the PreCompact hook makes, because the snapshot and the lock removal are what resume depends on and a lint failure must not strand the lock (task.124 QA cycle 2, CR-5). The corruption stays in the working tree, named, for a human to repair before the next commit. The HALT commit is the one most likely to carry a half-written report, because it is written under the pressure that caused the halt (task.117, obs #115).
 - **Push after every commit during the QA loop.** The PR must stay current with the local branch (`git push origin HEAD`).
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
 - **Snapshot then remove the lock file before every terminal HALT.** After committing the report (per the rule above), copy the active lock to a halt snapshot and then remove the active lock + transient logs:

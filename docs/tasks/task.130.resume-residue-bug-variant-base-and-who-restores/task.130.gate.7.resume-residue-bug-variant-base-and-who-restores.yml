@@ -1,0 +1,78 @@
+schema: 1
+task: 'task.130.resume-residue-bug-variant-base-and-who-restores'
+task_title: 'Resume residue from task.124 — bug-variant base, dispatch population, self-reported delete, who-restores enumeration'
+gate: PASS
+status_reason: 'Last granted cycle (budget 7), scoped to the Step 5c fix 8b4c0e60. Bug 13 verified fixed under both shells end to end — an --accept-legacy restore stamps task_or_story_directory, a precompact-shaped snapshot of that lock restores again without the flag, and another document''s --restore refuses it and keeps it; the stamp mutation goes red on 4 scenarios. The scoped review found no defect in the change and one LOW: the new "keeps its own directory" scenario is vacuous (an unconditional overwrite stays green — QA confirmed by mutation). One cleanup: the --restore header contract and its two prose mirrors do not yet mention the stamp.'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T13:20:00Z'
+
+top_issues:
+  - id: 'TASK-130-QA-14'
+    severity: low
+    file: 'shared/resources/advance-pipeline-lock.test.sh'
+    finding: 'The "a matched candidate keeps its own directory" scenario (:425) seeds the candidate with the exact string it passes as <doc-dir>, so it is satisfied equally by the intended // fill and by an unconditional assignment — 91/91 stays green with the fill replaced by `.task_or_story_directory = $dir` (review CR-1; QA mutation-confirmed).'
+    suggested_action: 'Seed the candidate with a canon-equal but textually different spelling (e.g. ./doc/ or an absolute path with a trailing slash), restore with $R/doc, and assert the lock keeps the candidate''s own spelling.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 3574
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  re_review: 'Bug 13 FIXED — under bash --noprofile --norc and zsh -f: --restore --accept-legacy on a directory-less snapshot writes task_or_story_directory=<doc-dir> (as passed; absolute stays absolute and canon makes the cross-spelling --which find it); a precompact-shaped snapshot of the rebuilt lock restores again WITHOUT the flag; docs/tasks/task.OTHER --restore against the stamped snapshot → "no halt snapshot or orphaned claim is for …", snapshot kept, no lock written. jq fill covers null, "" and false and keeps a present string. Mutation: stamp line removed → "directory stamp" + "recovery sticks" red under both shells (4 red); 91/91 baseline.'
+  step_4b: 'Not applicable — the cycle-7 diff is a shell script, its test suite and one troubleshooting row; the script is executed by its own suite (91 scenarios, both shells).'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-20'
+  total_iterations: 6
+  verification_method: 'End-to-end reproduction under both shells; stamp mutation; ci:fast 3574/3574; eval:develop-task 13/13; grant suite 42/42'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'The stamp fills an absent field with the operator-passed directory and never overwrites a present one; a stamped snapshot is refused by another document exactly as a natively matched one is (executed). No JS entry for the probe engine.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'The --accept-legacy recovery now persists across the next pause or HALT (executed end to end).'
+  maintainability:
+    status: PASS
+    notes: 'QA-14 (LOW) and CR-2 (header contract + develop-pipeline-pause.md:80 + grant-qa-cycles.sh:52-54 do not mention the stamp) are recorded for the follow-up task alongside the gate-5/6 advisories; neither changes what the code does.'
+
+code_review:
+  reviewed: 'scoped to the 3 files 8b4c0e60 touched (71 lines); the reviewer traced every reader of task_or_story_directory (choose_candidate, step-8, the contract delete loop, on-precompact.sh, the detector prompt, grant-qa-cycles.sh), confirmed 14 bundled copies identical, and ran the suite under both shells'
+  findings: 2
+  promoted_to_gate: ['TASK-130-QA-14 (CR-1, low, confidence high — QA mutation-confirmed)']
+  advisory:
+    - 'CR-2 cleanup: the --restore header bullets (advance-pipeline-lock.sh:71-85), develop-pipeline-pause.md:80 and grant-qa-cycles.sh:52-54 describe the rebuild as "halt fields and waiting_on stripped" only — add the stamp clause (fills an absent directory with <doc-dir> as spelled; keeps a present one)'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-130-QA-14'
+      carried_from: 'top_issues (route 2b, cycle 7)'
+      severity: low
+      finding: 'The "a matched candidate keeps its own directory" scenario seeds the candidate with the exact string it passes as <doc-dir>, so an unconditional overwrite stays green (mutation-confirmed).'
+      suggested_action: 'Seed the candidate with a canon-equal but textually different spelling, restore with $R/doc, and assert the lock keeps the candidate''s own spelling.'
+      refs: ['shared/resources/advance-pipeline-lock.test.sh']
+    - action: 'Follow-up task: QA-14 falsifiable no-overwrite scenario; CR-2 header/prose mirrors; gate-6 CR-1 (test D negative regex); gate-5 CR-2, CR-3, CR-5, CR-6, CR-7; detector prompt :80 zsh glob; change-log.js repair path that dropped six rows (5c PC-2).'
+      refs: ['shared/resources/advance-pipeline-lock.test.sh', 'shared/resources/advance-pipeline-lock.sh', 'shared/resources/develop-pipeline-pause.md', 'shared/resources/grant-qa-cycles.sh', 'shared/resources/tests/stale-snapshot-delete.test.mjs', 'shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/change-log.js']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

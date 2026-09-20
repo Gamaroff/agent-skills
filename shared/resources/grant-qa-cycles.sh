@@ -49,7 +49,9 @@
 #   • no lock AND advance-pipeline-lock.sh missing beside it    → exit 1, named message, nothing written
 #   • snapshot present but for another document (its task_or_story_directory, canonicalised,
 #     is not <doc-dir>, canonicalised — relative and absolute spellings of one directory match;
-#     a snapshot with NO task_or_story_directory is a pre-task.123 shape and is accepted)
+#     a snapshot with NO task_or_story_directory (the pre-task.123 shape) is REFUSED by --restore as
+#     `legacy-snapshot` and the grant relays that refusal; the operator restores it by hand with
+#     `advance-pipeline-lock.sh --restore --accept-legacy <doc-dir>` first, or deletes it (task.130);
 #                                                              → exit 1, nothing restored, nothing written
 #     (the check is --restore's; this script surfaces its stderr line)
 #   • jq missing                                               → exit 1 (this write cannot be skipped silently)
@@ -127,8 +129,11 @@ if [ -n "$REPORT" ]; then
 fi
 
 # 2. Never-lower guard FIRST, against whichever file the grant will land on — the lock if
-# present, else the snapshot it would be restored from — so a refusal writes nothing and
-# restores nothing (task.123 QA cycle 4, CR-1).
+# present, else the candidate `--restore` WILL consume — so a refusal writes nothing and
+# restores nothing (task.123 QA cycle 4, CR-1). The candidate is read through
+# `advance-pipeline-lock.sh --restore --which`, the same selection the restore uses: a guard
+# that read `$SNAPSHOT` directly passed on the snapshot's budget while the restore consumed a
+# newer `.pausing.<pid>` claim carrying a higher one (task.130; task.124 QA cycle 1, CR-5).
 read_budget() { # $1 = json file → integer budget, 0 when absent; warns on a non-integer
   local raw
   raw=$(jq -r '.qa_max_cycles // 0' "$1" 2>/dev/null)
@@ -139,11 +144,14 @@ read_budget() { # $1 = json file → integer budget, 0 when absent; warns on a n
   esac
 }
 NEW_MAX=$((QA_CYCLE + K))
+CHOSEN=""
 if [ -f "$LOCK" ]; then
   EXISTING=$(read_budget "$LOCK")
-elif [ -f "$SNAPSHOT" ] && jq -e 'type == "object"' "$SNAPSHOT" >/dev/null 2>&1; then
-  EXISTING=$(read_budget "$SNAPSHOT")
+elif [ -f "$ADVANCE" ] && CHOSEN=$(bash "$ADVANCE" --restore --which "$DOC_DIR" 2>/dev/null) && [ -n "$CHOSEN" ]; then
+  EXISTING=$(read_budget "$CHOSEN")
 else
+  # Nothing --which would restore from (or the helper is missing): the guard has nothing to
+  # protect, and step 3's own --restore call names the reason on stderr.
   EXISTING=0
 fi
 if [ "$EXISTING" -gt "$NEW_MAX" ]; then
@@ -154,8 +162,9 @@ fi
 # 3. Restore the lock from the halt snapshot when the HALT removed it — via the one
 # restore path. --restore refuses a snapshot for another document (task.123 QA cycle 3,
 # CR-5), strips the halt/pause fields, matches directories canonicalised (QA cycle 4,
-# CR-4), accepts a snapshot with no directory (pre-task.123 shape, CR-7), and CONSUMES
-# the snapshot. Its stderr is relayed verbatim so the operator sees which rule refused.
+# CR-4), refuses a snapshot with no directory unless `--accept-legacy` is passed (task.130),
+# and CONSUMES the snapshot. Its stderr is relayed verbatim so the operator sees which rule
+# refused.
 RESTORED=""
 if [ ! -f "$LOCK" ]; then
   # No snapshot-only pre-check here (QA cycle 2, CR-7): --restore also accepts an orphaned
