@@ -1,0 +1,98 @@
+schema: 1
+task: 'task.130.resume-residue-bug-variant-base-and-who-restores'
+task_title: 'Resume residue from task.124 — bug-variant base, dispatch population, self-reported delete, who-restores enumeration'
+gate: CONCERNS
+status_reason: 'Cycle-2 bugs 3, 4 and 5 verified fixed (12-input QA re-probe of the delete boundary, three mutation checks covered). The safety re-probe found no HIGH; three mediums remain on the same block — a bare-string note in deltas_since_pause HALTs a healthy resume, the detector output file the block reads has no writer, and the delete still rests on the detector label alone with no on-disk re-read of the evidence — plus four low/cleanup items.'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T13:30:00Z'
+
+top_issues:
+  - id: 'TASK-130-QA-6'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'A bare-string element in deltas_since_pause — the shape the detector prompt invites for its notes — passes the schema check (array of anything) but makes .concern error in jq, so the delete block HALTs a healthy resume; reproduced (re-probe CR-1; bug 6).'
+    suggested_action: 'Define every detector note as a delta object; require all(.deltas_since_pause[]; type == "object") in the schema check so a non-object routes to the fallback; select(type == "object") before .concern in the delete selector; test a string note.'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.6.bare-string-delta-halts-healthy-resume.md'
+    status: open
+  - id: 'TASK-130-QA-7'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'DETECTOR_JSON=$(cat <detector-output-file>) reads a file nothing writes — the detector is read-only and returns JSON, and no orchestrator step saves it — so a literal run binds empty, the schema check exits 4, and the delete block is skipped by rule on every resume (re-probe CR-2; bug 7).'
+    suggested_action: 'State the write: persist the returned JSON to {doc-directory}/.summaries/step-0a-resume-detector.json (the existing subagent-summary convention) before the block, bind from that path with the {placeholder} spelling.'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.7.detector-output-file-has-no-writer.md'
+    status: open
+  - id: 'TASK-130-QA-8'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The rm is gated on the detector label, string path and containment only — properties of what the subagent reported; the block never re-reads the snapshot to confirm it is for this document and that its pr_url is MERGED, so a mislabelled live halt is destroyed on the subagent say-so (re-probe CR-3, QA-promoted: the same trust the task removed from the detector).'
+    suggested_action: 'Re-read the evidence from disk before rm: task_or_story_directory canon-equal to {doc-directory} (HALT on mismatch) and gh pr view <pr_url> --json state == MERGED (keep and note on a failed or non-MERGED read); tests with a stub gh.'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.8.delete-trusts-detector-label-without-rereading-evidence.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3561
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+  re_review: 'Bug 3 FIXED (both skip notes kept; mutation prefix-back → H red). Bug 4 FIXED (traversal, symlink, empty, numeric, foreign path → HALT, nothing deleted; canonical path in three spellings deleted; mutation containment-dropped → I red). Bug 5 FIXED (schema block binds and rejects a non-array; mutation array-check-dropped → K red). QA re-probe: 12 enumerated inputs under bash, all per the rule.'
+  step_4b: 'Contract, detector prompt, hooks re-run under bash+zsh after the fix: 0 findings attributable (detector :69 unchanged cat, identical on develop).'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 3
+  fix_date: '2026-09-20'
+  total_iterations: 2
+  verification_method: 'Reproductions re-run against the committed tree; 12-input boundary re-probe; mutation spot checks; ci:fast 3561/3561; eval:develop-task 17/17'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Bug 8 — the delete still trusts the subagent label without re-reading the evidence; containment and string-path checks (bug 4) now bound WHAT can be deleted, not WHETHER it should be. No JS boundary; choose_candidate() arms executed by advance-pipeline-lock.test.sh.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'Bug 6 HALTs a healthy resume on a note shape the detector prompt invites; bug 7 makes the delete block unreachable on a literal run. Neither destroys data; both make the feature not work as stated.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-4 — the detector prompt tail block carries a second, stale copy of the schema check (no array field); CR-5 — the containment HALT says "nothing deleted" after deleting the first path; CR-6 — under --accept-legacy a legacy snapshot outranks a directory-matched claim on mtime; CR-7 — the step-8 kept-legacy case is a silent no-op.'
+
+code_review:
+  reviewed: 'safety re-probe over the whole branch diff (4283 lines); delete block and --restore --which executed by the reviewer under bash and zsh against 20 inputs'
+  findings: 7
+  promoted_to_gate: ['TASK-130-QA-6 (CR-1)', 'TASK-130-QA-7 (CR-2)', 'TASK-130-QA-8 (CR-3, QA-promoted)']
+  advisory:
+    - 'CR-4 low/high: detector prompt tail block is a stale second copy of the schema check — point at § Consume Output'
+    - 'CR-5 low/high: validate every path first, then delete, so "nothing deleted" is true; reproduced'
+    - 'CR-6 low/medium: rank directory-matched candidates above legacy ones under --accept-legacy'
+    - 'CR-7 cleanup: name the kept-legacy case in step-8'
+
+recommendations:
+  immediate:
+    - action: 'Bug 6: object-shape notes in the detector prompt; all(type=="object") in the schema check; select(type=="object") in the delete selector; test.'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/tests/stale-snapshot-delete.test.mjs']
+    - action: 'Bug 7: persist the returned detector JSON to {doc-directory}/.summaries/step-0a-resume-detector.json and bind from it.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'Bug 8: re-read directory match and MERGED state from disk before rm; keep on a failed read.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/tests/stale-snapshot-delete.test.mjs']
+  future:
+    - action: 'CR-4 pointer; CR-5 two-pass validate-then-delete; CR-6 provenance-first ranking; CR-7 else arm.'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/advance-pipeline-lock.sh', 'shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'Bugs 6, 7, 8 fixed and re-verified'

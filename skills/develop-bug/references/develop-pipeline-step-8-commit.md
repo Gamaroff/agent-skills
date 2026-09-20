@@ -127,7 +127,12 @@ if [ -f "$SNAPSHOT" ]; then
     n=1   # the snapshot itself
     while IFS= read -r f; do [ -n "$f" ] && n=$((n + 1)); done \
       < <(find .claude/state -maxdepth 1 -name 'develop-pipeline.lock.pausing.*' -type f 2>/dev/null)
-    [ "$n" -eq 1 ] && rm -f "$SNAPSHOT" && echo "legacy snapshot (no directory) removed — it belonged to no resumable run"
+    if [ "$n" -eq 1 ]; then
+      rm -f "$SNAPSHOT" && echo "legacy snapshot (no directory) removed — it belonged to no resumable run"
+    else
+      # Named, not silent: a kept file must be distinguishable from "no snapshot found" (CR-7).
+      echo "legacy snapshot (no directory) left in place beside $((n - 1)) orphaned claim(s) — inspect .claude/state by hand"
+    fi
   fi
 fi
 

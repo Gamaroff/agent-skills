@@ -214,7 +214,7 @@ for (const sh of SHELLS) {
     assert.match(r.stdout, /legacy snapshot \(no directory\) removed/);
     assert.equal(r.lock, false, "lock not removed at the end of cleanup");
   });
-  test(`F2 [${sh}] — step-8: a legacy snapshot beside a .pausing.* claim is KEPT`, () => {
+  test(`F2 [${sh}] — step-8: a legacy snapshot beside a .pausing.* claim is KEPT and the kept case is NAMED`, () => {
     const r = runStep8(sh, {
       snapshot: { current_step: 5, halt_reason: "x" },
       claim: true,
@@ -224,7 +224,12 @@ for (const sh of SHELLS) {
       true,
       "legacy snapshot deleted although a claim sits beside it",
     );
-    assert.doesNotMatch(r.stdout, /legacy snapshot/);
+    assert.doesNotMatch(r.stdout, /legacy snapshot \(no directory\) removed/);
+    // CR-7: the kept case prints its outcome like every sibling branch.
+    assert.match(
+      r.stdout,
+      /legacy snapshot \(no directory\) left in place beside 1 orphaned claim/,
+    );
   });
   test(`F4 [${sh}] — step-8: an UNPARSABLE sole snapshot is left in place and named (not treated as legacy)`, () => {
     const r = runStep8(sh, { rawSnapshot: "{not json\n" });

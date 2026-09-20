@@ -459,6 +459,21 @@ run_restore_scenarios() {
   fi
   rm -f "$L" "$S"
 
+  # Provenance over mtime (task.130 QA cycle 3, CR-6): under --accept-legacy a NEWER legacy
+  # snapshot must not outrank a directory-matched claim, and must not be consumed-as-loser either
+  # way — the matched claim is chosen and the legacy file, being MINE under the flag, is consumed
+  # as a loser only if it lost to a matched candidate (it did).
+  printf '{"task_or_story_directory":"%s","current_step":5,"qa_max_cycles":7}\n' "$R/doc" > "$L.pausing.4343"
+  touch -t 202601010000 "$L.pausing.4343"
+  printf '{"current_step":3,"halt_step":3}\n' > "$S"     # legacy, NEWER
+  WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --accept-legacy --which "$R/doc" 2>/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$WHICH" = "$L.pausing.4343" ]; then
+    pass "[$SH] --restore --accept-legacy --which: a directory-matched claim outranks a newer legacy snapshot"
+  else
+    fail "[$SH] provenance-first ranking" "rc=$RC which='$WHICH'"
+  fi
+  rm -f "$L" "$S" "$L.pausing.4343"
+
   # --which with nothing usable → exit 1, same stderr as --restore, nothing written
   WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --which "$R/doc" 2>/dev/null); RC=$?
   if [ "$RC" -eq 1 ] && [ -z "$WHICH" ] && [ ! -f "$L" ]; then

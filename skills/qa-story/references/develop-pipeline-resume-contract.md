@@ -25,69 +25,103 @@ Pass task_or_story_directory from the lock file as context.
 
 ### Consume Output
 
-Parse the JSON result. **Bind it once, here** — every later block in this section reads
-`$DETECTOR_JSON`, and a fenced block that names a variable no fence assigns is a block that
-HALTs at its own guard on a literal re-run (task.130 QA cycle 2, bug 5):
+The detector is **read-only and returns JSON** — it writes nothing (detector prompt § Invocation
+Context). The orchestrator therefore **persists what it returned** to the same place every other
+subagent summary lives, `{doc-directory}/.summaries/` (`subagent-summary-artifact.md`), and every
+later block in this section reads that file. A block that names a file no step writes is a block
+that runs on nothing (task.130 QA cycle 3, bug 7); a fence that names a variable no fence assigns
+HALTs at its own guard (cycle 2, bug 5). **Bind once, here:**
 
 ```bash
-# <detector-output-file> is the file the Explore dispatch wrote its JSON to.
-DETECTOR_JSON=$(cat <detector-output-file>)
-# Validate schema — deltas_since_pause must be an ARRAY here, because the delete block below
-# reads it as one; a shape the schema check accepts and the delete block refuses would give one
-# input two prescribed outcomes.
+# 1. Persist the JSON the Explore dispatch RETURNED — verbatim, from the tool result, into the
+#    pipeline's summary directory. The quoted heredoc keeps the JSON's own quotes and $ intact.
+mkdir -p {doc-directory}/.summaries
+cat > {doc-directory}/.summaries/step-0a-resume-detector.json <<'DETECTOR_EOF'
+{the JSON object the detector returned, pasted verbatim}
+DETECTOR_EOF
+# 2. Bind and validate. `deltas_since_pause` must be an ARRAY OF OBJECTS here, because the
+#    delete block below reads it as one — the detector's notes ("stale snapshot for <other dir>
+#    ignored", both `stale-snapshot check skipped — …` notes) are delta objects too, never bare
+#    strings (detector prompt § deltas_since_pause object fields; cycle 3, bug 6). A shape this
+#    check accepts and the delete block refuses would give one input two prescribed outcomes.
+DETECTOR_JSON=$(cat {doc-directory}/.summaries/step-0a-resume-detector.json)
 printf '%s' "$DETECTOR_JSON" \
   | jq -e '.schema_version == 1 and (.recommended_step | type == "number")
-           and (.blocking_issues | type == "array") and (.deltas_since_pause | type == "array")' >/dev/null
+           and (.blocking_issues | type == "array")
+           and (.deltas_since_pause | type == "array") and all(.deltas_since_pause[]; type == "object")' >/dev/null
 ```
 
-If validation fails (parse error or missing required fields): log `"⚠️ Detector output invalid — falling back to full Phase 0b verification"`, **skip the delete block below** (it acts only on validated output), and proceed to Phase 0b using `current_step` from the lock as the upper bound (treat all steps as unverified).
+If validation fails (parse error, missing required fields, a non-array or a non-object element in
+`deltas_since_pause`): log `"⚠️ Detector output invalid — falling back to full Phase 0b
+verification"`, **skip the delete block below** (it acts only on validated output), and proceed to
+Phase 0b using `current_step` from the lock as the upper bound (treat all steps as unverified).
 
-**Delete what the detector proved stale — here, once, and verified.** The detector is read-only;
-when it finds a `last-halt.json` for this document whose PR is `MERGED` it reports the file as a
-`deltas_since_pause` object whose `concern` is **exactly** `stale-snapshot: PR merged` and whose
-`path` names it, and leaves the file in place (detector prompt, Step 1 item 2). This is the **one**
-statement of the delete — the three orchestrators cite this section and carry no copy of the loop
-(task.130, PR #436 review CR-3; a subagent that self-reports a delete it may not perform, and three
-orchestrator copies of the rm, are two shapes of the same enumeration). **Only after the schema
-check above passed**, and before Phase 0b:
+**Delete what the detector proved stale — here, once, verified against the disk, not the label.**
+The detector is read-only; when it finds a `last-halt.json` for this document whose PR is `MERGED`
+it reports the file as a `deltas_since_pause` object whose `concern` is **exactly**
+`stale-snapshot: PR merged` and whose `path` names it, and leaves the file in place (detector
+prompt, Step 1 item 2). This is the **one** statement of the delete — the three orchestrators cite
+this section and carry no copy of the loop (task.130, PR #436 review CR-3). The label selects the
+candidates; **the evidence is re-read from disk before anything is removed** — the snapshot's own
+`task_or_story_directory` must be this document's, and its `pr_url` must read `MERGED` now — because
+a delete gated on a subagent's label alone is the same trust this task removed from the detector's
+own `rm` (cycle 3, bug 8). **Only after the schema check above passed**, and before Phase 0b:
 
 ```bash
 # Every `stale-snapshot: PR merged` delta names a snapshot the detector proved belongs to a MERGED
-# run. The detector is read-only; THIS is where it is deleted, one path per rm, re-read afterwards.
-#
-# Three rules, each from a QA cycle that found the previous shape wrong by executing it:
-# 1. EXACT label, never a prefix (cycle 2, bug 3): the detector also files two SKIP notes in this
-#    array — "stale-snapshot check skipped — pr_url is not a GitHub PR" / "… gh pr view failed:
-#    …" — for a snapshot it has NOT proven merged, and `startswith("stale-snapshot")` matched
-#    them, deleting a live snapshot exactly when the read failed.
-# 2. CONTAINMENT (cycle 2, bug 4): the rule applies to ONE file, so any other reported path — or a
-#    missing one, which jq prints as the literal `null` — is a HALT, never an rm.
-# 3. FAIL CLOSED (cycle 1, bug 2): the list is materialised with jq's exit read, `(.concern // "")`
-#    makes a missing concern a non-match, `jq -r` not `-e` (-e exits 4 on the ordinary empty
-#    result), and the loop reads a here-string so its `exit 1` ends the block under bash.
+# run. The detector is read-only; THIS is where it is deleted — verified, one path per rm, re-read
+# afterwards. Five rules, each from a QA cycle that found the previous shape wrong by executing it:
+# 1. EXACT label, never a prefix (cycle 2, bug 3): the two SKIP notes share the prefix.
+# 2. CONTAINMENT (cycle 2, bug 4): the rule applies to ONE file; any other path, or a missing one
+#    (jq prints the literal `null`), is a HALT, never an rm.
+# 3. FAIL CLOSED (cycle 1, bug 2): list materialised with jq's exit read; `(.concern // "")`;
+#    `jq -r` not `-e` (-e exits 4 on the ordinary empty result); here-string loop so `exit 1`
+#    ends the block under bash.
+# 4. VALIDATE ALL, THEN DELETE (cycle 3, CR-5): the containment HALT says "nothing deleted", so
+#    every path is checked before the first rm.
+# 5. EVIDENCE FROM DISK (cycle 3, bug 8): directory match is a HALT on mismatch; the PR state is
+#    re-read with gh — a failed or non-MERGED read KEEPS the snapshot and says so, because a
+#    failed read is never evidence of MERGED (detector prompt, Step 1 item 2).
 # (No apostrophe in the :? message — bash parses the word for quotes even inside "…".)
-: "${DETECTOR_JSON:?HALT: DETECTOR_JSON is unbound — run the schema-check block first}"
+: "${DETECTOR_JSON:?HALT: DETECTOR_JSON is unbound — run the bind-and-validate block first}"
 SNAPSHOT_PATH=.claude/state/develop-pipeline.last-halt.json
 STALE_PATHS=$(printf '%s' "$DETECTOR_JSON" \
-  | jq -r '[ .deltas_since_pause[]
+  | jq -r '[ .deltas_since_pause[] | select(type == "object")
              | select((.concern // "") == "stale-snapshot: PR merged")
              | (.path | if type == "string" and length > 0 then . else error("stale-snapshot delta without a string path") end) ]
            | .[]' 2>&1) \
   || { echo "HALT: could not read stale-snapshot deltas from the detector output — $STALE_PATHS"; exit 1; }
 canon() { local s; s=$(printf '%s' "$1" | sed -E 's#^\./##; s#/+$##'); (cd "$(dirname "$s")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$(basename "$s")") || printf '%s' "$s"; }
+# Pass 1 — every path must be THE snapshot path; nothing is removed until all are.
 while IFS= read -r p; do
   [ -n "$p" ] || continue
   [ "$(canon "$p")" = "$(canon "$SNAPSHOT_PATH")" ] \
     || { echo "HALT: the detector reported a stale-snapshot path outside the rule — '$p' is not $SNAPSHOT_PATH; nothing deleted"; exit 1; }
+done <<< "$STALE_PATHS"
+# Pass 2 — re-read the evidence from the file itself, then delete and re-read the directory.
+while IFS= read -r p; do
+  [ -n "$p" ] || continue
+  [ -f "$p" ] || { echo "stale snapshot $p already absent — nothing to delete"; continue; }
+  SNAP_DIR=$(jq -r '.task_or_story_directory // ""' "$p" 2>/dev/null)
+  [ -n "$SNAP_DIR" ] && [ "$(canon "$SNAP_DIR")" = "$(canon "{doc-directory}")" ] \
+    || { echo "HALT: $p is not a snapshot for {doc-directory} (task_or_story_directory: '${SNAP_DIR:-absent}') — the detector mislabelled it; nothing deleted"; exit 1; }
+  SNAP_PR=$(jq -r '.pr_url // ""' "$p" 2>/dev/null)
+  PR_STATE=$(gh pr view "$SNAP_PR" --json state --jq .state 2>/dev/null || true)
+  if [ "$PR_STATE" != "MERGED" ]; then
+    echo "stale snapshot $p KEPT — its PR ($SNAP_PR) did not read MERGED on re-check (read: '${PR_STATE:-failed}'); a failed read is never evidence of a merge"
+    continue
+  fi
   rm -f "$p"
   [ ! -f "$p" ] || { echo "HALT: stale snapshot $p survived deletion — remove it by hand and re-invoke"; exit 1; }
+  echo "stale snapshot $p removed (PR $SNAP_PR is MERGED; directory matches)"
 done <<< "$STALE_PATHS"
 ```
 
 The re-read is the point: a delete that is reported and not verified is the failure mode this
 section replaces, one layer up. The label the block matches is the one the detector prompt
 defines for a **proven** merge; the two skip notes share the `stale-snapshot` prefix by design
-(one label per cause) and are never acted on.
+(one label per cause) and are never acted on — and even the verdict label is not acted on until
+the snapshot itself says the same thing.
 
 ### Surface Results to User
 

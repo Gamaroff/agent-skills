@@ -174,7 +174,7 @@ mtime_of() {
 ACCEPT_LEGACY=0
 CHOSEN=""; MINE=()
 choose_candidate() {
-  local doc_dir="$1" want candidates=() c c_dir newest=-1 m legacy=0
+  local doc_dir="$1" want candidates=() c c_dir m legacy=0
   [ -d "$doc_dir" ] || { echo "advance-pipeline-lock: --restore needs an existing <doc-dir>, got '$doc_dir'" >&2; exit 1; }
   want=$(canon "$doc_dir")
   [ -f "$SNAPSHOT" ] && candidates+=("$SNAPSHOT")
@@ -188,6 +188,11 @@ choose_candidate() {
     echo "advance-pipeline-lock: no lock at '$LOCK', no halt snapshot at '$SNAPSHOT' and no orphaned claim at '$LOCK.pausing.*' — nothing to restore" >&2
     exit 1
   fi
+  # Provenance ranks above mtime (task.130 QA cycle 3, CR-6): a candidate MATCHED by its
+  # directory always outranks one accepted only by --accept-legacy (matched by absence), so a
+  # newer legacy file cannot win over — and then consume as a loser — a verified same-document
+  # claim. Within a rank the newest wins (the detector's rule, task.120 bug.5).
+  local matched_newest=-1 legacy_newest=-1 legacy_chosen=""
   for c in "${candidates[@]}"; do
     jq -e 'type == "object"' "$c" >/dev/null 2>&1 || { echo "advance-pipeline-lock: '$c' is not a JSON object — skipped" >&2; continue; }
     c_dir=$(jq -r '.task_or_story_directory // ""' "$c")
@@ -204,8 +209,14 @@ choose_candidate() {
     fi
     MINE+=("$c")
     m=$(mtime_of "$c")
-    if [ "$m" -gt "$newest" ]; then CHOSEN="$c"; newest="$m"; fi
+    if [ -n "$c_dir" ]; then
+      if [ "$m" -gt "$matched_newest" ]; then CHOSEN="$c"; matched_newest="$m"; fi
+    else
+      if [ "$m" -gt "$legacy_newest" ]; then legacy_chosen="$c"; legacy_newest="$m"; fi
+    fi
   done
+  # A legacy candidate is chosen only when no directory-matched candidate exists.
+  [ -n "$CHOSEN" ] || CHOSEN="$legacy_chosen"
   if [ -z "$CHOSEN" ]; then
     if [ "$legacy" -eq 1 ]; then
       echo "advance-pipeline-lock: no candidate for '$doc_dir' — the only one(s) found are legacy snapshots (see above)" >&2

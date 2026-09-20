@@ -385,41 +385,46 @@ Not applicable — one additional `sed` per resume.
 |------|---------|-------------|--------|
 | 2026-09-20 |  | QA gate 2 FAIL (70/100) — bugs 1–2 verified fixed; refute pass: 1 HIGH (delete selector matches skip notes), 2 MEDIUM (path containment; DETECTOR_JSON binding/order); bugs 3–5 | qa-task |
 | 2026-09-20 |  | QA findings fixed — bugs 3–5 (exact-label selector; path containment; single DETECTOR_JSON binding + validation-gated delete) + CR-5..CR-8, 2 iterations; +10 tests, all mutation-proven | qa-fix |
+| 2026-09-20 |  | QA gate 3 CONCERNS (80/100) — bugs 3–5 verified fixed; safety re-probe: 0 HIGH, 3 MEDIUM (string note HALTs; output file unwritten; label trusted without re-read), 3 LOW; bugs 6–8 | qa-task |
+| 2026-09-20 |  | QA findings fixed — bugs 6–8 (object-shaped notes; persisted detector JSON; on-disk evidence re-read before rm) + CR-4..CR-7, 3 iterations; +8 tests, all mutation-proven | qa-fix |
 <!-- change-log-end -->
 
 ## Bug Reports
 
 ### In QA Verification
 
-- [Bug 3: delete selector matches the detector skip notes — live snapshot deleted](./task.130.bug.3.delete-selector-matches-skip-notes.md) - ✅ Ready for QA - Priority: P1 (HIGH) (Fixed 2026-09-20)
-- [Bug 4: delete loop has no path containment; `rm -f null`](./task.130.bug.4.delete-loop-no-path-containment.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
-- [Bug 5: `DETECTOR_JSON` never bound in a fence; validation/delete contradict](./task.130.bug.5.detector-json-never-bound-and-validation-order.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [Bug 6: bare-string note in `deltas_since_pause` HALTs a healthy resume](./task.130.bug.6.bare-string-delta-halts-healthy-resume.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [Bug 7: `<detector-output-file>` has no writer](./task.130.bug.7.detector-output-file-has-no-writer.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [Bug 8: delete trusts the detector label without re-reading evidence](./task.130.bug.8.delete-trusts-detector-label-without-rereading-evidence.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
 
 ### Closed Bugs
 
-- [Bug 1: `--restore <doc-dir> --which` performed a consuming restore](./task.130.bug.1.restore-trailing-which-flag-consumes.md) - ✅ Closed (verified QA cycle 2)
-- [Bug 2: stale-snapshot delete loop exited 0 on unset/malformed `DETECTOR_JSON`](./task.130.bug.2.stale-snapshot-delete-loop-silent-on-broken-input.md) - ✅ Closed (verified QA cycle 2)
+- [Bug 1](./task.130.bug.1.restore-trailing-which-flag-consumes.md) - ✅ Closed (QA cycle 2)
+- [Bug 2](./task.130.bug.2.stale-snapshot-delete-loop-silent-on-broken-input.md) - ✅ Closed (QA cycle 2)
+- [Bug 3: delete selector matched the skip notes](./task.130.bug.3.delete-selector-matches-skip-notes.md) - ✅ Closed (verified QA cycle 3)
+- [Bug 4: no path containment](./task.130.bug.4.delete-loop-no-path-containment.md) - ✅ Closed (verified QA cycle 3)
+- [Bug 5: `DETECTOR_JSON` binding / validation order](./task.130.bug.5.detector-json-never-bound-and-validation-order.md) - ✅ Closed (verified QA cycle 3)
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-20
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.130.qa.2.resume-residue-bug-variant-base-and-who-restores.md](./task.130.qa.2.resume-residue-bug-variant-base-and-who-restores.md)
-- **Gate File**: [task.130.gate.2.resume-residue-bug-variant-base-and-who-restores.yml](./task.130.gate.2.resume-residue-bug-variant-base-and-who-restores.yml)
+- **Full Report**: [task.130.qa.3.resume-residue-bug-variant-base-and-who-restores.md](./task.130.qa.3.resume-residue-bug-variant-base-and-who-restores.md)
+- **Gate File**: [task.130.gate.3.resume-residue-bug-variant-base-and-who-restores.yml](./task.130.gate.3.resume-residue-bug-variant-base-and-who-restores.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3551 node tests + shell suites; eval:develop-task 17/17
-- **Phases Verified**: 5/5 (Phase 3 FAIL)
-- **Critical Issues**: 1 HIGH (bug 3), 2 MEDIUM (bugs 4–5); cycle-1 bugs 1–2 verified fixed
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Tests Executed**: 3561 node tests + shell suites; eval:develop-task 17/17; 12-input boundary re-probe
+- **Phases Verified**: 5/5 (Phase 3 CONCERNS)
+- **Critical Issues**: 0 HIGH; 3 MEDIUM (bugs 6–8); bugs 3–5 verified fixed
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle-2 refute pass: the one-statement delete loop's prefix selector matches the detector's `stale-snapshot check skipped — …` notes, so a live snapshot is deleted on the failure path ([bug 3](./task.130.bug.3.delete-selector-matches-skip-notes.md), HIGH); the loop deletes any reported path and `rm -f null` on a missing one ([bug 4](./task.130.bug.4.delete-loop-no-path-containment.md)); no fence binds `DETECTOR_JSON` and the fallback sentence contradicts the fail-closed block ([bug 5](./task.130.bug.5.detector-json-never-bound-and-validation-order.md)). Bugs 1–2 FIXED and covered.
+Cycle-3 safety re-probe (gate 2 HIGH on a boundary): bugs 3–5 FIXED and covered. New mediums on the same block: a bare-string detector note HALTs a healthy resume ([bug 6](./task.130.bug.6.bare-string-delta-halts-healthy-resume.md)); the detector output file the block reads has no writer ([bug 7](./task.130.bug.7.detector-output-file-has-no-writer.md)); the delete acts on the detector label without re-reading the evidence ([bug 8](./task.130.bug.8.delete-trusts-detector-label-without-rereading-evidence.md)). HIGH sequence 0, 1, 0.
 
 ## Progress Tracking
 
@@ -447,7 +452,7 @@ Cycle-2 refute pass: the one-statement delete loop's prefix selector matches the
 
 **Implementation summary.** All five phases landed as planned, in one PR, each with an executed test mutation-proven red on revert (proofs recorded in the implementation report's Step 3 entry). Three plan snippets were found wrong *by executing them* and corrected before commit:
 
-1. **Phase 3 — the piped `while` swallowed the HALT.** The plan's `printf | jq | while … exit 1; done` runs the loop body in a subshell under bash, so `exit 1` ended the subshell and the block carried on past the HALT (zsh runs the last pipeline stage in the current shell, which is why it passed there). The one statement now reads from a process substitution; `stale-snapshot-delete.test.mjs` case C is what found it. *(QA cycle 1, bug 2: the list is now materialised first with jq's exit checked and read from a here-string; an unbound `DETECTOR_JSON`, a non-array `deltas_since_pause` or a jq failure HALTs — cases E/F/G. QA cycle 2, bugs 3–5: the selector is now the exact label `.concern == "stale-snapshot: PR merged"` — the task's Phase 3 checklist text above still shows the original `startswith` form as written; the detector's two skip notes share that prefix and must never be acted on — the path is contained to the canonical snapshot, and the schema-check block binds `DETECTOR_JSON` and owns the array check; cases H–K.)*
+1. **Phase 3 — the piped `while` swallowed the HALT.** The plan's `printf | jq | while … exit 1; done` runs the loop body in a subshell under bash, so `exit 1` ended the subshell and the block carried on past the HALT (zsh runs the last pipeline stage in the current shell, which is why it passed there). The one statement now reads from a process substitution; `stale-snapshot-delete.test.mjs` case C is what found it. *(QA cycle 1, bug 2: the list is now materialised first with jq's exit checked and read from a here-string; an unbound `DETECTOR_JSON`, a non-array `deltas_since_pause` or a jq failure HALTs — cases E/F/G. QA cycle 2, bugs 3–5: the selector is now the exact label `.concern == "stale-snapshot: PR merged"` — the task's Phase 3 checklist text above still shows the original `startswith` form as written; the detector's two skip notes share that prefix and must never be acted on — the path is contained to the canonical snapshot, and the schema-check block binds `DETECTOR_JSON` and owns the array check; cases H–K. QA cycle 3, bugs 6–8: the orchestrator persists the returned detector JSON to `.summaries/step-0a-resume-detector.json` and binds from it; every detector note is an object; the delete re-reads the snapshot's directory and its PR's MERGED state from disk before `rm`, in a validate-all-then-delete shape; cases K–O.)*
 2. **Phase 5 — the "nullglob-guarded" loop had no nullglob guard.** `for f in <path> <glob>` aborts under zsh's `nomatch` exactly as `ls <path> <glob> | wc -l` does; `halt-snippet-glob-safe.test.mjs` F1 caught it with `no matches found`. Step 8 counts claims with `find`, the form `advance-pipeline-lock.sh` already uses.
 3. **Phase 1 — the stderr label could not split on exit status alone.** `gh pr view` exits 1 both for a failing `gh` and for a branch with no PR (`no pull requests found`), so the plan's `if [ "$GH_RC" -ne 0 ]` would have labelled every PR-less branch a `gh` failure. The split reads gh's stderr text as well.
 

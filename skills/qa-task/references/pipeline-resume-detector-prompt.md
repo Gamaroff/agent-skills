@@ -82,7 +82,9 @@ If the lock is absent, the state — if any — is in one of two places, and **n
 ls -t .claude/state/develop-pipeline.last-halt.json .claude/state/develop-pipeline.lock.pausing.* 2>/dev/null || true
 ```
 
-1. Read every candidate listed. Drop any whose `task_or_story_directory` is not the directory of the document being resumed — and **report each one dropped** in `deltas_since_pause` ("stale snapshot for `<other dir>` ignored"); a leftover for another task is itself worth the operator's attention.
+**Every note this step files in `deltas_since_pause` is a delta OBJECT** — `{ "path": "<the file the note is about>", "concern": "<the note>" }`, the field table's shape — never a bare string. The orchestrator's schema check requires `all(.deltas_since_pause[]; type == "object")` and a string element makes it fall back to full verification (task.130 QA cycle 3, bug 6).
+
+1. Read every candidate listed. Drop any whose `task_or_story_directory` is not the directory of the document being resumed — and **report each one dropped** in `deltas_since_pause` as `{ "path": "<that snapshot>", "concern": "stale snapshot for <other dir> ignored" }`; a leftover for another task is itself worth the operator's attention.
 2. **Stale snapshot after merge (task.124, obs #88).** For a `last-halt.json` that *is* for this document, check whether the run it records has already **finished**: the snapshot's `pr_url` is set and `gh pr view <pr_url> --json state --jq .state` returns `MERGED`. If so, the snapshot outlived its run — a completed run deletes its own snapshot at Step 8 since task.124, so one that survives is a leftover from before that, or from a run that completed outside the pipeline. Report it in `deltas_since_pause` as an ordinary delta object — `{ "path": "<snapshot path>", "concern": "stale-snapshot: PR merged" }`, the object's existing fields (§ `deltas_since_pause` object fields) — **with that exact `concern` string: it is the only label the orchestrator acts on** (resume contract § Consume Output matches it by equality, never by prefix, because the two skip notes below share the `stale-snapshot` prefix and must never be deleted on — task.130 QA cycle 2, bug 3) — drop it from the candidates, and **do not delete it**: this prompt is read-only, and the delete is the orchestrator's, verified on disk (resume contract § Consume Output; task.130, PR #436 review CR-3). A subagent that reports a delete it may not have performed is worse than one that reports nothing — the orchestrator would trust the report over the directory. Never offer a resume of merged work.
 
    **This check is `gh`-only, and a failed read is never evidence of MERGED.** Branch on the URL
@@ -90,7 +92,7 @@ ls -t .claude/state/develop-pipeline.last-halt.json .claude/state/develop-pipeli
    auto-detection) skips the check with `"stale-snapshot check skipped — pr_url is not a GitHub
    PR"`; a github.com `pr_url` whose `gh pr view` fails (offline, unauthenticated, rate-limited)
    skips it with `"stale-snapshot check skipped — gh pr view failed: <first stderr line>"`. Either
-   way the snapshot stays an ordinary candidate and the note goes in `deltas_since_pause` (task.124
+   way the snapshot stays an ordinary candidate and the note goes in `deltas_since_pause` as `{ "path": "<the snapshot>", "concern": "<the note>" }` (task.124
    QA cycle 3 CR-5; cycle 4 CR-3 — one label per cause, never one label for both). Step 8's
    same-document deletion covers the completed-run case on every platform.
 
@@ -223,10 +225,4 @@ The orchestrator dispatches this as an **Explore subagent**. Key constraints:
 - **No fallback prose**: if a field cannot be determined, use a safe default and record in `blocking_issues`
 - **macOS/Linux portable**: use the dual-form `stat` commands above
 
-The orchestrator validates the result with:
-
-```bash
-jq -e '.schema_version == 1 and (.recommended_step | type == "number") and (.blocking_issues | type == "array")' <output>
-```
-
-If validation fails: orchestrator falls back to full Phase 0b artifact verification using `LOCK_STEP` as the upper bound.
+The orchestrator persists the returned JSON to `{doc-directory}/.summaries/step-0a-resume-detector.json` and validates it — schema version, numeric `recommended_step`, array `blocking_issues`, and `deltas_since_pause` an **array of objects** — with the one check stated in the resume contract § Consume Output (not restated here: a second copy drifted the moment the first gained a field — task.130 QA cycle 3, CR-4). If validation fails the orchestrator falls back to full Phase 0b artifact verification using `LOCK_STEP` as the upper bound.
