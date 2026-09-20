@@ -741,6 +741,80 @@ test("isLaunchFailure: a runtime error inside the script is NOT a launch failure
   );
 });
 
+test("shell entry: an absent name that always exists or that the fixture creates is declined (BUG-13)", () => {
+  const base = corpusFor("filename").slice(0, 2);
+  for (const absent of [["."], [".."], ["!.gate.3.control.yml"]]) {
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: FIXED_SCRIPT,
+      cases: base.map((c) => ({ ...c, expected: { ...c.expected, absent } })),
+    });
+    assert.equal(r.executed, 0, JSON.stringify(absent));
+    assert.equal(r.reason, "entry-not-probeable");
+  }
+  // A case whose absent names its OWN input is the same collision.
+  const self = base.map((c) => ({
+    ...c,
+    expected: { ...c.expected, absent: [c.input] },
+  }));
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: FIXED_SCRIPT,
+    cases: self,
+  });
+  assert.equal(r.executed, 0);
+  assert.match(r.declined[0].detail, /the fixture itself creates/);
+  assert.match(
+    expectedProblem({ exit: 0, absent: [".."] }),
+    /other than \. and \.\./,
+  );
+});
+
+test("isLaunchFailure: bash 3.2's lower-case message is recognised (CR-2)", () => {
+  const p = "/repo/x.sh";
+  assert.equal(
+    isLaunchFailure({ status: 126, stderr: `${p}: ${p}: is a directory\n` }, p),
+    true,
+  );
+  assert.equal(
+    isLaunchFailure(
+      { status: 127, stderr: `bash: ${p}: no such file or directory\n` },
+      p,
+    ),
+    true,
+  );
+});
+
+test("shell entry: escapes and shells survive the all-errored decline (CR-3)", () => {
+  // A target that writes beside itself and then never answers on any case:
+  // every run errors, the run collapses to an entry-level decline, and the
+  // escapes it produced must still be reported.
+  const dir = mkdtempSync(
+    join(REPO_ROOT, "shared/resources/tests/.t128-errall-"),
+  );
+  try {
+    const script = join(dir, "writes-then-hangs.sh");
+    writeFileSync(
+      script,
+      '#!/usr/bin/env bash\ntouch "$HOME/PWNED-h"\nsleep 30\n',
+      { mode: 0o755 },
+    );
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${relative(REPO_ROOT, script)}`,
+      cases: corpusFor("filename").slice(0, 1),
+      timeoutMs: 300,
+    });
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.executed, 0);
+    assert.ok(r.escapes.length > 0, "the escape must survive the collapse");
+    assert.deepEqual(r.shells, [...probeShells()]);
+    assert.ok(toRecordEntry(r).escaped > 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("shell entry: a malformed expected is declined with its reason, never scored or thrown (BUG-11)", () => {
   const base = corpusFor("filename").slice(0, 2);
   const bad = [
@@ -771,23 +845,28 @@ test("shell entry: a malformed expected is declined with its reason, never score
 });
 
 test("shell entry: side effects in HOME, TMPDIR or beside the script are escapes (BUG-12)", () => {
-  const r = runProbeSpec({
-    sink: "filename",
-    entry: `shell:${SHELL_FIXTURES}/writes-home-tmp-self.sh`,
-  });
-  const paths = r.escapes.map((e) => e.path);
-  for (const marker of ["PWNED-home", "PWNED-tmp", "PWNED-self"]) {
-    assert.ok(
-      paths.some((p) => p.endsWith(marker)),
-      `${marker} not reported as an escape: ${JSON.stringify(paths.slice(0, 6))}`,
-    );
+  try {
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${SHELL_FIXTURES}/writes-home-tmp-self.sh`,
+    });
+    const paths = r.escapes.map((e) => e.path);
+    for (const marker of ["PWNED-home", "PWNED-tmp", "PWNED-self"]) {
+      assert.ok(
+        paths.some((p) => p.endsWith(marker)),
+        `${marker} not reported as an escape: ${JSON.stringify(paths.slice(0, 6))}`,
+      );
+    }
+    // Every escape names the shell it happened under.
+    assert.ok(r.escapes.every((e) => e.shell && e.id.endsWith(`@${e.shell}`)));
+    // Neither the real HOME nor the reader's real temp dir was written to.
+    assert.equal(existsSync(join(process.env.HOME, "PWNED-home")), false);
+    assert.equal(existsSync(join(tmpdir(), "PWNED-tmp")), false);
+  } finally {
+    // The script writes beside itself — in the real fixtures directory — so
+    // the marker is removed whether or not the assertions held.
+    rmSync(join(REPO_ROOT, SHELL_FIXTURES, "PWNED-self"), { force: true });
   }
-  // Every escape names the shell it happened under.
-  assert.ok(r.escapes.every((e) => e.shell && e.id.endsWith(`@${e.shell}`)));
-  // The real HOME and the reader's real temp dir were not written to.
-  assert.equal(existsSync(join(process.env.HOME, "PWNED-home")), false);
-  // Clean up the fixture-dir marker the script wrote beside itself.
-  rmSync(join(REPO_ROOT, SHELL_FIXTURES, "PWNED-self"), { force: true });
 });
 
 test("isLaunchFailure: bash's own open failure, keyed on its message AND the code", () => {

@@ -1,6 +1,6 @@
 # Bug Report: Task 128 - a side effect the target writes to `$HOME`, `$TMPDIR` or its own directory is invisible to `absent` and the sentinel
 
-**Task**: [Link](./task.128.shell-boundary-probe-and-finalise-recheck.md) · **Bug ID**: TASK-128-BUG-12 · **Severity**: MEDIUM · **Priority**: P2 · **Status**: ✅ Ready for QA · **Found By**: QA (cycle-3 review CR-2; BUG-5's class beyond the no-`cd` shape) · **Date Found**: 2026-09-20
+**Task**: [Link](./task.128.shell-boundary-probe-and-finalise-recheck.md) · **Bug ID**: TASK-128-BUG-12 · **Severity**: MEDIUM · **Priority**: P2 · **Status**: ✅ Closed · **Found By**: QA (cycle-3 review CR-2; BUG-5's class beyond the no-`cd` shape) · **Date Found**: 2026-09-20
 
 ## Description
 The shell child inherits the real `HOME` and `TMPDIR` (`sandboxEnv` copies them) and runs a script that lives in the real repo tree; the sentinel watches `sandboxRoot` only. A substitution side effect written to `$HOME`, `$TMPDIR`, or the script's own directory (`cd "$(dirname "$0")"` is a common idiom) lands where nothing looks, and the case scores `rejected`. Also (CR-6) `sandboxEnv({ cwd: workDir })` sets `PWD=workDir` while cwd is now `fixtureDir`.
@@ -15,3 +15,4 @@ Give the child fresh `HOME` and `TMPDIR` under `sandboxRoot` (outside `workDir`,
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-09-20 | Ready for QA | qa-fix | sandboxed HOME/TMPDIR, script-dir snapshot, PWD |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed at cycle 4 (execution) |

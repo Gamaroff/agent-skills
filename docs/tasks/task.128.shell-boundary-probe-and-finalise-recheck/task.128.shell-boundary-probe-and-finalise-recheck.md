@@ -287,36 +287,34 @@ None.
 
 ### In QA Verification
 
-- [TASK-128-BUG-9: launch-failure matcher catches runtime errors inside the target](./task.128.bug.9.launch-failure-matcher-catches-runtime-errors-inside-the-target.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
-- [TASK-128-BUG-10: three prose sites still say non-JS is unverifiable](./task.128.bug.10.three-prose-sites-still-say-non-js-is-unverifiable.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
-- [TASK-128-BUG-11: malformed expected scores absent or throws](./task.128.bug.11.malformed-expected-scores-absent-or-throws.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
-- [TASK-128-BUG-12: side effects outside the fixture dir invisible](./task.128.bug.12.side-effects-outside-the-fixture-dir-invisible.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [TASK-128-BUG-13: absent ".." always exists → vacuous defect](./task.128.bug.13.absent-dot-dot-always-exists-scores-a-vacuous-defect.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
 
 ### Closed Bugs
 
-- [BUG-1](./task.128.bug.1.fix-and-recheck-evaluator-no-ops-through-symlinked-path.md), [BUG-2](./task.128.bug.2.shell-entry-missing-script-scored-absent-not-declined.md), [BUG-3](./task.128.bug.3.nul-in-shell-entry-throws-from-runprobespec.md), [BUG-4](./task.128.bug.4.mutation-proved-precondition-is-a-self-reported-boolean.md) - ✅ Closed (verified at cycle 2)
-- [BUG-5](./task.128.bug.5.side-effect-in-child-cwd-invisible-to-absent-and-sentinel.md), [BUG-6](./task.128.bug.6.fix-and-recheck-licence-issued-on-forecast-not-record.md), [BUG-7](./task.128.bug.7.target-exit-126-127-declined-instead-of-compared.md), [BUG-8](./task.128.bug.8.empty-expected-scores-a-vacuous-engages.md) - ✅ Closed (verified at cycle 3)
+- BUG-1..4 - ✅ Closed (verified at cycle 2)
+- BUG-5..8 - ✅ Closed (verified at cycle 3)
+- [BUG-9](./task.128.bug.9.launch-failure-matcher-catches-runtime-errors-inside-the-target.md), [BUG-10](./task.128.bug.10.three-prose-sites-still-say-non-js-is-unverifiable.md), [BUG-11](./task.128.bug.11.malformed-expected-scores-absent-or-throws.md), [BUG-12](./task.128.bug.12.side-effects-outside-the-fixture-dir-invisible.md) - ✅ Closed (verified at cycle 4)
 
 ## QA Testing Results
 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-20
-**Quality Score**: 60/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.128.qa.3.shell-boundary-probe-and-finalise-recheck.md](./task.128.qa.3.shell-boundary-probe-and-finalise-recheck.md)
-- **Gate File**: [task.128.gate.3.shell-boundary-probe-and-finalise-recheck.yml](./task.128.gate.3.shell-boundary-probe-and-finalise-recheck.yml)
+- **Full Report**: [task.128.qa.4.shell-boundary-probe-and-finalise-recheck.md](./task.128.qa.4.shell-boundary-probe-and-finalise-recheck.md)
+- **Gate File**: [task.128.gate.4.shell-boundary-probe-and-finalise-recheck.yml](./task.128.gate.4.shell-boundary-probe-and-finalise-recheck.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3573 (isolated-worktree fast gate at 7b36fcac) + 39 engine-recorded security probes
+- **Tests Executed**: 3578 (isolated-worktree fast gate at 6ae01f48) + 39 engine-recorded security probes
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 HIGH, 4 MEDIUM
+- **Critical Issues**: 0 HIGH, 1 MEDIUM, 2 LOW
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-BUG-5..8 verified FIXED. New MEDIUMs: BUG-9 launch-failure matcher catches bash runtime errors inside the target; BUG-10 three prose sites still say non-JS is unverifiable; BUG-11 malformed `expected` scores absent or throws; BUG-12 side effects outside the fixture dir invisible. CR-5 (self-reported severity/otherFindingsOpen) → future.
+BUG-9..12 verified FIXED. New: BUG-13 (MEDIUM) `absent: [".."]` passes validation and always exists → the fixed script scores absent; CR-2 (LOW) case-sensitive launch-failure message vs bash 3.2; CR-3 (LOW) all-errored decline drops escapes/shells.
 
 ## Change Log
 <!-- change-log-start -->
@@ -334,6 +332,8 @@ BUG-5..8 verified FIXED. New MEDIUMs: BUG-9 launch-failure matcher catches bash 
 | 2026-09-20 |  | QA findings fixed — BUG-5 (cwd: fixtureDir), BUG-6 (--git-base post-commit licence), BUG-7 (launch failure keyed on bash stderr), BUG-8 (comparable-keys guard), CR-4..8; cycle 2 (2 iterations so far) | qa-fix |
 | 2026-09-20 |  | QA gate CONCERNS (60/100), cycle 3 — BUG-5..8 verified fixed; 0 HIGH, 4 MEDIUM new | qa-task |
 | 2026-09-20 |  | QA findings fixed — BUG-9 (script-as-subject launch matcher), BUG-10 (three prose sites → shell:, population grep), BUG-11 (expected validated), BUG-12 (sandboxed HOME/TMPDIR, script-dir snapshot, PWD); cycle 3 (3 iterations so far) | qa-fix |
+| 2026-09-20 |  | QA gate CONCERNS (90/100), cycle 4 — BUG-9..12 verified fixed; 0 HIGH, 1 MEDIUM, 2 LOW | qa-task |
+| 2026-09-20 |  | QA findings fixed — BUG-13 (absent . / .. / collisions rejected), CR-2 (case-insensitive launch message), CR-3 (escapes/shells through the collapse), CR-4; cycle 4 (4 iterations so far) | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

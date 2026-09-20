@@ -656,6 +656,10 @@ export function runProbeSpec({
       reason: "entry-not-probeable",
       cases: caseResults,
       declined: [{ id: entry, reason: "entry-not-probeable", detail: first }],
+      // A side effect observed during runs that then errored is still a side
+      // effect; and the record must say which shells ran (cycle 4, CR-3).
+      escapes,
+      shells: shells ?? null,
     };
   }
 
@@ -723,7 +727,9 @@ export function isLaunchFailure(child, entryPath) {
   const subject = escapeRegExp(entryPath);
   const re = new RegExp(
     `^(?:bash|${subject}): ${subject}: (?:No such file or directory|Is a directory|Permission denied|cannot execute)`,
-    "m",
+    // Case-insensitive: /bin/bash 3.2 (macOS without Homebrew bash) prints
+    // "is a directory" (cycle 4, CR-2).
+    "mi",
   );
   return re.test(err);
 }
@@ -759,11 +765,16 @@ export function expectedProblem(expected) {
         (p) =>
           typeof p !== "string" ||
           p === "" ||
+          p === "." ||
+          p === ".." ||
           p.includes("/") ||
           p.includes("\0"),
       )
     ) {
-      return "`expected.absent` must be an array of separator-free, non-empty strings";
+      // "." and ".." carry no separator and ALWAYS exist, so a case naming
+      // one would score every run as a side effect and the fixed script as
+      // absent with a full count (task.128 QA cycle 4, BUG-13).
+      return "`expected.absent` must be an array of separator-free, non-empty names other than . and ..";
     }
   }
   return null;
@@ -861,6 +872,18 @@ function runShellCase(
   const problem = expectedProblem(c.expected);
   if (problem !== null) {
     decline(`case's ${problem}`);
+    return;
+  }
+  // An `absent` name that the fixture itself creates — a control, or the
+  // case's own input — exists before the script runs, so it too would score
+  // every run as a side effect (BUG-13's second shape).
+  const collides = (c.expected.absent ?? []).find(
+    (p) => fixture.controls.includes(p) || p === c.input,
+  );
+  if (collides !== undefined) {
+    decline(
+      `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
+    );
     return;
   }
 

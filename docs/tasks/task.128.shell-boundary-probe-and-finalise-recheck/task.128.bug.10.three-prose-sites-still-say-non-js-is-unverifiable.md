@@ -1,6 +1,6 @@
 # Bug Report: Task 128 - three prose sites still instruct "non-JS entry points are unverifiable in v1"
 
-**Task**: [Link](./task.128.shell-boundary-probe-and-finalise-recheck.md) · **Bug ID**: TASK-128-BUG-10 · **Severity**: MEDIUM · **Priority**: P2 · **Status**: ✅ Ready for QA · **Found By**: QA (cycle-3 review CR-4, verified by grep) · **Date Found**: 2026-09-20
+**Task**: [Link](./task.128.shell-boundary-probe-and-finalise-recheck.md) · **Bug ID**: TASK-128-BUG-10 · **Severity**: MEDIUM · **Priority**: P2 · **Status**: ✅ Closed · **Found By**: QA (cycle-3 review CR-4, verified by grep) · **Date Found**: 2026-09-20
 
 ## Description
 Phase 2 rewrote the rule at four sites, but `shared/resources/security-review-prompt.md:97` ("A real, importable ES module export. Non-JS entry points are a stated v1 limit — report unverifiable"), `:235` and `skills/review-security/SKILL.md:155` ("Non-JS entry points are `unverifiable` in v1") still say the opposite. A `review-security` reader of a bash boundary is told to record the task.121 zero. The contract test cannot see these: it keys on sites that name the JS form, and these name neither form.
@@ -15,3 +15,4 @@ Route the three sites to `shell:`; extend the contract test with a zero-match gr
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-09-20 | Ready for QA | qa-fix | three sites rerouted + population grep |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed at cycle 4 (execution) |

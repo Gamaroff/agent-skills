@@ -1,0 +1,16 @@
+{
+  "sink": "path",
+  "entry": ".claude/state/t128-probe-wrapper.mjs#containsShellEntry",
+  "name": "resolveEntry-shell-form",
+  "call_site": "shared/resources/security-probe.mjs:201",
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 11,
+  "passed": 10,
+  "reproduced": 1,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "ran_at": "2026-09-20T19:42:33.749Z"
+}
