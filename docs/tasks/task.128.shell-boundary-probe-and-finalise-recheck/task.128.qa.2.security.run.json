@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": ".claude/state/t128-probe-wrapper.mjs#containsShellEntry",
+      "name": "resolveEntry-shell-form",
+      "call_site": "shared/resources/security-probe.mjs:201",
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 11,
+      "passed": 10,
+      "reproduced": 1,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "ran_at": "2026-09-20T18:50:26.605Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shell:shared/resources/qa-cycle.sh",
+      "name": "qa-cycle-shell-form",
+      "call_site": "shared/resources/qa-cycle.sh:42",
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 28,
+      "passed": 28,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "ran_at": "2026-09-20T18:50:27.797Z"
+    }
+  ],
+  "totals": {
+    "executed": 39,
+    "reproduced": 1
+  },
+  "updated_at": "2026-09-20T18:50:27.797Z"
+}

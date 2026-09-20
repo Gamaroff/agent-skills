@@ -4,7 +4,7 @@
 **Bug ID**: TASK-128-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (from diff code review CR-3, verified by reading the check)
 **Date Found**: 2026-09-20
 
@@ -39,3 +39,4 @@ Add a required `run` field (path to the captured proof output) to the finding re
 | --- | --- | --- | --- |
 | 2026-09-20 | In Progress | qa-fix | Investigation |
 | 2026-09-20 | Ready for QA | qa-fix | recorded run required |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed at cycle 2 (execution) |

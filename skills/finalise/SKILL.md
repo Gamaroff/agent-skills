@@ -1986,8 +1986,10 @@ execution** — a reproduced probe, a failing check with a citation — and noth
 two sections are FAIL, or the QA gate is FAIL, or CI is not green on the current head, this step does
 not apply: take Step 8.
 
-**1. Build the finding record and run the evaluator.** Every input comes from something already on
-disk; none is a judgement:
+**1. Build the finding record and run the evaluator.** `severity`, `filesSummary` and
+`otherFindingsOpen` come from things already on disk. `commits` and `touched` are the **plan** at
+this point — the fix does not exist yet — and the evaluator is run a **third** time after the commit
+with `--git-base` so both are re-read from git before anything is pushed (step 2b):
 
 ```bash
 mkdir -p .claude/state
@@ -2024,7 +2026,21 @@ line `Fix-and-recheck refused: {ids}` in the gap report's Blocking Issues Summar
   a flipped boolean with no recorded run halts on `mutation-proved`. **Exit 0 is the licence for
   the commit; exit 1 is Step 8.**
 - `git commit` — one commit, message `fix(<stem>): finalise DoD <section> — <finding, one line>`.
-  Then `git push origin HEAD`.
+
+**2b. Re-run the evaluator on the record, then push.** The second run licensed the *commit* on a
+forecast (`"commits": 1` typed before any commit existed; `touched` as the paths the fix *would*
+change). The push is licensed by what git says:
+
+```bash
+node references/finalise-fix-and-recheck.mjs \
+  --finding .claude/state/finalise-fix-finding.json --git-base "$CI_HEAD_1" --json
+```
+
+`--git-base` derives `commits` from `git rev-list --count <base>..HEAD` and `touched` from
+`git diff --name-only <base>..HEAD` and **refuses** a record that disagrees with either — two
+commits, a file the record did not name, a ref git cannot answer. Exit 0 → `git push origin HEAD`;
+exit 1 → Step 8, with the commit left local (it is one `git reset --hard "$CI_HEAD_1"` away). The
+run before the commit cannot do this check, and that is why there are three runs, not two.
 
 **3. Retake CI reading 1 on the fix head.** The decision reading from Step 6 was taken on a commit
 that no longer carries the acceptance. Record `CI_HEAD_1=$(git rev-parse HEAD)` again and re-run the
@@ -2051,7 +2067,8 @@ PASS and the fix head as `CI_HEAD_1`. Wording, from task.121's `dod.1`:
    re-run ({command}) — rather than by a further QA cycle or an independent reviewer. The other
    three DoD sections were not re-run: the fix touched only {touched}, inside the Files Summary,
    and they were evaluated against a tree those paths did not change.
-2. Fix-and-recheck preconditions: all five held (`finalise-fix-and-recheck.mjs` exit 0, record at
+2. Fix-and-recheck preconditions: all five held (`finalise-fix-and-recheck.mjs` exit 0 before the
+   commit and again with `--git-base {CI_HEAD_1}` after it; record at
    `.claude/state/finalise-fix-finding.json`).
 ```
 
@@ -2061,7 +2078,7 @@ provable gap under a rule; it is not a develop loop.
 
 **Step 8a Completion Checklist:**
 
-- [ ] Evaluator run twice: first halt on `mutation-proved` only; second exit 0 after the proof
+- [ ] Evaluator run three times: first halt on `mutation-proved` only; second exit 0 after the proof (licence to commit); third with `--git-base "$CI_HEAD_1"` exit 0 after the commit (licence to push)
 - [ ] One commit, pushed; `CI reading 1 (fix head)` recorded as SUCCESS
 - [ ] Only the failed section's reproduction re-run, from the record
 - [ ] Deviations block appended to the running summary

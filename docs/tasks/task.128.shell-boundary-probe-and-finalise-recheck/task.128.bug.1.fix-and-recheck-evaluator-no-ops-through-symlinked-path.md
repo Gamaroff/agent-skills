@@ -4,7 +4,7 @@
 **Bug ID**: TASK-128-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-20
 
@@ -47,3 +47,4 @@ Compare realpaths as `qa-execute-snippets.mjs` does (`realpathSync(process.argv[
 | --- | --- | --- | --- |
 | 2026-09-20 | In Progress | qa-fix | Investigation |
 | 2026-09-20 | Ready for QA | qa-fix | realpath guard + symlinked-invocation test |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed at cycle 2 (execution) |

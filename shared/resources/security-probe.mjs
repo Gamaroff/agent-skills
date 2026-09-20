@@ -504,6 +504,25 @@ export function runProbeSpec({
 
   const resolved = resolveEntry(entry, repoRoot);
   if (!resolved.ok) return decline(resolved.reason, resolved.detail);
+  if (resolved.kind === "shell") {
+    // The script must be a readable regular file BEFORE anything is compared.
+    // Without this a missing path made every run exit 127, every case mismatch
+    // `expected`, and the verdict read `absent` with executed = cases × shells —
+    // "could not look" scored as "the control is absent", with a count behind
+    // it (task.128 QA cycle 1, BUG-2). A property of the ENTRY, so it is
+    // checked once here (cycle 2, CR-7), and declined exactly as the JS form
+    // declines an unimportable entry.
+    try {
+      const st = statSync(resolved.entryPath);
+      if (!st.isFile()) throw new Error("not a regular file");
+      accessSync(resolved.entryPath, fsConstants.R_OK);
+    } catch (e) {
+      return decline(
+        "entry-not-probeable",
+        `script is not a readable regular file: ${e.message}`,
+      );
+    }
+  }
 
   let probeCases;
   if (Array.isArray(cases)) {
@@ -639,7 +658,11 @@ export function runProbeSpec({
   );
   const declined = caseResults
     .filter((c) => c.outcome === "errored")
-    .map((c) => ({ id: c.id, reason: "case-errored", detail: c.detail }));
+    .map((c) => ({
+      id: c.shell ? `${c.id}@${c.shell}` : c.id,
+      reason: "case-errored",
+      detail: c.detail,
+    }));
 
   return {
     sink: sink ?? null,
@@ -663,6 +686,26 @@ export function runProbeSpec({
     escapes,
     cases: caseResults,
   };
+}
+
+/** The `expected` keys that compare a run; `absent` alone compares nothing. */
+const COMPARABLE_KEYS = Object.freeze(["stdout", "exit", "stderr"]);
+
+/**
+ * bash failed to OPEN the script — its own message names the script path.
+ * Observed shapes: `bash: <path>: No such file or directory`,
+ * `<path>: <path>: Is a directory`, `bash: <path>: Permission denied`,
+ * `bash: <path>: cannot execute binary file`. The exit code is 126 or 127
+ * in every case, but the code alone is also what a target script exits
+ * with, so both are required.
+ */
+export function isLaunchFailure(child, entryPath) {
+  if (child.status !== 126 && child.status !== 127) return false;
+  const err = child.stderr ?? "";
+  if (!err.includes(entryPath)) return false;
+  return /(No such file or directory|Is a directory|Permission denied|cannot execute)/.test(
+    err,
+  );
 }
 
 /**
@@ -720,18 +763,14 @@ function runShellCase(
     );
     return;
   }
-  // The script must be a readable regular file BEFORE anything is compared.
-  // Without this a missing path made every run exit 127, every case mismatch
-  // `expected`, and the verdict read `absent` with executed = cases × shells —
-  // "could not look" scored as "the control is absent", with a count behind it
-  // (task.128 QA cycle 1, BUG-2). The JS form declines the same condition as
-  // entry-not-probeable; so does this now, through the all-errored collapse.
-  try {
-    const st = statSync(entryPath);
-    if (!st.isFile()) throw new Error("not a regular file");
-    accessSync(entryPath, fsConstants.R_OK);
-  } catch (e) {
-    decline(`script is not a readable regular file: ${e.message}`);
+  // BUG-8 (cycle 2): an `expected` that names none of stdout / exit / stderr
+  // matches every run — the pre-fix qa-cycle.sh scored `engages` on a
+  // --cases-file with `expected: {}`. A probe that compares nothing is not a
+  // probe; decline it, never score it.
+  if (!COMPARABLE_KEYS.some((k) => c.expected[k] !== undefined)) {
+    decline(
+      "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr",
+    );
     return;
   }
 
@@ -768,12 +807,18 @@ function runShellCase(
     // of a fixed one-line body. Building `bash <script> <dir>` as text would
     // put a caller-supplied path through a second parse, which is the class
     // of defect this engine exists to probe for.
+    // cwd is the FIXTURE directory, not workDir (task.128 QA cycle 2, BUG-5):
+    // a script that re-parses a name without `cd "$1"` — the qa-cycle.sh
+    // shape, which globs "$DIR"/* from wherever it is — writes its side effect
+    // to its cwd, and `absent` looks in the fixture. With cwd: workDir the
+    // marker landed where neither `absent` nor the sentinel (which skips
+    // workDir) could see it, and the case scored `rejected`.
     const child = spawnSync(
       shell,
       ["-c", 'bash "$1" "$2"', shell, entryPath, fixtureDir],
       {
         input: "",
-        cwd: workDir,
+        cwd: fixtureDir,
         env: { ...sandboxEnv({ cwd: workDir }), LC_ALL: "C" },
         encoding: "utf8",
         timeout: timeoutMs,
@@ -782,7 +827,9 @@ function runShellCase(
     );
     const after = snapshotTree(sandboxRoot, workDirName);
     for (const [path, stamp] of after) {
-      if (before.get(path) !== stamp) escapes.push({ id: c.id, path });
+      if (before.get(path) !== stamp) {
+        escapes.push({ id: `${c.id}@${shell}`, shell, path });
+      }
     }
 
     let outcome;
@@ -790,13 +837,16 @@ function runShellCase(
     if (neverRan(child)) {
       outcome = "errored";
       detail = child.signal ? `timed out after ${timeoutMs}ms` : "never ran";
-    } else if (child.status === 126 || child.status === 127) {
-      // bash could not run the script at all (126 not executable / 127 not
-      // found — a shebang interpreter missing, a race with the stat above).
-      // That is the harness failing to reach the target, not the target
-      // answering, so it is DECLINED and never compared against `expected`.
+    } else if (isLaunchFailure(child, entryPath)) {
+      // bash could not OPEN the script (a race with the readability check in
+      // runProbeSpec, or a permission change under it). Keyed on bash's own
+      // message about entryPath, not on the exit code alone: 126/127 are also
+      // what a TARGET exits with when a hostile name makes an unquoted script
+      // run it as a command, and that is a reproduction to compare, not a
+      // decline (task.128 QA cycle 2, BUG-7). `bash "$1"` never consults the
+      // shebang, so "interpreter missing" is not a state this branch can see.
       outcome = "errored";
-      detail = `bash could not run the script (exit ${child.status}): ${(child.stderr ?? "").trim().slice(0, 160)}`;
+      detail = `bash could not open the script (exit ${child.status}): ${(child.stderr ?? "").trim().slice(0, 160)}`;
     } else {
       const mismatches = compareExpected(c.expected, child, fixtureDir);
       const matched = mismatches.length === 0;
@@ -883,6 +933,9 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     overblocked: result.overblocked?.length ?? 0,
     declined: result.declined?.length ?? 0,
     escaped: result.escapes?.length ?? 0,
+    // Which shells each case ran under (shell form), or null. The count is
+    // cases × shells, and a reader must not have to divide (cycle 2, CR-5).
+    shells: Array.isArray(result.shells) ? [...result.shells] : null,
     ran_at: new Date().toISOString(),
   };
 }
@@ -1164,6 +1217,9 @@ export function emitBlock(record, { mode = "diff" } = {}) {
         `      sink: ${yamlStr(c.sink)}`,
         `      reason: ${yamlStr(c.reason)}`,
         `      probes_executed: ${c.executed}`,
+        ...(Array.isArray(c.shells) && c.shells.length > 0
+          ? [`      shells: [${c.shells.join(", ")}]`]
+          : []),
       );
     }
   }

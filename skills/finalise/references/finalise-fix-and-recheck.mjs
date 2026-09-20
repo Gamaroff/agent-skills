@@ -5,7 +5,15 @@
  * /finalise Step 8a (task.128, obs #121).
  *
  * Usage:
- *   node <this-file> --finding <path.json> [--json]
+ *   node <this-file> --finding <path.json> [--git-base <ref>] [--json]
+ *
+ * `--git-base <ref>` (BUG-6, task.128 QA cycle 2): derive `commits` and
+ * `touched` from git — `git rev-list --count <ref>..HEAD` and
+ * `git diff --name-only <ref>..HEAD` — and REFUSE a finding whose recorded
+ * values disagree with what git says. Without it the licence to push is
+ * issued on the plan ("commits": 1 typed before any commit exists; touched =
+ * "every path the fix WILL change"); with it, Step 8a's post-commit run is
+ * issued on the record.
  *
  * The finding file carries the five inputs the preconditions read:
  *   {
@@ -32,6 +40,7 @@
  * decides. A missing input is a failed precondition, never a pass.
  */
 
+import { spawnSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,7 +62,52 @@ const isList = (v) => Array.isArray(v);
 
 /** What a recorded red run looks like from node:test, bash test harnesses, or a
  *  hand-run assertion: a TAP `not ok`, the runner's ✖, or a `fail` count > 0. */
-const RED_MARKER = /(^|\n)\s*(not ok\b|✖|ℹ fail [1-9]|FAIL\b)/;
+const RED_MARKER = /^\s*(not ok\b|✖|ℹ fail [1-9]|FAIL\b)/;
+
+/** How far a red line may sit from a line naming the test and still count. */
+const RED_WINDOW = 3;
+
+/**
+ * A red marker TIED to the named test (cycle 2, CR-4). Checking "the log
+ * mentions the test" and "the log has a red line" independently let a
+ * whole-suite log pass on an unrelated failure while the named test was
+ * green. node:test prints a failing test as `✖ <name>` followed within a
+ * few lines by `test at <file>:<line>`, so a red line within RED_WINDOW of
+ * a line naming the test is the shape of a real red run; a green test's name
+ * appears only on a `✔` line with no red neighbour.
+ */
+function redNamesTest(text, test) {
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!lines[i].includes(test)) continue;
+    const lo = Math.max(0, i - RED_WINDOW);
+    const hi = Math.min(lines.length - 1, i + RED_WINDOW);
+    for (let j = lo; j <= hi; j += 1) {
+      if (RED_MARKER.test(lines[j])) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * What git says about the fix, for --git-base (BUG-6). Returns null when git
+ * cannot answer — and null is a FAILED precondition, never a skipped one.
+ */
+export function gitFacts(base, cwd = process.cwd()) {
+  const run = (args) =>
+    spawnSync("git", args, { cwd, encoding: "utf8", input: "" });
+  const count = run(["rev-list", "--count", `${base}..HEAD`]);
+  const names = run(["diff", "--name-only", `${base}..HEAD`]);
+  if (count.status !== 0 || names.status !== 0) return null;
+  const commits = Number.parseInt(count.stdout.trim(), 10);
+  if (!Number.isInteger(commits)) return null;
+  const touched = names.stdout
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .sort();
+  return { commits, touched };
+}
 
 /**
  * One check per precondition id. The keys of this map ARE the evaluator's
@@ -108,8 +162,8 @@ const CHECKS = Object.freeze({
     if (!text.includes(m.test)) {
       return `mutationProof.run ${m.run} does not mention ${m.test}`;
     }
-    if (!RED_MARKER.test(text)) {
-      return `mutationProof.run ${m.run} shows no failing test (no "not ok" / ✖ / fail line)`;
+    if (!redNamesTest(text, m.test)) {
+      return `mutationProof.run ${m.run} shows no failing test for ${m.test} (no "not ok" / ✖ / fail line within ${RED_WINDOW} lines of the test's name)`;
     }
     return null;
   },
@@ -129,12 +183,50 @@ export const CHECK_IDS = Object.freeze(Object.keys(CHECKS));
  *
  * @returns {{proceed: boolean, checked: string[], failed: Array<{id: string, detail: string}>}}
  */
-export function evaluateFixAndRecheck(finding) {
+export function evaluateFixAndRecheck(finding, { git } = {}) {
   if (!finding || typeof finding !== "object" || Array.isArray(finding)) {
     throw new TypeError("evaluateFixAndRecheck: finding must be an object");
   }
   const failed = [];
   const checked = [];
+  // --git-base: the record must agree with git, or the licence is refused.
+  // Compared BEFORE the table so a disagreement is named as itself, not as
+  // "commits is 2" — the reader needs to know the record was wrong, not only
+  // which way.
+  if (git !== undefined) {
+    if (git === null) {
+      failed.push({
+        id: "single-commit",
+        detail:
+          "--git-base: git could not answer (bad ref, or not a repository)",
+      });
+      failed.push({
+        id: "inside-files-summary",
+        detail:
+          "--git-base: git could not answer (bad ref, or not a repository)",
+      });
+    } else {
+      if (finding.commits !== git.commits) {
+        failed.push({
+          id: "single-commit",
+          detail: `record says commits: ${finding.commits}, git says ${git.commits}`,
+        });
+      }
+      const recorded = Array.isArray(finding.touched)
+        ? [...finding.touched].sort()
+        : null;
+      if (
+        recorded === null ||
+        recorded.length !== git.touched.length ||
+        recorded.some((p, i) => p !== git.touched[i])
+      ) {
+        failed.push({
+          id: "inside-files-summary",
+          detail: `record's touched [${(recorded ?? []).join(", ")}] ≠ git's [${git.touched.join(", ")}]`,
+        });
+      }
+    }
+  }
   for (const p of PRECONDITIONS) {
     const check = CHECKS[p.id];
     if (!check) {
@@ -150,16 +242,29 @@ export function evaluateFixAndRecheck(finding) {
     const detail = check(finding);
     if (detail !== null) failed.push({ id: p.id, detail });
   }
-  return { proceed: failed.length === 0, checked, failed };
+  // One entry per id: a git disagreement above and the table's own check on
+  // the same id are the same precondition failing, reported once (first wins).
+  const seen = new Set();
+  const uniq = failed.filter((f) => !seen.has(f.id) && seen.add(f.id));
+  return { proceed: uniq.length === 0, checked, failed: uniq };
 }
 
 export function main(argv = process.argv.slice(2)) {
   let findingPath;
+  let gitBase;
   let json = false;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--json") json = true;
-    else if (a === "--finding") {
+    else if (a === "--git-base") {
+      const operand = argv[i + 1];
+      if (operand === undefined || operand.startsWith("--")) {
+        process.stderr.write("--git-base requires a ref\n");
+        return 2;
+      }
+      gitBase = operand;
+      i += 1;
+    } else if (a === "--finding") {
       const operand = argv[i + 1];
       if (operand === undefined || operand.startsWith("--")) {
         process.stderr.write("--finding requires a path\n");
@@ -185,7 +290,10 @@ export function main(argv = process.argv.slice(2)) {
   }
   let result;
   try {
-    result = evaluateFixAndRecheck(finding);
+    result = evaluateFixAndRecheck(
+      finding,
+      gitBase === undefined ? {} : { git: gitFacts(gitBase) },
+    );
   } catch (e) {
     process.stderr.write(`${e.message}\n`);
     return 2;

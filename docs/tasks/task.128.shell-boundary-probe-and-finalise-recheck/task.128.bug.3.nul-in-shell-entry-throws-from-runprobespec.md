@@ -4,7 +4,7 @@
 **Bug ID**: TASK-128-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (security probe, `path` corpus `null-byte` case)
 **Date Found**: 2026-09-20
 
@@ -45,3 +45,4 @@ Reject `\0` in `resolveEntry` as `bad-entry` for both forms (one line), and add 
 | --- | --- | --- | --- |
 | 2026-09-20 | In Progress | qa-fix | Investigation |
 | 2026-09-20 | Ready for QA | qa-fix | NUL rejected in resolveEntry |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed at cycle 2 (execution) |

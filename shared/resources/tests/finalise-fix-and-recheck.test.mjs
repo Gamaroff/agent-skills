@@ -28,6 +28,7 @@ import {
   CHECK_IDS,
   PRECONDITIONS,
   evaluateFixAndRecheck,
+  gitFacts,
 } from "../finalise-fix-and-recheck.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -229,6 +230,119 @@ test("mutation-proved reads the RECORDED run, not the boolean (BUG-4)", () => {
   assert.match(r.failed[0].detail, /is empty/);
   // The real thing.
   assert.equal(evaluateFixAndRecheck(GOOD).proceed, true);
+});
+
+test("mutation-proved: the red marker must be TIED to the named test, not anywhere in the log (CR-4)", () => {
+  // A whole-suite log: the named test is green, an unrelated test is red.
+  const suite = join(RUN_DIR, "suite.log");
+  writeFileSync(
+    suite,
+    [
+      "✔ tests/qa-cycle.test.js passes everything (2ms)",
+      "✔ another green one (1ms)",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "✖ tests/other.test.js: something else is broken (3ms)",
+      "ℹ fail 1",
+      "",
+    ].join("\n"),
+  );
+  const r = evaluateFixAndRecheck({
+    ...GOOD,
+    mutationProof: {
+      test: "tests/qa-cycle.test.js",
+      redOnRevert: true,
+      run: suite,
+    },
+  });
+  assert.equal(r.proceed, false);
+  assert.match(
+    r.failed[0].detail,
+    /shows no failing test for tests\/qa-cycle\.test\.js/,
+  );
+  // The real shape — ✖ within a few lines of the test's name — still proves.
+  assert.equal(evaluateFixAndRecheck(GOOD).proceed, true);
+});
+
+test("--git-base: the record must agree with git, and the licence is refused on a forecast (BUG-6)", () => {
+  const repo = mkdtempSync(join(tmpdir(), "fix-recheck-git-"));
+  const g = (...args) =>
+    spawnSync("git", args, { cwd: repo, encoding: "utf8" });
+  try {
+    g("init", "-q");
+    g("config", "user.email", "t@example.com");
+    g("config", "user.name", "t");
+    writeFileSync(join(repo, "a.sh"), "one\n");
+    writeFileSync(join(repo, "b.js"), "one\n");
+    g("add", "-A");
+    g("commit", "-q", "-m", "base");
+    const base = g("rev-parse", "HEAD").stdout.trim();
+    // Before any fix commit: git says 0 commits, nothing touched.
+    let facts = gitFacts(base, repo);
+    assert.deepEqual(facts, { commits: 0, touched: [] });
+    const finding = {
+      ...GOOD,
+      commits: 1,
+      touched: ["a.sh"],
+      filesSummary: ["a.sh", "b.js"],
+    };
+    let r = evaluateFixAndRecheck(finding, { git: facts });
+    assert.equal(r.proceed, false, "a forecast is not a record");
+    assert.deepEqual(r.failed.map((f) => f.id).sort(), [
+      "inside-files-summary",
+      "single-commit",
+    ]);
+    assert.match(
+      r.failed.find((f) => f.id === "single-commit").detail,
+      /record says commits: 1, git says 0/,
+    );
+    // One commit touching exactly a.sh: the record now agrees.
+    writeFileSync(join(repo, "a.sh"), "two\n");
+    g("commit", "-q", "-am", "fix");
+    facts = gitFacts(base, repo);
+    assert.deepEqual(facts, { commits: 1, touched: ["a.sh"] });
+    assert.equal(evaluateFixAndRecheck(finding, { git: facts }).proceed, true);
+    // A second commit, or a file the record did not name, refuses.
+    writeFileSync(join(repo, "b.js"), "two\n");
+    g("commit", "-q", "-am", "oops");
+    facts = gitFacts(base, repo);
+    r = evaluateFixAndRecheck(finding, { git: facts });
+    assert.deepEqual(r.failed.map((f) => f.id).sort(), [
+      "inside-files-summary",
+      "single-commit",
+    ]);
+    // git that cannot answer is a failed precondition, never a skipped one.
+    assert.equal(gitFacts("not-a-ref", repo), null);
+    r = evaluateFixAndRecheck(finding, { git: null });
+    assert.equal(r.proceed, false);
+    assert.match(r.failed[0].detail, /git could not answer/);
+    // The CLI form.
+    const f = join(repo, "finding.json");
+    writeFileSync(f, JSON.stringify(finding));
+    const cli = spawnSync(
+      process.execPath,
+      [CLI, "--finding", f, "--git-base", base, "--json"],
+      { cwd: repo, encoding: "utf8" },
+    );
+    assert.equal(cli.status, 1, cli.stdout + cli.stderr);
+    assert.deepEqual(
+      JSON.parse(cli.stdout)
+        .failed.map((x) => x.id)
+        .sort(),
+      ["inside-files-summary", "single-commit"],
+    );
+    assert.equal(
+      spawnSync(process.execPath, [CLI, "--finding", f, "--git-base"], {
+        encoding: "utf8",
+      }).status,
+      2,
+    );
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 });
 
 test("CLI: invoked through a SYMLINKED path it still runs and exits per the verdict (BUG-1)", () => {

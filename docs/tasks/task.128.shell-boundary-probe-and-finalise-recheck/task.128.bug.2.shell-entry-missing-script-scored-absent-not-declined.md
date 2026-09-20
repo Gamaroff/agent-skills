@@ -4,7 +4,7 @@
 **Bug ID**: TASK-128-BUG-2
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (from diff code review CR-1, verified by execution)
 **Date Found**: 2026-09-20
 
@@ -46,3 +46,4 @@ Before the per-shell loop, decline (outcome `errored`) when `entryPath` is not a
 | --- | --- | --- | --- |
 | 2026-09-20 | In Progress | qa-fix | Investigation |
 | 2026-09-20 | Ready for QA | qa-fix | readable-regular-file check + 126/127 errored |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed at cycle 2 (execution) |

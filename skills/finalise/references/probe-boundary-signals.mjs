@@ -88,9 +88,15 @@ export function classifyBoundaryText(text, { scope = "doc" } = {}) {
   for (const signal of BOUNDARY_SIGNALS) {
     if (!signal.phrases) continue;
     if (signal.scope === "criteria" && scope !== "criteria") continue;
+    // One entry per signal — the first phrase that fires. Two overlapping
+    // phrases ("refuses rather than" and "refuses") would otherwise report one
+    // occurrence twice (task.128 QA cycle 2, CR-8).
     for (const re of signal.phrases) {
       const m = text.match(re);
-      if (m) matched.push({ signal: signal.id, phrase: m[0] });
+      if (m) {
+        matched.push({ signal: signal.id, phrase: m[0] });
+        break;
+      }
     }
   }
   return { boundary: matched.length > 0, matched };

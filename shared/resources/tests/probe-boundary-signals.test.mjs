@@ -39,6 +39,12 @@ const GATE_5_NOTE =
 test("qa-cycle.sh's header classifies as a boundary by its own words", () => {
   const r = classifyBoundaryText(qaCycleHeader());
   assert.equal(r.boundary, true);
+  // One entry per signal (CR-8): "refuses rather than" is one occurrence, not two.
+  assert.equal(
+    r.matched.filter((m) => m.signal === "self-declared-refusal").length,
+    1,
+    JSON.stringify(r.matched),
+  );
   assert.ok(
     r.matched.some(
       (m) =>

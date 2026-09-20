@@ -200,7 +200,7 @@ not exist and is not in `package.json`'s hand-listed globs)
 - `tests/fixtures/qa-cycle.prefix.sh` — the pre-fix script, from `git show a412f59a^:shared/resources/qa-cycle.sh`
 - `shared/resources/finalise-fix-and-recheck.mjs` — the precondition evaluator (library + CLI; exit 0 proceed / 1 halt / 2 usage) that reads the JSON, so Step 8a checks a table rather than a judgement
 - `shared/resources/tests/probe-boundary-signals.test.mjs` — classifier fixtures (qa-cycle.sh header, task.121 gate-5 note, negatives) and the JS-form/shell-form contract test
-- `shared/resources/tests/fixtures/security-probe/eval-names.sh` — a deliberately wrong script that `eval`s names, for the `absent` side-effect check
+- `shared/resources/tests/fixtures/security-probe/eval-names.sh` and `eval-names-nocd.sh` — deliberately wrong scripts that `eval` names (with and without `cd "$1"`), for the `absent` side-effect check
 
 ### Files to Modify (Tests)
 
@@ -287,35 +287,35 @@ None.
 
 ### In QA Verification
 
-- [TASK-128-BUG-1: fix-and-recheck evaluator no-ops through a symlinked path](./task.128.bug.1.fix-and-recheck-evaluator-no-ops-through-symlinked-path.md) - ✅ Ready for QA - Priority: P1 (Fixed 2026-09-20)
-- [TASK-128-BUG-2: missing shell: script scored absent, not declined](./task.128.bug.2.shell-entry-missing-script-scored-absent-not-declined.md) - ✅ Ready for QA - Priority: P1 (Fixed 2026-09-20)
-- [TASK-128-BUG-3: NUL in a shell: entry throws from runProbeSpec](./task.128.bug.3.nul-in-shell-entry-throws-from-runprobespec.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
-- [TASK-128-BUG-4: mutation-proved is a self-reported boolean](./task.128.bug.4.mutation-proved-precondition-is-a-self-reported-boolean.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [TASK-128-BUG-5: side effect in the child cwd invisible to absent and the sentinel](./task.128.bug.5.side-effect-in-child-cwd-invisible-to-absent-and-sentinel.md) - ✅ Ready for QA - Priority: P1 (Fixed 2026-09-20)
+- [TASK-128-BUG-6: fix-and-recheck licence issued on forecast, not record](./task.128.bug.6.fix-and-recheck-licence-issued-on-forecast-not-record.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [TASK-128-BUG-7: target 126/127 exit declined instead of compared](./task.128.bug.7.target-exit-126-127-declined-instead-of-compared.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [TASK-128-BUG-8: empty expected scores a vacuous engages](./task.128.bug.8.empty-expected-scores-a-vacuous-engages.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
 
 ### Closed Bugs
 
-_None yet — QA verifies at cycle 2._
+- [TASK-128-BUG-1](./task.128.bug.1.fix-and-recheck-evaluator-no-ops-through-symlinked-path.md), [BUG-2](./task.128.bug.2.shell-entry-missing-script-scored-absent-not-declined.md), [BUG-3](./task.128.bug.3.nul-in-shell-entry-throws-from-runprobespec.md), [BUG-4](./task.128.bug.4.mutation-proved-precondition-is-a-self-reported-boolean.md) - ✅ Closed (verified at cycle 2)
 
 ## QA Testing Results
 
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-20
-**Quality Score**: 40/100
+**Quality Score**: 50/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.128.qa.1.shell-boundary-probe-and-finalise-recheck.md](./task.128.qa.1.shell-boundary-probe-and-finalise-recheck.md)
-- **Gate File**: [task.128.gate.1.shell-boundary-probe-and-finalise-recheck.yml](./task.128.gate.1.shell-boundary-probe-and-finalise-recheck.yml)
+- **Full Report**: [task.128.qa.2.shell-boundary-probe-and-finalise-recheck.md](./task.128.qa.2.shell-boundary-probe-and-finalise-recheck.md)
+- **Gate File**: [task.128.gate.2.shell-boundary-probe-and-finalise-recheck.yml](./task.128.gate.2.shell-boundary-probe-and-finalise-recheck.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3614 (fast gate) + 39 engine-recorded security probes
+- **Tests Executed**: 3619 (fast gate at cycle-1 commit) + 39 engine-recorded security probes (re-run on the fixed tree)
 - **Phases Verified**: 3/3
-- **Critical Issues**: 2 HIGH, 2 MEDIUM
+- **Critical Issues**: 1 HIGH, 3 MEDIUM, 2 LOW
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-BUG-1 (HIGH): the fix-and-recheck evaluator silently no-ops and exits 0 through the symlinked `.agents/skills` path — fail-open. BUG-2 (HIGH): a missing `shell:` script is scored `absent` with 28 probes executed instead of declined. BUG-3 (MEDIUM): NUL in a `shell:` entry throws. BUG-4 (MEDIUM): `mutation-proved` is a hand-set boolean. Three LOW cleanups.
+BUG-1..4 verified FIXED. New: BUG-5 (HIGH) a side effect a script writes to its cwd is invisible to `absent` and the sentinel; BUG-6 Step 8a licenses on forecast `commits`/`touched`; BUG-7 a target 126/127 exit is declined, not compared; BUG-8 an empty `expected` is a vacuous pass. CR-4, CR-5 low.
 
 ## Change Log
 <!-- change-log-start -->
@@ -329,6 +329,8 @@ BUG-1 (HIGH): the fix-and-recheck evaluator silently no-ops and exits 0 through 
 | 2026-09-20 |  | Implemented — 18 files (5 created), 32 new tests across 3 suites; 12 mutants killed | develop |
 | 2026-09-20 |  | QA gate FAIL (40/100) — 2 HIGH, 2 MEDIUM, 3 LOW; 39 security probes measured | qa-task |
 | 2026-09-20 |  | QA findings fixed — BUG-1 (realpath CLI guard), BUG-2 (decline unreadable script / 126-127), BUG-3 (NUL → bad-entry), BUG-4 (recorded mutation run); 5 mutants red; cycle 1 (1 iteration) | qa-fix |
+| 2026-09-20 |  | QA gate FAIL (50/100), cycle 2 refute pass — BUG-1..4 verified fixed; 1 HIGH, 3 MEDIUM, 2 LOW new | qa-task |
+| 2026-09-20 |  | QA findings fixed — BUG-5 (cwd: fixtureDir), BUG-6 (--git-base post-commit licence), BUG-7 (launch failure keyed on bash stderr), BUG-8 (comparable-keys guard), CR-4..8; cycle 2 (2 iterations so far) | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking
