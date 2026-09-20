@@ -1,0 +1,102 @@
+schema: 1
+task: 'task.130.resume-residue-bug-variant-base-and-who-restores'
+task_title: 'Resume residue from task.124 — bug-variant base, dispatch population, self-reported delete, who-restores enumeration'
+gate: FAIL
+status_reason: 'Cycle-1 bugs 1 and 2 verified fixed and covered; the cycle-2 refute pass found one HIGH in the one-statement delete loop — its prefix selector matches the detector skip notes, so a LIVE snapshot is deleted exactly when the gh read failed — plus two mediums on the same block (no path containment, rm -f null; DETECTOR_JSON never bound in a fence and the fallback sentence contradicts the fail-closed HALT). All three reproduced by QA.'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T12:40:00Z'
+
+top_issues:
+  - id: 'TASK-130-QA-3'
+    severity: high
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The delete selector `startswith("stale-snapshot")` also matches the detector prompt two skip notes ("stale-snapshot check skipped — pr_url is not a GitHub PR" / "… gh pr view failed: …"), which the prompt places in deltas_since_pause for a snapshot NOT proven merged — so the orchestrator rm -f s a live snapshot exactly when the read failed, violating "a failed read is never evidence of MERGED"; reproduced (refute pass CR-1; bug 3).'
+    suggested_action: 'Select on the exact verdict label (.concern == "stale-snapshot: PR merged"), state in the detector prompt that this is the only label the orchestrator acts on, and add a kept-snapshot test case per skip wording.'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.3.delete-selector-matches-skip-notes.md'
+    status: open
+  - id: 'TASK-130-QA-4'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The loop rm -f s whatever .path a subagent reported with no containment (the rule applies to one canonical file) and a delta with no path yields the literal null, so rm -f null runs in the repo root — reproduced: rm -f null and rm -f unrelated.txt both executed (refute pass CR-2; bug 4).'
+    suggested_action: 'HALT on any reported path that is not the canonical snapshot path (canonicalised both sides) and on a null/non-string path; test both.'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.4.delete-loop-no-path-containment.md'
+    status: open
+  - id: 'TASK-130-QA-5'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'No fenced block binds DETECTOR_JSON (the schema check reads a literal <output> placeholder), so after the bug-2 fix the :? guard HALTs on every literal resume; and the sentence after the schema check says invalid output falls back to full Phase 0b while the unconditional delete block HALTs on it — one input, two prescribed outcomes (refute pass CR-3 + CR-4; bug 5).'
+    suggested_action: 'Bind DETECTOR_JSON once in the schema-check block from the detector output file, fold the array check into that jq -e, and run the delete block only after validation passed.'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.5.detector-json-never-bound-and-validation-order.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 3551
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+  re_review: 'Bug 1 FIXED (trailing flag → exit 1, nothing written; covered: -eq→-ge red). Bug 2 FIXED (unset → HALT, missing concern → kept, non-array → HALT under bash and zsh; covered: :? guard dropped → E red, || HALT dropped → G red). CR-3..CR-7 advisories verified applied (F4 covered).'
+  step_4b: 'Contract and step-8 re-run under bash+zsh after the fix: 0 findings.'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 3
+  fix_date: '2026-09-20'
+  total_iterations: 1
+  verification_method: 'Reproductions re-run against the committed tree under bash and zsh; mutation spot checks; ci:fast 3551/3551; eval:develop-task 17/17'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Bug 4 — an unbounded rm -f driven by a subagent-reported string: a hallucinated or malformed path deletes a file outside .claude/state. No JS boundary; choose_candidate() (shell) refusal arms are executed by advance-pipeline-lock.test.sh under both shells.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: one extra sed and one --which read per resume.'
+  reliability:
+    status: FAIL
+    notes: 'Bug 3 — the failure path (offline / non-GitHub PR) destroys a live halt snapshot; the next invocation offers a fresh start for paused work. This is the exact rule the detector prompt states and the one statement violates.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Bug 5 — two neighbouring sentences prescribe different outcomes for invalid detector output and no fence binds the variable the block requires. Cleanups: grant-qa-cycles.sh header still says a legacy snapshot is accepted (CR-7); the (c) row promises entries the unbindable-base HALT never prints (CR-8).'
+
+code_review:
+  reviewed: 'refute pass over the whole branch diff (3560 lines, bundled copies excluded)'
+  findings: 8
+  promoted_to_gate: ['TASK-130-QA-3 (CR-1, high)', 'TASK-130-QA-4 (CR-2)', 'TASK-130-QA-5 (CR-3 + CR-4)']
+  advisory:
+    - 'CR-5 low/medium: Step 8 deletes a sole legacy snapshot of ANY document while --accept-legacy promises recovery — accepted by the task spec (Breaking Change 2 states Step 8 removes it); document the tension in the hooks row rather than change the rule'
+    - 'CR-6 low/medium: the three Step 0-lock paragraphs read exit 1 as "fresh start" only; --restore now also exits 1 for legacy-snapshot — add the second cause (one sentence, or cite the hooks row)'
+    - 'CR-7 cleanup: grant-qa-cycles.sh header still says a directory-less snapshot is accepted'
+    - 'CR-8 cleanup: echo $DIRTY before the unbindable-base HALT so the (c) row holds'
+
+recommendations:
+  immediate:
+    - action: 'Bug 3: exact-label selector (.concern == "stale-snapshot: PR merged"); detector prompt names it as the only actionable label; kept-snapshot tests for both skip wordings.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/tests/stale-snapshot-delete.test.mjs']
+    - action: 'Bug 4: path containment — HALT unless the path canonicalises to .claude/state/develop-pipeline.last-halt.json; HALT on null/non-string path; tests.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/tests/stale-snapshot-delete.test.mjs']
+    - action: 'Bug 5: bind DETECTOR_JSON once in the schema-check block, fold the array check into it, run the delete block only after validation passed; test the schema check rejects a non-array.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+  future:
+    - action: 'CR-5: document in the hooks troubleshooting row that a legacy snapshot survives only until the next completed run of any document.'
+      refs: ['shared/resources/develop-pipeline-hooks.md']
+    - action: 'CR-6: name the legacy-snapshot exit-1 cause in the three Step 0-lock paragraphs (or cite the hooks row).'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md']
+    - action: 'CR-7 / CR-8 cleanups.'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/develop-pipeline-resume-contract.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'Bugs 3, 4, 5 fixed and re-verified'

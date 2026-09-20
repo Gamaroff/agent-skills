@@ -4,7 +4,7 @@
 **Bug ID**: TASK-130-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (Step 3b diff code review CR-1, reproduced by QA)
 **Date Found**: 2026-09-20
 
@@ -73,3 +73,4 @@ After the flag loop require exactly one remaining positional — `[ $# -eq 1 ] |
 | 2026-09-20 | New | QA Engineer | Found in QA cycle 1 (CR-1) |
 | 2026-09-20 | In Progress | qa-fix | Investigation started |
 | 2026-09-20 | Ready for QA | qa-fix | Fix implemented, mutation-proven |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed in QA cycle 2 (reproduction re-run under bash and zsh; mutation covered) |

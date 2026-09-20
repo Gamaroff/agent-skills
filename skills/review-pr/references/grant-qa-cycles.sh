@@ -50,7 +50,9 @@
 #   • no lock AND advance-pipeline-lock.sh missing beside it    → exit 1, named message, nothing written
 #   • snapshot present but for another document (its task_or_story_directory, canonicalised,
 #     is not <doc-dir>, canonicalised — relative and absolute spellings of one directory match;
-#     a snapshot with NO task_or_story_directory is a pre-task.123 shape and is accepted)
+#     a snapshot with NO task_or_story_directory (the pre-task.123 shape) is REFUSED by --restore as
+#     `legacy-snapshot` and the grant relays that refusal; the operator restores it by hand with
+#     `advance-pipeline-lock.sh --restore --accept-legacy <doc-dir>` first, or deletes it (task.130);
 #                                                              → exit 1, nothing restored, nothing written
 #     (the check is --restore's; this script surfaces its stderr line)
 #   • jq missing                                               → exit 1 (this write cannot be skipped silently)

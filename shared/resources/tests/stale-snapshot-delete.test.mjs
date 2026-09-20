@@ -10,7 +10,7 @@
 //
 // Each block below is the smallest claim whose reverse turns it red:
 //   A — a `stale-snapshot` delta's path is deleted and the block exits 0        (drop `rm -f` → red)
-//   B — a delta whose concern does not start `stale-snapshot` is left in place  (widen the select → red)
+//   B — a delta whose concern is not the exact verdict label is left in place  (widen the select → red)
 //   C — a path that survives the rm is a HALT with exit 1                        (drop the re-read → red)
 //   D — no orchestrator SKILL.md carries a copy of the loop; each cites the section instead
 //   E — an unbound DETECTOR_JSON HALTs                                          (drop the :? guard → red)
@@ -46,7 +46,7 @@ function deleteBlock() {
   // extractor that keys on the mutated token reports every case red the moment the token goes,
   // which reads like a proof and is only a missing block.
   const blocks = extractBlocks(md).filter((b) =>
-    /Every `stale-snapshot` delta names a snapshot the detector proved/.test(
+    /Every `stale-snapshot: PR merged` delta names a snapshot the detector proved/.test(
       b.code,
     ),
   );
@@ -58,7 +58,7 @@ function deleteBlock() {
   return blocks[0].code;
 }
 
-function run(shell, { concern, readOnlyDir, rawJson, unsetVar }) {
+function run(shell, { concern, readOnlyDir, rawJson, unsetVar, extraFile }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "stale-snapshot-"));
   const state = path.join(dir, ".claude", "state");
   fs.mkdirSync(state, { recursive: true });
@@ -74,6 +74,7 @@ function run(shell, { concern, readOnlyDir, rawJson, unsetVar }) {
   });
   // A directory the shell cannot write to makes `rm -f` fail silently (-f) and leaves the file —
   // the case the re-read exists to catch.
+  if (extraFile) fs.writeFileSync(path.join(dir, extraFile), "x\n");
   if (readOnlyDir) fs.chmodSync(state, 0o555);
   const bound = rawJson !== undefined ? rawJson : json;
   const prelude = unsetVar
@@ -86,9 +87,18 @@ function run(shell, { concern, readOnlyDir, rawJson, unsetVar }) {
       : ["--noprofile", "--norc", "-c", script];
   const r = spawnSync(shell, argv, { cwd: dir, encoding: "utf8" });
   const exists = fs.existsSync(snap);
+  const extraExists = extraFile
+    ? fs.existsSync(path.join(dir, extraFile))
+    : undefined;
   if (readOnlyDir) fs.chmodSync(state, 0o755);
   fs.rmSync(dir, { recursive: true, force: true });
-  return { status: r.status, stdout: r.stdout, stderr: r.stderr, exists };
+  return {
+    status: r.status,
+    stdout: r.stdout,
+    stderr: r.stderr,
+    exists,
+    extraExists,
+  };
 }
 
 for (const sh of SHELLS) {
@@ -172,6 +182,133 @@ for (const sh of SHELLS) {
     const garbage = run(sh, { rawJson: "{not json" });
     assert.equal(garbage.status, 1, `stdout: ${garbage.stdout}`);
     assert.match(garbage.stdout, /HALT: could not read stale-snapshot deltas/);
+  });
+}
+
+// ── H/I/J — cycle-2 refute-pass findings (task.130 QA cycle 2, bugs 3 and 4) ─────────────
+//
+// H: the detector files two SKIP notes in deltas_since_pause for a snapshot it has NOT proven
+//    merged; both share the `stale-snapshot` prefix. A prefix selector deleted a live snapshot
+//    exactly when the gh read failed. (exact-label selector → back to a prefix → red)
+// I: the rule applies to ONE file — a reported path anywhere else is a HALT, nothing deleted.
+//    (drop the canon comparison → red)
+// J: a delta with no `path` printed the literal `null` and ran `rm -f null` — now a HALT.
+//    (drop the string check → red)
+
+const SKIP_NOTES = [
+  "stale-snapshot check skipped — pr_url is not a GitHub PR",
+  "stale-snapshot check skipped — gh pr view failed: offline",
+];
+
+for (const sh of SHELLS) {
+  for (const note of SKIP_NOTES) {
+    test(`H [${sh}] — skip note "${note.slice(0, 40)}…" is NOT acted on; snapshot kept, exit 0`, () => {
+      const r = run(sh, { concern: note });
+      assert.equal(r.status, 0, `stderr: ${r.stderr} stdout: ${r.stdout}`);
+      assert.equal(
+        r.exists,
+        true,
+        "a live snapshot was deleted on a skip note",
+      );
+      assert.match(r.stdout, /BLOCK_DONE/);
+    });
+  }
+
+  test(`I [${sh}] — a stale-snapshot delta naming a path outside the rule is a HALT; nothing deleted`, () => {
+    const r = run(sh, {
+      rawJson: JSON.stringify({
+        deltas_since_pause: [
+          { path: "unrelated.txt", concern: "stale-snapshot: PR merged" },
+        ],
+      }),
+      extraFile: "unrelated.txt",
+    });
+    assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+    assert.match(
+      r.stdout,
+      /HALT: the detector reported a stale-snapshot path outside the rule/,
+    );
+    assert.equal(r.extraExists, true, "the foreign path was deleted");
+    assert.equal(r.exists, true);
+  });
+
+  test(`J [${sh}] — a stale-snapshot delta with no path is a HALT, never rm -f null`, () => {
+    const r = run(sh, {
+      rawJson: JSON.stringify({
+        deltas_since_pause: [{ concern: "stale-snapshot: PR merged" }],
+      }),
+    });
+    assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+    assert.match(
+      r.stdout,
+      /HALT: could not read stale-snapshot deltas .*without a string path/,
+    );
+    assert.equal(r.exists, true);
+  });
+}
+
+// ── K — the schema-check block binds DETECTOR_JSON and rejects a non-array (bug 5) ───────
+
+function schemaBlock() {
+  const md = fs.readFileSync(CONTRACT, "utf8");
+  const blocks = extractBlocks(md).filter((b) =>
+    /DETECTOR_JSON=\$\(cat <detector-output-file>\)/.test(b.code),
+  );
+  assert.equal(
+    blocks.length,
+    1,
+    `expected one schema-check block binding DETECTOR_JSON, found ${blocks.length}`,
+  );
+  return blocks[0].code;
+}
+
+for (const sh of SHELLS) {
+  test(`K [${sh}] — schema block binds DETECTOR_JSON from the output file and rejects a non-array deltas_since_pause`, () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-block-"));
+    const good = JSON.stringify({
+      schema_version: 1,
+      recommended_step: 2,
+      blocking_issues: [],
+      deltas_since_pause: [],
+    });
+    const bad = JSON.stringify({
+      schema_version: 1,
+      recommended_step: 2,
+      blocking_issues: [],
+      deltas_since_pause: "nope",
+    });
+    const argv = (script) =>
+      sh === "zsh"
+        ? ["-f", "-c", script]
+        : ["--noprofile", "--norc", "-c", script];
+    for (const [name, json, expect] of [
+      ["good", good, 0],
+      ["bad", bad, 1],
+    ]) {
+      const out = path.join(dir, `${name}.json`);
+      fs.writeFileSync(out, json + "\n");
+      // The block is a CHECK the prose reads ("If validation fails …"), not an exit — so read
+      // the status of its last pipeline, the way the prose does.
+      const script =
+        schemaBlock().replace(/<detector-output-file>/g, out) +
+        '\nSCHEMA_RC=$?; echo "SCHEMA_RC=$SCHEMA_RC BOUND=${#DETECTOR_JSON}"\n';
+      const r = spawnSync(sh, argv(script), { cwd: dir, encoding: "utf8" });
+      const m = /SCHEMA_RC=(\d+) BOUND=(\d+)/.exec(r.stdout);
+      assert.ok(
+        m,
+        `[${name}] no status line; stdout: ${r.stdout} stderr: ${r.stderr}`,
+      );
+      assert.equal(
+        Number(m[1]),
+        expect,
+        `[${name}] expected schema check exit ${expect}`,
+      );
+      assert.ok(
+        Number(m[2]) > 0,
+        `[${name}] DETECTOR_JSON not bound by the block`,
+      );
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 }
 
