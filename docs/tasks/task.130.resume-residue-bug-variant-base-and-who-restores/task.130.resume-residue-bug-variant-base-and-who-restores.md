@@ -5,7 +5,7 @@ type: task
 description: "Close the medium findings PR #436's Step 5c review carried past merge and collapse the who-restores enumeration that produced bugs 9→11→12→13: bind the probe base from the bug-variant report's Branch-model line, mark develop-bug's Step 3 dispatch and widen the population pattern, move the stale-snapshot rm -f into the orchestrator, state the restore rule once with citations and a test, and the four gate-6 futures."
 tags: [pipeline, resume, develop-bug, enumeration]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: High
 created: 2026-09-20
 updated: 2026-09-20
@@ -17,7 +17,7 @@ github_issue: 437
 
 # Technical Task: Resume residue from task.124 — bug-variant base, dispatch population, self-reported delete, who-restores enumeration
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.130.review.1.resume-residue-bug-variant-base-and-who-restores.md` implemented 2026-09-20
 **GitHub Issue**: [#437](https://github.com/Gamaroff/agent-skills/issues/437)
 
@@ -150,13 +150,13 @@ Task.124 shipped the working-tree probe, `--restore`, `waiting_on` and the repor
 **Files**: `shared/resources/develop-pipeline-resume-contract.md`; new `shared/resources/tests/probe-base-binding.test.mjs` (+ three report fixtures under `shared/resources/tests/fixtures/probe-base/`); `evals/develop-task/step-isolation/17-resume-no-base-row-halts/`.
 
 **Changes**:
-- [ ] Add the `**Branch model:** … (base: X` sed arm after the table-row arm
-- [ ] Replace the `develop` default with a HALT naming `{implementation-report-path}` and both shapes
-- [ ] Capture `gh pr view`'s exit status and first stderr line; two stderr labels ("no PR on this branch" / "gh pr view failed: …")
-- [ ] Update the Cost sentence and the (a)/(c) table note
-- [ ] `probe-base-binding.test.mjs`: extract the `BASE_BRANCH=` block from the contract (keyed on the `The base is RECORDED STATE` anchor), run it under `bash` and `zsh` with `gh` stubbed (exit 1 / empty output) against three fixture reports — story/task table row → `develop`; bug `**Branch model:** hotfix (base: main, PR target: main)` → `main`; neither → exit 1 with the HALT text naming both shapes and no `git checkout` in the transcript
-- [ ] Replay fixture 17: a **develop-task** resume whose report has no `Feature branch base` row and no PR → HALT, nothing discarded (Breaking Change 1, end to end)
-- [ ] Mutation-prove: revert the bug-variant arm → the `main` case red; restore the `develop` default → the HALT case red
+- [x] Add the `**Branch model:** … (base: X` sed arm after the table-row arm
+- [x] Replace the `develop` default with a HALT naming `{implementation-report-path}` and both shapes
+- [x] Capture `gh pr view`'s exit status and first stderr line; two stderr labels ("no PR on this branch" / "gh pr view failed: …")
+- [x] Update the Cost sentence and the (a)/(c) table note
+- [x] `probe-base-binding.test.mjs`: extract the `BASE_BRANCH=` block from the contract (keyed on the `The base is RECORDED STATE` anchor), run it under `bash` and `zsh` with `gh` stubbed (exit 1 / empty output) against three fixture reports — story/task table row → `develop`; bug `**Branch model:** hotfix (base: main, PR target: main)` → `main`; neither → exit 1 with the HALT text naming both shapes and no `git checkout` in the transcript
+- [x] Replay fixture 17: a **develop-task** resume whose report has no `Feature branch base` row and no PR → HALT, nothing discarded (Breaking Change 1, end to end)
+- [x] Mutation-prove: revert the bug-variant arm → the `main` case red; restore the `develop` default → the HALT case red
 
 **Dependencies**: none
 
@@ -169,9 +169,9 @@ Task.124 shipped the working-tree probe, `--restore`, `waiting_on` and the repor
 **Files**: `skills/develop-bug/references/develop-bug-step-3-investigate-fix.md`; `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs`.
 
 **Changes**:
-- [ ] Mark step 3's root-cause dispatch (`set-waiting-on.sh "step-3 root-cause localisation"` / `--clear` after the summary is read) — the file is not bundled; edit it in place
-- [ ] Widen the `DISPATCH` regex (line 190) to the three wordings the corpus uses; add a non-vacuity assertion that it matches ≥1 line of `develop-bug-step-3-investigate-fix.md` (the file is already in the directory-derived population — do **not** hand-list it); raise the `sites >= 12` floor (line 242) to the measured count
-- [ ] Mutation-prove: remove the mark → test names the develop-bug file as unmarked; narrow the regex back → the non-vacuity assertion red
+- [x] Mark step 3's root-cause dispatch (`set-waiting-on.sh "step-3 root-cause localisation"` / `--clear` after the summary is read) — the file is not bundled; edit it in place
+- [x] Widen the `DISPATCH` regex (line 190) to the three wordings the corpus uses; add a non-vacuity assertion that it matches ≥1 line of `develop-bug-step-3-investigate-fix.md` (the file is already in the directory-derived population — do **not** hand-list it); raise the `sites >= 12` floor (line 242) to the measured count
+- [x] Mutation-prove: remove the mark → test names the develop-bug file as unmarked; narrow the regex back → the non-vacuity assertion red
 
 **Dependencies**: none
 
@@ -182,10 +182,10 @@ Task.124 shipped the working-tree probe, `--restore`, `waiting_on` and the repor
 **Files**: `shared/resources/pipeline-resume-detector-prompt.md`; `shared/resources/develop-pipeline-resume-contract.md` § Consume Output; `skills/develop-{task,story,bug}/SKILL.md` Step 0a (one citing sentence each — no copy of the loop); `evals/develop-task/step-isolation/16-resume-stale-snapshot-after-merge-deleted/`.
 
 **Changes**:
-- [ ] Detector: emit the stale snapshot as a `deltas_since_pause` object `{path: <snapshot path>, concern: "stale-snapshot: PR merged"}` (the schema's existing fields) and keep the file; remove the "one sanctioned write" clause and the decision-table row's "deleted"
-- [ ] Contract § Consume Output — the **one** statement of the delete: `jq -r '.deltas_since_pause[] | select(.concern | startswith("stale-snapshot")) | .path'` piped to `while IFS= read -r p; do rm -f "$p"; [ ! -f "$p" ] || { echo "HALT: stale snapshot $p survived deletion"; exit 1; }; done`, before Phase 0b
-- [ ] Each orchestrator's Step 0a cites that section in one sentence ("stale snapshots the detector reports are deleted and verified per the resume contract § Consume Output") — three copies of the loop would be the enumeration this task removes
-- [ ] Fixture 16: re-record `detector-output.json` with the object shape (the current recording says `PR merged; deleted`); assertions: `fileAbsent` on the snapshot, `fileMatches` on `"concern": "stale-snapshot: PR merged"`, `fileDoesNotMatch` on `deleted`, and the orchestrator's delete placed after the `resume-detector` event in `pipeline-events.json`
+- [x] Detector: emit the stale snapshot as a `deltas_since_pause` object `{path: <snapshot path>, concern: "stale-snapshot: PR merged"}` (the schema's existing fields) and keep the file; remove the "one sanctioned write" clause and the decision-table row's "deleted"
+- [x] Contract § Consume Output — the **one** statement of the delete: `jq -r '.deltas_since_pause[] | select(.concern | startswith("stale-snapshot")) | .path'` piped to `while IFS= read -r p; do rm -f "$p"; [ ! -f "$p" ] || { echo "HALT: stale snapshot $p survived deletion"; exit 1; }; done`, before Phase 0b
+- [x] Each orchestrator's Step 0a cites that section in one sentence ("stale snapshots the detector reports are deleted and verified per the resume contract § Consume Output") — three copies of the loop would be the enumeration this task removes
+- [x] Fixture 16: re-record `detector-output.json` with the object shape (the current recording says `PR merged; deleted`); assertions: `fileAbsent` on the snapshot, `fileMatches` on `"concern": "stale-snapshot: PR merged"`, `fileDoesNotMatch` on `deleted`, and the orchestrator's delete placed after the `resume-detector` event in `pipeline-events.json`
 
 **Dependencies**: none
 
@@ -196,9 +196,9 @@ Task.124 shipped the working-tree probe, `--restore`, `waiting_on` and the repor
 **Files**: `shared/resources/develop-pipeline-resume-contract.md` (Phase 0b paragraph), `develop-pipeline-step-0-resolve-and-prepare.md` §0b, `skills/develop-{task,story,bug}/SKILL.md` Step 0-lock; new `shared/resources/tests/who-restores-single-statement.test.mjs`.
 
 **Changes**:
-- [ ] Put `<!-- who-restores: statement -->` on the Phase 0a section; reduce the five restatements (contract Phase 0b paragraph, step-0 §0b, three Step 0-lock paragraphs — develop-bug's "no re-entry grant" sentence included) to one-sentence citations; keep every pipeline qualifier in the one statement
-- [ ] Test: exactly one marker across `shared/resources/**/*.md` + `skills/develop-*/SKILL.md` (non-vacuity: `=== 1`); in each of the five citation sites, no line pairs `restore|restores|restoring|runs the command` with `loop-limit\|not-converging` or `no re-entry grant`; each site contains `Restore the lock (both resume paths)`. The grant-offer rule (contract § Re-entry step 3, SKILL.md Re-entry paragraphs) keeps its token and is not in the checked sites
-- [ ] Mutation-prove: remove the marker → red; paste the old Phase 0b sentence back → red; paste develop-bug's "no re-entry grant — …" sentence back → red
+- [x] Put `<!-- who-restores: statement -->` on the Phase 0a section; reduce the five restatements (contract Phase 0b paragraph, step-0 §0b, three Step 0-lock paragraphs — develop-bug's "no re-entry grant" sentence included) to one-sentence citations; keep every pipeline qualifier in the one statement
+- [x] Test: exactly one marker across `shared/resources/**/*.md` + `skills/develop-*/SKILL.md` (non-vacuity: `=== 1`); in each of the five citation sites, no line pairs `restore|restores|restoring|runs the command` with `loop-limit\|not-converging` or `no re-entry grant`; each site contains `Restore the lock (both resume paths)`. The grant-offer rule (contract § Re-entry step 3, SKILL.md Re-entry paragraphs) keeps its token and is not in the checked sites
+- [x] Mutation-prove: remove the marker → red; paste the old Phase 0b sentence back → red; paste develop-bug's "no re-entry grant — …" sentence back → red
 
 **Dependencies**: Phase 1 (the contract file is edited by both — land 1 first)
 
@@ -209,11 +209,11 @@ Task.124 shipped the working-tree probe, `--restore`, `waiting_on` and the repor
 **Files**: `shared/resources/advance-pipeline-lock.sh` (+ test), `grant-qa-cycles.sh` (+ test), `develop-pipeline-step-8-commit.md`, `skills/develop-{task,story,bug}/SKILL.md` (lint call sites), `develop-pipeline-hooks.md`.
 
 **Changes**:
-- [ ] `--restore --which`: print the winning candidate, exit 1 on none; no writes
-- [ ] `grant-qa-cycles.sh`: guard reads the budget from the `--which` result
-- [ ] `--restore` refuses a directory-less snapshot without `--accept-legacy`; Step 8 deletes a sole legacy snapshot — the "sole" count is a nullglob-guarded `for f in <snapshot> <claim-glob>; do [ -e "$f" ] && n=$((n+1)); done`, never `ls <path> <glob> | wc -l`; add the fence to `halt-snippet-glob-safe.test.mjs`'s population if step-8 is not already in it
-- [ ] Lint call sites: `rc=$?; case $rc in 0) ;; 1) …;; 2) …;; *) …;; esac` at the three inline sites — fenced and HALTing at (1) Step Transition action 2 and (4) step-8; **one-line and warn-only** at (2) the HALT rule (`SKILL.md` "Commit the report before any halt"), which must keep proceeding to the snapshot and lock removal
-- [ ] Tests for each; `npm run bundle`; CHANGELOG
+- [x] `--restore --which`: print the winning candidate, exit 1 on none; no writes
+- [x] `grant-qa-cycles.sh`: guard reads the budget from the `--which` result
+- [x] `--restore` refuses a directory-less snapshot without `--accept-legacy`; Step 8 deletes a sole legacy snapshot — the "sole" count is a nullglob-guarded `for f in <snapshot> <claim-glob>; do [ -e "$f" ] && n=$((n+1)); done`, never `ls <path> <glob> | wc -l`; add the fence to `halt-snippet-glob-safe.test.mjs`'s population if step-8 is not already in it
+- [x] Lint call sites: `rc=$?; case $rc in 0) ;; 1) …;; 2) …;; *) …;; esac` at the three inline sites — fenced and HALTing at (1) Step Transition action 2 and (4) step-8; **one-line and warn-only** at (2) the HALT rule (`SKILL.md` "Commit the report before any halt"), which must keep proceeding to the snapshot and lock removal
+- [x] Tests for each; `npm run bundle`; CHANGELOG
 
 **Dependencies**: Phase 4 (SKILL.md edits)
 
@@ -296,26 +296,26 @@ Not applicable — one additional `sed` per resume.
 
 ### Functional
 
-- [ ] A bug-variant report with base `main` binds `BASE_REF=origin/main`; no report shape → HALT, nothing discarded — proven by an executed test, not a recording
-- [ ] `gh` failure and "no PR" produce different stderr lines
-- [ ] develop-bug Step 3's dispatch is marked and matched by the tested regex
-- [ ] A MERGED snapshot is deleted by the orchestrator, from one stated loop, and asserted absent before Phase 0b
-- [ ] The who-restores rule carries one marker; the five citation sites carry no restore-verb rule text (token-bearing or not); the grant-offer prose is untouched
-- [ ] The grant's guard reads the candidate `--restore` will choose
-- [ ] A directory-less snapshot is refused without `--accept-legacy` and deleted by Step 8 when sole
+- [x] A bug-variant report with base `main` binds `BASE_REF=origin/main`; no report shape → HALT, nothing discarded — proven by an executed test, not a recording
+- [x] `gh` failure and "no PR" produce different stderr lines
+- [x] develop-bug Step 3's dispatch is marked and matched by the tested regex
+- [x] A MERGED snapshot is deleted by the orchestrator, from one stated loop, and asserted absent before Phase 0b
+- [x] The who-restores rule carries one marker; the five citation sites carry no restore-verb rule text (token-bearing or not); the grant-offer prose is untouched
+- [x] The grant's guard reads the candidate `--restore` will choose
+- [x] A directory-less snapshot is refused without `--accept-legacy` and deleted by Step 8 when sole
 
 ### Performance
 
-- [ ] Resume cost unchanged beyond one `sed` and one `--which` read
+- [x] Resume cost unchanged beyond one `sed` and one `--which` read
 
 ### Code Quality
 
-- [ ] Every new branch mutation-proven; `npm run ci:fast` and `eval:develop-task` green; `bundle:check` 0 problems; shellcheck clean
+- [x] Every new branch mutation-proven; `npm run ci:fast` and `eval:develop-task` green; `bundle:check` 0 problems; shellcheck clean
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` names the HALT and the legacy-snapshot refusal
-- [ ] `task.124.pr-review.1` CR-1..CR-5 and gate-6 futures referenced as closed in this task's implementation report
+- [x] CHANGELOG `[Unreleased]` names the HALT and the legacy-snapshot refusal
+- [x] `task.124.pr-review.1` CR-1..CR-5 and gate-6 futures referenced as closed in this task's implementation report
 
 ---
 
@@ -378,7 +378,6 @@ Not applicable — one additional `sed` per resume.
 **Non-Critical (Forward Fix)**: message wording; a citation the test misreads.
 
 ---
-
 <!-- change-log-start -->
 ## Change Log
 
@@ -387,15 +386,16 @@ Not applicable — one additional `sed` per resume.
 | 2026-09-20 | 1.0 | Initial draft — follow-ups from task.124 / PR #436 (5c review CR-1..CR-5, gate-6 futures, obs #132) | create-task |
 | 2026-09-20 | 1.1 | Review 1 (8/10, 0 critical / 7 important): who-restores test re-keyed on a marker (token shared with the grant-offer rule; develop-bug restates without it); Phase 1 gains an executed base-binding test, fixture 17 re-scoped to the develop-task HALT case; base-row date corrected to task.124 (no existing report carries it); Phase 2 regex-only (site already in the derived population); step-8 legacy count made glob-safe; lint site (2) one-line warn-only; delete loop stated once in the contract; effort 8h → 16h | review-task |
 | 2026-09-20 |  | Status → ready-for-development | review-task |
+| 2026-09-20 |  | Implemented — 26 source/doc files, 4 new + 4 extended test suites (+46 tests), fixtures 16 re-recorded and 17 added; 3 plan snippets corrected by execution | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: probe base
-- [ ] Phase 2: dispatch mark + population
-- [ ] Phase 3: orchestrator-owned delete
-- [ ] Phase 4: one statement of who restores
-- [ ] Phase 5: gate-6 futures
+- [x] Phase 1: probe base
+- [x] Phase 2: dispatch mark + population
+- [x] Phase 3: orchestrator-owned delete
+- [x] Phase 4: one statement of who restores
+- [x] Phase 5: gate-6 futures
 - [ ] QA: `task.130.qa.[N].resume-residue-bug-variant-base-and-who-restores.md`
 - [ ] Gate: `task.130.gate.[N].resume-residue-bug-variant-base-and-who-restores.yml`
 
@@ -410,3 +410,17 @@ Not applicable — one additional `sed` per resume.
 
 - QA artifacts land beside this file: `task.130.qa.[N].*.md`, `task.130.bug.[N].*.md`, `task.130.gate.[N].*.yml`.
 - Independent of tasks 128 and 129 (both `planned`); shares no file with 129, and touches `probe-boundary-rule.md` not at all.
+
+### Implementation notes (develop, 2026-09-20)
+
+**Implementation summary.** All five phases landed as planned, in one PR, each with an executed test mutation-proven red on revert (proofs recorded in the implementation report's Step 3 entry). Three plan snippets were found wrong *by executing them* and corrected before commit:
+
+1. **Phase 3 — the piped `while` swallowed the HALT.** The plan's `printf | jq | while … exit 1; done` runs the loop body in a subshell under bash, so `exit 1` ended the subshell and the block carried on past the HALT (zsh runs the last pipeline stage in the current shell, which is why it passed there). The one statement now reads from a process substitution; `stale-snapshot-delete.test.mjs` case C is what found it.
+2. **Phase 5 — the "nullglob-guarded" loop had no nullglob guard.** `for f in <path> <glob>` aborts under zsh's `nomatch` exactly as `ls <path> <glob> | wc -l` does; `halt-snippet-glob-safe.test.mjs` F1 caught it with `no matches found`. Step 8 counts claims with `find`, the form `advance-pipeline-lock.sh` already uses.
+3. **Phase 1 — the stderr label could not split on exit status alone.** `gh pr view` exits 1 both for a failing `gh` and for a branch with no PR (`no pull requests found`), so the plan's `if [ "$GH_RC" -ne 0 ]` would have labelled every PR-less branch a `gh` failure. The split reads gh's stderr text as well.
+
+Two test-design corrections: Phase 2's "≥1 line of the file matches" non-vacuity was vacuous (the file's triage dispatch already matched `subagent_type=`), so the assertion is anchored to the root-cause line itself; and the stale-snapshot test's extractor was first keyed on the `rm`/`select` tokens under proof, which made every mutation red for the wrong reason (a missing block), so it keys on the block's comment line. Phase 2's site floor is 17 (measured), not 12.
+
+**Testing.** `npm run ci:fast` 3542/3542 node tests + every shell suite (advance-pipeline-lock 75, grant-qa-cycles 42); `npm run eval:develop-task` 17/17 fixtures including new 17 and re-recorded 16; `bundle:check` 0 problems; `lint:shell` clean; Step 4b classifier over the four edited documents — the one finding (detector prompt line 69, `cat` of an absent lock) is identical on `develop` and out of scope. New suites: `probe-base-binding` (11), `stale-snapshot-delete` (7), `who-restores-single-statement` (4), `report-lint-call-sites` (3); extended: `halt-snippet-glob-safe` (+6), `qa-loop-lock-fields-parity`, `advance-pipeline-lock.test.sh` (+10), `grant-qa-cycles.test.sh` (+5).
+
+**Deferred.** None. Out of scope (unchanged): gate-6's third future (step-0's zero executed blocks), the grant-offer prose, tasks 128/129.

@@ -34,6 +34,30 @@ jq -e '.schema_version == 1 and (.recommended_step | type == "number") and (.blo
 
 If validation fails (parse error or missing required fields): log `"⚠️ Detector output invalid — falling back to full Phase 0b verification"` and proceed to Phase 0b using `current_step` from the lock as the upper bound (treat all steps as unverified).
 
+**Delete what the detector proved stale — here, once, and verified.** The detector is read-only;
+when it finds a `last-halt.json` for this document whose PR is `MERGED` it reports the file as a
+`deltas_since_pause` object whose `concern` starts `stale-snapshot` and whose `path` names it, and
+leaves the file in place (detector prompt, Step 1 item 2). This is the **one** statement of the
+delete — the three orchestrators cite this section and carry no copy of the loop (task.130,
+PR #436 review CR-3; a subagent that self-reports a delete it may not perform, and three
+orchestrator copies of the rm, are two shapes of the same enumeration). Run it before Phase 0b:
+
+```bash
+# Every `stale-snapshot` delta names a snapshot the detector proved belongs to a MERGED run.
+# The detector is read-only; THIS is where it is deleted, one path per rm, and re-read afterwards.
+# The loop reads from a process substitution, not a pipe: under bash a piped `while` body is a
+# subshell, and its `exit 1` ended the subshell while the block carried on past the HALT (found
+# by executing this block under both shells — stale-snapshot-delete.test.mjs, case C).
+while IFS= read -r p; do
+  rm -f "$p"
+  [ ! -f "$p" ] || { echo "HALT: stale snapshot $p survived deletion — remove it by hand and re-invoke"; exit 1; }
+done < <(printf '%s' "$DETECTOR_JSON" | jq -r '.deltas_since_pause[] | select(.concern | startswith("stale-snapshot")) | .path')
+```
+
+`$DETECTOR_JSON` is the detector's validated output (the `<output>` the schema check above read).
+The re-read is the point: a delete that is reported and not verified is the failure mode this
+section replaces, one layer up.
+
 ### Surface Results to User
 
 Always surface the detector output before proceeding, in this format:
@@ -54,6 +78,8 @@ Wait for user confirmation before proceeding to Phase 0b. If the user disputes `
 If `blocking_issues` is non-empty: **HALT** — display each issue to the user and require manual resolution before resuming. Do not proceed to Phase 0b.
 
 ### Restore the lock (both resume paths)
+
+<!-- who-restores: statement -->
 
 When `source` is `halt_snapshot` or `orphaned_claim` and the operator chooses Resume, the lock does
 not exist — a HALT or pause removed it, and a resume skips Step 1, its only ordinary writer. **Who
@@ -97,7 +123,7 @@ bundled copy the run had produced. So the probe runs **first**, and it **classif
 | --- | --- | --- |
 | **(a) overlay** | every entry is byte-identical to the base branch — a tracked file whose content equals `$BASE_REF`'s, or an untracked file the base **has** with the same bytes (a stray checkout/copy, not work) | discard, path by path, **from `HEAD` into both the index and the working tree**: `git checkout HEAD -- <tracked paths>`, `git clean -f -- <untracked paths>`; then re-read the **full** `git status --porcelain --no-renames` and HALT if anything remains; list every discarded path in the Decisions Log |
 | **(b) bundle drift** | every entry is under `skills/*/references/` — bundled copies out of date with their sources | `npm run bundle -- --check \|\| npm run bundle`, then continue |
-| **(c) anything else** | an entry the probe cannot classify — real uncommitted work, an untracked file the base does not have, a mix | **HALT**: print the entries and stop. A resume that guesses here is the task.116 overlay again |
+| **(c) anything else** | an entry the probe cannot classify — real uncommitted work, an untracked file the base does not have, a mix; and an **unbindable base** (no PR, no report row, no `**Branch model:**` line), which makes the whole tree (c) | **HALT**: print the entries and stop. A resume that guesses here is the task.116 overlay again |
 
 ```bash
 # `--no-renames`: a staged rename would otherwise print as one `R  old -> new` entry whose
@@ -111,13 +137,28 @@ if [ -n "$DIRTY" ]; then
   # and every epic-integration branch against develop — and the one outcome that deletes bytes,
   # the (a) discard, keyed on that comparison (task.124 QA cycle 5, CR-2). Order: the PR's own
   # base when the branch has one (Steps 4+); else the Q1 answer in the report's Pipeline
-  # Configuration row (Steps 1–3); else `develop`, SAID ALOUD, never assumed silently.
-  BASE_BRANCH=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || true)
+  # Configuration row (Steps 1–3); else the bug-variant report's `**Branch model:**` line; else
+  # HALT — a base the probe cannot bind is a base it must not guess, because the guess is what
+  # the (a) discard compares against (task.130, PR #436 review CR-1).
+  GH_ERR=$(mktemp); BASE_BRANCH=$(gh pr view --json baseRefName -q .baseRefName 2>"$GH_ERR"); GH_RC=$?
   [ -n "$BASE_BRANCH" ] || BASE_BRANCH=$(sed -nE 's/^\| *Feature branch base *\| *`?([^ |`]+).*/\1/p' \
     {implementation-report-path} 2>/dev/null | head -1)
-  [ -n "$BASE_BRANCH" ] || { BASE_BRANCH=develop
-    echo "probe: no PR on this branch and no 'Feature branch base' row in the report — classifying against origin/develop" >&2; }
-  BASE_REF="origin/$BASE_BRANCH"
+  # The BUG-variant report records the base on one line, not in a table row
+  # (implementation-report-template.md § Bug variant) — PR #436 review CR-1.
+  [ -n "$BASE_BRANCH" ] || BASE_BRANCH=$(sed -nE 's/^\*\*Branch model:\*\*.*\(base: *`?([^,) `]+).*/\1/p' \
+    {implementation-report-path} 2>/dev/null | head -1)
+  if [ -z "$BASE_BRANCH" ]; then
+    # Label the cause on stderr: a failed `gh` and a branch with no PR are different findings —
+    # and `gh pr view` exits 1 for BOTH, so the split reads its stderr, not only its status.
+    if [ "$GH_RC" -ne 0 ] && ! grep -qi 'no pull requests found' "$GH_ERR"; then
+      echo "probe: gh pr view failed: $(head -1 "$GH_ERR")" >&2
+    else
+      echo "probe: no PR on this branch" >&2
+    fi
+    echo "HALT: cannot bind the probe base — no PR, and {implementation-report-path} carries neither a '| Feature branch base |' row nor a '**Branch model:** … (base: X' line; add the row and re-invoke. Nothing was discarded."
+    rm -f "$GH_ERR"; exit 1
+  fi
+  rm -f "$GH_ERR"; BASE_REF="origin/$BASE_BRANCH"
   # Classify EVERY entry first; act only on the classified paths (never `checkout -- .`, never a
   # directory-wide `clean`). `git diff <commit> -- <path>` does not see an untracked path, so `??`
   # entries need their own test: base must HAVE the path and the bytes must match.
@@ -179,7 +220,8 @@ porcelain afterwards (a pathspec-filtered re-read is satisfied vacuously by an e
 probe mis-parsed), because a probe that prints "discarded" over an entry it did not discard is the
 task.116 failure with a success line in front of it (cycle 1 CR-4, cycle 2 CR-4). Renames are
 split by `--no-renames` and a quoted path is (c) for the same reason: the probe acts only on paths
-it can address. Cost: one `gh pr view` (or one `sed` over the report) to bind the base, one `git
+it can address. Cost: one `gh pr view` (or up to two `sed` passes over the report) to bind the base — an
+unbindable base is a HALT before any entry is classified, never a `develop` guess — one `git
 status --porcelain --no-renames`, plus one `git cat-file -e` and one
 `git diff --quiet` (tracked) or `git show | cmp` (untracked) per entry for (a), plus one full
 porcelain re-read.
@@ -187,8 +229,8 @@ porcelain re-read.
 **Halt snapshot for another document.** When Phase 0a's detector reports a `last-halt.json` whose
 `task_or_story_directory` is not this document's, it is **refused, not resumed** — and when a
 snapshot for *this* document names a `pr_url` that is `MERGED`, the detector reports it as
-`stale-snapshot` and **deletes it** rather than offering a resume of merged work (obs #88; the
-detector prompt's Step 1). A document that reads `status: accepted` is **not** evidence the run
+`stale-snapshot` and **the orchestrator deletes it** (§ Consume Output, verified on disk) rather
+than offering a resume of merged work (obs #88; the detector prompt's Step 1; task.130). A document that reads `status: accepted` is **not** evidence the run
 finished — `/finalise` writes it before its second CI reading and before Step 8 — so an accepted
 document with an unmerged PR keeps its snapshot (task.124 QA cycle 2, CR-1). A completed run also deletes its own snapshot at Step 8, so a snapshot
 that reaches this point is either this run's live one or a leftover the detector names.
@@ -199,12 +241,10 @@ that reaches this point is either this run's live one or a leftover the detector
 it — a session that continues in place after a pause **and** a re-invocation that chooses Resume
 in Phase 0b — so neither has a step that puts the lock back unless it is stated, and
 `advance-pipeline-lock.sh <n>` with no lock is now an **error naming the fix**, not a silent no-op
-(obs #123; QA cycle 2, CR-2). **Who restores is stated once — under Phase 0a, "Restore the lock
-(both resume paths)"** — and this paragraph defers to it: on a `develop-task`/`develop-story`
-`loop-limit|not-converging` snapshot the grant restores (after its never-lower guard), and on every
-other snapshot or pause — every `develop-bug` snapshot included — the command below runs first,
-then the run continues (QA cycle 4, CR-1 — an earlier revision of this paragraph
-said "restore first" unconditionally, which was the bug-9 ordering restated one section down):
+(obs #123; QA cycle 2, CR-2). Who restores, and when, is stated once — under Phase 0a,
+**Restore the lock (both resume paths)** — and this paragraph only points at it (task.130;
+obs #132: five restatements of that rule produced bugs 9 → 11 → 12 → 13, each fixed at one site
+while the others stayed wrong). When that section says the command runs here, run:
 
 ```bash
 bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --restore {doc-directory}

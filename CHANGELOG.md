@@ -151,6 +151,36 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The resume probe binds its base from every report variant and HALTs when it cannot; the
+  detector no longer deletes; who restores is stated once (task 130; PR #436 review CR-1…CR-5,
+  gate-6 futures, obs #132).** The working-tree probe's base chain now reads the bug-variant
+  report's `**Branch model:** … (base: X` line after the task/story table row, and **a base it
+  cannot bind is a HALT** naming the report and both shapes — never a silent `origin/develop`
+  guess, which is what the (a) discard compared against; the stderr label says whether `gh pr
+  view` failed or the branch simply has no PR. Proven by an executed test
+  (`probe-base-binding.test.mjs`: the block cut from the contract and run under bash and zsh
+  against three report fixtures with `gh` stubbed), not a recording. **Breaking:** a resume on a
+  report written before task.124's template (no `Feature branch base` row) with no PR now halts
+  where it used to guess — add the row and re-invoke. The resume detector is **read-only again**:
+  a `last-halt.json` whose PR is `MERGED` is reported as a `deltas_since_pause` object
+  (`concern: "stale-snapshot: PR merged"`) and the **orchestrator deletes it** from one loop in
+  the resume contract § Consume Output, re-reading the path (bash's piped `while` swallowed the
+  HALT's `exit 1` in a subshell — found by executing the block; it reads from a process
+  substitution now). The **who-restores rule** — grant restores on a `loop-limit|not-converging`
+  snapshot in develop-task/story, `--restore` everywhere else — is stated once, marked
+  `<!-- who-restores: statement -->`, and its five former restatements are one-sentence citations
+  guarded by `who-restores-single-statement.test.mjs` (keyed on the marker, not the token the
+  grant-offer rule legitimately shares). develop-bug's Step 3 root-cause dispatch is marked with
+  `set-waiting-on.sh`, and the population test's dispatch pattern reads its wording.
+  `advance-pipeline-lock.sh` gains **`--restore --which <doc-dir>`** (prints the candidate the
+  restore would consume; no writes) and **`--accept-legacy`**; **Breaking:** a snapshot with no
+  `task_or_story_directory` is refused as `legacy-snapshot` without the flag, and Step 8 deletes
+  such a snapshot when it is the sole candidate (counted with `find` — a `for f in <path> <glob>`
+  loop aborts under zsh's `nomatch` exactly as `ls | wc -l` did). `grant-qa-cycles.sh`'s
+  never-lower guard reads the `--which` candidate, so a newer claim's higher budget is what the
+  guard sees. The four inline `report-lint.js` call sites split the exit into `0 / 1 / 2 / other`
+  with a distinct message each (the report, the call site, the install).
+
 - **`probes_executed` and `evidence: measured` now come from the engine, not the agent (task 118).**
   `review-security`'s output block carried a probe count the agent typed, and the contract test
   checked the prompt's *example* block rather than a run — so an agent that executed nothing and

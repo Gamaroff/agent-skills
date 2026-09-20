@@ -32,11 +32,16 @@ Before invoking `/commit-changes`, update the implementation report one final ti
 
 ```bash
 REPORT="${IMPLEMENTATION_REPORT:?must be set from lock or context}"
-command node .agents/skills/{develop-story|develop-task|develop-bug}/references/report-lint.js --file "$REPORT" --json \
-  || { echo "HALT: report failed lint — repair $REPORT by hand before committing (see the problems above)"; exit 1; }
+command node .agents/skills/{develop-story|develop-task|develop-bug}/references/report-lint.js --file "$REPORT" --json; rc=$?
+case $rc in
+  0) ;;
+  1) echo "HALT: report failed lint — repair $REPORT by hand before committing (see the problems above)"; exit 1 ;;
+  2) echo "HALT: report-lint usage error — the call site is wrong, not the report"; exit 1 ;;
+  *) echo "HALT: report-lint.js not runnable (rc $rc) — check the bundled path"; exit 1 ;;
+esac
 ```
 
-Engine: `references/report-lint.js`; expected sections come from `references/implementation-report-template.md`, the one definition. A `problems` result is a HALT with nothing committed; the linter never repairs.
+Engine: `references/report-lint.js`; expected sections come from `references/implementation-report-template.md`, the one definition. A `problems` result is a HALT with nothing committed; the linter never repairs. The exit is read into `rc` **before** the `case` — inside a `*)` arm `$?` no longer names the linter's status — and the three non-zero arms carry distinct messages because they name three different repairs: the report (1), the call site (2), the install (127 or anything else). A single `|| { HALT }` reported all three as "the report failed lint" (task.130; task.124 cycle-1 CR-7).
 
 ## Invoke /commit-changes
 
@@ -105,6 +110,19 @@ if [ -f "$SNAPSHOT" ]; then
   SNAP_DIR=$(jq -r '.task_or_story_directory // ""' "$SNAPSHOT" 2>/dev/null)
   if [ -n "$SNAP_DIR" ] && [ "$(canon "$SNAP_DIR")" = "$(canon "{work-item-dir}")" ]; then
     rm -f "$SNAPSHOT" && echo "halt snapshot for this run removed"
+  elif [ -z "$SNAP_DIR" ]; then
+    # A snapshot with no directory predates task.123 and can belong to no run that will
+    # resume it (--restore refuses it without --accept-legacy; task.130). Delete it only when
+    # it is the SOLE candidate on disk — beside a live claim it might be the operator's
+    # evidence. Count the claims with `find`, never a glob: under zsh an unmatched glob is
+    # `nomatch`, which aborts `ls <path> <glob> | wc -l` AND a `for f in <path> <glob>` loop
+    # alike (the loop form was proposed and found aborting by halt-snippet-glob-safe.test.mjs
+    # F1 under zsh); docs/reference/anti-patterns.md § "Never put a must-succeed path and a
+    # glob in one `rm` argv".
+    n=1   # the snapshot itself
+    while IFS= read -r f; do [ -n "$f" ] && n=$((n + 1)); done \
+      < <(find .claude/state -maxdepth 1 -name 'develop-pipeline.lock.pausing.*' -type f 2>/dev/null)
+    [ "$n" -eq 1 ] && rm -f "$SNAPSHOT" && echo "legacy snapshot (no directory) removed — it belonged to no resumable run"
   fi
 fi
 

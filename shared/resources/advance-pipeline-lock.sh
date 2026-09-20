@@ -79,6 +79,15 @@
 #   • mtimes are read GNU-form first (`stat -c %Y`), BSD-form second (`stat -f %m`), and a
 #     non-numeric read is 0 with a warning — `stat -f` is filesystem mode on GNU coreutils,
 #     which made the first candidate win unconditionally on Linux (task.124 QA cycle 1, CR-1)
+#   • a candidate with NO task_or_story_directory (the pre-task.123 shape) is REFUSED with
+#     "legacy-snapshot" unless --accept-legacy is passed: it can belong to any document, and
+#     a match by absence is the guess this mode exists to remove (task.130, PR #436 review
+#     CR-5). Step 8 deletes such a snapshot when it is the sole candidate on disk.
+#   • --restore --which <doc-dir>: print the path --restore WOULD consume and exit 0, with
+#     no writes and nothing consumed; exit 1 (same stderr) when nothing is usable. This is
+#     the same selection function, not a re-derivation — grant-qa-cycles.sh reads its
+#     never-lower guard from this path, so the guard and the restore cannot disagree about
+#     which candidate is live (task.130; task.124 QA cycle 1, CR-5).
 #
 # Exit codes: 0 on every safe path listed above; 1 on argument error, a numeric advance
 # with no lock, a --restore with nothing usable, a non-object lock, or a jq failure.
@@ -96,6 +105,9 @@ Usage:
   $0 --complete             # remove lock (pipeline finished)
   $0 --skill <skill-name>   # advance based on returning sub-skill name
   $0 --restore <doc-dir>    # rebuild the lock from the halt snapshot / orphaned claim
+  $0 --restore [--which] [--accept-legacy] <doc-dir>
+                            #   --which: print the candidate --restore would consume; no writes
+                            #   --accept-legacy: accept a snapshot with no task_or_story_directory
 USAGE
   exit 1
 }
@@ -151,13 +163,16 @@ mtime_of() {
   printf '%s' "$m"
 }
 
-restore_lock() {
-  local doc_dir="$1" want candidates=() mine=() c c_dir chosen="" newest=-1 m step tmp
+# choose_candidate DOC_DIR → sets CHOSEN (the newest candidate for this document) and
+# MINE (every candidate for it). Exit 1 with the reason on stderr when nothing is usable.
+# The ONE selection: `--restore` consumes what this chooses, `--restore --which` prints it,
+# and grant-qa-cycles.sh reads its never-lower guard from it — a second derivation anywhere
+# is a guard that can pass on one file while the restore consumes another (task.130).
+ACCEPT_LEGACY="${ACCEPT_LEGACY:-0}"
+CHOSEN=""; MINE=()
+choose_candidate() {
+  local doc_dir="$1" want candidates=() c c_dir newest=-1 m legacy=0
   [ -d "$doc_dir" ] || { echo "advance-pipeline-lock: --restore needs an existing <doc-dir>, got '$doc_dir'" >&2; exit 1; }
-  if [ -f "$LOCK" ]; then
-    echo "advance-pipeline-lock: lock present at '$LOCK' — nothing to restore"
-    exit 0
-  fi
   want=$(canon "$doc_dir")
   [ -f "$SNAPSHOT" ] && candidates+=("$SNAPSHOT")
   # `find`, not a glob: this file is run under zsh as well as bash (the test suite's
@@ -173,18 +188,39 @@ restore_lock() {
   for c in "${candidates[@]}"; do
     jq -e 'type == "object"' "$c" >/dev/null 2>&1 || { echo "advance-pipeline-lock: '$c' is not a JSON object — skipped" >&2; continue; }
     c_dir=$(jq -r '.task_or_story_directory // ""' "$c")
+    if [ -z "$c_dir" ] && [ "$ACCEPT_LEGACY" != "1" ]; then
+      # A snapshot with no directory predates task.123 and can belong to ANY document; a match
+      # by absence is a guess. Refuse it by name so the operator decides (task.130).
+      echo "advance-pipeline-lock: legacy-snapshot: '$c' carries no task_or_story_directory — refusing to restore from it; pass --accept-legacy to restore it for '$doc_dir', or delete it (Step 8 removes a sole legacy snapshot)" >&2
+      legacy=1
+      continue
+    fi
     if [ -n "$c_dir" ] && [ "$(canon "$c_dir")" != "$want" ]; then
       echo "advance-pipeline-lock: '$c' is for '$c_dir', not '$doc_dir' — refusing to restore from it" >&2
       continue
     fi
-    mine+=("$c")
+    MINE+=("$c")
     m=$(mtime_of "$c")
-    if [ "$m" -gt "$newest" ]; then chosen="$c"; newest="$m"; fi
+    if [ "$m" -gt "$newest" ]; then CHOSEN="$c"; newest="$m"; fi
   done
-  if [ -z "$chosen" ]; then
-    echo "advance-pipeline-lock: no halt snapshot or orphaned claim is for '$doc_dir' — nothing restored" >&2
+  if [ -z "$CHOSEN" ]; then
+    if [ "$legacy" -eq 1 ]; then
+      echo "advance-pipeline-lock: no candidate for '$doc_dir' — the only one(s) found are legacy snapshots (see above)" >&2
+    else
+      echo "advance-pipeline-lock: no halt snapshot or orphaned claim is for '$doc_dir' — nothing restored" >&2
+    fi
     exit 1
   fi
+}
+
+restore_lock() {
+  local doc_dir="$1" chosen step tmp
+  if [ -f "$LOCK" ]; then
+    echo "advance-pipeline-lock: lock present at '$LOCK' — nothing to restore"
+    exit 0
+  fi
+  choose_candidate "$doc_dir"
+  chosen="$CHOSEN"
   mkdir -p "$(dirname "$LOCK")"
   tmp=$(mktemp "$(dirname "$LOCK")/.advance-pipeline-lock.XXXXXX") || {
     echo "advance-pipeline-lock: could not create temp file beside '$LOCK'" >&2
@@ -207,9 +243,9 @@ restore_lock() {
   mv "$tmp" "$LOCK"
   # Consume EVERY candidate for this document, not only the winner: a losing same-document
   # snapshot left behind is the stale-snapshot-after-merge leftover this mode exists to end
-  # (task.124 QA cycle 1, CR-8). Candidates for other documents were never in `mine`.
-  local losers=()
-  for c in "${mine[@]}"; do
+  # (task.124 QA cycle 1, CR-8). Candidates for other documents were never in `MINE`.
+  local losers=() c
+  for c in "${MINE[@]}"; do
     [ "$c" = "$chosen" ] && continue
     rm -f "$c" && losers+=("$c")
   done
@@ -281,8 +317,29 @@ case "$1" in
     exit 0
     ;;
   --restore)
-    [ $# -ge 2 ] || usage
-    restore_lock "$2"
+    shift
+    WHICH=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --which) WHICH=1; shift ;;
+        --accept-legacy) ACCEPT_LEGACY=1; shift ;;
+        --*) echo "advance-pipeline-lock: unknown --restore flag '$1'" >&2; usage ;;
+        *) break ;;
+      esac
+    done
+    [ $# -ge 1 ] || usage
+    if [ "$WHICH" -eq 1 ]; then
+      # Print the candidate --restore would consume. No writes, nothing consumed; the
+      # lock-present case is reported the same way --restore reports it, on stdout, exit 0.
+      if [ -f "$LOCK" ]; then
+        echo "advance-pipeline-lock: lock present at '$LOCK' — nothing to restore"
+        exit 0
+      fi
+      choose_candidate "$1"
+      printf '%s\n' "$CHOSEN"
+      exit 0
+    fi
+    restore_lock "$1"
     ;;
   --skill)
     [ $# -ge 2 ] || usage

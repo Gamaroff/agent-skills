@@ -83,7 +83,7 @@ ls -t .claude/state/develop-pipeline.last-halt.json .claude/state/develop-pipeli
 ```
 
 1. Read every candidate listed. Drop any whose `task_or_story_directory` is not the directory of the document being resumed — and **report each one dropped** in `deltas_since_pause` ("stale snapshot for `<other dir>` ignored"); a leftover for another task is itself worth the operator's attention.
-2. **Stale snapshot after merge (task.124, obs #88).** For a `last-halt.json` that *is* for this document, check whether the run it records has already **finished**: the snapshot's `pr_url` is set and `gh pr view <pr_url> --json state --jq .state` returns `MERGED`. If so, the snapshot outlived its run — a completed run deletes its own snapshot at Step 8 since task.124, so one that survives is a leftover from before that, or from a run that completed outside the pipeline. Report it in `deltas_since_pause` as `"stale-snapshot: <path> — PR merged; deleted"`, **delete the file** (`rm -f` — the one write this read-only prompt makes, and only on this evidence), and drop it from the candidates. Never offer a resume of merged work.
+2. **Stale snapshot after merge (task.124, obs #88).** For a `last-halt.json` that *is* for this document, check whether the run it records has already **finished**: the snapshot's `pr_url` is set and `gh pr view <pr_url> --json state --jq .state` returns `MERGED`. If so, the snapshot outlived its run — a completed run deletes its own snapshot at Step 8 since task.124, so one that survives is a leftover from before that, or from a run that completed outside the pipeline. Report it in `deltas_since_pause` as an ordinary delta object — `{ "path": "<snapshot path>", "concern": "stale-snapshot: PR merged" }`, the object's existing fields (§ `deltas_since_pause` object fields), so the orchestrator can select on `concern` and read `path` — drop it from the candidates, and **do not delete it**: this prompt is read-only, and the delete is the orchestrator's, verified on disk (resume contract § Consume Output; task.130, PR #436 review CR-3). A subagent that reports a delete it may not have performed is worse than one that reports nothing — the orchestrator would trust the report over the directory. Never offer a resume of merged work.
 
    **This check is `gh`-only, and a failed read is never evidence of MERGED.** Branch on the URL
    host first: a `pr_url` that is not a github.com pull request (Bitbucket, via `create-pr`'s
@@ -209,7 +209,7 @@ Emit the result object with all fields. Do NOT emit any other text.
 | Report without the `Subagent summary ref` column | LOCK_STEP + 1 (nothing expected) + a `deltas_since_pause` note |
 | Report missing or unreadable | LOCK_STEP (conservative) + blocking_issue |
 | Branch missing | Same as above + blocking_issue |
-| A `last-halt.json` for this document whose PR is `MERGED` | not a candidate — reported as `stale-snapshot`, deleted |
+| A `last-halt.json` for this document whose PR is `MERGED` | not a candidate — reported as `stale-snapshot`; the orchestrator deletes |
 | A `last-halt.json` for this document whose document is `accepted` but whose PR is not MERGED | an ordinary candidate — a live post-acceptance halt/pause (Step 7 6a → Step 8) |
 
 ---
@@ -218,7 +218,7 @@ Emit the result object with all fields. Do NOT emit any other text.
 
 The orchestrator dispatches this as an **Explore subagent**. Key constraints:
 
-- **Read-only** — with one named exception: no writes, no git operations beyond `git branch --list` and the `gh pr view … --json state` read in Step 1; the only write is the `rm -f` of a `last-halt.json` proven stale by a `MERGED` PR (Step 1, item 2)
+- **Read-only** — no writes, no git operations beyond `git branch --list` and the `gh pr view … --json state` read in Step 1. A `last-halt.json` proven stale by a `MERGED` PR is *reported* (Step 1, item 2); the orchestrator deletes it and verifies the deletion (task.130)
 - **Return JSON only**: the orchestrator parses the output with `jq`
 - **No fallback prose**: if a field cannot be determined, use a safe default and record in `blocking_issues`
 - **macOS/Linux portable**: use the dual-form `stat` commands above

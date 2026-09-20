@@ -56,7 +56,7 @@ run "$L" "$D/none.json" "$D/doc" 1 >/dev/null 2>&1
 
 # ── 2. lock restored from the halt snapshot ──────────────────────────────────
 D="$T/restore"; L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"; mkdoc "$D/doc" 1 2 3 4 5 6
-printf '{"skill":"develop-task","current_step":5,"qa_phase":"5b","branch":"feature/x","pr_url":"https://x/1","halted_at":"2026-09-19T00:00:00Z","halt_reason":"loop-limit","halt_step":"5"}\n' > "$S"
+printf '{"skill":"develop-task","current_step":5,"qa_phase":"5b","task_or_story_directory":"%s","branch":"feature/x","pr_url":"https://x/1","halted_at":"2026-09-19T00:00:00Z","halt_reason":"loop-limit","halt_step":"5"}\n' "$D/doc" > "$S"
 ERR=$(run "$L" "$S" "$D/doc" 2 2>&1 >/dev/null); RC=$?
 if [ "$RC" -ne 0 ] || [ ! -f "$L" ]; then
   fail "lock restored from snapshot" "rc=$RC lock exists=$([ -f "$L" ] && echo yes || echo no) err=$ERR"
@@ -79,7 +79,7 @@ fi
 
 # A PreCompact snapshot's pause fields are dropped too.
 D="$T/restore-pause"; L="$D/lock.json"; S="$D/snap.json"; mkdir -p "$D"; mkdoc "$D/doc" 5
-printf '{"current_step":5,"paused_at":"x","pause_reason":"precompact","halt_step":"5"}\n' > "$S"
+printf '{"current_step":5,"task_or_story_directory":"%s","paused_at":"x","pause_reason":"precompact","halt_step":"5"}\n' "$D/doc" > "$S"
 run "$L" "$S" "$D/doc" 1 >/dev/null 2>&1
 [ "$(jq -r '.pause_reason // "absent"' "$L")" = "absent" ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "6" ] \
   && pass "PreCompact pause fields dropped on restore" || fail "pause fields dropped" "$(cat "$L")"
@@ -177,11 +177,27 @@ printf '{"skill":"develop-task","current_step":5,"task_or_story_directory":"docs
 ( cd "$D/repo" && PIPELINE_LOCK="$D/lock.json" PIPELINE_HALT_SNAPSHOT="$D/snap.json" bash "$SCRIPT" docs/tasks/x 1 >/dev/null 2>&1 ); RC=$?
 [ "$RC" -ne 0 ] && [ ! -f "$D/lock.json" ] && pass "prefix-sharing other directory still refused" || fail "prefix-sharing dir" "rc=$RC"
 
-# A snapshot with no task_or_story_directory (pre-task.123 shape) is accepted.
+# A snapshot with no task_or_story_directory (pre-task.123 shape) is REFUSED through the one
+# restore path (`legacy-snapshot`, task.130) — the grant restores nothing, writes nothing, and
+# relays the refusal; C4-CR-7's acceptance is superseded by Breaking Change 2.
 D="$T/nofield"; L="$D/lock.json"; S="$D/snap.json"; mkdir -p "$D"; mkdoc "$D/doc" 2
 printf '{"skill":"develop-task","current_step":5,"halt_reason":"loop-limit"}\n' > "$S"
-PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$D/doc" 1 >/dev/null 2>&1; RC=$?
-[ "$RC" -eq 0 ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "3" ] && pass "snapshot without task_or_story_directory (pre-task.123) is accepted (C4-CR-7)" || fail "absent field" "rc=$RC"
+ERR=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$D/doc" 1 2>&1 >/dev/null); RC=$?
+[ "$RC" -eq 1 ] && [ ! -f "$L" ] && [ -f "$S" ] && echo "$ERR" | grep -q "legacy-snapshot" && pass "snapshot without task_or_story_directory → refused as legacy-snapshot; nothing written, snapshot kept (task.130)" || fail "legacy snapshot refused" "rc=$RC err=$ERR"
+
+# The never-lower guard reads the candidate --restore WILL consume, not $SNAPSHOT: a newer
+# orphaned `.pausing.<pid>` claim with a HIGHER budget outranks the snapshot, so a k that the
+# snapshot's budget would allow is refused against the claim's (task.130; task.124 CR-5).
+D="$T/guard-claim"; L="$D/state/lock"; S="$D/state/last-halt.json"; mkdir -p "$D/state"; mkdoc "$D/doc" 1 2 3 4 5
+printf '{"skill":"develop-task","current_step":5,"task_or_story_directory":"%s","qa_max_cycles":5,"halt_reason":"loop-limit"}\n' "$D/doc" > "$S"
+touch -t 202601010000 "$S"
+printf '{"skill":"develop-task","current_step":5,"task_or_story_directory":"%s","qa_max_cycles":9,"halt_reason":"loop-limit"}\n' "$D/doc" > "$L.pausing.777"
+ERR=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$D/doc" 2 2>&1 >/dev/null); RC=$?
+if [ "$RC" -eq 1 ] && [ ! -f "$L" ] && [ -f "$S" ] && [ -f "$L.pausing.777" ] && echo "$ERR" | grep -q "qa_max_cycles=9"; then
+  pass "never-lower guard reads the budget from the candidate --which names (the claim's 9, not the snapshot's 5); nothing restored"
+else
+  fail "guard reads --which candidate" "rc=$RC lock=$([ -f "$L" ] && echo present || echo absent) err=$ERR"
+fi
 
 # A non-integer qa_max_cycles on the lock is warned about and treated as 0, not swallowed.
 D="$T/badbudget"; L="$D/lock.json"; mkdir -p "$D"; mkdoc "$D/doc" 2
