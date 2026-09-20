@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`develop-bug` mirrors every general-bug status transition into the `bug-registry.md` row, not
+  only the close.** The registry row's Status cell is a second copy of the bug file's frontmatter
+  `status:`, and a consumer drift guard (tinker-city `check-bug-doc-consistency.js`, in `test:guard`
+  and the CI `guards` lane) asserts the two agree on every push. Step 3 wrote only the file at
+  `in-progress` and `ready-for-qa`, and Step 5–6 only the file at `reopened`, so the `guards` lane was
+  red from the first code push until Step 7's close commit finally wrote the row — a false red the
+  pipeline then had to reason past as "CI reading 2 is the real one" (bug.89, bug.90 and bug.91 in that
+  repo; the third recorded it as a pipeline gap for the second time). Step 3 now carries the rule as a
+  callout and pairs both of its transitions with the row; Step 5–6 pairs the reopen; Step 7 names the
+  close as the last mirrored write and flags a row still reading `🆕 New` as an earlier skipped mirror.
+  Story and task bugs are unchanged (no registry row). Contract tests pin each transition's
+  same-line mention of the registry, so a future edit cannot drop one write and keep the others.
+
 ### Added
 
 - **Resume trusts what it finds on disk — seven small mechanisms in the develop pipelines'

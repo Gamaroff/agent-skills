@@ -167,7 +167,7 @@ Exit the loop and proceed to Step 7.
 
    Off by default; non-blocking. Log per cycle: "Verify Cycle {N} — changes-requested: {landed status / disabled / skip reason}."
 
-1. **Reopen the bug**: set frontmatter `status: reopened`, body `**Status:** ⚠️ Reopened`. Append a new `### Iteration {N+1}` to the Developer Fix Cycle with a **Re-Investigation** note quoting the concrete failure (failing test name/output, regression, or review-code finding). Add a Status History row.
+1. **Reopen the bug**: set frontmatter `status: reopened`, body `**Status:** ⚠️ Reopened`; for a **general bug**, mirror it into the `docs/bugs/bug-registry.md` row's Status cell (`⚠️ Reopened`) in the same edit — the row is a second copy of the status and the consumer's drift guard compares the two on every push (Step 3 callout). Append a new `### Iteration {N+1}` to the Developer Fix Cycle with a **Re-Investigation** note quoting the concrete failure (failing test name/output, regression, or review-code finding). Add a Status History row.
 
 2. **Invoke `/qa-fix`** with the bug file path and the concrete findings as the developer-provided fix list (qa-fix discovers the bug, filters to `Reopened`, investigates, fixes, and writes the Fix Implementation for the new iteration — its bug-update machinery matches Step 3's section shapes). qa-fix requires the active PR, which exists.
 
