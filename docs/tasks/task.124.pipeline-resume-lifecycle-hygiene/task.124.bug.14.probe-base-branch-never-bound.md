@@ -4,7 +4,7 @@
 **Bug ID**: TASK-124-BUG-14
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-19
 **Source**: QA cycle 5 (narrowed), code review finding CR-2 (reviewer confidence medium; raised to high on verification — no binding exists)
@@ -67,3 +67,4 @@ The probe binds the base from recorded state before classifying: `gh pr view --j
 | 2026-09-19 | New | QA Engineer | Found in QA cycle 5 |
 | 2026-09-19 | In Progress | qa-fix | Investigation started |
 | 2026-09-19 | Ready for QA | qa-fix | Fix implemented |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed in QA cycle 6 |
