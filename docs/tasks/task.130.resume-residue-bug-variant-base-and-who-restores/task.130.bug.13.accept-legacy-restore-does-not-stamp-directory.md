@@ -4,7 +4,7 @@
 **Bug ID**: TASK-130-BUG-13
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: Step 5c `/review-pr` code lens CR-1 (confirmed by reading the rebuild)
 **Date Found**: 2026-09-20
 
@@ -70,3 +70,4 @@ Stamp the directory in the rebuild jq when the candidate carries none; assert th
 | 2026-09-20 | New | review-pr (5c) | Code lens CR-1, confirmed |
 | 2026-09-20 | In Progress | qa-fix | Investigation started |
 | 2026-09-20 | Ready for QA | qa-fix | Fix implemented, mutation-proven |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed in QA cycle 7 (end to end under bash and zsh -f; stamp mutation → 4 red) |

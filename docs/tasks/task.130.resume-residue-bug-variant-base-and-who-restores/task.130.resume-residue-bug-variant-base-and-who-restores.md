@@ -399,6 +399,7 @@ Not applicable — one additional `sed` per resume.
 | 2026-09-20 |  | QA findings fixed — bug 12 (three orchestrator citations name the exact delete label; test D reads the citation content), 5 iterations; +2 assertions, mutation-proven | qa-fix |
 | 2026-09-20 |  | QA gate 6 CONCERNS, no open entry (90/100) — granted cycle; bug 12 verified fixed; 0 HIGH, 0 MEDIUM, 1 cleanup; advisory residue carried to a follow-up; handed to 5c | qa-task |
 | 2026-09-20 |  | Step 5c review-pr CONCERNS (PC-2 six Change Log rows restored; PC-3 task.131/132 docs accepted; CR-1 --accept-legacy stamp → bug 13); QA findings fixed — bug 13, cycle 7; +3 scenarios, mutation-proven | qa-fix |
+| 2026-09-20 |  | QA gate 7 PASS (92/100) — last granted cycle; bug 13 verified fixed; 0 HIGH, 0 MEDIUM, 1 LOW carried (route 2b); Deferred Work recorded; handed to 5c | qa-task |
 <!-- change-log-end -->
 
 ## Bug Reports
@@ -406,10 +407,6 @@ Not applicable — one additional `sed` per resume.
 ### Open Bugs
 
 None.
-
-### In QA Verification
-
-- [Bug 13: `--restore --accept-legacy` did not stamp the directory](./task.130.bug.13.accept-legacy-restore-does-not-stamp-directory.md) - 🔍 Ready for QA - Priority: P2
 
 ### Closed Bugs
 
@@ -425,27 +422,28 @@ None.
 - [Bug 10: four bare-string note sites](./task.130.bug.10.remaining-bare-string-note-sites.md) - ✅ Closed (verified QA cycle 5)
 - [Bug 11: empty `pr_url` read the current branch](./task.130.bug.11.empty-pr-url-reads-current-branch.md) - ✅ Closed (verified QA cycle 5)
 - [Bug 12: three orchestrator citations described a prefix delete](./task.130.bug.12.orchestrator-citations-describe-prefix-delete.md) - ✅ Closed (verified QA cycle 6)
+- [Bug 13: `--restore --accept-legacy` did not stamp the directory](./task.130.bug.13.accept-legacy-restore-does-not-stamp-directory.md) - ✅ Closed (verified QA cycle 7)
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS (no open entry)
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-20
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS — no open entry; handed to 5c
+**Quality Score**: 92/100
+**Gate Decision**: PASS (one LOW carried — Cosmetic-residue exit, route 2b)
 
 ### QA Report
-- **Full Report**: [task.130.qa.6.resume-residue-bug-variant-base-and-who-restores.md](./task.130.qa.6.resume-residue-bug-variant-base-and-who-restores.md)
-- **Gate File**: [task.130.gate.6.resume-residue-bug-variant-base-and-who-restores.yml](./task.130.gate.6.resume-residue-bug-variant-base-and-who-restores.yml)
+- **Full Report**: [task.130.qa.7.resume-residue-bug-variant-base-and-who-restores.md](./task.130.qa.7.resume-residue-bug-variant-base-and-who-restores.md)
+- **Gate File**: [task.130.gate.7.resume-residue-bug-variant-base-and-who-restores.yml](./task.130.gate.7.resume-residue-bug-variant-base-and-who-restores.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3574 node tests + shell suites; eval:develop-task 13/13
+- **Tests Executed**: 3574 node tests + shell suites (91, 42); eval:develop-task 13/13
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 HIGH, 0 MEDIUM; bug 12 verified fixed (all 12 bugs closed)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS (advisory residue for a follow-up task)
+- **Critical Issues**: 0 HIGH, 0 MEDIUM; bug 13 verified fixed (all 13 bugs closed)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Granted cycle 6 (loop limit at 5; 2 cycles granted): bug 12 FIXED — the three orchestrator citations name the exact delete label and test D reads the citation's content (red under three mutations). One low cleanup on the new assertion (CR-1); gate-5 advisories CR-2, CR-3, CR-5–CR-7 carried for a follow-up task. HIGH sequence 0, 1, 0, 1, 0, 0. Earlier gates: 1 CONCERNS 85 · 2 FAIL 70 · 3 CONCERNS 80 · 4 FAIL 70 · 5 CONCERNS 85.
+Cycle 7 (last granted; scoped to the Step 5c fix): bug 13 FIXED — an `--accept-legacy` restore stamps `task_or_story_directory` and the recovery survives the next pause (executed end to end under both shells; stamp mutation → 4 red). One LOW (QA-14: the no-overwrite scenario is vacuous) carried to the gate's `recommendations.future`; CR-2 header-contract cleanup for the follow-up. Step 5c had returned CONCERNS (PC-2 six Change Log rows restored; PC-3 task.131/132 docs accepted; CR-1 → bug 13). HIGH sequence 0, 1, 0, 1, 0, 0, 0. Gates: 1 CONCERNS 85 · 2 FAIL 70 · 3 CONCERNS 80 · 4 FAIL 70 · 5 CONCERNS 85 · 6 CONCERNS 90 (no open entry) · 7 PASS 92.
 
 ## Progress Tracking
 
@@ -465,6 +463,18 @@ Granted cycle 6 (loop limit at 5; 2 cycles granted): bug 12 FIXED — the three 
 - `docs/reference/anti-patterns.md` — enumeration class
 
 ## Notes
+
+### Deferred Work
+
+Carried out of the QA loop by the Cosmetic-residue exit (route 2b, gate 7) and the Step 5c review — none gates; one follow-up task should take them together:
+
+- **TASK-130-QA-14** (LOW, gate 7) — `advance-pipeline-lock.test.sh` "keeps its own directory" scenario is vacuous; seed a canon-equal, textually different spelling.
+- Gate-7 CR-2 — `--restore` header contract, `develop-pipeline-pause.md:80`, `grant-qa-cycles.sh:52-54` do not mention the directory stamp.
+- Gate-6 CR-1 — test D's negative regex is a word-list heuristic; the exact-label match is the floor.
+- Gate-5 CR-2 (conditional main clause at the four `--restore` citation sites), CR-3 (detector prompt Step 1 candidate selection vs `choose_candidate()`), CR-5 (silent skip of an unrecognised `stale-snapshot`-prefixed label), CR-6 (one rc=2 message for the four lint sites), CR-7 (quote `{doc-directory}`).
+- Detector prompt `:80` — `ls … .pausing.*` never runs under zsh `nomatch` (pre-existing on develop).
+- 5c PC-2 root cause — the `change-log.js` repair at `fdba78d9` dropped six rows; check the upsert's handling of a corrupted block.
+- 5c PC-3 — task.131/132 planning documents ride in PR #441 (accepted).
 
 - QA artifacts land beside this file: `task.130.qa.[N].*.md`, `task.130.bug.[N].*.md`, `task.130.gate.[N].*.yml`.
 - Independent of tasks 128 and 129 (both `planned`); shares no file with 129, and touches `probe-boundary-rule.md` not at all.
