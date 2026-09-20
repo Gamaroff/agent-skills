@@ -13,6 +13,9 @@
 //   B — a delta whose concern does not start `stale-snapshot` is left in place  (widen the select → red)
 //   C — a path that survives the rm is a HALT with exit 1                        (drop the re-read → red)
 //   D — no orchestrator SKILL.md carries a copy of the loop; each cites the section instead
+//   E — an unbound DETECTOR_JSON HALTs                                          (drop the :? guard → red)
+//   F — a delta with no `concern` is a non-match, snapshot kept, exit 0         (drop `// ""` → red)
+//   G — a non-array deltas_since_pause / unparsable JSON HALTs with exit 1      (drop the `||` → red)
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -55,7 +58,7 @@ function deleteBlock() {
   return blocks[0].code;
 }
 
-function run(shell, { concern, readOnlyDir }) {
+function run(shell, { concern, readOnlyDir, rawJson, unsetVar }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "stale-snapshot-"));
   const state = path.join(dir, ".claude", "state");
   fs.mkdirSync(state, { recursive: true });
@@ -72,7 +75,11 @@ function run(shell, { concern, readOnlyDir }) {
   // A directory the shell cannot write to makes `rm -f` fail silently (-f) and leaves the file —
   // the case the re-read exists to catch.
   if (readOnlyDir) fs.chmodSync(state, 0o555);
-  const script = `DETECTOR_JSON='${json.replace(/'/g, "'\\''")}'\n${deleteBlock()}\necho "BLOCK_DONE"\n`;
+  const bound = rawJson !== undefined ? rawJson : json;
+  const prelude = unsetVar
+    ? "unset DETECTOR_JSON"
+    : `DETECTOR_JSON='${bound.replace(/'/g, "'\\''")}'`;
+  const script = `${prelude}\n${deleteBlock()}\necho "BLOCK_DONE"\n`;
   const argv =
     shell === "zsh"
       ? ["-f", "-c", script]
@@ -124,6 +131,48 @@ for (const sh of SHELLS) {
       );
     },
   );
+}
+
+// ── E/F/G — broken input is a HALT, never a silent exit 0 (task.130 QA cycle 1, bug 2) ─────
+//
+// Behind a bare process substitution, an unbound DETECTOR_JSON emitted nothing (exit 0), a
+// delta with no `concern` aborted jq (`startswith() requires string inputs`, exit lost), and
+// a non-array `deltas_since_pause` did the same — every one left the snapshot on disk and
+// reported success, which is the failure class this section replaced one layer down.
+
+for (const sh of SHELLS) {
+  test(`E [${sh}] — unbound DETECTOR_JSON is a HALT (exit non-zero), snapshot untouched`, () => {
+    const r = run(sh, { unsetVar: true });
+    assert.notEqual(r.status, 0, `expected non-zero exit; stdout: ${r.stdout}`);
+    assert.match(r.stderr + r.stdout, /DETECTOR_JSON is unbound/);
+    assert.doesNotMatch(r.stdout, /BLOCK_DONE/, "the block ran past the HALT");
+    assert.equal(r.exists, true);
+  });
+
+  test(`F [${sh}] — a delta with no concern is a non-match, not a jq abort; exit 0, snapshot kept`, () => {
+    const r = run(sh, {
+      rawJson: JSON.stringify({
+        deltas_since_pause: [
+          { path: ".claude/state/develop-pipeline.last-halt.json" },
+        ],
+      }),
+    });
+    assert.equal(r.status, 0, `stderr: ${r.stderr} stdout: ${r.stdout}`);
+    assert.equal(r.exists, true, "a concern-less delta's path was deleted");
+    assert.match(r.stdout, /BLOCK_DONE/);
+  });
+
+  test(`G [${sh}] — a non-array deltas_since_pause (or unparsable JSON) is a HALT (exit 1)`, () => {
+    const notArray = run(sh, {
+      rawJson: JSON.stringify({ deltas_since_pause: "nope" }),
+    });
+    assert.equal(notArray.status, 1, `stdout: ${notArray.stdout}`);
+    assert.match(notArray.stdout, /HALT: could not read stale-snapshot deltas/);
+    assert.equal(notArray.exists, true);
+    const garbage = run(sh, { rawJson: "{not json" });
+    assert.equal(garbage.status, 1, `stdout: ${garbage.stdout}`);
+    assert.match(garbage.stdout, /HALT: could not read stale-snapshot deltas/);
+  });
 }
 
 test("D — no orchestrator SKILL.md copies the loop; each cites § Consume Output", () => {

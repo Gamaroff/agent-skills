@@ -381,12 +381,46 @@ Not applicable — one additional `sed` per resume.
 <!-- change-log-start -->
 ## Change Log
 
+## Bug Reports
+
+### In QA Verification
+
+- [Bug 1: `--restore <doc-dir> --which` silently performs a consuming restore](./task.130.bug.1.restore-trailing-which-flag-consumes.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [Bug 2: stale-snapshot delete loop exits 0 on unset/malformed `DETECTOR_JSON`](./task.130.bug.2.stale-snapshot-delete-loop-silent-on-broken-input.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+
+### Closed Bugs
+
+_None yet — moved here by QA after verification._
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-20
+**Quality Score**: 85/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.130.qa.1.resume-residue-bug-variant-base-and-who-restores.md](./task.130.qa.1.resume-residue-bug-variant-base-and-who-restores.md)
+- **Gate File**: [task.130.gate.1.resume-residue-bug-variant-base-and-who-restores.yml](./task.130.gate.1.resume-residue-bug-variant-base-and-who-restores.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3542 node tests + shell suites; eval:develop-task 17/17
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 (2 medium — bugs 1 and 2)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Two medium defects in code this task introduced, both reproduced by QA: a trailing `--which`/`--accept-legacy` after the `--restore` positional performs a consuming restore ([bug 1](./task.130.bug.1.restore-trailing-which-flag-consumes.md)); the stale-snapshot delete loop exits 0 with the snapshot on disk when `$DETECTOR_JSON` is unset or a delta lacks `concern` ([bug 2](./task.130.bug.2.stale-snapshot-delete-loop-silent-on-broken-input.md)). Three low advisory findings and two cleanups recorded in the gate's `recommendations.future`.
+
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-09-20 | 1.0 | Initial draft — follow-ups from task.124 / PR #436 (5c review CR-1..CR-5, gate-6 futures, obs #132) | create-task |
 | 2026-09-20 | 1.1 | Review 1 (8/10, 0 critical / 7 important): who-restores test re-keyed on a marker (token shared with the grant-offer rule; develop-bug restates without it); Phase 1 gains an executed base-binding test, fixture 17 re-scoped to the develop-task HALT case; base-row date corrected to task.124 (no existing report carries it); Phase 2 regex-only (site already in the derived population); step-8 legacy count made glob-safe; lint site (2) one-line warn-only; delete loop stated once in the contract; effort 8h → 16h | review-task |
 | 2026-09-20 |  | Status → ready-for-development | review-task |
 | 2026-09-20 |  | Implemented — 26 source/doc files, 4 new + 4 extended test suites (+46 tests), fixtures 16 re-recorded and 17 added; 3 plan snippets corrected by execution | develop |
+| 2026-09-20 |  | QA gate CONCERNS (85/100) — 2 medium findings (bugs 1–2), 3 low advisory | qa-task |
+| 2026-09-20 |  | QA findings fixed — bugs 1–2 (trailing --which; fail-closed delete loop) + CR-3..CR-7 advisories, 1 iteration; +9 tests, all mutation-proven | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -415,7 +449,7 @@ Not applicable — one additional `sed` per resume.
 
 **Implementation summary.** All five phases landed as planned, in one PR, each with an executed test mutation-proven red on revert (proofs recorded in the implementation report's Step 3 entry). Three plan snippets were found wrong *by executing them* and corrected before commit:
 
-1. **Phase 3 — the piped `while` swallowed the HALT.** The plan's `printf | jq | while … exit 1; done` runs the loop body in a subshell under bash, so `exit 1` ended the subshell and the block carried on past the HALT (zsh runs the last pipeline stage in the current shell, which is why it passed there). The one statement now reads from a process substitution; `stale-snapshot-delete.test.mjs` case C is what found it.
+1. **Phase 3 — the piped `while` swallowed the HALT.** The plan's `printf | jq | while … exit 1; done` runs the loop body in a subshell under bash, so `exit 1` ended the subshell and the block carried on past the HALT (zsh runs the last pipeline stage in the current shell, which is why it passed there). The one statement now reads from a process substitution; `stale-snapshot-delete.test.mjs` case C is what found it. *(QA cycle 1, bug 2: the list is now materialised first with jq's exit checked and read from a here-string; an unbound `DETECTOR_JSON`, a non-array `deltas_since_pause` or a jq failure HALTs — cases E/F/G.)*
 2. **Phase 5 — the "nullglob-guarded" loop had no nullglob guard.** `for f in <path> <glob>` aborts under zsh's `nomatch` exactly as `ls <path> <glob> | wc -l` does; `halt-snippet-glob-safe.test.mjs` F1 caught it with `no matches found`. Step 8 counts claims with `find`, the form `advance-pipeline-lock.sh` already uses.
 3. **Phase 1 — the stderr label could not split on exit status alone.** `gh pr view` exits 1 both for a failing `gh` and for a branch with no PR (`no pull requests found`), so the plan's `if [ "$GH_RC" -ne 0 ]` would have labelled every PR-less branch a `gh` failure. The split reads gh's stderr text as well.
 

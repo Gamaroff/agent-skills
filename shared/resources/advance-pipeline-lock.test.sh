@@ -428,6 +428,37 @@ run_restore_scenarios() {
   fi
   rm -f "$L" "$S" "$L.pausing.4242"
 
+  # A TRAILING flag is a usage error, never a consuming restore (task.130 QA cycle 1, bug 1):
+  # `--restore <dir> --which` used to drop the flag and restore.
+  printf '{"task_or_story_directory":"%s","halt_step":5}\n' "$R/doc" > "$S"
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" --which 2>&1); RC=$?
+  if [ "$RC" -eq 1 ] && [ ! -f "$L" ] && [ -f "$S" ] && printf '%s' "$OUT" | grep -q "flags BEFORE"; then
+    pass "[$SH] --restore <dir> --which (trailing flag) → exit 1 usage, no lock, snapshot kept"
+  else
+    fail "[$SH] --restore trailing flag" "rc=$RC lock=$([ -f "$L" ] && echo CREATED || echo absent) snap=$([ -f "$S" ] && echo kept || echo CONSUMED) out=$(printf '%s' "$OUT" | head -1)"
+  fi
+  rm -f "$L" "$S"
+
+  # --which with a lock present: stdout is EMPTY (the notice goes to stderr), exit 0 (CR-4).
+  printf '{"current_step":5}\n' > "$L"
+  WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --which "$R/doc" 2>/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ -z "$WHICH" ]; then
+    pass "[$SH] --restore --which with a lock present → empty stdout, exit 0 (notice on stderr)"
+  else
+    fail "[$SH] --which with lock present" "rc=$RC stdout='$WHICH'"
+  fi
+  rm -f "$L"
+
+  # An exported ACCEPT_LEGACY in the environment must NOT accept a legacy snapshot (CR-6).
+  printf '{"current_step":7,"halt_step":7}\n' > "$S"
+  ACCEPT_LEGACY=1 PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 1 ] && [ ! -f "$L" ] && [ -f "$S" ]; then
+    pass "[$SH] --restore ignores an exported ACCEPT_LEGACY=1 — only the flag raises it"
+  else
+    fail "[$SH] env ACCEPT_LEGACY ignored" "rc=$RC lock=$([ -f "$L" ] && echo CREATED || echo absent)"
+  fi
+  rm -f "$L" "$S"
+
   # --which with nothing usable → exit 1, same stderr as --restore, nothing written
   WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --which "$R/doc" 2>/dev/null); RC=$?
   if [ "$RC" -eq 1 ] && [ -z "$WHICH" ] && [ ! -f "$L" ]; then

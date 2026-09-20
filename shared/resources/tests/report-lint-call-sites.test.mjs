@@ -104,6 +104,31 @@ test("B — the HALT-rule site (2) is one line, captures rc=$?, has the three ar
   }
 });
 
+// Population: the four call sites the report-lint contract names are (1) the Step Transition
+// action 2 in each orchestrator SKILL.md, (2) the HALT rule in the same files, (3) the PreCompact
+// hook, and (4) step-8. Site (3) — `develop-pipeline-on-precompact.sh` — is shell with its own
+// suite (`develop-pipeline-on-precompact.test.sh`) and is EXEMPT from this scan by task.130's
+// scope (§ Phase 5: "site (3) … is out of scope here"); the exemption is stated so a reader does
+// not take its absence from the population for an oversight (QA cycle 1, CR-5).
+const EXEMPT_SITES = {
+  "shared/resources/develop-pipeline-on-precompact.sh":
+    "site (3) — shell hook with its own suite; out of task.130 scope",
+};
+
+test("C0 — the exempt site still exists and still calls report-lint.js (an exemption for a vanished site is stale)", () => {
+  for (const [rel, why] of Object.entries(EXEMPT_SITES)) {
+    assert.ok(
+      fs.existsSync(path.join(ROOT, rel)),
+      `${rel} exempt (${why}) but no longer exists — drop the exemption`,
+    );
+    assert.match(
+      read(rel),
+      /report-lint\.js/,
+      `${rel} exempt (${why}) but no longer calls report-lint.js — drop the exemption`,
+    );
+  }
+});
+
 test('C — no canonical source carries the old `|| { echo "HALT: report failed lint` or `|| echo "⚠️ report failed lint` form', () => {
   for (const rel of [...SKILLS, STEP8]) {
     const md = read(rel);

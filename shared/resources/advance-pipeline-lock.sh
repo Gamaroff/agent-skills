@@ -104,10 +104,11 @@ Usage:
   $0 <next_step_number>     # 1..8
   $0 --complete             # remove lock (pipeline finished)
   $0 --skill <skill-name>   # advance based on returning sub-skill name
-  $0 --restore <doc-dir>    # rebuild the lock from the halt snapshot / orphaned claim
   $0 --restore [--which] [--accept-legacy] <doc-dir>
+                            # rebuild the lock from the halt snapshot / orphaned claim
                             #   --which: print the candidate --restore would consume; no writes
                             #   --accept-legacy: accept a snapshot with no task_or_story_directory
+                            #   (flags go BEFORE <doc-dir>; exactly one <doc-dir>)
 USAGE
   exit 1
 }
@@ -168,7 +169,9 @@ mtime_of() {
 # The ONE selection: `--restore` consumes what this chooses, `--restore --which` prints it,
 # and grant-qa-cycles.sh reads its never-lower guard from it — a second derivation anywhere
 # is a guard that can pass on one file while the restore consumes another (task.130).
-ACCEPT_LEGACY="${ACCEPT_LEGACY:-0}"
+# Raised ONLY by the --accept-legacy flag — never seeded from the environment, so a stray
+# exported ACCEPT_LEGACY cannot make every restore accept legacy snapshots (task.130 CR-6).
+ACCEPT_LEGACY=0
 CHOSEN=""; MINE=()
 choose_candidate() {
   local doc_dir="$1" want candidates=() c c_dir newest=-1 m legacy=0
@@ -327,12 +330,16 @@ case "$1" in
         *) break ;;
       esac
     done
-    [ $# -ge 1 ] || usage
+    # Exactly ONE positional may remain. A trailing flag (`--restore <dir> --which`) used to
+    # fall through this check and run a full, consuming restore where a read-only query was
+    # asked for (task.130 QA cycle 1, bug 1). Anything after the directory is a usage error.
+    [ $# -eq 1 ] || { echo "advance-pipeline-lock: --restore takes flags BEFORE the <doc-dir>, and exactly one <doc-dir>; got: $*" >&2; usage; }
     if [ "$WHICH" -eq 1 ]; then
-      # Print the candidate --restore would consume. No writes, nothing consumed; the
-      # lock-present case is reported the same way --restore reports it, on stdout, exit 0.
+      # Print the candidate --restore would consume. No writes, nothing consumed. stdout is
+      # a path or empty — the lock-present notice goes to stderr so a caller reading stdout
+      # as a path never receives prose (task.130 QA cycle 1, CR-4).
       if [ -f "$LOCK" ]; then
-        echo "advance-pipeline-lock: lock present at '$LOCK' — nothing to restore"
+        echo "advance-pipeline-lock: lock present at '$LOCK' — nothing to restore" >&2
         exit 0
       fi
       choose_candidate "$1"

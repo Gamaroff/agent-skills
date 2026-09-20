@@ -1,0 +1,88 @@
+schema: 1
+task: 'task.130.resume-residue-bug-variant-base-and-who-restores'
+task_title: 'Resume residue from task.124 — bug-variant base, dispatch population, self-reported delete, who-restores enumeration'
+gate: CONCERNS
+status_reason: 'All five phases landed, every new branch mutation-proven and the full fast gate + eval layer green; two medium correctness defects in code this diff introduced — a trailing --which flag performs a consuming restore, and the stale-snapshot delete loop exits 0 silently on an unset or malformed DETECTOR_JSON — both reproduced by QA and routed to qa-fix.'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T11:50:00Z'
+
+top_issues:
+  - id: 'TASK-130-QA-1'
+    severity: medium
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: 'The --restore flag parser stops at the first positional and checks only [ $# -ge 1 ], so `--restore <doc-dir> --which` (or a trailing --accept-legacy) drops the flag and performs a full consuming restore instead of the read-only query — reproduced: lock created, snapshot consumed, exit 0 (code review CR-1; bug 1).'
+    suggested_action: 'After the flag loop require exactly one remaining positional ([ $# -eq 1 ] || usage) so a trailing flag is a usage error; add an advance-pipeline-lock.test.sh scenario for the trailing-flag spelling (exit 1, no lock, snapshot kept).'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.1.restore-trailing-which-flag-consumes.md'
+    status: open
+  - id: 'TASK-130-QA-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The stale-snapshot delete loop (§ Consume Output) loses jq exit status behind the process substitution: an unset/empty DETECTOR_JSON emits nothing and a delta missing `concern` aborts jq (startswith on null) — both exit 0 with the snapshot still on disk, so "no stale snapshot" and "the reader is broken" report one value (code review CR-2, confidence raised to high by QA reproduction; bug 2).'
+    suggested_action: 'Guard the input (: "${DETECTOR_JSON:?}"), extend the schema check to deltas_since_pause being an array, materialise the path list with jq exit checked and (.concern // "") so a missing key is a non-match, then loop; add stale-snapshot-delete.test.mjs cases for the unset variable and the missing-concern delta (exit 1).'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.2.stale-snapshot-delete-loop-silent-on-broken-input.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 3542
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 5]
+  mutation_proofs: 'QA spot checks, one per phase, all covered: P1 develop default restored → probe-base-binding C/D/F red; P2 dispatch mark removed → parity test names develop-bug step-3 unmarked; P3 re-read dropped → stale-snapshot-delete C red; P4 marker removed → who-restores (i) red; P5 legacy accepted unconditionally → advance-pipeline-lock.test legacy-refused red. Tree restored to committed state before this gate.'
+  step_4b: '10 changed prose files run under bash+zsh; 0 findings attributable to this diff. Unseeded-run failures (SKILL.md :48/:51/:53 cat blocks, detector prompt :69) are unchanged lines (0 touched) and pass when seeded with --copy; step-0 zero-blocks-executed is identical on develop and out of scope (task § Out of Scope).'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No new trust boundary in JS. The one accept/reject function delivered is choose_candidate() in shell (candidate for this document vs another document vs legacy) — the probe engine imports JS entry points and cannot exercise it; its refusal arms are executed by advance-pipeline-lock.test.sh under bash and zsh (other-document refused, legacy refused, canonicalised match). No secrets, no network, no new file writes outside .claude/state.'
+  performance:
+    status: PASS
+    notes: 'Resume cost: one extra sed pass over the report and one --which read (a second jq scan of at most two files). No hot path.'
+  reliability:
+    status: CONCERNS
+    notes: 'Bug 2: the delete loop reports success on an unset or malformed input (ambiguous signal). Bug 1: a flag-order variant performs a write where a read was asked for. Both sit in the resume path, where a silent no-op is the failure class this task exists to close.'
+  maintainability:
+    status: PASS
+    notes: 'Who-restores collapsed to one marked statement with five citations and a marker-keyed guard test; delete loop stated once; population test derives from the directory; three plan snippets corrected by execution and recorded. Minor: usage text lists --restore twice (CR-7); ACCEPT_LEGACY seeded from the environment (CR-6).'
+
+code_review:
+  reviewed: '38 files; bundled copies excluded'
+  findings: 7
+  promoted_to_gate: ['TASK-130-QA-1 (CR-1)', 'TASK-130-QA-2 (CR-2, QA-reproduced)']
+  advisory:
+    - 'CR-3 low/medium: step-8 legacy arm is reached by a failed jq read too — an unparsable snapshot for another document would be deleted when sole'
+    - 'CR-4 low/medium: --which with a lock present prints prose on stdout with exit 0'
+    - 'CR-5 low/medium: report-lint-call-sites test does not name site (3), the PreCompact hook, as exempt (task scope excludes it)'
+    - 'CR-6 cleanup: ACCEPT_LEGACY is seeded from the environment'
+    - 'CR-7 cleanup: usage lists --restore twice'
+
+recommendations:
+  immediate:
+    - action: 'Refuse a trailing flag after the --restore positional ([ $# -eq 1 ] || usage) and test it.'
+      refs: ['shared/resources/advance-pipeline-lock.sh', 'shared/resources/advance-pipeline-lock.test.sh']
+    - action: 'Make the stale-snapshot delete loop fail closed on an unbound DETECTOR_JSON, a non-array deltas_since_pause and a jq failure; treat a missing concern as a non-match; test both.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/tests/stale-snapshot-delete.test.mjs']
+  future:
+    - action: 'CR-3: enter the step-8 legacy arm only when the snapshot parses as an object lacking the key; leave an unparsable snapshot in place with its own message.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'CR-4: send the lock-present notice to stderr in the --which arm so stdout is a path or empty; test it.'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+    - action: 'CR-5: name the PreCompact hook (site 3) as exempt-with-reason in report-lint-call-sites.test.mjs, or apply the split there in its own task.'
+      refs: ['shared/resources/tests/report-lint-call-sites.test.mjs', 'shared/resources/develop-pipeline-on-precompact.sh']
+    - action: 'CR-6/CR-7: initialise ACCEPT_LEGACY=0 unconditionally; collapse the duplicate --restore usage lines.'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'Bugs 1 and 2 fixed and re-verified (qa-fix cycle 1)'

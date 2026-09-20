@@ -165,8 +165,9 @@ All notable changes to this project will be documented in this file. Format foll
   a `last-halt.json` whose PR is `MERGED` is reported as a `deltas_since_pause` object
   (`concern: "stale-snapshot: PR merged"`) and the **orchestrator deletes it** from one loop in
   the resume contract § Consume Output, re-reading the path (bash's piped `while` swallowed the
-  HALT's `exit 1` in a subshell — found by executing the block; it reads from a process
-  substitution now). The **who-restores rule** — grant restores on a `loop-limit|not-converging`
+  HALT's `exit 1` in a subshell — found by executing the block; the path list is now
+  materialised first with jq's exit checked and an unbound `DETECTOR_JSON`, a non-array
+  `deltas_since_pause` or a jq failure is a HALT, never a silent exit 0). The **who-restores rule** — grant restores on a `loop-limit|not-converging`
   snapshot in develop-task/story, `--restore` everywhere else — is stated once, marked
   `<!-- who-restores: statement -->`, and its five former restatements are one-sentence citations
   guarded by `who-restores-single-statement.test.mjs` (keyed on the marker, not the token the

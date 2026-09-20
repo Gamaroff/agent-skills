@@ -45,13 +45,29 @@ orchestrator copies of the rm, are two shapes of the same enumeration). Run it b
 ```bash
 # Every `stale-snapshot` delta names a snapshot the detector proved belongs to a MERGED run.
 # The detector is read-only; THIS is where it is deleted, one path per rm, and re-read afterwards.
-# The loop reads from a process substitution, not a pipe: under bash a piped `while` body is a
-# subshell, and its `exit 1` ended the subshell while the block carried on past the HALT (found
-# by executing this block under both shells — stale-snapshot-delete.test.mjs, case C).
+#
+# Fail CLOSED on a broken input (task.130 QA cycle 1, bug 2): an unbound DETECTOR_JSON, a
+# `deltas_since_pause` that is not an array, or a jq failure must HALT — behind a bare process
+# substitution all three emitted nothing and the block exited 0 with the snapshot still on
+# disk, so "no stale snapshot" and "the reader is broken" reported one value. The list is
+# materialised first, with jq's exit read; `(.concern // "")` makes a delta with no concern a
+# non-match rather than a jq abort.
+# (No apostrophe in the :? message — bash parses the word for quotes even inside "…".)
+: "${DETECTOR_JSON:?HALT: DETECTOR_JSON is unbound — bind the validated detector output before this block}"
+# `jq -r`, not `-e`: -e exits 4 on an EMPTY result, and no stale snapshot is the ordinary case.
+# A parse failure (exit 2) or the error() below (exit 5) still fails the assignment.
+STALE_PATHS=$(printf '%s' "$DETECTOR_JSON" \
+  | jq -r 'if (.deltas_since_pause | type) != "array" then error("deltas_since_pause is not an array") else
+           [ .deltas_since_pause[] | select((.concern // "") | startswith("stale-snapshot")) | .path ] | .[] end' 2>&1) \
+  || { echo "HALT: could not read stale-snapshot deltas from the detector output — $STALE_PATHS"; exit 1; }
+# The loop body runs in THIS shell (here-string, not a pipe): under bash a piped `while` body is
+# a subshell, and its `exit 1` ended the subshell while the block carried on past the HALT
+# (found by executing this block under both shells — stale-snapshot-delete.test.mjs, case C).
 while IFS= read -r p; do
+  [ -n "$p" ] || continue
   rm -f "$p"
   [ ! -f "$p" ] || { echo "HALT: stale snapshot $p survived deletion — remove it by hand and re-invoke"; exit 1; }
-done < <(printf '%s' "$DETECTOR_JSON" | jq -r '.deltas_since_pause[] | select(.concern | startswith("stale-snapshot")) | .path')
+done <<< "$STALE_PATHS"
 ```
 
 `$DETECTOR_JSON` is the detector's validated output (the `<output>` the schema check above read).

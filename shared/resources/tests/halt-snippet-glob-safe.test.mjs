@@ -161,7 +161,7 @@ function step8Cleanup() {
   return blocks[0].code;
 }
 
-function runStep8(shell, { snapshot, claim }) {
+function runStep8(shell, { snapshot, claim, rawSnapshot }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "step8-cleanup-"));
   const state = path.join(dir, ".claude", "state");
   fs.mkdirSync(state, { recursive: true });
@@ -174,7 +174,7 @@ function runStep8(shell, { snapshot, claim }) {
   );
   fs.writeFileSync(
     path.join(state, "develop-pipeline.last-halt.json"),
-    JSON.stringify(snapshot) + "\n",
+    rawSnapshot !== undefined ? rawSnapshot : JSON.stringify(snapshot) + "\n",
   );
   if (claim)
     fs.writeFileSync(
@@ -224,6 +224,16 @@ for (const sh of SHELLS) {
       true,
       "legacy snapshot deleted although a claim sits beside it",
     );
+    assert.doesNotMatch(r.stdout, /legacy snapshot/);
+  });
+  test(`F4 [${sh}] — step-8: an UNPARSABLE sole snapshot is left in place and named (not treated as legacy)`, () => {
+    const r = runStep8(sh, { rawSnapshot: "{not json\n" });
+    assert.equal(
+      r.snapshot,
+      true,
+      "an unparsable snapshot was deleted as if legacy — stderr: " + r.stderr,
+    );
+    assert.match(r.stdout, /not a JSON object — left in place/);
     assert.doesNotMatch(r.stdout, /legacy snapshot/);
   });
   test(`F3 [${sh}] — step-8: a snapshot for THIS work item is removed by the same-document arm`, () => {

@@ -110,6 +110,11 @@ if [ -f "$SNAPSHOT" ]; then
   SNAP_DIR=$(jq -r '.task_or_story_directory // ""' "$SNAPSHOT" 2>/dev/null)
   if [ -n "$SNAP_DIR" ] && [ "$(canon "$SNAP_DIR")" = "$(canon "{work-item-dir}")" ]; then
     rm -f "$SNAPSHOT" && echo "halt snapshot for this run removed"
+  elif ! jq -e 'type == "object"' "$SNAPSHOT" >/dev/null 2>&1; then
+    # An EMPTY SNAP_DIR is reached by two states — a parsed object with no directory (legacy)
+    # and a snapshot jq could not read at all. The second is left alone, named: a corrupt file
+    # is not evidence of anything and may be another run's (task.130 QA cycle 1, CR-3).
+    echo "halt snapshot at $SNAPSHOT is not a JSON object — left in place; inspect it by hand"
   elif [ -z "$SNAP_DIR" ]; then
     # A snapshot with no directory predates task.123 and can belong to no run that will
     # resume it (--restore refuses it without --accept-legacy; task.130). Delete it only when
