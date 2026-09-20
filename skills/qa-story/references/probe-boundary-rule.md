@@ -168,21 +168,41 @@ Declining conditions, each reported with its reason:
 - **A symlink that points out of the tree resolves at import time**, after the
   path check. Node offers no cheap pre-import realpath guarantee for a path that
   may not yet exist. This is a limit, not a defence.
-- **v1 probes importable entry points only.** A shell/exec sink, a live database
-  sink, or anything that must open a socket is **declined and recorded as
-  declined** — never counted as probed, never counted as passing.
+- **The engine reaches two entry forms, and "not importable" is not a decline.**
+  `path#export` imports a JS module; `shell:path` runs a **shell script that
+  takes one positional argument** — `bash <script> <fixture-dir>` per case, under
+  bash and (when the host has it) zsh, with the script and directory passed as
+  argv, never as a string, stdin closed, `sandboxEnv()` plus `LC_ALL=C`. A sink
+  the corpus marks *materialised* (`MATERIALISED_SINKS`; today `filename`) is
+  written to a fixture directory beside its bracketing controls, and the case's
+  `expected` — stdout, exit, stderr, paths that must be absent — is what the run
+  is compared against. Same case loop, same verdict, same record, and each
+  (case, shell) run is one executed probe. **A bash boundary that was recorded
+  `boundary: false` because it had no export was the task.121 failure** (five
+  gates at `probes_executed: 0` against a script that says it refuses rather
+  than guesses); the shell form is what removes that reason for zero. It does
+  not soften the guard: zero executed is still `unverifiable`.
+- **What is still declined, and recorded as declined:** a script that reads
+  stdin, takes more than one positional, or must open a socket; a live database
+  sink; anything that needs the network. These are limits of the entry forms,
+  not reasons to record `boundary: false` — the boundary exists whether or not
+  the engine can reach it, and §5.1 is how it is tested.
 - **No probe opens a network connection.** Both motivating defects are pure
   composers; if a target needs the network, that is a decline.
 
-The precondition — a pure-ish predicate or composer — is what the boundary rule
-selects for anyway. If it turns out that most real controls are not importable
-in-process and v1 declines almost everything, **that is a finding to record here
-in this section**, not something to paper over by loosening §2.
+The precondition — a pure-ish predicate, composer, or single-argument script —
+is what the boundary rule selects for anyway. If it turns out that most real
+controls are reachable by neither form and the engine declines almost
+everything, **that is a finding to record here in this section**, not something
+to paper over by loosening §2.
 
 ### 5.1 When the sink is declined and the reviewer probes it by hand
 
-A declined sink (a shell/exec sink, a CLI that must be spawned) is not exempt from
-being tested; it is exempt from the *engine*. When the reviewer executes such
+A declined sink (a stdin-reading script, a multi-argument CLI, a networked
+control — what neither entry form reaches) is not exempt from being tested; it
+is exempt from the *engine*. **Reach for this only after `shell:` has been
+tried** — a one-argument script is the engine's job, and a by-hand probe of one
+is the self-report the engine exists to remove. When the reviewer executes such
 candidates itself, two rules apply that the engine would otherwise have enforced:
 
 **Every refused shape is re-tried through every arm that reaches the same sink.**
@@ -214,6 +234,19 @@ needs a variable the minimal env removed is a probe whose result must say so.
 Anything an executed candidate writes lands under the throwaway `HOME` or the
 scratch tree, and the reviewer diffs both afterwards — the by-hand equivalent of
 the engine's sentinel directory.
+
+### 5.2 Which deliverables the rule names — the signals live in one module
+
+The signal list a reader applies at Step 1b (finalise) and Step 3b (QA) is data,
+not only prose: `probe-boundary-signals.mjs` beside this file exports
+`BOUNDARY_SIGNALS` and `classifyBoundaryText(text)`, and the prompts' bullet
+lists are its `description`s. The fifth signal is the one task.121 lacked — **a
+script or function whose own header says it refuses, never guesses, or fails
+closed is a boundary by its own words, in any language.** `qa-cycle.sh`'s header
+("refuses rather than guesses") classifies as one; the task.121 gate-5 note ("the
+helper reads filenames and prints a bounded integer") carries no signal, which is
+why a reader applying only the JS-shaped ones recorded `boundary: false`
+against a script that said otherwise. A test calls the classifier on both.
 
 ## 6. Exit codes
 
@@ -257,3 +290,5 @@ and would silently remove per-case containment.
   consumes (task.79)
 - [`mutation-proving.md`](mutation-proving.md) — the procedure every verdict
   branch above was proved with
+- `probe-boundary-signals.mjs` — the signal list as data, and the classifier
+  a test can call (§5.2)

@@ -111,6 +111,19 @@ supplies, not a JSON-escaped rewrite of them. Only `|` is escaped, and control
 characters are shown with a visible glyph: `␊` newline, `␍` carriage return,
 `␉` tab, `␀` NUL. Take the bytes from the module, not from this table.
 
+**Materialised sinks.** A sink listed in the module's `MATERIALISED_SINKS` (today:
+`filename`) is not passed to a function as a value — each case is written into a
+fixture directory beside the sink's bracketing controls and a script is run against
+the directory (the engine's `shell:<path>` entry form). Those cases carry a
+fourth field the tables do not show, `expected` — `{stdout, exit, stderr, absent}`,
+the machine-readable pass condition — because for a script `correct` is prose and
+`direction` alone cannot say what a right run *prints*. `stderr: ""` is part of it:
+a script that leaks an arithmetic error and still prints the right value has not
+handled the name. The controls bracket every hostile name in byte order
+(`LC_ALL=C`), which is what makes the task.121 defect show on **stdout** rather than
+only on stderr — verified against the pre-fix script, which prints the same value
+as the fixed one on every ordering that does not bracket.
+
 ### `url-authority`
 
 A URL or DSN parser deciding **where a connection goes**. The through-line: authority delimiters are silent. A misplaced one does not raise; it re-points the connection and drops whatever followed. Several cases below behave differently in a spec-compliant parser than in a hand-rolled one, and each says which — that difference is itself the hazard.
@@ -264,7 +277,35 @@ A renderer deciding **what markup a value becomes**. The escaping is not one fun
 | `5 < 10` | A less-than sign in prose is not markup. Stripping `<` to stop the script tag above also mangles arithmetic, comparisons and generics. | Escape to `5 &lt; 10`, which displays as `5 < 10`. |
 | `https://example.com/a?b=c` | The scheme allow-list that stops `javascript:` must still pass this, query string and all. A URL validator strict enough to reject `?b=c` breaks ordinary links. | Accept and render as a working link, attribute-escaping the value inside the href. |
 
----
+### `filename`
+
+A script deciding **which directory entry counts**, and what value it derives from a name. These cases are **materialised**: the engine writes each name into a fixture directory beside two control gates (`!.gate.3.control.yml`, `~.gate.12.control.yml`, which bracket every hostile name under `LC_ALL=C`) and runs the script under probe against the directory. A handled hostile name leaves `12` on stdout, exit 0, nothing on stderr and no side effect; a legitimate name is numbered above the controls and must be printed itself. The through-line: a name is data the shell is eager to re-read as a line, a word, an option, a glob or a command.
+
+**9 hostile, 5 legitimate.**
+
+#### Hostile — must not be accepted
+
+| Input | Why | What a correct implementation does |
+|---|---|---|
+| `x.gate.5.y␊z.gate.9.w.yml` | sed and every other line tool work a LINE at a time, so one name yields two extracted values. A script that feeds the pair to arithmetic aborts its loop and prints whatever it had seen so far — a lower, wrong cycle — and exits 0. This is the task.121 defect, reproduced by the finalise DoD probe on the very script that says it refuses rather than guesses. | Anything not reduced to one run of digits is un-numbered: the entry is ignored, the high control (12) is printed, exit 0, nothing on stderr. |
+| `$(touch PWNED).gate.3.x.yml` | A name that reaches `eval`, an unquoted `echo $f` inside a `sh -c` string, or any second parse runs the substitution. The number still extracts (3), so stdout looks right — only the marker file betrays it. | The name is never re-parsed as code; `PWNED` is not created; the entry is numbered 3, below the high control, so 12 is printed. |
+| `` `touch PWNED2`.gate.3.x.yml `` | The older substitution syntax, which some quoting that stops `$(...)` does not stop. | As above: no `PWNED2`, 12 printed. |
+| `a;b\|c&d.gate.4.x.yml` | Every shell separator in one name. A script that word-splits a listing (`for f in $(ls)`) sees four entries, none of them a gate; one that interpolates the name into a command string runs three commands. | Quoted throughout, the name is one entry numbered 4; 12 is printed. |
+| `--.gate.2.x.yml` | Passed unquoted or without a `--` guard, a name beginning `--` is read as an option terminator by whatever it is handed to, and the real operand shifts. | The name is numbered 2 and handled as data; 12 is printed. |
+| `-n.gate.2.x.yml` | `echo "$name"` swallows it as a flag and prints nothing; a listing built with echo loses the entry silently. | printf '%s', not echo; the name is numbered 2; 12 is printed. |
+| `g[1]*.gate.2.x.yml` | An unquoted expansion re-globs the name against the directory, and `[1]` and `*` match other entries — the loop then processes files that were never listed. | Quoted, the name is one entry numbered 2; 12 is printed. |
+| `task.gate.99999999999.x.yml` | `[ -gt ]` is a 64-bit test that prints 'integer expected' and SKIPS the comparison on a long run of digits, so a script that compared it would exit 0 having never compared — and a script that accepted it would print a number no cycle can be. | A run longer than nine digits is a malformed name, not a number: un-numbered, ignored; 12 is printed. |
+| `task.gate.000.x.yml` | Normalises to 0, which names no cycle (`qa-gate-0` is not a stage) — a script that took it as current would key every comment to a round that never happened. | Zero is un-numbered; the entry is ignored; 12 is printed. |
+
+#### Legitimate — must still be accepted
+
+| Input | Why | What a correct implementation does |
+|---|---|---|
+| `task.121.gate.20.name.yml` | The ordinary case, numbered above both controls. A script that only ever printed the control would look correct on every hostile case and be a stub. | 20 is printed, exit 0, nothing on stderr. |
+| `story.2.1.gate.020.name.yml` | Zero-padded numbers are what an author types to keep a listing sorted; refusing them, or comparing them as strings (`020` < `12`), loses the current gate. | Normalised as base-10: 20 is printed. |
+| `tâche.121.gate.21.résumé.yml` | Non-ASCII bytes in a name are ordinary. A pattern anchored on ASCII, or a locale that cannot collate them, drops the entry. | 21 is printed. |
+| `task.121.gate.22.my-long-name.yml` | Hyphens inside the descriptive segment are the naming convention itself; a rule that bans `-` to stop the leading-dash cases above bans every real name. | 22 is printed. |
+| `task 121.gate.23.name with spaces.yml` | Spaces are legal in a name and common in one typed by hand. A listing that is word-split sees five entries and no gate. | Quoted throughout, one entry: 23 is printed. |
 
 ## Using the corpus
 
@@ -308,7 +349,7 @@ refuses to be the thing that hides it.
   having defeated something.
 - **Not a verdict.** It supplies inputs and their expected handling. Computing
   a verdict from a probe run belongs to the engine that executes them, not here.
-- **Not closed.** The five sinks are a judgement and a sixth will be wanted.
+- **Not closed.** The six sinks are a judgement and a seventh will be wanted.
   Adding one is a new key plus cases plus a row in the test's floor table —
   nothing depends on the set being complete.
 - **Not exhaustive per sink.** A sink that held against all of these held

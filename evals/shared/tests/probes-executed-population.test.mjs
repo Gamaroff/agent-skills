@@ -59,6 +59,12 @@ const ALLOWLIST = [
     reason: "names the defect (a self-reported zero) as the thing to avoid",
   },
   {
+    file: "shared/resources/probe-boundary-rule.md",
+    match: /against a script that says it refuses/,
+    reason:
+      "names task.121's five zero-count gates as the outcome the shell entry form ends; produces no count",
+  },
+  {
     file: "shared/resources/security-input-corpus.md",
     match: /exists to catch/,
     reason: "incidental mention of what the count is for",

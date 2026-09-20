@@ -139,6 +139,11 @@ re-run is an assertion, not evidence.
   than `absent`: the control demonstrably runs.
 ````
 
+A shell-script boundary takes the same row with `--entry 'shell:<path>'` in place of the
+`path#export` form (and `--sink filename` for a script that lists a directory): the engine
+materialises each case as a fixture directory and runs the script against it under bash and zsh, so
+"it is not JS" is never the reason a control row reads `unverifiable`.
+
 And the machine block, once per report, which is what a gate consumes. **It is printed, not
 written.** Every probe passes `--repo-root "$(git rev-parse --show-toplevel)"` — the engine's
 containment root defaults to two directories above its own file, which in an installed skill is the

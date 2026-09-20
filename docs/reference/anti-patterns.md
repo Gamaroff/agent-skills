@@ -249,6 +249,28 @@ find .claude/state -maxdepth 1 -name 'test-output-*.log' -delete 2>/dev/null || 
 `lint:shell` never sees a fence, so `shared/resources/tests/halt-snippet-glob-safe.test.mjs`
 extracts the HALT snippets and runs them under both shells with an empty glob.
 
+## Never record `unverifiable` as a verdict when it is a reason
+
+**The rule:** `unverifiable` names why an instrument could not reach a target — not a property of
+the target. When a probe engine, a checker or a review reports it, the next question is *which
+reason*, and the answer decides what happens: "the entry is a bash script" is a reason to use the
+engine's shell entry form; "the script reads stdin" is a reason to probe by hand under a minimal
+environment; "the sink is networked" is a decline to record. None of them is a reason to write
+`boundary: false`, `probes_executed: 0` and PASS.
+
+**Why:** an `unverifiable` that is read as a verdict is the one answer nobody questions — it looks
+like diligence. On task.121 five QA gates recorded "No boundary delivered" against a script whose
+own header says it "refuses rather than guesses", because the engine imported JS only and the
+boundary rule's signals were JS-shaped; `unverifiable` was the correct engine output and the wrong
+deliverable verdict, and the gate said PASS five times. The finalise security agent, working by
+hand, reproduced two fail-closed defects in the same script in ten minutes.
+
+**How to do it right:** treat `unverifiable` as a routing token. The engine reports the reason
+(`outside-repo-root`, `entry-not-probeable`, `no-cases-executed`, a decline detail); the reader
+routes on it — another entry form, a by-hand probe, a recorded decline — and only a decline the
+rule names is allowed to stand as the section's answer. A script that says it refuses is a boundary
+by its own words (`probe-boundary-signals.mjs`), whatever language it is in. (obs #121, task.128)
+
 ## See also
 
 - [Troubleshooting](./troubleshooting.md) — what to do when something breaks

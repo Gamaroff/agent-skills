@@ -6,10 +6,15 @@
  *
  * Usage:
  *   node <this-file> --sink <name> --entry <path#exportName> [options]
+ *   node <this-file> --sink <name> --entry shell:<path>     [options]
  *
  * Options:
  *   --sink <name>        one of the corpus sinks (see security-input-corpus.mjs)
- *   --entry <spec>       `relative/path.mjs#exportName` — the control under probe
+ *   --entry <spec>       `relative/path.mjs#exportName` — the control under probe;
+ *                        or `shell:relative/path.sh` — a SHELL SCRIPT taking one
+ *                        positional argument, run as `bash <path> <fixture-dir>`
+ *                        per case under bash and (when present) zsh. See "The
+ *                        shell entry form" below. Same record, same count.
  *   --cases-file <path>  JSON array of cases, replacing the corpus for this run
  *   --timeout <ms>       per-case timeout (default: the shared spawn budget)
  *   --json               emit one JSON object on stdout
@@ -46,6 +51,26 @@
  * argument, and the limits of what this engine can honestly claim, are stated
  * once in `probe-boundary-rule.md`, which sits beside this file. Read that
  * first; this file is the mechanism, not the argument.
+ *
+ * THE SHELL ENTRY FORM (task.128). A boundary delivered as a bash script has no
+ * export to import, and until this form existed the engine could only decline
+ * it — which is what happened on task.121: five QA gates recorded
+ * `probes_executed: 0` against a script whose header says it refuses rather
+ * than guesses, and a by-hand probe then found two fail-closed defects in it.
+ * `--entry shell:<path>` is an entry FORM, not a second engine: the case loop,
+ * the two directions, `computeVerdict` and the record writer are unchanged.
+ * What differs is how a case reaches the target. A sink listed in
+ * `MATERIALISED_SINKS` (the corpus) is written to a fixture directory — the
+ * sink's bracketing controls plus the case's own name — and the script is run
+ * against the directory: `bash "$1" "$2"` with the script and directory as
+ * ARGV, never a string; stdin closed; the engine's `sandboxEnv()` plus
+ * `LC_ALL=C` so glob order is byte order. The case's `expected` — stdout,
+ * exit, stderr, paths that must be absent — is what the run is compared
+ * against; `direction` then says whether a match is the good outcome. Each
+ * (case, shell) run is one executed probe, so the count is cases × shells and
+ * the record says which shells ran. A script that cannot take its input this
+ * way — stdin, a second positional, the network — is still declined, and
+ * probe-boundary-rule.md §5 says so.
  */
 
 import { spawnSync } from "node:child_process";
@@ -67,8 +92,15 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { sandboxEnv, snapshotTree } from "./qa-execute-snippets.mjs";
-import { corpusFor } from "./security-input-corpus.mjs";
+import { MATERIALISED_SINKS, corpusFor } from "./security-input-corpus.mjs";
 import { spawnBudget, neverRan, readInt } from "./spawn-budget.mjs";
+// Re-exported so the signal list ships beside the engine in every bundled copy:
+// the bundler follows sibling imports, and a prompt that cites the module by
+// name from an installed skill needs the file to be there.
+export {
+  BOUNDARY_SIGNALS,
+  classifyBoundaryText,
+} from "./probe-boundary-signals.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -195,23 +227,42 @@ export function defaultRepoRoot() {
  * absolute paths are both rejected here, on the resolved path rather than the
  * literal — `a/../../etc/x` is only visibly an escape after resolution.
  *
- * @returns {{ok: true, entryPath: string, exportName: string}
+ * The `shell:<path>` form takes the same containment — the path is checked
+ * before anything is spawned, for the same reason it is checked before an
+ * import — and returns `kind: "shell"` with no export name.
+ *
+ * @returns {{ok: true, kind: "js", entryPath: string, exportName: string}
+ *          |{ok: true, kind: "shell", entryPath: string}
  *          |{ok: false, reason: string, detail: string}}
  */
 export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
   if (typeof entry !== "string" || entry.trim() === "") {
     return { ok: false, reason: "bad-entry", detail: "entry is empty" };
   }
-  const hash = entry.lastIndexOf("#");
-  if (hash <= 0 || hash === entry.length - 1) {
-    return {
-      ok: false,
-      reason: "bad-entry",
-      detail: `entry must be "path#exportName", got "${entry}"`,
-    };
+  const isShell = entry.startsWith(SHELL_PREFIX);
+  let rawPath;
+  let exportName = null;
+  if (isShell) {
+    rawPath = entry.slice(SHELL_PREFIX.length);
+    if (rawPath.trim() === "" || rawPath.includes("#")) {
+      return {
+        ok: false,
+        reason: "bad-entry",
+        detail: `entry must be "shell:path" with no export name, got "${entry}"`,
+      };
+    }
+  } else {
+    const hash = entry.lastIndexOf("#");
+    if (hash <= 0 || hash === entry.length - 1) {
+      return {
+        ok: false,
+        reason: "bad-entry",
+        detail: `entry must be "path#exportName" or "shell:path", got "${entry}"`,
+      };
+    }
+    rawPath = entry.slice(0, hash);
+    exportName = entry.slice(hash + 1);
   }
-  const rawPath = entry.slice(0, hash);
-  const exportName = entry.slice(hash + 1);
 
   const root = resolve(repoRoot);
   const entryPath = isAbsolute(rawPath)
@@ -238,7 +289,64 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
       detail: `${entryPath} is under node_modules`,
     };
   }
-  return { ok: true, entryPath, exportName };
+  return isShell
+    ? { ok: true, kind: "shell", entryPath }
+    : { ok: true, kind: "js", entryPath, exportName };
+}
+
+/** The entry-spec prefix that selects the shell form. */
+export const SHELL_PREFIX = "shell:";
+
+/**
+ * The shells a shell-form probe runs under. bash always; zsh when the host has
+ * it — that is the Bash tool's shell on the machines that execute this
+ * repository's prose, and the unmatched-glob behaviour that differs between the
+ * two is exactly what `qa-cycle.sh`'s `bash …` invocation exists to avoid.
+ * The zsh run verifies the CALLER shape (`$(bash <script> "$dir")` issued from
+ * zsh), not the script's own interpreter, which its shebang fixes.
+ * Memoised: probing for zsh once per process, not once per case.
+ */
+let _shells;
+export function probeShells() {
+  if (_shells) return _shells;
+  const hasZsh =
+    spawnSync("zsh", ["-c", "true"], { stdio: "ignore" }).status === 0;
+  _shells = Object.freeze(["bash", ...(hasZsh ? ["zsh"] : [])]);
+  return _shells;
+}
+
+/**
+ * Compare one shell run against a case's `expected`.
+ *
+ * Every key of `expected` is compared and every mismatch is named, so a
+ * reader of the case result sees WHICH signal moved — the pre-fix qa-cycle.sh
+ * fails on stdout only when the fixture brackets the hostile name, and on
+ * stderr on every ordering; reporting only a boolean would hide which one
+ * caught it. `absent` paths are checked against the fixture directory.
+ *
+ * @returns {string[]} mismatches; empty means the run matched `expected`
+ */
+export function compareExpected(expected, run, fixtureDir) {
+  const mismatches = [];
+  if (expected.stdout !== undefined && run.stdout !== expected.stdout) {
+    mismatches.push(
+      `stdout ${JSON.stringify(run.stdout)} ≠ ${JSON.stringify(expected.stdout)}`,
+    );
+  }
+  if (expected.exit !== undefined && run.status !== expected.exit) {
+    mismatches.push(`exit ${run.status} ≠ ${expected.exit}`);
+  }
+  if (expected.stderr !== undefined && run.stderr !== expected.stderr) {
+    mismatches.push(
+      `stderr ${JSON.stringify(run.stderr.slice(0, 120))} ≠ ${JSON.stringify(expected.stderr)}`,
+    );
+  }
+  for (const rel of expected.absent ?? []) {
+    if (existsSync(join(fixtureDir, rel))) {
+      mismatches.push(`${rel} was created`);
+    }
+  }
+  return mismatches;
 }
 
 // ── Verdict computation ──────────────────────────────────────────────────────
@@ -362,6 +470,7 @@ export function runProbeSpec({
   const base = {
     sink: sink ?? null,
     entry: entry ?? null,
+    shells: null,
     executed: 0,
     passed: 0,
     reproduced: [],
@@ -412,8 +521,23 @@ export function runProbeSpec({
 
   const caseResults = [];
   const escapes = [];
+  const shells = resolved.kind === "shell" ? probeShells() : null;
   try {
     for (const c of probeCases) {
+      if (resolved.kind === "shell") {
+        runShellCase(c, {
+          sink,
+          entryPath: resolved.entryPath,
+          shells,
+          sandboxRoot,
+          workDir,
+          workDirName,
+          timeoutMs: perCaseTimeout,
+          caseResults,
+          escapes,
+        });
+        continue;
+      }
       const before = snapshotTree(sandboxRoot, workDirName);
 
       const child = spawnSync(
@@ -512,14 +636,158 @@ export function runProbeSpec({
     entry,
     verdict,
     reason,
+    // Which shells each case ran under, for the shell form; null for the JS
+    // form. Stated in the result so a record can say "bash only" on a host
+    // without zsh rather than leaving the reader to divide the count.
+    shells: shells ?? null,
     executed: ran.length,
     passed: ran.length - reproduced.length - overblocked.length,
-    reproduced: reproduced.map((c) => c.id),
-    overblocked: overblocked.map((c) => c.id),
+    // A shell-form case ran once per shell, so its id carries the shell: two
+    // identical ids would read as one finding counted twice, and "reproduced
+    // under bash but not zsh" is a real, reportable difference.
+    reproduced: reproduced.map((c) => (c.shell ? `${c.id}@${c.shell}` : c.id)),
+    overblocked: overblocked.map((c) =>
+      c.shell ? `${c.id}@${c.shell}` : c.id,
+    ),
     declined,
     escapes,
     cases: caseResults,
   };
+}
+
+/**
+ * Run one MATERIALISED case against a shell script, once per shell.
+ *
+ * Pushes one entry onto `caseResults` per (case, shell) — that is the unit
+ * `executed` counts, and it is what "cases × shells" means. A case the engine
+ * cannot materialise (a name the filesystem refuses, a sink with no fixture
+ * definition, a case with no `expected`) is DECLINED — outcome `errored` —
+ * never counted as executed and never as passed, exactly as a JS case whose
+ * child never ran.
+ *
+ * Outcome derivation, from `expected` + `direction`:
+ *   hostile,    run matches expected → "rejected"  (the name was handled)
+ *   hostile,    run differs          → "accepted"  (the name got through — reproduced)
+ *   legitimate, run matches expected → "accepted"  (the name was taken)
+ *   legitimate, run differs          → "rejected"  (over-blocked)
+ * which is the same vocabulary `computeVerdict` already reads.
+ */
+function runShellCase(
+  c,
+  {
+    sink,
+    entryPath,
+    shells,
+    sandboxRoot,
+    workDir,
+    workDirName,
+    timeoutMs,
+    caseResults,
+    escapes,
+  },
+) {
+  const fixture = MATERIALISED_SINKS[c.sink ?? sink];
+  const decline = (detail) => {
+    for (const shell of shells) {
+      caseResults.push({
+        id: c.id,
+        shell,
+        direction: c.direction,
+        outcome: "errored",
+        detail,
+      });
+    }
+  };
+  if (!fixture) {
+    decline(
+      `sink "${c.sink ?? sink}" is not materialised — the shell entry form needs a fixture definition in MATERIALISED_SINKS`,
+    );
+    return;
+  }
+  if (!c.expected || typeof c.expected !== "object") {
+    decline(
+      "case has no `expected` — a shell run has nothing to compare against",
+    );
+    return;
+  }
+
+  for (const shell of shells) {
+    // One directory per (case, shell): a side effect from the bash run must
+    // not be read as one from the zsh run.
+    let fixtureDir;
+    try {
+      fixtureDir = mkdtempSync(join(workDir, "fixture-"));
+      for (const control of fixture.controls) {
+        writeFileSync(join(fixtureDir, control), "");
+      }
+      // The case's own name. `join` normalises "/" and "..", which would turn
+      // a traversal name into a write outside the fixture — so the name is
+      // appended raw and any separator in it is a decline, not a normalised
+      // path.
+      if (c.input.includes("/") || c.input.includes("\0")) {
+        throw new Error("name carries a path separator or NUL");
+      }
+      writeFileSync(`${fixtureDir}/${c.input}`, "");
+    } catch (e) {
+      caseResults.push({
+        id: c.id,
+        shell,
+        direction: c.direction,
+        outcome: "errored",
+        detail: `fixture: cannot materialise "${c.input}": ${e.message}`,
+      });
+      continue;
+    }
+
+    const before = snapshotTree(sandboxRoot, workDirName);
+    // ARGV, never a string: the script path and the directory are $1 and $2
+    // of a fixed one-line body. Building `bash <script> <dir>` as text would
+    // put a caller-supplied path through a second parse, which is the class
+    // of defect this engine exists to probe for.
+    const child = spawnSync(
+      shell,
+      ["-c", 'bash "$1" "$2"', shell, entryPath, fixtureDir],
+      {
+        input: "",
+        cwd: workDir,
+        env: { ...sandboxEnv({ cwd: workDir }), LC_ALL: "C" },
+        encoding: "utf8",
+        timeout: timeoutMs,
+        maxBuffer: 8 * 1024 * 1024,
+      },
+    );
+    const after = snapshotTree(sandboxRoot, workDirName);
+    for (const [path, stamp] of after) {
+      if (before.get(path) !== stamp) escapes.push({ id: c.id, path });
+    }
+
+    let outcome;
+    let detail = null;
+    if (neverRan(child)) {
+      outcome = "errored";
+      detail = child.signal ? `timed out after ${timeoutMs}ms` : "never ran";
+    } else {
+      const mismatches = compareExpected(c.expected, child, fixtureDir);
+      const matched = mismatches.length === 0;
+      outcome =
+        c.direction === "hostile"
+          ? matched
+            ? "rejected"
+            : "accepted"
+          : matched
+            ? "accepted"
+            : "rejected";
+      detail = matched ? null : mismatches.join("; ");
+    }
+    caseResults.push({
+      id: c.id,
+      shell,
+      direction: c.direction,
+      outcome,
+      detail,
+      fixture: [...fixture.controls, c.input],
+    });
+  }
 }
 
 // ── The run record ───────────────────────────────────────────────────────────

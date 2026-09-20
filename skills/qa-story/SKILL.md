@@ -974,9 +974,15 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    any predicate whose `false` prevents an action). The signals and the
    explicit negative case are stated once, in Step 1b of `references/finalise-dod-security-prompt.md`;
    do not restate them here. When the rule fires, the probe engine is the harness — **run it**:
-   `node references/security-probe.mjs --sink <sink> --entry '<path>#<export>' --repo-root "$(git rev-parse --show-toplevel)" --record <work-item-dir>/<stem>.qa.<N>.security.run.json --json`.
+   `node references/security-probe.mjs --sink <sink> --entry '<path>#<export>' --repo-root "$(git rev-parse --show-toplevel)" --record <work-item-dir>/<stem>.qa.<N>.security.run.json --json`
+   — or, for a **shell-script** boundary (one positional argument; a script whose header says it
+   refuses / never guesses / fails closed is one by its own words), the shell entry form with the
+   same flags: `--entry 'shell:<path>' --sink filename`. "It is bash, not JS" is a reason to use
+   that form, never a reason to record `boundary: false` (task.121: five gates at
+   `probes_executed: 0` against `qa-cycle.sh`).
    It takes the candidates from `references/security-input-corpus.mjs` (`corpusFor(<sink>)`)
-   itself, imports the entry point in a sandboxed child, and calls it on each candidate.
+   itself, imports the entry point in a sandboxed child — or materialises each case as a fixture
+   directory and runs the script against it under bash and zsh — and scores each candidate.
    Report each case in its JSON `cases[]` whose `outcome` differs from what its `direction` requires
    on the existing `code_review` finding shape (`category: bug`, `file_line` = the entry point,
    `finding` naming the input verbatim). Record the total executed as **`probes_executed: N`**

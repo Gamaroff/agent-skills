@@ -1,0 +1,170 @@
+/**
+ * probe-boundary-signals — the boundary rule as data, and the two fixtures that
+ * showed two readers of one rule reaching opposite decisions (task.121, obs #121).
+ *
+ * The test calls the classifier; it never greps the prose. A test of prose
+ * proves the string exists, not that it works.
+ *
+ * Run: node --test shared/resources/tests/probe-boundary-signals.test.mjs
+ */
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  BOUNDARY_SIGNALS,
+  classifyBoundaryText,
+  renderSignalBullets,
+} from "../probe-boundary-signals.mjs";
+import { classifyBoundaryText as viaEngine } from "../security-probe.mjs";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(here, "..", "..", "..");
+const read = (rel) => readFileSync(join(REPO_ROOT, rel), "utf8");
+
+/** The script's own words — every `#` line of its header. */
+const qaCycleHeader = () =>
+  read("shared/resources/qa-cycle.sh")
+    .split("\n")
+    .filter((l) => l.startsWith("#"))
+    .join("\n");
+
+/** task.121 gate 5, `nfr_validation.security.notes`, verbatim. */
+const GATE_5_NOTE =
+  "No boundary delivered across five cycles; the cycle string is validated by both CLIs against a fixed stage list; the helper reads filenames and prints a bounded integer.";
+
+test("qa-cycle.sh's header classifies as a boundary by its own words", () => {
+  const r = classifyBoundaryText(qaCycleHeader());
+  assert.equal(r.boundary, true);
+  assert.ok(
+    r.matched.some(
+      (m) =>
+        m.signal === "self-declared-refusal" &&
+        /refuses rather than/i.test(m.phrase),
+    ),
+    JSON.stringify(r.matched),
+  );
+});
+
+test("the task.121 gate-5 note carries no signal — which is why the old rule missed the script", () => {
+  // The note describes the deliverable from outside ("reads filenames and
+  // prints a bounded integer"); the signal is in the script's own header, which
+  // the gate's reader did not read as a signal because every signal it had was
+  // JS-shaped. Pinned so the fixture stays what it was: the record of the
+  // failure, not a positive case.
+  const r = classifyBoundaryText(GATE_5_NOTE);
+  assert.equal(r.boundary, false, JSON.stringify(r.matched));
+  // …and the deliverable the note was ABOUT is a boundary once its own words are read.
+  const together = classifyBoundaryText(`${GATE_5_NOTE}\n\n${qaCycleHeader()}`);
+  assert.equal(together.boundary, true);
+});
+
+test("a header with none of the phrases is not a boundary — the negative case is explicit", () => {
+  for (const text of [
+    "# render the QA report as markdown and print it to stdout",
+    "# migrate the schema: add the `updated` column and backfill from `created`",
+    "# format every table in the document; a formatter never changes meaning", // "never" alone is not a doc signal
+  ]) {
+    const r = classifyBoundaryText(text);
+    assert.equal(r.boundary, false, `${text}: ${JSON.stringify(r.matched)}`);
+  }
+});
+
+test("criteria vocabulary applies only under scope: criteria", () => {
+  const text = "- [ ] The CLI must not accept a stage outside the list";
+  assert.equal(classifyBoundaryText(text).boundary, false);
+  const r = classifyBoundaryText(text, { scope: "criteria" });
+  assert.equal(r.boundary, true);
+  assert.equal(r.matched[0].signal, "criteria-vocabulary");
+});
+
+test("every signal has an id and a description; text signals carry phrases", () => {
+  assert.ok(
+    BOUNDARY_SIGNALS.length >= 5,
+    "the fifth signal is the task.128 one",
+  );
+  const ids = new Set();
+  for (const s of BOUNDARY_SIGNALS) {
+    assert.ok(s.id && s.description, JSON.stringify(s));
+    assert.ok(!ids.has(s.id), `duplicate signal id ${s.id}`);
+    ids.add(s.id);
+    if (s.phrases) {
+      assert.ok(s.phrases.length > 0, `${s.id}: empty phrase list`);
+      for (const re of s.phrases)
+        assert.ok(re instanceof RegExp, `${s.id}: phrase is not a RegExp`);
+    }
+  }
+  assert.ok(ids.has("self-declared-refusal"));
+  assert.match(renderSignalBullets(), /^- an exported predicate/m);
+});
+
+test("the engine re-exports the classifier, so a bundled copy ships the module", () => {
+  assert.equal(viaEngine, classifyBoundaryText);
+});
+
+test("classifyBoundaryText refuses a non-string rather than classifying it as nothing", () => {
+  assert.throws(() => classifyBoundaryText(undefined), TypeError);
+});
+
+// ── Prose parity ─────────────────────────────────────────────────────────────
+
+test("the finalise prompt's Step 1b lists every signal the module defines", () => {
+  const prompt = read("shared/resources/finalise-dod-security-prompt.md");
+  const step1b = prompt.slice(
+    prompt.indexOf("### Step 1b"),
+    prompt.indexOf("### Step 2"),
+  );
+  // A key phrase per signal — the description's opening words — so a signal
+  // added to the module without a bullet in the prompt turns this red.
+  for (const s of BOUNDARY_SIGNALS) {
+    const key = s.description
+      .replace(/[`*]/g, "")
+      .split(/[(—,]/)[0]
+      .trim()
+      .slice(0, 40);
+    assert.ok(
+      step1b.replace(/[`*]/g, "").includes(key),
+      `Step 1b does not name signal "${s.id}" (looked for "${key}")`,
+    );
+  }
+  assert.ok(
+    step1b.includes("probe-boundary-signals.mjs"),
+    "Step 1b must cite the module",
+  );
+});
+
+test("every site that names the JS entry form also names the shell entry form", () => {
+  // Contract test with a non-vacuity floor: the JS form appears at least at the
+  // finalise prompt, the security-review prompt and both QA Step 3b sites.
+  const files = [];
+  for (const f of readdirSync(join(REPO_ROOT, "shared/resources"))) {
+    if (f.endsWith(".md")) files.push(`shared/resources/${f}`);
+  }
+  for (const d of readdirSync(join(REPO_ROOT, "skills"))) {
+    files.push(`skills/${d}/SKILL.md`);
+  }
+  const jsForm = /--entry\s+'[^']*#<?[A-Za-z]*(?:export|exportName|Options)>?'/;
+  const shellForm = /--entry\s+'shell:/;
+  let sites = 0;
+  for (const rel of files) {
+    let text;
+    try {
+      text = read(rel);
+    } catch {
+      continue;
+    }
+    if (!jsForm.test(text)) continue;
+    sites += 1;
+    assert.ok(
+      shellForm.test(text),
+      `${rel} names the JS entry form but not the shell one — a reader of a bash boundary has no route from this site`,
+    );
+  }
+  assert.ok(
+    sites >= 3,
+    `only ${sites} site(s) name the JS entry form — the pattern no longer matches`,
+  );
+});

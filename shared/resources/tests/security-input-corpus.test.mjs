@@ -31,6 +31,8 @@ import {
   SINKS,
   DIRECTIONS,
   CASE_FIELDS,
+  OPTIONAL_CASE_FIELDS,
+  MATERIALISED_SINKS,
   corpusFor,
   allCases,
   renderCorpusTables,
@@ -57,6 +59,11 @@ const FLOORS = Object.freeze({
   "shell-exec": { hostile: 27, legitimate: 4 },
   path: { hostile: 7, legitimate: 3 },
   "template-render": { hostile: 5, legitimate: 3 },
+  // task.128: the names that defeated qa-cycle.sh, plus the shapes a shell
+  // re-reads (substitution, separators, options, globs) and the limits the
+  // script states (nine digits, zero). Four legitimate is the floor the task
+  // set; five ship.
+  filename: { hostile: 8, legitimate: 4 },
 });
 
 const byDirection = (sink, direction) =>
@@ -68,8 +75,13 @@ const byDirection = (sink, direction) =>
 
 test("every case satisfies the frozen shape", () => {
   for (const c of allCases()) {
+    // Required keys exactly; optional keys only from OPTIONAL_CASE_FIELDS. A
+    // materialised sink's cases carry `expected`; nothing else may, and no
+    // case may carry a key the engine has no reader for.
+    const keys = Object.keys(c);
+    const required = keys.filter((k) => !OPTIONAL_CASE_FIELDS.includes(k));
     assert.deepEqual(
-      Object.keys(c).sort(),
+      required.sort(),
       [...CASE_FIELDS].sort(),
       `case ${c.id}: keys do not match CASE_FIELDS — an engine reading a ` +
         `field that is sometimes absent cannot compute a verdict from it`,
@@ -197,6 +209,99 @@ test("per-sink case counts meet their floors", () => {
         `sink "${sink}" has ${actual} ${direction} cases, below its floor of ` +
           `${floor}. Cases are only ever added here; a drop means one was ` +
           `deleted rather than superseded.`,
+      );
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Materialised sinks — a case written to disk needs a pass condition and a fixture
+// ---------------------------------------------------------------------------
+
+test("every materialised sink's cases carry `expected`, and no other sink's do", () => {
+  for (const sink of SINKS) {
+    const materialised = Object.hasOwn(MATERIALISED_SINKS, sink);
+    for (const c of corpusFor(sink)) {
+      if (materialised) {
+        assert.ok(
+          c.expected && typeof c.expected === "object",
+          `case ${c.id}: a materialised sink's case has no \`expected\` — ` +
+            `the shell entry form would have nothing to compare a run against ` +
+            `and would decline it, which reads as a probe that ran nothing`,
+        );
+        assert.ok(
+          Object.isFrozen(c.expected),
+          `case ${c.id}: expected is not frozen`,
+        );
+        assert.equal(
+          typeof c.expected.stdout,
+          "string",
+          `case ${c.id}: expected.stdout`,
+        );
+        assert.equal(
+          typeof c.expected.exit,
+          "number",
+          `case ${c.id}: expected.exit`,
+        );
+        assert.equal(
+          c.expected.stderr,
+          "",
+          `case ${c.id}: expected.stderr must be "" — a leaked error with the ` +
+            `right value on stdout is the pre-fix qa-cycle.sh on most orderings`,
+        );
+      } else {
+        assert.ok(
+          !("expected" in c),
+          `case ${c.id}: \`expected\` on a non-materialised sink has no reader`,
+        );
+      }
+    }
+  }
+});
+
+test("a materialised sink's controls bracket every hostile name under LC_ALL=C", () => {
+  // The reproduction is by stdout only when the hostile name is processed
+  // after the low control and before the high one; byte order is what
+  // LC_ALL=C pins, so byte order is what this asserts.
+  const byteCompare = (a, b) =>
+    Buffer.compare(Buffer.from(a, "utf8"), Buffer.from(b, "utf8"));
+  for (const [sink, fixture] of Object.entries(MATERIALISED_SINKS)) {
+    assert.ok(fixture.controls.length >= 2, `${sink}: fewer than two controls`);
+    const sorted = [...fixture.controls].sort(byteCompare);
+    const [low, high] = [sorted[0], sorted[sorted.length - 1]];
+    for (const c of byDirection(sink, "hostile")) {
+      assert.ok(
+        byteCompare(low, c.input) < 0 && byteCompare(c.input, high) < 0,
+        `${c.id}: "${c.input}" is not bracketed by the controls ` +
+          `(${low} … ${high}) in byte order — the pre-fix reproduction would ` +
+          `depend on which side of the highest gate the name lands`,
+      );
+      assert.equal(
+        c.expected.stdout,
+        `${fixture.highValue}\n`,
+        `${c.id}: a handled hostile name must leave the high control's value`,
+      );
+    }
+    for (const c of byDirection(sink, "legitimate")) {
+      assert.ok(
+        Number(c.expected.stdout) > Number(fixture.highValue),
+        `${c.id}: a legitimate name must carry a number above the high control, ` +
+          `or a stub that only ever prints the control passes it`,
+      );
+    }
+  }
+});
+
+test("a materialised name never carries a path separator or NUL", () => {
+  // The engine appends the name to the fixture directory raw (join() would
+  // normalise a traversal into a write outside it), so a separator is a
+  // decline at run time. Assert it here so a case cannot be added that is
+  // declined on every run and silently lowers the count.
+  for (const sink of Object.keys(MATERIALISED_SINKS)) {
+    for (const c of corpusFor(sink)) {
+      assert.ok(
+        !c.input.includes("/") && !c.input.includes("\0"),
+        `${c.id}: name carries "/" or NUL and cannot be materialised`,
       );
     }
   }

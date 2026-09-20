@@ -1,0 +1,36 @@
+{
+  "$comment": "The fix-and-recheck preconditions for /finalise Step 8a (task.128). This file is the ONE definition: finalise-fix-and-recheck.mjs evaluates it, the Step 6 decision table and the DoD checklist's matrix cite it by id, and tests/finalise-fix-and-recheck.test.mjs (beside this file) pins the ids so a sixth cannot be added silently and none can be dropped. ALL must hold; any one false is the existing Step 8 halt.",
+  "version": 1,
+  "preconditions": [
+    {
+      "id": "severity-low",
+      "statement": "the finding's `severity` is `low`, read from the agent's YAML — a finding that carries no severity is NOT low",
+      "input": "severity",
+      "why": "The path exists for a one-line, fail-closed defect. A medium or high finding is the halt it always was, and a missing severity is a question the agent did not answer, not a low one."
+    },
+    {
+      "id": "single-commit",
+      "statement": "the fix is exactly one commit",
+      "input": "commits",
+      "why": "One commit is one thing to revert, one head to re-read CI on, and one diff a reader can hold in view."
+    },
+    {
+      "id": "inside-files-summary",
+      "statement": "every path the fix touches is listed in the work item's Files Summary (task §7) or File List (story)",
+      "input": "touched, filesSummary",
+      "why": "A fix outside the task's own file set is new scope, and scope is what QA reviewed; a fix inside it is a correction to what QA already covered."
+    },
+    {
+      "id": "mutation-proved",
+      "statement": "a named test goes red when the fix is reverted, and the run that showed it is recorded",
+      "input": "mutationProof",
+      "why": "A fix with no red-on-revert test is a change nothing holds; the next edit can undo it silently."
+    },
+    {
+      "id": "no-other-finding-open",
+      "statement": "no medium-or-higher finding is open in any section, and no other DoD section is FAIL",
+      "input": "otherFindingsOpen",
+      "why": "The path re-runs the ONE failed section's reproduction, not the four agents. That is sound only when nothing else was wrong — a second open finding means the tree is not the one the other sections judged."
+    }
+  ]
+}

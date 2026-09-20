@@ -6,6 +6,34 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A refusing shell script is a boundary the probe engine can reach, and finalise has a bounded
+  third exit (task 128; obs #121).** `security-probe.mjs` gains the **`shell:<path>` entry form**:
+  a bash script taking one positional argument is run as `bash "$1" "$2"` — argv, never a string —
+  per case under bash and (when present) zsh, stdin closed, `sandboxEnv()` plus `LC_ALL=C`; each
+  (case, shell) run is one executed probe, the record and verdict are unchanged, and the result
+  names `shells`. The corpus gains the **`filename` sink** (9 hostile, 5 legitimate): its cases are
+  *materialised* — written into a fixture directory beside two **bracketing controls**
+  (`!.gate.3`, `~.gate.12`, which sort around every hostile name in byte order) — and each carries
+  `expected: {stdout, exit, stderr, absent}`, because a correct script never *refuses* a hostile
+  name beside real gates, it ignores it, and `refuse | accept` could not say what a right run prints.
+  The bracket is what makes the task.121 defect (the pre-fix `qa-cycle.sh` printing a lower, wrong
+  cycle after a newline-bearing name) reproduce on **stdout**: without it the pre-fix and fixed
+  scripts print the same value on every ordering the plan proposed, and only the leaked arithmetic
+  error on stderr differs. The boundary rule gains a fifth signal, exported once from
+  `probe-boundary-signals.mjs` with `classifyBoundaryText`: **a script or function whose own
+  header says it refuses, never guesses or fails closed is a boundary in any language**, and "not
+  importable" routes to `shell:`, never to `boundary: false`; `probe-boundary-rule.md` §5 no
+  longer declines shell sinks outright. `/finalise` gains **Step 8a fix-and-recheck**: when exactly
+  one DoD section is FAIL on a finding the run produced by execution, `finalise-fix-and-recheck.mjs`
+  evaluates five preconditions pinned in `finalise-fix-and-recheck-preconditions.json` —
+  `severity-low`, `single-commit`, `inside-files-summary`, `mutation-proved`,
+  `no-other-finding-open` — and exit 0 licenses one commit, a retaken CI reading on the fix head, a
+  re-run of only that section's reproduction and a "Deviations recorded" block; anything else halts
+  as before, once per run. The security agent's YAML now carries `severity` on every `probes[]`
+  entry and FAIL `checks[]` entry, and a finding without one is not low. The Decision Matrix row is
+  in both of its definitions. Anti-pattern recorded: *never record `unverifiable` as a verdict when
+  it is a reason*.
+
 - **Resume trusts what it finds on disk — seven small mechanisms in the develop pipelines'
   resume and halt lifecycle (task 124; obs #85, #86, #88, #89, #111, #115, #123).** Phase 0b now
   opens with a **working-tree probe** that classifies every `git status --porcelain` entry before

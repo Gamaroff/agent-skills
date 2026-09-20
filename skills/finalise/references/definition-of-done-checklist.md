@@ -268,6 +268,7 @@ Use this matrix to determine if the story/task should be marked as "Accepted" or
 | Security review passed | ❌ No | **IN PROGRESS** - List security concerns |
 | Compliance review passed | ✅ Yes | **ACCEPTED** ✅ |
 | Compliance review passed | ❌ No | **IN PROGRESS** - List compliance issues |
+| Exactly one section ❌ on a finding this run produced by execution, and `finalise-fix-and-recheck.mjs` exits 0 (preconditions `severity-low`, `single-commit`, `inside-files-summary`, `mutation-proved`, `no-other-finding-open` — defined once in `shared/resources/finalise-fix-and-recheck-preconditions.json`) | ✅ Yes | **FIX-AND-RECHECK** — SKILL.md Step 8a, once; then re-enter this matrix on the fix head |
 
 ## Gap Reporting Format
 
