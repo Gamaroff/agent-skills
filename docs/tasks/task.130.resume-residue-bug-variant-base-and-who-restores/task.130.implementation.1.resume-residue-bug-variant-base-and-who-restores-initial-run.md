@@ -3,7 +3,7 @@
 **Task**: `task.130.resume-residue-bug-variant-base-and-who-restores.md`
 **Run Number**: 1
 **Started**: 2026-09-20 07:30
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -35,7 +35,7 @@ Close PR #436's three medium Step 5c findings and the four gate-6 futures, and c
 | 2. review-task             | ✅ Done    | `task.130.review.{N}.{name}.md` exists (or skip logged)                | Skipped — `Ready for Development` + `task.130.review.1` present (presence rule). Review artefacts committed `8b6e11f6`, pushed | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 22/22 phases; fast gate green (3542 node + shell suites); eval:develop-task 17/17; all 5 phases mutation-proven | `.summaries/step-3-surface-map.json`, `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #441: https://github.com/Gamaroff/agent-skills/pull/441 (OPEN, MERGEABLE); in-review comment `posted`; board `stage-disabled` | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.130.qa.{N}.*.md`; `task.130.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ⚠️ Escalated (loop limit — 5 cycles; cycle-5 fix `a9bccb13` ungated) | `task.130.qa.{N}.*.md`; `task.130.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.130.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -117,12 +117,40 @@ Close PR #436's three medium Step 5c findings and the four gate-6 futures, and c
 - Cycle 4 / 5a: `/qa-task` scoped re-review (SAFETY_REPROBE=false on all three clauses). Scope note: `git log --since=<gate 3 updated>` matched nothing (hand-written gate timestamp later than the fix commit's author time) and the empty pathspec widened `git diff` to the whole branch — the non-vacuity guard caught it; scope rebuilt from `git diff --name-only fdba78d9..HEAD` (7 source/test files). Bugs 6–8 FIXED under bash and `zsh -f` (an ad-hoc `zsh -c` check first mis-read the MERGED case: `.zshenv` re-prepended PATH ahead of the stub gh — harness, not code). Reviewer (Explore, 252 s) returned 5; QA reproduced CR-1 (fresh-shell HALT) and CR-3 (`gh pr view ""` → #441). Gate 4 FAIL 70/100; bugs 9–11 filed, 6–8 closed; PR + #437 `posted` (`qa-gate-4`, blocking_count 1).
 - Convergence check: HIGH [0, 1, 0, 1] → not tripped (HIGH_3 ≥ HIGH_2 false). Route classifier: `continue`. Third-strike: `develop-pipeline-resume-contract.md` carries the HIGH in gates 2 and 4 but not 3 → not consecutive, no strike; the pre-strike shape (two HIGHs in one pipeline-authored block) is named to qa-fix. → 5b. **Cycle 5 is the last budgeted cycle.**
 - qa-fix ingester dispatch skipped: the findings summary was already in context (this orchestrator authored gate 1 the same turn) — independence not at stake for an ingestion step; recorded per §Subagents.
+- Cycle 4 / 5b: changes-requested → `stage-disabled`; no third strike. `/qa-fix gate=…gate.4…`: bug 9 the delete block binds `DETECTOR_FILE` and re-reads the persisted JSON (HALT only on an absent file — rule 6); bug 11 empty `pr_url` → KEPT before any `gh` call; bug 10 + CR-5 the note-object shape stated once in the prompt's field table, four sites + the mtime line rewritten as objects; CR-4 provenance scenario comment corrected and the consume asserted. `stale-snapshot-delete.test.mjs` now carries the JSON by file only (36/36; E absent-file, P two-process, N2 no-pr_url, Q prompt enumeration). Mutations: re-bind → variable guard 32 red incl. E/P; empty-pr_url guard dropped N2 red ×2; bare string restored at :108/:112/:113/:167 → Q red each — Q's first draft (±1-line window) stayed green at :112 because :113 vouched for it, replaced with same-line-object-or-continuation before commit. Commit `b07373df` (report excluded), pushed; ci:fast 3574/3574, eval:develop-task 13/13 (13 is the count on the committed tree too — earlier "17" was the fixture count), bundle 0, shellcheck clean. PR + #437 `posted` (`qa-fix-4`; re-run `already`). Bugs 9–11 → Ready for QA.
+- Context compaction fired during 5b: the PreCompact hook wrote `last-halt.json` (`pause_reason: precompact`, `qa_phase: 5b`) and removed the lock; restored with `advance-pipeline-lock.sh --restore <dir>` (snapshot consumed), then `set-qa-phase.sh 5a`.
+- Cycle 5 / 5a: `/qa-task` — SAFETY_REPROBE=true by clause 3 (gate 4 FAIL + "refused" in § 9 Success Criteria; clause 1 `CONCERNS reasoned` OK; clause 2 no boundary HIGH) → unscoped re-probe with the directive (Explore, 702 s, executed the three blocks against 27 inputs). QA: bugs 9–11 re-verified from two processes under both shells; 15-input boundary re-probe; four mutations re-run; Step 4b 0 attributable (detector :80 zsh nomatch is pre-existing — follow-up); ci:fast 3574, eval 13/13. Gate 5 CONCERNS 85/100; bug 12 filed (CR-1 confirmed by grep at all three sites), bugs 9–11 closed; CR-4 refuted by execution; CR-3 left advisory (prompt-reading finding, no executed reproduction). PR + #437 `posted` (`qa-gate-5`).
+- Convergence check: cycle 5, HIGH sequence [0, 1, 0, 1, 0] → HIGH_N=0, precondition unmet → no escalation. Route classifier: `continue` (`not-a-pass-gate`; route 2 declined `high-findings-remain`). Third-strike: no HIGH in gate 5 → n/a. → 5b (cycle 5 of 5 — the last budgeted cycle; after 5b the budget rule decides).
 
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+### QA Loop Limit Reached — 2026-09-20
+
+The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
+
+**Final gate status**: CONCERNS (85/100) — gate 5, read against `b07373df`; cycle 5's fix `a9bccb13` is on the head and **no gate has read it**.
+**HIGH findings per cycle**: 0, 1, 0, 1, 0 — alternating, never flat; 0 on the final gate. MEDIUM: 2, 2, 3, 2, 1 — falling over the last three gates.
+**Remaining issues** (from final gate file):
+- TASK-130-QA-12 — medium — `skills/develop-task/SKILL.md` (and develop-story, develop-bug): the three Step 0a citations described the delete label as a prefix while the selector is exact equality. **Fixed in cycle 5's 5b (`a9bccb13`, bug 12 Ready for QA, mutation-proven both ways) — awaiting a gate.**
+- Advisory, not gating (gate 5 `code_review.advisory`): CR-2 conditional main clause at the four `--restore` citation sites; CR-3 the detector prompt's Step 1 candidate selection is a second derivation of `choose_candidate()` (silent on a legacy candidate; mtime-only ranking); CR-5 silent skip of an unrecognised `stale-snapshot`-prefixed label; CR-6 the lint rc=2 arm names the call site for three distinct causes at four sites; CR-7 `{doc-directory}` unquoted at four substitution sites; detector prompt `:80` `ls … .pausing.*` never runs under zsh `nomatch` (pre-existing on develop). CR-4 was refuted by execution.
+
+**What was attempted per cycle**:
+- Cycle 1 (gate CONCERNS 85 → `3479b14a`): bug 1 trailing `--which` is a usage error, not a consuming restore; bug 2 the delete loop fails closed (materialised list, jq exit read, here-string loop).
+- Cycle 2 (gate FAIL 70, refute pass → `fdba78d9`): bug 3 exact-label selector (the prefix matched the skip notes); bug 4 path containment; bug 5 one `DETECTOR_JSON` binding gated on validation.
+- Cycle 3 (gate CONCERNS 80, safety re-probe → `fa3e3fdc`): bug 6 object-shaped notes + `all(type=="object")`; bug 7 persist the returned detector JSON to `.summaries/step-0a-resume-detector.json`; bug 8 on-disk re-read of directory match and MERGED before `rm`; CR-4..CR-7.
+- Cycle 4 (gate FAIL 70, scoped → `b07373df`): bug 9 the delete block re-binds from the persisted file (every orchestrator Bash call is a fresh shell); bug 10 the note-object shape stated once, four prompt sites rewritten; bug 11 empty `pr_url` kept before any `gh` call; CR-4/CR-5. A context compaction fired mid-5b; the lock was restored from the precompact snapshot.
+- Cycle 5 (gate CONCERNS 85, safety re-probe → `a9bccb13`): bug 12 exact label at the three orchestrator citations; test D reads the citation's content. Gate-the-last-fix half-cycle (route 2c) **declined — `high-findings-seen`**: HIGH was not 0 throughout (0, 1, 0, 1, 0), so the loop escalates with its evidence rather than being granted a half-cycle.
+
+**Likely root cause**: not an architectural mismatch — every cycle's HIGH was a defect found *by executing* prose that had only been read (a subshell swallowing `exit`, a prefix matching a skip note, a variable that does not survive a fence boundary), each fixed in one cycle and none recurring. The loop alternated 0/1 because each fix cycle changed a boundary whose new inputs the next unscoped re-probe then enumerated; the last two findings (bugs 11, 12) are of steadily smaller consequence (a keep-not-delete on an edge input; a description wider than the selector). The run ended on a fix, which is the shape the route-2c half-cycle exists for, but the HIGH history disqualifies it by rule.
+
+**Recommended next steps**:
+1. Re-run `/develop-task task.130` and accept **"Resume at 5a with 1 more cycle"** — one gate over `a9bccb13` (a one-finding, mutation-proven fix) is what remains between this run and 5c; the grant re-enters through `grant-qa-cycles.sh`, which restores the lock from the halt snapshot.
+2. If the grant is declined: verify bug 12 by hand (`grep -rn -F 'starts \`stale-snapshot\`' skills/develop-*/SKILL.md` → 0; test D green), then `/qa-task` standalone → `/review-pr` → `/finalise`.
+3. File the advisories (CR-2, CR-3, CR-5, CR-6, CR-7, detector `:80` zsh glob) as a follow-up task rather than a sixth cycle — none gates, and two are enumeration gaps worth their own test.
 
 ---
 
@@ -164,7 +192,18 @@ _Track each QA review/fix cycle._
 **MEDIUM findings**: 2
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken (`continue`)
-**Action**: Running qa-fix (cycle 4 of 5)
+**Action**: qa-fix complete (cycle 4 of 5) — `b07373df`; bugs 9–11 Ready for QA → cycle 5 (last budgeted cycle)
+
+---
+
+### QA Cycle 5 — 2026-09-20
+**Gate Result**: CONCERNS
+**Issues Found**: bugs 9–11 verified FIXED (covered; two-process re-verification under both shells). Safety re-probe (clause 3): 0 high, 1 medium (TASK-130-QA-12 the three orchestrator citations describe the delete label as a prefix while the selector is exact equality — bug 12), 6 advisory (CR-2, CR-3 medium-confidence judgement items; CR-4 refuted by execution; CR-5..CR-7 cleanups)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken (`continue`)
+**Action**: Escalating — loop limit reached
 
 ---
 
