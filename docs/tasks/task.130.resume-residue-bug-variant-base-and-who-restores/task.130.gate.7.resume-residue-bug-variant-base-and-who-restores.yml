@@ -4,7 +4,7 @@ task_title: 'Resume residue from task.124 — bug-variant base, dispatch populat
 gate: PASS
 status_reason: 'Last granted cycle (budget 7), scoped to the Step 5c fix 8b4c0e60. Bug 13 verified fixed under both shells end to end — an --accept-legacy restore stamps task_or_story_directory, a precompact-shaped snapshot of that lock restores again without the flag, and another document''s --restore refuses it and keeps it; the stamp mutation goes red on 4 scenarios. The scoped review found no defect in the change and one LOW: the new "keeps its own directory" scenario is vacuous (an unconditional overwrite stays green — QA confirmed by mutation). One cleanup: the --restore header contract and its two prose mirrors do not yet mention the stamp.'
 reviewer: 'QA Engineer'
-updated: '2026-09-20T12:58:00Z'
+updated: '2026-09-20T13:20:00Z'
 
 top_issues:
   - id: 'TASK-130-QA-14'

@@ -1,10 +1,10 @@
 # PR Review Report: PR #441 — feat(task.130): resume probe binds its base or HALTs; detector read-only; who-restores stated once; --restore --which / --accept-legacy (#437)
 
 **Reviewed:** 2026-09-20
-**PR:** [#441](https://github.com/Gamaroff/agent-skills/pull/441) — `feature/task.130.resume-residue-bug-variant-base-and-who-restores` → `develop` (OPEN; checks 5/5 SUCCESS on `bd3fac0b`)
+**PR:** [#441](https://github.com/Gamaroff/agent-skills/pull/441) — `feature/task.130.resume-residue-bug-variant-base-and-who-restores` → `develop` (OPEN; checks 5/5 SUCCESS on `bd3fac0b` and on `0eccf859`)
 **Work item:** [`task.130.resume-residue-bug-variant-base-and-who-restores.md`](./task.130.resume-residue-bug-variant-base-and-who-restores.md) — resolved via `branch-stem`
 **Tracker:** [#437](https://github.com/Gamaroff/agent-skills/issues/437) — OPEN (task, priority:high)
-**Verdict:** ⚠️ CONCERNS
+**Verdict:** ✅ APPROVE (re-check after cycle 7; first pass: ⚠️ CONCERNS)
 
 Scope: whole-branch diff `origin/develop...HEAD` with `*/references/*` (56 bundled, auto-generated copies) excluded; the authored `skills/develop-bug/references/develop-bug-step-3-investigate-fix.md` was added back because the PR body and the Files Summary both name it. 67 files, 7,204 diff lines reviewed. Effort: medium. Invoked as develop-task Step 5c (lite mode).
 
@@ -122,3 +122,40 @@ truncated_count: 0
 3. **PC-1** — closure list in the implementation report's Completion section at finalise.
 4. **PC-3** — accepted as stated; no action.
 5. CR-2, CR-3 and the six QA advisories (gate 5/6) → one follow-up task.
+
+---
+
+## Re-check — after cycle 7 (2026-09-20)
+
+The first pass returned CONCERNS. The operator spent the last granted QA cycle on its one code finding: CR-1 → bug 13, fixed in `8b4c0e60`, gate 7 PASS (92) with QA-14 carried by the Cosmetic-residue exit. PC-2's six rows were restored; PC-3 stands as accepted. The conformance lens re-ran over the moved trail (the code delta since the first pass — 71 lines — was reviewed by gate 7's own scoped code lens, both findings recorded there).
+
+**Artifact trail now:** 7 QA reports / 7 gates; gate 7 `PASS` (92), cycle-7 entry `Proceeding to 5c` (route 2b); 13 bug reports, all Closed; no DoD yet (finalise next).
+
+```
+[PC-1] coverage · low · confidence: medium — §9 Success Criteria › Migration, second checkbox
+  The closure list for task.124.pr-review.1 CR-1..CR-5 and the gate-6 futures is still not in the implementation report.
+  → Written into the report's Completion section at finalise (Step 7).
+
+[PC-2] trail · low · confidence: high — task.130.gate.7.…yml:7
+  Gate 7's `updated` (12:58Z) preceded the commit it reviewed (8b4c0e60, 13:12Z) — the hand-stamped-timestamp class that broke cycle 4's --since scoping.
+  → Corrected to 13:20Z in this re-check.
+
+[PC-3] trail · low · confidence: medium — task doc › Notes › Deferred Work
+  The first pass's CR-2 and CR-3 were routed to "one follow-up task" but were missing from the Deferred Work list.
+  → Added in this re-check.
+
+[PC-4] consistency · low · confidence: medium — CHANGELOG.md [Unreleased] › task 130 entry
+  The entry did not mention that an --accept-legacy restore stamps the directory (the 8b4c0e60 behaviour).
+  → One clause added in this re-check.
+```
+
+**Verdict (deterministic table): ✅ APPROVE** — only `severity: low` findings remain.
+
+```yaml
+recheck_findings:
+  - { id: PC-1, category: coverage, severity: low, confidence: medium, ref: "§9 Success Criteria › Migration, second checkbox", finding: "Closure list for task.124 CR-1..CR-5 and gate-6 futures not yet in the implementation report.", suggested_action: "Write it into the Completion section at finalise." }
+  - { id: PC-2, category: trail, severity: low, confidence: high, ref: "task.130.gate.7.resume-residue-bug-variant-base-and-who-restores.yml:7", finding: "Gate 7 updated timestamp preceded the commit it reviewed.", suggested_action: "Corrected to 13:20Z." }
+  - { id: PC-3, category: trail, severity: low, confidence: medium, ref: "task.130.resume-residue-bug-variant-base-and-who-restores.md › Deferred Work", finding: "First-pass CR-2 and CR-3 missing from Deferred Work.", suggested_action: "Added." }
+  - { id: PC-4, category: consistency, severity: low, confidence: medium, ref: "CHANGELOG.md [Unreleased] › task 130", finding: "CHANGELOG did not mention the --accept-legacy directory stamp.", suggested_action: "Clause added." }
+truncated_count: 0
+```

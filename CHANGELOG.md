@@ -174,7 +174,9 @@ All notable changes to this project will be documented in this file. Format foll
   grant-offer rule legitimately shares). develop-bug's Step 3 root-cause dispatch is marked with
   `set-waiting-on.sh`, and the population test's dispatch pattern reads its wording.
   `advance-pipeline-lock.sh` gains **`--restore --which <doc-dir>`** (prints the candidate the
-  restore would consume; no writes) and **`--accept-legacy`**; **Breaking:** a snapshot with no
+  restore would consume; no writes) and **`--accept-legacy`** (the rebuilt lock is stamped with
+  `<doc-dir>`, so every snapshot derived from it restores without the flag — needed once, not on
+  every resume); **Breaking:** a snapshot with no
   `task_or_story_directory` is refused as `legacy-snapshot` without the flag, and Step 8 deletes
   such a snapshot when it is the sole candidate (counted with `find` — a `for f in <path> <glob>`
   loop aborts under zsh's `nomatch` exactly as `ls | wc -l` did). `grant-qa-cycles.sh`'s

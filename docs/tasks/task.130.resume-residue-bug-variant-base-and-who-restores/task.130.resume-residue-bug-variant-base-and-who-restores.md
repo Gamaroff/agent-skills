@@ -473,6 +473,7 @@ Carried out of the QA loop by the Cosmetic-residue exit (route 2b, gate 7) and t
 - Gate-6 CR-1 — test D's negative regex is a word-list heuristic; the exact-label match is the floor.
 - Gate-5 CR-2 (conditional main clause at the four `--restore` citation sites), CR-3 (detector prompt Step 1 candidate selection vs `choose_candidate()`), CR-5 (silent skip of an unrecognised `stale-snapshot`-prefixed label), CR-6 (one rc=2 message for the four lint sites), CR-7 (quote `{doc-directory}`).
 - Detector prompt `:80` — `ls … .pausing.*` never runs under zsh `nomatch` (pre-existing on develop).
+- 5c CR-2 — `advance-pipeline-lock.sh:202` prints the `--accept-legacy` advice for a bystander legacy snapshot even when the restore succeeds from a matched claim; 5c CR-3 — the contract delete block's Pass 2 reports an unparsable snapshot and a directory-less object with the same `'absent'` HALT text.
 - 5c PC-2 root cause — the `change-log.js` repair at `fdba78d9` dropped six rows; check the upsert's handling of a corrupted block.
 - 5c PC-3 — task.131/132 planning documents ride in PR #441 (accepted).
 
