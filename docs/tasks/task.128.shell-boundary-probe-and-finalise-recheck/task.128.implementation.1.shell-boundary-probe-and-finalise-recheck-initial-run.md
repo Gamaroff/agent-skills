@@ -36,9 +36,9 @@ Initial autonomous run (dispatched by `/develop-next`, source: task-registry) �
 | 2. review-task             | ✅ Done    | `task.128.review.{N}.{name}.md` exists (or skip logged)                | `task.128.review.1.…md`; 8/10 READY; 1 critical + 7 important fixes applied; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 3/3 phases; fast gate 3613/0 (iter 2, after 3 touched-area test fixes); 12 mutants killed | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #446: https://github.com/Gamaroff/agent-skills/pull/446 (commit `61bbf247`) | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.128.qa.{N}.*.md`; `task.128.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.128.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.128.qa.{N}.*.md`; `task.128.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | gates 1–5 (FAIL 40 → FAIL 50 → CONCERNS 60 → CONCERNS 90 → CONCERNS 95, no open entry); 13 bugs closed; 5c CONCERNS, pr-review.1 | 2026-09-20 |
+| 7. finalise                | ✅ Done    | `task.128.dod.{N}.*.md`; task `status: accepted`                       | task.128.dod.1 ACCEPTED; acceptance commit cf7dd582; CI 1 SUCCESS @ 01a0b475, CI 2 SUCCESS @ cf7dd582; DoD body + canonical comment on PR; #431 closed, board done → already | 2026-09-20 |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | implementation report committed (scoped to the work-item dir — `git add -u` skipped: a concurrent session's tracked edits are in this checkout) | 2026-09-20 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -83,6 +83,17 @@ Initial autonomous run (dispatched by `/develop-next`, source: task-registry) �
 - QA Cycle 3: gate CONCERNS (60/100) with 4 open MEDIUM entries. Convergence check: HIGH sequence 2 → 1 → 0 — no HIGH remains, guard does not trip. Route classifier: `continue (not-a-pass-gate)` — "route 2b is PASS-only … (and route 2 declined: high-findings-remain)". → 5b. Reviewer: one Explore subagent with SAFETY RE-PROBE (6m28s; 5 bugs + 1 cleanup); turn yielded while it ran.
 - QA Cycle 3 — changes-requested: stage-disabled. qa-fix: one `fix(...)` commit `6ae01f48` (explicit paths; concurrent qa-next files untouched); pushed once. Post-fix PR state: OPEN, head 6ae01f48.
 - QA Cycle 4: gate CONCERNS (90/100), 3 open entries (1 medium, 2 low). Convergence check: HIGH 2 → 1 → 0 → 0 — none remain, no stall. Route classifier: `continue (not-a-pass-gate)` — "(and route 2 declined: product-defect-signal)". → 5b. Cycle 5 is the last budgeted cycle.
+- QA Fix cycle 4: 4 findings fixed in one commit (76b7151f), 3 mutants killed; bug 13 → Ready for QA. → 5a, cycle 5 (last budgeted) scoped to files since gate 4; on a clean gate → 5c `/review-pr`, else Loop Escalation (route 2c half-cycle).
+- QA Cycle 5: gate CONCERNS (95/100) with `top_issues: []` — Outcome branching arm 3 (CONCERNS, no open entry) → 5c directly; Convergence check and route classifier not consulted (classifier for the record: `continue (not-a-pass-gate)` — a CONCERNS token is a reservation 5c must see raised). HIGH 2 → 1 → 0 → 0 → 0, MEDIUM 2 → 3 → 4 → 1 → 0. Reviewer's CR-1 (medium, high confidence) re-rated LOW by QA on reachability (authored case naming a case-variant of an engine-created filename; no corpus case does) and failure direction (false `absent`, loud) and carried to `future` as a fix-and-recheck candidate for Step 7 — the mechanism this task delivers. Route 2c not needed: the loop exits through its gate, not at the budget.
+- Step 5c `/review-pr --effort medium --comment`: CONCERNS (no high+high). Conformance: 5 findings, all applied in the working tree before Step 7 (pr_number: 446; Migration checkbox unticked until obs #121 is actioned; Phase 2 fixture polarity; two test files added to §7; paused block marked resumed). Code: CR-1 medium/high — `redNamesTest` matches a red marker within 3 lines of any line naming the proof FILE, so an unrelated ✖ in the same test file (its stack trace names the file) satisfies `mutation-proved`; real, reproduced by the reviewer; NOT fixed here (5c is advisory, the loop budget is spent, and the route to a fix is REQUEST CHANGES → 5b which this verdict is not) — recorded in the task document's known limits and the PR review report as the first item for a follow-up task; CR-2..4 low, carried. Verdict per the Step 6 table: CONCERNS → Step 7.
+- Step 7 /finalise invoked (not inlined): four parallel DoD agents — AC 7/7 (AC7 actioned in-run: obs #121 → actioned naming PR #446), security PASS (boundary: true; 39 probes engine-recorded in task.128.dod.security.run.json, only the known pre-existing symlink-escape reproduced; fix-and-recheck evaluator refused 11/11 hostile records), compliance NOT_APPLICABLE, docs PASS. No section FAIL — Step 8a fix-and-recheck not entered. Registry tick: `ticked`.
+- DoD summary: docs/tasks/task.128.shell-boundary-probe-and-finalise-recheck/task.128.dod.1.shell-boundary-probe-and-finalise-recheck.md
+- CI reading 1: SUCCESS @ 01a0b475 over 5 checks (acceptance decision); CI reading 2: SUCCESS @ cf7dd582 over 5 checks after 120s (pushed acceptance head — poll backgrounded, head asserted equal to the PR head). Publish boundary crossed before any side-effect. Pre-acceptance commit 52c7d645 carried the Step 5c report.
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/446#issuecomment-5752466229. Canonical summary comment: https://github.com/Gamaroff/agent-skills/pull/446#issuecomment-5752462930.
+- GitHub Issue #431 — Document link re-pointed to develop; done comment `posted`; close: CLOSED ✅ (verified via gh issue view).
+- GitHub Issue #431 — board: done → already.
+- CHANGELOG citation check: [Unreleased] cites task 128 ✅. Accept gap: ACCESS_TRACKER=full, no deferral records — tracker debt none.
+- Task completed.
 - No previous run detected (no `feature/task.128.*` branch, no PR, no implementation report, no halt snapshot) — fresh start.
 
 ---
@@ -140,23 +151,36 @@ _Track each QA review/fix cycle._
 **MEDIUM findings**: 1
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
-**Action**: Running qa-fix (cycle 4 of 5)
+**Action**: qa-fix applied (cycle 4 of 5)
+**Fixes Applied**: BUG-13 (`expectedProblem` rejects `.`/`..`; an `absent` name the fixture itself creates is declined), CR-2 (launch-failure regex `mi`), CR-3 (all-errored decline keeps `escapes`/`shells`), CR-4 (BUG-12 test try/finally + no-survivor assertion). Mutation-proved: 3 mutants (M-16/17/18) each red on its named test, restored 45/0. Isolated-worktree `ci:fast` 3579/3580 + observation-log 53/53 in the main tree; `bundle:check` 0 problems.
+**Commit**: 76b7151f — pushed; PR comment `qa-fix-4` + tracker comment (#431) posted.
+
+### QA Cycle 5 — 2026-09-20
+**Gate Result**: CONCERNS
+**Issues Found**: BUG-13, CR-2, CR-3, CR-4 verified FIXED by execution on 76b7151f (closed). New: none opened — two LOW advisories carried to `future` (CR-1 case-folded fixture names slip the string collision check on APFS, reproduced, reachable only by an authored case naming a case-variant of an engine-internal filename, fails loud; CR-2 the CR-3 test fixture orphans a `sleep`). Scoped review (2 files since gate 4, 193 diff lines, one read-only refute reviewer). Security measured 39 (record qa.5). `top_issues: []`, 95/100.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — 9 findings (0 high; 2 medium: PC-3 no `pr_number` in the task frontmatter [applied], CR-1 `mutation-proved` tied to the proof's file rather than the test [recorded, not applied]; 7 low). Report: task.128.pr-review.1.shell-boundary-probe-and-finalise-recheck.md; summary comment posted.
+**Loop exit**: 5c CONCERNS — findings recorded, loop exits to Step 7
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-20T20:45Z
+**Final Status**: Completed
 **Branch**: feature/task.128.shell-boundary-probe-and-finalise-recheck
 **PR**: https://github.com/Gamaroff/agent-skills/pull/446
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 5 (gates FAIL 40 → FAIL 50 → CONCERNS 60 → CONCERNS 90 → CONCERNS 95 with no open entry); 13 bugs opened, 13 closed by execution; Step 5c CONCERNS
+**DoD Summary**: docs/tasks/task.128.shell-boundary-probe-and-finalise-recheck/task.128.dod.1.shell-boundary-probe-and-finalise-recheck.md
+**Tracker debt**: none
 
 ---
 
-## Pipeline Paused — 2026-09-20T19:55:17Z
+## Pipeline Paused — 2026-09-20T19:55:17Z — RESUMED 2026-09-20T20:00Z
+
+✅ **Resumed in the same session**: the lock was rebuilt with `advance-pipeline-lock.sh --restore` from the halt snapshot at step 5 (`qa_phase` 5b → 5a), QA cycle 4's fix commit landed after the pause and cycles 5 and 5c followed; the block below is the hook's record at the moment of the pause and is kept as-is.
 
 ⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
 
