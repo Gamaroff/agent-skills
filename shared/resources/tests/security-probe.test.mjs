@@ -16,19 +16,25 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   OUTCOMES,
   VERDICTS,
+  compareExpected,
   computeVerdict,
   defaultRepoRoot,
+  expectedProblem,
+  isLaunchFailure,
   main,
+  probeShells,
+  readRecord,
   resolveEntry,
   runProbeSpec,
+  toRecordEntry,
 } from "../security-probe.mjs";
 import { corpusFor } from "../security-input-corpus.mjs";
 
@@ -522,4 +528,568 @@ test("runProbeSpec validates timeoutMs itself — the API, not only the CLI", ()
     timeoutMs: 30000,
   });
   assert.equal(good.verdict, "engages");
+});
+
+// ── The shell entry form (task.128) ──────────────────────────────────────────
+//
+// A boundary delivered as a bash script is reached through `shell:<path>`: each
+// materialised case is written into a fixture directory beside the sink's
+// bracketing controls and the script is run against it under every shell in
+// `probeShells()`. The tests below pin the three properties that make the form
+// honest — the count is cases × shells, the task.121 defect reproduces BY
+// STDOUT on the pre-fix script, and containment runs before anything spawns.
+
+const SHELL_FIXTURES = "shared/resources/tests/fixtures/security-probe";
+const FIXED_SCRIPT = "shell:shared/resources/qa-cycle.sh";
+const PREFIX_SCRIPT = "shell:tests/fixtures/qa-cycle.prefix.sh";
+
+test("shell entry: the fixed qa-cycle.sh engages, executed = cases × shells", () => {
+  const cases = corpusFor("filename");
+  const shells = probeShells();
+  const r = runProbeSpec({ sink: "filename", entry: FIXED_SCRIPT });
+  assert.deepEqual(r.shells, [...shells]);
+  assert.equal(r.executed, cases.length * shells.length);
+  assert.equal(r.declined.length, 0, JSON.stringify(r.declined));
+  assert.deepEqual(r.reproduced, []);
+  assert.deepEqual(r.overblocked, []);
+  assert.equal(r.verdict, "engages");
+  assert.equal(r.escapes.length, 0);
+});
+
+test("shell entry: the pre-fix qa-cycle.sh reproduces the newline case BY STDOUT, under every shell", () => {
+  // The red fixture is the script as it was before a412f59a. With the
+  // bracketing controls the hostile name is processed between gate 3 and gate
+  // 12, so the aborted loop prints 3 — the lower, wrong cycle the task.121
+  // finalise probe found — and stdout, not only stderr, carries the finding.
+  const r = runProbeSpec({ sink: "filename", entry: PREFIX_SCRIPT });
+  assert.equal(r.verdict, "present-but-inert", r.reason);
+  for (const shell of probeShells()) {
+    assert.ok(
+      r.reproduced.includes(`filename.newline-in-name@${shell}`),
+      `newline case not reproduced under ${shell}: ${JSON.stringify(r.reproduced)}`,
+    );
+    const hit = r.cases.find(
+      (c) => c.id === "filename.newline-in-name" && c.shell === shell,
+    );
+    assert.match(
+      hit.detail,
+      /stdout "3\\n" ≠ "12\\n"/,
+      `the reproduction must be visible on stdout, not only stderr: ${hit.detail}`,
+    );
+  }
+  // Every other hostile name is handled by the pre-fix script too — the
+  // defect was one name, and the verdict says so: inert, not absent.
+  assert.equal(
+    r.reproduced.length,
+    probeShells().length,
+    `only the newline case reproduces: ${JSON.stringify(r.reproduced)}`,
+  );
+});
+
+test("shell entry: a leaked error on stderr fails the case even when stdout is right", () => {
+  // `expected.stderr: ""` is the order-independent half of the signal. Prove it
+  // is read: the same run with stderr ignored would pass this comparison.
+  const run = {
+    stdout: "12\n",
+    status: 0,
+    stderr: "line 56: arithmetic error\n",
+  };
+  const withStderr = compareExpected(
+    { stdout: "12\n", exit: 0, stderr: "" },
+    run,
+    "/nonexistent",
+  );
+  assert.equal(withStderr.length, 1);
+  assert.match(withStderr[0], /^stderr /);
+  const without = compareExpected(
+    { stdout: "12\n", exit: 0 },
+    run,
+    "/nonexistent",
+  );
+  assert.deepEqual(without, []);
+});
+
+test("shell entry: `absent` catches a side effect when stdout is right", () => {
+  // eval-names.sh re-parses each name and prints 12 regardless, so the
+  // command-substitution cases are caught ONLY by the marker file they create.
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: `shell:${SHELL_FIXTURES}/eval-names.sh`,
+  });
+  for (const shell of probeShells()) {
+    for (const id of [
+      "filename.command-substitution",
+      "filename.backtick-substitution",
+    ]) {
+      assert.ok(
+        r.reproduced.includes(`${id}@${shell}`),
+        `${id} under ${shell}`,
+      );
+      const hit = r.cases.find((c) => c.id === id && c.shell === shell);
+      assert.match(hit.detail, /was created/, hit.detail);
+    }
+  }
+  assert.equal(
+    r.escapes.length,
+    0,
+    "a write INSIDE the fixture is not an escape",
+  );
+});
+
+test("shell entry: an out-of-root script is refused before anything spawns", () => {
+  const r = runProbeSpec({ sink: "filename", entry: "shell:/etc/passwd" });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "outside-repo-root");
+  assert.equal(r.executed, 0);
+  assert.equal(
+    r.cases.length,
+    0,
+    "no case may run against an out-of-root script",
+  );
+  assert.equal(r.shells, null);
+});
+
+test("shell entry: a missing or non-file script is DECLINED, never scored absent (BUG-2)", () => {
+  // Before the fix a missing path made every run exit 127, every case mismatch
+  // expected, and the verdict read absent with executed = cases × shells —
+  // "could not look" scored as "the control is absent", with a count behind it.
+  for (const entry of [
+    "shell:shared/resources/does-not-exist.sh",
+    "shell:shared/resources", // a directory
+  ]) {
+    const r = runProbeSpec({ sink: "filename", entry });
+    assert.equal(r.verdict, "unverifiable", entry);
+    assert.equal(r.reason, "entry-not-probeable", entry);
+    assert.equal(r.executed, 0, `${entry}: nothing may count as executed`);
+    assert.equal(r.reproduced.length, 0);
+    assert.match(r.declined[0].detail, /not a readable regular file/);
+  }
+});
+
+test("shell entry: a TARGET's own 126/127 exit is compared, not declined (BUG-7)", () => {
+  // `bash "$1"` never consults the shebang and the readability check runs
+  // before launch, so a 126/127 that reaches the comparison is the target's
+  // own answer — a hostile name run as a command under `set -e` — and must be
+  // scored against `expected` like any other exit, or a reproduction becomes
+  // a decline (cycle-1 fix 2 did exactly that).
+  const dir = mkdtempSync(
+    join(REPO_ROOT, "shared/resources/tests/.t128-launch-"),
+  );
+  try {
+    const script = join(dir, "exits-127.sh");
+    writeFileSync(script, "#!/usr/bin/env bash\nexit 127\n", { mode: 0o755 });
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${relative(REPO_ROOT, script)}`,
+    });
+    assert.ok(r.executed > 0, "a target exit is a run, not a decline");
+    assert.equal(r.declined.length, 0, JSON.stringify(r.declined));
+    // Every hostile case mismatches expected (exit 127 ≠ 0) → accepted → the
+    // script that "refuses everything by dying" is scored, not excused.
+    assert.ok(r.reproduced.length > 0);
+    assert.match(r.cases[0].detail, /exit 127 ≠ 0/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell entry: a target that RUNS each name is compared, not declined as a launch failure (BUG-9)", () => {
+  // bash prefixes runtime errors INSIDE the script with the script path
+  // (`<script>: line 9: <fixture>/x: Permission denied`, exit 126) — the same
+  // path a launch failure names. Containment alone declined the very
+  // scenario BUG-7 was fixed for.
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: `shell:${SHELL_FIXTURES}/runs-names.sh`,
+  });
+  assert.equal(r.declined.length, 0, JSON.stringify(r.declined));
+  assert.ok(r.executed > 0);
+  const hit = r.cases.find((c) => c.direction === "hostile");
+  assert.match(hit.detail, /exit 126 ≠ 0/, hit.detail);
+});
+
+test("isLaunchFailure: a runtime error inside the script is NOT a launch failure (BUG-9)", () => {
+  const p = "/repo/shared/resources/x.sh";
+  assert.equal(
+    isLaunchFailure(
+      {
+        status: 126,
+        stderr: `${p}: line 9: /tmp/fixture/x.gate.5.yml: Permission denied\n`,
+      },
+      p,
+    ),
+    false,
+  );
+  assert.equal(
+    isLaunchFailure(
+      {
+        status: 127,
+        stderr: `${p}: line 9: /tmp/fixture/x: No such file or directory\n`,
+      },
+      p,
+    ),
+    false,
+  );
+  // A path with regex metacharacters is matched literally.
+  const odd = "/repo/a+b (c)/x.sh";
+  assert.equal(
+    isLaunchFailure(
+      { status: 127, stderr: `bash: ${odd}: No such file or directory\n` },
+      odd,
+    ),
+    true,
+  );
+});
+
+test("shell entry: an absent name that always exists or that the fixture creates is declined (BUG-13)", () => {
+  const base = corpusFor("filename").slice(0, 2);
+  for (const absent of [["."], [".."], ["!.gate.3.control.yml"]]) {
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: FIXED_SCRIPT,
+      cases: base.map((c) => ({ ...c, expected: { ...c.expected, absent } })),
+    });
+    assert.equal(r.executed, 0, JSON.stringify(absent));
+    assert.equal(r.reason, "entry-not-probeable");
+  }
+  // A case whose absent names its OWN input is the same collision.
+  const self = base.map((c) => ({
+    ...c,
+    expected: { ...c.expected, absent: [c.input] },
+  }));
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: FIXED_SCRIPT,
+    cases: self,
+  });
+  assert.equal(r.executed, 0);
+  assert.match(r.declined[0].detail, /the fixture itself creates/);
+  assert.match(
+    expectedProblem({ exit: 0, absent: [".."] }),
+    /other than \. and \.\./,
+  );
+});
+
+test("isLaunchFailure: bash 3.2's lower-case message is recognised (CR-2)", () => {
+  const p = "/repo/x.sh";
+  assert.equal(
+    isLaunchFailure({ status: 126, stderr: `${p}: ${p}: is a directory\n` }, p),
+    true,
+  );
+  assert.equal(
+    isLaunchFailure(
+      { status: 127, stderr: `bash: ${p}: no such file or directory\n` },
+      p,
+    ),
+    true,
+  );
+});
+
+test("shell entry: escapes and shells survive the all-errored decline (CR-3)", () => {
+  // A target that writes beside itself and then never answers on any case:
+  // every run errors, the run collapses to an entry-level decline, and the
+  // escapes it produced must still be reported.
+  const dir = mkdtempSync(
+    join(REPO_ROOT, "shared/resources/tests/.t128-errall-"),
+  );
+  try {
+    const script = join(dir, "writes-then-hangs.sh");
+    writeFileSync(
+      script,
+      '#!/usr/bin/env bash\ntouch "$HOME/PWNED-h"\nsleep 30\n',
+      { mode: 0o755 },
+    );
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${relative(REPO_ROOT, script)}`,
+      cases: corpusFor("filename").slice(0, 1),
+      timeoutMs: 300,
+    });
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.executed, 0);
+    assert.ok(r.escapes.length > 0, "the escape must survive the collapse");
+    assert.deepEqual(r.shells, [...probeShells()]);
+    assert.ok(toRecordEntry(r).escaped > 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell entry: a malformed expected is declined with its reason, never scored or thrown (BUG-11)", () => {
+  const base = corpusFor("filename").slice(0, 2);
+  const bad = [
+    [{ stdout: 12 }, /expected\.stdout.*must be a string/],
+    [{ stdout: null }, /expected\.stdout.*must be a string/],
+    [{ exit: "0" }, /expected\.exit.*must be an integer/],
+    [{ exit: 0, absent: 5 }, /expected\.absent.*must be an array/],
+    [{ exit: 0, absent: ["a/b"] }, /expected\.absent.*must be an array/],
+    [{ exit: 0, stderr: 7 }, /expected\.stderr.*must be a string/],
+  ];
+  for (const [expected, re] of bad) {
+    let r;
+    assert.doesNotThrow(() => {
+      r = runProbeSpec({
+        sink: "filename",
+        entry: PREFIX_SCRIPT,
+        cases: base.map((c) => ({ ...c, expected })),
+      });
+    }, JSON.stringify(expected));
+    assert.equal(r.executed, 0, JSON.stringify(expected));
+    assert.match(r.declined[0].detail, re, JSON.stringify(expected));
+  }
+  assert.equal(
+    expectedProblem({ stdout: "12\n", exit: 0, stderr: "", absent: ["PWNED"] }),
+    null,
+  );
+  assert.match(expectedProblem("nope"), /not an object/);
+});
+
+test("shell entry: side effects in HOME, TMPDIR or beside the script are escapes (BUG-12)", () => {
+  try {
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${SHELL_FIXTURES}/writes-home-tmp-self.sh`,
+    });
+    const paths = r.escapes.map((e) => e.path);
+    for (const marker of ["PWNED-home", "PWNED-tmp", "PWNED-self"]) {
+      assert.ok(
+        paths.some((p) => p.endsWith(marker)),
+        `${marker} not reported as an escape: ${JSON.stringify(paths.slice(0, 6))}`,
+      );
+    }
+    // Every escape names the shell it happened under.
+    assert.ok(r.escapes.every((e) => e.shell && e.id.endsWith(`@${e.shell}`)));
+    // Neither the real HOME nor the reader's real temp dir was written to.
+    assert.equal(existsSync(join(process.env.HOME, "PWNED-home")), false);
+    assert.equal(existsSync(join(tmpdir(), "PWNED-tmp")), false);
+  } finally {
+    // The script writes beside itself — in the real fixtures directory — so
+    // the marker is removed whether or not the assertions held.
+    rmSync(join(REPO_ROOT, SHELL_FIXTURES, "PWNED-self"), { force: true });
+  }
+});
+
+test("isLaunchFailure: bash's own open failure, keyed on its message AND the code", () => {
+  const p = "/repo/shared/resources/x.sh";
+  const fails = (status, stderr) => isLaunchFailure({ status, stderr }, p);
+  assert.equal(fails(127, `bash: ${p}: No such file or directory\n`), true);
+  assert.equal(fails(126, `bash: ${p}: Permission denied\n`), true);
+  assert.equal(fails(126, `${p}: ${p}: Is a directory\n`), true);
+  assert.equal(fails(126, `bash: ${p}: cannot execute binary file\n`), true);
+  // A target that exits 127 with its own stderr (or none) is NOT a launch failure.
+  assert.equal(fails(127, ""), false);
+  assert.equal(
+    fails(127, "x.sh: line 3: frobnicate: command not found\n"),
+    false,
+  );
+  // bash's message about a DIFFERENT path is not about this script.
+  assert.equal(
+    fails(127, "bash: /other/thing: No such file or directory\n"),
+    false,
+  );
+  // The message without the code is not a launch failure either.
+  assert.equal(fails(0, `bash: ${p}: Permission denied\n`), false);
+});
+
+test("shell entry: a side effect a no-cd script writes to its cwd is caught by absent (BUG-5)", () => {
+  // eval-names-nocd.sh never cd's into the fixture; its `$(touch PWNED)`
+  // lands in the child's cwd. With cwd: workDir that was invisible to both
+  // `absent` (which looks in the fixture) and the sentinel (which skips
+  // workDir); the child now runs IN the fixture.
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: `shell:${SHELL_FIXTURES}/eval-names-nocd.sh`,
+  });
+  for (const shell of probeShells()) {
+    for (const id of [
+      "filename.command-substitution",
+      "filename.backtick-substitution",
+    ]) {
+      assert.ok(
+        r.reproduced.includes(`${id}@${shell}`),
+        `${id} under ${shell}`,
+      );
+      const hit = r.cases.find((c) => c.id === id && c.shell === shell);
+      assert.match(hit.detail, /was created/, hit.detail);
+    }
+  }
+  assert.equal(r.escapes.length, 0);
+});
+
+test("shell entry: an expected that compares nothing is declined, never a vacuous pass (BUG-8)", () => {
+  // With `expected: {}` every run "matched" and the PRE-FIX script scored
+  // engages. The corpus schema test cannot see a --cases-file; the engine must.
+  const base = corpusFor("filename").slice(0, 2);
+  for (const expected of [{}, { absent: ["PWNED"] }]) {
+    const cases = base.map((c) => ({ ...c, expected }));
+    const r = runProbeSpec({ sink: "filename", entry: PREFIX_SCRIPT, cases });
+    assert.equal(r.executed, 0, JSON.stringify(expected));
+    assert.equal(r.verdict, "unverifiable");
+    assert.match(r.declined[0].detail, /compares nothing/);
+  }
+  // A single comparable key is enough to be scored.
+  const one = base.map((c) => ({ ...c, expected: { exit: c.expected.exit } }));
+  assert.ok(
+    runProbeSpec({ sink: "filename", entry: FIXED_SCRIPT, cases: one })
+      .executed > 0,
+  );
+});
+
+test("shell entry: the record carries which shells ran (CR-5), and declined/escape ids carry the shell (CR-6)", () => {
+  const r = runProbeSpec({ sink: "filename", entry: FIXED_SCRIPT });
+  const entryRow = toRecordEntry(r, { name: "x" });
+  assert.deepEqual(entryRow.shells, [...probeShells()]);
+  assert.equal(
+    toRecordEntry(
+      runProbeSpec({ sink: "url-authority", entry: entry("engaging-control") }),
+    ).shells,
+    null,
+  );
+  // Round-trip through a record on disk and the emitted block.
+  const dir = mkdtempSync(join(tmpdir(), "probe-shells-"));
+  try {
+    const record = join(dir, "run.json");
+    const out = [];
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (chunk) => (out.push(String(chunk)), true);
+    try {
+      main([
+        "--sink",
+        "filename",
+        "--entry",
+        "shell:shared/resources/qa-cycle.sh",
+        "--record",
+        record,
+        "--repo-root",
+        REPO_ROOT,
+      ]);
+      main(["--emit-block", record]);
+    } finally {
+      process.stdout.write = write;
+    }
+    assert.deepEqual(readRecord(record).controls[0].shells, [...probeShells()]);
+    assert.match(
+      out.join(""),
+      new RegExp(`shells: \\[${probeShells().join(", ")}\\]`),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  // CR-6: a declined case under two shells is two ids, not one id twice.
+  // (One valid case alongside, or the all-errored path collapses the run to a
+  // single entry-level decline by design.)
+  const [first, second] = corpusFor("filename");
+  const { expected: _e, ...stripped } = first;
+  const d = runProbeSpec({
+    sink: "filename",
+    entry: FIXED_SCRIPT,
+    cases: [stripped, second],
+  });
+  assert.deepEqual(
+    d.declined.map((x) => x.id),
+    probeShells().map((sh) => `${first.id}@${sh}`),
+  );
+});
+
+test("a NUL byte in an entry is bad-entry for BOTH forms, and the shell form never throws (BUG-3)", () => {
+  assert.equal(
+    resolveEntry("shell:shared/resources/qa-cycle\u0000.sh", REPO_ROOT).reason,
+    "bad-entry",
+  );
+  assert.equal(
+    resolveEntry("shared/resources/x\u0000.mjs#f", REPO_ROOT).reason,
+    "bad-entry",
+  );
+  let r;
+  assert.doesNotThrow(() => {
+    r = runProbeSpec({
+      sink: "filename",
+      entry: "shell:shared/resources/qa-cycle\u0000.sh",
+    });
+  });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "bad-entry");
+});
+
+test("shell entry: a sink that is not materialised is declined, never executed", () => {
+  const r = runProbeSpec({ sink: "path", entry: FIXED_SCRIPT });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "entry-not-probeable");
+  assert.equal(r.executed, 0);
+  assert.match(r.declined[0].detail, /not materialised/);
+});
+
+test("shell entry: a case with no `expected` is declined, not scored", () => {
+  const stripped = corpusFor("filename").map(
+    ({ expected: _e, ...rest }) => rest,
+  );
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: FIXED_SCRIPT,
+    cases: stripped,
+  });
+  assert.equal(r.executed, 0);
+  assert.equal(r.verdict, "unverifiable");
+});
+
+test("resolveEntry: the shell prefix takes no export name and the same containment", () => {
+  const ok = resolveEntry("shell:shared/resources/qa-cycle.sh", REPO_ROOT);
+  assert.equal(ok.ok, true);
+  assert.equal(ok.kind, "shell");
+  assert.equal("exportName" in ok, false);
+  assert.equal(resolveEntry("shell:", REPO_ROOT).reason, "bad-entry");
+  assert.equal(resolveEntry("shell:a.sh#x", REPO_ROOT).reason, "bad-entry");
+  assert.equal(
+    resolveEntry("shell:../x.sh", REPO_ROOT).reason,
+    "outside-repo-root",
+  );
+  assert.equal(
+    resolveEntry("shell:node_modules/x/y.sh", REPO_ROOT).reason,
+    "outside-repo-root",
+  );
+  const js = resolveEntry(entry("engaging-control"), REPO_ROOT);
+  assert.equal(js.kind, "js");
+});
+
+test("shell entry: the CLI form runs and records the same shape as the JS form", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-shell-cli-"));
+  try {
+    const record = join(dir, "run.json");
+    const out = [];
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (chunk) => (out.push(String(chunk)), true);
+    let rc;
+    try {
+      rc = main([
+        "--sink",
+        "filename",
+        "--entry",
+        "shell:shared/resources/qa-cycle.sh",
+        "--record",
+        record,
+        "--name",
+        "qa-cycle",
+        "--repo-root",
+        REPO_ROOT,
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+    assert.equal(rc, 0, out.join(""));
+    assert.match(out.join(""), /^engages .* executed (\d+)/);
+    const emitted = [];
+    process.stdout.write = (chunk) => (emitted.push(String(chunk)), true);
+    try {
+      main(["--emit-block", record]);
+    } finally {
+      process.stdout.write = write;
+    }
+    assert.match(emitted.join(""), /evidence: measured/);
+    assert.match(
+      emitted.join(""),
+      /entry: shell:shared\/resources\/qa-cycle\.sh/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

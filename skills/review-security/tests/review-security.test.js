@@ -415,7 +415,11 @@ test("both modes are documented", () => {
 
 test("the skill states its own limits", () => {
   assert.match(SKILL, /^##\s+What this does not tell you\s*$/m);
-  assert.match(SKILL, /Non-JS entry points/);
+  // The limit moved with task.128: a bash script is reachable via the shell
+  // entry form, so the stated limit is what NEITHER form reaches — stdin, two
+  // positionals, the network — never "non-JS".
+  assert.match(SKILL, /neither form reaches/);
+  assert.doesNotMatch(SKILL, /Non-JS entry points are .?unverifiable/);
 });
 
 test("the skill claims no gate and no code edits", () => {
@@ -701,12 +705,27 @@ test("CLI: --repo-root re-anchors containment so a bundled copy can probe the co
     path.join(REPO_ROOT, "skills/review-security/tests/.t118-nest-"),
   );
   try {
-    for (const f of [
-      "security-probe.mjs",
-      "security-input-corpus.mjs",
-      "qa-execute-snippets.mjs",
-      "spawn-budget.mjs",
-    ]) {
+    // The engine's sibling imports, walked transitively from the source rather
+    // than listed by hand: a hand list is an enumeration of the engine's
+    // imports, and it went stale the first time the engine gained one
+    // (task.128 added probe-boundary-signals.mjs; the nested copy then failed
+    // to import and this test read an empty stdout as broken JSON).
+    const siblings = new Set();
+    const walk = (f) => {
+      if (siblings.has(f)) return;
+      siblings.add(f);
+      const src = fs.readFileSync(
+        path.join(REPO_ROOT, "shared/resources", f),
+        "utf8",
+      );
+      for (const m of src.matchAll(
+        /(?:from|import)\s+["']\.\/([A-Za-z0-9._-]+\.m?js)["']/g,
+      )) {
+        walk(m[1]);
+      }
+    };
+    walk("security-probe.mjs");
+    for (const f of siblings) {
       fs.copyFileSync(
         path.join(REPO_ROOT, "shared/resources", f),
         path.join(nest, f),

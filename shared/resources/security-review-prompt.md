@@ -94,8 +94,11 @@ answer to a question nobody asked.
 
 `entry` is `path#exportName`, resolved from the repository root. It must be:
 
-- **A real, importable ES module export.** Non-JS entry points are a stated v1 limit — report
-  `unverifiable` and name the language.
+- **A real, importable ES module export — or a shell script via the `shell:` entry form.** A bash
+  script taking one positional argument is probed with `--entry 'shell:<path>'` (and a
+  materialised sink such as `filename`); "it is not JS" is never a reason to report
+  `unverifiable`. A script that reads stdin, takes two positionals or needs the network is
+  what remains declined — say which.
 - **Called with exactly one argument.** The child runner calls `await fn(input)`. An entry needing
   more configuration than that is not probeable as-is; report `unverifiable` rather than inventing a
   wrapper, and say what shape would be.
@@ -137,6 +140,11 @@ re-run is an assertion, not evidence.
 - **What it did reject**: `exa mple.com`, `""` — which is why this is `present-but-inert` rather
   than `absent`: the control demonstrably runs.
 ````
+
+A shell-script boundary takes the same row with `--entry 'shell:<path>'` in place of the
+`path#export` form (and `--sink filename` for a script that lists a directory): the engine
+materialises each case as a fixture directory and runs the script against it under bash and zsh, so
+"it is not JS" is never the reason a control row reads `unverifiable`.
 
 And the machine block, once per report, which is what a gate consumes. **It is printed, not
 written.** Every probe passes `--repo-root "$(git rev-parse --show-toplevel)"` — the engine's
@@ -227,7 +235,9 @@ over-read a clean result.
    engage on a helper while the real call site bypasses it. Mitigation, not closure: cite the call
    site's `file:line`, record the module path the engine actually resolved, and **downgrade to
    `unverifiable` any citation naming no file in scope**.
-3. **Non-JS entry points are `unverifiable`** in v1 — a stated limit, not a silent skip.
+3. **A non-JS entry point is routed to `--entry 'shell:<path>'`**, not recorded `unverifiable`;
+   only a script neither entry form reaches (stdin, two positionals, network) is declined — and
+   the decline names the reason.
 
 ---
 

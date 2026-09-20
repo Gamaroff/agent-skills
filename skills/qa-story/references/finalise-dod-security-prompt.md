@@ -45,6 +45,9 @@ Signals — any **one** is sufficient:
 - a named allow-list or deny-list in any form (array, regex alternation, `switch`, set membership)
 - a function whose own tests are mostly of the shape "X is refused"
 - a work-item document whose Success Criteria contain *never*, *must not*, *fails closed*, or *refused*
+- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form (Step 4), never to `boundary: false`
+
+The list is data as well as prose: `probe-boundary-signals.mjs` (beside `security-probe.mjs`) exports it, and `classifyBoundaryText` applies the text-shaped signals to a header or a criteria section. Five QA gates on task.121 read a bash script that says "refuses rather than guesses" and recorded no boundary, because every signal above the last one is JS-shaped; the last one is what a script's own words match.
 
 **The negative case is explicit, and it is the common case.** A CRUD endpoint, a renderer, a report
 writer, a formatter, a schema migration, a logging change — none of these are boundaries, however
@@ -142,6 +145,15 @@ node PROMPT_DIR/security-probe.mjs \
   --sink <sink> --entry '<path-from-repo-root>#<exportName>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
   --record <STORY_DIR>/<stem>.dod.security.run.json --json
+
+# A SHELL SCRIPT boundary (one positional argument) takes the shell entry form —
+# same flags, same record, same count. The sink must be a materialised one
+# (`filename` for a script that lists a directory); each case is written into a
+# fixture directory and the script is run against it under bash and zsh.
+node PROMPT_DIR/security-probe.mjs \
+  --sink filename --entry 'shell:<path-from-repo-root>' \
+  --repo-root "$(git rev-parse --show-toplevel)" \
+  --record <STORY_DIR>/<stem>.dod.security.run.json --json
 ```
 
 The engine imports the entry in a sandboxed child, calls it on every corpus case for the sink —
@@ -149,10 +161,12 @@ both directions — and prints a JSON result whose `executed` is the count of ca
 actually ran, whose `reproduced[]` names the hostile cases that were accepted, and whose
 `overblocked[]` names the legitimate cases that were refused. The record it writes carries the same
 counts; **`probes_executed:` below is the record's `totals.executed`, copied, never composed.** An
-entry the engine cannot import (a non-JS boundary, or a function needing more than one argument) is
-`verdict: unverifiable` with `executed: 0` and takes the zero-guard below — say why in `summary`,
-do not fall back to a hand-written harness, because a count from a harness is the self-report this
-step removed.
+entry neither form reaches (a script that reads stdin or takes two positionals, a function needing
+more than one argument, anything networked) is `verdict: unverifiable` with `executed: 0` and
+takes the zero-guard below — say why in `summary`, do not fall back to a hand-written harness,
+because a count from a harness is the self-report this step removed. **"It is a bash script" is not
+such a reason**: that is the `shell:` form's case, and recording it as unverifiable is the task.121
+outcome this form exists to end.
 
 **4. Report only what reproduced — but count everything you ran.** A candidate you did not run is not a
 finding. A candidate that ran and returned its expected verdict is not a finding either. `probes[]`
@@ -197,6 +211,9 @@ security_review:
       status: PASS | FAIL | NOT_APPLICABLE
       citation: "path/to/file.ts:NN"   # null if not found
       note: "optional, required if NOT_APPLICABLE"
+      severity: low | medium | high    # REQUIRED on every FAIL. Read by /finalise Step 8a's
+        # fix-and-recheck evaluator: only `low` can take that path, and a FAIL with no
+        # severity is NOT low — it halts. Omit on PASS / NOT_APPLICABLE.
   general:
     - check: "security TODOs/FIXMEs"
       status: PASS | FAIL
@@ -216,11 +233,20 @@ security_review:
       actual: "runnable"
       reproduced: true # entries are reproduced by construction; the field is kept explicit
       # so an entry that somehow is not can be spotted and filtered rather than trusted
+      severity: low | medium | high # REQUIRED. `low` = fail-closed, one-line, no exposure
+      # (task.121's newline-in-a-gate-name is the reference case); `medium` = wrong result
+      # a caller could act on; `high` = a hostile input runs, escapes, or reaches a
+      # credential. /finalise Step 8a reads it; a probe with no severity halts.
   overall: PASS | FAIL | NOT_APPLICABLE
   summary: "one-line summary of security review results"
 ```
 
 **Citation rule**: `status: PASS` requires a non-null citation. Null → `FAIL`. `NOT_APPLICABLE` must include `note` explaining why.
+
+**Severity rule**: every `probes[]` entry and every FAIL `checks[]` entry carries `severity`. It is
+what lets `/finalise` take the bounded fix-and-recheck path on a low finding instead of halting a
+hands-free run; a finding without one is treated as not-low and halts, so leaving it off is never the
+lenient choice.
 
 **Probe rule**: only entries with `reproduced: true` may appear in `probes` — an unreproduced suspicion
 is not a finding and must not be reported. `boundary:` is always present; `probes_executed:` is required

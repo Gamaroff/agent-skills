@@ -1,0 +1,94 @@
+schema: 1
+task: 'task.128.shell-boundary-probe-and-finalise-recheck'
+task_title: 'A refusing shell script is a boundary the probe engine cannot reach, and finalise can only accept or halt'
+gate: FAIL
+status_reason: 'All three phases delivered and mutation-proved (4 of the 12 mutants re-run against the commit, all red). Two HIGH defects: the new fix-and-recheck evaluator silently no-ops through a symlinked invocation path and exits 0 (fail-open — reads as proceed), and a missing shell: script is scored absent with executed = cases × shells instead of declined. Two MEDIUM: a NUL in a shell: entry throws out of runProbeSpec; the mutation-proved precondition is a hand-set boolean. Three LOW cleanups from the diff review.'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T18:34:37Z'
+
+top_issues:
+  - id: 'TASK-128-BUG-1'
+    severity: high
+    file: 'shared/resources/finalise-fix-and-recheck.mjs'
+    finding: 'The CLI guard compares fileURLToPath(import.meta.url) to process.argv[1] raw; through the .agents/skills symlink (the path Step 8a documents) main() never runs, nothing prints and the process exits 0, which Step 8a reads as every precondition holding — bug.4 class, fail-open.'
+    suggested_action: 'Compare realpaths as qa-execute-snippets.mjs:1858 does, falling back to the plain compare when realpath throws; add a test that invokes the CLI through a symlinked directory and asserts output + exit code.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.128.bug.1.fix-and-recheck-evaluator-no-ops-through-symlinked-path.md'
+  - id: 'TASK-128-BUG-2'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'runShellCase never checks that entryPath exists or that bash opened it, so a missing shell: script mismatches every case (exit 127) and is scored absent with executed = cases × shells instead of the entry-not-probeable / executed 0 the JS form returns — could-not-look and control-absent resolve to one gating output (diff review CR-1, reproduced).'
+    suggested_action: 'Decline (outcome errored) before the per-shell loop when entryPath is not a readable regular file, and treat child exit 126/127 as errored rather than a compared run, so the all-errored path collapses to entry-not-probeable; test with a missing path.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.128.bug.2.shell-entry-missing-script-scored-absent-not-declined.md'
+  - id: 'TASK-128-BUG-3'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'A NUL byte in a shell: entry passes resolveEntry and reaches spawnSync as argv, which throws ERR_INVALID_ARG_VALUE out of runProbeSpec — the JS form declines the same input; the contract says the function returns a verdict and never throws for a bad argument (security probe, path corpus null-byte case).'
+    suggested_action: 'Reject a NUL in resolveEntry as bad-entry for both forms and add the null-byte shape to the shell-entry tests.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.128.bug.3.nul-in-shell-entry-throws-from-runprobespec.md'
+  - id: 'TASK-128-BUG-4'
+    severity: medium
+    file: 'shared/resources/finalise-fix-and-recheck.mjs'
+    finding: 'The mutation-proved check reads mutationProof.redOnRevert === true, a boolean Step 8a instructs the agent to flip by hand, while the precondition statement requires the run that showed it to be recorded — the one evidentiary precondition is a self-report (diff review CR-3, verified).'
+    suggested_action: 'Require a mutationProof.run path in the finding record; the check verifies the file exists, is non-empty and names the test failing; update the Step 8a template and the fixture GOOD finding.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.128.bug.4.mutation-proved-precondition-is-a-self-reported-boolean.md'
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 3614
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 39
+    notes: 'Boundary: true (resolveEntry containment for the new shell: form; the fix-and-recheck evaluator; classifyBoundaryText). Engine-recorded: 11 path-corpus cases against resolveEntry via a shell:-prefixed cases file (present-but-inert: symlink-escape accepted — a documented pre-existing limit identical on base, routed to future; null-byte accepted then throws on the shell form — BUG-3) and 28 filename cases against qa-cycle.sh via the shell form (engages 28/28 under bash and zsh). Record: task.128.qa.1.security.run.json, totals.executed 39. Provenance: the engine itself silently no-ops through a symlinked invocation path (same guard shape as BUG-1, identical on origin/develop:1043) — pre-existing, routed to future with a named follow-up.'
+  performance:
+    status: PASS
+    notes: 'Shell entry, filename sink, both shells: 1.35 s wall (target ≤ 2 s). JS entry path unchanged (url-authority fixture: engages, 12 executed).'
+  reliability:
+    status: CONCERNS
+    notes: 'Two fail-wrong paths: a missing script reads as absent with a full count (BUG-2); the evaluator exits 0 having evaluated nothing on the documented invocation path (BUG-1). A NUL entry throws (BUG-3). Rollback plan validated (three independent phases, git revert + bundle).'
+  maintainability:
+    status: PASS
+    notes: 'One definition each for the corpus, the signal list and the precondition table, with parity tests; 12 mutants killed at develop, 4 re-proved at QA against the commit; Step 4b: 2 runnable blocks executed under bash and zsh with no disagreement, 27 mutating refused by design, 1 template placeholder.'
+
+recommendations:
+  immediate:
+    - action: 'Realpath-compare the CLI guard in finalise-fix-and-recheck.mjs and add a symlinked-invocation test (BUG-1).'
+      refs: ['shared/resources/finalise-fix-and-recheck.mjs']
+    - action: 'Decline a missing/unreadable shell: script and 126/127 launches before scoring (BUG-2); reject NUL in resolveEntry (BUG-3).'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Make mutation-proved read a recorded run, not a boolean (BUG-4).'
+      refs: ['shared/resources/finalise-fix-and-recheck.mjs', 'skills/finalise/SKILL.md']
+  future:
+    - action: 'security-probe.mjs has the same raw argv[1]/import.meta.url guard (pre-existing, identical on base): through .agents/skills it silently no-ops with exit 0 — file as a general bug (bug.4 class) and fix with the realpath compare; every QA/finalise prompt invokes the engine through references/ paths.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'resolveEntry accepts an in-tree symlink that points out of the tree (path corpus symlink-escape); documented as a limit in probe-boundary-rule.md §5 — for the shell form the script is then executed, so consider realpath containment before spawn.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/probe-boundary-rule.md']
+    - action: 'CR-2: reconcile the per-finding severity the security agent self-assigns with the engine-derived SEVERITY_BY_VERDICT (present-but-inert = high) — state the rubric once.'
+      refs: ['shared/resources/finalise-dod-security-prompt.md', 'shared/resources/security-probe.mjs']
+    - action: 'CR-4: match the JS entry form generically in the contract test; CR-5: strip the shell: prefix from the default control name in --emit-block; CR-6: de-duplicate matched phrases per signal.'
+      refs: ['shared/resources/tests/probe-boundary-signals.test.mjs', 'shared/resources/security-probe.mjs', 'shared/resources/probe-boundary-signals.mjs']
+    - action: 'Observation #121 is parked; /finalise should set it actioned naming PR #446 (task §9 Migration criterion).'
+      refs: ['docs/tasks/task.128.shell-boundary-probe-and-finalise-recheck/task.128.shell-boundary-probe-and-finalise-recheck.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['BUG-1 and BUG-2 fixed and re-reviewed', 'BUG-3 and BUG-4 fixed']

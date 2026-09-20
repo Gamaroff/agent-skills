@@ -152,7 +152,9 @@ clean result:
    engage on a helper the real call site bypasses. Mitigated — not closed — by citing the call site's
    `file:line`, recording the module path the engine resolved, and downgrading any citation naming no
    file in scope to `unverifiable`.
-3. **Non-JS entry points are `unverifiable`** in v1. A stated limit, not a silent skip.
+3. **A non-JS entry point is routed to the engine's `shell:` entry form**, never recorded
+   `unverifiable` for being bash; only a script neither form reaches (stdin, two positionals,
+   network) is declined, with the reason named.
 
 ## Out of scope in v1
 

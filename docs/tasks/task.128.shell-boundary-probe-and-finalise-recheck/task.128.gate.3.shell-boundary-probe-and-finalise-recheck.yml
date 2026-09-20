@@ -1,0 +1,97 @@
+schema: 1
+task: 'task.128.shell-boundary-probe-and-finalise-recheck'
+task_title: 'A refusing shell script is a boundary the probe engine cannot reach, and finalise can only accept or halt'
+gate: CONCERNS
+status_reason: 'BUG-5..8 verified FIXED by execution and closed. No HIGH remains (2 → 1 → 0). Four MEDIUM: the launch-failure matcher also matches bash runtime errors inside the target (a script that runs a name is declined, not compared); three prose sites still say non-JS is unverifiable; a malformed expected scores absent or throws; side effects written outside the fixture dir (HOME, TMPDIR, the script dir) are invisible. One medium-confidence design finding (severity/otherFindingsOpen still self-reported) routed to future; one cleanup.'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T19:27:34Z'
+
+top_issues:
+  - id: 'TASK-128-BUG-9'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'isLaunchFailure keys on stderr CONTAINING entryPath, but bash prefixes runtime errors inside a script with that path — a target that runs each name (set -e) prints <entryPath>: line 3: <fixture>/x: Permission denied, exit 126, and is declined as "could not open the script" (reproduced: executed 0) — the BUG-7 scenario itself.'
+    suggested_action: 'Anchor the matcher to the script-as-subject shape (^(bash|<entryPath>): <entryPath>: …, no "line N:"), and add a runs-names fixture pinning that its 126 is scored.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.128.bug.9.launch-failure-matcher-catches-runtime-errors-inside-the-target.md'
+  - id: 'TASK-128-BUG-10'
+    severity: medium
+    file: 'shared/resources/security-review-prompt.md'
+    finding: 'security-review-prompt.md:97 and :235 and skills/review-security/SKILL.md:155 still instruct "Non-JS entry points are unverifiable in v1"; the contract test keys on sites naming the JS form and cannot see a site that names neither form.'
+    suggested_action: 'Route the three sites to shell:, and extend the contract test with a zero-match grep for the old phrasing across every SKILL.md and shared prompt.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.128.bug.10.three-prose-sites-still-say-non-js-is-unverifiable.md'
+  - id: 'TASK-128-BUG-11'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The BUG-8 guard checks that expected NAMES a comparable key, not its type: { stdout: 12 } / { stdout: null } score absent with executed 4; { exit: 0, absent: 5 } throws TypeError out of runProbeSpec (reproduced).'
+    suggested_action: 'Validate expected per case (stdout/stderr strings, exit integer, absent array of separator-free strings) and decline with a named reason.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.128.bug.11.malformed-expected-scores-absent-or-throws.md'
+  - id: 'TASK-128-BUG-12'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The shell child inherits the real HOME and TMPDIR and runs from the real repo tree while the sentinel watches sandboxRoot only, so a side effect written to $HOME, $TMPDIR or the script'"'"'s own directory (cd "$(dirname "$0")") is invisible to absent and the sentinel — BUG-5'"'"'s class beyond the no-cd shape. Also PWD=workDir while cwd is fixtureDir (CR-6).'
+    suggested_action: 'Fresh HOME and TMPDIR under sandboxRoot (outside workDir); snapshot dirname(entryPath) before/after each run and record a change as an escape; sandboxEnv({ cwd: fixtureDir }).'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.128.bug.12.side-effects-outside-the-fixture-dir-invisible.md'
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 3573
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 39
+    notes: 'Re-run on 7b36fcac, record task.128.qa.3.security.run.json (totals.executed 39; the filename control now carries shells: [bash, zsh]). symlink-escape still accepted (documented limit, future). BUG-12: side effects outside the fixture dir are a remaining blind spot of the probe itself.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-9 declines a reproduction; BUG-11 throws on a malformed case.'
+  maintainability:
+    status: PASS
+    notes: 'Step 4b cycle 3: 2 runnable executed under bash and zsh, 0 findings (28 mutating refused by design incl. the new step-2b block); TMPDIR=/tmp 69/0. CR-6 PWD/cwd disagreement is cosmetic.'
+
+bug_resolution:
+  bugs_fixed: 8
+  bugs_remaining: 4
+  fix_date: '2026-09-20'
+  total_iterations: 2
+  verification_method: 'Execution on 7b36fcac: no-cd substitution caught; --git-base refuses a disagreeing record; exit-127 target compared; empty expected declined'
+
+recommendations:
+  immediate:
+    - action: 'Anchor isLaunchFailure to the script-as-subject message; runs-names fixture (BUG-9).'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+    - action: 'Route the three stale prose sites to shell:; zero-match grep in the contract test (BUG-10).'
+      refs: ['shared/resources/security-review-prompt.md', 'skills/review-security/SKILL.md', 'shared/resources/tests/probe-boundary-signals.test.mjs']
+    - action: 'Validate expected types, decline on violation (BUG-11); sandbox HOME/TMPDIR, snapshot the script dir, PWD=fixtureDir (BUG-12, CR-6).'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-5 (cycle 3, medium confidence): severity and otherFindingsOpen are still typed into the finding record with nothing the evaluator opens to contradict them — accept the DoD agents'"'"' YAML / the security run record and derive both, refusing a disagreeing record as --git-base does. Needs a defined on-disk artefact for the four agents'"'"' output; file as a follow-up task.'
+      refs: ['shared/resources/finalise-fix-and-recheck.mjs', 'skills/finalise/SKILL.md']
+    - action: 'Pre-existing (identical on base): security-probe.mjs own CLI guard no-ops through .agents/skills; resolveEntry accepts an in-tree symlink pointing out. Cycle-1 advisories CR-2/CR-4/CR-5.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Observation #121 is parked; /finalise should set it actioned naming PR #446.'
+      refs: ['docs/tasks/task.128.shell-boundary-probe-and-finalise-recheck/task.128.shell-boundary-probe-and-finalise-recheck.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['BUG-9..12 fixed and re-reviewed']

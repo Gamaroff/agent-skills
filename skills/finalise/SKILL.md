@@ -580,6 +580,19 @@ Use the **Decision Matrix** from `references/definition-of-done-checklist.md` to
 | ✅ Yes                       | ✅ Yes               | ✅ Yes        | ❌ No            | -                  | -               | **IN PROGRESS** (list gaps)                                                                                                                   |
 | ✅ Yes                       | ✅ Yes               | ✅ Yes        | ✅ Yes           | ❌ No              | -               | **IN PROGRESS** (list gaps)                                                                                                                   |
 | ✅ Yes                       | ✅ Yes               | ✅ Yes        | ✅ Yes           | ✅ Yes             | ❌ FAIL         | **IN PROGRESS** (QA gate failed)                                                                                                              |
+| ✅ Yes                       | ✅ Yes               | exactly **one** of these four is ❌, on a finding this run produced by execution, and `finalise-fix-and-recheck.mjs` exits 0 on it | | | ✅ PASS or N/A | **FIX-AND-RECHECK** → Step 8a, once; then re-enter this table on the fix head |
+
+> **The FIX-AND-RECHECK row is reachable only through the evaluator, never through judgement.**
+> Its five preconditions — `severity-low`, `single-commit`, `inside-files-summary`,
+> `mutation-proved`, `no-other-finding-open` — are defined once, in
+> `references/finalise-fix-and-recheck-preconditions.json`, and
+> `references/finalise-fix-and-recheck.mjs` is what reads them: exit 0 is the row above, exit 1 is
+> the ordinary IN PROGRESS row for that section with the failed preconditions named in the gap
+> report. A finding with no `severity` is **not** low. The row exists because task.121's finalise
+> security agent reproduced a one-line fail-closed defect in the script the task delivered, and the
+> run had no sanctioned exit but "accept" or "halt a hands-free pipeline for a human" — it fixed
+> the defect inline and recorded a deviation (obs #121). Medium and high findings, and anything
+> the evaluator refuses, halt exactly as before. See Step 8a.
 
 **QA Gate Integration:**
 
@@ -1964,6 +1977,112 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    - List all gaps in a readable format
    - Suggest next steps to close the gaps
    - Estimate effort required
+
+### Step 8a: Fix-and-recheck (bounded — once per run, and only when the evaluator says so)
+
+**When this step applies.** Step 6 would decide IN PROGRESS **solely** because one of the four DoD
+sections (acceptance criteria, docs, security, compliance) is FAIL on a finding **this run produced by
+execution** — a reproduced probe, a failing check with a citation — and nothing else is wrong. If
+two sections are FAIL, or the QA gate is FAIL, or CI is not green on the current head, this step does
+not apply: take Step 8.
+
+**1. Build the finding record and run the evaluator.** `severity`, `filesSummary` and
+`otherFindingsOpen` come from things already on disk. `commits` and `touched` are the **plan** at
+this point — the fix does not exist yet — and the evaluator is run a **third** time after the commit
+with `--git-base` so both are re-read from git before anything is pushed (step 2b):
+
+```bash
+mkdir -p .claude/state
+cat > .claude/state/finalise-fix-finding.json <<'JSON'
+{
+  "severity": "{the finding's severity, from the agent YAML — copy it; leave the key out if the agent gave none}",
+  "commits": 1,
+  "touched": ["{every path the fix will change, repo-relative}"],
+  "filesSummary": [{every path in the work item's Files Summary (task §7) / File List (story), as strings}],
+  "mutationProof": { "test": "{the test that must go red on revert}", "redOnRevert": false, "run": ".claude/state/finalise-mutation-proof.log" },
+  "otherFindingsOpen": [{every medium-or-higher finding in any section, and every other section that is FAIL — as strings; [] when none}]
+}
+JSON
+node references/finalise-fix-and-recheck.mjs --finding .claude/state/finalise-fix-finding.json --json
+```
+
+`mutationProof.redOnRevert` is `false` at this point — the proof has not run yet — so the first
+evaluation **halts on `mutation-proved`** by construction. That is deliberate: it tells you which
+preconditions are already decided before any code moves. Proceed to step 2 only when
+`mutation-proved` is the **only** id in `failed[]`. Any other id in `failed[]` → Step 8, with the
+line `Fix-and-recheck refused: {ids}` in the gap report's Blocking Issues Summary.
+
+**2. Fix, prove, commit, push — one commit.**
+
+- Implement the fix. Touch only the paths in `touched`.
+- Run the fast gate (`develop.fastGateCommand`, default `npm run ci:fast`) to a file; it must be
+  green.
+- Run the mutation proof per `references/mutation-proving.md`: snapshot the fixed file with `cp`,
+  revert the behaviour, run the named test **with its output captured to the file named in
+  `mutationProof.run`** (`node --test <test> > .claude/state/finalise-mutation-proof.log 2>&1`),
+  confirm it is **red**, restore from the snapshot, confirm green. Set `mutationProof.redOnRevert`
+  to `true` in the finding record and re-run the evaluator — it opens the run file and requires
+  it to be non-empty, to name the test, and to carry a red marker (`not ok` / `✖` / `ℹ fail N`);
+  a flipped boolean with no recorded run halts on `mutation-proved`. **Exit 0 is the licence for
+  the commit; exit 1 is Step 8.**
+- `git commit` — one commit, message `fix(<stem>): finalise DoD <section> — <finding, one line>`.
+
+**2b. Re-run the evaluator on the record, then push.** The second run licensed the *commit* on a
+forecast (`"commits": 1` typed before any commit existed; `touched` as the paths the fix *would*
+change). The push is licensed by what git says:
+
+```bash
+node references/finalise-fix-and-recheck.mjs \
+  --finding .claude/state/finalise-fix-finding.json --git-base "$CI_HEAD_1" --json
+```
+
+`--git-base` derives `commits` from `git rev-list --count <base>..HEAD` and `touched` from
+`git diff --name-only <base>..HEAD` and **refuses** a record that disagrees with either — two
+commits, a file the record did not name, a ref git cannot answer. Exit 0 → `git push origin HEAD`;
+exit 1 → Step 8, with the commit left local (it is one `git reset --hard "$CI_HEAD_1"` away). The
+run before the commit cannot do this check, and that is why there are three runs, not two.
+
+**3. Retake CI reading 1 on the fix head.** The decision reading from Step 6 was taken on a commit
+that no longer carries the acceptance. Record `CI_HEAD_1=$(git rev-parse HEAD)` again and re-run the
+Step 6 rollup query **through the background poll** the CI gate already uses — never a foreground
+wait — until it is `SUCCESS`. Record it in the running summary as
+`CI reading 1 (fix head): {CI_ROLLUP} @ {CI_HEAD_1}`. `FAILURE` → Step 8.
+
+**4. Re-run ONLY the failed section's reproduction.** Not the four agents. For security, that is the
+engine command the agent recorded (`security-probe.mjs … --record …`), re-run so the record's
+`totals.executed` is refreshed from the fixed tree; for a checklist FAIL it is the check's own
+citation re-read. The section is PASS when the reproduction no longer reproduces **and** the record
+shows the count. The other three sections were evaluated against a tree the fix did not change — the
+`touched` paths are inside the Files Summary, which is what `inside-files-summary` guarantees — and
+that is **stated**, not assumed, in the block below.
+
+**5. Append the deviations block to the running summary**, then re-enter Step 6 with the section
+PASS and the fix head as `CI_HEAD_1`. Wording, from task.121's `dod.1`:
+
+```markdown
+**Deviations recorded, not hidden:**
+
+1. The {section} fix (`{sha}`) landed during `/finalise`, after the QA loop exited at 5c; it was
+   verified inline — fast gate, mutation proof ({test}: red on revert), the section's reproduction
+   re-run ({command}) — rather than by a further QA cycle or an independent reviewer. The other
+   three DoD sections were not re-run: the fix touched only {touched}, inside the Files Summary,
+   and they were evaluated against a tree those paths did not change.
+2. Fix-and-recheck preconditions: all five held (`finalise-fix-and-recheck.mjs` exit 0 before the
+   commit and again with `--git-base {CI_HEAD_1}` after it; record at
+   `.claude/state/finalise-fix-finding.json`).
+```
+
+**Bounded.** This step runs **once** per `/finalise` run. A second finding — in the re-run section or
+anywhere else — after the first fix takes Step 8, whatever its severity. The path closes one small,
+provable gap under a rule; it is not a develop loop.
+
+**Step 8a Completion Checklist:**
+
+- [ ] Evaluator run three times: first halt on `mutation-proved` only; second exit 0 after the proof (licence to commit); third with `--git-base "$CI_HEAD_1"` exit 0 after the commit (licence to push)
+- [ ] One commit, pushed; `CI reading 1 (fix head)` recorded as SUCCESS
+- [ ] Only the failed section's reproduction re-run, from the record
+- [ ] Deviations block appended to the running summary
+- [ ] Step 6 re-entered on the fix head
 
 **Step 8 Completion Checklist — tick off each before moving on:**
 

@@ -5,19 +5,22 @@ type: task
 description: "On task.121 five QA cycles reached PASS 100/100 with "No boundary delivered" in every gate's security notes, and the finalise DoD security agent then reproduced two fail-closed defects in the very script the task delivered — a gate filename with an embedded newline made qa-cycle.sh exit 0 with a lower cycle, and isKnownStage admitted qa-gate-0. The QA probe never ran because security-probe.mjs imports JS entry points only, so a bash script that says 'refuses, never guesses' is unverifiable to it and the boundary rule read it as not a boundary; and finalise, having found the defect, had two exits — accept, or halt a hands-free pipeline for a human — so the run fixed it inline as an undocumented deviation. Three mechanisms: a `filename` sink in the input corpus and a `shell` entry form in the probe engine (bash <script> <arg>, both shells, count engine-written); the probe-boundary rule names a refusing script as a boundary by its own header; and finalise Step 8 gains a bounded fix-and-recheck path for a low-severity, single-commit, mutation-provable finding inside the task's own file set, with everything else still halting. Observation #121."
 tags: [qa-task, qa-story, finalise, security-probe, boundary, review-security]
 category: refactoring
-status: planned
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-18
-updated: 2026-09-18
+updated: 2026-09-20
+completed_date: 2026-09-20
 assignee:
 estimated_effort_hours: 8
 github_issue: 431
+pr_number: 446
 ---
 
 # Technical Task: A refusing shell script is a boundary the probe engine cannot reach, and finalise can only accept or halt
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.128.review.1.shell-boundary-probe-and-finalise-recheck.md` implemented 2026-09-20
 **GitHub Issue**: [#431](https://github.com/Gamaroff/agent-skills/issues/431)
 
 ---
@@ -62,18 +65,39 @@ finalise Step 6/8       ACCEPTED | gaps → halt
 
 ```
 security-probe.mjs   --entry path#export            (JS, unchanged)
-                     --entry shell:path [--arg dir]  runs `bash <path> <fixture-dir>` per case, under bash AND zsh;
-                                                     a `filename` case materialises as a fixture directory
-                                                     (control file + hostile name); verdict from exit code + stdout
-                                                     against the case's `expected` (refuse | accept=<value>)
+                     --entry shell:path              runs `bash <path> <fixture-dir>` per case, under bash AND
+                                                     zsh (argv form: `zsh -c 'bash "$1" "$2"' zsh <path> <dir>`,
+                                                     never a string); child env = the engine's sandboxEnv() +
+                                                     LC_ALL=C, stdin </dev/null, per-case timeout;
+                                                     a `filename` case materialises as a fixture directory:
+                                                     BRACKETING controls (a low gate that sorts first and a
+                                                     high gate that sorts last in C order) + the case's name;
+                                                     verdict = {stdout, exit, stderr:"", absent:[paths]} vs
+                                                     the case's `expected`. `--arg <string>` is reserved for a
+                                                     sink whose input is a plain string; `filename` always
+                                                     materialises.
 security-input-corpus   + sink `filename`: newline-in-name, $(…), backticks, ;|&, leading -- / -n, glob metachars,
-                        10-digit run, leading zeros, and legitimate: plain, dotted, hyphenated, unicode
+                        10-digit run, leading zeros, and legitimate: plain, dotted, hyphenated, unicode.
+                        The sink declares its fixture controls ONCE; each case's `expected` is
+                        {stdout, exit, stderr: "", absent: [paths]} — beside controls a correct script never
+                        "refuses" a hostile name, it ignores it and prints the high control, so refuse|accept
+                        cannot express the pass condition (review 1)
 probe-boundary-rule     + signal: a script or function whose header/doc says refuses | never guesses | fails closed
+                          (the phrase list is EXPORTED once from probe-boundary-signals.mjs — classifyBoundaryText —
+                          and the prose cites it, so the fixture test calls a function, not a grep)
                         + rule: "not importable" is a reason to use the shell entry, never a reason to record false
+                        + §5 "v1 probes importable entry points only" bullet and §5.1 by-hand rule REWRITTEN:
+                          a one-positional-argument script is reachable via shell:; stdin/network/multi-arg
+                          remain declined and are what §5.1 still covers
 finalise Step 8         + fix-and-recheck: ALL of {severity low, single commit, inside the task's Files Summary,
                           a test that goes red on revert, no medium+ finding open} → commit, retake CI reading 1 on
                           the fix head, re-run ONLY the failed section's reproduction, record the independence loss;
-                          any precondition false → the existing halt
+                          any precondition false → the existing halt.
+                          `severity` DOES NOT EXIST in finalise-dod-security-prompt.md's output today (review 1):
+                          probes[] and FAIL checks[] entries gain `severity: low | medium | high`; an entry
+                          without one is NOT low (fail closed → halt). The Decision Matrix row lands in BOTH
+                          definitions — SKILL.md Step 6 and references/definition-of-done-checklist.md §
+                          "Completion Status Decision Matrix" — each citing the one precondition JSON fixture
 ```
 
 ### Important Clarifications
@@ -82,6 +106,8 @@ finalise Step 8         + fix-and-recheck: ALL of {severity low, single commit, 
 - **`filename` cases materialise, they are not passed as strings.** A hostile filename is hostile *as a directory entry*; the engine creates a temp directory per case, writes the case's control files, and passes the directory. The case declares what a correct script prints (`expected`), so the corpus says what a pass looks like.
 - **The fix-and-recheck path is bounded by preconditions, not by judgement.** Each is checkable: `severity: low` from the agent YAML; one commit; every touched path in the task's §7; a mutation proof recorded; no other section FAIL. It re-runs the *reproduction*, not the four agents — the other three sections were evaluated against a tree the fix did not change, and that is stated in the DoD summary.
 - **Zero executed is still a FAIL.** The shell entry removes the "cannot import" reason for zero; it does not soften the guard.
+- **The reproduction is by stdout, and that needs bracketing controls (review 1, verified).** The pre-fix `qa-cycle.sh` prints the *same* stdout as the fixed one whenever the hostile name is processed after the highest gate — glob order is `strcoll` order and locale-dependent. The engine therefore runs the child with `LC_ALL=C` and materialises a low control that sorts first and a high control that sorts last, so the hostile name is always between them; the arithmetic error the pre-fix script leaks on stderr is the order-independent second signal, which is why `expected.stderr` is `""`.
+- **The zsh run verifies the caller shape, not the script.** `qa-cycle.sh` carries a bash shebang and is always invoked as `bash <script>`; the zsh run is the `QA_CYCLE=$(bash … "$DIR")` call site as a zsh Bash tool executes it — argv form, never a string built from the path.
 
 ## 4. Scope
 
@@ -117,9 +143,10 @@ None. `--entry path#export` is unchanged; a corpus without `filename` cases fail
 `shared/resources/tests/security-input-corpus.test.mjs`, `security-probe.test.mjs`
 
 **Changes**:
-- [ ] `filename` sink with ≥8 hostile and ≥4 legitimate cases, each carrying `why` and `expected`.
-- [ ] `shell:` entry: containment check on the script path; per-case temp fixture; `bash` and `zsh` runs; verdict `accepted` when stdout/exit match `expected`, `rejected` on refusal; record unchanged.
-- [ ] Test: fixed `qa-cycle.sh` → all hostile rejected, all legitimate accepted, `executed` = cases × shells; the pre-fix script → the newline case `accepted` (reproduced).
+- [x] `filename` sink with ≥8 hostile and ≥4 legitimate cases, each carrying `why` and `expected`.
+- [x] `shell:` entry: containment check on the script path before `spawnSync`; per-case temp fixture with bracketing controls; `bash` and `zsh` runs in argv form under `sandboxEnv()` + `LC_ALL=C`, `</dev/null`, per-case timeout; verdict: for a hostile case `rejected` when `{stdout, exit, stderr, absent}` all match `expected` (the name was handled correctly), `accepted` otherwise (reproduced); for a legitimate case the inverse; record unchanged, plus the fixture listing per case.
+- [x] Test: fixed `qa-cycle.sh` → all hostile rejected, all legitimate accepted, `executed` = cases × shells; the pre-fix script (`tests/fixtures/qa-cycle.prefix.sh`, from `git show a412f59a^:shared/resources/qa-cycle.sh`) → the newline case `accepted` (reproduced) **by stdout** (prints the low control, not the high one) — a fixture without bracketing controls must fail this test, which is the mutation proof for the control design.
+- [x] `$(touch PWNED)` / backtick cases: `expected.absent` names the marker path; a marker created anywhere under the fixture is `accepted` (reproduced) regardless of stdout.
 
 **Dependencies**: none.
 
@@ -127,13 +154,16 @@ None. `--entry path#export` is unchanged; a corpus without `filename` cases fail
 
 **Risk Level**: Low
 
-**Files**: `shared/resources/probe-boundary-rule.md`, `finalise-dod-security-prompt.md`, `skills/qa-task/SKILL.md` 3b,
-`skills/qa-story/SKILL.md` equivalent, `skills/review-security/SKILL.md` if it restates the signals
+**Files**: `shared/resources/probe-boundary-rule.md` (§ new signal, § routing rule, **§5 bullet and §5.1 rewritten**),
+`shared/resources/probe-boundary-signals.mjs` (new — the exported phrase list + `classifyBoundaryText`),
+`finalise-dod-security-prompt.md` (Step 1b signal + `--entry shell:` + `severity` on `probes[]`/FAIL `checks[]`),
+`skills/qa-task/SKILL.md` 3b, `skills/qa-story/SKILL.md` equivalent, `skills/review-security/SKILL.md` if it restates the signals
 
 **Changes**:
-- [ ] Header signal added; "not importable" routed to the shell entry.
-- [ ] Every site that names `--entry '<path>#<export>'` also names `--entry shell:<path>`.
-- [ ] Test: the task.121 gate-5 security `notes` ("No boundary delivered — … the helper reads filenames and prints a bounded integer") as a fixture the new rule classifies as a boundary.
+- [x] Header signal added; "not importable" routed to the shell entry; §5 "v1 probes importable entry points only" bullet and §5.1 rewritten so the document does not contradict itself.
+- [x] `probe-boundary-signals.mjs` exports the phrase list once; the rule's prose cites it.
+- [x] Every site that names `--entry '<path>#<export>'` also names `--entry shell:<path>`.
+- [x] Test: the `qa-cycle.sh` header ("refuses rather than guesses") as the positive fixture `classifyBoundaryText` classifies as a boundary, and the task.121 gate-5 security `notes` ("No boundary delivered — … the helper reads filenames and prints a bounded integer") as the negative fixture that carries no signal (§9); a header with none of the phrases as the negative fixture. The test calls the function — never greps the prose.
 
 **Dependencies**: Phase 1.
 
@@ -141,13 +171,17 @@ None. `--entry path#export` is unchanged; a corpus without `filename` cases fail
 
 **Risk Level**: Medium
 
-**Files**: `skills/finalise/SKILL.md` Step 6 (decision table row) and Step 8, `shared/resources/finalise-*` if the
-prompts carry severity, `skills/finalise/tests/` (new precondition test)
+**Files**: `skills/finalise/SKILL.md` Step 6 (decision table row) and Step 8, `skills/finalise/references/definition-of-done-checklist.md`
+§ "Completion Status Decision Matrix" (the second definition of the same table), `shared/resources/finalise-dod-security-prompt.md`
+(`severity` field — it does not carry one today), `shared/resources/finalise-fix-and-recheck-preconditions.json` (the pinned table),
+`shared/resources/tests/finalise-fix-and-recheck.test.mjs` (under the glob `npm test` already runs — `skills/finalise/tests/` does
+not exist and is not in `package.json`'s hand-listed globs)
 
 **Changes**:
-- [ ] The path, its five preconditions, the re-check scope, the DoD-summary "Deviations recorded" block (task.121's dod.1 as the wording source).
-- [ ] The decision table gains the row; the gaps path is unchanged for every other case.
-- [ ] Test: a table-driven precondition check (five inputs → proceed / halt) pinned so a sixth cannot be added silently.
+- [x] The path, its five preconditions, the re-check scope, the DoD-summary "Deviations recorded" block (task.121's dod.1 as the wording source).
+- [x] The decision table gains the row in **both** definitions (SKILL.md Step 6; DoD checklist reference); the gaps path is unchanged for every other case.
+- [x] `finalise-dod-security-prompt.md` output schema: `severity: low | medium | high` on every `probes[]` entry and every FAIL `checks[]` entry; the precondition reads it, and an entry with no `severity` is **not low**.
+- [x] Test: a table-driven precondition check (five inputs → proceed / halt) reading the JSON fixture, pinned so a sixth cannot be added silently, plus the fail-closed case (missing `severity` → halt).
 
 **Dependencies**: none.
 
@@ -157,21 +191,28 @@ prompts carry severity, `skills/finalise/tests/` (new precondition test)
 
 1. ✅ `shared/resources/security-input-corpus.mjs`, `security-input-corpus.md`
 2. ✅ `shared/resources/security-probe.mjs`
-3. ✅ `shared/resources/probe-boundary-rule.md`, `finalise-dod-security-prompt.md`
+3. ✅ `shared/resources/probe-boundary-rule.md`, `finalise-dod-security-prompt.md` (schema: `severity`), `skills/finalise/references/definition-of-done-checklist.md`
 4. ✅ `skills/finalise/SKILL.md`, `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, `skills/review-security/SKILL.md`
 
 ### Files to Create
 
-None (tests extend existing suites; one new finalise test file if none exists).
+- `shared/resources/probe-boundary-signals.mjs` — the boundary phrase list, exported once
+- `shared/resources/finalise-fix-and-recheck-preconditions.json` — the pinned precondition table
+- `shared/resources/tests/finalise-fix-and-recheck.test.mjs` — under the existing `npm test` glob
+- `tests/fixtures/qa-cycle.prefix.sh` — the pre-fix script, from `git show a412f59a^:shared/resources/qa-cycle.sh`
+- `shared/resources/finalise-fix-and-recheck.mjs` — the precondition evaluator (library + CLI; exit 0 proceed / 1 halt / 2 usage) that reads the JSON, so Step 8a checks a table rather than a judgement
+- `shared/resources/tests/probe-boundary-signals.test.mjs` — classifier fixtures (qa-cycle.sh header, task.121 gate-5 note, negatives) and the JS-form/shell-form contract test
+- `shared/resources/tests/fixtures/security-probe/eval-names.sh`, `eval-names-nocd.sh`, `runs-names.sh`, `writes-home-tmp-self.sh` — deliberately wrong scripts (eval with/without `cd "$1"`; executing each name under `set -e`; writing to `$HOME`/`$TMPDIR`/beside itself) for the `absent`, launch-failure and escape checks
 
 ### Files to Modify (Tests)
 
-5. ✅ `shared/resources/tests/security-input-corpus.test.mjs`, `security-probe.test.mjs`; finalise precondition test
+5. ✅ `shared/resources/tests/security-input-corpus.test.mjs`, `security-probe.test.mjs` (+ BUG-2/BUG-3 regression tests), `probe-boundary-signals.test.mjs` (new), `finalise-fix-and-recheck.test.mjs` (+ BUG-1 symlinked-invocation and BUG-4 recorded-run tests)
+6. ✅ `evals/shared/tests/probes-executed-population.test.mjs` (allowlist entry for the boundary-rule prose "against a script that says it refuses") and `skills/review-security/tests/review-security.test.js` (transitive sibling-import walk for the nested engine copy; limits assertion now `neither form reaches`) — consequential updates to the Phase 2 prose changes (BUG-10, QA cycles 1 and 3).
 
 ### Files to Modify (Documentation)
 
-6. ✅ `CHANGELOG.md`; `docs/reference/anti-patterns.md` — "unverifiable is a reason, not a verdict"
-7. ✅ `skills/*/references/` — regenerated
+6. ✅ `CHANGELOG.md`; `docs/reference/anti-patterns.md` — "Never record `unverifiable` as a verdict when it is a reason"
+7. ✅ `skills/{finalise,qa-task,qa-story,review-security}/references/` — regenerated (`probe-boundary-signals.mjs` lands beside the engine via its re-export; `finalise-fix-and-recheck.{mjs,json}` in finalise)
 
 ### Files to Delete
 
@@ -180,20 +221,21 @@ None.
 ## 8. Testing Strategy
 
 ### Unit Tests
-- [ ] Corpus schema: `filename` has both directions; every case has `why` and `expected`.
-- [ ] Engine: shell entry against the fixed and pre-fix `qa-cycle.sh`; count = cases × shells; a script outside `--repo-root` refused before execution.
-- [ ] Finalise precondition table: each precondition false → halt; all true → proceed.
+- [x] Corpus schema: `filename` has both directions; every case has `why` and `expected`.
+- [x] Engine: shell entry against the fixed and pre-fix `qa-cycle.sh`; count = cases × shells; a script outside `--repo-root` refused before execution; the newline reproduction is by stdout (bracketing controls) and a fixture without them fails.
+- [x] Boundary signals: `classifyBoundaryText` on the gate-5 note, the `qa-cycle.sh` header (positive) and a plain header (negative).
+- [x] Finalise precondition table: each precondition false → halt; all true → proceed; missing `severity` → halt.
 
 **Command**: `npm test`
 
 ### Integration Tests
-- [ ] `qa-task` Step 3b on a fixture diff that adds a refusing script: gate records `boundary: true`, `probes_executed > 0`.
+- [x] `qa-task` Step 3b on a fixture diff that adds a refusing script: gate records `boundary: true`, `probes_executed > 0`.
 
 ### Contract Tests
-- [ ] Every site naming the JS entry names the shell entry (grep with a non-vacuity floor).
+- [x] Every site naming the JS entry names the shell entry (grep with a non-vacuity floor).
 
 ### Performance Tests
-- [ ] Shell entry ≤ 2 s for the `filename` sink in both shells.
+- [x] Shell entry ≤ 2 s for the `filename` sink in both shells.
 
 ### Consumer Tests
 - [ ] The next task that ships a shell helper gets a measured security axis, not `reasoned`.
@@ -201,19 +243,19 @@ None.
 ## 9. Success Criteria
 
 ### Functional
-- [ ] `security-probe.mjs --entry shell:shared/resources/qa-cycle.sh --sink filename` executes every case under bash and zsh and reproduces the newline case on the pre-fix script.
-- [ ] The boundary rule classifies a refusing script as a boundary; the task.121 gate-5 security note is the red fixture.
-- [ ] `/finalise` proceeds through fix-and-recheck only when all five preconditions hold, and halts otherwise.
+- [x] `security-probe.mjs --entry shell:shared/resources/qa-cycle.sh --sink filename` executes every case under bash and zsh and reproduces the newline case on the pre-fix script.
+- [x] `classifyBoundaryText` classifies a refusing script as a boundary by its own header (`qa-cycle.sh` → `refuses rather than`); the task.121 gate-5 security note is pinned as the negative fixture — it carries no signal, which is why the JS-shaped rule recorded `boundary: false` against the script the note describes.
+- [x] `/finalise` proceeds through fix-and-recheck only when all five preconditions hold — including a `severity: low` the security agent now emits — and halts otherwise, including on a finding with no severity.
 
 ### Performance
-- [ ] No change to the JS entry path.
+- [x] No change to the JS entry path.
 
 ### Code Quality
-- [ ] One engine, one record shape; the shell form adds no second count.
-- [ ] Each mechanism has a mutation proof recorded.
+- [x] One engine, one record shape; the shell form adds no second count.
+- [x] Each mechanism has a mutation proof recorded.
 
 ### Migration
-- [ ] Observation #121 closes naming the PR.
+- [x] Observation #121 closes naming the PR — set `actioned` at `/finalise`, resolution names PR #446.
 
 ## 10. Risk Assessment
 
@@ -226,6 +268,12 @@ None.
 
 ### Low Risk
 1. zsh absent on CI — the engine runs bash only and records `shells: [bash]` in the record.
+
+### Known limits at acceptance (recorded by Step 5c, PR review 1 — follow-up task candidates)
+1. **`mutation-proved` is tied to the proof's file, not the test** (`finalise-fix-and-recheck.mjs` `redNamesTest`, PR-review CR-1, medium): `mutationProof.test` is a file path and node:test prints every failing test's location within `RED_WINDOW` of its ✖, so a log where the named test is green and an unrelated test in the same file is red satisfies the precondition. Fix: require the test's title and match it on the ✖ line itself, keeping the file for the `test at <file>` cross-check.
+2. `severity-low` is self-reported and not cross-checked against the run record's `escaped` count (CR-2; cycle-3 CR-5 names the same derivation).
+3. `listDirStamps` stamps sibling directories, so a write into one during a run reads as an escape (CR-3); the inline non-object `expected` guard duplicates `expectedProblem` (CR-4).
+4. A case-variant of an engine-created fixture name slips the string collision check on case-folding filesystems (QA cycle 5 CR-1); the CR-3 test fixture should `exec` its sleep (QA cycle 5 CR-2).
 
 ## 11. Rollback Plan
 
@@ -241,22 +289,98 @@ None.
 - A stdin-reading script: `</dev/null` on the child, a timeout per case.
 
 ### Rollback Triggers
-- **Critical**: a zero-executed boundary recorded as PASS; finalise proceeding on a medium finding.
+- **Critical**: a zero-executed boundary recorded as PASS; finalise proceeding on a medium finding or on a finding with no `severity`.
 - **Non-critical**: corpus wording, prompt text.
 
+## Bug Reports
+
+### In QA Verification
+
+_None._
+
+### Closed Bugs
+
+- BUG-1..4 - ✅ Closed (verified at cycle 2)
+- BUG-5..8 - ✅ Closed (verified at cycle 3)
+- [BUG-9](./task.128.bug.9.launch-failure-matcher-catches-runtime-errors-inside-the-target.md), [BUG-10](./task.128.bug.10.three-prose-sites-still-say-non-js-is-unverifiable.md), [BUG-11](./task.128.bug.11.malformed-expected-scores-absent-or-throws.md), [BUG-12](./task.128.bug.12.side-effects-outside-the-fixture-dir-invisible.md) - ✅ Closed (verified at cycle 4)
+- [BUG-13](./task.128.bug.13.absent-dot-dot-always-exists-scores-a-vacuous-defect.md) - ✅ Closed (verified at cycle 5)
+
+## QA Testing Results
+
+**QA Status**: CONCERNS (no open entry)
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-20
+**Quality Score**: 95/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.128.qa.5.shell-boundary-probe-and-finalise-recheck.md](./task.128.qa.5.shell-boundary-probe-and-finalise-recheck.md)
+- **Gate File**: [task.128.gate.5.shell-boundary-probe-and-finalise-recheck.yml](./task.128.gate.5.shell-boundary-probe-and-finalise-recheck.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3579 (isolated-worktree fast gate at 76b7151f) + 39 engine-recorded security probes
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0 HIGH, 0 MEDIUM, 2 LOW (advisory, future)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+BUG-13, CR-2, CR-3, CR-4 verified FIXED by execution; no open entry. Advisory (future): CR-1 case-folded fixture names slip the string collision check (APFS) — eligible for finalise fix-and-recheck; CR-2 the CR-3 test fixture should `exec sleep`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.128.qa.5.shell-boundary-probe-and-finalise-recheck.md` (cycle 5 of 5)
+**Gate File**: `task.128.gate.5.shell-boundary-probe-and-finalise-recheck.yml`
+**Gate Status**: ⚠️ CONCERNS — `top_issues: []` (no open entry)
+**Quality Score**: 95/100
+**PR Review (Step 5c)**: `task.128.pr-review.1.shell-boundary-probe-and-finalise-recheck.md` — CONCERNS, findings applied or recorded
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** All 7 met — shell entry form under bash+zsh with the newline case reproduced on the pre-fix script; `classifyBoundaryText` header signal with the gate-5 note as the negative fixture; fix-and-recheck evaluator halts unless all five pinned preconditions hold; JS entry path unchanged; one record shape; every mechanism mutation-proved; obs #121 actioned naming PR #446
+✅ **Tests:** 3,579 in the per-PR `npm test` lane; 31 mutants killed across develop and four QA cycles; CI reading 1 SUCCESS @ `01a0b475` over 5 checks
+✅ **PR Review:** PR #446 — Step 5c conformance + code lenses (5 conformance findings applied; CR-1 recorded under §10 Known limits)
+✅ **Documentation:** CHANGELOG `(task 128; obs #121)`; finalise Step 6 row + Step 8a; DoD checklist matrix row; probe-boundary-rule §5/§5.1/§5.2; corpus filename sink; dod-security-prompt shell command + severity; qa-task/qa-story 3b; review-security; anti-patterns; bundles regenerated
+✅ **Security Review:** PASS — boundary probed with the engine-recorded run `task.128.dod.security.run.json` (39 executed; only the known pre-existing `resolveEntry` symlink-escape reproduced); evaluator refused 11/11 hostile records; no secrets, no shell-string interpolation of case input
+⚠️ **Compliance Review:** NOT_APPLICABLE — agent tooling only
+
+**Known limits carried** (§10, follow-up task candidates): mutation-proved keyed on the proof's file; severity-low self-reported; `listDirStamps` stamps directories; case-folded fixture names; `resolveEntry` symlink-escape.
+
+**Task marked as ACCEPTED on:** 2026-09-20
+
+**Detailed Verification Log:** See `task.128.dod.1.shell-boundary-probe-and-finalise-recheck.md` for complete verification evidence and timestamps.
+
+## Change Log
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-09-18 | 1.0 | Initial draft — observation review 2026-09-18 (obs #121) | create-task |
+| 2026-09-20 | 1.1 | Review passed (8/10) — 1 critical + 7 important fixes applied: `severity` added to the security agent schema (did not exist); bracketing controls + `LC_ALL=C` so the pre-fix reproduction is by stdout (verified order-dependent); `expected` as {stdout, exit, stderr, absent}; argv-form zsh call; §5/§5.1 of the boundary rule rewritten; signals exported once (`probe-boundary-signals.mjs`); Decision Matrix row in both definitions; precondition test under the globbed `shared/resources/tests/` | review-task |
+| 2026-09-20 |  | Status → ready-for-development | review-task |
+| 2026-09-20 |  | Implemented — 18 files (5 created), 32 new tests across 3 suites; 12 mutants killed | develop |
+| 2026-09-20 |  | QA gate FAIL (40/100) — 2 HIGH, 2 MEDIUM, 3 LOW; 39 security probes measured | qa-task |
+| 2026-09-20 |  | QA findings fixed — BUG-1 (realpath CLI guard), BUG-2 (decline unreadable script / 126-127), BUG-3 (NUL → bad-entry), BUG-4 (recorded mutation run); 5 mutants red; cycle 1 (1 iteration) | qa-fix |
+| 2026-09-20 |  | QA gate FAIL (50/100), cycle 2 refute pass — BUG-1..4 verified fixed; 1 HIGH, 3 MEDIUM, 2 LOW new | qa-task |
+| 2026-09-20 |  | QA findings fixed — BUG-5 (cwd: fixtureDir), BUG-6 (--git-base post-commit licence), BUG-7 (launch failure keyed on bash stderr), BUG-8 (comparable-keys guard), CR-4..8; cycle 2 (2 iterations so far) | qa-fix |
+| 2026-09-20 |  | QA gate CONCERNS (60/100), cycle 3 — BUG-5..8 verified fixed; 0 HIGH, 4 MEDIUM new | qa-task |
+| 2026-09-20 |  | QA findings fixed — BUG-9 (script-as-subject launch matcher), BUG-10 (three prose sites → shell:, population grep), BUG-11 (expected validated), BUG-12 (sandboxed HOME/TMPDIR, script-dir snapshot, PWD); cycle 3 (3 iterations so far) | qa-fix |
+| 2026-09-20 |  | QA gate CONCERNS (90/100), cycle 4 — BUG-9..12 verified fixed; 0 HIGH, 1 MEDIUM, 2 LOW | qa-task |
+| 2026-09-20 |  | QA findings fixed — BUG-13 (absent . / .. / collisions rejected), CR-2 (case-insensitive launch message), CR-3 (escapes/shells through the collapse), CR-4; cycle 4 (4 iterations so far) | qa-fix |
+| 2026-09-20 |  | QA gate CONCERNS (95/100), cycle 5 — BUG-13, CR-2..4 verified fixed; 0 HIGH, 0 MEDIUM, 2 LOW advisory; no open entry → 5c | qa-task |
+| 2026-09-20 |  | PR review 1 (Step 5c) CONCERNS — 5 conformance findings applied (pr_number, Migration checkbox, Phase 2 fixture polarity, §7 test files, paused block); CR-1 mutation-proved file-vs-test recorded under Known limits | review-pr |
+| 2026-09-20 | 1.2 | DoD passed — accepted (PR #446); obs #121 actioned | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: filename sink + shell entry
-- [ ] Phase 2: boundary rule + prompts
-- [ ] Phase 3: finalise fix-and-recheck
+- [x] Phase 1: filename sink + shell entry
+- [x] Phase 2: boundary rule + prompts
+- [x] Phase 3: finalise fix-and-recheck
 - [ ] QA: `task.128.qa.[N].shell-boundary-probe-and-finalise-recheck.md`
 - [ ] Gate: `task.128.gate.[N].shell-boundary-probe-and-finalise-recheck.yml`
 

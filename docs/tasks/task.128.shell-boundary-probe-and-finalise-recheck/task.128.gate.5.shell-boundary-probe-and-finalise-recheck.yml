@@ -1,0 +1,59 @@
+schema: 1
+task: 'task.128.shell-boundary-probe-and-finalise-recheck'
+task_title: 'A refusing shell script is a boundary the probe engine cannot reach, and finalise can only accept or halt'
+gate: CONCERNS
+status_reason: 'BUG-13, CR-2, CR-3 and CR-4 verified FIXED by execution on 76b7151f and closed. No HIGH for the fourth gate running (2 → 1 → 0 → 0 → 0); no MEDIUM. No open entry. Two advisories carried to future: a case-variant of an engine-created fixture name (APFS case folding) slips the string collision check — real, reproduced, but requires an authored case naming a case-variant of an engine-internal filename that no corpus case does, and fails loud (a false absent) rather than silent; and the CR-3 test fixture orphans a sleep for 30 s. The pre-existing resolveEntry symlink-escape stays a documented limit.'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T20:08:34Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 3579
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 39
+    notes: 'Re-run on 76b7151f, record task.128.qa.5.security.run.json (totals.executed 39): qa-cycle shell form engages (28 executed, 0 escapes, shells bash+zsh); containsShellEntry present-but-inert on shellentry.symlink-escape (documented pre-existing resolveEntry limit, future, unchanged since gate 1). BUG-13 shapes (. / .. / control / own input) all decline, executed 0 — the fixed script no longer scores absent. Advisory: case-folded fixture names (CR-1, future).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'CR-3 verified: the all-errored decline carries shells [bash, zsh] and every (case, shell) escape; toRecordEntry reports escaped 4 on a 4-run decline.'
+  maintainability:
+    status: PASS
+    notes: 'CR-4 test hygiene landed (try/finally + no-survivor assertion). Advisory: the CR-3 fixture body should exec its sleep so spawnSync timeout kills the sleeper (CR-2 of this cycle, future).'
+
+bug_resolution:
+  bugs_fixed: 13
+  bugs_remaining: 0
+  fix_date: '2026-09-20'
+  total_iterations: 4
+  verification_method: 'Execution on 76b7151f: expectedProblem rejects . and ..; control/input collisions decline (executed 0); isLaunchFailure matches "is a directory" and "Is a directory" and not in-script "line N:" errors; CR-3/BUG-12/BUG-13/CR-2 tests green (67/67 across the two engine suites); no PWNED file survives in HOME or tmpdir'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cycle 5, low): after the fixture is materialised and before spawnSync, decline any expected.absent name for which existsSync(join(fixtureDir, p)) is already true — covers case folding and Unicode normalisation that the string collision check cannot. Eligible for the finalise fix-and-recheck path (low, single commit, inside the file set, mutation-provable).'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-2 (cycle 5, low): the CR-3 test fixture should read  so the timed-out sleeper is the pid spawnSync kills; today one orphan per shell survives 30 s.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'Carried: CR-5 (cycle 4) shellCaseId()/pushErrored() helper; CR-5 (cycle 3) severity/otherFindingsOpen derivation; pre-existing engine CLI symlink no-op and resolveEntry symlink-escape; cycle-1 advisories; obs #121 → actioned at /finalise.'
+      refs: ['shared/resources/finalise-fix-and-recheck.mjs', 'shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

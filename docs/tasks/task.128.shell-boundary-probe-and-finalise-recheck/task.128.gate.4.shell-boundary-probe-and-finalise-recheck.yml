@@ -1,0 +1,81 @@
+schema: 1
+task: 'task.128.shell-boundary-probe-and-finalise-recheck'
+task_title: 'A refusing shell script is a boundary the probe engine cannot reach, and finalise can only accept or halt'
+gate: CONCERNS
+status_reason: 'BUG-9..12 verified FIXED by execution and closed. No HIGH (2 → 1 → 0 → 0). One MEDIUM: an absent entry of "." or ".." passes validation and always exists, so the fixed script scores absent with a full count. Two LOW adopted after verification: the launch-failure message alternation is case-sensitive and bash 3.2 prints "is a directory"; the all-errored collapse drops escapes and shells. Two cleanups advisory.'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T19:49:26Z'
+
+top_issues:
+  - id: 'TASK-128-BUG-13'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'expectedProblem accepts absent entries "." and ".." (no separator); existsSync(join(fixtureDir, "..")) is always true, so every hostile case is accepted and the FIXED qa-cycle.sh scores absent, executed 4 (cycle-4 review CR-1, reproduced).'
+    suggested_action: 'Reject "." and ".." in the absent validator and decline an absent name that collides with a control or the case input.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.128.bug.13.absent-dot-dot-always-exists-scores-a-vacuous-defect.md'
+  - id: 'CR-2'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'isLaunchFailure'"'"'s message alternation is case-sensitive; macOS /bin/bash 3.2 prints "<script>: <script>: is a directory" (verified on this host), so under that bash the directory race falls through to comparison instead of declining.'
+    suggested_action: 'Match the message case-insensitively.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The all-errored collapse returns ...base, discarding escapes and shells — a shell target that writes to $HOME or beside itself and then errors on every case has its escapes dropped and its record reads escaped: 0, shells: null.'
+    suggested_action: 'Carry escapes and shells through the entry-level decline return.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3578
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 39
+    notes: 'Re-run on 6ae01f48, record task.128.qa.4.security.run.json (totals.executed 39). symlink-escape still accepted (documented pre-existing limit, future). BUG-13 is one more shape by which a bad case reads as a defect; escapes now cover HOME, TMPDIR and the script dir (writes-home-tmp-self.sh → 84 escapes over 28 runs, real HOME untouched).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-3: escapes observed during errored runs are dropped on the entry-level decline.'
+  maintainability:
+    status: PASS
+    notes: 'Cleanups CR-4 (test hygiene) and CR-5 (id-suffix helper) advisory. TMPDIR=/tmp 107/0.'
+
+bug_resolution:
+  bugs_fixed: 12
+  bugs_remaining: 1
+  fix_date: '2026-09-20'
+  total_iterations: 3
+  verification_method: 'Execution on 6ae01f48: runs-names compared (exit 126 ≠ 0, declined 0); 0 stale prose sites; malformed expected declined; HOME/TMPDIR/self escapes reported'
+
+recommendations:
+  immediate:
+    - action: 'Reject "." / ".." and colliding names in absent (BUG-13); case-insensitive launch-failure match (CR-2); carry escapes/shells through the all-errored decline (CR-3).'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-4: try/finally around the BUG-12 test'"'"'s fixture-dir cleanup and assert the real temp dir too; CR-5: one shellCaseId()/pushErrored() helper for the @shell convention.'
+      refs: ['shared/resources/tests/security-probe.test.mjs', 'shared/resources/security-probe.mjs']
+    - action: 'Carried: CR-5 (cycle 3) severity/otherFindingsOpen derivation; pre-existing engine CLI symlink no-op and resolveEntry symlink-escape; cycle-1 advisories; obs #121 → actioned at /finalise.'
+      refs: ['shared/resources/finalise-fix-and-recheck.mjs', 'shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-13, CR-2, CR-3 fixed and re-reviewed']

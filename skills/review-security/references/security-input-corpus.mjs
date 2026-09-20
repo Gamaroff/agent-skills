@@ -33,6 +33,7 @@ export const SINKS = Object.freeze([
   "shell-exec",
   "path",
   "template-render",
+  "filename",
 ]);
 
 /** The two directions every sink must cover. */
@@ -49,6 +50,49 @@ export const CASE_FIELDS = Object.freeze([
 ]);
 
 /**
+ * Fields a case MAY carry beyond CASE_FIELDS. `expected` is the machine-readable
+ * pass condition for a sink whose cases are MATERIALISED — written to a fixture
+ * directory and run against a script — rather than passed to a function as a
+ * value. For those, `correct` (prose) cannot be compared mechanically and
+ * `direction` alone cannot say what a right script PRINTS; `expected` can:
+ *
+ *   { stdout: "12\n", exit: 0, stderr: "", absent: ["PWNED"] }
+ *
+ * Every key is compared. `stderr: ""` is load-bearing — a script that leaks an
+ * arithmetic error and still prints the right value has not handled the name.
+ * `absent` lists paths, relative to the fixture directory, that a correct run
+ * must NOT create: it is how a command-substitution name is caught when the
+ * substitution ran but the number still came out right.
+ */
+export const OPTIONAL_CASE_FIELDS = Object.freeze(["expected"]);
+
+/**
+ * Sinks whose cases materialise as a FIXTURE DIRECTORY rather than as a string.
+ *
+ * A hostile filename is hostile as a directory entry, not as a value: a script
+ * that lists a directory meets it through the glob, not through an argument. So
+ * the engine creates a directory per case, writes these controls plus the case's
+ * own name, and runs the script under probe against the directory.
+ *
+ * The controls BRACKET the case. Globs are sorted (strcoll, which the engine
+ * pins to byte order with LC_ALL=C), and the defect this sink was built from —
+ * qa-cycle.sh printing a lower, wrong cycle after a newline-bearing name aborted
+ * its loop (task.121) — only shows in stdout when the hostile name is processed
+ * AFTER a lower gate and BEFORE the highest one. `!` (0x21) sorts before every
+ * printable name and `~` (0x7E) after every ASCII one, so a hostile name always
+ * lands between them; a legitimate case carries a number above the high control
+ * so it wins on its own. Verified on the pre-fix script: without the bracket,
+ * pre-fix and fixed print the same value on every ordering the plan proposed.
+ */
+export const MATERIALISED_SINKS = Object.freeze({
+  filename: Object.freeze({
+    controls: Object.freeze(["!.gate.3.control.yml", "~.gate.12.control.yml"]),
+    /** What the high control makes a correct script print when the case is handled. */
+    highValue: "12",
+  }),
+});
+
+/**
  * Stamp the sink onto each case, namespace its id, and freeze the result.
  * Ids are namespaced here rather than by hand so a copy-pasted case cannot
  * silently collide with the one it was copied from.
@@ -63,6 +107,11 @@ function sinkCases(sink, cases) {
         why: c.why,
         correct: c.correct,
         direction: c.direction,
+        // Only a materialised sink's cases carry it; the key is absent, not
+        // null, elsewhere so the frozen-shape test keeps its exact key set.
+        ...(c.expected !== undefined
+          ? { expected: Object.freeze({ ...c.expected }) }
+          : {}),
       }),
     ),
   );
@@ -680,12 +729,144 @@ const TEMPLATE_RENDER = sinkCases("template-render", [
   },
 ]);
 
+// ---------------------------------------------------------------------------
+// filename — a script deciding WHICH DIRECTORY ENTRY COUNTS, and what it derives
+// ---------------------------------------------------------------------------
+// The through-line: a name is data the shell is eager to re-read as something
+// else — a line, a word, an option, a glob, a command. Cases are MATERIALISED
+// (see MATERIALISED_SINKS): each is written into a fixture directory beside two
+// control gates, and the script under probe (`qa-cycle.sh`-shaped: print the
+// highest gate number in <dir>, refuse rather than guess) is run against the
+// directory. A handled hostile name leaves the high control's value on stdout,
+// exit 0, nothing on stderr, and no side effect; a legitimate name carries a
+// number above the controls and must itself be printed.
+
+const FILENAME = sinkCases("filename", [
+  {
+    id: "newline-in-name",
+    input: "x.gate.5.y\nz.gate.9.w.yml",
+    direction: "hostile",
+    why: "sed and every other line tool work a LINE at a time, so one name yields two extracted values. A script that feeds the pair to arithmetic aborts its loop and prints whatever it had seen so far — a lower, wrong cycle — and exits 0. This is the task.121 defect, reproduced by the finalise DoD probe on the very script that says it refuses rather than guesses.",
+    correct:
+      "Anything not reduced to one run of digits is un-numbered: the entry is ignored, the high control (12) is printed, exit 0, nothing on stderr.",
+    expected: { stdout: "12\n", exit: 0, stderr: "" },
+  },
+  {
+    id: "command-substitution",
+    input: "$(touch PWNED).gate.3.x.yml",
+    direction: "hostile",
+    why: "A name that reaches `eval`, an unquoted `echo $f` inside a `sh -c` string, or any second parse runs the substitution. The number still extracts (3), so stdout looks right — only the marker file betrays it.",
+    correct:
+      "The name is never re-parsed as code; `PWNED` is not created; the entry is numbered 3, below the high control, so 12 is printed.",
+    expected: { stdout: "12\n", exit: 0, stderr: "", absent: ["PWNED"] },
+  },
+  {
+    id: "backtick-substitution",
+    input: "`touch PWNED2`.gate.3.x.yml",
+    direction: "hostile",
+    why: "The older substitution syntax, which some quoting that stops `$(...)` does not stop.",
+    correct: "As above: no `PWNED2`, 12 printed.",
+    expected: { stdout: "12\n", exit: 0, stderr: "", absent: ["PWNED2"] },
+  },
+  {
+    id: "separators-in-name",
+    input: "a;b|c&d.gate.4.x.yml",
+    direction: "hostile",
+    why: "Every shell separator in one name. A script that word-splits a listing (`for f in $(ls)`) sees four entries, none of them a gate; one that interpolates the name into a command string runs three commands.",
+    correct:
+      "Quoted throughout, the name is one entry numbered 4; 12 is printed.",
+    expected: { stdout: "12\n", exit: 0, stderr: "" },
+  },
+  {
+    id: "leading-double-dash",
+    input: "--.gate.2.x.yml",
+    direction: "hostile",
+    why: "Passed unquoted or without a `--` guard, a name beginning `--` is read as an option terminator by whatever it is handed to, and the real operand shifts.",
+    correct: "The name is numbered 2 and handled as data; 12 is printed.",
+    expected: { stdout: "12\n", exit: 0, stderr: "" },
+  },
+  {
+    id: "leading-dash-n",
+    input: "-n.gate.2.x.yml",
+    direction: "hostile",
+    why: '`echo "$name"` swallows it as a flag and prints nothing; a listing built with echo loses the entry silently.',
+    correct: "printf '%s', not echo; the name is numbered 2; 12 is printed.",
+    expected: { stdout: "12\n", exit: 0, stderr: "" },
+  },
+  {
+    id: "glob-metacharacters",
+    input: "g[1]*.gate.2.x.yml",
+    direction: "hostile",
+    why: "An unquoted expansion re-globs the name against the directory, and `[1]` and `*` match other entries — the loop then processes files that were never listed.",
+    correct: "Quoted, the name is one entry numbered 2; 12 is printed.",
+    expected: { stdout: "12\n", exit: 0, stderr: "" },
+  },
+  {
+    id: "eleven-digit-run",
+    input: "task.gate.99999999999.x.yml",
+    direction: "hostile",
+    why: "`[ -gt ]` is a 64-bit test that prints 'integer expected' and SKIPS the comparison on a long run of digits, so a script that compared it would exit 0 having never compared — and a script that accepted it would print a number no cycle can be.",
+    correct:
+      "A run longer than nine digits is a malformed name, not a number: un-numbered, ignored; 12 is printed.",
+    expected: { stdout: "12\n", exit: 0, stderr: "" },
+  },
+  {
+    id: "zero-cycle",
+    input: "task.gate.000.x.yml",
+    direction: "hostile",
+    why: "Normalises to 0, which names no cycle (`qa-gate-0` is not a stage) — a script that took it as current would key every comment to a round that never happened.",
+    correct: "Zero is un-numbered; the entry is ignored; 12 is printed.",
+    expected: { stdout: "12\n", exit: 0, stderr: "" },
+  },
+  {
+    id: "plain",
+    input: "task.121.gate.20.name.yml",
+    direction: "legitimate",
+    why: "The ordinary case, numbered above both controls. A script that only ever printed the control would look correct on every hostile case and be a stub.",
+    correct: "20 is printed, exit 0, nothing on stderr.",
+    expected: { stdout: "20\n", exit: 0, stderr: "" },
+  },
+  {
+    id: "leading-zeros",
+    input: "story.2.1.gate.020.name.yml",
+    direction: "legitimate",
+    why: "Zero-padded numbers are what an author types to keep a listing sorted; refusing them, or comparing them as strings (`020` < `12`), loses the current gate.",
+    correct: "Normalised as base-10: 20 is printed.",
+    expected: { stdout: "20\n", exit: 0, stderr: "" },
+  },
+  {
+    id: "unicode",
+    input: "tâche.121.gate.21.résumé.yml",
+    direction: "legitimate",
+    why: "Non-ASCII bytes in a name are ordinary. A pattern anchored on ASCII, or a locale that cannot collate them, drops the entry.",
+    correct: "21 is printed.",
+    expected: { stdout: "21\n", exit: 0, stderr: "" },
+  },
+  {
+    id: "hyphenated",
+    input: "task.121.gate.22.my-long-name.yml",
+    direction: "legitimate",
+    why: "Hyphens inside the descriptive segment are the naming convention itself; a rule that bans `-` to stop the leading-dash cases above bans every real name.",
+    correct: "22 is printed.",
+    expected: { stdout: "22\n", exit: 0, stderr: "" },
+  },
+  {
+    id: "spaces",
+    input: "task 121.gate.23.name with spaces.yml",
+    direction: "legitimate",
+    why: "Spaces are legal in a name and common in one typed by hand. A listing that is word-split sees five entries and no gate.",
+    correct: "Quoted throughout, one entry: 23 is printed.",
+    expected: { stdout: "23\n", exit: 0, stderr: "" },
+  },
+]);
+
 const CORPUS = Object.freeze({
   "url-authority": URL_AUTHORITY,
   "sql-orm": SQL_ORM,
   "shell-exec": SHELL_EXEC,
   path: PATH,
   "template-render": TEMPLATE_RENDER,
+  filename: FILENAME,
 });
 
 /**
@@ -781,6 +962,8 @@ const SINK_BLURB = Object.freeze({
   path: "A filesystem API deciding **which file to open**. Note how many of the hostile cases defeat a check that is lexically correct — the disagreement is between the string and the kernel.",
   "template-render":
     "A renderer deciding **what markup a value becomes**. The escaping is not one function: element text, attribute value, URL and script context are four different ones, and choosing by position is the control.",
+  filename:
+    "A script deciding **which directory entry counts**, and what value it derives from a name. These cases are **materialised**: the engine writes each name into a fixture directory beside two control gates (`!.gate.3.control.yml`, `~.gate.12.control.yml`, which bracket every hostile name under `LC_ALL=C`) and runs the script under probe against the directory. A handled hostile name leaves `12` on stdout, exit 0, nothing on stderr and no side effect; a legitimate name is numbered above the controls and must be printed itself. The through-line: a name is data the shell is eager to re-read as a line, a word, an option, a glob or a command.",
 });
 
 /**

@@ -6,10 +6,15 @@
  *
  * Usage:
  *   node <this-file> --sink <name> --entry <path#exportName> [options]
+ *   node <this-file> --sink <name> --entry shell:<path>     [options]
  *
  * Options:
  *   --sink <name>        one of the corpus sinks (see security-input-corpus.mjs)
- *   --entry <spec>       `relative/path.mjs#exportName` — the control under probe
+ *   --entry <spec>       `relative/path.mjs#exportName` — the control under probe;
+ *                        or `shell:relative/path.sh` — a SHELL SCRIPT taking one
+ *                        positional argument, run as `bash <path> <fixture-dir>`
+ *                        per case under bash and (when present) zsh. See "The
+ *                        shell entry form" below. Same record, same count.
  *   --cases-file <path>  JSON array of cases, replacing the corpus for this run
  *   --timeout <ms>       per-case timeout (default: the shared spawn budget)
  *   --json               emit one JSON object on stdout
@@ -46,6 +51,26 @@
  * argument, and the limits of what this engine can honestly claim, are stated
  * once in `probe-boundary-rule.md`, which sits beside this file. Read that
  * first; this file is the mechanism, not the argument.
+ *
+ * THE SHELL ENTRY FORM (task.128). A boundary delivered as a bash script has no
+ * export to import, and until this form existed the engine could only decline
+ * it — which is what happened on task.121: five QA gates recorded
+ * `probes_executed: 0` against a script whose header says it refuses rather
+ * than guesses, and a by-hand probe then found two fail-closed defects in it.
+ * `--entry shell:<path>` is an entry FORM, not a second engine: the case loop,
+ * the two directions, `computeVerdict` and the record writer are unchanged.
+ * What differs is how a case reaches the target. A sink listed in
+ * `MATERIALISED_SINKS` (the corpus) is written to a fixture directory — the
+ * sink's bracketing controls plus the case's own name — and the script is run
+ * against the directory: `bash "$1" "$2"` with the script and directory as
+ * ARGV, never a string; stdin closed; the engine's `sandboxEnv()` plus
+ * `LC_ALL=C` so glob order is byte order. The case's `expected` — stdout,
+ * exit, stderr, paths that must be absent — is what the run is compared
+ * against; `direction` then says whether a match is the good outcome. Each
+ * (case, shell) run is one executed probe, so the count is cases × shells and
+ * the record says which shells ran. A script that cannot take its input this
+ * way — stdin, a second positional, the network — is still declined, and
+ * probe-boundary-rule.md §5 says so.
  */
 
 import { spawnSync } from "node:child_process";
@@ -60,6 +85,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -67,8 +93,15 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { sandboxEnv, snapshotTree } from "./qa-execute-snippets.mjs";
-import { corpusFor } from "./security-input-corpus.mjs";
+import { MATERIALISED_SINKS, corpusFor } from "./security-input-corpus.mjs";
 import { spawnBudget, neverRan, readInt } from "./spawn-budget.mjs";
+// Re-exported so the signal list ships beside the engine in every bundled copy:
+// the bundler follows sibling imports, and a prompt that cites the module by
+// name from an installed skill needs the file to be there.
+export {
+  BOUNDARY_SIGNALS,
+  classifyBoundaryText,
+} from "./probe-boundary-signals.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -195,23 +228,52 @@ export function defaultRepoRoot() {
  * absolute paths are both rejected here, on the resolved path rather than the
  * literal — `a/../../etc/x` is only visibly an escape after resolution.
  *
- * @returns {{ok: true, entryPath: string, exportName: string}
+ * The `shell:<path>` form takes the same containment — the path is checked
+ * before anything is spawned, for the same reason it is checked before an
+ * import — and returns `kind: "shell"` with no export name.
+ *
+ * @returns {{ok: true, kind: "js", entryPath: string, exportName: string}
+ *          |{ok: true, kind: "shell", entryPath: string}
  *          |{ok: false, reason: string, detail: string}}
  */
 export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
   if (typeof entry !== "string" || entry.trim() === "") {
     return { ok: false, reason: "bad-entry", detail: "entry is empty" };
   }
-  const hash = entry.lastIndexOf("#");
-  if (hash <= 0 || hash === entry.length - 1) {
+  // A NUL is never part of a path. For the JS form it fails at import (declined);
+  // for the shell form it reached spawnSync, which THROWS on a NUL in argv — out
+  // of runProbeSpec, whose contract is to return a verdict (task.128 BUG-3).
+  if (entry.includes("\0")) {
     return {
       ok: false,
       reason: "bad-entry",
-      detail: `entry must be "path#exportName", got "${entry}"`,
+      detail: "entry contains a NUL byte",
     };
   }
-  const rawPath = entry.slice(0, hash);
-  const exportName = entry.slice(hash + 1);
+  const isShell = entry.startsWith(SHELL_PREFIX);
+  let rawPath;
+  let exportName = null;
+  if (isShell) {
+    rawPath = entry.slice(SHELL_PREFIX.length);
+    if (rawPath.trim() === "" || rawPath.includes("#")) {
+      return {
+        ok: false,
+        reason: "bad-entry",
+        detail: `entry must be "shell:path" with no export name, got "${entry}"`,
+      };
+    }
+  } else {
+    const hash = entry.lastIndexOf("#");
+    if (hash <= 0 || hash === entry.length - 1) {
+      return {
+        ok: false,
+        reason: "bad-entry",
+        detail: `entry must be "path#exportName" or "shell:path", got "${entry}"`,
+      };
+    }
+    rawPath = entry.slice(0, hash);
+    exportName = entry.slice(hash + 1);
+  }
 
   const root = resolve(repoRoot);
   const entryPath = isAbsolute(rawPath)
@@ -238,7 +300,64 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
       detail: `${entryPath} is under node_modules`,
     };
   }
-  return { ok: true, entryPath, exportName };
+  return isShell
+    ? { ok: true, kind: "shell", entryPath }
+    : { ok: true, kind: "js", entryPath, exportName };
+}
+
+/** The entry-spec prefix that selects the shell form. */
+export const SHELL_PREFIX = "shell:";
+
+/**
+ * The shells a shell-form probe runs under. bash always; zsh when the host has
+ * it — that is the Bash tool's shell on the machines that execute this
+ * repository's prose, and the unmatched-glob behaviour that differs between the
+ * two is exactly what `qa-cycle.sh`'s `bash …` invocation exists to avoid.
+ * The zsh run verifies the CALLER shape (`$(bash <script> "$dir")` issued from
+ * zsh), not the script's own interpreter, which its shebang fixes.
+ * Memoised: probing for zsh once per process, not once per case.
+ */
+let _shells;
+export function probeShells() {
+  if (_shells) return _shells;
+  const hasZsh =
+    spawnSync("zsh", ["-c", "true"], { stdio: "ignore" }).status === 0;
+  _shells = Object.freeze(["bash", ...(hasZsh ? ["zsh"] : [])]);
+  return _shells;
+}
+
+/**
+ * Compare one shell run against a case's `expected`.
+ *
+ * Every key of `expected` is compared and every mismatch is named, so a
+ * reader of the case result sees WHICH signal moved — the pre-fix qa-cycle.sh
+ * fails on stdout only when the fixture brackets the hostile name, and on
+ * stderr on every ordering; reporting only a boolean would hide which one
+ * caught it. `absent` paths are checked against the fixture directory.
+ *
+ * @returns {string[]} mismatches; empty means the run matched `expected`
+ */
+export function compareExpected(expected, run, fixtureDir) {
+  const mismatches = [];
+  if (expected.stdout !== undefined && run.stdout !== expected.stdout) {
+    mismatches.push(
+      `stdout ${JSON.stringify(run.stdout)} ≠ ${JSON.stringify(expected.stdout)}`,
+    );
+  }
+  if (expected.exit !== undefined && run.status !== expected.exit) {
+    mismatches.push(`exit ${run.status} ≠ ${expected.exit}`);
+  }
+  if (expected.stderr !== undefined && run.stderr !== expected.stderr) {
+    mismatches.push(
+      `stderr ${JSON.stringify(run.stderr.slice(0, 120))} ≠ ${JSON.stringify(expected.stderr)}`,
+    );
+  }
+  for (const rel of expected.absent ?? []) {
+    if (existsSync(join(fixtureDir, rel))) {
+      mismatches.push(`${rel} was created`);
+    }
+  }
+  return mismatches;
 }
 
 // ── Verdict computation ──────────────────────────────────────────────────────
@@ -362,6 +481,7 @@ export function runProbeSpec({
   const base = {
     sink: sink ?? null,
     entry: entry ?? null,
+    shells: null,
     executed: 0,
     passed: 0,
     reproduced: [],
@@ -385,6 +505,25 @@ export function runProbeSpec({
 
   const resolved = resolveEntry(entry, repoRoot);
   if (!resolved.ok) return decline(resolved.reason, resolved.detail);
+  if (resolved.kind === "shell") {
+    // The script must be a readable regular file BEFORE anything is compared.
+    // Without this a missing path made every run exit 127, every case mismatch
+    // `expected`, and the verdict read `absent` with executed = cases × shells —
+    // "could not look" scored as "the control is absent", with a count behind
+    // it (task.128 QA cycle 1, BUG-2). A property of the ENTRY, so it is
+    // checked once here (cycle 2, CR-7), and declined exactly as the JS form
+    // declines an unimportable entry.
+    try {
+      const st = statSync(resolved.entryPath);
+      if (!st.isFile()) throw new Error("not a regular file");
+      accessSync(resolved.entryPath, fsConstants.R_OK);
+    } catch (e) {
+      return decline(
+        "entry-not-probeable",
+        `script is not a readable regular file: ${e.message}`,
+      );
+    }
+  }
 
   let probeCases;
   if (Array.isArray(cases)) {
@@ -409,11 +548,37 @@ export function runProbeSpec({
   const workDirName = "work";
   const workDir = join(sandboxRoot, workDirName);
   mkdirSync(workDir);
+  // A shell child's HOME and TMPDIR live INSIDE the sandbox root, outside the
+  // work dir, so a side effect written to either is an escape the sentinel
+  // sees rather than a write to the reader's real home (task.128 QA cycle 3,
+  // BUG-12). The JS runner keeps sandboxEnv()'s values: its child never sees
+  // a shell.
+  const sandboxHome = join(sandboxRoot, "home");
+  const sandboxTmp = join(sandboxRoot, "tmp");
+  mkdirSync(sandboxHome);
+  mkdirSync(sandboxTmp);
 
   const caseResults = [];
   const escapes = [];
+  const shells = resolved.kind === "shell" ? probeShells() : null;
   try {
     for (const c of probeCases) {
+      if (resolved.kind === "shell") {
+        runShellCase(c, {
+          sink,
+          entryPath: resolved.entryPath,
+          shells,
+          sandboxRoot,
+          sandboxHome,
+          sandboxTmp,
+          workDir,
+          workDirName,
+          timeoutMs: perCaseTimeout,
+          caseResults,
+          escapes,
+        });
+        continue;
+      }
       const before = snapshotTree(sandboxRoot, workDirName);
 
       const child = spawnSync(
@@ -491,6 +656,10 @@ export function runProbeSpec({
       reason: "entry-not-probeable",
       cases: caseResults,
       declined: [{ id: entry, reason: "entry-not-probeable", detail: first }],
+      // A side effect observed during runs that then errored is still a side
+      // effect; and the record must say which shells ran (cycle 4, CR-3).
+      escapes,
+      shells: shells ?? null,
     };
   }
 
@@ -505,21 +674,330 @@ export function runProbeSpec({
   );
   const declined = caseResults
     .filter((c) => c.outcome === "errored")
-    .map((c) => ({ id: c.id, reason: "case-errored", detail: c.detail }));
+    .map((c) => ({
+      id: c.shell ? `${c.id}@${c.shell}` : c.id,
+      reason: "case-errored",
+      detail: c.detail,
+    }));
 
   return {
     sink: sink ?? null,
     entry,
     verdict,
     reason,
+    // Which shells each case ran under, for the shell form; null for the JS
+    // form. Stated in the result so a record can say "bash only" on a host
+    // without zsh rather than leaving the reader to divide the count.
+    shells: shells ?? null,
     executed: ran.length,
     passed: ran.length - reproduced.length - overblocked.length,
-    reproduced: reproduced.map((c) => c.id),
-    overblocked: overblocked.map((c) => c.id),
+    // A shell-form case ran once per shell, so its id carries the shell: two
+    // identical ids would read as one finding counted twice, and "reproduced
+    // under bash but not zsh" is a real, reportable difference.
+    reproduced: reproduced.map((c) => (c.shell ? `${c.id}@${c.shell}` : c.id)),
+    overblocked: overblocked.map((c) =>
+      c.shell ? `${c.id}@${c.shell}` : c.id,
+    ),
     declined,
     escapes,
     cases: caseResults,
   };
+}
+
+/** The `expected` keys that compare a run; `absent` alone compares nothing. */
+const COMPARABLE_KEYS = Object.freeze(["stdout", "exit", "stderr"]);
+
+/**
+ * bash failed to OPEN the script — its own message names the script path.
+ * Observed shapes: `bash: <path>: No such file or directory`,
+ * `<path>: <path>: Is a directory`, `bash: <path>: Permission denied`,
+ * `bash: <path>: cannot execute binary file`. The exit code is 126 or 127
+ * in every case, but the code alone is also what a target script exits
+ * with, so both are required.
+ */
+export function isLaunchFailure(child, entryPath) {
+  if (child.status !== 126 && child.status !== 127) return false;
+  const err = child.stderr ?? "";
+  // The message must be ABOUT the script — `bash: <script>: …` or
+  // `<script>: <script>: …` — with no `line N:` segment. bash prefixes every
+  // runtime error INSIDE a script with the script's path too
+  // (`<script>: line 3: <fixture>/x: Permission denied`, exit 126), and that is
+  // the target answering, not bash failing to open it (task.128 QA cycle 3,
+  // BUG-9). Containment alone matched both.
+  const subject = escapeRegExp(entryPath);
+  const re = new RegExp(
+    `^(?:bash|${subject}): ${subject}: (?:No such file or directory|Is a directory|Permission denied|cannot execute)`,
+    // Case-insensitive: /bin/bash 3.2 (macOS without Homebrew bash) prints
+    // "is a directory" (cycle 4, CR-2).
+    "mi",
+  );
+  return re.test(err);
+}
+
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Validate a materialised case's `expected` (task.128 QA cycle 3, BUG-11).
+ * Returns null when well-formed, else the reason to decline. A malformed
+ * `expected` mismatched every run and scored `absent` with a full count — a
+ * bad case and a real defect reporting one value — and a non-array `absent`
+ * threw out of runProbeSpec.
+ */
+export function expectedProblem(expected) {
+  if (!expected || typeof expected !== "object" || Array.isArray(expected)) {
+    return "`expected` is not an object";
+  }
+  if (!COMPARABLE_KEYS.some((k) => expected[k] !== undefined)) {
+    return "`expected` compares nothing — it needs at least one of stdout, exit, stderr";
+  }
+  for (const k of ["stdout", "stderr"]) {
+    if (expected[k] !== undefined && typeof expected[k] !== "string") {
+      return `\`expected.${k}\` must be a string, got ${describeType(expected[k])}`;
+    }
+  }
+  if (expected.exit !== undefined && !Number.isInteger(expected.exit)) {
+    return `\`expected.exit\` must be an integer, got ${describeType(expected.exit)}`;
+  }
+  if (expected.absent !== undefined) {
+    if (
+      !Array.isArray(expected.absent) ||
+      expected.absent.some(
+        (p) =>
+          typeof p !== "string" ||
+          p === "" ||
+          p === "." ||
+          p === ".." ||
+          p.includes("/") ||
+          p.includes("\0"),
+      )
+    ) {
+      // "." and ".." carry no separator and ALWAYS exist, so a case naming
+      // one would score every run as a side effect and the fixed script as
+      // absent with a full count (task.128 QA cycle 4, BUG-13).
+      return "`expected.absent` must be an array of separator-free, non-empty names other than . and ..";
+    }
+  }
+  return null;
+}
+
+const describeType = (v) =>
+  v === null ? "null" : Array.isArray(v) ? "array" : typeof v;
+
+/** Non-recursive name → mtime stamps of one directory (the script's own). */
+function listDirStamps(dir) {
+  const out = new Map();
+  let names;
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return out;
+  }
+  for (const n of names) {
+    try {
+      const st = statSync(join(dir, n));
+      out.set(n, `${st.size}:${st.mtimeMs}`);
+    } catch {
+      out.set(n, "?");
+    }
+  }
+  return out;
+}
+
+/**
+ * Run one MATERIALISED case against a shell script, once per shell.
+ *
+ * Pushes one entry onto `caseResults` per (case, shell) — that is the unit
+ * `executed` counts, and it is what "cases × shells" means. A case the engine
+ * cannot materialise (a name the filesystem refuses, a sink with no fixture
+ * definition, a case with no `expected`) is DECLINED — outcome `errored` —
+ * never counted as executed and never as passed, exactly as a JS case whose
+ * child never ran.
+ *
+ * Outcome derivation, from `expected` + `direction`:
+ *   hostile,    run matches expected → "rejected"  (the name was handled)
+ *   hostile,    run differs          → "accepted"  (the name got through — reproduced)
+ *   legitimate, run matches expected → "accepted"  (the name was taken)
+ *   legitimate, run differs          → "rejected"  (over-blocked)
+ * which is the same vocabulary `computeVerdict` already reads.
+ */
+function runShellCase(
+  c,
+  {
+    sink,
+    entryPath,
+    shells,
+    sandboxRoot,
+    sandboxHome,
+    sandboxTmp,
+    workDir,
+    workDirName,
+    timeoutMs,
+    caseResults,
+    escapes,
+  },
+) {
+  // The script's OWN directory is in the real tree; a `cd "$(dirname "$0")"`
+  // idiom writes its side effect there, where neither the fixture check nor
+  // the sandbox sentinel looks. Snapshot it (non-recursively) around each run
+  // and report a change as an escape (BUG-12).
+  const scriptDir = dirname(entryPath);
+  const fixture = MATERIALISED_SINKS[c.sink ?? sink];
+  const decline = (detail) => {
+    for (const shell of shells) {
+      caseResults.push({
+        id: c.id,
+        shell,
+        direction: c.direction,
+        outcome: "errored",
+        detail,
+      });
+    }
+  };
+  if (!fixture) {
+    decline(
+      `sink "${c.sink ?? sink}" is not materialised — the shell entry form needs a fixture definition in MATERIALISED_SINKS`,
+    );
+    return;
+  }
+  if (!c.expected || typeof c.expected !== "object") {
+    decline(
+      "case has no `expected` — a shell run has nothing to compare against",
+    );
+    return;
+  }
+  // BUG-8 (cycle 2) + BUG-11 (cycle 3): an `expected` that compares nothing,
+  // or compares with the wrong types, is declined — never scored. The pre-fix
+  // qa-cycle.sh scored `engages` on `expected: {}`; `{ stdout: 12 }` scored
+  // `absent` with a full count; `{ absent: 5 }` threw.
+  const problem = expectedProblem(c.expected);
+  if (problem !== null) {
+    decline(`case's ${problem}`);
+    return;
+  }
+  // An `absent` name that the fixture itself creates — a control, or the
+  // case's own input — exists before the script runs, so it too would score
+  // every run as a side effect (BUG-13's second shape).
+  const collides = (c.expected.absent ?? []).find(
+    (p) => fixture.controls.includes(p) || p === c.input,
+  );
+  if (collides !== undefined) {
+    decline(
+      `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
+    );
+    return;
+  }
+
+  for (const shell of shells) {
+    // One directory per (case, shell): a side effect from the bash run must
+    // not be read as one from the zsh run.
+    let fixtureDir;
+    try {
+      fixtureDir = mkdtempSync(join(workDir, "fixture-"));
+      for (const control of fixture.controls) {
+        writeFileSync(join(fixtureDir, control), "");
+      }
+      // The case's own name. `join` normalises "/" and "..", which would turn
+      // a traversal name into a write outside the fixture — so the name is
+      // appended raw and any separator in it is a decline, not a normalised
+      // path.
+      if (c.input.includes("/") || c.input.includes("\0")) {
+        throw new Error("name carries a path separator or NUL");
+      }
+      writeFileSync(`${fixtureDir}/${c.input}`, "");
+    } catch (e) {
+      caseResults.push({
+        id: c.id,
+        shell,
+        direction: c.direction,
+        outcome: "errored",
+        detail: `fixture: cannot materialise "${c.input}": ${e.message}`,
+      });
+      continue;
+    }
+
+    const before = snapshotTree(sandboxRoot, workDirName);
+    const scriptDirBefore = listDirStamps(scriptDir);
+    // ARGV, never a string: the script path and the directory are $1 and $2
+    // of a fixed one-line body. Building `bash <script> <dir>` as text would
+    // put a caller-supplied path through a second parse, which is the class
+    // of defect this engine exists to probe for.
+    // cwd is the FIXTURE directory, not workDir (task.128 QA cycle 2, BUG-5):
+    // a script that re-parses a name without `cd "$1"` — the qa-cycle.sh
+    // shape, which globs "$DIR"/* from wherever it is — writes its side effect
+    // to its cwd, and `absent` looks in the fixture. With cwd: workDir the
+    // marker landed where neither `absent` nor the sentinel (which skips
+    // workDir) could see it, and the case scored `rejected`.
+    const child = spawnSync(
+      shell,
+      ["-c", 'bash "$1" "$2"', shell, entryPath, fixtureDir],
+      {
+        input: "",
+        cwd: fixtureDir,
+        env: {
+          ...sandboxEnv({ cwd: fixtureDir }),
+          HOME: sandboxHome,
+          TMPDIR: sandboxTmp,
+          LC_ALL: "C",
+        },
+        encoding: "utf8",
+        timeout: timeoutMs,
+        maxBuffer: 8 * 1024 * 1024,
+      },
+    );
+    const after = snapshotTree(sandboxRoot, workDirName);
+    for (const [path, stamp] of after) {
+      if (before.get(path) !== stamp) {
+        escapes.push({ id: `${c.id}@${shell}`, shell, path });
+      }
+    }
+    const scriptDirAfter = listDirStamps(scriptDir);
+    for (const [name, stamp] of scriptDirAfter) {
+      if (scriptDirBefore.get(name) !== stamp) {
+        escapes.push({
+          id: `${c.id}@${shell}`,
+          shell,
+          path: join(scriptDir, name),
+        });
+      }
+    }
+
+    let outcome;
+    let detail = null;
+    if (neverRan(child)) {
+      outcome = "errored";
+      detail = child.signal ? `timed out after ${timeoutMs}ms` : "never ran";
+    } else if (isLaunchFailure(child, entryPath)) {
+      // bash could not OPEN the script (a race with the readability check in
+      // runProbeSpec, or a permission change under it). Keyed on bash's own
+      // message about entryPath, not on the exit code alone: 126/127 are also
+      // what a TARGET exits with when a hostile name makes an unquoted script
+      // run it as a command, and that is a reproduction to compare, not a
+      // decline (task.128 QA cycle 2, BUG-7). `bash "$1"` never consults the
+      // shebang, so "interpreter missing" is not a state this branch can see.
+      outcome = "errored";
+      detail = `bash could not open the script (exit ${child.status}): ${(child.stderr ?? "").trim().slice(0, 160)}`;
+    } else {
+      const mismatches = compareExpected(c.expected, child, fixtureDir);
+      const matched = mismatches.length === 0;
+      outcome =
+        c.direction === "hostile"
+          ? matched
+            ? "rejected"
+            : "accepted"
+          : matched
+            ? "accepted"
+            : "rejected";
+      detail = matched ? null : mismatches.join("; ");
+    }
+    caseResults.push({
+      id: c.id,
+      shell,
+      direction: c.direction,
+      outcome,
+      detail,
+      fixture: [...fixture.controls, c.input],
+    });
+  }
 }
 
 // ── The run record ───────────────────────────────────────────────────────────
@@ -584,6 +1062,9 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     overblocked: result.overblocked?.length ?? 0,
     declined: result.declined?.length ?? 0,
     escaped: result.escapes?.length ?? 0,
+    // Which shells each case ran under (shell form), or null. The count is
+    // cases × shells, and a reader must not have to divide (cycle 2, CR-5).
+    shells: Array.isArray(result.shells) ? [...result.shells] : null,
     ran_at: new Date().toISOString(),
   };
 }
@@ -865,6 +1346,9 @@ export function emitBlock(record, { mode = "diff" } = {}) {
         `      sink: ${yamlStr(c.sink)}`,
         `      reason: ${yamlStr(c.reason)}`,
         `      probes_executed: ${c.executed}`,
+        ...(Array.isArray(c.shells) && c.shells.length > 0
+          ? [`      shells: [${c.shells.join(", ")}]`]
+          : []),
       );
     }
   }
