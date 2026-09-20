@@ -287,34 +287,35 @@ None.
 
 ### In QA Verification
 
-- [TASK-128-BUG-13: absent ".." always exists → vacuous defect](./task.128.bug.13.absent-dot-dot-always-exists-scores-a-vacuous-defect.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+_None._
 
 ### Closed Bugs
 
 - BUG-1..4 - ✅ Closed (verified at cycle 2)
 - BUG-5..8 - ✅ Closed (verified at cycle 3)
 - [BUG-9](./task.128.bug.9.launch-failure-matcher-catches-runtime-errors-inside-the-target.md), [BUG-10](./task.128.bug.10.three-prose-sites-still-say-non-js-is-unverifiable.md), [BUG-11](./task.128.bug.11.malformed-expected-scores-absent-or-throws.md), [BUG-12](./task.128.bug.12.side-effects-outside-the-fixture-dir-invisible.md) - ✅ Closed (verified at cycle 4)
+- [BUG-13](./task.128.bug.13.absent-dot-dot-always-exists-scores-a-vacuous-defect.md) - ✅ Closed (verified at cycle 5)
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: CONCERNS (no open entry)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-20
-**Quality Score**: 90/100
+**Quality Score**: 95/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.128.qa.4.shell-boundary-probe-and-finalise-recheck.md](./task.128.qa.4.shell-boundary-probe-and-finalise-recheck.md)
-- **Gate File**: [task.128.gate.4.shell-boundary-probe-and-finalise-recheck.yml](./task.128.gate.4.shell-boundary-probe-and-finalise-recheck.yml)
+- **Full Report**: [task.128.qa.5.shell-boundary-probe-and-finalise-recheck.md](./task.128.qa.5.shell-boundary-probe-and-finalise-recheck.md)
+- **Gate File**: [task.128.gate.5.shell-boundary-probe-and-finalise-recheck.yml](./task.128.gate.5.shell-boundary-probe-and-finalise-recheck.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3578 (isolated-worktree fast gate at 6ae01f48) + 39 engine-recorded security probes
+- **Tests Executed**: 3579 (isolated-worktree fast gate at 76b7151f) + 39 engine-recorded security probes
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 HIGH, 1 MEDIUM, 2 LOW
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 0 MEDIUM, 2 LOW (advisory, future)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-BUG-9..12 verified FIXED. New: BUG-13 (MEDIUM) `absent: [".."]` passes validation and always exists → the fixed script scores absent; CR-2 (LOW) case-sensitive launch-failure message vs bash 3.2; CR-3 (LOW) all-errored decline drops escapes/shells.
+BUG-13, CR-2, CR-3, CR-4 verified FIXED by execution; no open entry. Advisory (future): CR-1 case-folded fixture names slip the string collision check (APFS) — eligible for finalise fix-and-recheck; CR-2 the CR-3 test fixture should `exec sleep`.
 
 ## Change Log
 <!-- change-log-start -->
@@ -334,6 +335,7 @@ BUG-9..12 verified FIXED. New: BUG-13 (MEDIUM) `absent: [".."]` passes validatio
 | 2026-09-20 |  | QA findings fixed — BUG-9 (script-as-subject launch matcher), BUG-10 (three prose sites → shell:, population grep), BUG-11 (expected validated), BUG-12 (sandboxed HOME/TMPDIR, script-dir snapshot, PWD); cycle 3 (3 iterations so far) | qa-fix |
 | 2026-09-20 |  | QA gate CONCERNS (90/100), cycle 4 — BUG-9..12 verified fixed; 0 HIGH, 1 MEDIUM, 2 LOW | qa-task |
 | 2026-09-20 |  | QA findings fixed — BUG-13 (absent . / .. / collisions rejected), CR-2 (case-insensitive launch message), CR-3 (escapes/shells through the collapse), CR-4; cycle 4 (4 iterations so far) | qa-fix |
+| 2026-09-20 |  | QA gate CONCERNS (95/100), cycle 5 — BUG-13, CR-2..4 verified fixed; 0 HIGH, 0 MEDIUM, 2 LOW advisory; no open entry → 5c | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

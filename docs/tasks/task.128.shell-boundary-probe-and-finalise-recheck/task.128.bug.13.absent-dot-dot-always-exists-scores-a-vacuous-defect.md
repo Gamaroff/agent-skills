@@ -1,6 +1,6 @@
 # Bug Report: Task 128 - `absent: [".."]` passes validation and always "exists", so the fixed script scores `absent` with a full count
 
-**Task**: [Link](./task.128.shell-boundary-probe-and-finalise-recheck.md) · **Bug ID**: TASK-128-BUG-13 · **Severity**: MEDIUM · **Priority**: P2 · **Status**: ✅ Ready for QA · **Found By**: QA (cycle-4 review CR-1, reproduced) · **Date Found**: 2026-09-20
+**Task**: [Link](./task.128.shell-boundary-probe-and-finalise-recheck.md) · **Bug ID**: TASK-128-BUG-13 · **Severity**: MEDIUM · **Priority**: P2 · **Status**: ✅ Closed · **Found By**: QA (cycle-4 review CR-1, reproduced) · **Date Found**: 2026-09-20
 
 ## Description
 `expectedProblem` rejects separators and NUL in `absent` entries but not `.` / `..`, which carry neither. `existsSync(join(fixtureDir, ".."))` is always true, so every hostile case mismatches, every case is `accepted`, and the **fixed** `qa-cycle.sh` scores `absent` — executed 4 — the bad-case-scored-as-defect class BUG-11 was fixed for, one entry short.
@@ -18,3 +18,4 @@ Reject `.` and `..` (and, where the fixture is known, a name that collides with 
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-09-20 | Ready for QA | qa-fix | . / .. / collisions rejected |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed at cycle 5 (execution: `.`/`..` decline; control and input collisions decline; hostile shapes executed 0) |
