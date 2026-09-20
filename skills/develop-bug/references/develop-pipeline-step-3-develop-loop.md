@@ -18,7 +18,7 @@ Loaded by `/develop-story` and `/develop-task` during Step 3. Story/task variant
 
 **Resume optimization:** If the Decisions Log already contains a "Pre-develop surface map:" entry (from a prior session), skip both the Explore subagent invocation AND the plan file discovery below — reuse the recorded surface map and plan-file decision. Log: "Resume — pre-develop surface map and plan-file decision reused from Decisions Log." Then proceed to the develop loop.
 
-Before invoking `/develop`, use the Agent tool with subagent_type="Explore" to map the codebase surface. Subagent **unavailable** (no dispatch in this session), **failed**, or **slow** past its wall-clock budget: follow the three-row table in `references/develop-pipeline-autonomous-defaults.md` §Subagents — perform the pass inline, record the independence loss, write `killed at N minutes` never `stalled`, and remember that **output-file size is not a liveness signal**.
+Before invoking `/develop`, use the Agent tool with subagent_type="Explore" to map the codebase surface. **Mark the wait on the lock as the dispatch's own next action** — `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "step-3 codebase map"` — and clear it (`… set-waiting-on.sh --clear`) as the first action after the map is read: a turn yielded while the agent runs is a *wait*, and without the mark the Stop hook reads it as a stall and re-prompts (task.124, obs #89; `references/develop-pipeline-hooks.md` §"waiting_on"). Subagent **unavailable** (no dispatch in this session), **failed**, or **slow** past its wall-clock budget: follow the three-row table in `references/develop-pipeline-autonomous-defaults.md` §Subagents — perform the pass inline, record the independence loss, write `killed at N minutes` never `stalled`, and remember that **output-file size is not a liveness signal**.
 
 #### develop-story
 Ask it to find: all files likely affected by the acceptance criteria, existing patterns in the same module/layer, test file conventions for the affected areas, any files explicitly named in the story's Dev Notes or Tasks.
@@ -111,7 +111,7 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 #### develop-story loop body
 
 1. Invoke `/develop` with the story file path. On iteration 1, pass the always-load file contents (from `ALWAYS_LOAD_FILES`), the Explore surface map, and the plan file (or note that all were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see story checkboxes for completed tasks."
-2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress using the **shared loop-audit prompt** (`references/loop-audit-prompt.md`).
+2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress using the **shared loop-audit prompt** (`references/loop-audit-prompt.md`). Mark the wait: `bash .agents/skills/develop-story/references/set-waiting-on.sh "step-3 loop audit iter $ITER"` beside the dispatch, `… --clear` once the audit JSON is read.
 
    Substitute: `<DOC_TYPE>=story`, `<DOC_PATH>={story_path}`, `<TASKS_SECTION>=## Tasks`. Pass the resulting prompt verbatim to the Explore subagent.
 
@@ -128,7 +128,7 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 #### develop-task loop body
 
 1. Invoke `/develop` with the task file path. On iteration 1, pass the always-load file contents (from `ALWAYS_LOAD_FILES`), the Explore surface map, and the plan file (or note that all were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see task checkboxes for completed phases."
-2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress using the **shared loop-audit prompt** (`references/loop-audit-prompt.md`).
+2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress using the **shared loop-audit prompt** (`references/loop-audit-prompt.md`). Mark the wait: `bash .agents/skills/develop-task/references/set-waiting-on.sh "step-3 loop audit iter $ITER"` beside the dispatch, `… --clear` once the audit JSON is read.
 
    Substitute: `<DOC_TYPE>=task`, `<DOC_PATH>={task_path}`, `<TASKS_SECTION>=## Implementation Plan`. Pass the resulting prompt verbatim to the Explore subagent.
 
@@ -226,7 +226,7 @@ TEST_EXIT=$?
 
 ### On Test Failure (TEST_EXIT != 0)
 
-Dispatch the Agent tool with `subagent_type="Explore"` using the prompt from `references/test-failure-triage-prompt.md`. Substitute `<log_path>` with `$TEST_LOG`. Persist the returned triage YAML as a JSON artifact at `.summaries/step-3-test-triage-<ITER>.json` (schema per `references/subagent-summary-artifact.md`). Update the implementation report `Subagent summary ref` column with the artifact path.
+Dispatch the Agent tool with `subagent_type="Explore"` using the prompt from `references/test-failure-triage-prompt.md`. Substitute `<log_path>` with `$TEST_LOG`. Mark the wait: `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "step-3 test triage iter $ITER"` beside the dispatch, `… --clear` once the triage summary is read. Persist the returned triage YAML as a JSON artifact at `.summaries/step-3-test-triage-<ITER>.json` (schema per `references/subagent-summary-artifact.md`). Update the implementation report `Subagent summary ref` column with the artifact path.
 
 Main reads only the triage summary (counts + ≤10 failure bullets + `next_file` hint). Never read `$TEST_LOG` directly.
 

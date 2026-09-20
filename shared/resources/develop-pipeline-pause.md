@@ -77,7 +77,7 @@ The pause flow is therefore: a shell hook (independent execution budget, runs ev
 - **Created**: at the *end of Step 1*, after the feature branch exists. Not earlier — between Phase 0 and end-of-Step-1, the implementation report is either uncommitted on the base branch (`develop`/`main`) or sitting in a `git stash`. A hook firing during that window has no safe place to commit, so the lock-absent path (hook = noop) is intentional.
 - **Updated**: at every step banner from Step 2 onward (`current_step` field) and after PR creation (`pr_url` field).
 - **Removed**: at the end of Step 8 (clean completion); at every terminal HALT (Error Recovery rule); by the hook itself when it fires.
-- **Restored**: by `grant-qa-cycles.sh` at a granted re-entry after a QA loop-limit halt — from the halt snapshot, minus the halt-only fields (task.123). No other resume path restores the lock today; a resumed run that skips Step 1 otherwise proceeds without one, which is a pre-existing gap the task.123 QA cycle 2 gate names as a follow-up.
+- **Restored**: by **`advance-pipeline-lock.sh --restore <doc-dir>`** — the one restore path (task.124, Phase 4; obs #123). It rebuilds the lock from the newest candidate **for this document** — the halt snapshot `last-halt.json` (written by a terminal HALT or by this hook) or an orphaned `.lock.pausing.<pid>` claim — strips `halted_at` / `halt_reason` / `halt_step` / `paused_at` / `pause_reason`, sets `current_step` to the halted step, refuses a candidate for another document, and **consumes** the source. It also drops any `waiting_on` the snapshot carried — a rebuilt lock waits on nothing this session dispatched. `grant-qa-cycles.sh` (task.123) calls it rather than carrying its own. **Both resume paths must run `--restore` before any step advances** — a session that continues in place after this hook fires (the hook's own signal names the command), *and* a re-invocation that chooses Resume in Phase 0b (the step-0 doc's Shared Resume Logic names it). Step 1 is the lock's only ordinary writer and every resume skips it; `advance-pipeline-lock.sh <n>` with no lock is now an error naming `--restore`, not the silent exit 0 that once left every advance and the Stop hook inert for a whole session.
 
 **Format**:
 
@@ -92,7 +92,9 @@ The pause flow is therefore: a shell hook (independent execution budget, runs ev
   "tracker": "github",
   "tracker_issue": "297",
   "current_step": 5,
-  "started_at": "2026-04-30T14:22:00Z"
+  "started_at": "2026-04-30T14:22:00Z",
+  "qa_phase": "5b",
+  "waiting_on": { "kind": "agent", "label": "5c review-pr lenses", "since": "2026-04-30T15:01:00Z", "budget_minutes": 10 }
 }
 ```
 
@@ -108,6 +110,9 @@ The pause flow is therefore: a shell hook (independent execution budget, runs ev
 | `tracker_issue` | GitHub issue number or Jira key — passed to `tracker-comment.js` with `--tracker <tracker>`, so it is used for both trackers |
 | `current_step` | 1–8. Set to 1 at end of Step 1, updated at every banner thereafter. |
 | `started_at` | UTC ISO-8601 timestamp |
+| `qa_phase` | Optional. `5a\|5b\|5c` — the QA loop's sub-position while `current_step` is 5 (task.123). One writer: `set-qa-phase.sh`. |
+| `qa_max_cycles`, `extra_cycles_granted` | Optional. The QA loop's absolute budget and the grant that set it (task.123). One writer: `grant-qa-cycles.sh`. |
+| `waiting_on` | Optional. `{kind: "agent"\|"task", label, since, budget_minutes}` — the step is legitimately waiting on something it dispatched (a background Explore agent, a `gh pr checks --watch` job), and the Stop hook allows the stop until `since + budget_minutes` has elapsed (task.124, obs #89). One writer: `set-waiting-on.sh "<label>"` at dispatch, `--clear` once the result is read. Absent = not waiting. The hook never reads the config for the budget; the writer stored it. |
 
 **Concurrency note**: only one pipeline can run per repo at a time (the lock file is a single shared path). This matches the existing assumption that `develop-task`/`develop-story` operate against the current working tree.
 

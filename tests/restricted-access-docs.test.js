@@ -346,9 +346,9 @@ test("the accept gap is a DECISION: finalise accepts locally AND records the deb
 
   // And the report templates carry the debt line, so a restricted run's
   // Completion block cannot read "Completed" with the gap unstated.
-  const step0 = read(
-    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
-  );
+  // The templates live in implementation-report-template.md since task.124 (step-0 §0e
+  // references it rather than inlining them).
+  const step0 = read("shared/resources/implementation-report-template.md");
   const debtLines = step0.match(/\*\*Tracker debt\*\*/g) || [];
   assert.ok(
     debtLines.length >= 2,

@@ -30,6 +30,10 @@
 #  10. lock=5 + qa_phase (task.123)       → names the SUB-step's skill, never a
 #                                            neighbour's; absent qa_phase names 5a;
 #                                            the end-of-loop advance is 5 → 7
+#  11. waiting_on (task.124)               → set and within budget: ALLOW, naming the
+#                                            wait on stderr; cleared: re-prompt; older
+#                                            than budget_minutes (a crashed step): re-prompt;
+#                                            malformed since / budget: re-prompt (fail loud)
 
 PASS=0
 FAIL=0
@@ -241,6 +245,36 @@ if echo "$R" | grep -q "Step 5 per develop-bug SKILL.md (verify)" && echo "$R" |
 else
   fail "develop-bug ignores qa_phase" "got: $(echo "$R" | head -1) / $(echo "$R" | grep -o 'advance the lock to [0-9]*')"
 fi
+
+# ── Scenario 11: waiting_on — a step waiting on a dispatch is not a stall ────
+run_hook_err() { # $1 = dir → stderr only
+  ( cd "$1" && { printf '{}' | "$BASH_BIN" "$HOOK" >/dev/null; } 2>&1 )
+}
+NOW_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+d="$TMPDIR_TEST/waiting-live"
+mklock "$d" "{\"skill\":\"develop-task\",\"current_step\":3,\"report_path\":\"r.md\",\"waiting_on\":{\"kind\":\"agent\",\"label\":\"step-3 codebase map\",\"since\":\"$NOW_ISO\",\"budget_minutes\":10}}"
+OUT=$(run_hook "$d"); ERR=$(run_hook_err "$d")
+if [ -z "$OUT" ] && echo "$ERR" | grep -q "waiting on step-3 codebase map since $NOW_ISO"; then
+  pass "waiting_on within budget → allow (empty stdout), the wait is named on stderr"
+else
+  fail "waiting_on within budget → allow" "stdout=$(echo "$OUT" | head -c 80) stderr=$ERR"
+fi
+d="$TMPDIR_TEST/waiting-cleared"
+mklock "$d" '{"skill":"develop-task","current_step":3,"report_path":"r.md"}'
+R=$(reason_of "$(run_hook "$d")")
+echo "$R" | grep -q "Step 3 (DEVELOP) is PENDING" && pass "waiting_on cleared → re-prompt as before" || fail "cleared → re-prompt" "got: $(echo "$R" | head -1)"
+d="$TMPDIR_TEST/waiting-stale"
+mklock "$d" '{"skill":"develop-task","current_step":3,"report_path":"r.md","waiting_on":{"kind":"agent","label":"map","since":"2026-01-01T00:00:00Z","budget_minutes":10}}'
+R=$(reason_of "$(run_hook "$d")")
+echo "$R" | grep -q "Step 3 (DEVELOP) is PENDING" && pass "waiting_on older than budget_minutes → re-prompt (a crashed step is not protected)" || fail "stale → re-prompt" "got: $(echo "$R" | head -1)"
+d="$TMPDIR_TEST/waiting-malformed"
+mklock "$d" '{"skill":"develop-task","current_step":3,"report_path":"r.md","waiting_on":{"kind":"agent","label":"map","since":"yesterday","budget_minutes":"ten"}}'
+R=$(reason_of "$(run_hook "$d")")
+echo "$R" | grep -q "Step 3 (DEVELOP) is PENDING" && pass "malformed waiting_on (unparseable since, string budget) → re-prompt, never allow" || fail "malformed → re-prompt" "got: $(echo "$R" | head -1)"
+d="$TMPDIR_TEST/waiting-qa"
+mklock "$d" "{\"skill\":\"develop-story\",\"current_step\":5,\"qa_phase\":\"5c\",\"report_path\":\"r.md\",\"waiting_on\":{\"kind\":\"agent\",\"label\":\"review-pr lenses\",\"since\":\"$NOW_ISO\",\"budget_minutes\":1}}"
+OUT=$(run_hook "$d")
+[ -z "$OUT" ] && pass "waiting_on inside the QA loop (5c) → allow; qa_phase does not override the wait" || fail "wait inside QA loop" "stdout=$(echo "$OUT" | head -c 80)"
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""

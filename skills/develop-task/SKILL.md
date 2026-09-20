@@ -53,6 +53,16 @@ cat .agents/skills/develop-task/SKILL.md
 ```
 Output: "⚠️ Context recovery — re-reading full skill file before resuming."
 
+**Step 0-lock — Restore the lock if the pause removed it (task.124, obs #123):**
+
+The PreCompact hook and every terminal HALT **remove the lock**. A session that continues in place — this one, if you are reading this after a `🛑 PIPELINE-PAUSE-SIGNAL` or a HALT rather than after a fresh `/develop-task` invocation — has no step that puts it back: Step 1 is the lock's only ordinary writer and a resume skips it. Without the lock every `advance-pipeline-lock.sh <n>` below is an error (no longer a silent no-op) and the `Stop` hook is inert. Run this **before** any step advances:
+
+```bash
+bash .agents/skills/develop-task/references/advance-pipeline-lock.sh --restore {task-directory}
+```
+
+It rebuilds the lock from the halt snapshot (`.claude/state/develop-pipeline.last-halt.json`) or an orphaned `.lock.pausing.<pid>` claim — newest candidate **for this document** wins; one for another document is refused — keeps `current_step` at the halted step, strips the halt/pause fields and any `waiting_on`, and consumes the candidates. **The same call belongs on the re-invocation path**: Phase 0b's "Resume from last completed step" also skips Step 1, so when the detector's `source` is `halt_snapshot` or `orphaned_claim` run `--restore {task-directory}` before Phase 0b verification (step-0 §0b Shared Resume Logic; task.124 QA cycle 2, CR-2) — **except on a `loop-limit|not-converging` snapshot**, where the grant restores (`grant-qa-cycles.sh` → `--restore`, only after its never-lower guard passes) so a declined or refused grant leaves nothing behind (QA cycle 3, CR-1). "lock present — nothing to restore" (exit 0) means the lock survived and nothing was needed. Exit 1 with "no halt snapshot … and no orphaned claim" means there is nothing to restore from: treat the run as Phase 0b's fresh-start case.
+
 **Step 0a — Dispatch stale-context detector (Phase 0a):**
 
 Dispatch a read-only Explore subagent using `references/pipeline-resume-detector-prompt.md`. The subagent reads `.claude/state/develop-pipeline.lock`, lists `.summaries/step-*.json` in the task directory, and diffs artifact mtimes. It returns `recommended_step`, `deltas_since_pause`, and `blocking_issues`.
@@ -89,7 +99,7 @@ This complements the post-compaction recovery above. **Pre**-compaction graceful
    ═══ DEVELOP-TASK PIPELINE: PAUSED — CONTEXT COMPACTION IMMINENT ═══
    ```
 3. **Output the user-facing summary** using the template provided in the signal's `additionalContext`. Repeat the two comment outcomes the signal reports (`PR comment:` / `Tracker issue comment:`) verbatim — `deferred` means the consumer's `access.tracker` held, `no-credentials` on a Jira issue means the Jira side was not commented on.
-4. **HALT.** Do not proceed to any further step. The lock file has been removed by the hook; on next user invocation of `/develop-task <path>`, Phase 0b will detect the existing run, read the report, and resume cleanly.
+4. **HALT.** Do not proceed to any further step. The lock file has been removed by the hook; on next user invocation of `/develop-task <path>`, Phase 0b will detect the existing run, read the report, and resume cleanly. If instead the session **continues in place** after the compaction, the Context Compression Recovery's Step 0-lock (`advance-pipeline-lock.sh --restore {task-directory}`) is the first action — the signal's own summary names it.
 
 **No additional report edits, no additional commits, no additional comments** — the hook already did all of that, and you have very little budget left before compaction proceeds. Spending it on duplicate work risks losing the user-facing summary entirely.
 
@@ -120,7 +130,14 @@ This prevents context accumulation across the 8-step pipeline.
 Every step ends with the same four actions, executed *in order, with no text output between them*:
 
 1. **Bash tool call** advancing the lock to the next step (use the helper: `bash .agents/skills/develop-task/references/advance-pipeline-lock.sh {N+1}`). **This must be the first call** — it is the binding side-effect that anchors the orchestrator into "still working" mode and signals to the `Stop` hook that the pipeline has advanced. If the just-completed step was Step 8, use `--complete` instead, which removes the lock. (This call is idempotent: a sub-skill normally self-advances the lock as its own last action, so this re-advance noops — but issuing it unconditionally is the deterministic, single-instruction behaviour.)
-2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`).
+2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`), then **read it back** — this is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
+
+   ```bash
+   command node .agents/skills/develop-task/references/report-lint.js --file "{implementation-report-path}" --json \
+     || { echo "HALT: report failed lint — the Edit above corrupted it; repair by hand (see the problems listed), nothing has been committed"; exit 1; }
+   ```
+
+   A `problems` result is a HALT with nothing committed — the protocol edits, it does not commit, so the corruption is caught where the Edit introduced it rather than at the next commit boundary. task.117's report was doubled and spliced mid-line by exactly such an Edit and shipped in the HALT commit because nothing read it back (obs #115). The linter never repairs.
 3. **Emit the Remaining Work Status block, then the Step {N+1} banner** (or the Phase 2 Completion banner if N=8) — one contiguous output, nothing between them:
 
    ```
@@ -265,7 +282,7 @@ If a situation arises that is not in this table or the shared defaults table and
 
 - **Never silently continue past a failed step.** Every failure is logged and surfaced to the user.
 - **Always use `/commit-changes` to commit** — never raw `git commit`. This ensures consistent commit quality, conventional messages, and proper staging.
-- **Commit the report before any halt.** Invoke `/commit-changes` for the report before surfacing any HALT so the audit trail is in git even when the pipeline doesn't complete.
+- **Commit the report before any halt.** Invoke `/commit-changes` for the report before surfacing any HALT so the audit trail is in git even when the pipeline doesn't complete — and **lint it first** (call site (2) of four): `command node .agents/skills/develop-task/references/report-lint.js --file "{implementation-report-path}" --json || echo "⚠️ report failed lint — HALT commit skipped; repair {implementation-report-path} by hand"`. A report that fails the linter is **not committed** by this rule, and the HALT **still proceeds** to the snapshot and lock removal below — the same decision the PreCompact hook makes, because the snapshot and the lock removal are what resume depends on and a lint failure must not strand the lock (task.124 QA cycle 2, CR-5). The corruption stays in the working tree, named, for a human to repair before the next commit. The HALT commit is the one most likely to carry a half-written report, because it is written under the pressure that caused the halt (task.117, obs #115).
 - **Push after every commit during the QA loop.** The PR must stay current with the local branch (`git push origin HEAD`).
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
 - **Snapshot then remove the lock file before every terminal HALT.** After committing the report (per the rule above), copy the active lock to a halt snapshot and then remove the active lock + transient logs:
@@ -276,8 +293,11 @@ If a situation arises that is not in this table or the shared defaults table and
        '. + {halted_at: $ts, halt_reason: $reason, halt_step: $step}' \
        .claude/state/develop-pipeline.lock > .claude/state/develop-pipeline.last-halt.json
   fi
-  rm -f .claude/state/develop-pipeline.lock .claude/state/test-output-*.log
+  rm -f .claude/state/develop-pipeline.lock
+  find .claude/state -maxdepth 1 -name 'test-output-*.log' -delete 2>/dev/null || true
   ```
+
+  **Two commands, not one `rm` argv.** The lock is a path that must be removed; the logs are a glob that may match nothing. Under zsh — the default shell on every macOS host — an unmatched glob is `nomatch`, which aborts the whole command **before `rm` runs**, so the one-argv form left the lock in place on every HALT that had no test logs to sweep (obs #111). `find -delete` is the glob-free spelling and is a noop on an empty match in every shell. The rule: [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md) § "Never put a must-succeed path and a glob in one `rm` argv".
 
   Removing the active lock prevents a future PreCompact firing in this same session from re-running the pause flow, and stops accumulation of transient Step 3 test logs. The **halt snapshot** (`develop-pipeline.last-halt.json`) preserves resume context so the next `/develop-task` invocation can re-enter Phase 0b artifact verification: the resume detector subagent reads the snapshot when no active lock is present, surfaces it to the user, and offers "Resume from {halt_step}" or "Start fresh" (latter deletes the snapshot). The graceful-pause hook also removes the active lock itself if it runs — this rule covers the non-hook halt paths.
 

@@ -441,7 +441,7 @@ Every Explore subagent dispatched by `develop-story`. Each row is meant to ancho
 
 - `test-failure-triage`: **bias rule** — when unsure between `real` and `flaky`, classify as `real`. Eval target: failure-classification regression suite.
 - `lite-mode detector`: all three conditions must be true; any `false` ⇒ `pipeline_mode=standard`.
-- `resume detector`: summary-exempt steps `[1, 2, 4, 8]` are never treated as gaps. Eval target: gap-detection unit tests.
+- `resume detector`: a step summary is expected only where the implementation report's `Subagent summary ref` column names one — a `—` cell expects nothing, so a step that ran its subagent work inline is never a gap (task 124; the fixed exemption list `[1, 2, 4, 8]` it replaces fired on every healthy resume). Eval target: `evals/develop-task/step-isolation/15-resume-healthy-no-step-3-summary`.
 - `qa-traceability-mapper`: `Coverage` enum is `{full, partial, none, integration, unit}`; `Uncertainty` is `—` when confident, populated otherwise. Eval target: matrix-row schema validation.
 - All Explore subagents: **read-only** — no writes, no git mutations beyond `git branch --list` / `git log`. The traceability mapper is the only subagent that writes a non-`.summaries/` file (the matrix), and even that is a fresh-file write under `.summaries/`.
 

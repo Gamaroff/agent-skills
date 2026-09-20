@@ -410,6 +410,8 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
 
 2. **Dispatch a read-only Explore subagent** with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context. In lite/direct-tools mode use one subagent; for large/high-risk tasks the Adaptive Review Strategy may run it alongside the other parallel agents.
 
+   **Mark the wait on the pipeline lock** beside this dispatch — `bash .agents/skills/qa-task/references/set-waiting-on.sh "5a qa-task code review"` — and clear it (`… set-waiting-on.sh --clear`) as the first action after the `code_review:` block is read (source: `references/set-waiting-on.sh`; task.124 QA cycle 1, CR-3). Inside a `/develop-*` pipeline this skill runs as Step 5a, and a turn yielded while the reviewer runs is a wait the Stop hook would otherwise re-prompt as a stall; standalone there is no lock and both calls are silent no-ops.
+
    **Cycle 2 only (`REFUTE_PASS=true`) — refute, do not review.** Append this directive to the
    subagent prompt. It is the one pass in the loop performed by an agent that did not write the
    code and is not asked to agree with it:

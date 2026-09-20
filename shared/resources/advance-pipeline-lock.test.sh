@@ -31,6 +31,22 @@
 #        on any of them FABRICATES `{"current_step":5}` from a file that never
 #        held an object — the empty case's defect wearing a different shape.
 #        Found by QA probing the fix for scenario 8.
+#   13.  --restore (task.124, Phase 4) — the one restore path, in bash AND zsh:
+#        no lock + snapshot → lock at halt_step, snapshot consumed; lock present →
+#        exit 0 no-op, nothing touched; neither → exit 1 naming both paths;
+#        snapshot for another document → exit 1, nothing written, snapshot kept;
+#        relative vs absolute spellings of one directory match; a snapshot with
+#        no directory (pre-task.123) is accepted; an orphaned `.pausing.<pid>`
+#        claim is a candidate and the newest candidate wins (and the losing
+#        same-document snapshot is consumed with it); a string halt_step is
+#        stored as a number; a GNU-shaped `stat` (shimmed) still picks the newest
+#        candidate, and a non-numeric mtime read degrades to 0 with a warning; a
+#        snapshot's `waiting_on` is dropped by the restore.
+#   14.  No-lock split (task.124): `<n>` with no lock → exit 1 naming --restore
+#        (the silent exit 0 hid an inert Stop hook for a whole session, obs #123);
+#        `--skill <name>` and `--complete` with no lock keep exit 0 — the
+#        self-advance runs standalone in nine sub-skills, and --complete must
+#        stay able to clear an absent lock.
 #
 # Scenarios 8–11 run under BOTH bash and zsh. macOS logins are zsh and task 51
 # found a real bash/zsh divergence in a sibling shared resource, so the
@@ -296,6 +312,182 @@ if command -v zsh >/dev/null 2>&1; then
   run_malformed_lock_scenarios zsh
 else
   echo "  SKIP  zsh interpreter pass for scenarios 8-11 (zsh not on this host)"
+fi
+
+# ── Scenario 13: --restore ───────────────────────────────────────────────────
+run_restore_scenarios() {
+  local SH="$1"
+  local R="$TMPDIR_TEST/restore-$SH"
+  mkdir -p "$R/doc" "$R/other" "$R/state"
+  local L="$R/state/lock" S="$R/state/last-halt.json"
+
+  # no lock + snapshot → lock rebuilt at halt_step, halt fields gone, snapshot consumed
+  printf '{"skill":"develop-task","task_or_story_directory":"%s","branch":"feature/x","current_step":5,"qa_phase":"5b","halted_at":"t","halt_reason":"loop-limit","halt_step":"5"}\n' "$R/doc" > "$S"
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -ne 0 ] || [ ! -f "$L" ]; then
+    fail "[$SH] --restore: no lock + snapshot → lock rebuilt" "rc=$RC out=$OUT"
+  elif [ "$(jq -c '[.current_step, .branch, .qa_phase, (.halt_step // "absent"), (.halt_reason // "absent"), (.halted_at // "absent")]' "$L")" != '[5,"feature/x","5b","absent","absent","absent"]' ]; then
+    fail "[$SH] --restore: halt fields stripped, pipeline fields kept, halt_step → numeric current_step" "lock: $(jq -c . "$L")"
+  elif [ -f "$S" ]; then
+    fail "[$SH] --restore: snapshot consumed" "snapshot still present"
+  elif ! echo "$OUT" | grep -q "lock restored from .* at step 5"; then
+    fail "[$SH] --restore: announces the source and step" "out=$OUT"
+  else
+    pass "[$SH] --restore: no lock + snapshot → lock at halt_step 5 (numeric), halt fields stripped, snapshot consumed"
+  fi
+
+  # a waiting_on captured in a PreCompact snapshot does not survive the restore (QA cycle 2, CR-3)
+  printf '{"task_or_story_directory":"%s","current_step":3,"paused_at":"t","pause_reason":"precompact","waiting_on":{"kind":"agent","label":"stale","since":"2026-01-01T00:00:00Z","budget_minutes":10}}\n' "$R/doc" > "$S"
+  rm -f "$L"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -c '[has("waiting_on"), .current_step, (.pause_reason // "absent")]' "$L")" = '[false,3,"absent"]' ]; then
+    pass "[$SH] --restore: a snapshot's waiting_on is dropped (a rebuilt lock waits on nothing)"
+  else
+    fail "[$SH] --restore: waiting_on dropped" "rc=$RC lock=$(jq -c . "$L" 2>/dev/null)"
+  fi
+  printf '{"skill":"develop-task","task_or_story_directory":"%s","branch":"feature/x","current_step":5,"qa_phase":"5b","halted_at":"t","halt_reason":"loop-limit","halt_step":"5"}\n' "$R/doc" > "$S"
+  rm -f "$L"; PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1
+
+  # lock present → exit 0 no-op; a snapshot beside it is left alone
+  printf '{"task_or_story_directory":"%s","halt_step":2}\n' "$R/doc" > "$S"
+  BEFORE=$(cat "$L")
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(cat "$L")" = "$BEFORE" ] && [ -f "$S" ]; then
+    pass "[$SH] --restore: lock present → exit 0, lock and snapshot untouched"
+  else
+    fail "[$SH] --restore: lock present → no-op" "rc=$RC changed=$([ "$(cat "$L")" != "$BEFORE" ] && echo yes || echo no) snapshot=$([ -f "$S" ] && echo kept || echo consumed)"
+  fi
+  rm -f "$L" "$S"
+
+  # neither → exit 1 naming both paths, nothing written
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -ne 0 ] && [ ! -f "$L" ] && echo "$OUT" | grep -q "$S" && echo "$OUT" | grep -q "pausing"; then
+    pass "[$SH] --restore: no snapshot and no claim → exit 1 naming both paths, nothing written"
+  else
+    fail "[$SH] --restore: neither → exit 1" "rc=$RC lock=$([ -f "$L" ] && echo yes || echo no) out=$OUT"
+  fi
+
+  # snapshot for another document → exit 1, nothing written, snapshot kept
+  printf '{"task_or_story_directory":"%s","halt_step":4}\n' "$R/other" > "$S"
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -ne 0 ] && [ ! -f "$L" ] && [ -f "$S" ] && echo "$OUT" | grep -q "refusing to restore"; then
+    pass "[$SH] --restore: snapshot for another document → exit 1, nothing written, snapshot kept"
+  else
+    fail "[$SH] --restore: other-document refusal" "rc=$RC lock=$([ -f "$L" ] && echo yes || echo no) snap=$([ -f "$S" ] && echo kept || echo gone) out=$OUT"
+  fi
+  rm -f "$S"
+
+  # relative snapshot dir vs absolute doc-dir: one directory, restored
+  ( cd "$R" && printf '{"task_or_story_directory":"./doc/","halt_step":3}\n' > state/last-halt.json \
+      && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1 )
+  if [ -f "$L" ] && [ "$(jq -r '.current_step' "$L")" = "3" ]; then
+    pass "[$SH] --restore: relative snapshot dir vs absolute doc-dir match (canonicalised)"
+  else
+    fail "[$SH] --restore: canonicalised match" "lock=$([ -f "$L" ] && jq -c . "$L" || echo absent)"
+  fi
+  rm -f "$L" "$S"
+
+  # a snapshot with no directory (pre-task.123 shape) is accepted
+  printf '{"current_step":7,"halt_step":7}\n' > "$S"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r '.current_step' "$L")" = "7" ]; then
+    pass "[$SH] --restore: snapshot without task_or_story_directory (pre-task.123) accepted"
+  else
+    fail "[$SH] --restore: pre-task.123 snapshot" "rc=$RC"
+  fi
+  rm -f "$L" "$S"
+
+  # an orphaned .pausing.<pid> claim is a candidate; the newest candidate wins, and the
+  # losing same-document snapshot is consumed with it (QA cycle 1, CR-8)
+  printf '{"task_or_story_directory":"%s","halt_step":4}\n' "$R/doc" > "$S"
+  touch -t 202601010000 "$S"
+  printf '{"task_or_story_directory":"%s","current_step":6}\n' "$R/doc" > "$L.pausing.4242"
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r '.current_step' "$L")" = "6" ] && [ ! -f "$L.pausing.4242" ] && echo "$OUT" | grep -q "pausing.4242"; then
+    pass "[$SH] --restore: newer orphaned claim outranks an older snapshot; the claim is consumed"
+  else
+    fail "[$SH] --restore: orphaned claim" "rc=$RC lock=$([ -f "$L" ] && jq -c . "$L" || echo absent) claim=$([ -f "$L.pausing.4242" ] && echo kept || echo gone) out=$OUT"
+  fi
+  if [ ! -f "$S" ] && echo "$OUT" | grep -q "also removed 1 older candidate"; then
+    pass "[$SH] --restore: the losing same-document snapshot is consumed too, and named"
+  else
+    fail "[$SH] --restore: losing candidate consumed" "snapshot=$([ -f "$S" ] && echo kept || echo gone) out=$OUT"
+  fi
+  rm -f "$L" "$S" "$L".pausing.*
+
+  # GNU-shaped stat on every host (QA cycle 1, CR-1). A shim that behaves like GNU coreutils —
+  # `-f` is FILE-SYSTEM mode (prints text, exits 0), `-c %Y` prints the mtime — is put first on
+  # PATH. The pre-fix `stat -f %m || stat -c %Y` read text, `[ text -gt n ]` aborted, and the
+  # first candidate (the snapshot) won regardless of age: this is the scenario that was red
+  # under Linux CI while green on macOS. The shim delegates the real read to the host's stat
+  # through an absolute path, so it runs on BSD and GNU hosts alike.
+  local SHIM="$R/gnu-shim" REAL_STAT
+  REAL_STAT=$(command -v stat)
+  mkdir -p "$SHIM"
+  cat > "$SHIM/stat" <<SHIMEOF
+#!/usr/bin/env bash
+case "\$1" in
+  -f) echo "  File: \"\$2\"  ID: 0  Namelen: 255  Type: apfs"; exit 0 ;;
+  -c) [ "\$2" = "%Y" ] || exit 1; shift 2
+      if "$REAL_STAT" -c %Y "\$1" >/dev/null 2>&1; then "$REAL_STAT" -c %Y "\$1"; else "$REAL_STAT" -f %m "\$1"; fi ;;
+  *) exec "$REAL_STAT" "\$@" ;;
+esac
+SHIMEOF
+  chmod +x "$SHIM/stat"
+  printf '{"task_or_story_directory":"%s","halt_step":4}\n' "$R/doc" > "$S"
+  touch -t 202601010000 "$S"
+  printf '{"task_or_story_directory":"%s","current_step":6}\n' "$R/doc" > "$L.pausing.7"
+  OUT=$(PATH="$SHIM:$PATH" PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r '.current_step' "$L")" = "6" ] && ! echo "$OUT" | grep -q "could not read the mtime"; then
+    pass "[$SH] --restore: newest candidate still wins under a GNU-shaped stat (CR-1)"
+  else
+    fail "[$SH] --restore: GNU-shaped stat" "rc=$RC step=$(jq -r '.current_step' "$L" 2>/dev/null) out=$OUT"
+  fi
+  rm -f "$L" "$S" "$L".pausing.*
+  # …and a stat that yields nothing numeric at all degrades to 0 with a warning, never an abort.
+  cat > "$SHIM/stat" <<'SHIMEOF'
+#!/usr/bin/env bash
+echo "garbage"; exit 0
+SHIMEOF
+  printf '{"task_or_story_directory":"%s","halt_step":4}\n' "$R/doc" > "$S"
+  OUT=$(PATH="$SHIM:$PATH" PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ -f "$L" ] && echo "$OUT" | grep -q "could not read the mtime"; then
+    pass "[$SH] --restore: a non-numeric mtime read is 0 with a warning, and the restore still completes"
+  else
+    fail "[$SH] --restore: non-numeric mtime guard" "rc=$RC out=$OUT"
+  fi
+  rm -f "$L" "$S" "$L".pausing.*
+}
+
+# ── Scenario 14: the no-lock split ───────────────────────────────────────────
+run_no_lock_split() {
+  local SH="$1"
+  local L="$TMPDIR_TEST/split-$SH.lock" OUT RC
+  OUT=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" 4 2>&1); RC=$?
+  if [ "$RC" -ne 0 ] && [ ! -f "$L" ] && echo "$OUT" | grep -q -- "--restore"; then
+    pass "[$SH] <n> with no lock → exit 1, message names --restore, no lock fabricated"
+  else
+    fail "[$SH] <n> with no lock → exit 1" "rc=$RC out=$OUT"
+  fi
+  for MODE in "--skill develop" "--skill commit-changes" "--complete"; do
+    # MODE is a two-word flag deliberately split into argv.
+    # shellcheck disable=SC2086
+    PIPELINE_LOCK="$L" "$SH" "$SCRIPT" $MODE >/dev/null 2>&1; RC=$?
+    if [ "$RC" -eq 0 ] && [ ! -f "$L" ]; then
+      pass "[$SH] $MODE with no lock → exit 0 (standalone sub-skill / clearable lock)"
+    else
+      fail "[$SH] $MODE with no lock → exit 0" "rc=$RC"
+    fi
+  done
+}
+
+run_restore_scenarios bash
+run_no_lock_split bash
+if command -v zsh >/dev/null 2>&1; then
+  run_restore_scenarios zsh
+  run_no_lock_split zsh
+else
+  echo "  SKIP  zsh interpreter pass for scenarios 13-14 (zsh not on this host)"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

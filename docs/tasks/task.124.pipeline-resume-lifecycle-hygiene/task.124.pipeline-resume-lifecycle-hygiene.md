@@ -5,19 +5,22 @@ type: task
 description: "Six defects in the develop pipelines' resume and halt lifecycle, all observed on tasks 109–117. Phase 0b inherits a dirty tree instead of classifying it (an overlay reverted every bundled task.116 copy unseen); the resume detector flags a missing step-3 summary as blocking on every resume that never dispatched one; a completed run leaves the earlier halt snapshot on disk and the next run is offered a resume for merged work; the Stop hook re-prompts a step that is legitimately waiting on a background task; the HALT snippet's `rm` pairs the lock with a glob that zsh's nomatch aborts, leaving the lock in place; and the HALT commit shipped a doubled, mid-line-spliced implementation report because no boundary reads the report back. One task: each is a small mechanism in the resume contract, the detector prompt, the hooks, or a new report-lint.js. A seventh (task.121): after a PreCompact pause the hook removes the lock by design, and a session that continues in place — rather than re-invoking the skill — has no step that puts it back; advance-pipeline-lock.sh is a silent exit-0 no-op without a lock, so the Stop hook and every advance were inert until the run rebuilt the lock from the snapshot by hand. Observations #85, #86, #88, #89, #111, #115, #123."
 tags: [develop-task, develop-story, develop-bug, resume, hooks, pipeline, precompact]
 category: refactoring
-status: planned
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-17
-updated: 2026-09-18
+updated: 2026-09-20
 assignee:
 estimated_effort_hours: 9
 github_issue: 424
+pr_number: 436
+completed_date: 2026-09-20
 ---
 
 # Technical Task: Resume trusts what it finds on disk
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.124.review.1.pipeline-resume-lifecycle-hygiene.md` implemented 2026-09-19
 **GitHub Issue**: [#424](https://github.com/Gamaroff/agent-skills/issues/424)
 
 ---
@@ -34,8 +37,11 @@ the report — and, from the 2026-09-18 review, a `--restore` mode on the lock a
 in-session continuation after a PreCompact pause has a lock to advance.
 
 **Scope**: `develop-pipeline-resume-contract.md`, `pipeline-resume-detector-prompt.md`,
-`develop-pipeline-on-stop.sh`, `develop-pipeline-hooks.md`, the HALT snippets in the step docs,
-the Step 8 completion path, `advance-pipeline-lock.sh`, and a new pure `report-lint.js` beside `change-log.js`.
+`develop-pipeline-on-stop.sh`, `develop-pipeline-hooks.md`, the HALT snippets in the three
+orchestrator `SKILL.md` files, the Step 8 completion path, `advance-pipeline-lock.sh` (and
+`grant-qa-cycles.sh`, which delegates its restore to it), a new `set-waiting-on.sh` beside
+`set-qa-phase.sh`, a new `implementation-report-template.md` extracted from the step-0 doc, and a
+new pure `report-lint.js` beside `change-log.js`.
 
 ## 2. Motivation
 
@@ -95,22 +101,30 @@ advance-lock <n> with no lock → exit 0, silent (an in-session resume after a p
 ### Target Architecture
 
 ```
-Phase 0b     git status --porcelain non-empty → classify:
-               (a) every change byte-identical to merge-base or origin/<base>  → overlay: discard, record
+Phase 0b     git status --porcelain non-empty → classify EVERY entry, then act on the classified paths only:
+               (a) every entry byte-identical to origin/<base> (a `??` entry only if base HAS the path
+                   and the content matches)                                      → overlay: discard those paths, record
                (b) only skills/*/references/                                     → npm run bundle -- --check; reconcile
-               (c) anything else                                                 → HALT naming the files
+               (c) anything else, or any entry the probe cannot classify         → HALT naming the files
              summary-gap rule: raise only when the report's `Subagent summary ref` for that step names a missing path
-Step 8       on success: delete last-halt.json when it names this work item (writer owns cleanup);
-             detector: refuse a snapshot whose document reads status: accepted or whose PR is merged, and delete it
-Lock         waiting_on: {agent|task, since} — set at dispatch, cleared on result
-Stop hook    waiting_on set → allow the stop with "waiting on {x} since {t}"; else re-prompt as today
+Step 8       on success: delete last-halt.json when its task_or_story_directory is this run's (writer owns cleanup);
+             detector: refuse and delete a snapshot whose PR is MERGED (gh-only); `status: accepted` alone never fires the rule
+Lock         waiting_on: {kind: agent|task, label, since, budget_minutes} — written ONLY by set-waiting-on.sh
+             (sibling of set-qa-phase.sh): `set-waiting-on.sh "<label>"` at dispatch, `--clear` on result
+Stop hook    waiting_on set and younger than budget_minutes → allow the stop with "waiting on {label} since {since}";
+             set and older → re-prompt (a crashed step); absent → re-prompt as today
 HALT snippet rm -f lock; find .claude/state -name 'test-output-*.log' -delete   (two commands)
-report-lint.js  pure: exactly one `# Implementation Report`, each `## ` section once in template order,
-                no `### QA Cycle N` repeated; run before every commit of the report and at HALT
+report-lint.js  pure: exactly one `# Implementation Report`, each REQUIRED `## ` section once in template order,
+                optional sections (Tracker Actions Required) at most once, no `### QA Cycle N` repeated;
+                expected sections read from implementation-report-template.md (extracted from step-0, one definition);
+                run after every report Edit (Step Transition action 2), before the HALT commit,
+                in the PreCompact hook between its append and `git add`, and at Step 8
 advance-lock --restore   no lock + snapshot (last-halt.json, else newest .pausing.* — by document, then age)
                          → rebuild the lock at halt_step, strip the pause fields, consume the snapshot
                          lock present → no-op exit 0; neither → exit 1 naming both paths
+                         grant-qa-cycles.sh calls --restore instead of its own inline restore (one implementation)
                          <n> with no lock → exit 1 (was silent exit 0), pointing at --restore
+                         --skill and --complete with no lock → exit 0 unchanged (standalone sub-skill runs; clearable lock)
 ```
 
 ### Important Clarifications
@@ -124,8 +138,27 @@ advance-lock --restore   no lock + snapshot (last-halt.json, else newest .pausin
 - **`waiting_on` is written by the step, not inferred by the hook.** The hook has only the lock; a
   field the dispatching step sets and clears is the one thing it can read.
 - **`--restore` consumes the snapshot it reads from**, so a restored run cannot be re-offered later (the other half of #88); the completion-path deletion stays for runs that never restored.
+- **Same-class mechanisms this task must name, not duplicate** (review 2026-09-19, obs #103):
+  - `shared/resources/grant-qa-cycles.sh:142-175` (task.123) already restores the lock from
+    `last-halt.json` for the QA re-entry grant — refusing another document's snapshot by
+    `task_or_story_directory`, stripping `halted_at/halt_reason/halt_step/paused_at/pause_reason`,
+    and deliberately **not** consuming the snapshot. `--restore` **replaces** that inline restore:
+    grant calls `advance-pipeline-lock.sh --restore` and keeps only its budget logic, so there is
+    one document-match check and one consumption policy. Grant's restore test cases move with it.
+  - `shared/resources/set-qa-phase.sh` (task.123) is "the ONLY writer of `qa_phase`" — the pattern
+    for a non-step lock field. `set-waiting-on.sh` **sits beside** it as the only writer of
+    `waiting_on`; the field is not added to `advance-pipeline-lock.sh`, which stays monotonic.
+  - `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` already asserts lock field spellings
+    across lock, snapshot, writer scripts and docs. `waiting_on` **extends** it; no new contract test.
+- **The report template is defined once.** Today both templates (story and task) are fenced blocks
+  inside `develop-pipeline-step-0-resolve-and-prepare.md` (§0e) and `## Tracker Actions Required`
+  is documented as *omitted when the journal is empty*. This task extracts them to
+  `shared/resources/implementation-report-template.md` with an optional-section marker; step-0
+  references the file, and `report-lint.js` reads it — so "each section once" cannot refuse a valid
+  report for a section the template itself says to omit.
 - **`report-lint.js` is pure and CLI-thin**, like `change-log.js` and `registry-tick.js`: the
-  pipelines, the PreCompact hook and a test share one reader.
+  pipelines, the PreCompact hook and a test share one reader. The `--json` output carries a
+  `reason` field (`ok` | `problems` | `usage`) like its siblings.
 
 ## 4. Scope
 
@@ -134,12 +167,20 @@ advance-lock --restore   no lock + snapshot (last-halt.json, else newest .pausin
 ✅ Resume contract: dirty-tree classification; snapshot refusal; re-entry pointer to task.123.
 ✅ Detector prompt: evidence-conditioned summary-gap rule.
 ✅ Step 8 / completion path: snapshot deletion.
-✅ Lock schema + Stop hook: `waiting_on`; `develop-pipeline-hooks.md` documents the pattern and
+✅ Lock schema + Stop hook: `waiting_on`, written by a new `shared/resources/set-waiting-on.sh`
+   (sibling of `set-qa-phase.sh`); `develop-pipeline-hooks.md` documents the pattern and
    retires foreground `sleep` advice.
-✅ HALT snippets in step docs and the resume contract's halt text: two-command form.
-✅ `shared/resources/report-lint.js` + test; called from the Step Transition Protocol, HALT, and
-   the PreCompact hook.
-✅ `advance-pipeline-lock.sh --restore`; the pause reference and the orchestrators' Phase 0 name it as the in-session continuation step; the compaction-summary instruction points at it.
+✅ HALT snippets — the three one-argv `rm` sites are `skills/develop-task/SKILL.md`,
+   `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md` (none in `shared/resources/`;
+   `grep -rn 'test-output-\*'` is the completeness check) — and the resume contract's halt text:
+   two-command form.
+✅ `shared/resources/implementation-report-template.md` extracted from step-0 §0e (story + task
+   variants, optional-section marker); step-0 references it.
+✅ `shared/resources/report-lint.js` + test; called after every report Edit (Step Transition
+   action 2), before the HALT commit, in the PreCompact hook, and at Step 8.
+✅ `advance-pipeline-lock.sh --restore`; `grant-qa-cycles.sh` delegates its restore to it; the pause
+   reference and the orchestrators' Phase 0 name `--restore` as the in-session continuation step;
+   the compaction-summary instruction points at it.
 ✅ `npm run bundle`.
 
 ### Out of Scope
@@ -152,7 +193,12 @@ advance-lock --restore   no lock + snapshot (last-halt.json, else newest .pausin
 
 None. A lock without `waiting_on` reads as not waiting; a report that fails the linter was already
 unreadable. `advance-pipeline-lock.sh <n>` with no lock changes from silent exit 0 to exit 1 — a
-caller that relied on the silence was advancing nothing.
+numeric advance is only ever issued by an orchestrator that believes a pipeline is running, so the
+silence hid a bug. **`--skill <name>` and `--complete` keep exit 0 without a lock**: `--skill` is the
+self-advance every sub-skill issues as its last action, including the nine that legitimately run
+outside any pipeline (a standalone `/review-task` is one), and `--complete` must stay able to clear
+a corrupt or absent lock. `grant-qa-cycles.sh`'s behaviour is unchanged from the caller's side; only
+its restore moves behind `--restore`.
 
 ## 6. Implementation Plan
 
@@ -166,10 +212,23 @@ caller that relied on the silence was advancing nothing.
 `shared/resources/pipeline-resume-detector-prompt.md`, `shared/resources/develop-pipeline-step-8-commit.md`
 
 **Changes**:
-- [ ] Phase 0b dirty-tree probe with the three classifications and their actions.
-- [ ] Summary-gap rule conditioned on the report's `Subagent summary ref` column.
-- [ ] Step 8 success path deletes a matching `last-halt.json`; detector refuses and deletes a stale one.
-- [ ] Replay fixtures: overlay resume; healthy resume with no step-3 summary; stale snapshot after merge.
+- [x] Phase 0b dirty-tree probe with the three classifications and their actions. **Classify every
+      `git status --porcelain` entry before acting, and act only on the classified paths**:
+      `git checkout HEAD -- <paths>` for tracked overlay entries (index and worktree — the bare
+      index-restoring form leaves a staged overlay in place, QA cycle 1 CR-4), `git clean -f --
+      <paths>` for untracked ones — never `git checkout -- .` or a directory-wide `git clean` — and
+      a re-read of the full `git status --porcelain --no-renames` before the success line (a path-scoped
+      re-read is satisfied vacuously by an entry the probe mis-parsed — QA cycle 2 CR-4); the tracked
+      arm also requires `git cat-file -e "$BASE_REF:$p"` so a deleted branch-added file is never (a)
+      (QA cycle 3 CR-2). A `??` entry is
+      identical-to-base only when `git cat-file -e "$BASE_REF:$p"` succeeds **and** the content
+      matches (`git diff <commit> -- <path>` never reports an untracked path, so the tracked-file
+      test alone passes every untracked file). Any entry the probe cannot classify → (c) HALT.
+- [x] Summary-gap rule conditioned on the report's `Subagent summary ref` column.
+- [x] Step 8 success path deletes `last-halt.json` when its `task_or_story_directory` (canonicalised,
+      as `grant-qa-cycles.sh:161` compares it) is this run's; detector refuses and deletes a stale one.
+- [x] Replay fixtures: overlay resume (including an untracked file base does not have → HALT);
+      healthy resume with no step-3 summary; stale snapshot after merge.
 
 **Dependencies**: none.
 
@@ -177,13 +236,41 @@ caller that relied on the silence was advancing nothing.
 
 **Risk Level**: Low
 
-**Files**: `shared/resources/develop-pipeline-on-stop.sh`, `shared/resources/develop-pipeline-hooks.md`,
-the lock schema in the resume contract, every step doc that dispatches (5, 5c, 7) and every HALT snippet
+**Files**: `shared/resources/set-waiting-on.sh` (new) + `set-waiting-on.test.sh` (new — list it in
+`package.json` `test` by hand; the shell tests are named individually, not globbed),
+`shared/resources/develop-pipeline-on-stop.sh`, `shared/resources/develop-pipeline-hooks.md`,
+the lock schema in the resume contract, `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs`,
+every dispatch site, and the three HALT snippets.
+
+**Dispatch sites** — enumerated by grep (`subagent_type=`, `dispatch an Explore subagent`,
+`run_in_background`, `gh pr checks --watch`) over `shared/resources/develop-pipeline-step-*.md`,
+`skills/develop-*/SKILL.md`, `skills/develop-bug/references/*.md` and the sub-skills the loop invokes
+(`qa-task`, `review-pr`, `finalise`), not by hand. At review time (2026-09-19) that is — `kind: agent`:
+Step 3 ×3 (`develop-pipeline-step-3-develop-loop.md:20` codebase map, `:113`/`:130` loop audit,
+`:228` triage), Step 5 ×2 (`develop-pipeline-step-5-6-qa-loop.md:187`, `:243` traceability mapper),
+5c (`skills/review-pr/SKILL.md:265`, two lenses), Step 7 (`skills/finalise/SKILL.md:337`, four
+parallel Explore agents); `kind: task`: Step 7's CI poll (`skills/finalise/SKILL.md:1226`,
+`gh pr checks --watch` as a background job). The plan's "qa-task 3b reviewer" and the develop-bug
+verify loop have no dispatch of their own. **Phase 0a's resume detector is exempt** — no lock exists
+while it runs. Re-run the grep before implementing; list the result in the implementation report.
 
 **Changes**:
-- [ ] `waiting_on` in the lock; dispatch sites set it, result reads clear it.
-- [ ] Stop hook allows the stop when set; hook test covers set / cleared / stale (> wall-clock budget → re-prompt).
-- [ ] HALT snippets: `rm -f "$LOCK"` then `find … -delete`; `lint:shell` / shellcheck over the fenced snippets via `qa-execute-snippets` in both shells.
+- [x] `waiting_on: {kind, label, since, budget_minutes}` in the lock schema. **One writer**:
+      `set-waiting-on.sh "<label>"` at dispatch (reads `subagents.wallClockMinutes` once and stores
+      it as `budget_minutes`, so the hook needs no config read; `--budget-minutes N` for a wait whose
+      own bound the caller knows, e.g. the finalise CI poll — QA cycle 1, CR-2), `set-waiting-on.sh
+      --clear` when the result is read. Mirrors `set-qa-phase.sh`: never touches `current_step`; exit 0 no-op
+      without a lock. Add `waiting_on` to `qa-loop-lock-fields-parity.test.mjs`.
+- [x] Stop hook allows the stop when set and `since` + `budget_minutes` is in the future; hook test
+      covers set / cleared / stale (older than budget → re-prompt, a crashed step).
+- [x] HALT snippets at `skills/develop-task/SKILL.md:279`, `skills/develop-story/SKILL.md:292`,
+      `skills/develop-bug/SKILL.md:288` (line numbers as of 2026-09-19; the grep is the check):
+      `rm -f "$LOCK"` then `find … -delete`. Also the glob-only `rm` at
+      `develop-pipeline-step-8-commit.md:77` while in the area. Test: extract each fenced snippet
+      with `shared/resources/qa-execute-snippets.mjs` and run it in **bash and zsh** with an empty
+      glob — lock removed in both. (`lint:shell` lints `.sh` sources only and never sees a fence.)
+
+**Dispatch sites at implementation (2026-09-19, grep re-run)** — `kind: agent`: `develop-pipeline-step-3-develop-loop.md` ×4 (codebase map; story and task loop audits; test triage), `develop-pipeline-resume-contract.md` ×1 (initial loop audit), `develop-pipeline-step-5-6-qa-loop.md` ×2 (story and task traceability mappers), `skills/review-pr/SKILL.md` ×1 (two lenses, one dispatch), `skills/finalise/SKILL.md` ×1 (four DoD agents, one dispatch); `kind: task`: `skills/finalise/SKILL.md` CI poll (reading 2). `qa-story/SKILL.md:566` dispatches inside `/qa-story` itself and marks no wait — it is not in the loop's dispatch list and runs standalone as often as not. Every site is pinned by `qa-loop-lock-fields-parity.test.mjs` (a dispatch line without `set-waiting-on.sh` within 12 lines is red).
 
 **Dependencies**: none.
 
@@ -191,15 +278,38 @@ the lock schema in the resume contract, every step doc that dispatches (5, 5c, 7
 
 **Risk Level**: Low
 
-**Files**: `shared/resources/report-lint.js`, `shared/resources/tests/report-lint.test.mjs`,
-`develop-pipeline-remaining-work-banner.md` or the Step Transition Protocol doc, the HALT path,
-`develop-pipeline-on-precompact.sh`
+**Files**: `shared/resources/implementation-report-template.md` (new — extracted from
+`develop-pipeline-step-0-resolve-and-prepare.md` §0e, which then references it),
+`shared/resources/report-lint.js` (new), `shared/resources/tests/report-lint.test.mjs` (new),
+the Step Transition Protocol in the three orchestrator `SKILL.md` files (action 2), the HALT rule
+("Commit the report before any halt") in the same three files, `develop-pipeline-on-precompact.sh`,
+`develop-pipeline-step-8-commit.md`
 
 **Changes**:
-- [ ] Pure `lintReport(text) → { ok, problems[] }`: one H1; each template `## ` once, in order; no repeated `### QA Cycle N`; no text after the final section's last line that duplicates an earlier heading.
-- [ ] CLI: `report-lint.js --file <report> --json`, exit 1 on problems.
-- [ ] Call sites: before the report commit at every Step Transition, at HALT, in the PreCompact hook — refuse the commit and name the problem.
-- [ ] Test: the task.117 corrupt report (`329b4a65`) as a fixture → the three problems named; a clean report → ok.
+- [x] Extract the story and task report templates into `implementation-report-template.md`, one
+      file, two variants, with a marker on `## Tracker Actions Required` that names it **optional**
+      (the template already says "omit this section entirely when the journal is empty"). Step-0 §0e
+      points at the file instead of inlining. This is the one definition of "what sections a report
+      has"; the linter does not restate it.
+- [x] Pure `lintReport(text, template) → { ok, problems[] }`: one H1; each required template `## `
+      exactly once, optional ones at most once, all in template order; no repeated `### QA Cycle N`;
+      no second `**Task**:`/`**Story**:` header block; no text after the final section that repeats
+      an earlier heading. Fence-aware via `change-log.js`'s exported `fencedRanges`. Codes:
+      `multiple-h1`, `section-missing`, `section-duplicated`, `section-out-of-order`,
+      `qa-cycle-duplicated`, `header-block-duplicated`, `trailing-duplicate-body`.
+- [x] CLI: `report-lint.js --file <report> --json`, `reason: ok | problems | usage`, exit 1 on problems.
+- [x] Call sites (four, all named): **(1)** Step Transition Protocol action 2 — lint right after the
+      report Edit, HALT on failure with nothing committed (the protocol edits; it does not commit);
+      **(2)** the HALT rule — lint before "commit the report before any halt"; **(3)**
+      `develop-pipeline-on-precompact.sh` between its append (`:189`) and `git add` (`:192`); **(4)**
+      Step 8 before the terminal commit. Sites (1) and (4): `command node …/report-lint.js --file "$REPORT" --json || { echo "HALT: report failed lint"; exit 1; }`. Site (2) — the three orchestrator HALT rules — and the PreCompact hook call the same reader but **skip only the report commit and proceed with the halt** on a lint failure, so a corrupt report never strands the lock (QA cycle 2, CR-5).
+- [x] Test: the task.117 corrupt report (`329b4a65`, 366 lines) as a fixture. It has **one** H1 —
+      the duplicate begins at its `**Task**:` header block (line 218) and repeats seven `## `
+      sections (226–358) — so the assertion names the codes: `section-duplicated` ×7,
+      `section-out-of-order`, `header-block-duplicated`; `multiple-h1` does **not** fire, and
+      `section-missing` does **not** fire for the omitted `Tracker Actions Required`. Green fixtures:
+      the five most recent accepted reports (a report with a fenced example containing
+      `# Implementation Report` among them).
 
 **Dependencies**: none.
 
@@ -207,14 +317,34 @@ the lock schema in the resume contract, every step doc that dispatches (5, 5c, 7
 
 **Risk Level**: Low
 
-**Files**: `shared/resources/advance-pipeline-lock.sh`, `develop-pipeline-pause.md`, `develop-pipeline-resume-contract.md`,
-the orchestrators' Phase 0 (`develop-task` / `develop-story` / `develop-bug` SKILL.md), `evals/shared/tests/` hook/lock tests
+**Files**: `shared/resources/advance-pipeline-lock.sh` + `advance-pipeline-lock.test.sh`,
+`shared/resources/grant-qa-cycles.sh` + `grant-qa-cycles.test.sh`, `develop-pipeline-pause.md`,
+`develop-pipeline-resume-contract.md`, the orchestrators' Phase 0 (`develop-task` / `develop-story` /
+`develop-bug` SKILL.md), `evals/shared/tests/` hook/lock tests
+
+**Same-class inventory**: `grant-qa-cycles.sh:142-175` already restores the lock from `last-halt.json`
+(task.123) — document match by `task_or_story_directory`, halt/pause fields stripped, snapshot **not**
+consumed. `--restore` **replaces** it: grant calls `advance-pipeline-lock.sh --restore` and keeps
+only its budget logic. One restore, one document-match check, one consumption policy.
 
 **Changes**:
-- [ ] `--restore`: rebuild from `last-halt.json` or the newest `.pausing.*` claim (choose by document, then age — the detector's rule); strip `paused_at` / `pause_reason` / `halt_step`; keep `current_step`; delete the source.
-- [ ] `<n>` with no lock → exit 1 with a message naming `--restore`; `--complete` stays exempt.
-- [ ] Pause reference + Phase 0: "continuing in the same session after a pause → `--restore` first"; the PreCompact hook's summary instruction says the same.
-- [ ] Tests: no lock + snapshot → lock at halt_step, snapshot gone; lock present → no-op; neither → exit 1; `<n>` with no lock → exit 1.
+- [x] `--restore`: rebuild from `last-halt.json` or the newest `.pausing.*` claim (choose by
+      document, then age — the detector's rule); refuse a snapshot for another document (grant's
+      check, moved here); strip `halted_at` / `halt_reason` / `halt_step` / `paused_at` /
+      `pause_reason`; keep `current_step`; delete the source. Rewrite the header's Behaviour block —
+      it currently documents "No lock file → exit 0, silent noop" as the contract.
+- [x] `grant-qa-cycles.sh` step 3 ("Restore the lock from the halt snapshot") becomes a call to
+      `--restore`; its refusal-leaves-nothing-behind rule (task.123 CR-1) is preserved by calling
+      `--restore` only after the budget check passes. Its restore test cases move to
+      `advance-pipeline-lock.test.sh`; its own tests keep the budget cases.
+- [x] `<n>` with no lock → exit 1 with a message naming `--restore`. **`--skill` and `--complete`
+      stay exit 0** (standalone sub-skill runs; clearable lock) — state it in the header and test it.
+- [x] Pause reference + Phase 0: "continuing in the same session after a pause → `--restore` first";
+      the PreCompact hook's summary instruction says the same.
+- [x] Tests: no lock + snapshot → lock at halt_step, snapshot gone; lock present → no-op; neither →
+      exit 1; snapshot for another document → exit 1, nothing written; `<n>` with no lock → exit 1;
+      `--skill` and `--complete` with no lock → exit 0; grant after a HALT still restores (via
+      `--restore`) and records the grant.
 
 **Dependencies**: none (shares files with Phase 1's snapshot cleanup; land Phase 1 first).
 
@@ -226,16 +356,20 @@ the orchestrators' Phase 0 (`develop-task` / `develop-story` / `develop-bug` SKI
 2. ✅ `shared/resources/pipeline-resume-detector-prompt.md`
 3. ✅ `shared/resources/develop-pipeline-step-8-commit.md`
 4. ✅ `shared/resources/develop-pipeline-on-stop.sh`, `develop-pipeline-hooks.md`, `develop-pipeline-on-precompact.sh`
-5. ✅ `shared/resources/advance-pipeline-lock.sh`, `develop-pipeline-pause.md`, the three orchestrators' Phase 0
-6. ✅ Step docs with dispatch sites and HALT snippets (`develop-pipeline-step-5-6-qa-loop.md`, `-step-7-finalise.md`, `develop-bug-step-5-6-verify-loop.md`)
+5. ✅ `shared/resources/advance-pipeline-lock.sh`, `shared/resources/grant-qa-cycles.sh`, `develop-pipeline-pause.md`, the three orchestrators' Phase 0
+6. ✅ Dispatch sites (Phase 2 list): `develop-pipeline-step-3-develop-loop.md`, `develop-pipeline-step-5-6-qa-loop.md`, `skills/review-pr/SKILL.md`, `skills/finalise/SKILL.md`
+6a. ✅ HALT snippets + Step Transition Protocol + HALT rule: `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md`
+6b. ✅ `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` §0e — references the extracted template
 
 ### Files to Create
 
 7. ✅ `shared/resources/report-lint.js`
+7a. ✅ `shared/resources/implementation-report-template.md`
+7b. ✅ `shared/resources/set-waiting-on.sh`
 
 ### Files to Modify (Tests)
 
-8. ✅ `shared/resources/tests/report-lint.test.mjs` (new), the hooks test, replay fixtures under `evals/develop-task/step-isolation/`
+8. ✅ `shared/resources/tests/report-lint.test.mjs` (new) + `shared/resources/tests/fixtures/report-lint/`, `shared/resources/set-waiting-on.test.sh` (new — add to `package.json` `test`), `advance-pipeline-lock.test.sh`, `grant-qa-cycles.test.sh`, `develop-pipeline-on-stop.test.sh`, `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs`, replay fixtures under `evals/develop-task/step-isolation/`
 
 ### Files to Modify (Documentation)
 
@@ -249,45 +383,47 @@ None.
 ## 8. Testing Strategy
 
 ### Unit Tests
-- [ ] `report-lint.js`: corrupt fixture → three named problems; clean → ok; a report with a fenced example containing `# Implementation Report` → ok (fence-aware, reuse `change-log.js`'s `fencedRanges`).
-- [ ] Stop hook: `waiting_on` set → exit 0 with the waiting line; cleared → re-prompt; older than budget → re-prompt.
-- [ ] `advance-pipeline-lock.sh --restore`: the four cases above; `<n>` with no lock exits 1.
+- [x] `report-lint.js`: corrupt fixture → `section-duplicated` ×7, `section-out-of-order`, `header-block-duplicated`, and neither `multiple-h1` nor `section-missing`; five accepted reports → ok; a report with a fenced example containing `# Implementation Report` → ok (fence-aware, reuse `change-log.js`'s `fencedRanges`); a report omitting `Tracker Actions Required` → ok.
+- [x] `set-waiting-on.sh`: set writes the four fields; `--clear` removes them; no lock → exit 0 no-op; never changes `current_step`.
+- [x] Stop hook: `waiting_on` set → exit 0 with the waiting line; cleared → re-prompt; older than `budget_minutes` → re-prompt.
+- [x] `advance-pipeline-lock.sh --restore`: the cases in Phase 4; `<n>` with no lock exits 1; `--skill`/`--complete` with no lock exit 0; `grant-qa-cycles.sh` after a HALT restores via `--restore`.
 
-**Command**: `npm test`
+**Command**: `npm test` (new `*.test.sh` files must be added to the `test` script by hand — it lists shell tests individually)
 
 ### Integration Tests
-- [ ] Replay fixtures for the three Phase 1 cases.
-- [ ] HALT snippet under `qa-execute-snippets` in bash and zsh with an empty glob: lock removed in both.
+- [x] Replay fixtures for the Phase 1 cases (overlay discarded; untracked non-base file → HALT; healthy resume with no step-3 summary; stale snapshot after merge).
+- [x] The three HALT snippets extracted with `qa-execute-snippets.mjs`, run in bash and zsh with an empty glob: lock removed in both.
 
 ### Contract Tests
-- [ ] Lock schema in the resume contract and the hook agree on `waiting_on` (one test reads both).
+- [x] `qa-loop-lock-fields-parity.test.mjs` extended with `waiting_on` — lock schema (resume contract), `set-waiting-on.sh`, the Stop hook and `develop-pipeline-hooks.md` agree on the spelling.
+- [x] `report-lint.js` and step-0 §0e read the same `implementation-report-template.md` (one definition; a test asserts step-0 no longer inlines a template).
 
 ### Performance Tests
 Not applicable.
 
 ### Consumer Tests
-- [ ] Next pipeline run that halts and resumes: no stale snapshot after merge; no re-prompt while a reviewer is running.
+- [x] Next pipeline run that halts and resumes: no stale snapshot after merge; no re-prompt while a reviewer is running.
 
 ## 9. Success Criteria
 
 ### Functional
-- [ ] A dirty tree on resume is classified and recorded; an overlay never reaches `git add`.
-- [ ] A healthy resume with no step-3 summary is not blocked.
-- [ ] No `last-halt.json` survives a completed run for the same work item.
-- [ ] The Stop hook does not re-prompt a step with `waiting_on` set.
-- [ ] A HALT removes the lock in bash and zsh with an empty glob.
-- [ ] A structurally invalid report cannot be committed by the pipeline.
-- [ ] An in-session continuation after a PreCompact pause restores the lock with one documented command; advancing with no lock is an error, not silence.
+- [x] A dirty tree on resume is classified and recorded; an overlay never reaches `git add`.
+- [x] A healthy resume with no step-3 summary is not blocked.
+- [x] No `last-halt.json` survives a completed run for the same work item.
+- [x] The Stop hook does not re-prompt a step with `waiting_on` set.
+- [x] A HALT removes the lock in bash and zsh with an empty glob.
+- [x] A structurally invalid report cannot be committed by the pipeline.
+- [x] An in-session continuation after a PreCompact pause restores the lock with one documented command; advancing with no lock is an error, not silence.
 
 ### Performance
-- [ ] The tree probe adds one `git status --porcelain` and, for (a), one `git diff --stat` against the base.
+- [x] The tree probe adds one `git status --porcelain --no-renames`, one `git cat-file -e` plus one `git diff --quiet` / `cmp` per entry for (a), and one full porcelain re-read after the discard.
 
 ### Code Quality
-- [ ] `report-lint.js` is pure with a thin CLI; one reader for all call sites.
-- [ ] Every mechanism has a mutation proof recorded.
+- [x] `report-lint.js` is pure with a thin CLI; one reader for all call sites.
+- [x] Every mechanism has a mutation proof recorded.
 
 ### Migration
-- [ ] Observations #85, #86, #88, #89, #111, #115, #123 close naming the PR.
+- [ ] Observations #85, #86, #88, #89, #111, #115, #123 close naming the PR — **post-merge action**: all seven are `parked` with `parked_until: task.124 merged to develop`; resolve them naming PR #436 once it lands (PR review PC-1).
 
 ## 10. Risk Assessment
 
@@ -319,26 +455,118 @@ None.
 - Linter false positive: add the shape as a green fixture and adjust.
 
 ### Rollback Triggers
-- **Critical**: a HALT that leaves the lock; a resume that discards non-overlay work.
+- **Critical**: a HALT that leaves the lock; a resume that discards non-overlay work; `grant-qa-cycles.sh` refusing a grant it accepted before (its restore now runs through `--restore`, so a `--restore` regression also breaks QA re-entry).
 - **Non-critical**: message wording, anti-pattern text.
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-20
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.124.qa.6.pipeline-resume-lifecycle-hygiene.md](./task.124.qa.6.pipeline-resume-lifecycle-hygiene.md)
+- **Gate File**: [task.124.gate.6.pipeline-resume-lifecycle-hygiene.yml](./task.124.gate.6.pipeline-resume-lifecycle-hygiene.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3512 (fast gate) + 2 runnable blocks × 2 shells (Step 4b) + corpus execution (12-site grep; 119-report sed)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH; 0 MEDIUM; 1 LOW advisory
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- Cycle-5 CR-1..CR-2 verified FIXED by execution; bugs 13–14 closed.
+- No blocking findings. Advisory: the probe's fallback stderr line conflates "no PR" with "gh could not look" (`recommendations.future`).
+## Bug Reports
+
+### In QA Verification
+
+- [Bug 124.1: `--restore` picks the wrong candidate on GNU coreutils](./task.124.bug.1.restore-mtime-gnu-stat.md) - ✅ Closed - Severity: HIGH (Fixed 2026-09-19)
+- [Bug 124.2: finalise CI-poll wait budget shorter than the poll](./task.124.bug.2.ci-poll-wait-outlives-budget.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.3: dispatch population hand-listed; QA-skill dispatches unmarked](./task.124.bug.3.dispatch-population-hand-listed.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.4: staged overlay entry survives the probe](./task.124.bug.4.staged-overlay-not-discarded.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+
+- [Bug 124.5: stale-snapshot rule fires on `status: accepted`](./task.124.bug.5.stale-snapshot-rule-fires-on-accepted.md) - ✅ Closed - Severity: HIGH (Fixed 2026-09-19)
+- [Bug 124.6: re-invocation resume never restores the lock](./task.124.bug.6.reinvocation-resume-never-restores-lock.md) - ✅ Closed - Severity: HIGH (Fixed 2026-09-19)
+- [Bug 124.7: `--restore` carries a stale `waiting_on`](./task.124.bug.7.restore-carries-stale-waiting-on.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.8: probe mis-parses renames and quoted paths](./task.124.bug.8.probe-mishandles-renames-and-quoted-paths.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+
+- [Bug 124.9: restore before the grant defeats a refused re-entry](./task.124.bug.9.restore-before-grant-defeats-refusal.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.10: probe re-creates a deleted branch-added file](./task.124.bug.10.probe-recreates-deleted-branch-added-file.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+
+- [Bug 124.11: two restore statements in the resume contract](./task.124.bug.11.two-restore-statements-in-resume-contract.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.12: develop-bug carries the grant exception without a grant](./task.124.bug.12.develop-bug-carries-grant-exception-without-a-grant.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+
+- [Bug 124.13: shared sources state the grant exception for develop-bug](./task.124.bug.13.shared-sources-state-grant-exception-for-develop-bug.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+- [Bug 124.14: probe base branch never bound](./task.124.bug.14.probe-base-branch-never-bound.md) - ✅ Closed - Severity: MEDIUM (Fixed 2026-09-19)
+
+### Closed Bugs
+
+- Bugs 124.1–124.4 — verified FIXED in QA cycle 2 (2026-09-19)
+- Bugs 124.5–124.8 — verified FIXED in QA cycle 3 (2026-09-19)
+- Bugs 124.9–124.10 — verified FIXED in QA cycle 4 (2026-09-19)
+- Bugs 124.11–124.12 — verified FIXED in QA cycle 5 (2026-09-19)
+- Bugs 124.13–124.14 — verified FIXED in QA cycle 6 (2026-09-20)
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.124.qa.6.pipeline-resume-lifecycle-hygiene.md` (6 cycles: qa.1–qa.6)
+**Gate File**: `task.124.gate.6.pipeline-resume-lifecycle-hygiene.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+**PR Review (5c)**: ⚠️ CONCERNS — `task.124.pr-review.1.pipeline-resume-lifecycle-hygiene.md` (advisory; 3 medium findings carried as follow-ups)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 10/10 verified with code and per-PR test citations (F1–F3 via the L4 replay evals in `test.yml`); M1 (observations close naming the PR) is a post-merge action recorded as a condition
+✅ **Tests:** 3512 tests (0 fail) + 16 replay fixtures; CI reading 1 SUCCESS over 5 checks @ `a727d7306e55`
+✅ **PR Review:** PR #436 — 6 QA cycles (FAIL 70 → FAIL 70 → CONCERNS 80 → CONCERNS 85 → CONCERNS 85 → PASS 95), 14 bugs closed, Step 5c review CONCERNS (non-blocking)
+✅ **Documentation:** CHANGELOG `[Unreleased]`, hooks/pause references, anti-patterns, traps, skill READMEs; bundles in sync
+✅ **Security Review:** PASS by operator decision — no hardcoded secrets, no unsafe patterns, no new dependencies; `report-lint.js#lintReport` classed a boundary with no fitting probe sink (`probes_executed: 0`, `evidence: reasoned`, consistent with all six QA gates); follow-up: add a `markdown-structure` sink
+⚠️ **Compliance Review:** NOT_APPLICABLE (developer tooling — no personal data, payments, UI or health data)
+
+**Follow-ups carried (non-blocking):** M1 post-merge closure of obs #85/#86/#88/#89/#111/#115/#123; PR review CR-1 (bug-variant report base line), CR-2 (develop-bug Step 3 dispatch unmarked), CR-3 (self-reported stale-snapshot delete); security probe corpus gap; gate 6 `recommendations.future`.
+
+**Task marked as ACCEPTED on:** 2026-09-20
+
+**Detailed Verification Log:** See `task.124.dod.1.pipeline-resume-lifecycle-hygiene.md` for complete verification evidence and timestamps.
+
+## Change Log
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-09-17 | 1.0 | Initial draft — observation review 2026-09-17 (obs #85, #86, #88, #89, #111, #115) | create-task |
 | 2026-09-18 | 1.1 | Phase 4 added — `advance-pipeline-lock.sh --restore` for an in-session continuation after a PreCompact pause (obs #123, task.121); effort 8h → 9h | observe-work |
+| 2026-09-19 | 1.2 | Review 1 (7/10, NEEDS REVISION → fixes applied): `--restore` replaces `grant-qa-cycles.sh`'s inline restore; `set-waiting-on.sh` is the one `waiting_on` writer; report template extracted to `implementation-report-template.md` with `Tracker Actions Required` optional; lint runs after every report Edit and at each commit site; overlay discard path-scoped with a `??` check; `--skill`/`--complete` keep exit 0; dispatch sites and HALT `rm` locations corrected from grep | review-task |
+| 2026-09-19 |  | Status → ready-for-development | review-task |
+| 2026-09-19 |  | Implemented — 4 phases; 3 new engines (report-lint.js, set-waiting-on.sh, advance-pipeline-lock.sh --restore) + implementation-report-template.md; 7 shell/JS suites extended (+81 assertions), 4 replay fixtures; docs swept | develop |
+| 2026-09-19 |  | QA gate FAIL (70/100) — 1 HIGH (CR-1 GNU stat), 3 MEDIUM (CR-2..CR-4), 3 LOW; 4 bug reports | qa-task |
+| 2026-09-19 |  | QA gate 2 FAIL (70/100) — cycle-1 findings verified fixed; refute pass: 2 HIGH (CR-1 accepted≠finished, CR-2 re-invocation never restores), 2 MEDIUM; bugs 5–8 | qa-task |
+| 2026-09-19 |  | QA gate 3 CONCERNS (80/100) — cycle-2 findings verified fixed; 0 HIGH, 2 MEDIUM (restore/grant order; deleted branch-added file), 3 LOW; bugs 9–10 | qa-task |
+| 2026-09-19 |  | QA gate 4 CONCERNS (85/100) — cycle-3 findings verified fixed; 0 HIGH, 2 MEDIUM (duplicate restore statement; develop-bug exception), 2 LOW; bugs 11–12 | qa-task |
+| 2026-09-19 |  | QA gate 5 CONCERNS (85/100) — cycle-4 findings verified fixed; 0 HIGH, 2 MEDIUM (shared sources state the exception for develop-bug; probe base never bound), 0 LOW; bugs 13–14 | qa-task |
+| 2026-09-20 |  | QA gate 6 PASS (95/100) — granted cycle; cycle-5 findings verified fixed by corpus execution; 0 HIGH, 0 MEDIUM, 1 LOW advisory; bugs 13–14 closed | qa-task |
+| 2026-09-20 |  | QA findings fixed — gate PASS (95/100), 5 iterations (+1 granted verification cycle); 14 bugs closed | qa-fix |
+| 2026-09-20 |  | PR review 1 CONCERNS (5c) — 3 medium code findings recorded in task.124.pr-review.1; Migration criterion marked post-merge, Phase 3 lint bullet corrected, Progress Tracking ticked | review-pr |
+| 2026-09-20 | 1.3 | DoD passed — accepted (PR #436); security probe classification accepted by operator (not-probeable Markdown validator); 6 follow-ups carried | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: snapshot and tree on resume
-- [ ] Phase 2: waiting_on + HALT rm
-- [ ] Phase 3: report-lint.js
-- [ ] Phase 4: lock restore
-- [ ] QA: `task.124.qa.[N].pipeline-resume-lifecycle-hygiene.md`
-- [ ] Gate: `task.124.gate.[N].pipeline-resume-lifecycle-hygiene.yml`
+- [x] Phase 1: snapshot and tree on resume
+- [x] Phase 2: waiting_on + HALT rm
+- [x] Phase 3: report-lint.js
+- [x] Phase 4: lock restore
+- [x] QA: `task.124.qa.6.pipeline-resume-lifecycle-hygiene.md` (6 cycles)
+- [x] Gate: `task.124.gate.6.pipeline-resume-lifecycle-hygiene.yml` (PASS 95/100)
 
 ## References
 

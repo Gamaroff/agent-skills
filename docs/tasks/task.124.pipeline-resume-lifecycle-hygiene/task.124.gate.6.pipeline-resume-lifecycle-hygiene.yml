@@ -1,0 +1,72 @@
+schema: 1
+task: 'task.124.pipeline-resume-lifecycle-hygiene'
+task_title: 'Resume trusts what it finds on disk'
+gate: PASS
+status_reason: 'Granted cycle after the loop-limit escalation. Cycle-5 findings verified FIXED by execution: the loop-limit exception is scoped to develop-task/develop-story at every one of the 12 statements across shared sources, orchestrator SKILL.md files and bundled copies, with develop-bug named as restoring on every snapshot; the probe base is bound from gh pr view → report row → develop-with-warning, and the report-row sed was executed over all 119 implementation reports in the repository with zero misparses. The narrowed cycle-6 review found no bug — one low advisory cleanup (the stderr fallback conflates "no PR" with "gh could not look"; nothing gates on it). All four NFR axes PASS.'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T04:57:35Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 3512
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged — no boundary in the cycle-5 delta; no corpus sink fits a Markdown contract. The probe binds its base from gh / the report row: both are repository-controlled inputs, and the value only names a ref for git to read.'
+  performance:
+    status: PASS
+    notes: 'The Cost sentence names the base-binding call; one gh read per resume.'
+  reliability:
+    status: PASS
+    notes: 'One rule per pipeline at every site; the probe compares against the real base on every branch model. Residue is one stderr label on a non-gating fallback (advisory).'
+  maintainability:
+    status: PASS
+    notes: 'Single-definition mechanisms and tests unchanged. The who-restores rule is still stated at five sites (all now consistent) — collapsing them to one citation is observation #132, filed as follow-up, not a defect in this change.'
+
+bug_resolution:
+  cycle_5_findings_verified:
+    - { id: 'CR-1 (cycle 5)', status: FIXED, evidence: 'grep loop-limit|not-converging across shared/resources/*.md and skills/*/SKILL.md → 12 hits, every one scoped or carved out; develop-bug SKILL.md:69 and its two bundled sources agree' }
+    - { id: 'CR-2 (cycle 5)', status: FIXED, evidence: 'binding block executed bash+zsh on {PR, report-row, neither}; sed pattern run over 119 real reports (79 develop / 29 main / 11 feature-or-epic), 0 misparses; {implementation-report-path} is an established contract placeholder (lines 313, 356)' }
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-19'
+  total_iterations: 6
+  verification_method: 'Executed greps/sed over the real corpus; fast gate; Step 4b'
+
+code_review:
+  reviewed: '2 canonical files changed since gate 5 (429 diff lines full-branch; 97-line cycle-5 delta read first), narrowed; bundled copies verified in sync'
+  findings_total: 1
+  bugs: 0
+  cleanups: 1
+  promoted_to_gate: 0
+  code_review_blocking: true
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Probe fallback stderr line: capture gh exit status / first stderr line so "no PR" is not reported for "gh could not look" (cycle-6 CR-1, low)'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'Collapse the five who-restores statements to one citation with a test (observation #132)'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md']
+    - action: 'Step 4b on develop-pipeline-step-0-resolve-and-prepare.md reports zero-blocks-executed (3 template-slot blocks) — identical on origin/develop; pre-existing'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'Carried: cycle-1 CR-5 (guard vs chosen candidate), cycle-1 CR-7 (inline lint exit-code split)'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

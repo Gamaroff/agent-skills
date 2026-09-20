@@ -12,6 +12,14 @@
 //                         (Phase 0b), READ by the step-5-6 doc (QA_MAX_CYCLES),
 //                         the resume contract and the detector prompt.
 //
+// A third joined with task.124:
+//
+//   waiting_on            {kind, label, since, budget_minutes} — the step is
+//                         waiting on a background agent or task it dispatched.
+//                         WRITTEN by set-waiting-on.sh (the one writer), READ by
+//                         the Stop hook, DESCRIBED by the hooks doc and the pause
+//                         reference's lock schema.
+//
 // A field with two spellings is a field with no reader: the writer writes
 // `qa_phase`, the hook reads `qaPhase`, and the default arm fires on every
 // stop — silently, because an absent field IS a legal state. This test pins
@@ -28,7 +36,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import fs, { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -47,6 +55,8 @@ const FILES = {
   hooksDoc: "shared/resources/develop-pipeline-hooks.md",
   grantScript: "shared/resources/grant-qa-cycles.sh",
   changelog: "CHANGELOG.md",
+  setWaitingOn: "shared/resources/set-waiting-on.sh",
+  pauseDoc: "shared/resources/develop-pipeline-pause.md",
 };
 const text = Object.fromEntries(
   Object.entries(FILES).map(([k, p]) => [k, read(p)]),
@@ -70,6 +80,13 @@ const MISSPELLINGS = [
   // since the original budget against the grant. It is an absolute qa_max_cycles now.
   /5 \+ extra_cycles_granted/,
   /QA_MAX_CYCLES = 5 \+ k\b/, // C2-CR-5: the CHANGELOG spelling of the same rule
+  // task.124: the waiting_on field and its four sub-fields
+  /\bwaitingOn\b/,
+  /(?<!set-)\bwaiting-on\b(?!\.XXXXXX|\.test\.sh|\.sh)/, // `set-waiting-on.sh` is the writer's filename
+  /\bwaiting_for\b/,
+  /\bbudgetMinutes\b/,
+  /(?<!-)\bbudget-minutes\b/, // `--budget-minutes` is the writer's flag, not a field spelling
+  /\bwall_clock_minutes\b/,
 ];
 
 test("every participant spells `qa_phase` and `extra_cycles_granted` the same way", () => {
@@ -106,6 +123,130 @@ test("every participant spells `qa_phase` and `extra_cycles_granted` the same wa
       text[name],
       /\bextra_cycles_granted\b/,
       `${name} must name extra_cycles_granted`,
+    );
+  }
+});
+
+test("waiting_on: one writer, one reader, and every describer spells the field and its sub-fields the same way", () => {
+  for (const name of ["setWaitingOn", "stopHook", "hooksDoc", "pauseDoc"]) {
+    assert.match(text[name], /\bwaiting_on\b/, `${name} must name waiting_on`);
+  }
+  // The writer writes exactly the four sub-fields, through jq, and never touches
+  // current_step or qa_phase (code lines only — the header says it does not).
+  assert.match(
+    text.setWaitingOn,
+    /'\.waiting_on = \{kind: \$kind, label: \$label, since: \$since, budget_minutes: \$budget\}'/,
+    "set-waiting-on.sh must write {kind, label, since, budget_minutes} through jq",
+  );
+  assert.match(
+    text.setWaitingOn,
+    /jq 'del\(\.waiting_on\)'/,
+    "set-waiting-on.sh --clear must delete the field through jq",
+  );
+  const code = text.setWaitingOn
+    .split(/\r?\n/)
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+  assert.doesNotMatch(
+    code,
+    /current_step|qa_phase/,
+    "set-waiting-on.sh writes one field and never touches current_step or qa_phase",
+  );
+  // The reader reads the same four names and compares since + budget_minutes against now.
+  assert.match(
+    text.stopHook,
+    /\$w\.since \| fromdateiso8601\) \+ \(\$w\.budget_minutes \* 60\)\) > now/,
+    "the Stop hook must compare since + budget_minutes*60 against now",
+  );
+  assert.doesNotMatch(
+    text.stopHook,
+    /read_nested_config_key|wallClockMinutes/,
+    "the Stop hook never reads the config — the writer stored the budget",
+  );
+  // The describers agree on the shape.
+  assert.match(
+    text.pauseDoc,
+    /"waiting_on": \{ "kind": "agent", "label": "[^"]+", "since": "[^"]+", "budget_minutes": \d+ \}/,
+    "the pause reference's lock schema must show the four sub-fields",
+  );
+  assert.match(
+    text.hooksDoc,
+    /set-waiting-on\.sh "<label>" \[--kind agent\|task\]/,
+    "the hooks doc must show the writer's set form",
+  );
+  assert.match(
+    text.hooksDoc,
+    /set-waiting-on\.sh --clear/,
+    "the hooks doc must show the writer's --clear form",
+  );
+  // Every dispatch site marks the wait. The POPULATION is derived from the directories the hooks
+  // doc names — never a literal file list, which is how qa-task's and qa-story's own dispatches
+  // went unmarked and unseen (QA cycle 1, CR-3) — and the pattern is case-insensitive over every
+  // dispatch spelling the sources use. Two exemptions, each stated in the hooks doc: Phase 0a's
+  // resume detector (no lock exists while it runs) and commentary about a dispatch (a comment, a
+  // quote, a "do NOT re-dispatch"). Adding a dispatch anywhere in the population without a
+  // set-waiting-on call within 12 lines is red.
+  const DISPATCH =
+    /subagent_type=|\bdispatch(?:es|ed)?\s+(?:an?|four|both|the|two)\s+[^\n.]{0,40}?\b(?:subagents?|lenses|mapper)\b|run_in_background|gh pr checks --watch/i;
+  const EXEMPT =
+    /^\s*#|^\s*>|pipeline-resume-detector-prompt|not re-dispatch|Do NOT re-dispatch|observed three times|forbidden for the same reason|Follow this systematic workflow|Conditions to dispatch|This skill dispatches/i;
+  const listDir = (dir, re) =>
+    fs
+      .readdirSync(join(ROOT, dir))
+      .filter((f) => re.test(f))
+      .map((f) => `${dir}/${f}`);
+  const population = [
+    // Step 0 docs are excluded on purpose: no lock exists during Phase 0 (it is written at the
+    // end of Step 1), so a Phase 0 dispatch has nothing to mark — the same exemption the hooks
+    // doc states for the resume detector.
+    ...listDir("shared/resources", /^develop-pipeline-step-[1-9].*\.md$/),
+    "shared/resources/develop-pipeline-resume-contract.md",
+    ...fs
+      .readdirSync(join(ROOT, "skills"))
+      .filter(
+        (d) =>
+          /^develop-/.test(d) &&
+          fs.existsSync(join(ROOT, "skills", d, "SKILL.md")),
+      )
+      .map((d) => `skills/${d}/SKILL.md`),
+    ...listDir(
+      "skills/develop-bug/references",
+      /^develop-bug-step-[1-9].*\.md$/,
+    ),
+    ...["qa-task", "qa-story", "review-pr", "finalise"].map(
+      (d) => `skills/${d}/SKILL.md`,
+    ),
+  ];
+  assert.ok(
+    population.length >= 14,
+    `population too small: ${population.length}`,
+  );
+  let sites = 0;
+  for (const rel of population) {
+    const lines = read(rel).split(/\r?\n/);
+    lines.forEach((l, i) => {
+      if (!DISPATCH.test(l) || EXEMPT.test(l)) return;
+      sites += 1;
+      const window = lines.slice(Math.max(0, i - 12), i + 12).join("\n");
+      // The SET form with a quoted label — a mention of the script (`--clear`, a citation)
+      // is not a mark.
+      assert.match(
+        window,
+        /set-waiting-on\.sh "[^"]+"/,
+        `${rel}:${i + 1} dispatches without marking the wait: ${l.trim().slice(0, 80)}`,
+      );
+    });
+  }
+  // Non-vacuity: the two QA skills' own dispatches are in the count (the ones the hand-list missed).
+  assert.ok(
+    sites >= 12,
+    `expected ≥12 dispatch sites across the population, found ${sites} — the pattern drifted`,
+  );
+  for (const rel of ["skills/qa-task/SKILL.md", "skills/qa-story/SKILL.md"]) {
+    assert.match(
+      read(rel),
+      /set-waiting-on\.sh "5a qa-/,
+      `${rel} must mark its own 5a dispatch`,
     );
   }
 });
@@ -249,10 +390,25 @@ test("QA_MAX_CYCLES is the lock's qa_max_cycles — reconstructed count plus the
     /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\) \| \.qa_phase = "5a"'/,
     "grant-qa-cycles.sh must write qa_max_cycles as the reconstructed count plus the grant, and qa_phase 5a, in one write (C3-CR-3)",
   );
+  // task.124: the restore moved into advance-pipeline-lock.sh --restore, the ONE restore path.
+  // The field stripping lives there; the grant script must call it and must not carry its own.
+  assert.match(
+    text.lockHelper,
+    /del\(\.halted_at, \.halt_reason, \.halt_step, \.paused_at, \.pause_reason, \.waiting_on\)/,
+    "advance-pipeline-lock.sh --restore must rebuild the lock from the snapshot minus the halt-only fields and any waiting_on (task.124 QA cycle 2, CR-3)",
+  );
   assert.match(
     text.grantScript,
-    /del\(\.halted_at, \.halt_reason, \.halt_step, \.paused_at, \.pause_reason\)/,
-    "grant-qa-cycles.sh must restore the lock from the snapshot minus the halt-only fields",
+    /"\$ADVANCE" --restore "\$DOC_DIR"/,
+    "grant-qa-cycles.sh must restore through advance-pipeline-lock.sh --restore",
+  );
+  assert.doesNotMatch(
+    text.grantScript
+      .split(/\r?\n/)
+      .filter((l) => !/^\s*#/.test(l))
+      .join("\n"),
+    /del\(\.halted_at/,
+    "grant-qa-cycles.sh must not carry a second restore (one restore path, task.124)",
   );
   // Every call site is the script, and none inlines the jq or reads $QA_CYCLE across fences.
   for (const name of ["resumeContract", "taskSkill", "storySkill"]) {

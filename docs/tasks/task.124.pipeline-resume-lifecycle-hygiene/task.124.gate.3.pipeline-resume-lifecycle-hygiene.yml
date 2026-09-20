@@ -1,0 +1,108 @@
+schema: 1
+task: 'task.124.pipeline-resume-lifecycle-hygiene'
+task_title: 'Resume trusts what it finds on disk'
+gate: CONCERNS
+status_reason: 'Cycle-2 findings CR-1..CR-4 verified FIXED (MERGED-only rule; --restore on the re-invocation path; waiting_on drop mutation-proven; rename → class (c) reproduced). The narrowed cycle-3 review found no HIGH: two MEDIUM (medium confidence) on the interaction of the restore with the grant refusal and on a deletion of a branch-added file, and three LOW prose contradictions the fixes left behind. Reliability CONCERNS.'
+reviewer: 'QA Engineer'
+updated: '2026-09-19T14:39:09Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'Phase 0b runs `--restore` at the Resume choice, before the grant prompt; on a loop-escalation snapshot a declined or refused grant then leaves a restored lock and a consumed snapshot, contradicting re-entry step 4 and the task.123 refusal-leaves-nothing-behind rule.'
+    suggested_action: 'Branch on halt_reason before restoring: on loop-limit|not-converging the grant prompt comes first and the grant restores; a plain Resume restores directly; rewrite step 4.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.9.restore-before-grant-defeats-refusal.md'
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: '`git diff --quiet $BASE_REF -- $p` is 0 for a path absent on both sides, so an uncommitted deletion of a branch-added file is classed overlay and `git checkout HEAD -- $p` re-creates it under a success line (reproduced).'
+    suggested_action: 'Require `git cat-file -e "$BASE_REF:$p"` on the tracked arm before the diff test, mirroring the `??` arm.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.10.probe-recreates-deleted-branch-added-file.md'
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'docs/tasks/task.124.pipeline-resume-lifecycle-hygiene/task.124.pipeline-resume-lifecycle-hygiene.md'
+    finding: 'The Target Architecture block still says the detector refuses a snapshot whose document reads status: accepted or whose PR is merged — the rule cycle 2 reversed.'
+    suggested_action: 'Rewrite the line: MERGED only; accepted alone never fires.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'Table row (a) and task.124.md:218 still say the re-read is "over those paths", while the snippet re-reads the whole tree and says why the scoped form is vacuous.'
+    suggested_action: 'Change both sentences to the full `git status --porcelain --no-renames` re-read.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'shared/resources/pipeline-resume-detector-prompt.md'
+    finding: 'platform-variance: the MERGED check is `gh pr view`, so a Bitbucket pr_url makes the rule silently inert (a merged-work snapshot stays a candidate).'
+    suggested_action: 'State the rule as GitHub-only (a Bitbucket snapshot is always an ordinary candidate) or branch on the URL host.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3512
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged: no corpus sink for the Markdown-input boundary; local paths/labels through jq --arg; the restore now drops waiting_on so the Stop hook valve cannot be held open by a snapshot.'
+  performance:
+    status: PASS
+    notes: 'One extra `git cat-file -e` per tracked entry once CR-2 lands; negligible.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-2: a deliberate uncommitted deletion of a branch-added file is undone by the probe (reproduced). CR-1: a refused re-entry leaves a lock behind. Both are recoverable and neither corrupts committed state; neither is HIGH.'
+  maintainability:
+    status: PASS
+    notes: 'Three low prose contradictions (CR-3, CR-4, CR-6) are the residue of two fix cycles; the mechanisms themselves are single-definition and tested.'
+
+bug_resolution:
+  cycle_2_findings_verified:
+    - { id: 'CR-1 (cycle 2)', status: FIXED, evidence: 'detector keys on MERGED only; accepted-but-unmerged paragraph and table row present' }
+    - { id: 'CR-2 (cycle 2)', status: FIXED, evidence: '--restore stated in step-0 §0b, resume contract Phase 0a, pause doc, three orchestrators' }
+    - { id: 'CR-3 (cycle 2)', status: FIXED, evidence: 'mutation (drop the del(.waiting_on)) → [bash]/[zsh] --restore: waiting_on dropped red' }
+    - { id: 'CR-4 (cycle 2)', status: FIXED, evidence: 'git mv a b → porcelain --no-renames yields D a / A b; A b fails the diff test → class (c)' }
+
+code_review:
+  reviewed: '16 files changed since gate 2 (2279 diff lines), narrowed'
+  findings_total: 6
+  bugs: 5
+  cleanups: 1
+  promoted_to_gate: 2
+  code_review_blocking: true
+
+recommendations:
+  immediate:
+    - action: 'CR-1: grant-first ordering on a loop-escalation snapshot; rewrite re-entry step 4'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'CR-2: cat-file -e precondition on the tracked arm; fixture variant'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-3 / CR-4 / CR-6: the three stale sentences'
+      refs: ['docs/tasks/task.124.pipeline-resume-lifecycle-hygiene/task.124.pipeline-resume-lifecycle-hygiene.md', 'shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-5: state the MERGED rule as GitHub-only or branch on the host'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md']
+  future:
+    - action: 'Carried: cycle-1 CR-5 (guard vs chosen candidate), cycle-1 CR-7 (inline lint exit-code split)'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed (a refused grant leaves nothing; a deleted branch-added file is class (c))']

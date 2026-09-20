@@ -48,7 +48,7 @@ With the root cause localised, now:
 
 Run the project's lint + tests after the change (the exact commands come from the codebase; e.g. `npx nx lint <project> && npx nx test <project>` or `deno lint && deno test -A`). Iterate until zero lint errors and all tests pass, including the new regression test.
 
-Apply the shared develop-loop's **stall detection** and **test-failure triage** verbatim: on a failing run, capture output to `.claude/state/test-output-${ITER}-*.log`, dispatch an Explore subagent with [`references/test-failure-triage-prompt.md`](test-failure-triage-prompt.md), and consume only its summary. Honour the shared loop's iteration bound; on HALT, follow the shared halt protocol (commit report, snapshot+remove lock, surface to user).
+Apply the shared develop-loop's **stall detection** and **test-failure triage** verbatim: on a failing run, capture output to `.claude/state/test-output-${ITER}-*.log`, dispatch an Explore subagent with [`references/test-failure-triage-prompt.md`](test-failure-triage-prompt.md) — marking the wait on the lock beside the dispatch (`bash .agents/skills/develop-bug/references/set-waiting-on.sh "step-3 test triage iter $ITER"`) and clearing it (`… --clear`) once the summary is read (task.124) — and consume only its summary. Honour the shared loop's iteration bound; on HALT, follow the shared halt protocol (commit report, snapshot+remove lock, surface to user).
 
 ---
 

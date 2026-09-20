@@ -155,6 +155,7 @@ PR_URL=$(jq -r '.pr_url // ""' "$LOCK" 2>/dev/null)
 LOCK_TRACKER=$(jq -r '.tracker // ""' "$LOCK" 2>/dev/null)
 TRACKER_ISSUE=$(jq -r '.tracker_issue // ""' "$LOCK" 2>/dev/null)
 CURRENT_STEP=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
+DOC_DIR=$(jq -r '.task_or_story_directory // ""' "$LOCK" 2>/dev/null)
 # NOW is set once near the top (used by both write_pause_snapshot and the report entry).
 
 # Sanity: if we don't even know which skill, bail gracefully
@@ -188,10 +189,29 @@ if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
     echo ""
   } >> "$REPORT" || echo "on-precompact: failed to append to report" >&2
 
-  # Best-effort commit + push
-  git add "$REPORT" 2>/dev/null || true
-  git commit -m "docs(${SKILL}): pipeline paused at step ${CURRENT_STEP} — context compaction imminent" >/dev/null 2>&1 || true
-  git push origin HEAD >/dev/null 2>&1 || true
+  # Read the report back before committing it — lint call site (3) of four
+  # (task.124, obs #115). The append above is the one write this hook makes to
+  # the report, and this hook runs under the pressure that makes a half-written
+  # report most likely; task.117's doubled, mid-line-spliced report reached git
+  # through a commit nobody read first. A failing lint does NOT abort the pause
+  # (the snapshot and the lock removal below are what resume depends on) — it
+  # skips the commit, so the corruption stays in the working tree for a human to
+  # repair, and says so on stderr and in the additionalContext summary.
+  REPORT_LINT_OK=true
+  if command -v node >/dev/null 2>&1 && [ -f "$HOOK_DIR/report-lint.js" ]; then
+    if ! LINT_OUT=$(command node "$HOOK_DIR/report-lint.js" --file "$REPORT" --json 2>&1); then
+      REPORT_LINT_OK=false
+      echo "on-precompact: report failed lint — pause entry appended but NOT committed; repair $REPORT by hand" >&2
+      printf '%s\n' "$LINT_OUT" | jq -r '.problems[]? | "  \(.code) (line \(.line)): \(.detail)"' 2>/dev/null >&2 || true
+    fi
+  fi
+
+  # Best-effort commit + push — only over a report the linter accepted.
+  if [ "$REPORT_LINT_OK" = true ]; then
+    git add "$REPORT" 2>/dev/null || true
+    git commit -m "docs(${SKILL}): pipeline paused at step ${CURRENT_STEP} — context compaction imminent" >/dev/null 2>&1 || true
+    git push origin HEAD >/dev/null 2>&1 || true
+  fi
 fi
 
 # Best-effort PR comment — through the access gate, lead first, body by file.
@@ -338,14 +358,22 @@ fi
 # was renamed away at the claim, so there is nothing left for it to claim.
 rm -f "$LOCK"
 
-# Build the agent signal
+# Build the agent signal. The lint outcome is reported both to the agent and in the
+# user-facing template — a pause entry that was appended but not committed is a
+# repair the operator has to do, and a summary that said "committed" would hide it.
+REPORT_LINT_NOTE=", committed, and pushed"
+REPORT_LINT_SUMMARY=", committed the report, and pushed to remote"
+if [ "${REPORT_LINT_OK:-true}" != true ]; then
+  REPORT_LINT_NOTE=" but NOT committed — the report FAILED report-lint.js; repair it by hand, then commit"
+  REPORT_LINT_SUMMARY=" (report NOT committed: it failed report-lint.js — repair by hand)"
+fi
 SIGNAL=$(cat <<EOF
 🛑 PIPELINE-PAUSE-SIGNAL
 
 The \`/${SKILL}\` pipeline was paused at Step ${CURRENT_STEP} due to imminent context compaction.
 
 **Done by the hook (no action needed from you):**
-- Implementation report appended with pause entry, committed, and pushed: \`${REPORT}\`
+- Implementation report appended with pause entry${REPORT_LINT_NOTE}: \`${REPORT}\`
 - PR comment: ${PR_COMMENT_OUTCOME}
 - Tracker issue comment: ${ISSUE_COMMENT_OUTCOME}
 - Lock file removed
@@ -366,10 +394,12 @@ Branch:                ${BRANCH}
 PR:                    ${PR_URL:-(none yet)}
 Implementation Report: ${REPORT}
 
-The hook saved state, committed the report, and pushed to remote.
+The hook saved state${REPORT_LINT_SUMMARY}.
 PR comment:            ${PR_COMMENT_OUTCOME}
 Tracker issue comment: ${ISSUE_COMMENT_OUTCOME}
 Resume with: /${SKILL} <path>   (choose 'Resume from last completed step' when prompted)
+Continuing in THIS session instead? The lock is gone — restore it FIRST, before any step advances:
+  bash .agents/skills/${SKILL}/references/advance-pipeline-lock.sh --restore ${DOC_DIR:-<doc-dir>}
 \`\`\`
 EOF
 )

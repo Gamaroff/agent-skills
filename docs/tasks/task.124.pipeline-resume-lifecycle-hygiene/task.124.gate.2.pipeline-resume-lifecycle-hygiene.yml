@@ -1,0 +1,111 @@
+schema: 1
+task: 'task.124.pipeline-resume-lifecycle-hygiene'
+task_title: 'Resume trusts what it finds on disk'
+gate: FAIL
+status_reason: 'Cycle-1 findings CR-1..CR-4 verified FIXED (GNU coreutils container 43/43; staged-overlay reproduction; budget override; derived population). The cycle-2 refute pass found two new HIGH defects in the mechanisms themselves: the stale-snapshot rule fires on `status: accepted`, which finalise writes before Step 8, and the re-invocation resume path never restores the lock — so every re-invoked resume now fails at its first advance. Two MEDIUM on the fixes combination and porcelain parsing.'
+reviewer: 'QA Engineer'
+updated: '2026-09-19T14:15:01Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'shared/resources/pipeline-resume-detector-prompt.md'
+    finding: 'The stale-snapshot rule deletes a same-document last-halt.json when the document reads `status: accepted` — a state finalise writes at Step 7 6a, before CI reading 2 and Step 8 — so a legitimate post-acceptance HALT or pause loses its resume record on the next invocation.'
+    suggested_action: 'Key the deletion on evidence the run finished (PR MERGED) only; drop the `status: accepted` disjunct.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.5.stale-snapshot-rule-fires-on-accepted.md'
+    status: open
+  - id: 'CR-2'
+    severity: high
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The re-invocation resume path (Phase 0b Resume) skips Step 1 and has no `--restore` step, so with the numeric advance now exit 1 every re-invoked resume at step ≥ 2 fails at its first transition.'
+    suggested_action: 'Run `advance-pipeline-lock.sh --restore {doc-directory}` in Phase 0b when the detector source is halt_snapshot / orphaned_claim and the operator chooses Resume — step-0 §0b, the resume contract, the three orchestrators.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.6.reinvocation-resume-never-restores-lock.md'
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: '`--restore` keeps a `waiting_on` captured in a PreCompact snapshot while `--clear` in the no-lock window is a no-op, so the rebuilt lock carries a stale wait that makes the Stop hook allow every stop until the budget elapses.'
+    suggested_action: 'del(.waiting_on) in the restore jq; document and test the drop.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.7.restore-carries-stale-waiting-on.md'
+    status: open
+  - id: 'CR-4'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The probe parses porcelain with `p=${line:3}`, so a staged rename or quoted path becomes a no-match pathspec that is classed overlay, "discarded" without effect, and re-read clean by the same pathspec.'
+    suggested_action: '`git status --porcelain --no-renames`; quoted paths → class (c); re-read the FULL porcelain and HALT on any survivor.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.8.probe-mishandles-renames-and-quoted-paths.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 3512
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged from cycle 1: the boundary (report-lint.js) has no corpus sink; --restore and set-waiting-on.sh take local paths/labels through jq --arg and mktemp+mv. CR-3 is a liveness escape, not a security surface. Reasoned.'
+  performance:
+    status: PASS
+    notes: 'Unchanged; the full-porcelain re-read is one more `git status`.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 destroys a live resume record; CR-2 blocks every re-invoked resume; CR-3 opens the Stop hook. All three sit on the recovery path. Cycle-1 items verified fixed: CR-1(c1) 43/43 under GNU coreutils; CR-4(c1) staged overlay discarded from HEAD.'
+  maintainability:
+    status: PASS
+    notes: 'One restore path, one writer, one template definition hold. CR-6 (bundled grant copies lack the sibling) and CR-7/CR-8 cleanups are advisory.'
+
+bug_resolution:
+  cycle_1_findings_verified:
+    - { id: 'CR-1 (cycle 1)', status: FIXED, evidence: 'advance-pipeline-lock.test.sh 43/43 under alpine+coreutils; GNU-shaped stat shim scenario green in bash and zsh' }
+    - { id: 'CR-2 (cycle 1)', status: FIXED, evidence: '--budget-minutes 26 stored on the lock; finalise site passes FINALISE_CI_MAX_WAIT/60+1' }
+    - { id: 'CR-3 (cycle 1)', status: FIXED, evidence: 'derived population; qa-task/qa-story/develop-bug marks; unmarking qa-task names skills/qa-task/SKILL.md:411' }
+    - { id: 'CR-4 (cycle 1)', status: FIXED, evidence: 'staged overlay reproduction: HEAD form clears index+worktree, bare form leaves M  f' }
+
+code_review:
+  reviewed: '68 files, full branch diff, refute pass over cycle-1 fixes'
+  findings_total: 8
+  bugs: 6
+  cleanups: 2
+  promoted_to_gate: 2
+  code_review_blocking: true
+
+recommendations:
+  immediate:
+    - action: 'CR-1: delete a stale snapshot on PR MERGED only, never on status: accepted alone'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md', 'evals/develop-task/step-isolation/16-resume-stale-snapshot-after-merge-deleted']
+    - action: 'CR-2: --restore in the re-invocation resume path (step-0 §0b, resume contract Phase 0b, three orchestrators)'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md', 'shared/resources/develop-pipeline-resume-contract.md', 'skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md']
+    - action: 'CR-3: --restore drops waiting_on'
+      refs: ['shared/resources/advance-pipeline-lock.sh', 'shared/resources/advance-pipeline-lock.test.sh']
+    - action: 'CR-4: --no-renames, quoted paths → (c), full-porcelain re-read'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+  future:
+    - action: 'CR-5: the HALT-rule lint should skip the commit and still snapshot + remove the lock (mirror the PreCompact hook); reword the sentence'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md']
+    - action: 'CR-6: declare grant-qa-cycles.sh → advance-pipeline-lock.sh as a bundler-visible dependency and fail with a named message when absent'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+    - action: 'CR-7: drop the snapshot-only pre-check in grant so an orphaned claim can serve a grant'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+    - action: 'CR-8: the --budget-minutes refusal loop prints pass unconditionally'
+      refs: ['shared/resources/set-waiting-on.test.sh']
+    - action: 'Carried from cycle 1: CR-5 (guard vs chosen candidate), CR-7 (inline lint exit-code split)'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR-1 and CR-2 fixed; a re-invoked resume restores its lock; a post-acceptance snapshot survives the detector']

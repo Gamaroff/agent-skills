@@ -1,0 +1,15 @@
+{
+  "skill": "develop-task",
+  "report_path": "docs/tasks/task.42.example/task.42.implementation.1.example.md",
+  "task_or_story_id": "42",
+  "task_or_story_directory": "docs/tasks/task.42.example",
+  "branch": "feature/task.42.example",
+  "pr_url": "",
+  "tracker": "github",
+  "tracker_issue": "1",
+  "current_step": 4,
+  "started_at": "2026-09-19T09:00:00Z",
+  "halted_at": "2026-09-19T09:05:00Z",
+  "halt_reason": "dirty-tree",
+  "halt_step": "4"
+}

@@ -25,6 +25,18 @@ Before invoking `/commit-changes`, update the implementation report one final ti
 
 ---
 
+## Lint the report before the terminal commit
+
+**Before** invoking `/commit-changes`, read the report back with the linter. This is call site **(4)** of the four the report-lint contract names (the other three: the Step Transition Protocol's post-Edit check, the HALT rule's pre-commit check, and the PreCompact hook). The Step 8 commit is the last writer of the report and the one every later reader trusts, and task.117's HALT commit shipped a report doubled and spliced mid-line because no boundary read it back (obs #115):
+
+```bash
+REPORT="${IMPLEMENTATION_REPORT:?must be set from lock or context}"
+command node .agents/skills/{develop-story|develop-task|develop-bug}/references/report-lint.js --file "$REPORT" --json \
+  || { echo "HALT: report failed lint — repair $REPORT by hand before committing (see the problems above)"; exit 1; }
+```
+
+Engine: `shared/resources/report-lint.js`; expected sections come from `shared/resources/implementation-report-template.md`, the one definition. A `problems` result is a HALT with nothing committed; the linter never repairs.
+
 ## Invoke /commit-changes
 
 Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`. This stages tracked modifications across the whole tree (`git add -u`) plus any remaining new artifacts inside the work-item dir (including the finalised implementation report), without sweeping unrelated untracked paths:
@@ -74,7 +86,26 @@ Pipeline finished cleanly — no further pause possible. Remove the lock file an
 # Successful iterations remove their own log on TEST_EXIT==0; this catches
 # logs left behind by failed iterations that later recovered, plus any
 # logs from prior aborted runs that never reached cleanup.
-rm -f .claude/state/test-output-*.log
+# `find -delete`, not an `rm` glob: an unmatched glob is a zsh `nomatch` abort
+# (obs #111; docs/reference/anti-patterns.md § "Never put a must-succeed path
+# and a glob in one `rm` argv").
+find .claude/state -maxdepth 1 -name 'test-output-*.log' -delete 2>/dev/null || true
+
+# Delete the halt snapshot this run's own earlier HALT left behind — and ONLY
+# this run's. A completed run used to leave `last-halt.json` on disk, and the
+# next `/develop-*` invocation was offered a resume of merged work (obs #88).
+# Match on the snapshot's task_or_story_directory, canonicalised the way
+# advance-pipeline-lock.sh --restore compares it (relative and absolute
+# spellings of one directory are one directory); a snapshot for ANOTHER
+# document is left for its own run's detector to refuse.
+SNAPSHOT=.claude/state/develop-pipeline.last-halt.json
+if [ -f "$SNAPSHOT" ]; then
+  canon() { local s; s=$(printf '%s' "$1" | sed -E 's#^\./##; s#/+$##'); (cd "$s" 2>/dev/null && pwd -P) || printf '%s' "$s"; }
+  SNAP_DIR=$(jq -r '.task_or_story_directory // ""' "$SNAPSHOT" 2>/dev/null)
+  if [ -n "$SNAP_DIR" ] && [ "$(canon "$SNAP_DIR")" = "$(canon "{work-item-dir}")" ]; then
+    rm -f "$SNAPSHOT" && echo "halt snapshot for this run removed"
+  fi
+fi
 
 # Remove the pipeline lock — must be last so a crash mid-cleanup still leaves
 # the lock available for resume.
@@ -91,8 +122,16 @@ Run these post-condition checks. **If any fails, do NOT emit "Story/Task Develop
 # 1. Lock file removed
 [ ! -f .claude/state/develop-pipeline.lock ] || { echo "❌ Step 8 incomplete: lock file still present"; exit 1; }
 
-# 2. Test-output logs cleaned
-ls .claude/state/test-output-*.log 2>/dev/null | grep -q . && { echo "❌ Step 8 incomplete: test-output logs remain"; exit 1; } || true
+# 2. Test-output logs cleaned (`find`, not `ls <glob>`: an unmatched glob aborts under zsh)
+[ -z "$(find .claude/state -maxdepth 1 -name 'test-output-*.log' 2>/dev/null)" ] || { echo "❌ Step 8 incomplete: test-output logs remain"; exit 1; }
+
+# 2b. No halt snapshot for THIS work item survives the run (task.124 — a snapshot that
+#     outlives its run is offered as a resume for merged work on the next invocation)
+if [ -f .claude/state/develop-pipeline.last-halt.json ]; then
+  SNAP_DIR=$(jq -r '.task_or_story_directory // ""' .claude/state/develop-pipeline.last-halt.json 2>/dev/null)
+  [ -n "$SNAP_DIR" ] && [ "$(cd "$SNAP_DIR" 2>/dev/null && pwd -P)" = "$(cd "{work-item-dir}" && pwd -P)" ] \
+    && { echo "❌ Step 8 incomplete: halt snapshot for this work item still present"; exit 1; }
+fi
 
 # 3. Implementation report finalised — Final Status must be 'Completed' or 'Accepted', Finished must NOT be '—'
 REPORT="${IMPLEMENTATION_REPORT:?must be set from lock or context}"
@@ -112,7 +151,7 @@ VERIFY_EXIT=$?
 echo "✅ Step 8 post-conditions verified"
 ```
 
-Checks 1–4 address regressions #3 and #4 from the live-github-test (impl report stuck at "In Progress / Finished: —", lock file not removed). Treat the bash assertions as binding — emit the Phase 2 Completion banner only after all five pass.
+Checks 1–4 (and 2b) address regressions #3 and #4 from the live-github-test and obs #88 (impl report stuck at "In Progress / Finished: —", lock file not removed). Treat the bash assertions as binding — emit the Phase 2 Completion banner only after all five pass.
 
 ---
 

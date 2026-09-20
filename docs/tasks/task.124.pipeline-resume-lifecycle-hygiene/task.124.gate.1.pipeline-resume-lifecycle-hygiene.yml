@@ -1,0 +1,106 @@
+schema: 1
+task: 'task.124.pipeline-resume-lifecycle-hygiene'
+task_title: 'Resume trusts what it finds on disk'
+gate: FAIL
+status_reason: 'All four phases implemented and green on macOS, but the --restore mtime read uses the BSD stat form, which on GNU coreutils is filesystem mode — the newest-candidate rule is not honoured on Linux and the lock-helper suite is red there (CI will fail). Three medium findings on the new waiting_on/probe mechanisms.'
+reviewer: 'QA Engineer'
+updated: '2026-09-19T13:50:10Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: 'platform-variance: `stat -f %m || stat -c %Y` is filesystem mode on GNU coreutils, so $m is non-numeric and the first candidate (last-halt.json) always wins; advance-pipeline-lock.test.sh fails on Linux (orphaned-claim scenario).'
+    suggested_action: 'Try `stat -c %Y` first, fall back to `stat -f %m`, and validate the result is all digits before comparing (non-numeric → 0 with a stderr warning).'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.1.restore-mtime-gnu-stat.md'
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The Step 7 CI poll is marked with the 10-minute config budget but runs up to FINALISE_CI_MAX_WAIT (25 min); the Stop hook re-prompts for the last 15 minutes and the docs now call that a crashed dispatch.'
+    suggested_action: 'Add `--budget-minutes N` to set-waiting-on.sh and pass the poll bound at the finalise site.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.2.ci-poll-wait-outlives-budget.md'
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'evals/shared/tests/qa-loop-lock-fields-parity.test.mjs'
+    finding: 'Dispatch-site population is hand-listed (five files) and the pattern is case-sensitive; qa-task Step 3b and qa-story:566 dispatch inside 5a with no set-waiting-on call and the test cannot see them.'
+    suggested_action: 'Enumerate sources from the directories the hooks doc names, widen the pattern, and mark the two QA-skill dispatches.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.3.dispatch-population-hand-listed.md'
+    status: open
+  - id: 'CR-4'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'A staged overlay entry passes the working-tree test but `git checkout -- <path>` restores from the index, so it survives under an "overlay discarded" line and Step 3 commits it.'
+    suggested_action: 'Discard index and worktree from HEAD (`git checkout HEAD -- <paths>`) and re-read porcelain afterwards, halting on any survivor.'
+    suggested_owner: dev
+    bug_ref: 'task.124.bug.4.staged-overlay-not-discarded.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 3512
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Boundary rule fires on report-lint.js (a validator), but its input surface is Markdown prose — none of the five corpus sinks (url-authority, sql-orm, shell-exec, path, template-render) addresses it, so no probe was executable; --restore and set-waiting-on.sh take only local paths/labels through jq --arg and mktemp+mv. Reasoned, not measured.'
+  performance:
+    status: PASS
+    notes: 'One git status + one diff/cmp per dirty entry on resume; report-lint is a single pass over the report (12 tests in ~2 ms); no new work on the hot path.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: the restore candidate choice is platform-dependent — reproduced under GNU coreutils in a container (suite 39/40 there vs 59/59 on macOS). CR-4: a staged overlay survives the probe. Both are on the recovery path the task exists to harden.'
+  maintainability:
+    status: PASS
+    notes: 'One definition for the report sections (template read by step-0 and the linter, with a test asserting step-0 no longer inlines one); one restore path; one waiting_on writer; every new mechanism has a mutation proof recorded and four re-run independently at QA (all covered). Cleanups CR-8..CR-10 are advisory.'
+
+code_review:
+  reviewed: '62 files in the diff; executable verification on the seven scripts/engines and six test files'
+  findings_total: 10
+  bugs: 7
+  cleanups: 3
+  promoted_to_gate: 1
+  code_review_blocking: true
+
+recommendations:
+  immediate:
+    - action: 'Fix the --restore mtime read for GNU coreutils and add a numeric guard (CR-1)'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+    - action: 'Add --budget-minutes to set-waiting-on.sh and use the poll bound at the finalise CI poll (CR-2)'
+      refs: ['shared/resources/set-waiting-on.sh', 'skills/finalise/SKILL.md']
+    - action: 'Enumerate the dispatch population from directories, widen the pattern, mark the qa-task/qa-story dispatches (CR-3)'
+      refs: ['evals/shared/tests/qa-loop-lock-fields-parity.test.mjs', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'Discard staged overlay entries from HEAD and re-verify porcelain after the discard (CR-4)'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+  future:
+    - action: 'CR-5: run the never-lower guard against the candidate --restore actually chose (or drop the snapshot-only pre-check)'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+    - action: 'CR-6: an unreadable report is a blocking issue, not "nothing expected"'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md']
+    - action: 'CR-7: the three inline lint call sites should distinguish exit 2/127 (lint unavailable) from exit 1 (problems), as the PreCompact hook does'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md', 'shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'CR-8: consume every same-document candidate on a successful --restore, not only the winner'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+    - action: 'CR-9: reword the --clear header ("semantically unchanged") or short-circuit on has("waiting_on")'
+      refs: ['shared/resources/set-waiting-on.sh']
+    - action: 'CR-10: remove the dead insideVariantFence state in parseTemplate'
+      refs: ['shared/resources/report-lint.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR-1 fixed and advance-pipeline-lock.test.sh green under GNU coreutils']
