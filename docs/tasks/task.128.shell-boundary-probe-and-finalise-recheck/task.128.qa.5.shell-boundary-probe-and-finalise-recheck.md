@@ -29,7 +29,7 @@ Cycle 4's four fixes hold — each verified by execution on `76b7151f`. The scop
 
 ## Review Methodology
 
-Lite mode — direct tools only (`Adaptive strategy override: lite mode — direct tools only`). Step 3b: one read-only Explore reviewer over the scoped patch with a refute directive on each cycle-4 fix (24 tool uses; every claimed fix executed against real bash 3.2 and 5.3). SAFETY RE-PROBE: engine-recorded run on `76b7151f` (`task.128.qa.5.security.run.json`, 39 executed). Suite: isolated-worktree `ci:fast` on this exact tree 3579/3580 (the one failure is `observation-log.test.mjs` refusing a `/private/tmp` worktree by design; re-run in the main tree 53/53); `bundle:check` 0 problems; the four bundled `references/security-probe.mjs` copies differ from the source only by the AUTO-GENERATED header.
+Re-review (cycle 5) — direct tools, focused scope; PIPELINE_MODE standard. Step 3b: one read-only Explore reviewer over the scoped patch with a refute directive on each cycle-4 fix (24 tool uses; every claimed fix executed against real bash 3.2 and 5.3). SAFETY RE-PROBE: engine-recorded run on `76b7151f` (`task.128.qa.5.security.run.json`, 39 executed). Suite: isolated-worktree `ci:fast` on this exact tree 3579/3580 (the one failure is `observation-log.test.mjs` refusing a `/private/tmp` worktree by design; re-run in the main tree 53/53); `bundle:check` 0 problems; the four bundled `references/security-probe.mjs` copies differ from the source only by the AUTO-GENERATED header.
 
 ## NFR Assessment
 
