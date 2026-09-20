@@ -5,7 +5,7 @@ type: task
 description: "Close the medium findings PR #436's Step 5c review carried past merge and collapse the who-restores enumeration that produced bugs 9→11→12→13: bind the probe base from the bug-variant report's Branch-model line, mark develop-bug's Step 3 dispatch and widen the population pattern, move the stale-snapshot rm -f into the orchestrator, state the restore rule once with citations and a test, and the four gate-6 futures."
 tags: [pipeline, resume, develop-bug, enumeration]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-09-20
 updated: 2026-09-20
@@ -13,11 +13,13 @@ assignee:
 estimated_effort_hours: 16
 risk_level: medium
 github_issue: 437
+completed_date: 2026-09-20
+pr_number: 441
 ---
 
 # Technical Task: Resume residue from task.124 — bug-variant base, dispatch population, self-reported delete, who-restores enumeration
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.130.review.1.resume-residue-bug-variant-base-and-who-restores.md` implemented 2026-09-20
 **GitHub Issue**: [#437](https://github.com/Gamaroff/agent-skills/issues/437)
 
@@ -400,7 +402,36 @@ Not applicable — one additional `sed` per resume.
 | 2026-09-20 |  | QA gate 6 CONCERNS, no open entry (90/100) — granted cycle; bug 12 verified fixed; 0 HIGH, 0 MEDIUM, 1 cleanup; advisory residue carried to a follow-up; handed to 5c | qa-task |
 | 2026-09-20 |  | Step 5c review-pr CONCERNS (PC-2 six Change Log rows restored; PC-3 task.131/132 docs accepted; CR-1 --accept-legacy stamp → bug 13); QA findings fixed — bug 13, cycle 7; +3 scenarios, mutation-proven | qa-fix |
 | 2026-09-20 |  | QA gate 7 PASS (92/100) — last granted cycle; bug 13 verified fixed; 0 HIGH, 0 MEDIUM, 1 LOW carried (route 2b); Deferred Work recorded; handed to 5c | qa-task |
+| 2026-09-20 | 1.2 | DoD passed — accepted (PR #441); security probe recorded as unverified-by-engine (shell boundary), accepted on QA-executed evidence | finalise |
 <!-- change-log-end -->
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.130.qa.7.resume-residue-bug-variant-base-and-who-restores.md` (7 cycles; loop limit at 5, two granted)
+**Gate File**: `task.130.gate.7.resume-residue-bug-variant-base-and-who-restores.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 92/100
+**Step 5c**: `task.130.pr-review.1.…md` — APPROVE on re-check
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11/11 met, each with code and per-PR-lane test citations
+✅ **Tests:** 3574 node tests + shell suites (91/42) + 13 eval replays; five new/extended suites; every fix mutation-proven
+✅ **PR Review:** PR #441 — 5c conformance + code lenses, APPROVE on re-check; CI 5/5 SUCCESS on `d4d29bb4`
+✅ **Documentation:** CHANGELOG entry with both Breaking markers; contract, detector prompt, step-0/8, hooks, pause and three orchestrator SKILL.md updated; bundle in sync
+⚠️ **Security Review:** checks PASS (no secrets, no unsafe patterns, gated single-path deletes); probe mode **unverified by the engine** — both boundaries are shell and `security-probe.mjs` imports only ES modules (`totals.executed: 0`). Accepted by the operator on the recorded executed evidence: QA gates 3/5/7 ran the delete block and `--restore` under bash and zsh against 74 enumerated inputs, no hostile input accepted, no legitimate input refused. Follow-up: a shell-capable probe sink.
+✅ **Compliance Review:** NOT_APPLICABLE — internal refactor
+✅ **Bugs:** 13 filed across the loop, all Closed
+
+**Deferred Work:** see § Notes › Deferred Work (one follow-up task).
+
+**Task marked as ACCEPTED on:** 2026-09-20
+
+**Detailed Verification Log:** See `task.130.dod.1.resume-residue-bug-variant-base-and-who-restores.md` for complete verification evidence and timestamps.
 
 ## Bug Reports
 
