@@ -391,6 +391,7 @@ Not applicable — one additional `sed` per resume.
 | 2026-09-20 |  | QA findings fixed — bugs 9–11 (delete block re-binds from the persisted file; empty pr_url kept before gh; note-object shape stated once, every site an object) + CR-4..CR-5, 4 iterations; +5 tests, all mutation-proven | qa-fix |
 | 2026-09-20 |  | QA gate 5 CONCERNS (85/100) — bugs 9–11 verified fixed; safety re-probe: 0 HIGH, 1 MEDIUM (three orchestrator citations describe a prefix delete), 6 advisory; bug 12 | qa-task |
 | 2026-09-20 |  | QA findings fixed — bug 12 (three orchestrator citations name the exact delete label; test D reads the citation content), 5 iterations; +2 assertions, mutation-proven | qa-fix |
+| 2026-09-20 |  | QA gate 6 CONCERNS, no open entry (90/100) — granted cycle; bug 12 verified fixed; 0 HIGH, 0 MEDIUM, 1 cleanup; advisory residue carried to a follow-up; handed to 5c | qa-task |
 <!-- change-log-end -->
 
 ## Bug Reports
@@ -398,10 +399,6 @@ Not applicable — one additional `sed` per resume.
 ### Open Bugs
 
 None.
-
-### In QA Verification
-
-- [Bug 12: three orchestrator citations describe a prefix delete](./task.130.bug.12.orchestrator-citations-describe-prefix-delete.md) - 🔍 Ready for QA - Priority: P2
 
 ### Closed Bugs
 
@@ -416,27 +413,28 @@ None.
 - [Bug 9: delete block read the previous fence's variable](./task.130.bug.9.delete-block-reads-variable-from-previous-fence.md) - ✅ Closed (verified QA cycle 5)
 - [Bug 10: four bare-string note sites](./task.130.bug.10.remaining-bare-string-note-sites.md) - ✅ Closed (verified QA cycle 5)
 - [Bug 11: empty `pr_url` read the current branch](./task.130.bug.11.empty-pr-url-reads-current-branch.md) - ✅ Closed (verified QA cycle 5)
+- [Bug 12: three orchestrator citations described a prefix delete](./task.130.bug.12.orchestrator-citations-describe-prefix-delete.md) - ✅ Closed (verified QA cycle 6)
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: CONCERNS (no open entry)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-20
-**Quality Score**: 85/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS — no open entry; handed to 5c
 
 ### QA Report
-- **Full Report**: [task.130.qa.5.resume-residue-bug-variant-base-and-who-restores.md](./task.130.qa.5.resume-residue-bug-variant-base-and-who-restores.md)
-- **Gate File**: [task.130.gate.5.resume-residue-bug-variant-base-and-who-restores.yml](./task.130.gate.5.resume-residue-bug-variant-base-and-who-restores.yml)
+- **Full Report**: [task.130.qa.6.resume-residue-bug-variant-base-and-who-restores.md](./task.130.qa.6.resume-residue-bug-variant-base-and-who-restores.md)
+- **Gate File**: [task.130.gate.6.resume-residue-bug-variant-base-and-who-restores.yml](./task.130.gate.6.resume-residue-bug-variant-base-and-who-restores.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 3574 node tests + shell suites; eval:develop-task 13/13
-- **Phases Verified**: 5/5 (Phase 3 CONCERNS — description, not behaviour)
-- **Critical Issues**: 0 HIGH, 1 MEDIUM (bug 12); bugs 9–11 verified fixed
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 HIGH, 0 MEDIUM; bug 12 verified fixed (all 12 bugs closed)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS (advisory residue for a follow-up task)
 
 ### Key Findings
-Cycle-5 safety re-probe (clause 3: gate 4 FAIL + "refused"): bugs 9–11 FIXED, re-verified from two processes under both shells; 42 executed inputs to the delete boundary across QA and the reviewer, all per the rule. One medium: the three orchestrators still describe the delete label as a prefix (`starts \`stale-snapshot\``) while the selector has been exact equality since cycle 2 ([bug 12](./task.130.bug.12.orchestrator-citations-describe-prefix-delete.md)). Six advisories (CR-2, CR-3 medium-confidence; CR-4 refuted; CR-5..CR-7 cleanups). HIGH sequence 0, 1, 0, 1, 0.
+Granted cycle 6 (loop limit at 5; 2 cycles granted): bug 12 FIXED — the three orchestrator citations name the exact delete label and test D reads the citation's content (red under three mutations). One low cleanup on the new assertion (CR-1); gate-5 advisories CR-2, CR-3, CR-5–CR-7 carried for a follow-up task. HIGH sequence 0, 1, 0, 1, 0, 0. Earlier gates: 1 CONCERNS 85 · 2 FAIL 70 · 3 CONCERNS 80 · 4 FAIL 70 · 5 CONCERNS 85.
 
 ## Progress Tracking
 

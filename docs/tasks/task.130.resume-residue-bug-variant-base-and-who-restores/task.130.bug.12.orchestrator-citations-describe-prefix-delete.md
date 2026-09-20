@@ -4,7 +4,7 @@
 **Bug ID**: TASK-130-BUG-12
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 5 safety re-probe CR-1, confirmed by QA)
 **Date Found**: 2026-09-20
 
@@ -72,3 +72,4 @@ Reword the three sentences to `whose concern is exactly stale-snapshot: PR merge
 | 2026-09-20 | New | QA Engineer | Found in QA cycle 5 (safety re-probe CR-1, confirmed by grep) |
 | 2026-09-20 | In Progress | qa-fix | Investigation started |
 | 2026-09-20 | Ready for QA | qa-fix | Fix implemented, mutation-proven |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed in QA cycle 6 (0 prefix hits; test D red under three independent mutations) |
