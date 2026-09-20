@@ -4,7 +4,7 @@
 **Bug ID**: TASK-128-BUG-7
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle-2 refute review CR-3, verified: `bash <file>` never consults the shebang; launch failures carry `bash: <path>: No such file|Is a directory|Permission denied`)
 **Date Found**: 2026-09-20
 
@@ -28,3 +28,4 @@ Key the branch on bash's launch-failure stderr (`^bash: <entryPath>: (No such fi
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-09-20 | Ready for QA | qa-fix | launch failure keyed on bash stderr |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed at cycle 3 (execution) |

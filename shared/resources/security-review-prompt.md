@@ -94,8 +94,11 @@ answer to a question nobody asked.
 
 `entry` is `path#exportName`, resolved from the repository root. It must be:
 
-- **A real, importable ES module export.** Non-JS entry points are a stated v1 limit — report
-  `unverifiable` and name the language.
+- **A real, importable ES module export — or a shell script via the `shell:` entry form.** A bash
+  script taking one positional argument is probed with `--entry 'shell:<path>'` (and a
+  materialised sink such as `filename`); "it is not JS" is never a reason to report
+  `unverifiable`. A script that reads stdin, takes two positionals or needs the network is
+  what remains declined — say which.
 - **Called with exactly one argument.** The child runner calls `await fn(input)`. An entry needing
   more configuration than that is not probeable as-is; report `unverifiable` rather than inventing a
   wrapper, and say what shape would be.
@@ -232,7 +235,9 @@ over-read a clean result.
    engage on a helper while the real call site bypasses it. Mitigation, not closure: cite the call
    site's `file:line`, record the module path the engine actually resolved, and **downgrade to
    `unverifiable` any citation naming no file in scope**.
-3. **Non-JS entry points are `unverifiable`** in v1 — a stated limit, not a silent skip.
+3. **A non-JS entry point is routed to `--entry 'shell:<path>'`**, not recorded `unverifiable`;
+   only a script neither entry form reaches (stdin, two positionals, network) is declined — and
+   the decline names the reason.
 
 ---
 

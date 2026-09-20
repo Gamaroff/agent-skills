@@ -16,7 +16,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,6 +27,7 @@ import {
   compareExpected,
   computeVerdict,
   defaultRepoRoot,
+  expectedProblem,
   isLaunchFailure,
   main,
   probeShells,
@@ -690,6 +691,103 @@ test("shell entry: a TARGET's own 126/127 exit is compared, not declined (BUG-7)
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("shell entry: a target that RUNS each name is compared, not declined as a launch failure (BUG-9)", () => {
+  // bash prefixes runtime errors INSIDE the script with the script path
+  // (`<script>: line 9: <fixture>/x: Permission denied`, exit 126) — the same
+  // path a launch failure names. Containment alone declined the very
+  // scenario BUG-7 was fixed for.
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: `shell:${SHELL_FIXTURES}/runs-names.sh`,
+  });
+  assert.equal(r.declined.length, 0, JSON.stringify(r.declined));
+  assert.ok(r.executed > 0);
+  const hit = r.cases.find((c) => c.direction === "hostile");
+  assert.match(hit.detail, /exit 126 ≠ 0/, hit.detail);
+});
+
+test("isLaunchFailure: a runtime error inside the script is NOT a launch failure (BUG-9)", () => {
+  const p = "/repo/shared/resources/x.sh";
+  assert.equal(
+    isLaunchFailure(
+      {
+        status: 126,
+        stderr: `${p}: line 9: /tmp/fixture/x.gate.5.yml: Permission denied\n`,
+      },
+      p,
+    ),
+    false,
+  );
+  assert.equal(
+    isLaunchFailure(
+      {
+        status: 127,
+        stderr: `${p}: line 9: /tmp/fixture/x: No such file or directory\n`,
+      },
+      p,
+    ),
+    false,
+  );
+  // A path with regex metacharacters is matched literally.
+  const odd = "/repo/a+b (c)/x.sh";
+  assert.equal(
+    isLaunchFailure(
+      { status: 127, stderr: `bash: ${odd}: No such file or directory\n` },
+      odd,
+    ),
+    true,
+  );
+});
+
+test("shell entry: a malformed expected is declined with its reason, never scored or thrown (BUG-11)", () => {
+  const base = corpusFor("filename").slice(0, 2);
+  const bad = [
+    [{ stdout: 12 }, /expected\.stdout.*must be a string/],
+    [{ stdout: null }, /expected\.stdout.*must be a string/],
+    [{ exit: "0" }, /expected\.exit.*must be an integer/],
+    [{ exit: 0, absent: 5 }, /expected\.absent.*must be an array/],
+    [{ exit: 0, absent: ["a/b"] }, /expected\.absent.*must be an array/],
+    [{ exit: 0, stderr: 7 }, /expected\.stderr.*must be a string/],
+  ];
+  for (const [expected, re] of bad) {
+    let r;
+    assert.doesNotThrow(() => {
+      r = runProbeSpec({
+        sink: "filename",
+        entry: PREFIX_SCRIPT,
+        cases: base.map((c) => ({ ...c, expected })),
+      });
+    }, JSON.stringify(expected));
+    assert.equal(r.executed, 0, JSON.stringify(expected));
+    assert.match(r.declined[0].detail, re, JSON.stringify(expected));
+  }
+  assert.equal(
+    expectedProblem({ stdout: "12\n", exit: 0, stderr: "", absent: ["PWNED"] }),
+    null,
+  );
+  assert.match(expectedProblem("nope"), /not an object/);
+});
+
+test("shell entry: side effects in HOME, TMPDIR or beside the script are escapes (BUG-12)", () => {
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: `shell:${SHELL_FIXTURES}/writes-home-tmp-self.sh`,
+  });
+  const paths = r.escapes.map((e) => e.path);
+  for (const marker of ["PWNED-home", "PWNED-tmp", "PWNED-self"]) {
+    assert.ok(
+      paths.some((p) => p.endsWith(marker)),
+      `${marker} not reported as an escape: ${JSON.stringify(paths.slice(0, 6))}`,
+    );
+  }
+  // Every escape names the shell it happened under.
+  assert.ok(r.escapes.every((e) => e.shell && e.id.endsWith(`@${e.shell}`)));
+  // The real HOME and the reader's real temp dir were not written to.
+  assert.equal(existsSync(join(process.env.HOME, "PWNED-home")), false);
+  // Clean up the fixture-dir marker the script wrote beside itself.
+  rmSync(join(REPO_ROOT, SHELL_FIXTURES, "PWNED-self"), { force: true });
 });
 
 test("isLaunchFailure: bash's own open failure, keyed on its message AND the code", () => {

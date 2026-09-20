@@ -415,7 +415,11 @@ test("both modes are documented", () => {
 
 test("the skill states its own limits", () => {
   assert.match(SKILL, /^##\s+What this does not tell you\s*$/m);
-  assert.match(SKILL, /Non-JS entry points/);
+  // The limit moved with task.128: a bash script is reachable via the shell
+  // entry form, so the stated limit is what NEITHER form reaches — stdin, two
+  // positionals, the network — never "non-JS".
+  assert.match(SKILL, /neither form reaches/);
+  assert.doesNotMatch(SKILL, /Non-JS entry points are .?unverifiable/);
 });
 
 test("the skill claims no gate and no code edits", () => {

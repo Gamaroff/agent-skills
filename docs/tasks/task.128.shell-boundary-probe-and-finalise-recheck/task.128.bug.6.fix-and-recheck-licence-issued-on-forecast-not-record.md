@@ -4,7 +4,7 @@
 **Bug ID**: TASK-128-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle-2 refute review CR-2, verified against Step 8a)
 **Date Found**: 2026-09-20
 
@@ -31,3 +31,4 @@ The licence is issued on the plan.
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-09-20 | Ready for QA | qa-fix | --git-base + Step 8a step 2b |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed at cycle 3 (execution) |

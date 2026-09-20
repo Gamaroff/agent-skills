@@ -548,6 +548,15 @@ export function runProbeSpec({
   const workDirName = "work";
   const workDir = join(sandboxRoot, workDirName);
   mkdirSync(workDir);
+  // A shell child's HOME and TMPDIR live INSIDE the sandbox root, outside the
+  // work dir, so a side effect written to either is an escape the sentinel
+  // sees rather than a write to the reader's real home (task.128 QA cycle 3,
+  // BUG-12). The JS runner keeps sandboxEnv()'s values: its child never sees
+  // a shell.
+  const sandboxHome = join(sandboxRoot, "home");
+  const sandboxTmp = join(sandboxRoot, "tmp");
+  mkdirSync(sandboxHome);
+  mkdirSync(sandboxTmp);
 
   const caseResults = [];
   const escapes = [];
@@ -560,6 +569,8 @@ export function runProbeSpec({
           entryPath: resolved.entryPath,
           shells,
           sandboxRoot,
+          sandboxHome,
+          sandboxTmp,
           workDir,
           workDirName,
           timeoutMs: perCaseTimeout,
@@ -703,10 +714,82 @@ const COMPARABLE_KEYS = Object.freeze(["stdout", "exit", "stderr"]);
 export function isLaunchFailure(child, entryPath) {
   if (child.status !== 126 && child.status !== 127) return false;
   const err = child.stderr ?? "";
-  if (!err.includes(entryPath)) return false;
-  return /(No such file or directory|Is a directory|Permission denied|cannot execute)/.test(
-    err,
+  // The message must be ABOUT the script — `bash: <script>: …` or
+  // `<script>: <script>: …` — with no `line N:` segment. bash prefixes every
+  // runtime error INSIDE a script with the script's path too
+  // (`<script>: line 3: <fixture>/x: Permission denied`, exit 126), and that is
+  // the target answering, not bash failing to open it (task.128 QA cycle 3,
+  // BUG-9). Containment alone matched both.
+  const subject = escapeRegExp(entryPath);
+  const re = new RegExp(
+    `^(?:bash|${subject}): ${subject}: (?:No such file or directory|Is a directory|Permission denied|cannot execute)`,
+    "m",
   );
+  return re.test(err);
+}
+
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Validate a materialised case's `expected` (task.128 QA cycle 3, BUG-11).
+ * Returns null when well-formed, else the reason to decline. A malformed
+ * `expected` mismatched every run and scored `absent` with a full count — a
+ * bad case and a real defect reporting one value — and a non-array `absent`
+ * threw out of runProbeSpec.
+ */
+export function expectedProblem(expected) {
+  if (!expected || typeof expected !== "object" || Array.isArray(expected)) {
+    return "`expected` is not an object";
+  }
+  if (!COMPARABLE_KEYS.some((k) => expected[k] !== undefined)) {
+    return "`expected` compares nothing — it needs at least one of stdout, exit, stderr";
+  }
+  for (const k of ["stdout", "stderr"]) {
+    if (expected[k] !== undefined && typeof expected[k] !== "string") {
+      return `\`expected.${k}\` must be a string, got ${describeType(expected[k])}`;
+    }
+  }
+  if (expected.exit !== undefined && !Number.isInteger(expected.exit)) {
+    return `\`expected.exit\` must be an integer, got ${describeType(expected.exit)}`;
+  }
+  if (expected.absent !== undefined) {
+    if (
+      !Array.isArray(expected.absent) ||
+      expected.absent.some(
+        (p) =>
+          typeof p !== "string" ||
+          p === "" ||
+          p.includes("/") ||
+          p.includes("\0"),
+      )
+    ) {
+      return "`expected.absent` must be an array of separator-free, non-empty strings";
+    }
+  }
+  return null;
+}
+
+const describeType = (v) =>
+  v === null ? "null" : Array.isArray(v) ? "array" : typeof v;
+
+/** Non-recursive name → mtime stamps of one directory (the script's own). */
+function listDirStamps(dir) {
+  const out = new Map();
+  let names;
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return out;
+  }
+  for (const n of names) {
+    try {
+      const st = statSync(join(dir, n));
+      out.set(n, `${st.size}:${st.mtimeMs}`);
+    } catch {
+      out.set(n, "?");
+    }
+  }
+  return out;
 }
 
 /**
@@ -733,6 +816,8 @@ function runShellCase(
     entryPath,
     shells,
     sandboxRoot,
+    sandboxHome,
+    sandboxTmp,
     workDir,
     workDirName,
     timeoutMs,
@@ -740,6 +825,11 @@ function runShellCase(
     escapes,
   },
 ) {
+  // The script's OWN directory is in the real tree; a `cd "$(dirname "$0")"`
+  // idiom writes its side effect there, where neither the fixture check nor
+  // the sandbox sentinel looks. Snapshot it (non-recursively) around each run
+  // and report a change as an escape (BUG-12).
+  const scriptDir = dirname(entryPath);
   const fixture = MATERIALISED_SINKS[c.sink ?? sink];
   const decline = (detail) => {
     for (const shell of shells) {
@@ -764,14 +854,13 @@ function runShellCase(
     );
     return;
   }
-  // BUG-8 (cycle 2): an `expected` that names none of stdout / exit / stderr
-  // matches every run — the pre-fix qa-cycle.sh scored `engages` on a
-  // --cases-file with `expected: {}`. A probe that compares nothing is not a
-  // probe; decline it, never score it.
-  if (!COMPARABLE_KEYS.some((k) => c.expected[k] !== undefined)) {
-    decline(
-      "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr",
-    );
+  // BUG-8 (cycle 2) + BUG-11 (cycle 3): an `expected` that compares nothing,
+  // or compares with the wrong types, is declined — never scored. The pre-fix
+  // qa-cycle.sh scored `engages` on `expected: {}`; `{ stdout: 12 }` scored
+  // `absent` with a full count; `{ absent: 5 }` threw.
+  const problem = expectedProblem(c.expected);
+  if (problem !== null) {
+    decline(`case's ${problem}`);
     return;
   }
 
@@ -804,6 +893,7 @@ function runShellCase(
     }
 
     const before = snapshotTree(sandboxRoot, workDirName);
+    const scriptDirBefore = listDirStamps(scriptDir);
     // ARGV, never a string: the script path and the directory are $1 and $2
     // of a fixed one-line body. Building `bash <script> <dir>` as text would
     // put a caller-supplied path through a second parse, which is the class
@@ -820,7 +910,12 @@ function runShellCase(
       {
         input: "",
         cwd: fixtureDir,
-        env: { ...sandboxEnv({ cwd: workDir }), LC_ALL: "C" },
+        env: {
+          ...sandboxEnv({ cwd: fixtureDir }),
+          HOME: sandboxHome,
+          TMPDIR: sandboxTmp,
+          LC_ALL: "C",
+        },
         encoding: "utf8",
         timeout: timeoutMs,
         maxBuffer: 8 * 1024 * 1024,
@@ -830,6 +925,16 @@ function runShellCase(
     for (const [path, stamp] of after) {
       if (before.get(path) !== stamp) {
         escapes.push({ id: `${c.id}@${shell}`, shell, path });
+      }
+    }
+    const scriptDirAfter = listDirStamps(scriptDir);
+    for (const [name, stamp] of scriptDirAfter) {
+      if (scriptDirBefore.get(name) !== stamp) {
+        escapes.push({
+          id: `${c.id}@${shell}`,
+          shell,
+          path: join(scriptDir, name),
+        });
       }
     }
 

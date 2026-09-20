@@ -4,7 +4,7 @@
 **Bug ID**: TASK-128-BUG-5
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle-2 refute review CR-1, reproduced)
 **Date Found**: 2026-09-20
 
@@ -36,3 +36,4 @@ Spawn with `cwd: fixtureDir`; add the no-`cd` fixture to the tests so the substi
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-09-20 | Ready for QA | qa-fix | cwd: fixtureDir + no-cd fixture |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed at cycle 3 (execution) |

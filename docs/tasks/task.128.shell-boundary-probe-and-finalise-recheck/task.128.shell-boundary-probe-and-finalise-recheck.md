@@ -200,7 +200,7 @@ not exist and is not in `package.json`'s hand-listed globs)
 - `tests/fixtures/qa-cycle.prefix.sh` — the pre-fix script, from `git show a412f59a^:shared/resources/qa-cycle.sh`
 - `shared/resources/finalise-fix-and-recheck.mjs` — the precondition evaluator (library + CLI; exit 0 proceed / 1 halt / 2 usage) that reads the JSON, so Step 8a checks a table rather than a judgement
 - `shared/resources/tests/probe-boundary-signals.test.mjs` — classifier fixtures (qa-cycle.sh header, task.121 gate-5 note, negatives) and the JS-form/shell-form contract test
-- `shared/resources/tests/fixtures/security-probe/eval-names.sh` and `eval-names-nocd.sh` — deliberately wrong scripts that `eval` names (with and without `cd "$1"`), for the `absent` side-effect check
+- `shared/resources/tests/fixtures/security-probe/eval-names.sh`, `eval-names-nocd.sh`, `runs-names.sh`, `writes-home-tmp-self.sh` — deliberately wrong scripts (eval with/without `cd "$1"`; executing each name under `set -e`; writing to `$HOME`/`$TMPDIR`/beside itself) for the `absent`, launch-failure and escape checks
 
 ### Files to Modify (Tests)
 
@@ -287,35 +287,36 @@ None.
 
 ### In QA Verification
 
-- [TASK-128-BUG-5: side effect in the child cwd invisible to absent and the sentinel](./task.128.bug.5.side-effect-in-child-cwd-invisible-to-absent-and-sentinel.md) - ✅ Ready for QA - Priority: P1 (Fixed 2026-09-20)
-- [TASK-128-BUG-6: fix-and-recheck licence issued on forecast, not record](./task.128.bug.6.fix-and-recheck-licence-issued-on-forecast-not-record.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
-- [TASK-128-BUG-7: target 126/127 exit declined instead of compared](./task.128.bug.7.target-exit-126-127-declined-instead-of-compared.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
-- [TASK-128-BUG-8: empty expected scores a vacuous engages](./task.128.bug.8.empty-expected-scores-a-vacuous-engages.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [TASK-128-BUG-9: launch-failure matcher catches runtime errors inside the target](./task.128.bug.9.launch-failure-matcher-catches-runtime-errors-inside-the-target.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [TASK-128-BUG-10: three prose sites still say non-JS is unverifiable](./task.128.bug.10.three-prose-sites-still-say-non-js-is-unverifiable.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [TASK-128-BUG-11: malformed expected scores absent or throws](./task.128.bug.11.malformed-expected-scores-absent-or-throws.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
+- [TASK-128-BUG-12: side effects outside the fixture dir invisible](./task.128.bug.12.side-effects-outside-the-fixture-dir-invisible.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-20)
 
 ### Closed Bugs
 
-- [TASK-128-BUG-1](./task.128.bug.1.fix-and-recheck-evaluator-no-ops-through-symlinked-path.md), [BUG-2](./task.128.bug.2.shell-entry-missing-script-scored-absent-not-declined.md), [BUG-3](./task.128.bug.3.nul-in-shell-entry-throws-from-runprobespec.md), [BUG-4](./task.128.bug.4.mutation-proved-precondition-is-a-self-reported-boolean.md) - ✅ Closed (verified at cycle 2)
+- [BUG-1](./task.128.bug.1.fix-and-recheck-evaluator-no-ops-through-symlinked-path.md), [BUG-2](./task.128.bug.2.shell-entry-missing-script-scored-absent-not-declined.md), [BUG-3](./task.128.bug.3.nul-in-shell-entry-throws-from-runprobespec.md), [BUG-4](./task.128.bug.4.mutation-proved-precondition-is-a-self-reported-boolean.md) - ✅ Closed (verified at cycle 2)
+- [BUG-5](./task.128.bug.5.side-effect-in-child-cwd-invisible-to-absent-and-sentinel.md), [BUG-6](./task.128.bug.6.fix-and-recheck-licence-issued-on-forecast-not-record.md), [BUG-7](./task.128.bug.7.target-exit-126-127-declined-instead-of-compared.md), [BUG-8](./task.128.bug.8.empty-expected-scores-a-vacuous-engages.md) - ✅ Closed (verified at cycle 3)
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-20
-**Quality Score**: 50/100
-**Gate Decision**: FAIL
+**Quality Score**: 60/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.128.qa.2.shell-boundary-probe-and-finalise-recheck.md](./task.128.qa.2.shell-boundary-probe-and-finalise-recheck.md)
-- **Gate File**: [task.128.gate.2.shell-boundary-probe-and-finalise-recheck.yml](./task.128.gate.2.shell-boundary-probe-and-finalise-recheck.yml)
+- **Full Report**: [task.128.qa.3.shell-boundary-probe-and-finalise-recheck.md](./task.128.qa.3.shell-boundary-probe-and-finalise-recheck.md)
+- **Gate File**: [task.128.gate.3.shell-boundary-probe-and-finalise-recheck.yml](./task.128.gate.3.shell-boundary-probe-and-finalise-recheck.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3619 (fast gate at cycle-1 commit) + 39 engine-recorded security probes (re-run on the fixed tree)
+- **Tests Executed**: 3573 (isolated-worktree fast gate at 7b36fcac) + 39 engine-recorded security probes
 - **Phases Verified**: 3/3
-- **Critical Issues**: 1 HIGH, 3 MEDIUM, 2 LOW
+- **Critical Issues**: 0 HIGH, 4 MEDIUM
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-BUG-1..4 verified FIXED. New: BUG-5 (HIGH) a side effect a script writes to its cwd is invisible to `absent` and the sentinel; BUG-6 Step 8a licenses on forecast `commits`/`touched`; BUG-7 a target 126/127 exit is declined, not compared; BUG-8 an empty `expected` is a vacuous pass. CR-4, CR-5 low.
+BUG-5..8 verified FIXED. New MEDIUMs: BUG-9 launch-failure matcher catches bash runtime errors inside the target; BUG-10 three prose sites still say non-JS is unverifiable; BUG-11 malformed `expected` scores absent or throws; BUG-12 side effects outside the fixture dir invisible. CR-5 (self-reported severity/otherFindingsOpen) → future.
 
 ## Change Log
 <!-- change-log-start -->
@@ -331,6 +332,8 @@ BUG-1..4 verified FIXED. New: BUG-5 (HIGH) a side effect a script writes to its 
 | 2026-09-20 |  | QA findings fixed — BUG-1 (realpath CLI guard), BUG-2 (decline unreadable script / 126-127), BUG-3 (NUL → bad-entry), BUG-4 (recorded mutation run); 5 mutants red; cycle 1 (1 iteration) | qa-fix |
 | 2026-09-20 |  | QA gate FAIL (50/100), cycle 2 refute pass — BUG-1..4 verified fixed; 1 HIGH, 3 MEDIUM, 2 LOW new | qa-task |
 | 2026-09-20 |  | QA findings fixed — BUG-5 (cwd: fixtureDir), BUG-6 (--git-base post-commit licence), BUG-7 (launch failure keyed on bash stderr), BUG-8 (comparable-keys guard), CR-4..8; cycle 2 (2 iterations so far) | qa-fix |
+| 2026-09-20 |  | QA gate CONCERNS (60/100), cycle 3 — BUG-5..8 verified fixed; 0 HIGH, 4 MEDIUM new | qa-task |
+| 2026-09-20 |  | QA findings fixed — BUG-9 (script-as-subject launch matcher), BUG-10 (three prose sites → shell:, population grep), BUG-11 (expected validated), BUG-12 (sandboxed HOME/TMPDIR, script-dir snapshot, PWD); cycle 3 (3 iterations so far) | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

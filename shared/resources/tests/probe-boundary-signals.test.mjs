@@ -142,6 +142,44 @@ test("the finalise prompt's Step 1b lists every signal the module defines", () =
   );
 });
 
+test("no shipped prose still says a non-JS entry point is unverifiable (BUG-10)", () => {
+  // The contract test below keys on sites that name the JS form; three sites
+  // that named neither form kept the old rule. This is the population check
+  // for that: zero matches of the old phrasing, and — so the check cannot pass
+  // on a renamed phrase — at least one site carrying the new one.
+  const files = [];
+  for (const f of readdirSync(join(REPO_ROOT, "shared/resources"))) {
+    if (f.endsWith(".md")) files.push(`shared/resources/${f}`);
+  }
+  for (const d of readdirSync(join(REPO_ROOT, "skills"))) {
+    files.push(`skills/${d}/SKILL.md`);
+  }
+  const OLD =
+    /Non-JS entry points are (a stated v1 limit|`?unverifiable`?)|importable ES module export\.\*\* Non-JS/;
+  const NEW = /shell:/;
+  const stale = [];
+  let routed = 0;
+  for (const rel of files) {
+    let text;
+    try {
+      text = read(rel);
+    } catch {
+      continue;
+    }
+    if (OLD.test(text)) stale.push(rel);
+    if (NEW.test(text) && /non-JS|not JS|bash script/i.test(text)) routed += 1;
+  }
+  assert.deepEqual(
+    stale,
+    [],
+    "these sites still tell a reader that non-JS is unverifiable",
+  );
+  assert.ok(
+    routed >= 3,
+    `only ${routed} site(s) route non-JS to shell: — the new phrasing moved`,
+  );
+});
+
 test("every site that names the JS entry form also names the shell entry form", () => {
   // Contract test with a non-vacuity floor: the JS form appears at least at the
   // finalise prompt, the security-review prompt and both QA Step 3b sites.

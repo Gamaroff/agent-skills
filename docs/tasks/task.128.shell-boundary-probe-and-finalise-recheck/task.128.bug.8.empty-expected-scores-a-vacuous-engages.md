@@ -4,7 +4,7 @@
 **Bug ID**: TASK-128-BUG-8
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (safety re-probe — surface enumeration of `compareExpected`)
 **Date Found**: 2026-09-20
 
@@ -29,3 +29,4 @@ Guard in `runShellCase` (or `compareExpected`); test with an empty and an absent
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-09-20 | Ready for QA | qa-fix | comparable-keys guard |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed at cycle 3 (execution) |
