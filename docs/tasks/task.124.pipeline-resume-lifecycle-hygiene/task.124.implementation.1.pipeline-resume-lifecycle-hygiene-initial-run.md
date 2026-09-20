@@ -3,7 +3,7 @@
 **Task**: `task.124.pipeline-resume-lifecycle-hygiene.md`
 **Run Number**: 1
 **Started**: 2026-09-19 14:44
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -36,9 +36,9 @@ First pipeline run for task 124 — add the resume/halt lifecycle checks (dirty-
 | 2. review-task             | ✅ Done    | `task.124.review.{N}.{name}.md` exists (or skip logged)               | Skipped — already reviewed (`review.1`, NEEDS REVISION with all 9 Important recs applied; status Ready for Development) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 17/17 implementation checkboxes ticked; committed in `86ebcade` and pushed; fast gate green | `.summaries/step-3-codebase-map.json`, `.summaries/step-3-iteration-audit.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #436: https://github.com/Gamaroff/agent-skills/pull/436 — implementation commit `86ebcade` + report commit `1bbb6f36`; in-review comment posted; board in-review → `stage-disabled` (not configured for this board — correct outcome, card stays In Progress) | —                    |
-| 5–6. qa-task / qa-fix loop | ❌ Escalated | `task.124.qa.{N}.*.md`; `task.124.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Loop limit reached after 5 cycles (gates FAIL, FAIL, CONCERNS, CONCERNS, CONCERNS; HIGH 1,2,0,0,0); cycle-5 fixes committed `5be57806`, ungated; route 2c declined (high-findings-seen); 5c not reached | —                    |
-| 7. finalise                | ⏳ Pending | `task.124.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.124.qa.{N}.*.md`; `task.124.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (5 + 1 granted after a loop-limit escalation): gates FAIL 70, FAIL 70, CONCERNS 80, CONCERNS 85, CONCERNS 85, PASS 95; HIGH 1,2,0,0,0,0; 14 bugs all Closed; 5c `/review-pr` CONCERNS (3 medium code findings recorded in `task.124.pr-review.1.*.md`); ready-for-merge → stage-disabled | —                    |
+| 7. finalise                | ✅ Done    | `task.124.dod.{N}.*.md`; task `status: accepted`                      | `task.124.dod.1.*.md` ACCEPTED; status accepted; registry ticked; sprint review; acceptance commit `4ce95d09` pushed; CI reading 1 SUCCESS @ `a727d730`, reading 2 SUCCESS @ `4ce95d09` (5 checks, 90s); canonical PR comment posted; doc link re-pointed to develop; done comment `posted`; issue #424 CLOSED; board done → `already` | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | implementation report committed (final `docs(task.124)` commit — hash in Decisions Log) and pushed; lock removed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -102,7 +102,21 @@ First pipeline run for task 124 — add the resume/halt lifecycle checks (dirty-
 - /qa-task cycle 5 (narrowed, 3 canonical sources + 18 bundle copies + 7 artifacts since gate 4; Step 4b 5/5 blocks green with a seeded tree): gate 5 CONCERNS 85/100 — 0 HIGH; CR-1 (medium/high) + CR-2 (medium; reviewer medium, raised to high on verification — no `BASE_BRANCH=` anywhere, lock has no base field). Convergence check: HIGH sequence [1, 2, 0, 0, 0] — gone, no trip. Route classifier: continue (not-a-pass-gate; route 2 declined: product-defect-signal — the residue is shared/resources prose, not test machinery). PR comment (qa-gate-5) + tracker `posted`. → 5b, cycle 5 of 5 — the budget is spent after this fix: Loop Escalation (loop-limit trigger) follows 5b unless route 2c fires, and it cannot (HIGH was not 0 throughout). changes-requested: stage-disabled.
 - /qa-fix cycle 5: CR-1..CR-2 fixed (exception scoped in both shared sources; probe base bound from recorded state and executed bash+zsh × 3 branches). Fast gate 3512/0; eval 16/16. Fix summary posted (qa-fix-5) to PR and #424 (`posted`). Committed `5be57806` and pushed once.
 - Budget spent (cycle 5 = QA_MAX_CYCLES). Route 2c asked with `budgetSpent: true` → `continue` (`high-findings-seen`). Loop Escalation — loop limit: Action row overwritten, escalation entry written to the Issues Log, report status Escalated, board `blocked` signalled, lock snapshotted with `halt_reason: loop-limit` at step 5 and removed. HALT.
+- /qa-task cycle 6 (granted; narrowed, 2 canonical sources since gate 5; Step 4b contract 2/2 green, step-0 `zero-blocks-executed` identical on develop → pre-existing): gate 6 PASS 95/100 — 0 HIGH, 0 MEDIUM, 1 LOW advisory. Cycle-5 fixes verified by execution over the real corpus. Convergence check: HIGH sequence [1, 2, 0, 0, 0, 0]. Route: PASS with no open entry → 5c (route 1; classifier not needed). PR comment (qa-gate-6) + tracker `posted`. Gate + QA report + task doc + bug closures committed and pushed once before 5c (path 1).
+- 5c `/review-pr --effort medium --comment`: both lenses dispatched in parallel (wait marked/cleared); scope excluded 131 bundled `references/` copies. Conformance: PC-1..PC-3 low. Code: CR-1 (medium/high, bug-variant report base fallback), CR-2 (medium/high, develop-bug Step 3 dispatch unmarked), CR-3 (medium/medium), CR-4/CR-5 low. Verdict by the normative table: CONCERNS (no high finding) → not blocking; report written, idempotent summary comment posted. ready-for-merge → stage-disabled. Loop exit: 6 cycles, PASS, PR review CONCERNS. Lock 5 → 7.
 - Reviewer wait marked/cleared via set-waiting-on.sh; CR-3 is the finding that the QA skills themselves do not mark it.
+
+### Step 7 — finalise — 2026-09-20
+
+- `/finalise` invoked (full mode). DoD running summary `task.124.dod.1.pipeline-resume-lifecycle-hygiene.md`. Four Explore agents dispatched in one message (wait marked/cleared): AC PARTIAL as returned → verified PASS 10/10 (the agent believed the replay fixtures do not run in CI; `test.yml` step "End-to-end replay evals (L4)" ran them green on `a727d7306e55`, run 35490510042); M1 post-merge by construction. Security: FAIL as returned (zero-guard: `lintReport` a boundary, no fitting corpus sink, two-arg entry → `unverifiable`, `probes_executed: 0`). Compliance N/A. Docs PASS. CI reading 1: SUCCESS over 5 checks @ `a727d7306e55`.
+- **Operator decision (AskUserQuestion):** accept the not-probeable classification for `report-lint.js#lintReport` (validates a pipeline-authored artefact; no `security-input-corpus` sink models Markdown structure; own 12-test suite covers the hostile fixture both ways; consistent with all six QA gates' `evidence: reasoned`). Follow-up filed: add a `markdown-structure` sink or an explicit non-boundary class for validators of internal artefacts. Decision: ✅ ACCEPTED with six carried follow-ups (M1; PR review CR-1..CR-3; probe corpus; gate-6 futures).
+- CI reading 2: SUCCESS @ `4ce95d098cef` over 5 checks after 90s (poll result read on a later turn; wait cleared). Side-effects after the boundary: canonical PR comment posted (`finalise-canonical-summary` marker); issue #424 document link re-pointed to `develop`; `done` tracker comment `posted`; issue closed and confirmed CLOSED; `gh-stage.js --stage done` → `already`. `--skill finalise` advance; lock 7 → 8.
+- Local writes: frontmatter `status: accepted`, `pr_number: 436`, `completed_date`; change-log row 1.3 via `change-log.js`; `registry-tick.js` → `ticked` (row 124, line 166, planned → accepted); DoD PASSED section; `sprint-review-summary.md`. Acceptance commit `4ce95d09` (`docs(task.124): accept — DoD, sprint review; registry ticked`) pushed; 6b assertions: document, DoD, sprint review tracked and on origin, pushed doc reads `status: accepted`, PR head == acceptance head. 6d: CHANGELOG cites task 124 ✅. 6c: CI reading 2 poll backgrounded on `4ce95d09` (wait marked, 26-min budget).
+
+### Re-entry after loop escalation — 2026-09-20
+
+- Re-invoked `/develop-task 124`. Phase 0a detector: `source: halt_snapshot`, `halt_reason: loop-limit`, step 5 / `qa_phase: 5b`, PR #436 OPEN, branch present, no orphaned claim, step-3 summaries valid, gates on disk (5) = report entries (5) → no back-fill; no blocking issues. Phase 0b working-tree probe: 0 entries; HEAD `3884b46e` = origin.
+- QA loop re-entry: 1 extra cycle granted (operator chose "Resume at 5a with 1 more cycle" over the recommended 2 — both cycle-5 fixes are on the head ungated and one-paragraph/one-line); 0 cycle(s) run outside the loop back-filled from disk. `grant-qa-cycles.sh` restored the lock from the snapshot (consumed) and wrote `extra_cycles_granted: 1`, `qa_max_cycles: 6`, `qa_phase: 5a`. QA_MAX_CYCLES = 6 (from the lock). Report status In Progress; Pipeline Progress 5–6 row reopened.
 - Step 1 (resume): review/task/plan edits from the pre-run `/review-task` committed on the branch and pushed before Step 3.
 
 ---
@@ -185,21 +199,33 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop limit reached
 
+### QA Cycle 6 — 2026-09-20
+**Origin**: granted re-entry (1 extra cycle; qa_max_cycles 6)
+**Gate Result**: PASS
+**Issues Found**: cycle-5 CR-1..CR-2 verified FIXED by corpus execution (12-site grep; sed over 119 reports; binding block bash+zsh × 3 branches); new: 0 HIGH, 0 MEDIUM, 1 LOW advisory (fallback stderr label) → recommendations.future; bugs 13–14 closed
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — `task.124.pr-review.1.pipeline-resume-lifecycle-hygiene.md`: 3 medium code findings (CR-1 probe base fallback misses the bug-variant report's `**Branch model:** (base: X` form; CR-2 develop-bug Step 3 root-cause dispatch unmarked and outside the population pattern; CR-3 stale-snapshot `rm -f` is self-reported by a read-only detector), 2 low code, 3 low conformance (Migration criterion is post-merge; Phase 3 lint bullet overstates; Progress Tracking rows unticked). Not blocking by the 5c table; carried into the completion summary
+**Loop exit**: PASS with no open entry — route 1 (the loop's exit gate is 5c)
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: 2026-09-19 (escalated at Step 5–6)
-**Final Status**: Escalated
+**Finished**: 2026-09-20 05:30 UTC
+**Final Status**: Completed
 **Branch**: feature/task.124.pipeline-resume-lifecycle-hygiene
 **PR**: https://github.com/Gamaroff/agent-skills/pull/436
-**QA Iterations**: 5 (budget spent; cycle-5 fix ungated)
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 6 (5 budgeted + 1 granted after a loop-limit escalation)
+**DoD Summary**: `task.124.dod.1.pipeline-resume-lifecycle-hygiene.md` — ACCEPTED (security PASS by operator decision; 6 follow-ups carried)
+**Tracker debt**: none — issue #424 closed, board `already` Done, document link re-pointed to develop; every board stage this run signalled was `stage-disabled` on this repository by design
+
+**Completion Summary:** Implemented the four phases of task.124 — the Phase 0b working-tree probe (classify every porcelain entry against the real base, discard overlays path by path, HALT on anything else), the evidence-conditioned summary-gap rule and MERGED-only stale-snapshot deletion, the `waiting_on` lock field with one writer and a Stop-hook budget, the glob-safe HALT, `report-lint.js` + the extracted report template at four call sites, and `advance-pipeline-lock.sh --restore` (with `grant-qa-cycles.sh` delegating to it). Six QA cycles: two FAIL gates on mechanism defects (GNU stat mtime, staged overlay, re-invocation never restoring, `waiting_on` carried through restore, porcelain renames), three CONCERNS gates whose residue was one rule — who restores the lock — restated at five sites and made false one site at a time (bugs 9 → 11 → 12 → 13), and a final PASS after a loop-limit escalation and one granted cycle. Two live exercises of the shipped restore path on this run (a real PreCompact pause mid-cycle-4; the grant restore on re-entry). Notable decisions: k = 1 on the grant; the security probe's zero-guard on `lintReport` accepted as not-probeable by the operator; PR review 5c CONCERNS (three medium findings) carried as follow-ups rather than a seventh cycle; observations #132 and #133 written.
 
 ---
 
-## Pipeline Paused — 2026-09-19T14:54:55Z
+## Pipeline Paused — 2026-09-19T14:54:55Z (historical, superseded)
 
 ⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
 
@@ -213,5 +239,5 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 
 **Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 5.
 
-**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+**Pipeline Progress** for this step was marked paused (equivalent to pending for resume purposes). _Historical — superseded: the session continued in place on 2026-09-19 and restored the lock with `advance-pipeline-lock.sh --restore`; the Step 5–6 row above now reads ✅ Done._
 
