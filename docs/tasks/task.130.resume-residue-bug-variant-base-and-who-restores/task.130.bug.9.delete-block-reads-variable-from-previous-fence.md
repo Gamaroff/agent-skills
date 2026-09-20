@@ -4,7 +4,7 @@
 **Bug ID**: TASK-130-BUG-9
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 4 scoped review CR-1, reproduced by QA)
 **Date Found**: 2026-09-20
 
@@ -67,3 +67,4 @@ Re-bind from the file in the delete block; keep the file as the carrier; change 
 | 2026-09-20 | New | QA Engineer | Found in QA cycle 4 (cycle 4 scoped review CR-1, reproduced by QA) |
 | 2026-09-20 | In Progress | qa-fix | Investigation started |
 | 2026-09-20 | Ready for QA | qa-fix | Fix implemented, mutation-proven |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed in QA cycle 5 (reproductions re-run from two processes under bash and zsh -f; mutation covered) |

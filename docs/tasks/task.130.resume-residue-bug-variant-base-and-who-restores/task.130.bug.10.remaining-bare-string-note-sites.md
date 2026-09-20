@@ -4,7 +4,7 @@
 **Bug ID**: TASK-130-BUG-10
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 4 scoped review CR-2)
 **Date Found**: 2026-09-20
 
@@ -63,3 +63,4 @@ Move the rule into the field table; rewrite the four sites; add the enumerating 
 | 2026-09-20 | New | QA Engineer | Found in QA cycle 4 (cycle 4 scoped review CR-2) |
 | 2026-09-20 | In Progress | qa-fix | Investigation started |
 | 2026-09-20 | Ready for QA | qa-fix | Fix implemented, mutation-proven |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed in QA cycle 5 (reproductions re-run from two processes under bash and zsh -f; mutation covered) |

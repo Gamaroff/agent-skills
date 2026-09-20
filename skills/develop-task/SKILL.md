@@ -69,7 +69,7 @@ Dispatch a read-only Explore subagent using `references/pipeline-resume-detector
 
 Surface the detector output to the user and wait for confirmation. If `blocking_issues` is non-empty: **HALT** — require manual resolution before resuming. Use `recommended_step` to narrow Step 1 verification scope.
 
-See `references/develop-pipeline-resume-contract.md` — Phase 0a for the full dispatch, output validation, and blocking-issues protocol. Stale snapshots the detector reports (a `deltas_since_pause` object whose `concern` starts `stale-snapshot`) are deleted **here**, by the orchestrator, and verified absent before Phase 0b — the loop is the resume contract § Consume Output; do not copy it (task.130).
+See `references/develop-pipeline-resume-contract.md` — Phase 0a for the full dispatch, output validation, and blocking-issues protocol. Stale snapshots the detector reports (a `deltas_since_pause` object whose `concern` is exactly `stale-snapshot: PR merged` — the two `stale-snapshot check skipped …` notes share the prefix and are never deleted on) are deleted **here**, by the orchestrator, and verified absent before Phase 0b — the loop is the resume contract § Consume Output; do not copy it (task.130).
 
 **Step 1 — Recover pipeline state from the implementation report:**
 ```bash

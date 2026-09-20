@@ -566,10 +566,26 @@ test("D — no orchestrator SKILL.md copies the loop; each cites § Consume Outp
       /stale-snapshot: PR merged"\)/,
       `${rel} carries a copy of the delete loop`,
     );
-    assert.match(
-      md,
+    const citation = md.match(
       /Stale snapshots the detector reports[^\n]*resume contract § Consume Output/,
+    );
+    assert.ok(
+      citation,
       `${rel} does not cite the contract's one statement of the delete`,
+    );
+    // The citation may DESCRIBE the label only as the selector reads it. Cycle 2 (bug 3) made the
+    // selector exact equality; the three citations kept the original prefix wording for three more
+    // cycles because this test read only for the citation, not for what it said (cycle 5, bug 12).
+    // A description wider than the selector promises a delete the block refuses.
+    assert.doesNotMatch(
+      citation[0],
+      /(starts|start with|starting with|prefix|startswith)[^\n]*stale-snapshot/i,
+      `${rel} describes the delete label as a PREFIX; the selector is exact equality`,
+    );
+    assert.match(
+      citation[0],
+      /exactly `stale-snapshot: PR merged`/,
+      `${rel} names a label other than the exact one the selector acts on`,
     );
   }
 });

@@ -389,6 +389,8 @@ Not applicable — one additional `sed` per resume.
 | 2026-09-20 |  | QA findings fixed — bugs 6–8 (object-shaped notes; persisted detector JSON; on-disk evidence re-read before rm) + CR-4..CR-7, 3 iterations; +8 tests, all mutation-proven | qa-fix |
 | 2026-09-20 |  | QA gate 4 FAIL (70/100) — bugs 6–8 verified fixed; scoped review: 1 HIGH (delete block reads the previous fence's variable — fresh shell HALTs), 2 MEDIUM (four string-note sites; empty pr_url reads the current branch); bugs 9–11 | qa-task |
 | 2026-09-20 |  | QA findings fixed — bugs 9–11 (delete block re-binds from the persisted file; empty pr_url kept before gh; note-object shape stated once, every site an object) + CR-4..CR-5, 4 iterations; +5 tests, all mutation-proven | qa-fix |
+| 2026-09-20 |  | QA gate 5 CONCERNS (85/100) — bugs 9–11 verified fixed; safety re-probe: 0 HIGH, 1 MEDIUM (three orchestrator citations describe a prefix delete), 6 advisory; bug 12 | qa-task |
+| 2026-09-20 |  | QA findings fixed — bug 12 (three orchestrator citations name the exact delete label; test D reads the citation content), 5 iterations; +2 assertions, mutation-proven | qa-fix |
 <!-- change-log-end -->
 
 ## Bug Reports
@@ -399,9 +401,7 @@ None.
 
 ### In QA Verification
 
-- [Bug 9: delete block reads `$DETECTOR_JSON` from the previous fence (fresh shell → HALT)](./task.130.bug.9.delete-block-reads-variable-from-previous-fence.md) - 🔍 Ready for QA - Priority: P1 (HIGH)
-- [Bug 10: four bare-string note sites remain in the detector prompt](./task.130.bug.10.remaining-bare-string-note-sites.md) - 🔍 Ready for QA - Priority: P2
-- [Bug 11: empty `pr_url` → `gh pr view ""` reads the current branch](./task.130.bug.11.empty-pr-url-reads-current-branch.md) - 🔍 Ready for QA - Priority: P2
+- [Bug 12: three orchestrator citations describe a prefix delete](./task.130.bug.12.orchestrator-citations-describe-prefix-delete.md) - 🔍 Ready for QA - Priority: P2
 
 ### Closed Bugs
 
@@ -413,27 +413,30 @@ None.
 - [Bug 6: bare-string note HALTs a healthy resume](./task.130.bug.6.bare-string-delta-halts-healthy-resume.md) - ✅ Closed (verified QA cycle 4)
 - [Bug 7: detector output file had no writer](./task.130.bug.7.detector-output-file-has-no-writer.md) - ✅ Closed (verified QA cycle 4)
 - [Bug 8: delete trusted the label without re-reading evidence](./task.130.bug.8.delete-trusts-detector-label-without-rereading-evidence.md) - ✅ Closed (verified QA cycle 4)
+- [Bug 9: delete block read the previous fence's variable](./task.130.bug.9.delete-block-reads-variable-from-previous-fence.md) - ✅ Closed (verified QA cycle 5)
+- [Bug 10: four bare-string note sites](./task.130.bug.10.remaining-bare-string-note-sites.md) - ✅ Closed (verified QA cycle 5)
+- [Bug 11: empty `pr_url` read the current branch](./task.130.bug.11.empty-pr-url-reads-current-branch.md) - ✅ Closed (verified QA cycle 5)
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-20
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 85/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.130.qa.4.resume-residue-bug-variant-base-and-who-restores.md](./task.130.qa.4.resume-residue-bug-variant-base-and-who-restores.md)
-- **Gate File**: [task.130.gate.4.resume-residue-bug-variant-base-and-who-restores.yml](./task.130.gate.4.resume-residue-bug-variant-base-and-who-restores.yml)
+- **Full Report**: [task.130.qa.5.resume-residue-bug-variant-base-and-who-restores.md](./task.130.qa.5.resume-residue-bug-variant-base-and-who-restores.md)
+- **Gate File**: [task.130.gate.5.resume-residue-bug-variant-base-and-who-restores.yml](./task.130.gate.5.resume-residue-bug-variant-base-and-who-restores.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3569 node tests + shell suites; eval:develop-task 17/17
-- **Phases Verified**: 5/5 (Phase 3 FAIL)
-- **Critical Issues**: 1 HIGH (bug 9), 2 MEDIUM (bugs 10–11); bugs 6–8 verified fixed
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Tests Executed**: 3574 node tests + shell suites; eval:develop-task 13/13
+- **Phases Verified**: 5/5 (Phase 3 CONCERNS — description, not behaviour)
+- **Critical Issues**: 0 HIGH, 1 MEDIUM (bug 12); bugs 9–11 verified fixed
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle-4 scoped re-review: bugs 6–8 FIXED. The delete block reads `$DETECTOR_JSON` from the previous fence and every orchestrator Bash call is a fresh shell, so a literal resume HALTs at the guard ([bug 9](./task.130.bug.9.delete-block-reads-variable-from-previous-fence.md), HIGH); four bare-string note sites remain in the detector prompt ([bug 10](./task.130.bug.10.remaining-bare-string-note-sites.md)); an empty `pr_url` makes `gh pr view ""` read the current branch ([bug 11](./task.130.bug.11.empty-pr-url-reads-current-branch.md)). HIGH sequence 0, 1, 0, 1.
+Cycle-5 safety re-probe (clause 3: gate 4 FAIL + "refused"): bugs 9–11 FIXED, re-verified from two processes under both shells; 42 executed inputs to the delete boundary across QA and the reviewer, all per the rule. One medium: the three orchestrators still describe the delete label as a prefix (`starts \`stale-snapshot\``) while the selector has been exact equality since cycle 2 ([bug 12](./task.130.bug.12.orchestrator-citations-describe-prefix-delete.md)). Six advisories (CR-2, CR-3 medium-confidence; CR-4 refuted; CR-5..CR-7 cleanups). HIGH sequence 0, 1, 0, 1, 0.
 
 ## Progress Tracking
 
@@ -461,7 +464,7 @@ Cycle-4 scoped re-review: bugs 6–8 FIXED. The delete block reads `$DETECTOR_JS
 
 **Implementation summary.** All five phases landed as planned, in one PR, each with an executed test mutation-proven red on revert (proofs recorded in the implementation report's Step 3 entry). Three plan snippets were found wrong *by executing them* and corrected before commit:
 
-1. **Phase 3 — the piped `while` swallowed the HALT.** The plan's `printf | jq | while … exit 1; done` runs the loop body in a subshell under bash, so `exit 1` ended the subshell and the block carried on past the HALT (zsh runs the last pipeline stage in the current shell, which is why it passed there). The one statement now reads from a process substitution; `stale-snapshot-delete.test.mjs` case C is what found it. *(QA cycle 1, bug 2: the list is now materialised first with jq's exit checked and read from a here-string; an unbound `DETECTOR_JSON`, a non-array `deltas_since_pause` or a jq failure HALTs — cases E/F/G. QA cycle 2, bugs 3–5: the selector is now the exact label `.concern == "stale-snapshot: PR merged"` — the task's Phase 3 checklist text above still shows the original `startswith` form as written; the detector's two skip notes share that prefix and must never be acted on — the path is contained to the canonical snapshot, and the schema-check block binds `DETECTOR_JSON` and owns the array check; cases H–K. QA cycle 3, bugs 6–8: the orchestrator persists the returned detector JSON to `.summaries/step-0a-resume-detector.json` and binds from it; every detector note is an object; the delete re-reads the snapshot's directory and its PR's MERGED state from disk before `rm`, in a validate-all-then-delete shape; cases K–O. QA cycle 4, bugs 9–11: the delete block re-binds from the persisted file itself — every orchestrator Bash call is a fresh shell, so a variable set by the bind fence does not exist in the delete fence — and HALTs only when the file is absent; an empty `pr_url` keeps the snapshot before any `gh` call (`gh pr view ""` reads the current branch); the note-object shape is stated once in the detector prompt's field table and every site is an object; the test suite carries the JSON by file only and runs the two blocks in two processes; cases E/N2/P/Q.)*
+1. **Phase 3 — the piped `while` swallowed the HALT.** The plan's `printf | jq | while … exit 1; done` runs the loop body in a subshell under bash, so `exit 1` ended the subshell and the block carried on past the HALT (zsh runs the last pipeline stage in the current shell, which is why it passed there). The one statement now reads from a process substitution; `stale-snapshot-delete.test.mjs` case C is what found it. *(QA cycle 1, bug 2: the list is now materialised first with jq's exit checked and read from a here-string; an unbound `DETECTOR_JSON`, a non-array `deltas_since_pause` or a jq failure HALTs — cases E/F/G. QA cycle 2, bugs 3–5: the selector is now the exact label `.concern == "stale-snapshot: PR merged"` — the task's Phase 3 checklist text above still shows the original `startswith` form as written; the detector's two skip notes share that prefix and must never be acted on — the path is contained to the canonical snapshot, and the schema-check block binds `DETECTOR_JSON` and owns the array check; cases H–K. QA cycle 3, bugs 6–8: the orchestrator persists the returned detector JSON to `.summaries/step-0a-resume-detector.json` and binds from it; every detector note is an object; the delete re-reads the snapshot's directory and its PR's MERGED state from disk before `rm`, in a validate-all-then-delete shape; cases K–O. QA cycle 4, bugs 9–11: the delete block re-binds from the persisted file itself — every orchestrator Bash call is a fresh shell, so a variable set by the bind fence does not exist in the delete fence — and HALTs only when the file is absent; an empty `pr_url` keeps the snapshot before any `gh` call (`gh pr view ""` reads the current branch); the note-object shape is stated once in the detector prompt's field table and every site is an object; the test suite carries the JSON by file only and runs the two blocks in two processes; cases E/N2/P/Q. QA cycle 5, bug 12: the three orchestrator citations name the exact label the selector acts on, and test D reads the citation's content rather than only its presence.)*
 2. **Phase 5 — the "nullglob-guarded" loop had no nullglob guard.** `for f in <path> <glob>` aborts under zsh's `nomatch` exactly as `ls <path> <glob> | wc -l` does; `halt-snippet-glob-safe.test.mjs` F1 caught it with `no matches found`. Step 8 counts claims with `find`, the form `advance-pipeline-lock.sh` already uses.
 3. **Phase 1 — the stderr label could not split on exit status alone.** `gh pr view` exits 1 both for a failing `gh` and for a branch with no PR (`no pull requests found`), so the plan's `if [ "$GH_RC" -ne 0 ]` would have labelled every PR-less branch a `gh` failure. The split reads gh's stderr text as well.
 

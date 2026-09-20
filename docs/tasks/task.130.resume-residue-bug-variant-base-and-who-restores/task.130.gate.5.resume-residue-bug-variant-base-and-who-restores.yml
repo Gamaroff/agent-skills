@@ -1,0 +1,80 @@
+schema: 1
+task: 'task.130.resume-residue-bug-variant-base-and-who-restores'
+task_title: 'Resume residue from task.124 — bug-variant base, dispatch population, self-reported delete, who-restores enumeration'
+gate: CONCERNS
+status_reason: 'Cycle-4 bugs 9, 10 and 11 verified fixed under both shells from two separate processes (four mutation checks covered). The unscoped safety re-probe (clause 3: gate 4 FAIL + "refused" in the Success Criteria) found no HIGH and one MEDIUM — the three orchestrators describe the delete label as a PREFIX ("whose concern starts stale-snapshot"), the shape cycle 2 removed from the selector, so the citations promise a delete-and-verify for the two skip notes the contract never performs — plus six advisories (two medium-confidence judgement items, four cleanups).'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T11:33:23Z'
+
+top_issues:
+  - id: 'TASK-130-QA-12'
+    severity: medium
+    file: 'skills/develop-task/SKILL.md'
+    finding: 'The Step 0a sentence in develop-task:72, develop-story:76 and develop-bug:73 describes the stale-snapshot delete as acting on "a deltas_since_pause object whose concern starts stale-snapshot" and says such snapshots "are deleted here … and verified absent before Phase 0b" — a prefix rule the contract selector replaced with exact equality in cycle 2 (bug 3), so the three citations promise a delete-and-verify of the two skip notes that the executed block correctly refuses; test D''s citation regex passes on the wording (review CR-1, confirmed by grep).'
+    suggested_action: 'Reword the three sentences to the exact label ("whose concern is exactly stale-snapshot: PR merged") or drop the label description and cite only; extend test D to reject a prefix description ("starts stale-snapshot") at every orchestrator citation so the three sites cannot drift from the selector again.'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.12.orchestrator-citations-describe-prefix-delete.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 3574
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+  re_review: 'Bug 9 FIXED (bind block in one process, delete block in a second: MERGED → removed; OPEN / failed gh → KEPT; absent or empty detector file → HALT, nothing deleted). Bug 10 FIXED (string note → bind exit 1; every prompt site an object; Q red on a bare string restored at :108/:112/:113/:167). Bug 11 FIXED (no pr_url and null pr_url → KEPT before any gh call, even with a stub that answers MERGED for everything). All under bash --noprofile --norc and zsh -f. QA re-probe of 15 further inputs (other document, unparsable snapshot, metachar pr_url, missing deltas key, duplicate spellings, symlink at the path) — all per the rule.'
+  step_4b: 'Contract (2 runnable, exit 0 both shells; 20 mutating skipped), detector prompt (:69 cat of an absent lock; :80 ls glob prints "no matches found" under zsh -f — both byte-identical on origin/develop, not attributable), step-8 (no runnable blocks).'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 1
+  fix_date: '2026-09-20'
+  total_iterations: 4
+  verification_method: 'Reproductions re-run against the committed blocks from two processes; four mutation checks; 15-input boundary re-probe; ci:fast 3574/3574; eval:develop-task 13/13'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No JS boundary for the probe engine; the shell boundary was executed instead — 15 QA inputs and the reviewer''s 27 variants under both shells: label equality, path containment, directory re-read, MERGED re-read and the empty-pr_url keep all hold; a metachar pr_url reaches gh as one argument. The one open item (QA-12) is a description of the boundary at three citing sites that is wider than the boundary itself.'
+  performance:
+    status: PASS
+    notes: 'Unchanged (one gh pr view per stale delta).'
+  reliability:
+    status: PASS
+    notes: 'The delete block now runs on a literal two-fence resume; a healthy resume with object notes passes the schema check; absent/empty detector file and unparsable snapshot fail closed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'QA-12 — the same rule described differently at three citing sites and at its statement. Advisory: CR-2 citation main clauses read as unconditional imperatives; CR-3 the detector prompt''s Step 1 candidate selection does not state the legacy-snapshot rule or provenance ranking (a second derivation of choose_candidate); CR-5 an unrecognised stale-snapshot-prefixed label is skipped silently; CR-6 the lint rc=2 arm names the call site for three distinct causes at four sites; CR-7 the doc-directory placeholder is unquoted at four substitution sites.'
+
+code_review:
+  reviewed: 'unscoped safety re-probe over the whole branch diff (2593 lines, 34 files); the reviewer executed the delete, bind and step-8 legacy blocks under both shells against 27 input variants'
+  findings: 7
+  promoted_to_gate: ['TASK-130-QA-12 (CR-1, medium, confidence high — confirmed)']
+  advisory:
+    - 'CR-2 medium/medium: step-0 :253 and the three Step 0-lock paragraphs state the --restore imperative in the main clause and defer the who-restores rule in a parenthetical — QA reads the parenthetical as gating ("which snapshots restore here and which wait for the grant"); make the main clause conditional'
+    - 'CR-3 medium/medium: detector prompt Step 1 is silent on a candidate with no task_or_story_directory and ranks by mtime alone, a second derivation of choose_candidate that can recommend a step --restore will not restore from; not promoted — a prompt-reading finding with no executed reproduction; follow-up candidate'
+    - 'CR-4 low: refuted for the pipeline''s relative doc-directory substitution — from a subdirectory the rule-6 guard HALTs before SNAPSHOT_PATH is consulted (executed); holds only with an absolute substitution'
+    - 'CR-5 cleanup: a stale-snapshot-prefixed concern that is neither the verdict nor a skip note is skipped with no output'
+    - 'CR-6 cleanup: report-lint exit 2 covers unknown argument, unreadable --file and unreadable template; the 2) arm says "call site" for all three, at four sites'
+    - 'CR-7 cleanup: quote the doc-directory placeholder at every substitution site in both fences'
+
+recommendations:
+  immediate:
+    - action: 'QA-12: reword the three orchestrator citations to the exact label (or cite without describing it) and extend test D to reject a prefix description.'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md', 'shared/resources/tests/stale-snapshot-delete.test.mjs']
+  future:
+    - action: 'CR-2 conditional main clause; CR-3 legacy rule in the detector prompt (or read the winner from --restore --which); CR-5 named skip; CR-6 one rc=2 message; CR-7 quoting.'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md', 'shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'QA-12 fixed and re-verified'
