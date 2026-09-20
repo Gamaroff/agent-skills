@@ -248,7 +248,16 @@ restore_lock() {
   # dispatched, and a `--clear` issued in the no-lock window was a no-op — a wait carried
   # over from the snapshot would keep the Stop hook allowing every stop, a real stall
   # included, until its recorded budget elapsed (task.124 QA cycle 2, CR-3).
-  if ! jq '(.current_step = ((.halt_step // .current_step) | (tonumber? // .)))
+  # `task_or_story_directory` is stamped when the candidate carries none — the --accept-legacy
+  # case. The flag is the operator asserting which document a pre-task.123 snapshot belongs
+  # to; a rebuild that dropped that assertion produced a lock whose NEXT pause or HALT
+  # snapshotted legacy-shaped again — refused by the next --restore, unmatched by the
+  # detector, and eligible for Step 8's sole-legacy delete from another document's run — so
+  # the recovery the flag exists for never stuck (task.130 Step 5c review, CR-1). A candidate
+  # that already names a directory keeps its own; `//` never overwrites a present value.
+  if ! jq --arg dir "$doc_dir" \
+          '(.current_step = ((.halt_step // .current_step) | (tonumber? // .)))
+           | .task_or_story_directory = ((.task_or_story_directory // "") | if . == "" then $dir else . end)
            | del(.halted_at, .halt_reason, .halt_step, .paused_at, .pause_reason, .waiting_on)' "$chosen" > "$tmp"; then
     rm -f "$tmp"
     echo "advance-pipeline-lock: could not rebuild the lock from '$chosen'" >&2

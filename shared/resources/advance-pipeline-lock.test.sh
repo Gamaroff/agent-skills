@@ -404,6 +404,31 @@ run_restore_scenarios() {
   else
     fail "[$SH] --restore --accept-legacy" "rc=$RC"
   fi
+  # …and the restored lock CARRIES the directory the operator asserted, so the recovery sticks:
+  # the next pause or HALT snapshots a matched candidate, not a legacy one (task.130 5c CR-1).
+  # Proven end to end — a second --restore WITHOUT the flag from a snapshot of that lock succeeds.
+  if [ "$(jq -r '.task_or_story_directory // ""' "$L")" = "$R/doc" ]; then
+    pass "[$SH] --restore --accept-legacy: the rebuilt lock is stamped with task_or_story_directory"
+  else
+    fail "[$SH] --restore --accept-legacy: directory stamp" "lock=$(jq -c . "$L")"
+  fi
+  jq '. + {halted_at:"t", halt_reason:"x", halt_step:7}' "$L" > "$S"; rm -f "$L"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ -f "$L" ] && [ ! -f "$S" ]; then
+    pass "[$SH] --restore --accept-legacy: a snapshot of the rebuilt lock restores again WITHOUT the flag"
+  else
+    fail "[$SH] --restore --accept-legacy: recovery sticks" "rc=$RC"
+  fi
+  rm -f "$L" "$S"
+  # A candidate that already names a directory keeps its own under the flag — the stamp
+  # fills an absence, it never overwrites.
+  printf '{"task_or_story_directory":"%s","current_step":4}\n' "$R/doc" > "$S"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --accept-legacy "$R/doc" >/dev/null 2>&1
+  if [ "$(jq -r '.task_or_story_directory' "$L")" = "$R/doc" ] && [ "$(jq -r '.current_step' "$L")" = "4" ]; then
+    pass "[$SH] --restore --accept-legacy: a matched candidate keeps its own directory"
+  else
+    fail "[$SH] --restore --accept-legacy: no overwrite" "lock=$(jq -c . "$L")"
+  fi
   rm -f "$L" "$S"
 
   # --restore --which prints the path --restore would consume, writes nothing, consumes nothing
