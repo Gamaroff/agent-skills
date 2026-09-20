@@ -4,7 +4,7 @@
 **Bug ID**: TASK-130-BUG-7
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 3 safety re-probe CR-2)
 **Date Found**: 2026-09-20
 
@@ -63,3 +63,4 @@ State the write in § Consume Output: `printf '%s' '<the returned JSON>' > {doc-
 | 2026-09-20 | New | QA Engineer | Found in QA cycle 3 (safety re-probe) |
 | 2026-09-20 | In Progress | qa-fix | Investigation started |
 | 2026-09-20 | Ready for QA | qa-fix | Fix implemented, mutation-proven |
+| 2026-09-20 | Closed | QA Engineer | Verified fixed in QA cycle 4 (reproductions re-run under bash and zsh -f; mutation covered) |

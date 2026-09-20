@@ -16,7 +16,7 @@
 //   B — a delta whose concern is not the exact verdict label is left in place (widen select → red)
 //   C — a path that survives the rm is a HALT with exit 1                 (drop the re-read → red)
 //   D — no orchestrator SKILL.md carries a copy of the loop; each cites the section
-//   E — an unbound DETECTOR_JSON HALTs                                      (drop the :? guard → red)
+//   E — no persisted detector file HALTs                                     (drop the -s guard → red)
 //   F — a delta with no `concern` is a non-match, kept, exit 0               (drop `// ""` → red)
 //   G — a non-array deltas_since_pause / unparsable JSON HALTs with exit 1   (drop the `||` → red)
 //   H — the detector's two SKIP notes are never acted on                (prefix selector → red)
@@ -28,6 +28,9 @@
 //   M — a snapshot for ANOTHER document is a HALT, kept                (drop the directory read → red)
 //   N — PR not MERGED on re-check (OPEN / gh fails) → KEPT, exit 0         (drop the gh read → red)
 //   O — canonical then foreign path → HALT with nothing deleted        (collapse the two passes → red)
+//   P — bind block and delete block in TWO processes → deleted        (read the variable again → red)
+//   N2 — a snapshot with no pr_url is KEPT before any gh call          (drop the guard → red)
+//   Q — the detector prompt files no bare-string note                  (restore a string site → red)
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -107,6 +110,7 @@ function run(
     prState = "merged",
     snapshotDir,
     snapshotRaw,
+    noPrUrl,
   } = {},
 ) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "stale-snapshot-"));
@@ -129,7 +133,7 @@ function run(
           skill: "develop-task",
           task_or_story_directory:
             snapshotDir !== undefined ? snapshotDir : docDir,
-          pr_url: "https://github.com/x/y/pull/1",
+          ...(noPrUrl ? {} : { pr_url: "https://github.com/x/y/pull/1" }),
         }) + "\n",
   );
   const json = JSON.stringify({
@@ -145,9 +149,16 @@ function run(
   // the case the re-read exists to catch.
   if (readOnlyDir) fs.chmodSync(state, 0o555);
   const bound = rawJson !== undefined ? rawJson : json;
-  const prelude = unsetVar
-    ? "unset DETECTOR_JSON"
-    : `DETECTOR_JSON='${bound.replace(/'/g, "'\\''")}'`;
+  // The delete block reads the PERSISTED FILE, never a variable from an earlier fence (bug 9).
+  // No variable is injected; the file is what carries the detector output across shells.
+  if (!unsetVar) {
+    fs.mkdirSync(path.join(docDir, ".summaries"), { recursive: true });
+    fs.writeFileSync(
+      path.join(docDir, ".summaries", "step-0a-resume-detector.json"),
+      bound + "\n",
+    );
+  }
+  const prelude = "unset DETECTOR_JSON";
   const code = deleteBlock().replace(/\{doc-directory\}/g, docDir);
   const script = `${prelude}\n${code}\necho "BLOCK_DONE"\n`;
   const r = spawnSync(shell, argvFor(shell, script), {
@@ -217,12 +228,75 @@ for (const sh of SHELLS) {
     },
   );
 
-  test(`E [${sh}] — unbound DETECTOR_JSON is a HALT (exit non-zero), snapshot untouched`, () => {
+  test(`E [${sh}] — no persisted detector file (bind block did not run) is a HALT, snapshot untouched`, () => {
     const r = run(sh, { unsetVar: true });
-    assert.notEqual(r.status, 0, `expected non-zero exit; stdout: ${r.stdout}`);
-    assert.match(r.stderr + r.stdout, /DETECTOR_JSON is unbound/);
+    assert.equal(r.status, 1, `expected exit 1; stdout: ${r.stdout}`);
+    assert.match(
+      r.stdout,
+      /HALT: .*step-0a-resume-detector\.json is absent or empty — run the bind-and-validate block first/,
+    );
     assert.doesNotMatch(r.stdout, /BLOCK_DONE/, "the block ran past the HALT");
     assert.equal(r.exists, true);
+  });
+
+  test(`P [${sh}] — TWO SHELLS: bind block in one process, delete block in another → deleted (bug 9)`, () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "two-shell-"));
+    const state = path.join(dir, ".claude", "state");
+    fs.mkdirSync(state, { recursive: true });
+    const docDir = path.join(dir, "docs", "tasks", "task.1.x");
+    fs.mkdirSync(docDir, { recursive: true });
+    const bin = path.join(dir, "bin");
+    fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, "gh"), GH_STUB.merged, { mode: 0o755 });
+    const snap = path.join(state, "develop-pipeline.last-halt.json");
+    fs.writeFileSync(
+      snap,
+      JSON.stringify({
+        task_or_story_directory: docDir,
+        pr_url: "https://github.com/x/y/pull/1",
+      }) + "\n",
+    );
+    const json = JSON.stringify({
+      schema_version: 1,
+      recommended_step: 1,
+      blocking_issues: [],
+      deltas_since_pause: [
+        { path: snap, concern: "stale-snapshot: PR merged" },
+      ],
+    });
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+    const bind = bindBlock()
+      .replace(/\{doc-directory\}/g, docDir)
+      .replace(
+        /\{the JSON object the detector returned, pasted verbatim\}/,
+        json,
+      );
+    const r1 = spawnSync(sh, argvFor(sh, bind), {
+      cwd: dir,
+      encoding: "utf8",
+      env,
+    });
+    assert.equal(r1.status, 0, `bind block: ${r1.stderr}`);
+    const del =
+      deleteBlock().replace(/\{doc-directory\}/g, docDir) +
+      '\necho "BLOCK_DONE"\n';
+    const r2 = spawnSync(sh, argvFor(sh, del), {
+      cwd: dir,
+      encoding: "utf8",
+      env,
+    });
+    assert.equal(
+      r2.status,
+      0,
+      `delete block (fresh shell): stdout ${r2.stdout} stderr ${r2.stderr}`,
+    );
+    assert.match(r2.stdout, /removed \(PR .* is MERGED; directory matches\)/);
+    assert.equal(
+      fs.existsSync(snap),
+      false,
+      "snapshot still on disk after a two-shell run",
+    );
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 
   test(`F [${sh}] — a delta with no concern is a non-match, not a jq abort; exit 0, snapshot kept`, () => {
@@ -399,6 +473,24 @@ for (const sh of SHELLS) {
     }
   });
 
+  test(`N2 [${sh}] — a snapshot with NO pr_url is KEPT before any gh call, even with a MERGED gh (bug 11)`, () => {
+    const r = run(sh, {
+      concern: "stale-snapshot: PR merged",
+      noPrUrl: true,
+      prState: "merged",
+    });
+    assert.equal(r.status, 0, `stdout: ${r.stdout} stderr: ${r.stderr}`);
+    assert.equal(
+      r.exists,
+      true,
+      "a snapshot with no pr_url was deleted on the current branch PR state",
+    );
+    assert.match(
+      r.stdout,
+      /KEPT — it names no pr_url, so there is no merge evidence to re-read/,
+    );
+  });
+
   test(`O [${sh}] — canonical then foreign path: HALT before any rm; canonical snapshot still present`, () => {
     const r = run(sh, {
       rawJson: JSON.stringify({
@@ -422,6 +514,48 @@ for (const sh of SHELLS) {
     assert.equal(r.extraExists, true);
   });
 }
+
+test("Q — the detector prompt files no bare-string note in deltas_since_pause (bug 10)", () => {
+  const PROMPT = path.join(
+    ROOT,
+    "shared",
+    "resources",
+    "pipeline-resume-detector-prompt.md",
+  );
+  const lines = fs.readFileSync(PROMPT, "utf8").split(/\r?\n/);
+  // A note SITE is a prose line that tells the subagent to put something in deltas_since_pause
+  // and quotes the something. It is well-formed when the quoted thing sits inside an object
+  // literal (`{ "path": …, "concern": "…" }`) on the SAME line, or when the line is the
+  // continuation of an object literal the PREVIOUS line opened and did not close (a wrapped
+  // object). A ±1-line window is NOT the same test: two adjacent sites vouch for each other, and
+  // restoring the bare string at :112 stayed green because :113 still carried `"concern":`.
+  const offenders = [];
+  lines.forEach((l, i) => {
+    if (!/deltas_since_pause/.test(l)) return;
+    if (/^\s*[|#]/.test(l) || /^\s*"deltas_since_pause"/.test(l)) return;
+    const prev = lines[i - 1] || "";
+    // The quoted literal may itself be wrapped: one `"` on this line closing one the previous
+    // line opened. Test the join, or a wrapped bare string is never seen as quoted at all.
+    const quotedHere = /"[^"]{4,}"/.test(l);
+    const quotedAcross = /^[^"]*"[^"]*$/.test(l) && /"[^"]*$/.test(prev);
+    if (!quotedHere && !quotedAcross) return;
+    const openedAbove =
+      /\{[^}]*$/.test(prev) && /"concern"\s*:/.test(`${prev}\n${l}`);
+    const objectHere = /\{[^}]*"concern"\s*:/.test(l);
+    if (!objectHere && !openedAbove)
+      offenders.push(`${i + 1}: ${l.trim().slice(0, 100)}`);
+  });
+  assert.deepEqual(
+    offenders,
+    [],
+    `bare-string note instructions in the detector prompt:\n  ${offenders.join("\n  ")}`,
+  );
+  const sites = lines.filter((l) => /"concern"\s*:/.test(l)).length;
+  assert.ok(
+    sites >= 5,
+    `expected ≥5 object-shaped note sites in the prompt, found ${sites}`,
+  );
+});
 
 test("D — no orchestrator SKILL.md copies the loop; each cites § Consume Output", () => {
   for (const file of SKILLS) {

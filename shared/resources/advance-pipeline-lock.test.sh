@@ -459,10 +459,10 @@ run_restore_scenarios() {
   fi
   rm -f "$L" "$S"
 
-  # Provenance over mtime (task.130 QA cycle 3, CR-6): under --accept-legacy a NEWER legacy
-  # snapshot must not outrank a directory-matched claim, and must not be consumed-as-loser either
-  # way — the matched claim is chosen and the legacy file, being MINE under the flag, is consumed
-  # as a loser only if it lost to a matched candidate (it did).
+  # Provenance over mtime (task.130 QA cycle 3, CR-6; cycle 4, CR-4): under --accept-legacy a
+  # directory-MATCHED claim is chosen over a NEWER legacy snapshot, and — because the legacy file
+  # is MINE under the flag and lost — a consuming --restore removes it as a loser. Both halves
+  # are asserted: the selection via --which, the consume via --restore.
   printf '{"task_or_story_directory":"%s","current_step":5,"qa_max_cycles":7}\n' "$R/doc" > "$L.pausing.4343"
   touch -t 202601010000 "$L.pausing.4343"
   printf '{"current_step":3,"halt_step":3}\n' > "$S"     # legacy, NEWER
@@ -471,6 +471,12 @@ run_restore_scenarios() {
     pass "[$SH] --restore --accept-legacy --which: a directory-matched claim outranks a newer legacy snapshot"
   else
     fail "[$SH] provenance-first ranking" "rc=$RC which='$WHICH'"
+  fi
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --accept-legacy "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "7" ] && [ ! -f "$L.pausing.4343" ] && [ ! -f "$S" ]; then
+    pass "[$SH] --restore --accept-legacy: restores from the matched claim and consumes the losing legacy snapshot"
+  else
+    fail "[$SH] provenance-first consume" "rc=$RC lock=$([ -f "$L" ] && jq -c . "$L" || echo absent) legacy=$([ -f "$S" ] && echo KEPT || echo consumed) out=$OUT"
   fi
   rm -f "$L" "$S" "$L.pausing.4343"
 

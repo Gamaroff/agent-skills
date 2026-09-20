@@ -64,12 +64,15 @@ this section and carry no copy of the loop (task.130, PR #436 review CR-3). The 
 candidates; **the evidence is re-read from disk before anything is removed** — the snapshot's own
 `task_or_story_directory` must be this document's, and its `pr_url` must read `MERGED` now — because
 a delete gated on a subagent's label alone is the same trust this task removed from the detector's
-own `rm` (cycle 3, bug 8). **Only after the schema check above passed**, and before Phase 0b:
+own `rm` (cycle 3, bug 8). **Only after the schema check above passed**, and before Phase 0b.
+The block re-reads the **persisted file**, never a variable from the previous fence — every
+orchestrator Bash call is a fresh shell, and a fence that depends on another fence's variable
+HALTs on every real run (cycle 4, bug 9):
 
 ```bash
 # Every `stale-snapshot: PR merged` delta names a snapshot the detector proved belongs to a MERGED
 # run. The detector is read-only; THIS is where it is deleted — verified, one path per rm, re-read
-# afterwards. Five rules, each from a QA cycle that found the previous shape wrong by executing it:
+# afterwards. Six rules, each from a QA cycle that found the previous shape wrong by executing it:
 # 1. EXACT label, never a prefix (cycle 2, bug 3): the two SKIP notes share the prefix.
 # 2. CONTAINMENT (cycle 2, bug 4): the rule applies to ONE file; any other path, or a missing one
 #    (jq prints the literal `null`), is a HALT, never an rm.
@@ -79,10 +82,15 @@ own `rm` (cycle 3, bug 8). **Only after the schema check above passed**, and bef
 # 4. VALIDATE ALL, THEN DELETE (cycle 3, CR-5): the containment HALT says "nothing deleted", so
 #    every path is checked before the first rm.
 # 5. EVIDENCE FROM DISK (cycle 3, bug 8): directory match is a HALT on mismatch; the PR state is
-#    re-read with gh — a failed or non-MERGED read KEEPS the snapshot and says so, because a
-#    failed read is never evidence of MERGED (detector prompt, Step 1 item 2).
-# (No apostrophe in the :? message — bash parses the word for quotes even inside "…".)
-: "${DETECTOR_JSON:?HALT: DETECTOR_JSON is unbound — run the bind-and-validate block first}"
+#    re-read with gh — a failed, non-MERGED or ABSENT pr_url KEEPS the snapshot and says so,
+#    because a failed read is never evidence of MERGED (detector prompt, Step 1 item 2).
+# 6. THE FILE IS THE CARRIER (cycle 4, bug 9): every orchestrator Bash call is a fresh shell, so
+#    a variable the bind block set does not exist here. This block re-binds from the artifact
+#    the bind block persisted and HALTs only when that file is absent — which means the bind
+#    block did not run.
+DETECTOR_FILE={doc-directory}/.summaries/step-0a-resume-detector.json
+[ -s "$DETECTOR_FILE" ] || { echo "HALT: $DETECTOR_FILE is absent or empty — run the bind-and-validate block first; nothing deleted"; exit 1; }
+DETECTOR_JSON=$(cat "$DETECTOR_FILE")
 SNAPSHOT_PATH=.claude/state/develop-pipeline.last-halt.json
 STALE_PATHS=$(printf '%s' "$DETECTOR_JSON" \
   | jq -r '[ .deltas_since_pause[] | select(type == "object")
@@ -105,6 +113,12 @@ while IFS= read -r p; do
   [ -n "$SNAP_DIR" ] && [ "$(canon "$SNAP_DIR")" = "$(canon "{doc-directory}")" ] \
     || { echo "HALT: $p is not a snapshot for {doc-directory} (task_or_story_directory: '${SNAP_DIR:-absent}') — the detector mislabelled it; nothing deleted"; exit 1; }
   SNAP_PR=$(jq -r '.pr_url // ""' "$p" 2>/dev/null)
+  # An EMPTY pr_url is "no merge evidence" — and `gh pr view ""` would silently resolve the CURRENT
+  # branch's PR instead of failing, so the guard comes BEFORE the call (cycle 4, bug 11).
+  if [ -z "$SNAP_PR" ]; then
+    echo "stale snapshot $p KEPT — it names no pr_url, so there is no merge evidence to re-read"
+    continue
+  fi
   PR_STATE=$(gh pr view "$SNAP_PR" --json state --jq .state 2>/dev/null || true)
   if [ "$PR_STATE" != "MERGED" ]; then
     echo "stale snapshot $p KEPT — its PR ($SNAP_PR) did not read MERGED on re-check (read: '${PR_STATE:-failed}'); a failed read is never evidence of a merge"

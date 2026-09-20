@@ -1,0 +1,96 @@
+schema: 1
+task: 'task.130.resume-residue-bug-variant-base-and-who-restores'
+task_title: 'Resume residue from task.124 — bug-variant base, dispatch population, self-reported delete, who-restores enumeration'
+gate: FAIL
+status_reason: 'Cycle-3 bugs 6, 7 and 8 verified fixed under both shells (three mutation checks covered). The scoped re-review found one HIGH the test harness could not see — the delete block reads $DETECTOR_JSON from the previous fence, and every orchestrator Bash call is a fresh shell, so a literal run HALTs at the guard on every resume — plus two mediums (four bare-string note sites still in the detector prompt; an empty pr_url makes gh read the current branch) and two cleanups.'
+reviewer: 'QA Engineer'
+updated: '2026-09-20T14:10:00Z'
+
+top_issues:
+  - id: 'TASK-130-QA-9'
+    severity: high
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The delete block reads $DETECTOR_JSON that only the previous fence assigns; the repository rule is that every orchestrator Bash call is a fresh shell, so the :? guard fires on every real run and the block HALTs instead of deleting — reproduced (bind block persisted the file; delete block alone in a fresh shell → HALT); the test harness injects the variable into the same script and cannot see it (scoped review CR-1; bug 9).'
+    suggested_action: 'Re-bind from the persisted artifact in the delete block (DETECTOR_JSON=$(cat {doc-directory}/.summaries/step-0a-resume-detector.json) || HALT); make test E assert the HALT on an ABSENT file and add a two-shell case (bind block, then delete block, separate processes).'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.9.delete-block-reads-variable-from-previous-fence.md'
+    status: open
+  - id: 'TASK-130-QA-10'
+    severity: medium
+    file: 'shared/resources/pipeline-resume-detector-prompt.md'
+    finding: 'The object-shape rule is scoped to Step 1; lines 108, 112, 113 and 167 still instruct bare-string notes in deltas_since_pause, any of which fails all(type=="object") and drops a healthy resume to the fallback — bug 6 at the sites nobody enumerated (CR-2; bug 10).'
+    suggested_action: 'Move the rule to the § Output Schema field table, rewrite the four sites as {path, concern} objects, and add a test that enumerates deltas_since_pause lines in the prompt and fails on a quoted bare-string note.'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.10.remaining-bare-string-note-sites.md'
+    status: open
+  - id: 'TASK-130-QA-11'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'With no pr_url in the snapshot, gh pr view "" resolves the CURRENT branch PR (reproduced: #441 OPEN), so the evidence re-read is satisfied by the wrong PR on pre-Step-4 halt snapshots (CR-3, QA-reproduced; bug 11).'
+    suggested_action: 'Guard before the gh call: an empty pr_url keeps the snapshot with "no merge evidence to re-read"; test N variant with no pr_url and a MERGED stub → kept.'
+    suggested_owner: dev
+    bug_ref: 'task.130.bug.11.empty-pr-url-reads-current-branch.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 3569
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+  re_review: 'Bug 6 FIXED (string note → schema exit 1; persisted). Bug 7 FIXED (bind block persists .summaries/step-0a-resume-detector.json and binds a non-empty DETECTOR_JSON). Bug 8 FIXED (other-document snapshot → HALT, kept; OPEN/failed gh → KEPT with reason; MERGED → removed with the evidence line) — under bash and zsh -f. Mutations: all(object) dropped → K red; directory read dropped → M red; gh read dropped → N red.'
+  step_4b: 'Contract, detector prompt, step-8 re-run under bash+zsh: 0 findings attributable (detector :69 unchanged cat).'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 3
+  fix_date: '2026-09-20'
+  total_iterations: 3
+  verification_method: 'Reproductions re-run against the committed blocks; mutation spot checks; ci:fast 3569/3569; eval:develop-task 17/17'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Bug 11 — the merge-evidence re-read can be satisfied by the current branch PR when the snapshot names none. Otherwise the boundary (label, containment, directory, MERGED) holds: 12-input re-probe in cycle 3 and the 31-case suite.'
+  performance:
+    status: PASS
+    notes: 'Unchanged (one gh pr view per stale delta).'
+  reliability:
+    status: FAIL
+    notes: 'Bug 9 — the delete block HALTs on every literal run (fresh shell), so no resume passes Phase 0a without the operator re-binding by hand; bug 10 drops QA-loop resumes (qa_phase / grant notes) to the fallback.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-4 — the provenance test scenario comment contradicts itself and never asserts the consume; CR-5 — the field table lists old_mtime/new_mtime as unconditional while note objects omit them.'
+
+code_review:
+  reviewed: 'scoped to the 7 source/test files the cycle-3 fix touched (2360 lines); bundled copies excluded'
+  findings: 5
+  promoted_to_gate: ['TASK-130-QA-9 (CR-1, high)', 'TASK-130-QA-10 (CR-2)', 'TASK-130-QA-11 (CR-3, QA-reproduced)']
+  advisory:
+    - 'CR-4 cleanup: provenance scenario comment self-contradicts; assert the legacy file fate after a consuming --restore --accept-legacy'
+    - 'CR-5 cleanup: field table — old_mtime/new_mtime required only for mtime deltas, omitted for notes'
+
+recommendations:
+  immediate:
+    - action: 'Bug 9: re-bind from the persisted file inside the delete block; two-shell test; test E on an absent file.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/tests/stale-snapshot-delete.test.mjs']
+    - action: 'Bug 10: object-shape rule in the field table; rewrite the four note sites; enumerating test.'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md']
+    - action: 'Bug 11: empty pr_url → KEPT before any gh call; test N variant.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/tests/stale-snapshot-delete.test.mjs']
+  future:
+    - action: 'CR-4 test comment + consume assertion; CR-5 field table note.'
+      refs: ['shared/resources/advance-pipeline-lock.test.sh', 'shared/resources/pipeline-resume-detector-prompt.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'Bugs 9, 10, 11 fixed and re-verified'
