@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-09-20
-**Next Available Task Number:** **136**
+**Last Updated:** 2026-09-21
+**Next Available Task Number:** **137**
 
 ## How to use
 
@@ -175,6 +175,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 133 | [Residue of task.130's seven QA cycles: eleven advisory findings that never gated, grouped by file — a vacuous test scenario, three stale rule mirrors, two silent skips, one unguarded append-only table](task.133.task-130-residue-cleanup/task.133.task-130-residue-cleanup.md) | planned | refactoring | Medium | 2026-09-20 | [#442](https://github.com/Gamaroff/agent-skills/issues/442) | task.130 Deferred Work, gates 5–7 advisories, pr-review.1 CR-2/3, obs #137 |
 | 134 | [The gate-the-last-fix half-cycle keys on the loop's whole HIGH history, not on the fix it exists to gate: a converging 0/1/0/1/0 loop escalated with a one-finding, mutation-proven fix that no gate had read](task.134.route-2c-keyed-on-last-fix/task.134.route-2c-keyed-on-last-fix.md) | planned | refactoring | Medium | 2026-09-20 | [#443](https://github.com/Gamaroff/agent-skills/issues/443) | obs #139; task.123 (route 2c) |
 | 135 | [A gate's `updated:` is a typed claim that three consumers treat as a clock: record the reviewed head on the gate, scope the next cycle from that commit, and stamp the time from `date -u`](task.135.gate-scoping-from-recorded-head/task.135.gate-scoping-from-recorded-head.md) | planned | refactoring | Medium | 2026-09-20 | [#444](https://github.com/Gamaroff/agent-skills/issues/444) | obs #136; task.130 cycle 4 + 5c PC-2 |
+| 136 | [A sourced function library is a boundary the shell: entry form runs past: a shell-fn:<path>#<function> entry that sources the file and calls the function, and a fake-gh affordance so a boundary that consults a CLI can be probed offline](task.136.shell-fn-probe-entry-form/task.136.shell-fn-probe-entry-form.md) | planned | infrastructure | High | 2026-09-21 | [#448](https://github.com/Gamaroff/agent-skills/issues/448) | Observation review 2026-09-21: obs #138 (task.130 + task.125 instances); extends task.128 |
 
 - **Tasks 104-106 close the stakeholder-readability gap in tracker comments**, filed 2026-09-09 after stakeholders reported that Jira and GitHub issue comments are unreadable to a non-technical reader. One shippable unit each, in dependency order: **104** builds the primitive (a per-stage catalogue of plain-language lead paragraphs, rendered by `tracker-comment.js` from the `--stage` every call site already passes — so all 22 sites gain a lead with no call-site edit); **105** feeds real values into the lead's slots and converts the seven sites that post a bare `gh issue comment` and never reach the engine at all; **106** carries the same lead onto the eleven pull-request conversation templates. 105 and 106 both depend on 104 and are independent of each other. Per-line inline PR findings are deliberately excluded — see task.106 §4. None has a tracker issue yet.
 
@@ -205,5 +206,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - **Tasks 121–127 were cut from the 2026-09-17 observation review** — one shippable unit each, all independent of one another. task.123 (QA loop routes) and task.124 (resume lifecycle) touch the same two contract files and should not be developed in the same worktree at once; either may land first. task.122 (`UNREACHED` check class) and task.126 (citation edges) both edit `bundle_skill.py`'s discovery and are independent in outcome but will conflict textually — land one, rebase the other. task.127 bundles three unrelated one-function parser fixes deliberately: each is under two hours and none is worth a pipeline run alone; its three phases are separately revertible.
 
 - **Tasks 133–135 were cut from task.130's residue (PR #441)** — one shippable unit each, all independent of one another. 133 gathers the eleven advisory findings the loop carried (grouped by file, five phases); 134 changes one clause in `qa-diminishing-returns.js` (route 2c reads gate N's HIGH count, not the whole history); 135 puts `head:` on the gate and scopes cycle N+1 from it. None depends on another; 133 and 135 both touch `pr-conformance-prompt.md` § D (different rows) and should not be developed in the same worktree at once. Task.128 owns the shell probe sink (obs #138) and is deliberately not restated in 133.
+
+- **Tasks 136–138 were cut from the 2026-09-21 observation review (task.125's follow-ups)** — one shippable unit each, independent of one another in outcome. 136 extends task.128's `shell:` probe form with `shell-fn:` and a fake-`gh` fixture (obs #138) and shares `security-probe.mjs` with task.131 — land one, rebase the other. 137 sweeps the 31 `ls`-glob sites the staged obs #144 ratchet pins (obs #145); its Phase 0 installs that one test file if the staged skill-updates PR has not landed. 138 closes `finalise --bug`'s low residuals and records the feature's first end-to-end run (obs #146). 137 and 138 both edit `skills/finalise/SKILL.md` 7.6b (different lines) — land one, rebase the other; not in one worktree.
 
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
