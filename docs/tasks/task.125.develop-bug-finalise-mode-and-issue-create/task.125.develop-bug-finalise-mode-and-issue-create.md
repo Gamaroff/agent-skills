@@ -5,11 +5,13 @@ type: task
 description: "Three develop-bug defects on the same theme — the bug pipeline borrows story/task machinery that does not fit and reports its own failures poorly. Step 7 tells the pipeline to run /finalise against the bug file, whose AC agent, Change Log row, status: accepted, sprint review and registry tick either do not apply or are forbidden for a bug; bug.13 and bug.14 each hand-wrote the same bug-shaped DoD from the template as the 'fallback'. And ensure-bug-github-issue passes priority/severity labels verbatim (High, Major) to a repo whose labels are lowercase with no severity:* at all, so gh rejects the whole create and tracker-issue.js drops the stderr line naming the label; on an unattended run the bug proceeds with no issue. Ship finalise --bug, and make the issue create tolerant and its failure legible. Observations #65, #69. The third (task.121, 2026-09-18): the verify loop invokes /qa-fix for a general bug, qa-fix now derives its cycle from the highest-numbered gate file with references/qa-cycle.sh — which refuses rather than guesses — and a general bug's directory carries no gate, so the helper refuses and the bug issue gets no fix-cycle comment at all; the loop already knows its cycle and should pass it. Observation #122."
 tags: [develop-bug, finalise, ensure-bug-github-issue, tracker-issue, qa-fix, qa-cycle]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-17
 updated: 2026-09-21
+completed_date: 2026-09-21
+pr_number: 447
 assignee:
 estimated_effort_hours: 9
 github_issue: 425
@@ -17,7 +19,7 @@ github_issue: 425
 
 # Technical Task: develop-bug's only DoD path is documented as a fallback, and its issue create fails on a label case mismatch
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.125.review.1.develop-bug-finalise-mode-and-issue-create.md` implemented 2026-09-21
 **GitHub Issue**: [#425](https://github.com/Gamaroff/agent-skills/issues/425)
 
@@ -311,6 +313,34 @@ None.
 
 ### Key Findings
 Cycle 11 (narrowed; third grant). No correctness finding. Eleven cycles closed 24 bug reports (3 HIGH, 21 MEDIUM) and the LOWs in the finalise bug path, the label tolerance and the `fix_cycle` guard; the two residuals (a reworded placeholder `PASS or FAIL`; an unreadable report's diagnostic) are low-confidence cleanups in the gate's future list.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.125.qa.11.develop-bug-finalise-mode-and-issue-create.md` (of 11)
+**Gate File**: `task.125.gate.11.develop-bug-finalise-mode-and-issue-create.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: `task.125.pr-review.1.develop-bug-finalise-mode-and-issue-create.md` — ⚠️ CONCERNS (non-blocking; its two actionable findings closed before finalise)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 8/8 — SC1–SC7 traced to authored code and a test in the per-PR lane; SC8 (observations #65/#69/#122 close) parked on the merge
+✅ **Tests:** `npm run ci:fast` 3741/3741 at the last fix; 119 targeted (finalise-bug-mode 59, gh-labels, qa-cycle); every fix across 11 cycles mutation-proved
+✅ **PR Review:** PR #447, 11 QA cycles, 24 bug reports filed and closed; Step 5c conformance + code review
+✅ **Documentation:** CHANGELOG (3 entries under [Unreleased]), every changed SKILL.md and step doc, `docs/runbooks/bug-fix.md` + `hotfix.md`
+✅ **Security Review:** checklist clean (no secrets, no unsafe patterns, no dependency change). **The probe engine could not reach `gh_labels_filter` — a sourced shell function (obs #138) — so its record is unverifiable for this shape; accepted on the boundary's committed executed tests (`tests/gh-labels.test.js`, bash + zsh, hostile inputs, fake `gh`) and QA cycle 2's 20 by-hand executions, by explicit operator override.**
+⚠️ **Compliance Review:** NOT_APPLICABLE — no personal data, payments, UI or health data
+✅ **CI:** reading 1 SUCCESS @ `e680c08bf8ff` over 5 checks; reading 2 on the acceptance head recorded on the PR canonical comment
+
+**Deployment Readiness:** APPROVED (gate 11)
+
+**Task marked as ACCEPTED on:** 2026-09-21
+
+**Detailed Verification Log:** See `task.125.dod.1.develop-bug-finalise-mode-and-issue-create.md` for complete verification evidence, the override statement and timestamps.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -333,6 +363,7 @@ Cycle 11 (narrowed; third grant). No correctness finding. Eleven cycles closed 2
 | 2026-09-21 |  | QA gate 9 CONCERNS (90/100) — cycle-8 fixes verified; 0 HIGH, 1 MEDIUM (a template-placeholder verdict reads as PASS), 1 LOW; 1 bug report filed | qa-task |
 | 2026-09-21 |  | QA gate 10 CONCERNS (90/100) — cycle-9 fixes verified; 0 HIGH, 1 MEDIUM (the verdict guard over- and under-reaches), 2 LOW; 1 bug report filed | qa-task |
 | 2026-09-21 |  | QA gate 11 PASS (100/100) — cycle-10 fixes verified; 0 findings; 2 low-confidence cleanups recorded for follow-up | qa-task |
+| 2026-09-21 | 1.3 | DoD passed — accepted (PR #447); security probe recorded unverifiable for a sourced shell function (obs #138), accepted on committed tests by operator override | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
