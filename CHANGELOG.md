@@ -377,6 +377,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Route 2c (gate-the-last-fix) keys on the last gate's HIGH count, not the loop's whole HIGH
+  history (task 134; obs #139).** `classifyLoopRoute` in `qa-diminishing-returns.js` declined the
+  half-cycle with `high-findings-seen` whenever any earlier gate had raised a HIGH — a loop that
+  raised a blocker mid-run, fixed it in one cycle and ended on a HIGH-0 gate (task.130 `0,1,0,1,0`)
+  escalated and needed an operator grant. The clause now reads `HIGH_N` and declines with
+  `high-on-last-gate` only when the last gate itself raised one; the MEDIUM-falling clause is
+  unchanged. Route table and § conditions in `develop-pipeline-step-5-6-qa-loop.md` restate it;
+  `qa-loop-route.test.mjs` +2 rows (30 → 32), mutation-proved.
+
 - **QA tracker comments are keyed per cycle, so a tracker issue now carries every QA cycle
   instead of the first one (task 121).** `tracker-comment.js` builds its idempotency marker from
   `--stage` alone, and `qa-task`/`qa-story` passed a bare `qa-gate` on every cycle while

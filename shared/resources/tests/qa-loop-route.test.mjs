@@ -27,8 +27,13 @@
 //   4. Route 2 still wins.    The `7,7,7,7,4` and `0,0,0` rows behave as the
 //                             Diminishing-returns suite already pins them.
 //   5. 2c fires only at the budget, only after a 5b cycle, only with HIGH 0
-//                             throughout, only with MEDIUM strictly falling.
-//                             Each negative row removes exactly one of those.
+//                             on the LAST gate, only with MEDIUM strictly
+//                             falling. Each negative row removes exactly one of
+//                             those. HIGH keys on the last gate, not on the
+//                             whole history (obs #139): a blocker raised and
+//                             fixed at cycle 2 is not the stall this route
+//                             refuses, and the HIGH-0-throughout clause declined
+//                             task.130 (0,1,0,1,0) and task.125 (1,1,0,1,0).
 //   6. The MEDIUM count is the engine's, the HIGH count is not (property 2 of
 //                             the engine — group 7 of its own suite reads the
 //                             source for that; here it is asserted from the API).
@@ -225,7 +230,7 @@ const ROWS = [
   },
   {
     label:
-      "2c negative: a HIGH was raised at cycle 1 — HIGH must be 0 throughout",
+      "2c fires: a HIGH raised at cycle 1 and fixed — HIGH keys on the last gate, not the history (obs #139)",
     input: {
       cycle: 5,
       highCounts: [1, 0, 0, 0, 0],
@@ -234,8 +239,36 @@ const ROWS = [
       budgetSpent: true,
       lastCycleAction: FIX,
     },
+    route: ROUTES.GATE_THE_LAST_FIX,
+    reason: "gate-the-last-fix",
+  },
+  {
+    label:
+      "2c fires: HIGH alternating 0,1,0,1,0 with MEDIUM falling — task.130's shape, declined by the old clause (obs #139)",
+    input: {
+      cycle: 5,
+      highCounts: [0, 1, 0, 1, 0],
+      mediumCounts: [5, 4, 3, 2],
+      latestGateContent: fixture("medium-falling-cycle5.yml"),
+      budgetSpent: true,
+      lastCycleAction: FIX,
+    },
+    route: ROUTES.GATE_THE_LAST_FIX,
+    reason: "gate-the-last-fix",
+  },
+  {
+    label:
+      "2c negative: HIGH on the LAST gate — the fix answers a blocker, which is escalated, not gated",
+    input: {
+      cycle: 5,
+      highCounts: [0, 0, 0, 0, 1],
+      mediumCounts: [5, 4, 3, 2],
+      latestGateContent: fixture("medium-falling-cycle5.yml"),
+      budgetSpent: true,
+      lastCycleAction: FIX,
+    },
     route: ROUTES.CONTINUE,
-    reason: "high-findings-seen",
+    reason: "high-on-last-gate",
   },
   {
     label:
@@ -295,17 +328,17 @@ const ROWS = [
   },
   {
     label:
-      "2c negative: budget spent on a loop that raised HIGH — a granted budget of 7 with HIGH at cycle 6",
+      "2c negative: budget spent with HIGH on the last gate — a granted budget of 7 with HIGH at cycle 7",
     input: {
       cycle: 7,
-      highCounts: [0, 0, 0, 0, 0, 2, 0],
+      highCounts: [0, 0, 0, 0, 0, 0, 2],
       mediumCounts: [6, 5, 4, 3, 3, 2],
       latestGateContent: fixture("medium-falling-cycle5.yml"),
       budgetSpent: true,
       lastCycleAction: FIX,
     },
     route: ROUTES.CONTINUE,
-    reason: "high-findings-seen",
+    reason: "high-on-last-gate",
   },
 ];
 
