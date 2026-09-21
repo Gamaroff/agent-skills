@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The code reviewer asks "who binds this?" of every defaulted read a diff adds, and a repo test
+  walks the whole population (task 132; obs #133).** `code-review-prompt.md` gains check **E —
+  unbound reads in executed prose**: a `${NAME:-default}`, `${NAME:?}` or bare `$NAME` in a
+  fenced block the diff touches must name its writer *in that block* or the `{placeholder}` that
+  substitutes it, because every fenced block is its own shell. `tests/unbound-default-reads.test.js`
+  is the floor: every default-form read in `skills/*/SKILL.md` and the shared pipeline step docs is
+  bound in its file, a declared input (four, reasoned), or a pinned known defect — and a pin whose
+  name gains a writer turns the test red so the fix deletes it. Step 8's post-conditions now bind
+  `BASE_BRANCH` from the PR's own base instead of reading `${BASE_BRANCH:?}` unbound; the one pin
+  shipped with the test is therefore already gone. `docs/reference/anti-patterns.md` carries the rule.
+
 - **`/finalise --bug` — the bug pipeline's DoD is a mode, not a fallback (task 125; obs #65, #69,
   #122).** `finalise` resolves the document kind once (`--bug`, or a hint when the path carries a
   `.bug.{N}.` segment and the flag is absent) and runs the same DoD as a **fix-evidence** check over

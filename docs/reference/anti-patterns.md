@@ -271,6 +271,26 @@ routes on it — another entry form, a by-hand probe, a recorded decline — and
 rule names is allowed to stand as the section's answer. A script that says it refuses is a boundary
 by its own words (`probe-boundary-signals.mjs`), whatever language it is in. (obs #121, task.128)
 
+## Never read a variable in executed prose that no writer binds
+
+**The rule:** a `${NAME:-default}`, `${NAME:?}` or bare `$NAME` inside a fenced block is a claim
+that *something binds `NAME`* — and every fenced block runs as its own shell, so "bound in an
+earlier block" or "bound in the step doc" is not a writer. A default with no writer is a constant
+wearing a variable's name: it is right on exactly the path the reviewing host ran and wrong on the
+one nobody ran. A `:?` with no writer is a guaranteed failure on that path instead.
+
+**Why it matters more than a lint:** `develop-pipeline-resume-contract.md` read
+`${BASE_BRANCH:-develop}` from its first commit through five green QA cycles — every run was a
+feature branch off develop, so the default was right and the unbound read was invisible. Four text
+reviews read the line; the fifth asked "who binds this?". Step 8's post-conditions read
+`${BASE_BRANCH:?}` with no writer for the same reason.
+
+**How to do it right:** bind the name *in the block that reads it*, or name the `{placeholder}` the
+skill substitutes, or declare it an input where the document says it comes from outside. The code
+reviewer asks the question on every diff (`code-review-prompt.md` check E), and
+`tests/unbound-default-reads.test.js` walks the whole population with a reasoned inputs list and
+a pin list that goes red the moment a pinned read gains a writer. (obs #133, task.132)
+
 ## See also
 
 - [Troubleshooting](./troubleshooting.md) — what to do when something breaks

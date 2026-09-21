@@ -5,19 +5,20 @@ type: task
 description: "On task.124 the working-tree probe read origin/${BASE_BRANCH:-develop} for five QA cycles while no pipeline bound BASE_BRANCH; the default was correct on every run reviewed, so the unbound read was invisible until a reviewer grepped for a writer (obs #133). Add a mandatory check to code-review-prompt.md — name the writer for every parameter-expansion default or :? the diff adds, on every path that reaches it — and a test over the pipeline's executed prose that every such read has a binding in the same bundle set or an allow-listed reason."
 tags: [code-review, executed-prose, shell, enumeration]
 category: testing
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-21
 assignee:
 estimated_effort_hours: 4
 risk_level: low
+pr_number: 453
 github_issue: 439
 ---
 
 # Technical Task: The reviewer asks who binds every `${VAR:-default}` and `${VAR:?}` in executed prose
 
-**Status:** Planned
+**Status:** Accepted
 **GitHub Issue**: [#439](https://github.com/Gamaroff/agent-skills/issues/439)
 
 ---
@@ -268,13 +269,15 @@ None.
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-09-20 | 1.0 | Initial draft — from obs #133 (task.124 QA cycle 5 CR-2) | create-task |
+| 2026-09-21 |  | Implemented — staged #133 check E + `tests/unbound-default-reads.test.js` installed; step-8 binds `BASE_BRANCH` from the PR base and the shipped pin deleted; anti-patterns entry; 2 mutations proved | manual |
+| 2026-09-21 | 1.1 | Accepted (PR #453) — a defaulted read with no writer is a reviewer finding and a red CI test. Hand-driven quick win: no QA loop, no DoD file; the tests named here are the evidence | manual |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: reviewer check
-- [ ] Phase 2: population test
-- [ ] Phase 3: bind what the test finds
+- [x] Phase 1: reviewer check
+- [x] Phase 2: population test
+- [x] Phase 3: bind what the test finds
 - [ ] QA: `task.132.qa.[N].unbound-variable-default-review-check.md`
 - [ ] Gate: `task.132.gate.[N].unbound-variable-default-review-check.yml`
 
@@ -286,5 +289,6 @@ None.
 
 ## Notes
 
+- **Accepted 2026-09-21 without the pipeline (PR #453).** The guard shipped as `tests/unbound-default-reads.test.js` (the staged name), not `executed-prose-bindings.test.mjs`; it binds at file granularity (the per-block rule is the reviewer's), with four declared inputs and an empty pin list.
 - QA artifacts land beside this file: `task.132.qa.[N].*.md`, `task.132.bug.[N].*.md`, `task.132.gate.[N].*.yml`.
 - Independent of tasks 130 and 131; cites 130's `BASE_BRANCH` derivation rather than duplicating it.
