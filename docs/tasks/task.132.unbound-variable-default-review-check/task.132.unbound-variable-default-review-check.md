@@ -262,7 +262,6 @@ None.
 
 ---
 
-## Change Log
 <!-- change-log-start -->
 ## Change Log
 

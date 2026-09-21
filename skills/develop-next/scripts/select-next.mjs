@@ -923,14 +923,21 @@ const DEFAULT_COLUMNS = {
   task: { n: 0, title: 1, status: 2, priority: 4, deps: 7 },
 };
 
-// A dependency reference inside a registry `Depends on` cell. Accepts the forms
-// a hand-maintained table actually carries: `task.83`, `T83`, `bug.4`, `B4`,
-// `#83`, and a bare `83` (read as the same kind as the row declaring it).
-// The number is captured WITH any dotted segments so a story-shaped reference is
-// consumed whole. Matching a bare `\d+` here would take `story.2.3` as story 2
-// plus a stray task 3 — inventing a dependency nobody declared.
+// A dependency reference inside a registry `Depends on` cell: `task.83`, `T83`,
+// `bug.4`, `B4` — a KIND word or letter is required. The cell is also the notes
+// cell (`registry-tick.js --annotate` appends ` · PR #N merged` to it, and authors
+// write `obs #83` / `Observation review 2026-09-17` there), so `#83` and a bare
+// `83` are NOT dependency spellings: every one of them parsed as a phantom task
+// that could block the frontier or warn on every lint (obs #74, task.127). The
+// number is captured WITH any dotted segments so a story-shaped reference is
+// consumed whole rather than read as story 2 plus a stray task 3.
 const DEP_REF_RE =
-  /(?:\b(task|bug|story)\s*[.#-]?\s*|\b([TB]))?(\d+(?:\.\d+)*)\b/gi;
+  /(?:\b(task|bug|story)\s*[.#-]?\s*|\b([TB]))(\d+(?:\.\d+)*)\b/gi;
+
+// Where the dependencies stop and the note begins. Dependencies come FIRST;
+// a ` · ` (what --annotate writes) or a ` — ` starts free text that is never
+// parsed, so a note may name a task as provenance without declaring it.
+const DEP_NOTE_SEP_RE = /\s(?:·|—)\s/;
 
 // Cell values that mean "no dependency". A registry is hand-maintained, so the
 // em-dash this repo uses is only one of the spellings that show up.
@@ -939,16 +946,18 @@ const DEP_EMPTY_RE = /^(?:[—–-]|none|n\/a|na|tbd)$/i;
 /**
  * Parse a registry `Depends on` cell into `{kind, n}` references.
  *
- * `kind` defaults to the declaring row's kind, so a bare `83` in the task
- * registry means task 83. Story references are dropped: stories are not
- * registry rows and cannot be resolved here.
+ * Only the text BEFORE the first ` · ` / ` — ` separator is read; what follows is
+ * the row's note. Every reference names its kind (`task.83`, `bug.4`, `T83`,
+ * `B4`); a bare number or `#83` is not a dependency (obs #74). Story references
+ * are dropped: stories are not registry rows and cannot be resolved here.
  *
  * @param {string} cell raw cell text
- * @param {"bug"|"task"} kind kind of the row declaring the dependency
+ * @param {"bug"|"task"} kind kind of the row declaring the dependency (kept for
+ *   the call sites; no spelling defaults to it any more)
  * @returns {{kind: "bug"|"task", n: number}[]} deduped, in declaration order
  */
 export function parseDepCell(cell, kind) {
-  const text = (cell || "").trim();
+  const text = (cell || "").trim().split(DEP_NOTE_SEP_RE)[0].trim();
   if (!text || DEP_EMPTY_RE.test(text)) return [];
   const out = [];
   const seen = new Set();

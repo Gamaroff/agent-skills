@@ -2629,12 +2629,29 @@ test("deps: an empty cell places no constraint", () => {
 test("parseDepCell: accepts the spellings a hand-maintained table carries", () => {
   assert.deepEqual(parseDepCell("task.83", "task"), [{ kind: "task", n: 83 }]);
   assert.deepEqual(parseDepCell("T83", "task"), [{ kind: "task", n: 83 }]);
-  assert.deepEqual(parseDepCell("#83", "task"), [{ kind: "task", n: 83 }]);
-  assert.deepEqual(parseDepCell("83", "task"), [{ kind: "task", n: 83 }]);
   assert.deepEqual(parseDepCell("bug.4", "task"), [{ kind: "bug", n: 4 }]);
   assert.deepEqual(parseDepCell("B4", "task"), [{ kind: "bug", n: 4 }]);
-  // A bare number in the bug registry means a bug, not a task.
-  assert.deepEqual(parseDepCell("4", "bug"), [{ kind: "bug", n: 4 }]);
+  // `#83` and a bare number are NOT dependency spellings: the cell is also the
+  // notes cell, and `PR #289 merged` / `obs #83` parsed as phantom tasks (obs #74).
+  assert.deepEqual(parseDepCell("#83", "task"), []);
+  assert.deepEqual(parseDepCell("83", "task"), []);
+  assert.deepEqual(parseDepCell("4", "bug"), []);
+  assert.deepEqual(parseDepCell("PR #294 merged", "task"), []);
+  assert.deepEqual(
+    parseDepCell("Observation review 2026-09-17: obs #83, #114", "task"),
+    [],
+  );
+  // Dependencies come first; a ` · ` (what --annotate writes) or ` — ` starts the
+  // note, which is never parsed even when it names a task.
+  assert.deepEqual(parseDepCell("task.66 · PR #289 merged", "task"), [
+    { kind: "task", n: 66 },
+  ]);
+  assert.deepEqual(parseDepCell("task.77 — PR #363 merged", "task"), [
+    { kind: "task", n: 77 },
+  ]);
+  assert.deepEqual(parseDepCell("task.66 · split from task.99", "task"), [
+    { kind: "task", n: 66 },
+  ]);
   // Deduped, order preserved.
   assert.deepEqual(parseDepCell("task.79, task.80, task.79", "task"), [
     { kind: "task", n: 79 },

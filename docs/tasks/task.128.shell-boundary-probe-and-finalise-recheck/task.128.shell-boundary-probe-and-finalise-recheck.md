@@ -353,7 +353,6 @@ All Definition of Done criteria have been verified:
 
 **Detailed Verification Log:** See `task.128.dod.1.shell-boundary-probe-and-finalise-recheck.md` for complete verification evidence and timestamps.
 
-## Change Log
 <!-- change-log-start -->
 ## Change Log
 

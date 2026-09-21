@@ -369,3 +369,35 @@ test("generated catalog is in sync with SKILL.md frontmatter", () => {
     fs.writeFileSync(catalog, before);
   }
 });
+
+/**
+ * obs #107 / task.127 — a `description:` that YAML parses to null, a boolean or
+ * a list was coerced with `str()` and validated as the text "None", "True" or
+ * "[]": a skill with no description passed as if it had one four characters
+ * long. The value must be a non-empty string, and the message must say what
+ * type it was instead.
+ */
+for (const [label, line, typeName] of [
+  ["null (bare key)", "description:", "NoneType"],
+  ["null (tilde)", "description: ~", "NoneType"],
+  ["boolean", "description: true", "bool"],
+  ["list", "description: []", "list"],
+]) {
+  test(`validator rejects a description that is ${label}, naming the type`, () => {
+    const dir = fixtureSkill(
+      `typed-desc-${typeName.toLowerCase()}`,
+      ["---", "name: typed-desc", line, "---", "", "# T", ""].join("\n"),
+    );
+    const res = python([VALIDATOR, dir]);
+    assert.equal(
+      res.status,
+      1,
+      `validator accepted a ${label} description: ${res.stdout}${res.stderr}`,
+    );
+    assert.match(
+      res.stdout + res.stderr,
+      /description must be a non-empty string/,
+    );
+    assert.match(res.stdout + res.stderr, new RegExp(`got ${typeName}`));
+  });
+}

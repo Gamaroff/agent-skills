@@ -428,7 +428,6 @@ All Definition of Done criteria have been verified:
 
 **Task marked as ACCEPTED on:** 2026-09-18
 
-## Change Log
 <!-- change-log-start -->
 ## Change Log
 

@@ -537,7 +537,6 @@ All Definition of Done criteria have been verified:
 
 **Detailed Verification Log:** See `task.124.dod.1.pipeline-resume-lifecycle-hygiene.md` for complete verification evidence and timestamps.
 
-## Change Log
 <!-- change-log-start -->
 ## Change Log
 
