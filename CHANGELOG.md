@@ -388,6 +388,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The PreCompact hook's two tracker writes go through the comment contract and the access gate
+  (bug 14; PR #392, merged 2026-09-12 — entry backfilled by task 138's end-to-end DoD run).** The
+  shared hook posted a bare `gh issue comment … --body` and a bare `gh pr comment` — no
+  plain-language lead, no idempotency marker, an inline body, and outside `tracker_write`, so a
+  consumer with `access.tracker: read-only` still got a tracker write. The issue arm is now one
+  `tracker-comment.js --stage pipeline-paused-<step> --body-file` call (Jira included, when
+  credentials exist), the PR arm is `tracker_write gh pr comment --body-file`, and both fail closed.
+  `tests/mutation-call-site-coverage.test.js` scans the tracked shell under `shared/resources/`,
+  `skills/*/scripts/` and `scripts/` — the Markdown-only scan is how the hook stayed invisible.
+
 - **The task template's Change Log is the canonical marker block, heading inside the markers
   (obs #104 follow-through to task 127).** `task-template.md` shipped a bare `## Change Log` and no
   markers; authors added markers beneath it and every new task carried the heading-above-markers
@@ -404,7 +414,9 @@ All notable changes to this project will be documented in this file. Format foll
   than as "no verdict line found". `newest_numbered` — defined in 6b and inlined in 7.6a/7.6b — is
   one file, `shared/resources/newest-numbered.sh`, sourced from the repository root like
   `qa-cycle.sh`; `create-skill/SKILL.md` states that addressing rule once. Phase 4 — one
-  end-to-end `/finalise --bug` run in a scratch clone — is still owed; the task stays in progress.
+  end-to-end `/finalise --bug` run in a scratch clone — ran on 2026-09-21 against bug.14 (GAPS run, then
+  ACCEPT run; record in the task's implementation report) and found the Step 8 bug-mode gaps now
+  filed as obs #148.
 
 - **Every optional-file lookup in the pipeline prose is a quoted `find -name`, and the newest of a
   numbered series is picked by number (task 137; obs #144, #145).** Twenty-nine fenced-bash sites
