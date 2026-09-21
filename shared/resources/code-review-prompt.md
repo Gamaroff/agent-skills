@@ -74,6 +74,21 @@ D. ENUMERATION RISK (category: bug):
      passes, so the risk is entirely in the sites nobody listed. Name the population and say
      what would enumerate it.
 
+E. UNBOUND READS IN EXECUTED PROSE (category: bug):
+   - a fenced block the diff adds or changes reads a variable it does not bind — `${NAME:-default}`,
+     `${NAME:?}`, or a bare `$NAME` — and the WRITER is not in the same block. Every fenced block
+     runs as its own shell: a value bound in an earlier block, a step doc, or "in prose" does not
+     exist here. For each such read, name the line IN THIS BLOCK that assigns it, or the
+     `{placeholder}` that substitutes it; when there is none, report it. Ask "who binds this?" —
+     do not accept the read because a default makes the run green: `${NAME:-x}` with no writer is
+     a constant wearing a variable's name, and its default is right on exactly the path the
+     reviewing host ran; `${NAME:?}` with no writer fails on the path nobody ran; a bare `$NAME`
+     with no writer is empty, and an empty glob, path or kind takes the branch nobody meant. One
+     step doc read `${BASE_BRANCH:-develop}` through five green cycles with no writer anywhere;
+     one skill's step read `$STEM` "bound at 6a" — another block — and published an empty
+     artefact path at exit 0. A test that injects the variable through `env` cannot see this;
+     say so when you find one.
+
 ## Discipline (mandatory)
 - VERIFY every candidate against the actual surrounding code before reporting — read the lines,
   trace the call. Do NOT flag on a pattern/name match alone.

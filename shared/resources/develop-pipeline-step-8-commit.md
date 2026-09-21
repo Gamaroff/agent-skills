@@ -172,7 +172,13 @@ grep -q "⏳ Pending" "$REPORT" && { echo "❌ Step 8 incomplete: Pipeline Progr
 # 5. The work actually exists on the remote — commits present, tree clean,
 #    local HEAD == remote HEAD, and (when a PR is open) PR head == local HEAD.
 #    Run it UNPIPED and read its own exit status; see the note below.
-bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "${BASE_BRANCH:?}" ${PR_NUMBER:+--pr "$PR_NUMBER"}
+#    BASE_BRANCH is bound HERE, from the PR's own base — Step 8 runs after Step 4, so the branch
+#    has a PR, and this is the first source the resume contract's probe reads too. It was read
+#    unbound (`${BASE_BRANCH:?}`) through five green cycles because every host ran a feature
+#    branch off develop (obs #133, task.132); a block that reads a name must bind it.
+BASE_BRANCH=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)
+[ -n "$BASE_BRANCH" ] || { echo "❌ Step 8 incomplete: cannot bind BASE_BRANCH — no PR on this branch (gh pr view --json baseRefName)"; exit 1; }
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" ${PR_NUMBER:+--pr "$PR_NUMBER"}
 VERIFY_EXIT=$?
 [ "$VERIFY_EXIT" -eq 0 ] || { echo "❌ Step 8 incomplete: verify-push-state failed (exit $VERIFY_EXIT)"; exit 1; }
 
