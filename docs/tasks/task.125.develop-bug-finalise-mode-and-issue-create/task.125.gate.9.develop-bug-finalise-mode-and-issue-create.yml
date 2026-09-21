@@ -1,0 +1,71 @@
+schema: 1
+task: 'task.125.develop-bug-finalise-mode-and-issue-create'
+task_title: "develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
+gate: CONCERNS
+status_reason: 'Cycle 9 (last of the second grant; budget 9) — narrowed to the 2 files changed since gate 8. Cycle-8 BUG-21/22 and CR-3/5 verified FIXED by re-execution on head e78e66a8 (115 targeted tests). No HIGH. One MEDIUM: a **Verdict** line left as the verify-loop template''s own placeholder `{PASS / FAIL}` publishes PASS at exit 0 (executed) — the placeholder class one line over from where the block refuses it. One LOW: `{document-directory}` is passed unquoted to the helper and a missing/verbatim directory shares the DoD HALT. Two routed to future with reasons: the two orchestrator report lookups that still path-sort are on origin/develop (pre-existing; belongs with the obs #145 sweep), and hoisting the helper into a references/ script needs a cwd contract fenced blocks do not yet have.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T08:48:35Z'
+
+top_issues:
+  - id: 'TASK-125-BUG-23'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The bug-mode verdict is `grep -oE ''PASS|FAIL'' | head -1` over the last `**Verdict**:` line, so the verify-loop template''s own unsubstituted `**Verdict**: {PASS / FAIL}` (develop-bug-step-5-6-verify-loop.md:67) publishes FINAL_GATE=PASS at exit 0 (executed) — a bug closed as accepted on a verdict nobody wrote.'
+    suggested_action: 'Refuse a verdict line containing `{`; take the first token after the colon with `*` stripped and HALT unless it is exactly PASS or FAIL; add the placeholder-line fixture case.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.23.template-placeholder-verdict-publishes-pass.md'
+  - id: 'CR-4'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: '`{document-directory}` is passed unquoted to `newest_numbered` at four sites (a path with a space splits into dir and kind), and a missing or verbatim directory reaches the same HALT as "no DoD file", pointing the reader at 7.2 when the input path is what is wrong.'
+    suggested_action: 'Quote the placeholder at every call and add a `[ -d ]` check with its own HALT before the DoD lookup, mirroring the STEM/DOC_KIND guard.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3737
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new boundary this cycle. The label boundary probed 20/20 in cycle 2 is unchanged since.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-23: a placeholder verdict reads as PASS; CR-4: one HALT for two states.'
+  maintainability:
+    status: PASS
+    notes: 'CR-3 (helper inlined at 7.6a/7.6b) and the duplicated fix_cycle guard are follow-ups.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-23: refuse `{` on the verdict line and require an exact PASS/FAIL token; CR-4: quote the directory placeholder and check `[ -d ]` with its own HALT'
+      refs: ['skills/finalise/SKILL.md', 'evals/shared/tests/finalise-bug-mode.test.mjs']
+  future:
+    - action: 'CR-2 (pre-existing on origin/develop): develop-story/develop-task Step 0 `ls …implementation.*.md | sort | tail -1` path-sorts — fold into the obs #145 sweep with an enumeration test over every numbered-artefact resolver; CR-3: hoist newest_numbered into a references/ script once the fenced blocks carry a cwd contract (the TASK-121-BUG-4 rule); the duplicated fix_cycle guard (qa-cycle.sh --cycle)'
+      refs: ['skills/develop-story/SKILL.md', 'skills/develop-task/SKILL.md', 'skills/finalise/SKILL.md', 'skills/qa-fix/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 22
+  bugs_remaining: 1
+  fix_date: '2026-09-21'
+  total_iterations: 8
+  verification_method: 'Cycle-8 fixes re-executed on head e78e66a8 (115 targeted tests: the ordering cases gate.9/19 and dod.9/10 across 6b/7.6a/7.6b, CYCLES pinned in 6b, the 7.6a no-DoD HALT under bash + zsh)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-23 fixed with the placeholder fixture', 'CR-4 fixed']

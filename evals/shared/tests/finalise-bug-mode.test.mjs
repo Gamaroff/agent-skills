@@ -580,6 +580,81 @@ for (const shell of SHELLS) {
     }
   });
 
+  test(`[${shell}] 6b HALTs on a verdict line left as the template placeholder, and on a line whose first word is not PASS/FAIL — a token later on the line is never the verdict (TASK-125-BUG-23)`, () => {
+    for (const [verdict, why] of [
+      ["{PASS / FAIL}", "the verify-loop template's own placeholder"],
+      ["pending — PASS expected", "PASS is not the first word"],
+      ["**PASSED**", "PASSED is not PASS"],
+    ]) {
+      const dir = sixBFixture({ verdict });
+      try {
+        const r = run(dir, "task.67.bug.3", "bug");
+        assert.equal(r.status, 1, `${why}: ${r.stdout}${r.stderr}`);
+        assert.doesNotMatch(
+          r.stdout,
+          /^FINAL_GATE=/m,
+          `${why}: nothing published`,
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+    // The bolded and the trailing-prose forms still read.
+    for (const verdict of [
+      "**FAIL**",
+      "FAIL — fix cycle 2",
+      "PASS — proceeding to Step 7",
+    ]) {
+      const dir = sixBFixture({ verdict });
+      try {
+        const r = run(dir, "task.67.bug.3", "bug");
+        assert.equal(r.status, 0, r.stderr + r.stdout);
+        assert.match(
+          r.stdout,
+          new RegExp(
+            `^FINAL_GATE=${verdict.startsWith("PASS") ? "PASS" : "FAIL"}$`,
+            "m",
+          ),
+          r.stdout,
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  test(`[${shell}] 6b, 7.6a and 7.6b HALT on a missing document directory with a diagnostic that names the directory, not the DoD (cycle-9 CR-4)`, () => {
+    const missing = path.join(
+      tmpdir(),
+      "finalise-does-not-exist-" + process.pid,
+    );
+    const blocks = [
+      ["6b", derivationBlock()],
+      ["7.6a", sixABlock()],
+      ["7.6b", sixBAssertBlock()],
+    ];
+    for (const [name, block] of blocks) {
+      const r = spawnSync(shell, ["-s", "--"], {
+        input: block,
+        encoding: "utf8",
+        env: {
+          PATH: process.env.PATH,
+          DIR: missing,
+          DOC: "x",
+          STEM_IN: "task.67",
+          KIND_IN: "task",
+        },
+      });
+      assert.equal(r.status, 1, `${name}: ${r.stdout}${r.stderr}`);
+      assert.match(r.stdout + r.stderr, /HALT: .* is not a directory/, name);
+      assert.doesNotMatch(
+        r.stdout + r.stderr,
+        /beside the document/,
+        `${name} names the directory, not the DoD`,
+      );
+    }
+  });
+
   test(`[${shell}] 6b with STEM unset HALTs — an empty stem is a HALT, never an empty DoD path and gate published at exit 0 (TASK-125-BUG-15)`, () => {
     const dir = sixBFixture();
     try {
