@@ -580,16 +580,33 @@ for (const shell of SHELLS) {
     }
   });
 
-  test(`[${shell}] 6b HALTs on a verdict line left as the template placeholder, and on a line whose first word is not PASS/FAIL — a token later on the line is never the verdict (TASK-125-BUG-23)`, () => {
-    for (const [verdict, why] of [
+  test(`[${shell}] 6b's verdict is the FIRST word after the colon, exactly PASS/FAIL — template placeholders and remnants are refused with a diagnostic naming the line; a brace in trailing prose is prose (TASK-125-BUG-23, BUG-24)`, () => {
+    const refused = [
       ["{PASS / FAIL}", "the verify-loop template's own placeholder"],
+      ["PASS / FAIL", "the placeholder with its braces dropped"],
+      ["PASS/FAIL", "the placeholder, no spaces"],
+      ["PASS|FAIL", "the placeholder as an alternation"],
       ["pending — PASS expected", "PASS is not the first word"],
       ["**PASSED**", "PASSED is not PASS"],
-    ]) {
+      ["✅ PASS", "a leading glyph"],
+    ];
+    for (const [verdict, why] of refused) {
       const dir = sixBFixture({ verdict });
       try {
         const r = run(dir, "task.67.bug.3", "bug");
         assert.equal(r.status, 1, `${why}: ${r.stdout}${r.stderr}`);
+        // The diagnostic pins WHICH guard refused (cycle-10 CR-4): the line exists, so it is
+        // named — never the "no verdict line found" text.
+        assert.match(
+          r.stdout + r.stderr,
+          /HALT: bug mode — the last \*\*Verdict\*\*: line in .* is not an exact PASS or FAIL: \*\*Verdict\*\*: /,
+          why,
+        );
+        assert.doesNotMatch(
+          r.stdout + r.stderr,
+          /no \*\*Verdict\*\*: PASS\|FAIL line found/,
+          why,
+        );
         assert.doesNotMatch(
           r.stdout,
           /^FINAL_GATE=/m,
@@ -599,23 +616,22 @@ for (const shell of SHELLS) {
         rmSync(dir, { recursive: true, force: true });
       }
     }
-    // The bolded and the trailing-prose forms still read.
-    for (const verdict of [
-      "**FAIL**",
-      "FAIL — fix cycle 2",
-      "PASS — proceeding to Step 7",
-    ]) {
+    const accepted = [
+      ["**FAIL**", "FAIL"],
+      ["FAIL — fix cycle 2", "FAIL"],
+      ["PASS — proceeding to Step 7", "PASS"],
+      ["PASS — the `{bug-prefix}` reader now accepts both shapes", "PASS"], // a brace in prose (BUG-24)
+      ["**PASS** — closed by {develop-bug} Part B", "PASS"],
+    ];
+    for (const [verdict, want] of accepted) {
       const dir = sixBFixture({ verdict });
       try {
         const r = run(dir, "task.67.bug.3", "bug");
-        assert.equal(r.status, 0, r.stderr + r.stdout);
+        assert.equal(r.status, 0, `${verdict}: ${r.stderr}${r.stdout}`);
         assert.match(
           r.stdout,
-          new RegExp(
-            `^FINAL_GATE=${verdict.startsWith("PASS") ? "PASS" : "FAIL"}$`,
-            "m",
-          ),
-          r.stdout,
+          new RegExp(`^FINAL_GATE=${want}$`, "m"),
+          `${verdict}: ${r.stdout}`,
         );
       } finally {
         rmSync(dir, { recursive: true, force: true });

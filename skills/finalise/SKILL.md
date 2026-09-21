@@ -1601,15 +1601,28 @@ POLLEOF
      # `**Verdict**: **PASS**` as often as `**Verdict**: PASS`, and the second
      # word of the first is `**PASS**` (cycle-4 CR-3). Neither token is a HALT.
      VERDICT_LINE=$(grep -E '^\*\*Verdict\*\*:' "${IMPLEMENTATION_REPORT:-/dev/null}" 2>/dev/null | tail -1)
-     # A verdict line left as the verify-loop template's own placeholder — `**Verdict**: {PASS /
-     # FAIL}` — carries the literal PASS, and a token grep published it as the bug's verdict at
-     # exit 0 (TASK-125-BUG-23). A brace on the line is a placeholder, not a verdict; and the
-     # verdict is the FIRST word after the colon with its bold stripped, which must be exactly
-     # PASS or FAIL — never a token found somewhere later on the line.
-     case "$VERDICT_LINE" in *'{'*) echo "HALT: bug mode — the last **Verdict**: line in ${IMPLEMENTATION_REPORT} is an unsubstituted template placeholder: ${VERDICT_LINE}"; exit 1 ;; esac
-     VERIFY_VERDICT=$(printf '%s\n' "$VERDICT_LINE" | sed -E 's/^\*\*Verdict\*\*:[[:space:]]*\**([A-Za-z]+).*$/\1/')
+     # ONE refusal path (TASK-125-BUG-24). The verdict is the FIRST word after the colon with
+     # its bold stripped, and it must be exactly PASS or FAIL. The verify-loop template's own
+     # placeholder `{PASS / FAIL}` fails that rule by itself (its first character is a brace),
+     # and so does the placeholder with its braces dropped — `PASS / FAIL`, `PASS|FAIL` — because
+     # what FOLLOWS the first word begins with the template's alternation. A brace anywhere else
+     # on the line is prose: this repository's verdict lines routinely name a `{placeholder}`
+     # in their trailing text, and a whole-line brace check HALTed every one of them
+     # (TASK-125-BUG-23's first fix; cycle-10 CR-1).
+     VERDICT_REST=$(printf '%s\n' "$VERDICT_LINE" | sed -E 's/^\*\*Verdict\*\*:[[:space:]]*//')
+     VERIFY_VERDICT=$(printf '%s\n' "$VERDICT_REST" | sed -nE 's/^\**([A-Za-z]+).*$/\1/p')
+     VERDICT_AFTER=$(printf '%s\n' "$VERDICT_REST" | sed -E 's/^\**[A-Za-z]+\**[[:space:]]*//')
      case "$VERIFY_VERDICT" in PASS|FAIL) ;; *) VERIFY_VERDICT='' ;; esac
-     [ -n "$VERIFY_VERDICT" ] || { echo "HALT: bug mode — no **Verdict**: PASS|FAIL line found in ${IMPLEMENTATION_REPORT:-<no ${STEM}.implementation.*.md or ${STEM}.*.implementation.*.md beside the bug>}; the verify loop's QA Iteration History is the bug's only verdict"; exit 1; }
+     case "$VERDICT_AFTER" in /*|\|*) VERIFY_VERDICT='' ;; esac   # `PASS / FAIL` — a template remnant, not a verdict
+     # Two states, two diagnostics (cycle-10 CR-3): no verdict line at all, or a line that
+     # exists and was refused — the reader told to write one must learn that one exists.
+     if [ -z "$VERIFY_VERDICT" ]; then
+       if [ -z "$VERDICT_LINE" ]; then
+         echo "HALT: bug mode — no **Verdict**: PASS|FAIL line found in ${IMPLEMENTATION_REPORT:-<no ${STEM}.implementation.*.md or ${STEM}.*.implementation.*.md beside the bug>}; the verify loop's QA Iteration History is the bug's only verdict"; exit 1
+       else
+         echo "HALT: bug mode — the last **Verdict**: line in ${IMPLEMENTATION_REPORT} is not an exact PASS or FAIL: ${VERDICT_LINE}"; exit 1
+       fi
+     fi
      FINAL_GATE="$VERIFY_VERDICT"
      # What the acceptance commit carried, and what "accepted" means, differ by
      # kind: bug mode writes no `status: accepted` (frontmatter-accepted: skip)

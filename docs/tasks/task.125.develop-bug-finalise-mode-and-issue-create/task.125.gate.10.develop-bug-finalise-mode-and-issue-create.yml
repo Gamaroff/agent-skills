@@ -1,0 +1,78 @@
+schema: 1
+task: 'task.125.develop-bug-finalise-mode-and-issue-create'
+task_title: "develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
+gate: CONCERNS
+status_reason: 'Cycle 10 (third grant; budget 11) — narrowed to the 2 files changed since gate 9. Cycle-9 BUG-23 and CR-4 verified FIXED by re-execution on head 335559e2 (119 targeted tests). No HIGH. One MEDIUM, a regression of the cycle-9 fix: its whole-line brace check HALTs a correct verdict whose trailing prose names a {placeholder} (reproduced) and was already shown absorbed by the first-word rule; and the template remnant `PASS / FAIL` with braces dropped still publishes PASS (reproduced). Two cleanups taken as LOW: one diagnostic for "no verdict line" and "a line refused"; the refused-verdict tests assert only exit 1.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T09:03:00Z'
+
+top_issues:
+  - id: 'TASK-125-BUG-24'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The cycle-9 `case "$VERDICT_LINE" in *''{''*` HALT fires on any brace on the line, so `**Verdict**: PASS — the `{bug-prefix}` reader now accepts both shapes` HALTs a correct bug run with a misleading diagnostic (reproduced), while the first-word rule already refuses `{PASS / FAIL}` on its own (the cycle-9 mutation showed the arm absorbed); and the brace-less template remnant `PASS / FAIL` / `PASS/FAIL` publishes PASS at exit 0 (reproduced).'
+    suggested_action: 'Drop the whole-line brace check; keep the first-word extraction as the single refusal path and also refuse a remainder beginning with `/` or `|`; add the trailing-prose-with-brace line to the accepted cases and `PASS / FAIL` to the refused ones.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.24.whole-line-brace-halt-refuses-a-correct-verdict-with-trailing-prose.md'
+  - id: 'CR-3'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: '"No **Verdict**: line at all" and "a line exists whose first word is not PASS/FAIL" reach one diagnostic, so the reader told to write a verdict does not learn one exists and was refused.'
+    suggested_action: 'Branch the HALT text on whether $VERDICT_LINE is empty; echo the refused line and the extracted token when it is not.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'evals/shared/tests/finalise-bug-mode.test.mjs'
+    finding: 'The refused-verdict cases assert only exit 1 and no FINAL_GATE, so any earlier HALT or a parse error satisfies them and the case cannot tell which guard refused.'
+    suggested_action: 'Assert the HALT diagnostic per refused case.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3741
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new boundary this cycle. The label boundary probed 20/20 in cycle 2 is unchanged since.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-24: a correct bug run HALTs on prose; a template remnant publishes PASS.'
+  maintainability:
+    status: PASS
+    notes: 'CR-3, CR-4 test/diagnostic hygiene. The gate-9 future list stands.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-24: single refusal path on the first token + alternation remainder; CR-3: branched diagnostic; CR-4: per-case diagnostic assertions'
+      refs: ['skills/finalise/SKILL.md', 'evals/shared/tests/finalise-bug-mode.test.mjs']
+  future:
+    - action: 'As gate 9: the orchestrator path-sort lookups (obs #145 sweep + enumeration test); hoist newest_numbered once the blocks carry a cwd contract; qa-cycle.sh --cycle'
+      refs: ['skills/develop-story/SKILL.md', 'skills/develop-task/SKILL.md', 'skills/finalise/SKILL.md', 'skills/qa-fix/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 23
+  bugs_remaining: 1
+  fix_date: '2026-09-21'
+  total_iterations: 9
+  verification_method: 'Cycle-9 fixes re-executed on head 335559e2 (119 targeted tests; the three refused and three accepted verdict shapes, the missing-directory HALT across 6b/7.6a/7.6b, under bash + zsh)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-24 fixed with the two new cases', 'CR-3 and CR-4 fixed']
