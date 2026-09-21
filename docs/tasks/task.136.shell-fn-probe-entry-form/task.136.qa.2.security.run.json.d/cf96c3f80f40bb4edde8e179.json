@@ -1,0 +1,20 @@
+{
+  "sink": "filename",
+  "entry": "shell-fn:shared/resources/gh-labels.sh#gh_labels_filter",
+  "name": "gh-labels-shell-fn",
+  "call_site": "shared/resources/gh-labels.sh:60",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 20,
+  "passed": 20,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "fake_gh": "/Users/gamaroff/Development/Projects/agent-skills/tests/fixtures/fake-gh",
+  "ran_at": "2026-09-21T20:25:37.322Z"
+}

@@ -369,6 +369,13 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
 export const SHELL_PREFIX = "shell:";
 /** The entry-spec prefix that selects the sourced-function form (task.136). */
 export const SHELL_FN_PREFIX = "shell-fn:";
+/**
+ * `gh` as a command word somewhere in a library's text — the signal that a
+ * shell-fn run needs `--fake-gh` (QA cycle 2, CR-2). A mention in a comment
+ * matches too; that is a named decline the caller answers by passing the
+ * fixture, not a wrong verdict.
+ */
+const GH_COMMAND_WORD = /(^|[\s;|&(`$])gh(\s|$)/m;
 /** A name bash and zsh both accept as a function name — and nothing else. */
 const SHELL_FN_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 /** Reserved exits of the shell-fn one-liner: the source failed / the function is undefined. */
@@ -398,13 +405,26 @@ const noRcFlags = (shell) =>
  * command, which `command -v` would.
  */
 const SHELL_FN_BODY =
-  `source "$1" || exit ${SHELL_FN_SOURCE_FAILED}; shift; fn="$1"; shift; ` +
+  // An EXIT trap around the source: `source` runs the library in THIS shell,
+  // so a top-level `exit N` inside it ends the harness with N before `||`
+  // is reached — every case then mismatches and the verdict is a SCORED
+  // `absent` with a full count, the task.125 shape (task.136 QA cycle 2,
+  // BUG-2). The trap re-maps that exit to the source-failed sentinel and is
+  // disarmed the moment the source has returned normally.
+  `trap 'exit ${SHELL_FN_SOURCE_FAILED}' EXIT; source "$1" || exit ${SHELL_FN_SOURCE_FAILED}; trap - EXIT; ` +
+  `shift; fn="$1"; shift; ` +
   `typeset -f "$fn" >/dev/null 2>&1 || exit ${SHELL_FN_NOT_DEFINED}; ` +
   // The function runs in a SUBSHELL: a function that calls `exit` would
   // otherwise end the harness shell with that code before the remap below
   // ever ran, and `exit 97` inside the function would read as "the source
-  // failed" (task.136 QA cycle 1, CR-2 — found by its own row).
-  `( "$fn" "$@" ); rc=$?; case $rc in ${SHELL_FN_SOURCE_FAILED}|${SHELL_FN_NOT_DEFINED}) exit ${SHELL_FN_RESERVED_COLLISION};; esac; exit $rc`;
+  // failed" (task.136 QA cycle 1, CR-2 — found by its own row). errexit is
+  // snapshotted from `$-`, switched OFF in the harness so `rc=$?` and the
+  // remap always run, and switched back ON inside the subshell so the
+  // function keeps the semantics its library set (QA cycle 2, CR-3: under
+  // `set -e` errexit fired on the non-zero subshell before the remap).
+  `ee=; case $- in *e*) ee=1;; esac; set +e; ` +
+  `( [ -n "$ee" ] && set -e; "$fn" "$@" ); rc=$?; ` +
+  `case $rc in ${SHELL_FN_SOURCE_FAILED}|${SHELL_FN_NOT_DEFINED}) exit ${SHELL_FN_RESERVED_COLLISION};; esac; exit $rc`;
 
 /**
  * The shells a shell-form probe runs under. bash always; zsh when the host has
@@ -670,6 +690,27 @@ export function runProbeSpec({
     }
   }
   base.fakeGh = fakeGhDir;
+  // A shell-fn library whose body names `gh` and was given no `--fake-gh` is
+  // DECLINED, not scored: run bare, `gh` fails from the sandbox cwd, the
+  // function takes its read-failed passthrough, and the verdict lands on
+  // `absent` / `present-but-inert` — the same values a missing control
+  // produces — with only `fake_gh: null` deep in the record to say "could not
+  // look" rather than "nothing filters" (task.136 QA cycle 2, CR-2). Two
+  // states, one value is the defect class this engine exists to remove.
+  if (resolved.kind === "shell-fn" && fakeGhDir === null) {
+    let libText = "";
+    try {
+      libText = readFileSync(resolved.entryPath, "utf8");
+    } catch {
+      libText = "";
+    }
+    if (GH_COMMAND_WORD.test(libText)) {
+      return decline(
+        "needs-fake-gh",
+        `${resolved.entryPath} names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
+      );
+    }
+  }
 
   let probeCases;
   if (Array.isArray(cases)) {
@@ -1029,8 +1070,11 @@ function runShellCase(
   // An `absent` name that the fixture itself creates — a control, or the
   // case's own input — exists before the script runs, so it too would score
   // every run as a side effect (BUG-13's second shape).
+  // The shell-fn form writes no per-case file (CR-3), so its input is not a
+  // name the fixture creates and may legitimately be an `absent` path
+  // (QA cycle 2, CR-4).
   const collides = (c.expected.absent ?? []).find(
-    (p) => fixture.controls.includes(p) || p === c.input,
+    (p) => fixture.controls.includes(p) || (fnName === null && p === c.input),
   );
   if (collides !== undefined) {
     decline(
@@ -1151,7 +1195,8 @@ function runShellCase(
       detail = child.signal ? `timed out after ${timeoutMs}ms` : "never ran";
     } else if (fnName !== null && child.status === SHELL_FN_SOURCE_FAILED) {
       // The source itself failed — a syntax error, a `return` at top level,
-      // an `exit` in the library. A property of the ENTRY, so every case
+      // an `exit` in the library (re-mapped by the EXIT trap around the
+      // source — BUG-2). A property of the ENTRY, so every case
       // reports it identically and runProbeSpec folds them into one decline.
       // Without the reserved exit this read as N mismatches and scored
       // `absent` with a full count (task.136).

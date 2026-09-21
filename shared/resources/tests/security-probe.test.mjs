@@ -1563,3 +1563,138 @@ test("shell-fn entry: a missing library is declined BEFORE anything spawns, not 
   );
   assert.equal(r.shells, null);
 });
+
+// ── task.136 QA cycle 2 — the fixes, each with its row ───────────────────────
+
+test("shell-fn entry: a library that exits at top level is declined via the EXIT trap, never scored absent (TASK-136-BUG-2)", () => {
+  // `source` runs the library in the harness shell: a top-level `exit 1`
+  // ended the harness with 1 before `|| exit 97` ran, every case mismatched,
+  // and the verdict was a SCORED absent with a full count.
+  const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, ".t136-toplevel-exit-"));
+  try {
+    const lib = join(dir, "exits.sh");
+    writeFileSync(
+      lib,
+      "#!/usr/bin/env bash\nf() { printf 'bug\\n'; }\nexit 1\n",
+      {
+        mode: 0o644,
+      },
+    );
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, lib)}#f`,
+      cases: LABEL_CASES,
+      fakeGh: FAKE_GH,
+    });
+    assert.equal(r.verdict, "unverifiable");
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(
+      r.executed,
+      0,
+      "a top-level exit is a source failure, not 20 executions",
+    );
+    assert.match(r.declined[0].detail, /source .* failed \(exit 97\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: under set -e the function's own 97 is still re-mapped and scored (TASK-136-BUG-2 / CR-3)", () => {
+  const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, ".t136-errexit-"));
+  try {
+    const lib = join(dir, "errexit.sh");
+    writeFileSync(
+      lib,
+      '#!/usr/bin/env bash\nset -e\nrefuse97() { case "$1" in bug) printf "bug\\n";; *) return 97;; esac; }\nreached() { false; printf "reached\\n"; }\n',
+      { mode: 0o644 },
+    );
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, lib)}#refuse97`,
+      cases: LABEL_CASES,
+      fakeGh: FAKE_GH,
+    });
+    assert.equal(r.declined.length, 0, JSON.stringify(r.declined));
+    assert.equal(r.executed, LABEL_CASES.length * probeShells().length);
+    assert.match(
+      r.cases.find((c) => c.id === "label.undefined-label").detail,
+      /exit 99 ≠ 0/,
+    );
+    // errexit is still in force INSIDE the function: `false` stops it before
+    // it can print.
+    const e = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, lib)}#reached`,
+      cases: [
+        {
+          id: "x.ok",
+          input: "bug",
+          direction: "legitimate",
+          expected: { stdout: "reached\n", exit: 0 },
+        },
+        {
+          id: "x.h",
+          input: "zzz",
+          direction: "hostile",
+          expected: { stdout: "", exit: 0 },
+        },
+      ],
+      fakeGh: FAKE_GH,
+    });
+    assert.equal(e.declined.length, 0);
+    const ok = e.cases.find((c) => c.id === "x.ok");
+    assert.match(
+      ok.detail,
+      /stdout "" ≠ "reached\\n"/,
+      "errexit stopped the function before printf",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: a library that names gh without --fake-gh is declined needs-fake-gh, not scored through the passthrough (CR-2)", () => {
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: FN_ENTRY,
+    cases: LABEL_CASES,
+  });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "needs-fake-gh");
+  assert.equal(r.executed, 0, "nothing may spawn without the fixture");
+  assert.match(r.declined[0].detail, /names `gh`.*--fake-gh/);
+  // A library that does not name gh runs without one.
+  const e = runProbeSpec({
+    sink: "filename",
+    entry: `shell-fn:${FN_FIXTURES}/echo-unfiltered.sh#echo_all`,
+    cases: LABEL_CASES,
+  });
+  assert.equal(e.reason, "no-hostile-case-was-rejected");
+});
+
+test("shell-fn entry: expected.absent may name the case's own input — no per-case file is created for this form (CR-4)", () => {
+  const cases = [
+    {
+      id: "x.self",
+      input: "PWNED",
+      direction: "hostile",
+      expected: { stdout: "", exit: 0, absent: ["PWNED"] },
+    },
+    {
+      id: "x.ok",
+      input: "bug",
+      direction: "legitimate",
+      expected: { stdout: "bug\n", exit: 0 },
+    },
+  ];
+  const fn = runProbeSpec({
+    sink: "filename",
+    entry: FN_ENTRY,
+    cases,
+    fakeGh: FAKE_GH,
+  });
+  assert.equal(fn.verdict, "engages", JSON.stringify(fn.declined));
+  // The shell: form still refuses it — that form does create the file.
+  const sh = runProbeSpec({ sink: "filename", entry: FIXED_SCRIPT, cases });
+  assert.match(sh.declined[0].detail, /which the fixture itself creates/);
+});

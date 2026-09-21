@@ -308,17 +308,17 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.136.qa.1.shell-fn-probe-entry-form.md](./task.136.qa.1.shell-fn-probe-entry-form.md)
-- **Gate File**: [task.136.gate.1.shell-fn-probe-entry-form.yml](./task.136.gate.1.shell-fn-probe-entry-form.yml)
+- **Full Report**: [task.136.qa.2.shell-fn-probe-entry-form.md](./task.136.qa.2.shell-fn-probe-entry-form.md)
+- **Gate File**: [task.136.gate.2.shell-fn-probe-entry-form.yml](./task.136.gate.2.shell-fn-probe-entry-form.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3879 (`npm run ci:fast`; 57 in `security-probe.test.mjs`); 41 security probes executed (measured)
+- **Tests Executed**: 3884 (`npm run ci:fast`; 62 in `security-probe.test.mjs`); 41 security probes executed (measured)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 1 MEDIUM (TASK-136-BUG-1), 3 LOW advisory
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 1 MEDIUM (TASK-136-BUG-2), 3 LOW advisory; TASK-136-BUG-1 verified fixed and closed
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The new `shell-fn:` form engages on the live `gh-labels.sh#gh_labels_filter` boundary (20/20 under bash and zsh); every hostile path and function name is refused. One MEDIUM: `--fake-gh` is validated and recorded for a JS-form entry the JS runner never puts on `PATH`, so a record can claim a fixture answered when the real `gh` did ([bug 1](./task.136.bug.1.fake-gh-recorded-on-js-entry.md)).
+Cycle 2 (full refute pass): bug 1 and the three cycle-1 advisories verified fixed by execution. New MEDIUM ([bug 2](./task.136.bug.2.top-level-exit-in-library-escapes-sentinel.md)): a top-level `exit` in a sourced library ends the harness shell before the exit-97 sentinel, scoring `absent` with a full count; under `set -e` the cycle-1 remap is inert. Verified fix (EXIT trap + errexit snapshot) in the bug report.
 
 ---
 <!-- change-log-start -->
@@ -332,6 +332,8 @@ The new `shell-fn:` form engages on the live `gh-labels.sh#gh_labels_filter` bou
 | 2026-09-21 |  | Implemented — 12 files (engine, 2 tests, 3 fixtures, 4 prompts, CHANGELOG, 10 bundled copies), 12 new test rows, 5 mutants killed; live probe of gh-labels.sh#gh_labels_filter: engages, executed 20 | develop |
 | 2026-09-21 |  | QA gate CONCERNS (90/100) — 1 MEDIUM (CR-1: --fake-gh recorded on a JS entry the runner ignores), 3 LOW advisory; 41 security probes measured | qa-task |
 | 2026-09-21 |  | QA findings fixed — cycle 1: TASK-136-BUG-1 (--fake-gh declined on a JS entry) + CR-2/3/4 advisories closed, 5 rows added, 4 mutants killed; suite 62/62 | qa-fix |
+| 2026-09-21 |  | QA gate CONCERNS (90/100) — cycle 2 refute: bug 1 closed; 1 new MEDIUM (bug 2: top-level exit / set -e escape the shell-fn sentinels), 3 LOW advisory | qa-task |
+| 2026-09-21 |  | QA findings fixed — cycle 2: TASK-136-BUG-2 (EXIT trap + errexit snapshot) + CR-2 needs-fake-gh decline, CR-4, CR-5; 4 rows added, 4 mutants killed; suite 66/66 | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -355,15 +357,16 @@ The new `shell-fn:` form engages on the live `gh-labels.sh#gh_labels_filter` bou
 
 ### In QA Verification
 
-- [TASK-136-BUG-1: `--fake-gh` recorded on a JS-form entry the runner never puts on PATH](./task.136.bug.1.fake-gh-recorded-on-js-entry.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-21, qa-fix cycle 1)
+- [TASK-136-BUG-2: top-level `exit` in a sourced library escapes the exit-97 sentinel; errexit makes the remap inert](./task.136.bug.2.top-level-exit-in-library-escapes-sentinel.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-21, qa-fix cycle 2)
 
 ### Closed Bugs
 
-[Bugs will be moved here by QA after verification]
+- [TASK-136-BUG-1: `--fake-gh` recorded on a JS-form entry the runner never puts on PATH](./task.136.bug.1.fake-gh-recorded-on-js-entry.md) - ✅ Closed - Priority: P2 (Fixed qa-fix cycle 1; verified QA cycle 2)
 
 ## Notes
 
 - QA artifacts land beside this file: `task.136.qa.[N].*.md`, `task.136.bug.[N].*.md`, `task.136.gate.[N].*.yml`.
 - Independent of tasks 137 and 138. Shares `security-probe.mjs` with task.131 (markdown-structure sink, planned): both add an arm to `runProbeSpec` — land one, rebase the other.
+- qa-fix cycle 2: an EXIT trap around the `source` and an errexit snapshot/restore around the subshell (bug 2); a `gh`-naming library run without `--fake-gh` is now declined `needs-fake-gh` rather than scored through its passthrough (QA cycle 2 CR-2) — the "without `--fake-gh`" success criterion is satisfied by that named decline, which names the mismatch's cause and does not hang; `expected.absent` may name the input for the shell-fn form (CR-4); the fake `gh` header says `FAKE_GH_LOG` is reachable only outside the engine (CR-5).
 - qa-fix cycle 1 also closed the three advisories QA carried to `future` (CR-2: the function runs in a subshell and its own 97/98 is re-mapped to 99 and scored; CR-3: no per-case fixture file for `shell-fn:` cases, so slash-bearing labels are probeable; CR-4: `FAKE_GH_LOG` exercised by a row) and pinned the pre-spawn decline for a missing library.
 - Until this lands, the finalise security probe FAILs (low) on any sourced-shell-function boundary and Step 8a refuses the fix; that is a human override, to be asked for, never auto-accepted.

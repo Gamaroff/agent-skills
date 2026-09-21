@@ -35,7 +35,10 @@ case "${1:-} ${2:-}" in
     ;;
   "issue create")
     # Record the argv so a test can assert what reached the create, and answer
-    # with the URL shape a caller parses the issue number from.
+    # with the URL shape a caller parses the issue number from. FAKE_GH_LOG is
+    # reachable only when this file is spawned DIRECTLY (as its test row does):
+    # the probe engine builds the child env from an allow-list and never passes
+    # it through, so no probe run can observe what reached a create.
     printf '%s\n' "$@" >>"${FAKE_GH_LOG:-/dev/null}"
     echo "https://example.invalid/issues/1"
     ;;

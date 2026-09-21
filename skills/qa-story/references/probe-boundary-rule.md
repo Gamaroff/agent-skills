@@ -207,15 +207,23 @@ Declining conditions, each reported with its reason:
     own). The engine prepends it to `PATH` with `FAKE_GH=1` in the env — the
     fixture refuses to run without that variable — validates it before anything
     spawns (`bad-fake-gh` otherwise), and records it as `fake_gh` on the run.
-    Without it the run does not hang: the real `gh` fails from the sandbox cwd,
-    the function takes its no-labels path, and the record names the mismatch.
+    **A library whose text names `gh` and was given no `--fake-gh` is declined
+    `needs-fake-gh`, not scored**: run bare, the real `gh` fails from the
+    sandbox cwd, the function takes its read-failed passthrough, and the verdict
+    would land on `absent` / `present-but-inert` — the values a missing control
+    produces — with nothing but `fake_gh: null` to say "could not look". The
+    decline names the library and the flag; it does not hang.
 
   Exit 97 is reserved for "the source itself failed" and 98 for "the function
   is not defined after sourcing"; both fold into one `entry-not-probeable`
-  decline that names the library, never into a scored `absent`. The function
-  itself runs in a **subshell**, so a function that calls `exit` cannot end the
-  harness — and its own 97 or 98 is re-mapped to 99 and *scored* as a mismatch
-  rather than read as a broken library. Because the input reaches the function
+  decline that names the library, never into a scored `absent`. An EXIT trap
+  is armed around the `source`, so a **top-level `exit` inside the library**
+  (a `|| exit 1` guard, say) is the same named decline rather than a scored
+  `absent` behind a full count. The function itself runs in a **subshell** with
+  the library's own errexit setting restored inside it, so a function that
+  calls `exit` cannot end the harness, `set -e` in the library cannot skip the
+  status capture — and its own 97 or 98 is re-mapped to 99 and *scored* as a
+  mismatch rather than read as a broken library. Because the input reaches the function
   as argv and not as a directory entry, a `shell-fn:` case may carry a `/`
   (`area/backend` is a real label); no per-case file is written for this form,
   only the sink's controls. `--fake-gh` on a JS-form entry is `bad-fake-gh`:

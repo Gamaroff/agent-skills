@@ -160,7 +160,8 @@ node PROMPT_DIR/security-probe.mjs \
 # form: the file is sourced and the function called with each case as argv.
 # Its `expected` is the function's own contract, so name a cases file; and a
 # function that consults `gh` is answered by the fixture on --fake-gh, never
-# the network. `shell:` against a library sources it and exits — every case
+# the network — a library that names `gh` with no --fake-gh is declined
+# `needs-fake-gh`, not scored through its no-labels passthrough. `shell:` against a library sources it and exits — every case
 # mismatches, `absent` with a full count (task.125).
 node PROMPT_DIR/security-probe.mjs \
   --sink filename --entry 'shell-fn:<path-from-repo-root>#<function>' \

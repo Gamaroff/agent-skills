@@ -4,7 +4,7 @@
 **Bug ID**: TASK-136-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (Step 3b diff code review, CR-1)
 **Date Found**: 2026-09-21
 
@@ -74,3 +74,9 @@ Decline (a): a JS export that shells out to `gh` is outside what the JS runner's
 | 2026-09-21 | New | QA Engineer | Found in QA cycle 1 (CR-1) |
 | 2026-09-21 | In Progress | Claude (qa-fix) | Investigation started |
 | 2026-09-21 | Ready for QA | Claude (qa-fix) | Fix implemented (decline on JS entry + row) |
+| 2026-09-21 | Closed | QA Engineer | Verified by execution on f2561282 (QA cycle 2): bad-fake-gh, fakeGh null, fake_gh null; mutant (decline removed) reds the row |
+
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**Result**: FIXED — `runProbeSpec({ sink: "url-authority", entry: "…engaging-control.mjs#validateHost", fakeGh })` → `unverifiable` / `bad-fake-gh`, `executed 0`, `fakeGh: null`, `toRecordEntry(...).fake_gh: null`; the same directory on the `shell:` form is accepted. Mutation: JS decline removed → the BUG-1 row goes red.
