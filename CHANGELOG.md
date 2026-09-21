@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.49.0] - 2026-09-21
+
 ### Added
 
 - **`qa-next` — a UAT loop, sibling of `develop-next`.** `/develop-next` ends at `status: accepted`,
