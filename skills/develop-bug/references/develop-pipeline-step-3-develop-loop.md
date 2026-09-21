@@ -59,7 +59,7 @@ After the Explore subagent returns, look for a co-located plan file:
 
 #### develop-story
 ```bash
-ls {story-directory}/story.{epic}.{story}.plan.*.md 2>/dev/null
+find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.plan.*.md" 2>/dev/null | head -1
 ```
 If found, read the plan file and include its content as additional context when invoking `/develop`. The plan file contains implementation-level detail (code snippets, exact file changes, function signatures) that supplements the story's Tasks section. Log in Decisions Log: "Plan file found: {path} — included as implementation context for /develop".
 
@@ -67,7 +67,7 @@ If no plan file exists, proceed without it — plan files are optional (only pre
 
 #### develop-task
 ```bash
-ls {task-directory}/task.{id}.plan.*.md 2>/dev/null
+find {task-directory} -maxdepth 1 -name "task.{id}.plan.*.md" 2>/dev/null | head -1
 ```
 If found, read the plan file and include its content as additional context when invoking `/develop`. The plan file contains implementation-level detail (code snippets, exact file changes, function signatures) that supplements the task's Implementation Plan section. Log in Decisions Log: "Plan file found: {path} — included as implementation context for /develop".
 

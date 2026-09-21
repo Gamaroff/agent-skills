@@ -228,7 +228,14 @@ After finding the story file and validating PR exists:
    ```bash
    # Find existing gate files in story directory
    STORY_DIR=$(dirname "$STORY_FILE")
-   LATEST_GATE=$(ls -t "$STORY_DIR"/story.*.gate.*.yml 2>/dev/null | head -1)
+   # The current gate is the HIGHEST-numbered one, and the number has ONE definition — the bundled
+   # qa-cycle.sh (task.121). It refuses (rc 1, empty) when no numbered gate exists, which is the
+   # first-review case. The path is then a quoted find on that number: an unmatched bare glob
+   # aborts the whole command under zsh, and `ls -t` ties on a fresh checkout (obs #144/#145).
+   PRIOR_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR" 2>/dev/null); rc=$?
+   [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
+   LATEST_GATE=""
+   [ -n "$PRIOR_CYCLE" ] && LATEST_GATE=$(find "$STORY_DIR" -maxdepth 1 -name "story.*.gate.${PRIOR_CYCLE}.*.yml" 2>/dev/null | head -1)
    ```
 
 2. **If gate file exists, read and analyze:**
@@ -261,7 +268,7 @@ After finding the story file and validating PR exists:
 
    ```bash
    # Find highest existing QA number
-   LATEST_QA_NUM=$(ls "$STORY_DIR"/story.*.qa.*.md 2>/dev/null | \
+   LATEST_QA_NUM=$(find "$STORY_DIR" -maxdepth 1 -name "story.*.qa.*.md" 2>/dev/null | \
                    sed -E 's/.*\.qa\.([0-9]+)\..*/\1/' | \
                    sort -n | tail -1)
 
@@ -882,7 +889,7 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    BASE="origin/${BASE_REF:-develop}"
    DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
    # How many gates already exist? 0 = first review, 1 = cycle 2, 2+ = cycle 3 and later.
-   PRIOR_GATES=$(ls "$STORY_DIR"/story.*.gate.*.yml 2>/dev/null | wc -l | tr -d ' ')
+   PRIOR_GATES=$(find "$STORY_DIR" -maxdepth 1 -name "story.*.gate.*.yml" 2>/dev/null | wc -l | tr -d ' ')   # "0" with no gate — an `ls` glob left this EMPTY under zsh and the -ge below errored (obs #145)
    # Re-review only: derive the prior gate's date from its `updated:` field ($LATEST_GATE set in Phase 0).
    LAST_GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
    # $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
@@ -1968,7 +1975,7 @@ if [ -n "$QA_ISSUE" ]; then
   # complete by this point. Re-resolve rather than reusing LATEST_GATE from
   # Phase 0 — that one names the PREVIOUS run's gate (it is read to decide
   # whether to re-review), and this run has written a newer one since.
-  THIS_GATE=$(ls "$STORY_DIR"/story.*.gate."${QA_CYCLE:-none}".*.yml 2>/dev/null | head -1)
+  THIS_GATE=$(find "$STORY_DIR" -maxdepth 1 -name "story.*.gate.${QA_CYCLE:-none}.*.yml" 2>/dev/null | head -1)
   # `|| true`, NOT `|| echo 0`. `grep -c` PRINTS "0" and EXITS 1 when it matches
   # nothing, so `|| echo 0` appends a second zero and the variable becomes the
   # two-line string "0\n0" — which the engine's numeric coercion then reads as

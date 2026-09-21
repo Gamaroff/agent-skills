@@ -79,7 +79,7 @@ If the lock is absent, the state — if any — is in one of two places, and **n
 **Choose between them by document, then by age — not by a fixed order** (task.120 bug.5: a fixed snapshot-first order let a stale `last-halt.json` from a previous task shadow a fresher claim for this one, and would have recommended resuming the wrong task):
 
 ```bash
-ls -t .claude/state/develop-pipeline.last-halt.json .claude/state/develop-pipeline.lock.pausing.* 2>/dev/null || true
+find .claude/state -maxdepth 1 \( -name "develop-pipeline.last-halt.json" -o -name "develop-pipeline.lock.pausing.*" \) -exec ls -t {} + 2>/dev/null || true
 ```
 
 Every note any step of this prompt files in `deltas_since_pause` is a delta **object** — the shape is stated once, in § Output Schema's `deltas_since_pause` object fields, and governs every site below.
@@ -128,7 +128,7 @@ If branch does not exist locally: add `"Branch recorded in lock/snapshot does no
 ### Step 2 — List and validate step summaries
 
 ```bash
-ls "{DOC_DIR}/.summaries/step-*.json" 2>/dev/null | sort
+find "{DOC_DIR}/.summaries" -maxdepth 1 -name "step-*.json" 2>/dev/null | sort
 ```
 
 For each file found:

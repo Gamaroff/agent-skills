@@ -388,6 +388,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Every optional-file lookup in the pipeline prose is a quoted `find -name`, and the newest of a
+  numbered series is picked by number (task 137; obs #144, #145).** Twenty-nine fenced-bash sites
+  across the qa-task / qa-story / finalise / develop-story / develop-task skills and seven shared
+  step docs located a file that may not exist with `ls <dir>/<glob> 2>/dev/null` — which under zsh
+  (the Bash tool's shell on macOS) aborts the whole command before `ls` runs and leaves `$(…)`
+  empty, so `PRIOR_GATES` was `""` on every first QA cycle and `[ "" -ge 2 ]` errored. Every site is
+  now `find <dir> -maxdepth 1 -name "<pattern>"`; the `sort | tail -1` / `ls -t` sites that pick the
+  newest gate, DoD, review or implementation report now rank numerically (`gate.19` beats `gate.9`),
+  and qa-task / qa-story derive the prior gate's number through `qa-cycle.sh` — one definition — and
+  `find` its path. `tests/fenced-bash-optional-file-globs.test.js` (the obs #144 ratchet) ships with
+  an empty pin list as a pure guard, and `evals/shared/tests/optional-file-lookups.test.mjs` executes
+  every swept site with the file **absent** under bash and zsh (and `.9`/`.19` for the numbered
+  shapes). The rule lives in `create-skill/SKILL.md` § "An optional file is found with `find -name`".
+
 - **Three parsers that accepted what they should refuse (task 127; obs #74, #104, #107).**
   (1) `select-next.mjs` `parseDepCell` read `#83` and a bare `83` as task dependencies — and
   the `Depends on` cell is also the notes cell, so `PR #289 merged` blocked on a phantom task 289

@@ -140,7 +140,7 @@ Use a format-agnostic regex to extract the numeric `{N}` from each filename, sor
 #### develop-story
 
 ```bash
-ls {story-directory}/story.{epic}.{story}.gate.*.yml 2>/dev/null \
+find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.gate.*.yml" 2>/dev/null \
   | awk -F'gate\\.' '{ split($2, a, "."); printf "%d\t%s\n", a[1], $0 }' \
   | sort -k1,1 -n | tail -1 | cut -f2-
 ```
@@ -148,7 +148,7 @@ ls {story-directory}/story.{epic}.{story}.gate.*.yml 2>/dev/null \
 #### develop-task
 
 ```bash
-ls {task-directory}/task.{id}.gate.*.yml 2>/dev/null \
+find {task-directory} -maxdepth 1 -name "task.{id}.gate.*.yml" 2>/dev/null \
   | awk -F'gate\\.' '{ split($2, a, "."); printf "%d\t%s\n", a[1], $0 }' \
   | sort -k1,1 -n | tail -1 | cut -f2-
 ```

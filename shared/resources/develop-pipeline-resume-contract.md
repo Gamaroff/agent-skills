@@ -376,11 +376,11 @@ If the Decisions Log records a plan file from a prior session and Step 3 is bein
 ```bash
 # develop-story (macOS/Linux portable):
 _mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1"; }
-plan=$(ls {story-directory}/story.{epic}.{story}.plan.*.md 2>/dev/null | head -1)
+plan=$(find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.plan.*.md" 2>/dev/null | head -1)
 [ -n "$plan" ] && [ "$(_mtime "$plan")" -ge "$(_mtime {story-file})" ]
 
 # develop-task (macOS/Linux portable):
-plan=$(ls {task-directory}/task.{id}.plan.*.md 2>/dev/null | head -1)
+plan=$(find {task-directory} -maxdepth 1 -name "task.{id}.plan.*.md" 2>/dev/null | head -1)
 [ -n "$plan" ] && [ "$(_mtime "$plan")" -ge "$(_mtime {task-file})" ]
 ```
 
@@ -427,7 +427,7 @@ disk**, and use the `### QA Cycle` entries in the implementation report as the c
 
 ```bash
 # The gate is what a QA run leaves behind whether or not it ran inside this pipeline.
-QA_CYCLE=$(ls {doc-directory}/{story|task}.*.gate.*.yml 2>/dev/null \
+QA_CYCLE=$(find {doc-directory} -maxdepth 1 \( -name "story.*.gate.*.yml" -o -name "task.*.gate.*.yml" \) 2>/dev/null \
   | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/' | sort -n | tail -1)
 QA_CYCLE=${QA_CYCLE:-0}
 COMPLETED=$(grep -c "^### QA Cycle" {implementation-report-path})
