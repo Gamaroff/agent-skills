@@ -38,4 +38,4 @@ Everything seen that is **not** an item's own result: a rough edge on a story th
 
 | # | Where | What was observed | Severity | Filed as |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | {{route / element / endpoint}} | {{what was seen}} | {{Blocker|Major|Minor|Trivial}} | {{[bug.N.slug](../../bugs/…) or `note`}} |
+| 1 | {{route / element / endpoint}} | {{what was seen}} | {{Blocker|Major|Minor|Trivial}} | {{link to the bug report, relative to this file, or `note`}} |
