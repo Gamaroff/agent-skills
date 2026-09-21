@@ -235,7 +235,10 @@ All notable changes to this project will be documented in this file. Format foll
   over a fixture that holds both. The four sync edits define the `--remove-label` they pass
   (against the filtered label — the old placeholder was assigned nowhere), fixed labels
   (`epic`, `create-issue`'s) route through the helper too, and the population guard scans every
-  `--label` argument line that reaches `tracker-issue.js`, nine sites today.
+  `--label` argument line that reaches `tracker-issue.js`, nine sites today. **QA cycle 3**
+  closed the last gap of the same class: 6b re-binds the kind from its own argv and derives the
+  bug's verdict in its own block (HALT when the implementation report carries none) instead of
+  trusting values a prose step promised to bind, and its test injects nothing.
 
 - **The resume probe binds its base from every report variant and HALTs when it cannot; the
   detector no longer deletes; who restores is stated once (task 130; PR #436 review CR-1…CR-5,

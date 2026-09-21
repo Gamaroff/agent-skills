@@ -192,7 +192,7 @@ hint naming the mode).
 
 ### Files to Modify (Core Implementation)
 
-1. ✅ `skills/finalise/SKILL.md` — `--bug` mode; 6b `DOD_PATH`/`FINAL_GATE` and Step 2 globs keyed on the bug stem (QA cycle 2 — a co-located bug must not publish its parent's artefacts)
+1. ✅ `skills/finalise/SKILL.md` — `--bug` mode; 6b `DOD_PATH`/`FINAL_GATE` and Step 2 globs keyed on the bug stem (QA cycle 2 — a co-located bug must not publish its parent's artefacts); 6b re-binds `DOC_KIND` and derives the verify-loop verdict in-block, HALTing when none (QA cycle 3)
 2. ✅ `skills/develop-bug/references/develop-bug-step-7-close-bug.md` — Part A
 3. ✅ `skills/ensure-bug-github-issue/SKILL.md` — Step B5
 4. ✅ `shared/resources/tracker-issue.js` — failure message (both spawn paths: `gh()` and the `--body-file` `withStdin` closure — QA cycle 1); `shared/resources/registry-tick.js` — a `.bug.<N>.` stem is `not-a-task` (QA cycle 1)
@@ -293,24 +293,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-21
-**Quality Score**: 50/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.125.qa.2.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.2.develop-bug-finalise-mode-and-issue-create.md)
-- **Gate File**: [task.125.gate.2.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.2.develop-bug-finalise-mode-and-issue-create.yml)
+- **Full Report**: [task.125.qa.3.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.3.develop-bug-finalise-mode-and-issue-create.md)
+- **Gate File**: [task.125.gate.3.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.3.develop-bug-finalise-mode-and-issue-create.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3685 (fast gate) + 132 targeted + 20 boundary probes + Step 4b over 9 prose files; every cycle-1 fix re-executed
+- **Tests Executed**: 3693 (fast gate) + 77 targeted on the head; `10#` and the remove-label grep re-run by hand in bash + zsh
 - **Phases Verified**: 3/3
-- **Critical Issues**: 1 HIGH (TASK-125-BUG-8), 3 MEDIUM (BUG-9..11), 1 LOW in gate (CR-5); cycle-1 BUG-1..7 verified FIXED
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0 HIGH; 1 MEDIUM (TASK-125-BUG-12); 2 LOW in gate (CR-2, CR-3); cycle-2 BUG-8..11 verified FIXED
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 2 refute pass. Cycle-1 fixes hold. finalise 7.7 derives `DOD_PATH`/`FINAL_GATE` with directory-wide globs, so a co-located story/task bug publishes its parent's DoD and gate (BUG-8, HIGH); Step 2 reads the parent's QA artefacts (BUG-9); the four sync edits' `--remove-label` reads an undefined variable that a verbatim-case derivation turns into add-then-remove (BUG-10); the fixed `epic` label bypasses the helper and the guard (BUG-11).
+Cycle 3 (narrowed). Cycle-2 fixes hold. 6b's bug branch keys on `DOC_KIND` and `VERIFY_VERDICT`, neither bound by a command in that block, and the fixture test injects both (BUG-12); the PR body claims `status: accepted` on a bug run (CR-2); an invalid `fix_cycle` is cleared silently (CR-3).
 <!-- change-log-start -->
 ## Change Log
 
@@ -322,8 +322,9 @@ Cycle 2 refute pass. Cycle-1 fixes hold. finalise 7.7 derives `DOD_PATH`/`FINAL_
 | 2026-09-21 |  | Status → ready-for-development | review-task |
 | 2026-09-21 |  | Implemented — 3 phases; 11 source files + 20 bundled copies; 4 test files (+19 tests), 9 mutations proved | develop |
 | 2026-09-21 |  | QA gate FAIL (20/100) — 1 HIGH, 6 MEDIUM, 3 LOW; 7 bug reports filed | qa-task |
-| 2026-09-21 |  | QA findings fixed — gates 1–2 answered: 11 bugs (2 HIGH, 9 MEDIUM) + 7 LOW, 2 iterations; shared gh-labels.sh helper across 9 sites, finalise bug-mode derivations keyed on the stem, +39 tests | qa-fix |
+| 2026-09-21 |  | QA findings fixed — gates 1–3 answered: 12 bugs (2 HIGH, 10 MEDIUM) + 9 LOW, 3 iterations; shared gh-labels.sh helper across 9 sites, finalise bug-mode derivations keyed on the stem and bound in-block, +43 tests | qa-fix |
 | 2026-09-21 |  | QA gate 2 FAIL (50/100) — cycle-1 fixes verified; refute pass found 1 HIGH (7.7 globs the parent's DoD/gate), 3 MEDIUM, 4 LOW; 4 bug reports filed | qa-task |
+| 2026-09-21 |  | QA gate 3 CONCERNS (90/100) — cycle-2 fixes verified; 0 HIGH, 1 MEDIUM (6b inputs unbound in-block), 2 LOW; 1 bug report filed | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

@@ -864,7 +864,11 @@ DOC_DIR=$(dirname "$STORY_FILE")
 # helper path could never produce (TASK-125-BUG-7). Invalid reads as absent;
 # digits are normalised (`007` → `7`, `00` → 0 → absent) so the PR lead and the
 # tracker engine — which rejects a non-positive suffix — agree (cycle-2 CR-5).
-case "${FIX_CYCLE_ARG:-}" in ''|*[!0-9]*) FIX_CYCLE_ARG='' ;; *) FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || FIX_CYCLE_ARG='' ;; esac
+case "${FIX_CYCLE_ARG:-}" in
+  '') ;;
+  *[!0-9]*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive integer — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
+  *) FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || { echo "⚠️  fix_cycle=0 is not a cycle — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG=''; } ;;
+esac
 if [ -n "${FIX_CYCLE_ARG:-}" ]; then
   FIX_CYCLE=$FIX_CYCLE_ARG; rc=0
 else
@@ -893,7 +897,7 @@ ${QA_FIX_LEAD}
 
 ${FIX_SUMMARY}"
 else
-  echo "⚠️  QA cycle unknown (no fix_cycle arg, and see qa-cycle.sh above) — posting the PR comment without its lead"
+  echo "⚠️  QA cycle unknown (fix_cycle absent or invalid, and see qa-cycle.sh above) — posting the PR comment without its lead"
   PR_COMMENT_BODY="## 🛠️ QA Fixes Applied
 
 ${FIX_SUMMARY}"
@@ -977,7 +981,11 @@ if [ -n "$FIX_ISSUE" ]; then
   # for the gate-driven path (task.125, obs #122).
   # Positive integer or nothing — same guard as the pull-request block
   # (TASK-125-BUG-7); an invalid value falls through to the helper.
-  case "${FIX_CYCLE_ARG:-}" in ''|*[!0-9]*) FIX_CYCLE_ARG='' ;; *) FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || FIX_CYCLE_ARG='' ;; esac
+  case "${FIX_CYCLE_ARG:-}" in
+    '') ;;
+    *[!0-9]*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive integer — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
+  *) FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || { echo "⚠️  fix_cycle=0 is not a cycle — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG=''; } ;;
+esac
   if [ -n "${FIX_CYCLE_ARG:-}" ]; then
     FIX_CYCLE=$FIX_CYCLE_ARG; rc=0
   else
@@ -995,7 +1003,7 @@ if [ -n "$FIX_ISSUE" ]; then
       --json \
       || echo "⚠️  Tracker issue comment failed — continuing"
   else
-    echo "⚠️  Tracker issue comment skipped — QA cycle unknown (no fix_cycle arg, and see qa-cycle.sh above)"
+    echo "⚠️  Tracker issue comment skipped — QA cycle unknown (fix_cycle absent or invalid, and see qa-cycle.sh above)"
   fi
 fi
 ```

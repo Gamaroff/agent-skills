@@ -1,0 +1,78 @@
+schema: 1
+task: 'task.125.develop-bug-finalise-mode-and-issue-create'
+task_title: "develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
+gate: CONCERNS
+status_reason: 'Cycle 3 — narrowed to the 14 files changed since gate 2. Cycle-2 BUG-8..11 and CR-5 verified FIXED by re-execution (77 targeted tests on the committed head; 10# normalisation checked identical under bash and zsh; the empty-NEW_PRIORITY grep degrades correctly). No HIGH. One MEDIUM (QA-owned after verification): the 6b bug branch keys on DOC_KIND and VERIFY_VERDICT, and no command binds VERIFY_VERDICT anywhere — the Step 2 marker binds it in prose — while the executed fixture test injects both through env and so cannot see the gap. Two LOW: the PR comment body still says "the commit carrying status: accepted" / "Story/task accepted" on a bug run; an invalid fix_cycle is cleared silently and the skip message says "no fix_cycle arg". Two cleanups advisory.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T05:57:31Z'
+
+top_issues:
+  - id: 'TASK-125-BUG-12'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The 6b derivation branches on $DOC_KIND and reads ${VERIFY_VERDICT:-N/A}; DOC_KIND is assigned ~1400 lines earlier in another fenced block and VERIFY_VERDICT is assigned by no command at all (Step 2 says "bind" in prose) — in the 6b shell an unbound DOC_KIND takes the task branch and an unbound verdict reports N/A indistinguishably from a genuine N/A; the executed fixture test sets all three via env and passes vacuously on this gap.'
+    suggested_action: 'Re-bind DOC_KIND in the 6b block from the invocation args and derive VERIFY_VERDICT in-block from the implementation report (last **Verdict**: line), HALT in bug mode on an empty verdict; rewrite the fixture test to run the block without injecting those variables and add the no-flag → task-branch case.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.12.six-b-bug-branch-inputs-unbound-in-block-and-test-injects-them.md'
+  - id: 'CR-2'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The PR comment BODY after the DOC_KIND branch is unconditional: a bug run publishes "pushed acceptance head — the commit carrying `status: accepted`" and "All Definition of Done criteria verified. Story/task accepted." although bug mode (frontmatter-accepted: skip) writes no accepted.'
+    suggested_action: 'Branch those two lines on DOC_KIND so the comment describes what the bug run committed (the DoD file and Status History row; closed by develop-bug Part B).'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'A supplied-but-invalid fix_cycle ({N} unsubstituted, 0, "3 ") is cleared silently and the skip message reads "no fix_cycle arg" — "not supplied" and "supplied but malformed" resolve to one state, so a develop-bug call that fails to substitute {N} reproduces the obs #122 silence with nothing naming the rejected value.'
+    suggested_action: 'Warn with the rejected value quoted in the invalid arms of both blocks, and word the skip message "fix_cycle absent or invalid".'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3693
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new boundary this cycle: the remove-label derivation is a comparison over gh output the helper already filtered, exercised by three committed executed cases; the label boundary itself was probed 20/20 in cycle 2 and is unchanged since. Verdict by reading the cycle-2 diff plus those tests — reasoned, not measured.'
+  performance:
+    status: PASS
+    notes: 'One extra gh issue view per sync edit, as predicted.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-12: on a bug run 6b can silently take the task branch; CR-2 publishes a claim the run did not make; CR-3 hides a malformed argument.'
+  maintainability:
+    status: PASS
+    notes: 'Helper + widened guard at nine sites; executed tests for 6b, remove-label, fix_cycle. CR-4 (guard regex breadth, references/*.md population) and CR-5 (a grep-of-prose test titled as a runtime property) noted for the fix cycle.'
+
+recommendations:
+  immediate:
+    - action: 'Bind DOC_KIND and VERIFY_VERDICT in the 6b block; make the fixture test run without injecting them (BUG-12); branch the two body lines on DOC_KIND (CR-2); warn on a rejected fix_cycle value (CR-3)'
+      refs: ['skills/finalise/SKILL.md', 'evals/shared/tests/finalise-bug-mode.test.mjs', 'skills/qa-fix/SKILL.md', 'tests/qa-cycle.test.js']
+  future:
+    - action: 'CR-4: match any --label form on any line except the collector and scan skills/*/references/*.md too; CR-5: retitle the verify-loop invocation-string test as a documented-example pin'
+      refs: ['tests/gh-labels.test.js', 'tests/qa-cycle.test.js']
+
+bug_resolution:
+  bugs_fixed: 11
+  bugs_remaining: 1
+  fix_date: '2026-09-21'
+  total_iterations: 2
+  verification_method: 'Cycle-2 fixes re-executed on head a246f4ae (77 targeted tests; 10# normalisation and the empty-NEW_PRIORITY grep re-run by hand under bash + zsh)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-12 fixed with a non-injecting executed test', 'CR-2 and CR-3 fixed']

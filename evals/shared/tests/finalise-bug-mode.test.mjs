@@ -366,9 +366,13 @@ for (const shell of SHELLS) {
 }
 
 // The 6b derivation is bash, so it is EXECUTED over a fixture directory that
-// holds a PARENT task's DoD and gate beside a task BUG's DoD — the layout
-// docs/tasks/task.67.* actually has. QA cycle 2 found the directory-wide glob
-// picking the parent's files (`.b` sorts before `.d`) (TASK-125-BUG-8).
+// holds a PARENT task's DoD and gate beside a task BUG's DoD and implementation
+// report — the layout docs/tasks/task.67.* actually has. QA cycle 2 found the
+// directory-wide glob picking the parent's files (`.b` sorts before `.d`)
+// (TASK-125-BUG-8); QA cycle 3 found the first version of this test INJECTING
+// DOC_KIND and VERIFY_VERDICT through env, so it could not see that no command
+// bound them in the block (TASK-125-BUG-12). Only STEM and DIR are inputs here;
+// the kind comes from argv and the verdict from the fixture report.
 function derivationBlock() {
   const i = skill.indexOf('MARKER="<!-- finalise-canonical-summary -->"');
   const j = skill.indexOf("# The plain-language lead", i);
@@ -378,32 +382,36 @@ function derivationBlock() {
       .slice(i, j)
       .replace(/^ {3}/gm, "")
       .replace(/\{document-directory\}/g, '"$DIR"') +
-    '\nprintf "DOD_PATH=%s\\nFINAL_GATE=%s\\n" "$DOD_PATH" "$FINAL_GATE"\n'
+    '\nprintf "DOD_PATH=%s\\nFINAL_GATE=%s\\nDOC_KIND=%s\\nCLOSING=%s\\n" "$DOD_PATH" "$FINAL_GATE" "$DOC_KIND" "$CLOSING_LINE"\n'
   );
 }
+function sixBFixture({ verdict = "PASS" } = {}) {
+  const dir = mkdtempSync(path.join(tmpdir(), "finalise-6b-"));
+  for (const f of ["task.67.dod.1.parent.md", "task.67.bug.3.dod.1.fix.md"])
+    writeFileSync(path.join(dir, f), "");
+  writeFileSync(path.join(dir, "task.67.gate.2.parent.yml"), "gate: FAIL\n");
+  writeFileSync(
+    path.join(dir, "task.67.bug.3.implementation.1.run.md"),
+    verdict === null
+      ? "## QA Iteration History\n\n### Verify Cycle 1\n**Regression test**: pass\n"
+      : `## QA Iteration History\n\n### Verify Cycle 1\n**Verdict**: FAIL\n\n### Verify Cycle 2\n**Verdict**: ${verdict}\n`,
+  );
+  return dir;
+}
 for (const shell of SHELLS) {
-  test(`[${shell}] 6b, executed: a co-located task bug's DoD and verdict are its OWN, not its parent's`, () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "finalise-6b-"));
+  const run = (dir, stem, args) =>
+    spawnSync(shell, ["-s", "--", ...args], {
+      input: derivationBlock(),
+      encoding: "utf8",
+      // NOTHING but the two inputs the block documents. No DOC_KIND, no VERIFY_VERDICT.
+      env: { PATH: process.env.PATH, DIR: dir, STEM: stem },
+    });
+
+  test(`[${shell}] 6b, executed with --bug: the bug's DoD, the verify loop's LAST verdict, the bug closing line — nothing injected`, () => {
+    const dir = sixBFixture();
     try {
-      for (const f of ["task.67.dod.1.parent.md", "task.67.bug.3.dod.1.fix.md"])
-        writeFileSync(path.join(dir, f), "");
-      writeFileSync(
-        path.join(dir, "task.67.gate.2.parent.yml"),
-        "gate: FAIL\n",
-      );
-      const run = (env) =>
-        spawnSync(shell, ["-s"], {
-          input: derivationBlock(),
-          encoding: "utf8",
-          env: { PATH: process.env.PATH, DIR: dir, ...env },
-        });
-      // Bug mode: the bug's stem, the verify loop's verdict.
-      let r = run({
-        STEM: "task.67.bug.3",
-        DOC_KIND: "bug",
-        VERIFY_VERDICT: "PASS",
-      });
-      assert.equal(r.status, 0, r.stderr);
+      const r = run(dir, "task.67.bug.3", ["--bug"]);
+      assert.equal(r.status, 0, r.stderr + r.stdout);
       assert.match(
         r.stdout,
         /DOD_PATH=.*\/task\.67\.bug\.3\.dod\.1\.fix\.md$/m,
@@ -412,13 +420,43 @@ for (const shell of SHELLS) {
       assert.match(
         r.stdout,
         /^FINAL_GATE=PASS$/m,
-        "the verify-loop verdict, never the parent's gate",
+        "the last **Verdict**: line, never the parent's gate",
       );
-      // Task mode in the same directory: the parent's own artefacts.
-      r = run({ STEM: "task.67", DOC_KIND: "task" });
+      assert.match(r.stdout, /^DOC_KIND=bug$/m);
+      assert.match(
+        r.stdout,
+        /^CLOSING=.*Bug fix accepted/m,
+        "the closing line names a bug, not status: accepted",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 6b, executed without the flag in the same directory: the task branch, the parent's own artefacts`, () => {
+    const dir = sixBFixture();
+    try {
+      const r = run(dir, "task.67", []);
       assert.equal(r.status, 0, r.stderr);
       assert.match(r.stdout, /DOD_PATH=.*\/task\.67\.dod\.1\.parent\.md$/m);
       assert.match(r.stdout, /^FINAL_GATE=FAIL$/m);
+      assert.match(r.stdout, /^DOC_KIND=task$/m);
+      assert.match(r.stdout, /^CLOSING=.*Story\/task accepted/m);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 6b in bug mode with NO **Verdict** line HALTs — never an N/A that looks like a verdict`, () => {
+    const dir = sixBFixture({ verdict: null });
+    try {
+      const r = run(dir, "task.67.bug.3", ["--bug"]);
+      assert.equal(r.status, 1, "exit 1 is the HALT");
+      assert.match(
+        r.stdout + r.stderr,
+        /HALT: bug mode — no \*\*Verdict\*\*: line found/,
+      );
+      assert.doesNotMatch(r.stdout, /^FINAL_GATE=/m, "nothing was derived");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

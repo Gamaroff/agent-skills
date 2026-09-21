@@ -235,9 +235,9 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
    (TASK-125-BUG-9). Expect **none**: the develop-bug verify loop writes no gate, so `qa-cycle.sh`
    refuses on it and the stem-scoped glob matches nothing. That is the normal case, not a gap. The
    QA record is the bug file's `#### QA Verification` on its last iteration
-   (`**Verification Result**: ✅ Fixed`) and the implementation report's `## QA Iteration History`;
-   bind `VERIFY_VERDICT` from that history's last `**Verdict**:` line (6b reads it) and summarise
-   both in the template's Step 1 block. When a bug's **own** stem *does* match a QA report or gate
+   (`**Verification Result**: ✅ Fixed`) and the implementation report's `## QA Iteration History`
+   — whose last `**Verdict**:` line 6b derives for itself, in its own block; summarise both in the
+   template's Step 1 block. When a bug's **own** stem *does* match a QA report or gate
    (a task bug reviewed with `/qa-task`), read it exactly as on the story/task path.
 
 2. **Ignore prior-run acceptance blocks in the document body — they are history, not evidence.**
@@ -1437,11 +1437,13 @@ POLLEOF
 
 7. **Add Canonical PR Comment (idempotent via marker):**
 
-   **Bug mode (`pr-comment`):** run — the 6b block below keys `DOD_PATH` on `${STEM}` (the bug
-   prefix) and, under `DOC_KIND=bug`, sets `FINAL_GATE` from `VERIFY_VERDICT` (bound in Step 2 from
-   the verify loop's last `**Verdict**`) instead of globbing gates. Both branches are in the block
-   itself, not in this note — a directory-wide glob here published a co-located bug's PARENT
-   artefacts as the bug's (TASK-125-BUG-8).
+   **Bug mode (`pr-comment`):** run — the 6b block below re-binds `DOC_KIND` from the invocation
+   args, keys `DOD_PATH` on `${STEM}` (the bug prefix) and, in bug mode, derives `FINAL_GATE` **in
+   the block** from the implementation report's last `**Verdict**:` line (HALT when none) instead
+   of globbing gates; the body's head description and closing line branch on the kind too. All of
+   it is in the block itself, not in this note — a directory-wide glob here published a
+   co-located bug's PARENT artefacts as the bug's (TASK-125-BUG-8), and a verdict "bound in Step 2"
+   by prose was never bound at all (TASK-125-BUG-12).
 
 
    **PR-comment authorship contract**:
@@ -1477,14 +1479,31 @@ POLLEOF
    # `*.dod.*.md | sort | tail -1` published the parent's DoD path and gate
    # verdict as the bug's (TASK-125-BUG-8). STEM is bound at 6a.
    DOD_PATH=$(ls {document-directory}/${STEM}.dod.*.md 2>/dev/null | sort | tail -1)
+   # DOC_KIND is re-bound HERE, from the invocation args, with the same line the
+   # Document-kind block uses: every fenced block runs as its own shell, so the
+   # value that block computed does not exist in this one (TASK-121-BUG-2), and
+   # an unbound DOC_KIND silently took the story/task branch (TASK-125-BUG-12).
+   case " $* " in *" --bug "*) DOC_KIND=bug ;; *) DOC_KIND=${DOC_KIND:-task} ;; esac
    if [ "$DOC_KIND" = "bug" ]; then
-     # A bug has no gate file; its verdict is the develop-bug verify loop's
-     # (`**Verdict**: PASS` on the last cycle of the implementation report's
-     # QA Iteration History). Bound in Step 2 as VERIFY_VERDICT.
-     FINAL_GATE="${VERIFY_VERDICT:-N/A}"
+     # A bug has no gate file; its verdict is the develop-bug verify loop's —
+     # the last `**Verdict**:` line of the implementation report beside the bug
+     # (`{bug-prefix}.implementation.{N}.*.md`, QA Iteration History). Derived
+     # IN THIS BLOCK, and an empty verdict is a HALT, not an N/A: "never bound"
+     # and "genuinely N/A" must not share one value (TASK-125-BUG-12).
+     IMPLEMENTATION_REPORT=$(ls {document-directory}/${STEM}.implementation.*.md 2>/dev/null | sort | tail -1)
+     VERIFY_VERDICT=$(grep -E '^\*\*Verdict\*\*:' "${IMPLEMENTATION_REPORT:-/dev/null}" 2>/dev/null | tail -1 | awk '{print $(2)}')
+     [ -n "$VERIFY_VERDICT" ] || { echo "HALT: bug mode — no **Verdict**: line found in ${IMPLEMENTATION_REPORT:-<no ${STEM}.implementation.*.md beside the bug>}; the verify loop's QA Iteration History is the bug's only verdict"; exit 1; }
+     FINAL_GATE="$VERIFY_VERDICT"
+     # What the acceptance commit carried, and what "accepted" means, differ by
+     # kind: bug mode writes no `status: accepted` (frontmatter-accepted: skip)
+     # and the bug closes in develop-bug Part B (cycle-3 CR-2).
+     HEAD_DESC="pushed DoD head — the commit carrying the DoD file and the Status History row"
+     CLOSING_LINE="All applicable Definition of Done criteria verified. Bug fix accepted — closed by develop-bug Step 7 Part B."
    else
      FINAL_GATE=$(ls {document-directory}/${STEM}.gate.*.yml 2>/dev/null | sort | tail -1 \
        | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $(2)}' || echo "N/A")
+     HEAD_DESC="pushed acceptance head — the commit carrying \`status: accepted\`"
+     CLOSING_LINE="All Definition of Done criteria verified. Story/task accepted."
    fi
 
    # The plain-language lead. It goes BELOW the marker and above everything
@@ -1504,10 +1523,10 @@ POLLEOF
    **Accepted**: $(date +%Y-%m-%d)
    **DoD Summary**: \`${DOD_PATH}\`
    **CI reading 1**: ${CI_ROLLUP} @ \`${CI_HEAD_1:0:12}\` (acceptance decision)
-   **CI reading 2**: ${CI_ROLLUP_2} @ \`${CI_HEAD_2:0:12}\` (pushed acceptance head — the commit carrying \`status: accepted\`)
+   **CI reading 2**: ${CI_ROLLUP_2} @ \`${CI_HEAD_2:0:12}\` (${HEAD_DESC})
    $([ "$CYCLES" -gt 0 ] && echo "**QA Cycles**: ${CYCLES}" || true)
 
-   All Definition of Done criteria verified. Story/task accepted."
+   ${CLOSING_LINE}"
    ```
 
    > **The lead goes below the marker, and the ordering is load-bearing.** Step 6c finds this

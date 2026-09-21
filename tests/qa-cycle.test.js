@@ -480,7 +480,16 @@ for (const bad of ["{N}", "0", "00", "000", "3 ", "two", "-1", "007x"]) {
     const r = runQaFixTrackerBlock({ gates: [], fixCycleArg: bad });
     assert.equal(r.status, 0, r.stderr);
     assert.equal(r.argv, null, "nothing reaches tracker-comment.js");
-    assert.match(r.stdout, /Tracker issue comment skipped — QA cycle unknown/);
+    assert.match(
+      r.stdout,
+      /Tracker issue comment skipped — QA cycle unknown \(fix_cycle absent or invalid/,
+    );
+    // "supplied but malformed" is NOT "not supplied": the rejected value is named (cycle-3 CR-3).
+    assert.match(
+      r.stderr,
+      /⚠️  fix_cycle=.*ignored, deriving from the gate/,
+      `the rejected value ${JSON.stringify(bad)} must be named on stderr`,
+    );
     // Gate on disk: the helper answers, so the invalid arg must not shadow it.
     const g = runQaFixTrackerBlock({
       gates: ["bug.9.gate.4.x.yml"],
@@ -501,7 +510,10 @@ test("[fix_cycle] a leading-zero arg is NORMALISED — 007 is cycle 7, so the PR
   assert.ok(!r.argv.includes("qa-fix-007"));
 });
 
-test("[fix_cycle] develop-bug's verify loop passes the cycle it already counts", () => {
+// A pin on the DOCUMENTED invocation string, not proof of a runtime property: the
+// runtime half — that a supplied cycle reaches the stage — is the executed cases
+// above (cycle-3 CR-5).
+test('[fix_cycle] the verify-loop reference documents the invocation as Skill(qa-fix, args="{bug-file-path} fix_cycle={N}") — a text pin', () => {
   const s = fs.readFileSync(
     path.join(
       REPO_ROOT,

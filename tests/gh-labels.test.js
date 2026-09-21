@@ -196,28 +196,42 @@ function fencedBash(text) {
 
 test("every --label/--add-label in a block that calls tracker-issue.js routes through gh_labels_filter — fixed labels included", () => {
   const skillsDir = path.join(REPO_ROOT, "skills");
+  const sharedDir = path.join(REPO_ROOT, "shared", "resources");
   const offenders = [];
   const routed = new Set();
-  for (const name of fs.readdirSync(skillsDir)) {
-    const f = path.join(skillsDir, name, "SKILL.md");
+  // Population: every SKILL.md plus every canonical shared/resources/*.md (the
+  // bundled skills/*/references/*.md are copies of those, so the sources are
+  // what is scanned) — cycle-3 CR-4.
+  const files = [
+    ...fs
+      .readdirSync(skillsDir)
+      .map((n) => [n, path.join(skillsDir, n, "SKILL.md")]),
+    ...fs
+      .readdirSync(sharedDir)
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => [`shared/resources/${f}`, path.join(sharedDir, f)]),
+  ];
+  for (const [name, f] of files) {
     if (!fs.existsSync(f)) continue;
     const text = fs.readFileSync(f, "utf8");
     for (const block of fencedBash(text)) {
+      if (!/tracker-issue\.js/.test(block)) continue;
       // The population is EVERY label that reaches gh through tracker-issue.js —
       // a fixed `--label "epic"` fails a create on a repository without that
-      // label by the same mechanism as a cased field (TASK-125-BUG-11).
-      // An ARGUMENT line to the CLI (`  --label "…" \`), not the helper's own
-      // `LABEL_ARGS+=(--label "$l")` collection, which is mid-line.
-      if (
-        /tracker-issue\.js/.test(block) &&
-        /^\s*--(add-)?label "/m.test(block)
-      ) {
+      // label by the same mechanism as a cased field (TASK-125-BUG-11). Any
+      // `--label`/`--add-label` token, any quoting, any line — except the
+      // helper's own `LABEL_ARGS+=(…)` collector line (cycle-3 CR-4).
+      // Comments are not call sites: a `#` line quoting the old shape is the
+      // explanation, not the defect.
+      const argLines = block
+        .split("\n")
+        .filter((l) => !/LABEL_ARGS\+=/.test(l) && !/^\s*#/.test(l));
+      if (argLines.some((l) => /(^|\s)--(add-)?label(\s|=)/.test(l))) {
         offenders.push(
-          `skills/${name}/SKILL.md: a --label/--add-label reaches tracker-issue.js without gh_labels_filter`,
+          `${name}: a --label/--add-label reaches tracker-issue.js without gh_labels_filter`,
         );
       }
-      if (/tracker-issue\.js/.test(block) && /gh_labels_filter /.test(block))
-        routed.add(name);
+      if (/gh_labels_filter /.test(block)) routed.add(name);
     }
   }
   assert.deepEqual(offenders, []);
