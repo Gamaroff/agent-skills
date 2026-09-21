@@ -293,24 +293,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-21
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 60/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.125.qa.4.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.4.develop-bug-finalise-mode-and-issue-create.md)
-- **Gate File**: [task.125.gate.4.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.4.develop-bug-finalise-mode-and-issue-create.yml)
+- **Full Report**: [task.125.qa.5.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.5.develop-bug-finalise-mode-and-issue-create.md)
+- **Gate File**: [task.125.gate.5.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.5.develop-bug-finalise-mode-and-issue-create.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 75 targeted on the head `a1d13b19` (fast gate 3697 at the cycle-3 fix; head unchanged); the 6b glob and verdict extraction run by hand against `docs/bugs/bug.14` and `bug.12`
+- **Tests Executed**: 83 targeted on the head `24423428` (fast gate 3705 at the cycle-4 fix; head unchanged); the two-shape `find` + verdict extraction run by hand against `docs/bugs/bug.14`, `bug.12`, `bug.1` under bash + zsh; 6b run with `STEM` unset × 2 shells
 - **Phases Verified**: 3/3
-- **Critical Issues**: 1 HIGH (TASK-125-BUG-13); 0 MEDIUM; 2 LOW in gate (CR-2, CR-3); cycle-3 BUG-12 + CR-2..5 verified FIXED
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Critical Issues**: 0 HIGH; 4 MEDIUM (TASK-125-BUG-14..17); 3 LOW in gate (CR-3, CR-6, CR-7); cycle-4 BUG-13 + CR-2..5 verified FIXED
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 4 (narrowed). Cycle-3 fixes hold. The new in-block verdict derivation globs `${STEM}.implementation.*.md` on the short bug id, but develop-bug's three most recent real runs named the report with the full filename stem — the glob is empty and the new HALT fires on a run that has a verdict (BUG-13); the same line publishes the verdict token raw, `**PASS**` (CR-3); 6b's kind check reads `$*` with no cross-check against the bound `STEM` (CR-2).
+Cycle 5 (narrowed; the budget cycle). Cycle-4 fixes hold. Four MEDIUM, all in the finalise bug path: the two-shape lookup orders by path so an older full-stem report beats a newer short one (BUG-14); 6b reads `STEM` bound in another block and publishes a blank canonical comment when it is unset (BUG-15); 7.6a's `git add` and 7.6b's `status: accepted` assertion HALT verbatim on a bug run, the bug variant living only in marker prose (BUG-16); the "both shapes" contract has no population check and missed the cycle count, which greps `### QA Cycle` while bug reports write `### Verify Cycle` (BUG-17).
 <!-- change-log-start -->
 ## Change Log
 
@@ -322,10 +322,11 @@ Cycle 4 (narrowed). Cycle-3 fixes hold. The new in-block verdict derivation glob
 | 2026-09-21 |  | Status → ready-for-development | review-task |
 | 2026-09-21 |  | Implemented — 3 phases; 11 source files + 20 bundled copies; 4 test files (+19 tests), 9 mutations proved | develop |
 | 2026-09-21 |  | QA gate FAIL (20/100) — 1 HIGH, 6 MEDIUM, 3 LOW; 7 bug reports filed | qa-task |
-| 2026-09-21 |  | QA findings fixed — gates 1–4 answered: 13 bugs (3 HIGH, 10 MEDIUM) + 11 LOW, 4 iterations; shared gh-labels.sh helper across 9 sites, finalise bug-mode derivations keyed on the stem, bound in-block and reading both report shapes, +51 tests | qa-fix |
+| 2026-09-21 |  | QA findings fixed — gates 1–5 answered: 17 bugs (3 HIGH, 14 MEDIUM) + 14 LOW, 5 iterations; shared gh-labels.sh helper across 9 sites, finalise bug-mode blocks self-binding (STEM, kind, flag as substituted inputs) and branching in-block, both report shapes read newest-first, +70 tests | qa-fix |
 | 2026-09-21 |  | QA gate 2 FAIL (50/100) — cycle-1 fixes verified; refute pass found 1 HIGH (7.7 globs the parent's DoD/gate), 3 MEDIUM, 4 LOW; 4 bug reports filed | qa-task |
 | 2026-09-21 |  | QA gate 3 CONCERNS (90/100) — cycle-2 fixes verified; 0 HIGH, 1 MEDIUM (6b inputs unbound in-block), 2 LOW; 1 bug report filed | qa-task |
 | 2026-09-21 |  | QA gate 4 FAIL (70/100) — cycle-3 fixes verified; 1 HIGH (6b report glob keys on the short bug id; the full-stem shape HALTs), 0 MEDIUM, 2 LOW; 1 bug report filed | qa-task |
+| 2026-09-21 |  | QA gate 5 CONCERNS (60/100) — cycle-4 fixes verified; 0 HIGH, 4 MEDIUM (finalise bug path: stale-report ordering, STEM from another block, 7.6a/7.6b bug variant in prose, no both-shapes population check), 3 LOW; 4 bug reports filed | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

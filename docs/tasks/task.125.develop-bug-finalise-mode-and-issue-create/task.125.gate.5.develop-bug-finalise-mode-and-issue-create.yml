@@ -1,0 +1,109 @@
+schema: 1
+task: 'task.125.develop-bug-finalise-mode-and-issue-create'
+task_title: "develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
+gate: CONCERNS
+status_reason: 'Cycle 5 (the budget cycle) — narrowed to the 5 files changed since gate 4. Cycle-4 BUG-13 and CR-2..5 verified FIXED by re-execution (83 targeted tests on head 24423428; the new find + verdict extraction run against docs/bugs/bug.14, bug.12 and bug.1 under bash + zsh — both shapes found, bare tokens). No HIGH. Four MEDIUM, all in the finalise bug path: the two-shape lookup sorts lexically so an older full-stem report beats a newer short one (reproduced); 6b reads STEM bound in another block and with it unset publishes an empty DoD path and gate, exit 0 (reproduced under bash + zsh; the test injects STEM); 7.6a git add and 7.6b status-accepted assertion HALT verbatim on a bug run with the bug variant only in marker prose (the BUG-12 class); the both-shapes contract has no population check and missed the cycle count (### QA Cycle vs the bug reports 25 × ### Verify Cycle). Three LOW in the queue, two cleanups advisory.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T06:51:37Z'
+
+top_issues:
+  - id: 'TASK-125-BUG-14'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: '6b (and develop-bug Step 0) resolve the report with `find … | sort | tail -1`, which orders by path: with both shapes on disk — a pre-task.125 full-stem `bug.14.{name}.implementation.1.*` beside a newer short `bug.14.implementation.2.*` — the OLDER full-stem report wins whenever `{name}` sorts after `i` (reproduced), and its verdict is published as the bug''s.'
+    suggested_action: 'Order candidates by the `.implementation.{N}.` number (or mtime) at every site that picks a report; add an executed case with both shapes on disk and the short one newer.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.14.six-b-report-lookup-sorts-lexically-older-full-stem-report-wins.md'
+  - id: 'TASK-125-BUG-15'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: '6b reads `${STEM}` on the comment "STEM is bound at 6a" — another fenced block — while its next comment states blocks share no variables (TASK-121-BUG-2, the reason DOC_KIND was re-bound in-block for BUG-12); with STEM unset the DoD glob is empty, the cycle-4 cross-check cannot fire, the task branch runs and the canonical comment posts with an empty DoD path and empty Final Gate at exit 0 (reproduced under bash + zsh); the executed test injects STEM through env and cannot see it.'
+    suggested_action: 'Re-bind STEM in 6b as a substituted placeholder like 6a, HALT on an empty value (`[ -n "$STEM" ]`), and add the executed STEM-unset case.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.15.six-b-reads-stem-bound-in-another-block-empty-stem-publishes-silently.md'
+  - id: 'TASK-125-BUG-16'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: '7.6a''s block runs `git add … "{document-directory}/sprint-review-summary.md"` and HALTs on a non-zero exit, and 7.6b''s block ends with `grep -q ''^status: accepted$'' || HALT`; the bug variants (a different artefact list; a REPLACED assertion on `$DOD_PATH`) live only in the `acceptance-commit` / `pushed-assertions` marker prose, so both blocks HALT verbatim on every correct bug run — "bound by prose, never bound at all", the class this diff''s own BUG-12 fix names.'
+    suggested_action: 'Branch inside both blocks on the re-bound kind — the artefact list and the final assertion as variables — so the block runs unedited in either mode; add an executed bug-mode case for each.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.16.six-a-git-add-and-six-b-accepted-assertion-halt-verbatim-on-a-bug-run.md'
+  - id: 'TASK-125-BUG-17'
+    severity: medium
+    file: 'skills/develop-bug/SKILL.md'
+    finding: 'The cycle-4 contract "every reader of the report accepts both shapes" was applied at three sites by hand with nothing enumerating the readers; two were missed — finalise 6a''s cycle count greps `^### QA Cycle` while every bug report writes `### Verify Cycle` (25 real headings, 0 `QA Cycle`), so a bug''s canonical comment never carries its cycle count; and the verify loop''s `/commit-changes` `exclude=` names the short shape only (the `git reset` beside it covers both).'
+    suggested_action: 'Add a test that enumerates every implementation.* glob/exclude and cycle-heading pattern across develop-bug and finalise with a non-vacuity floor and asserts each accepts both shapes / both heading names; widen the 6a grep and the exclude.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.17.both-report-shapes-contract-has-no-population-check-cycle-count-reads-qa-cycle.md'
+  - id: 'CR-3'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: '`case " $* "` (6b and the Document-kind block) is the only source of `--bug`, and no prose says how a fenced block run through the Bash tool receives positional parameters, so a conforming `/finalise --bug` run resolves DOC_KIND=task and the cycle-4 cross-check then HALTs telling the agent to pass a flag the skill never says how to pass. Reviewer medium/medium; QA holds LOW — the mechanism predates this diff (kind block, cycle 1) and the HALT is loud — but the BUG-15 fix (re-bind as a placeholder) is the same design and should carry the kind too.'
+    suggested_action: 'Carry the kind as a substituted input placeholder re-bound per block (like STEM), or state the exact `bash -s -- --bug` invocation beside both blocks.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-6'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The STEM cross-check is one-directional: `--bug` with a non-bug STEM (`task.67`, the parent) proceeds into the bug branch and publishes the parent task''s `task.67.implementation.*` verdict as the bug''s.'
+    suggested_action: 'HALT symmetrically when DOC_KIND=bug and STEM does not match the bug-prefix pattern.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-7'
+    severity: low
+    file: 'skills/qa-fix/SKILL.md'
+    finding: '`$((10#$FIX_CYCLE_ARG))` wraps silently past 19 digits (`18446744073709551617` → 1, reproduced), passing `-gt 0` and keying `qa-fix-1`, while the sibling qa-cycle.sh caps a cycle at 9 digits to refuse exactly that; duplicated at lines 873 and 991.'
+    suggested_action: 'Reject runs longer than 9 digits in the case pattern before the arithmetic, matching the helper.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 3705
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new boundary this cycle: the diff is a find over a local directory, a grep, a case guard and test fixtures. The label boundary probed 20/20 in cycle 2 is unchanged since. Reasoned, not measured.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-14..17 as above: the finalise bug path still has a block that publishes blank on an unbound input, two blocks that HALT verbatim, a lookup that can pick a stale report, and a contract with no floor.'
+  maintainability:
+    status: PASS
+    notes: 'CR-8 (the eight-line fix_cycle guard duplicated in both qa-fix blocks against the skill''s one-definition rule) and CR-9 (the task-branch `|| echo N/A` never emits N/A — awk succeeds on empty input, verified under bash + zsh) are cleanups for a fix cycle.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-14 order by N; BUG-15 re-bind STEM + non-vacuity HALT (carry the kind the same way — CR-3); BUG-16 in-block bug branches for 7.6a/7.6b; BUG-17 enumeration test + widen the 6a grep and the exclude; CR-6 symmetric HALT; CR-7 9-digit cap'
+      refs: ['skills/finalise/SKILL.md', 'skills/develop-bug/SKILL.md', 'skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md', 'skills/qa-fix/SKILL.md', 'evals/shared/tests/finalise-bug-mode.test.mjs', 'tests/qa-cycle.test.js']
+  future:
+    - action: 'CR-8: fold the fix_cycle arg handling into qa-cycle.sh (or a sibling) so both blocks call one definition; CR-9: emit N/A from an explicit empty-check on the ls result'
+      refs: ['skills/qa-fix/SKILL.md', 'skills/qa-fix/references/qa-cycle.sh', 'skills/finalise/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 13
+  bugs_remaining: 4
+  fix_date: '2026-09-21'
+  total_iterations: 4
+  verification_method: 'Cycle-4 fixes re-executed on head 24423428 (83 targeted tests; the find + grep -oE verdict extraction run by hand against docs/bugs/bug.14 (full stem), bug.12 (short) and bug.1 (full stem) under bash + zsh)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-14..17 fixed with executed cases', 'CR-3, CR-6, CR-7 fixed']

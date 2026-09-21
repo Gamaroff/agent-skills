@@ -48,7 +48,12 @@ Resolve the kind **once**, before Step 0, and carry it as `DOC_KIND` (`story` | 
 
 ```bash
 DOC_KIND=""
-case " $* " in *" --bug "*) DOC_KIND=bug ;; esac
+# The invocation's flag is a SUBSTITUTED INPUT, exactly like the path below: a block run
+# through a tool has no positional parameters, so `$*` alone resolved every `/finalise --bug`
+# run to task and then told the agent to pass a flag it had already passed (cycle-5 CR-3).
+# Both are read so a shell that does carry argv (the executed test) still works.
+BUG_FLAG="{--bug when the invocation carried it, else empty}"
+case " $* $BUG_FLAG " in *" --bug "*) DOC_KIND=bug ;; esac
 DOC_FILE="{the document path argument}"
 if [ -z "$DOC_KIND" ]; then
   case "$(basename "$DOC_FILE")" in
@@ -1187,17 +1192,30 @@ standalone.
    ```bash
    BRANCH=$(git rev-parse --abbrev-ref HEAD)
    STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"   # the work item's filename stem
+   DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"   # re-bound here: no block inherits another's variables (TASK-121-BUG-2)
+   [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — both are substituted inputs, not values carried over from an earlier block"; exit 1; }
 
-   # Exactly the acceptance artefacts. The implementation report is NOT staged here — the
-   # orchestrator's Step 8 owns its final commit, and staging it would split its history.
+   # Exactly the acceptance artefacts, CHOSEN IN THE BLOCK by kind: a bug run stages the bug
+   # report (its Status History row from 7.3) and the DoD file — there is no sprint review to
+   # stage, and naming it would abort the add. The bug list used to live only in the marker
+   # prose beside this block, so the block HALTed verbatim on every bug run (TASK-125-BUG-16).
+   # The implementation report is NOT staged here — the orchestrator's Step 8 owns its final
+   # commit, and staging it would split its history.
+   if [ "$DOC_KIND" = "bug" ]; then
+     ADD_PATHS=("{document-path}" "{document-directory}/${STEM}.dod."*.md)
+     COMMIT_MSG="docs(${STEM}): DoD verified — finalise --bug"
+   else
+     ADD_PATHS=("{document-path}" "{document-directory}/${STEM}.dod."*.md "{document-directory}/sprint-review-summary.md")
+     COMMIT_MSG="docs(${STEM}): accept — DoD, sprint review"
+   fi
+   # --- acceptance artefacts resolved (the executed test slices to here) ---
    # One unmatched pathspec aborts the WHOLE `git add`, so the registry (tasks only; absent on a
    # story or a project without one) is added on its own, behind an existence check — not folded
    # into the list behind a `|| true` that would also swallow a real failure.
    # Read the add's exit code. A failed add — bash: "pathspec did not match" (128); zsh: "no
    # matches found" refuses the whole command — leaves the index clean, and the idempotency guard
    # below would then read that as "already committed" and push nothing (task.115 5c pass 2, CR-1).
-   git add "{document-path}" "{document-directory}/${STEM}.dod."*.md \
-           "{document-directory}/sprint-review-summary.md"
+   git add "${ADD_PATHS[@]}"
    ADD_EXIT=$?
    [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the acceptance artefacts failed (exit $ADD_EXIT) — an artefact is missing or the DoD glob matched nothing"; exit 1; }
    if [ -f docs/tasks/task-registry.md ]; then
@@ -1218,7 +1236,7 @@ standalone.
    if git diff --cached --quiet; then
      echo "acceptance artefacts already committed — skipping commit, pushing"
    else
-     git commit -m "docs(${STEM}): accept — DoD, sprint review${REG_SUFFIX}"
+     git commit -m "${COMMIT_MSG}${REG_SUFFIX}"
      COMMIT_EXIT=$?
      [ "$COMMIT_EXIT" -eq 0 ] || { echo "HALT: acceptance commit rejected (exit $COMMIT_EXIT) — see output above"; exit 1; }
    fi
@@ -1229,13 +1247,13 @@ standalone.
    CI_HEAD_2=$(git rev-parse HEAD)
    ```
 
-   **Bug mode (`acceptance-commit`):** run — same block, different artefacts. `STEM` is the bug
-   prefix (`bug.13`, `story.7.4.bug.4`, `task.67.bug.3`); the `git add` names **the bug report**
-   (it carries the Status History row from 7.3) and **the DoD file** only — no
-   `sprint-review-summary.md` (skipped, so the pathspec would abort the add), and the registry
-   check is a no-op because the tick answered `not-a-task`. The commit message is
-   `docs(${STEM}): DoD verified — finalise --bug`. Everything else in the block — read the add's
-   exit, never suppress the commit, skip the commit when clean but never the push — holds verbatim.
+   **Bug mode (`acceptance-commit`):** run — the block itself branches on `DOC_KIND` (bound in
+   the block): `STEM` is the bug prefix (`bug.13`, `story.7.4.bug.4`, `task.67.bug.3`), the
+   `git add` names **the bug report** (it carries the Status History row from 7.3) and **the DoD
+   file** only — no `sprint-review-summary.md` — and the commit message is
+   `docs(${STEM}): DoD verified — finalise --bug`. The registry check is a no-op because the tick
+   answered `not-a-task`. Nothing here is an instruction to edit the block: it ran verbatim in
+   task mode only until TASK-125-BUG-16 moved the bug list from this note into the block.
 
    The `git diff --cached --quiet` guard is in the block, not beside it: the first version said
    "skip the commit when clean" in prose two lines below an unconditional `git commit`, and the prose
@@ -1246,25 +1264,43 @@ standalone.
    merely on disk:
 
    ```bash
+   BRANCH=$(git rev-parse --abbrev-ref HEAD)
+   STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
+   DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
+   [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from 6a"; exit 1; }
    DOD_PATH=$(ls "{document-directory}/${STEM}.dod."*.md 2>/dev/null | sort | tail -1)
-   for ARTIFACT in "{document-path}" "$DOD_PATH" "{document-directory}/sprint-review-summary.md"; do
+   # The artefact list and the final assertion are chosen IN THE BLOCK by kind: a bug run has
+   # no sprint review, and its frontmatter was deliberately not changed in 7.2, so asserting
+   # `status: accepted` on it HALTed every correct bug run while the bug variant lived only in
+   # the note below (TASK-125-BUG-16).
+   if [ "$DOC_KIND" = "bug" ]; then
+     ARTIFACTS=("{document-path}" "$DOD_PATH")
+     FINAL_ASSERT_PATH="$DOD_PATH"; FINAL_ASSERT_PATTERN='^## Verification Complete'
+     FINAL_ASSERT_DESC="the pushed DoD file does not carry ## Verification Complete"
+   else
+     ARTIFACTS=("{document-path}" "$DOD_PATH" "{document-directory}/sprint-review-summary.md")
+     FINAL_ASSERT_PATH="{document-path}"; FINAL_ASSERT_PATTERN='^status: accepted$'
+     FINAL_ASSERT_DESC="the pushed document does not read status: accepted"
+   fi
+   # --- assertions resolved (the executed test slices to here) ---
+   for ARTIFACT in "${ARTIFACTS[@]}"; do
      git ls-files --error-unmatch "$ARTIFACT" >/dev/null \
        || { echo "HALT: $ARTIFACT is not tracked — the acceptance commit did not include it"; exit 1; }
      git show "origin/${BRANCH}:${ARTIFACT}" 2>/dev/null | grep -q . \
        || { echo "HALT: $ARTIFACT is not on origin/${BRANCH} — the push did not carry it"; exit 1; }
    done
-   git show "origin/${BRANCH}:{document-path}" | grep -q '^status: accepted$' \
-     || { echo "HALT: the pushed document does not read status: accepted"; exit 1; }
+   git show "origin/${BRANCH}:${FINAL_ASSERT_PATH}" | grep -q "$FINAL_ASSERT_PATTERN" \
+     || { echo "HALT: $FINAL_ASSERT_DESC"; exit 1; }
    ```
 
    `-f` and `ls` answer "does a file exist here"; `git ls-files --error-unmatch` answers "is it
    tracked" and `git show origin/<branch>:<path>` answers "is it on the branch the PR describes".
 
-   **Bug mode (`pushed-assertions`):** run — the loop covers the bug report and `$DOD_PATH` only
-   (no sprint review), and the final `status: accepted` assertion is **replaced** by
-   `git show "origin/${BRANCH}:$DOD_PATH" | grep -q '^## Verification Complete'` — the bug's
-   frontmatter was deliberately not changed in 7.2, so asserting `accepted` on it would HALT every
-   correct bug run.
+   **Bug mode (`pushed-assertions`):** run — the block itself branches on `DOC_KIND`: the loop
+   covers the bug report and `$DOD_PATH` only (no sprint review), and the final assertion is
+   `^## Verification Complete` on `$DOD_PATH` rather than `status: accepted` on the document —
+   the bug's frontmatter was deliberately not changed in 7.2, so asserting `accepted` on it
+   would HALT every correct bug run. Not an instruction to edit the block (TASK-125-BUG-16).
    Only the last question is the one a reviewer's PR view will agree with. (These are per-artifact
    on purpose: `references/verify-push-state.sh`, which the orchestrator's Step 8 runs, fails on
    *any* dirty tree — and here the orchestrator's implementation report is legitimately uncommitted
@@ -1437,10 +1473,10 @@ POLLEOF
 
 7. **Add Canonical PR Comment (idempotent via marker):**
 
-   **Bug mode (`pr-comment`):** run — the 6b block below re-binds `DOC_KIND` from the invocation
-   args, keys `DOD_PATH` on `${STEM}` (the bug prefix) and, in bug mode, derives `FINAL_GATE` **in
-   the block** from the implementation report's last `**Verdict**:` line (HALT when none) instead
-   of globbing gates; the body's head description and closing line branch on the kind too. All of
+   **Bug mode (`pr-comment`):** run — the 6b block below re-binds `STEM` and `DOC_KIND` as
+   substituted inputs (HALT when either is empty), keys `DOD_PATH` on `${STEM}` (the bug prefix)
+   and, in bug mode, derives `FINAL_GATE` **in the block** from the newest implementation report's
+   last `**Verdict**:` line (either filename shape; HALT when none) instead of globbing gates; the body's head description and closing line branch on the kind too. All of
    it is in the block itself, not in this note — a directory-wide glob here published a
    co-located bug's PARENT artefacts as the bug's (TASK-125-BUG-8), and a verdict "bound in Step 2"
    by prose was never bound at all (TASK-125-BUG-12).
@@ -1462,7 +1498,11 @@ POLLEOF
    # Locate the implementation report (passed by develop-task/develop-story as IMPLEMENTATION_REPORT env var,
    # or search the document directory for task.{id}.implementation.*.md / story.{epic}.{story}.implementation.*.md)
    if [ -n "$IMPLEMENTATION_REPORT" ] && [ -f "$IMPLEMENTATION_REPORT" ]; then
-     CYCLES=$(grep -c '^### QA Cycle' "$IMPLEMENTATION_REPORT" 2>/dev/null || echo 0)
+     # Both heading names: the story/task QA loop writes `### QA Cycle {N}`, the develop-bug
+     # verify loop writes `### Verify Cycle {N}` (TASK-125-BUG-17). `|| true`, not `|| echo 0`:
+     # `grep -c` PRINTS 0 and exits 1 on no match, and `|| echo 0` made the value "0\n0".
+     CYCLES=$(grep -cE '^### (QA|Verify) Cycle' "$IMPLEMENTATION_REPORT" 2>/dev/null || true)
+     CYCLES=${CYCLES:-0}
    else
      CYCLES=0
    fi
@@ -1477,20 +1517,23 @@ POLLEOF
    # task bug lives in its PARENT's directory: `task.67.dod.1.*` sorts after
    # `task.67.bug.3.dod.1.*` and the parent's gate is the only gate there, so
    # `*.dod.*.md | sort | tail -1` published the parent's DoD path and gate
-   # verdict as the bug's (TASK-125-BUG-8). STEM is bound at 6a.
+   # verdict as the bug's (TASK-125-BUG-8). STEM is re-bound just below (TASK-125-BUG-15).
+   # BOTH inputs are re-bound HERE as substituted placeholders — the same two lines 6a
+   # and 7.6b carry. Every fenced block runs as its own shell, so nothing 6a bound exists
+   # in this one (TASK-121-BUG-2): an unbound DOC_KIND silently took the story/task
+   # branch (TASK-125-BUG-12), and an unbound STEM globbed `dir/.dod.*.md`, matched
+   # nothing, and published a canonical comment with an empty DoD path and empty gate
+   # at exit 0 (TASK-125-BUG-15). Empty is a HALT, not a default.
+   STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
+   DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
+   [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from an earlier block"; exit 1; }
    DOD_PATH=$(ls {document-directory}/${STEM}.dod.*.md 2>/dev/null | sort | tail -1)
-   # DOC_KIND is re-bound HERE, from the invocation args, with the same line the
-   # Document-kind block uses: every fenced block runs as its own shell, so the
-   # value that block computed does not exist in this one (TASK-121-BUG-2), and
-   # an unbound DOC_KIND silently took the story/task branch (TASK-125-BUG-12).
-   case " $* " in *" --bug "*) DOC_KIND=bug ;; *) DOC_KIND=${DOC_KIND:-task} ;; esac
-   # The flag is the only thing that selects the bug branch, and the STEM bound
-   # at 6a is the only other input here that knows the kind. A bug prefix with
-   # the flag absent is this block run without its args — the BUG-12 symptom
-   # under a different unbound input — not a task, so it HALTs rather than
-   # publishing the story/task derivation on a bug (cycle-4 CR-2).
+   # The two inputs must agree, in BOTH directions: a bug prefix with a non-bug kind is
+   # this block run with a stale kind (cycle-4 CR-2), and a bug kind with the PARENT's
+   # stem would publish the parent task's verdict as the bug's (cycle-5 CR-6).
    case "$STEM" in
-     bug.[0-9]*|*.bug.[0-9]*) [ "$DOC_KIND" = "bug" ] || { echo "HALT: STEM ${STEM} is a bug prefix but --bug is not among this block's args — pass the flag when running 6b"; exit 1; } ;;
+     bug.[0-9]*|*.bug.[0-9]*) [ "$DOC_KIND" = "bug" ] || { echo "HALT: STEM ${STEM} is a bug prefix but DOC_KIND is ${DOC_KIND} — bind the kind the Document-kind block resolved"; exit 1; } ;;
+     *) [ "$DOC_KIND" != "bug" ] || { echo "HALT: DOC_KIND is bug but STEM ${STEM} is not a bug prefix — a bug's STEM is its own prefix (task.67.bug.3), never its parent's"; exit 1; } ;;
    esac
    if [ "$DOC_KIND" = "bug" ]; then
      # A bug has no gate file; its verdict is the develop-bug verify loop's —
@@ -1507,7 +1550,11 @@ POLLEOF
      # HALTed on the other (TASK-125-BUG-13). `find -name` with QUOTED patterns,
      # not two `ls` globs: zsh aborts a command whose glob matches nothing, and
      # one of the two shapes is always absent.
-     IMPLEMENTATION_REPORT=$(find {document-directory} -maxdepth 1 \( -name "${STEM}.implementation.*.md" -o -name "${STEM}.*.implementation.*.md" \) 2>/dev/null | sort | tail -1)
+     # Ordered by the report NUMBER, never by path: with both shapes on disk a plain sort
+     # put an older `bug.14.{name}.implementation.1.*` after a newer
+     # `bug.14.implementation.2.*` whenever `{name}` sorts past `i` (TASK-125-BUG-14).
+     IMPLEMENTATION_REPORT=$(find {document-directory} -maxdepth 1 \( -name "${STEM}.implementation.*.md" -o -name "${STEM}.*.implementation.*.md" \) 2>/dev/null \
+       | sed -E 's/^(.*\.implementation\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
      # The bare token, never the line's second word: real reports write
      # `**Verdict**: **PASS**` as often as `**Verdict**: PASS`, and the second
      # word of the first is `**PASS**` (cycle-4 CR-3). Neither token is a HALT.

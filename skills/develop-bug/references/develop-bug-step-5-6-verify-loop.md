@@ -241,7 +241,7 @@ Exit the loop and proceed to Step 7.
    ```bash
    git reset HEAD -- '**/*.implementation.*.md' 2>/dev/null || true
    ```
-   Invoke `/commit-changes` with `exclude={bug-prefix}.implementation.*.md` and message `fix({bug-prefix}): fix cycle {N} — {brief summary}`. Then `git push origin HEAD`. Record the commit hash in the Verify Cycle entry.
+   Invoke `/commit-changes` with `exclude={bug-prefix}.implementation.*.md,{bug-prefix}.*.implementation.*.md` (both report shapes — TASK-125-BUG-17) and message `fix({bug-prefix}): fix cycle {N} — {brief summary}`. Then `git push origin HEAD`. Record the commit hash in the Verify Cycle entry.
 
 5. Increment the counter and return to **5a**.
 

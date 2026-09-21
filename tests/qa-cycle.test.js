@@ -474,7 +474,20 @@ test("[fix_cycle] a gate on disk + no arg → derived from the gate, unchanged b
   assert.ok(r.argv.includes("qa-fix-5"), JSON.stringify(r.argv));
 });
 
-for (const bad of ["{N}", "0", "00", "000", "3 ", "two", "-1", "007x"]) {
+// The last two are the 9-digit cap: `10#` arithmetic wraps silently past 19 digits
+// (18446744073709551617 → 1), and a 10-digit value is not a cycle either (cycle-5 CR-7).
+for (const bad of [
+  "{N}",
+  "0",
+  "00",
+  "000",
+  "3 ",
+  "two",
+  "-1",
+  "007x",
+  "1234567890",
+  "18446744073709551617",
+]) {
   test(`[fix_cycle] an invalid arg ${JSON.stringify(bad)} reads as ABSENT — helper path, never a qa-fix-${bad} stage (TASK-125-BUG-7)`, () => {
     // Empty dir: the helper refuses, so the block must skip — not abort, not post.
     const r = runQaFixTrackerBlock({ gates: [], fixCycleArg: bad });

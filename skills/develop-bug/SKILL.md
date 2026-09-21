@@ -80,7 +80,10 @@ Dispatch a read-only Explore subagent using [`references/pipeline-resume-detecto
 # filename stem earlier runs used). `find -name` with quoted patterns rather than
 # two globs: zsh aborts a command whose glob matches nothing, and one of the two
 # shapes is always absent (TASK-125-BUG-13).
-find {bug-directory} -maxdepth 1 \( -name "{bug-prefix}.implementation.*.md" -o -name "{bug-prefix}.*.implementation.*.md" \) 2>/dev/null | sort | tail -1
+# Ordered by the report NUMBER, not the path: with both shapes on disk a plain sort
+# picks an older full-stem report over a newer short one (TASK-125-BUG-14).
+find {bug-directory} -maxdepth 1 \( -name "{bug-prefix}.implementation.*.md" -o -name "{bug-prefix}.*.implementation.*.md" \) 2>/dev/null \
+  | sed -E 's/^(.*\.implementation\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.

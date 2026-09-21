@@ -27,6 +27,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   readFileSync,
+  readdirSync,
   existsSync,
   mkdtempSync,
   writeFileSync,
@@ -302,7 +303,11 @@ function kindBlock() {
       .replace(
         'DOC_FILE="{the document path argument}"',
         'DOC_FILE="$1"; shift',
-      ) + '\nprintf "DOC_KIND=%s\\n" "$DOC_KIND"\n'
+      )
+      // The flag is a substituted input beside the path (cycle-5 CR-3); the
+      // executed cases feed it through env so argv-less runs are covered too.
+      .replace(/BUG_FLAG="\{[^\n]*\}"/, 'BUG_FLAG="${BUG_FLAG_IN:-}"') +
+    '\nprintf "DOC_KIND=%s\\n" "$DOC_KIND"\n'
   );
 }
 const SHELLS = [
@@ -381,7 +386,12 @@ function derivationBlock() {
     skill
       .slice(i, j)
       .replace(/^ {3}/gm, "")
-      .replace(/\{document-directory\}/g, '"$DIR"') +
+      .replace(/\{document-directory\}/g, '"$DIR"')
+      // Both inputs are substituted placeholders in the block (TASK-125-BUG-15);
+      // the harness feeds them through env, and a case that leaves one unset is
+      // exactly the run the block must refuse.
+      .replace(/STEM="\{[^\n]*\}"/, 'STEM="${STEM_IN:-}"')
+      .replace(/DOC_KIND="\{[^\n]*\}"/, 'DOC_KIND="${KIND_IN:-}"') +
     '\nprintf "DOD_PATH=%s\\nFINAL_GATE=%s\\nDOC_KIND=%s\\nCLOSING=%s\\n" "$DOD_PATH" "$FINAL_GATE" "$DOC_KIND" "$CLOSING_LINE"\n'
   );
 }
@@ -409,18 +419,25 @@ function sixBFixture({ verdict = "PASS", shape = "short" } = {}) {
   return dir;
 }
 for (const shell of SHELLS) {
-  const run = (dir, stem, args) =>
-    spawnSync(shell, ["-s", "--", ...args], {
+  // `kind` is the value the block's DOC_KIND placeholder is substituted with;
+  // undefined leaves it EMPTY, as does an undefined `stem`.
+  const run = (dir, stem, kind) =>
+    spawnSync(shell, ["-s", "--"], {
       input: derivationBlock(),
       encoding: "utf8",
-      // NOTHING but the two inputs the block documents. No DOC_KIND, no VERIFY_VERDICT.
-      env: { PATH: process.env.PATH, DIR: dir, STEM: stem },
+      // NOTHING but the inputs the block documents. No VERIFY_VERDICT, no argv.
+      env: {
+        PATH: process.env.PATH,
+        DIR: dir,
+        ...(stem === undefined ? {} : { STEM_IN: stem }),
+        ...(kind === undefined ? {} : { KIND_IN: kind }),
+      },
     });
 
   test(`[${shell}] 6b, executed with --bug: the bug's DoD, the verify loop's LAST verdict, the bug closing line — nothing injected`, () => {
     const dir = sixBFixture();
     try {
-      const r = run(dir, "task.67.bug.3", ["--bug"]);
+      const r = run(dir, "task.67.bug.3", "bug");
       assert.equal(r.status, 0, r.stderr + r.stdout);
       assert.match(
         r.stdout,
@@ -446,7 +463,7 @@ for (const shell of SHELLS) {
   test(`[${shell}] 6b, executed without the flag in the same directory: the task branch, the parent's own artefacts`, () => {
     const dir = sixBFixture();
     try {
-      const r = run(dir, "task.67", []);
+      const r = run(dir, "task.67", "task");
       assert.equal(r.status, 0, r.stderr);
       assert.match(r.stdout, /DOD_PATH=.*\/task\.67\.dod\.1\.parent\.md$/m);
       assert.match(r.stdout, /^FINAL_GATE=FAIL$/m);
@@ -460,7 +477,7 @@ for (const shell of SHELLS) {
   test(`[${shell}] 6b in bug mode with NO **Verdict** line HALTs — never an N/A that looks like a verdict`, () => {
     const dir = sixBFixture({ verdict: null });
     try {
-      const r = run(dir, "task.67.bug.3", ["--bug"]);
+      const r = run(dir, "task.67.bug.3", "bug");
       assert.equal(r.status, 1, "exit 1 is the HALT");
       assert.match(
         r.stdout + r.stderr,
@@ -475,7 +492,7 @@ for (const shell of SHELLS) {
   test(`[${shell}] 6b finds the report in the FULL-stem shape develop-bug's recent runs wrote (TASK-125-BUG-13)`, () => {
     const dir = sixBFixture({ shape: "full" });
     try {
-      const r = run(dir, "task.67.bug.3", ["--bug"]);
+      const r = run(dir, "task.67.bug.3", "bug");
       assert.equal(r.status, 0, r.stderr + r.stdout);
       assert.match(
         r.stdout,
@@ -490,7 +507,7 @@ for (const shell of SHELLS) {
   test(`[${shell}] 6b publishes the bare verdict token when the line is bolded — 9 of 25 real reports write **Verdict**: **PASS** (cycle-4 CR-3)`, () => {
     const dir = sixBFixture({ verdict: "**PASS** — proceeding to Step 7" });
     try {
-      const r = run(dir, "task.67.bug.3", ["--bug"]);
+      const r = run(dir, "task.67.bug.3", "bug");
       assert.equal(r.status, 0, r.stderr + r.stdout);
       assert.match(r.stdout, /^FINAL_GATE=PASS$/m, r.stdout);
       assert.doesNotMatch(
@@ -506,7 +523,7 @@ for (const shell of SHELLS) {
   test(`[${shell}] 6b HALTs on a **Verdict** line that names neither PASS nor FAIL — a token that is not a verdict is not published (cycle-4 CR-3)`, () => {
     const dir = sixBFixture({ verdict: "pending" });
     try {
-      const r = run(dir, "task.67.bug.3", ["--bug"]);
+      const r = run(dir, "task.67.bug.3", "bug");
       assert.equal(r.status, 1, "exit 1 is the HALT");
       assert.doesNotMatch(r.stdout, /^FINAL_GATE=/m, "nothing was derived");
     } finally {
@@ -514,14 +531,14 @@ for (const shell of SHELLS) {
     }
   });
 
-  test(`[${shell}] 6b with a bug STEM and NO --bug HALTs — a bug prefix without the flag is the block run without its args, not a task (cycle-4 CR-2)`, () => {
+  test(`[${shell}] 6b with a bug STEM and DOC_KIND=task HALTs — a bug prefix with a stale kind is the block run with the wrong input, not a task (cycle-4 CR-2)`, () => {
     const dir = sixBFixture();
     try {
-      const r = run(dir, "task.67.bug.3", []);
+      const r = run(dir, "task.67.bug.3", "task");
       assert.equal(r.status, 1, "exit 1 is the HALT: " + r.stdout + r.stderr);
       assert.match(
         r.stdout + r.stderr,
-        /HALT: STEM task\.67\.bug\.3 is a bug prefix but --bug is not among/,
+        /HALT: STEM task\.67\.bug\.3 is a bug prefix but DOC_KIND is task/,
       );
       assert.doesNotMatch(
         r.stdout,
@@ -532,7 +549,274 @@ for (const shell of SHELLS) {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test(`[${shell}] 6b with DOC_KIND=bug and the PARENT's STEM HALTs — the cross-check is symmetric, so a bug run cannot publish the parent task's verdict (cycle-5 CR-6)`, () => {
+    const dir = sixBFixture();
+    try {
+      writeFileSync(
+        path.join(dir, "task.67.implementation.1.parent.md"),
+        "**Verdict**: FAIL\n",
+      );
+      const r = run(dir, "task.67", "bug");
+      assert.equal(r.status, 1, "exit 1 is the HALT: " + r.stdout + r.stderr);
+      assert.match(
+        r.stdout + r.stderr,
+        /HALT: DOC_KIND is bug but STEM task\.67 is not a bug prefix/,
+      );
+      assert.doesNotMatch(r.stdout, /^FINAL_GATE=/m, "nothing was derived");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 6b with STEM unset HALTs — an empty stem is a HALT, never an empty DoD path and gate published at exit 0 (TASK-125-BUG-15)`, () => {
+    const dir = sixBFixture();
+    try {
+      const r = run(dir, undefined, "bug");
+      assert.equal(r.status, 1, "exit 1 is the HALT: " + r.stdout + r.stderr);
+      assert.match(
+        r.stdout + r.stderr,
+        /HALT: STEM and DOC_KIND must be bound in this block/,
+      );
+      assert.doesNotMatch(
+        r.stdout,
+        /^DOD_PATH=/m,
+        "nothing was derived, nothing would post",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 6b with both report shapes on disk picks the NEWEST by number, not the last by path (TASK-125-BUG-14)`, () => {
+    // Full-stem implementation.1 says FAIL; short-prefix implementation.2 says PASS.
+    // `{name}` here sorts after `i`, which is exactly when a path sort picks the old one.
+    const dir = sixBFixture({ shape: "full", verdict: "FAIL" });
+    try {
+      writeFileSync(
+        path.join(dir, "task.67.bug.3.implementation.2.run.md"),
+        "## QA Iteration History\n\n### Verify Cycle 1\n**Verdict**: PASS\n",
+      );
+      const r = run(dir, "task.67.bug.3", "bug");
+      assert.equal(r.status, 0, r.stderr + r.stdout);
+      assert.match(
+        r.stdout,
+        /^FINAL_GATE=PASS$/m,
+        `implementation.2 wins: ${r.stdout}`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 }
+
+// 7.6a and 7.6b branch on the kind IN THE BLOCK — the artefact list, the commit
+// message and the final assertion. Until TASK-125-BUG-16 the bug variants lived
+// only in the marker prose beside each block, so both HALTed verbatim on every
+// bug run. Each block is sliced up to its "resolved" marker and EXECUTED with the
+// two inputs substituted; nothing git-related runs.
+function sliceBlock(startNeedle, endNeedle, before) {
+  const end = skill.indexOf(endNeedle, before);
+  assert.ok(end > -1, `${endNeedle} present`);
+  const start = skill.lastIndexOf(startNeedle, end);
+  assert.ok(
+    start > -1 && start > before,
+    `${startNeedle} present before the marker`,
+  );
+  return skill
+    .slice(start, end)
+    .replace(/^ {3}/gm, "")
+    .replace(/\{document-directory\}/g, '"$DIR"')
+    .replace(/\{document-path\}/g, '"$DOC"')
+    .replace(/STEM="\{[^\n]*\}"/, 'STEM="${STEM_IN:-}"')
+    .replace(/DOC_KIND="\{[^\n]*\}"/, 'DOC_KIND="${KIND_IN:-}"');
+}
+const SIX_A_START = skill.indexOf("### Document kind");
+function sixABlock() {
+  return (
+    sliceBlock('STEM="{', "# --- acceptance artefacts resolved", SIX_A_START) +
+    '\nprintf "N=%s\\n" "${#ADD_PATHS[@]}"; printf "P=%s\\n" "${ADD_PATHS[@]}"; printf "MSG=%s\\n" "$COMMIT_MSG"\n'
+  );
+}
+function sixBAssertBlock() {
+  return (
+    sliceBlock('STEM="{', "# --- assertions resolved", SIX_A_START) +
+    '\nprintf "N=%s\\n" "${#ARTIFACTS[@]}"; printf "A=%s\\n" "${ARTIFACTS[@]}"; printf "PAT=%s\\nAT=%s\\n" "$FINAL_ASSERT_PATTERN" "$FINAL_ASSERT_PATH"\n'
+  );
+}
+for (const shell of SHELLS) {
+  const runBlock = (block, dir, stem, kind) =>
+    spawnSync(shell, ["-s", "--"], {
+      input: block,
+      encoding: "utf8",
+      env: {
+        PATH: process.env.PATH,
+        DIR: dir,
+        DOC: `${dir}/${stem}.name.md`,
+        STEM_IN: stem,
+        KIND_IN: kind,
+      },
+    });
+
+  test(`[${shell}] 7.6a in bug mode stages the bug report + DoD only and commits as "DoD verified — finalise --bug"; task mode adds the sprint review (TASK-125-BUG-16)`, () => {
+    const dir = sixBFixture();
+    try {
+      const bug = runBlock(sixABlock(), dir, "task.67.bug.3", "bug");
+      assert.equal(bug.status, 0, bug.stderr + bug.stdout);
+      assert.match(bug.stdout, /^N=2$/m, bug.stdout);
+      assert.doesNotMatch(bug.stdout, /sprint-review-summary/);
+      assert.match(bug.stdout, /^P=.*task\.67\.bug\.3\.dod\.1\.fix\.md$/m);
+      assert.match(
+        bug.stdout,
+        /^MSG=docs\(task\.67\.bug\.3\): DoD verified — finalise --bug$/m,
+      );
+      const task = runBlock(sixABlock(), dir, "task.67", "task");
+      assert.equal(task.status, 0, task.stderr + task.stdout);
+      assert.match(task.stdout, /^N=3$/m, task.stdout);
+      assert.match(task.stdout, /^P=.*sprint-review-summary\.md$/m);
+      assert.match(
+        task.stdout,
+        /^MSG=docs\(task\.67\): accept — DoD, sprint review$/m,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 7.6b in bug mode asserts ## Verification Complete on the DoD file, never status: accepted on the bug; task mode asserts accepted on the document (TASK-125-BUG-16)`, () => {
+    const dir = sixBFixture();
+    try {
+      const bug = runBlock(sixBAssertBlock(), dir, "task.67.bug.3", "bug");
+      assert.equal(bug.status, 0, bug.stderr + bug.stdout);
+      assert.match(bug.stdout, /^N=2$/m, bug.stdout);
+      assert.match(bug.stdout, /^PAT=\^## Verification Complete$/m);
+      assert.match(bug.stdout, /^AT=.*task\.67\.bug\.3\.dod\.1\.fix\.md$/m);
+      const task = runBlock(sixBAssertBlock(), dir, "task.67", "task");
+      assert.equal(task.status, 0, task.stderr + task.stdout);
+      assert.match(task.stdout, /^N=3$/m);
+      assert.match(task.stdout, /^PAT=\^status: accepted\$$/m);
+      assert.match(task.stdout, /^AT=.*task\.67\.name\.md$/m);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 7.6a / 7.6b with an input unbound HALT rather than run the task branch (TASK-125-BUG-15 class)`, () => {
+    const dir = sixBFixture();
+    try {
+      for (const block of [sixABlock(), sixBAssertBlock()]) {
+        const r = spawnSync(shell, ["-s", "--"], {
+          input: block,
+          encoding: "utf8",
+          env: { PATH: process.env.PATH, DIR: dir, DOC: "x" },
+        });
+        assert.equal(r.status, 1, r.stdout + r.stderr);
+        assert.match(
+          r.stdout + r.stderr,
+          /HALT: STEM and DOC_KIND must be bound in this block/,
+        );
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] the kind block resolves bug from the substituted BUG_FLAG input with NO argv flag — a block run through a tool has no positional parameters (cycle-5 CR-3)`, () => {
+    const r = spawnSync(
+      shell,
+      ["-s", "--", "docs/bugs/bug.14.x/bug.14.name.md"],
+      {
+        input: kindBlock(),
+        encoding: "utf8",
+        env: { PATH: process.env.PATH, BUG_FLAG_IN: "--bug" },
+      },
+    );
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /^DOC_KIND=bug$/m, r.stdout);
+  });
+
+  test(`[${shell}] 6a's cycle count reads BOTH heading names and never the two-line "0\\n0" (TASK-125-BUG-17)`, () => {
+    const i = skill.indexOf("CYCLES=$(grep -cE");
+    const j = skill.indexOf("\n", skill.indexOf("CYCLES=${CYCLES:-0}", i));
+    assert.ok(i > -1 && j > i, "the cycle-count lines are present");
+    const lines =
+      skill.slice(i, j).replace(/^ {5}/gm, "") +
+      '\nprintf "[%s]\\n" "$CYCLES"\n';
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-cycles-"));
+    try {
+      const verify = path.join(dir, "bug.md");
+      writeFileSync(
+        verify,
+        "### Verify Cycle 1\n### Verify Cycle 2\n### Verify Cycle 3\n",
+      );
+      const qa = path.join(dir, "task.md");
+      writeFileSync(qa, "### QA Cycle 1\n### QA Cycle 2\n");
+      const none = path.join(dir, "none.md");
+      writeFileSync(none, "## Summary\n");
+      for (const [file, want] of [
+        [verify, "[3]"],
+        [qa, "[2]"],
+        [none, "[0]"],
+      ]) {
+        const r = spawnSync(shell, ["-s"], {
+          input: lines,
+          encoding: "utf8",
+          env: { PATH: process.env.PATH, IMPLEMENTATION_REPORT: file },
+        });
+        assert.equal(r.status, 0, r.stderr);
+        assert.equal(
+          r.stdout.trim(),
+          want,
+          `${path.basename(file)}: ${JSON.stringify(r.stdout)}`,
+        );
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+// The contract the cycle-4 fix stated — every reader of a bug's implementation
+// report accepts BOTH filename shapes — was applied by hand at three sites and
+// missed two (TASK-125-BUG-17). This enumerates the population: every non-comment
+// line in the bug pipeline's sources that keys `implementation.*` on the bug prefix
+// must name both shapes. A floor keeps it from passing on an empty population.
+test("every stem-keyed implementation.* reader in develop-bug and finalise accepts both filename shapes (TASK-125-BUG-17)", () => {
+  const files = [
+    "skills/finalise/SKILL.md",
+    "skills/develop-bug/SKILL.md",
+    ...readdirSync(path.join(REPO_ROOT, "skills/develop-bug/references"))
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => `skills/develop-bug/references/${f}`),
+  ];
+  const sites = [];
+  for (const f of files) {
+    const text = readFileSync(path.join(REPO_ROOT, f), "utf8");
+    text.split("\n").forEach((line, n) => {
+      if (!/implementation\.\*/.test(line)) return;
+      if (!/\{bug-prefix\}|\$\{STEM\}/.test(line)) return;
+      if (/^\s*#/.test(line)) return; // a comment may describe one shape per line
+      sites.push({ file: f, line: n + 1, text: line });
+    });
+  }
+  assert.ok(
+    sites.length >= 4,
+    `non-vacuity floor: expected ≥ 4 reader sites, found ${sites.length}`,
+  );
+  for (const s of sites) {
+    const short = /(\{bug-prefix\}|\$\{STEM\})\.implementation\.\*/.test(
+      s.text,
+    );
+    const full =
+      /(\{bug-prefix\}|\$\{STEM\})\.(\*|\{name\})\.implementation\.\*/.test(
+        s.text,
+      );
+    assert.ok(
+      short && full,
+      `${s.file}:${s.line} names one shape only: ${s.text.trim().slice(0, 140)}`,
+    );
+  }
+});
 
 test("Step 2's bug-mode marker scopes the QA globs to the bug stem (TASK-125-BUG-9)", () => {
   const m = skill.match(

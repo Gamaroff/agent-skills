@@ -867,6 +867,9 @@ DOC_DIR=$(dirname "$STORY_FILE")
 case "${FIX_CYCLE_ARG:-}" in
   '') ;;
   *[!0-9]*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive integer — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
+  # At most 9 digits, the cap qa-cycle.sh applies: `10#` arithmetic wraps silently past 19
+  # digits (18446744073709551617 → 1) and would key stage qa-fix-1 (cycle-5 CR-7).
+  ??????????*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive cycle (more than 9 digits) — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
   # The value the caller SUPPLIED is what the warning names — after `10#`
   # normalisation `00`, `000` and `0` are all `0`, and a caller told
   # `fix_cycle=0` for a `000` they never wrote cannot find it (cycle-4 CR-5).
@@ -987,6 +990,7 @@ if [ -n "$FIX_ISSUE" ]; then
   case "${FIX_CYCLE_ARG:-}" in
     '') ;;
     *[!0-9]*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive integer — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
+    ??????????*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive cycle (more than 9 digits) — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
     # Names the SUPPLIED value, as the pull-request block does (cycle-4 CR-5).
     *) FIX_CYCLE_RAW=$FIX_CYCLE_ARG; FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || { echo "⚠️  fix_cycle='${FIX_CYCLE_RAW}' is not a positive cycle — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG=''; } ;;
   esac
