@@ -355,3 +355,132 @@ test("the helper is bundled into every skill whose prose calls it", () => {
   ).filter((p) => !fs.existsSync(path.join(REPO_ROOT, p)));
   assert.deepEqual(missing, []);
 });
+
+// ── An explicit cycle for the bug verify loop (task.125, obs #122) ──────────
+//
+// develop-bug's verify loop writes no gate file, so the helper refuses on its
+// directory BY DESIGN — and before task.125 that meant the bug issue got no
+// `qa-fix-N` comment at all. The loop knows its cycle and now passes it as the
+// Skill arg `fix_cycle=N`, which qa-fix binds as $FIX_CYCLE_ARG. These tests
+// EXECUTE qa-fix's tracker block (extracted from SKILL.md, run under bash from a
+// scratch repository root with a `node` shim that records argv) rather than
+// reading its text: the block is prose, and prose that is only grepped is prose
+// that was never run.
+
+function qaFixTrackerBlock() {
+  const blocks = fencedBlocks("skills/qa-fix/SKILL.md");
+  const b = blocks.find(
+    (x) =>
+      /--issue "\$FIX_ISSUE"/.test(x.text) &&
+      /--stage "qa-fix-\$\{FIX_CYCLE\}"/.test(x.text),
+  );
+  assert.ok(
+    b,
+    "qa-fix carries the tracker block that posts qa-fix-${FIX_CYCLE}",
+  );
+  // fencedBlocks joins continuations for the guards above; the block runs fine
+  // joined (a continuation is whitespace to bash).
+  return b.text;
+}
+
+function runQaFixTrackerBlock({ gates, fixCycleArg }) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "qa-fix-cycle-"));
+  FIXTURE_DIRS.push(root);
+  const refs = path.join(root, ".agents", "skills", "qa-fix", "references");
+  fs.mkdirSync(refs, { recursive: true });
+  fs.copyFileSync(HELPER, path.join(refs, "qa-cycle.sh"));
+  fs.writeFileSync(path.join(refs, "tracker-comment.js"), "");
+  fs.mkdirSync(path.join(root, ".claude", "state"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, ".claude", "state", "comment-body.md"),
+    "body\n",
+  );
+  const docDir = path.join(root, "docs", "bugs", "bug.9.x");
+  fs.mkdirSync(docDir, { recursive: true });
+  const story = path.join(docDir, "bug.9.x.md");
+  fs.writeFileSync(story, "");
+  for (const g of gates) fs.writeFileSync(path.join(docDir, g), "");
+  const bin = path.join(root, "bin");
+  fs.mkdirSync(bin);
+  fs.writeFileSync(
+    path.join(bin, "node"),
+    [
+      "#!/bin/sh",
+      `printf '%s\\n' "$@" > "${root}/argv.log"`,
+      'echo "{\\"reason\\":\\"posted\\"}"',
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  const env = {
+    PATH: `${bin}:${process.env.PATH}`,
+    STORY_FILE: story,
+    FIX_ISSUE: "42",
+  };
+  if (fixCycleArg !== undefined) env.FIX_CYCLE_ARG = fixCycleArg;
+  const r = spawnSync("bash", ["-c", qaFixTrackerBlock()], {
+    cwd: root,
+    encoding: "utf8",
+    env,
+  });
+  const argvLog = path.join(root, "argv.log");
+  const argv = fs.existsSync(argvLog)
+    ? fs.readFileSync(argvLog, "utf8").split("\n")
+    : null;
+  return { status: r.status, stdout: r.stdout, stderr: r.stderr, argv };
+}
+
+test("[fix_cycle] an empty gate directory + fix_cycle=2 → the tracker call carries qa-fix-2", () => {
+  const r = runQaFixTrackerBlock({ gates: [], fixCycleArg: "2" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.argv, "tracker-comment.js was invoked");
+  assert.ok(
+    r.argv.includes("qa-fix-2"),
+    `--stage qa-fix-2 expected in ${JSON.stringify(r.argv)}`,
+  );
+  assert.ok(
+    r.argv.includes("cycle=2"),
+    "the cycle slot carries the same number",
+  );
+  assert.doesNotMatch(r.stdout + r.stderr, /QA cycle unknown/);
+});
+
+test("[fix_cycle] an empty gate directory + no arg → refuses as today: no post, one ⚠️", () => {
+  const r = runQaFixTrackerBlock({ gates: [] });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(
+    r.argv,
+    null,
+    "tracker-comment.js must NOT be invoked with a guessed cycle",
+  );
+  assert.match(r.stdout, /Tracker issue comment skipped — QA cycle unknown/);
+});
+
+test("[fix_cycle] a gate on disk + fix_cycle=2 → the arg wins over the gate", () => {
+  const r = runQaFixTrackerBlock({
+    gates: ["bug.9.gate.5.x.yml"],
+    fixCycleArg: "2",
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(
+    r.argv.includes("qa-fix-2"),
+    `arg must win: ${JSON.stringify(r.argv)}`,
+  );
+  assert.ok(!r.argv.includes("qa-fix-5"));
+});
+
+test("[fix_cycle] a gate on disk + no arg → derived from the gate, unchanged behaviour", () => {
+  const r = runQaFixTrackerBlock({ gates: ["bug.9.gate.5.x.yml"] });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.argv.includes("qa-fix-5"), JSON.stringify(r.argv));
+});
+
+test("[fix_cycle] develop-bug's verify loop passes the cycle it already counts", () => {
+  const s = fs.readFileSync(
+    path.join(
+      REPO_ROOT,
+      "skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md",
+    ),
+    "utf8",
+  );
+  assert.match(s, /Skill\(qa-fix, args="\{bug-file-path\} fix_cycle=\{N\}"\)/);
+});

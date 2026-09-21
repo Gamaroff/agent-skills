@@ -169,7 +169,16 @@ Exit the loop and proceed to Step 7.
 
 1. **Reopen the bug**: set frontmatter `status: reopened`, body `**Status:** ⚠️ Reopened`. Append a new `### Iteration {N+1}` to the Developer Fix Cycle with a **Re-Investigation** note quoting the concrete failure (failing test name/output, regression, or review-code finding). Add a Status History row.
 
-2. **Invoke `/qa-fix`** with the bug file path and the concrete findings as the developer-provided fix list (qa-fix discovers the bug, filters to `Reopened`, investigates, fixes, and writes the Fix Implementation for the new iteration — its bug-update machinery matches Step 3's section shapes). qa-fix requires the active PR, which exists.
+2. **Invoke `/qa-fix`** with the bug file path, **this cycle's number as `fix_cycle={N}`**, and the concrete findings as the developer-provided fix list — `Skill(qa-fix, args="{bug-file-path} fix_cycle={N}")` (qa-fix discovers the bug, filters to `Reopened`, investigates, fixes, and writes the Fix Implementation for the new iteration — its bug-update machinery matches Step 3's section shapes). qa-fix requires the active PR, which exists.
+
+   **`fix_cycle={N}` is not optional here.** qa-fix keys its tracker comment to the cycle
+   (the cycle-scoped stage `qa-fix-{N}`) and, with no argument, derives `{N}` from the highest-numbered gate file
+   with `qa-cycle.sh` — which **refuses** when the directory holds no numbered gate. This loop writes
+   no gate (5a posts `qa-cycle-{N}` itself), so before task.125 every develop-bug run hit that
+   refusal and the bug issue carried no `qa-fix-N` comment at all (obs #122; task.121 5c CR-1). The
+   loop already knows `{N}` — it is the counter from **Loop Setup**, the same number 5a's
+   `qa-cycle-{N}` stage carries — so it states it. Pass the same `{N}` as the `qa-cycle-{N}` that
+   triggered this fix; the two comments then read as one round.
 
 3. **Check for actual changes**: run `git diff --stat HEAD`. If qa-fix made **no code edits**, do NOT increment the counter — log in Issues Log and **HALT**: "qa-fix could not address the remaining failure. Human review required. See implementation report."
 
