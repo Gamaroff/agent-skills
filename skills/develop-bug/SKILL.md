@@ -341,7 +341,7 @@ If a situation arises that is not in this table or the shared defaults table and
 - Story bug: `{story-dir}/story.{epic}.{story}.bug.{n}.{name}.md` (co-located with the story)
 - Task bug: `docs/tasks/task.{id}.{name}/task.{id}.bug.{n}.{name}.md`
 - General bug: `docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md` (+ `docs/bugs/bug-registry.md`)
-- Implementation report: `{bug-directory}/{bug-prefix}.implementation.{N}.{descriptive-name}.md` — `{bug-prefix}` is the **short** prefix Step 1 defines (`bug.14`, `task.67.bug.3`), not the bug file's full stem. Runs before task.125 also wrote `{bug-prefix}.{name}.implementation.{N}.*.md`, so every reader of the report (Step 0's resume glob above, `finalise` 6b, `bug-doc.js`) accepts both shapes; a writer picks the short one (TASK-125-BUG-13).
+- Implementation report: `{bug-directory}/{bug-prefix}.implementation.{N}.{descriptive-name}.md` — `{bug-prefix}` is the **short** id **Step 0 defines** (`bug.14`, `task.67.bug.3`; `bug-doc.js` `bug_id`), never the bug file's full stem, which is `{bug-file-stem}` (TASK-125-BUG-18). Runs before task.125 wrote `{bug-file-stem}.implementation.{N}.*.md` too, so every reader of the report (Step 0's resume lookup above, `finalise` 6a/6b, `bug-doc.js`) accepts both shapes; a writer uses the short id (TASK-125-BUG-13).
 - Bug template (section shapes the fix record fills): `assets/bug-report-template.md` in `create-bug-report`
 
 ## Related Skills

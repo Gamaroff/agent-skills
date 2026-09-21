@@ -68,14 +68,14 @@ In the **parent story file**'s `## Bug Reports` section, move this bug from *Ope
 ```markdown
 ### Closed Bugs
 
-- [Bug {epic}.{story}.{n}: {desc}](./{bug-prefix}.md) - ✅ Closed - Priority: {priority} (Fixed {date})
+- [Bug {epic}.{story}.{n}: {desc}](./{bug-file-stem}.md) - ✅ Closed - Priority: {priority} (Fixed {date})
 ```
 If this was the parent story's **only** open bug and the story status is `Reopened`, restore it to its prior status (`Ready for Review`/`In Progress` as recorded before the bug was filed). If other open bugs remain, leave the story `Reopened`.
 
 #### Task bug
 In the **parent task file**'s Bug Reports list, mark this bug ✅ Closed:
 ```markdown
-- [{bug-prefix}.md](./{bug-prefix}.md) - ✅ Closed - Priority: {priority} - Fixed {date}
+- [{bug-file-stem}.md](./{bug-file-stem}.md) - ✅ Closed - Priority: {priority} - Fixed {date}
 ```
 Tasks do not use the `Reopened` status — no parent-status change needed.
 

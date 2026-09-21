@@ -721,6 +721,72 @@ for (const shell of SHELLS) {
     }
   });
 
+  test(`[${shell}] 6b / 7.6a / 7.6b with a placeholder left VERBATIM HALT — non-empty is not bound (cycle-6 CR-3)`, () => {
+    const dir = sixBFixture();
+    const PH = "{story.{epic}.{story} | task.{id} | bug mode: the bug prefix}";
+    try {
+      for (const [name, block] of [
+        ["6b", derivationBlock()],
+        ["7.6a", sixABlock()],
+        ["7.6b", sixBAssertBlock()],
+      ]) {
+        const r = spawnSync(shell, ["-s", "--"], {
+          input: block,
+          encoding: "utf8",
+          env: {
+            PATH: process.env.PATH,
+            DIR: dir,
+            DOC: "x",
+            STEM_IN: PH,
+            KIND_IN: "task",
+          },
+        });
+        assert.equal(r.status, 1, `${name}: ${r.stdout}${r.stderr}`);
+        assert.match(r.stdout + r.stderr, /unsubstituted placeholder/, name);
+        assert.doesNotMatch(
+          r.stdout,
+          /^(DOD_PATH|N)=/m,
+          `${name} derived nothing`,
+        );
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 6b and 7.6b HALT when no DoD file is beside the document — never an empty path in the canonical comment (cycle-6 CR-3)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-nodod-"));
+    try {
+      writeFileSync(
+        path.join(dir, "task.67.gate.2.parent.yml"),
+        "gate: FAIL\n",
+      );
+      const six = spawnSync(shell, ["-s", "--"], {
+        input: derivationBlock(),
+        encoding: "utf8",
+        env: {
+          PATH: process.env.PATH,
+          DIR: dir,
+          STEM_IN: "task.67",
+          KIND_IN: "task",
+        },
+      });
+      assert.equal(six.status, 1, six.stdout + six.stderr);
+      assert.match(
+        six.stdout + six.stderr,
+        /HALT: no task\.67\.dod\.\*\.md beside the document/,
+      );
+      const asr = runBlock(sixBAssertBlock(), dir, "task.67", "task");
+      assert.equal(asr.status, 1, asr.stdout + asr.stderr);
+      assert.match(
+        asr.stdout + asr.stderr,
+        /HALT: no task\.67\.dod\.\*\.md beside the document/,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(`[${shell}] the kind block resolves bug from the substituted BUG_FLAG input with NO argv flag — a block run through a tool has no positional parameters (cycle-5 CR-3)`, () => {
     const r = spawnSync(
       shell,
@@ -735,41 +801,51 @@ for (const shell of SHELLS) {
     assert.match(r.stdout, /^DOC_KIND=bug$/m, r.stdout);
   });
 
-  test(`[${shell}] 6a's cycle count reads BOTH heading names and never the two-line "0\\n0" (TASK-125-BUG-17)`, () => {
-    const i = skill.indexOf("CYCLES=$(grep -cE");
-    const j = skill.indexOf("\n", skill.indexOf("CYCLES=${CYCLES:-0}", i));
-    assert.ok(i > -1 && j > i, "the cycle-count lines are present");
-    const lines =
-      skill.slice(i, j).replace(/^ {5}/gm, "") +
+  test(`[${shell}] 6a's cycle count LOCATES the report itself — either shape, newest by number — reads BOTH heading names, and never yields "0\\n0" (TASK-125-BUG-17, cycle-6 CR-2)`, () => {
+    const block =
+      sliceBlock('STEM="{', "# --- cycle count resolved", SIX_A_START) +
       '\nprintf "[%s]\\n" "$CYCLES"\n';
+    const run = (dir, stem, extraEnv = {}) =>
+      spawnSync(shell, ["-s"], {
+        input: block,
+        encoding: "utf8",
+        env: { PATH: process.env.PATH, DIR: dir, STEM_IN: stem, ...extraEnv },
+      });
     const dir = mkdtempSync(path.join(tmpdir(), "finalise-cycles-"));
     try {
-      const verify = path.join(dir, "bug.md");
       writeFileSync(
-        verify,
+        path.join(dir, "bug.14.precompact-hook.implementation.1.run.md"),
         "### Verify Cycle 1\n### Verify Cycle 2\n### Verify Cycle 3\n",
+      );
+      const bug = run(dir, "bug.14");
+      assert.equal(bug.status, 0, bug.stderr);
+      assert.equal(
+        bug.stdout.trim(),
+        "[3]",
+        `located without an env var: ${JSON.stringify(bug.stdout)}`,
+      );
+      writeFileSync(
+        path.join(dir, "bug.14.implementation.2.run.md"),
+        "### Verify Cycle 1\n",
+      );
+      assert.equal(
+        run(dir, "bug.14").stdout.trim(),
+        "[1]",
+        "implementation.2 wins",
       );
       const qa = path.join(dir, "task.md");
       writeFileSync(qa, "### QA Cycle 1\n### QA Cycle 2\n");
-      const none = path.join(dir, "none.md");
-      writeFileSync(none, "## Summary\n");
-      for (const [file, want] of [
-        [verify, "[3]"],
-        [qa, "[2]"],
-        [none, "[0]"],
-      ]) {
-        const r = spawnSync(shell, ["-s"], {
-          input: lines,
-          encoding: "utf8",
-          env: { PATH: process.env.PATH, IMPLEMENTATION_REPORT: file },
-        });
-        assert.equal(r.status, 0, r.stderr);
-        assert.equal(
-          r.stdout.trim(),
-          want,
-          `${path.basename(file)}: ${JSON.stringify(r.stdout)}`,
-        );
-      }
+      assert.equal(
+        run(dir, "bug.14", { IMPLEMENTATION_REPORT: qa }).stdout.trim(),
+        "[2]",
+      );
+      assert.equal(run(dir, "bug.99").stdout.trim(), "[0]");
+      const ph = run(dir, "{story.{epic}.{story} | task.{id}}");
+      assert.equal(ph.status, 1, ph.stdout + ph.stderr);
+      assert.match(
+        ph.stdout + ph.stderr,
+        /HALT: STEM is empty or an unsubstituted placeholder/,
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -793,7 +869,7 @@ test("every stem-keyed implementation.* reader in develop-bug and finalise accep
   for (const f of files) {
     const text = readFileSync(path.join(REPO_ROOT, f), "utf8");
     text.split("\n").forEach((line, n) => {
-      if (!/implementation\.\*/.test(line)) return;
+      if (!/(implementation|review)\.\*/.test(line)) return;
       if (!/\{bug-prefix\}|\$\{STEM\}/.test(line)) return;
       if (/^\s*#/.test(line)) return; // a comment may describe one shape per line
       sites.push({ file: f, line: n + 1, text: line });
@@ -804,11 +880,10 @@ test("every stem-keyed implementation.* reader in develop-bug and finalise accep
     `non-vacuity floor: expected ≥ 4 reader sites, found ${sites.length}`,
   );
   for (const s of sites) {
-    const short = /(\{bug-prefix\}|\$\{STEM\})\.implementation\.\*/.test(
-      s.text,
-    );
+    const short =
+      /(\{bug-prefix\}|\$\{STEM\})\.(implementation|review)\.\*/.test(s.text);
     const full =
-      /(\{bug-prefix\}|\$\{STEM\})\.(\*|\{name\})\.implementation\.\*/.test(
+      /(\{bug-prefix\}|\$\{STEM\})\.(\*|\{name\})\.(implementation|review)\.\*/.test(
         s.text,
       );
     assert.ok(
@@ -816,6 +891,70 @@ test("every stem-keyed implementation.* reader in develop-bug and finalise accep
       `${s.file}:${s.line} names one shape only: ${s.text.trim().slice(0, 140)}`,
     );
   }
+});
+
+// The readers above key on `{bug-prefix}`; the DEFINITION they key on lived in one file and
+// said the opposite of every consumer (TASK-125-BUG-18). One definition, and the test reads it.
+test("develop-bug defines {bug-prefix} ONCE, as the short id, and {bug-file-stem} as the full stem (TASK-125-BUG-18)", () => {
+  const step0 = readFileSync(
+    path.join(
+      REPO_ROOT,
+      "skills/develop-bug/references/develop-bug-step-0-resolve-bug.md",
+    ),
+    "utf8",
+  );
+  const defs = step0
+    .split("\n")
+    .filter((l) => /`\{bug-prefix\}` is the \*\*short id\*\*/.test(l));
+  assert.equal(
+    defs.length,
+    1,
+    "exactly one definition line for {bug-prefix}, naming the short id",
+  );
+  assert.match(
+    defs[0],
+    /`bug\.7`/,
+    "the short example is bug.7, not bug.7.stale-token",
+  );
+  assert.match(defs[0], /bug_id/, "the definition is bug-doc.js's bug_id");
+  const stem = step0
+    .split("\n")
+    .filter((l) =>
+      /`\{bug-file-stem\}` is the \*\*full filename stem\*\*/.test(l),
+    );
+  assert.equal(
+    stem.length,
+    1,
+    "exactly one definition line for {bug-file-stem}",
+  );
+  assert.match(stem[0], /bug_stem/);
+  const bugSources = [
+    "skills/develop-bug/SKILL.md",
+    ...readdirSync(path.join(REPO_ROOT, "skills/develop-bug/references"))
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => `skills/develop-bug/references/${f}`),
+  ];
+  for (const f of bugSources) {
+    const t = readFileSync(path.join(REPO_ROOT, f), "utf8");
+    assert.doesNotMatch(
+      t,
+      /`\{bug-prefix\}` \(the filename stem before `\.md`/,
+      `${f} redefines {bug-prefix} as the full stem`,
+    );
+  }
+  const step7 = readFileSync(
+    path.join(
+      REPO_ROOT,
+      "skills/develop-bug/references/develop-bug-step-7-close-bug.md",
+    ),
+    "utf8",
+  );
+  assert.doesNotMatch(
+    step7,
+    /\(\.\/\{bug-prefix\}\.md\)/,
+    "a link to the bug file must use {bug-file-stem}",
+  );
+  assert.match(step7, /\(\.\/\{bug-file-stem\}\.md\)/);
 });
 
 test("Step 2's bug-mode marker scopes the QA globs to the bug stem (TASK-125-BUG-9)", () => {

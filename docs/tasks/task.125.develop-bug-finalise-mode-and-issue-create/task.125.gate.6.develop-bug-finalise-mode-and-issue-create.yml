@@ -1,0 +1,78 @@
+schema: 1
+task: 'task.125.develop-bug-finalise-mode-and-issue-create'
+task_title: "develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
+gate: CONCERNS
+status_reason: 'Cycle 6 (granted; budget now 7) — narrowed to the 6 files changed since gate 5. Cycle-5 BUG-14..17 and CR-3/6/7 verified FIXED by re-execution on head 156efdad (102 targeted tests; the numeric ordering, the Verify-Cycle count on a real bug report and the 20-digit fix_cycle refusal run by hand under bash + zsh). No HIGH. One MEDIUM: `{bug-prefix}` is defined twice — full filename stem in develop-bug Step 0, short id in SKILL.md/finalise/bug-doc.js — so writers and readers of a bug''s artefacts disagree by construction; the both-shapes contract was applied to readers, never to the definition. Two LOW: finalise''s cycle-count block reads $IMPLEMENTATION_REPORT that no bug run binds (CYCLES=0 on every bug); the new non-vacuity guards accept an unsubstituted placeholder. One cleanup advisory (duplicated fix_cycle guard — second cycle it is raised).'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T07:55:17Z'
+
+top_issues:
+  - id: 'TASK-125-BUG-18'
+    severity: medium
+    file: 'skills/develop-bug/references/develop-bug-step-0-resolve-bug.md'
+    finding: 'Step 0 line 22 returns `{bug-prefix}` as "the filename stem before .md, e.g. bug.7.stale-token" (full stem) while SKILL.md:184, finalise''s STEM, bug-doc.js bug_id and the cycle-5 note at SKILL.md:344 mean the short id — so the resume find, the verify-loop exclude, the report name, the step-7 `./{bug-prefix}.md` links (which need the full stem) and the `{bug-prefix}.dod.{N}` check (which needs the short) each inherit whichever meaning the agent picked; the corpus carries `.review.` and `.implementation.` files in both shapes and `.dod.` files in one.'
+    suggested_action: 'One meaning: `{bug-prefix}` = the short id (bug-doc.js bug_id, = finalise STEM); add `{bug-file-stem}` (full stem) for the two bug-file links; two-shape find for the step-2 review globs; extend the enumeration test to the definition line and to `.review.*` readers.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.18.bug-prefix-has-two-definitions-full-stem-in-step-0-short-id-everywhere-else.md'
+  - id: 'CR-2'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The 6a cycle-count block (the BUG-17 fix) reads `$IMPLEMENTATION_REPORT` "passed by develop-task/develop-story as an env var"; develop-bug passes nothing and the bug-mode find that locates the report lives in the NEXT block, so every bug run takes `CYCLES=0` and the QA Cycles line is silently omitted — the executed test proves the grep by injecting the path (the BUG-12 shape).'
+    suggested_action: 'Bind STEM in that block and derive IMPLEMENTATION_REPORT there (both shapes, newest by number) when the env var is empty; run the test against a fixture directory.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The three `[ -n "$STEM" ] && [ -n "$DOC_KIND" ] || HALT` guards (6a, 7.6b, 6b) refuse an EMPTY input but accept a placeholder left verbatim — `STEM="{story.{epic}.{story} | …}"` is non-empty — after which `ls …${STEM}.dod.*.md` yields an empty DOD_PATH at exit 0 (executed under bash + zsh).'
+    suggested_action: 'Refuse a value containing `{` in each guard and HALT when DOD_PATH resolves empty; add the unsubstituted-placeholder case to the executed tests.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3724
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new boundary this cycle: placeholders, in-block branches, a sort key and a digit cap. The label boundary probed 20/20 in cycle 2 is unchanged since.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-18: two definitions of the prefix every bug artefact is keyed on; CR-2: a bug run never carries its cycle count; CR-3: a verbatim placeholder passes the guard.'
+  maintainability:
+    status: PASS
+    notes: 'CR-4: the fix_cycle guard is duplicated in both qa-fix blocks with only one copy executed — raised as CR-8 at cycle 5 too; recommended as a follow-up task (qa-cycle.sh --cycle), not a seventh cycle here.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-18: one definition of {bug-prefix} (short id) + {bug-file-stem} for the bug-file links; two-shape find for review globs; enumeration test covers the definition and .review.* readers. CR-2: cycle-count block self-binding. CR-3: guards refuse `{`; empty DOD_PATH HALTs.'
+      refs: ['skills/develop-bug/references/develop-bug-step-0-resolve-bug.md', 'skills/develop-bug/references/develop-bug-step-7-close-bug.md', 'skills/develop-bug/references/develop-bug-step-2-review.md', 'skills/develop-bug/SKILL.md', 'skills/finalise/SKILL.md', 'evals/shared/tests/finalise-bug-mode.test.mjs']
+  future:
+    - action: 'CR-4 (= cycle-5 CR-8): give qa-cycle.sh an explicit-cycle argument so both qa-fix blocks call one validation — a follow-up task'
+      refs: ['skills/qa-fix/SKILL.md', 'skills/qa-fix/references/qa-cycle.sh']
+
+bug_resolution:
+  bugs_fixed: 17
+  bugs_remaining: 1
+  fix_date: '2026-09-21'
+  total_iterations: 5
+  verification_method: 'Cycle-5 fixes re-executed on head 156efdad (102 targeted tests; BUG-14 numeric ordering with both shapes on disk under bash + zsh; BUG-17 count = 3 on a real Verify-Cycle report; CR-7 20-digit value refused)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-18 fixed with the enumeration test covering the definition', 'CR-2 and CR-3 fixed']

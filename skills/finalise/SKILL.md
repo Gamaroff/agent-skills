@@ -1193,7 +1193,10 @@ standalone.
    BRANCH=$(git rev-parse --abbrev-ref HEAD)
    STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"   # the work item's filename stem
    DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"   # re-bound here: no block inherits another's variables (TASK-121-BUG-2)
-   [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — both are substituted inputs, not values carried over from an earlier block"; exit 1; }
+   # Empty OR left as a placeholder: `{story.{epic}…}` is non-empty and passed the first
+   # version of this guard, after which the DoD glob matched nothing at exit 0 (cycle-6 CR-3).
+   case "$STEM$DOC_KIND" in ''|*'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — both are substituted inputs, not values carried over from an earlier block (empty or an unsubstituted placeholder found)"; exit 1 ;; esac
+   [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
 
    # Exactly the acceptance artefacts, CHOSEN IN THE BLOCK by kind: a bug run stages the bug
    # report (its Status History row from 7.3) and the DoD file — there is no sprint review to
@@ -1267,8 +1270,10 @@ standalone.
    BRANCH=$(git rev-parse --abbrev-ref HEAD)
    STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
    DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
-   [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from 6a"; exit 1; }
+   case "$STEM$DOC_KIND" in ''|*'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from 6a (empty or an unsubstituted placeholder found)"; exit 1 ;; esac
+   [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
    DOD_PATH=$(ls "{document-directory}/${STEM}.dod."*.md 2>/dev/null | sort | tail -1)
+   [ -n "$DOD_PATH" ] || { echo "HALT: no ${STEM}.dod.*.md beside the document — 7.2 writes it before this block runs (cycle-6 CR-3)"; exit 1; }
    # The artefact list and the final assertion are chosen IN THE BLOCK by kind: a bug run has
    # no sprint review, and its frontmatter was deliberately not changed in 7.2, so asserting
    # `status: accepted` on it HALTed every correct bug run while the bug variant lived only in
@@ -1495,8 +1500,18 @@ POLLEOF
    **Step 6a — Resolve QA cycle count:**
 
    ```bash
-   # Locate the implementation report (passed by develop-task/develop-story as IMPLEMENTATION_REPORT env var,
-   # or search the document directory for task.{id}.implementation.*.md / story.{epic}.{story}.implementation.*.md)
+   # The implementation report is LOCATED IN THIS BLOCK. An IMPLEMENTATION_REPORT env var,
+   # when the orchestrator passed one, wins; otherwise the report is the newest
+   # `${STEM}.implementation.{N}.*` beside the document, in either filename shape (the
+   # short prefix or the full stem — TASK-125-BUG-13), ordered by N (TASK-125-BUG-14). The
+   # first version only read the env var, and develop-bug passes none, so every bug run
+   # counted 0 cycles and silently dropped the line (cycle-6 CR-2 — the BUG-12 shape).
+   STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
+   case "$STEM" in ''|*'{'*) echo "HALT: STEM is empty or an unsubstituted placeholder — bind the work item's stem in this block"; exit 1 ;; esac
+   if [ -z "${IMPLEMENTATION_REPORT:-}" ] || [ ! -f "${IMPLEMENTATION_REPORT:-}" ]; then
+     IMPLEMENTATION_REPORT=$(find {document-directory} -maxdepth 1 \( -name "${STEM}.implementation.*.md" -o -name "${STEM}.*.implementation.*.md" \) 2>/dev/null \
+       | sed -E 's/^(.*\.implementation\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
+   fi
    if [ -n "$IMPLEMENTATION_REPORT" ] && [ -f "$IMPLEMENTATION_REPORT" ]; then
      # Both heading names: the story/task QA loop writes `### QA Cycle {N}`, the develop-bug
      # verify loop writes `### Verify Cycle {N}` (TASK-125-BUG-17). `|| true`, not `|| echo 0`:
@@ -1506,6 +1521,7 @@ POLLEOF
    else
      CYCLES=0
    fi
+   # --- cycle count resolved (the executed test slices to here) ---
    # If grep returns 0 (no headings found), CYCLES=0 → omit the cycle-count line from the body
    ```
 
@@ -1526,8 +1542,12 @@ POLLEOF
    # at exit 0 (TASK-125-BUG-15). Empty is a HALT, not a default.
    STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
    DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
-   [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from an earlier block"; exit 1; }
+   case "$STEM$DOC_KIND" in ''|*'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from an earlier block (empty or an unsubstituted placeholder found)"; exit 1 ;; esac
+   [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
    DOD_PATH=$(ls {document-directory}/${STEM}.dod.*.md 2>/dev/null | sort | tail -1)
+   # An empty DoD path is a HALT, never a blank line in the canonical comment: 7.2 wrote the
+   # file, so nothing here can legitimately fail to find it (cycle-6 CR-3).
+   [ -n "$DOD_PATH" ] || { echo "HALT: no ${STEM}.dod.*.md beside the document — 7.2 writes it before this block runs"; exit 1; }
    # The two inputs must agree, in BOTH directions: a bug prefix with a non-bug kind is
    # this block run with a stale kind (cycle-4 CR-2), and a bug kind with the PARENT's
    # stem would publish the parent task's verdict as the bug's (cycle-5 CR-6).

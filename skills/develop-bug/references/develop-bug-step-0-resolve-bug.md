@@ -19,7 +19,12 @@ Accept any of: an absolute/relative bug file path, a bug directory, or a bare bu
 | **task** | `task.{id}.bug.{n}.{name}.md` | `docs/tasks/task.{id}.{name}/` | link to parent task |
 | **general** | `bug.{N}.{name}.md` | `docs/bugs/bug.{N}.{name}/` | `None — cross-cutting` |
 
-The subagent returns: absolute bug file path, bug directory, mode, and `{bug-prefix}` (the filename stem before `.md`, e.g. `story.8.5.3.bug.1.cache-leak`, `task.44.bug.2.perf`, `bug.7.stale-token`). Exclude any file whose name contains `.implementation.` (that is the report, not the bug).
+The subagent returns: absolute bug file path, bug directory, mode, **`{bug-prefix}`** and **`{bug-file-stem}`**. They are two different values and every consumer below names the one it means (TASK-125-BUG-18):
+
+- `{bug-prefix}` is the **short id** — `story.8.5.3.bug.1`, `task.44.bug.2`, `bug.7` — what `bug-doc.js --file <bug> --json` reports as `bug_id`. It keys every artefact this pipeline *writes* beside the bug (the implementation report, the DoD that `/finalise --bug` writes as `${STEM}.dod.{N}.*`, the lock's `task_or_story_id`, the `docs({bug-prefix}):` commit scopes) — the same value `finalise` binds as `STEM`.
+- `{bug-file-stem}` is the **full filename stem** before `.md` — `story.8.5.3.bug.1.cache-leak`, `task.44.bug.2.perf`, `bug.7.stale-token` — `bug-doc.js`'s `bug_stem`. It addresses the bug file itself (the `./{bug-file-stem}.md` links Step 7 writes).
+
+Until task.125 this file defined `{bug-prefix}` as the full stem while `SKILL.md`, `finalise` and `bug-doc.js` meant the short id, so runs wrote `.implementation.` and `.review.` files in both shapes; readers of those artefacts accept both shapes for that reason, and new writers use the short id. Exclude any file whose name contains `.implementation.` or `.review.` (those are reports, not the bug).
 
 **HALT** if no bug file resolves: `Bug file not found for "{input}". Provide a path to a story/task/general bug report, or file one first with /create-bug-report.`
 
