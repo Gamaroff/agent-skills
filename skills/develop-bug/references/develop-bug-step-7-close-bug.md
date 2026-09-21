@@ -15,7 +15,15 @@ Runs in full in **both lite and standard modes**.
 
 ### DO NOT inline this step
 
-Invoke the `/finalise` skill via the Skill tool against the **bug file**. Do NOT write a DoD file directly or set any accepted/closed status without running `/finalise` first. Finalise runs the DoD checks (fix present, regression test present, tests/lint green, no security regression) and produces the `{bug-prefix}.dod.{N}.*.md` summary.
+Invoke the `/finalise` skill via the Skill tool **in bug mode** against the **bug file**:
+
+```
+Skill(finalise, args="--bug {bug-file-path}")
+```
+
+Do NOT write a DoD file directly or set any accepted/closed status without running `/finalise --bug` first. Bug mode is the same DoD run as a fix-evidence check: it dispatches the fix-evidence agent (expected behaviour implemented; regression test asserts it and runs per PR; recorded red without the fix; guard scope; bundled copies) in the AC agent's slot, keeps the security / compliance / docs agents, both CI readings, the canonical PR comment and the tracker `done` comment + close, and **skips** — by a list stated once in `finalise`'s SKILL.md § "What bug mode runs and skips" — the AC agent, the Change Log row (forbidden on a bug), `status: accepted`, the body DoD section and the sprint review. It writes `{bug-prefix}.dod.{N}.*.md` from `assets/bug-dod-template.md` (the shape bug.13 and bug.14 converged on) and one `## Status History` row (`DoD verified — …`, via `status-history.js`) into the bug file, commits and pushes both at its publish boundary.
+
+**The flag is not optional.** `/finalise <bug-file>` without `--bug` runs the story/task DoD, prints a hint naming the mode, and would then try to write a Change Log row and `status: accepted` into the bug — exactly what every run before task.125 had to avoid by hand-writing the DoD instead (obs #69).
 
 After finalise returns, read its output:
 - DoD satisfied → continue to Part B.
@@ -25,7 +33,7 @@ After finalise returns, read its output:
   Address the gaps in {report path} before re-running /develop-bug.
   ```
 
-Note: `/finalise` targets story/task documents primarily; for a bug it validates the fix evidence. If `/finalise` cannot process the bug document type in your install, fall back to the equivalent inline DoD checklist (fix present ✓, regression test fails-without/passes-with ✓, suite + lint green ✓, no new security surface ✓), record it in the report, and continue — but prefer invoking the skill.
+There is no inline fallback. A `/finalise` that does not recognise `--bug` is an install older than task.125 — update the skill; do not hand-write the DoD, which is the drift this mode exists to end.
 
 ---
 
@@ -76,7 +84,7 @@ Update the row for this bug in `docs/bugs/bug-registry.md` — set the `Status` 
 
 ### B4. Tracker close (only if linked)
 
-If the bug has `github_issue`/`jira_key` (`TRACKER_ISSUE` non-empty): post a completion comment and close/transition the issue, following the GitHub close / Jira Done-transition mechanics in [`references/develop-pipeline-step-7-finalise.md`](develop-pipeline-step-7-finalise.md) (Tracker Issue Update), substituting bug terminology.
+`/finalise --bug` is the **one writer** for the tracker close: its Step 7.8 (`tracker-done`) posted the completion comment, closed / transitioned the issue and signalled the board `done` stage before Part B began. This step **verifies** rather than repeats. If the bug has `github_issue`/`jira_key` (`TRACKER_ISSUE` non-empty), read the state back — `gh issue view $TRACKER_ISSUE --json state -q .state` → `CLOSED`, or the Jira status → the ladder's `done` target — and record it in the Decisions Log. Only when the read-back shows the close did **not** land (finalise reported it, or the state is still open) repeat that one step, following the GitHub close / Jira Done-transition mechanics in [`references/develop-pipeline-step-7-finalise.md`](develop-pipeline-step-7-finalise.md) (Tracker Issue Update), substituting bug terminology.
 
 Step 1 ensures the issue via `ensure-bug-{jira,github}-issue`, so a bug normally **has** one — an empty `TRACKER_ISSUE` here means that create failed or was deferred, not that bugs go untracked. Skip the close when it is empty, and say so in the report rather than silently: a deferred create leaves the card uncreated *and* unclosed, and the handover checklist is what carries both actions.
 
@@ -94,13 +102,14 @@ node .agents/skills/sync-jira-bug/scripts/sync-jira-bug.js \
 
 ## Step 7 Completion Checklist (verify before marking ✅)
 
-- [ ] `/finalise` invoked (or documented inline DoD fallback) — DoD satisfied
-- [ ] `{bug-prefix}.dod.{N}.*.md` present (or inline DoD checklist recorded in the report)
+- [ ] `/finalise --bug` invoked — DoD satisfied
+- [ ] `{bug-prefix}.dod.{N}.*.md` present, committed and on the remote (finalise's publish boundary)
+- [ ] Bug `## Status History` carries the `DoD verified — …` row from finalise
 - [ ] Bug `## Resolution Summary` fully written (no stub text remains)
 - [ ] Bug frontmatter `status: closed` AND body `**Status:** ✅ Closed`
 - [ ] Final Status History row added
 - [ ] Parent linkage updated per mode (story Bug Reports moved to Closed / task marked Closed / registry row `closed`)
-- [ ] Tracker issue closed IF `TRACKER_ISSUE` set (else N/A — logged)
+- [ ] Tracker issue confirmed closed by read-back IF `TRACKER_ISSUE` set (closed by `/finalise --bug`; repeated here only on a gap; else N/A — logged)
 - [ ] Decisions Log records: Resolution Summary written, parent/registry updated, tracker close (or N/A)
 
 Update Pipeline Progress: ✅ finalise-close. Record the DoD summary path in the report's Completion section. Proceed to Step 8.

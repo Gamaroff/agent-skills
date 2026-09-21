@@ -1,6 +1,6 @@
 ---
 name: finalise
-description: Verify story/task completion against comprehensive Definition of Done criteria (acceptance criteria, tests, code reviews, documentation, security review, compliance check), then update status to 'accepted' and generate Sprint Review artifacts, or list gaps if incomplete. Use when finalising stories or tasks for Sprint Review.
+description: Verify story/task completion against comprehensive Definition of Done criteria (acceptance criteria, tests, code reviews, documentation, security review, compliance check), then update status to 'accepted' and generate Sprint Review artifacts, or list gaps if incomplete. Use when finalising stories or tasks for Sprint Review. `--bug` runs the same DoD as a fix-evidence check over a bug report — skip list stated once, no Change Log row, no `accepted`, no sprint review — for develop-bug Step 7.
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
@@ -9,7 +9,7 @@ description: Verify story/task completion against comprehensive Definition of Do
 
 ## Overview
 
-Mark a story or task as complete by verifying it against a comprehensive Definition of Done (DoD) checklist. This skill automates the verification of acceptance criteria, unit tests, code reviews, documentation updates, security reviews, and compliance checks.
+Mark a story or task as complete by verifying it against a comprehensive Definition of Done (DoD) checklist. This skill automates the verification of acceptance criteria, unit tests, code reviews, documentation updates, security reviews, and compliance checks. A **bug report** is finalised in **bug mode** (`/finalise --bug <bug-file>`): the same DoD run as a fix-evidence check, with the story/task-shaped steps skipped by a list stated once — see § "Document kind — story, task, or bug" below.
 
 **Parallel DoD Verification Approach:** This skill dispatches four read-only Explore subagents in a single parallel message to perform DoD checks (AC traceability, security, compliance, docs/changelog). Each agent returns a structured YAML result. Main context writes the DoD running summary in **one consolidated pass per section** after aggregation — not per individual check. This gives:
 
@@ -41,6 +41,64 @@ This skill should be used when:
 ## Workflow
 
 Follow this systematic workflow to verify and mark a story/task as complete. Steps 3–5 dispatch four parallel Explore subagents; the running summary is written in four consolidated appends after all agents return (Step 3d). Do NOT write incrementally.
+
+### Document kind — story, task, or bug
+
+Resolve the kind **once**, before Step 0, and carry it as `DOC_KIND` (`story` | `task` | `bug`):
+
+```bash
+DOC_KIND=""
+case " $* " in *" --bug "*) DOC_KIND=bug ;; esac
+DOC_FILE="{the document path argument}"
+if [ -z "$DOC_KIND" ]; then
+  case "$(basename "$DOC_FILE")" in
+    story.*) DOC_KIND=story ;;
+    task.*)  DOC_KIND=task ;;
+  esac
+  # A bug report's filename is `bug.{N}.{name}.md`, `story.{e}.{s}.bug.{N}.{name}.md` or
+  # `task.{id}.bug.{N}.{name}.md` — the `.bug.{N}.` segment is what a story/task file never has.
+  if printf '%s' "$(basename "$DOC_FILE")" | grep -qE '(^|\.)bug\.[0-9]+\.'; then
+    echo "hint: $(basename "$DOC_FILE") is a bug report — run \`/finalise --bug $DOC_FILE\` for the fix-evidence DoD; continuing in $DOC_KIND mode as invoked"
+  fi
+fi
+```
+
+**`--bug` is opt-in, and the hint is all the path check does.** `/finalise <bug-file>` without the
+flag continues to do what it did before — the story/task DoD — so nothing that calls this skill
+today changes behaviour; only `develop-bug` Step 7 Part A passes the flag. The hint exists because
+every real bug run before task.125 took the "inline DoD fallback" and hand-wrote the same file
+(bug.13, bug.14 — obs #69): a mode a reader has to know about is a mode that does not get used.
+
+#### What bug mode runs and skips
+
+The whole difference between a story/task run and a bug run is this table. Each row's key appears
+**exactly once** in the prose below as `**Bug mode (\`key\`):** skip …` or `**Bug mode (\`key\`):**
+run …`, beside the step it governs, and `evals/shared/tests/finalise-bug-mode.test.mjs` asserts the
+table and the markers agree in both directions — a step skipped here and not marked in the prose, or
+marked in the prose and not listed here, is red. Stating the skips once is what makes "does this
+apply to a bug?" a lookup instead of a judgement.
+
+| Key | Step | story / task | bug |
+| --- | --- | --- | --- |
+| `running-summary` | Step 0 — running summary file | run | run — `{bug-prefix}.dod.{N}.{name}.md` from `assets/bug-dod-template.md` |
+| `read-document` | Step 1 — read the document | run | run — the bug report, frontmatter or header block (`references/bug-doc.js`) |
+| `qa-reports` | Step 2 — QA reports and gate | run | run — none expected; the verify loop's `#### QA Verification` and the implementation report are the QA record |
+| `ac-agent` | Step 3b — AC traceability agent | run | **skip** — a bug has no ACs; the `fix-evidence` agent takes its slot |
+| `fix-evidence` | Step 3b — fix-evidence agent | — | run — `references/finalise-dod-fix-evidence-prompt.md` |
+| `frontmatter-accepted` | Step 7.2 — `status: accepted` | run | **skip** — `accepted` is not a bug status; develop-bug Part B writes `closed` |
+| `change-log-row` | Step 7.3 — Change Log acceptance row | run | **skip — forbidden** — bug reports never carry a Change Log (`references/document-change-log.md` §Exclusions) |
+| `status-history-row` | Step 7.3 — Status History row | — | run — `references/status-history.js`, the bug counterpart of `change-log.js` |
+| `registry-tick` | Step 7.4 — task registry tick | run | run — called unconditionally; answers `not-a-task` and writes nothing |
+| `body-dod-section` | Step 7.4–7.5 — DoD section in the document body | run | **skip** — the bug's closing record is `## Resolution Summary`, written by develop-bug Part B |
+| `sprint-review` | Step 7.6 — sprint review summary | run | **skip** — a bug fix is reported through its Resolution Summary and the registry |
+| `acceptance-commit` | Step 7.6a — acceptance commit + push | run | run — stages the DoD file and the bug report (its Status History row); no sprint review |
+| `pushed-assertions` | Step 7.6b — tracked-and-pushed | run | run — the DoD file and the bug report; no `status: accepted` assertion |
+| `ci-reading-2` | Step 7.6c — CI reading 2 | run | run |
+| `pr-comment` | Step 7.7 — canonical PR comment | run | run |
+| `tracker-done` | Step 7.8 — tracker comment, close, board `done` | run | run — one writer; develop-bug Part B4 verifies rather than repeats |
+
+A skipped step logs `skipped — bug mode (\`key\`)` in the running summary's Verification Complete
+block, so the file says which steps did not run and why, rather than reading as if they never existed.
 
 ### Step 0: Initialize Task List and Create Running Summary File
 
@@ -82,6 +140,7 @@ Before starting any verification, also create a co-located running summary file 
 2. **Create running summary file:**
    - File name format (stories): `story.{epic}.{story}.dod.{num}.{story-name}.md` — `{num}` starts at 1, increment if re-running finalise
    - File name format (tasks): `task.{id}.dod.{num}.{task-name}.md`
+   - File name format (bugs): `{bug-prefix}.dod.{num}.{bug-name}.md` — the prefix is the bug id `bug-doc.js` reports (`bug.13`, `story.7.4.bug.4`, `task.67.bug.3`)
    - Full path: `{story-directory}/story.{epic}.{story}.dod.{num}.{story-name}.md`
    - Initialize with header and timestamp
 
@@ -103,6 +162,8 @@ Before starting any verification, also create a co-located running summary file 
    ```
 
 4. **Use Write tool to create the file**
+
+**Bug mode (`running-summary`):** run — create the file from `assets/bug-dod-template.md` instead of the header above: its header block (Bug, Verification Started, PR, Mode) replaces the story/task one, and Steps 3d and 7 fill its `{placeholders}` section by section. The template is the shape bug.13 and bug.14's hand-written DoDs converged on, lifted rather than designed; it carries no `**Status:**` header line for the same reason the story/task header does not.
 
 > **The header carries no `**Status:**` line, and that is deliberate (task.115, obs #57).** This
 > file's status is written exactly once, as `**Final Status:**` in the `## Verification Complete`
@@ -149,6 +210,8 @@ docs/tasks/task.90.swagger-cli-plugin-enablement/
 3. Parse YAML frontmatter to extract current status and metadata
 4. Extract acceptance criteria, PR references, and documentation notes from the body
 
+**Bug mode (`read-document`):** run — the document is a bug report, and it comes in two shapes: YAML frontmatter, or a `**Bug ID**:` / `**Status**:` header block with no frontmatter at all. Read it through `node references/bug-doc.js --file "$DOC_FILE"` (the same reader `ensure-bug-github-issue` and the syncs use) rather than by frontmatter grep; the JSON carries `mode`, `bug_id`, `status`, `severity`, `priority`, `github_issue` / `jira_key` and `pr_number`. There are no acceptance criteria to extract — the bug's one "criterion" is its `**Expected Behavior**` line, which the fix-evidence agent reads.
+
 ### Step 2: Check for and Review QA Reports
 
 Before proceeding with manual DoD verification, check if QA reports and gate files exist in the story/task directory. These provide comprehensive quality assessments that inform the finalisation decision.
@@ -159,6 +222,8 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
    - Use Glob to find QA report files: `{story-directory}/*.qa.*.md`
    - Use Glob to find gate files: `{story-directory}/*.gate.*.yml`
    - If multiple reports exist, review the most recent one (highest number in filename)
+
+   **Bug mode (`qa-reports`):** run — expect **none**. A bug directory carries no gate file: the develop-bug verify loop writes no gate, so `qa-cycle.sh` refuses on it and `*.gate.*.yml` matches nothing. That is the normal case, not a gap. The QA record is the bug file's `#### QA Verification` on its last iteration (`**Verification Result**: ✅ Fixed`) and the implementation report's `## QA Iteration History`; summarise those in the template's Step 1 block. When a bug directory *does* hold a QA report or gate (a task bug reviewed with `/qa-task`), read it exactly as on the story/task path.
 
 2. **Ignore prior-run acceptance blocks in the document body — they are history, not evidence.**
 
@@ -376,6 +441,10 @@ Read each prompt file to get the template, substitute the placeholder values, th
 
 Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RESULT`, `DOCS_RESULT`.
 
+**Bug mode (`ac-agent`):** skip — a bug report has no acceptance criteria, so agent 1's prompt has nothing to trace. Its slot is taken by the fix-evidence agent below; still four agents, still one message.
+
+**Bug mode (`fix-evidence`):** run — dispatch `references/finalise-dod-fix-evidence-prompt.md` as agent 1 with `<BUG_FILE>`, `<PR_NUMBER>`, `<DIFF_FILE>` and `<IMPL_REPORT>` (the newest `{bug-prefix}.implementation.*.md` beside the bug, or empty). It checks the five things a bug fix must show — the expected behaviour is implemented, a regression test asserts it *and runs per PR*, the test is recorded red without the fix, a new guard states its scope, bundled copies match their source — and returns `fix_evidence:` YAML in the same PASS/FAIL-with-citation contract as `ac_traceability:`. Capture it **as `AC_RESULT`** so Steps 3c–6 read one variable: `AC_OVERALL` is `fix_evidence.overall`, and the Step 6 column "All Acceptance Criteria Met?" reads "all fix-evidence checks PASS". `STORY_TYPE` is `bug` for the other three agents, which need no bug variant.
+
 > **`SECURITY_RESULT` carries a `boundary:` flag and, when it is true, `probes_executed:` and `probes[]`.**
 > `boundary: true` means the security agent's Step 1b identified a **boundary deliverable** — a predicate,
 > validator, classifier or allow/deny-list — and it then generated candidate inputs, **executed** them
@@ -408,7 +477,7 @@ After all 4 agents complete, parse each YAML result. Handle agent failures:
 
 Append sections to the running summary file. **One append per section** — not per individual check. Use the Edit tool four times (one per section).
 
-**Append 1 — AC & PR section** (from `AC_RESULT`):
+**Append 1 — AC & PR section** (from `AC_RESULT`; in bug mode this is the template's `## Step 2: Fix Evidence (the bug's "acceptance criteria")` block, one `####` per `fix_evidence.checks[]` entry, and its `### Documentation` list from `fix_evidence.docs[]`):
 
 ```markdown
 ## Step 2: Core Acceptance Criteria & PR Review
@@ -903,6 +972,12 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    ---
    ```
 
+   **Bug mode (`frontmatter-accepted`):** skip — `accepted` is not a bug status (the lifecycle is
+   `new → in-progress → ready-for-qa → closed | reopened`), and the bug's terminal write is
+   `status: closed`, made by develop-bug Step 7 Part B **after** this skill returns. Leave the
+   frontmatter and header block untouched; the Status History row in the next item is the only
+   thing this skill writes into a bug report.
+
 3. **Append the acceptance row to `## Change Log`** — in the **same edit** as the frontmatter
    change above. Acceptance is the single most important event in a document's life; splitting the
    status write from the log write is how one lands without the other.
@@ -932,6 +1007,26 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    `version` set to the bumped minor. It creates the section when the document predates the
    template (for a task, after `## 11. Rollback Plan`) and cannot land the row inside a fenced
    example, which a regex did on task.42/43 (obs #113).
+
+   **Bug mode (`change-log-row`):** skip — **forbidden**, not merely inapplicable. Bug reports are
+   barred from carrying a `## Change Log` (`references/document-change-log.md` §Exclusions;
+   `docs/standards/bug-documents.md`), and `change-log.js` has no `bug` anchor — a writer that
+   reaches for it on a bug file appends the one table the standard forbids, to the end of the file.
+   The rollback trigger for this whole mode is "a Change Log row written to a bug report".
+
+   **Bug mode (`status-history-row`):** run — the bug counterpart of the acceptance row is a
+   `## Status History` row, written through the engine that exists for exactly this purpose:
+
+   ```bash
+   node references/status-history.js --file "$DOC_FILE" \
+     --date "$(date -u +%Y-%m-%d)" --status "{the bug's current status, unchanged}" \
+     --changed-by finalise --notes "DoD verified — {bug-prefix}.dod.{N}.{name}.md"
+   ```
+
+   The `--status` is the bug's **current** status, read back from `bug-doc.js` — this row records
+   that the DoD was verified, not a transition; the `closed` transition is Part B's row. Never
+   hand-author the row: the engine is fence-guarded and finds the real table, which a regex did not
+   on the documents whose examples are pictures of one.
 
 4. **Tick the task registry row** — in the same step, for a **task** only.
 
@@ -977,6 +1072,10 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    speed; it has previously been the path where Step 7 side-effects were quietly skipped, which is
    why this is stated rather than left implied. The CLI takes no mode flag, and a test pins its whole
    argument surface so one cannot be added without that decision being made deliberately.
+
+   **Bug mode (`registry-tick`):** run — call it exactly as above, unconditionally. It reads the
+   document's own kind and answers `not-a-task` without touching any registry; the bug registry (or
+   the parent story/task's Bug Reports table) is written by develop-bug Part B3, not here.
 
 4. **Add DoD Verification Section to Document Body:**
    - Add a "## Definition of Done - PASSED ✅" section to the document
@@ -1039,10 +1138,19 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Add a reference to the detailed running summary file
    - Example: "**Detailed Verification Log:** See `story.311.1.dod.1.example-system.md` for complete verification evidence and timestamps."
 
+   **Bug mode (`body-dod-section`):** skip — items 4 and 5 both. A bug report has no
+   `## Definition of Done` section; its closing record is `## Resolution Summary`, which develop-bug
+   Part B1 writes, and the DoD file is referenced from there. Writing a DoD block into a bug report
+   would put a second verdict in a document whose lifecycle table already carries one.
+
 6. **Generate Sprint Review Summary:**
    - Use the template from `assets/sprint-review-summary-template.md`
    - Fill in all sections with information from the story/task document and PR
    - Save summary as: `{story-directory}/sprint-review-summary.md`
+
+   **Bug mode (`sprint-review`):** skip — a bug fix is reported through its Resolution Summary and
+   the registry row, not a sprint-review artefact; bug.13 and bug.14 both recorded "not generated"
+   here by hand. Nothing below (6a, 6b) may reference `sprint-review-summary.md` on a bug run.
 
 ---
 
@@ -1106,6 +1214,14 @@ standalone.
    CI_HEAD_2=$(git rev-parse HEAD)
    ```
 
+   **Bug mode (`acceptance-commit`):** run — same block, different artefacts. `STEM` is the bug
+   prefix (`bug.13`, `story.7.4.bug.4`, `task.67.bug.3`); the `git add` names **the bug report**
+   (it carries the Status History row from 7.3) and **the DoD file** only — no
+   `sprint-review-summary.md` (skipped, so the pathspec would abort the add), and the registry
+   check is a no-op because the tick answered `not-a-task`. The commit message is
+   `docs(${STEM}): DoD verified — finalise --bug`. Everything else in the block — read the add's
+   exit, never suppress the commit, skip the commit when clean but never the push — holds verbatim.
+
    The `git diff --cached --quiet` guard is in the block, not beside it: the first version said
    "skip the commit when clean" in prose two lines below an unconditional `git commit`, and the prose
    lost (task.115 5c, CR-2). Never reach for `--allow-empty`.
@@ -1128,6 +1244,12 @@ standalone.
 
    `-f` and `ls` answer "does a file exist here"; `git ls-files --error-unmatch` answers "is it
    tracked" and `git show origin/<branch>:<path>` answers "is it on the branch the PR describes".
+
+   **Bug mode (`pushed-assertions`):** run — the loop covers the bug report and `$DOD_PATH` only
+   (no sprint review), and the final `status: accepted` assertion is **replaced** by
+   `git show "origin/${BRANCH}:$DOD_PATH" | grep -q '^## Verification Complete'` — the bug's
+   frontmatter was deliberately not changed in 7.2, so asserting `accepted` on it would HALT every
+   correct bug run.
    Only the last question is the one a reviewer's PR view will agree with. (These are per-artifact
    on purpose: `references/verify-push-state.sh`, which the orchestrator's Step 8 runs, fails on
    *any* dirty tree — and here the orchestrator's implementation report is legitimately uncommitted
@@ -1137,6 +1259,9 @@ standalone.
    (the GitHub `gh pr view … statusCheckRollup` form or the Bitbucket pipelines form — same code,
    same `PENDING`/`NONE`/`CANCELLED`/`UNKNOWN` semantics) against the PR, whose head is now
    `CI_HEAD_2`, and **resolve it before any side-effect below fires**:
+
+   **Bug mode (`ci-reading-2`):** run — unchanged. The acceptance head is the commit 6a pushed,
+   whatever it staged.
 
    ```bash
    # Confirm the PR head IS the commit just pushed — never gate one commit and read another.
@@ -1297,6 +1422,10 @@ POLLEOF
 
 7. **Add Canonical PR Comment (idempotent via marker):**
 
+   **Bug mode (`pr-comment`):** run — unchanged. The `FINAL_GATE` slot reads the verify loop's
+   verdict (`PASS` on cycle N) since there is no gate file, and `DOD_PATH` is the bug DoD.
+
+
    **PR-comment authorship contract**:
 
    | Skill      | Owns                                                                                                      |
@@ -1423,6 +1552,12 @@ POLLEOF
    **Failure handling**: All `⚠️` paths are non-blocking. The implementation report in git is the durable audit trail.
 
 8. **Move Tracker Issue to Done:**
+
+   **Bug mode (`tracker-done`):** run — the whole item, unchanged: the Document-link re-point, the
+   `done` comment, the close / Done transition, the board `done` stage. The bug's tracker issue is
+   the one `ensure-bug-github-issue` / `ensure-bug-jira-issue` linked (`github_issue` / `jira_key`
+   from `bug-doc.js`). This is the **one writer** for the bug's tracker close; develop-bug Step 7
+   Part B4 reads the issue state back and repeats a step only when this one reports it did not land.
 
    **Detect tracker platform** — resolver already sourced above (`TRACKER` is set):
    - When `TRACKER=jira` → **Jira path**

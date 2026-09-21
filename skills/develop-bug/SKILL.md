@@ -223,7 +223,7 @@ See [`references/develop-bug-step-5-6-verify-loop.md`](references/develop-bug-st
 
 ### Step 7: Finalise & Close Bug
 
-See [`references/develop-bug-step-7-close-bug.md`](references/develop-bug-step-7-close-bug.md): invoke `/finalise` against the bug file for the DoD checks, then run the **bug-close routine** — write `## Resolution Summary` (Final Status, Total Iterations, Time to Resolution, Final Fix Details, Lessons Learned), set bug frontmatter `status: closed` + body `**Status:** ✅ Closed`, add the final Status History row, and update parent linkage per mode:
+See [`references/develop-bug-step-7-close-bug.md`](references/develop-bug-step-7-close-bug.md): invoke `/finalise --bug` against the bug file for the fix-evidence DoD (the mode skips the Change Log row, `status: accepted` and the sprint review by a list stated once in `finalise`), then run the **bug-close routine** — write `## Resolution Summary` (Final Status, Total Iterations, Time to Resolution, Final Fix Details, Lessons Learned), set bug frontmatter `status: closed` + body `**Status:** ✅ Closed`, add the final Status History row, and update parent linkage per mode:
 
 - **Story bug** → move the bug to **Closed Bugs** in the parent story's `## Bug Reports`; if it was the parent's only open bug, restore the parent story status from `Reopened`.
 - **Task bug** → mark the bug ✅ Closed in the parent task's Bug Reports list.
@@ -342,6 +342,6 @@ If a situation arises that is not in this table or the shared defaults table and
 - `/create-branch` — Step 1
 - `/review-bug` — Step 2 (fix-readiness gate; also runnable standalone before this pipeline)
 - `/qa-fix` — Step 6 (fix engine within the verify loop; also updates the bug file)
-- `/finalise` — Step 7
+- `/finalise --bug` — Step 7
 - `/commit-changes` — Step 8
 - `/develop-task`, `/develop-story` — sibling orchestrators for tasks and stories
