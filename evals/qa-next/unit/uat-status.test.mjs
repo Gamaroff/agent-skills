@@ -26,8 +26,16 @@ const TOOL = path.resolve(
   __dirname,
   "../../../skills/qa-next/scripts/uat-status.mjs",
 );
-const { parseTracker, nextItem, checkTracker, scoreboard, STATES } =
-  await import(TOOL);
+const {
+  parseTracker,
+  nextItem,
+  checkTracker,
+  scoreboard,
+  parseFindings,
+  checkFindings,
+  isOpenFinding,
+  STATES,
+} = await import(TOOL);
 
 const RUN = "[2026-09-21-lan-7.5](runs/2026-09-21-lan-7.5.md)";
 const TRACKER = `
@@ -336,4 +344,134 @@ test("CLI: a missing surfaces file is scaffolded from the template and the run s
   assert.equal(code, 2);
   assert.match(out, /a template was written there/);
   assert.ok(existsSync(path.join(root, "docs/qa/uat-surfaces.json")));
+});
+
+// ---------- findings ----------
+
+const RUN_FILE = `# UAT run — 7.5
+
+## Items
+
+### D.7.5.1 Score
+
+- **Result:** pass
+
+## Verdict
+
+All items passed.
+
+## Findings
+
+Prose before the table is ignored, as are the header and separator rows.
+
+| # | Where | What was observed | Severity | Filed as |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | /health | body has no redis field | Minor | note |
+| 2 | /u/nobody | 500 instead of 404 | Major | [bug.3.x](../../bugs/bug.3.x/bug.3.x.md) |
+
+## After
+
+| 9 | not | a finding | Trivial | note |
+`;
+
+test("parseFindings reads only the Findings table; a link becomes bug, anything else is a note", () => {
+  const f = parseFindings(RUN_FILE);
+  assert.deepEqual(
+    f.map((x) => [x.n, x.where, x.severity, x.bug]),
+    [
+      [1, "/health", "Minor", null],
+      [2, "/u/nobody", "Major", "../../bugs/bug.3.x/bug.3.x.md"],
+    ],
+    "the row under a later heading is not a finding",
+  );
+  assert.equal(f[0].what, "body has no redis field");
+  assert.deepEqual(parseFindings("# run\n\n## Findings\n\n_None._\n"), []);
+  assert.deepEqual(parseFindings("# run\n\n## Verdict\n\nok\n"), []);
+});
+
+test("checkFindings names a finding whose bug link does not resolve; open = note or non-closed bug", () => {
+  const rows = [
+    { run: "runs/a.md", n: 1, bug: null, bugStatus: null },
+    { run: "runs/a.md", n: 2, bug: "../../bugs/b.md", bugStatus: "missing" },
+    { run: "runs/b.md", n: 1, bug: "../../bugs/c.md", bugStatus: "closed" },
+    { run: "runs/b.md", n: 2, bug: "../../bugs/d.md", bugStatus: "new" },
+  ];
+  assert.deepEqual(checkFindings(rows), [
+    "runs/a.md finding 2: bug file not found: ../../bugs/b.md",
+  ]);
+  assert.deepEqual(rows.map(isOpenFinding), [true, true, false, true]);
+});
+
+test("CLI: --findings aggregates open findings across run files; --check fails on a dangling bug link", () => {
+  const root = corpus();
+  run(root, "--init");
+  const runs = path.join(root, "docs/qa/runs");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.closed.md"),
+    "---\ntype: bug\nstatus: closed\n---\n",
+  );
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.2.open.md"),
+    "---\ntype: bug\nstatus: new\n---\n",
+  );
+  const table = (rows) =>
+    `# run\n\n## Findings\n\n| # | Where | What was observed | Severity | Filed as |\n| :--- | :--- | :--- | :--- | :--- |\n${rows.join("\n")}\n`;
+  writeFileSync(
+    path.join(runs, "2026-09-21-lan-7.1.md"),
+    table([
+      "| 1 | /health | no redis field | Minor | note |",
+      "| 2 | /u/x | 500 | Major | [bug.1.closed](../../bugs/bug.1.closed.md) |",
+    ]),
+  );
+  writeFileSync(
+    path.join(runs, "2026-09-22-lan-7.5.md"),
+    table([
+      "| 1 | /play | toast fires twice | Minor | [bug.2.open](../../bugs/bug.2.open.md) |",
+    ]),
+  );
+  writeFileSync(path.join(runs, "notes.txt"), "not a run file");
+
+  const open = JSON.parse(run(root, "--findings", "--json").out);
+  assert.deepEqual(
+    open.map((f) => [f.run, f.n, f.bugStatus]),
+    [
+      ["runs/2026-09-21-lan-7.1.md", 1, null],
+      ["runs/2026-09-22-lan-7.5.md", 1, "new"],
+    ],
+    "the closed bug's finding is not open; runs are oldest first",
+  );
+  assert.equal(
+    JSON.parse(run(root, "--findings", "--all", "--json").out).length,
+    3,
+  );
+  const text = run(root, "--findings").out;
+  assert.match(
+    text,
+    /^runs\/2026-09-21-lan-7\.1\.md\n {3}1 {2}Minor {4}\/health — no redis field {2}\[note\]$/m,
+  );
+  assert.match(text, /\[bug\.2\.open \(new\)\]/);
+  assert.match(
+    text,
+    /^findings: 2 open \(1 unfiled, 1 in open bugs\) · 1 closed — --all to include them$/m,
+  );
+  assert.match(
+    run(root).out,
+    /^findings: 2 open — --findings to list them$/m,
+    "the scoreboard surfaces the count",
+  );
+  assert.equal(run(root, "--check").code, 0);
+
+  writeFileSync(
+    path.join(runs, "2026-09-23-lan-31.1.md"),
+    table([
+      "| 1 | /x | gone | Trivial | [bug.9.gone](../../bugs/bug.9.gone.md) |",
+    ]),
+  );
+  const check = run(root, "--check");
+  assert.equal(check.code, 1);
+  assert.match(
+    check.out,
+    /\[ERROR\] runs\/2026-09-23-lan-31\.1\.md finding 1: bug file not found: \.\.\/\.\.\/bugs\/bug\.9\.gone\.md/,
+  );
 });

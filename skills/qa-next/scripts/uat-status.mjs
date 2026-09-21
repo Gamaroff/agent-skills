@@ -15,6 +15,7 @@
 //   node uat-status.mjs --set <id> <state> --run <path> [--bug <path>] [--note "..."]
 //   node uat-status.mjs --verified <id> "<items>"      fill the Verified-by cell
 //   node uat-status.mjs --accept <id> [--note "..."]   🟡 pass → ✅ accepted — the owner's command
+//   node uat-status.mjs --findings [--all] [--json]    open findings across every run file
 //
 // Paths: --root <dir> (default: cwd) · --tracker <path> (default docs/qa/uat-tracker.md) ·
 // --surfaces <path> (default: uat-surfaces.json beside the tracker) · --stories <dir> (default docs/prd).
@@ -219,7 +220,7 @@ function renderTracker(opts, cfg, stories, today) {
     "",
     `**Rules** (enforced by \`${tool} --check\`): 🟡 / ✅ / ❌ need a **Last run** link into \`runs/\`; ❌ needs a bug link in **Notes**; ⏸ and ➖ need a note; every live story has exactly one row. Rows are hand-movable between surfaces; \`--sync\` only appends, never moves.`,
     "",
-    `**Tooling:** \`${tool}\` (scoreboard) · \`--next\` (the \`/qa-next\` selector) · \`--set <id> <state> --run <path>\` · \`--verified <id> "<items>"\` · \`--accept <id>\` · \`--sync\` · \`--check\`. Surface checklists live beside this file as \`qa.<letter>.<slug>.md\`; per-run results under \`runs/\`.`,
+    `**Tooling:** \`${tool}\` (scoreboard) · \`--next\` (the \`/qa-next\` selector) · \`--set <id> <state> --run <path>\` · \`--verified <id> "<items>"\` · \`--accept <id>\` · \`--sync\` · \`--check\` · \`--findings\` (open findings across every run). Surface checklists live beside this file as \`qa.<letter>.<slug>.md\`; per-run results under \`runs/\`, each with a Findings table for what was seen beyond the items themselves.`,
     "",
   ];
   for (const { letter, title } of cfg.surfaces) {
@@ -373,6 +374,73 @@ export function checkTracker({ sections }, stories, exists = () => true) {
   return { errors, warns };
 }
 
+// ---------- findings ----------
+//
+// A run file's `## Findings` table holds what was seen that is not an item's own result — a rough
+// edge on a passing story, a defect on another surface, a harness fault. Parsed here so
+// `--findings` can list them across every run and `--check` can prove their bug links resolve.
+
+const FINDING_ROW = /^\|\s*(\d+)\s*\|(.*)\|(.*)\|(.*)\|(.*)\|\s*$/;
+const BUG_CLOSED = /^(closed|done|fixed|resolved)$/i;
+
+export function parseFindings(text) {
+  const lines = text.split("\n");
+  const start = lines.findIndex((l) => /^## Findings\s*$/.test(l));
+  if (start < 0) return [];
+  const out = [];
+  for (const line of lines.slice(start + 1)) {
+    if (/^## /.test(line)) break;
+    const m = line.match(FINDING_ROW);
+    if (!m) continue;
+    const [, n, where, what, severity, filed] = m;
+    const link = filed.match(/\[[^\]]*\]\(([^)]+)\)/);
+    out.push({
+      n: Number(n),
+      where: where.trim(),
+      what: what.trim(),
+      severity: severity.trim(),
+      filedAs: filed.trim(),
+      bug: link ? link[1] : null,
+    });
+  }
+  return out;
+}
+
+// Every finding in every run file, oldest run first. `bug` is relative to the run file; `bugStatus`
+// is the bug's frontmatter status, `missing` when the link does not resolve, null for a note.
+function loadFindings(opts) {
+  const runsDir = join(opts.root, opts.trackerDir, "runs");
+  if (!existsSync(runsDir)) return [];
+  const out = [];
+  for (const name of readdirSync(runsDir).sort()) {
+    if (!name.endsWith(".md")) continue;
+    const run = join("runs", name);
+    for (const f of parseFindings(readFileSync(join(runsDir, name), "utf8"))) {
+      let bugStatus = null;
+      if (f.bug) {
+        const p = join(runsDir, f.bug);
+        bugStatus = existsSync(p)
+          ? (frontmatter(readFileSync(p, "utf8")).status ?? "")
+          : "missing";
+      }
+      out.push({ ...f, run, bugStatus });
+    }
+  }
+  return out;
+}
+
+export function isOpenFinding(f) {
+  return f.bugStatus === null || !BUG_CLOSED.test(f.bugStatus);
+}
+
+// Pure: a finding whose bug link does not resolve is an error — the row claims a record that
+// does not exist, which is the one thing the Findings table must never do.
+export function checkFindings(findings) {
+  return findings
+    .filter((f) => f.bugStatus === "missing")
+    .map((f) => `${f.run} finding ${f.n}: bug file not found: ${f.bug}`);
+}
+
 function cmdCheck(opts) {
   const cfg = requireSurfaces(opts);
   const exists = (rel) => existsSync(join(opts.root, opts.trackerDir, rel));
@@ -381,12 +449,35 @@ function cmdCheck(opts) {
     loadStories(opts, cfg),
     exists,
   );
+  errors.push(...checkFindings(loadFindings(opts)));
   for (const w of warns) console.log(`[warn ] ${w}`);
   for (const e of errors) console.log(`[ERROR] ${e}`);
   console.log(
     `uat-check: ${errors.length} error(s), ${warns.length} warning(s)`,
   );
   process.exitCode = errors.length ? 1 : 0;
+}
+
+function cmdFindings(opts) {
+  const all = loadFindings(opts);
+  const shown = opts.has("--all") ? all : all.filter(isOpenFinding);
+  if (opts.has("--json")) return console.log(JSON.stringify(shown, null, 2));
+  let run = null;
+  for (const f of shown) {
+    if (f.run !== run) console.log((run = f.run));
+    const filed =
+      f.bugStatus === null
+        ? "note"
+        : `${basename(f.bug).replace(/\.md$/, "")} (${f.bugStatus})`;
+    console.log(
+      `  ${String(f.n).padStart(2)}  ${f.severity.padEnd(7)}  ${f.where} — ${f.what}  [${filed}]`,
+    );
+  }
+  const open = all.filter(isOpenFinding);
+  const unfiled = open.filter((f) => f.bugStatus === null).length;
+  console.log(
+    `findings: ${open.length} open (${unfiled} unfiled, ${open.length - unfiled} in open bugs) · ${all.length - open.length} closed${opts.has("--all") ? "" : " — --all to include them"}`,
+  );
 }
 
 export function nextItem({ sections }) {
@@ -552,6 +643,8 @@ function cmdScoreboard(opts) {
       ? `next: ${next.id} — ${next.title} (${next.surface})`
       : "next: nothing untested",
   );
+  const open = loadFindings(opts).filter(isOpenFinding).length;
+  if (open) console.log(`findings: ${open} open — --findings to list them`);
 }
 
 export function main(argv) {
@@ -572,6 +665,7 @@ function dispatch(opts) {
   if (opts.has("--set")) return cmdSet(opts);
   if (opts.has("--verified")) return cmdVerified(opts);
   if (opts.has("--accept")) return cmdAccept(opts);
+  if (opts.has("--findings")) return cmdFindings(opts);
   return cmdScoreboard(opts);
 }
 

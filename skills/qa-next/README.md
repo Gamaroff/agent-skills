@@ -25,12 +25,19 @@
 ## The owner's three commands
 
 ```bash
-node .agents/skills/qa-next/scripts/uat-status.mjs                 # scoreboard + next item
+node .agents/skills/qa-next/scripts/uat-status.mjs                 # scoreboard + next item + open-findings count
 node .agents/skills/qa-next/scripts/uat-status.mjs --accept 7.5    # 🟡 → ✅ (only from 🟡)
 node .agents/skills/qa-next/scripts/uat-status.mjs --check         # is the tracker telling the truth?
+node .agents/skills/qa-next/scripts/uat-status.mjs --findings      # everything the loop has seen that nobody has closed
 ```
 
 Read the run file before accepting — `runs/<date>-<env>-<id>.md` is the evidence; the 🟡 is only the summary.
+
+## Findings — what a pass does not tell you
+
+A story's verdict answers one question: did its checklist items hold. Most of what UAT actually turns up is not that — a broken link on the way to the item, a contrast defect, a toast that fires twice, a 500 on a page the story never mentions. Every run file therefore ends with a **Findings** table (where · what was observed · severity · filed as), written on passes as much as fails, and each row is filed as a bug at record time: story mode when it is about the story under test, general mode (`docs/bugs/`) when it belongs elsewhere. A row a stranger could not reproduce stays `note` — the row is the record.
+
+`--findings` walks every run file and lists the open rows: the `note`s, plus those whose bug is not yet `closed` (`--all` includes the closed ones, `--json` for tooling). `--check` fails on a `Filed as` link that does not resolve, so the table can never claim a bug that is not there. There is no separate findings document to maintain — the list is derived from the run files, which is why it cannot drift from them.
 
 ## Operating modes
 
