@@ -86,7 +86,7 @@ apply to a bug?" a lookup instead of a judgement.
 | --- | --- | --- | --- |
 | `running-summary` | Step 0 — running summary file | run | run — `{bug-prefix}.dod.{N}.{name}.md` from `assets/bug-dod-template.md` |
 | `read-document` | Step 1 — read the document | run | run — the bug report, frontmatter or header block (`references/bug-doc.js`) |
-| `qa-reports` | Step 2 — QA reports and gate | run | run — none expected; the verify loop's `#### QA Verification` and the implementation report are the QA record |
+| `qa-reports` | Step 2 — QA reports and gate | run | run — globs scoped to `${STEM}` (a co-located bug must not read its parent's); none expected; the verify loop's `#### QA Verification` and the implementation report are the QA record |
 | `ac-agent` | Step 3b — AC traceability agent | run | **skip** — a bug has no ACs; the `fix-evidence` agent takes its slot |
 | `fix-evidence` | Step 3b — fix-evidence agent | — | run — `references/finalise-dod-fix-evidence-prompt.md` |
 | `frontmatter-accepted` | Step 7.2 — `status: accepted` | run | **skip** — `accepted` is not a bug status; develop-bug Part B writes `closed` |
@@ -98,7 +98,7 @@ apply to a bug?" a lookup instead of a judgement.
 | `acceptance-commit` | Step 7.6a — acceptance commit + push | run | run — stages the DoD file and the bug report (its Status History row); no sprint review |
 | `pushed-assertions` | Step 7.6b — tracked-and-pushed | run | run — the DoD file and the bug report; no `status: accepted` assertion |
 | `ci-reading-2` | Step 7.6c — CI reading 2 | run | run |
-| `pr-comment` | Step 7.7 — canonical PR comment | run | run |
+| `pr-comment` | Step 7.7 — canonical PR comment | run | run — `DOD_PATH` on `${STEM}`, `FINAL_GATE` from the verify-loop verdict |
 | `tracker-done` | Step 7.8 — tracker comment, close, board `done` | run | run — one writer; develop-bug Part B4 verifies rather than repeats |
 
 A skipped step logs `skipped — bug mode (\`key\`)` in the running summary's Verification Complete
@@ -227,7 +227,18 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
    - Use Glob to find gate files: `{story-directory}/*.gate.*.yml`
    - If multiple reports exist, review the most recent one (highest number in filename)
 
-   **Bug mode (`qa-reports`):** run — expect **none**. A bug directory carries no gate file: the develop-bug verify loop writes no gate, so `qa-cycle.sh` refuses on it and `*.gate.*.yml` matches nothing. That is the normal case, not a gap. The QA record is the bug file's `#### QA Verification` on its last iteration (`**Verification Result**: ✅ Fixed`) and the implementation report's `## QA Iteration History`; summarise those in the template's Step 1 block. When a bug directory *does* hold a QA report or gate (a task bug reviewed with `/qa-task`), read it exactly as on the story/task path.
+   **Bug mode (`qa-reports`):** run — but **scope both globs to the bug's own stem**:
+   `{story-directory}/${STEM}.qa.*.md` and `{story-directory}/${STEM}.gate.*.yml`, where `STEM` is
+   the bug prefix `bug-doc.js` reports (`bug.13`, `story.7.4.bug.4`, `task.67.bug.3`). A story or
+   task bug lives in its **parent's** directory, and the directory-wide globs above return the
+   parent's `task.67.qa.1` / `task.67.gate.2` — another work item's QA record, not the bug's
+   (TASK-125-BUG-9). Expect **none**: the develop-bug verify loop writes no gate, so `qa-cycle.sh`
+   refuses on it and the stem-scoped glob matches nothing. That is the normal case, not a gap. The
+   QA record is the bug file's `#### QA Verification` on its last iteration
+   (`**Verification Result**: ✅ Fixed`) and the implementation report's `## QA Iteration History`;
+   bind `VERIFY_VERDICT` from that history's last `**Verdict**:` line (6b reads it) and summarise
+   both in the template's Step 1 block. When a bug's **own** stem *does* match a QA report or gate
+   (a task bug reviewed with `/qa-task`), read it exactly as on the story/task path.
 
 2. **Ignore prior-run acceptance blocks in the document body — they are history, not evidence.**
 
@@ -1175,7 +1186,7 @@ standalone.
 
    ```bash
    BRANCH=$(git rev-parse --abbrev-ref HEAD)
-   STEM="{story.{epic}.{story} | task.{id}}"   # the work item's filename stem
+   STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"   # the work item's filename stem
 
    # Exactly the acceptance artefacts. The implementation report is NOT staged here — the
    # orchestrator's Step 8 owns its final commit, and staging it would split its history.
@@ -1426,8 +1437,11 @@ POLLEOF
 
 7. **Add Canonical PR Comment (idempotent via marker):**
 
-   **Bug mode (`pr-comment`):** run — unchanged. The `FINAL_GATE` slot reads the verify loop's
-   verdict (`PASS` on cycle N) since there is no gate file, and `DOD_PATH` is the bug DoD.
+   **Bug mode (`pr-comment`):** run — the 6b block below keys `DOD_PATH` on `${STEM}` (the bug
+   prefix) and, under `DOC_KIND=bug`, sets `FINAL_GATE` from `VERIFY_VERDICT` (bound in Step 2 from
+   the verify loop's last `**Verdict**`) instead of globbing gates. Both branches are in the block
+   itself, not in this note — a directory-wide glob here published a co-located bug's PARENT
+   artefacts as the bug's (TASK-125-BUG-8).
 
 
    **PR-comment authorship contract**:
@@ -1457,9 +1471,21 @@ POLLEOF
 
    ```bash
    MARKER="<!-- finalise-canonical-summary -->"
-   DOD_PATH=$(ls {document-directory}/*.dod.*.md 2>/dev/null | sort | tail -1)
-   FINAL_GATE=$(ls {document-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
-     | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $(2)}' || echo "N/A")
+   # Keyed on the work item's own STEM, never a directory-wide glob. A story or
+   # task bug lives in its PARENT's directory: `task.67.dod.1.*` sorts after
+   # `task.67.bug.3.dod.1.*` and the parent's gate is the only gate there, so
+   # `*.dod.*.md | sort | tail -1` published the parent's DoD path and gate
+   # verdict as the bug's (TASK-125-BUG-8). STEM is bound at 6a.
+   DOD_PATH=$(ls {document-directory}/${STEM}.dod.*.md 2>/dev/null | sort | tail -1)
+   if [ "$DOC_KIND" = "bug" ]; then
+     # A bug has no gate file; its verdict is the develop-bug verify loop's
+     # (`**Verdict**: PASS` on the last cycle of the implementation report's
+     # QA Iteration History). Bound in Step 2 as VERIFY_VERDICT.
+     FINAL_GATE="${VERIFY_VERDICT:-N/A}"
+   else
+     FINAL_GATE=$(ls {document-directory}/${STEM}.gate.*.yml 2>/dev/null | sort | tail -1 \
+       | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $(2)}' || echo "N/A")
+   fi
 
    # The plain-language lead. It goes BELOW the marker and above everything
    # else — see the warning under Step 6c. `done` is the same stage the tracker

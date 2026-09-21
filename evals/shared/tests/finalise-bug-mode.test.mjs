@@ -25,7 +25,14 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import {
+  readFileSync,
+  existsSync,
+  mkdtempSync,
+  writeFileSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -174,11 +181,9 @@ test("every prose marker has a table row — a skip the table does not admit to 
 
 test("the Change Log skip is grounded in the spec's own exclusion, not restated", () => {
   const spec = readFileSync(CHANGE_LOG_SPEC, "utf8");
-  const exclusions = spec.slice(spec.indexOf("Exclusions"));
-  assert.ok(
-    exclusions.length > 0,
-    "document-change-log.md carries an Exclusions section",
-  );
+  const at = spec.indexOf("Exclusions");
+  assert.ok(at > -1, "document-change-log.md carries an Exclusions section");
+  const exclusions = spec.slice(at);
   assert.match(exclusions, /bug report/i, "§Exclusions names bug reports");
   const row = rows.find((r) => r.key === "change-log-row");
   assert.match(
@@ -359,6 +364,84 @@ for (const shell of SHELLS) {
     }
   });
 }
+
+// The 6b derivation is bash, so it is EXECUTED over a fixture directory that
+// holds a PARENT task's DoD and gate beside a task BUG's DoD — the layout
+// docs/tasks/task.67.* actually has. QA cycle 2 found the directory-wide glob
+// picking the parent's files (`.b` sorts before `.d`) (TASK-125-BUG-8).
+function derivationBlock() {
+  const i = skill.indexOf('MARKER="<!-- finalise-canonical-summary -->"');
+  const j = skill.indexOf("# The plain-language lead", i);
+  assert.ok(i > -1 && j > i, "the 6b derivation lines are present");
+  return (
+    skill
+      .slice(i, j)
+      .replace(/^ {3}/gm, "")
+      .replace(/\{document-directory\}/g, '"$DIR"') +
+    '\nprintf "DOD_PATH=%s\\nFINAL_GATE=%s\\n" "$DOD_PATH" "$FINAL_GATE"\n'
+  );
+}
+for (const shell of SHELLS) {
+  test(`[${shell}] 6b, executed: a co-located task bug's DoD and verdict are its OWN, not its parent's`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-6b-"));
+    try {
+      for (const f of ["task.67.dod.1.parent.md", "task.67.bug.3.dod.1.fix.md"])
+        writeFileSync(path.join(dir, f), "");
+      writeFileSync(
+        path.join(dir, "task.67.gate.2.parent.yml"),
+        "gate: FAIL\n",
+      );
+      const run = (env) =>
+        spawnSync(shell, ["-s"], {
+          input: derivationBlock(),
+          encoding: "utf8",
+          env: { PATH: process.env.PATH, DIR: dir, ...env },
+        });
+      // Bug mode: the bug's stem, the verify loop's verdict.
+      let r = run({
+        STEM: "task.67.bug.3",
+        DOC_KIND: "bug",
+        VERIFY_VERDICT: "PASS",
+      });
+      assert.equal(r.status, 0, r.stderr);
+      assert.match(
+        r.stdout,
+        /DOD_PATH=.*\/task\.67\.bug\.3\.dod\.1\.fix\.md$/m,
+        r.stdout,
+      );
+      assert.match(
+        r.stdout,
+        /^FINAL_GATE=PASS$/m,
+        "the verify-loop verdict, never the parent's gate",
+      );
+      // Task mode in the same directory: the parent's own artefacts.
+      r = run({ STEM: "task.67", DOC_KIND: "task" });
+      assert.equal(r.status, 0, r.stderr);
+      assert.match(r.stdout, /DOD_PATH=.*\/task\.67\.dod\.1\.parent\.md$/m);
+      assert.match(r.stdout, /^FINAL_GATE=FAIL$/m);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("Step 2's bug-mode marker scopes the QA globs to the bug stem (TASK-125-BUG-9)", () => {
+  const m = skill.match(
+    /\*\*Bug mode \(`qa-reports`\):\*\*[\s\S]*?(?=\n\n\d+\. )/,
+  );
+  assert.ok(m, "qa-reports marker present");
+  assert.match(
+    m[0],
+    /\$\{STEM\}\.qa\.\*\.md/,
+    "QA report glob keyed on the stem",
+  );
+  assert.match(
+    m[0],
+    /\$\{STEM\}\.gate\.\*\.yml/,
+    "gate glob keyed on the stem",
+  );
+  assert.match(m[0], /parent/i, "names the parent-directory hazard");
+});
 
 test("SKILL.md resolves the kind once and hints on a bug path without --bug", () => {
   assert.match(skill, /DOC_KIND=bug/, "the --bug flag sets DOC_KIND");

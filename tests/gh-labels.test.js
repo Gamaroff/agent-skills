@@ -194,7 +194,7 @@ function fencedBash(text) {
   return out;
 }
 
-test("every GitHub label site built from a document field routes through gh_labels_filter", () => {
+test("every --label/--add-label in a block that calls tracker-issue.js routes through gh_labels_filter — fixed labels included", () => {
   const skillsDir = path.join(REPO_ROOT, "skills");
   const offenders = [];
   const routed = new Set();
@@ -203,20 +203,140 @@ test("every GitHub label site built from a document field routes through gh_labe
     if (!fs.existsSync(f)) continue;
     const text = fs.readFileSync(f, "utf8");
     for (const block of fencedBash(text)) {
-      if (/--(add-)?label "(priority|severity):\$\{/.test(block)) {
+      // The population is EVERY label that reaches gh through tracker-issue.js —
+      // a fixed `--label "epic"` fails a create on a repository without that
+      // label by the same mechanism as a cased field (TASK-125-BUG-11).
+      // An ARGUMENT line to the CLI (`  --label "…" \`), not the helper's own
+      // `LABEL_ARGS+=(--label "$l")` collection, which is mid-line.
+      if (
+        /tracker-issue\.js/.test(block) &&
+        /^\s*--(add-)?label "/m.test(block)
+      ) {
         offenders.push(
-          `skills/${name}/SKILL.md: a --label/--add-label built from a document field bypasses gh_labels_filter`,
+          `skills/${name}/SKILL.md: a --label/--add-label reaches tracker-issue.js without gh_labels_filter`,
         );
       }
-      if (/gh_labels_filter .*"(priority|severity):\$\{/.test(block))
+      if (/tracker-issue\.js/.test(block) && /gh_labels_filter /.test(block))
         routed.add(name);
     }
   }
   assert.deepEqual(offenders, []);
-  // Non-vacuity floor: the seven sites that exist today.
+  // Non-vacuity floor: the nine sites that exist today.
   assert.ok(
-    routed.size >= 7,
-    `only ${routed.size} sites route through the helper — expected ≥ 7: ${[...routed].join(", ")}`,
+    routed.size >= 9,
+    `only ${routed.size} sites route through the helper — expected ≥ 9: ${[...routed].join(", ")}`,
+  );
+});
+
+// The sync edits' --remove-label derivation, EXECUTED: the four blocks are
+// textually identical after the helper call, so the sync-github-bug block
+// stands for all four. A fake gh answers `label list` (repo labels) and
+// `issue view` (the issue's current labels); a `node` shim records the argv.
+// With frontmatter `High` and the issue at `priority:high`, the old
+// "different" comparison added and removed the same label (TASK-125-BUG-10).
+function editBlock() {
+  const text = fs.readFileSync(
+    path.join(REPO_ROOT, "skills", "sync-github-bug", "SKILL.md"),
+    "utf8",
+  );
+  const b = fencedBash(text).find(
+    (t) => t.includes("gh_labels_filter") && t.includes("--kind edit"),
+  );
+  assert.ok(b, "sync-github-bug carries the edit block");
+  return b.slice(b.indexOf("source references/gh-labels.sh"));
+}
+function runEdit({ repoLabels, issueLabels, env }) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-edit-"));
+  DIRS.push(dir);
+  const bin = path.join(dir, "bin");
+  fs.mkdirSync(path.join(dir, "references"), { recursive: true });
+  fs.mkdirSync(path.join(dir, ".claude", "state"), { recursive: true });
+  fs.mkdirSync(bin);
+  fs.copyFileSync(HELPER, path.join(dir, "references", "gh-labels.sh"));
+  fs.writeFileSync(path.join(dir, "references", "tracker-issue.js"), "");
+  const q = (arr) => arr.map((l) => JSON.stringify(l)).join(" ");
+  fs.writeFileSync(
+    path.join(bin, "gh"),
+    [
+      "#!/bin/sh",
+      'case "$1 $2" in',
+      `  "label list") printf '%s\\n' ${q(repoLabels)}; exit 0 ;;`,
+      `  "issue view") printf '%s\\n' ${q(issueLabels)}; exit 0 ;;`,
+      "esac; exit 1",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  fs.writeFileSync(
+    path.join(bin, "node"),
+    ["#!/bin/sh", `printf '%s\\n' "$@" > "${dir}/argv.log"`].join("\n"),
+    { mode: 0o755 },
+  );
+  const r = spawnSync("bash", ["-c", editBlock()], {
+    cwd: dir,
+    encoding: "utf8",
+    env: {
+      PATH: `${bin}:/usr/bin:/bin`,
+      ISSUE_NUM: "42",
+      BUG_ID: "bug.9",
+      BUG_TITLE: "t",
+      NEW_BODY: "b",
+      ...env,
+    },
+  });
+  const argv = fs.existsSync(path.join(dir, "argv.log"))
+    ? fs
+        .readFileSync(path.join(dir, "argv.log"), "utf8")
+        .split("\n")
+        .filter(Boolean)
+    : null;
+  return { status: r.status, stderr: r.stderr, argv };
+}
+function flagValues(argv, flag) {
+  const out = [];
+  for (let i = 0; i < argv.length; i++)
+    if (argv[i] === flag) out.push(argv[i + 1]);
+  return out;
+}
+
+test("[remove-label] frontmatter High with the issue already at priority:high → the label is re-added, NOTHING is removed", () => {
+  const r = runEdit({
+    repoLabels: ["bug", "priority:high", "priority:medium"],
+    issueLabels: ["bug", "priority:high"],
+    env: { PRIORITY: "High", SEVERITY: "" },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.argv, "tracker-issue.js was invoked");
+  assert.deepEqual(flagValues(r.argv, "--add-label"), ["priority:high"]);
+  assert.deepEqual(
+    flagValues(r.argv, "--remove-label"),
+    [],
+    "the label just added must not be removed",
+  );
+});
+
+test("[remove-label] a real priority change removes the OLD label and adds the new one", () => {
+  const r = runEdit({
+    repoLabels: ["bug", "priority:high", "priority:medium"],
+    issueLabels: ["bug", "priority:medium"],
+    env: { PRIORITY: "High", SEVERITY: "" },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(flagValues(r.argv, "--add-label"), ["priority:high"]);
+  assert.deepEqual(flagValues(r.argv, "--remove-label"), ["priority:medium"]);
+});
+
+test("[remove-label] when the helper drops the new priority label, nothing is removed either", () => {
+  const r = runEdit({
+    repoLabels: ["bug"],
+    issueLabels: ["bug", "priority:medium"],
+    env: { PRIORITY: "High", SEVERITY: "" },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(flagValues(r.argv, "--add-label"), []);
+  assert.deepEqual(
+    flagValues(r.argv, "--remove-label"),
+    [],
+    "no new label → the old one stays; a strip is not a sync",
   );
 });
 

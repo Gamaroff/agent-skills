@@ -861,8 +861,10 @@ DOC_DIR=$(dirname "$STORY_FILE")
 # The arg is a POSITIVE INTEGER or it is nothing: an unsubstituted `{N}`, a `0`
 # or a `3 ` used verbatim keys a stage `qa-fix-{N}`, which the lead CLI rejects
 # (exit 2) and the `|| exit 1` below turns into an aborted block — a failure the
-# helper path could never produce (TASK-125-BUG-7). Invalid reads as absent.
-case "${FIX_CYCLE_ARG:-}" in ''|0|*[!0-9]*) FIX_CYCLE_ARG='' ;; esac
+# helper path could never produce (TASK-125-BUG-7). Invalid reads as absent;
+# digits are normalised (`007` → `7`, `00` → 0 → absent) so the PR lead and the
+# tracker engine — which rejects a non-positive suffix — agree (cycle-2 CR-5).
+case "${FIX_CYCLE_ARG:-}" in ''|*[!0-9]*) FIX_CYCLE_ARG='' ;; *) FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || FIX_CYCLE_ARG='' ;; esac
 if [ -n "${FIX_CYCLE_ARG:-}" ]; then
   FIX_CYCLE=$FIX_CYCLE_ARG; rc=0
 else
@@ -975,7 +977,7 @@ if [ -n "$FIX_ISSUE" ]; then
   # for the gate-driven path (task.125, obs #122).
   # Positive integer or nothing — same guard as the pull-request block
   # (TASK-125-BUG-7); an invalid value falls through to the helper.
-  case "${FIX_CYCLE_ARG:-}" in ''|0|*[!0-9]*) FIX_CYCLE_ARG='' ;; esac
+  case "${FIX_CYCLE_ARG:-}" in ''|*[!0-9]*) FIX_CYCLE_ARG='' ;; *) FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || FIX_CYCLE_ARG='' ;; esac
   if [ -n "${FIX_CYCLE_ARG:-}" ]; then
     FIX_CYCLE=$FIX_CYCLE_ARG; rc=0
   else

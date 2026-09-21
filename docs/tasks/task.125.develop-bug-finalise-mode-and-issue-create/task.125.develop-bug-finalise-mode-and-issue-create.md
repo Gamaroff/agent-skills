@@ -192,7 +192,7 @@ hint naming the mode).
 
 ### Files to Modify (Core Implementation)
 
-1. ✅ `skills/finalise/SKILL.md` — `--bug` mode
+1. ✅ `skills/finalise/SKILL.md` — `--bug` mode; 6b `DOD_PATH`/`FINAL_GATE` and Step 2 globs keyed on the bug stem (QA cycle 2 — a co-located bug must not publish its parent's artefacts)
 2. ✅ `skills/develop-bug/references/develop-bug-step-7-close-bug.md` — Part A
 3. ✅ `skills/ensure-bug-github-issue/SKILL.md` — Step B5
 4. ✅ `shared/resources/tracker-issue.js` — failure message (both spawn paths: `gh()` and the `--body-file` `withStdin` closure — QA cycle 1); `shared/resources/registry-tick.js` — a `.bug.<N>.` stem is `not-a-task` (QA cycle 1)
@@ -202,7 +202,7 @@ hint naming the mode).
 
 6. ✅ `skills/finalise/assets/bug-dod-template.md`
 6a. ✅ `shared/resources/finalise-dod-fix-evidence-prompt.md` — the agent that takes the AC agent's slot in bug mode (bundled into `skills/finalise/references/`)
-6b. ✅ `shared/resources/gh-labels.sh` (new, QA cycle 1) — `gh_labels_filter`, the one definition of which labels may reach a gh mutation; sourced by the seven GitHub label sites (`ensure-bug/story/task-github-issue`, `sync-github-bug/story/task/epic`) and bundled into each
+6b. ✅ `shared/resources/gh-labels.sh` (new, QA cycle 1) — `gh_labels_filter`, the one definition of which labels may reach a gh mutation; sourced by all nine GitHub label sites (`ensure-bug/story/task/epic-github-issue`, `sync-github-bug/story/task/epic`, `create-issue` — fixed labels included, QA cycle 2) and bundled into each; the four sync edits derive `--remove-label` against the filtered label (QA cycle 2)
 
 ### Files to Modify (Tests)
 
@@ -296,21 +296,21 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-21
-**Quality Score**: 20/100
+**Quality Score**: 50/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.125.qa.1.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.1.develop-bug-finalise-mode-and-issue-create.md)
-- **Gate File**: [task.125.gate.1.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.1.develop-bug-finalise-mode-and-issue-create.yml)
+- **Full Report**: [task.125.qa.2.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.2.develop-bug-finalise-mode-and-issue-create.md)
+- **Gate File**: [task.125.gate.2.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.2.develop-bug-finalise-mode-and-issue-create.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3654 (fast gate) + 92 (targeted suites) + 32 boundary probes + 4 executed prose blocks
+- **Tests Executed**: 3685 (fast gate) + 132 targeted + 20 boundary probes + Step 4b over 9 prose files; every cycle-1 fix re-executed
 - **Phases Verified**: 3/3
-- **Critical Issues**: 1 HIGH (TASK-125-BUG-1), 6 MEDIUM (BUG-2..7), 1 LOW in gate (CR-6)
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 1 HIGH (TASK-125-BUG-8), 3 MEDIUM (BUG-9..11), 1 LOW in gate (CR-5); cycle-1 BUG-1..7 verified FIXED
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-`tracker-issue.js` pipes gh's stderr in `gh()` only; the `withStdin` path every `--body-file` create takes still ignores it (BUG-1, reproduced end-to-end). `gh label list` at the default 30-label page (BUG-2); normalisation at one of nine label sites (BUG-3); `registry-tick` reads a header-block task bug as the task (BUG-4); a general bug without `--bug` resolves `DOC_KIND=""` (BUG-5, executed); a newline value passes `grep -F` (BUG-6, probed); `fix_cycle` unvalidated (BUG-7).
+Cycle 2 refute pass. Cycle-1 fixes hold. finalise 7.7 derives `DOD_PATH`/`FINAL_GATE` with directory-wide globs, so a co-located story/task bug publishes its parent's DoD and gate (BUG-8, HIGH); Step 2 reads the parent's QA artefacts (BUG-9); the four sync edits' `--remove-label` reads an undefined variable that a verbatim-case derivation turns into add-then-remove (BUG-10); the fixed `epic` label bypasses the helper and the guard (BUG-11).
 <!-- change-log-start -->
 ## Change Log
 
@@ -322,7 +322,8 @@ None.
 | 2026-09-21 |  | Status → ready-for-development | review-task |
 | 2026-09-21 |  | Implemented — 3 phases; 11 source files + 20 bundled copies; 4 test files (+19 tests), 9 mutations proved | develop |
 | 2026-09-21 |  | QA gate FAIL (20/100) — 1 HIGH, 6 MEDIUM, 3 LOW; 7 bug reports filed | qa-task |
-| 2026-09-21 |  | QA findings fixed — gate 1 FAIL (20/100) answered: 7 bugs (1 HIGH, 6 MEDIUM) + 3 LOW, 1 iteration; shared gh-labels.sh helper across 7 sites, +31 tests | qa-fix |
+| 2026-09-21 |  | QA findings fixed — gates 1–2 answered: 11 bugs (2 HIGH, 9 MEDIUM) + 7 LOW, 2 iterations; shared gh-labels.sh helper across 9 sites, finalise bug-mode derivations keyed on the stem, +39 tests | qa-fix |
+| 2026-09-21 |  | QA gate 2 FAIL (50/100) — cycle-1 fixes verified; refute pass found 1 HIGH (7.7 globs the parent's DoD/gate), 3 MEDIUM, 4 LOW; 4 bug reports filed | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

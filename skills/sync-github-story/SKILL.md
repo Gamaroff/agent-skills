@@ -163,12 +163,22 @@ source references/gh-labels.sh || exit 1
 LABEL_ARGS=()
 while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--add-label "$l"); done \
   < <(gh_labels_filter "priority:${priority}")
+# The label to REMOVE is computed against the FILTERED new priority label (the
+# line the helper emitted — the repository's case), never the frontmatter value:
+# comparing `priority:High` to the issue's `priority:high` read as "different"
+# and gh received add-then-remove of the same label, stripping it on every
+# re-sync (TASK-125-BUG-10). Empty when nothing changes, so no --remove-label.
+NEW_PRIORITY=$(printf '%s\n' "${LABEL_ARGS[@]}" | grep '^priority:' | head -1)
+OLD_PRIORITY=$(gh issue view "${ISSUE_NUM}" --json labels -q '.labels[].name' 2>/dev/null \
+  | grep '^priority:' | grep -vxF -- "${NEW_PRIORITY:-__none__}" | head -1)
+REMOVE_ARGS=()
+[ -n "$OLD_PRIORITY" ] && [ -n "$NEW_PRIORITY" ] && REMOVE_ARGS=(--remove-label "$OLD_PRIORITY")
 
 node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   --title "[Story ${STORY_E}.${STORY_S}] ${STORY_TITLE}" \
   --body-file .claude/state/issue-body.md \
   "${LABEL_ARGS[@]}" \
-  --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
+  "${REMOVE_ARGS[@]}"
 ```
 
 The body is rebuilt to the **same shape** `ensure-story-github-issue` emits on create — Summary, Acceptance Criteria (capped at 5), Metadata, Document — so create→update is diff-stable. That shape and its caps are specified once, in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md); follow it there rather than restating it here. Two hand-maintained copies of this contract had already drifted apart once.

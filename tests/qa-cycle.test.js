@@ -474,7 +474,7 @@ test("[fix_cycle] a gate on disk + no arg → derived from the gate, unchanged b
   assert.ok(r.argv.includes("qa-fix-5"), JSON.stringify(r.argv));
 });
 
-for (const bad of ["{N}", "0", "3 ", "two", "-1", "007x"]) {
+for (const bad of ["{N}", "0", "00", "000", "3 ", "two", "-1", "007x"]) {
   test(`[fix_cycle] an invalid arg ${JSON.stringify(bad)} reads as ABSENT — helper path, never a qa-fix-${bad} stage (TASK-125-BUG-7)`, () => {
     // Empty dir: the helper refuses, so the block must skip — not abort, not post.
     const r = runQaFixTrackerBlock({ gates: [], fixCycleArg: bad });
@@ -494,10 +494,11 @@ for (const bad of ["{N}", "0", "3 ", "two", "-1", "007x"]) {
   });
 }
 
-test("[fix_cycle] a leading-zero arg is a number the guard keeps — 007 is cycle 007 to the stage, as the caller wrote it", () => {
+test("[fix_cycle] a leading-zero arg is NORMALISED — 007 is cycle 7, so the PR lead and the tracker engine agree (CR-5)", () => {
   const r = runQaFixTrackerBlock({ gates: [], fixCycleArg: "007" });
   assert.equal(r.status, 0, r.stderr);
-  assert.ok(r.argv && r.argv.includes("qa-fix-007"), JSON.stringify(r.argv));
+  assert.ok(r.argv && r.argv.includes("qa-fix-7"), JSON.stringify(r.argv));
+  assert.ok(!r.argv.includes("qa-fix-007"));
 });
 
 test("[fix_cycle] develop-bug's verify loop passes the cycle it already counts", () => {

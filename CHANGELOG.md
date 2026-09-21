@@ -228,7 +228,14 @@ All notable changes to this project will be documented in this file. Format foll
   `registry-tick.js` now answers `not-a-task` for any `.bug.<N>.` stem (a header-block task bug
   matched the task's stem and read as the task); `finalise`'s kind block defaults a general bug run
   without `--bug` to `task` (it resolved to an empty kind); `qa-fix` validates `fix_cycle` as a
-  positive integer inside both blocks.
+  positive integer inside both blocks. **QA cycle 2 (refute pass)** reached the last place the
+  mode's skip table had not: a story or task bug lives in its *parent's* directory, so finalise's
+  directory-wide `*.dod.*.md` / `*.gate.*.yml` globs published the parent's DoD and gate as the
+  bug's — 6b and Step 2 now key on the bug's own stem, with the 6b lines executed by the mode test
+  over a fixture that holds both. The four sync edits define the `--remove-label` they pass
+  (against the filtered label — the old placeholder was assigned nowhere), fixed labels
+  (`epic`, `create-issue`'s) route through the helper too, and the population guard scans every
+  `--label` argument line that reaches `tracker-issue.js`, nine sites today.
 
 - **The resume probe binds its base from every report variant and HALTs when it cannot; the
   detector no longer deletes; who restores is stated once (task 130; PR #436 review CR-1…CR-5,

@@ -37,9 +37,9 @@ after(() => {
   for (const d of DIRS) fs.rmSync(d, { recursive: true, force: true });
 });
 
-// The one fenced bash block that builds LABEL_ARGS — from the `REPO_LABELS=`
-// line to the end of the create call, so the heredoc above it (which needs the
-// document's own values) is not executed.
+// The one fenced bash block that builds LABEL_ARGS — from the `source
+// references/gh-labels.sh` line to the end of the create call, so the heredoc
+// above it (which needs the document's own values) is not executed.
 function labelBlock() {
   const text = fs.readFileSync(SKILL, "utf8");
   const blocks = [];

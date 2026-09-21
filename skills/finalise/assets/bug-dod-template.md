@@ -9,7 +9,7 @@
 
 ## Step 1: QA Report Review
 
-**QA Reports:** {none — a bug directory carries no gate file; the develop-bug verify loop is the QA record: N cycles in the implementation report (`{bug-prefix}.….implementation.{N}.….md` §QA Iteration History), {FAIL → … → PASS}, with the bug file's `#### QA Verification` on the last iteration reading `✅ Fixed` | the co-located `*.qa.*.md` / `*.gate.*.yml` found, summarised}
+**QA Reports:** {none — a bug directory carries no gate file; the develop-bug verify loop is the QA record: N cycles in the implementation report (`{bug-prefix}.….implementation.{N}.….md` §QA Iteration History), {FAIL → … → PASS}, with the bug file's `#### QA Verification` on the last iteration reading `✅ Fixed` | the `{bug-prefix}.qa.*.md` / `{bug-prefix}.gate.*.yml` found (the bug's OWN stem — never the parent's artefacts in the same directory), summarised}
 
 ---
 

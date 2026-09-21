@@ -14,8 +14,10 @@
 # repository's labels are lowercase `priority:*` with no `severity:*` at all — so
 # a frontmatter value passed verbatim (`priority:High`) created nothing and an
 # unattended bug proceeded with no issue (task.125, obs #65). The rule was first
-# written at one of the nine sites; the shared function is what makes it hold at
-# all of them (TASK-125-BUG-3), and `tests/gh-labels.test.js` scans the sites.
+# written at one site; the shared function is what makes it hold at every
+# site (TASK-125-BUG-3) — fixed labels included (BUG-11) — and the population
+# guard in `tests/gh-labels.test.js` scans them so the count never has to be
+# restated here.
 #
 # What it does, per candidate, in order:
 #   1. An EMPTY value (`priority:`, `severity:`, or nothing) is no label — dropped
