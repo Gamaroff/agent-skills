@@ -5,19 +5,20 @@ type: task
 description: "Replace route 2c's 'HIGH 0 throughout' clause with 'the last gate raised no HIGH' — the property the half-cycle actually needs — so a loop whose blockers were each found and fixed inside the loop, and whose last fix closes only non-blocking findings, gets the one gate it is owed instead of a loop-limit HALT and an operator grant."
 tags: [pipeline, qa-loop, routes, develop-task, develop-story]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-21
 assignee:
 estimated_effort_hours: 2
+pr_number: 452
 github_issue: 443
 risk_level: low
 ---
 
 # Technical Task: Route 2c keys on HIGH history, not on the last fix it exists to gate
 
-**Status:** Planned
+**Status:** Accepted
 **GitHub Issue**: [#443](https://github.com/Gamaroff/agent-skills/issues/443)
 
 ---
@@ -260,13 +261,15 @@ None.
 |------|---------|-------------|--------|
 | 2026-09-20 | 1.0 | Initial draft — obs #139; task.130 loop-limit escalation (route 2c declined `high-findings-seen`) | create-task |
 
+| 2026-09-21 |  | Implemented — staged #139 fix installed: `high-on-last-gate` reads `highCounts[cycle-1]`; step-5-6 route table + § conditions; +2 fixture rows (32/32), mutation-proved | manual |
+| 2026-09-21 | 1.1 | Accepted (PR #452) — route 2c fires on task.130's shape and declines a HIGH on the last gate. Hand-driven quick win: no QA loop, no DoD file; the tests named here are the evidence | manual |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: fixture rows
-- [ ] Phase 2: predicate
-- [ ] Phase 3: the two statements
+- [x] Phase 1: fixture rows
+- [x] Phase 2: predicate
+- [x] Phase 3: the two statements
 - [ ] QA: `task.134.qa.[N].route-2c-keyed-on-last-fix.md`
 - [ ] Gate: `task.134.gate.[N].route-2c-keyed-on-last-fix.yml`
 
@@ -279,5 +282,6 @@ None.
 
 ## Notes
 
+- **Accepted 2026-09-21 without the pipeline (PR #452).** The reason string shipped as `high-on-last-gate` (the staged name), not the `last-gate-raised-high` this document proposed; the engine reads the HIGH sequence's last entry rather than re-counting the gate — the same value.
 - QA artifacts land beside this file: `task.134.qa.[N].*.md`, `task.134.bug.[N].*.md`, `task.134.gate.[N].*.yml`.
 - Independent of tasks 133 and 135. Touches `develop-pipeline-step-5-6-qa-loop.md`, which task.135 also cites but does not edit.
