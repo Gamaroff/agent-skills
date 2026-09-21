@@ -74,7 +74,11 @@ const skill = readFileSync(SKILL, "utf8");
 function parseSkipTable(text) {
   const start = text.indexOf("#### What bug mode runs and skips");
   assert.ok(start > -1, 'SKILL.md carries § "What bug mode runs and skips"');
-  const body = text.slice(start);
+  // Bounded at the next heading: an unbounded slice would read any later four-column
+  // table whose first cell is a backticked token as skip-table rows (cycle-7 CR-4).
+  const next = text.slice(start + 1).search(/\n#{2,4} /);
+  const body =
+    next === -1 ? text.slice(start) : text.slice(start, start + 1 + next);
   const rows = [];
   for (const line of body.split("\n")) {
     const m = line.match(
@@ -787,6 +791,48 @@ for (const shell of SHELLS) {
     }
   });
 
+  test(`[${shell}] 6b's task branch HALTs on a missing gate file instead of publishing an empty Final Gate (cycle-7 CR-3)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-nogate-"));
+    try {
+      writeFileSync(path.join(dir, "task.67.dod.1.parent.md"), "");
+      const r = spawnSync(shell, ["-s", "--"], {
+        input: derivationBlock(),
+        encoding: "utf8",
+        env: {
+          PATH: process.env.PATH,
+          DIR: dir,
+          STEM_IN: "task.67",
+          KIND_IN: "task",
+        },
+      });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(
+        r.stdout + r.stderr,
+        /HALT: no task\.67\.gate\.\*\.yml beside the document/,
+      );
+      assert.doesNotMatch(r.stdout, /^FINAL_GATE=/m);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] the kind block HALTs when BUG_FLAG or DOC_FILE is left as its placeholder — a --bug run must not continue as task (TASK-125-BUG-20)`, () => {
+    const i = skill.indexOf('DOC_KIND=""');
+    const j = skill.indexOf("```", i);
+    const raw = skill.slice(i, j) + '\nprintf "DOC_KIND=%s\\n" "$DOC_KIND"\n'; // NO substitution
+    const r = spawnSync(shell, ["-s"], {
+      input: raw,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(
+      r.stdout + r.stderr,
+      /HALT: BUG_FLAG or DOC_FILE is an unsubstituted placeholder/,
+    );
+    assert.doesNotMatch(r.stdout, /^DOC_KIND=/m, "no kind was resolved");
+  });
+
   test(`[${shell}] the kind block resolves bug from the substituted BUG_FLAG input with NO argv flag — a block run through a tool has no positional parameters (cycle-5 CR-3)`, () => {
     const r = spawnSync(
       shell,
@@ -805,11 +851,17 @@ for (const shell of SHELLS) {
     const block =
       sliceBlock('STEM="{', "# --- cycle count resolved", SIX_A_START) +
       '\nprintf "[%s]\\n" "$CYCLES"\n';
-    const run = (dir, stem, extraEnv = {}) =>
+    const run = (dir, stem, extraEnv = {}, kind = "bug") =>
       spawnSync(shell, ["-s"], {
         input: block,
         encoding: "utf8",
-        env: { PATH: process.env.PATH, DIR: dir, STEM_IN: stem, ...extraEnv },
+        env: {
+          PATH: process.env.PATH,
+          DIR: dir,
+          STEM_IN: stem,
+          KIND_IN: kind,
+          ...extraEnv,
+        },
       });
     const dir = mkdtempSync(path.join(tmpdir(), "finalise-cycles-"));
     try {
@@ -840,11 +892,30 @@ for (const shell of SHELLS) {
         "[2]",
       );
       assert.equal(run(dir, "bug.99").stdout.trim(), "[0]");
+      // A TASK beside its own bug: the parent's count, never the bug's higher-numbered
+      // report — the full-stem shape is a bug-only shape (TASK-125-BUG-19).
+      writeFileSync(
+        path.join(dir, "task.67.implementation.1.run.md"),
+        "### QA Cycle 1\n",
+      );
+      writeFileSync(
+        path.join(dir, "task.67.bug.3.implementation.2.fix.md"),
+        "### Verify Cycle 1\n### Verify Cycle 2\n### Verify Cycle 3\n",
+      );
+      const parent = run(dir, "task.67", {}, "task");
+      assert.equal(parent.status, 0, parent.stderr);
+      assert.equal(
+        parent.stdout.trim(),
+        "[1]",
+        `the parent's own report: ${parent.stdout}`,
+      );
+      const child = run(dir, "task.67.bug.3", {}, "bug");
+      assert.equal(child.stdout.trim(), "[3]", "the bug still reads its own");
       const ph = run(dir, "{story.{epic}.{story} | task.{id}}");
       assert.equal(ph.status, 1, ph.stdout + ph.stderr);
       assert.match(
         ph.stdout + ph.stderr,
-        /HALT: STEM is empty or an unsubstituted placeholder/,
+        /HALT: STEM and DOC_KIND must be bound in this block — empty or an unsubstituted placeholder found/,
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -886,6 +957,11 @@ test("every stem-keyed implementation.* reader in develop-bug and finalise accep
       /(\{bug-prefix\}|\$\{STEM\})\.(\*|\{name\})\.(implementation|review)\.\*/.test(
         s.text,
       );
+    // A reader that names one shape ON PURPOSE says so on the line, with the reason:
+    // story/task reports never carry the full-stem shape, and reading it there
+    // matched a co-located bug's report (TASK-125-BUG-19). The annotation is the
+    // recorded judgement, the same shape as `--siblings-checked none`.
+    if (/# short-shape-only: .{20,}/.test(s.text) && short && !full) continue;
     assert.ok(
       short && full,
       `${s.file}:${s.line} names one shape only: ${s.text.trim().slice(0, 140)}`,

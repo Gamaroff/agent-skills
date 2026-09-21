@@ -55,6 +55,12 @@ DOC_KIND=""
 BUG_FLAG="{--bug when the invocation carried it, else empty}"
 case " $* $BUG_FLAG " in *" --bug "*) DOC_KIND=bug ;; esac
 DOC_FILE="{the document path argument}"
+# Both inputs must be SUBSTITUTED, not left as their placeholders: a verbatim `{…}` is
+# non-empty, cannot match ` --bug `, and its basename takes the `*)` arm — a `--bug` run
+# would continue as a TASK at exit 0, reaching the Change Log writer bug mode forbids.
+# The three Step 7 blocks refuse the same shape (cycle-6 CR-3); this block decides the
+# kind for all of them, so it refuses first (TASK-125-BUG-20).
+case "$BUG_FLAG$DOC_FILE" in *'{'*) echo "HALT: BUG_FLAG or DOC_FILE is an unsubstituted placeholder — substitute both before running the Document-kind block"; exit 1 ;; esac
 if [ -z "$DOC_KIND" ]; then
   case "$(basename "$DOC_FILE")" in
     story.*) DOC_KIND=story ;;
@@ -1507,9 +1513,20 @@ POLLEOF
    # first version only read the env var, and develop-bug passes none, so every bug run
    # counted 0 cycles and silently dropped the line (cycle-6 CR-2 — the BUG-12 shape).
    STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
-   case "$STEM" in ''|*'{'*) echo "HALT: STEM is empty or an unsubstituted placeholder — bind the work item's stem in this block"; exit 1 ;; esac
+   DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
+   case "$STEM$DOC_KIND" in ''|*'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — empty or an unsubstituted placeholder found"; exit 1 ;; esac
+   [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
    if [ -z "${IMPLEMENTATION_REPORT:-}" ] || [ ! -f "${IMPLEMENTATION_REPORT:-}" ]; then
-     IMPLEMENTATION_REPORT=$(find {document-directory} -maxdepth 1 \( -name "${STEM}.implementation.*.md" -o -name "${STEM}.*.implementation.*.md" \) 2>/dev/null \
+     # The full-stem shape exists only for BUG reports (TASK-125-BUG-13). In story/task mode
+     # `${STEM}.*.implementation.*` with STEM=task.67 matched the co-located
+     # `task.67.bug.3.implementation.2.*`, and the parent published its bug's cycle count
+     # (TASK-125-BUG-19 — BUG-8's parent/child leak in the other direction).
+     if [ "$DOC_KIND" = "bug" ]; then
+       SHAPES=( -name "${STEM}.implementation.*.md" -o -name "${STEM}.*.implementation.*.md" )
+     else
+       SHAPES=( -name "${STEM}.implementation.*.md" )   # short-shape-only: story/task reports never carry the full-stem shape, and the second pattern matched a co-located bug's report (TASK-125-BUG-19)
+     fi
+     IMPLEMENTATION_REPORT=$(find {document-directory} -maxdepth 1 \( "${SHAPES[@]}" \) 2>/dev/null \
        | sed -E 's/^(.*\.implementation\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
    fi
    if [ -n "$IMPLEMENTATION_REPORT" ] && [ -f "$IMPLEMENTATION_REPORT" ]; then
@@ -1587,8 +1604,14 @@ POLLEOF
      HEAD_DESC="pushed DoD head — the commit carrying the DoD file and the Status History row"
      CLOSING_LINE="All applicable Definition of Done criteria verified. Bug fix accepted — closed by develop-bug Step 7 Part B."
    else
-     FINAL_GATE=$(ls {document-directory}/${STEM}.gate.*.yml 2>/dev/null | sort | tail -1 \
-       | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $(2)}' || echo "N/A")
+     # The gate path is resolved FIRST and checked: the old `… | awk … || echo "N/A"` never
+     # emitted N/A (awk exits 0 on empty input), so a missing gate published an empty Final
+     # Gate — the "never bound" vs "genuinely N/A" ambiguity the bug branch HALTs on
+     # (cycle-5 CR-9 / cycle-7 CR-3). A story or task always has a gate by Step 7.
+     GATE_PATH=$(ls {document-directory}/${STEM}.gate.*.yml 2>/dev/null | sort | tail -1)
+     [ -n "$GATE_PATH" ] || { echo "HALT: no ${STEM}.gate.*.yml beside the document — the QA loop writes one before Step 7"; exit 1; }
+     FINAL_GATE=$(grep '^gate:' "$GATE_PATH" | head -1 | grep -oE 'PASS|CONCERNS|FAIL|WAIVED' | head -1)
+     [ -n "$FINAL_GATE" ] || { echo "HALT: $GATE_PATH carries no gate: PASS|CONCERNS|FAIL|WAIVED line"; exit 1; }
      HEAD_DESC="pushed acceptance head — the commit carrying \`status: accepted\`"
      CLOSING_LINE="All Definition of Done criteria verified. Story/task accepted."
    fi

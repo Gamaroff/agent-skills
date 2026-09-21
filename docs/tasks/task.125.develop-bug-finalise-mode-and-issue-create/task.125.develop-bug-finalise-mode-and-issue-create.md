@@ -300,17 +300,17 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.125.qa.6.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.6.develop-bug-finalise-mode-and-issue-create.md)
-- **Gate File**: [task.125.gate.6.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.6.develop-bug-finalise-mode-and-issue-create.yml)
+- **Full Report**: [task.125.qa.7.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.7.develop-bug-finalise-mode-and-issue-create.md)
+- **Gate File**: [task.125.gate.7.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.7.develop-bug-finalise-mode-and-issue-create.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 102 targeted on the head `156efdad` (fast gate 3724 at the cycle-5 fix); BUG-14 ordering, BUG-17 count and CR-7 refusal run by hand under bash + zsh
+- **Tests Executed**: 107 targeted on the head `ad432c85` (fast gate 3729 at the cycle-6 fix); the cycle-count block and the kind block run by hand under bash + zsh
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 HIGH; 1 MEDIUM (TASK-125-BUG-18); 2 LOW in gate (CR-2, CR-3); cycle-5 BUG-14..17 + CR-3/6/7 verified FIXED
+- **Critical Issues**: 0 HIGH; 2 MEDIUM (TASK-125-BUG-19, BUG-20); 2 LOW in gate (CR-3, CR-4); cycle-6 BUG-18 + CR-2/CR-3 verified FIXED
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 6 (narrowed; first granted cycle, budget 7). Cycle-5 fixes hold. `{bug-prefix}` is defined twice — the full filename stem in develop-bug's Step 0, the short id in SKILL.md, finalise and `bug-doc.js` — so writers and readers of a bug's artefacts disagree by construction and the corpus carries `.review.`/`.implementation.` files in both shapes (BUG-18); finalise's cycle-count block reads a report path no bug run binds (CR-2); the new non-vacuity guards accept an unsubstituted placeholder (CR-3).
+Cycle 7 (narrowed; last granted cycle). Cycle-6 fixes hold. The cycle-count block's two-shape `find` runs for every kind, so a parent task picks up its co-located bug's higher-numbered report (BUG-19); the Document-kind block's own placeholders lack the verbatim guard the later blocks got, so a `--bug` run with them unsubstituted continues as task at exit 0 (BUG-20); the task branch's `|| echo N/A` is dead (CR-3); the skip-table test parser slices to end-of-file (CR-4).
 <!-- change-log-start -->
 ## Change Log
 
@@ -322,12 +322,13 @@ Cycle 6 (narrowed; first granted cycle, budget 7). Cycle-5 fixes hold. `{bug-pre
 | 2026-09-21 |  | Status → ready-for-development | review-task |
 | 2026-09-21 |  | Implemented — 3 phases; 11 source files + 20 bundled copies; 4 test files (+19 tests), 9 mutations proved | develop |
 | 2026-09-21 |  | QA gate FAIL (20/100) — 1 HIGH, 6 MEDIUM, 3 LOW; 7 bug reports filed | qa-task |
-| 2026-09-21 |  | QA findings fixed — gates 1–6 answered: 18 bugs (3 HIGH, 15 MEDIUM) + 16 LOW, 6 iterations; shared gh-labels.sh helper across 9 sites, finalise bug-mode blocks self-binding (STEM, kind, flag as substituted inputs; placeholders refused) and branching in-block, one definition of {bug-prefix} + {bug-file-stem}, both artefact shapes read newest-first, +75 tests | qa-fix |
+| 2026-09-21 |  | QA findings fixed — gates 1–7 answered: 20 bugs (3 HIGH, 17 MEDIUM) + 18 LOW, 7 iterations; shared gh-labels.sh helper across 9 sites, finalise bug-mode blocks self-binding (STEM, kind, flag as substituted inputs; placeholders refused) and branching in-block, one definition of {bug-prefix} + {bug-file-stem}, both artefact shapes read newest-first, +79 tests | qa-fix |
 | 2026-09-21 |  | QA gate 2 FAIL (50/100) — cycle-1 fixes verified; refute pass found 1 HIGH (7.7 globs the parent's DoD/gate), 3 MEDIUM, 4 LOW; 4 bug reports filed | qa-task |
 | 2026-09-21 |  | QA gate 3 CONCERNS (90/100) — cycle-2 fixes verified; 0 HIGH, 1 MEDIUM (6b inputs unbound in-block), 2 LOW; 1 bug report filed | qa-task |
 | 2026-09-21 |  | QA gate 4 FAIL (70/100) — cycle-3 fixes verified; 1 HIGH (6b report glob keys on the short bug id; the full-stem shape HALTs), 0 MEDIUM, 2 LOW; 1 bug report filed | qa-task |
 | 2026-09-21 |  | QA gate 5 CONCERNS (60/100) — cycle-4 fixes verified; 0 HIGH, 4 MEDIUM (finalise bug path: stale-report ordering, STEM from another block, 7.6a/7.6b bug variant in prose, no both-shapes population check), 3 LOW; 4 bug reports filed | qa-task |
 | 2026-09-21 |  | QA gate 6 CONCERNS (80/100) — cycle-5 fixes verified; 0 HIGH, 1 MEDIUM ({bug-prefix} defined twice: full stem in develop-bug Step 0, short id everywhere else), 2 LOW; 1 bug report filed | qa-task |
+| 2026-09-21 |  | QA gate 7 CONCERNS (80/100) — cycle-6 fixes verified; 0 HIGH, 2 MEDIUM (cycle-count find leaks a co-located bug's report into the parent; kind block unguarded against verbatim placeholders), 2 LOW; 2 bug reports filed | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

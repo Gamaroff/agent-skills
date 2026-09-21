@@ -1,0 +1,86 @@
+schema: 1
+task: 'task.125.develop-bug-finalise-mode-and-issue-create'
+task_title: "develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
+gate: CONCERNS
+status_reason: 'Cycle 7 (last granted; budget 7) — narrowed to the 6 files changed since gate 6. Cycle-6 BUG-18 and CR-2/CR-3 verified FIXED by re-execution on head ad432c85 (107 targeted tests; one definition of each placeholder; the cycle-count block locates bug.14''s full-stem report and counts 3 under bash + zsh; a verbatim placeholder is refused). No HIGH. Two MEDIUM, both introduced by cycle 6: the cycle-count find runs the full-stem pattern in task mode and so picks a co-located bug''s higher-numbered report as the parent''s (reproduced); the Document-kind block''s own placeholders were not given the verbatim guard the three later blocks got, so a --bug run with them unsubstituted resolves task at exit 0 (reproduced). Two LOW: the task-branch `|| echo N/A` is dead (second raise); the skip-table parser slices to end-of-file.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T08:12:56Z'
+
+top_issues:
+  - id: 'TASK-125-BUG-19'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The 6a cycle-count block (cycle-6 CR-2 fix) runs the two-shape find for every kind; in task/story mode `${STEM}.*.implementation.*.md` with STEM=task.67 matches the co-located bug''s `task.67.bug.3.implementation.2.*`, which sort -n ranks above the parent''s implementation.1 — CYCLES=3 from the bug''s report (reproduced under bash + zsh); TASK-125-BUG-8''s parent/child leak in the other direction.'
+    suggested_action: 'Bind DOC_KIND in the block; use the full-stem pattern only in bug mode; add the parent-beside-bug fixture case.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.19.six-a-cycle-count-find-in-task-mode-picks-a-co-located-bugs-report.md'
+  - id: 'TASK-125-BUG-20'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The Document-kind block''s substituted inputs BUG_FLAG and DOC_FILE have no verbatim-placeholder guard (the cycle-6 CR-3 guard went to 6a/7.6b/6b only): run with both left verbatim and no argv, `/finalise --bug` resolves DOC_KIND=task at exit 0 with a hint (reproduced), reaching the Change Log writer bug mode forbids.'
+    suggested_action: 'Add `case "$BUG_FLAG$DOC_FILE" in *''{''*) HALT` to the kind block and a verbatim-placeholder case to the executed kind-block test expecting exit 1.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.20.kind-block-placeholders-left-verbatim-resolve-task-at-exit-0.md'
+  - id: 'CR-3'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'In 6b''s story/task branch `… | awk … || echo "N/A"` never emits N/A (awk exits 0 on empty input), so a missing `${STEM}.gate.*.yml` publishes an empty Final Gate — the same "never bound" vs "genuinely N/A" ambiguity the bug branch HALTs on. Raised as CR-9 at cycle 5; taken now.'
+    suggested_action: 'Resolve the gate path first; HALT when empty; then grep the verdict.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'evals/shared/tests/finalise-bug-mode.test.mjs'
+    finding: 'parseSkipTable slices from its heading to end-of-file, so a later four-column table whose first cell is a backticked token would be read as skip-table rows and fail the exact-key-set assertion with a misleading message.'
+    suggested_action: 'Bound the slice at the next heading after the section start.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3729
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new boundary this cycle. The label boundary probed 20/20 in cycle 2 is unchanged since.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-19: a parent publishes its bug''s cycle count; BUG-20: the kind block continues as task on unsubstituted inputs; CR-3: empty Final Gate on a missing gate file.'
+  maintainability:
+    status: PASS
+    notes: 'CR-4 test hygiene. The cycle-5/6 CR-8/CR-4 duplicated fix_cycle guard stays a follow-up task.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-19: bind DOC_KIND in the cycle-count block, full-stem pattern only in bug mode, parent-beside-bug case; BUG-20: verbatim guard in the kind block + executed case; CR-3: explicit gate-path check; CR-4: bound the skip-table slice'
+      refs: ['skills/finalise/SKILL.md', 'evals/shared/tests/finalise-bug-mode.test.mjs']
+  future:
+    - action: 'qa-cycle.sh --cycle so both qa-fix blocks share one fix_cycle validation (cycle-5 CR-8 / cycle-6 CR-4) — follow-up task'
+      refs: ['skills/qa-fix/SKILL.md', 'skills/qa-fix/references/qa-cycle.sh']
+
+bug_resolution:
+  bugs_fixed: 18
+  bugs_remaining: 2
+  fix_date: '2026-09-21'
+  total_iterations: 6
+  verification_method: 'Cycle-6 fixes re-executed on head ad432c85 (107 targeted tests; the cycle-count block run by hand against docs/bugs/bug.14 with no env var under bash + zsh → 3; one definition line each for {bug-prefix} and {bug-file-stem}; verbatim placeholder refused by the guards)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-19 and BUG-20 fixed with executed cases', 'CR-3 and CR-4 fixed']
