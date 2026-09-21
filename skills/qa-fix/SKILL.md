@@ -867,7 +867,10 @@ DOC_DIR=$(dirname "$STORY_FILE")
 case "${FIX_CYCLE_ARG:-}" in
   '') ;;
   *[!0-9]*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive integer — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
-  *) FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || { echo "⚠️  fix_cycle=0 is not a cycle — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG=''; } ;;
+  # The value the caller SUPPLIED is what the warning names — after `10#`
+  # normalisation `00`, `000` and `0` are all `0`, and a caller told
+  # `fix_cycle=0` for a `000` they never wrote cannot find it (cycle-4 CR-5).
+  *) FIX_CYCLE_RAW=$FIX_CYCLE_ARG; FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || { echo "⚠️  fix_cycle='${FIX_CYCLE_RAW}' is not a positive cycle — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG=''; } ;;
 esac
 if [ -n "${FIX_CYCLE_ARG:-}" ]; then
   FIX_CYCLE=$FIX_CYCLE_ARG; rc=0
@@ -984,8 +987,9 @@ if [ -n "$FIX_ISSUE" ]; then
   case "${FIX_CYCLE_ARG:-}" in
     '') ;;
     *[!0-9]*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive integer — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
-  *) FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || { echo "⚠️  fix_cycle=0 is not a cycle — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG=''; } ;;
-esac
+    # Names the SUPPLIED value, as the pull-request block does (cycle-4 CR-5).
+    *) FIX_CYCLE_RAW=$FIX_CYCLE_ARG; FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || { echo "⚠️  fix_cycle='${FIX_CYCLE_RAW}' is not a positive cycle — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG=''; } ;;
+  esac
   if [ -n "${FIX_CYCLE_ARG:-}" ]; then
     FIX_CYCLE=$FIX_CYCLE_ARG; rc=0
   else

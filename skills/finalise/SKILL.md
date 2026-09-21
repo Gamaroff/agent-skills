@@ -458,7 +458,7 @@ Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RE
 
 **Bug mode (`ac-agent`):** skip — a bug report has no acceptance criteria, so agent 1's prompt has nothing to trace. Its slot is taken by the fix-evidence agent below; still four agents, still one message.
 
-**Bug mode (`fix-evidence`):** run — dispatch `references/finalise-dod-fix-evidence-prompt.md` as agent 1 with `<BUG_FILE>`, `<PR_NUMBER>`, `<DIFF_FILE>` and `<IMPL_REPORT>` (the newest `{bug-prefix}.implementation.*.md` beside the bug, or empty). It checks the five things a bug fix must show — the expected behaviour is implemented, a regression test asserts it *and runs per PR*, the test is recorded red without the fix, a new guard states its scope, bundled copies match their source — and returns `fix_evidence:` YAML in the same PASS/FAIL-with-citation contract as `ac_traceability:`. Capture it **as `AC_RESULT`** so Steps 3c–6 read one variable: `AC_OVERALL` is `fix_evidence.overall`, and the Step 6 column "All Acceptance Criteria Met?" reads "all fix-evidence checks PASS". `STORY_TYPE` is `bug` for the other three agents, which need no bug variant.
+**Bug mode (`fix-evidence`):** run — dispatch `references/finalise-dod-fix-evidence-prompt.md` as agent 1 with `<BUG_FILE>`, `<PR_NUMBER>`, `<DIFF_FILE>` and `<IMPL_REPORT>` (the newest implementation report beside the bug in **either** shape the pipeline has written — `{bug-prefix}.implementation.*.md` or `{bug-prefix}.{name}.implementation.*.md`, the two prefixes `references/bug-doc.js` accepts (TASK-125-BUG-13) — or empty). It checks the five things a bug fix must show — the expected behaviour is implemented, a regression test asserts it *and runs per PR*, the test is recorded red without the fix, a new guard states its scope, bundled copies match their source — and returns `fix_evidence:` YAML in the same PASS/FAIL-with-citation contract as `ac_traceability:`. Capture it **as `AC_RESULT`** so Steps 3c–6 read one variable: `AC_OVERALL` is `fix_evidence.overall`, and the Step 6 column "All Acceptance Criteria Met?" reads "all fix-evidence checks PASS". `STORY_TYPE` is `bug` for the other three agents, which need no bug variant.
 
 > **`SECURITY_RESULT` carries a `boundary:` flag and, when it is true, `probes_executed:` and `probes[]`.**
 > `boundary: true` means the security agent's Step 1b identified a **boundary deliverable** — a predicate,
@@ -1484,15 +1484,35 @@ POLLEOF
    # value that block computed does not exist in this one (TASK-121-BUG-2), and
    # an unbound DOC_KIND silently took the story/task branch (TASK-125-BUG-12).
    case " $* " in *" --bug "*) DOC_KIND=bug ;; *) DOC_KIND=${DOC_KIND:-task} ;; esac
+   # The flag is the only thing that selects the bug branch, and the STEM bound
+   # at 6a is the only other input here that knows the kind. A bug prefix with
+   # the flag absent is this block run without its args — the BUG-12 symptom
+   # under a different unbound input — not a task, so it HALTs rather than
+   # publishing the story/task derivation on a bug (cycle-4 CR-2).
+   case "$STEM" in
+     bug.[0-9]*|*.bug.[0-9]*) [ "$DOC_KIND" = "bug" ] || { echo "HALT: STEM ${STEM} is a bug prefix but --bug is not among this block's args — pass the flag when running 6b"; exit 1; } ;;
+   esac
    if [ "$DOC_KIND" = "bug" ]; then
      # A bug has no gate file; its verdict is the develop-bug verify loop's —
      # the last `**Verdict**:` line of the implementation report beside the bug
-     # (`{bug-prefix}.implementation.{N}.*.md`, QA Iteration History). Derived
-     # IN THIS BLOCK, and an empty verdict is a HALT, not an N/A: "never bound"
-     # and "genuinely N/A" must not share one value (TASK-125-BUG-12).
-     IMPLEMENTATION_REPORT=$(ls {document-directory}/${STEM}.implementation.*.md 2>/dev/null | sort | tail -1)
-     VERIFY_VERDICT=$(grep -E '^\*\*Verdict\*\*:' "${IMPLEMENTATION_REPORT:-/dev/null}" 2>/dev/null | tail -1 | awk '{print $(2)}')
-     [ -n "$VERIFY_VERDICT" ] || { echo "HALT: bug mode — no **Verdict**: line found in ${IMPLEMENTATION_REPORT:-<no ${STEM}.implementation.*.md beside the bug>}; the verify loop's QA Iteration History is the bug's only verdict"; exit 1; }
+     # (QA Iteration History). Derived IN THIS BLOCK, and an empty verdict is a
+     # HALT, not an N/A: "never bound" and "genuinely N/A" must not share one
+     # value (TASK-125-BUG-12).
+     #
+     # The report carries EITHER shape the pipeline has written — the short
+     # prefix develop-bug specifies (`bug.14.implementation.1.*.md`) and the
+     # full filename stem its three most recent runs used
+     # (`bug.14.{name}.implementation.1.*.md`) — the same two prefixes
+     # `references/bug-doc.js` findRelatedBugDocs accepts. One shape alone
+     # HALTed on the other (TASK-125-BUG-13). `find -name` with QUOTED patterns,
+     # not two `ls` globs: zsh aborts a command whose glob matches nothing, and
+     # one of the two shapes is always absent.
+     IMPLEMENTATION_REPORT=$(find {document-directory} -maxdepth 1 \( -name "${STEM}.implementation.*.md" -o -name "${STEM}.*.implementation.*.md" \) 2>/dev/null | sort | tail -1)
+     # The bare token, never the line's second word: real reports write
+     # `**Verdict**: **PASS**` as often as `**Verdict**: PASS`, and the second
+     # word of the first is `**PASS**` (cycle-4 CR-3). Neither token is a HALT.
+     VERIFY_VERDICT=$(grep -E '^\*\*Verdict\*\*:' "${IMPLEMENTATION_REPORT:-/dev/null}" 2>/dev/null | tail -1 | grep -oE 'PASS|FAIL' | head -1)
+     [ -n "$VERIFY_VERDICT" ] || { echo "HALT: bug mode — no **Verdict**: PASS|FAIL line found in ${IMPLEMENTATION_REPORT:-<no ${STEM}.implementation.*.md or ${STEM}.*.implementation.*.md beside the bug>}; the verify loop's QA Iteration History is the bug's only verdict"; exit 1; }
      FINAL_GATE="$VERIFY_VERDICT"
      # What the acceptance commit carried, and what "accepted" means, differ by
      # kind: bug mode writes no `status: accepted` (frontmatter-accepted: skip)

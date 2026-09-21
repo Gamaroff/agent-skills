@@ -484,11 +484,16 @@ for (const bad of ["{N}", "0", "00", "000", "3 ", "two", "-1", "007x"]) {
       r.stdout,
       /Tracker issue comment skipped — QA cycle unknown \(fix_cycle absent or invalid/,
     );
-    // "supplied but malformed" is NOT "not supplied": the rejected value is named (cycle-3 CR-3).
+    // "supplied but malformed" is NOT "not supplied": the rejected value is named (cycle-3 CR-3) —
+    // and it is the value the caller SUPPLIED, quoted verbatim: `000` was reported as `fix_cycle=0`
+    // after `10#` normalisation, a value the caller never wrote (cycle-4 CR-5).
+    const quoted = bad.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     assert.match(
       r.stderr,
-      /⚠️  fix_cycle=.*ignored, deriving from the gate/,
-      `the rejected value ${JSON.stringify(bad)} must be named on stderr`,
+      new RegExp(
+        `⚠️  fix_cycle='${quoted}' is not a positive .*ignored, deriving from the gate`,
+      ),
+      `the rejected value ${JSON.stringify(bad)} must be named verbatim on stderr: ${r.stderr}`,
     );
     // Gate on disk: the helper answers, so the invalid arg must not shadow it.
     const g = runQaFixTrackerBlock({

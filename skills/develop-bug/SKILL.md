@@ -75,7 +75,12 @@ Dispatch a read-only Explore subagent using [`references/pipeline-resume-detecto
 **Step 1 — Recover pipeline state from the implementation report:**
 
 ```bash
-ls {bug-directory}/{bug-prefix}.implementation.*.md 2>/dev/null | sort | tail -1
+# Either shape a run has written: `{bug-prefix}.implementation.*.md` (the prefix
+# this skill specifies) or `{bug-prefix}.{name}.implementation.*.md` (the full
+# filename stem earlier runs used). `find -name` with quoted patterns rather than
+# two globs: zsh aborts a command whose glob matches nothing, and one of the two
+# shapes is always absent (TASK-125-BUG-13).
+find {bug-directory} -maxdepth 1 \( -name "{bug-prefix}.implementation.*.md" -o -name "{bug-prefix}.*.implementation.*.md" \) 2>/dev/null | sort | tail -1
 ```
 
 1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.
@@ -333,7 +338,7 @@ If a situation arises that is not in this table or the shared defaults table and
 - Story bug: `{story-dir}/story.{epic}.{story}.bug.{n}.{name}.md` (co-located with the story)
 - Task bug: `docs/tasks/task.{id}.{name}/task.{id}.bug.{n}.{name}.md`
 - General bug: `docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md` (+ `docs/bugs/bug-registry.md`)
-- Implementation report: `{bug-directory}/{bug-prefix}.implementation.{N}.{descriptive-name}.md`
+- Implementation report: `{bug-directory}/{bug-prefix}.implementation.{N}.{descriptive-name}.md` — `{bug-prefix}` is the **short** prefix Step 1 defines (`bug.14`, `task.67.bug.3`), not the bug file's full stem. Runs before task.125 also wrote `{bug-prefix}.{name}.implementation.{N}.*.md`, so every reader of the report (Step 0's resume glob above, `finalise` 6b, `bug-doc.js`) accepts both shapes; a writer picks the short one (TASK-125-BUG-13).
 - Bug template (section shapes the fix record fills): `assets/bug-report-template.md` in `create-bug-report`
 
 ## Related Skills

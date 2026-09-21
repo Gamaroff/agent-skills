@@ -385,13 +385,23 @@ function derivationBlock() {
     '\nprintf "DOD_PATH=%s\\nFINAL_GATE=%s\\nDOC_KIND=%s\\nCLOSING=%s\\n" "$DOD_PATH" "$FINAL_GATE" "$DOC_KIND" "$CLOSING_LINE"\n'
   );
 }
-function sixBFixture({ verdict = "PASS" } = {}) {
+// `shape` is the implementation report's filename: "short" is the prefix
+// develop-bug specifies (`task.67.bug.3.implementation.1.*`); "full" is the bug
+// file's whole stem (`task.67.bug.3.six-b.implementation.1.*`), which the three
+// most recent real develop-bug runs wrote and the short-only glob could not see
+// (TASK-125-BUG-13).
+function sixBFixture({ verdict = "PASS", shape = "short" } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), "finalise-6b-"));
   for (const f of ["task.67.dod.1.parent.md", "task.67.bug.3.dod.1.fix.md"])
     writeFileSync(path.join(dir, f), "");
   writeFileSync(path.join(dir, "task.67.gate.2.parent.yml"), "gate: FAIL\n");
   writeFileSync(
-    path.join(dir, "task.67.bug.3.implementation.1.run.md"),
+    path.join(
+      dir,
+      shape === "full"
+        ? "task.67.bug.3.six-b.implementation.1.run.md"
+        : "task.67.bug.3.implementation.1.run.md",
+    ),
     verdict === null
       ? "## QA Iteration History\n\n### Verify Cycle 1\n**Regression test**: pass\n"
       : `## QA Iteration History\n\n### Verify Cycle 1\n**Verdict**: FAIL\n\n### Verify Cycle 2\n**Verdict**: ${verdict}\n`,
@@ -454,9 +464,70 @@ for (const shell of SHELLS) {
       assert.equal(r.status, 1, "exit 1 is the HALT");
       assert.match(
         r.stdout + r.stderr,
-        /HALT: bug mode — no \*\*Verdict\*\*: line found/,
+        /HALT: bug mode — no \*\*Verdict\*\*: PASS\|FAIL line found/,
       );
       assert.doesNotMatch(r.stdout, /^FINAL_GATE=/m, "nothing was derived");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 6b finds the report in the FULL-stem shape develop-bug's recent runs wrote (TASK-125-BUG-13)`, () => {
+    const dir = sixBFixture({ shape: "full" });
+    try {
+      const r = run(dir, "task.67.bug.3", ["--bug"]);
+      assert.equal(r.status, 0, r.stderr + r.stdout);
+      assert.match(
+        r.stdout,
+        /^FINAL_GATE=PASS$/m,
+        `the full-stem report's verdict, not a HALT: ${r.stdout}${r.stderr}`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 6b publishes the bare verdict token when the line is bolded — 9 of 25 real reports write **Verdict**: **PASS** (cycle-4 CR-3)`, () => {
+    const dir = sixBFixture({ verdict: "**PASS** — proceeding to Step 7" });
+    try {
+      const r = run(dir, "task.67.bug.3", ["--bug"]);
+      assert.equal(r.status, 0, r.stderr + r.stdout);
+      assert.match(r.stdout, /^FINAL_GATE=PASS$/m, r.stdout);
+      assert.doesNotMatch(
+        r.stdout,
+        /FINAL_GATE=\*\*/,
+        "no asterisks reach the comment",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 6b HALTs on a **Verdict** line that names neither PASS nor FAIL — a token that is not a verdict is not published (cycle-4 CR-3)`, () => {
+    const dir = sixBFixture({ verdict: "pending" });
+    try {
+      const r = run(dir, "task.67.bug.3", ["--bug"]);
+      assert.equal(r.status, 1, "exit 1 is the HALT");
+      assert.doesNotMatch(r.stdout, /^FINAL_GATE=/m, "nothing was derived");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 6b with a bug STEM and NO --bug HALTs — a bug prefix without the flag is the block run without its args, not a task (cycle-4 CR-2)`, () => {
+    const dir = sixBFixture();
+    try {
+      const r = run(dir, "task.67.bug.3", []);
+      assert.equal(r.status, 1, "exit 1 is the HALT: " + r.stdout + r.stderr);
+      assert.match(
+        r.stdout + r.stderr,
+        /HALT: STEM task\.67\.bug\.3 is a bug prefix but --bug is not among/,
+      );
+      assert.doesNotMatch(
+        r.stdout,
+        /^CLOSING=.*Story\/task accepted/m,
+        "the task branch did not publish",
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

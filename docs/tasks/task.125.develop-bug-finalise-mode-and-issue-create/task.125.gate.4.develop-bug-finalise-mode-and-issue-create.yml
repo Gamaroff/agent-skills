@@ -1,0 +1,78 @@
+schema: 1
+task: 'task.125.develop-bug-finalise-mode-and-issue-create'
+task_title: "develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
+gate: FAIL
+status_reason: 'Cycle 4 — narrowed to the 5 files changed since gate 3. Cycle-3 BUG-12 and CR-2..5 verified FIXED by re-execution (75 targeted tests on head a1d13b19; the 6b block run with nothing injected under bash + zsh). One HIGH, introduced by the cycle-3 fix: the in-block verdict derivation globs ${STEM}.implementation.*.md on the short bug id, but develop-bug writes the report with the FULL filename stem on its three most recent real runs (bug.13/14/15), so IMPLEMENTATION_REPORT is empty and the new HALT fires on every such run — executed against docs/bugs/bug.14 (empty) and bug.12 (found, but the verdict reads **PASS** with the asterisks). The fixture test names its report in the short shape and cannot see it. Two LOW in the queue (the $*-only kind check in 6b with no STEM cross-check; the raw verdict token), two cleanups advisory.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T06:22:33Z'
+
+top_issues:
+  - id: 'TASK-125-BUG-13'
+    severity: high
+    file: 'skills/finalise/SKILL.md'
+    finding: '6b resolves the bug verdict from `ls {dir}/${STEM}.implementation.*.md` with STEM = the short bug prefix (bug.14, task.67.bug.3); develop-bug names the report `{bug-prefix}.implementation.{N}.*.md` where its runs bind {bug-prefix} to the FULL filename stem (bug.14.precompact-hook-bare-tracker-comment.implementation.1.*.md — bug.13/14/15, the three most recent, plus bug.1 and bug.8), so the glob matches nothing and the cycle-3 HALT ("no **Verdict**: line found") fires on a run that has a verdict. Executed: STEM=bug.14 → empty. bug-doc.js findRelatedBugDocs already matches on [bugStem, bugId] because both shapes exist. The fixture report in finalise-bug-mode.test.mjs is short-shape only.'
+    suggested_action: 'Glob both shapes (`${STEM}.implementation.*.md` and `${STEM}.*.implementation.*.md`, or read bug_stem from bug-doc.js beside bug_id); apply the same to the Step 2 qa-reports marker and the <IMPL_REPORT> prose; add a full-stem fixture report to the 6b test so it goes red on the short-only glob; note the two shapes beside develop-bug SKILL.md:336.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.13.six-b-report-glob-short-id-vs-full-stem-report-name.md'
+  - id: 'CR-2'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: '6b re-binds DOC_KIND from `$*` alone, so a 6b shell with no argv bound (STEM bound, --bug not) resolves to task and silently publishes the story/task derivation on a bug — the BUG-12 symptom under a different unbound input. Reviewer rated medium; QA holds it LOW: the Document-kind block resolves the whole skill from the same `$*` and the test executes 6b with --bug on argv, so the residual is the missing basename-style hint 6b has and the kind block does not.'
+    suggested_action: 'Cross-check the kind against the bound STEM — a STEM matching `(^|\.)bug\.[0-9]+($|\.)` with --bug absent from `$*` is a HALT naming the flag — and state in the 6b prose that --bug is a positional input the agent passes when running the block.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: '`awk ''{print $(2)}''` on the last `**Verdict**:` line publishes the raw token; 9 of 25 real verdict lines are `**Verdict**: **PASS**`, so FINAL_GATE reads `**PASS**` in the PR comment and tracker done comment (executed against docs/bugs/bug.12).'
+    suggested_action: 'Normalise to the first PASS|FAIL token (`grep -oE ''PASS|FAIL'' | head -1`) and HALT when it is neither.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 3697
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new boundary this cycle: the diff is the 6b derivation (a glob + grep + awk over a local file), two guard-message edits and test fixtures. The label boundary probed 20/20 in cycle 2 is unchanged since. Reasoned, not measured.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: FAIL
+    notes: 'BUG-13: finalise --bug HALTs on every full-stem implementation report, which is the shape the three most recent develop-bug runs produced; CR-3 publishes a decorated verdict; CR-2 leaves the 6b kind check with one input and no cross-check.'
+  maintainability:
+    status: PASS
+    notes: 'CR-4 (tracker-block case arm indented to the enclosing if) and CR-5 (the non-positive fix_cycle arm names the literal 0 after normalisation, not the value supplied) are cleanups for the fix cycle.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-13: glob both report shapes in 6b (+ qa-reports marker, <IMPL_REPORT> prose), add a full-stem fixture to the 6b test, note both shapes beside develop-bug SKILL.md:336; CR-3: normalise the verdict token; CR-2: STEM-vs-flag cross-check in 6b'
+      refs: ['skills/finalise/SKILL.md', 'evals/shared/tests/finalise-bug-mode.test.mjs', 'skills/develop-bug/SKILL.md']
+  future:
+    - action: 'CR-4: indent the tracker-block `*)` arm and `esac` to their case; CR-5: capture the raw fix_cycle value before 10# normalisation and name it in the non-positive warning (both blocks, lines 870 and 987)'
+      refs: ['skills/qa-fix/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 12
+  bugs_remaining: 1
+  fix_date: '2026-09-21'
+  total_iterations: 3
+  verification_method: 'Cycle-3 fixes re-executed on head a1d13b19 (75 targeted tests; the 6b block run with only DIR/STEM/argv bound under bash + zsh: bug → KIND=bug GATE=PASS, task → parent gate, no verdict → HALT exit 1)'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['BUG-13 fixed with a full-stem fixture in the executed test', 'CR-2 and CR-3 fixed']

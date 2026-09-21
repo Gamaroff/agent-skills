@@ -293,24 +293,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-21
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.125.qa.3.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.3.develop-bug-finalise-mode-and-issue-create.md)
-- **Gate File**: [task.125.gate.3.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.3.develop-bug-finalise-mode-and-issue-create.yml)
+- **Full Report**: [task.125.qa.4.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.4.develop-bug-finalise-mode-and-issue-create.md)
+- **Gate File**: [task.125.gate.4.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.4.develop-bug-finalise-mode-and-issue-create.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3693 (fast gate) + 77 targeted on the head; `10#` and the remove-label grep re-run by hand in bash + zsh
+- **Tests Executed**: 75 targeted on the head `a1d13b19` (fast gate 3697 at the cycle-3 fix; head unchanged); the 6b glob and verdict extraction run by hand against `docs/bugs/bug.14` and `bug.12`
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 HIGH; 1 MEDIUM (TASK-125-BUG-12); 2 LOW in gate (CR-2, CR-3); cycle-2 BUG-8..11 verified FIXED
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 1 HIGH (TASK-125-BUG-13); 0 MEDIUM; 2 LOW in gate (CR-2, CR-3); cycle-3 BUG-12 + CR-2..5 verified FIXED
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
 
 ### Key Findings
-Cycle 3 (narrowed). Cycle-2 fixes hold. 6b's bug branch keys on `DOC_KIND` and `VERIFY_VERDICT`, neither bound by a command in that block, and the fixture test injects both (BUG-12); the PR body claims `status: accepted` on a bug run (CR-2); an invalid `fix_cycle` is cleared silently (CR-3).
+Cycle 4 (narrowed). Cycle-3 fixes hold. The new in-block verdict derivation globs `${STEM}.implementation.*.md` on the short bug id, but develop-bug's three most recent real runs named the report with the full filename stem — the glob is empty and the new HALT fires on a run that has a verdict (BUG-13); the same line publishes the verdict token raw, `**PASS**` (CR-3); 6b's kind check reads `$*` with no cross-check against the bound `STEM` (CR-2).
 <!-- change-log-start -->
 ## Change Log
 
@@ -322,9 +322,10 @@ Cycle 3 (narrowed). Cycle-2 fixes hold. 6b's bug branch keys on `DOC_KIND` and `
 | 2026-09-21 |  | Status → ready-for-development | review-task |
 | 2026-09-21 |  | Implemented — 3 phases; 11 source files + 20 bundled copies; 4 test files (+19 tests), 9 mutations proved | develop |
 | 2026-09-21 |  | QA gate FAIL (20/100) — 1 HIGH, 6 MEDIUM, 3 LOW; 7 bug reports filed | qa-task |
-| 2026-09-21 |  | QA findings fixed — gates 1–3 answered: 12 bugs (2 HIGH, 10 MEDIUM) + 9 LOW, 3 iterations; shared gh-labels.sh helper across 9 sites, finalise bug-mode derivations keyed on the stem and bound in-block, +43 tests | qa-fix |
+| 2026-09-21 |  | QA findings fixed — gates 1–4 answered: 13 bugs (3 HIGH, 10 MEDIUM) + 11 LOW, 4 iterations; shared gh-labels.sh helper across 9 sites, finalise bug-mode derivations keyed on the stem, bound in-block and reading both report shapes, +51 tests | qa-fix |
 | 2026-09-21 |  | QA gate 2 FAIL (50/100) — cycle-1 fixes verified; refute pass found 1 HIGH (7.7 globs the parent's DoD/gate), 3 MEDIUM, 4 LOW; 4 bug reports filed | qa-task |
 | 2026-09-21 |  | QA gate 3 CONCERNS (90/100) — cycle-2 fixes verified; 0 HIGH, 1 MEDIUM (6b inputs unbound in-block), 2 LOW; 1 bug report filed | qa-task |
+| 2026-09-21 |  | QA gate 4 FAIL (70/100) — cycle-3 fixes verified; 1 HIGH (6b report glob keys on the short bug id; the full-stem shape HALTs), 0 MEDIUM, 2 LOW; 1 bug report filed | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
