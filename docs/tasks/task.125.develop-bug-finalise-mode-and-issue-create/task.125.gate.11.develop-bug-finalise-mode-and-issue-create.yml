@@ -1,0 +1,58 @@
+schema: 1
+task: 'task.125.develop-bug-finalise-mode-and-issue-create'
+task_title: "develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
+gate: PASS
+status_reason: 'Cycle 11 (last of the third grant; budget 11) — narrowed to the 2 files changed since gate 10. Cycle-10 BUG-24 and CR-3/CR-4 verified FIXED by re-execution on head 3cd57768 (119 targeted tests; the 7 refused / 5 accepted verdict shapes under bash + zsh; the reviewer probed the sed pipeline with 21 line shapes in both shells and executed 6b against three real bug reports). No correctness finding. Two low-confidence cleanups recorded in recommendations.future: a de-braced placeholder REWORDED as `PASS or FAIL` still reads PASS (the refusal covers the template''s `/` and `|` forms, not prose rewrites); an unreadable report and a report with no verdict line share one HALT. Every top_issue raised across gates 1–10 has a verified fix on the head.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T09:20:42Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3741
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new boundary since cycle 2; the label boundary was probed 20/20 there (measured) and is unchanged since — every later cycle changed finalise''s bash blocks and their tests only.'
+  performance:
+    status: PASS
+    notes: 'One extra gh label list per create (cycle 1); one extra gh issue view per sync edit (cycle 2). Unchanged since.'
+  reliability:
+    status: PASS
+    notes: 'The finalise bug path now: resolves the kind from substituted inputs and refuses placeholders; binds STEM/DOC_KIND in every Step 7 block; locates every numbered artefact zsh-safely and by number; reads the verdict as an exact first word; branches 7.6a/7.6b in-block; publishes the cycle count from the same block. Residual (future, low confidence): a placeholder reworded as `PASS or FAIL` reads PASS.'
+  maintainability:
+    status: PASS
+    notes: 'Follow-ups carried from gates 9–10: the orchestrator path-sort lookups (obs #145 sweep), hoisting newest_numbered once the blocks carry a cwd contract, qa-cycle.sh --cycle for the duplicated fix_cycle guard.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Cycle-11 CR-1 (low/low): extend the template-remnant refusal to a trailing text whose first word is the opposite verdict (`PASS or FAIL`, `PASS, FAIL`), or narrow the comment to the two forms refused'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Cycle-11 CR-2 (low/low): distinguish an unreadable report from one with no verdict line (`[ -r ]` before the grep, or let grep''s error through)'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Carried: develop-story/develop-task Step 0 report lookups path-sort (pre-existing; obs #145 sweep + enumeration test); hoist newest_numbered into a references/ script once fenced blocks carry a cwd contract; qa-cycle.sh --cycle so both qa-fix blocks share one fix_cycle validation'
+      refs: ['skills/develop-story/SKILL.md', 'skills/develop-task/SKILL.md', 'skills/finalise/SKILL.md', 'skills/qa-fix/SKILL.md', 'skills/qa-fix/references/qa-cycle.sh']
+
+bug_resolution:
+  bugs_fixed: 24
+  bugs_remaining: 0
+  fix_date: '2026-09-21'
+  total_iterations: 10
+  verification_method: 'Cycle-10 fixes re-executed on head 3cd57768 (119 targeted tests: 7 refused / 5 accepted verdict shapes with their diagnostics, under bash + zsh); every earlier fix re-verified at the cycle that followed it'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

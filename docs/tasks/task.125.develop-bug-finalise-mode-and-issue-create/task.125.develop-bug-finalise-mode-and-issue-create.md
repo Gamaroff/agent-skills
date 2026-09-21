@@ -293,24 +293,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-21
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.125.qa.10.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.10.develop-bug-finalise-mode-and-issue-create.md)
-- **Gate File**: [task.125.gate.10.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.10.develop-bug-finalise-mode-and-issue-create.yml)
+- **Full Report**: [task.125.qa.11.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.11.develop-bug-finalise-mode-and-issue-create.md)
+- **Gate File**: [task.125.gate.11.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.11.develop-bug-finalise-mode-and-issue-create.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 119 targeted on the head `335559e2`; 6b executed by hand with three verdict lines
+- **Tests Executed**: 119 targeted on the head `3cd57768` (fast gate 3741 at the cycle-10 fix); the reviewer probed the verdict pipeline with 21 shapes under bash + zsh
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 HIGH; 1 MEDIUM (TASK-125-BUG-24); 2 LOW in gate (CR-3, CR-4); cycle-9 BUG-23 + CR-4 verified FIXED
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH; 0 MEDIUM; 0 LOW in gate (2 low-confidence cleanups in future); cycle-10 BUG-24 + CR-3/4 verified FIXED — all 24 bug reports Ready for QA with fixes re-verified
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 10 (narrowed; third grant). Cycle-9 fixes hold. The cycle-9 whole-line `{` check HALTs a correct verdict whose trailing prose names a `{placeholder}`, and the brace-less template remnant `PASS / FAIL` still publishes PASS (BUG-24); one diagnostic for two states (CR-3); refused-verdict tests assert only exit 1 (CR-4).
+Cycle 11 (narrowed; third grant). No correctness finding. Eleven cycles closed 24 bug reports (3 HIGH, 21 MEDIUM) and the LOWs in the finalise bug path, the label tolerance and the `fix_cycle` guard; the two residuals (a reworded placeholder `PASS or FAIL`; an unreadable report's diagnostic) are low-confidence cleanups in the gate's future list.
 <!-- change-log-start -->
 ## Change Log
 
@@ -332,6 +332,7 @@ Cycle 10 (narrowed; third grant). Cycle-9 fixes hold. The cycle-9 whole-line `{`
 | 2026-09-21 |  | QA gate 8 CONCERNS (80/100) — cycle-7 fixes verified; 0 HIGH, 2 MEDIUM (gate/DoD lookups sort lexically; CYCLES crosses a block boundary), 2 LOW; 2 bug reports filed | qa-task |
 | 2026-09-21 |  | QA gate 9 CONCERNS (90/100) — cycle-8 fixes verified; 0 HIGH, 1 MEDIUM (a template-placeholder verdict reads as PASS), 1 LOW; 1 bug report filed | qa-task |
 | 2026-09-21 |  | QA gate 10 CONCERNS (90/100) — cycle-9 fixes verified; 0 HIGH, 1 MEDIUM (the verdict guard over- and under-reaches), 2 LOW; 1 bug report filed | qa-task |
+| 2026-09-21 |  | QA gate 11 PASS (100/100) — cycle-10 fixes verified; 0 findings; 2 low-confidence cleanups recorded for follow-up | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
