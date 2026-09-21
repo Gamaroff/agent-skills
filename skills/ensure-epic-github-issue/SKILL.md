@@ -120,11 +120,18 @@ cat > .claude/state/issue-body.md <<EOF
 📁 \`${EPIC_RELATIVE_PATH}\`${PRD_LINE}
 EOF
 
+# Even a FIXED label reaches gh through the helper: a repository without an
+# `epic` label fails the whole create otherwise (task.125, TASK-125-BUG-11).
+source references/gh-labels.sh || exit 1
+LABEL_ARGS=()
+while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--label "$l"); done \
+  < <(gh_labels_filter "epic")
+
 EPIC_ISSUE_NUM=$(node references/tracker-issue.js \
   --kind create \
   --title "[Epic ${EPIC_N}] ${EPIC_TITLE}" \
   --body-file .claude/state/issue-body.md \
-  --label "epic" \
+  "${LABEL_ARGS[@]}" \
   --milestone "${MILESTONE_TITLE}")
 ```
 

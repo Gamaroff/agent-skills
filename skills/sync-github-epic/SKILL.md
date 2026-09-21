@@ -161,12 +161,29 @@ If anything changed, run:
 mkdir -p .claude/state
 printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
 
+# A label the repository does not define fails the WHOLE edit; the shared
+# helper drops it with a warning instead (task.125, TASK-125-BUG-3).
+source references/gh-labels.sh || exit 1
+LABEL_ARGS=()
+while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--add-label "$l"); done \
+  < <(gh_labels_filter "priority:${priority}")
+# The label to REMOVE is computed against the FILTERED new priority label (the
+# line the helper emitted — the repository's case), never the frontmatter value:
+# comparing `priority:High` to the issue's `priority:high` read as "different"
+# and gh received add-then-remove of the same label, stripping it on every
+# re-sync (TASK-125-BUG-10). Empty when nothing changes, so no --remove-label.
+NEW_PRIORITY=$(printf '%s\n' "${LABEL_ARGS[@]}" | grep '^priority:' | head -1)
+OLD_PRIORITY=$(gh issue view "${ISSUE_NUM}" --json labels -q '.labels[].name' 2>/dev/null \
+  | grep '^priority:' | grep -vxF -- "${NEW_PRIORITY:-__none__}" | head -1)
+REMOVE_ARGS=()
+[ -n "$OLD_PRIORITY" ] && [ -n "$NEW_PRIORITY" ] && REMOVE_ARGS=(--remove-label "$OLD_PRIORITY")
+
 node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   --title "[Epic ${EPIC_N}] ${EPIC_TITLE}" \
   --body-file .claude/state/issue-body.md \
   --milestone "${MILESTONE_TITLE}" \
-  --add-label "priority:${priority}" \
-  --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
+  "${LABEL_ARGS[@]}" \
+  "${REMOVE_ARGS[@]}"
 ```
 
 The milestone is auto-created first if it does not yet exist (e.g. the epic title changed):

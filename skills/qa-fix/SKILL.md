@@ -49,6 +49,22 @@ You can invoke this skill with either:
 - **A specific file**: `story.178.8.example-feature.md`, `story.178.8.qa.1.initial-review.md`, or `story.178.8.gate.1.initial-review.yml`
 - **A story directory**: `stories/story.178.8.example-feature/`
 
+**Pipeline Skill args** (optional, after the path):
+
+- `fix_cycle=<N>` — the QA/verify cycle this fix answers, as a **positive integer**. Bind it in
+  Step 0 as `FIX_CYCLE_ARG` (empty when absent or not a positive integer — never a guessed `1`).
+  The two Step 7 blocks that key the cycle-scoped tracker stage (`qa-fix-${FIX_CYCLE}`) use it
+  **when set** and otherwise derive the cycle from the highest-numbered gate file with
+  `references/qa-cycle.sh`; they refuse (warn, skip the post) only when **both** are absent.
+
+  **Who passes it, and why it exists.** The story/task QA loop passes nothing: its cycle is on disk
+  as `*.gate.{N}.*.yml`, and the helper reads it. `develop-bug`'s verify loop writes **no gate** —
+  it posts `qa-cycle-{N}` comments itself and counts the cycle in prose — so on every develop-bug
+  run the helper refused by design and the bug issue got no `qa-fix-N` comment at all, a
+  regression from before task.121 when the bare stage posted once (obs #122). A loop that already
+  knows its cycle states it: `Skill(qa-fix, args="{bug-file} fix_cycle={N}")`. The helper's
+  refusal is kept for the gate-driven path, where guessing is the defect.
+
 **File Discovery Logic:**
 
 When given a directory path, discover all relevant QA artifacts:
@@ -316,6 +332,10 @@ Before starting fixes:
 3. Resolve paths: source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`). QA artifacts are co-located with the story (no `qa.qaLocation` key).
 4. Locate story file via glob `${PRD_ROOT}/**/epics/*/stories/**/story.{epic}.{story}.*.md` — this searches the full nested epic structure. HALT if not found → ask user for path.
 5. HALT if story not found → ask for correct story id/path
+6. Bind `FIX_CYCLE_ARG` from the Skill args — the value of `fix_cycle=<N>` when it is a positive
+   integer, else empty. Record which in the Decisions Log ("fix_cycle: 3 (caller-supplied)" /
+   "fix_cycle: not supplied — derived from the gate"). Every fenced block below that uses it re-binds
+   it the way it re-binds `$STORY_FILE`: it is an INPUT, not a computed value.
 
 The PRD root is configurable; the nested structure under it and QA-artifact co-location are fixed (see [Configuration](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)).
 
@@ -833,7 +853,33 @@ FIX_SUMMARY="**Status**: ✅ Fixes Complete - Ready for Re-Review 🔄
 # cycle never is — nor is $TRACKER_COMMENT_BODY, which is why this block also
 # WRITES the tracker body file the tracker block later reads.
 DOC_DIR=$(dirname "$STORY_FILE")
-FIX_CYCLE=$(bash .agents/skills/qa-fix/references/qa-cycle.sh "$DOC_DIR"); rc=$?
+# A caller-supplied cycle WINS (Pipeline Skill args `fix_cycle=N`, bound in Step 0
+# as $FIX_CYCLE_ARG — an INPUT re-bound per block, like $STORY_FILE). develop-bug's
+# verify loop writes no gate, so the helper refuses there by design; the loop
+# knows its cycle and states it (task.125, obs #122). Only when no cycle was
+# supplied is it derived from the gate on disk.
+# The arg is a POSITIVE INTEGER or it is nothing: an unsubstituted `{N}`, a `0`
+# or a `3 ` used verbatim keys a stage `qa-fix-{N}`, which the lead CLI rejects
+# (exit 2) and the `|| exit 1` below turns into an aborted block — a failure the
+# helper path could never produce (TASK-125-BUG-7). Invalid reads as absent;
+# digits are normalised (`007` → `7`, `00` → 0 → absent) so the PR lead and the
+# tracker engine — which rejects a non-positive suffix — agree (cycle-2 CR-5).
+case "${FIX_CYCLE_ARG:-}" in
+  '') ;;
+  *[!0-9]*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive integer — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
+  # At most 9 digits, the cap qa-cycle.sh applies: `10#` arithmetic wraps silently past 19
+  # digits (18446744073709551617 → 1) and would key stage qa-fix-1 (cycle-5 CR-7).
+  ??????????*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive cycle (more than 9 digits) — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
+  # The value the caller SUPPLIED is what the warning names — after `10#`
+  # normalisation `00`, `000` and `0` are all `0`, and a caller told
+  # `fix_cycle=0` for a `000` they never wrote cannot find it (cycle-4 CR-5).
+  *) FIX_CYCLE_RAW=$FIX_CYCLE_ARG; FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || { echo "⚠️  fix_cycle='${FIX_CYCLE_RAW}' is not a positive cycle — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG=''; } ;;
+esac
+if [ -n "${FIX_CYCLE_ARG:-}" ]; then
+  FIX_CYCLE=$FIX_CYCLE_ARG; rc=0
+else
+  FIX_CYCLE=$(bash .agents/skills/qa-fix/references/qa-cycle.sh "$DOC_DIR"); rc=$?
+fi
 # rc 1 = the helper REFUSED (no numbered gate) → empty, the skip branch below.
 # Anything else (127 not found, 126 not runnable) is a broken invocation, and
 # it must not wear a refusal's clothes — that is how BUG-4 hid for a cycle.
@@ -857,7 +903,7 @@ ${QA_FIX_LEAD}
 
 ${FIX_SUMMARY}"
 else
-  echo "⚠️  QA cycle unknown (see qa-cycle.sh above) — posting the PR comment without its lead"
+  echo "⚠️  QA cycle unknown (fix_cycle absent or invalid, and see qa-cycle.sh above) — posting the PR comment without its lead"
   PR_COMMENT_BODY="## 🛠️ QA Fixes Applied
 
 ${FIX_SUMMARY}"
@@ -936,7 +982,23 @@ if [ -n "$FIX_ISSUE" ]; then
   # a block ($STORY_FILE, $FIX_ISSUE); a COMPUTED value like the cycle is never
   # carried over, and the body travels as the file above.
   DOC_DIR=$(dirname "$STORY_FILE")
-  FIX_CYCLE=$(bash .agents/skills/qa-fix/references/qa-cycle.sh "$DOC_DIR"); rc=$?
+  # Same precedence as the pull-request block: the caller's `fix_cycle=N`
+  # ($FIX_CYCLE_ARG, an input re-bound here) wins; the helper is the fallback
+  # for the gate-driven path (task.125, obs #122).
+  # Positive integer or nothing — same guard as the pull-request block
+  # (TASK-125-BUG-7); an invalid value falls through to the helper.
+  case "${FIX_CYCLE_ARG:-}" in
+    '') ;;
+    *[!0-9]*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive integer — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
+    ??????????*) echo "⚠️  fix_cycle='${FIX_CYCLE_ARG}' is not a positive cycle (more than 9 digits) — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG='' ;;
+    # Names the SUPPLIED value, as the pull-request block does (cycle-4 CR-5).
+    *) FIX_CYCLE_RAW=$FIX_CYCLE_ARG; FIX_CYCLE_ARG=$((10#$FIX_CYCLE_ARG)); [ "$FIX_CYCLE_ARG" -gt 0 ] || { echo "⚠️  fix_cycle='${FIX_CYCLE_RAW}' is not a positive cycle — ignored, deriving from the gate" >&2; FIX_CYCLE_ARG=''; } ;;
+  esac
+  if [ -n "${FIX_CYCLE_ARG:-}" ]; then
+    FIX_CYCLE=$FIX_CYCLE_ARG; rc=0
+  else
+    FIX_CYCLE=$(bash .agents/skills/qa-fix/references/qa-cycle.sh "$DOC_DIR"); rc=$?
+  fi
   # rc 1 = the helper REFUSED (no numbered gate) → empty, the skip branch below.
   # Anything else (127 not found, 126 not runnable) is a broken invocation, and
   # it must not wear a refusal's clothes — that is how BUG-4 hid for a cycle.
@@ -949,7 +1011,7 @@ if [ -n "$FIX_ISSUE" ]; then
       --json \
       || echo "⚠️  Tracker issue comment failed — continuing"
   else
-    echo "⚠️  Tracker issue comment skipped — QA cycle unknown (see qa-cycle.sh above)"
+    echo "⚠️  Tracker issue comment skipped — QA cycle unknown (fix_cycle absent or invalid, and see qa-cycle.sh above)"
   fi
 fi
 ```
@@ -958,14 +1020,18 @@ fi
 > non-numeric value is dropped and the lead degrades to the shorter true sentence rather than rendering
 > a stray token.
 >
-> **It is derived, not passed in, and that is deliberate.** An earlier draft of this block read
-> `--slot cycle="$QA_CYCLE"` — a variable that exists nowhere in this skill. It would have expanded to
-> the empty string, which the engine drops, so the lead would have degraded silently and correctly and
-> nobody would ever have found out. Deriving from the gate filename uses a value that is genuinely on
-> disk at this point — and it is derived **in this block**, by the bundled `qa-cycle.sh`, not carried
-> over from the block above: fenced blocks run as separate shells (TASK-121-BUG-2). When no numbered
-> gate is found the helper refuses (exit 1, empty), and this block skips the post with a ⚠️ rather
-> than guessing a cycle that would key the comment to another round's marker.
+> **It is derived, or passed in as a named input — never carried over, never guessed.** An earlier
+> draft of this block read `--slot cycle="$QA_CYCLE"` — a variable that exists nowhere in this skill.
+> It would have expanded to the empty string, which the engine drops, so the lead would have degraded
+> silently and correctly and nobody would ever have found out. Deriving from the gate filename uses a
+> value that is genuinely on disk at this point — and it is derived **in this block**, by the bundled
+> `qa-cycle.sh`, not carried over from the block above: fenced blocks run as separate shells
+> (TASK-121-BUG-2). The one thing that may pre-empt the helper is `$FIX_CYCLE_ARG`, which is an
+> **input** (Pipeline Skill args `fix_cycle=N`, bound in Step 0 and re-bound per block like
+> `$STORY_FILE`), not a value computed in another block — develop-bug's verify loop supplies it
+> because it writes no gate for the helper to read (task.125, obs #122). When neither is present the
+> helper refuses (exit 1, empty), and this block skips the post with a ⚠️ rather than guessing a cycle
+> that would key the comment to another round's marker.
 >
 > **The stage is `qa-fix-${FIX_CYCLE}`, never bare `qa-fix`.** `qa-fix` is cycle-scoped in the engine
 > (`CYCLE_SCOPED_STAGES`): the numeric suffix is what the idempotency marker is built from, so cycle

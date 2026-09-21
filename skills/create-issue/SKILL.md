@@ -276,12 +276,19 @@ fi
 **GitHub:**
 
 ```bash
+# Every label reaches gh through the shared helper: one the repository does not
+# define (`story.180` on a fresh repo) fails the WHOLE create otherwise
+# (task.125, TASK-125-BUG-11).
+source references/gh-labels.sh || exit 1
+LABEL_ARGS=()
+while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--label "$l"); done \
+  < <(gh_labels_filter "enhancement" "story.180")
+
 issue_number=$(node references/tracker-issue.js \
   --kind create \
   --title "[Story 180.3] Debounce timing needs adjustment" \
   --body-file "$body_file" \
-  --label "enhancement" \
-  --label "story.180")
+  "${LABEL_ARGS[@]}")
 # REPO_SLUG is already derived from $REMOTE_URL during platform detection above
 # — reuse it. The earlier fix here referenced ${OWNER}/${REPO_NAME}, which this
 # skill never assigns (producing https://github.com///issues/N); the fix after

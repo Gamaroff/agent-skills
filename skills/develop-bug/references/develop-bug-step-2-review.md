@@ -14,7 +14,12 @@ Loaded by `/develop-bug` during Step 2. This is the fix-readiness gate — the b
 Re-read the bug `status` (captured in Phase 0c) and check for an existing review report:
 
 ```bash
-ls {bug-directory}/{bug-prefix}.review.*.md 2>/dev/null | sort | tail -1
+# Either shape a run has written — `{bug-prefix}.review.*` (the short id) or
+# `{bug-file-stem}.review.*` (review-bug's own BUG_PREFIX is the full stem) — as quoted
+# `find -name` patterns, since zsh aborts a command whose glob matches nothing; newest by N
+# (TASK-125-BUG-18).
+find {bug-directory} -maxdepth 1 \( -name "{bug-prefix}.review.*.md" -o -name "{bug-prefix}.*.review.*.md" \) 2>/dev/null \
+  | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 - Bug `status` is `reopened` (a prior fix cycle already validated the report) **and** a review report exists → **skip**; log "review-bug skipped — bug already validated (status=reopened, report exists)" and proceed to Step 3.
@@ -33,7 +38,12 @@ Invoke the `/review-bug` skill with the bug file path in **validate-and-apply** 
 Log: "review-bug invoked in validate-and-apply mode". After it returns, locate the review report:
 
 ```bash
-ls {bug-directory}/{bug-prefix}.review.*.md 2>/dev/null | sort | tail -1
+# Either shape a run has written — `{bug-prefix}.review.*` (the short id) or
+# `{bug-file-stem}.review.*` (review-bug's own BUG_PREFIX is the full stem) — as quoted
+# `find -name` patterns, since zsh aborts a command whose glob matches nothing; newest by N
+# (TASK-125-BUG-18).
+find {bug-directory} -maxdepth 1 \( -name "{bug-prefix}.review.*.md" -o -name "{bug-prefix}.*.review.*.md" \) 2>/dev/null \
+  | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 Record the path in the Decisions Log. If no report file was produced, log a warning in the Issues Log but read the verdict from review-bug's output.

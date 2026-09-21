@@ -124,12 +124,29 @@ If anything changed:
 mkdir -p .claude/state
 printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
 
+# Labels the repository defines, in its case — never the frontmatter's verbatim.
+# One unknown label fails the WHOLE edit and loses the body update; the rule is
+# stated once in the shared helper (task.125, TASK-125-BUG-3).
+source references/gh-labels.sh || exit 1
+LABEL_ARGS=()
+while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--add-label "$l"); done \
+  < <(gh_labels_filter "priority:${PRIORITY}" "severity:${SEVERITY}")
+# The label to REMOVE is computed against the FILTERED new priority label (the
+# line the helper emitted — the repository's case), never the frontmatter value:
+# comparing `priority:High` to the issue's `priority:high` read as "different"
+# and gh received add-then-remove of the same label, stripping it on every
+# re-sync (TASK-125-BUG-10). Empty when nothing changes, so no --remove-label.
+NEW_PRIORITY=$(printf '%s\n' "${LABEL_ARGS[@]}" | grep '^priority:' | head -1)
+OLD_PRIORITY=$(gh issue view "${ISSUE_NUM}" --json labels -q '.labels[].name' 2>/dev/null \
+  | grep '^priority:' | grep -vxF -- "${NEW_PRIORITY:-__none__}" | head -1)
+REMOVE_ARGS=()
+[ -n "$OLD_PRIORITY" ] && [ -n "$NEW_PRIORITY" ] && REMOVE_ARGS=(--remove-label "$OLD_PRIORITY")
+
 node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   --title "[${BUG_ID}] ${BUG_TITLE}" \
   --body-file .claude/state/issue-body.md \
-  --add-label "priority:${PRIORITY}" \
-  --add-label "severity:${SEVERITY}" \
-  --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
+  "${LABEL_ARGS[@]}" \
+  "${REMOVE_ARGS[@]}"
 ```
 
 **Always `--body-file`, never an inline `--body`** — a bug report's reproduction steps and expected/actual values are exactly the text most likely to contain backticks and `$(…)`.

@@ -6,6 +6,32 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/finalise --bug` — the bug pipeline's DoD is a mode, not a fallback (task 125; obs #65, #69,
+  #122).** `finalise` resolves the document kind once (`--bug`, or a hint when the path carries a
+  `.bug.{N}.` segment and the flag is absent) and runs the same DoD as a **fix-evidence** check over
+  a bug report: a `fix-evidence` agent (`shared/resources/finalise-dod-fix-evidence-prompt.md` —
+  expected behaviour implemented, regression test asserts it *and runs per PR*, recorded red without
+  the fix, guard scope, bundled copies) takes the AC agent's slot; security / compliance / docs, both
+  CI readings, the canonical PR comment and the tracker `done` comment + close run as on a task. The
+  story/task-shaped steps — `status: accepted`, the Change Log acceptance row (**forbidden** on a bug),
+  the body DoD section, the sprint review — are skipped by **one table**, `SKILL.md` § "What bug mode
+  runs and skips", each row keyed and marked once in the prose beside the step it governs;
+  `evals/shared/tests/finalise-bug-mode.test.mjs` holds the table and the markers together in both
+  directions and reads the Change Log exclusion from `document-change-log.md` rather than restating
+  it. The DoD file comes from `skills/finalise/assets/bug-dod-template.md`, the shape bug.13 and
+  bug.14's hand-written DoDs converged on; the bug gets one `## Status History` row
+  (`status-history.js`, the bug counterpart of `change-log.js`). `develop-bug` Step 7 Part A now
+  invokes `Skill(finalise, args="--bug …")` and the "inline DoD fallback" paragraph is gone; Part B4
+  verifies the tracker close finalise made rather than repeating it.
+- **`qa-fix` accepts `fix_cycle=<N>` and develop-bug's verify loop passes it (task 125; obs #122).**
+  The two Step 7 blocks that key the cycle-scoped tracker stage (`qa-fix-${FIX_CYCLE}`) use a
+  caller-supplied `$FIX_CYCLE_ARG` when set and derive from the highest-numbered gate with
+  `qa-cycle.sh` otherwise, refusing only when both are absent. The verify loop writes no gate, so the
+  helper refused on every develop-bug run and the bug issue carried no `qa-fix-N` comment at all —
+  a regression from before task.121; the loop knows its cycle and now states it
+  (`Skill(qa-fix, args="{bug-file} fix_cycle={N}")`). `tests/qa-cycle.test.js` executes the block:
+  empty directory + arg → `qa-fix-2`; empty + no arg → refuses; gate + arg → the arg wins.
+
 - **A refusing shell script is a boundary the probe engine can reach, and finalise has a bounded
   third exit (task 128; obs #121).** `security-probe.mjs` gains the **`shell:<path>` entry form**:
   a bash script taking one positional argument is run as `bash "$1" "$2"` — argv, never a string —
@@ -178,6 +204,41 @@ All notable changes to this project will be documented in this file. Format foll
   mutation-proved — forcing the arm false fails it by name and no other. Closes handoff §3c.
 
 ### Changed
+
+- **A bug issue create never fails on a label, and a `gh` failure names its reason (task 125;
+  obs #65).** `ensure-bug-github-issue` Step B5 lowercases `priority` / `severity` to the repo's
+  convention, reads `gh label list` once and drops any label the repository lacks with a warning
+  (`severity:*` does not exist here at all) — the create always runs; when the label read itself
+  fails, labels pass through unchecked rather than being stripped. `tracker-issue.js` now pipes
+  `gh`'s stderr and puts its first non-empty line ahead of the argv in every kind's failure message
+  and in the `--json` payload's `error` — `create a GitHub issue failed: could not add label:
+  'severity:Major' not found (Command failed: …)` — where before only the argv was reported and the
+  bug proceeded unattended with no issue. `tests/ensure-bug-label-tolerance.test.js` executes the
+  SKILL.md block with a fake `gh`; `tracker-issue.test.mjs` §9 covers the stderr line in-process and
+  end-to-end. **QA cycle 1 reshaped both halves.** The stderr pipe now reaches the `--body-file`
+  path too (`withStdin`, the one every bug/story/task create actually takes — the first cut covered
+  only argv calls; §9b pins the spawn stdio and the end-to-end line). And the label rule moved out
+  of one site into **`shared/resources/gh-labels.sh`** — `gh_labels_filter LABEL...` reads the
+  repository's labels once with an explicit limit (gh's default page of 30 stripped real labels),
+  drops an empty field, refuses a candidate that is not a single line (a newline passed `grep -F`
+  and reached `--label`), emits a candidate as given or lowercased when the repository defines it,
+  drops it with a warning otherwise, and passes everything through when the *read* fails (exit
+  code, not an empty list). All seven GitHub label sites source it, `tests/gh-labels.test.js` runs
+  it under bash and zsh and scans the sites so a verbatim `priority:${…}` cannot come back.
+  `registry-tick.js` now answers `not-a-task` for any `.bug.<N>.` stem (a header-block task bug
+  matched the task's stem and read as the task); `finalise`'s kind block defaults a general bug run
+  without `--bug` to `task` (it resolved to an empty kind); `qa-fix` validates `fix_cycle` as a
+  positive integer inside both blocks. **QA cycle 2 (refute pass)** reached the last place the
+  mode's skip table had not: a story or task bug lives in its *parent's* directory, so finalise's
+  directory-wide `*.dod.*.md` / `*.gate.*.yml` globs published the parent's DoD and gate as the
+  bug's — 6b and Step 2 now key on the bug's own stem, with the 6b lines executed by the mode test
+  over a fixture that holds both. The four sync edits define the `--remove-label` they pass
+  (against the filtered label — the old placeholder was assigned nowhere), fixed labels
+  (`epic`, `create-issue`'s) route through the helper too, and the population guard scans every
+  `--label` argument line that reaches `tracker-issue.js`, nine sites today. **QA cycle 3**
+  closed the last gap of the same class: 6b re-binds the kind from its own argv and derives the
+  bug's verdict in its own block (HALT when the implementation report carries none) instead of
+  trusting values a prose step promised to bind, and its test injects nothing.
 
 - **The resume probe binds its base from every report variant and HALTs when it cannot; the
   detector no longer deletes; who restores is stated once (task 130; PR #436 review CR-1…CR-5,

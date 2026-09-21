@@ -79,6 +79,17 @@ const GIT_EXEC_OPTS = {
   stdio: ["ignore", "pipe", "ignore"],
 };
 
+// stdio for every MUTATING `gh` call — stderr PIPED, not ignored, so a failure
+// carries the one line that says why (`could not add label: 'severity:Major'
+// not found`). Two spawn sites use it: `gh()` (argv-only calls) and the
+// `withStdin` closure in perform() (the --body-file path, which is the one
+// every bug/story/task create actually takes). Both must read it — task.125
+// shipped the pipe on the first and not the second, and the motivating failure
+// stayed silent on exactly the call site it was filed against (TASK-125-BUG-1).
+const GH_EXEC_STDIO = ["ignore", "pipe", "pipe"];
+// The stdin-fed variant: same stderr pipe, stdin open for the body.
+const GH_EXEC_STDIO_STDIN = ["pipe", "pipe", "pipe"];
+
 /**
  * The kinds this CLI performs, and what each yields.
  *
@@ -303,7 +314,39 @@ function gh(execImpl, argv, cwd = undefined) {
   // issue was closed in an unrelated repository — silently, and reported as
   // `performed`. That is precisely the failure the two-tier slug design exists
   // to prevent, arriving after the slug logic had already run.
-  return String(execImpl("gh", argv, { ...GIT_EXEC_OPTS, cwd }) || "").trim();
+  //
+  // stderr is PIPED, not ignored, on the mutating calls: execFileSync attaches
+  // it to the thrown error as `e.stderr`, and that is the one line that says
+  // WHY `gh` refused — `could not add label: 'severity:Major' not found`. With
+  // stdio ignore the failure message named the argv and nothing else, and the
+  // operator was left to re-run the command by hand to learn what the CLI had
+  // already told us (task.125, obs #65). On success the captured stderr is
+  // dropped, exactly as before.
+  return String(
+    execImpl("gh", argv, { ...GIT_EXEC_OPTS, stdio: GH_EXEC_STDIO, cwd }) || "",
+  ).trim();
+}
+
+// The first non-empty line `gh` wrote to stderr before it failed, or "" when
+// the error carries none (a stub that throws a bare Error, a spawn failure).
+function ghFailureLine(e) {
+  const raw = e && e.stderr != null ? String(e.stderr) : "";
+  return (
+    raw
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) || ""
+  );
+}
+
+// execFileSync's own message is `Command failed: <argv>` followed — once stderr
+// is piped — by the whole stderr text. The failure warning already leads with
+// the first stderr line, so keep only the message's first line here or the
+// same line prints twice (QA cycle 1, plain path).
+function ghFailureArgv(e) {
+  return String((e && e.message) || "")
+    .split("\n")[0]
+    .trim();
 }
 
 /**
@@ -823,7 +866,7 @@ function perform({
     String(
       execImpl(argv[0], argv.slice(1), {
         encoding: "utf-8",
-        stdio: ["pipe", "pipe", "ignore"],
+        stdio: GH_EXEC_STDIO_STDIN,
         input: body || "",
         cwd,
       }) || "",
@@ -1309,8 +1352,19 @@ function run({
       cwd: root || process.cwd(),
     });
   } catch (e) {
-    output.warn(`⚠️  ${spec.summary} failed: ${e.message}`);
-    return emit({ performed: false, reason: "failed" }, skipCode);
+    // The stderr line first, because it is the one a human needs; the argv
+    // (execFileSync's own message) after it, because it is what a re-run needs.
+    const line = ghFailureLine(e);
+    const argvLine = ghFailureArgv(e);
+    output.warn(
+      line
+        ? `⚠️  ${spec.summary} failed: ${line} (${argvLine})`
+        : `⚠️  ${spec.summary} failed: ${argvLine}`,
+    );
+    return emit(
+      { performed: false, reason: "failed", error: line || argvLine },
+      skipCode,
+    );
   }
 }
 

@@ -75,7 +75,15 @@ Dispatch a read-only Explore subagent using [`references/pipeline-resume-detecto
 **Step 1 — Recover pipeline state from the implementation report:**
 
 ```bash
-ls {bug-directory}/{bug-prefix}.implementation.*.md 2>/dev/null | sort | tail -1
+# Either shape a run has written: `{bug-prefix}.implementation.*.md` (the prefix
+# this skill specifies) or `{bug-prefix}.{name}.implementation.*.md` (the full
+# filename stem earlier runs used). `find -name` with quoted patterns rather than
+# two globs: zsh aborts a command whose glob matches nothing, and one of the two
+# shapes is always absent (TASK-125-BUG-13).
+# Ordered by the report NUMBER, not the path: with both shapes on disk a plain sort
+# picks an older full-stem report over a newer short one (TASK-125-BUG-14).
+find {bug-directory} -maxdepth 1 \( -name "{bug-prefix}.implementation.*.md" -o -name "{bug-prefix}.*.implementation.*.md" \) 2>/dev/null \
+  | sed -E 's/^(.*\.implementation\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.
@@ -223,7 +231,7 @@ See [`references/develop-bug-step-5-6-verify-loop.md`](references/develop-bug-st
 
 ### Step 7: Finalise & Close Bug
 
-See [`references/develop-bug-step-7-close-bug.md`](references/develop-bug-step-7-close-bug.md): invoke `/finalise` against the bug file for the DoD checks, then run the **bug-close routine** — write `## Resolution Summary` (Final Status, Total Iterations, Time to Resolution, Final Fix Details, Lessons Learned), set bug frontmatter `status: closed` + body `**Status:** ✅ Closed`, add the final Status History row, and update parent linkage per mode:
+See [`references/develop-bug-step-7-close-bug.md`](references/develop-bug-step-7-close-bug.md): invoke `/finalise --bug` against the bug file for the fix-evidence DoD (the mode skips the Change Log row, `status: accepted` and the sprint review by a list stated once in `finalise`), then run the **bug-close routine** — write `## Resolution Summary` (Final Status, Total Iterations, Time to Resolution, Final Fix Details, Lessons Learned), set bug frontmatter `status: closed` + body `**Status:** ✅ Closed`, add the final Status History row, and update parent linkage per mode:
 
 - **Story bug** → move the bug to **Closed Bugs** in the parent story's `## Bug Reports`; if it was the parent's only open bug, restore the parent story status from `Reopened`.
 - **Task bug** → mark the bug ✅ Closed in the parent task's Bug Reports list.
@@ -333,7 +341,7 @@ If a situation arises that is not in this table or the shared defaults table and
 - Story bug: `{story-dir}/story.{epic}.{story}.bug.{n}.{name}.md` (co-located with the story)
 - Task bug: `docs/tasks/task.{id}.{name}/task.{id}.bug.{n}.{name}.md`
 - General bug: `docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md` (+ `docs/bugs/bug-registry.md`)
-- Implementation report: `{bug-directory}/{bug-prefix}.implementation.{N}.{descriptive-name}.md`
+- Implementation report: `{bug-directory}/{bug-prefix}.implementation.{N}.{descriptive-name}.md` — `{bug-prefix}` is the **short** id **Step 0 defines** (`bug.14`, `task.67.bug.3`; `bug-doc.js` `bug_id`), never the bug file's full stem, which is `{bug-file-stem}` (TASK-125-BUG-18). Runs before task.125 wrote `{bug-file-stem}.implementation.{N}.*.md` too, so every reader of the report (Step 0's resume lookup above, `finalise` 6a/6b, `bug-doc.js`) accepts both shapes; a writer uses the short id (TASK-125-BUG-13).
 - Bug template (section shapes the fix record fills): `assets/bug-report-template.md` in `create-bug-report`
 
 ## Related Skills
@@ -342,6 +350,6 @@ If a situation arises that is not in this table or the shared defaults table and
 - `/create-branch` — Step 1
 - `/review-bug` — Step 2 (fix-readiness gate; also runnable standalone before this pipeline)
 - `/qa-fix` — Step 6 (fix engine within the verify loop; also updates the bug file)
-- `/finalise` — Step 7
+- `/finalise --bug` — Step 7
 - `/commit-changes` — Step 8
 - `/develop-task`, `/develop-story` — sibling orchestrators for tasks and stories

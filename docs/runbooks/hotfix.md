@@ -85,7 +85,7 @@ what changes under the hotfix answer:
 | 2–3  | Unchanged: `review-bug` gate, then reproduce → root cause → fix **plus a regression test that fails without it**.                                                                                                       |
 | 4    | `create-pr --base main`. The **Branch Policy** workflow admits a PR into `main` only from `develop`, `hotfix/*` or `release/*` — the branch name from Step 1 is what gets it through.                                    |
 | 4    | The pipeline writes `hotfix: merge-back to develop required` into the implementation report's **Issues Log** — the back-merge is a recorded follow-up from this moment on, not a step to remember.                       |
-| 5–7  | Unchanged: verify loop (bounded at 5), then `finalise` closes the bug. The card reaches Done with the PR still open; the merge itself is a human review action on `main`.                                              |
+| 5–7  | Unchanged: verify loop (bounded at 5), then `finalise --bug` (the fix-evidence DoD) closes the bug. The card reaches Done with the PR still open; the merge itself is a human review action on `main`.                                              |
 
 **Tracker sync — both arms.** Step 1 branches on `TRACKER` and ensures the card through
 [`ensure-bug-github-issue`](../../skills/ensure-bug-github-issue/SKILL.md) or

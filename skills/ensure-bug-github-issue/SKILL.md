@@ -138,16 +138,43 @@ line: '+N more in the [bug report](${DOC_URL})' with N the exact number omitted.
 📁 \`${BUG_RELATIVE_PATH}\`
 EOF
 
+# Labels follow the REPO's convention, not the frontmatter's case, and a label
+# the repo does not have is dropped with a warning — never allowed to fail the
+# create. `gh issue create` rejects the WHOLE create on one unknown label, and
+# this repository's labels are lowercase `priority:*` with no `severity:*` at
+# all, so `--label "priority:High" --label "severity:Major"` (the frontmatter
+# values verbatim) created nothing and an unattended run proceeded with no
+# issue (task.125, obs #65). Severity still travels: the body's Metadata table
+# above carries it whatever the label set. The rule lives ONCE, in the shared
+# helper every label site sources — not here (TASK-125-BUG-3).
+source references/gh-labels.sh || exit 1
+LABEL_ARGS=()
+while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--label "$l"); done \
+  < <(gh_labels_filter "bug" "priority:${PRIORITY}" "severity:${SEVERITY}")
+
 BUG_ISSUE_NUM=$(node references/tracker-issue.js \
   --kind create \
   --title "[${BUG_ID}] ${BUG_TITLE}" \
   --body-file .claude/state/issue-body.md \
-  --label "bug" \
-  --label "priority:${PRIORITY}" \
-  --label "severity:${SEVERITY}")
+  "${LABEL_ARGS[@]}")
 ```
 
 The CLI prints the issue **number**.
+
+**What `gh_labels_filter` does** — stated once, in `references/gh-labels.sh`, and tested by
+`tests/gh-labels.test.js`: reads the repository's labels **once** with an explicit limit (gh's
+default page of 30 stripped real labels — TASK-125-BUG-2), drops an empty field silently, refuses a
+candidate that is not a single line (a newline passed `grep -F` and reached `--label` —
+TASK-125-BUG-6), emits the candidate as given or lowercased when the repository defines it, and
+drops it with a warning naming it otherwise. When the label **read itself fails** (exit code, not
+an empty list — a zero-label repository is a different state and drops everything), every candidate
+passes through unchecked so the create's own failure names the label, which `tracker-issue.js` now
+surfaces.
+
+**A label is metadata; the issue is the deliverable.** The failure mode this block closes was not
+"a bug issue had the wrong label" but "a bug had no issue" — the sub-routine's contract makes an
+empty `BUG_ISSUE_NUM` non-blocking, so the pipeline continued, and the only trace was a warning
+that named the command line and dropped the line naming the label.
 
 **On an empty `BUG_ISSUE_NUM`** — whether the create failed or was **deferred**:
 

@@ -205,7 +205,7 @@ every machine writer and the bumped minor for `finalise`. A writer that cannot r
 already the bug-type equivalent, and it is richer — it carries a `Status` column, which is the
 thing a bug's history is actually about. Do not add a second table to bug reports.
 
-That table has its own engine — [`status-history.js`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/status-history.js), the peer of
+That table has its own engine — [`status-history.js`](status-history.js), the peer of
 `change-log.js` — so a writer that needs to record a moment on a bug has somewhere correct to go.
 Reaching for `upsertChangeLog(content, entry, { docType: "bug" })` instead does **not** fail: there
 is no `bug` anchor, so it falls through to the end-of-file path and appends the one table this

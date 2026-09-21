@@ -1,0 +1,100 @@
+schema: 1
+task: 'task.125.develop-bug-finalise-mode-and-issue-create'
+task_title: "develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
+gate: FAIL
+status_reason: 'Cycle 2 — full-branch refute pass. All seven cycle-1 bugs verified FIXED by re-execution (not inherited); suite 3685/3685; boundary probe 20/20 held (the cycle-1 newline case now refused). The refute found one HIGH the mode had not reached: finalise 7.7 derives DOD_PATH and FINAL_GATE with directory-wide globs, so a story/task bug co-located with its parent publishes the PARENT''s DoD and gate as its own (.bug. sorts before .dod.). Three MEDIUM of the same shape: Step 2 reads the parent''s QA artefacts as the bug''s; the sync edits'' --remove-label reads an undefined variable that any verbatim-case derivation turns into add-then-remove; the fixed `epic` label bypasses the helper and the guard. One LOW (`00` passes the fix_cycle guard) and three cleanups, all advisory.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T05:35:38Z'
+
+top_issues:
+  - id: 'TASK-125-BUG-8'
+    severity: high
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 7.7 runs DOD_PATH=$(ls {document-directory}/*.dod.*.md | sort | tail -1) and FINAL_GATE=$(ls {document-directory}/*.gate.*.yml …); the bug-mode pr-comment marker promises the bug DoD and the verify-loop verdict but changes neither derivation, so for a story/task bug co-located with its parent (task.67.dod.1 sorts after task.67.bug.3.dod.1; the parent''s gate is the only gate) the canonical PR comment publishes the PARENT''s DoD path and gate verdict as the bug''s. 6b already keys on ${STEM}; 7.7 does not.'
+    suggested_action: 'In bug mode key DOD_PATH on ${STEM}.dod.*.md and set FINAL_GATE to the verify-loop verdict instead of globbing gates; cover with an executed fixture test holding both a parent''s and a bug''s artefacts.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.8.finalise-pr-comment-globs-parent-dod-and-gate-for-a-co-located-bug.md'
+  - id: 'TASK-125-BUG-9'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The qa-reports bug-mode marker leaves Step 2''s {story-directory}/*.qa.*.md and *.gate.*.yml globs directory-wide and says to ingest whatever is found; for a story or task bug the directory is the parent''s, so the parent''s QA report and gate are read as the bug''s QA record on every such run.'
+    suggested_action: 'Scope the Step 2 globs to ${STEM}.qa.*.md and ${STEM}.gate.*.yml in bug mode and state that a parent''s artefacts in the same directory are not the bug''s evidence.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.9.finalise-step-2-reads-the-parents-qa-artefacts-as-the-bugs.md'
+  - id: 'TASK-125-BUG-10'
+    severity: medium
+    file: 'skills/sync-github-bug/SKILL.md'
+    finding: 'All four sync-github-* edit blocks pass --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT", a variable no block defines (grep: assigned nowhere); an ad-hoc derivation against the verbatim frontmatter value (High) with the issue carrying priority:high yields --add-label priority:high --remove-label priority:high — add then remove, stripping the label on every re-sync. Pre-existing undefined variable; this diff''s lowercasing makes the misfire the likely outcome.'
+    suggested_action: 'Define the derivation in each edit block against the FILTERED new label and pass --remove-label only when the issue''s current priority:* label differs from it; executed test with a fake gh.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.10.remove-label-old-priority-undefined-and-compared-against-verbatim-value.md'
+  - id: 'TASK-125-BUG-11'
+    severity: medium
+    file: 'skills/ensure-epic-github-issue/SKILL.md'
+    finding: 'Enumeration risk: the population guard matches only --(add-)?label "(priority|severity):${, so ensure-epic-github-issue line 127 still passes --label "epic" verbatim to tracker-issue.js --kind create — a repository without an epic label loses the whole epic create by the obs #65 mechanism, and no test sees it.'
+    suggested_action: 'Route ensure-epic through gh_labels_filter and widen the guard to any --label/--add-label inside a fenced block that invokes tracker-issue.js; floor 8.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.11.fixed-label-epic-bypasses-the-helper-and-the-population-guard.md'
+  - id: 'CR-5'
+    severity: low
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The guard ''''|0|*[!0-9]* admits all-zero multi-digit values (00, 000): stakeholder-summary-cli accepts qa-fix-00 so the PR lead posts "cycle 00", while tracker-comment.js isKnownStage rejects it (Number(suffix) > 0) — the two comments disagree, the class the guard was written to close (both blocks).'
+    suggested_action: 'Normalise with $((10#$FIX_CYCLE_ARG)) and reject 0 after the digit check; add 00 to the invalid-arg loop and expect 007 → 7.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 3685
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    notes: 'Boundary: true — gh_labels_filter (new in cycle 1) behind the B5 block. Probed by hand under env -i with a throwaway HOME (probe-boundary-rule §5.1; the helper is a sourced function fed an env value plus gh output, which neither engine entry form reaches), 10 shapes × bash + zsh = 20 executions: every hostile shape refused or inert, nothing written under HOME, the cycle-1 newline case (BUG-6) now refused in both shells. A further 14 hostile executions are committed tests in tests/gh-labels.test.js.'
+  performance:
+    status: PASS
+    notes: 'One gh label list per create/edit; the edit sites gain one gh issue view when BUG-10 is fixed.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-8 and BUG-9 misattribute evidence for two of three bug modes; BUG-10 strips a label on re-sync; BUG-11 fails an epic create whole.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The helper is the right shape and mutation-proved; the population guard is one regex too narrow (BUG-11); a stale count in gh-labels.sh (nine vs seven), a stale extraction comment, and a vacuous indexOf assertion in the mode test (CR-6..8).'
+
+recommendations:
+  immediate:
+    - action: 'Key 7.7 and Step 2 on ${STEM} in bug mode, with an executed fixture test (BUG-8, BUG-9)'
+      refs: ['skills/finalise/SKILL.md', 'evals/shared/tests/finalise-bug-mode.test.mjs']
+    - action: 'Define the --remove-label derivation against the filtered label at all four sync sites (BUG-10); route ensure-epic through the helper and widen the guard (BUG-11)'
+      refs: ['skills/sync-github-bug/SKILL.md', 'skills/sync-github-story/SKILL.md', 'skills/sync-github-task/SKILL.md', 'skills/sync-github-epic/SKILL.md', 'skills/ensure-epic-github-issue/SKILL.md', 'tests/gh-labels.test.js']
+  future:
+    - action: 'CR-5: reject 00 in the fix_cycle guard; CR-6/7/8: header count, extraction comment, indexOf assertion'
+      refs: ['skills/qa-fix/SKILL.md', 'shared/resources/gh-labels.sh', 'tests/ensure-bug-label-tolerance.test.js', 'evals/shared/tests/finalise-bug-mode.test.mjs']
+    - action: 'Pre-existing (identical on origin/develop): sync-github-{task,story,epic} discovery blocks fail under the snippet engine because --copy does not seed docs/ at the expected path; harness configuration, not the diff'
+      refs: ['skills/sync-github-task/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 4
+  fix_date: '2026-09-21'
+  total_iterations: 1
+  verification_method: 'Each cycle-1 fix re-executed against the committed head (BUG-1 end-to-end with a fake gh; BUG-4 registry-tick on a header-block task bug; BUG-5 kind block under bash + zsh; BUG-2/3/6/7 via their executing tests) — not inherited from the fix commit'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['BUG-8 fixed with an executed fixture test', 'BUG-9..11 fixed with their named tests']

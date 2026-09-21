@@ -1,0 +1,121 @@
+schema: 1
+task: 'task.125.develop-bug-finalise-mode-and-issue-create'
+task_title: "develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
+gate: FAIL
+status_reason: 'All three phases delivered, 3654/3654 suite green, four new test files. One HIGH: tracker-issue.js pipes gh stderr only in gh(), and the withStdin path every --body-file create takes — the exact call site obs #65 describes — still ignores it (reproduced end-to-end with a fake gh). Six MEDIUM: gh label list at its default limit 30 strips real labels; the label normalisation was fixed at one of three sites (sync-github-bug edit still verbatim); registry-tick answers not-accepted, not not-a-task, for a header-block task bug; a general bug without --bug resolves DOC_KIND to the empty string (executed); a newline in a priority value passes grep -F and reaches --label (probed); fix_cycle is taken on trust with no positive-integer check. Two LOW and one cleanup advisory.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T04:59:54Z'
+
+top_issues:
+  - id: 'TASK-125-BUG-1'
+    severity: high
+    file: 'shared/resources/tracker-issue.js'
+    finding: 'GH_EXEC_STDIO pipes stderr only inside gh(); perform() routes create/edit through withStdin() whenever --body-file is passed, which still spawns with stdio ["pipe","pipe","ignore"] — ensure-bug-github-issue always passes --body-file, so on that path gh''s label line is still dropped (end-to-end: fake gh on PATH, --body-file → message names the argv only; without --body-file → the line is present). The §9 tests all omit --body-file.'
+    suggested_action: 'Pipe stderr in withStdin too (keep stdin piped) and add a §9 case that creates with --body-file, in-process and end-to-end; mutation: revert the stdio and that case goes red.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.1.tracker-issue-body-file-path-still-drops-stderr.md'
+  - id: 'TASK-125-BUG-2'
+    severity: medium
+    file: 'skills/ensure-bug-github-issue/SKILL.md'
+    finding: 'gh label list --json name runs at gh''s default --limit 30 (confirmed: gh label list --help), so on a repository with more than 30 labels a real label past the first page is reported "not defined in this repository — skipped" and stripped from the create.'
+    suggested_action: 'Pass an explicit high limit (-L 1000) and add a test case whose fake gh emits the wanted label only when the limit flag is present.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.2.gh-label-list-default-limit-30-strips-real-labels.md'
+  - id: 'TASK-125-BUG-3'
+    severity: medium
+    file: 'skills/sync-github-bug/SKILL.md'
+    finding: 'Enumeration risk: the normalise-and-filter loop was applied at ensure-bug-github-issue B5 only; sync-github-bug lines 130–131 still pass --add-label "priority:${PRIORITY}" --add-label "severity:${SEVERITY}" verbatim to --kind edit, and the story/task ensure/sync sites pass priority:${priority} unchecked — nothing enumerates the population (grep -rn -- "--label\|--add-label" skills/*/SKILL.md finds 9 sites).'
+    suggested_action: 'Move the loop into a shared references helper sourced by every site (at minimum apply it to sync-github-bug''s edit path) and add a population guard test with a non-vacuity floor over the sites known today.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.3.label-normalisation-fixed-at-one-of-three-sites.md'
+  - id: 'TASK-125-BUG-4'
+    severity: medium
+    file: 'shared/resources/registry-tick.js'
+    finding: 'The registry-tick marker promises not-a-task on a bug run, but registry-tick.js keys on the ^task\.(\d+)\. stem (line 237) and lets an absent type: through by design, so a header-block task bug task.67.bug.3.*.md — the frontmatter-less shape this diff supports via bug-doc.js — is read as task 67 and answers not-accepted, whose Step 7.4 row says "Investigate — step 2 above should have set it", a step bug mode skips.'
+    suggested_action: 'Treat a stem containing .bug.<N>. as not-a-task before the id match, with a test for the header-block task-bug shape.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.4.registry-tick-task-bug-stem-is-not-not-a-task.md'
+  - id: 'TASK-125-BUG-5'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Executed under bash and zsh: /finalise <general-bug-file> without --bug matches neither story.* nor task.*, so DOC_KIND resolves to "" and the hint reads "continuing in  mode as invoked" — a third, undefined kind every later branch on DOC_KIND then sees; the breaking-changes promise ("without --bug continues to do what it does today") does not hold for general bugs.'
+    suggested_action: 'Default DOC_KIND=task on no prefix match so the hint names the kind; add the general-bug-no-flag case to finalise-bug-mode.test.mjs by executing the block.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.5.general-bug-without-bug-flag-resolves-empty-doc-kind.md'
+  - id: 'TASK-125-BUG-6'
+    severity: medium
+    file: 'skills/ensure-bug-github-issue/SKILL.md'
+    finding: 'Boundary probe (by hand, minimal env, bash + zsh): a priority value containing a newline (high<LF>foo) passes printf ''%s\n'' "$REPO_LABELS" | grep -qxF "$l" because grep -F reads a multi-line pattern as several patterns and priority:high is real, so priority:high<LF>foo reaches --label and gh rejects the whole create — the class obs #65 closed. Present-but-inert for this input; the other nine hostile shapes were refused or inert.'
+    suggested_action: 'Refuse a candidate that is not a single line before the existence check, and add the newline case to tests/ensure-bug-label-tolerance.test.js.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.6.label-filter-multiline-value-passes-grep-f.md'
+  - id: 'TASK-125-BUG-7'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'Both FIX_CYCLE blocks use $FIX_CYCLE_ARG unchecked (FIX_CYCLE=$FIX_CYCLE_ARG; rc=0) although the Skill-args section promises a positive-integer binding; an unsubstituted {N}, 0 or "3 " yields --stage qa-fix-{N}, which the lead CLI rejects (exit 2) and the || exit 1 then aborts the whole pull-request block — a failure the helper path could never produce.'
+    suggested_action: 'Guard inside both blocks before the precedence if (case "${FIX_CYCLE_ARG:-}" in ""|0|*[!0-9]*) FIX_CYCLE_ARG="" ;; esac) and add [fix_cycle] cases for {N} and 0 expecting the helper/refusal path.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.7.fix-cycle-arg-taken-on-trust-no-positive-integer-check.md'
+  - id: 'CR-6'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The read-document marker says bug-doc.js''s JSON carries pr_number and top-level status/severity/priority; describe() (bug-doc.js:536–561) exposes no pr_number and nests those three under fields, so PR_NUMBER has no stated source in bug mode (Step 3a''s own grep of pr_number:/PR #NNN on the document is what actually supplies it).'
+    suggested_action: 'Correct the marker to name fields.status/severity/priority and say PR_NUMBER comes from Step 3a''s existing derivation over the bug file.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 20
+
+evidence:
+  tests_reviewed: 3654
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 32
+    notes: 'Boundary: true — two new predicates, neither reachable by the engine''s one-argument shell form (the label filter consumes an env value plus gh output; the kind block consumes argv plus a flag), so both were probed by hand under env -i with a throwaway HOME (probe-boundary-rule §5.1), under bash and zsh. Label filter: 10 hostile/legitimate shapes × 2 shells = 20 executions — glob, leading -, $(…), backticks, quote-injection, ../, empty, prefix-doubling all refused or inert, no file written under HOME; the newline shape is present-but-inert (BUG-6). Kind block: 6 inputs × 2 shells = 12 executions — bug path without the flag resolves DOC_KIND="" (BUG-5). No injection surface reached; the bash blocks never interpolate the values into a command string.'
+  performance:
+    status: PASS
+    notes: 'One gh label list per bug create (SC6 met); stderr pipe adds no cost on success.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-1 leaves the motivating failure path unchanged; BUG-2 and BUG-6 reintroduce the whole-create failure on larger repos / malformed values; BUG-7 turns a skipped comment into an aborted block.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Skip table + bidirectional test is the right shape; BUG-3 leaves the label rule stated at one of three sites with no population guard; BUG-4 marker promise contradicts the engine; CR-6 marker names fields the reader does not return.'
+
+recommendations:
+  immediate:
+    - action: 'Pipe stderr on the withStdin path and cover --body-file in §9 (BUG-1)'
+      refs: ['shared/resources/tracker-issue.js', 'shared/resources/tests/tracker-issue.test.mjs']
+    - action: 'gh label list -L 1000; single-line guard on label candidates; shared helper + population guard across the 9 label sites (BUG-2, BUG-6, BUG-3)'
+      refs: ['skills/ensure-bug-github-issue/SKILL.md', 'skills/sync-github-bug/SKILL.md', 'tests/ensure-bug-label-tolerance.test.js']
+    - action: 'registry-tick.js: .bug.<N>. stem → not-a-task (BUG-4); DOC_KIND default on no prefix match (BUG-5); positive-integer guard in both qa-fix blocks (BUG-7)'
+      refs: ['shared/resources/registry-tick.js', 'skills/finalise/SKILL.md', 'skills/qa-fix/SKILL.md']
+  future:
+    - action: 'CR-7: key the label pass-through on gh label list''s exit code rather than an empty string (a zero-label repo and a failed read report one value)'
+      refs: ['skills/ensure-bug-github-issue/SKILL.md']
+    - action: 'CR-8: declare GH_EXEC_STDIO beside GIT_EXEC_OPTS; also trim e.message to its first line so the plain path does not print the stderr line twice'
+      refs: ['shared/resources/tracker-issue.js']
+    - action: 'Pre-existing (not this diff): qa-fix SKILL.md line 937 block ends on [ … = null ] && …, exit 1 when FIX_ISSUE is set — identical under bash and zsh; harmless outside set -e'
+      refs: ['skills/qa-fix/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['BUG-1 fixed and covered by a --body-file test', 'BUG-2..7 fixed with their named tests']

@@ -161,12 +161,18 @@ the common case. Never leave an empty heading behind.}
 📁 \`${TASK_RELATIVE_PATH}\`
 EOF
 
+# A label the repository does not define fails the WHOLE create; the shared
+# helper drops it with a warning instead (task.125, TASK-125-BUG-3).
+source references/gh-labels.sh || exit 1
+LABEL_ARGS=()
+while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--label "$l"); done \
+  < <(gh_labels_filter "task" "priority:${priority}")
+
 TASK_ISSUE_NUM=$(node references/tracker-issue.js \
   --kind create \
   --title "[Task ${TASK_N}] ${TASK_TITLE}" \
   --body-file .claude/state/issue-body.md \
-  --label "task" \
-  --label "priority:${priority}" \
+  "${LABEL_ARGS[@]}" \
   --milestone "${MILESTONE_TITLE}")
 ```
 

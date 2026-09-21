@@ -235,7 +235,14 @@ async function main() {
   }
 
   const base = path.basename(opts.file);
-  const idMatch = base.match(/^task\.(\d+)\./);
+  // A task BUG — `task.67.bug.3.name.md` — carries the task's stem and, in its
+  // header-block shape, no `type:` to contradict it, so the id match below read
+  // it as task 67 and answered `not-accepted` (the bug's own status) where
+  // `finalise --bug` had been promised `not-a-task` (TASK-125-BUG-4). The
+  // `.bug.<N>.` segment is what a task document never has; it decides before
+  // the stem does.
+  const isBugStem = /(^|\.)bug\.\d+\./.test(base);
+  const idMatch = isBugStem ? null : base.match(/^task\.(\d+)\./);
   const docText = fs.readFileSync(opts.file, "utf8");
   const docType = (frontmatterField(docText, "type") || "").toLowerCase();
 

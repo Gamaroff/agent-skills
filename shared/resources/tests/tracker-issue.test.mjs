@@ -1302,3 +1302,343 @@ test("§11 a slug with shell metacharacters is refused, from every source", () =
     2,
   );
 });
+
+// ── §9 A failure names gh's own reason — task.125 (obs #65) ─────────────────
+//
+// `gh issue create --label severity:Major` against a repo whose labels are
+// lowercase and carry no `severity:*` fails the WHOLE create, and gh says why
+// on stderr in one line. The engine used to run gh with stderr ignored and
+// report "create a GitHub issue failed: Command failed: gh issue create …" —
+// the argv, and nothing about the label. The line that names the real problem
+// must reach the log, for every kind, without the operator re-running the
+// command by hand.
+
+test("§9 the failure warning carries gh's first non-empty stderr line, then the argv", () => {
+  const dir = withRepo();
+  const execImpl = (bin, argv) => {
+    const joined = argv.join(" ");
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "acme/repo";
+    if (argv[0] === "issue" && argv[1] === "create") {
+      const e = new Error(`Command failed: gh ${joined}`);
+      // execFileSync's shape: stderr attached to the thrown error.
+      e.stderr = "\n\ncould not add label: 'severity:Major' not found\n";
+      throw e;
+    }
+    throw new Error(`unexpected gh call: ${joined}`);
+  };
+  const warnings = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnings.push(a.join(" "));
+  let r;
+  try {
+    r = cli.run({
+      argv: [
+        "node",
+        "tracker-issue.js",
+        "--kind",
+        "create",
+        "--title",
+        "T",
+        "--repo",
+        "acme/repo",
+        "--label",
+        "severity:Major",
+      ],
+      repoRoot: dir,
+      env: {},
+      execImpl,
+    });
+  } finally {
+    console.warn = origWarn;
+  }
+  assert.equal(r.reason, "failed");
+  assert.equal(
+    r.error,
+    "could not add label: 'severity:Major' not found",
+    "the payload carries the stderr line, trimmed, blank lines skipped",
+  );
+  assert.equal(warnings.length, 1);
+  assert.match(
+    warnings[0],
+    /^⚠️  create a GitHub issue failed: could not add label: 'severity:Major' not found \(Command failed: gh issue create /,
+    "stderr line first, argv after it",
+  );
+});
+
+test("§9 the stderr line is surfaced for every kind, not only create", () => {
+  const dir = withRepo();
+  const { execImpl: base } = stubGh();
+  const execImpl = (bin, argv, opts) => {
+    if (argv[0] === "issue" && argv[1] === "close") {
+      const e = new Error(`Command failed: gh ${argv.join(" ")}`);
+      e.stderr = "GraphQL: Could not resolve to an issue (closeIssue)\n";
+      throw e;
+    }
+    return base(bin, argv, opts);
+  };
+  const warnings = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnings.push(a.join(" "));
+  let r;
+  try {
+    r = cli.run({
+      argv: ["node", "tracker-issue.js", "--kind", "close", "--issue", "42"],
+      repoRoot: dir,
+      env: {},
+      execImpl,
+    });
+  } finally {
+    console.warn = origWarn;
+  }
+  assert.equal(r.reason, "failed");
+  assert.match(
+    warnings[0],
+    /close a GitHub issue failed: GraphQL: Could not resolve to an issue/,
+  );
+});
+
+test("§9 an error with no stderr still reports the argv — the old message, not a blank", () => {
+  const dir = withRepo();
+  const { execImpl } = stubGh({ failOn: "issue create" });
+  const warnings = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnings.push(a.join(" "));
+  let r;
+  try {
+    r = cli.run({
+      argv: [
+        "node",
+        "tracker-issue.js",
+        "--kind",
+        "create",
+        "--title",
+        "T",
+        "--repo",
+        "acme/repo",
+      ],
+      repoRoot: dir,
+      env: {},
+      execImpl,
+    });
+  } finally {
+    console.warn = origWarn;
+  }
+  assert.equal(r.reason, "failed");
+  assert.match(
+    warnings[0],
+    /^⚠️  create a GitHub issue failed: gh failed: issue create/,
+  );
+  assert.match(r.error, /^gh failed: issue create /);
+});
+
+test("§9 END-TO-END: a real gh subprocess that rejects a label puts its line in the warning", () => {
+  // Through a real subprocess and a fake `gh` on PATH that behaves as the
+  // real one does on an unknown label: one line on stderr, exit 1. This is the
+  // half the in-process tests cannot see — that the engine actually PIPES
+  // stderr. With `stdio: ["ignore", "pipe", "ignore"]` the in-process tests
+  // above still pass (the stub attaches e.stderr itself) and this one goes red.
+  const dir = withRepo();
+  const bin = join(dir, "bin");
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    join(bin, "gh"),
+    [
+      "#!/bin/sh",
+      'case "$1 $2" in',
+      '  "auth status") exit 0 ;;',
+      '  "repo view") echo acme/repo ;;',
+      '  "issue create") echo "could not add label: \'severity:Major\' not found" >&2; exit 1 ;;',
+      "  *) exit 1 ;;",
+      "esac",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  const res = spawnSync(
+    process.execPath,
+    [
+      CLI_PATH,
+      "--kind",
+      "create",
+      "--title",
+      "T",
+      "--repo",
+      "acme/repo",
+      "--label",
+      "severity:Major",
+    ],
+    {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    },
+  );
+  assert.equal(
+    res.stdout,
+    "",
+    "no number on stdout — the create did not happen",
+  );
+  assert.match(
+    res.stderr,
+    /create a GitHub issue failed: could not add label: 'severity:Major' not found/,
+    "the line gh wrote reaches the operator",
+  );
+});
+
+// ── §9b The --body-file path — TASK-125-BUG-1 ────────────────────────────────
+//
+// QA cycle 1 found the stderr pipe applied to `gh()` only, while `perform()`
+// routes every `--body-file` create/edit through `withStdin()`, which still
+// spawned with stderr ignored — and ensure-bug-github-issue ALWAYS passes
+// --body-file. The §9 tests above all omit it, so they were green on a fix
+// that never reached the call site obs #65 was filed against. These pin the
+// body-file path on both halves: the stdio the create is spawned with
+// (in-process — a stub cannot see stderr the parent never captured, so it
+// asserts the option), and the line reaching the operator (end-to-end).
+
+test("§9b a --body-file create is spawned with stderr PIPED, and its stderr line is surfaced", () => {
+  const dir = withRepo();
+  writeFileSync(join(dir, "body.md"), "body\n");
+  let createStdio = null;
+  const execImpl = (bin, argv, opts) => {
+    const joined = argv.join(" ");
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "acme/repo";
+    if (argv[0] === "issue" && argv[1] === "create") {
+      createStdio = opts && opts.stdio;
+      const e = new Error(
+        `Command failed: gh ${joined}\ncould not add label: 'severity:Major' not found`,
+      );
+      e.stderr = "could not add label: 'severity:Major' not found\n";
+      throw e;
+    }
+    throw new Error(`unexpected gh call: ${joined}`);
+  };
+  const warnings = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnings.push(a.join(" "));
+  let r;
+  try {
+    r = cli.run({
+      argv: [
+        "node",
+        "tracker-issue.js",
+        "--kind",
+        "create",
+        "--title",
+        "T",
+        "--repo",
+        "acme/repo",
+        "--body-file",
+        join(dir, "body.md"),
+        "--label",
+        "severity:Major",
+      ],
+      repoRoot: dir,
+      env: {},
+      execImpl,
+    });
+  } finally {
+    console.warn = origWarn;
+  }
+  assert.deepEqual(
+    createStdio,
+    ["pipe", "pipe", "pipe"],
+    "the --body-file spawn must pipe stderr (stdin stays piped for the body)",
+  );
+  assert.equal(r.reason, "failed");
+  assert.equal(r.error, "could not add label: 'severity:Major' not found");
+  assert.match(
+    warnings[0],
+    /^⚠️  create a GitHub issue failed: could not add label: 'severity:Major' not found \(Command failed: gh issue create [^\n]*\)$/,
+    "stderr line first, then ONLY the first line of the argv message — the line is not printed twice",
+  );
+});
+
+test("§9b END-TO-END: a --body-file create against a real gh subprocess surfaces gh's line", () => {
+  const dir = withRepo();
+  writeFileSync(join(dir, "body.md"), "body\n");
+  const bin = join(dir, "bin");
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    join(bin, "gh"),
+    [
+      "#!/bin/sh",
+      'case "$1 $2" in',
+      '  "auth status") exit 0 ;;',
+      '  "repo view") echo acme/repo ;;',
+      // Drain stdin like the real gh does with --body-file -, then refuse.
+      '  "issue create") cat >/dev/null; echo "could not add label: \'severity:Major\' not found" >&2; exit 1 ;;',
+      "  *) exit 1 ;;",
+      "esac",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  const res = spawnSync(
+    process.execPath,
+    [
+      CLI_PATH,
+      "--kind",
+      "create",
+      "--title",
+      "T",
+      "--repo",
+      "acme/repo",
+      "--body-file",
+      "body.md",
+      "--label",
+      "severity:Major",
+    ],
+    {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    },
+  );
+  assert.equal(
+    res.stdout,
+    "",
+    "no number on stdout — the create did not happen",
+  );
+  assert.match(
+    res.stderr,
+    /create a GitHub issue failed: could not add label: 'severity:Major' not found \(Command failed: gh issue create /,
+    "the line gh wrote reaches the operator on the --body-file path",
+  );
+  assert.equal(
+    (res.stderr.match(/could not add label/g) || []).length,
+    1,
+    "the stderr line is printed once, not echoed again from execFileSync's message",
+  );
+});
+
+test("§9b a --body-file edit takes the same piped-stderr path", () => {
+  const dir = withRepo();
+  writeFileSync(join(dir, "body.md"), "body\n");
+  let editStdio = null;
+  const { execImpl: base } = stubGh();
+  const execImpl = (bin, argv, opts) => {
+    if (argv[0] === "issue" && argv[1] === "edit") {
+      editStdio = opts && opts.stdio;
+      return "";
+    }
+    return base(bin, argv, opts);
+  };
+  const r = cli.run({
+    argv: [
+      "node",
+      "tracker-issue.js",
+      "--kind",
+      "edit",
+      "--issue",
+      "42",
+      "--body-file",
+      join(dir, "body.md"),
+    ],
+    repoRoot: dir,
+    env: {},
+    execImpl,
+  });
+  assert.equal(r.reason, "performed");
+  assert.deepEqual(editStdio, ["pipe", "pipe", "pipe"]);
+});
