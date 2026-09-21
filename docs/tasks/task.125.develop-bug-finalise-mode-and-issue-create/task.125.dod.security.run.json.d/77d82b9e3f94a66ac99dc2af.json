@@ -1,0 +1,19 @@
+{
+  "sink": "filename",
+  "entry": "shell:shared/resources/gh-labels.sh",
+  "name": null,
+  "call_site": null,
+  "verdict": "absent",
+  "reason": "no-hostile-case-was-rejected",
+  "executed": 28,
+  "passed": 0,
+  "reproduced": 18,
+  "overblocked": 10,
+  "declined": 0,
+  "escaped": 0,
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "ran_at": "2026-09-21T09:35:11.137Z"
+}

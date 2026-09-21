@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-23
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-9 review CR-1 (reviewer confidence medium; verified by QA: `printf '**Verdict**: {PASS / FAIL}\n' | grep -oE 'PASS|FAIL' | head -1` → `PASS`; the template line is `develop-bug-step-5-6-verify-loop.md:67`)
@@ -54,6 +54,15 @@ Refuse a verdict line containing `{`; extract the first token after the colon wi
 **Verification Steps for QA**:
 1. Run `evals/shared/tests/finalise-bug-mode.test.mjs`; revert the `sed` first-word extraction to `grep -oE 'PASS|FAIL'` and confirm the placeholder case goes red.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 10 (Re-Review Context table of `task.125.qa.10.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: {PASS / FAIL}, **PASSED**, pending… refused; bolded and trailing-prose forms read.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -61,3 +70,4 @@ Refuse a verdict line containing `{`; extract the first token after the colon wi
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 9 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 10 — {PASS / FAIL}, **PASSED**, pending… refused; bolded and trai… |

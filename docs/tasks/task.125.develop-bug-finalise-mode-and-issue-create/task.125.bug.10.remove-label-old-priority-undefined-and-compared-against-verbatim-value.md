@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-10
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-2 refute review CR-3; verified by grep: `OLD_PRIORITY_LABEL_IF_DIFFERENT` is assigned nowhere in sync-github-{bug,story,task,epic}
@@ -55,6 +55,15 @@ Define the derivation in each edit block: capture the filtered lines, take the `
 1. Run the named test file(s); revert the named mechanism and confirm the named tests go red.
 2. `npm run ci:fast` green; `npm run bundle:check` 0 problems.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 3 (Re-Review Context table of `task.125.qa.3.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: --remove-label derived against the filtered label; executed ×3.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -62,3 +71,4 @@ Define the derivation in each edit block: capture the filtered lines, take the `
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 2 (refute pass) |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 3 — --remove-label derived against the filtered label; executed … |

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: QA Step 4b execution of the Document-kind block under bash and zsh (6 inputs × 2 shells)
@@ -55,6 +55,15 @@ Default `DOC_KIND=task` when the basename matches neither prefix (`*) DOC_KIND=t
 1. Run the named test file(s); revert the named mechanism and confirm the named tests go red.
 2. `npm run ci:fast` green; `npm run bundle:check` 0 problems.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 2 (Re-Review Context table of `task.125.qa.2.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: kind block executed under bash + zsh: bug.* without --bug → task.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -62,3 +71,4 @@ Default `DOC_KIND=task` when the basename matches neither prefix (`*) DOC_KIND=t
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 1 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 2 — kind block executed under bash + zsh: bug.* without --bug → … |

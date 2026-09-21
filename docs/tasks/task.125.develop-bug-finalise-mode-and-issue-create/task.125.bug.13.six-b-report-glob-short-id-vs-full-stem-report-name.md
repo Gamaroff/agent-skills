@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-13
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-4 review CR-1 (reviewer confidence high; verified by QA by executing the 6b glob against real bug directories — see Steps to Reproduce)
@@ -67,6 +67,15 @@ Glob both prefixes in 6b; strip `*` / take the first `PASS|FAIL` token from the 
 1. `for STEM in bug.14 bug.12; do D=$(ls -d docs/bugs/${STEM}.*/); find $D -maxdepth 1 \( -name "${STEM}.implementation.*.md" -o -name "${STEM}.*.implementation.*.md" \); done` — both found, under bash and zsh.
 2. Run `evals/shared/tests/finalise-bug-mode.test.mjs`; revert the `find` to the short-only glob and confirm the full-stem cases go red.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 5 (Re-Review Context table of `task.125.qa.5.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: find over both report shapes against docs/bugs/bug.14 (full stem) and bug.12 (short) under bash + zsh.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -74,3 +83,4 @@ Glob both prefixes in 6b; strip `*` / take the first `PASS|FAIL` token from the 
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 4 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 5 — find over both report shapes against docs/bugs/bug.14 (full … |

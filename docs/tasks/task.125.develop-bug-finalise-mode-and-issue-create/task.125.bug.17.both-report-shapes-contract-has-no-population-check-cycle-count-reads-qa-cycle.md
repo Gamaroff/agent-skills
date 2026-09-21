@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-17
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-5 review CR-5 (reviewer confidence high; verified by QA: `grep -c '^### QA Cycle'` at finalise 6a vs `grep -h -oE '^### (QA|Verify) Cycle' docs/bugs/*/*.implementation.*.md` → 25 × `Verify Cycle`, 0 × `QA Cycle`; the verify loop's line 242 `git reset` uses `**/*.implementation.*.md` (both shapes) but line 244's `exclude={bug-prefix}.implementation.*.md` is short-only)
@@ -55,6 +55,15 @@ Add `evals/shared/tests/…` (or extend `finalise-bug-mode.test.mjs`) with the e
 **Verification Steps for QA**:
 1. Run `evals/shared/tests/finalise-bug-mode.test.mjs`; apply the mutation named above and confirm the red.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 6 (Re-Review Context table of `task.125.qa.6.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: cycle count = 3 on a real Verify-Cycle report; enumeration test green.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -62,3 +71,4 @@ Add `evals/shared/tests/…` (or extend `finalise-bug-mode.test.mjs`) with the e
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 5 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 6 — cycle count = 3 on a real Verify-Cycle report; enumeration t… |

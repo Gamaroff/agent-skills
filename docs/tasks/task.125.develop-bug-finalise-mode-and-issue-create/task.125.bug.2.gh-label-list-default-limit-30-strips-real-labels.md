@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Diff code review CR-2 (verified: gh's documented default limit is 30)
@@ -58,6 +58,15 @@ Pass an explicit high limit (`gh label list --json name -L 1000 -q '.[].name'`) 
 1. Run the named test file(s); revert the named mechanism and confirm the named tests go red.
 2. `npm run ci:fast` green; `npm run bundle:check` 0 problems.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 2 (Re-Review Context table of `task.125.qa.2.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: gh label list --limit 1000 + population guard executed at 7 sites.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -65,3 +74,4 @@ Pass an explicit high limit (`gh label list --json name -L 1000 -q '.[].name'`) 
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 1 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 2 — gh label list --limit 1000 + population guard executed at 7 … |

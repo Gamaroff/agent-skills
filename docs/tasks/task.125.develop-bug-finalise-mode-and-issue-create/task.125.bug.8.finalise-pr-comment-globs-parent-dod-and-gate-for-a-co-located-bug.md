@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-8
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-2 refute review CR-1 (verified: `ls docs/tasks/task.67.*/*.dod.*.md | sort | tail -1` sorts `task.67.dod.1` after `task.67.bug.3.dod.1`; the parent's `task.67.gate.2` is the only gate in the directory)
@@ -57,6 +57,15 @@ Add the bug-mode substitution to 7.7 explicitly: `DOD_PATH=$(ls {document-direct
 1. Run the named test file(s); revert the named mechanism and confirm the named tests go red.
 2. `npm run ci:fast` green; `npm run bundle:check` 0 problems.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 3 (Re-Review Context table of `task.125.qa.3.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: 6b keyed on ${STEM}; executed fixture with a parent DoD beside the bug's.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -64,3 +73,4 @@ Add the bug-mode substitution to 7.7 explicitly: `DOD_PATH=$(ls {document-direct
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 2 (refute pass) |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 3 — 6b keyed on ${STEM}; executed fixture with a parent DoD besi… |

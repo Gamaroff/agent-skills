@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-11
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-2 refute review CR-4 (verified: line 127 passes `--label "epic"` straight to `tracker-issue.js --kind create`; the guard regex requires `(priority|severity):${`)
@@ -56,6 +56,15 @@ Route ensure-epic through the helper (`gh_labels_filter "epic"`), widen the guar
 1. Run the named test file(s); revert the named mechanism and confirm the named tests go red.
 2. `npm run ci:fast` green; `npm run bundle:check` 0 problems.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 3 (Re-Review Context table of `task.125.qa.3.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: epic label through the helper; guard at 9 sites.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -63,3 +72,4 @@ Route ensure-epic through the helper (`gh_labels_filter "epic"`), widen the guar
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 2 (refute pass) |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 3 — epic label through the helper; guard at 9 sites |

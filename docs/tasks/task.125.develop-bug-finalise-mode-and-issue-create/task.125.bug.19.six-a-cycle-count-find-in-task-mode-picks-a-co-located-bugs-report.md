@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-19
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-7 review CR-1 (reviewer confidence high; reproduced by QA: STEM=task.67 beside `task.67.bug.3.implementation.2.*` → CYCLES=3 from the bug's report, under bash + zsh)
@@ -54,6 +54,15 @@ Bind `DOC_KIND` in the cycle-count block; second `-name` only when bug; fixture 
 **Verification Steps for QA**:
 1. Run `evals/shared/tests/finalise-bug-mode.test.mjs`; apply the mutation named above and confirm the red.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 8 (Re-Review Context table of `task.125.qa.8.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: parent beside its bug counts its own report under bash + zsh.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -61,3 +70,4 @@ Bind `DOC_KIND` in the cycle-count block; second `-name` only when bug; fixture 
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 7 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 8 — parent beside its bug counts its own report under bash + zsh |

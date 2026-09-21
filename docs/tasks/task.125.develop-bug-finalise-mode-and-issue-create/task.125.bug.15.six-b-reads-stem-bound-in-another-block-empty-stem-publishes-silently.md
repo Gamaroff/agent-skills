@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-15
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-5 review CR-2 (reviewer confidence high; reproduced by QA: the 6b block run with STEM unset under bash and zsh → `DOD_PATH=[] FINAL_GATE=[] DOC_KIND=[task]`, exit 0)
@@ -54,6 +54,15 @@ Add `STEM="{… the same placeholder as 6a}"` at the top of 6b and `[ -n "$STEM"
 **Verification Steps for QA**:
 1. Run `evals/shared/tests/finalise-bug-mode.test.mjs`; apply the mutation named above and confirm the red.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 6 (Re-Review Context table of `task.125.qa.6.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: STEM unset → HALT in 6b/7.6a/7.6b, executed.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -61,3 +70,4 @@ Add `STEM="{… the same placeholder as 6a}"` at the top of 6b and `[ -n "$STEM"
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 5 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 6 — STEM unset → HALT in 6b/7.6a/7.6b, executed |

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-16
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-5 review CR-4 (reviewer confidence medium; verified by QA by reading lines 1199 and 1257 against the `acceptance-commit` / `pushed-assertions` markers at 1232 and 1263, which describe a different artefact list and a *replaced* assertion in prose)
@@ -54,6 +54,15 @@ In 6a: `ARTEFACTS=(…)` chosen by `DOC_KIND`; in 6b: `FINAL_ASSERT` chosen by `
 **Verification Steps for QA**:
 1. Run `evals/shared/tests/finalise-bug-mode.test.mjs`; apply the mutation named above and confirm the red.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 6 (Re-Review Context table of `task.125.qa.6.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: 7.6a/7.6b bug/task artefact lists and assertions executed.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -61,3 +70,4 @@ In 6a: `ARTEFACTS=(…)` chosen by `DOC_KIND`; in 6b: `FINAL_ASSERT` chosen by `
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 5 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 6 — 7.6a/7.6b bug/task artefact lists and assertions executed |

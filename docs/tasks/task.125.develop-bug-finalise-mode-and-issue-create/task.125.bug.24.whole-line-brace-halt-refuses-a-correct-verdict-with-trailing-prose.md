@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-24
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-10 review CR-1 + CR-2 (reviewer confidence high / medium; both reproduced by QA under bash: `**Verdict**: PASS — the \`{bug-prefix}\` reader now accepts both shapes` → HALT "unsubstituted template placeholder"; `**Verdict**: PASS / FAIL` and `PASS/FAIL` → `FINAL_GATE=PASS`, exit 0)
@@ -54,6 +54,15 @@ Drop the whole-line brace check; refuse an alternation remainder; branch the dia
 **Verification Steps for QA**:
 1. Run `evals/shared/tests/finalise-bug-mode.test.mjs`; re-introduce a whole-line `*'{'*` HALT and confirm the trailing-prose cases go red.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 11 (Re-Review Context table of `task.125.qa.11.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: 7 refused / 5 accepted shapes with their diagnostics under bash + zsh; the reviewer's 21-shape probe agrees.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -61,3 +70,4 @@ Drop the whole-line brace check; refuse an alternation remainder; branch the dia
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 10 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 11 — 7 refused / 5 accepted shapes with their diagnostics under b… |

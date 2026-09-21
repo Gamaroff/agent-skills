@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-22
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-8 review CR-2 (reviewer confidence medium; verified by QA: `[ "" -gt 0 ]` → `integer expected` → `|| true` → empty line, exit 0)
@@ -54,6 +54,15 @@ Fold the derivation into 6b; delete the separate 6a block; keep the executed cas
 **Verification Steps for QA**:
 1. Run `evals/shared/tests/finalise-bug-mode.test.mjs`; apply the mutation named above and confirm the red.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 9 (Re-Review Context table of `task.125.qa.9.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: CYCLES published by 6b itself (pinned 2 on the fixture).
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -61,3 +70,4 @@ Fold the derivation into 6b; delete the separate 6a block; keep the executed cas
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 8 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 9 — CYCLES published by 6b itself (pinned 2 on the fixture) |

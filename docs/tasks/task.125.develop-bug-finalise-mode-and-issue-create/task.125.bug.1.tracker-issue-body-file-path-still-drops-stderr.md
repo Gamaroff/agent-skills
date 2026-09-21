@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Diff code review CR-1 (verified by reading lines 843–856)
@@ -59,6 +59,15 @@ Spawn `withStdin` with stderr piped (`stdio: ["pipe","pipe","pipe"]`) so `e.stde
 1. Run the named test file(s); revert the named mechanism and confirm the named tests go red.
 2. `npm run ci:fast` green; `npm run bundle:check` 0 problems.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 2 (Re-Review Context table of `task.125.qa.2.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: stderr pipe on the body-file path executed; tracker-issue.test.mjs.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -66,3 +75,4 @@ Spawn `withStdin` with stderr piped (`stdio: ["pipe","pipe","pipe"]`) so `e.stde
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 1 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 2 — stderr pipe on the body-file path executed; tracker-issue.te… |

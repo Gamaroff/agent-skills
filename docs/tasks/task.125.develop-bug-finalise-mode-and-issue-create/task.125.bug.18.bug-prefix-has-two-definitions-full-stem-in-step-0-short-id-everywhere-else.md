@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-18
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-6 review CR-1 (reviewer confidence high; verified by QA by reading `develop-bug-step-0-resolve-bug.md:22` against `develop-bug/SKILL.md:184`, finalise 6a `STEM`, and `bug-doc.js` `bug_id`/`bug_stem`; the corpus confirms the split — `.review.` and `.implementation.` files exist in both shapes, every `.dod.` file is short)
@@ -58,6 +58,15 @@ Rewrite step-0 line 22 (short id + `{bug-file-stem}`), the step-7 links (`./{bug
 1. `grep -n 'bug-prefix\|bug-file-stem' skills/develop-bug/references/develop-bug-step-0-resolve-bug.md` — one definition each.
 2. Revert step-0's short-id line and confirm the definition test goes red.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 7 (Re-Review Context table of `task.125.qa.7.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: one definition line each for {bug-prefix} and {bug-file-stem}; definition test green.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -65,3 +74,4 @@ Rewrite step-0 line 22 (short id + `{bug-file-stem}`), the step-7 links (`./{bug
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 6 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 7 — one definition line each for {bug-prefix} and {bug-file-stem… |

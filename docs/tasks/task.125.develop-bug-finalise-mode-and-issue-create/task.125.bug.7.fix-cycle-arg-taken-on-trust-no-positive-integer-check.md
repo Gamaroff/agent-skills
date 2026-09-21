@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-7
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Diff code review CR-5 (medium confidence), verified by QA: neither block validates; `stakeholder-summary-cli.js --stage qa-fix-{N}` exits 2 → `|| exit 1`
@@ -55,6 +55,15 @@ Guard inside both blocks before the precedence `if`: `case "${FIX_CYCLE_ARG:-}" 
 1. Run the named test file(s); revert the named mechanism and confirm the named tests go red.
 2. `npm run ci:fast` green; `npm run bundle:check` 0 problems.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 2 (Re-Review Context table of `task.125.qa.2.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: fix_cycle positive-integer guard executed in both blocks.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -62,3 +71,4 @@ Guard inside both blocks before the precedence `if`: `case "${FIX_CYCLE_ARG:-}" 
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 1 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 2 — fix_cycle positive-integer guard executed in both blocks |

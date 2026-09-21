@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-12
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-3 review CR-1 (reviewer confidence medium; verified by QA: `grep -n 'VERIFY_VERDICT=' skills/finalise/SKILL.md` → no assignment anywhere; the Step 2 marker says "bind `VERIFY_VERDICT`" in prose)
@@ -55,6 +55,15 @@ In-block: `case " $* " in *" --bug "*) DOC_KIND=bug ;; *) DOC_KIND=${DOC_KIND:-t
 1. Run `evals/shared/tests/finalise-bug-mode.test.mjs`; revert the `case " $* "` re-bind and confirm the 6b cases go red.
 2. `npm run ci:fast` green; `npm run bundle:check` 0 problems.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 4 (Re-Review Context table of `task.125.qa.4.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: 6b run with nothing injected under bash + zsh: bug → bug branch, task → parent's, no verdict → HALT.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -62,3 +71,4 @@ In-block: `case " $* " in *" --bug "*) DOC_KIND=bug ;; *) DOC_KIND=${DOC_KIND:-t
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 3 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 4 — 6b run with nothing injected under bash + zsh: bug → bug bra… |

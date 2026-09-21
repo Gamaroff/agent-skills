@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-14
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-5 review CR-1 (reviewer confidence high; reproduced by QA: `find` over a fixture with `bug.14.precompact-hook.implementation.1.old.md` beside `bug.14.implementation.2.new.md` → the `.1.` report)
@@ -58,6 +58,15 @@ Extract N with `sed -E 's/.*\.implementation\.([0-9]+)\..*/\1 &/' | sort -n | ta
 **Verification Steps for QA**:
 1. Run `evals/shared/tests/finalise-bug-mode.test.mjs`; apply the mutation named above and confirm the red.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 6 (Re-Review Context table of `task.125.qa.6.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: numeric ordering picks implementation.2 over an older full-stem implementation.1 under bash + zsh.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -65,3 +74,4 @@ Extract N with `sed -E 's/.*\.implementation\.([0-9]+)\..*/\1 &/' | sort -n | ta
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 5 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 6 — numeric ordering picks implementation.2 over an older full-s… |

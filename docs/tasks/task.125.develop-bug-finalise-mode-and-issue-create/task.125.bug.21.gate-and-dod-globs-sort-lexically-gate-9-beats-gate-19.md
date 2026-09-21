@@ -4,7 +4,7 @@
 **Bug ID**: TASK-125-BUG-21
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-21
 **Source**: Cycle-8 review CR-1 (reviewer confidence high; reproduced by QA on `docs/tasks/task.110.*`: 19 gates, `ls … | sort | tail -1` → `task.110.gate.9.*`)
@@ -54,6 +54,15 @@ One numeric-ordered lookup shape for `.gate.`, `.dod.` and `.implementation.`; a
 **Verification Steps for QA**:
 1. Run `evals/shared/tests/finalise-bug-mode.test.mjs`; apply the mutation named above and confirm the red.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**QA Engineer**: QA Engineer
+**Verified in**: QA cycle 9 (Re-Review Context table of `task.125.qa.9.develop-bug-finalise-mode-and-issue-create.md`)
+
+**Verification Result**: ✅ Fixed
+**Verification Notes**: gate.19 over gate.9, dod.10 over dod.9 in 6b/7.6a/7.6b.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -61,3 +70,4 @@ One numeric-ordered lookup shape for `.gate.`, `.dod.` and `.implementation.`; a
 | 2026-09-21 | New | QA Engineer | Filed at QA cycle 8 |
 | 2026-09-21 | In Progress | qa-fix | Investigation started |
 | 2026-09-21 | Ready for QA | qa-fix | Fix implemented, mutation-proved |
+| 2026-09-21 | Closed | QA Engineer | Fix verified in QA cycle 9 — gate.19 over gate.9, dod.10 over dod.9 in 6b/7.6a/7.6b |
