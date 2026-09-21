@@ -5,20 +5,20 @@ type: task
 description: "Close the bug-mode residuals task.125's review trail carried out of its QA loop — 7.6b's template-satisfied final assertion, 7.1's append-vs-fill with no bug-mode row, a `PASS or FAIL` verdict reading PASS, one HALT for an unreadable report and a report with no verdict, the `newest_numbered` helper defined once and inlined twice — and produce the feature's missing acceptance evidence: one end-to-end `/finalise --bug` run in a scratch clone against a real bug report, recorded."
 tags: [finalise, develop-bug, bug-mode, dod, qa-task]
 category: refactoring
-status: in-progress
+status: accepted
 priority: Medium
 created: 2026-09-21
 updated: 2026-09-21
 assignee:
 estimated_effort_hours: 8
 risk_level: medium
-pr_number: 456
+pr_number: 459
 github_issue: 450
 ---
 
 # Technical Task: finalise bug-mode residuals and the end-to-end run task.125 never had
 
-**Status:** In Progress
+**Status:** Accepted
 **GitHub Issue**: [#450](https://github.com/Gamaroff/agent-skills/issues/450)
 
 ---
@@ -303,6 +303,8 @@ None.
 
 | 2026-09-21 |  | Status → in-progress | manual |
 | 2026-09-21 |  | Implemented — phases 1–3 and 5 (PR #456): 7.6b asserts the written Final Status; 7.1 fills, never appends; 6b refuses `PASS or FAIL` and HALTs on an unreadable report as such; `newest_numbered` hoisted to `shared/resources/newest-numbered.sh`; +10 executed rows, 3 mutations proved. Phase 4 (end-to-end `/finalise --bug` run) NOT done — hand-driven, no QA loop, no DoD | manual |
+| 2026-09-21 |  | Phase 4 — end-to-end `/finalise --bug` run on bug.14 in a scratch clone: run A → GAPS (CHANGELOG entry for the fix missing; security probe unverifiable — obs #138 class), run B → ACCEPT path through 7.1/7.3/7.4/7.6a/7.6b and the correct 7.6c HALT; 4 Step-8 findings → obs #148; record in `task.138.implementation.1` | manual |
+| 2026-09-21 | 1.1 | Accepted (PR #459) — all five residuals shipped (PR #456) and the feature's end-to-end run recorded; the bug.14 CHANGELOG gap the run found is closed in the same PR. Hand-driven: no QA loop, no DoD file; the implementation report is the evidence | manual |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -310,7 +312,7 @@ None.
 - [x] Phase 1: `newest_numbered` hoisted
 - [x] Phase 2: 6b read-before-grep; reworded verdict refused
 - [x] Phase 3: 7.1 fills; 7.6b asserts the written state
-- [ ] Phase 4: end-to-end run recorded
+- [x] Phase 4: end-to-end run recorded
 - [x] Phase 5: bundle, CHANGELOG
 - [ ] QA: `task.138.qa.[N].finalise-bug-mode-residuals.md`
 - [ ] Gate: `task.138.gate.[N].finalise-bug-mode-residuals.yml`
@@ -325,7 +327,7 @@ None.
 
 ## Notes
 
-- **Phases 1–3 and 5 landed hand-driven on 2026-09-21 (PR #456); Phase 4 is outstanding.** The end-to-end `/finalise --bug` run in a scratch clone is the feature's acceptance evidence and this task does not read `accepted` without it. The task is `in-progress` and remains eligible for `/develop-next` (a pipeline run would execute Phase 4) or a by-hand run per the plan's Phase 4 recipe. Obs #146 stays parked until then.
+- **Phases 1–3 and 5 landed hand-driven on 2026-09-21 (PR #456); Phase 4 ran the same day (PR #459).** The end-to-end record is `task.138.implementation.1.finalise-bug-mode-residuals.md` § End-to-end run. Two things the run changed about the recipe: clone **outside `/tmp`** (the observation-log suite refuses an ephemeral scratch base) and run the suite **before** adding the read-only key (the Jira-transition tests read the live config). The DoD files it produced stay in the scratch clone — a second DoD on a closed bug is the second verdict `body-dod-section` exists to prevent.
 - QA artifacts land beside this file: `task.138.qa.[N].*.md`, `task.138.bug.[N].*.md`, `task.138.gate.[N].*.yml`.
 - Independent of tasks 136 and 137 in outcome. Shares `skills/finalise/SKILL.md` 7.6b with task.137 (its `ls` sites) — land one, rebase the other; not in one worktree. If task.137 lands first, its swept 7.6b lines are what this task's `source` line sits above.
 - The end-to-end run in Phase 4 is by hand in a scratch clone with tracker mutations deferred or read-only; it is never run against this checkout.
