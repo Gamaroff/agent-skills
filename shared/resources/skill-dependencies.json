@@ -162,6 +162,9 @@
   "prd-template": [],
   "qa-fix": [],
   "qa-gate": [],
+  "qa-next": [
+    "create-bug-report"
+  ],
   "qa-planning": [],
   "qa-story": [],
   "qa-task": [],

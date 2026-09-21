@@ -240,9 +240,17 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// A refusal is thrown, never exited: `main` prints it and sets `process.exitCode`
+// so control flow returns and stdout drains. `process.exit()` after a write
+// truncates at ~64KB on a pipe (bug.3, `stdout-drain-on-exit.test.mjs`).
+class UsageError extends Error {
+  constructor(msg, code) {
+    super(msg);
+    this.code = code;
+  }
+}
 function die(msg, code = 2) {
-  console.error(`uat-status: ${msg}`);
-  process.exit(code);
+  throw new UsageError(msg, code);
 }
 
 function readTracker(opts) {
@@ -378,7 +386,7 @@ function cmdCheck(opts) {
   console.log(
     `uat-check: ${errors.length} error(s), ${warns.length} warning(s)`,
   );
-  process.exit(errors.length ? 1 : 0);
+  process.exitCode = errors.length ? 1 : 0;
 }
 
 export function nextItem({ sections }) {
@@ -396,7 +404,8 @@ function cmdNext(opts) {
     console.log(
       opts.has("--json") ? "null" : "nothing untested — tracker complete",
     );
-    process.exit(3);
+    process.exitCode = 3;
+    return;
   }
   const story = loadStories(opts, cfg).find((s) => s.id === r.id);
   const dir = join(opts.root, opts.trackerDir);
@@ -546,7 +555,16 @@ function cmdScoreboard(opts) {
 }
 
 export function main(argv) {
-  const opts = parseArgs(argv);
+  try {
+    return dispatch(parseArgs(argv));
+  } catch (e) {
+    if (!(e instanceof UsageError)) throw e;
+    console.error(`uat-status: ${e.message}`);
+    process.exitCode = e.code;
+  }
+}
+
+function dispatch(opts) {
   if (opts.has("--init")) return cmdInit(opts);
   if (opts.has("--sync")) return cmdSync(opts);
   if (opts.has("--check")) return cmdCheck(opts);
