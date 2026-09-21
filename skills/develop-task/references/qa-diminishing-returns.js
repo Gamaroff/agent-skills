@@ -718,12 +718,20 @@ function classifyLoopRoute(input) {
         "the HIGH sequence from QA Iteration History is absent, shorter than the cycle count, or carries a non-integer reading",
       );
     }
-    const nonZero = highCounts.slice(0, cycle).filter((h) => h !== 0);
-    if (nonZero.length > 0) {
+    // The gate this route grants is owed to the LAST fix, so the HIGH reading
+    // that matters is the last gate's — the one that fix answers. An earlier
+    // clause required HIGH 0 at EVERY cycle, which keyed on history: a loop
+    // that raised a blocker at cycle 2, fixed it at cycle 2, and ended on a
+    // HIGH-0 gate was declined twice (task.130 HIGH 0,1,0,1,0; task.125
+    // 1,1,0,1,0 — obs #139), and each time an operator granted the cycle by
+    // hand and the fix read clean. The flat-MEDIUM stall this route was
+    // written against (task.117) is still refused by the MEDIUM clause below.
+    const lastHigh = highCounts[cycle - 1];
+    if (lastHigh !== 0) {
       return route(
         ROUTES.CONTINUE,
-        "high-findings-seen",
-        `HIGH was not 0 throughout (${highCounts.slice(0, cycle).join(", ")}) — a loop that raised a blocker at any cycle escalates with its evidence, it is not granted a half-cycle`,
+        "high-on-last-gate",
+        `HIGH is ${lastHigh} on cycle ${cycle}'s gate (sequence ${highCounts.slice(0, cycle).join(", ")}) — the fix this route would gate answers a blocker, and a blocker is escalated with its evidence, not gated on a half-cycle`,
       );
     }
     const raised = countRaised(latestGateContent);
@@ -756,7 +764,7 @@ function classifyLoopRoute(input) {
     return route(
       ROUTES.GATE_THE_LAST_FIX,
       "gate-the-last-fix",
-      `the ${cycle}-cycle budget is spent with HIGH 0 throughout and MEDIUM falling ${seq.join(" → ")}; cycle ${cycle}'s fix has landed and no gate has read it, so one ordinary 5a (review + gate, no 5b) runs on that head before any escalation entry is written`,
+      `the ${cycle}-cycle budget is spent with HIGH 0 on cycle ${cycle}'s gate and MEDIUM falling ${seq.join(" → ")}; cycle ${cycle}'s fix has landed and no gate has read it, so one ordinary 5a (review + gate, no 5b) runs on that head before any escalation entry is written`,
       { mediumSequence: seq },
     );
   }

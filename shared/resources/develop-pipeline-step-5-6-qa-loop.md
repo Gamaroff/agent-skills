@@ -52,7 +52,7 @@ kept as the awk that predates the engine); none is evaluated by eye.
 | **Convergence check** (stall) | HIGH findings **remain and stop falling** for two cycles (cycle ≥ 3) | **Escalate** | the loop stopped working |
 | **Diminishing-returns exit** (finished, route 2) | HIGH is 0 for two consecutive gates and the residue is **entirely test machinery** (cycle ≥ 3) | **Exit to 5c** | the loop finished working |
 | **Cosmetic-residue exit** (cosmetic, route 2b) | HIGH is 0 for two consecutive gates and a **`PASS` gate's only open entries are LOW** (cycle ≥ 2) | **Exit to 5c** | what is left is not worth a fix cycle |
-| **Gate-the-last-fix half-cycle** (budget, route 2c) | the budget is spent, HIGH was 0 throughout, MEDIUM fell strictly for three cycles, and the last cycle's fix has **no gate** | **One 5a, then 5c or escalate** | the budget ended one gate too early |
+| **Gate-the-last-fix half-cycle** (budget, route 2c) | the budget is spent, the last gate raised no HIGH, MEDIUM fell strictly for three cycles, and the last cycle's fix has **no gate** | **One 5a, then 5c or escalate** | the budget ended one gate too early |
 
 The stall and finished rows are the original pair and are still opposites: a run with HIGH
 remaining can only stall; a run with HIGH gone can only finish. The cosmetic row is the finished
@@ -1297,7 +1297,7 @@ commit-and-HALT shape, one set of templates.
 
 Runs **only on the Loop limit trigger**, after 5b of cycle `N = QA_MAX_CYCLES` has committed and
 pushed its fix, and **before** the escalation entry is written. The Convergence stall never reaches
-it: a stall has HIGH remaining, and this route requires HIGH 0 throughout.
+it: a stall has HIGH remaining, and this route requires HIGH 0 on the last gate.
 
 **Why it exists.** The loop's shape is *gate → fix → gate*, and a budget of N cycles ends on a
 **fix**: cycle N's 5b lands a commit that no gate ever reads. On task.117 the loop ran five
@@ -1342,8 +1342,12 @@ The route fires — `gate-the-last-fix` — only when **all** of:
    qualify (fixture row "2c negative: the last cycle reached 5c"): the review's findings are outside
    the gate sequence this route reasons over, and it is 5c, not 5a, that would have to re-read that
    fix — which the spent budget does not allow.
-2. `HIGH_k == 0` for **every** `k ≤ N` — a loop that raised a blocker at any cycle escalates with
-   its evidence.
+2. `HIGH_N == 0` — the **last** gate, the one cycle `N`'s fix answers, raised no blocker. The
+   reading is the last gate's, not the whole history's: an earlier version required HIGH 0 at
+   *every* cycle, and declined two loops that had raised a blocker mid-run, fixed it in one cycle,
+   and ended on a HIGH-0 gate (task.130 `0,1,0,1,0`; task.125 `1,1,0,1,0` — obs #139). Both were
+   granted a cycle by hand and read clean. A blocker on the last gate still escalates with its
+   evidence — that fix is not owed a half-cycle.
 3. `MEDIUM_N < MEDIUM_{N-1} < MEDIUM_{N-2}` — strictly falling across the last three gates. Flat, or
    fell-then-plateaued, is not evidence that one more gate would clear.
 
@@ -1373,7 +1377,7 @@ The route fires — `gate-the-last-fix` — only when **all** of:
 loop-limit-via-review path is a real `REQUEST CHANGES` the escalation entry quotes — then write the
 escalation entry as today. Put `ROUTE_JSON`'s `reason` in the entry's **What was attempted per cycle** so the reader
 knows the half-cycle was considered and why it was declined (`last-cycle-not-a-fix`,
-`high-findings-seen`, `medium-not-falling`, …). The Action overwrite is not optional: the resume
+`high-on-last-gate`, `medium-not-falling`, …). The Action overwrite is not optional: the resume
 contract's 5c sub-state table keys the "left the loop through escalation" row on it, and the
 Convergence trip already writes its own value the same way.
 
