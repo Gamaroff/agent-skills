@@ -13,6 +13,7 @@
    qaNext:
      baseUrl: http://<host>:<port>     # the app under test — required
      apiUrl: http://<host>:<port>      # optional, enables HTTP probes
+     apiHealthPath: /health            # probed on apiUrl at preflight (default /health)
      envLabel: lan                     # goes into run file names
      personasDoc: docs/development/feature-testing-checklist.md   # test accounts + roles
    ```

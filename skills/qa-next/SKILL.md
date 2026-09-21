@@ -28,6 +28,7 @@ Read once per run from the consumer project's `skills-config.yaml` (`qaNext:` bl
 | `qaNext.baseUrl`        | *(required)* — the portal / web app under test     | 0, 3    |
 | `qaNext.apiUrl`         | *(optional)* — the API origin, for HTTP probes     | 0, 3    |
 | `qaNext.healthPath`     | `/`                                                | 0       |
+| `qaNext.apiHealthPath`  | `/health` — probed on `apiUrl`; an API root is usually a 404 | 0 |
 | `qaNext.envLabel`       | `local`                                            | 4 (run file name) |
 | `qaNext.personasDoc`    | *(optional)* — doc listing test accounts + roles   | 2, 3    |
 | `qaNext.baseBranch`     | `develop`                                          | 0, 5    |
@@ -55,7 +56,7 @@ Resume on re-run: `phase: recorded` → Step 5; `executed` → Step 4; `resolved
 2. `git status --porcelain` non-empty → **HALT** `dirty-tree`. This skill commits docs; it must not sweep up someone's work.
 3. Check out and fast-forward `baseBranch`.
 4. Tracker absent → run `--init`; if that scaffolds `uat-surfaces.json` and stops, **STOP** `surfaces-unmapped` and tell the owner to fill it in. Tracker present → run `--sync` (append rows for newly accepted stories), then `--check`; a non-zero `--check` is **HALT** `tracker-invalid` — never test on top of a tracker that is lying.
-5. Environment: `curl -fsS --max-time 10 "$baseUrl$healthPath"` and, if set, `apiUrl`. Either unreachable → **STOP** `env-unreachable`. Under `--dry-run` this is reported, not fatal.
+5. Environment: `curl -fsS --max-time 10 "$baseUrl$healthPath"` and, if `apiUrl` is set, `curl -fsS --max-time 10 "$apiUrl$apiHealthPath"` — never the bare API origin, whose root is a 404 on most frameworks and would read as down while the service is up. Either unreachable → **STOP** `env-unreachable`. Under `--dry-run` this is reported, not fatal.
 6. Browser automation: prefer the Playwright MCP tools when the session exposes them (`browser_navigate` / `browser_snapshot` / `browser_click` …); otherwise the project's own Playwright (`npx playwright` with a throwaway spec under the OS temp dir). Neither available → **STOP** `no-browser`.
 
 ## Step 1 — Select
