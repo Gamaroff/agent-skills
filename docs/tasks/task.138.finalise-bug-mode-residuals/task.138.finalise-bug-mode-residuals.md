@@ -5,19 +5,20 @@ type: task
 description: "Close the bug-mode residuals task.125's review trail carried out of its QA loop — 7.6b's template-satisfied final assertion, 7.1's append-vs-fill with no bug-mode row, a `PASS or FAIL` verdict reading PASS, one HALT for an unreadable report and a report with no verdict, the `newest_numbered` helper defined once and inlined twice — and produce the feature's missing acceptance evidence: one end-to-end `/finalise --bug` run in a scratch clone against a real bug report, recorded."
 tags: [finalise, develop-bug, bug-mode, dod, qa-task]
 category: refactoring
-status: planned
+status: in-progress
 priority: Medium
 created: 2026-09-21
 updated: 2026-09-21
 assignee:
 estimated_effort_hours: 8
 risk_level: medium
+pr_number: 456
 github_issue: 450
 ---
 
 # Technical Task: finalise bug-mode residuals and the end-to-end run task.125 never had
 
-**Status:** Planned
+**Status:** In Progress
 **GitHub Issue**: [#450](https://github.com/Gamaroff/agent-skills/issues/450)
 
 ---
@@ -300,15 +301,17 @@ None.
 |------|---------|-------------|--------|
 | 2026-09-21 | 1.0 | Initial draft — obs #146; task.125 gates 9–11 futures, pr-review.1 CR-1/CR-2/PC-1 | create-task |
 
+| 2026-09-21 |  | Status → in-progress | manual |
+| 2026-09-21 |  | Implemented — phases 1–3 and 5 (PR #456): 7.6b asserts the written Final Status; 7.1 fills, never appends; 6b refuses `PASS or FAIL` and HALTs on an unreadable report as such; `newest_numbered` hoisted to `shared/resources/newest-numbered.sh`; +10 executed rows, 3 mutations proved. Phase 4 (end-to-end `/finalise --bug` run) NOT done — hand-driven, no QA loop, no DoD | manual |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: `newest_numbered` hoisted
-- [ ] Phase 2: 6b read-before-grep; reworded verdict refused
-- [ ] Phase 3: 7.1 fills; 7.6b asserts the written state
+- [x] Phase 1: `newest_numbered` hoisted
+- [x] Phase 2: 6b read-before-grep; reworded verdict refused
+- [x] Phase 3: 7.1 fills; 7.6b asserts the written state
 - [ ] Phase 4: end-to-end run recorded
-- [ ] Phase 5: bundle, CHANGELOG
+- [x] Phase 5: bundle, CHANGELOG
 - [ ] QA: `task.138.qa.[N].finalise-bug-mode-residuals.md`
 - [ ] Gate: `task.138.gate.[N].finalise-bug-mode-residuals.yml`
 
@@ -322,6 +325,7 @@ None.
 
 ## Notes
 
+- **Phases 1–3 and 5 landed hand-driven on 2026-09-21 (PR #456); Phase 4 is outstanding.** The end-to-end `/finalise --bug` run in a scratch clone is the feature's acceptance evidence and this task does not read `accepted` without it. The task is `in-progress` and remains eligible for `/develop-next` (a pipeline run would execute Phase 4) or a by-hand run per the plan's Phase 4 recipe. Obs #146 stays parked until then.
 - QA artifacts land beside this file: `task.138.qa.[N].*.md`, `task.138.bug.[N].*.md`, `task.138.gate.[N].*.yml`.
 - Independent of tasks 136 and 137 in outcome. Shares `skills/finalise/SKILL.md` 7.6b with task.137 (its `ls` sites) — land one, rebase the other; not in one worktree. If task.137 lands first, its swept 7.6b lines are what this task's `source` line sits above.
 - The end-to-end run in Phase 4 is by hand in a scratch clone with tracker mutations deferred or read-only; it is never run against this checkout.
