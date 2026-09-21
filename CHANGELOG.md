@@ -388,6 +388,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The task template's Change Log is the canonical marker block, heading inside the markers
+  (obs #104 follow-through to task 127).** `task-template.md` shipped a bare `## Change Log` and no
+  markers; authors added markers beneath it and every new task carried the heading-above-markers
+  shape the engine doubled on its first write. `tests/skill-protocol.test.js` pins the block shape.
+
 - **`finalise --bug`: the five low residuals task.125's eleven gates never closed (task 138, phases
   1–3 and 5; obs #146).** 7.6b's bug-mode pushed assertion now greps `**Final Status:** ✅ ACCEPTED`
   on the DoD — a state only Step 7.1 writes — instead of the `## Verification Complete` heading the

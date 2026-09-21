@@ -394,11 +394,13 @@ Sign when you have reviewed this document: replace your **Signature** cell with 
   EVERY new row bumps frontmatter `updated:` in the same edit.
 -->
 
+<!-- change-log-start -->
 ## Change Log
 
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | YYYY-MM-DD | 1.0     | Initial draft | create-task |
+<!-- change-log-end -->
 
 ---
 

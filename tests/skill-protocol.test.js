@@ -579,3 +579,25 @@ for (const skill of [
     );
   });
 }
+
+test("task-template.md's Change Log is the canonical marker block — heading INSIDE the markers (obs #104, task.127)", () => {
+  // The template shipped a bare `## Change Log` heading and no markers; authors added
+  // markers beneath it and every new task carried the heading-above-markers shape the
+  // engine then doubled on its first write (tasks 120/122/123/124/128/131/132). One
+  // canonical block, per document-change-log.md § The section.
+  const content = fs.readFileSync(
+    path.join(SKILLS_DIR, "create-task", "resources", "task-template.md"),
+    "utf8",
+  );
+  assert.match(
+    content,
+    /<!-- change-log-start -->\n## Change Log\n/,
+    "the heading is the first line inside the markers",
+  );
+  assert.doesNotMatch(
+    content,
+    /## Change Log\n[\s\S]{0,40}<!-- change-log-start -->/,
+    "no heading above the start marker",
+  );
+  assert.equal((content.match(/^## Change Log$/gm) || []).length, 1);
+});
