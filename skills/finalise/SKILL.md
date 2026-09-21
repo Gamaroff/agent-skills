@@ -1201,7 +1201,7 @@ standalone.
    DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"   # re-bound here: no block inherits another's variables (TASK-121-BUG-2)
    # Empty OR left as a placeholder: `{story.{epic}…}` is non-empty and passed the first
    # version of this guard, after which the DoD glob matched nothing at exit 0 (cycle-6 CR-3).
-   case "$STEM$DOC_KIND" in ''|*'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — both are substituted inputs, not values carried over from an earlier block (empty or an unsubstituted placeholder found)"; exit 1 ;; esac
+   case "$STEM$DOC_KIND" in *'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — both are substituted inputs, not values carried over from an earlier block (empty or an unsubstituted placeholder found)"; exit 1 ;; esac
    [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
 
    # Exactly the acceptance artefacts, CHOSEN IN THE BLOCK by kind: a bug run stages the bug
@@ -1210,20 +1210,27 @@ standalone.
    # prose beside this block, so the block HALTed verbatim on every bug run (TASK-125-BUG-16).
    # The implementation report is NOT staged here — the orchestrator's Step 8 owns its final
    # commit, and staging it would split its history.
+   # The DoD path is resolved FIRST, zsh-safe and by number, and checked — a bare glob inside
+   # the array assignment aborted the whole script under zsh before the HALT below could
+   # print (cycle-8 CR-5; ordering: TASK-125-BUG-21).
+   DOD_PATH=$(find {document-directory} -maxdepth 1 -name "${STEM}.dod.*.md" 2>/dev/null \
+     | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
+   [ -n "$DOD_PATH" ] || { echo "HALT: no ${STEM}.dod.*.md beside the document — 7.2 writes it before this block runs"; exit 1; }
    if [ "$DOC_KIND" = "bug" ]; then
-     ADD_PATHS=("{document-path}" "{document-directory}/${STEM}.dod."*.md)
+     ADD_PATHS=("{document-path}" "$DOD_PATH")
      COMMIT_MSG="docs(${STEM}): DoD verified — finalise --bug"
    else
-     ADD_PATHS=("{document-path}" "{document-directory}/${STEM}.dod."*.md "{document-directory}/sprint-review-summary.md")
+     ADD_PATHS=("{document-path}" "$DOD_PATH" "{document-directory}/sprint-review-summary.md")
      COMMIT_MSG="docs(${STEM}): accept — DoD, sprint review"
    fi
    # --- acceptance artefacts resolved (the executed test slices to here) ---
    # One unmatched pathspec aborts the WHOLE `git add`, so the registry (tasks only; absent on a
    # story or a project without one) is added on its own, behind an existence check — not folded
    # into the list behind a `|| true` that would also swallow a real failure.
-   # Read the add's exit code. A failed add — bash: "pathspec did not match" (128); zsh: "no
-   # matches found" refuses the whole command — leaves the index clean, and the idempotency guard
-   # below would then read that as "already committed" and push nothing (task.115 5c pass 2, CR-1).
+   # Read the add's exit code. A failed add — bash: "pathspec did not match" (128) — leaves the
+   # index clean, and the idempotency guard below would then read that as "already committed"
+   # and push nothing (task.115 5c pass 2, CR-1). The DoD path above is already resolved and
+   # checked, so no bare glob reaches this add (cycle-8 CR-5).
    git add "${ADD_PATHS[@]}"
    ADD_EXIT=$?
    [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the acceptance artefacts failed (exit $ADD_EXIT) — an artefact is missing or the DoD glob matched nothing"; exit 1; }
@@ -1276,9 +1283,10 @@ standalone.
    BRANCH=$(git rev-parse --abbrev-ref HEAD)
    STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
    DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
-   case "$STEM$DOC_KIND" in ''|*'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from 6a (empty or an unsubstituted placeholder found)"; exit 1 ;; esac
+   case "$STEM$DOC_KIND" in *'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from 6a (empty or an unsubstituted placeholder found)"; exit 1 ;; esac
    [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
-   DOD_PATH=$(ls "{document-directory}/${STEM}.dod."*.md 2>/dev/null | sort | tail -1)
+   DOD_PATH=$(find {document-directory} -maxdepth 1 -name "${STEM}.dod.*.md" 2>/dev/null \
+     | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
    [ -n "$DOD_PATH" ] || { echo "HALT: no ${STEM}.dod.*.md beside the document — 7.2 writes it before this block runs (cycle-6 CR-3)"; exit 1; }
    # The artefact list and the final assertion are chosen IN THE BLOCK by kind: a bug run has
    # no sprint review, and its frontmatter was deliberately not changed in 7.2, so asserting
@@ -1503,44 +1511,11 @@ POLLEOF
 
    `finalise` is the designated author of the canonical PR summary. It edits in place on re-run.
 
-   **Step 6a — Resolve QA cycle count:**
-
-   ```bash
-   # The implementation report is LOCATED IN THIS BLOCK. An IMPLEMENTATION_REPORT env var,
-   # when the orchestrator passed one, wins; otherwise the report is the newest
-   # `${STEM}.implementation.{N}.*` beside the document, in either filename shape (the
-   # short prefix or the full stem — TASK-125-BUG-13), ordered by N (TASK-125-BUG-14). The
-   # first version only read the env var, and develop-bug passes none, so every bug run
-   # counted 0 cycles and silently dropped the line (cycle-6 CR-2 — the BUG-12 shape).
-   STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
-   DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
-   case "$STEM$DOC_KIND" in ''|*'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — empty or an unsubstituted placeholder found"; exit 1 ;; esac
-   [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
-   if [ -z "${IMPLEMENTATION_REPORT:-}" ] || [ ! -f "${IMPLEMENTATION_REPORT:-}" ]; then
-     # The full-stem shape exists only for BUG reports (TASK-125-BUG-13). In story/task mode
-     # `${STEM}.*.implementation.*` with STEM=task.67 matched the co-located
-     # `task.67.bug.3.implementation.2.*`, and the parent published its bug's cycle count
-     # (TASK-125-BUG-19 — BUG-8's parent/child leak in the other direction).
-     if [ "$DOC_KIND" = "bug" ]; then
-       SHAPES=( -name "${STEM}.implementation.*.md" -o -name "${STEM}.*.implementation.*.md" )
-     else
-       SHAPES=( -name "${STEM}.implementation.*.md" )   # short-shape-only: story/task reports never carry the full-stem shape, and the second pattern matched a co-located bug's report (TASK-125-BUG-19)
-     fi
-     IMPLEMENTATION_REPORT=$(find {document-directory} -maxdepth 1 \( "${SHAPES[@]}" \) 2>/dev/null \
-       | sed -E 's/^(.*\.implementation\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
-   fi
-   if [ -n "$IMPLEMENTATION_REPORT" ] && [ -f "$IMPLEMENTATION_REPORT" ]; then
-     # Both heading names: the story/task QA loop writes `### QA Cycle {N}`, the develop-bug
-     # verify loop writes `### Verify Cycle {N}` (TASK-125-BUG-17). `|| true`, not `|| echo 0`:
-     # `grep -c` PRINTS 0 and exits 1 on no match, and `|| echo 0` made the value "0\n0".
-     CYCLES=$(grep -cE '^### (QA|Verify) Cycle' "$IMPLEMENTATION_REPORT" 2>/dev/null || true)
-     CYCLES=${CYCLES:-0}
-   else
-     CYCLES=0
-   fi
-   # --- cycle count resolved (the executed test slices to here) ---
-   # If grep returns 0 (no headings found), CYCLES=0 → omit the cycle-count line from the body
-   ```
+   **Step 6a — Resolve QA cycle count:** folded into 6b below. It used to be its own fenced
+   block, and 6b read its `$CYCLES` — a value no block can inherit from another (TASK-121-BUG-2),
+   so the QA Cycles line was silently omitted on every run that executed the blocks as
+   documented (TASK-125-BUG-22). One block now locates the report once and derives both the
+   cycle count and, in bug mode, the verdict from it.
 
    **Step 6b — Build comment body:**
 
@@ -1550,21 +1525,18 @@ POLLEOF
    # task bug lives in its PARENT's directory: `task.67.dod.1.*` sorts after
    # `task.67.bug.3.dod.1.*` and the parent's gate is the only gate there, so
    # `*.dod.*.md | sort | tail -1` published the parent's DoD path and gate
-   # verdict as the bug's (TASK-125-BUG-8). STEM is re-bound just below (TASK-125-BUG-15).
-   # BOTH inputs are re-bound HERE as substituted placeholders — the same two lines 6a
-   # and 7.6b carry. Every fenced block runs as its own shell, so nothing 6a bound exists
-   # in this one (TASK-121-BUG-2): an unbound DOC_KIND silently took the story/task
-   # branch (TASK-125-BUG-12), and an unbound STEM globbed `dir/.dod.*.md`, matched
-   # nothing, and published a canonical comment with an empty DoD path and empty gate
-   # at exit 0 (TASK-125-BUG-15). Empty is a HALT, not a default.
+   # verdict as the bug's (TASK-125-BUG-8).
+   # BOTH inputs are re-bound HERE as substituted placeholders — the same two lines 7.6a
+   # and 7.6b carry. Every fenced block runs as its own shell, so nothing an earlier block
+   # bound exists in this one (TASK-121-BUG-2): an unbound DOC_KIND silently took the
+   # story/task branch (TASK-125-BUG-12), and an unbound STEM globbed `dir/.dod.*.md`,
+   # matched nothing, and published a canonical comment with an empty DoD path and empty
+   # gate at exit 0 (TASK-125-BUG-15). Empty is a HALT; so is a placeholder left verbatim
+   # (cycle-6 CR-3).
    STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
    DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
-   case "$STEM$DOC_KIND" in ''|*'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from an earlier block (empty or an unsubstituted placeholder found)"; exit 1 ;; esac
+   case "$STEM$DOC_KIND" in *'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from an earlier block (an unsubstituted placeholder found)"; exit 1 ;; esac
    [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
-   DOD_PATH=$(ls {document-directory}/${STEM}.dod.*.md 2>/dev/null | sort | tail -1)
-   # An empty DoD path is a HALT, never a blank line in the canonical comment: 7.2 wrote the
-   # file, so nothing here can legitimately fail to find it (cycle-6 CR-3).
-   [ -n "$DOD_PATH" ] || { echo "HALT: no ${STEM}.dod.*.md beside the document — 7.2 writes it before this block runs"; exit 1; }
    # The two inputs must agree, in BOTH directions: a bug prefix with a non-bug kind is
    # this block run with a stale kind (cycle-4 CR-2), and a bug kind with the PARENT's
    # stem would publish the parent task's verdict as the bug's (cycle-5 CR-6).
@@ -1572,6 +1544,43 @@ POLLEOF
      bug.[0-9]*|*.bug.[0-9]*) [ "$DOC_KIND" = "bug" ] || { echo "HALT: STEM ${STEM} is a bug prefix but DOC_KIND is ${DOC_KIND} — bind the kind the Document-kind block resolved"; exit 1; } ;;
      *) [ "$DOC_KIND" != "bug" ] || { echo "HALT: DOC_KIND is bug but STEM ${STEM} is not a bug prefix — a bug's STEM is its own prefix (task.67.bug.3), never its parent's"; exit 1; } ;;
    esac
+   # Every numbered artefact is found with QUOTED `find -name` patterns (zsh aborts a command
+   # whose bare glob matches nothing) and ordered by its NUMBER — a path sort puts `gate.9`
+   # after `gate.19` and picked the stale one on any item with ten or more (TASK-125-BUG-21,
+   # the defect BUG-14 fixed for reports). One helper, three artefact kinds.
+   newest_numbered() {   # newest_numbered <dir> <kind: dod|gate|implementation> <-name pattern>…
+     local dir="${1}" kind="${2}"; shift 2
+     find "$dir" -maxdepth 1 \( "$@" \) 2>/dev/null \
+       | sed -E "s/^(.*\.${kind}\.)([0-9]+)(\..*)$/\2 \1\2\3/" | sort -n | tail -1 | cut -d' ' -f2-
+   }
+   DOD_PATH=$(newest_numbered {document-directory} dod -name "${STEM}.dod.*.md")
+   # An empty DoD path is a HALT, never a blank line in the canonical comment: 7.2 wrote the
+   # file, so nothing here can legitimately fail to find it (cycle-6 CR-3).
+   [ -n "$DOD_PATH" ] || { echo "HALT: no ${STEM}.dod.*.md beside the document — 7.2 writes it before this block runs"; exit 1; }
+   # The implementation report — an IMPLEMENTATION_REPORT env var the orchestrator passed wins;
+   # otherwise the newest beside the document. The full-stem shape exists only for BUG reports
+   # (TASK-125-BUG-13); in story/task mode `${STEM}.*.implementation.*` with STEM=task.67 matched
+   # the co-located `task.67.bug.3.implementation.2.*` and the parent published its bug's cycle
+   # count (TASK-125-BUG-19). The one-shape line below says so for the enumeration test.
+   if [ -z "${IMPLEMENTATION_REPORT:-}" ] || [ ! -f "${IMPLEMENTATION_REPORT:-}" ]; then
+     if [ "$DOC_KIND" = "bug" ]; then
+       IMPLEMENTATION_REPORT=$(newest_numbered {document-directory} implementation -name "${STEM}.implementation.*.md" -o -name "${STEM}.*.implementation.*.md")
+     else
+       IMPLEMENTATION_REPORT=$(newest_numbered {document-directory} implementation -name "${STEM}.implementation.*.md")   # short-shape-only: story/task reports never carry the full-stem shape, and the second pattern matched a co-located bug's report (TASK-125-BUG-19)
+     fi
+   fi
+   # The cycle count, from the same report, in the same block that publishes it. Both heading
+   # names: the story/task QA loop writes `### QA Cycle {N}`, the develop-bug verify loop writes
+   # `### Verify Cycle {N}` (TASK-125-BUG-17). `|| true`, not `|| echo 0`: `grep -c` PRINTS 0
+   # and exits 1 on no match, and `|| echo 0` made the value "0\n0". No report → 0 → the line
+   # is omitted from the body below.
+   if [ -n "$IMPLEMENTATION_REPORT" ] && [ -f "$IMPLEMENTATION_REPORT" ]; then
+     CYCLES=$(grep -cE '^### (QA|Verify) Cycle' "$IMPLEMENTATION_REPORT" 2>/dev/null || true)
+     CYCLES=${CYCLES:-0}
+   else
+     CYCLES=0
+   fi
+   # --- cycle count resolved (the executed test slices to here) ---
    if [ "$DOC_KIND" = "bug" ]; then
      # A bug has no gate file; its verdict is the develop-bug verify loop's —
      # the last `**Verdict**:` line of the implementation report beside the bug
@@ -1579,19 +1588,10 @@ POLLEOF
      # HALT, not an N/A: "never bound" and "genuinely N/A" must not share one
      # value (TASK-125-BUG-12).
      #
-     # The report carries EITHER shape the pipeline has written — the short
-     # prefix develop-bug specifies (`bug.14.implementation.1.*.md`) and the
-     # full filename stem its three most recent runs used
-     # (`bug.14.{name}.implementation.1.*.md`) — the same two prefixes
-     # `references/bug-doc.js` findRelatedBugDocs accepts. One shape alone
-     # HALTed on the other (TASK-125-BUG-13). `find -name` with QUOTED patterns,
-     # not two `ls` globs: zsh aborts a command whose glob matches nothing, and
-     # one of the two shapes is always absent.
      # Ordered by the report NUMBER, never by path: with both shapes on disk a plain sort
      # put an older `bug.14.{name}.implementation.1.*` after a newer
      # `bug.14.implementation.2.*` whenever `{name}` sorts past `i` (TASK-125-BUG-14).
-     IMPLEMENTATION_REPORT=$(find {document-directory} -maxdepth 1 \( -name "${STEM}.implementation.*.md" -o -name "${STEM}.*.implementation.*.md" \) 2>/dev/null \
-       | sed -E 's/^(.*\.implementation\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
+     # $IMPLEMENTATION_REPORT was located above, once, for both the cycle count and this.
      # The bare token, never the line's second word: real reports write
      # `**Verdict**: **PASS**` as often as `**Verdict**: PASS`, and the second
      # word of the first is `**PASS**` (cycle-4 CR-3). Neither token is a HALT.
@@ -1608,7 +1608,7 @@ POLLEOF
      # emitted N/A (awk exits 0 on empty input), so a missing gate published an empty Final
      # Gate — the "never bound" vs "genuinely N/A" ambiguity the bug branch HALTs on
      # (cycle-5 CR-9 / cycle-7 CR-3). A story or task always has a gate by Step 7.
-     GATE_PATH=$(ls {document-directory}/${STEM}.gate.*.yml 2>/dev/null | sort | tail -1)
+     GATE_PATH=$(newest_numbered {document-directory} gate -name "${STEM}.gate.*.yml")
      [ -n "$GATE_PATH" ] || { echo "HALT: no ${STEM}.gate.*.yml beside the document — the QA loop writes one before Step 7"; exit 1; }
      FINAL_GATE=$(grep '^gate:' "$GATE_PATH" | head -1 | grep -oE 'PASS|CONCERNS|FAIL|WAIVED' | head -1)
      [ -n "$FINAL_GATE" ] || { echo "HALT: $GATE_PATH carries no gate: PASS|CONCERNS|FAIL|WAIVED line"; exit 1; }

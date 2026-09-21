@@ -396,7 +396,7 @@ function derivationBlock() {
       // exactly the run the block must refuse.
       .replace(/STEM="\{[^\n]*\}"/, 'STEM="${STEM_IN:-}"')
       .replace(/DOC_KIND="\{[^\n]*\}"/, 'DOC_KIND="${KIND_IN:-}"') +
-    '\nprintf "DOD_PATH=%s\\nFINAL_GATE=%s\\nDOC_KIND=%s\\nCLOSING=%s\\n" "$DOD_PATH" "$FINAL_GATE" "$DOC_KIND" "$CLOSING_LINE"\n'
+    '\nprintf "DOD_PATH=%s\\nFINAL_GATE=%s\\nDOC_KIND=%s\\nCLOSING=%s\\nCYCLES=%s\\n" "$DOD_PATH" "$FINAL_GATE" "$DOC_KIND" "$CLOSING_LINE" "$CYCLES"\n'
   );
 }
 // `shape` is the implementation report's filename: "short" is the prefix
@@ -454,6 +454,13 @@ for (const shell of SHELLS) {
         "the last **Verdict**: line, never the parent's gate",
       );
       assert.match(r.stdout, /^DOC_KIND=bug$/m);
+      // The cycle count is derived in THIS block from the same report (TASK-125-BUG-22):
+      // the fixture report carries two Verify Cycle headings.
+      assert.match(
+        r.stdout,
+        /^CYCLES=2$/m,
+        `cycle count published by 6b: ${r.stdout}`,
+      );
       assert.match(
         r.stdout,
         /^CLOSING=.*Bug fix accepted/m,
@@ -816,6 +823,71 @@ for (const shell of SHELLS) {
     }
   });
 
+  test(`[${shell}] 6b picks gate.19 over gate.9 and dod.10 over dod.9 — numbered artefacts are ordered by number, not by path (TASK-125-BUG-21)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-order-"));
+    try {
+      writeFileSync(path.join(dir, "task.67.dod.9.old.md"), "");
+      writeFileSync(path.join(dir, "task.67.dod.10.new.md"), "");
+      writeFileSync(path.join(dir, "task.67.gate.9.old.yml"), "gate: FAIL\n");
+      writeFileSync(path.join(dir, "task.67.gate.19.new.yml"), "gate: PASS\n");
+      const r = spawnSync(shell, ["-s", "--"], {
+        input: derivationBlock(),
+        encoding: "utf8",
+        env: {
+          PATH: process.env.PATH,
+          DIR: dir,
+          STEM_IN: "task.67",
+          KIND_IN: "task",
+        },
+      });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(
+        r.stdout,
+        /^DOD_PATH=.*task\.67\.dod\.10\.new\.md$/m,
+        r.stdout,
+      );
+      assert.match(
+        r.stdout,
+        /^FINAL_GATE=PASS$/m,
+        `gate.19's verdict, not gate.9's: ${r.stdout}`,
+      );
+      // 7.6a and 7.6b resolve the DoD the same way.
+      for (const [name, block] of [
+        ["7.6a", sixABlock()],
+        ["7.6b", sixBAssertBlock()],
+      ]) {
+        const b = runBlock(block, dir, "task.67", "task");
+        assert.equal(b.status, 0, `${name}: ${b.stdout}${b.stderr}`);
+        assert.match(
+          b.stdout,
+          /task\.67\.dod\.10\.new\.md/,
+          `${name} picks dod.10: ${b.stdout}`,
+        );
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 7.6a with no DoD beside the document HALTs with the same diagnostic in both shells — no bare glob reaches the array assignment (cycle-8 CR-5)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-nodod-a-"));
+    try {
+      const r = runBlock(sixABlock(), dir, "task.67", "task");
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(
+        r.stdout + r.stderr,
+        /HALT: no task\.67\.dod\.\*\.md beside the document/,
+      );
+      assert.doesNotMatch(
+        r.stderr,
+        /no matches found/,
+        "zsh's own nomatch error never appears",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(`[${shell}] the kind block HALTs when BUG_FLAG or DOC_FILE is left as its placeholder — a --bug run must not continue as task (TASK-125-BUG-20)`, () => {
     const i = skill.indexOf('DOC_KIND=""');
     const j = skill.indexOf("```", i);
@@ -847,7 +919,7 @@ for (const shell of SHELLS) {
     assert.match(r.stdout, /^DOC_KIND=bug$/m, r.stdout);
   });
 
-  test(`[${shell}] 6a's cycle count LOCATES the report itself — either shape, newest by number — reads BOTH heading names, and never yields "0\\n0" (TASK-125-BUG-17, cycle-6 CR-2)`, () => {
+  test(`[${shell}] 6b's cycle count LOCATES the report itself — either shape, newest by number — reads BOTH heading names, and never yields "0\\n0" (TASK-125-BUG-17, cycle-6 CR-2)`, () => {
     const block =
       sliceBlock('STEM="{', "# --- cycle count resolved", SIX_A_START) +
       '\nprintf "[%s]\\n" "$CYCLES"\n';
@@ -865,6 +937,15 @@ for (const shell of SHELLS) {
       });
     const dir = mkdtempSync(path.join(tmpdir(), "finalise-cycles-"));
     try {
+      // 6b checks the DoD before it counts (cycle-6 CR-3); the count is now derived in 6b
+      // (TASK-125-BUG-22), so the fixtures carry one DoD per stem the cases bind.
+      for (const f of [
+        "bug.14.dod.1.x.md",
+        "bug.99.dod.1.x.md",
+        "task.67.dod.1.x.md",
+        "task.67.bug.3.dod.1.x.md",
+      ])
+        writeFileSync(path.join(dir, f), "");
       writeFileSync(
         path.join(dir, "bug.14.precompact-hook.implementation.1.run.md"),
         "### Verify Cycle 1\n### Verify Cycle 2\n### Verify Cycle 3\n",
@@ -913,10 +994,7 @@ for (const shell of SHELLS) {
       assert.equal(child.stdout.trim(), "[3]", "the bug still reads its own");
       const ph = run(dir, "{story.{epic}.{story} | task.{id}}");
       assert.equal(ph.status, 1, ph.stdout + ph.stderr);
-      assert.match(
-        ph.stdout + ph.stderr,
-        /HALT: STEM and DOC_KIND must be bound in this block — empty or an unsubstituted placeholder found/,
-      );
+      assert.match(ph.stdout + ph.stderr, /unsubstituted placeholder/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

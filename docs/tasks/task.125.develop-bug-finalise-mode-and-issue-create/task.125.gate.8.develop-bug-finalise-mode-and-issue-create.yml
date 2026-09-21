@@ -1,0 +1,86 @@
+schema: 1
+task: 'task.125.develop-bug-finalise-mode-and-issue-create'
+task_title: "develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
+gate: CONCERNS
+status_reason: 'Cycle 8 (granted; budget 9) — narrowed to the 2 files changed since gate 7. Cycle-7 BUG-19/20 and CR-3/4 verified FIXED by re-execution on head e4ab4d56 (111 targeted tests; the parent counts its own report beside its bug under bash + zsh; the verbatim kind block HALTs). No HIGH. Two MEDIUM: the cycle-7 gate-path lookup (and the three DoD lookups) sort lexically — gate.9 beats gate.19, reproduced on task.110 — the defect BUG-14 fixed for reports one block over; and CYCLES is computed in 6a but consumed in 6b, so by the skill''s own per-block rule the QA Cycles line is silently omitted (verified: [ "" -gt 0 ] errors into || true). Three cleanups taken as LOW: a dead case arm, the duplicated report locator, and a zsh abort inside the ADD_PATHS assignment that pre-empts 7.6a''s HALT.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T08:28:08Z'
+
+top_issues:
+  - id: 'TASK-125-BUG-21'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The task branch''s `GATE_PATH=$(ls …${STEM}.gate.*.yml | sort | tail -1)` (cycle-7 CR-3 fix) sorts lexically — on task.110 (19 gates) it returns gate.9 — and the three `${STEM}.dod.*.md | sort | tail -1` lookups share the defect; BUG-14 fixed exactly this for implementation reports with a numeric sort.'
+    suggested_action: 'Order every numbered artefact lookup by its number (the BUG-14 sed | sort -n | cut pipeline) and make them zsh-safe; add a ≥ 10 gate fixture case.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.21.gate-and-dod-globs-sort-lexically-gate-9-beats-gate-19.md'
+  - id: 'TASK-125-BUG-22'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'CYCLES is computed in the 6a block and read by 6b''s body (`[ "$CYCLES" -gt 0 ] && … || true`), another fenced block; unbound there it errors into `|| true` and the QA Cycles line is omitted at exit 0 — "0 cycles" and "never counted" are the same comment, and the cycle-6/7 work on 6a was inert on any run executing blocks as documented.'
+    suggested_action: 'Derive the cycle count inside 6b after its cross-check from the report 6b already locates; delete the separate 6a block (this also removes the duplicated locator, cycle-8 CR-4).'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.125.bug.22.cycles-computed-in-6a-consumed-in-6b-another-block-line-silently-omitted.md'
+  - id: 'CR-3'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The `''''` arm of `case "$STEM$DOC_KIND" in ''''|*''{''*)` is dead at all four sites — the concatenation is empty only when both are, which the next line already HALTs on.'
+    suggested_action: 'Drop the `''''|` alternative; keep the placeholder arm and the two-variable emptiness check.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: '7.6a''s DoD glob now expands inside `ADD_PATHS=(…)`; under zsh an unmatched glob aborts the script there, before the HALT diagnostic the comment promises (bash reaches it with exit 128).'
+    suggested_action: 'Resolve DOD_PATH first (zsh-safe, numeric order), HALT on empty as 7.6b does, then build ADD_PATHS from it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3733
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new boundary this cycle. The label boundary probed 20/20 in cycle 2 is unchanged since.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-21: a stale verdict on any item with ≥ 10 gates; BUG-22: the cycle count never reaches the comment; CR-5: a zsh abort without the diagnostic.'
+  maintainability:
+    status: PASS
+    notes: 'CR-3 dead arm; CR-4 duplicated locator (closed by the BUG-22 consolidation). The duplicated fix_cycle guard remains a follow-up task.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-21 numeric ordering for gate/DoD lookups + ≥ 10 case; BUG-22 fold the cycle count into 6b and delete the 6a block (closes CR-4); CR-3 drop the dead arm; CR-5 resolve DOD_PATH first in 7.6a'
+      refs: ['skills/finalise/SKILL.md', 'evals/shared/tests/finalise-bug-mode.test.mjs']
+  future:
+    - action: 'qa-cycle.sh --cycle so both qa-fix blocks share one fix_cycle validation — follow-up task'
+      refs: ['skills/qa-fix/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 20
+  bugs_remaining: 2
+  fix_date: '2026-09-21'
+  total_iterations: 7
+  verification_method: 'Cycle-7 fixes re-executed on head e4ab4d56 (111 targeted tests; the cycle-count block with STEM=task.67 beside task.67.bug.3.implementation.2 → 1 under bash + zsh; the kind block with verbatim placeholders → HALT exit 1)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-21 and BUG-22 fixed with executed cases', 'CR-3 and CR-5 fixed']
