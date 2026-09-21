@@ -4,7 +4,7 @@
 **Bug ID**: TASK-136-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 2 refute pass, CR-1; CR-3 of the same pass is the sibling errexit case)
 **Date Found**: 2026-09-21
 
@@ -75,3 +75,9 @@ Verified under bash and zsh by QA: `trap 'exit 97' EXIT; source "$1" || exit 97;
 | 2026-09-21 | New | QA Engineer | Found in QA cycle 2 refute pass (CR-1 + CR-3) |
 | 2026-09-21 | In Progress | Claude (qa-fix) | Investigation started |
 | 2026-09-21 | Ready for QA | Claude (qa-fix) | EXIT trap + errexit snapshot, two rows |
+| 2026-09-21 | Closed | QA Engineer | Verified by execution on a99f881f (QA cycle 3): top-level exit → entry-not-probeable executed 0; set -e + return 97 → exit 99 ≠ 0, declined 0; mutants (trap removed; disarm removed) red their rows |
+
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-21
+**Result**: FIXED — a library ending `exit 1` → `unverifiable` / `entry-not-probeable`, `executed 0`, detail `source … failed (exit 97)`; `set -e` + `return 97` → the hostile case's detail reads `exit 99 ≠ 0`, `declined 0`, executed 20. Mutation: EXIT trap removed → BUG-2 row red; trap disarm removed → the green row goes red (a normal return would exit 97). Residual limit recorded as cycle-3 CR-1 (a library that installs its *own* EXIT trap displaces the guard) — advisory, `future`.

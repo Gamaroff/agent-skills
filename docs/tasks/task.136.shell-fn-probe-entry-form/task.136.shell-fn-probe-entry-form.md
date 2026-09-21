@@ -301,24 +301,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: CONCERNS (no open finding)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-21
 **Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.136.qa.2.shell-fn-probe-entry-form.md](./task.136.qa.2.shell-fn-probe-entry-form.md)
-- **Gate File**: [task.136.gate.2.shell-fn-probe-entry-form.yml](./task.136.gate.2.shell-fn-probe-entry-form.yml)
+- **Full Report**: [task.136.qa.3.shell-fn-probe-entry-form.md](./task.136.qa.3.shell-fn-probe-entry-form.md)
+- **Gate File**: [task.136.gate.3.shell-fn-probe-entry-form.yml](./task.136.gate.3.shell-fn-probe-entry-form.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3884 (`npm run ci:fast`; 62 in `security-probe.test.mjs`); 41 security probes executed (measured)
+- **Tests Executed**: 3888 (`npm run ci:fast`; 66 in `security-probe.test.mjs`); 41 security probes executed (measured)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 1 MEDIUM (TASK-136-BUG-2), 3 LOW advisory; TASK-136-BUG-1 verified fixed and closed
+- **Critical Issues**: 0 HIGH, 0 MEDIUM in the queue; 3 advisory limits (c3-CR-1..3) recorded as `future`; bugs 1 and 2 verified fixed and closed
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 2 (full refute pass): bug 1 and the three cycle-1 advisories verified fixed by execution. New MEDIUM ([bug 2](./task.136.bug.2.top-level-exit-in-library-escapes-sentinel.md)): a top-level `exit` in a sourced library ends the harness shell before the exit-97 sentinel, scoring `absent` with a full count; under `set -e` the cycle-1 remap is inert. Verified fix (EXIT trap + errexit snapshot) in the bug report.
+Cycle 3: bug 2 verified fixed by execution and closed. Three verified limits of the new mechanism (a library-installed EXIT trap displaces the source guard; `needs-fake-gh` covers `shell-fn:` only; the `gh` detector misses `gh;`/`gh>`/`$GH`/transitive `source`) are recorded with concrete fixes for a follow-up — none affects the `gh-labels.sh` boundary this task was built for.
 
 ---
 <!-- change-log-start -->
@@ -334,6 +334,7 @@ Cycle 2 (full refute pass): bug 1 and the three cycle-1 advisories verified fixe
 | 2026-09-21 |  | QA findings fixed — cycle 1: TASK-136-BUG-1 (--fake-gh declined on a JS entry) + CR-2/3/4 advisories closed, 5 rows added, 4 mutants killed; suite 62/62 | qa-fix |
 | 2026-09-21 |  | QA gate CONCERNS (90/100) — cycle 2 refute: bug 1 closed; 1 new MEDIUM (bug 2: top-level exit / set -e escape the shell-fn sentinels), 3 LOW advisory | qa-task |
 | 2026-09-21 |  | QA findings fixed — cycle 2: TASK-136-BUG-2 (EXIT trap + errexit snapshot) + CR-2 needs-fake-gh decline, CR-4, CR-5; 4 rows added, 4 mutants killed; suite 66/66 | qa-fix |
+| 2026-09-21 |  | QA gate CONCERNS (90/100), no open finding — cycle 3: bug 2 closed; 3 advisory limits recorded for follow-up | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -355,11 +356,9 @@ Cycle 2 (full refute pass): bug 1 and the three cycle-1 advisories verified fixe
 
 ## Bug Reports
 
-### In QA Verification
-
-- [TASK-136-BUG-2: top-level `exit` in a sourced library escapes the exit-97 sentinel; errexit makes the remap inert](./task.136.bug.2.top-level-exit-in-library-escapes-sentinel.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-21, qa-fix cycle 2)
-
 ### Closed Bugs
+
+- [TASK-136-BUG-2: top-level `exit` in a sourced library escapes the exit-97 sentinel; errexit makes the remap inert](./task.136.bug.2.top-level-exit-in-library-escapes-sentinel.md) - ✅ Closed - Priority: P2 (Fixed qa-fix cycle 2; verified QA cycle 3)
 
 - [TASK-136-BUG-1: `--fake-gh` recorded on a JS-form entry the runner never puts on PATH](./task.136.bug.1.fake-gh-recorded-on-js-entry.md) - ✅ Closed - Priority: P2 (Fixed qa-fix cycle 1; verified QA cycle 2)
 
