@@ -96,6 +96,7 @@ apply to a bug?" a lookup instead of a judgement.
 | Key | Step | story / task | bug |
 | --- | --- | --- | --- |
 | `running-summary` | Step 0 — running summary file | run | run — `{bug-prefix}.dod.{N}.{name}.md` from `assets/bug-dod-template.md` |
+| `verification-complete` | Step 7.1 — the `## Verification Complete` block | run — append | run — **fill** the template's block in place; never append a second heading |
 | `read-document` | Step 1 — read the document | run | run — the bug report, frontmatter or header block (`references/bug-doc.js`) |
 | `qa-reports` | Step 2 — QA reports and gate | run | run — globs scoped to `${STEM}` (a co-located bug must not read its parent's); none expected; the verify loop's `#### QA Verification` and the implementation report are the QA record |
 | `ac-agent` | Step 3b — AC traceability agent | run | **skip** — a bug has no ACs; the `fix-evidence` agent takes its slot |
@@ -952,6 +953,31 @@ If all DoD criteria are met, finalize the running summary, update the story/task
      file's **only** status line (the header carries none; see Step 0)
    - Add timestamp
 
+   **Bug mode (`verification-complete`):** run — **fill**, never append. `assets/bug-dod-template.md`
+   already ends with the block and its `**Final Status:** {…}` placeholder; a verbatim append wrote a
+   second heading and a second status line (task.125 5c CR-2, obs #146). Replace the placeholders in
+   place, and prove the once-only rule on the file this run wrote — the template alone proving it is
+   what let the doubled file through:
+
+   ```bash
+   DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
+   DOD_PATH="{dod-path — the running summary Step 0 created}"
+   case "$DOC_KIND$DOD_PATH" in *'{'*) echo "HALT: DOC_KIND and DOD_PATH must be bound in this block"; exit 1 ;; esac
+   if [ "$DOC_KIND" = "bug" ]; then
+     [ -r "$DOD_PATH" ] || { echo "HALT: bug mode — $DOD_PATH is not readable; Step 0 creates it from the template"; exit 1; }
+     TMP=$(mktemp) && sed -E \
+       -e 's/^\*\*Final Status:\*\* \{.*\}$/**Final Status:** ✅ ACCEPTED/' \
+       -e "s/^\*\*Completion Time:\*\* \{YYYY-MM-DDTHH:MMZ\}$/**Completion Time:** $(date -u +%Y-%m-%dT%H:%MZ)/" \
+       "$DOD_PATH" > "$TMP" && mv "$TMP" "$DOD_PATH"
+     # Exactly one heading and one status line, on the WRITTEN file. Idempotent: a second run
+     # matches neither placeholder and changes nothing.
+     [ "$(grep -c '^## Verification Complete$' "$DOD_PATH")" = 1 ] && [ "$(grep -c '^\*\*Final Status:\*\*' "$DOD_PATH")" = 1 ] \
+       || { echo "HALT: bug mode — $DOD_PATH must carry exactly one ## Verification Complete heading and one **Final Status:** line"; exit 1; }
+     grep -q '^\*\*Final Status:\*\* ✅ ACCEPTED$' "$DOD_PATH" \
+       || { echo "HALT: bug mode — the Final Status placeholder in $DOD_PATH was not filled (is the template's line intact?)"; exit 1; }
+   fi
+   ```
+
    **Example final append:**
 
    ```markdown
@@ -1214,8 +1240,8 @@ standalone.
    # the array assignment aborted the whole script under zsh before the HALT below could
    # print (cycle-8 CR-5; ordering: TASK-125-BUG-21).
    [ -d "{document-directory}" ] || { echo "HALT: {document-directory} is not a directory — substitute the document directory before running this block"; exit 1; }
-   DOD_PATH=$(find "{document-directory}" -maxdepth 1 -name "${STEM}.dod.*.md" 2>/dev/null \
-     | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
+   source .agents/skills/finalise/references/newest-numbered.sh || exit 1   # one definition (task.138)
+   DOD_PATH=$(newest_numbered "{document-directory}" dod -name "${STEM}.dod.*.md")
    [ -n "$DOD_PATH" ] || { echo "HALT: no ${STEM}.dod.*.md beside the document — 7.2 writes it before this block runs"; exit 1; }
    if [ "$DOC_KIND" = "bug" ]; then
      ADD_PATHS=("{document-path}" "$DOD_PATH")
@@ -1287,8 +1313,8 @@ standalone.
    case "$STEM$DOC_KIND" in *'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from 6a (empty or an unsubstituted placeholder found)"; exit 1 ;; esac
    [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
    [ -d "{document-directory}" ] || { echo "HALT: {document-directory} is not a directory — substitute the document directory before running this block"; exit 1; }
-   DOD_PATH=$(find "{document-directory}" -maxdepth 1 -name "${STEM}.dod.*.md" 2>/dev/null \
-     | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
+   source .agents/skills/finalise/references/newest-numbered.sh || exit 1   # one definition (task.138)
+   DOD_PATH=$(newest_numbered "{document-directory}" dod -name "${STEM}.dod.*.md")
    [ -n "$DOD_PATH" ] || { echo "HALT: no ${STEM}.dod.*.md beside the document — 7.2 writes it before this block runs (cycle-6 CR-3)"; exit 1; }
    # The artefact list and the final assertion are chosen IN THE BLOCK by kind: a bug run has
    # no sprint review, and its frontmatter was deliberately not changed in 7.2, so asserting
@@ -1296,8 +1322,10 @@ standalone.
    # the note below (TASK-125-BUG-16).
    if [ "$DOC_KIND" = "bug" ]; then
      ARTIFACTS=("{document-path}" "$DOD_PATH")
-     FINAL_ASSERT_PATH="$DOD_PATH"; FINAL_ASSERT_PATTERN='^## Verification Complete'
-     FINAL_ASSERT_DESC="the pushed DoD file does not carry ## Verification Complete"
+     # A state only Step 7.1 writes. The heading is NOT that state: the template ships it at
+     # Step 0, so a stub and a filled DoD reached the same PASS (task.125 5c CR-1, obs #146).
+     FINAL_ASSERT_PATH="$DOD_PATH"; FINAL_ASSERT_PATTERN='^\*\*Final Status:\*\* ✅ ACCEPTED'
+     FINAL_ASSERT_DESC="the pushed DoD file does not carry **Final Status:** ✅ ACCEPTED — Step 7.1 did not fill it"
    else
      ARTIFACTS=("{document-path}" "$DOD_PATH" "{document-directory}/sprint-review-summary.md")
      FINAL_ASSERT_PATH="{document-path}"; FINAL_ASSERT_PATTERN='^status: accepted$'
@@ -1319,7 +1347,8 @@ standalone.
 
    **Bug mode (`pushed-assertions`):** run — the block itself branches on `DOC_KIND`: the loop
    covers the bug report and `$DOD_PATH` only (no sprint review), and the final assertion is
-   `^## Verification Complete` on `$DOD_PATH` rather than `status: accepted` on the document —
+   `**Final Status:** ✅ ACCEPTED` on `$DOD_PATH` — a state only 7.1 writes; the heading the template
+   ships at Step 0 proved nothing (5c CR-1) — rather than `status: accepted` on the document —
    the bug's frontmatter was deliberately not changed in 7.2, so asserting `accepted` on it
    would HALT every correct bug run. Not an instruction to edit the block (TASK-125-BUG-16).
    Only the last question is the one a reviewer's PR view will agree with. (These are per-artifact
@@ -1546,15 +1575,12 @@ POLLEOF
      bug.[0-9]*|*.bug.[0-9]*) [ "$DOC_KIND" = "bug" ] || { echo "HALT: STEM ${STEM} is a bug prefix but DOC_KIND is ${DOC_KIND} — bind the kind the Document-kind block resolved"; exit 1; } ;;
      *) [ "$DOC_KIND" != "bug" ] || { echo "HALT: DOC_KIND is bug but STEM ${STEM} is not a bug prefix — a bug's STEM is its own prefix (task.67.bug.3), never its parent's"; exit 1; } ;;
    esac
-   # Every numbered artefact is found with QUOTED `find -name` patterns (zsh aborts a command
-   # whose bare glob matches nothing) and ordered by its NUMBER — a path sort puts `gate.9`
-   # after `gate.19` and picked the stale one on any item with ten or more (TASK-125-BUG-21,
-   # the defect BUG-14 fixed for reports). One helper, three artefact kinds.
-   newest_numbered() {   # newest_numbered <dir> <kind: dod|gate|implementation> <-name pattern>…
-     local dir="${1}" kind="${2}"; shift 2
-     find "$dir" -maxdepth 1 \( "$@" \) 2>/dev/null \
-       | sed -E "s/^(.*\.${kind}\.)([0-9]+)(\..*)$/\2 \1\2\3/" | sort -n | tail -1 | cut -d' ' -f2-
-   }
+   # Every numbered artefact is found with QUOTED `find -name` patterns and ordered by its
+   # NUMBER (TASK-125-BUG-21, BUG-14). ONE definition — the bundled newest-numbered.sh —
+   # sourced in every block that needs it, from the repository root like qa-cycle.sh (a
+   # fenced block shares no shell function with the next; three inline copies drifted —
+   # obs #146, task.138).
+   source .agents/skills/finalise/references/newest-numbered.sh || exit 1
    # The directory is checked on its own first — a missing or verbatim `{document-directory}`
    # otherwise reached the DoD HALT below and pointed the reader at 7.2 (cycle-9 CR-4).
    [ -d "{document-directory}" ] || { echo "HALT: {document-directory} is not a directory — substitute the document directory before running this block"; exit 1; }
@@ -1600,6 +1626,13 @@ POLLEOF
      # The bare token, never the line's second word: real reports write
      # `**Verdict**: **PASS**` as often as `**Verdict**: PASS`, and the second
      # word of the first is `**PASS**` (cycle-4 CR-3). Neither token is a HALT.
+     # Two states, two diagnostics — and a THIRD that must not wear either's clothes: a report
+     # that exists and cannot be read. `grep` on it prints nothing, which the branch below
+     # reported as "no verdict line found" and sent the reader to write one (gate 11 future,
+     # obs #146). Read before grep; an empty path still takes the "no report" diagnostic below.
+     if [ -n "$IMPLEMENTATION_REPORT" ] && [ ! -r "$IMPLEMENTATION_REPORT" ]; then
+       echo "HALT: bug mode — ${IMPLEMENTATION_REPORT} exists but is not readable — a permission or a dangling path, not a missing verdict"; exit 1
+     fi
      VERDICT_LINE=$(grep -E '^\*\*Verdict\*\*:' "${IMPLEMENTATION_REPORT:-/dev/null}" 2>/dev/null | tail -1)
      # ONE refusal path (TASK-125-BUG-24). The verdict is the FIRST word after the colon with
      # its bold stripped, and it must be exactly PASS or FAIL. The verify-loop template's own
@@ -1613,7 +1646,11 @@ POLLEOF
      VERIFY_VERDICT=$(printf '%s\n' "$VERDICT_REST" | sed -nE 's/^\**([A-Za-z]+).*$/\1/p')
      VERDICT_AFTER=$(printf '%s\n' "$VERDICT_REST" | sed -E 's/^\**[A-Za-z]+\**[[:space:]]*//')
      case "$VERIFY_VERDICT" in PASS|FAIL) ;; *) VERIFY_VERDICT='' ;; esac
-     case "$VERDICT_AFTER" in /*|\|*) VERIFY_VERDICT='' ;; esac   # `PASS / FAIL` — a template remnant, not a verdict
+     # A remainder that begins with a separator OR with the other verdict token is a template
+     # remnant, not a verdict: `PASS / FAIL`, `PASS|FAIL`, and the reworded `PASS or FAIL` /
+     # `FAIL or PASS` / `PASS FAIL`, which read as PASS until task.138 (gate 11 future, obs #146).
+     # Prose after a real verdict never starts with the other token.
+     case "$VERDICT_AFTER" in /*|\|*|PASS*|FAIL*|[Oo][Rr]\ *|[Oo][Rr]) VERIFY_VERDICT='' ;; esac
      # Two states, two diagnostics (cycle-10 CR-3): no verdict line at all, or a line that
      # exists and was refused — the reader told to write one must learn that one exists.
      if [ -z "$VERIFY_VERDICT" ]; then

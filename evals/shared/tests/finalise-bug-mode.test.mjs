@@ -32,6 +32,7 @@ import {
   mkdtempSync,
   writeFileSync,
   rmSync,
+  chmodSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -121,6 +122,7 @@ const markers = parseMarkers(skill);
 // shape is spelled out, and the table is held to it exactly.
 const EXPECTED_VERBS = {
   "running-summary": "run",
+  "verification-complete": "run",
   "read-document": "run",
   "qa-reports": "run",
   "ac-agent": "skip",
@@ -580,6 +582,39 @@ for (const shell of SHELLS) {
     }
   });
 
+  test(
+    `[${shell}] 6b HALTs on an UNREADABLE report as unreadable — never as "no verdict line found" (obs #146, task.138)`,
+    {
+      skip:
+        process.getuid && process.getuid() === 0
+          ? "root reads everything"
+          : false,
+    },
+    () => {
+      const dir = sixBFixture({ verdict: "PASS" });
+      try {
+        const report = path.join(dir, "task.67.bug.3.implementation.1.run.md");
+        chmodSync(report, 0o000);
+        const r = run(dir, "task.67.bug.3", "bug");
+        assert.equal(r.status, 1, r.stdout + r.stderr);
+        assert.match(
+          r.stdout + r.stderr,
+          /HALT: bug mode — .*implementation\.1\.run\.md exists but is not readable/,
+        );
+        assert.doesNotMatch(
+          r.stdout + r.stderr,
+          /no \*\*Verdict\*\*: PASS\|FAIL line found/,
+        );
+      } finally {
+        chmodSync(
+          path.join(dir, "task.67.bug.3.implementation.1.run.md"),
+          0o644,
+        );
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
+
   test(`[${shell}] 6b's verdict is the FIRST word after the colon, exactly PASS/FAIL — template placeholders and remnants are refused with a diagnostic naming the line; a brace in trailing prose is prose (TASK-125-BUG-23, BUG-24)`, () => {
     const refused = [
       ["{PASS / FAIL}", "the verify-loop template's own placeholder"],
@@ -589,6 +624,13 @@ for (const shell of SHELLS) {
       ["pending — PASS expected", "PASS is not the first word"],
       ["**PASSED**", "PASSED is not PASS"],
       ["✅ PASS", "a leading glyph"],
+      [
+        "PASS or FAIL",
+        "the placeholder reworded with 'or' — read PASS before task.138 (obs #146)",
+      ],
+      ["PASS OR FAIL", "the reworded placeholder, upper-case"],
+      ["FAIL or PASS", "the reworded placeholder, other order"],
+      ["PASS FAIL", "both tokens, no separator"],
     ];
     for (const [verdict, why] of refused) {
       const dir = sixBFixture({ verdict });
@@ -785,13 +827,17 @@ for (const shell of SHELLS) {
     }
   });
 
-  test(`[${shell}] 7.6b in bug mode asserts ## Verification Complete on the DoD file, never status: accepted on the bug; task mode asserts accepted on the document (TASK-125-BUG-16)`, () => {
+  test(`[${shell}] 7.6b in bug mode asserts **Final Status:** ✅ ACCEPTED on the DoD file — a state only 7.1 writes, never the heading the template ships, never status: accepted on the bug; task mode asserts accepted on the document (TASK-125-BUG-16, obs #146)`, () => {
     const dir = sixBFixture();
     try {
       const bug = runBlock(sixBAssertBlock(), dir, "task.67.bug.3", "bug");
       assert.equal(bug.status, 0, bug.stderr + bug.stdout);
       assert.match(bug.stdout, /^N=2$/m, bug.stdout);
-      assert.match(bug.stdout, /^PAT=\^## Verification Complete$/m);
+      assert.match(
+        bug.stdout,
+        /^PAT=\^\\\*\\\*Final Status:\\\*\\\* ✅ ACCEPTED$/m,
+        bug.stdout,
+      );
       assert.match(bug.stdout, /^AT=.*task\.67\.bug\.3\.dod\.1\.fix\.md$/m);
       const task = runBlock(sixBAssertBlock(), dir, "task.67", "task");
       assert.equal(task.status, 0, task.stderr + task.stdout);
@@ -1233,3 +1279,192 @@ test("SKILL.md resolves the kind once and hints on a bug path without --bug", ()
     "a bug path without the flag prints a hint",
   );
 });
+
+// ── task.138 (obs #146): the residuals task.125's eleven gates never closed ──────────────
+
+function fillBlock() {
+  const needle = 'DOD_PATH="{dod-path';
+  const at = skill.indexOf(needle);
+  assert.ok(at > -1, "7.1's bug-mode fill block is present");
+  const start = skill.lastIndexOf('DOC_KIND="{', at);
+  const end = skill.indexOf("   ```", at);
+  return skill
+    .slice(start, end)
+    .replace(/^ {3}/gm, "")
+    .replace(/DOC_KIND="\{[^\n]*\}"/, 'DOC_KIND="${KIND_IN:-}"')
+    .replace(/DOD_PATH="\{[^\n]*\}"/, 'DOD_PATH="${DOD:-}"');
+}
+const TEMPLATE_TEXT = readFileSync(
+  path.join(REPO_ROOT, "skills/finalise/assets/bug-dod-template.md"),
+  "utf8",
+);
+const countHeadings = (s) =>
+  (s.match(/^## Verification Complete$/gm) || []).length;
+const countStatus = (s) => (s.match(/^\*\*Final Status:\*\*/gm) || []).length;
+
+for (const shell of SHELLS) {
+  const runFill = (dod, kind) =>
+    spawnSync(shell, ["-s", "--"], {
+      input: fillBlock(),
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, DOD: dod, KIND_IN: kind },
+    });
+
+  test(`[${shell}] 7.1 bug mode FILLS the template's block — one heading, one Final Status, and it reads ACCEPTED; a second run changes nothing (5c CR-2, obs #146)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-71-"));
+    try {
+      const dod = path.join(dir, "bug.14.dod.1.x.md");
+      writeFileSync(dod, TEMPLATE_TEXT);
+      assert.equal(
+        countStatus(TEMPLATE_TEXT),
+        1,
+        "the template carries the placeholder line",
+      );
+      assert.doesNotMatch(
+        TEMPLATE_TEXT,
+        /\*\*Final Status:\*\* ✅ ACCEPTED/,
+        "and it is a placeholder, not a verdict",
+      );
+      const r = runFill(dod, "bug");
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      const once = readFileSync(dod, "utf8");
+      assert.equal(countHeadings(once), 1);
+      assert.equal(countStatus(once), 1);
+      assert.match(once, /^\*\*Final Status:\*\* ✅ ACCEPTED$/m);
+      assert.match(
+        once,
+        /^\*\*Completion Time:\*\* \d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/m,
+        "the timestamp placeholder was filled too",
+      );
+      const r2 = runFill(dod, "bug");
+      assert.equal(r2.status, 0, r2.stdout + r2.stderr);
+      assert.equal(readFileSync(dod, "utf8"), once, "idempotent");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 7.1 fill block is inert for a story/task run — the append path is theirs`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-71-"));
+    try {
+      const dod = path.join(dir, "task.7.dod.1.x.md");
+      writeFileSync(
+        dod,
+        "# running summary\n\n## Verification Complete\n\n**Final Status:** ✅ ACCEPTED\n",
+      );
+      const before = readFileSync(dod, "utf8");
+      const r = runFill(dod, "task");
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.equal(readFileSync(dod, "utf8"), before);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 7.1 fill block refuses unbound inputs and a doubled file`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-71-"));
+    try {
+      const dod = path.join(dir, "bug.14.dod.1.x.md");
+      writeFileSync(
+        dod,
+        TEMPLATE_TEXT +
+          "\n## Verification Complete\n\n**Final Status:** ✅ ACCEPTED\n",
+      );
+      const r = runFill(dod, "bug");
+      assert.equal(r.status, 1);
+      assert.match(
+        r.stdout + r.stderr,
+        /exactly one ## Verification Complete heading and one \*\*Final Status:\*\* line/,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("7.6b's bug-mode pattern matches a FILLED DoD and not the template — the heading the template ships is not the state Step 7 writes (5c CR-1, obs #146)", () => {
+  const m = skill.match(
+    /FINAL_ASSERT_PATTERN='(\^\\\*\\\*Final Status:\\\*\\\* ✅ ACCEPTED)'/,
+  );
+  assert.ok(m, "7.6b's bug branch asserts the Final Status line");
+  const re = new RegExp(m[1].replace(/\\\*/g, "\\*"), "m");
+  assert.doesNotMatch(
+    TEMPLATE_TEXT,
+    re,
+    "a template-only DoD must fail the pushed assertion",
+  );
+  assert.match(
+    TEMPLATE_TEXT.replace(
+      /\*\*Final Status:\*\* \{[^\n]*\}/,
+      "**Final Status:** ✅ ACCEPTED",
+    ),
+    re,
+  );
+  assert.doesNotMatch(
+    skill.slice(skill.indexOf('FINAL_ASSERT_PATH="$DOD_PATH"')),
+    /FINAL_ASSERT_PATTERN='\^## Verification Complete'/,
+    "the old heading assertion is gone",
+  );
+});
+
+test("newest_numbered has ONE definition — the bundled helper — and SKILL.md defines it nowhere (gate 9 future, obs #146)", () => {
+  assert.equal(
+    (skill.match(/newest_numbered\(\) \{/g) || []).length,
+    0,
+    "no inline definition in SKILL.md",
+  );
+  const sources =
+    skill.match(
+      /source \.agents\/skills\/finalise\/references\/newest-numbered\.sh \|\| exit 1/g,
+    ) || [];
+  assert.ok(
+    sources.length >= 3,
+    `sourced in 6b, 7.6a and 7.6b — found ${sources.length}`,
+  );
+  const shared = readFileSync(
+    path.join(REPO_ROOT, "shared/resources/newest-numbered.sh"),
+    "utf8",
+  );
+  const bundled = readFileSync(
+    path.join(REPO_ROOT, "skills/finalise/references/newest-numbered.sh"),
+    "utf8",
+  );
+  // The bundler stamps one provenance line on the copy; everything else is the source.
+  assert.equal(
+    bundled.replace(/^# AUTO-GENERATED[^\n]*\n/m, ""),
+    shared,
+    "the bundled copy is the shared source (banner aside)",
+  );
+});
+
+for (const shell of SHELLS) {
+  test(`[${shell}] newest-numbered.sh picks .19 over .9 for dod, gate and implementation, and prints nothing for an empty series`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-nn-"));
+    try {
+      for (const [kind, ext] of [
+        ["dod", "md"],
+        ["gate", "yml"],
+        ["implementation", "md"],
+      ]) {
+        writeFileSync(path.join(dir, `task.7.${kind}.9.a.${ext}`), "");
+        writeFileSync(path.join(dir, `task.7.${kind}.19.b.${ext}`), "");
+      }
+      const script = `source .agents/skills/finalise/references/newest-numbered.sh || exit 1
+for k in dod gate implementation; do printf '%s\\n' "$(newest_numbered "$DIR" "$k" -name "task.7.$k.*")"; done
+printf 'EMPTY=[%s]\\n' "$(newest_numbered "$DIR" qa -name "task.7.qa.*")"`;
+      const r = spawnSync(shell, ["-s", "--"], {
+        input: script,
+        encoding: "utf8",
+        cwd: REPO_ROOT,
+        env: { PATH: process.env.PATH, DIR: dir },
+      });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      for (const kind of ["dod", "gate", "implementation"])
+        assert.match(r.stdout, new RegExp(`task\\.7\\.${kind}\\.19\\.b\\.`));
+      assert.match(r.stdout, /^EMPTY=\[\]$/m);
+      assert.doesNotMatch(r.stderr, /no matches found/i);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}

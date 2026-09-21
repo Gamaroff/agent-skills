@@ -202,6 +202,21 @@ verbatim, so the guard's scope is `SKILL.md` alone. And `qa-task` Step 4b, which
 documented snippets, executes them **from disk** — it cannot see a render-time corruption, and its
 own step says so.
 
+### A helper a fenced block executes is addressed from the repository root
+
+**The rule.** A script under `references/` that a fenced block **sources or runs** is addressed as
+`.agents/skills/{skill}/references/<file>` — from the repository root, the cwd every pipeline block
+already declares by writing `.claude/state/` and reading `{document-path}` relative to it — never as
+a bare `references/<file>` and never through a `$SKILL_DIR` the block would have to bind. One
+contract: `qa-cycle.sh` is called this way from every block that needs the cycle (guard:
+`tests/qa-cycle.test.js` "every block addresses the helper from the repository root"), and
+`newest-numbered.sh` — the one definition of "the newest artefact of a numbered series", hoisted
+out of three inline copies in `finalise` (obs #146, task.138) — is sourced the same way.
+
+**Why a shared function has to be a file.** Every fenced block runs as its own shell; a function
+defined in one block does not exist in the next, so a helper written inline is copied into every
+block that needs it and the copies drift. `finalise` carried `newest_numbered` three times.
+
 ### An optional file is found with `find -name`, never a bare glob
 
 **The rule.** A fenced `bash` block that locates a file that **may not exist** — the newest

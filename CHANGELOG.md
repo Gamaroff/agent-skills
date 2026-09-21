@@ -388,6 +388,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`finalise --bug`: the five low residuals task.125's eleven gates never closed (task 138, phases
+  1–3 and 5; obs #146).** 7.6b's bug-mode pushed assertion now greps `**Final Status:** ✅ ACCEPTED`
+  on the DoD — a state only Step 7.1 writes — instead of the `## Verification Complete` heading the
+  template ships at Step 0, which a stub and a filled DoD both satisfied. 7.1 gains a
+  `verification-complete` skip-table row and an executed **fill** block for bug mode (replace the
+  template's placeholders in place; assert one heading and one status line on the written file;
+  idempotent) instead of appending a second block. 6b refuses a verdict remainder that begins with
+  the other token (`PASS or FAIL` read PASS) and HALTs on an unreadable report as unreadable rather
+  than as "no verdict line found". `newest_numbered` — defined in 6b and inlined in 7.6a/7.6b — is
+  one file, `shared/resources/newest-numbered.sh`, sourced from the repository root like
+  `qa-cycle.sh`; `create-skill/SKILL.md` states that addressing rule once. Phase 4 — one
+  end-to-end `/finalise --bug` run in a scratch clone — is still owed; the task stays in progress.
+
 - **Every optional-file lookup in the pipeline prose is a quoted `find -name`, and the newest of a
   numbered series is picked by number (task 137; obs #144, #145).** Twenty-nine fenced-bash sites
   across the qa-task / qa-story / finalise / develop-story / develop-task skills and seven shared
