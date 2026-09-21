@@ -1419,3 +1419,147 @@ test("shell-fn entry: --fake-gh without an operand, and an unreadable directory,
   }
   assert.match(err.join(""), /--fake-gh requires an operand/);
 });
+
+// ── task.136 QA cycle 1 — the fixes, each with its row ───────────────────────
+
+test("shell-fn entry: --fake-gh on a JS-form entry is bad-fake-gh, never recorded as having answered (TASK-136-BUG-1)", () => {
+  // The JS runner hands the entry JSON on stdin and spawns no shell, so a fake
+  // on PATH can never answer it. Before the fix the directory was validated,
+  // ignored by the runner, and RECORDED as `fake_gh` — a record claiming a
+  // fixture answered when the real binary did.
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("engaging-control"),
+    fakeGh: FAKE_GH,
+  });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "bad-fake-gh");
+  assert.match(r.declined[0].detail, /shell entry forms only/);
+  assert.equal(r.executed, 0, "nothing may spawn");
+  assert.equal(
+    r.fakeGh,
+    null,
+    "a declined fake is not recorded as the one that answered",
+  );
+  assert.equal(toRecordEntry(r).fake_gh, null);
+  // The same directory on the shell: form is accepted (it does consult PATH).
+  const sh = runProbeSpec({
+    sink: "filename",
+    entry: FIXED_SCRIPT,
+    fakeGh: FAKE_GH,
+  });
+  assert.equal(sh.verdict, "engages");
+  assert.equal(sh.fakeGh, join(REPO_ROOT, FAKE_GH));
+});
+
+test("shell-fn entry: a function that itself exits 97 or 98 is SCORED, not declined as a broken library (CR-2)", () => {
+  const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, ".t136-collide-"));
+  try {
+    const lib = join(dir, "collides.sh");
+    writeFileSync(
+      lib,
+      '#!/usr/bin/env bash\nrefuse97() { case "$1" in bug) printf "bug\\n";; *) exit 97;; esac; }\n',
+      { mode: 0o644 },
+    );
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, lib)}#refuse97`,
+      cases: LABEL_CASES,
+      fakeGh: FAKE_GH,
+    });
+    // Every hostile case mismatches on exit (99 ≠ 0) → reproduced; the one
+    // legitimate `bug` case matches → the control is absent, with a full count.
+    assert.equal(r.declined.length, 0, JSON.stringify(r.declined));
+    assert.equal(r.executed, LABEL_CASES.length * probeShells().length);
+    assert.notEqual(r.verdict, "unverifiable");
+    const hostile = r.cases.find((c) => c.id === "label.undefined-label");
+    assert.match(hostile.detail, /exit 99 ≠ 0/, hostile.detail);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: a slash-bearing input is a case, not a materialisation failure (CR-3)", () => {
+  // `area/backend` is a real label shape. The shell: form must still refuse
+  // it (a directory entry cannot carry a separator); the shell-fn form passes
+  // it as argv and writes no per-case file.
+  const cases = [
+    {
+      id: "label.slash",
+      input: "area/backend",
+      direction: "hostile",
+      expected: { stdout: "", exit: 0 },
+    },
+    {
+      id: "label.ok",
+      input: "bug",
+      direction: "legitimate",
+      expected: { stdout: "bug\n", exit: 0, stderr: "" },
+    },
+  ];
+  const fn = runProbeSpec({
+    sink: "filename",
+    entry: FN_ENTRY,
+    cases,
+    fakeGh: FAKE_GH,
+  });
+  assert.equal(fn.verdict, "engages", JSON.stringify(fn.declined));
+  assert.equal(fn.declined.length, 0);
+  const slash = fn.cases.find((c) => c.id === "label.slash");
+  assert.deepEqual(
+    slash.fixture,
+    ["!.gate.3.control.yml", "~.gate.12.control.yml"],
+    "no per-case file is claimed",
+  );
+  const script = runProbeSpec({ sink: "filename", entry: FIXED_SCRIPT, cases });
+  assert.match(script.declined[0].detail, /path separator/);
+  // A NUL in a shell-fn input is still declined — argv cannot carry it.
+  const nul = runProbeSpec({
+    sink: "filename",
+    entry: FN_ENTRY,
+    cases: [{ ...cases[0], id: "label.nul", input: "a\u0000b" }, cases[1]],
+    fakeGh: FAKE_GH,
+  });
+  assert.match(nul.declined[0].detail, /NUL/);
+});
+
+test("shell-fn entry: the fake gh's issue create records its argv to FAKE_GH_LOG and answers a URL (CR-4)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "fake-gh-log-"));
+  try {
+    const log = join(dir, "gh.log");
+    const gh = join(REPO_ROOT, FAKE_GH, "gh");
+    const r = spawnSync(
+      gh,
+      ["issue", "create", "--title", "t", "--label", "bug"],
+      {
+        encoding: "utf8",
+        env: { PATH: process.env.PATH, FAKE_GH: "1", FAKE_GH_LOG: log },
+      },
+    );
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, "https://example.invalid/issues/1\n");
+    assert.equal(
+      readFileSync(log, "utf8"),
+      "issue\ncreate\n--title\nt\n--label\nbug\n",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: a missing library is declined BEFORE anything spawns, not only by the source failing", () => {
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: "shell-fn:shared/resources/does-not-exist.sh#f",
+    cases: LABEL_CASES,
+    fakeGh: FAKE_GH,
+  });
+  assert.equal(r.reason, "entry-not-probeable");
+  assert.match(r.declined[0].detail, /not a readable regular file/);
+  assert.equal(
+    r.cases.length,
+    0,
+    "the pre-spawn check, not exit 97, is what declined it",
+  );
+  assert.equal(r.shells, null);
+});

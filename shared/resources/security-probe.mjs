@@ -95,7 +95,10 @@
  * the library, the function name and the case's input as ARGV, never a string.
  * Exit 97 is reserved for "the source itself failed" and exit 98 for "the
  * function is not defined after sourcing", so a broken or misnamed library is
- * a NAMED decline (`entry-not-probeable`) rather than a silent `absent`. A
+ * a NAMED decline (`entry-not-probeable`) rather than a silent `absent`; the
+ * function runs in a subshell and its own 97/98 is re-mapped to 99 and scored,
+ * so the sentinels can only come from the harness. No per-case file is written
+ * for this form — the input is argv, so it may carry a `/`. A
  * function that consults `gh` is answered by `--fake-gh <dir>`: the directory
  * is prepended to PATH with `FAKE_GH=1` in the env, so the fixture's `gh`
  * answers and a real `gh` — or the network — never does. What the function
@@ -371,6 +374,14 @@ const SHELL_FN_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const SHELL_FN_SOURCE_FAILED = 97;
 export const SHELL_FN_NOT_DEFINED = 98;
 /**
+ * What the body exits when the FUNCTION ITSELF returned 97 or 98: those two
+ * are the harness's sentinels, and a function that answers a hostile input
+ * with one of them must be SCORED (as a mismatch against `expected.exit`), not
+ * declined as a broken library (task.136 QA cycle 1, CR-2). Any other exit
+ * passes through unchanged.
+ */
+export const SHELL_FN_RESERVED_COLLISION = 99;
+/**
  * Flags that keep a shell from reading any rc file. The sandbox HOME the
  * shell arm already sets is the first line; these are the second, and they
  * matter more here because this arm sources INTO the shell proper (the
@@ -387,7 +398,12 @@ const noRcFlags = (shell) =>
  */
 const SHELL_FN_BODY =
   `source "$1" || exit ${SHELL_FN_SOURCE_FAILED}; shift; fn="$1"; shift; ` +
-  `typeset -f "$fn" >/dev/null 2>&1 || exit ${SHELL_FN_NOT_DEFINED}; "$fn" "$@"`;
+  `typeset -f "$fn" >/dev/null 2>&1 || exit ${SHELL_FN_NOT_DEFINED}; ` +
+  // The function runs in a SUBSHELL: a function that calls `exit` would
+  // otherwise end the harness shell with that code before the remap below
+  // ever ran, and `exit 97` inside the function would read as "the source
+  // failed" (task.136 QA cycle 1, CR-2 — found by its own row).
+  `( "$fn" "$@" ); rc=$?; case $rc in ${SHELL_FN_SOURCE_FAILED}|${SHELL_FN_NOT_DEFINED}) exit ${SHELL_FN_RESERVED_COLLISION};; esac; exit $rc`;
 
 /**
  * The shells a shell-form probe runs under. bash always; zsh when the host has
@@ -619,6 +635,17 @@ export function runProbeSpec({
   // outside the repo root is not a fixture this repository owns.
   let fakeGhDir = null;
   if (fakeGh !== undefined && fakeGh !== null) {
+    // Only the shell forms consult PATH. The JS runner hands the entry its
+    // input as JSON on stdin and never spawns a shell, so a fake it cannot
+    // reach must not be RECORDED as having answered — `fake_gh: <dir>` on a
+    // JS-form record would claim a fixture where the real binary ran
+    // (TASK-136-BUG-1). Declined, not ignored: a caller who passed it meant it.
+    if (!isShellForm) {
+      return decline(
+        "bad-fake-gh",
+        "--fake-gh applies to the shell entry forms only (shell:, shell-fn:) — a JS export never consults PATH",
+      );
+    }
     if (typeof fakeGh !== "string" || fakeGh.trim() === "") {
       return decline("bad-fake-gh", "--fake-gh must name a directory");
     }
@@ -1024,10 +1051,21 @@ function runShellCase(
       // a traversal name into a write outside the fixture — so the name is
       // appended raw and any separator in it is a decline, not a normalised
       // path.
-      if (c.input.includes("/") || c.input.includes("\0")) {
-        throw new Error("name carries a path separator or NUL");
+      //
+      // The shell-fn form gets the input as ARGV, not as a directory entry, so
+      // it does not need the file — and must not be declined for a name a
+      // file cannot carry: a real label such as `area/backend` is exactly the
+      // kind of input a label filter must be probed with (task.136 QA cycle
+      // 1, CR-3). The controls are still written, so `absent` and the cwd
+      // sentinel keep their meaning.
+      if (fnName === null) {
+        if (c.input.includes("/") || c.input.includes("\0")) {
+          throw new Error("name carries a path separator or NUL");
+        }
+        writeFileSync(`${fixtureDir}/${c.input}`, "");
+      } else if (c.input.includes("\0")) {
+        throw new Error("input carries a NUL");
       }
-      writeFileSync(`${fixtureDir}/${c.input}`, "");
     } catch (e) {
       caseResults.push({
         id: c.id,
@@ -1150,7 +1188,12 @@ function runShellCase(
       direction: c.direction,
       outcome,
       detail,
-      fixture: [...fixture.controls, c.input],
+      // The shell-fn form materialises no per-case file (CR-3), and the
+      // record must not claim one.
+      fixture:
+        fnName === null
+          ? [...fixture.controls, c.input]
+          : [...fixture.controls],
     });
   }
 }

@@ -299,6 +299,27 @@ None.
 - **Critical**: network reached; any existing verdict changes.
 - **Non-critical**: wording in the rule or the prompts.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-21
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.136.qa.1.shell-fn-probe-entry-form.md](./task.136.qa.1.shell-fn-probe-entry-form.md)
+- **Gate File**: [task.136.gate.1.shell-fn-probe-entry-form.yml](./task.136.gate.1.shell-fn-probe-entry-form.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3879 (`npm run ci:fast`; 57 in `security-probe.test.mjs`); 41 security probes executed (measured)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 1 MEDIUM (TASK-136-BUG-1), 3 LOW advisory
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+The new `shell-fn:` form engages on the live `gh-labels.sh#gh_labels_filter` boundary (20/20 under bash and zsh); every hostile path and function name is refused. One MEDIUM: `--fake-gh` is validated and recorded for a JS-form entry the JS runner never puts on `PATH`, so a record can claim a fixture answered when the real `gh` did ([bug 1](./task.136.bug.1.fake-gh-recorded-on-js-entry.md)).
+
 ---
 <!-- change-log-start -->
 ## Change Log
@@ -309,6 +330,8 @@ None.
 | 2026-09-21 | 1.1 | Review passed (9/10 after fixes) — green row and finalise command now share a label-shaped `--cases-file` (the `filename` corpus expects `"12\n"`); fake `gh` honours `-q`; Risk 1 mitigation restated (sandbox HOME today, no-rc flags a Phase 2 deliverable); pin test is `probe-boundary-signals.test.mjs` | review-task |
 | 2026-09-21 |  | Status → ready-for-development | review-task |
 | 2026-09-21 |  | Implemented — 12 files (engine, 2 tests, 3 fixtures, 4 prompts, CHANGELOG, 10 bundled copies), 12 new test rows, 5 mutants killed; live probe of gh-labels.sh#gh_labels_filter: engages, executed 20 | develop |
+| 2026-09-21 |  | QA gate CONCERNS (90/100) — 1 MEDIUM (CR-1: --fake-gh recorded on a JS entry the runner ignores), 3 LOW advisory; 41 security probes measured | qa-task |
+| 2026-09-21 |  | QA findings fixed — cycle 1: TASK-136-BUG-1 (--fake-gh declined on a JS entry) + CR-2/3/4 advisories closed, 5 rows added, 4 mutants killed; suite 62/62 | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -328,8 +351,19 @@ None.
 - `shared/resources/security-probe.mjs` § "THE SHELL ENTRY FORM (task.128)" — the comment block the new form's block sits under
 - `shared/resources/gh-labels.sh` — the green fixture; `tests/gh-labels.test.js` — its by-hand evidence
 
+## Bug Reports
+
+### In QA Verification
+
+- [TASK-136-BUG-1: `--fake-gh` recorded on a JS-form entry the runner never puts on PATH](./task.136.bug.1.fake-gh-recorded-on-js-entry.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-21, qa-fix cycle 1)
+
+### Closed Bugs
+
+[Bugs will be moved here by QA after verification]
+
 ## Notes
 
 - QA artifacts land beside this file: `task.136.qa.[N].*.md`, `task.136.bug.[N].*.md`, `task.136.gate.[N].*.yml`.
 - Independent of tasks 137 and 138. Shares `security-probe.mjs` with task.131 (markdown-structure sink, planned): both add an arm to `runProbeSpec` — land one, rebase the other.
+- qa-fix cycle 1 also closed the three advisories QA carried to `future` (CR-2: the function runs in a subshell and its own 97/98 is re-mapped to 99 and scored; CR-3: no per-case fixture file for `shell-fn:` cases, so slash-bearing labels are probeable; CR-4: `FAKE_GH_LOG` exercised by a row) and pinned the pre-spawn decline for a missing library.
 - Until this lands, the finalise security probe FAILs (low) on any sourced-shell-function boundary and Step 8a refuses the fix; that is a human override, to be asked for, never auto-accepted.

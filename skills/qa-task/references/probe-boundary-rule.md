@@ -212,9 +212,16 @@ Declining conditions, each reported with its reason:
 
   Exit 97 is reserved for "the source itself failed" and 98 for "the function
   is not defined after sourcing"; both fold into one `entry-not-probeable`
-  decline that names the library, never into a scored `absent`. A stdin-reading
-  function, or one needing more than argv, is still declined (§ Out of Scope,
-  task.128).
+  decline that names the library, never into a scored `absent`. The function
+  itself runs in a **subshell**, so a function that calls `exit` cannot end the
+  harness — and its own 97 or 98 is re-mapped to 99 and *scored* as a mismatch
+  rather than read as a broken library. Because the input reaches the function
+  as argv and not as a directory entry, a `shell-fn:` case may carry a `/`
+  (`area/backend` is a real label); no per-case file is written for this form,
+  only the sink's controls. `--fake-gh` on a JS-form entry is `bad-fake-gh`:
+  the JS runner never consults `PATH`, and a fake it cannot reach must not be
+  recorded as having answered. A stdin-reading function, or one needing more
+  than argv, is still declined (§ Out of Scope, task.128).
 - **What is still declined, and recorded as declined:** a script that reads
   stdin, takes more than one positional, or must open a socket; a live database
   sink; anything that needs the network. These are limits of the entry forms,

@@ -1,0 +1,65 @@
+schema: 1
+task: 'task.136.shell-fn-probe-entry-form'
+task_title: 'A shell-fn: entry form for the security probe, and a fake-gh affordance'
+gate: CONCERNS
+status_reason: 'All 4 phases verified against the diff, 8/8 success criteria met, ci:fast 3878/3879 (0 fail), security probes measured (41 executed: the new form engages on the live gh-labels.sh boundary; the shell-fn: containment/name gate is present-but-inert only on the documented pre-existing symlink limit). One MEDIUM from the diff review (CR-1, high confidence, promoted under code_review_blocking): --fake-gh is validated and recorded for a JS-form entry the runner never puts it on PATH for, so the record can claim a fixture answered when the network did.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T20:12:12Z'
+
+top_issues:
+  - id: 'TASK-136-BUG-1'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'fakeGh is validated and recorded (base.fakeGh, fake_gh on the record) for every entry kind, but only runShellCase prepends it to PATH — the JS runner (line 714) spawns with sandboxEnv({ cwd: workDir }) — so a JS entry probed with --fake-gh reports fake_gh: <dir> while any gh it shelled out to was answered by the real binary (CR-1; reproduced).'
+    suggested_action: 'Decline --fake-gh on a kind: "js" entry with bad-fake-gh ("only the shell forms consult PATH") — or apply the same PATH/FAKE_GH prepend to the JS runner env — and add a row asserting the chosen contract.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3879
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 41
+    notes: 'Record task.136.qa.1.security.run.json (totals.executed 41). gh-labels-shell-fn (shell-fn:shared/resources/gh-labels.sh#gh_labels_filter, --cases-file tests/fixtures/shell-fn/gh-labels.cases.json, --fake-gh tests/fixtures/fake-gh): engages, shells [bash, zsh], 20 executed, 0 reproduced, 0 escapes. containsShellFnEntry (resolveEntry via wrapper, 21 cases — 8 path-containment hostile mirrored from task.128, 7 function-name hostile, 6 legitimate): present-but-inert on shellfn.symlink-escape only — the documented pre-existing resolveEntry limit (task.128 gate 5; reproduced identically on origin/develop, containment block byte-identical to base) → pre-existing, future. Every function-name hostile (uid=501(gamaroff) gid=20(staff) groups=20(staff),12(everyone),61(localaccounts),79(_appserverusr),80(admin),81(_appserveradm),701(com.apple.sharepoint.group.1),33(_appstore),98(_lpadmin),100(_lpoperator),204(_developer),250(_analyticsusers),395(com.apple.access_ftp),398(com.apple.access_screensharing),399(com.apple.access_ssh),400(com.apple.access_remote_ae), backtick, ;-chain, space, path-shaped, empty, leading digit) refused with bad-entry. QA mutation spot check: 3 covered (name regex, FAKE_GH env, fake_gh record); 1 absorbed (shell-fn readability pre-check — a missing library still declines via exit 97, cases.length differs; no row pins the pre-spawn decline for shell-fn).'
+  performance:
+    status: PASS
+    notes: 'shell-fn run over 10 cases x 2 shells completes in ~0.9 s inside the existing per-case timeout; the security-probe suite runs in 28 s (57 rows). No new work on the JS or shell: arms.'
+  reliability:
+    status: PASS
+    notes: 'Exits 97/98 are reserved and fold into one named entry-not-probeable decline; --fake-gh validated before anything spawns; without --fake-gh the run exits 1 in 1.6 s with the mismatch named (no hang). Advisory CR-2 (low/medium): a function that itself exits 97 or 98 on a hostile input is indistinguishable from the harness sentinels and would decline rather than score — documented as reserved; a stderr token or an in-body remap would make the codes harness-only (future).'
+  maintainability:
+    status: PASS
+    notes: 'The arm is a branch in runShellCase, not a copy; the header signal is stated once in probe-boundary-rule.md and four sites cite it, pinned by probe-boundary-signals.test.mjs (extended, mutation-proved). Advisory CR-3: the filename materialiser declines any input carrying a slash, so a real label such as area/backend cannot be a shell-fn case — skip the per-case file write when fnName is set (future). Advisory CR-4: the fake gh issue-create branch reads FAKE_GH_LOG that nothing binds and no row exercises (future).'
+
+recommendations:
+  immediate:
+    - action: 'CR-1 / TASK-136-BUG-1: decline --fake-gh on a kind: "js" entry with bad-fake-gh (or prepend it in the JS runner env) and add the asserting row'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+  future:
+    - action: 'shellfn.symlink-escape: resolveEntry does not realpath before the containment check — pre-existing limit carried from task.128 gate 5, unchanged by this diff; documented in probe-boundary-rule.md §5'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-2: make exits 97/98 harness-only (stderr token or in-body remap of the function''s own 97/98)'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-3: skip the per-case fixture file write for shell-fn cases so slash-bearing inputs (area/backend) can be probed'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-4: bind FAKE_GH_LOG in a row that exercises issue create, or drop the branch until a boundary calls it'
+      refs: ['tests/fixtures/fake-gh/gh']
+    - action: 'Add a row pinning that a missing shell-fn library is declined before anything spawns (cases.length === 0), not only via exit 97'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-136-BUG-1 fixed and re-reviewed']

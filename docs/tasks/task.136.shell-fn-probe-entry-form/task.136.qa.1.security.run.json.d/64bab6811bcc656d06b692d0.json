@@ -1,0 +1,17 @@
+{
+  "sink": null,
+  "entry": ".claude/state/t136-probe-wrapper.mjs#containsShellFnEntry",
+  "name": "containsShellFnEntry",
+  "call_site": "shared/resources/security-probe.mjs:262",
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 21,
+  "passed": 20,
+  "reproduced": 1,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "ran_at": "2026-09-21T20:05:36.523Z"
+}
