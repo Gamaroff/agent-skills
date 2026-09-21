@@ -173,9 +173,9 @@ commit. Two consequences for the orchestrator:
 After the DoD file is written, post its **full content** as a PR comment so reviewers see the acceptance evidence on the PR itself (not only in the repo tree). A one-line "task/story accepted" comment is insufficient.
 
 ```bash
-DOD_FILE=$(ls {story-or-task-directory}/{story-or-task-prefix}.dod.*.md 2>/dev/null | sort | tail -1)
+DOD_FILE=$(find {story-or-task-directory} -maxdepth 1 -name "{story-or-task-prefix}.dod.*.md" 2>/dev/null | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
 
-# Tracked AND on the remote — not merely present. `ls` found a file in the working tree; the
+# Tracked AND on the remote — not merely present. `find` found a file in the working tree; the
 # reader of this comment sees the PR's branch. If these disagree the comment lies (obs #48).
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 git ls-files --error-unmatch "$DOD_FILE" >/dev/null || { echo "HALT: $DOD_FILE is not tracked"; exit 1; }
@@ -343,8 +343,8 @@ If `TRACKER_ISSUE` is set, post the completion comment and confirm the Done tran
 1. **Post completion comment.** Locate the DoD summary and gate files, then make the one call:
 
    ```bash
-   DOD_PATH=$(ls {story-or-task-directory}/*.dod.*.md 2>/dev/null | sort | tail -1)
-   FINAL_GATE=$(ls {story-or-task-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
+   DOD_PATH=$(find {story-or-task-directory} -maxdepth 1 -name "*.dod.*.md" 2>/dev/null | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
+   FINAL_GATE=$(find {story-or-task-directory} -maxdepth 1 -name "*.gate.*.yml" 2>/dev/null | sed -E 's/^(.*\.gate\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2- \
      | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
 
    mkdir -p .claude/state
@@ -537,13 +537,13 @@ Locate the DoD summary file created by finalise:
 #### develop-story
 
 ```bash
-ls {story-directory}/story.{epic}.{story}.dod.*.md 2>/dev/null | sort | tail -1
+find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.dod.*.md" 2>/dev/null | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 #### develop-task
 
 ```bash
-ls {task-directory}/task.{id}.dod.*.md 2>/dev/null | sort | tail -1
+find {task-directory} -maxdepth 1 -name "task.{id}.dod.*.md" 2>/dev/null | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 Record its path in the Decisions Log: "DoD summary: {path}". Add it to the Completion section of the implementation report as **DoD Summary**: {path}.

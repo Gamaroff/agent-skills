@@ -202,6 +202,31 @@ verbatim, so the guard's scope is `SKILL.md` alone. And `qa-task` Step 4b, which
 documented snippets, executes them **from disk** — it cannot see a render-time corruption, and its
 own step says so.
 
+### An optional file is found with `find -name`, never a bare glob
+
+**The rule.** A fenced `bash` block that locates a file that **may not exist** — the newest
+implementation report, the latest gate, a DoD file that a bug run has not written yet — uses
+`find <dir> -maxdepth 1 -name "<pattern>"` with the pattern **quoted**, never `ls <dir>/<glob>`.
+Guard: `tests/fenced-bash-optional-file-globs.test.js` — shipped as a **ratchet** pinning the 29
+sites that existed on 2026-09-21, swept to zero by task.137 (obs #145) the same day; it is now a
+pure guard with an empty pin list, and `evals/shared/tests/optional-file-lookups.test.mjs` executes
+every swept site with the file absent under both shells.
+
+**The failure.** The two shells this repository supports disagree about a glob that matches
+nothing. bash passes it through literally and `ls` fails, which `2>/dev/null` hides; zsh's default
+`NOMATCH` aborts the **whole command** before `ls` runs, prints its own error (which no redirection
+on `ls` covers) and leaves `$(…)` empty. A block that reads correctly on the author's shell reads
+wrongly on the other — and the Claude Code Bash tool runs the user's shell, which on every macOS
+host is zsh. On task.125 the fix for one filename shape needed a second glob for the other shape,
+and two globs, one of which is always absent, HALTed on every bug under zsh (TASK-125-BUG-13's
+fix; obs #144). `find -name` hands the matching to a program whose behaviour is the same everywhere.
+
+**Two more shapes of the same defect.** `PRIOR_GATES=$(ls dir/*.gate.*.yml 2>/dev/null | wc -l)`
+under zsh with no gate is not `0` — the pipeline never runs and the value is empty, so the next
+`[ "$PRIOR_GATES" -ge 2 ]` is an error, not a comparison. And a fixture-driven test that always
+puts the file there cannot see any of this: for every optional-file lookup, execute the block once
+with the file **absent**, under zsh.
+
 ### Shell matrices are derived from `zshAvailable()`, never hardcoded
 
 **The rule.** A test that spawns a shell takes its matrix from

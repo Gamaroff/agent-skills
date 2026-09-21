@@ -18,12 +18,12 @@ Re-read the document's `Status:` field (captured in Phase 0). Then check for an 
 
 #### develop-story
 ```bash
-ls {story-directory}/story.{epic}.{story}.review.*.md 2>/dev/null | sort | tail -1
+find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 #### develop-task
 ```bash
-ls {task-directory}/task.{id}.review.*.md 2>/dev/null | sort | tail -1
+find {task-directory} -maxdepth 1 -name "task.{id}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 ### Skip/Run Decision Table
@@ -216,7 +216,7 @@ Invoke the `/review-story` skill with the story file path in **validate-and-appl
 
 After review-story completes, locate the generated review report:
 ```bash
-ls {story-directory}/story.{epic}.{story}.review.*.md 2>/dev/null | sort | tail -1
+find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 Record the path in the Decisions Log: "Review report: {path}". If no review report file is found, log a warning in the Issues Log ("review-story did not produce a review report file") but do not halt.
 
@@ -227,16 +227,18 @@ Invoke the `/review-task` skill with the task file path.
 
 After review-task completes, locate the generated review report:
 ```bash
-ls {task-directory}/task.{id}.review.*.md 2>/dev/null | sort | tail -1
+find {task-directory} -maxdepth 1 -name "task.{id}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 Record the path in the Decisions Log: "Review report: {path}". If no review report file is found, log a warning in the Issues Log ("review-task did not produce a review report file") but do not halt — the post-review table below is what decides, and it needs the status as well as the report.
 
-> **`sort | tail -1` is a heuristic here, and it is wrong for some real filenames.** Reports exist in
-> at least three shapes (`task.12.review.2026-05-06.md`, `task.11.slug.review.2026-05-06.md`,
-> `task.97.review.1.slug.md`), so lexical order is not recency order across them. Where more than one
-> matches, prefer the highest `review.{N}.` index and fall back to this `ls` only when no report
-> carries one. This matters more than it used to: the Skip/Run table now lets a *current* report
-> authorise skipping the review, so picking the wrong report is no longer merely a mis-logged path.
+> **The pipeline above picks by `review.{N}.` index, numerically.** Reports exist in at least three
+> shapes (`task.12.review.2026-05-06.md`, `task.11.slug.review.2026-05-06.md`,
+> `task.97.review.1.slug.md`), and lexical order is not recency order across them — `sort | tail -1`
+> picked `review.9` over `review.19`. The `sed` prefixes each numbered report with its index and
+> leaves a dated one unprefixed, so `sort -n` ranks every numbered report above every dated one and
+> the highest index wins; a directory holding only dated reports yields whichever sorts last among
+> them. This matters more than it used to: the Skip/Run table now lets a *current* report authorise
+> skipping the review, so picking the wrong report is no longer merely a mis-logged path (task.137).
 
 ---
 

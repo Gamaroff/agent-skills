@@ -78,7 +78,7 @@ See `references/develop-pipeline-resume-contract.md` — Phase 0a for the full d
 **Step 1 — Recover pipeline state from the implementation report:**
 
 ```bash
-ls {story-directory}/story.{epic}.{story}.implementation.*.md 2>/dev/null | sort | tail -1
+find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.implementation.*.md" 2>/dev/null | sed -E 's/^(.*\.implementation\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.

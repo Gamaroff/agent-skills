@@ -5,19 +5,20 @@ type: task
 description: "Rewrite every fenced-bash optional-file lookup pinned by tests/fenced-bash-optional-file-globs.test.js from `ls <dir>/<glob> 2>/dev/null` to quoted `find <dir> -maxdepth 1 -name \"<pattern>\"` — one commit per shared step doc plus its bundle, each deleting its pins from KNOWN so the ratchet tightens — and give every rewritten site the executed case the fixtures never had: the block run under zsh with the file absent, asserting the empty or zero value the following prose expects."
 tags: [pipeline, zsh, shell, qa-task, qa-story, finalise, develop-task, develop-story, ratchet]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-21
 updated: 2026-09-21
 assignee:
 estimated_effort_hours: 8
 risk_level: medium
+pr_number: 455
 github_issue: 449
 ---
 
 # Technical Task: Sweep the pinned `ls <glob>` optional-file sites to quoted `find -name`
 
-**Status:** Planned
+**Status:** Accepted
 **GitHub Issue**: [#449](https://github.com/Gamaroff/agent-skills/issues/449)
 
 ---
@@ -316,15 +317,17 @@ None.
 |------|---------|-------------|--------|
 | 2026-09-21 | 1.0 | Initial draft — obs #145 (the inventory the obs #144 ratchet pins); T125 merge-gate `gate.9`/`gate.19` instance | create-task |
 
+| 2026-09-21 |  | Implemented — Phase 0 installed the staged #144 pair; 29 pinned sites + 1 unpinned (`{story|task}`) swept; qa-task/qa-story LATEST_GATE via qa-cycle.sh (one definition) + find; KNOWN emptied, ratchet a pure guard with an instrument floor; `optional-file-lookups.test.mjs` 84 rows; 1 mutation proved (zsh red, bash green, ratchet red) | manual |
+| 2026-09-21 | 1.1 | Accepted (PR #455) — no fenced block in the two canonical trees globs for an optional file; every swept site executes correctly with the file absent under both shells. Hand-driven quick win: no QA loop, no DoD file; the tests named here are the evidence | manual |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 0: ratchet present (installed or confirmed)
-- [ ] Phase 1: qa-task / qa-story Step 3b
-- [ ] Phase 2: finalise 7.6b + step-7-finalise
-- [ ] Phase 3: step docs + develop SKILLs
-- [ ] Phase 4: resume detector prompt; `KNOWN` empty; CHANGELOG
+- [x] Phase 0: ratchet present (installed or confirmed)
+- [x] Phase 1: qa-task / qa-story Step 3b
+- [x] Phase 2: finalise 7.6b + step-7-finalise
+- [x] Phase 3: step docs + develop SKILLs
+- [x] Phase 4: resume detector prompt; `KNOWN` empty; CHANGELOG
 - [ ] QA: `task.137.qa.[N].optional-file-glob-sweep.md`
 - [ ] Gate: `task.137.gate.[N].optional-file-glob-sweep.yml`
 
@@ -338,6 +341,7 @@ None.
 
 ## Notes
 
+- **Accepted 2026-09-21 without the pipeline (PR #455).** Two of the 31 pins were already gone (task.125's last cycles rewrote finalise 7.6b) and one site the ratchet's regex cannot see (`{story|task}` carries a `|`) was swept anyway. LATEST_GATE in qa-task/qa-story does not carry the inline numeric pipeline — `tests/qa-cycle.test.js` forbids a second definition of the gate number — so it derives the number through `qa-cycle.sh` and finds the path from it.
 - QA artifacts land beside this file: `task.137.qa.[N].*.md`, `task.137.bug.[N].*.md`, `task.137.gate.[N].*.yml`.
 - Independent of tasks 136 and 138 in outcome. Touches `skills/finalise/SKILL.md` 7.6b, which task.138 also edits (its `[ -r ]` and template-satisfied assertion are in 7.6b and 6b) — land one, rebase the other; do not develop both in one worktree.
 - Precondition: the obs #144 ratchet must exist (Phase 0). Its install is part of the staged skill-updates PR, deliberately not merged at task creation.

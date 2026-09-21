@@ -232,7 +232,7 @@ Before asking any questions, check whether a previous run was started:
 ```bash
 git branch --list "feature/story.{epic}.{story}.*"
 gh pr list --head "feature/story.{epic}.{story}.*" --json number,url,state 2>/dev/null
-ls {story-directory}/story.{epic}.{story}.implementation.*.md 2>/dev/null
+find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.implementation.*.md" 2>/dev/null
 ```
 
 **If a previous run is detected**: ask "A previous pipeline run exists for this story. What would you like to do?" Options: "Resume from last completed step" (Recommended) / "Start fresh".
@@ -242,7 +242,7 @@ ls {story-directory}/story.{epic}.{story}.implementation.*.md 2>/dev/null
 ```bash
 git branch --list "feature/task.{id}.*"
 gh pr list --head "feature/task.{id}.*" --json number,url,state 2>/dev/null
-ls {task-directory}/task.{id}.implementation.*.md 2>/dev/null
+find {task-directory} -maxdepth 1 -name "task.{id}.implementation.*.md" 2>/dev/null
 ```
 
 **If a previous run is detected**: ask "A previous pipeline run exists for this task. What would you like to do?" Options: "Resume from last completed step" (Recommended) / "Start fresh".
