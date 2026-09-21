@@ -2,9 +2,9 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Validate Skills](https://github.com/Gamaroff/agent-skills/actions/workflows/validate.yml/badge.svg)](https://github.com/Gamaroff/agent-skills/actions/workflows/validate.yml)
-[![Skills](https://img.shields.io/badge/skills-128-brightgreen)](#skill-catalog)
+[![Skills](https://img.shields.io/badge/skills-129-brightgreen)](#skill-catalog)
 
-A library of **AI coding agent skills** — modular, self-contained packages that extend agent capabilities with specialized workflows, domain knowledge, and tooling. 128 skills covering development, story management, QA, PM, architecture, validation, and more.
+A library of **AI coding agent skills** — modular, self-contained packages that extend agent capabilities with specialized workflows, domain knowledge, and tooling. 129 skills covering development, story management, QA, PM, architecture, validation, and more.
 
 Skills live in `.agents/skills/` inside any project. Compatible agents (Claude Code and others) pick them up automatically at startup — no config needed. Skills activate by context match or explicit invocation.
 
@@ -63,7 +63,7 @@ Full categorised index with descriptions (auto-generated): [`docs/reference/skil
 
 Featured starting points:
 
-- **Development orchestrators:** [`develop-next`](./skills/develop-next/SKILL.md), [`develop-story`](./skills/develop-story/SKILL.md), [`develop-task`](./skills/develop-task/SKILL.md)
+- **Development orchestrators:** [`develop-next`](./skills/develop-next/SKILL.md), [`qa-next`](./skills/qa-next/SKILL.md) (its UAT sibling — verifies what develop-next built, from the owner's seat), [`develop-story`](./skills/develop-story/SKILL.md), [`develop-task`](./skills/develop-task/SKILL.md)
 - **Authoring:** [`create-story`](./skills/create-story/SKILL.md), [`create-task`](./skills/create-task/SKILL.md), [`create-epic`](./skills/create-epic/SKILL.md), [`create-prd`](./skills/create-prd/SKILL.md)
 - **Review:** [`review-story`](./skills/review-story/SKILL.md), [`review-task`](./skills/review-task/SKILL.md), [`review-epic`](./skills/review-epic/SKILL.md), [`review-prd`](./skills/review-prd/SKILL.md), [`review-pr`](./skills/review-pr/SKILL.md)
 - **QA:** [`qa-story`](./skills/qa-story/SKILL.md), [`qa-task`](./skills/qa-task/SKILL.md), [`qa-fix`](./skills/qa-fix/SKILL.md), [`review-pr`](./skills/review-pr/SKILL.md)

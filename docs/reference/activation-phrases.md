@@ -57,6 +57,7 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Fix the QA findings" | `qa-fix` |
 | "Run test-it against the checklist" / "Test this feature and update the testing stack" | `test-it` |
 | "Waive the gate on story 2.3" / "Override the gate" | `qa-gate` |
+| "UAT the next accepted story" / "What's next to test?" | `qa-next` |
 
 ## Tracker sync
 
