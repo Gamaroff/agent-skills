@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-09-21
-**Next Available Task Number:** **138**
+**Next Available Task Number:** **139**
 
 ## How to use
 
@@ -177,6 +177,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 135 | [A gate's `updated:` is a typed claim that three consumers treat as a clock: record the reviewed head on the gate, scope the next cycle from that commit, and stamp the time from `date -u`](task.135.gate-scoping-from-recorded-head/task.135.gate-scoping-from-recorded-head.md) | planned | refactoring | Medium | 2026-09-20 | [#444](https://github.com/Gamaroff/agent-skills/issues/444) | obs #136; task.130 cycle 4 + 5c PC-2 |
 | 136 | [A sourced function library is a boundary the shell: entry form runs past: a shell-fn:<path>#<function> entry that sources the file and calls the function, and a fake-gh affordance so a boundary that consults a CLI can be probed offline](task.136.shell-fn-probe-entry-form/task.136.shell-fn-probe-entry-form.md) | planned | infrastructure | High | 2026-09-21 | [#448](https://github.com/Gamaroff/agent-skills/issues/448) | Observation review 2026-09-21: obs #138 (task.130 + task.125 instances); extends task.128 |
 | 137 | [The obs #144 ratchet pins an inventory of ls-over-glob optional-file lookups that abort under zsh when the file is absent: sweep every pinned site to quoted find -name, delete its pin as it lands, and execute each rewritten block with the file absent under zsh](task.137.optional-file-glob-sweep/task.137.optional-file-glob-sweep.md) | planned | refactoring | Medium | 2026-09-21 | [#449](https://github.com/Gamaroff/agent-skills/issues/449) | Observation review 2026-09-21: obs #145; needs the staged #144 ratchet (Phase 0) |
+| 138 | [finalise --bug shipped through eleven gates with six low findings nobody closed and no end-to-end run: assert a state Step 7 must have written, fill the template's block instead of appending a second, refuse a verdict remainder that names the other verdict, read before grep, hoist newest_numbered, and run the whole thing once in a scratch clone](task.138.finalise-bug-mode-residuals/task.138.finalise-bug-mode-residuals.md) | planned | refactoring | Medium | 2026-09-21 | [#450](https://github.com/Gamaroff/agent-skills/issues/450) | Observation review 2026-09-21: obs #146; task.125 gates 9–11 futures, pr-review.1 CR-1/CR-2/PC-1 |
 
 - **Tasks 104-106 close the stakeholder-readability gap in tracker comments**, filed 2026-09-09 after stakeholders reported that Jira and GitHub issue comments are unreadable to a non-technical reader. One shippable unit each, in dependency order: **104** builds the primitive (a per-stage catalogue of plain-language lead paragraphs, rendered by `tracker-comment.js` from the `--stage` every call site already passes — so all 22 sites gain a lead with no call-site edit); **105** feeds real values into the lead's slots and converts the seven sites that post a bare `gh issue comment` and never reach the engine at all; **106** carries the same lead onto the eleven pull-request conversation templates. 105 and 106 both depend on 104 and are independent of each other. Per-line inline PR findings are deliberately excluded — see task.106 §4. None has a tracker issue yet.
 
