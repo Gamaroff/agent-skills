@@ -1302,3 +1302,185 @@ test("§11 a slug with shell metacharacters is refused, from every source", () =
     2,
   );
 });
+
+// ── §9 A failure names gh's own reason — task.125 (obs #65) ─────────────────
+//
+// `gh issue create --label severity:Major` against a repo whose labels are
+// lowercase and carry no `severity:*` fails the WHOLE create, and gh says why
+// on stderr in one line. The engine used to run gh with stderr ignored and
+// report "create a GitHub issue failed: Command failed: gh issue create …" —
+// the argv, and nothing about the label. The line that names the real problem
+// must reach the log, for every kind, without the operator re-running the
+// command by hand.
+
+test("§9 the failure warning carries gh's first non-empty stderr line, then the argv", () => {
+  const dir = withRepo();
+  const execImpl = (bin, argv) => {
+    const joined = argv.join(" ");
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "acme/repo";
+    if (argv[0] === "issue" && argv[1] === "create") {
+      const e = new Error(`Command failed: gh ${joined}`);
+      // execFileSync's shape: stderr attached to the thrown error.
+      e.stderr = "\n\ncould not add label: 'severity:Major' not found\n";
+      throw e;
+    }
+    throw new Error(`unexpected gh call: ${joined}`);
+  };
+  const warnings = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnings.push(a.join(" "));
+  let r;
+  try {
+    r = cli.run({
+      argv: [
+        "node",
+        "tracker-issue.js",
+        "--kind",
+        "create",
+        "--title",
+        "T",
+        "--repo",
+        "acme/repo",
+        "--label",
+        "severity:Major",
+      ],
+      repoRoot: dir,
+      env: {},
+      execImpl,
+    });
+  } finally {
+    console.warn = origWarn;
+  }
+  assert.equal(r.reason, "failed");
+  assert.equal(
+    r.error,
+    "could not add label: 'severity:Major' not found",
+    "the payload carries the stderr line, trimmed, blank lines skipped",
+  );
+  assert.equal(warnings.length, 1);
+  assert.match(
+    warnings[0],
+    /^⚠️  create a GitHub issue failed: could not add label: 'severity:Major' not found \(Command failed: gh issue create /,
+    "stderr line first, argv after it",
+  );
+});
+
+test("§9 the stderr line is surfaced for every kind, not only create", () => {
+  const dir = withRepo();
+  const { execImpl: base } = stubGh();
+  const execImpl = (bin, argv, opts) => {
+    if (argv[0] === "issue" && argv[1] === "close") {
+      const e = new Error(`Command failed: gh ${argv.join(" ")}`);
+      e.stderr = "GraphQL: Could not resolve to an issue (closeIssue)\n";
+      throw e;
+    }
+    return base(bin, argv, opts);
+  };
+  const warnings = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnings.push(a.join(" "));
+  let r;
+  try {
+    r = cli.run({
+      argv: ["node", "tracker-issue.js", "--kind", "close", "--issue", "42"],
+      repoRoot: dir,
+      env: {},
+      execImpl,
+    });
+  } finally {
+    console.warn = origWarn;
+  }
+  assert.equal(r.reason, "failed");
+  assert.match(
+    warnings[0],
+    /close a GitHub issue failed: GraphQL: Could not resolve to an issue/,
+  );
+});
+
+test("§9 an error with no stderr still reports the argv — the old message, not a blank", () => {
+  const dir = withRepo();
+  const { execImpl } = stubGh({ failOn: "issue create" });
+  const warnings = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnings.push(a.join(" "));
+  let r;
+  try {
+    r = cli.run({
+      argv: [
+        "node",
+        "tracker-issue.js",
+        "--kind",
+        "create",
+        "--title",
+        "T",
+        "--repo",
+        "acme/repo",
+      ],
+      repoRoot: dir,
+      env: {},
+      execImpl,
+    });
+  } finally {
+    console.warn = origWarn;
+  }
+  assert.equal(r.reason, "failed");
+  assert.match(
+    warnings[0],
+    /^⚠️  create a GitHub issue failed: gh failed: issue create/,
+  );
+  assert.match(r.error, /^gh failed: issue create /);
+});
+
+test("§9 END-TO-END: a real gh subprocess that rejects a label puts its line in the warning", () => {
+  // Through a real subprocess and a fake `gh` on PATH that behaves as the
+  // real one does on an unknown label: one line on stderr, exit 1. This is the
+  // half the in-process tests cannot see — that the engine actually PIPES
+  // stderr. With `stdio: ["ignore", "pipe", "ignore"]` the in-process tests
+  // above still pass (the stub attaches e.stderr itself) and this one goes red.
+  const dir = withRepo();
+  const bin = join(dir, "bin");
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    join(bin, "gh"),
+    [
+      "#!/bin/sh",
+      'case "$1 $2" in',
+      '  "auth status") exit 0 ;;',
+      '  "repo view") echo acme/repo ;;',
+      '  "issue create") echo "could not add label: \'severity:Major\' not found" >&2; exit 1 ;;',
+      "  *) exit 1 ;;",
+      "esac",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  const res = spawnSync(
+    process.execPath,
+    [
+      CLI_PATH,
+      "--kind",
+      "create",
+      "--title",
+      "T",
+      "--repo",
+      "acme/repo",
+      "--label",
+      "severity:Major",
+    ],
+    {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    },
+  );
+  assert.equal(
+    res.stdout,
+    "",
+    "no number on stdout — the create did not happen",
+  );
+  assert.match(
+    res.stderr,
+    /create a GitHub issue failed: could not add label: 'severity:Major' not found/,
+    "the line gh wrote reaches the operator",
+  );
+});

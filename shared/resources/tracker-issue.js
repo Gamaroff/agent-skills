@@ -302,7 +302,31 @@ function gh(execImpl, argv, cwd = undefined) {
   // issue was closed in an unrelated repository — silently, and reported as
   // `performed`. That is precisely the failure the two-tier slug design exists
   // to prevent, arriving after the slug logic had already run.
-  return String(execImpl("gh", argv, { ...GIT_EXEC_OPTS, cwd }) || "").trim();
+  //
+  // stderr is PIPED, not ignored, on the mutating calls: execFileSync attaches
+  // it to the thrown error as `e.stderr`, and that is the one line that says
+  // WHY `gh` refused — `could not add label: 'severity:Major' not found`. With
+  // stdio ignore the failure message named the argv and nothing else, and the
+  // operator was left to re-run the command by hand to learn what the CLI had
+  // already told us (task.125, obs #65). On success the captured stderr is
+  // dropped, exactly as before.
+  return String(
+    execImpl("gh", argv, { ...GIT_EXEC_OPTS, stdio: GH_EXEC_STDIO, cwd }) || "",
+  ).trim();
+}
+
+const GH_EXEC_STDIO = ["ignore", "pipe", "pipe"];
+
+// The first non-empty line `gh` wrote to stderr before it failed, or "" when
+// the error carries none (a stub that throws a bare Error, a spawn failure).
+function ghFailureLine(e) {
+  const raw = e && e.stderr != null ? String(e.stderr) : "";
+  return (
+    raw
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) || ""
+  );
 }
 
 /**
@@ -1308,8 +1332,18 @@ function run({
       cwd: root || process.cwd(),
     });
   } catch (e) {
-    output.warn(`⚠️  ${spec.summary} failed: ${e.message}`);
-    return emit({ performed: false, reason: "failed" }, skipCode);
+    // The stderr line first, because it is the one a human needs; the argv
+    // (execFileSync's own message) after it, because it is what a re-run needs.
+    const line = ghFailureLine(e);
+    output.warn(
+      line
+        ? `⚠️  ${spec.summary} failed: ${line} (${e.message})`
+        : `⚠️  ${spec.summary} failed: ${e.message}`,
+    );
+    return emit(
+      { performed: false, reason: "failed", error: line || e.message },
+      skipCode,
+    );
   }
 }
 

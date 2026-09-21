@@ -138,16 +138,46 @@ line: '+N more in the [bug report](${DOC_URL})' with N the exact number omitted.
 📁 \`${BUG_RELATIVE_PATH}\`
 EOF
 
+# Labels follow the REPO's convention, not the frontmatter's case, and a label
+# the repo does not have is dropped with a warning — never allowed to fail the
+# create. `gh issue create` rejects the WHOLE create on one unknown label, and
+# this repository's labels are lowercase `priority:*` with no `severity:*` at
+# all, so `--label "priority:High" --label "severity:Major"` (the frontmatter
+# values verbatim) created nothing and an unattended run proceeded with no
+# issue (task.125, obs #65). Severity still travels: the body's Metadata table
+# above carries it whatever the label set. The sibling `ensure-task-github-issue`
+# lowercases priority the same way; the existence check is what is new here.
+REPO_LABELS=$(gh label list --json name -q '.[].name' 2>/dev/null)
+LABEL_ARGS=()
+for l in "bug" \
+         "priority:$(printf '%s' "$PRIORITY" | tr '[:upper:]' '[:lower:]')" \
+         "severity:$(printf '%s' "$SEVERITY" | tr '[:upper:]' '[:lower:]')"; do
+  case "$l" in priority:|severity:) continue ;; esac   # an empty field is no label
+  if [ -z "$REPO_LABELS" ] || printf '%s\n' "$REPO_LABELS" | grep -qxF "$l"; then
+    LABEL_ARGS+=(--label "$l")
+  else
+    echo "⚠️  label '$l' is not defined in this repository — skipped (the create still runs)" >&2
+  fi
+done
+
 BUG_ISSUE_NUM=$(node references/tracker-issue.js \
   --kind create \
   --title "[${BUG_ID}] ${BUG_TITLE}" \
   --body-file .claude/state/issue-body.md \
-  --label "bug" \
-  --label "priority:${PRIORITY}" \
-  --label "severity:${SEVERITY}")
+  "${LABEL_ARGS[@]}")
 ```
 
 The CLI prints the issue **number**.
+
+**When `gh label list` itself fails** (`REPO_LABELS` empty — no network, a scope the token lacks),
+every normalised label is passed through unchecked: the create's own failure message then names
+the label, because `tracker-issue.js` surfaces gh's first stderr line (task.125). A read that
+cannot run must not silently strip every label from every issue.
+
+**A label is metadata; the issue is the deliverable.** The failure mode this block closes was not
+"a bug issue had the wrong label" but "a bug had no issue" — the sub-routine's contract makes an
+empty `BUG_ISSUE_NUM` non-blocking, so the pipeline continued, and the only trace was a warning
+that named the command line and dropped the line naming the label.
 
 **On an empty `BUG_ISSUE_NUM`** — whether the create failed or was **deferred**:
 
