@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# fake gh — a fixture on PATH, not a mock framework (task.136).
+#
+# `security-probe.mjs --fake-gh <dir>` prepends <dir> to PATH for every run of a
+# `shell-fn:` boundary, so a function that consults `gh` is answered by this file
+# instead of the network. It answers exactly the shapes this repository's
+# boundaries call, and refuses everything else by name — an unknown subcommand
+# answered with a plausible reply would be a probe that measures the fixture.
+#
+# It also refuses to run unless FAKE_GH=1 is in its environment, which the
+# engine sets for the run it owns. A stray invocation from any other context —
+# a shell whose PATH was left pointing here — exits 2 rather than answering.
+[ "${FAKE_GH:-}" = "1" ] || {
+  echo "fake gh invoked outside the probe (FAKE_GH unset)" >&2
+  exit 2
+}
+
+case "${1:-} ${2:-}" in
+  "label list")
+    # gh_labels_filter calls: gh label list --json name -L <n> -q '.[].name'
+    # Under -q / --jq, real gh prints the query result — one name per line.
+    # Without it, the --json array. Answer both; a JSON reply to the -q form
+    # would make `grep -qxF` miss every label and score the boundary absent.
+    jq_form=0
+    for a in "$@"; do
+      case "$a" in
+        -q | --jq) jq_form=1 ;;
+      esac
+    done
+    if [ "$jq_form" = 1 ]; then
+      printf '%s\n' priority:high priority:medium priority:low task bug
+    else
+      printf '[{"name":"priority:high"},{"name":"priority:medium"},{"name":"priority:low"},{"name":"task"},{"name":"bug"}]\n'
+    fi
+    ;;
+  "issue create")
+    # Record the argv so a test can assert what reached the create, and answer
+    # with the URL shape a caller parses the issue number from. FAKE_GH_LOG is
+    # reachable only when this file is spawned DIRECTLY (as its test row does):
+    # the probe engine builds the child env from an allow-list and never passes
+    # it through, so no probe run can observe what reached a create.
+    printf '%s\n' "$@" >>"${FAKE_GH_LOG:-/dev/null}"
+    echo "https://example.invalid/issues/1"
+    ;;
+  *)
+    echo "fake gh: unsupported subcommand: $*" >&2
+    exit 2
+    ;;
+esac

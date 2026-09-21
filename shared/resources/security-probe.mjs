@@ -6,6 +6,7 @@
  * Usage:
  *   node <this-file> --sink <name> --entry <path#exportName> [options]
  *   node <this-file> --sink <name> --entry shell:<path>     [options]
+ *   node <this-file> --sink <name> --entry shell-fn:<path>#<function> [--fake-gh <dir>] [options]
  *
  * Options:
  *   --sink <name>        one of the corpus sinks (see security-input-corpus.mjs)
@@ -14,7 +15,16 @@
  *                        positional argument, run as `bash <path> <fixture-dir>`
  *                        per case under bash and (when present) zsh. See "The
  *                        shell entry form" below. Same record, same count.
+ *                        or `shell-fn:relative/path.sh#function` — a SOURCED
+ *                        LIBRARY: the file is sourced and the function called
+ *                        with the case's input as its argv, per case under bash
+ *                        and (when present) zsh. See "The shell-fn entry form".
  *   --cases-file <path>  JSON array of cases, replacing the corpus for this run
+ *   --fake-gh <dir>      a directory holding an executable `gh`, prepended to
+ *                        PATH for every shell run (with FAKE_GH=1 in its env) so
+ *                        a boundary that consults `gh` is answered by a fixture
+ *                        rather than the network. Refused (`bad-fake-gh`) unless
+ *                        <dir>/gh exists and is executable; recorded as `fake_gh`
  *   --timeout <ms>       per-case timeout (default: the shared spawn budget)
  *   --json               emit one JSON object on stdout
  *   --repo-root <path>   containment root for --entry (default: two dirs above this
@@ -70,6 +80,30 @@
  * the record says which shells ran. A script that cannot take its input this
  * way — stdin, a second positional, the network — is still declined, and
  * probe-boundary-rule.md §5 says so.
+ *
+ * THE SHELL-FN ENTRY FORM (task.136). The other shape a shell boundary takes in
+ * this repository is a LIBRARY: a file whose header says "source it" and whose
+ * function is then called — `gh-labels.sh`'s `gh_labels_filter`, sourced by
+ * nine GitHub skills. Run through `shell:` such a file defines its function and
+ * exits 0 with nothing on stdout; every case mismatches, the filtering branch
+ * never runs, and the verdict reads `absent` with `escaped 0` behind a full
+ * count. That is what task.125's finalise gate recorded, and the override it
+ * forced is why this form exists. `--entry shell-fn:<path>#<function>` keeps
+ * everything the `shell:` arm has — the same materialisation, shells, timeout,
+ * `compareExpected` and verdict — and changes only the command line: per case
+ * per shell, `<shell> --norc -c 'source "$1" || exit 97; …; "$fn" "$@"'` with
+ * the library, the function name and the case's input as ARGV, never a string.
+ * Exit 97 is reserved for "the source itself failed" and exit 98 for "the
+ * function is not defined after sourcing", so a broken or misnamed library is
+ * a NAMED decline (`entry-not-probeable`) rather than a silent `absent`; the
+ * function runs in a subshell and its own 97/98 is re-mapped to 99 and scored,
+ * so the sentinels can only come from the harness. No per-case file is written
+ * for this form — the input is argv, so it may carry a `/`. A
+ * function that consults `gh` is answered by `--fake-gh <dir>`: the directory
+ * is prepended to PATH with `FAKE_GH=1` in the env, so the fixture's `gh`
+ * answers and a real `gh` — or the network — never does. What the function
+ * must print is NOT the sink corpus's `expected` (that describes a script
+ * printing a gate number): the caller names a cases file with `--cases-file`.
  */
 
 import { spawnSync } from "node:child_process";
@@ -229,10 +263,14 @@ export function defaultRepoRoot() {
  *
  * The `shell:<path>` form takes the same containment — the path is checked
  * before anything is spawned, for the same reason it is checked before an
- * import — and returns `kind: "shell"` with no export name.
+ * import — and returns `kind: "shell"` with no export name. The
+ * `shell-fn:<path>#<function>` form takes it too and returns `kind: "shell-fn"`
+ * with the function name; the name must be one a shell would accept as a
+ * function name, because it is called by name after the source.
  *
  * @returns {{ok: true, kind: "js", entryPath: string, exportName: string}
  *          |{ok: true, kind: "shell", entryPath: string}
+ *          |{ok: true, kind: "shell-fn", entryPath: string, fnName: string}
  *          |{ok: false, reason: string, detail: string}}
  */
 export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
@@ -249,10 +287,31 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
       detail: "entry contains a NUL byte",
     };
   }
-  const isShell = entry.startsWith(SHELL_PREFIX);
+  const isShellFn = entry.startsWith(SHELL_FN_PREFIX);
+  const isShell = !isShellFn && entry.startsWith(SHELL_PREFIX);
   let rawPath;
   let exportName = null;
-  if (isShell) {
+  let fnName = null;
+  if (isShellFn) {
+    const body = entry.slice(SHELL_FN_PREFIX.length);
+    const hash = body.lastIndexOf("#");
+    if (hash <= 0 || hash === body.length - 1) {
+      return {
+        ok: false,
+        reason: "bad-entry",
+        detail: `entry must be "shell-fn:path#function", got "${entry}"`,
+      };
+    }
+    rawPath = body.slice(0, hash);
+    fnName = body.slice(hash + 1);
+    if (!SHELL_FN_NAME.test(fnName)) {
+      return {
+        ok: false,
+        reason: "bad-entry",
+        detail: `"${fnName}" is not a shell function name`,
+      };
+    }
+  } else if (isShell) {
     rawPath = entry.slice(SHELL_PREFIX.length);
     if (rawPath.trim() === "" || rawPath.includes("#")) {
       return {
@@ -299,6 +358,7 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
       detail: `${entryPath} is under node_modules`,
     };
   }
+  if (isShellFn) return { ok: true, kind: "shell-fn", entryPath, fnName };
   return isShell
     ? { ok: true, kind: "shell", entryPath }
     : { ok: true, kind: "js", entryPath, exportName };
@@ -306,6 +366,64 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
 
 /** The entry-spec prefix that selects the shell form. */
 export const SHELL_PREFIX = "shell:";
+/** The entry-spec prefix that selects the sourced-function form (task.136). */
+export const SHELL_FN_PREFIX = "shell-fn:";
+/**
+ * `gh` as a command word somewhere in a library's text — the signal that a
+ * shell-fn run needs `--fake-gh` (QA cycle 2, CR-2). A mention in a comment
+ * matches too; that is a named decline the caller answers by passing the
+ * fixture, not a wrong verdict.
+ */
+const GH_COMMAND_WORD = /(^|[\s;|&(`$])gh(\s|$)/m;
+/** A name bash and zsh both accept as a function name — and nothing else. */
+const SHELL_FN_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/** Reserved exits of the shell-fn one-liner: the source failed / the function is undefined. */
+export const SHELL_FN_SOURCE_FAILED = 97;
+export const SHELL_FN_NOT_DEFINED = 98;
+/**
+ * What the body exits when the FUNCTION ITSELF returned 97 or 98: those two
+ * are the harness's sentinels, and a function that answers a hostile input
+ * with one of them must be SCORED (as a mismatch against `expected.exit`), not
+ * declined as a broken library (task.136 QA cycle 1, CR-2). Any other exit
+ * passes through unchanged.
+ */
+export const SHELL_FN_RESERVED_COLLISION = 99;
+/**
+ * Flags that keep a shell from reading any rc file. The sandbox HOME the
+ * shell arm already sets is the first line; these are the second, and they
+ * matter more here because this arm sources INTO the shell proper (the
+ * `shell:` arm only ever runs `bash <script>` under zsh), so a zsh `.zshenv`
+ * would be the one file a sandbox HOME cannot fully rule out.
+ */
+const noRcFlags = (shell) =>
+  shell === "zsh" ? ["-f"] : ["--noprofile", "--norc"];
+/**
+ * The fixed body every shell-fn case runs. $1 is the library, $2 the function
+ * name, the rest the case's argv. `typeset -f` is what both bash and zsh use
+ * to ask "is this a defined function" without also matching an external
+ * command, which `command -v` would.
+ */
+const SHELL_FN_BODY =
+  // An EXIT trap around the source: `source` runs the library in THIS shell,
+  // so a top-level `exit N` inside it ends the harness with N before `||`
+  // is reached — every case then mismatches and the verdict is a SCORED
+  // `absent` with a full count, the task.125 shape (task.136 QA cycle 2,
+  // BUG-2). The trap re-maps that exit to the source-failed sentinel and is
+  // disarmed the moment the source has returned normally.
+  `trap 'exit ${SHELL_FN_SOURCE_FAILED}' EXIT; source "$1" || exit ${SHELL_FN_SOURCE_FAILED}; trap - EXIT; ` +
+  `shift; fn="$1"; shift; ` +
+  `typeset -f "$fn" >/dev/null 2>&1 || exit ${SHELL_FN_NOT_DEFINED}; ` +
+  // The function runs in a SUBSHELL: a function that calls `exit` would
+  // otherwise end the harness shell with that code before the remap below
+  // ever ran, and `exit 97` inside the function would read as "the source
+  // failed" (task.136 QA cycle 1, CR-2 — found by its own row). errexit is
+  // snapshotted from `$-`, switched OFF in the harness so `rc=$?` and the
+  // remap always run, and switched back ON inside the subshell so the
+  // function keeps the semantics its library set (QA cycle 2, CR-3: under
+  // `set -e` errexit fired on the non-zero subshell before the remap).
+  `ee=; case $- in *e*) ee=1;; esac; set +e; ` +
+  `( [ -n "$ee" ] && set -e; "$fn" "$@" ); rc=$?; ` +
+  `case $rc in ${SHELL_FN_SOURCE_FAILED}|${SHELL_FN_NOT_DEFINED}) exit ${SHELL_FN_RESERVED_COLLISION};; esac; exit $rc`;
 
 /**
  * The shells a shell-form probe runs under. bash always; zsh when the host has
@@ -442,6 +560,8 @@ export function computeVerdict(caseResults) {
  * @param {string} spec.sink       one of `SINKS`; supplies the corpus when `cases` is absent
  * @param {string} spec.entry      `path#exportName`, resolved relative to the repo root
  * @param {Array}  [spec.cases]    caller-supplied cases in the corpus shape
+ * @param {string} [spec.fakeGh]   directory holding an executable `gh`, prepended to PATH
+ *                                 for every shell run (shell and shell-fn forms)
  * @param {number} [spec.timeoutMs] per-case timeout; defaults to the shared spawn budget
  * @param {string} [spec.repoRoot] containment root; defaults to the repository root
  * @returns {{sink, entry, verdict, reason, executed, passed, reproduced, overblocked, declined, cases}}
@@ -450,6 +570,7 @@ export function runProbeSpec({
   sink,
   entry,
   cases,
+  fakeGh,
   timeoutMs,
   repoRoot = defaultRepoRoot(),
 } = {}) {
@@ -488,6 +609,9 @@ export function runProbeSpec({
     declined: [],
     escapes: [],
     cases: [],
+    // The directory whose `gh` answered the shell runs, or null. Stated in the
+    // result so the record says what answered (task.136).
+    fakeGh: null,
   };
 
   // `declined` is its own state and is NEVER folded into `executed: 0`. Both
@@ -504,7 +628,8 @@ export function runProbeSpec({
 
   const resolved = resolveEntry(entry, repoRoot);
   if (!resolved.ok) return decline(resolved.reason, resolved.detail);
-  if (resolved.kind === "shell") {
+  const isShellForm = resolved.kind === "shell" || resolved.kind === "shell-fn";
+  if (isShellForm) {
     // The script must be a readable regular file BEFORE anything is compared.
     // Without this a missing path made every run exit 127, every case mismatch
     // `expected`, and the verdict read `absent` with executed = cases × shells —
@@ -520,6 +645,68 @@ export function runProbeSpec({
       return decline(
         "entry-not-probeable",
         `script is not a readable regular file: ${e.message}`,
+      );
+    }
+  }
+  // `--fake-gh` is validated BEFORE anything spawns, like the entry: a
+  // directory with no `gh` in it would let the real one answer from further
+  // down PATH, which is the exact outcome the flag exists to prevent, with
+  // nothing in the record to say so. Same containment as an entry — a fake
+  // outside the repo root is not a fixture this repository owns.
+  let fakeGhDir = null;
+  if (fakeGh !== undefined && fakeGh !== null) {
+    // Only the shell forms consult PATH. The JS runner hands the entry its
+    // input as JSON on stdin and never spawns a shell, so a fake it cannot
+    // reach must not be RECORDED as having answered — `fake_gh: <dir>` on a
+    // JS-form record would claim a fixture where the real binary ran
+    // (TASK-136-BUG-1). Declined, not ignored: a caller who passed it meant it.
+    if (!isShellForm) {
+      return decline(
+        "bad-fake-gh",
+        "--fake-gh applies to the shell entry forms only (shell:, shell-fn:) — a JS export never consults PATH",
+      );
+    }
+    if (typeof fakeGh !== "string" || fakeGh.trim() === "") {
+      return decline("bad-fake-gh", "--fake-gh must name a directory");
+    }
+    const root = resolve(repoRoot);
+    fakeGhDir = isAbsolute(fakeGh) ? resolve(fakeGh) : resolve(root, fakeGh);
+    const rel = relative(root, fakeGhDir);
+    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+      return decline("bad-fake-gh", `${fakeGhDir} is outside ${root}`);
+    }
+    try {
+      if (!statSync(fakeGhDir).isDirectory())
+        throw new Error("not a directory");
+      const bin = join(fakeGhDir, "gh");
+      if (!statSync(bin).isFile()) throw new Error("gh is not a regular file");
+      accessSync(bin, fsConstants.X_OK);
+    } catch (e) {
+      return decline(
+        "bad-fake-gh",
+        `${fakeGhDir} does not hold an executable gh: ${e.message}`,
+      );
+    }
+  }
+  base.fakeGh = fakeGhDir;
+  // A shell-fn library whose body names `gh` and was given no `--fake-gh` is
+  // DECLINED, not scored: run bare, `gh` fails from the sandbox cwd, the
+  // function takes its read-failed passthrough, and the verdict lands on
+  // `absent` / `present-but-inert` — the same values a missing control
+  // produces — with only `fake_gh: null` deep in the record to say "could not
+  // look" rather than "nothing filters" (task.136 QA cycle 2, CR-2). Two
+  // states, one value is the defect class this engine exists to remove.
+  if (resolved.kind === "shell-fn" && fakeGhDir === null) {
+    let libText = "";
+    try {
+      libText = readFileSync(resolved.entryPath, "utf8");
+    } catch {
+      libText = "";
+    }
+    if (GH_COMMAND_WORD.test(libText)) {
+      return decline(
+        "needs-fake-gh",
+        `${resolved.entryPath} names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
       );
     }
   }
@@ -559,13 +746,15 @@ export function runProbeSpec({
 
   const caseResults = [];
   const escapes = [];
-  const shells = resolved.kind === "shell" ? probeShells() : null;
+  const shells = isShellForm ? probeShells() : null;
   try {
     for (const c of probeCases) {
-      if (resolved.kind === "shell") {
+      if (isShellForm) {
         runShellCase(c, {
           sink,
           entryPath: resolved.entryPath,
+          fnName: resolved.fnName ?? null,
+          fakeGhDir,
           shells,
           sandboxRoot,
           sandboxHome,
@@ -659,6 +848,7 @@ export function runProbeSpec({
       // effect; and the record must say which shells ran (cycle 4, CR-3).
       escapes,
       shells: shells ?? null,
+      fakeGh: fakeGhDir,
     };
   }
 
@@ -700,6 +890,7 @@ export function runProbeSpec({
     declined,
     escapes,
     cases: caseResults,
+    fakeGh: fakeGhDir,
   };
 }
 
@@ -824,6 +1015,8 @@ function runShellCase(
   {
     sink,
     entryPath,
+    fnName = null,
+    fakeGhDir = null,
     shells,
     sandboxRoot,
     sandboxHome,
@@ -876,8 +1069,11 @@ function runShellCase(
   // An `absent` name that the fixture itself creates — a control, or the
   // case's own input — exists before the script runs, so it too would score
   // every run as a side effect (BUG-13's second shape).
+  // The shell-fn form writes no per-case file (CR-3), so its input is not a
+  // name the fixture creates and may legitimately be an `absent` path
+  // (QA cycle 2, CR-4).
   const collides = (c.expected.absent ?? []).find(
-    (p) => fixture.controls.includes(p) || p === c.input,
+    (p) => fixture.controls.includes(p) || (fnName === null && p === c.input),
   );
   if (collides !== undefined) {
     decline(
@@ -899,10 +1095,21 @@ function runShellCase(
       // a traversal name into a write outside the fixture — so the name is
       // appended raw and any separator in it is a decline, not a normalised
       // path.
-      if (c.input.includes("/") || c.input.includes("\0")) {
-        throw new Error("name carries a path separator or NUL");
+      //
+      // The shell-fn form gets the input as ARGV, not as a directory entry, so
+      // it does not need the file — and must not be declined for a name a
+      // file cannot carry: a real label such as `area/backend` is exactly the
+      // kind of input a label filter must be probed with (task.136 QA cycle
+      // 1, CR-3). The controls are still written, so `absent` and the cwd
+      // sentinel keep their meaning.
+      if (fnName === null) {
+        if (c.input.includes("/") || c.input.includes("\0")) {
+          throw new Error("name carries a path separator or NUL");
+        }
+        writeFileSync(`${fixtureDir}/${c.input}`, "");
+      } else if (c.input.includes("\0")) {
+        throw new Error("input carries a NUL");
       }
-      writeFileSync(`${fixtureDir}/${c.input}`, "");
     } catch (e) {
       caseResults.push({
         id: c.id,
@@ -926,23 +1133,43 @@ function runShellCase(
     // to its cwd, and `absent` looks in the fixture. With cwd: workDir the
     // marker landed where neither `absent` nor the sentinel (which skips
     // workDir) could see it, and the case scored `rejected`.
-    const child = spawnSync(
-      shell,
-      ["-c", 'bash "$1" "$2"', shell, entryPath, fixtureDir],
-      {
-        input: "",
-        cwd: fixtureDir,
-        env: {
-          ...sandboxEnv({ cwd: fixtureDir }),
-          HOME: sandboxHome,
-          TMPDIR: sandboxTmp,
-          LC_ALL: "C",
-        },
-        encoding: "utf8",
-        timeout: timeoutMs,
-        maxBuffer: 8 * 1024 * 1024,
-      },
-    );
+    //
+    // The shell-fn form (task.136) keeps the ARGV rule: the library path, the
+    // function name and the case's input are $1, $2 and $3 of a fixed body,
+    // and the shell is spawned with its rc files off — this arm sources INTO
+    // the shell, where the `shell:` arm only ever runs `bash <script>`.
+    const argv =
+      fnName === null
+        ? ["-c", 'bash "$1" "$2"', shell, entryPath, fixtureDir]
+        : [
+            ...noRcFlags(shell),
+            "-c",
+            SHELL_FN_BODY,
+            "probe",
+            entryPath,
+            fnName,
+            c.input,
+          ];
+    const env = {
+      ...sandboxEnv({ cwd: fixtureDir }),
+      HOME: sandboxHome,
+      TMPDIR: sandboxTmp,
+      LC_ALL: "C",
+    };
+    if (fakeGhDir !== null) {
+      // First on PATH, and armed: the fixture's `gh` refuses to run without
+      // FAKE_GH=1, so a stray invocation from any other context exits 2.
+      env.PATH = `${fakeGhDir}:${env.PATH}`;
+      env.FAKE_GH = "1";
+    }
+    const child = spawnSync(shell, argv, {
+      input: "",
+      cwd: fixtureDir,
+      env,
+      encoding: "utf8",
+      timeout: timeoutMs,
+      maxBuffer: 8 * 1024 * 1024,
+    });
     const after = snapshotTree(sandboxRoot, workDirName);
     for (const [path, stamp] of after) {
       if (before.get(path) !== stamp) {
@@ -965,6 +1192,18 @@ function runShellCase(
     if (neverRan(child)) {
       outcome = "errored";
       detail = child.signal ? `timed out after ${timeoutMs}ms` : "never ran";
+    } else if (fnName !== null && child.status === SHELL_FN_SOURCE_FAILED) {
+      // The source itself failed — a syntax error, a `return` at top level,
+      // an `exit` in the library (re-mapped by the EXIT trap around the
+      // source — BUG-2). A property of the ENTRY, so every case
+      // reports it identically and runProbeSpec folds them into one decline.
+      // Without the reserved exit this read as N mismatches and scored
+      // `absent` with a full count (task.136).
+      outcome = "errored";
+      detail = `source "${entryPath}" failed (exit ${SHELL_FN_SOURCE_FAILED}): ${(child.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`;
+    } else if (fnName !== null && child.status === SHELL_FN_NOT_DEFINED) {
+      outcome = "errored";
+      detail = `function "${fnName}" is not defined after sourcing "${entryPath}" (exit ${SHELL_FN_NOT_DEFINED})`;
     } else if (isLaunchFailure(child, entryPath)) {
       // bash could not OPEN the script (a race with the readability check in
       // runProbeSpec, or a permission change under it). Keyed on bash's own
@@ -994,7 +1233,12 @@ function runShellCase(
       direction: c.direction,
       outcome,
       detail,
-      fixture: [...fixture.controls, c.input],
+      // The shell-fn form materialises no per-case file (CR-3), and the
+      // record must not claim one.
+      fixture:
+        fnName === null
+          ? [...fixture.controls, c.input]
+          : [...fixture.controls],
     });
   }
 }
@@ -1064,6 +1308,10 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     // Which shells each case ran under (shell form), or null. The count is
     // cases × shells, and a reader must not have to divide (cycle 2, CR-5).
     shells: Array.isArray(result.shells) ? [...result.shells] : null,
+    // The directory whose `gh` answered the shell runs (task.136), or null —
+    // the record must say what answered, not leave a reader to assume the
+    // real one did not.
+    fake_gh: typeof result.fakeGh === "string" ? result.fakeGh : null,
     ran_at: new Date().toISOString(),
   };
 }
@@ -1361,6 +1609,7 @@ const OPERAND_FLAGS = Object.freeze({
   "--sink": "sink",
   "--entry": "entry",
   "--cases-file": "casesFile",
+  "--fake-gh": "fakeGh",
   "--repo-root": "repoRoot",
   "--record": "record",
   "--name": "name",
@@ -1440,7 +1689,9 @@ export function main(argv = process.argv.slice(2)) {
     return 0;
   }
   if (!opts.entry) {
-    process.stderr.write("--entry <path#exportName> is required\n");
+    process.stderr.write(
+      "--entry <path#exportName | shell:path | shell-fn:path#function> is required\n",
+    );
     return 2;
   }
   if (!opts.sink && !opts.casesFile) {
@@ -1471,6 +1722,7 @@ export function main(argv = process.argv.slice(2)) {
     sink: opts.sink,
     entry: opts.entry,
     cases,
+    fakeGh: opts.fakeGh,
     timeoutMs: opts.timeoutMs,
     ...(opts.repoRoot ? { repoRoot: resolve(opts.repoRoot) } : {}),
   });

@@ -1,0 +1,70 @@
+schema: 1
+task: 'task.136.shell-fn-probe-entry-form'
+task_title: 'A shell-fn: entry form for the security probe, and a fake-gh affordance'
+gate: CONCERNS
+status_reason: 'Re-review (cycle 2, full refute pass over the whole branch diff at f2561282). TASK-136-BUG-1 verified FIXED by execution and closed; the three cycle-1 advisories verified closed. ci:fast 3883/3884 (0 fail); security measured (41 executed, the form engages on the live boundary). The refute pass found one new MEDIUM (high confidence, reproduced under bash and zsh): a top-level exit in a sourced library ends the harness shell before the exit-97 sentinel, so every case mismatches and the verdict is a scored absent with a full count — the task.125 shape — and its errexit sibling makes the cycle-1 remap inert. Correct body prototyped and verified by QA in the recommendation.'
+reviewer: 'QA Engineer'
+updated: '2026-09-21T20:32:49Z'
+
+top_issues:
+  - id: 'TASK-136-BUG-2'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'SHELL_FN_BODY: a top-level exit N in the sourced library terminates the harness shell before "|| exit 97" runs (bash + zsh: exit 1 library → rc 1, empty stdout), so every case mismatches and the verdict is a scored absent with a full count; and a library that sets set -e makes errexit fire on the non-zero subshell before rc=$? and the 97/98→99 remap run (set -e + return 97 → rc 97, read as source-failed). CR-1 + CR-3 of the refute pass.'
+    suggested_action: 'Arm an EXIT trap around the source (trap "exit 97" EXIT; source "$1" || exit 97; trap - EXIT), snapshot errexit from $- and switch it off in the harness before the subshell while re-enabling it inside, so rc=$? and the remap always run; add rows for a library ending in exit 1 (→ entry-not-probeable) and set -e + return 97 (→ scored exit 99 ≠ 0). Verified under bash and zsh — see the bug report.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3884
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 41
+    notes: 'Record task.136.qa.2.security.run.json (totals.executed 41) on f2561282: gh-labels-shell-fn engages (bash+zsh, 20 executed, 0 reproduced, 0 escapes); containsShellFnEntry present-but-inert only on shellfn.symlink-escape — the documented pre-existing resolveEntry limit (task.128 gate 5; unchanged, future). BUG-1 fix verified by execution: --fake-gh on a JS entry → bad-fake-gh, fakeGh null, fake_gh null. QA cycle-2 mutants: JS decline removed → BUG-1 row red (covered); remap dropped → CR-2 row red (covered); record fixture claim → CR-3 row red (covered).'
+  performance:
+    status: PASS
+    notes: 'Unchanged; the subshell adds one fork per case per shell (~ms).'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-136-BUG-2: the source sentinel does not survive a top-level exit in the library, and the remap does not survive errexit — two library shapes (a top-level guard, set -e) turn a named decline into a scored absent or a scorable rejection into a decline. Advisory CR-2 (medium/medium, not gated): a gh-consulting function run WITHOUT --fake-gh is scored through gh_labels_filter'"'"'s read-failed passthrough (verified: unarmed priority:urgent is printed, exit 0) and lands on absent/present-but-inert — the same verdicts a missing control produces — with only fake_gh: null in the record to tell them apart; decline with a named reason (needs-fake-gh) when the library body names gh and no fake was supplied.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory CR-4 (cleanup): the collides check still refuses expected.absent equal to the input for the shell-fn form, though that form writes no per-case file — apply the input half only when fnName is null. Advisory CR-5 (cleanup): FAKE_GH_LOG cannot be bound through the engine (sandboxEnv is an allow-list), so the issue-create log is observable only by spawning the fixture directly, as the CR-4 row does — say so in the fixture header.'
+
+recommendations:
+  immediate:
+    - action: 'TASK-136-BUG-2: EXIT trap around the source + errexit snapshot/restore around the subshell, with the two rows'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+  future:
+    - action: 'CR-2: decline needs-fake-gh when a shell-fn library body names gh and no --fake-gh was supplied (two states, one value otherwise)'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-4: apply the p === c.input half of the collides check only when fnName === null'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-5: document in tests/fixtures/fake-gh/gh that FAKE_GH_LOG is reachable only outside the engine'
+      refs: ['tests/fixtures/fake-gh/gh']
+    - action: 'shellfn.symlink-escape: pre-existing resolveEntry limit (no realpath before containment), carried from task.128 gate 5'
+      refs: ['shared/resources/security-probe.mjs']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-09-21'
+  total_iterations: 1
+  verification_method: 'Execution against f2561282 (runProbeSpec with fakeGh on a JS entry → bad-fake-gh, record fake_gh null) + 3 QA mutants'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-136-BUG-2 fixed and re-reviewed']

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "label.newline-in-label",
+    "input": "priority:high\nfoo",
+    "direction": "hostile",
+    "why": "grep -F reads a multi-line pattern as several patterns, so a newline-carrying candidate matched a real label and the newline reached --label (TASK-125-BUG-6). Rule 2: not one line, refused.",
+    "expected": { "stdout": "", "exit": 0 }
+  },
+  {
+    "id": "label.command-substitution",
+    "input": "$(touch PWNED).label",
+    "direction": "hostile",
+    "why": "A candidate that reaches eval or a second parse runs the substitution. The label is not defined, so nothing is printed; PWNED must not exist.",
+    "expected": { "stdout": "", "exit": 0, "absent": ["PWNED"] }
+  },
+  {
+    "id": "label.backtick-substitution",
+    "input": "`touch PWNED2`",
+    "direction": "hostile",
+    "why": "The older substitution syntax; same rule, same marker.",
+    "expected": { "stdout": "", "exit": 0, "absent": ["PWNED2"] }
+  },
+  {
+    "id": "label.undefined-label",
+    "input": "priority:urgent",
+    "direction": "hostile",
+    "why": "gh rejects the whole create on one unknown label (obs #65). Rule 4: not defined in either case, dropped with a warning.",
+    "expected": { "stdout": "", "exit": 0 }
+  },
+  {
+    "id": "label.glob",
+    "input": "*",
+    "direction": "hostile",
+    "why": "An unquoted expansion would turn one candidate into every file in the cwd. Not a defined label; dropped.",
+    "expected": { "stdout": "", "exit": 0 }
+  },
+  {
+    "id": "label.option-shaped",
+    "input": "--label",
+    "direction": "hostile",
+    "why": "A candidate that looks like a flag must reach grep as data (`--`), not as an option. Not defined; dropped.",
+    "expected": { "stdout": "", "exit": 0 }
+  },
+  {
+    "id": "label.empty-field",
+    "input": "priority:",
+    "direction": "hostile",
+    "why": "An absent frontmatter field renders as `priority:`. Rule 1: no label, dropped silently.",
+    "expected": { "stdout": "", "exit": 0, "stderr": "" }
+  },
+  {
+    "id": "label.defined-as-given",
+    "input": "priority:high",
+    "direction": "legitimate",
+    "why": "Rule 3: defined as given, printed as given.",
+    "expected": { "stdout": "priority:high\n", "exit": 0, "stderr": "" }
+  },
+  {
+    "id": "label.defined-when-lowercased",
+    "input": "Priority:High",
+    "direction": "legitimate",
+    "why": "The frontmatter convention is Title Case; the repository's labels are lowercase. Rule 3: the lowercased form is emitted.",
+    "expected": { "stdout": "priority:high\n", "exit": 0, "stderr": "" }
+  },
+  {
+    "id": "label.fixed-label",
+    "input": "bug",
+    "direction": "legitimate",
+    "why": "A fixed label goes through the same function (TASK-125-BUG-11).",
+    "expected": { "stdout": "bug\n", "exit": 0, "stderr": "" }
+  }
+]
