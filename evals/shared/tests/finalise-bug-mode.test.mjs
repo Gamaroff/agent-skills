@@ -30,6 +30,8 @@ import {
   readdirSync,
   existsSync,
   mkdtempSync,
+  mkdirSync,
+  symlinkSync,
   writeFileSync,
   rmSync,
   chmodSync,
@@ -41,6 +43,23 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
+// Every extracted snippet runs from a CONSUMER-shaped root, never from the
+// repo root. The SKILL.md blocks source
+// `.agents/skills/finalise/references/newest-numbered.sh` — the path a consumer
+// has because setup-consumer.sh vendors it. The repo root only has it through
+// the developer's gitignored `.agents/skills -> ../skills` symlink, which is
+// how this file passed 71/71 locally while CI (no `.agents/` at all) failed 19
+// — the suite was certifying a symlink, not the code. Reproduce that failure
+// by running with the symlink moved aside; this fixture must pass without it.
+const CONSUMER_ROOT = mkdtempSync(path.join(tmpdir(), "finalise-consumer-"));
+mkdirSync(path.join(CONSUMER_ROOT, ".agents"));
+symlinkSync(
+  path.join(REPO_ROOT, "skills"),
+  path.join(CONSUMER_ROOT, ".agents", "skills"),
+);
+process.on("exit", () =>
+  rmSync(CONSUMER_ROOT, { recursive: true, force: true }),
+);
 const SKILL = path.join(REPO_ROOT, "skills", "finalise", "SKILL.md");
 const TEMPLATE = path.join(
   REPO_ROOT,
@@ -353,6 +372,7 @@ for (const shell of SHELLS) {
       const r = spawnSync(shell, ["-s", "--", ...c.args], {
         input: kindBlock(),
         encoding: "utf8",
+        cwd: CONSUMER_ROOT,
       });
       assert.equal(r.status, 0, r.stderr);
       const kind = (r.stdout.match(/^DOC_KIND=(.*)$/m) || [])[1];
@@ -431,6 +451,7 @@ for (const shell of SHELLS) {
     spawnSync(shell, ["-s", "--"], {
       input: derivationBlock(),
       encoding: "utf8",
+      cwd: CONSUMER_ROOT,
       // NOTHING but the inputs the block documents. No VERIFY_VERDICT, no argv.
       env: {
         PATH: process.env.PATH,
@@ -695,6 +716,7 @@ for (const shell of SHELLS) {
       const r = spawnSync(shell, ["-s", "--"], {
         input: block,
         encoding: "utf8",
+        cwd: CONSUMER_ROOT,
         env: {
           PATH: process.env.PATH,
           DIR: missing,
@@ -793,6 +815,7 @@ for (const shell of SHELLS) {
     spawnSync(shell, ["-s", "--"], {
       input: block,
       encoding: "utf8",
+      cwd: CONSUMER_ROOT,
       env: {
         PATH: process.env.PATH,
         DIR: dir,
@@ -856,6 +879,7 @@ for (const shell of SHELLS) {
         const r = spawnSync(shell, ["-s", "--"], {
           input: block,
           encoding: "utf8",
+          cwd: CONSUMER_ROOT,
           env: { PATH: process.env.PATH, DIR: dir, DOC: "x" },
         });
         assert.equal(r.status, 1, r.stdout + r.stderr);
@@ -881,6 +905,7 @@ for (const shell of SHELLS) {
         const r = spawnSync(shell, ["-s", "--"], {
           input: block,
           encoding: "utf8",
+          cwd: CONSUMER_ROOT,
           env: {
             PATH: process.env.PATH,
             DIR: dir,
@@ -912,6 +937,7 @@ for (const shell of SHELLS) {
       const six = spawnSync(shell, ["-s", "--"], {
         input: derivationBlock(),
         encoding: "utf8",
+        cwd: CONSUMER_ROOT,
         env: {
           PATH: process.env.PATH,
           DIR: dir,
@@ -942,6 +968,7 @@ for (const shell of SHELLS) {
       const r = spawnSync(shell, ["-s", "--"], {
         input: derivationBlock(),
         encoding: "utf8",
+        cwd: CONSUMER_ROOT,
         env: {
           PATH: process.env.PATH,
           DIR: dir,
@@ -970,6 +997,7 @@ for (const shell of SHELLS) {
       const r = spawnSync(shell, ["-s", "--"], {
         input: derivationBlock(),
         encoding: "utf8",
+        cwd: CONSUMER_ROOT,
         env: {
           PATH: process.env.PATH,
           DIR: dir,
@@ -1032,6 +1060,7 @@ for (const shell of SHELLS) {
     const r = spawnSync(shell, ["-s"], {
       input: raw,
       encoding: "utf8",
+      cwd: CONSUMER_ROOT,
       env: { PATH: process.env.PATH },
     });
     assert.equal(r.status, 1, r.stdout + r.stderr);
@@ -1049,6 +1078,7 @@ for (const shell of SHELLS) {
       {
         input: kindBlock(),
         encoding: "utf8",
+        cwd: CONSUMER_ROOT,
         env: { PATH: process.env.PATH, BUG_FLAG_IN: "--bug" },
       },
     );
@@ -1064,6 +1094,7 @@ for (const shell of SHELLS) {
       spawnSync(shell, ["-s"], {
         input: block,
         encoding: "utf8",
+        cwd: CONSUMER_ROOT,
         env: {
           PATH: process.env.PATH,
           DIR: dir,
@@ -1307,6 +1338,7 @@ for (const shell of SHELLS) {
     spawnSync(shell, ["-s", "--"], {
       input: fillBlock(),
       encoding: "utf8",
+      cwd: CONSUMER_ROOT,
       env: { PATH: process.env.PATH, DOD: dod, KIND_IN: kind },
     });
 
@@ -1455,7 +1487,7 @@ printf 'EMPTY=[%s]\\n' "$(newest_numbered "$DIR" qa -name "task.7.qa.*")"`;
       const r = spawnSync(shell, ["-s", "--"], {
         input: script,
         encoding: "utf8",
-        cwd: REPO_ROOT,
+        cwd: CONSUMER_ROOT,
         env: { PATH: process.env.PATH, DIR: dir },
       });
       assert.equal(r.status, 0, r.stdout + r.stderr);
