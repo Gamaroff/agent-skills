@@ -26,6 +26,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -278,6 +279,86 @@ test("develop-bug Step 7 Part A invokes finalise --bug and carries no inline DoD
     "the checklist no longer offers the fallback",
   );
 });
+
+// The kind block is bash, so it is EXECUTED — extracted from the SKILL.md,
+// the one template slot substituted with argv, run under bash and (when the
+// host has it) zsh. QA cycle 1 found `DOC_KIND=""` on a general bug without
+// the flag by running it; a grep of the text would have passed (TASK-125-BUG-5).
+function kindBlock() {
+  const i = skill.indexOf('DOC_KIND=""');
+  const j = skill.indexOf("```", i);
+  assert.ok(
+    i > -1 && j > i,
+    "the Document-kind block is present as a fenced bash block",
+  );
+  return (
+    skill
+      .slice(i, j)
+      .replace(
+        'DOC_FILE="{the document path argument}"',
+        'DOC_FILE="$1"; shift',
+      ) + '\nprintf "DOC_KIND=%s\\n" "$DOC_KIND"\n'
+  );
+}
+const SHELLS = [
+  "bash",
+  ...(spawnSync("zsh", ["-c", "true"], { stdio: "ignore" }).status === 0
+    ? ["zsh"]
+    : []),
+];
+const KIND_CASES = [
+  { args: ["docs/bugs/bug.14.x/bug.14.name.md"], kind: "task", hint: true },
+  {
+    args: ["docs/bugs/bug.14.x/bug.14.name.md", "--bug"],
+    kind: "bug",
+    hint: false,
+  },
+  {
+    args: ["docs/tasks/task.125.x/task.125.name.md"],
+    kind: "task",
+    hint: false,
+  },
+  {
+    args: ["docs/tasks/task.67.x/task.67.bug.3.name.md"],
+    kind: "task",
+    hint: true,
+  },
+  {
+    args: ["docs/tasks/task.67.x/task.67.bug.3.name.md", "--bug"],
+    kind: "bug",
+    hint: false,
+  },
+  { args: ["docs/x/story.7.4.bug.4.name.md"], kind: "story", hint: true },
+  { args: ["docs/x/story.7.4.name.md"], kind: "story", hint: false },
+];
+for (const shell of SHELLS) {
+  test(`[${shell}] the kind block, executed: every input resolves to a DEFINED kind, and only a bug path without --bug hints`, () => {
+    for (const c of KIND_CASES) {
+      const r = spawnSync(shell, ["-s", "--", ...c.args], {
+        input: kindBlock(),
+        encoding: "utf8",
+      });
+      assert.equal(r.status, 0, r.stderr);
+      const kind = (r.stdout.match(/^DOC_KIND=(.*)$/m) || [])[1];
+      assert.equal(
+        kind,
+        c.kind,
+        `${c.args.join(" ")} → DOC_KIND=${JSON.stringify(kind)}`,
+      );
+      assert.equal(
+        /^hint: /m.test(r.stdout),
+        c.hint,
+        `${c.args.join(" ")} hint`,
+      );
+      if (c.hint)
+        assert.match(
+          r.stdout,
+          new RegExp(`continuing in ${c.kind} mode`),
+          "the hint names the kind it continues in",
+        );
+    }
+  });
+}
 
 test("SKILL.md resolves the kind once and hints on a bug path without --bug", () => {
   assert.match(skill, /DOC_KIND=bug/, "the --bug flag sets DOC_KIND");

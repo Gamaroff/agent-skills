@@ -641,6 +641,62 @@ test("annotate: a bug document answers `not-a-task` — the bug registry has no 
   }
 });
 
+/**
+ * A task bug's filename carries the task's stem — `task.67.bug.3.name.md` — and
+ * in its header-block shape (the frontmatter-less form bug-doc.js reads) it has
+ * no `type:` to contradict it. Before task.125 the stem match read it as task
+ * 67 and answered `not-accepted` (the BUG's status), which finalise's Step 7.4
+ * table turns into "investigate"; a `status: accepted` bug would have TICKED
+ * task 67's row. The `.bug.<N>.` segment decides before the stem does.
+ */
+test("a header-block TASK BUG (no type:, task stem) answers `not-a-task` and never touches the registry", () => {
+  const { dir, registry } = sandbox([row(67, "parent", "accepted")]);
+  try {
+    const d = path.join(dir, "docs", "tasks", "task.67.parent");
+    mkdirSync(d, { recursive: true });
+    const f = path.join(d, "task.67.bug.3.header-shape.md");
+    // No frontmatter at all — the header-block shape.
+    writeFileSync(
+      f,
+      "# Bug Report: something\n\n**Bug ID**: task.67.bug.3\n**Status**: ✅ Ready for QA\n\n## Bug Description\n",
+    );
+    const before = readFileSync(registry, "utf8");
+    for (const args of [
+      ["--file", path.relative(dir, f)],
+      ["--annotate", "--file", path.relative(dir, f), "--pr", "447"],
+    ]) {
+      const res = run(dir, args);
+      assert.equal(res.reason, "not-a-task", JSON.stringify(res));
+      assert.notEqual(res.ticked, true);
+    }
+    assert.equal(
+      readFileSync(registry, "utf8"),
+      before,
+      "the parent task's row is untouched",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a frontmatter TASK BUG with `status: accepted` cannot tick its parent task's row", () => {
+  const { dir, registry } = sandbox([row(68, "parent", "planned")]);
+  try {
+    const d = path.join(dir, "docs", "tasks", "task.68.parent");
+    mkdirSync(d, { recursive: true });
+    const f = path.join(d, "task.68.bug.1.x.md");
+    // `type: bug` would already refuse; the stem rule must refuse even when the
+    // type line is absent and the status happens to read accepted.
+    writeFileSync(f, doc({ status: "accepted" }).replace(/^type:.*\n/m, ""));
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "not-a-task");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("annotate: a task with no row reports `no-row` and exits 0", () => {
   const { dir } = sandbox([row(36, "eta", "accepted")]);
   try {

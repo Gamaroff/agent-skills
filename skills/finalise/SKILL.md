@@ -54,6 +54,10 @@ if [ -z "$DOC_KIND" ]; then
   case "$(basename "$DOC_FILE")" in
     story.*) DOC_KIND=story ;;
     task.*)  DOC_KIND=task ;;
+    # Anything else — a general bug `bug.{N}.{name}.md` run without the flag —
+    # continues as a TASK: that is the DoD every such run took before task.125,
+    # and a kind this prose never defines is not a kind (TASK-125-BUG-5).
+    *)       DOC_KIND=task ;;
   esac
   # A bug report's filename is `bug.{N}.{name}.md`, `story.{e}.{s}.bug.{N}.{name}.md` or
   # `task.{id}.bug.{N}.{name}.md` — the `.bug.{N}.` segment is what a story/task file never has.
@@ -210,7 +214,7 @@ docs/tasks/task.90.swagger-cli-plugin-enablement/
 3. Parse YAML frontmatter to extract current status and metadata
 4. Extract acceptance criteria, PR references, and documentation notes from the body
 
-**Bug mode (`read-document`):** run — the document is a bug report, and it comes in two shapes: YAML frontmatter, or a `**Bug ID**:` / `**Status**:` header block with no frontmatter at all. Read it through `node references/bug-doc.js --file "$DOC_FILE"` (the same reader `ensure-bug-github-issue` and the syncs use) rather than by frontmatter grep; the JSON carries `mode`, `bug_id`, `status`, `severity`, `priority`, `github_issue` / `jira_key` and `pr_number`. There are no acceptance criteria to extract — the bug's one "criterion" is its `**Expected Behavior**` line, which the fix-evidence agent reads.
+**Bug mode (`read-document`):** run — the document is a bug report, and it comes in two shapes: YAML frontmatter, or a `**Bug ID**:` / `**Status**:` header block with no frontmatter at all. Read it through `node references/bug-doc.js --file "$DOC_FILE"` (the same reader `ensure-bug-github-issue` and the syncs use) rather than by frontmatter grep; the JSON carries `mode`, `bug_id`, `github_issue` / `jira_key`, and `fields.status` / `fields.severity` / `fields.priority` (merged across both shapes). It carries **no** `pr_number`: `PR_NUMBER` comes from Step 3a's existing derivation over the document (`pr_number:` in frontmatter, else `PR #NNN` / `pull/NNN` in the body), which reads a bug file exactly as it reads a task. There are no acceptance criteria to extract — the bug's one "criterion" is its `**Expected Behavior**` line, which the fix-evidence agent reads.
 
 ### Step 2: Check for and Review QA Reports
 

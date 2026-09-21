@@ -215,7 +215,20 @@ All notable changes to this project will be documented in this file. Format foll
   'severity:Major' not found (Command failed: …)` — where before only the argv was reported and the
   bug proceeded unattended with no issue. `tests/ensure-bug-label-tolerance.test.js` executes the
   SKILL.md block with a fake `gh`; `tracker-issue.test.mjs` §9 covers the stderr line in-process and
-  end-to-end.
+  end-to-end. **QA cycle 1 reshaped both halves.** The stderr pipe now reaches the `--body-file`
+  path too (`withStdin`, the one every bug/story/task create actually takes — the first cut covered
+  only argv calls; §9b pins the spawn stdio and the end-to-end line). And the label rule moved out
+  of one site into **`shared/resources/gh-labels.sh`** — `gh_labels_filter LABEL...` reads the
+  repository's labels once with an explicit limit (gh's default page of 30 stripped real labels),
+  drops an empty field, refuses a candidate that is not a single line (a newline passed `grep -F`
+  and reached `--label`), emits a candidate as given or lowercased when the repository defines it,
+  drops it with a warning otherwise, and passes everything through when the *read* fails (exit
+  code, not an empty list). All seven GitHub label sites source it, `tests/gh-labels.test.js` runs
+  it under bash and zsh and scans the sites so a verbatim `priority:${…}` cannot come back.
+  `registry-tick.js` now answers `not-a-task` for any `.bug.<N>.` stem (a header-block task bug
+  matched the task's stem and read as the task); `finalise`'s kind block defaults a general bug run
+  without `--bug` to `task` (it resolved to an empty kind); `qa-fix` validates `fix_cycle` as a
+  positive integer inside both blocks.
 
 - **The resume probe binds its base from every report variant and HALTs when it cannot; the
   detector no longer deletes; who restores is stated once (task 130; PR #436 review CR-1…CR-5,

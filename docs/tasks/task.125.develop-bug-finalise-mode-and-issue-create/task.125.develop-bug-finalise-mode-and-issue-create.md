@@ -195,20 +195,23 @@ hint naming the mode).
 1. ✅ `skills/finalise/SKILL.md` — `--bug` mode
 2. ✅ `skills/develop-bug/references/develop-bug-step-7-close-bug.md` — Part A
 3. ✅ `skills/ensure-bug-github-issue/SKILL.md` — Step B5
-4. ✅ `shared/resources/tracker-issue.js` — failure message
+4. ✅ `shared/resources/tracker-issue.js` — failure message (both spawn paths: `gh()` and the `--body-file` `withStdin` closure — QA cycle 1); `shared/resources/registry-tick.js` — a `.bug.<N>.` stem is `not-a-task` (QA cycle 1)
 5. ✅ `skills/qa-fix/SKILL.md` — `fix_cycle` arg; `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md` — passes it
 
 ### Files to Create
 
 6. ✅ `skills/finalise/assets/bug-dod-template.md`
 6a. ✅ `shared/resources/finalise-dod-fix-evidence-prompt.md` — the agent that takes the AC agent's slot in bug mode (bundled into `skills/finalise/references/`)
+6b. ✅ `shared/resources/gh-labels.sh` (new, QA cycle 1) — `gh_labels_filter`, the one definition of which labels may reach a gh mutation; sourced by the seven GitHub label sites (`ensure-bug/story/task-github-issue`, `sync-github-bug/story/task/epic`) and bundled into each
 
 ### Files to Modify (Tests)
 
 7. ✅ `shared/resources/tests/tracker-issue.test.mjs` — §9 stderr surfacing (in-process ×3 + end-to-end with a fake `gh` on PATH)
 8. ✅ `evals/shared/tests/finalise-bug-mode.test.mjs` (new) — skip table ↔ prose markers, both directions; template shape; Step 7 fallback gone
 9. ✅ `tests/qa-cycle.test.js` — `[fix_cycle]` cases: empty dir + arg, empty dir + no arg, gate + arg (arg wins), gate + no arg
-9a. ✅ `tests/ensure-bug-label-tolerance.test.js` (new) — executes the B5 block with a fake `gh` / `node`: lowercase, absent label skipped, create still runs, failed `gh label list` passes labels through
+9a. ✅ `tests/ensure-bug-label-tolerance.test.js` (new) — executes the B5 block with a fake `gh` / `node`: the block sources the shared helper, collects its lines, expands `"${LABEL_ARGS[@]}"` into the create; newline value wired (QA cycle 1)
+9b. ✅ `tests/gh-labels.test.js` (new, QA cycle 1) — `gh_labels_filter` under bash + zsh with a fake `gh` (limit flag required, newline refused, failed read passes through lowercased, zero-label repo drops all, hostile shapes inert) + population guard over every `skills/*/SKILL.md` label site + bundled-copy check
+9c. ✅ `shared/resources/tests/registry-tick.test.mjs` (QA cycle 1) — header-block task bug and accepted task bug answer `not-a-task`
 
 ### Files to Modify (Documentation)
 
@@ -288,7 +291,26 @@ None.
 - **Critical**: a Change Log row written to a bug report.
 - **Non-critical**: warning text.
 
-## Change Log
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-21
+**Quality Score**: 20/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.125.qa.1.develop-bug-finalise-mode-and-issue-create.md](./task.125.qa.1.develop-bug-finalise-mode-and-issue-create.md)
+- **Gate File**: [task.125.gate.1.develop-bug-finalise-mode-and-issue-create.yml](./task.125.gate.1.develop-bug-finalise-mode-and-issue-create.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3654 (fast gate) + 92 (targeted suites) + 32 boundary probes + 4 executed prose blocks
+- **Phases Verified**: 3/3
+- **Critical Issues**: 1 HIGH (TASK-125-BUG-1), 6 MEDIUM (BUG-2..7), 1 LOW in gate (CR-6)
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+`tracker-issue.js` pipes gh's stderr in `gh()` only; the `withStdin` path every `--body-file` create takes still ignores it (BUG-1, reproduced end-to-end). `gh label list` at the default 30-label page (BUG-2); normalisation at one of nine label sites (BUG-3); `registry-tick` reads a header-block task bug as the task (BUG-4); a general bug without `--bug` resolves `DOC_KIND=""` (BUG-5, executed); a newline value passes `grep -F` (BUG-6, probed); `fix_cycle` unvalidated (BUG-7).
 <!-- change-log-start -->
 ## Change Log
 
@@ -299,6 +321,8 @@ None.
 | 2026-09-21 | 1.2 | Review passed (9/10) — develop-bug step-doc paths corrected to `skills/develop-bug/references/`, Phase 2 severity item marked already-present, tracker-issue.js fix anchored | review-task |
 | 2026-09-21 |  | Status → ready-for-development | review-task |
 | 2026-09-21 |  | Implemented — 3 phases; 11 source files + 20 bundled copies; 4 test files (+19 tests), 9 mutations proved | develop |
+| 2026-09-21 |  | QA gate FAIL (20/100) — 1 HIGH, 6 MEDIUM, 3 LOW; 7 bug reports filed | qa-task |
+| 2026-09-21 |  | QA findings fixed — gate 1 FAIL (20/100) answered: 7 bugs (1 HIGH, 6 MEDIUM) + 3 LOW, 1 iteration; shared gh-labels.sh helper across 7 sites, +31 tests | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

@@ -145,20 +145,12 @@ EOF
 # all, so `--label "priority:High" --label "severity:Major"` (the frontmatter
 # values verbatim) created nothing and an unattended run proceeded with no
 # issue (task.125, obs #65). Severity still travels: the body's Metadata table
-# above carries it whatever the label set. The sibling `ensure-task-github-issue`
-# lowercases priority the same way; the existence check is what is new here.
-REPO_LABELS=$(gh label list --json name -q '.[].name' 2>/dev/null)
+# above carries it whatever the label set. The rule lives ONCE, in the shared
+# helper every label site sources — not here (TASK-125-BUG-3).
+source references/gh-labels.sh || exit 1
 LABEL_ARGS=()
-for l in "bug" \
-         "priority:$(printf '%s' "$PRIORITY" | tr '[:upper:]' '[:lower:]')" \
-         "severity:$(printf '%s' "$SEVERITY" | tr '[:upper:]' '[:lower:]')"; do
-  case "$l" in priority:|severity:) continue ;; esac   # an empty field is no label
-  if [ -z "$REPO_LABELS" ] || printf '%s\n' "$REPO_LABELS" | grep -qxF "$l"; then
-    LABEL_ARGS+=(--label "$l")
-  else
-    echo "⚠️  label '$l' is not defined in this repository — skipped (the create still runs)" >&2
-  fi
-done
+while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--label "$l"); done \
+  < <(gh_labels_filter "bug" "priority:${PRIORITY}" "severity:${SEVERITY}")
 
 BUG_ISSUE_NUM=$(node references/tracker-issue.js \
   --kind create \
@@ -169,10 +161,15 @@ BUG_ISSUE_NUM=$(node references/tracker-issue.js \
 
 The CLI prints the issue **number**.
 
-**When `gh label list` itself fails** (`REPO_LABELS` empty — no network, a scope the token lacks),
-every normalised label is passed through unchecked: the create's own failure message then names
-the label, because `tracker-issue.js` surfaces gh's first stderr line (task.125). A read that
-cannot run must not silently strip every label from every issue.
+**What `gh_labels_filter` does** — stated once, in `references/gh-labels.sh`, and tested by
+`tests/gh-labels.test.js`: reads the repository's labels **once** with an explicit limit (gh's
+default page of 30 stripped real labels — TASK-125-BUG-2), drops an empty field silently, refuses a
+candidate that is not a single line (a newline passed `grep -F` and reached `--label` —
+TASK-125-BUG-6), emits the candidate as given or lowercased when the repository defines it, and
+drops it with a warning naming it otherwise. When the label **read itself fails** (exit code, not
+an empty list — a zero-label repository is a different state and drops everything), every candidate
+passes through unchecked so the create's own failure names the label, which `tracker-issue.js` now
+surfaces.
 
 **A label is metadata; the issue is the deliverable.** The failure mode this block closes was not
 "a bug issue had the wrong label" but "a bug had no issue" — the sub-routine's contract makes an

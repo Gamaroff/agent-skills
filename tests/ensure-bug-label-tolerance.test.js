@@ -11,10 +11,11 @@
  * number. Asserting on the SKILL.md text would prove the string exists, not
  * that the block works; task.84 caught 0 of 27 defects that way.
  *
- * Mutation proofs: revert the `tr '[:upper:]' '[:lower:]'` → the argv carries
- * `priority:High` (red); drop the existence check → `severity:major` reaches
- * the create (red); drop the empty-REPO_LABELS pass-through → a failed
- * `gh label list` strips every label (red).
+ * The rules themselves live in shared/resources/gh-labels.sh and are proved in
+ * tests/gh-labels.test.js; this file proves the B5 BLOCK wires them — the
+ * source line, the read loop, the `"${LABEL_ARGS[@]}"` expansion into the
+ * create. Mutation proofs: drop the `source` → every case red; drop the loop →
+ * no label reaches the create (red).
  */
 const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
@@ -52,13 +53,14 @@ function labelBlock() {
     } else open.push(l);
   }
   const b = blocks.find(
-    (t) => t.includes("REPO_LABELS=") && t.includes("BUG_ISSUE_NUM=$("),
+    (t) => t.includes("gh_labels_filter") && t.includes("BUG_ISSUE_NUM=$("),
   );
   assert.ok(
     b,
     "SKILL.md carries the fenced block that builds LABEL_ARGS and runs the create",
   );
-  const start = b.indexOf("REPO_LABELS=");
+  const start = b.indexOf("source references/gh-labels.sh");
+  assert.ok(start > -1, "the block sources the shared helper");
   return b.slice(start);
 }
 
@@ -69,6 +71,11 @@ function runBlock({ labels, ghLabelListExit = 0, env = {} }) {
   fs.mkdirSync(bin);
   fs.mkdirSync(path.join(dir, "references"));
   fs.writeFileSync(path.join(dir, "references", "tracker-issue.js"), "");
+  // The block sources the bundled helper; the fixture ships the SOURCE copy.
+  fs.copyFileSync(
+    path.join(REPO_ROOT, "shared", "resources", "gh-labels.sh"),
+    path.join(dir, "references", "gh-labels.sh"),
+  );
   fs.mkdirSync(path.join(dir, ".claude", "state"), { recursive: true });
   fs.writeFileSync(
     path.join(dir, ".claude", "state", "issue-body.md"),
@@ -80,6 +87,10 @@ function runBlock({ labels, ghLabelListExit = 0, env = {} }) {
       "#!/bin/sh",
       `if [ "$1 $2" = "label list" ]; then`,
       `  [ ${ghLabelListExit} -eq 0 ] || exit ${ghLabelListExit}`,
+      // Like the real gh: without an explicit limit only the first 30 would come
+      // back — here NONE do, so a helper that drops the flag is caught (BUG-2).
+      '  has_limit=0; for a in "$@"; do case "$a" in -L|--limit) has_limit=1 ;; esac; done',
+      '  [ "$has_limit" -eq 1 ] || exit 0',
       ...labels.map((l) => `  echo ${JSON.stringify(l)}`),
       "  exit 0",
       "fi",
@@ -133,7 +144,7 @@ test("lowercase priority reaches the create; the absent severity label is skippe
   assert.deepEqual(labelsIn(r.argv), ["bug", "priority:high"]);
   assert.match(
     r.stderr,
-    /label 'severity:major' is not defined in this repository — skipped/,
+    /label 'severity:Major' is not defined in this repository — skipped/,
   );
   assert.match(r.stdout, /BUG_ISSUE_NUM=207/);
 });
@@ -169,6 +180,16 @@ test("when `gh label list` fails, every normalised label is passed through unche
     "priority:high",
     "severity:major",
   ]);
+});
+
+test("a multi-line value is refused by the helper and never reaches the create (BUG-6, wired)", () => {
+  const r = runBlock({
+    labels: ["bug", "priority:high"],
+    env: { PRIORITY: "high\nfoo" },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(labelsIn(r.argv), ["bug"]);
+  assert.match(r.stderr, /not a single line — skipped/);
 });
 
 test("an empty severity or priority field produces no label, not `severity:`", () => {

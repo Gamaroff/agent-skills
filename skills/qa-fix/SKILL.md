@@ -858,6 +858,11 @@ DOC_DIR=$(dirname "$STORY_FILE")
 # verify loop writes no gate, so the helper refuses there by design; the loop
 # knows its cycle and states it (task.125, obs #122). Only when no cycle was
 # supplied is it derived from the gate on disk.
+# The arg is a POSITIVE INTEGER or it is nothing: an unsubstituted `{N}`, a `0`
+# or a `3 ` used verbatim keys a stage `qa-fix-{N}`, which the lead CLI rejects
+# (exit 2) and the `|| exit 1` below turns into an aborted block — a failure the
+# helper path could never produce (TASK-125-BUG-7). Invalid reads as absent.
+case "${FIX_CYCLE_ARG:-}" in ''|0|*[!0-9]*) FIX_CYCLE_ARG='' ;; esac
 if [ -n "${FIX_CYCLE_ARG:-}" ]; then
   FIX_CYCLE=$FIX_CYCLE_ARG; rc=0
 else
@@ -968,6 +973,9 @@ if [ -n "$FIX_ISSUE" ]; then
   # Same precedence as the pull-request block: the caller's `fix_cycle=N`
   # ($FIX_CYCLE_ARG, an input re-bound here) wins; the helper is the fallback
   # for the gate-driven path (task.125, obs #122).
+  # Positive integer or nothing — same guard as the pull-request block
+  # (TASK-125-BUG-7); an invalid value falls through to the helper.
+  case "${FIX_CYCLE_ARG:-}" in ''|0|*[!0-9]*) FIX_CYCLE_ARG='' ;; esac
   if [ -n "${FIX_CYCLE_ARG:-}" ]; then
     FIX_CYCLE=$FIX_CYCLE_ARG; rc=0
   else

@@ -157,10 +157,17 @@ Diff `title`, `body`, `labels` against current GitHub state. The body is rebuilt
 mkdir -p .claude/state
 printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
 
+# A label the repository does not define fails the WHOLE edit; the shared
+# helper drops it with a warning instead (task.125, TASK-125-BUG-3).
+source references/gh-labels.sh || exit 1
+LABEL_ARGS=()
+while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--add-label "$l"); done \
+  < <(gh_labels_filter "priority:${priority}")
+
 node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   --title "[Story ${STORY_E}.${STORY_S}] ${STORY_TITLE}" \
   --body-file .claude/state/issue-body.md \
-  --add-label "priority:${priority}" \
+  "${LABEL_ARGS[@]}" \
   --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
 ```
 
