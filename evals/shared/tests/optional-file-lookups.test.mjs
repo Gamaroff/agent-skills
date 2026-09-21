@@ -22,6 +22,7 @@ import {
   writeFileSync,
   readFileSync,
   mkdirSync,
+  symlinkSync,
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -32,6 +33,20 @@ import { spawnBudget } from "../../../shared/resources/spawn-budget.mjs";
 const REPO = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../..",
+);
+// A `cwd: "repo"` row runs a snippet that invokes `.agents/skills/<name>/…` —
+// the path a CONSUMER has because setup-consumer.sh vendors it. It resolves at
+// the repo root only through the developer's gitignored `.agents/skills ->
+// ../skills` symlink, which is why those rows passed locally and failed on CI
+// (no `.agents/` there). So "repo" means this consumer-shaped root, never REPO.
+const CONSUMER_ROOT = mkdtempSync(path.join(tmpdir(), "ofl-consumer-"));
+mkdirSync(path.join(CONSUMER_ROOT, ".agents"));
+symlinkSync(
+  path.join(REPO, "skills"),
+  path.join(CONSUMER_ROOT, ".agents", "skills"),
+);
+process.on("exit", () =>
+  rmSync(CONSUMER_ROOT, { recursive: true, force: true }),
 );
 const { timeoutMs: SPAWN_TIMEOUT_MS } = spawnBudget("optional-file-lookups");
 const SHELLS = [
@@ -341,7 +356,7 @@ for (const row of ROWS) {
         const r = run(
           shell,
           scriptFor(row, dir),
-          row.cwd === "repo" ? REPO : dir,
+          row.cwd === "repo" ? CONSUMER_ROOT : dir,
         );
         assert.doesNotMatch(
           r.stderr,
@@ -377,7 +392,7 @@ for (const row of ROWS) {
           const r = run(
             shell,
             scriptFor(row, dir),
-            row.cwd === "repo" ? REPO : dir,
+            row.cwd === "repo" ? CONSUMER_ROOT : dir,
           );
           assert.doesNotMatch(r.stderr, /no matches found/i, r.stderr);
           const got = (row.varName ? r.stdout : r.stdout.trim()).trim();
