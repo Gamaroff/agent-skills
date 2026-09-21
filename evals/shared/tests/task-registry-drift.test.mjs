@@ -346,3 +346,32 @@ test("cancelled and in-flight rows do not trip the agreement check", () => {
       "in-flight task both legitimately disagree on the literal string and neither is drift",
   );
 });
+
+test("every declared dependency resolves to a registry row — the notes half of the cell is never a dependency (obs #74, task.127)", () => {
+  // The `Depends on` cell is also the notes cell: `registry-tick.js --annotate`
+  // appends ` · PR #N merged`, authors write `obs #83` and dates there. Before
+  // task.127 the parser read `#83`, a bare `83` and every number after the
+  // separator as task references, so `PR #289 merged` blocked on a phantom
+  // task 289 and every lint warned about `task.2026`. The property that holds
+  // now: whatever parseDepCell yields for a real row is a real row.
+  const { rows } = loadRows();
+  const ids = new Set(rows.map((r) => r.n));
+  const dangling = [];
+  let declared = 0;
+  for (const r of rows) {
+    for (const d of r.deps ?? []) {
+      if (d.kind !== "task") continue;
+      declared += 1;
+      if (!ids.has(d.n)) dangling.push(`row ${r.n} → task.${d.n}`);
+    }
+  }
+  assert.ok(
+    declared > 0,
+    "non-vacuity: at least one row declares a task dependency, or this test proves nothing about the parser",
+  );
+  assert.deepEqual(
+    dangling,
+    [],
+    `dependencies that resolve to no registry row:\n  ${dangling.join("\n  ")}`,
+  );
+});

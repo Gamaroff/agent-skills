@@ -85,6 +85,14 @@ preserved on rewrite: an H3 log stays H3.
 A document that was synced to both trackers grew two independent blocks. On first write through
 this engine they **collapse into one**, rows merged in date order, with no duplication.
 
+**The heading lives inside the markers.** The engine emits `## Change Log` as the first line of the
+block on every rebuild. A hand-authored heading sitting *directly above* `<!-- change-log-start -->`
+is the same section written twice — task.120's first machine write produced two consecutive headings,
+and tasks 122/124/128 shipped that way — so the engine **absorbs** it on the next write, whether the
+block already carries its own heading or not (obs #104, task.127). Only the nearest non-blank line
+counts: a heading with prose between it and the markers is another section and is left alone. Author
+new blocks with the heading inside the markers; do not rely on the absorb.
+
 **Migration is a side effect of writing a row, never a write of its own.** It happens inside
 `upsertChangeLog`, so a sync that earns no row never passes the document through the engine and
 never rewrites it. This is load-bearing rather than incidental: migrating unconditionally would

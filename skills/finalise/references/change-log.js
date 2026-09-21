@@ -641,6 +641,23 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
     );
     const merged = [...head.entries, ...tail.entries];
 
+    // A hand-authored heading DIRECTLY above the marker block is the same section
+    // written twice: the rebuild always emits its own heading inside the markers,
+    // so task.120's first machine write left two consecutive `## Change Log`
+    // lines, and tasks 122/124/128 shipped that way (obs #104). Absorb it — the
+    // same convergence shape as collapseOtherLegacyBlocks, one line up — whether
+    // the block already carries its own heading (the doubled state) or not yet
+    // (the authored state). Only the nearest non-blank line counts: a heading
+    // with prose between it and the markers is somebody else's section and stays.
+    let headContent = head.content;
+    if (found.hasMarkers) {
+      const lines = headContent.replace(/\s+$/, "").split("\n");
+      if (lines.length && RE_HEADING.test(lines[lines.length - 1])) {
+        lines.pop();
+        headContent = lines.join("\n") + "\n";
+      }
+    }
+
     // Only when rows from a second block are being merged in do the historical
     // rows get sorted — otherwise the two blocks' histories would interleave
     // wrongly. In the ordinary single-block case the existing order is preserved
@@ -666,7 +683,7 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
     // across writes.
     const trailing = found.end < content.length ? "\n\n" : "\n";
     return trimSeam(
-      head.content.replace(/\n+$/, "\n") + block + trailing + tail.content,
+      headContent.replace(/\n+$/, "\n") + block + trailing + tail.content,
     );
   }
 

@@ -115,9 +115,17 @@ def validate_skill(skill_path):
 
     # Validate description
     warnings = []
-    description = ' '.join(str(fm['description']).split())
-    if not description:
-        return False, "Description is empty"
+    # The value must BE a string. `description:` with nothing after it parses to
+    # None, `true` to a bool and `[]` to a list; `str()` turned each into the
+    # text "None" / "True" / "[]" and validated that as a four-character
+    # description, so a skill with no description passed (obs #107, task.127).
+    desc = fm['description']
+    if not isinstance(desc, str) or not desc.strip():
+        return False, (
+            f"description must be a non-empty string (got {type(desc).__name__})"
+            if not isinstance(desc, str) else "Description is empty"
+        )
+    description = ' '.join(desc.split())
     # Check for angle brackets
     if '<' in description or '>' in description:
         return False, "Description cannot contain angle brackets (< or >)"
@@ -131,7 +139,7 @@ def validate_skill(skill_path):
     # the parsed value as 1,026). The trailing newline a clip-chomped block
     # scalar carries is not content and is stripped. This is a failure, not a
     # warning: a loader that enforces the cap rejects the whole skill.
-    parsed_len = len(str(fm['description']).strip())
+    parsed_len = len(desc.strip())
     if parsed_len > DESCRIPTION_MAX_CHARS:
         return False, (
             f"Description is {parsed_len} chars as parsed "

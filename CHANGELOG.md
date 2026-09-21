@@ -388,6 +388,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Three parsers that accepted what they should refuse (task 127; obs #74, #104, #107).**
+  (1) `select-next.mjs` `parseDepCell` read `#83` and a bare `83` as task dependencies — and
+  the `Depends on` cell is also the notes cell, so `PR #289 merged` blocked on a phantom task 289
+  and every lint warned about `task.2026`; a kind word is now required (`task.N`, `bug.N`, `T83`,
+  `B4`), dependencies come first and a ` · ` / ` — ` starts the never-parsed note. A drift test
+  asserts every declared dependency resolves to a row (non-vacuous). (2) `change-log.js`
+  `upsertChangeLog` emitted its own `## Change Log` inside the markers under a hand-authored one
+  directly above them, so tasks 120/122/123/124/128/131 carried two headings; the engine now absorbs
+  the heading above, in both the authored and the already-doubled state, and the six documents are
+  repaired. (3) `quick_validate.py` coerced a null, boolean or list `description:` with `str()`
+  and validated the text `None` / `True` / `[]`; it now requires a non-empty string and names
+  the type it got.
+
 - **Route 2c (gate-the-last-fix) keys on the last gate's HIGH count, not the loop's whole HIGH
   history (task 134; obs #139).** `classifyLoopRoute` in `qa-diminishing-returns.js` declined the
   half-cycle with `high-findings-seen` whenever any earlier gate had raised a HIGH — a loop that

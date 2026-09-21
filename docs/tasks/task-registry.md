@@ -20,6 +20,7 @@
 - If a merge conflict on the next-number occurs, the higher number wins; the loser bumps to the next free slot.
 - Status values follow `shared/resources/document-status-lifecycle.md`: `draft → planned → ready-for-development → in-progress → ready-for-review → accepted` (or `cancelled`).
 - `Issue` column links to the GitHub/Bitbucket/Jira tracker issue created at task-creation time. `—` if no tracker.
+- `Depends on` is also the notes cell. **Dependencies come first** (`task.N` / `bug.N` — the kind word is required; `#83` and a bare `83` are not dependencies); a ` · ` (what `registry-tick.js --annotate` appends) or a ` — ` starts free text that is never parsed, so a note may name a task as provenance without declaring it (obs #74, task.127).
 
 ### Quick commands
 

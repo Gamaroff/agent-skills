@@ -287,7 +287,6 @@ None — additive corpus and an additive field.
 
 ---
 
-## Change Log
 <!-- change-log-start -->
 ## Change Log
 

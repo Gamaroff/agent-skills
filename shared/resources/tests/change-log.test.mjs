@@ -1882,3 +1882,82 @@ test("I: a start and end marker on ONE line with an inline span between them are
   assert.ok(out.includes(span), "the span is carried");
   assert.equal(CL.extractEntries(out).length, 1);
 });
+
+test("a hand-authored heading directly above the markers is absorbed, not duplicated (obs #104, task.127)", () => {
+  // task.120 shipped `## Change Log` ABOVE `<!-- change-log-start -->` with only the
+  // table inside; the first machine write rebuilt the block with its own heading
+  // inside the markers and the document carried two consecutive headings.
+  const doc = [
+    "---",
+    "id: x",
+    "type: task",
+    "---",
+    "# T",
+    "",
+    "## Change Log",
+    "",
+    "<!-- change-log-start -->",
+    "",
+    "| Date | Version | Description | Author |",
+    "|------|---------|-------------|--------|",
+    "| 2026-09-01 | 1.0 | Initial | create-task |",
+    "",
+    "<!-- change-log-end -->",
+    "",
+    "## Notes",
+    "",
+    "- x",
+    "",
+  ].join("\n");
+  const entry = {
+    date: "2026-09-21",
+    version: "",
+    description: "row",
+    author: "t",
+  };
+  const once = CL.upsertChangeLog(doc, entry, { docType: "task" });
+  assert.equal((once.match(/^## Change Log$/gm) || []).length, 1, once);
+  assert.match(
+    once,
+    /<!-- change-log-start -->\n## Change Log\n/,
+    "the surviving heading is the block's own, inside the markers",
+  );
+  assert.match(
+    once,
+    /\| 2026-09-01 \| 1\.0 \| Initial \|/,
+    "history preserved",
+  );
+  assert.match(
+    once,
+    /# T\n<!-- change-log-start -->/,
+    "nothing else above the block was touched (the engine seats the block directly under the previous line)",
+  );
+  // A heading that is NOT directly above the markers (prose between) is somebody
+  // else's section and stays.
+  const far = doc.replace(
+    "## Change Log\n\n<!--",
+    "## Change Log\n\nSee the table.\n\n<!--",
+  );
+  const kept = CL.upsertChangeLog(far, entry, { docType: "task" });
+  assert.equal((kept.match(/^## Change Log$/gm) || []).length, 2, kept);
+  // The already-doubled state (heading outside AND inside — tasks 122/124/128)
+  // converges to one on the next write too.
+  const doubled = doc.replace(
+    "<!-- change-log-start -->\n",
+    "<!-- change-log-start -->\n## Change Log\n",
+  );
+  assert.equal(
+    (doubled.match(/^## Change Log$/gm) || []).length,
+    2,
+    "fixture is doubled",
+  );
+  const repaired = CL.upsertChangeLog(doubled, entry, { docType: "task" });
+  assert.equal((repaired.match(/^## Change Log$/gm) || []).length, 1, repaired);
+  // Idempotent: a second write on the repaired document changes nothing structural.
+  const twice = CL.upsertChangeLog(
+    once,
+    { ...entry, description: "row 2" },
+    { docType: "task" },
+  );
+  assert.equal((twice.match(/^## Change Log$/gm) || []).length, 1);
+});

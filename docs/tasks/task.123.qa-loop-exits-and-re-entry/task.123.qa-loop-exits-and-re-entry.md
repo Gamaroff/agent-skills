@@ -556,7 +556,6 @@ Gate 4 CONCERNS (60) — four MEDIUMs, all fixed, plus C4-CR-5/6/7.
 ### Key Findings
 Cycle 5 (scoped since gate 4): cycle-4 findings verified FIXED; no HIGH or MEDIUM remains (HIGH 1, 1, 0, 0, 0). Four LOWs in `grant-qa-cycles.sh` — a misleading clause in the no-lock refusal message (reviewer medium → QA LOW: behaviour correct, remedy adjacent), foreign-snapshot diagnosis order, `./` under bash 5, `CDPATH` in `canon()` — plus three wording cleanups.
 
-## Change Log
 ## Definition of Done - PASSED ✅
 
 **Status:** ACCEPTED
