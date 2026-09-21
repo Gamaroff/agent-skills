@@ -5,10 +5,12 @@ type: task
 description: "Give security-probe.mjs a second shell entry form — shell-fn:<path>#<function> — that sources a function library and calls the named function with the corpus case as argv under bash and zsh, plus a --fake-gh fixture so a boundary that shells out to gh (gh-labels.sh) can be executed offline; the finalise security gate then counts real executions for the boundary class it currently FAILs on the zero-guard, and the human override recorded on task.125 stops recurring."
 tags: [security, probe, finalise, qa-task, shell, gh-labels]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-09-21
 updated: 2026-09-21
+completed_date: 2026-09-21
+pr_number: 462
 assignee:
 estimated_effort_hours: 8
 risk_level: medium
@@ -17,7 +19,7 @@ github_issue: 448
 
 # Technical Task: A `shell-fn:` entry form for the security probe, and a fake-`gh` affordance
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.136.review.1.shell-fn-probe-entry-form.md` implemented 2026-09-21
 **GitHub Issue**: [#448](https://github.com/Gamaroff/agent-skills/issues/448)
 
@@ -233,7 +235,7 @@ Not applicable — the corpus is small and the runner is bounded by the existing
 
 ### Functional
 
-- [x] `shell-fn:shared/resources/gh-labels.sh#gh_labels_filter` with `--cases-file tests/fixtures/shell-fn/gh-labels.cases.json --fake-gh tests/fixtures/fake-gh` returns `engages`; without `--fake-gh` returns a verdict whose `cases[].detail` names the mismatch (the function's no-labels path) rather than hanging
+- [x] `shell-fn:shared/resources/gh-labels.sh#gh_labels_filter` with `--cases-file tests/fixtures/shell-fn/gh-labels.cases.json --fake-gh tests/fixtures/fake-gh` returns `engages`; without `--fake-gh` a library whose text names `gh` is **declined before anything spawns** — `unverifiable` / `needs-fake-gh`, `executed 0`, the declined detail naming the library and the flag — rather than scored through its no-labels passthrough or hanging (delivered contract after QA cycle 2 CR-2; PR review PC-2)
 - [x] The echo library returns `absent`; the syntax-error library returns `unverifiable` with exit 97 in every case
 - [x] Every existing `security-probe.test.mjs` row is unchanged and green
 
@@ -248,7 +250,7 @@ Not applicable — the corpus is small and the runner is bounded by the existing
 ### Migration
 
 - [x] The header signal for `shell-fn:` is stated once, in `probe-boundary-rule.md`; both prompts and both Step 3b sections cite it; CHANGELOG entry
-- [x] Obs #138 set `actioned` with the PR as resolution; task.125's DoD § Step 5 override is cited from the implementation report as the case this closes
+- [ ] Obs #138 set `actioned` with the PR as resolution — **deferred to the post-merge step**: the record reads `parked_until: task.136 merged to develop`, so `/develop-next` sets it after PR #462 lands (PR review PC-1); task.125's DoD § Step 5 override is cited from the implementation report as the case this closes ✅
 
 ---
 
@@ -321,6 +323,33 @@ None.
 Cycle 3: bug 2 verified fixed by execution and closed. Three verified limits of the new mechanism (a library-installed EXIT trap displaces the source guard; `needs-fake-gh` covers `shell-fn:` only; the `gh` detector misses `gh;`/`gh>`/`$GH`/transitive `source`) are recorded with concrete fixes for a follow-up — none affects the `gh-labels.sh` boundary this task was built for.
 
 ---
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.136.qa.{1,2,3}.shell-fn-probe-entry-form.md` (3 cycles)
+**Gate File**: `task.136.gate.3.shell-fn-probe-entry-form.yml`
+**Gate Status**: ⚠️ CONCERNS — no open finding
+**Quality Score**: 90/100
+**PR Review (5c)**: `task.136.pr-review.1.shell-fn-probe-entry-form.md` — CONCERNS, actionable findings applied
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 6/7 met by code + per-PR test; SC7 (obs #138 `actioned`) deliberately deferred to the post-merge step
+✅ **Tests:** 3888 (`ci:fast`, 0 fail); 66 rows in `security-probe.test.mjs` (16 new), each new branch mutation-proven (develop M1–M5, qa-fix F1–F4 + G1–G4, QA 3+3+3)
+✅ **PR:** #462 — 4 commits + acceptance, CI reading 1 SUCCESS @ `56b5ec1d` (5/5 checks)
+✅ **Documentation:** rule §5 (one statement of the signal), 4 citing prompt sites under a mutation-proved pin, CHANGELOG [Unreleased], bundled copies in sync
+✅ **Security Review:** ✅ PASS — boundary probed via the engine: `gh-labels.sh#gh_labels_filter` **engages** 20/20 under bash+zsh behind the fake `gh`; `resolveEntry` shell-fn gate 14/15 hostile refused, 6/6 legitimate; 41 executed (`task.136.dod.1.security.run.json`); the one reproduction is the documented pre-existing symlink limit
+✅ **Compliance Review:** NOT_APPLICABLE (no data, payments, UI or PHI)
+⚠️ **Reliability:** CONCERNS — three verified limits of the new mechanism (library-installed EXIT trap; `needs-fake-gh` on `shell-fn:` only; `gh` detector terminators / transitive `source`) plus PR-review CR-1/CR-3 and the shellcheck-lane gap for the extensionless fixture — all recorded with concrete fixes for a follow-up task
+
+**Task marked as ACCEPTED on:** 2026-09-21
+
+**Detailed Verification Log:** See `task.136.dod.1.shell-fn-probe-entry-form.md` for complete verification evidence and timestamps.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
@@ -335,6 +364,7 @@ Cycle 3: bug 2 verified fixed by execution and closed. Three verified limits of 
 | 2026-09-21 |  | QA gate CONCERNS (90/100) — cycle 2 refute: bug 1 closed; 1 new MEDIUM (bug 2: top-level exit / set -e escape the shell-fn sentinels), 3 LOW advisory | qa-task |
 | 2026-09-21 |  | QA findings fixed — cycle 2: TASK-136-BUG-2 (EXIT trap + errexit snapshot) + CR-2 needs-fake-gh decline, CR-4, CR-5; 4 rows added, 4 mutants killed; suite 66/66 | qa-fix |
 | 2026-09-21 |  | QA gate CONCERNS (90/100), no open finding — cycle 3: bug 2 closed; 3 advisory limits recorded for follow-up | qa-task |
+| 2026-09-21 | 1.2 | DoD passed — accepted (PR #462) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -343,8 +373,8 @@ Cycle 3: bug 2 verified fixed by execution and closed. Three verified limits of 
 - [x] Phase 2: entry resolution and runner
 - [x] Phase 3: rule and prompts
 - [x] Phase 4: bundle, evidence, CHANGELOG
-- [ ] QA: `task.136.qa.[N].shell-fn-probe-entry-form.md`
-- [ ] Gate: `task.136.gate.[N].shell-fn-probe-entry-form.yml`
+- [x] QA: `task.136.qa.{1,2,3}.shell-fn-probe-entry-form.md`
+- [x] Gate: `task.136.gate.{1,2,3}.shell-fn-probe-entry-form.yml` (gate 3: CONCERNS, no open finding)
 
 ## References
 
