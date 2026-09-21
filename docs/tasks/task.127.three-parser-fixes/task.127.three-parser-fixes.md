@@ -5,19 +5,20 @@ type: task
 description: "Three small, independent parser defects, each with a one-function fix and a fixture, bundled as one task because each is under two hours and they share nothing but the shape. select-next.mjs's parseDepCell reads the task-registry column that also carries prose notes, so 'PR #381 merged' and '3 QA cycles (80 → 95 → 90)' parse as phantom dependencies — inert today only because accepted rows are skipped. change-log.js upsertChangeLog, given a hand-authored ## Change Log heading above the start marker, rebuilds the block with its own heading inside and leaves the document with two. quick_validate.py wraps description in str() before every check, so a null, ~ or bare boolean validates as the 4-character string 'None'/'True' and passes with a 'very short' warning. Observations #74, #104, #107."
 tags: [develop-next, change-log, create-skill, parsers]
 category: refactoring
-status: planned
+status: accepted
 priority: Low
 risk_level: low
 created: 2026-09-17
-updated: 2026-09-17
+updated: 2026-09-21
 assignee:
 estimated_effort_hours: 4
+pr_number: 454
 github_issue: 427
 ---
 
 # Technical Task: Three parsers that accept what they should refuse
 
-**Status:** Planned
+**Status:** Accepted
 **GitHub Issue**: [#427](https://github.com/Gamaroff/agent-skills/issues/427)
 
 ---
@@ -248,13 +249,15 @@ None.
 | Date | Version | Description | Author |
 | ---- | ------- | ----------- | ------ |
 | 2026-09-17 | 1.0 | Initial draft — observation review 2026-09-17 (obs #74, #104, #107) | create-task |
+| 2026-09-21 |  | Implemented — 3 phases: parseDepCell kind-required + note separator (+drift test); change-log.js heading absorb (+test; 6 docs repaired); quick_validate.py typed description (+4 rows); 3 mutations proved | manual |
+| 2026-09-21 | 1.1 | Accepted (PR #454) — the three parsers refuse what they should. Hand-driven quick win: no QA loop, no DoD file; the tests named here are the evidence | manual |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: parseDepCell
-- [ ] Phase 2: heading absorption
-- [ ] Phase 3: description type
+- [x] Phase 1: parseDepCell
+- [x] Phase 2: heading absorption
+- [x] Phase 3: description type
 - [ ] QA: `task.127.qa.[N].three-parser-fixes.md`
 - [ ] Gate: `task.127.gate.[N].three-parser-fixes.yml`
 
@@ -265,4 +268,5 @@ None.
 
 ## Notes
 
+- **Accepted 2026-09-21 without the pipeline (PR #454).** Selector side effect: with phantom deps gone, `/develop-next` selects T136 (High) ahead of T126. Task.132's doubled heading is repaired by the engine's absorb on its next write or by hand after PR #453 merges.
 Bugs found during QA land at `task.127.bug.[N].[name].md` in this directory.
