@@ -5,7 +5,7 @@ type: task
 description: "Give security-probe.mjs a second shell entry form — shell-fn:<path>#<function> — that sources a function library and calls the named function with the corpus case as argv under bash and zsh, plus a --fake-gh fixture so a boundary that shells out to gh (gh-labels.sh) can be executed offline; the finalise security gate then counts real executions for the boundary class it currently FAILs on the zero-guard, and the human override recorded on task.125 stops recurring."
 tags: [security, probe, finalise, qa-task, shell, gh-labels]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-09-21
 updated: 2026-09-21
@@ -17,7 +17,8 @@ github_issue: 448
 
 # Technical Task: A `shell-fn:` entry form for the security probe, and a fake-`gh` affordance
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.136.review.1.shell-fn-probe-entry-form.md` implemented 2026-09-21
 **GitHub Issue**: [#448](https://github.com/Gamaroff/agent-skills/issues/448)
 
 ---
@@ -124,42 +125,44 @@ None — API stable. Both existing entry spellings resolve as before; `shell-fn:
 ### Phase 1: The fixtures and the red rows
 
 **Risk**: Low
-**Files**: `shared/resources/tests/security-probe.test.mjs`, `tests/fixtures/fake-gh/gh`, `tests/fixtures/shell-fn/echo-unfiltered.sh`
+**Files**: `shared/resources/tests/security-probe.test.mjs`, `tests/fixtures/fake-gh/gh`, `tests/fixtures/shell-fn/gh-labels.cases.json`, `tests/fixtures/shell-fn/echo-unfiltered.sh`, `tests/fixtures/shell-fn/syntax-error.sh`
 
-- [ ] Fake `gh`: `label list` prints the fixture label set (`priority:high`, `priority:medium`, `priority:low`, `task`, `bug`) as JSON when `--json name` is passed; `issue create` appends its argv to `$FAKE_GH_LOG` and prints `https://…/issues/1`; anything else exits 2 naming the subcommand
-- [ ] Red fixture library: one function that prints every argument, no filtering
-- [ ] Rows: `resolveEntry("shell-fn:shared/resources/gh-labels.sh#gh_labels_filter")` → `{ kind: "shell-fn", entryPath, fnName }`; `shell-fn:` without `#` → `bad-entry` naming the form; containment rows (`/etc/passwd`, `node_modules`, NUL) mirrored from the `shell:` block
-- [ ] Green row: `runProbeSpec({ sink: "filename", entry: "shell-fn:shared/resources/gh-labels.sh#gh_labels_filter", fakeGh })` → `engages` (red today: `bad-entry`)
-- [ ] Red-fixture row: the echo library → `absent`
-- [ ] Source-failure row: a library with a syntax error → every case `exit 97 ≠ 0`, verdict `unverifiable`, reason names the source
+- [x] Fake `gh`: `label list` answers with the fixture label set (`priority:high`, `priority:medium`, `priority:low`, `task`, `bug`) — **one name per line when `-q`/`--jq` is passed** (that is the call `gh_labels_filter` makes: `gh label list --json name -L N -q '.[].name'`, and real `gh` prints plain lines under `-q`; a JSON reply here makes `grep -qxF` miss every label and the green row scores `absent`), a JSON array otherwise; `issue create` appends its argv to `$FAKE_GH_LOG` and prints `https://…/issues/1`; anything else exits 2 naming the subcommand; refuses to run unless `FAKE_GH=1` is in its environment
+- [x] Label-shaped cases file `tests/fixtures/shell-fn/gh-labels.cases.json` — the `filename` corpus's `expected` is `{ stdout: "12\n", … }` (the `qa-cycle.sh` shape: print the highest gate number), which a label filter never prints, so a `shell-fn:` run of `gh_labels_filter` against the stock corpus mismatches on every case and scores `absent` — the task.125 result, reproduced. The engine already takes `--cases-file` / `runProbeSpec({ cases })`; this file is the one definition of what the function must print: each hostile label case (newline, command substitution, an undefined label) expects empty stdout and exit 0 (`stderr` left unasserted — the warning text is the function's, not the contract's), each legitimate case expects the label itself on one line, and the command-substitution case keeps `absent: ["PWNED"]`. The test's green row and the documented finalise command both read this file
+- [x] Red fixture library: one function that prints every argument, no filtering
+- [x] Rows: `resolveEntry("shell-fn:shared/resources/gh-labels.sh#gh_labels_filter")` → `{ kind: "shell-fn", entryPath, fnName }`; `shell-fn:` without `#` → `bad-entry` naming the form; containment rows (`/etc/passwd`, `node_modules`, NUL) mirrored from the `shell:` block
+- [x] Green row: `runProbeSpec({ sink: "filename", entry: "shell-fn:shared/resources/gh-labels.sh#gh_labels_filter", cases: <gh-labels.cases.json>, fakeGh })` → `engages` (red today: `bad-entry`); `sink` stays `filename` because it selects the materialised fixture directory the runner runs in
+- [x] Red-fixture row: the echo library → `absent`
+- [x] Source-failure row: a library with a syntax error → every case `exit 97 ≠ 0`, verdict `unverifiable`, reason names the source
 
 ### Phase 2: Entry resolution and the runner
 
 **Risk**: Medium
 **Files**: `shared/resources/security-probe.mjs`
 
-- [ ] `SHELL_FN_PREFIX = "shell-fn:"`; `resolveEntry` splits on the last `#`, applies the existing containment, returns `kind: "shell-fn"`
-- [ ] Third arm in `runProbeSpec`: shared materialisation; per case per shell the `source … ; "$fn" "$@"` command line above; `PATH` prepend when `fakeGh` is set; `LC_ALL=C`; the existing timeout; exit 97 reserved
-- [ ] `--fake-gh <dir>` on `main`: must exist, must contain an executable `gh`, refused otherwise with `reason: bad-fake-gh`; recorded on the run as `fakeGh`
-- [ ] Mutation proofs: run the function without sourcing (the task.125 shape) → green row falls to `absent`; drop the `PATH` prepend → green row falls to `absent` because `gh label list` fails and the function takes its no-labels path — record both
+- [x] `SHELL_FN_PREFIX = "shell-fn:"`; `resolveEntry` splits on the last `#`, applies the existing containment, returns `kind: "shell-fn"`
+- [x] Third arm in `runProbeSpec`: shared materialisation; per case per shell the `source … ; "$fn" "$@"` command line above; `PATH` prepend when `fakeGh` is set; `LC_ALL=C`; the existing timeout; exit 97 reserved
+- [x] No-rc spawn flags on the new arm — `bash --noprofile --norc` and `zsh -f` — **in addition to** the sandbox `HOME`/`TMPDIR` the `shell:` arm already sets. The `shell:` arm today spawns `<shell> -c 'bash "$1" "$2"'` with no rc flags; its rc isolation is `HOME=<sandbox>/home`, which the new arm inherits. The flags are added here because the new arm sources into the shell proper (the `shell:` arm only ever runs `bash <script>` under zsh), so a zsh `.zshenv` would otherwise be the one file a sandbox `HOME` cannot fully rule out; `FAKE_GH=1` is set in the same env
+- [x] `--fake-gh <dir>` on `main`: must exist, must contain an executable `gh`, refused otherwise with `reason: bad-fake-gh`; recorded on the run as `fakeGh`
+- [x] Mutation proofs: run the function without sourcing (the task.125 shape) → green row falls to `unverifiable (rejects-every-input)` (with a label-shaped cases file, empty stdout *matches* every hostile case and mismatches every legitimate one — the engine's own distinction between "filters" and "prints nothing"); drop the `PATH` prepend → green row falls to `present-but-inert` (the real `gh` fails from the sandbox cwd, the function passes candidates through lowercased, 10 reproduced, and the sentinel flags 1 escape) — both recorded in the implementation report, with three further mutants (exit-97 branch, exit-98 branch, `--fake-gh` validation) each killed by its own row
 
 ### Phase 3: The rule and the two prompts
 
 **Risk**: Low
 **Files**: `probe-boundary-rule.md`, `finalise-dod-security-prompt.md`, `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`
 
-- [ ] `probe-boundary-rule.md`: beside task.128's header signal, the second signal — a `source it` comment or a function definition with no top-level call → `shell-fn:`; a boundary whose body names `gh` → add `--fake-gh tests/fixtures/fake-gh`
-- [ ] The two prompts and both Step 3b sections name `shell-fn:` and `--fake-gh` in the sentence that names `shell:`; nothing restates the signal
-- [ ] `evals/shared/tests/transition-protocol-parity.test.mjs` and any prompt-contract test that pins the entry-form sentence: re-run and update the pinned sentence in the same commit
+- [x] `probe-boundary-rule.md`: beside task.128's header signal, the second signal — a `source it` comment or a function definition with no top-level call → `shell-fn:`; a boundary whose body names `gh` → add `--fake-gh tests/fixtures/fake-gh`; a function boundary's `expected` is not the sink corpus's — it is a cases file the reviewer names with `--cases-file` (the corpus `expected` describes a script printing a gate number, not a function printing labels)
+- [x] The two prompts and both Step 3b sections name `shell-fn:` and `--fake-gh` in the sentence that names `shell:`; nothing restates the signal
+- [x] `shared/resources/tests/probe-boundary-signals.test.mjs` pins the entry-form sentences ("every site that names the JS entry form also names the shell entry form"; "route non-JS to `shell:`") — re-run it and extend the pin to `shell-fn:` in the same commit
 
 ### Phase 4: Bundle, evidence, CHANGELOG
 
 **Risk**: Low
 **Files**: `skills/*/references/`, `CHANGELOG.md`
 
-- [ ] `npm run bundle`; `npm run bundle:check` 0
-- [ ] Re-run the probe on `gh-labels.sh` from the repository root with the documented command and paste the record's `verdict`, `reason`, `totals` into this task's implementation report as the evidence task.125's DoD lacked
-- [ ] CHANGELOG [Unreleased]: the form, the affordance, the fixture path
+- [x] `npm run bundle`; `npm run bundle:check` 0
+- [x] Re-run the probe on `gh-labels.sh` from the repository root with the documented command (§ 8 Integration Tests — `--cases-file` included) and paste the record's `verdict`, `reason`, `totals` into this task's implementation report as the evidence task.125's DoD lacked
+- [x] CHANGELOG [Unreleased]: the form, the affordance, the fixture path
 
 ---
 
@@ -174,18 +177,24 @@ None — API stable. Both existing entry spellings resolve as before; `shell-fn:
 2. ✅ `tests/fixtures/fake-gh/gh` — executable fake `gh` (mode 755; `tests/*.test.js` glob does not read it)
 3. ✅ `tests/fixtures/shell-fn/echo-unfiltered.sh` — red fixture library
 4. ✅ `tests/fixtures/shell-fn/syntax-error.sh` — source-failure fixture
+4a. ✅ `tests/fixtures/shell-fn/gh-labels.cases.json` — label-shaped cases (the one `expected` definition for the green row and the finalise command)
+
+> `syntax-error.sh` is **written at test time** into a temp dir under `tests/fixtures/shell-fn/` and removed after: a tracked `.sh` with a syntax error would fail the ShellCheck lane by design (`git ls-files '*.sh'` selects it).
 
 ### Files to Modify (Tests)
 
 5. ✅ `shared/resources/tests/security-probe.test.mjs` — resolution, green, red, mutation, source-failure, containment rows
+5a. ✅ `shared/resources/tests/probe-boundary-signals.test.mjs` — the site-parity pin extended: a site naming `shell:` must name `shell-fn:` and `--fake-gh`
 
 ### Files to Modify (Documentation)
 
 6. ✅ `shared/resources/probe-boundary-rule.md` — second shell branch + header signal
 7. ✅ `shared/resources/finalise-dod-security-prompt.md` — names the form and the affordance
 8. ✅ `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md` — Step 3b sentence
+8a. ✅ `shared/resources/security-review-prompt.md` — the fourth site naming the entry forms, found by the extended pin (§ Choosing the entry point; § limits item 3)
 9. ✅ `CHANGELOG.md`
 10. ✅ `skills/*/references/` — regenerated by `npm run bundle`
+11. ✅ `skills/qa-next/assets/run.template.md` — **incidental, pre-existing CI break**: the `Filed as` placeholder was a parseable relative link (`../../bugs/…`) that `tests/bundled-links.test.js` fails on; `develop` was red at `c11d1f49` on exactly this, so every PR off it inherited the failure. One-cell change, no behaviour
 
 ### Files to Delete
 
@@ -203,7 +212,7 @@ None.
 
 ### Integration Tests
 
-- The documented finalise command against the live `gh-labels.sh` (`--sink filename --entry shell-fn:shared/resources/gh-labels.sh#gh_labels_filter --fake-gh tests/fixtures/fake-gh`) from the repository root: verdict `engages`, `totals.executed` = cases × shells, `escaped 0`. Recorded in the implementation report, not asserted in CI (it is the same run as the green row with a different cwd).
+- The documented finalise command against the live `gh-labels.sh` (`--sink filename --entry shell-fn:shared/resources/gh-labels.sh#gh_labels_filter --cases-file tests/fixtures/shell-fn/gh-labels.cases.json --fake-gh tests/fixtures/fake-gh`) from the repository root: verdict `engages`, `totals.executed` = cases × shells, `escaped 0`. Recorded in the implementation report, not asserted in CI (it is the same run as the green row with a different cwd — same cases file, same fake).
 
 ### Contract Tests
 
@@ -224,22 +233,22 @@ Not applicable — the corpus is small and the runner is bounded by the existing
 
 ### Functional
 
-- [ ] `shell-fn:shared/resources/gh-labels.sh#gh_labels_filter` with `--fake-gh` returns `engages`; without `--fake-gh` returns a verdict whose `cases[].mismatches` name the failed `gh` call rather than hanging
-- [ ] The echo library returns `absent`; the syntax-error library returns `unverifiable` with exit 97 in every case
-- [ ] Every existing `security-probe.test.mjs` row is unchanged and green
+- [x] `shell-fn:shared/resources/gh-labels.sh#gh_labels_filter` with `--cases-file tests/fixtures/shell-fn/gh-labels.cases.json --fake-gh tests/fixtures/fake-gh` returns `engages`; without `--fake-gh` returns a verdict whose `cases[].detail` names the mismatch (the function's no-labels path) rather than hanging
+- [x] The echo library returns `absent`; the syntax-error library returns `unverifiable` with exit 97 in every case
+- [x] Every existing `security-probe.test.mjs` row is unchanged and green
 
 ### Performance
 
-- [ ] A `shell-fn:` run over the `filename` corpus under both shells completes inside the existing default timeout
+- [x] A `shell-fn:` run over the `filename` corpus under both shells completes inside the existing default timeout
 
 ### Code Quality
 
-- [ ] Both mutation proofs recorded in the implementation report; `ci:fast`, `bundle:check`, Prettier, shellcheck on the fixture `gh` green
+- [x] Both mutation proofs recorded in the implementation report; `ci:fast`, `bundle:check`, Prettier, shellcheck on the fixture `gh` green
 
 ### Migration
 
-- [ ] The header signal for `shell-fn:` is stated once, in `probe-boundary-rule.md`; both prompts and both Step 3b sections cite it; CHANGELOG entry
-- [ ] Obs #138 set `actioned` with the PR as resolution; task.125's DoD § Step 5 override is cited from the implementation report as the case this closes
+- [x] The header signal for `shell-fn:` is stated once, in `probe-boundary-rule.md`; both prompts and both Step 3b sections cite it; CHANGELOG entry
+- [x] Obs #138 set `actioned` with the PR as resolution; task.125's DoD § Step 5 override is cited from the implementation report as the case this closes
 
 ---
 
@@ -254,7 +263,7 @@ None.
 1. **A real `gh` on `PATH` answers instead of the fake**
    - **Risk**: the prepend is lost (a shell rc file resets `PATH`) and the probe hits the network with the operator's credentials.
    - **Probability**: Low · **Impact**: Medium — a probe that mutates a real repository.
-   - **Mitigation**: `--noprofile --norc` (bash) and `-f` (zsh) are already how the `shell:` arm spawns; the fake `gh` also refuses to run unless `FAKE_GH=1` is in its environment, which the engine sets, so a stray invocation from any other context exits 2. Both are asserted.
+   - **Mitigation**: the `shell:` arm's rc isolation is its sandbox `HOME`/`TMPDIR` (`runShellCase` sets `HOME: sandboxHome`; there are no rc flags on that arm today), which the new arm inherits; the new arm additionally spawns `bash --noprofile --norc` / `zsh -f` (Phase 2) so no rc file can reset `PATH`; and the fake `gh` refuses to run unless `FAKE_GH=1` is in its environment, which the engine sets, so a stray invocation from any other context exits 2. All three are asserted.
    - **Rollback**: revert Phase 2; the form is additive.
 
 2. **The green fixture depends on `gh-labels.sh`'s label set**
@@ -291,23 +300,23 @@ None.
 - **Non-critical**: wording in the rule or the prompts.
 
 ---
-
-## Change Log
-
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-09-21 | 1.0 | Initial draft — obs #138 (task.130 and task.125 instances); task.128 shipped `shell:`, this adds `shell-fn:` and `--fake-gh` | create-task |
-
+| 2026-09-21 | 1.1 | Review passed (9/10 after fixes) — green row and finalise command now share a label-shaped `--cases-file` (the `filename` corpus expects `"12\n"`); fake `gh` honours `-q`; Risk 1 mitigation restated (sandbox HOME today, no-rc flags a Phase 2 deliverable); pin test is `probe-boundary-signals.test.mjs` | review-task |
+| 2026-09-21 |  | Status → ready-for-development | review-task |
+| 2026-09-21 |  | Implemented — 12 files (engine, 2 tests, 3 fixtures, 4 prompts, CHANGELOG, 10 bundled copies), 12 new test rows, 5 mutants killed; live probe of gh-labels.sh#gh_labels_filter: engages, executed 20 | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: fixtures and red rows
-- [ ] Phase 2: entry resolution and runner
-- [ ] Phase 3: rule and prompts
-- [ ] Phase 4: bundle, evidence, CHANGELOG
+- [x] Phase 1: fixtures and red rows
+- [x] Phase 2: entry resolution and runner
+- [x] Phase 3: rule and prompts
+- [x] Phase 4: bundle, evidence, CHANGELOG
 - [ ] QA: `task.136.qa.[N].shell-fn-probe-entry-form.md`
 - [ ] Gate: `task.136.gate.[N].shell-fn-probe-entry-form.yml`
 

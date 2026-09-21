@@ -16,7 +16,14 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1092,4 +1099,323 @@ test("shell entry: the CLI form runs and records the same shape as the JS form",
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ── The shell-fn entry form (task.136) ───────────────────────────────────────
+//
+// A boundary delivered as a SOURCED LIBRARY — a file whose header says "source
+// it" and whose function is then called — is reached through
+// `shell-fn:<path>#<function>`: the file is sourced and the function called with
+// the case's input as argv, under every shell in `probeShells()`. The `shell:`
+// form run against such a file sources it and exits — the function never runs,
+// every case mismatches, and the verdict reads `absent` with `escaped 0`. That
+// is the task.125 result these rows exist to make unreachable. A function that
+// consults `gh` is answered by the `--fake-gh` directory on PATH, so the
+// filtering branch is the branch that runs.
+
+const FN_LIB = "shared/resources/gh-labels.sh";
+const FN_ENTRY = `shell-fn:${FN_LIB}#gh_labels_filter`;
+const FAKE_GH = "tests/fixtures/fake-gh";
+const FN_FIXTURES = "tests/fixtures/shell-fn";
+const LABEL_CASES = JSON.parse(
+  readFileSync(join(REPO_ROOT, FN_FIXTURES, "gh-labels.cases.json"), "utf8"),
+);
+
+test("resolveEntry: shell-fn:<path>#<fn> resolves with kind shell-fn and the function name", () => {
+  const r = resolveEntry(FN_ENTRY, REPO_ROOT);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.kind, "shell-fn");
+  assert.equal(r.fnName, "gh_labels_filter");
+  assert.equal(r.entryPath, join(REPO_ROOT, FN_LIB));
+  assert.equal("exportName" in r, false);
+});
+
+test("resolveEntry: shell-fn: without a function, or with a name no shell accepts, is bad-entry naming the form", () => {
+  for (const bad of [
+    "shell-fn:",
+    `shell-fn:${FN_LIB}`,
+    `shell-fn:${FN_LIB}#`,
+    "shell-fn:#gh_labels_filter",
+    `shell-fn:${FN_LIB}#not a name`,
+    `shell-fn:${FN_LIB}#$(id)`,
+  ]) {
+    const r = resolveEntry(bad, REPO_ROOT);
+    assert.equal(r.ok, false, bad);
+    assert.equal(r.reason, "bad-entry", bad);
+    assert.match(r.detail, /shell-fn:path#function|shell function name/, bad);
+  }
+  // The `shell:` form's own refusal of a `#` still points at the new form.
+  assert.equal(resolveEntry("shell:a.sh#x", REPO_ROOT).reason, "bad-entry");
+});
+
+test("resolveEntry: shell-fn: takes the same containment as shell:", () => {
+  assert.equal(
+    resolveEntry("shell-fn:/etc/passwd#f", REPO_ROOT).reason,
+    "outside-repo-root",
+  );
+  assert.equal(
+    resolveEntry("shell-fn:../x.sh#f", REPO_ROOT).reason,
+    "outside-repo-root",
+  );
+  assert.equal(
+    resolveEntry("shell-fn:node_modules/x/y.sh#f", REPO_ROOT).reason,
+    "outside-repo-root",
+  );
+  assert.equal(
+    resolveEntry(`shell-fn:${FN_LIB}\u0000#f`, REPO_ROOT).reason,
+    "bad-entry",
+  );
+  let r;
+  assert.doesNotThrow(() => {
+    r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:shared/resources/gh-labels\u0000.sh#f`,
+      cases: LABEL_CASES,
+    });
+  });
+  assert.equal(r.reason, "bad-entry");
+});
+
+test("shell-fn entry: gh_labels_filter engages against the label cases behind the fake gh, executed = cases × shells", () => {
+  const shells = probeShells();
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: FN_ENTRY,
+    cases: LABEL_CASES,
+    fakeGh: FAKE_GH,
+  });
+  assert.equal(
+    r.verdict,
+    "engages",
+    JSON.stringify(
+      {
+        reason: r.reason,
+        declined: r.declined,
+        cases: r.cases.filter((c) => c.detail),
+      },
+      null,
+      1,
+    ),
+  );
+  assert.deepEqual(r.shells, [...shells]);
+  assert.equal(r.executed, LABEL_CASES.length * shells.length);
+  assert.equal(r.declined.length, 0, JSON.stringify(r.declined));
+  assert.deepEqual(r.reproduced, []);
+  assert.deepEqual(r.overblocked, []);
+  assert.equal(r.escapes.length, 0, JSON.stringify(r.escapes));
+  assert.equal(r.fakeGh, join(REPO_ROOT, FAKE_GH));
+});
+
+test("shell-fn entry: the shell: form run against the same library is the task.125 result — sourced, never called", () => {
+  // The pre-task shape: `bash gh-labels.sh <fixture-dir>` defines the function
+  // and exits 0 with nothing on stdout. Every legitimate case mismatches, the
+  // function's filtering branch never runs, and the count looks complete.
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: `shell:${FN_LIB}`,
+    cases: LABEL_CASES,
+    fakeGh: FAKE_GH,
+  });
+  assert.notEqual(r.verdict, "engages");
+  assert.equal(r.executed, LABEL_CASES.length * probeShells().length);
+  assert.ok(r.overblocked.length > 0, "every legitimate label is dropped");
+});
+
+test("shell-fn entry: a function that echoes every argument unfiltered is absent", () => {
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: `shell-fn:${FN_FIXTURES}/echo-unfiltered.sh#echo_all`,
+    cases: LABEL_CASES,
+    fakeGh: FAKE_GH,
+  });
+  assert.equal(r.verdict, "absent", JSON.stringify(r.declined));
+  assert.equal(r.reason, "no-hostile-case-was-rejected");
+  assert.equal(r.executed, LABEL_CASES.length * probeShells().length);
+  // Every hostile case is reproduced under every shell, and the ids say which.
+  for (const shell of probeShells()) {
+    assert.ok(
+      r.reproduced.includes(`label.undefined-label@${shell}`),
+      `undefined label not reproduced under ${shell}`,
+    );
+  }
+});
+
+test("shell-fn entry: a library that fails to source is declined with exit 97 on every case, never scored", () => {
+  // A syntax error in the library makes `source` fail. Exit 97 is reserved for
+  // that so the failure is a NAMED decline rather than a silent `absent` — and
+  // the fixture is written at test time, because a tracked `.sh` with a syntax
+  // error would fail the ShellCheck lane by design.
+  const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, ".t136-source-"));
+  try {
+    const lib = join(dir, "syntax-error.sh");
+    writeFileSync(lib, "#!/usr/bin/env bash\nbroken() {\n  if [ 1 ]; then\n", {
+      mode: 0o644,
+    });
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, lib)}#broken`,
+      cases: LABEL_CASES,
+      fakeGh: FAKE_GH,
+    });
+    assert.equal(r.verdict, "unverifiable");
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.executed, 0, "a source failure is not an execution");
+    assert.match(r.declined[0].detail, /source .* failed \(exit 97\)/);
+    assert.equal(r.cases.length, LABEL_CASES.length * probeShells().length);
+    assert.ok(
+      r.cases.every((c) => c.outcome === "errored" && /exit 97/.test(c.detail)),
+      JSON.stringify(r.cases.slice(0, 2)),
+    );
+    assert.deepEqual(r.shells, [...probeShells()]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: a function the library does not define is declined, not scored as a 127 mismatch", () => {
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: `shell-fn:${FN_LIB}#no_such_function`,
+    cases: LABEL_CASES,
+    fakeGh: FAKE_GH,
+  });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "entry-not-probeable");
+  assert.equal(r.executed, 0);
+  assert.match(r.declined[0].detail, /no_such_function.*not defined/);
+});
+
+test("shell-fn entry: --fake-gh must name a directory holding an executable gh, else bad-fake-gh before anything spawns", () => {
+  for (const bad of [
+    "tests/fixtures/does-not-exist",
+    FN_FIXTURES, // a directory with no gh in it
+    `${FAKE_GH}/gh`, // the file, not its directory
+  ]) {
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: FN_ENTRY,
+      cases: LABEL_CASES,
+      fakeGh: bad,
+    });
+    assert.equal(r.verdict, "unverifiable", bad);
+    assert.equal(r.reason, "bad-fake-gh", bad);
+    assert.equal(r.executed, 0, bad);
+    assert.equal(r.cases.length, 0, `${bad}: nothing may spawn`);
+  }
+  // Outside the repo root is refused by the same containment as an entry.
+  const r = runProbeSpec({
+    sink: "filename",
+    entry: FN_ENTRY,
+    cases: LABEL_CASES,
+    fakeGh: "/usr/bin",
+  });
+  assert.equal(r.reason, "bad-fake-gh");
+});
+
+test("shell-fn entry: the fake gh refuses to answer outside the probe (FAKE_GH unset)", () => {
+  // The engine sets FAKE_GH=1 for the run it owns. Anywhere else — a shell
+  // whose PATH was left pointing at the fixture — the fake exits 2 by name.
+  const gh = join(REPO_ROOT, FAKE_GH, "gh");
+  const bare = spawnSync(
+    gh,
+    ["label", "list", "--json", "name", "-q", ".[].name"],
+    {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    },
+  );
+  assert.equal(bare.status, 2);
+  assert.match(bare.stderr, /FAKE_GH unset/);
+  const armed = spawnSync(
+    gh,
+    ["label", "list", "--json", "name", "-q", ".[].name"],
+    {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, FAKE_GH: "1" },
+    },
+  );
+  assert.equal(armed.status, 0);
+  assert.equal(
+    armed.stdout,
+    "priority:high\npriority:medium\npriority:low\ntask\nbug\n",
+  );
+  const json = spawnSync(gh, ["label", "list", "--json", "name"], {
+    encoding: "utf8",
+    env: { PATH: process.env.PATH, FAKE_GH: "1" },
+  });
+  assert.deepEqual(
+    JSON.parse(json.stdout).map((l) => l.name),
+    ["priority:high", "priority:medium", "priority:low", "task", "bug"],
+  );
+  const other = spawnSync(gh, ["repo", "view"], {
+    encoding: "utf8",
+    env: { PATH: process.env.PATH, FAKE_GH: "1" },
+  });
+  assert.equal(other.status, 2);
+  assert.match(other.stderr, /unsupported subcommand: repo view/);
+});
+
+test("shell-fn entry: the CLI form runs with --cases-file and --fake-gh and records fake_gh on the entry", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-shell-fn-cli-"));
+  try {
+    const record = join(dir, "run.json");
+    const out = [];
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (chunk) => (out.push(String(chunk)), true);
+    let rc;
+    try {
+      rc = main([
+        "--sink",
+        "filename",
+        "--entry",
+        FN_ENTRY,
+        "--cases-file",
+        join(REPO_ROOT, FN_FIXTURES, "gh-labels.cases.json"),
+        "--fake-gh",
+        FAKE_GH,
+        "--record",
+        record,
+        "--name",
+        "gh_labels_filter",
+        "--repo-root",
+        REPO_ROOT,
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+    assert.equal(rc, 0, out.join(""));
+    assert.match(out.join(""), /^engages .* executed (\d+)/);
+    const control = readRecord(record).controls[0];
+    assert.equal(control.entry, FN_ENTRY);
+    assert.equal(control.fake_gh, join(REPO_ROOT, FAKE_GH));
+    assert.deepEqual(control.shells, [...probeShells()]);
+    assert.equal(control.executed, LABEL_CASES.length * probeShells().length);
+    // A JS-form entry carries no fake_gh.
+    assert.equal(
+      toRecordEntry(
+        runProbeSpec({
+          sink: "url-authority",
+          entry: entry("engaging-control"),
+        }),
+      ).fake_gh,
+      null,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: --fake-gh without an operand, and an unreadable directory, are argument errors", () => {
+  const err = [];
+  const write = process.stderr.write.bind(process.stderr);
+  process.stderr.write = (chunk) => (err.push(String(chunk)), true);
+  try {
+    assert.equal(
+      main(["--sink", "filename", "--entry", FN_ENTRY, "--fake-gh"]),
+      2,
+    );
+  } finally {
+    process.stderr.write = write;
+  }
+  assert.match(err.join(""), /--fake-gh requires an operand/);
 });

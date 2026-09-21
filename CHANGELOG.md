@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`security-probe.mjs` — a `shell-fn:<path>#<function>` entry form and a `--fake-gh <dir>`
+  affordance (task.136, obs #138).** The `shell:` form runs a script; a **sourced library** — a file
+  whose header says *source it* and whose function is then called, which is what `gh-labels.sh`
+  is and what nine GitHub skills source — run through it defines its function and exits 0 with
+  nothing on stdout, so every case mismatched and the finalise security gate on task.125 recorded
+  `absent` behind a full count (28 identical `"" ≠ "12\n"`), forcing a human override. `shell-fn:`
+  sources the file and calls the function with each case as argv under bash and zsh (rc files off
+  on top of the sandbox `HOME`), reusing the `shell:` arm's materialisation, shells, timeout and
+  verdict; exit 97 (source failed) and 98 (function not defined) are reserved and fold into one
+  named `entry-not-probeable` decline. `--fake-gh <dir>` prepends a directory holding an executable
+  `gh` to `PATH` with `FAKE_GH=1` in the env, so a function that consults `gh` is answered by a
+  fixture rather than the network; it is validated before anything spawns (`bad-fake-gh`) and
+  recorded as `fake_gh` on the run. This repository's fixture is `tests/fixtures/fake-gh/gh`
+  (answers `label list` — one name per line under `-q`, JSON otherwise — and `issue create`;
+  refuses everything else and refuses to run without `FAKE_GH=1`). A function's `expected` is not
+  the sink corpus's, so the run names a cases file: `tests/fixtures/shell-fn/gh-labels.cases.json`
+  is the one for `gh_labels_filter`, read by both the green test row and the documented finalise
+  command. The rule's header signal for telling the two shell forms apart is stated once in
+  `probe-boundary-rule.md` §5; the finalise and security-review prompts and both QA Step 3b sites
+  cite it, and `probe-boundary-signals.test.mjs` now fails on a site that names `shell:` without
+  `shell-fn:` and `--fake-gh`. Evidence from the live run: `engages`, executed 20 (10 cases × 2
+  shells), reproduced 0, escaped 0.
+
 ## [v0.49.0] - 2026-09-21
 
 ### Added

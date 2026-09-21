@@ -168,7 +168,7 @@ Declining conditions, each reported with its reason:
 - **A symlink that points out of the tree resolves at import time**, after the
   path check. Node offers no cheap pre-import realpath guarantee for a path that
   may not yet exist. This is a limit, not a defence.
-- **The engine reaches two entry forms, and "not importable" is not a decline.**
+- **The engine reaches three entry forms, and "not importable" is not a decline.**
   `path#export` imports a JS module; `shell:path` runs a **shell script that
   takes one positional argument** — `bash <script> <fixture-dir>` per case, under
   bash and (when the host has it) zsh, with the script and directory passed as
@@ -182,6 +182,39 @@ Declining conditions, each reported with its reason:
   gates at `probes_executed: 0` against a script that says it refuses rather
   than guesses); the shell form is what removes that reason for zero. It does
   not soften the guard: zero executed is still `unverifiable`.
+
+  **`shell-fn:path#function` sources a library and calls the function** with the
+  case's input as its argv, per case under the same shells, with rc files off
+  (`bash --noprofile --norc` / `zsh -f`) on top of the sandbox `HOME` — because
+  this form sources *into* the shell, where `shell:` only ever runs `bash
+  <script>`. **The header signal that tells the two shell forms apart:** a file
+  whose header says *source it* (`source references/x.sh || exit 1`, then call
+  `fn`), or that defines functions and makes **no top-level call**, is a
+  library — probe it with `shell-fn:`. Run through `shell:` such a file defines
+  its function and exits 0 with nothing on stdout, so every case mismatches and
+  the verdict reads `absent` behind a full count with `escaped 0` — **the
+  task.125 result** (`gh-labels.sh#gh_labels_filter`, 28 identical `"" ≠ "12\n"`
+  mismatches, a human override at the gate). Two consequences the caller owns:
+  - **A function's `expected` is not the sink corpus's.** The `filename` corpus
+    describes a script that prints the highest gate number; a label filter never
+    prints `12`. Name a cases file with `--cases-file <path>` whose `expected`
+    is the function's own contract (`tests/fixtures/shell-fn/gh-labels.cases.json`
+    is the one for `gh_labels_filter`); keep `--sink filename` — it selects the
+    materialised fixture directory the runner runs in.
+  - **A function whose body names `gh` is answered by a fixture, not the
+    network:** add `--fake-gh <dir>`, a directory holding an executable `gh`
+    (this repository's is `tests/fixtures/fake-gh`; a consumer supplies its
+    own). The engine prepends it to `PATH` with `FAKE_GH=1` in the env — the
+    fixture refuses to run without that variable — validates it before anything
+    spawns (`bad-fake-gh` otherwise), and records it as `fake_gh` on the run.
+    Without it the run does not hang: the real `gh` fails from the sandbox cwd,
+    the function takes its no-labels path, and the record names the mismatch.
+
+  Exit 97 is reserved for "the source itself failed" and 98 for "the function
+  is not defined after sourcing"; both fold into one `entry-not-probeable`
+  decline that names the library, never into a scored `absent`. A stdin-reading
+  function, or one needing more than argv, is still declined (§ Out of Scope,
+  task.128).
 - **What is still declined, and recorded as declined:** a script that reads
   stdin, takes more than one positional, or must open a socket; a live database
   sink; anything that needs the network. These are limits of the entry forms,

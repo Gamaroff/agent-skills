@@ -192,6 +192,11 @@ test("every site that names the JS entry form also names the shell entry form", 
   }
   const jsForm = /--entry\s+'[^']*#<?[A-Za-z]*(?:export|exportName|Options)>?'/;
   const shellForm = /--entry\s+'shell:/;
+  // task.136: a site that routes a bash SCRIPT must also route a sourced
+  // LIBRARY, or a reader of gh-labels.sh has a form that sources it and exits
+  // (the task.125 result) and no route to the one that calls the function.
+  const shellFnForm = /--entry\s+'shell-fn:/;
+  const fakeGh = /--fake-gh/;
   let sites = 0;
   for (const rel of files) {
     let text;
@@ -205,6 +210,14 @@ test("every site that names the JS entry form also names the shell entry form", 
     assert.ok(
       shellForm.test(text),
       `${rel} names the JS entry form but not the shell one — a reader of a bash boundary has no route from this site`,
+    );
+    assert.ok(
+      shellFnForm.test(text),
+      `${rel} names the shell entry form but not shell-fn: — a reader of a sourced library has no route from this site (task.136)`,
+    );
+    assert.ok(
+      fakeGh.test(text),
+      `${rel} names shell-fn: but not --fake-gh — a function that consults gh has no offline route from this site`,
     );
   }
   assert.ok(

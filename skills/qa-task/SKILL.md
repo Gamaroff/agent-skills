@@ -478,7 +478,12 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    refuses / never guesses / fails closed is one by its own words), the shell entry form with the
    same flags: `--entry 'shell:<path>' --sink filename`. "It is bash, not JS" is a reason to use
    that form, never a reason to record `boundary: false` (task.121: five gates at
-   `probes_executed: 0` against `qa-cycle.sh`).
+   `probes_executed: 0` against `qa-cycle.sh`). A **sourced library** (a header that says *source
+   it*, or functions with no top-level call; the signal is stated once in
+   `references/probe-boundary-rule.md` §5) takes the shell-fn form instead:
+   `--entry 'shell-fn:<path>#<function>' --sink filename --cases-file <cases.json>`, plus
+   `--fake-gh <dir>` when the function's body names `gh` — running `shell:` against a library is
+   the task.125 result: sourced, never called, `absent` behind a full count.
    It takes the candidates from `references/security-input-corpus.mjs` (`corpusFor(<sink>)`)
    itself, imports the entry point in a sandboxed child — or materialises each case as a fixture
    directory and runs the script against it under bash and zsh — and scores each candidate.

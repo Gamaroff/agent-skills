@@ -45,7 +45,7 @@ Signals — any **one** is sufficient:
 - a named allow-list or deny-list in any form (array, regex alternation, `switch`, set membership)
 - a function whose own tests are mostly of the shape "X is refused"
 - a work-item document whose Success Criteria contain *never*, *must not*, *fails closed*, or *refused*
-- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form (Step 4), never to `boundary: false`
+- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form — or, for a **sourced library** (a header that says *source it*, or functions with no top-level call), the `shell-fn:path#function` form with `--cases-file` and, when the body names `gh`, `--fake-gh` (Step 4; the signal that tells the two apart is stated once, in `probe-boundary-rule.md` §5) — never to `boundary: false`
 
 The list is data as well as prose: `probe-boundary-signals.mjs` (beside `security-probe.mjs`) exports it, and `classifyBoundaryText` applies the text-shaped signals to a header or a criteria section. Five QA gates on task.121 read a bash script that says "refuses rather than guesses" and recorded no boundary, because every signal above the last one is JS-shaped; the last one is what a script's own words match.
 
@@ -154,6 +154,19 @@ node PROMPT_DIR/security-probe.mjs \
   --sink filename --entry 'shell:<path-from-repo-root>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
   --record <STORY_DIR>/<stem>.dod.security.run.json --json
+
+# A SOURCED LIBRARY boundary (header says "source it", or functions with no
+# top-level call — probe-boundary-rule.md §5 has the signal) takes the shell-fn
+# form: the file is sourced and the function called with each case as argv.
+# Its `expected` is the function's own contract, so name a cases file; and a
+# function that consults `gh` is answered by the fixture on --fake-gh, never
+# the network. `shell:` against a library sources it and exits — every case
+# mismatches, `absent` with a full count (task.125).
+node PROMPT_DIR/security-probe.mjs \
+  --sink filename --entry 'shell-fn:<path-from-repo-root>#<function>' \
+  --cases-file <path-to-cases.json> --fake-gh <dir-holding-an-executable-gh> \
+  --repo-root "$(git rev-parse --show-toplevel)" \
+  --record <STORY_DIR>/<stem>.dod.security.run.json --json
 ```
 
 The engine imports the entry in a sandboxed child, calls it on every corpus case for the sink —
@@ -166,7 +179,9 @@ more than one argument, anything networked) is `verdict: unverifiable` with `exe
 takes the zero-guard below — say why in `summary`, do not fall back to a hand-written harness,
 because a count from a harness is the self-report this step removed. **"It is a bash script" is not
 such a reason**: that is the `shell:` form's case, and recording it as unverifiable is the task.121
-outcome this form exists to end.
+outcome this form exists to end. **Nor is "it is a sourced function"**: that is the `shell-fn:`
+form's case, and running `shell:` against a library instead is the task.125 outcome — `absent`
+behind a full count — that *that* form exists to end.
 
 **4. Report only what reproduced — but count everything you ran.** A candidate you did not run is not a
 finding. A candidate that ran and returned its expected verdict is not a finding either. `probes[]`
