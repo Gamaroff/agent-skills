@@ -1,0 +1,13 @@
+{
+  "$comment": "Story→surface placement for the UAT tracker. Surfaces are the sections of the tracker (letters must be unique capitals). epicSurface maps an epic number to a surface letter; storySurface overrides one story; stories in excludedPrds (directory names under the stories root) are not part of the product to accept. defaultSurface catches unmapped epics. toolPath is how the tracker's own instructions name this tool.",
+  "toolPath": ".agents/skills/qa-next/scripts/uat-status.mjs",
+  "excludedPrds": [],
+  "defaultSurface": "Z",
+  "surfaces": [
+    { "letter": "A", "title": "Platform Shell & Navigation" },
+    { "letter": "B", "title": "Core Feature Area" },
+    { "letter": "Z", "title": "Unmapped — place these rows" }
+  ],
+  "epicSurface": { "1": "A" },
+  "storySurface": {}
+}

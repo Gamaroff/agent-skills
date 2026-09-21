@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`qa-next` — a UAT loop, sibling of `develop-next`.** `/develop-next` ends at `status: accepted`,
+  which is the pipeline's Definition of Done — an agent's signature. Nobody had a place to record the
+  *owner's* signature that a feature is the one that was wanted. `qa-next` keeps that in a separate
+  tracker (`docs/qa/uat-tracker.md`, one row per accepted story, grouped by QA surface) and works it
+  one story per iteration: select the first `⬜ untested` row, resolve the story's ACs to executable
+  checklist items (authoring them into the surface checklist when none exist), execute them against a
+  configured environment with browser automation + HTTP probes, write `runs/<date>-<env>-<id>.md`,
+  record `🟡 pass` / `❌ fail` (bug filed via `create-bug-report`) / `⏸ blocked`, commit, report.
+  It never writes `✅ accepted` — that is `uat-status.mjs --accept`, the owner's command, and only
+  from 🟡. Story status is never touched: a UAT failure is a bug, not a lifecycle regression.
+  `scripts/uat-status.mjs` (`--init`/`--sync`/`--check`/`--next`/`--set`/`--verified`/`--accept`,
+  scoreboard) is project-agnostic; the epic → surface placement lives in the consumer's
+  `uat-surfaces.json`, scaffolded on first `--init`. `--check` is a gate: 🟡/✅/❌ need a run link that
+  resolves, ❌ a bug link that resolves, ⏸/➖ a note, every accepted story exactly one row. 12 unit +
+  CLI end-to-end tests under `evals/qa-next/unit/`. Config: `qaNext:` block.
+
 - **The code reviewer asks "who binds this?" of every defaulted read a diff adds, and a repo test
   walks the whole population (task 132; obs #133).** `code-review-prompt.md` gains check **E —
   unbound reads in executed prose**: a `${NAME:-default}`, `${NAME:?}` or bare `$NAME` in a
@@ -42,7 +58,6 @@ All notable changes to this project will be documented in this file. Format foll
   a regression from before task.121; the loop knows its cycle and now states it
   (`Skill(qa-fix, args="{bug-file} fix_cycle={N}")`). `tests/qa-cycle.test.js` executes the block:
   empty directory + arg → `qa-fix-2`; empty + no arg → refuses; gate + arg → the arg wins.
-
 - **A refusing shell script is a boundary the probe engine can reach, and finalise has a bounded
   third exit (task 128; obs #121).** `security-probe.mjs` gains the **`shell:<path>` entry form**:
   a bash script taking one positional argument is run as `bash "$1" "$2"` — argv, never a string —
