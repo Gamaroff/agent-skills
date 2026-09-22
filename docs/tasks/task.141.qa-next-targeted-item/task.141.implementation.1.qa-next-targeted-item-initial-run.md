@@ -111,6 +111,11 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
   posted to the PR); and the cycle-4 commit linked a QA report that had never been written, which CI
   caught on `link-check` while the local `npm test` — run before the link was added — was green.
 - Steps 5–6: the QA loop halted at its budget. See the Loop Escalation entry.
+- **QA loop re-entry: 2 extra cycles granted** (operator, 2026-09-22); 0 cycle(s) run outside the
+  loop back-filled from disk — the five gates on disk match the five `### QA Cycle`-equivalent
+  entries, so the reconstructed count is 5 and `qa_max_cycles` is **7**, not a literal `5 + 2`.
+  Lock restored from the halt snapshot by `grant-qa-cycles.sh`; `qa_phase` set to `5a`.
+  Cycle 6's remit is bounded: review the four cycle-5 fixes.
 
 ---
 
