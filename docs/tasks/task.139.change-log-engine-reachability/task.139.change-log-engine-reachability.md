@@ -6,7 +6,7 @@ description: "Make `references/change-log.js` ship with every skill whose SKILL.
 tags: [bundler, change-log, develop, parity-test, observation-152]
 category: infrastructure
 status: planned
-priority: Medium
+priority: High
 created: 2026-09-22
 updated: 2026-09-22
 assignee:
@@ -274,15 +274,13 @@ None.
 - **Non-critical**: wording of the floor's failure message.
 
 ---
-
-## Change Log
-
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-09-22 | 1.0 | Initial draft — obs #152 (task.136 instance); the `create-skill` UNREACHED rule names this exact case and its remedy | create-task |
-
+| 2026-09-22 |  | Priority Medium → High (owner decision); issue label and board priority updated | edit-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

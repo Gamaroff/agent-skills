@@ -6,7 +6,7 @@ description: "Close the seven limits task.136's QA cycle 3, PR review and finali
 tags: [security, probe, shell-fn, fake-gh, shellcheck, task-136-follow-up]
 category: infrastructure
 status: planned
-priority: Medium
+priority: High
 created: 2026-09-22
 updated: 2026-09-22
 assignee:
@@ -293,15 +293,13 @@ None.
 - **Non-critical**: wording in §5.
 
 ---
-
-## Change Log
-
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-09-22 | 1.0 | Initial draft — the seven limits recorded on task.136 (gate 3 `future`, PR review CR-1/CR-3, DoD SC5) with the reviewers' verified fixes | create-task |
-
+| 2026-09-22 |  | Priority Medium → High (owner decision); issue label and board priority updated | edit-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
