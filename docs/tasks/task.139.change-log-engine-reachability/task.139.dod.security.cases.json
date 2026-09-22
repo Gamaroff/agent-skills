@@ -1,0 +1,146 @@
+[
+  {
+    "id": "path.dot-dot-relative",
+    "sink": "path",
+    "input": "../secrets.env",
+    "why": "One level of traversal leaves the intended directory. The simplest case, and the one a containment check is usually written against.",
+    "correct": "Resolve against the root, then assert the result is inside the root before any filesystem call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "path.dot-dot-deep",
+    "sink": "path",
+    "input": "../../../../etc/passwd",
+    "why": "Enough levels to reach the filesystem root from anywhere, so the depth of the intended directory provides no protection.",
+    "correct": "Resolve and assert containment. Do not count directory levels.",
+    "direction": "hostile"
+  },
+  {
+    "id": "path.absolute",
+    "sink": "path",
+    "input": "/etc/passwd",
+    "why": "An absolute path discards the root when resolved — `path.join(root, '/etc/passwd')` keeps the root, but `path.resolve(root, '/etc/passwd')` does not, and which one the code used is easy to misread.",
+    "correct": "Reject absolute inputs explicitly, then resolve and assert containment.",
+    "direction": "hostile"
+  },
+  {
+    "id": "path.encoded-traversal",
+    "sink": "path",
+    "input": "..%2f..%2fetc%2fpasswd",
+    "why": "The containment check sees no `/` and passes; a later decode — in a router, a client, or the code itself — re-introduces the traversal after the check has already run.",
+    "correct": "Decode fully before validating, and validate immediately before use.",
+    "direction": "hostile"
+  },
+  {
+    "id": "path.symlink-escape",
+    "sink": "path",
+    "input": "uploads/link-to-etc/passwd",
+    "why": "Every component is inside the root lexically, and the filesystem resolves `link-to-etc` somewhere else. A `path.resolve` check is satisfied by a string the kernel does not agree with. **This case needs filesystem setup to discriminate**: without the symlink present, a realpath-checking implementation and one that skips realpath return the same verdict, so the input alone proves nothing.",
+    "correct": "realpath the resolved path — following symlinks — and re-assert containment on the result. To probe it, first create the fixture: a directory `<root>/uploads` containing a symlink `link-to-etc` → `/etc`. Then a correct implementation rejects; one that only resolves lexically accepts.",
+    "direction": "hostile"
+  },
+  {
+    "id": "path.null-byte",
+    "sink": "path",
+    "input": "safe.txt\u0000.png",
+    "why": "An extension check passes on `.png` while syscall layers that truncate at NUL open `safe.txt`. The validated string and the opened file are different strings.",
+    "correct": "Reject any input containing a NUL before any filesystem call or extension check.",
+    "direction": "hostile"
+  },
+  {
+    "id": "path.prefix-not-boundary",
+    "sink": "path",
+    "input": "../data-evil/x",
+    "why": "With root `/srv/data` this resolves to `/srv/data-evil/x`, which `startsWith('/srv/data')` accepts. The check passes on a sibling directory that merely shares a prefix.",
+    "correct": "Compare on a separator boundary — `resolved === root || resolved.startsWith(root + path.sep)`.",
+    "direction": "hostile"
+  },
+  {
+    "id": "path.empty",
+    "sink": "path",
+    "input": "",
+    "why": "Resolves to the root itself, so an operation meant for one file targets the whole directory — a delete or a chmod then applies to everything under it.",
+    "correct": "Reject empty input explicitly; a containment check alone accepts it.",
+    "direction": "hostile"
+  },
+  {
+    "id": "work-item-doc.task",
+    "sink": "path",
+    "input": "docs/tasks/task.1.x/task.1.x.md",
+    "why": "The ordinary task document, repo-root-relative under docs/ — the shape /finalise Step 8a's docs-link clause names in `documentPath`.",
+    "correct": "Accept: it is a work item document and may admit itself to the fix scope.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "work-item-doc.story",
+    "sink": "path",
+    "input": "docs/prd/a/b/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md",
+    "why": "A story nests under its epic under the PRD root; the depth is free.",
+    "correct": "Accept.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "work-item-doc.epic",
+    "sink": "path",
+    "input": "docs/prd/a/b/epics/epic.2.x/epic.2.x.md",
+    "why": "An epic document.",
+    "correct": "Accept.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "work-item-doc.bug",
+    "sink": "path",
+    "input": "docs/bugs/bug.3.z/bug.3.z.md",
+    "why": "A general bug report.",
+    "correct": "Accept.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "work-item-doc.artifact-qa",
+    "sink": "path",
+    "input": "docs/tasks/task.1.x/task.1.qa.1.x.md",
+    "why": "A QA report shares the document's stem and directory; admitting it would let a fix rewrite the QA record under the document's name.",
+    "correct": "Reject: the `.qa.` segment marks a pipeline artifact, not the document.",
+    "direction": "hostile"
+  },
+  {
+    "id": "work-item-doc.artifact-dod",
+    "sink": "path",
+    "input": "docs/tasks/task.1.x/task.1.dod.3.x.md",
+    "why": "The DoD running summary beside the document — the file this very run is writing.",
+    "correct": "Reject.",
+    "direction": "hostile"
+  },
+  {
+    "id": "work-item-doc.outside-docs",
+    "sink": "path",
+    "input": "src/task.1.x.md",
+    "why": "A task-shaped filename outside docs/ is not a work item.",
+    "correct": "Reject.",
+    "direction": "hostile"
+  },
+  {
+    "id": "work-item-doc.readme",
+    "sink": "path",
+    "input": "README.md",
+    "why": "Any other file — the cycle-4 CR-2 case: a `documentPath` that names a non-document must not admit itself.",
+    "correct": "Reject.",
+    "direction": "hostile"
+  },
+  {
+    "id": "work-item-doc.traversal-inside",
+    "sink": "path",
+    "input": "docs/tasks/task.1.x/../task.1.x.md",
+    "why": "Traversal inside an otherwise well-formed docs path; the regex alone would accept it since `..` is a legal `[^/]+` component.",
+    "correct": "Reject on the `..` component.",
+    "direction": "hostile"
+  },
+  {
+    "id": "work-item-doc.null-byte-inside",
+    "sink": "path",
+    "input": "docs/tasks/task.1.x/task.1.x.md\u0000.md",
+    "why": "A null byte is not `/`, so `[^/]+\\.md$` matches; the shape check alone lets it through.",
+    "correct": "Reject: a path with a null byte names nothing.",
+    "direction": "hostile"
+  }
+]

@@ -784,6 +784,28 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      Measured on task.82: five anchors, every path right, every line number wrong within seven days.
      Report a drifted anchor as **Optional** with the corrected number — the claim is true, the
      coordinate moved. (obs #22)
+   - **Relative Markdown links resolve from the document's own directory, not from wherever the
+     text was copied.** A path check asks "does the cited file exist somewhere"; a link check asks "does the
+     link target resolve from *this* file's directory", and only the second is what CI's
+     `docs-link-check` asks. On task.139 the task document quoted `develop/SKILL.md` verbatim — including
+     the skill's own relative link — and the dead link survived this review, two QA cycles and the PR
+     review, failing only in CI. Run the engine (`references/doc-links.js`, bundled beside this
+     skill); it resolves against the **tracked** tree from the repository root, skips fences and
+     code spans, and treats a fence that never closes as a finding:
+
+     ```bash
+     # From the REPOSITORY ROOT, like every engine call in this skill — a helper a fenced
+     # block executes is addressed as .agents/skills/<skill>/references/<file>, never bare
+     # references/<file>, which resolves only from inside the skill directory (create-skill).
+     node .agents/skills/review-task/references/doc-links.js --file "{resolved task file path}"
+     ```
+
+     It exits 0 when every relative link resolves and 1 with one `✖ file:line → target` per dead
+     link (or per fence that never closes); add `--json` for a machine-readable `broken[]`.
+
+     Report each dead link as **Important** with the line and the fix — a quotation that carries a
+     link is wrapped in backticks so it reads as text, a real cross-reference gets the right relative
+     path. (obs #154)
 
 3. **API Pattern Accuracy**:
    - Verify endpoints match REST API patterns or GraphQL schemas

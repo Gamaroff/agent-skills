@@ -20,6 +20,8 @@
  *     "commits": 1,                             // commits the fix takes
  *     "touched": ["lib/x.sh"],                  // paths the fix changes
  *     "filesSummary": ["lib/x.sh"],             // the work item's Files Summary / File List
+ *     "documentPath": "docs/tasks/task.1.x/task.1.x.md",   // optional: the work item document —
+ *                                               // always inside its own scope (finalise 8a docs-link clause)
  *     "mutationProof": { "test": "tests/x.test.js", "redOnRevert": true,
  *                        "run": ".claude/state/mutation-proof.log" },   // the recorded red run
  *     "otherFindingsOpen": []                   // medium+ findings, or other FAIL sections
@@ -58,6 +60,21 @@ export const PRECONDITIONS = Object.freeze(
 );
 
 const isList = (v) => Array.isArray(v);
+
+/** A repo-relative path to a task / story / epic / bug document under docs/. */
+const WORK_ITEM_DOC_RE =
+  /^docs\/(?:[^/]+\/)*(?:task\.\d+|story\.\d+\.\d+|epic\.\d+|bug\.\d+)\.[^/]+\.md$/;
+// A pipeline artifact beside the document (its QA report, gate, DoD, plan,
+// review…) shares the stem and is NOT the document.
+const WORK_ITEM_ARTIFACT_RE =
+  /\.(qa|gate|bug|implementation|review|dod|plan|handover|pr-review|risk|test-design)\./;
+export const isWorkItemDocument = (p) =>
+  typeof p === "string" &&
+  WORK_ITEM_DOC_RE.test(p) &&
+  !WORK_ITEM_ARTIFACT_RE.test(p.slice(p.lastIndexOf("/") + 1)) &&
+  !p.includes("..") &&
+  // A null byte is not `/`, so the regex alone accepts `task.1.x.md\0.md`.
+  !p.includes("\0");
 
 /** What a recorded red run looks like from node:test, bash test harnesses, or a
  *  hand-run assertion: a TAP `not ok`, the runner's ✖, or a `fail` count > 0. */
@@ -130,7 +147,19 @@ const CHECKS = Object.freeze({
       return "no `touched` paths recorded";
     }
     if (!isList(f.filesSummary)) return "no `filesSummary` recorded";
-    const outside = f.touched.filter((p) => !f.filesSummary.includes(p));
+    // The work item's own document is inside its own scope by construction —
+    // a Files Summary lists what the work changes, not the file it lives in —
+    // so a record that names it as `documentPath` may touch it (8a docs-link
+    // clause, task.139 QA cycle 3 CR-5). Only that one path; anything else
+    // still has to be listed.
+    // `documentPath` admits ONE path, and only a path shaped like a work item
+    // document under docs/ — a record naming README.md as its "document" is a
+    // declaration, not a fact, and the precondition would be satisfied by
+    // saying so (task.139 QA cycle 4, CR-2).
+    const inScope = (p) =>
+      f.filesSummary.includes(p) ||
+      (isWorkItemDocument(f.documentPath) && p === f.documentPath);
+    const outside = f.touched.filter((p) => !inScope(p));
     return outside.length === 0
       ? null
       : `outside the Files Summary: ${outside.join(", ")}`;

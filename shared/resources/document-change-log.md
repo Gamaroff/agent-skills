@@ -189,7 +189,7 @@ pairs and the insertion point; a writing skill calls it:
 ```bash
 command node -e '
   const fs = require("fs");
-  const CL = require("./.agents/skills/{skill}/references/change-log.js");
+  const CL = require("./.agents/skills/{develop|finalise}/references/change-log.js");
   const [file, date, version, description, author] = process.argv.slice(1);
   let c = fs.readFileSync(file, "utf8");
   c = CL.upsertChangeLog(c, { date, version, description, author });
@@ -204,6 +204,17 @@ mandatory section when there is none), preserves rows it does not recognise, mig
 same write — the two edits the contract requires to be one. The `version` argument is `""` for
 every machine writer and the bumped minor for `finalise`. A writer that cannot reach the engine
 (no `node`) reports that as a skipped step; it does not fall back to a regex.
+
+The braces are not a placeholder. `{develop|finalise}` is the alternation the bundler follows out of
+shared text (`create-skill` § "A bundled copy nothing reaches is `UNREACHED`"): it names every skill
+whose **prose runs this one-liner**, and naming a skill there is what makes the bundler ship
+`references/change-log.js` with it. Other skills may carry the engine too — transitively, because a
+`.js` they bundle for another reason `require`s it — but that is incidental and can change with the
+next refactor; the alternation is the only declaration. A bare `{skill}` names no skill and is skipped
+by design, which is how `develop` came to instruct this call without carrying the module (task.139,
+obs #152). `tests/change-log-engine-reachability.test.js` keeps the list equal to the skills whose
+prose says "through `change-log.js`". **Name your skill here when you add a writer**, and
+substitute your own name for the group when you run it.
 
 ## Exclusions
 

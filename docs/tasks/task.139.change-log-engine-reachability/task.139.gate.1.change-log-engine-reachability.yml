@@ -1,0 +1,79 @@
+schema: 1
+task: 'task.139.change-log-engine-reachability'
+task_title: 'The Change Log engine is unreachable from a skill whose prose runs it: spell the writer alternation and pin engine reachability with a parity test'
+gate: CONCERNS
+status_reason: 'Implementation is complete and every phase verifies (3/3 tests green, bundle:check clean, ci:fast 3890/3890), but the diff code review found two high-confidence correctness defects: the contract paragraph asserts a population fact that is false for 24 skills, and the population regex misses the line-wrapped spelling of the instruction that develop/SKILL.md already carries.'
+reviewer: 'QA Engineer'
+updated: '2026-09-22T05:48:45Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/document-change-log.md'
+    finding: 'New paragraph (line ~210) says every skill named in {develop|finalise} ships references/change-log.js "and no other does" — false: 24 skills outside the alternation carry it transitively via JS_SIBLING_RE (create-*, qa-*, review-*, sync-jira-*, bug skills, develop-*). Re-rendered into 42 bundled copies.'
+    suggested_action: 'Reword: the alternation is the set of skills whose PROSE runs the engine; other skills may carry it transitively through a bundled .js that requires it.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'tests/change-log-engine-reachability.test.js'
+    finding: 'RUNS_ENGINE = /through `change-log\.js`/ requires a literal single space; skills/develop/SKILL.md:589-590 carries the instruction wrapped across a line break ("Append through\n`change-log.js`") and is invisible to it — develop is in the population only because a second site (line 753) is on one line. A future writer whose only instance is wrapped is silently absent from the population and, if also absent from the alternation, reproduces the original MODULE_NOT_FOUND with all three tests green.'
+    suggested_action: 'Match whitespace across the wrap: /through\s+`change-log\.js`/ — and prove it with a test that reads develop/SKILL.md line-wrapped instance.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered (boundary: false) — the change set is a contract sentence, a bundler-generated copy and a parity test; no validator, parser or predicate whose false prevents an action. No new dependency, no auth, no network.'
+  performance:
+    status: PASS
+    notes: 'One 37 KB generated file more; npm run bundle wall-clock unchanged within noise (no figure recorded by dev — SC4 uncertainty noted; not a regression risk).'
+  reliability:
+    status: PASS
+    notes: 'Test refuses vacuity via floor ≥ 2; bundler over-match excluded by git status evidence; rollback is a one-line revert.'
+  maintainability:
+    status: PASS
+    notes: 'Population derived from prose, not listed; alternation is the one declaration. CR-1 wording and CR-4 stale "five" counts are the maintainability nits and are in the queue / advisory.'
+
+code_review:
+  blocking: true
+  bugs: 2
+  cleanups: 2
+  promoted: ['CR-1', 'CR-2']
+  probes_executed: 0
+  boundary: false
+  mutation_proven:
+    - 'drop develop from the alternation → test 3 (parity) red → covered'
+    - 'append a comment to skills/develop/references/change-log.js → test 2 (identity) red → covered'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: reword the contract paragraph so it does not claim skills outside the alternation lack the engine'
+      refs: ['shared/resources/document-change-log.md']
+    - action: 'CR-2: make RUNS_ENGINE whitespace-tolerant (/through\s+`change-log\.js`/) and add a regression assertion that the wrapped develop/SKILL.md:589 instance is matched'
+      refs: ['tests/change-log-engine-reachability.test.js']
+  future:
+    - action: 'CR-3: accept the bundler''s literal single-skill form in ALTERNATION_RE or narrow the failure message to say the test requires braces'
+      refs: ['tests/change-log-engine-reachability.test.js']
+    - action: 'CR-4: Phase 4 checkbox and Success Criteria § Migration still say "five" hand-appending writers; § Notes / CHANGELOG say eight'
+      refs: ['docs/tasks/task.139.change-log-engine-reachability/task.139.change-log-engine-reachability.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed and re-reviewed']

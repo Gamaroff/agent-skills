@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": null,
+      "entry": "shared/resources/finalise-fix-and-recheck.mjs#isWorkItemDocument",
+      "name": "isWorkItemDocument",
+      "call_site": "shared/resources/finalise-fix-and-recheck.mjs:161",
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 18,
+      "passed": 18,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "ran_at": "2026-09-22T08:12:46.426Z"
+    }
+  ],
+  "totals": {
+    "executed": 18,
+    "reproduced": 0
+  },
+  "updated_at": "2026-09-22T08:12:46.426Z"
+}

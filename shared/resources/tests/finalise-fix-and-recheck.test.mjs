@@ -29,6 +29,7 @@ import {
   PRECONDITIONS,
   evaluateFixAndRecheck,
   gitFacts,
+  isWorkItemDocument,
 } from "../finalise-fix-and-recheck.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -99,6 +100,104 @@ test("the evaluator's checks are exactly the table's ids — neither side can dr
     [...PINNED],
     "the JSON on disk is the same table the module loaded",
   );
+});
+
+test("isWorkItemDocument is exported, so the boundary the docs-link admission rests on is probeable (task.139 finalise run 3, security)", () => {
+  // The predicate is the allow/deny-list that decides whether documentPath may
+  // admit itself. Module-private, the security probe engine could not reach
+  // it (`entry-not-probeable — export isWorkItemDocument is not a function`,
+  // executed 0 of 11) and the section failed on the zero-guard. Exporting it
+  // is what makes the engine's count real; these are the same cases the
+  // probe's cases file carries, asserted here so the export cannot be
+  // dropped silently.
+  assert.equal(typeof isWorkItemDocument, "function");
+  for (const doc of [
+    "docs/tasks/task.1.x/task.1.x.md",
+    "docs/prd/a/b/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md",
+    "docs/prd/a/b/epics/epic.2.x/epic.2.x.md",
+    "docs/bugs/bug.3.z/bug.3.z.md",
+  ]) {
+    assert.equal(isWorkItemDocument(doc), true, doc);
+  }
+  for (const notDoc of [
+    "",
+    "README.md",
+    "docs/README.md",
+    "src/task.1.x.md",
+    "/etc/passwd",
+    "../docs/tasks/task.1.x/task.1.x.md",
+    "docs/tasks/task.1.x/../task.1.x.md",
+    "docs/tasks/task.1.x/task.1.qa.1.x.md",
+    "docs/tasks/task.1.x/task.1.dod.3.x.md",
+    "docs/tasks/task.1.x/task.1.x.md\u0000.md",
+  ]) {
+    assert.equal(isWorkItemDocument(notDoc), false, JSON.stringify(notDoc));
+  }
+  for (const bad of [42, null, undefined, {}]) {
+    assert.equal(isWorkItemDocument(bad), false, String(bad));
+  }
+});
+
+test("inside-files-summary: the work item's own document is in scope when named by documentPath, and only that path (task.139 QA cycle 3, CR-5)", () => {
+  const doc = "docs/tasks/task.1.x/task.1.x.md";
+  // The docs-link shape: the fix touches the document itself, which the Files
+  // Summary — listing what the work changes, not where it lives — omits.
+  const withDoc = { ...GOOD, touched: [doc], documentPath: doc };
+  assert.deepEqual(evaluateFixAndRecheck(withDoc).failed, []);
+  // Without documentPath the same record is outside the Files Summary.
+  const without = { ...GOOD, touched: [doc] };
+  assert.deepEqual(
+    evaluateFixAndRecheck(without).failed.map((x) => x.id),
+    ["inside-files-summary"],
+  );
+  // documentPath admits ONE path: a second unlisted file is still outside.
+  const two = { ...GOOD, touched: [doc, "README.md"], documentPath: doc };
+  assert.deepEqual(
+    evaluateFixAndRecheck(two).failed.map((x) => x.id),
+    ["inside-files-summary"],
+  );
+  // documentPath must be shaped like a work item document under docs/ — any
+  // other string is a declaration the evaluator refuses (cycle 4, CR-2).
+  for (const notDoc of [
+    "README.md",
+    "docs/README.md",
+    "src/task.1.x.md",
+    "../docs/tasks/task.1.x/task.1.x.md",
+    "docs/tasks/task.1.x/task.1.qa.1.x.md",
+  ]) {
+    assert.deepEqual(
+      evaluateFixAndRecheck({
+        ...GOOD,
+        touched: [notDoc],
+        documentPath: notDoc,
+      }).failed.map((x) => x.id),
+      ["inside-files-summary"],
+      `documentPath ${notDoc} is not a work item document and must not admit itself`,
+    );
+  }
+  for (const doc2 of [
+    "docs/prd/a/b/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md",
+    "docs/bugs/bug.3.z/bug.3.z.md",
+  ]) {
+    assert.deepEqual(
+      evaluateFixAndRecheck({ ...GOOD, touched: [doc2], documentPath: doc2 })
+        .failed,
+      [],
+      doc2,
+    );
+  }
+  // An empty or non-string documentPath admits nothing.
+  for (const bad of ["", 42, null]) {
+    assert.deepEqual(
+      evaluateFixAndRecheck({
+        ...GOOD,
+        touched: [doc],
+        documentPath: bad,
+      }).failed.map((x) => x.id),
+      ["inside-files-summary"],
+      `documentPath ${JSON.stringify(bad)} must not admit the path`,
+    );
+  }
 });
 
 test("all five hold → proceed, every id checked, nothing failed", () => {
