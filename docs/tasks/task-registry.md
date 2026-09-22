@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-09-21
-**Next Available Task Number:** **141**
+**Next Available Task Number:** **142**
 
 ## How to use
 
@@ -181,6 +181,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 138 | [finalise --bug shipped through eleven gates with six low findings nobody closed and no end-to-end run: assert a state Step 7 must have written, fill the template's block instead of appending a second, refuse a verdict remainder that names the other verdict, read before grep, hoist newest_numbered, and run the whole thing once in a scratch clone](task.138.finalise-bug-mode-residuals/task.138.finalise-bug-mode-residuals.md) | accepted | refactoring | Medium | 2026-09-21 | [#450](https://github.com/Gamaroff/agent-skills/issues/450) | Observation review 2026-09-21: obs #146; task.125 gates 9–11 futures, pr-review.1 CR-1/CR-2/PC-1 · PR #456 (phases 1–3, 5) · PR #459 (Phase 4 e2e run) merged |
 | 139 | [The Change Log engine is unreachable from a skill whose prose runs it: spell the writer alternation in the contract's one-liner and pin engine reachability with a parity test](task.139.change-log-engine-reachability/task.139.change-log-engine-reachability.md) | accepted | infrastructure | High | 2026-09-22 | [#463](https://github.com/Gamaroff/agent-skills/issues/463) | Obs #152 (task.136 instance); applies the create-skill UNREACHED remedy · PR #465 merged |
 | 140 | [Harden the shell-fn: sentinels and the fake-gh coverage: seven verified limits recorded on task.136](task.140.shell-fn-sentinel-hardening/task.140.shell-fn-sentinel-hardening.md) | planned | infrastructure | High | 2026-09-22 | [#464](https://github.com/Gamaroff/agent-skills/issues/464) | task.136 follow-up: gate 3 future, PR review CR-1/CR-3, DoD SC5; shares security-probe.mjs with task.131 |
+| 141 | [qa-next: accept an explicit registry item id, so a function can be re-tested on demand](task.141.qa-next-targeted-item/task.141.qa-next-targeted-item.md) | planned | infrastructure | Medium | 2026-09-22 | [#466](https://github.com/Gamaroff/agent-skills/issues/466) | `/qa-next <id>` runs the full UAT protocol against a named row from any state; run-file path, accepted-row rule and bug reuse made mechanical in uat-status.mjs |
 
 - **Tasks 104-106 close the stakeholder-readability gap in tracker comments**, filed 2026-09-09 after stakeholders reported that Jira and GitHub issue comments are unreadable to a non-technical reader. One shippable unit each, in dependency order: **104** builds the primitive (a per-stage catalogue of plain-language lead paragraphs, rendered by `tracker-comment.js` from the `--stage` every call site already passes — so all 22 sites gain a lead with no call-site edit); **105** feeds real values into the lead's slots and converts the seven sites that post a bare `gh issue comment` and never reach the engine at all; **106** carries the same lead onto the eleven pull-request conversation templates. 105 and 106 both depend on 104 and are independent of each other. Per-line inline PR findings are deliberately excluded — see task.106 §4. None has a tracker issue yet.
 
