@@ -69,11 +69,13 @@ const WORK_ITEM_DOC_RE =
 // review…) shares the stem and is NOT the document.
 const WORK_ITEM_ARTIFACT_RE =
   /\.(qa|gate|bug|implementation|review|dod|plan|handover|pr-review|risk|test-design)\./;
-const isWorkItemDocument = (p) =>
+export const isWorkItemDocument = (p) =>
   typeof p === "string" &&
   WORK_ITEM_DOC_RE.test(p) &&
   !WORK_ITEM_ARTIFACT_RE.test(p.slice(p.lastIndexOf("/") + 1)) &&
-  !p.includes("..");
+  !p.includes("..") &&
+  // A null byte is not `/`, so the regex alone accepts `task.1.x.md\0.md`.
+  !p.includes("\0");
 
 /** What a recorded red run looks like from node:test, bash test harnesses, or a
  *  hand-run assertion: a TAP `not ok`, the runner's ✖, or a `fail` count > 0. */

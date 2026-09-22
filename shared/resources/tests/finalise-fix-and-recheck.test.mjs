@@ -29,6 +29,7 @@ import {
   PRECONDITIONS,
   evaluateFixAndRecheck,
   gitFacts,
+  isWorkItemDocument,
 } from "../finalise-fix-and-recheck.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -99,6 +100,42 @@ test("the evaluator's checks are exactly the table's ids — neither side can dr
     [...PINNED],
     "the JSON on disk is the same table the module loaded",
   );
+});
+
+test("isWorkItemDocument is exported, so the boundary the docs-link admission rests on is probeable (task.139 finalise run 3, security)", () => {
+  // The predicate is the allow/deny-list that decides whether documentPath may
+  // admit itself. Module-private, the security probe engine could not reach
+  // it (`entry-not-probeable — export isWorkItemDocument is not a function`,
+  // executed 0 of 11) and the section failed on the zero-guard. Exporting it
+  // is what makes the engine's count real; these are the same cases the
+  // probe's cases file carries, asserted here so the export cannot be
+  // dropped silently.
+  assert.equal(typeof isWorkItemDocument, "function");
+  for (const doc of [
+    "docs/tasks/task.1.x/task.1.x.md",
+    "docs/prd/a/b/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md",
+    "docs/prd/a/b/epics/epic.2.x/epic.2.x.md",
+    "docs/bugs/bug.3.z/bug.3.z.md",
+  ]) {
+    assert.equal(isWorkItemDocument(doc), true, doc);
+  }
+  for (const notDoc of [
+    "",
+    "README.md",
+    "docs/README.md",
+    "src/task.1.x.md",
+    "/etc/passwd",
+    "../docs/tasks/task.1.x/task.1.x.md",
+    "docs/tasks/task.1.x/../task.1.x.md",
+    "docs/tasks/task.1.x/task.1.qa.1.x.md",
+    "docs/tasks/task.1.x/task.1.dod.3.x.md",
+    "docs/tasks/task.1.x/task.1.x.md\u0000.md",
+  ]) {
+    assert.equal(isWorkItemDocument(notDoc), false, JSON.stringify(notDoc));
+  }
+  for (const bad of [42, null, undefined, {}]) {
+    assert.equal(isWorkItemDocument(bad), false, String(bad));
+  }
 });
 
 test("inside-files-summary: the work item's own document is in scope when named by documentPath, and only that path (task.139 QA cycle 3, CR-5)", () => {
