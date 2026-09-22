@@ -3,7 +3,7 @@
 **Task**: `task.139.change-log-engine-reachability.md`
 **Run Number**: 1
 **Started**: 2026-09-22 05:21
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Spell the writer alternation (`{develop|finalise}`) in `document-change-log.md`'
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 13/13 phases; test red→green; 4 mutants red; ci:fast 3890/3890; status `ready-for-review` | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #465: https://github.com/Gamaroff/agent-skills/pull/465 — 2 commits (`2d11faee` fix, `f80f1165` docs); in-review comment posted | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.139.qa.{N}.*.md`; `task.139.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles: gate.1 CONCERNS 80 → gate.2 PASS 100 → [obs #154 re-entry] gate.3 CONCERNS 50 → gate.4 CONCERNS 80 → gate.5 CONCERNS 90 (no open entry); 5c run 1 APPROVE, run 2 CONCERNS | `.summaries/step-5-traceability-mapper.json` |
-| 7. finalise                | ⚠️ Needs Attention | `task.139.dod.{N}.*.md`; task `status: accepted`                       | run 1 `dod.1` NOT ACCEPTED (link-check red on the task doc line 63 → obs #154, fixed); run 2 `dod.2` NOT ACCEPTED (link-check red on quoted examples in qa.4/qa.5 → obs #155) | — |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.139.dod.{N}.*.md`; task `status: accepted`                       | run 1 `dod.1` NOT ACCEPTED (link-check red on the task doc line 63 → obs #154, fixed); run 2 `dod.2` NOT ACCEPTED (link-check red on quoted examples in qa.4/qa.5 → obs #155, fixed); run 3 `dod.3` **ACCEPTED** — Security FAIL → PASS via Step 8a (`d25adf2e`); acceptance commit `1f623112`; CI readings 1/2 SUCCESS | — |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | this report (final commit) | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -151,6 +151,17 @@ Spell the writer alternation (`{develop|finalise}`) in `document-change-log.md`'
 
 ---
 
+### Step 7 — finalise run 3 (resumed after compaction)
+
+- Head at decision: `e454b4c9` (the PreCompact pause commit on top of `34b26ffc`), CI **SUCCESS** 5/5 — reading 1. The four DoD agents dispatched: AC PASS (8/8; SC3/SC4/SC7 on the task's own NOT_APPLICABLE test statements), Compliance NOT_APPLICABLE, Docs PASS, **Security FAIL** — boundary `isWorkItemDocument` fired but the probe engine could not reach it (`entry-not-probeable — export isWorkItemDocument is not a function`, executed 0 of 11): the zero-guard, severity low.
+- **Step 8a fix-and-recheck** (first live use on a security finding in this repo): evaluator run 1 halted on `mutation-proved` only — after a false start that read run 2's stale record (the rewrite sat behind a `&&` on a head check that failed; caught by the `redOnRevert` the run reported). Fix `d25adf2e`: `export const isWorkItemDocument` + `!p.includes("\0")` — the domain-shaped test cases surfaced that the regex's `[^/]+` tail accepts `task.1.x.md\0.md`; closed in the same predicate, same commit, same test, and recorded in dod.3 as a judgement under the *Bounded* rule rather than a second finding. Mutation proof: pre-fix file → test file ✖ (import fails), probe `entry-not-probeable`; export-only → probe `present-but-inert`, `work-item-doc.null-byte-inside` reproduced; fixed → 24/24, probe `engages` 18/18. Fast gate 3909/0 fail; evaluator run 2 exit 0 (commit), run 3 `--git-base e454b4c9` exit 0 (push). CI reading 1 retaken on the fix head `d25adf2e`: SUCCESS 5/5 (a first poll keyed on an 8-char SHA could never decide — the script compares 12-char prefixes — killed and re-run).
+- Probe re-run from the committed tree with `--record`: `--cases-file` (8 corpus hostile verbatim + 10 domain: 4 legitimate documents, 6 hostile) because the generic `path` corpus's legitimate inputs are not work-item documents and the engine correctly returns `rejects-every-input` for an allow-list of one shape. `task.139.dod.security.run.json`: executed 18, reproduced 0, `evidence: measured`.
+- Step 6 re-entered: **ACCEPTED**. Step 7: Verification Complete in dod.3; frontmatter `accepted` / `completed_date` / `pr_number: 465`; Change Log 1.2 via `change-log.js`; `registry-tick.js` → `ticked` (line 182, planned → accepted); PASSED section replaces the run-2 Gaps section; sprint-review-summary.md. 6a acceptance commit `1f623112` pushed (7 files incl. probe cases + record); 6b tracked/pushed assertions all ok, PR head == pushed head; 6c **CI reading 2: SUCCESS @ `1f623112`** 5/5 (120 s); 6d CHANGELOG cites task 139.
+- Canonical PR comment posted (`#issuecomment-5773355955`, `done` lead). Tracker: Document link already on `develop`; `done` comment `posted`; #463 closed (`completed`), verified CLOSED; `gh-stage.js --stage done` → `already` (Done). Lock: restored from the halt snapshot (the PreCompact pause had consumed it and the post-compaction resume did not restore it), advanced 7 → 8.
+- **Tracker debt**: none.
+
+---
+
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
@@ -215,17 +226,17 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Paused — DoD gap, run 2 (CI link-check red on qa.4/qa.5 quoted examples); resume at Step 7
+**Finished**: 2026-09-22 10:40
+**Final Status**: Completed — accepted on finalise run 3 (`dod.3`); Step 8a security fix `d25adf2e`; acceptance commit `1f623112`
 **Branch**: `feature/task.139.change-log-engine-reachability`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/465
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 5 (gate.1 CONCERNS 80 → gate.2 PASS 100 → gate.3 CONCERNS 50 → gate.4 CONCERNS 80 → gate.5 CONCERNS 90, no open entry); 5c review-pr ×2
+**DoD Summary**: `task.139.dod.3.change-log-engine-reachability.md` (runs 1–2: `dod.1`, `dod.2` — historical)
+**Tracker debt**: none — #463 closed, board Done, canonical PR comment posted
 
 ---
 
-## Pipeline Paused — 2026-09-22T07:59:45Z
+## Pipeline Paused — 2026-09-22T07:59:45Z (historical — resumed the same session; Step 7 re-ran as run 3 above)
 
 ⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
 
