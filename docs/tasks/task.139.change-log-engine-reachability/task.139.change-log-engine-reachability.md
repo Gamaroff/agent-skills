@@ -5,19 +5,21 @@ type: task
 description: "Make `references/change-log.js` ship with every skill whose SKILL.md tells the agent to append a Change Log row through it — today `develop` cites the engine and does not carry it, so the documented append fails MODULE_NOT_FOUND in every consumer install and the contract's own 'no regex fallback' rule turns that into a silently skipped row — by spelling the writer alternation in the contract's one-liner (the discovery form the bundler already follows) and adding a parity test that derives the writer population from the prose."
 tags: [bundler, change-log, develop, parity-test, observation-152]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-09-22
 updated: 2026-09-22
+completed_date: 2026-09-22
 assignee:
 estimated_effort_hours: 4
 risk_level: low
 github_issue: 463
+pr_number: 465
 ---
 
 # Technical Task: The Change Log engine is unreachable from a skill whose prose runs it
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#463](https://github.com/Gamaroff/agent-skills/issues/463)
 **Review**: ✅ All review recommendations from `task.139.review.1.change-log-engine-reachability.md` implemented 2026-09-22
 
@@ -311,6 +313,7 @@ None.
 | 2026-09-22 |  | QA gate CONCERNS (90/100, no open entry) — cycle 5: cycle-4 closures verified; Maintainability reservation on the two artifact deny-lists; 4 low advisories | qa-task |
 | 2026-09-22 |  | Scope widened (owner decision, obs #154; 5022ad02) — doc-links engine + corpus guard, review-task/review-story check 2, finalise Step 8a docs-link clause, evaluator documentPath; line 63 → code span. Recorded here after 5c run 2 (PC-3) | develop-next |
 | 2026-09-22 |  | DoD incomplete (run 2) — 1 gap: CI link-check red on quoted examples in qa.4 / qa.5 | finalise |
+| 2026-09-22 | 1.2 | DoD passed — accepted (PR #465) | finalise |
 <!-- change-log-end -->
 
 ## QA Testing Results
@@ -334,34 +337,31 @@ None.
 ### Key Findings
 All cycle-4 closures verified by execution. Maintainability reservation (C5-CR-2): the evaluator and the corpus guard each keep a hand-written artifact deny-list and the two already differ — replace both with one exported predicate (basename stem == parent directory name) in the follow-up. Three further nits (C5-CR-1 indented-code-block fence false red; C5-CR-3 double-backslash escape; C5-CR-4 bug reports outside the ratchet) recorded.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - PASSED ✅
 
-**Status:** IN PROGRESS (document status unchanged: `ready-for-review`) — run 2, 2026-09-22; run 1's gap (line 63) was closed in `5022ad02`
+**Status:** ACCEPTED
 
-### QA Gate Status
+### QA Report Summary
 
-**QA Report**: `task.139.qa.5.change-log-engine-reachability.md`
+**QA Report**: `task.139.qa.5.change-log-engine-reachability.md` (cycles 1–4: qa.1–qa.4)
 **Gate File**: `task.139.gate.5.change-log-engine-reachability.yml`
-**Gate Status**: ⚠️ CONCERNS — no open entry (Maintainability reservation C5-CR-2)
+**Gate Status**: ⚠️ CONCERNS — no open entry (`top_issues: []`; Maintainability reservation C5-CR-2, whose export Step 8a of finalise run 3 made)
 **Quality Score**: 90/100
 
-5c review-pr run 2: CONCERNS — documentation consistency, applied in `4871a174`.
+All Definition of Done criteria have been verified (finalise run 3; runs 1 and 2 halted on CI `docs-link-check` reds — line 63 of this document, then quoted examples in qa.4 / qa.5 — both closed on this PR):
 
-### Missing Criteria:
+✅ **Success Criteria:** All 8 met — SC1–SC7 on the original deliverable (alternation, parity test, Phase 3 evidence, CHANGELOG, obs #152), SC8 on the obs #154 widening (doc-links engine, corpus guard, review-*/finalise prose, evaluator `documentPath`)
+✅ **Unit Tests:** `tests/change-log-engine-reachability.test.js` (4), `shared/resources/tests/doc-links.test.mjs` (15), `shared/resources/tests/finalise-fix-and-recheck.test.mjs` (24) — all in the per-PR `npm test` lanes; `ci:fast` 3909 tests, 0 fail
+✅ **PR Review:** PR #465 — 5c review-pr run 1 APPROVE, run 2 CONCERNS (documentation consistency) applied in `4871a174`; CI green on all 5 checks at the acceptance head
+✅ **Documentation:** CHANGELOG [Unreleased] › Fixed (two entries); `shared/resources/document-change-log.md:192` + 42 bundled copies; `review-task` / `review-story` check 2; `finalise` Step 6 pointer and Step 8a docs-link clause
+✅ **Security Review:** PASS — checklist clean (no secrets, argv-array child processes only, no security TODOs, no dependency change). The boundary `isWorkItemDocument` was module-private and unprobeable at the agent's run (executed 0 of 11 — a zero-guard FAIL); Step 8a exported it, closed a null-byte hole the domain probe cases then surfaced, and re-ran the reproduction on the fixed tree: `engages`, 18 executed, 0 reproduced, 0 over-blocked (`task.139.dod.security.run.json`; fix `d25adf2e`)
+✅ **Compliance Review:** NOT_APPLICABLE — no data collection, UI, payments or health data
+✅ **Performance / Reliability:** PASS (QA gate.5)
+⚠️ **Maintainability:** CONCERNS on gate.5 (C5-CR-2 — the export is now in place; the shared-predicate consolidation with the corpus guard remains a § Notes follow-up)
 
-1. **CI green on the final head:**
-   - [ ] `docs-link-check` is red on `4871a174`: `task.139.qa.4.*.md:41` and `task.139.qa.5.*.md:29` quote the cycle-4 reviewer's example with a backtick inside a code span, which ends the span early and leaves `[y](b.md)` / `[x](a.md)` as live links. The engine reproduces it (`doc-links.js` exits 1 on those two files, 0 on every other changed `.md`); Step 8a's docs-link clause covers the work item's own document only, so it does not apply.
+**Task marked as ACCEPTED on:** 2026-09-22
 
-### Next Steps:
-
-- [ ] Rewrite the two quotations so no live link survives (placeholder targets, or describe the shape in words)
-- [ ] Push; wait for a green run; re-run `/finalise` (run 3)
-- [ ] Log the observation: 8a's clause and the corpus guard should cover co-located pipeline artifacts
-
-**Estimated Effort:** Small (< 10 minutes)
-
-**Gap Report Generated:** 2026-09-22 (run 2)
-**Detailed Verification Log:** See `task.139.dod.2.change-log-engine-reachability.md` (run 1: `task.139.dod.1.*`).
+**Detailed Verification Log:** See `task.139.dod.3.change-log-engine-reachability.md` for complete verification evidence and timestamps (runs 1–2: `task.139.dod.1.*`, `task.139.dod.2.*` — historical, superseded).
 
 ## Progress Tracking
 
