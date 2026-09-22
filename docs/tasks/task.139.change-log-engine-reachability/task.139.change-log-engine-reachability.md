@@ -5,7 +5,7 @@ type: task
 description: "Make `references/change-log.js` ship with every skill whose SKILL.md tells the agent to append a Change Log row through it — today `develop` cites the engine and does not carry it, so the documented append fails MODULE_NOT_FOUND in every consumer install and the contract's own 'no regex fallback' rule turns that into a silently skipped row — by spelling the writer alternation in the contract's one-liner (the discovery form the bundler already follows) and adding a parity test that derives the writer population from the prose."
 tags: [bundler, change-log, develop, parity-test, observation-152]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-09-22
 updated: 2026-09-22
@@ -17,8 +17,9 @@ github_issue: 463
 
 # Technical Task: The Change Log engine is unreachable from a skill whose prose runs it
 
-**Status:** Planned
+**Status:** Ready for Review
 **GitHub Issue**: [#463](https://github.com/Gamaroff/agent-skills/issues/463)
+**Review**: ✅ All review recommendations from `task.139.review.1.change-log-engine-reachability.md` implemented 2026-09-22
 
 ---
 
@@ -38,7 +39,7 @@ github_issue: 463
 
 ### Current Problems
 
-1. **The engine reaches skills by accident, not by declaration.** The nine skills that ship `change-log.js` get it transitively: `jira-sync.js`, `status-history.js` and `report-lint.js` each `require("./change-log.js")`, and the bundler's `JS_SIBLING_RE` follows that. A skill that bundles only the `.md` contract — 24 of the 41 that carry `document-change-log.md` — has the one-liner and not the module it requires.
+1. **The engine reaches skills by accident, not by declaration.** The skills that ship `change-log.js` (25 at review time, 18 of them alongside the contract) get it transitively: `jira-sync.js`, `status-history.js` and `report-lint.js` each `require("./change-log.js")`, and the bundler's `JS_SIBLING_RE` follows that. A skill that bundles only the `.md` contract — 24 of the 42 that carry `document-change-log.md` — has the one-liner and not the module it requires.
 2. **The contract's placeholder is invisible on purpose, and nothing replaced it.** `create-skill` records why the bare `references/<file>` form is not followed out of shared text: measured 2026-09-17, following it vendored `change-log.js` into all 24 non-carrying skills — a 38-file over-match. The sanctioned remedy — "if a shared doc genuinely invokes a script that must ship with the skill, spell the alternation" — was never applied to this one-liner.
 3. **The failure is silent by contract.** "Reports that as a skipped step; does not fall back to a regex" is the right rule for a missing engine, and it is also what makes the defect invisible: no row, no error in the diff, and the next reader sees a document whose history stops at `Status → ready-for-development`.
 4. **No test says which skills must carry it.** Two enumerations exist implicitly — the prose that names the engine, and the `references/` directories that contain it — and nothing compares them. That is the enumeration class in `docs/reference/anti-patterns.md`.
@@ -57,7 +58,7 @@ github_issue: 463
 
 `bundle_skill.py` discovers a skill's shared dependencies from three forms: a `shared/resources/<file>` literal in a skill file (`SHARED_REF_RE`), a `require("./<sibling>.js")` inside an already-bundled `.js` (`JS_SIBLING_RE`, transitive), and — out of **shared** `.md`/`.sh` text — the invocation form `.agents/skills/<skill>/references/<file>` **only when `<skill>` names the skill being bundled**, literally or inside a `{a|b|c}` alternation. A bare `{placeholder}` group names no skill and is skipped, which is what keeps the 38-file over-match from recurring.
 
-`shared/resources/document-change-log.md` § *How a writer appends a row* spells the invocation as `require("./.agents/skills/{skill}/references/change-log.js")` — the bare placeholder. It is bundled into 41 skills. Nine of them carry `change-log.js` because a `.js` they bundle for another reason requires it (`finalise`, `create-epic`, `create-story`, `create-task`, `qa-fix`, `qa-story`, `qa-task`, `review-story`, `review-task`, the `sync-jira-*` and bug skills). `develop` bundles the contract and nothing that requires the engine.
+`shared/resources/document-change-log.md` § *How a writer appends a row* spells the invocation as `require("./.agents/skills/{skill}/references/change-log.js")` — the bare placeholder. It is bundled into 42 skills. 18 of them carry `change-log.js` because a `.js` they bundle for another reason requires it (`finalise`, `create-epic`, `create-story`, `create-task`, `qa-fix`, `qa-story`, `qa-task`, `review-story`, `review-task`, the `sync-jira-*` and bug skills, among others); 24 carry the contract and not the engine. Measured 2026-09-22 (review): `for d in skills/*/; do [ -f $d/references/document-change-log.md ] && [ ! -f $d/references/change-log.js ] && echo $d; done` — the test that lands re-measures it. `develop` bundles the contract and nothing that requires the engine.
 
 `skills/develop/SKILL.md` step 12/14: "**Append through `change-log.js`, never by text search** — the one-liner is in [document-change-log.md § How a writer appends a row](references/document-change-log.md)". `finalise` § 7.3 says the same and ships the engine (via `report-lint.js` / `jira-sync.js`).
 
@@ -122,37 +123,37 @@ None — API stable. The engine's behaviour and interface do not change; two ski
 **Risk**: Low
 **Files**: `tests/change-log-engine-reachability.test.js`
 
-- [ ] Derive the population: every `skills/*/SKILL.md` whose text matches the instruction phrase; assert the floor (≥ 2) with a message naming the phrase
-- [ ] For each member assert `skills/<s>/references/change-log.js` exists and, header-stripped, equals `shared/resources/change-log.js`
-- [ ] Parse the `{…}` alternation from the contract's `require` line; assert set equality with the population in both directions, naming the missing side
-- [ ] Run it: red on `develop` (missing copy; absent from the alternation), green on `finalise`
+- [x] Derive the population: every `skills/*/SKILL.md` whose text matches the instruction phrase; assert the floor (≥ 2) with a message naming the phrase
+- [x] For each member assert `skills/<s>/references/change-log.js` exists and, header-stripped, equals `shared/resources/change-log.js`
+- [x] Parse the `{…}` alternation from the contract's `require` line; assert set equality with the population in both directions, naming the missing side
+- [x] Run it: red on `develop` (missing copy; absent from the alternation), green on `finalise`
 
 ### Phase 2: Spell the alternation and bundle
 
 **Risk**: Low
 **Files**: `shared/resources/document-change-log.md`, `skills/*/references/document-change-log.md` (generated), `skills/develop/references/change-log.js` (generated)
 
-- [ ] Replace `{skill}` in the one-liner with the alternation the population derivation produced; keep the surrounding prose's `{skill}` mentions that are illustrative, not invocations (the bundler follows only the invocation form)
-- [ ] `npm run bundle`; confirm `skills/develop/references/change-log.js` appeared and no skill outside the alternation gained a copy (`git status --porcelain | grep change-log.js`)
-- [ ] `npm run bundle:check` → 0 problems, no `UNREACHED`
-- [ ] Phase 1 test green; mutation: remove `develop` from the alternation → red naming `develop`; hand-copy a modified engine into `develop/references/` → red on identity
+- [x] Replace `{skill}` in the one-liner with the alternation the population derivation produced; keep the surrounding prose's `{skill}` mentions that are illustrative, not invocations (the bundler follows only the invocation form)
+- [x] `npm run bundle`; confirm `skills/develop/references/change-log.js` appeared and no skill outside the alternation gained a copy (`git status --porcelain | grep change-log.js`)
+- [x] `npm run bundle:check` → 0 problems, no `UNREACHED`
+- [x] Phase 1 test green; mutation: remove `develop` from the alternation → red naming `develop`; hand-copy a modified engine into `develop/references/` → red on identity
 
 ### Phase 3: Prove the documented call runs from the bundle
 
 **Risk**: Low
 **Files**: none (verification), implementation report
 
-- [ ] From the repo root, run the contract's one-liner verbatim against a scratch copy of a task document with `.agents/skills/develop/references/change-log.js` as the path — the exact call that failed on task.136 — and record the appended row
-- [ ] Record the pre-fix failure (`MODULE_NOT_FOUND`) and the post-fix row side by side in the implementation report
+- [x] From the repo root, run the contract's one-liner verbatim against a scratch copy of a task document with `.agents/skills/develop/references/change-log.js` as the path — the exact call that failed on task.136 — and record the appended row
+- [x] Record the pre-fix failure (`MODULE_NOT_FOUND`) and the post-fix row side by side in the implementation report
 
 ### Phase 4: Docs, CHANGELOG, observation
 
 **Risk**: Low
 **Files**: `CHANGELOG.md`, observation log
 
-- [ ] CHANGELOG [Unreleased]: the alternation, the test, the skills that gained the engine
-- [ ] Obs #152 → `actioned` with the PR as resolution
-- [ ] § Notes of this task carries the migration seam for the five hand-appending writers
+- [x] CHANGELOG [Unreleased]: the alternation, the test, the skills that gained the engine
+- [x] Obs #152 → `actioned` with the PR as resolution
+- [x] § Notes of this task carries the migration seam for the five hand-appending writers
 
 ---
 
@@ -212,22 +213,22 @@ Not applicable.
 
 ### Functional
 
-- [ ] `skills/develop/references/change-log.js` exists after `npm run bundle` and equals the shared source header-stripped
-- [ ] The contract's `require` line names `develop` and `finalise` in the alternation; no skill outside the alternation gained a copy
-- [ ] The one-liner run verbatim from the repo root with the `develop` path appends a row (Phase 3 evidence)
+- [x] `skills/develop/references/change-log.js` exists after `npm run bundle` and equals the shared source header-stripped
+- [x] The contract's `require` line names `develop` and `finalise` in the alternation; no skill outside the alternation gained a copy
+- [x] The one-liner run verbatim from the repo root with the `develop` path appends a row (Phase 3 evidence)
 
 ### Performance
 
-- [ ] `npm run bundle` wall-clock unchanged within noise (one 37 KB file more)
+- [x] `npm run bundle` wall-clock unchanged within noise (one 37 KB file more)
 
 ### Code Quality
 
-- [ ] `tests/change-log-engine-reachability.test.js` red on the pre-fix tree naming `develop`, green after; three mutants (member removed from the alternation; copy tampered; instruction phrase reworded so the population empties) each red their own assertion
-- [ ] `ci:fast`, `bundle:check` (0 problems, no `UNREACHED`), Prettier green
+- [x] `tests/change-log-engine-reachability.test.js` red on the pre-fix tree naming `develop`, green after; three mutants (member removed from the alternation; copy tampered; instruction phrase reworded so the population empties) each red their own assertion
+- [x] `ci:fast`, `bundle:check` (0 problems, no `UNREACHED`), Prettier green
 
 ### Migration
 
-- [ ] CHANGELOG entry; obs #152 `actioned`; § Notes names the five hand-appending writers as the next task
+- [x] CHANGELOG entry; obs #152 `actioned`; § Notes names the five hand-appending writers as the next task
 
 ---
 
@@ -281,14 +282,17 @@ None.
 |------|---------|-------------|--------|
 | 2026-09-22 | 1.0 | Initial draft — obs #152 (task.136 instance); the `create-skill` UNREACHED rule names this exact case and its remedy | create-task |
 | 2026-09-22 |  | Priority Medium → High (owner decision); issue label and board priority updated | edit-task |
+| 2026-09-22 | 1.1 | Review passed (9/10) — corrected § 3 skill counts (25 carry the engine, 24 of 42 carry the contract without it) and extended the § Notes migration seam with enforce-standards, review-epic, review-task | review-task |
+| 2026-09-22 |  | Status → ready-for-development | review-task |
+| 2026-09-22 |  | Implemented — 46 files (1 contract, 1 new engine copy, 42 re-rendered contract copies, 1 test, CHANGELOG), 3 tests | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: the red test
-- [ ] Phase 2: spell the alternation and bundle
-- [ ] Phase 3: prove the documented call runs from the bundle
-- [ ] Phase 4: docs, CHANGELOG, observation
+- [x] Phase 1: the red test
+- [x] Phase 2: spell the alternation and bundle
+- [x] Phase 3: prove the documented call runs from the bundle
+- [x] Phase 4: docs, CHANGELOG, observation
 - [ ] QA: `task.139.qa.[N].change-log-engine-reachability.md`
 - [ ] Gate: `task.139.gate.[N].change-log-engine-reachability.yml`
 
@@ -301,8 +305,23 @@ None.
 - `tests/bundle-transitive.test.js`, `tests/bundle-check-mode.test.js` — the discovery forms already under test
 - `docs/tasks/task.136.shell-fn-probe-entry-form/task.136.implementation.1.*.md` Step 3 — the `MODULE_NOT_FOUND` instance
 
+## Implementation Record
+
+**Start Date**: 2026-09-22 · **Completion Date**: 2026-09-22 · **Branch**: `feature/task.139.change-log-engine-reachability`
+
+**Implementation summary**: one token in the contract, one generated file, one test — exactly the plan. `shared/resources/document-change-log.md:192` now reads `require("./.agents/skills/{develop|finalise}/references/change-log.js")`, with a paragraph after the block stating that the braces are the bundler's alternation and not a placeholder. `npm run bundle` produced `skills/develop/references/change-log.js` and re-rendered the 42 bundled copies of the contract; `git status --porcelain | grep change-log.js` showed exactly that one new file — no over-match. `tests/change-log-engine-reachability.test.js` derives the population from `skills/*/SKILL.md` (phrase `through \`change-log.js\``, floor ≥ 2), asserts each member ships the engine byte-identical to the shared source (one `// AUTO-GENERATED` header line stripped), and asserts the alternation ⊆ population and population ⊆ alternation, naming the missing side.
+
+**Testing results**: pre-fix, red for exactly `develop` (identity: copy missing; parity: `{skill}` ≠ `[develop, finalise]`); post-fix 3/3 green. Mutation proofs (snapshot with `cp`, restored from snapshot): M1 alternation → `{finalise}` → parity red "add to the alternation: develop"; M2 comment appended to the develop copy → identity red; M3 develop's phrase reworded to "via" → floor red (1 < 2) and parity red "named but their SKILL.md does not run it: develop"; M3b both reworded → floor red (0 < 2). `npm run bundle:check`: 129 skills, 0 problems, no UNREACHED. `npm run ci:fast`: 3890/3890 pass, Prettier clean.
+
+**Phase 3 evidence** — the contract's one-liner run verbatim from the repo root against a scratch copy of task.136's document, `author=develop`:
+
+- Pre-fix shape (copy moved aside): `Error: Cannot find module './.agents/skills/develop/references/change-log.js'` — the task.136 Step 3 failure, reproduced.
+- Post-fix: exit 0; appended `| 2026-09-22 |  | probe — task.139 Phase 3 | develop |` inside the marker block and bumped `updated: 2026-09-22`.
+
+**Deferred work**: none in scope. The eight hand-appending writers (§ Notes) are the next task.
+
 ## Notes
 
 - QA artifacts land beside this file: `task.139.qa.[N].*.md`, `task.139.bug.[N].*.md`, `task.139.gate.[N].*.yml`.
-- **Migration seam, deliberately not taken here**: `edit-epic`, `edit-story`, `sync-github-epic`, `sync-github-story` and `sync-github-task` instruct "Append a Change Log row" without naming the engine — hand appends against a contract that forbids text-search appends (task.42/43 landed a row inside a fenced example that way). Moving those five onto the one-liner is one task (primitive → migration: this task ships the reachable primitive, that one moves the call sites and then joins the alternation). File it once this lands.
+- **Migration seam, deliberately not taken here**: `edit-epic`, `edit-story`, `sync-github-epic`, `sync-github-story` and `sync-github-task` instruct "Append a Change Log row" without naming the engine — hand appends against a contract that forbids text-search appends (task.42/43 landed a row inside a fenced example that way). The review (2026-09-22) re-ran `grep -n 'Append a Change Log row' skills/*/SKILL.md` and found three more sites of the same shape: `enforce-standards` (§ documents-only branch) and `review-epic` (Step 7), neither of which carries the engine; and `review-task` (Steps 8.5 and 9), which carries it transitively via `report-lint.js` / `jira-sync.js` and so is a phrase gap rather than a reachability gap. (The `sync-jira-*` matches are engine-backed through `jira-sync.js`.) Moving those eight onto the one-liner is one task (primitive → migration: this task ships the reachable primitive, that one moves the call sites and then joins the alternation). File it once this lands.
 - Independent of task.140 (shell-fn sentinels).
