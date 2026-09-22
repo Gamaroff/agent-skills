@@ -48,6 +48,16 @@ All notable changes to this project will be documented in this file. Format foll
   lifecycle vocabulary — `qa-story` already carried the rule, and its bug-report `Reopened` writes
   are excluded by design.
 
+- **The `#2e` install-hooks negative control asserts that the legacy command fails, not how it
+  phrases it (obs #158).** It ran the pre-fix bare-relative command from a subdirectory and required
+  the throw to match `/No such file or directory|cannot|not found/`; on a fast Linux runner it threw
+  `spawnSync /bin/sh EPIPE` instead, because `sh` exits the moment it cannot resolve the script and
+  closes stdin before the parent's `input` write lands. Which surface appears is a race, lost in
+  different directions on macOS and on CI — so the lane went red on a commit that touches nothing
+  near the installer, while the same code was green locally. The control now asserts the command did
+  not run (`EPIPE`, or a non-zero status) and checks the shell's wording only when the shell got far
+  enough to produce any.
+
 ## [v0.50.0] - 2026-09-22
 
 ### Added
