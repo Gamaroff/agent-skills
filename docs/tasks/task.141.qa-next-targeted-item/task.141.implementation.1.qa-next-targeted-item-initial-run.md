@@ -35,8 +35,8 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
 | 2. review-task             | ✅ Done    | `task.141.review.{N}.{name}.md` exists (or skip logged)                | **Skipped** — status `Ready for Development` + `task.141.review.1.*.md` present (verdict READY TO IMPLEMENT, reviewed 2026-09-22) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1–5 implemented; 10 new tests, all 10 mutations red; full `npm test` green (3931) with the symlink moved aside | `.summaries/` n/a — surface map consumed inline |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #468: https://github.com/Gamaroff/agent-skills/pull/468 — OPEN, base `develop`, MERGEABLE | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.141.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 7. finalise                | ⏳ Pending | `task.141.dod.{N}.*.md`; task `status: accepted`                       | Blocked by the loop-limit escalation | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -104,6 +104,13 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
 - Step 4: tracker — `in-review` comment posted (`reason: posted`). The GitHub board move returned
   `reason: stage-disabled`: `in-review` is not enabled for this project's workflow record, which is a
   correct outcome and exits 0. The card stays In Progress.
+- Steps 5–6: five QA cycles run; see the QA Iteration History for the per-cycle table. Two process
+  failures of my own are recorded rather than repaired quietly: cycle 2's report first claimed the
+  dispatched reviewer had been *killed at ~12 minutes* when it had in fact returned at 5m56s (the
+  elapsed time was judged from polling, not measured, and the correction is in the report and was
+  posted to the PR); and the cycle-4 commit linked a QA report that had never been written, which CI
+  caught on `link-check` while the local `npm test` — run before the link was added — was green.
+- Steps 5–6: the QA loop halted at its budget. See the Loop Escalation entry.
 
 ---
 
@@ -116,6 +123,37 @@ _Problems encountered and how they were resolved or escalated._
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### Loop Escalation — QA_MAX_CYCLES reached (2026-09-22)
+
+**Reason**: `loop-limit`. Five complete cycles ran. Gate 5 is FAIL with a HIGH, so route 2c (the
+gate-the-last-fix half-cycle) does not apply, and the pipeline escalates rather than entering a
+sixth cycle.
+
+| Cycle | Gate | Findings | HIGH | Where the defect came from |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | FAIL 70 | 4 | 1 | the original change |
+| 2 | FAIL 70 | 5 | 1 | 3 from cycle 1's fixes, 2 from the original |
+| 3 | FAIL 65 | 4 | 1 | all 4 from cycle 2's fixes |
+| 4 | CONCERNS 80 | 5 | 0 | 4 from cycle 3's fix, 1 pre-existing but aggravated |
+| 5 | FAIL 60 | 5 | 1 | all 5 from cycle 4's fixes |
+
+13 defects found and closed. 29 mutations, every one red. `npm test` 3941 green, `validate` green,
+CI green on every push that was gated.
+
+**The state the operator is handed**: every known finding is fixed, mutation-proved and green — and
+the cycle-5 fixes have not been reviewed by any gate. On this branch, four of five cycles found
+their defect in the previous cycle's fix, so "fixed and green" has not been a reliable predictor of
+"correct", and that is why this is an escalation rather than a pass.
+
+**The convergence check did not fire.** HIGH by gate: 1, 1, 1, 0, 1 — not a monotonic stall. This is
+not a loop failing to converge on one defect; it is a small, sharp-edged area (one table cell, one
+in-band separator, one escape) where each correct-looking fix has had a consequence one layer out.
+
+**Recommendation**: grant 1–2 cycles. The next cycle has a bounded job — review the four cycle-5
+fixes — rather than an open remit, and a dispatched review has found something in every cycle it has
+run on this branch (cycles 2, 3, 4 and 5; in cycles 2, 4 and 5 it found defects the inline pass had
+reached none of).
 
 ### Mutation proof — Step 3 (2026-09-22)
 
