@@ -288,6 +288,7 @@ None.
 | 2026-09-22 |  | QA gate CONCERNS (80/100) — 2 findings (CR-1 contract wording, CR-2 wrapped-phrase regex); 2 advisory | qa-task |
 | 2026-09-22 |  | QA findings fixed — CR-1 contract wording, CR-2 wrap-tolerant phrase regex + regression test, CR-3 literal skill form, CR-4 counts; 1 iteration | qa-fix |
 | 2026-09-22 |  | QA gate PASS (100/100) — cycle 2 refute pass; cycle-1 findings verified fixed; 4 low advisories | qa-task |
+| 2026-09-22 |  | DoD incomplete — 1 gap identified (CI link-check red on a quoted relative link, line 63) | finalise |
 <!-- change-log-end -->
 
 ## QA Testing Results
@@ -310,6 +311,35 @@ None.
 
 ### Key Findings
 Cycle 1 (CONCERNS 80): CR-1 contract wording, CR-2 wrap-tolerant phrase regex — both fixed in `9f928818` and verified in cycle 2. Cycle 2 (PASS 100, refute pass): four low/medium-confidence advisories (C2-CR-1..4: site-count assertion, "only declaration", 38-file provenance figure, literal filename) recorded as future recommendations.
+
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (document status unchanged: `ready-for-review`)
+
+### QA Gate Status
+
+**QA Report**: `task.139.qa.2.change-log-engine-reachability.md`
+**Gate File**: `task.139.gate.2.change-log-engine-reachability.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+DoD sections: Acceptance Criteria ✅ 7/7 · Security ✅ · Compliance — N/A · Documentation ✅ · 5c PR review ✅ APPROVE.
+
+### Missing Criteria:
+
+1. **CI green on the final head:**
+   - [ ] `docs-link-check` is red on `88c8a243`: `task.139.change-log-engine-reachability.md:63` quotes `skills/develop/SKILL.md` verbatim, and the quotation's skill-relative link `(references/document-change-log.md)` resolves to nothing from `docs/tasks/` (`Status: 400`). Present since `c99e09d7`; the checker runs on changed files only, and this PR changed the file.
+
+### Next Steps:
+
+- [ ] Render the quoted link as a code span (or drop the link target from the quote) on line 63
+- [ ] Optionally fold in 5c PC-1 (three "41" → 42 mentions) in the same commit
+- [ ] Push; wait for a green run; re-run `/finalise`
+
+**Estimated Effort:** Small (< 15 minutes)
+
+**Gap Report Generated:** 2026-09-22
+**Detailed Verification Log:** See `task.139.dod.1.change-log-engine-reachability.md` for complete verification evidence and timestamps.
 
 ## Progress Tracking
 
