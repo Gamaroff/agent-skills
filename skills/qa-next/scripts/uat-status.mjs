@@ -466,19 +466,23 @@ export function checkRegistry({ sections }, stories, cfg, exists = () => true) {
         else if (!exists(runLink[1]))
           errors.push(`${r.id}: run file not found: ${runLink[1]}`);
       }
-      if (k === "fail") {
-        // EVERY bug link, not the first: the note cell is appended to on a kept ✅ so it can hold
-        // several, and describeRow hands the skill the LAST one. Validating only the first proved
-        // that a different file exists from the one Step 4 opens — --check green, and the loop
-        // then appending a re-test section to a path that does not resolve.
-        const bugLinks = [
-          ...r.notes.matchAll(/\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/g),
-        ].map((m) => m[1]);
-        if (!bugLinks.length)
-          errors.push(`${r.id}: fail requires a bug link in Notes`);
-        for (const link of bugLinks)
-          if (!exists(link))
-            errors.push(`${r.id}: bug file not found: ${link}`);
+      // Every bug-shaped link in the cell, on EVERY row — not only on `fail`. describeRow
+      // publishes `bug` for a row in any state and SKILL.md Step 4 opens that path to append a
+      // re-test section, so validating only `fail` rows left the published path unchecked on four
+      // of the six states. Requiring a link AT ALL stays fail-only; that is a separate rule.
+      //
+      // And only links the tool itself could have written are required to resolve: `linkTo` always
+      // emits a repo-relative path, so a scheme-qualified or anchor link is a human's prose
+      // reference. Requiring those to exist on disk turned a legal registry into a --check error,
+      // which /qa-next Step 0 treats as HALT `registry-invalid`.
+      const bugLinks = [
+        ...r.notes.matchAll(/\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/g),
+      ].map((m) => m[1]);
+      if (k === "fail" && !bugLinks.length)
+        errors.push(`${r.id}: fail requires a bug link in Notes`);
+      for (const link of bugLinks) {
+        if (/^[a-z][a-z0-9+.-]*:/i.test(link) || link.startsWith("#")) continue;
+        if (!exists(link)) errors.push(`${r.id}: bug file not found: ${link}`);
       }
       if ((k === "na" || k === "blocked") && r.notes === "")
         errors.push(`${r.id}: ${k} requires a note saying why`);
@@ -860,10 +864,6 @@ function updateRow(opts, rawId, mutate) {
   );
 }
 
-// Append, but do not repeat: a ✅ row blocked nightly by the same missing credential would
-// otherwise grow its cell forever, and --clear-note is refused there so nothing could trim it.
-// Suppressing only an immediate repeat keeps the operation an append — a different reason arriving
-// between two identical ones is still recorded twice, which is the honest history.
 function appendNote(existing, addition) {
   // A PLAIN append. Duplicate suppression was tried three ways and each traded one wrong answer
   // for another, because ` · ` is the registry's own separator AND is legal inside a note: no

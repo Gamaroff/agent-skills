@@ -1583,10 +1583,13 @@ test("every state in STATES is classified by each of cmdSet's three rules (TASK-
     );
     asserted++;
   }
+  // The floor is DERIVED, not a literal: it still catches a `continue` that skips a state, but a
+  // sixth state added to both STATES and RULES — the correct extension this test exists to force —
+  // must not red here with a message pointing at the wrong thing.
   assert.equal(
     asserted,
-    10,
-    "five states × two assertions each, executed against the tool",
+    Object.values(RULES).filter(Boolean).length * 2,
+    "every classified state contributed both of its assertions against the tool",
   );
   assert.equal(run(root, "--check").code, 0);
 });
@@ -1681,4 +1684,59 @@ test("--check validates every bug link in the cell, including the one --item han
     "and --check refuses the row, because that link does not resolve",
   );
   assert.match(check.out, /bug file not found: \.\.\/bugs\/bug\.7\.new\.md/);
+});
+
+test("--check validates repo-relative bug links on EVERY row, and leaves prose URLs alone (BUG-14/BUG-15)", () => {
+  // Two findings, one rule. Cycle 5 validated every bug-shaped link but only on `fail` rows, which
+  // (a) made a prose URL in a fail note a hard error on a legal registry — /qa-next Step 0 HALTs
+  // on a non-zero --check — and (b) left the path describeRow PUBLISHES unchecked on the other
+  // four states, which is where SKILL.md Step 4 opens it to append a re-test section.
+  const root = corpus();
+  run(root, "--init");
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.1/r.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.real.md"),
+    "---\nstatus: new\n---\n",
+  );
+
+  // A fail row whose note carries a real link AND a prose URL.
+  addRows(
+    root,
+    "D",
+    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
+  );
+  let check = run(root, "--check");
+  assert.equal(
+    check.code,
+    0,
+    "a scheme-qualified link is a human's prose reference, not a path the tool wrote",
+  );
+  assert.doesNotMatch(check.out, /example\.com/);
+
+  // A blocked row — never validated before — whose published link does not resolve.
+  addRows(
+    root,
+    "D",
+    "| D.2 | Board | A visitor reads. | /g | 7.5 |  |  | ⏸ blocked |  | stale [bug.7.gone](../bugs/bug.7.gone.md) |\n",
+  );
+  assert.equal(
+    JSON.parse(run(root, "--item", "D.2", "--json").out).bug,
+    "../bugs/bug.7.gone.md",
+    "the payload publishes it, so --check must cover it",
+  );
+  check = run(root, "--check");
+  assert.equal(check.code, 1, "a stale link on a non-fail row is now caught");
+  assert.match(
+    check.out,
+    /D\.2: bug file not found: \.\.\/bugs\/bug\.7\.gone\.md/,
+  );
+
+  // And the fail-only rule is still fail-only: a blocked row needs no bug link at all.
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.7.gone.md"),
+    "---\nstatus: new\n---\n",
+  );
+  assert.equal(run(root, "--check").code, 0);
 });

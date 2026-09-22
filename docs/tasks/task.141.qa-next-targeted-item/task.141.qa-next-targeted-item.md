@@ -664,11 +664,10 @@ historical naming.
 
 ## QA Testing Results
 
-**QA Status**: FAIL — QA loop limit reached (5 of 5 cycles)
-**QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-22
-**Quality Score**: 60/100
-**Gate Decision**: FAIL (loop limit)
+**QA Status**: CONCERNS (cycle 6 of 7) — findings fixed, awaiting the cycle-7 gate
+**Testing Date**: 2026-09-23
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS — no HIGH
 
 ### QA Reports
 
@@ -678,29 +677,26 @@ historical naming.
 | 2 | [gate.2](./task.141.gate.2.qa-next-targeted-item.yml) | [qa.2](./task.141.qa.2.qa-next-targeted-item.md) | FAIL (70) — refute pass |
 | 3 | [gate.3](./task.141.gate.3.qa-next-targeted-item.yml) | [qa.3](./task.141.qa.3.qa-next-targeted-item.md) | FAIL (65) |
 | 4 | [gate.4](./task.141.gate.4.qa-next-targeted-item.yml) | [qa.4](./task.141.qa.4.qa-next-targeted-item.md) | CONCERNS (80) |
-| 5 | [gate.5](./task.141.gate.5.qa-next-targeted-item.yml) | [qa.5](./task.141.qa.5.qa-next-targeted-item.md) | FAIL (60) — **loop limit** |
+| 5 | [gate.5](./task.141.gate.5.qa-next-targeted-item.yml) | [qa.5](./task.141.qa.5.qa-next-targeted-item.md) | FAIL (60) — loop limit |
+| 6 | [gate.6](./task.141.gate.6.qa-next-targeted-item.yml) | [qa.6](./task.141.qa.6.qa-next-targeted-item.md) | CONCERNS (80) |
+
+Budget: 7 cycles (5 + 2 granted). Cycle 7 remains.
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3941 (0 failures, 1 skipped); qa-next suite 38
-- **Phases Verified**: 5/5
+- **Tests Executed**: 3942 (0 failures, 1 skipped); qa-next suite 39
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
-- **Mutation proof**: 29 mutations across five cycles, every one red
+- **Mutation proof**: 32 across six cycles, every one red
 
-### Where this stands
+### Key Finding — cycle 5's HIGH is closed, and the trend turned
 
-**Every known finding is fixed, mutation-proved and green — and the cycle-5 fixes have not been
-reviewed by any gate.** The loop's five-cycle budget is spent, and route 2c (the gate-the-last-fix
-half-cycle) does not apply because gate 5 raised a HIGH.
+The render/parse round trip was verified **adversarially through the CLI** — a literal backslash, an
+escaped backslash before a pipe, a trailing backslash, a bare pipe in a note, six rewrites each,
+byte-identical. First fix in this loop confirmed by hostile input rather than by its own test.
 
-Thirteen defects were found and closed across the five cycles. Four of the five cycles found their
-defect in the *previous cycle's fix* rather than in the original change, which is why "fixed and
-green" is stated here without being presented as "finished".
-
-The area is one table cell, one in-band separator and one escape — small, and unusually
-sharp-edged: a correct-looking fix has repeatedly had a consequence one layer out (escape without
-unescape; newest-link reader against first-link validator; a suppression rule that no string
-comparison can make correct).
+Cycle 6's two MEDIUMs were both in cycle 5's every-bug-link change and both closed by **one**
+correction — validate every *repo-relative* bug link on *every* row, keeping the required-link rule
+`fail`-only. First cycle whose findings collapsed into a single change rather than a list.
 
 ---
 
@@ -719,6 +715,7 @@ comparison can make correct).
 | 2026-09-22 |         | QA cycle 3 — gate FAIL (65/100); sign-off guard replaced by an append rule rather than a fourth enumeration | qa-task |
 | 2026-09-22 |         | QA cycle 4 — gate CONCERNS (80/100); append rule verified over the writer set; pipe escaping, newest-bug-link and a STATES population test | qa-task |
 | 2026-09-22 |         | QA cycle 5 — gate FAIL (60/100); render/parse idempotence, every-bug-link validation, suppression withdrawn; **loop limit reached** | qa-task |
+| 2026-09-23 |         | QA cycle 6 (granted 1/2) — gate CONCERNS (80/100); round trip verified adversarially; bug-link validation corrected on both axes | qa-task |
 
 <!-- change-log-end -->
 
