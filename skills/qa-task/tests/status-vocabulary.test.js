@@ -41,7 +41,10 @@ for (const rel of SKILLS) {
     const text = read(rel);
     // The warning must exist AND name at least two of the words it forbids: deleting the whole
     // table would otherwise pass the first test with nothing said.
-    assert.match(text, /Never write `(Completed|Ready for Done)`|Do not write `Ready for Done`/);
+    assert.match(
+      text,
+      /Never write `(Completed|Ready for Done)`|Do not write `Ready for Done`/,
+    );
     assert.match(text, /ready-for-review/);
     assert.match(text, /`accepted`.*finalise|finalise.*`accepted`/);
   });
@@ -49,7 +52,19 @@ for (const rel of SKILLS) {
 
 test("a return of the old qa-task wording is caught (mutation of the source, not the test)", () => {
   // Same regex the first test uses, applied to the exact line qa-task carried until 2026-09-22.
-  assert.ok(NON_CANONICAL_WRITE.test('- PASS or CONCERNS → Status: "Completed" (with notes about concerns if applicable)'));
-  assert.ok(NON_CANONICAL_WRITE.test('- WAIVED → Status: "Completed" (with waiver notes)'));
-  assert.ok(!NON_CANONICAL_WRITE.test("- FAIL → Status: `in-progress` (requires fixes before re-review)"));
+  assert.ok(
+    NON_CANONICAL_WRITE.test(
+      '- PASS or CONCERNS → Status: "Completed" (with notes about concerns if applicable)',
+    ),
+  );
+  assert.ok(
+    NON_CANONICAL_WRITE.test(
+      '- WAIVED → Status: "Completed" (with waiver notes)',
+    ),
+  );
+  assert.ok(
+    !NON_CANONICAL_WRITE.test(
+      "- FAIL → Status: `in-progress` (requires fixes before re-review)",
+    ),
+  );
 });

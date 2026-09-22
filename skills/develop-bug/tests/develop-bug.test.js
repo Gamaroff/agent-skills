@@ -106,7 +106,10 @@ test("Step 3 mirrors both of its status transitions into the general-bug registr
   // mention of the registry elsewhere in the doc does not satisfy this.
   assert.match(STEP3, /status: in-progress[^\n]*bug-registry\.md/);
   assert.match(STEP3, /status: ready-for-qa[^\n]*bug-registry\.md/);
-  assert.match(STEP3, /every write of the bug file's `status:`[\s\S]{0,200}paired with the registry row/);
+  assert.match(
+    STEP3,
+    /every write of the bug file's `status:`[\s\S]{0,200}paired with the registry row/,
+  );
 });
 
 test("Step 5-6 mirrors the reopen into the general-bug registry row", () => {
