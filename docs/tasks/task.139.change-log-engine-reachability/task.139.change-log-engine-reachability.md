@@ -310,6 +310,7 @@ None.
 | 2026-09-22 |  | QA findings fixed (cycle 4) — CRLF normalisation, documentPath constrained to work-item documents, opener lookbehind, indented fences, ref-def/escaped-bracket guards, repo once, operand errors; 1 iteration | qa-fix |
 | 2026-09-22 |  | QA gate CONCERNS (90/100, no open entry) — cycle 5: cycle-4 closures verified; Maintainability reservation on the two artifact deny-lists; 4 low advisories | qa-task |
 | 2026-09-22 |  | Scope widened (owner decision, obs #154; 5022ad02) — doc-links engine + corpus guard, review-task/review-story check 2, finalise Step 8a docs-link clause, evaluator documentPath; line 63 → code span. Recorded here after 5c run 2 (PC-3) | develop-next |
+| 2026-09-22 |  | DoD incomplete (run 2) — 1 gap: CI link-check red on quoted examples in qa.4 / qa.5 | finalise |
 <!-- change-log-end -->
 
 ## QA Testing Results
@@ -335,32 +336,32 @@ All cycle-4 closures verified by execution. Maintainability reservation (C5-CR-2
 
 ## Definition of Done - Gaps Identified
 
-**Status:** IN PROGRESS (document status unchanged: `ready-for-review`)
+**Status:** IN PROGRESS (document status unchanged: `ready-for-review`) — run 2, 2026-09-22; run 1's gap (line 63) was closed in `5022ad02`
 
 ### QA Gate Status
 
-**QA Report**: `task.139.qa.2.change-log-engine-reachability.md`
-**Gate File**: `task.139.gate.2.change-log-engine-reachability.yml`
-**Gate Status**: ✅ PASS
-**Quality Score**: 100/100
+**QA Report**: `task.139.qa.5.change-log-engine-reachability.md`
+**Gate File**: `task.139.gate.5.change-log-engine-reachability.yml`
+**Gate Status**: ⚠️ CONCERNS — no open entry (Maintainability reservation C5-CR-2)
+**Quality Score**: 90/100
 
-DoD sections: Acceptance Criteria ✅ 7/7 · Security ✅ · Compliance — N/A · Documentation ✅ · 5c PR review ✅ APPROVE.
+5c review-pr run 2: CONCERNS — documentation consistency, applied in `4871a174`.
 
 ### Missing Criteria:
 
 1. **CI green on the final head:**
-   - [x] `docs-link-check` was red on `88c8a243` — fixed in `5022ad02`: `task.139.change-log-engine-reachability.md:63` quotes `skills/develop/SKILL.md` verbatim, and the quotation's skill-relative link `(references/document-change-log.md)` resolves to nothing from `docs/tasks/` (`Status: 400`). Present since `c99e09d7`; the checker runs on changed files only, and this PR changed the file.
+   - [ ] `docs-link-check` is red on `4871a174`: `task.139.qa.4.*.md:41` and `task.139.qa.5.*.md:29` quote the cycle-4 reviewer's example with a backtick inside a code span, which ends the span early and leaves `[y](b.md)` / `[x](a.md)` as live links. The engine reproduces it (`doc-links.js` exits 1 on those two files, 0 on every other changed `.md`); Step 8a's docs-link clause covers the work item's own document only, so it does not apply.
 
 ### Next Steps:
 
-- [x] Render the quoted link as a code span on line 63 (`5022ad02`)
-- [x] Fold in 5c PC-1 (three "41" → 42 mentions) in the same commit (`5022ad02`)
-- [ ] Push; wait for a green run; re-run `/finalise` — the fresh run replaces this section
+- [ ] Rewrite the two quotations so no live link survives (placeholder targets, or describe the shape in words)
+- [ ] Push; wait for a green run; re-run `/finalise` (run 3)
+- [ ] Log the observation: 8a's clause and the corpus guard should cover co-located pipeline artifacts
 
-**Estimated Effort:** Small (< 15 minutes)
+**Estimated Effort:** Small (< 10 minutes)
 
-**Gap Report Generated:** 2026-09-22
-**Detailed Verification Log:** See `task.139.dod.1.change-log-engine-reachability.md` for complete verification evidence and timestamps.
+**Gap Report Generated:** 2026-09-22 (run 2)
+**Detailed Verification Log:** See `task.139.dod.2.change-log-engine-reachability.md` (run 1: `task.139.dod.1.*`).
 
 ## Progress Tracking
 

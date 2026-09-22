@@ -35,8 +35,8 @@ Spell the writer alternation (`{develop|finalise}`) in `document-change-log.md`'
 | 2. review-task             | ✅ Done    | `task.139.review.{N}.{name}.md` exists (or skip logged)                | `task.139.review.1.change-log-engine-reachability.md` — READY TO IMPLEMENT 9/10, 0C/0I/3O; status Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 13/13 phases; test red→green; 4 mutants red; ci:fast 3890/3890; status `ready-for-review` | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #465: https://github.com/Gamaroff/agent-skills/pull/465 — 2 commits (`2d11faee` fix, `f80f1165` docs); in-review comment posted | —                    |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.139.qa.{N}.*.md`; `task.139.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles: gate.1 CONCERNS 80 → qa-fix `9f928818` → gate.2 PASS 100; 5c review-pr APPROVE (3 low) | `.summaries/step-5-traceability-mapper.json` |
-| 7. finalise                | ⚠️ Needs Attention | `task.139.dod.{N}.*.md`; task `status: accepted`                       | `task.139.dod.1.*` written — NOT ACCEPTED: CI `link-check` red on a quoted relative link (task doc line 63); all four DoD sections PASS/N-A | — |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.139.qa.{N}.*.md`; `task.139.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles: gate.1 CONCERNS 80 → gate.2 PASS 100 → [obs #154 re-entry] gate.3 CONCERNS 50 → gate.4 CONCERNS 80 → gate.5 CONCERNS 90 (no open entry); 5c run 1 APPROVE, run 2 CONCERNS | `.summaries/step-5-traceability-mapper.json` |
+| 7. finalise                | ⚠️ Needs Attention | `task.139.dod.{N}.*.md`; task `status: accepted`                       | run 1 `dod.1` NOT ACCEPTED (link-check red on the task doc line 63 → obs #154, fixed); run 2 `dod.2` NOT ACCEPTED (link-check red on quoted examples in qa.4/qa.5 → obs #155) | — |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -123,13 +123,40 @@ Spell the writer alternation (`{develop|finalise}`) in `document-change-log.md`'
 - Decision: NOT ACCEPTED — 1 gap (CI red). Step 8a fix-and-recheck does not apply by its own text (no DoD section FAIL; CI not green on the head). Document status left `ready-for-review`; gaps row appended; gap report section added; `dod-gaps` PR comment posted (lead counted 4 unchecked boxes — 1 gap + 3 next-step boxes; the counter reads every `- [ ]` in the section).
 - Pipeline HALT per Step 7 "If DoD Gaps Are Found".
 
+### Resume — owner decision on obs #154 (2026-09-22)
+
+- Owner chose "Fix line 63 + make the skill changes on this PR". Landed as `5022ad02`: `shared/resources/doc-links.js` (engine: doc-relative link resolution against the tracked tree; ✖/FAIL red markers) bundled into review-task, review-story, finalise; `shared/resources/tests/doc-links.test.mjs` (fixtures + work-item corpus guard, KNOWN ratchet of 2); review-task/review-story check 2 bullet; finalise Step 8a docs-link clause + Step 6 FAILURE row pointer; task doc line 63 → code span, "41" → 42 (5c PC-1); scope + Files Summary record the widening; CHANGELOG entry. `ci:fast` 3896/3896; `bundle:check` 0; `check:generated` clean. Evaluator run on the real finding record with the pre-fix engine log as `mutationProof.run` → `proceed` 5/5 — the 8a clause is executable as written. Mutation: reverting line 63 reds the corpus guard naming the line. First draft of the review bullet tripped the repo's own link guards (illustrative `references/x.md` and a bracket link) — reworded to prose; that is the create-skill "illustrate with a placeholder" rule biting its own author.
+- Obs #154 → `actioned` (resolution names the commit).
+- Lock restored from the halt snapshot at step 7 (`--restore`), then **deliberately re-entered at `current_step: 5`, `qa_phase: 5a`** by direct edit — the diff grew by an engine, a test suite and three skill edits after 5c approved, so QA cycle 3 and a fresh 5c run on the enlarged diff before finalise re-runs. The advance helper is monotonic by design; this is the one backward move, made by the operator's instruction, and it is recorded here so a resume reads it as intended rather than as drift.
+- Cycle 3 5a: `/qa-task` scoped to files changed since gate.2 (12 files; `SAFETY_REPROBE=false`). Reviewer (scoped Explore, 331 s) returned 8 bugs + 2 cleanups; `ci:fast` red on the exit-after-write guard (TQ-1 — vacuously green pre-commit because the guard walks `git ls-files`). Verified CR-1 (task.42 → 0 links), CR-2 (5 false dead from `skills/review-task`), CR-3 (`$TASK_FILE_PATH` is the bound name), CR-4 (canonical calls use `.agents/skills/…`). Gate.3 CONCERNS 50, 5 promoted. Step 4b with bindings: 0 findings. Mutation 3 `covered`. PR + `qa-gate-3` comments posted.
+- Cycle 3 route: CONCERNS with open entries; cycle ≥ 3 → Convergence check: HIGH sequence 0,0,0 (no HIGH ever) → does not trip; route classifier: residue is engine code, not test machinery → no diminishing-returns exit; gate is not PASS → no cosmetic exit → 5b. changes-requested → `stage-disabled`.
+- Cycle 3 5b: `/qa-fix` on gate.3 — findings ingested inline (gate authored this session). All 5 promoted + 6 advisory fixed in `6b72f629`: engine rewritten (root anchoring w/ realpath, CommonMark fences + open-fence finding, paragraph-bound code spans, more link forms, usage guards, exitCode); prose call form + placeholders; finalise 8a pointer; evaluator `documentPath` (+ test, mutation-proven). A whole-text code-span pass was tried first and ate lines 85–376 of the task doc on an escaped-backtick run — bounded to paragraphs. macOS `/var`→`/private/var` needed realpath on both ends. A `.json` bundled copy the bundler reported AMBIGUOUS was deleted and re-bundled. `ci:fast` 3903/3903; `bundle:check` 0; `check:generated` clean. One push. qa-fix PR + `qa-fix-3` issue comments posted.
+- Cycle counter: 3 complete → cycle 4 5a (scoped to files changed since gate.3).
+- Cycle 4 5a: `/qa-task` scoped since gate.3 (11 files). Cycle-3 closures verified by execution (TQ-1, CR-1..CR-10). Reviewer (341 s) returned 5 bugs + 3 cleanups; C4-CR-1 (CRLF), C4-CR-2 (`documentPath` admits any string) and C4-CR-3 (opener lookbehind) reproduced by the orchestrator; only C4-CR-1 meets the promotion bar → gate.4 CONCERNS 80. Mutation: open-fence finding removed → its test red. PR + `qa-gate-4` comments posted.
+- Cycle 4 route: CONCERNS with an open entry; cycle ≥ 3 → Convergence check: HIGH 0,0,0,0 → no trip; residue engine code → no diminishing-returns exit; not PASS → no cosmetic exit → 5b (cycle 4 of 5). changes-requested → `stage-disabled`.
+- Cycle 4 5b: `/qa-fix` on gate.4 — C4-CR-1 (CRLF) + all seven advisories fixed in `fa554b67`; two mutation proofs (CRLF normalisation; documentPath shape). 15 doc-links tests, 23 evaluator tests; `ci:fast` 3907/3907; `bundle:check` 0; `check:generated` clean. One push; qa-fix PR + `qa-fix-4` issue comments posted.
+- Cycle counter: 4 complete → cycle 5 5a (last budgeted cycle; scoped since gate.4).
+- Cycle 5 5a: `/qa-task` scoped since gate.4 (8 files). Cycle-4 closures verified by execution; reviewer (303 s) scanned 1,738 tracked .md and returned 2 bugs + 2 cleanups, all low — none promoted. C5-CR-2 (two artifact deny-lists already differ inside this PR) recorded as a Maintainability CONCERNS rather than fixed in a sixth cycle: gate.5 CONCERNS 90 with `top_issues: []`. Mutation: opener lookbehind removed → C4-CR-3 test red. PR + `qa-gate-5` comments posted.
+- Cycle 5 route: CONCERNS with no open entry → route 3 → 5c. Path-1 commit (gate.5 + qa.5 + task doc), one push; trail asserted on origin.
+- 5c run 2 `/review-pr --effort medium --comment` over the whole branch (27 files; bundle copies excluded): code lens 423 s, conformance lens 178 s. Verdict **CONCERNS** — PC-6/PC-7/PC-3 (medium/high) documentation consistency of the widening, CR-1 (medium/medium) 8a path form, six low. Report `task.139.pr-review.2.*`; marker comment updated in place.
+- CONCERNS follow-through before Step 7 (documentation only; no code change after the last QA cycle): PC-2..PC-7 applied to the task document (§ 1 pointer, § 4 evaluator mention, § 7 item 11, § 8 line + SC8, Implementation Record paragraph, gap boxes ticked, Change Log row for the owner decision, § Notes follow-up list) and obs #152's resolution names PR #465; CR-1 as a one-sentence clarification + one template line in finalise 8a. CR-2 / CR-3 → follow-up (§ Notes). Committed `4871a174`, pushed. `ci:fast` 3907/3907; `bundle:check` 0.
+- ready-for-merge → `stage-disabled`. Loop exit: 5 cycles, gate.5 CONCERNS (no open entry), PR review CONCERNS → Step 7 (fresh `/finalise` run — dod.2).
+
+### Step 7 — finalise run 2
+
+- `/finalise` run 2: `task.139.dod.2.*` created; QA gate.5 CONCERNS (no open entry) read. CI reading 1: **FAILURE** @ `4871a174f361` — `link-check` red on `task.139.qa.4.*.md:41` and `task.139.qa.5.*.md:29`: a quoted reviewer example with a backtick inside a code span renders `[y](b.md)` / `[x](a.md)` as live links. Engine reproduces it (exit 1 on those two files, 0 on every other changed .md). The four DoD agents were **not** dispatched — the CI gate decided the run; deviation stated in dod.2 (run 1 holds the last full section pass; run 3 dispatches all four).
+- Decision: NOT ACCEPTED — 1 gap. Step 8a does not apply by its own text (the red is on QA artifacts, not the work-item document). Gap section (run 2) replaces run 1's in the task doc; gaps row appended; `dod-gaps` PR comment posted (lead counted 4 boxes — 1 gap + 3 next steps).
+- Obs #155 written: 8a's clause and the corpus guard draw their boundary at the document and miss the co-located artifacts CI link-checks just the same; the writer of a report is the cheapest checker of it.
+- Pipeline HALT per Step 7 "If DoD Gaps Are Found" (second time; same class, one directory entry over).
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
 
-- **Step 7 — DoD gap (blocking):** CI `docs-link-check` red on `88c8a243`: `task.139.change-log-engine-reachability.md:63` renders a quoted skill-relative link `(references/document-change-log.md)` as a live Markdown link. Fix: turn the quotation into a code span (or drop the link target), push, wait for green, re-run `/finalise`. The 5c PC-1 "41"→42 edits can ride in the same commit. Escalated: pipeline HALT.
+- **Step 7 run 2 — DoD gap (blocking):** CI `docs-link-check` red on `4871a174`: `task.139.qa.4.*.md:41` and `task.139.qa.5.*.md:29` quote the cycle-4 reviewer's example with a backtick inside a code span → `[y](b.md)` / `[x](a.md)` render as live links. Fix: rewrite the two quotations (placeholder targets), push, green, re-run `/finalise`. Escalated: pipeline HALT (obs #155).
+- **Step 7 run 1 — DoD gap (blocking, resolved in 5022ad02):** CI `docs-link-check` red on `88c8a243`: `task.139.change-log-engine-reachability.md:63` renders a quoted skill-relative link `(references/document-change-log.md)` as a live Markdown link. Fix: turn the quotation into a code span (or drop the link target), push, wait for green, re-run `/finalise`. The 5c PC-1 "41"→42 edits can ride in the same commit. Escalated: pipeline HALT.
 - **Step 3 — fast gate, first two runs:** Prettier on the new test file; then `bundled-links` on the untracked engine copy (the test resolves links against the tracked tree). Resolved in-iteration (format; `git add`).
 - **Step 5 — traceability mapper:** the read-only Explore agent cannot write files; it returned the matrix in its result and the orchestrator wrote it. Expected for Explore; the prompt file says "write the matrix file".
 
@@ -157,12 +184,39 @@ _Track each QA review/fix cycle._
 **Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review)
 
+### QA Cycle 3 — 2026-09-22
+**Gate Result**: CONCERNS
+**Issues Found**: 5 medium promoted on the obs #154 addition (TQ-1 exit-after-write; CR-1 fence desync → task.42 parses to 0 links, corpus guard vacuous; CR-2 cwd-relative `git ls-files` → 5 false dead links; CR-3 unbound `$TASK_FILE`/`$STORY_FILE`; CR-4 bare `references/` path at 4 sites); 6 advisory (CR-5..CR-10)
+**HIGH findings**: 0
+**MEDIUM findings**: 6
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+
+### QA Cycle 4 — 2026-09-22
+**Gate Result**: CONCERNS
+**Issues Found**: 1 medium promoted (C4-CR-1 CRLF: no fence opens, paragraph splitter never fires); 7 advisory (C4-CR-2 `documentPath` unconstrained; C4-CR-3 opener lookbehind; C4-CR-4 container-indented fences; C4-CR-5 ref-def / escaped-bracket false positives; C4-CR-6 per-doc rev-parse; C4-CR-7 stale header; C4-CR-8 wrong-operand message). All eleven cycle-3 findings verified closed by execution.
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+
+### QA Cycle 5 — 2026-09-22
+**Gate Result**: CONCERNS (no open entry)
+**Issues Found**: none promoted — 4 low advisories: C5-CR-2 two artifact deny-lists drift (Maintainability reservation; one exported predicate is the fix), C5-CR-1 indented-code-block fence false red, C5-CR-3 double-backslash escape, C5-CR-4 bug reports outside the ratchet. All cycle-4 closures verified by execution.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — `task.139.pr-review.2.change-log-engine-reachability.md`; PC-3/PC-6/PC-7 (medium/high: no Change Log row for the widening, evaluator files missing from § 7, no criterion for the addition), CR-1 (medium/medium: 8a path form), 6 low
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: Paused — DoD gap (CI link-check red); resume at Step 7
+**Final Status**: Paused — DoD gap, run 2 (CI link-check red on qa.4/qa.5 quoted examples); resume at Step 7
 **Branch**: `feature/task.139.change-log-engine-reachability`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/465
 **QA Iterations**: {populated at end}
