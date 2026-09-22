@@ -22,6 +22,8 @@
 // Paths: --root <dir> (default: cwd) · --registry <path> (default docs/qa/uat-registry.md) ·
 // --surfaces <path> (default: uat-surfaces.json beside the registry) · --stories <dir> (default docs/prd).
 // Every relative link written into the registry is relative to the registry's own directory.
+// Run files live at runs/<function id>/<date>-<env>.md beside the registry; --findings walks that
+// tree recursively.
 
 import {
   readFileSync,
@@ -499,19 +501,34 @@ export function parseFindings(text) {
   return out;
 }
 
+// Every `.md` under runs/, at any depth, as paths relative to the registry directory. Run files
+// live at runs/<function id>/<date>-<env>.md, so the walk must recurse: a flat readdir would skip
+// every nested run and report a clean zero — the one answer nobody questions. Ordered by file
+// name (the date prefix) first, so "oldest run first" holds across function directories.
+export function listRunFiles(runsDir) {
+  const walk = (dir) =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) return walk(p);
+      return e.isFile() && e.name.endsWith(".md") ? [p] : [];
+    });
+  return walk(runsDir)
+    .map((p) => relative(dirname(runsDir), p))
+    .sort((a, b) => basename(a).localeCompare(basename(b)) || a.localeCompare(b));
+}
+
 // Every finding in every run file, oldest run first. `bug` is relative to the run file; `bugStatus`
 // is the bug's frontmatter status, `missing` when the link does not resolve, null for a note.
 function loadFindings(opts) {
   const runsDir = join(opts.root, opts.registryDir, "runs");
   if (!existsSync(runsDir)) return [];
   const out = [];
-  for (const name of readdirSync(runsDir).sort()) {
-    if (!name.endsWith(".md")) continue;
-    const run = join("runs", name);
-    for (const f of parseFindings(readFileSync(join(runsDir, name), "utf8"))) {
+  for (const run of listRunFiles(runsDir)) {
+    const runPath = join(opts.root, opts.registryDir, run);
+    for (const f of parseFindings(readFileSync(runPath, "utf8"))) {
       let bugStatus = null;
       if (f.bug) {
-        const p = join(runsDir, f.bug);
+        const p = join(dirname(runPath), f.bug);
         bugStatus = existsSync(p)
           ? (frontmatter(readFileSync(p, "utf8")).status ?? "")
           : "missing";

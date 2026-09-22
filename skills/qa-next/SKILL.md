@@ -122,19 +122,19 @@ Record the exit code and copy `uatReportDir` (with its `results.json`) into the 
 
 Function result: **pass** only if every item passed; **fail** if any item failed; **blocked** if none failed but some could not be executed (list them in the note). Do not stop at the first failure — the owner wants the whole picture. Findings do not affect the result: a function with three findings and no failed item is still **pass**.
 
-Evidence (screenshots, response bodies, the lane report) goes under `.claude/state/qa-next/<date>-<envLabel>-<id>/` — never into the repo. The run file names the paths.
+Evidence (screenshots, response bodies, the lane report) goes under `.claude/state/qa-next/<id>/<date>-<envLabel>/` — the same shape as the run file's path, never into the repo. The run file names the paths.
 
 Update the state file (`phase: executed`).
 
 ## Step 4 — Record
 
-1. Write `runs/<date>-<envLabel>-<id>.md` beside the registry from `assets/run.template.md`: header (function, what it does, stories, environment, commit under test, personas, tester = `qa-next`), the **Automated run** block (command, exit code, report path, one line per test — or `_None_`), one block per item with its observed result and evidence, the verdict, the **Findings** table (one row per Step 3 finding, `_None._` when there were none — written on every run, pass or fail; it is the only place an observation that failed no item survives), and the **Automation candidate** block (`_None — covered by <spec>_` when the lane ran).
+1. Write `runs/<id>/<date>-<envLabel>.md` beside the registry (`mkdir -p runs/<id>` first — one directory per function, so a function's whole history is one listing) from `assets/run.template.md`: header (function, what it does, stories, environment, commit under test, personas, tester = `qa-next`), the **Automated run** block (command, exit code, report path, one line per test — or `_None_`), one block per item with its observed result and evidence, the verdict, the **Findings** table (one row per Step 3 finding, `_None._` when there were none — written on every run, pass or fail; it is the only place an observation that failed no item survives), and the **Automation candidate** block (`_None — covered by <spec>_` when the lane ran).
 2. On **fail**: invoke `/create-bug-report` in **story mode** against the story in `stories[]` whose AC the failed item exercises (the first story when it is unclear; **general mode** when the function's stories are all `storyNa`-grade infra), severity from the worst failed item, reproduction steps copied verbatim from the failing item(s). Capture the bug file path.
 3. File the findings, independently of the verdict. For each row: **story mode** against the story it concerns when one of this function's stories owns it; **general mode** (`docs/bugs/`, no parent) when it belongs to another surface, to the environment or to this harness — never file a foreign defect against the story you happened to be testing. Severity as recorded; reproduction from the row. File only what a stranger could reproduce from the row alone; otherwise `Filed as` stays `note` and the row itself is the record. Put each bug's link (relative to the run file) in its row's `Filed as` cell.
 4. Registry:
-   - pass → `--set <id> pass --run runs/<file>.md`
-   - fail → `--set <id> fail --run runs/<file>.md --bug <bug path>`
-   - blocked → `--set <id> blocked --run runs/<file>.md --note "<items and reasons>"`
+   - pass → `--set <id> pass --run runs/<id>/<file>.md`
+   - fail → `--set <id> fail --run runs/<id>/<file>.md --bug <bug path>`
+   - blocked → `--set <id> blocked --run runs/<id>/<file>.md --note "<items and reasons>"`
 5. `--check` must exit 0. It also proves every `Filed as` link in every run file resolves. If it does not, fix what it names — never proceed past a red check.
 
 Update the state file (`phase: recorded`).

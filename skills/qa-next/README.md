@@ -56,7 +56,7 @@ node .agents/skills/qa-next/scripts/uat-status.mjs --findings      # everything 
 node .agents/skills/qa-next/scripts/uat-status.mjs --automated D.2 "apps/portal/e2e/uat/D.2.uat.spec.ts"   # after a spec lands
 ```
 
-Read the run file before accepting — `runs/<date>-<env>-<id>.md` is the evidence; the 🟡 is only the summary.
+Read the run file before accepting — `runs/<id>/<date>-<env>.md` is the evidence; the 🟡 is only the summary. One directory per function, so `ls docs/qa/runs/D.2/` is that function's whole UAT history, oldest first.
 
 ## Three layers, and how a manual pass becomes a regression test
 

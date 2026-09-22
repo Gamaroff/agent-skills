@@ -38,13 +38,14 @@ const {
   parseFindings,
   checkFindings,
   isOpenFinding,
+  listRunFiles,
   STATES,
   COLUMNS,
 } = await import(TOOL);
 
 const HEAD = `| # | Function | What it does | Entry | Stories | Items | Automated by | UAT | Last run | Notes / bug |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |`;
-const RUN = "[2026-09-21-lan-D.2](runs/2026-09-21-lan-D.2.md)";
+const RUN = "[2026-09-21-lan](runs/D.2/2026-09-21-lan.md)";
 const REGISTRY = `
 ### A. Shell
 
@@ -179,7 +180,7 @@ test("checkRegistry: state rules — pass/fail/accepted need a run, fail needs a
     () => false,
   ).errors;
   assert.ok(
-    missing.includes("D.1: run file not found: runs/2026-09-21-lan-D.2.md"),
+    missing.includes("D.1: run file not found: runs/D.2/2026-09-21-lan.md"),
   );
   assert.ok(missing.includes("D.2: bug file not found: ../bugs/bug.92.x.md"));
 });
@@ -439,7 +440,7 @@ test("CLI: set → items → automated → accept round-trip; refusals are real;
   assert.equal(run(root, "--set", "D.2", "na").code, 2, "n/a needs a note");
   assert.equal(run(root, "--set", "D.2", "pass").code, 2, "pass needs --run");
   assert.equal(
-    run(root, "--set", "D.2", "fail", "--run", "runs/r.md").code,
+    run(root, "--set", "D.2", "fail", "--run", "runs/D.2/r.md").code,
     2,
     "fail needs --bug",
   );
@@ -449,10 +450,11 @@ test("CLI: set → items → automated → accept round-trip; refusals are real;
     run(root, "--automated", "D.2", "apps/portal/e2e/uat/D.2.uat.spec.ts").code,
     0,
   );
-  assert.equal(run(root, "--set", "D.2", "pass", "--run", "runs/r.md").code, 0);
+  assert.equal(run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r.md").code, 0);
   assert.equal(run(root, "--check").code, 1, "run file does not exist yet");
-  writeFileSync(path.join(root, "docs/qa/runs/r.md"), "# run\n");
-  assert.equal(run(root, "--check").code, 0);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r.md"), "# run\n");
+  assert.equal(run(root, "--check").code, 0, "a nested Last run link resolves");
   assert.equal(
     readFileSync(REG(root), "utf8")
       .split("\n")
@@ -470,7 +472,7 @@ test("CLI: set → items → automated → accept round-trip; refusals are real;
       "D.1",
       "fail",
       "--run",
-      "runs/r.md",
+      "runs/D.2/r.md",
       "--bug",
       "docs/bugs/bug.1.x.md",
     ).code,
@@ -480,11 +482,11 @@ test("CLI: set → items → automated → accept round-trip; refusals are real;
   const text = readFileSync(REG(root), "utf8");
   assert.match(
     text,
-    /^\| D\.2 \| Submit a score \| A game posts a score\. \| \/games\/:slug \| 7\.5 · 31\.1 \| D\.2\.1–D\.2\.9 \| apps\/portal\/e2e\/uat\/D\.2\.uat\.spec\.ts \| ✅ accepted \| \[r\]\(runs\/r\.md\) \| accepted \d{4}-\d{2}-\d{2} — looks right \|$/m,
+    /^\| D\.2 \| Submit a score \| A game posts a score\. \| \/games\/:slug \| 7\.5 · 31\.1 \| D\.2\.1–D\.2\.9 \| apps\/portal\/e2e\/uat\/D\.2\.uat\.spec\.ts \| ✅ accepted \| \[r\]\(runs\/D\.2\/r\.md\) \| accepted \d{4}-\d{2}-\d{2} — looks right \|$/m,
   );
   assert.match(
     text,
-    /^\| D\.1 \|.*\| ❌ fail \| \[r\]\(runs\/r\.md\) \| \[bug\.1\.x\]\(\.\.\/bugs\/bug\.1\.x\.md\) \|$/m,
+    /^\| D\.1 \|.*\| ❌ fail \| \[r\]\(runs\/D\.2\/r\.md\) \| \[bug\.1\.x\]\(\.\.\/bugs\/bug\.1\.x\.md\) \|$/m,
   );
   assert.equal(run(root, "--next").code, 3, "nothing untested left");
   assert.equal(run(root, "--next", "--json").out.trim(), "null");
@@ -573,7 +575,7 @@ test("checkFindings names a finding whose bug link does not resolve; open = note
   assert.deepEqual(rows.map(isOpenFinding), [true, true, false, true]);
 });
 
-test("CLI: --findings aggregates open findings across run files; --check fails on a dangling bug link", () => {
+test("CLI: --findings walks runs/<id>/ recursively, oldest first across directories; --check fails on a dangling bug link", () => {
   const root = corpus();
   run(root, "--init");
   const runs = path.join(root, "docs/qa/runs");
@@ -588,29 +590,38 @@ test("CLI: --findings aggregates open findings across run files; --check fails o
   );
   const table = (rows) =>
     `# run\n\n## Findings\n\n| # | Where | What was observed | Severity | Filed as |\n| :--- | :--- | :--- | :--- | :--- |\n${rows.join("\n")}\n`;
+  // D.2 is written first and sorts first by directory; the walk must still order by date.
+  mkdirSync(path.join(runs, "D.2"), { recursive: true });
+  mkdirSync(path.join(runs, "A.1"), { recursive: true });
   writeFileSync(
-    path.join(runs, "2026-09-21-lan-A.1.md"),
+    path.join(runs, "D.2/2026-09-22-lan.md"),
+    table([
+      "| 1 | /play | toast fires twice | Minor | [bug.2.open](../../../bugs/bug.2.open.md) |",
+    ]),
+  );
+  writeFileSync(
+    path.join(runs, "A.1/2026-09-21-lan.md"),
     table([
       "| 1 | /health | no redis field | Minor | note |",
-      "| 2 | /u/x | 500 | Major | [bug.1.closed](../../bugs/bug.1.closed.md) |",
+      "| 2 | /u/x | 500 | Major | [bug.1.closed](../../../bugs/bug.1.closed.md) |",
     ]),
   );
-  writeFileSync(
-    path.join(runs, "2026-09-22-lan-D.2.md"),
-    table([
-      "| 1 | /play | toast fires twice | Minor | [bug.2.open](../../bugs/bug.2.open.md) |",
-    ]),
+  writeFileSync(path.join(runs, "A.1/notes.txt"), "not a run file");
+  writeFileSync(path.join(runs, "README.md"), "# runs\n\nno Findings section here\n");
+  assert.deepEqual(
+    listRunFiles(runs),
+    ["runs/A.1/2026-09-21-lan.md", "runs/D.2/2026-09-22-lan.md", "runs/README.md"],
+    "every .md at any depth, ordered by file name (date) before directory",
   );
-  writeFileSync(path.join(runs, "notes.txt"), "not a run file");
 
   const open = JSON.parse(run(root, "--findings", "--json").out);
   assert.deepEqual(
     open.map((f) => [f.run, f.n, f.bugStatus]),
     [
-      ["runs/2026-09-21-lan-A.1.md", 1, null],
-      ["runs/2026-09-22-lan-D.2.md", 1, "new"],
+      ["runs/A.1/2026-09-21-lan.md", 1, null],
+      ["runs/D.2/2026-09-22-lan.md", 1, "new"],
     ],
-    "the closed bug's finding is not open; runs are oldest first",
+    "the closed bug's finding is not open; runs are oldest first across directories",
   );
   assert.equal(
     JSON.parse(run(root, "--findings", "--all", "--json").out).length,
@@ -619,7 +630,7 @@ test("CLI: --findings aggregates open findings across run files; --check fails o
   const text = run(root, "--findings").out;
   assert.match(
     text,
-    /^runs\/2026-09-21-lan-A\.1\.md\n {3}1 {2}Minor {4}\/health — no redis field {2}\[note\]$/m,
+    /^runs\/A\.1\/2026-09-21-lan\.md\n {3}1 {2}Minor {4}\/health — no redis field {2}\[note\]$/m,
   );
   assert.match(text, /\[bug\.2\.open \(new\)\]/);
   assert.match(
@@ -633,16 +644,17 @@ test("CLI: --findings aggregates open findings across run files; --check fails o
   );
   assert.equal(run(root, "--check").code, 0, "no rows, links resolve");
 
+  mkdirSync(path.join(runs, "D.3"), { recursive: true });
   writeFileSync(
-    path.join(runs, "2026-09-23-lan-D.3.md"),
+    path.join(runs, "D.3/2026-09-23-lan.md"),
     table([
-      "| 1 | /x | gone | Trivial | [bug.9.gone](../../bugs/bug.9.gone.md) |",
+      "| 1 | /x | gone | Trivial | [bug.9.gone](../../../bugs/bug.9.gone.md) |",
     ]),
   );
   const check = run(root, "--check");
   assert.equal(check.code, 1);
   assert.match(
     check.out,
-    /\[ERROR\] runs\/2026-09-23-lan-D\.3\.md finding 1: bug file not found: \.\.\/\.\.\/bugs\/bug\.9\.gone\.md/,
+    /\[ERROR\] runs\/D\.3\/2026-09-23-lan\.md finding 1: bug file not found: \.\.\/\.\.\/\.\.\/bugs\/bug\.9\.gone\.md/,
   );
 });

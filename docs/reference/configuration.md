@@ -138,7 +138,7 @@ qaNext: # optional — qa-next UAT loop orchestrator
   apiUrl: http://localhost:3001 # optional; enables HTTP probes
   healthPath: /
   apiHealthPath: /health # probed on apiUrl at preflight; an API root is usually a 404
-  envLabel: local # goes into run file names: runs/<date>-<envLabel>-<id>.md
+  envLabel: local # goes into run file names: runs/<id>/<date>-<envLabel>.md
   personasDoc: docs/development/feature-testing-checklist.md # test accounts + roles
   uatCommand: npm run test:e2e:uat --workspace=apps/portal -- # optional; the real-stack lane, run with --grep "@<id>"
   uatReportDir: apps/portal/playwright-report-uat # where that lane writes results.json
@@ -248,7 +248,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `developNext.mergeStrategy`                      | `merge` \| `squash` \| `rebase` | `merge`                                          | Strategy passed to `gh pr merge`.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `qaNext.registryPath`                            | path                            | `docs/qa/uat-registry.md`                        | The owner's UAT registry — one row per **user function**, authored by hand, grouped by surface; each row names the stories that built it. `uat-surfaces.json` (surfaces, epic → surface map, `storyNa`, `uatSpecPattern`) is read from the same directory. |
 | `qaNext.baseUrl` / `qaNext.apiUrl` / `qaNext.healthPath` / `qaNext.apiHealthPath` | URL / URL / path / path | (none) / (none) / `/` / `/health`          | The environment `/qa-next` exercises. `baseUrl` is required for a run; `apiUrl` enables HTTP probes; preflight `curl`s `baseUrl + healthPath` and, when `apiUrl` is set, `apiUrl + apiHealthPath` — never the bare API origin, whose root is a 404 on most frameworks — and stops with `env-unreachable` on failure. |
-| `qaNext.envLabel`                                | string                          | `local`                                          | Names the environment in run files: `runs/<date>-<envLabel>-<id>.md`. |
+| `qaNext.envLabel`                                | string                          | `local`                                          | Names the environment in run files: `runs/<id>/<date>-<envLabel>.md` — one directory per function. |
 | `qaNext.personasDoc`                             | path                            | (none)                                           | Document listing the test accounts and which surface each exercises; read when resolving a function to items. |
 | `qaNext.uatCommand` / `qaNext.uatReportDir`      | shell command / path            | (none) / `apps/portal/playwright-report-uat`     | The real-stack Playwright lane `/qa-next` runs against `baseUrl` as evidence — invoked as `<uatCommand> --grep "@<function id>"`, its `results.json` read from `uatReportDir`. Unset → no lane; every item is walked by hand. |
 | `qaNext.baseBranch` / `qaNext.commit`            | branch / bool                   | `develop` / `true`                               | Where the docs commit lands, and whether the skill commits at all. |
