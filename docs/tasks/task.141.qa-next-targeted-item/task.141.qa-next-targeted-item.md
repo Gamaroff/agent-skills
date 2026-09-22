@@ -672,36 +672,40 @@ historical naming.
 
 ### QA Report
 
-- **Full Report**: [task.141.qa.1.qa-next-targeted-item.md](./task.141.qa.1.qa-next-targeted-item.md)
-- **Gate File**: [task.141.gate.1.qa-next-targeted-item.yml](./task.141.gate.1.qa-next-targeted-item.yml)
+- **Full Report**: [task.141.qa.2.qa-next-targeted-item.md](./task.141.qa.2.qa-next-targeted-item.md)
+- **Gate File**: [task.141.gate.2.qa-next-targeted-item.yml](./task.141.gate.2.qa-next-targeted-item.yml)
+- **Cycle 1**: [task.141.qa.1.qa-next-targeted-item.md](./task.141.qa.1.qa-next-targeted-item.md) · [task.141.gate.1.qa-next-targeted-item.yml](./task.141.gate.1.qa-next-targeted-item.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3931 (0 failures, 1 skipped)
-- **Phases Verified**: 5/5 (3 PASS, 2 CONCERNS)
-- **Critical Issues**: 1 HIGH, 1 MEDIUM, 2 LOW
+- **Tests Executed**: 3933 (0 failures, 1 skipped)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 1 HIGH, 1 MEDIUM, 1 LOW new this cycle; 2 bugs fixed and verified
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
-### Bug Resolution (cycle 1 fixes — awaiting QA verification)
+### Bug Resolution
 
-| Bug | Severity | Fix | Held by |
-| :--- | :--- | :--- | :--- |
-| TASK-141-BUG-1 | HIGH | `untested` excluded from the kept predicate — it is the demotion, not a verdict | New `untested`-on-`✅` leg in the accepted-row group; mutation-proved (M11) |
-| TASK-141-BUG-2 | MEDIUM | Both run-template evidence placeholders now name `<run-file-basename>` | New agreement test over `SKILL.md` + the template, with a non-vacuity floor; mutation-proved (M13) |
-| CR-4 | LOW | `--run-path` refuses an `--env` label ending in `-NN` — the ambiguity is created at write time, so it is refused there | `runPathFor` + CLI refusal tests; mutation-proved (M12) |
-
-Both bug reports are at **Ready for QA**. CR-3 remains advisory in `recommendations.future`.
+| Bug | Severity | Cycle | Status | Verification |
+| :--- | :--- | :--- | :--- | :--- |
+| TASK-141-BUG-1 | HIGH | 1 | **Verified fixed** | Full 6×5 verdict-by-prior-state matrix executed; mutation-proved |
+| TASK-141-BUG-2 | MEDIUM | 1 | **Verified fixed** | Agreement test confirmed to catch drift in both directions; mutation-proved |
+| TASK-141-BUG-3 | HIGH | 2 | Fixed, awaiting QA | `/qa-next D.2` in the description; `quick_validate.py` green |
+| TASK-141-BUG-4 | MEDIUM | 2 | Fixed, awaiting QA | Both SKILL.md sentences name the demotion beside the fail |
+| TASK-141-BUG-5 | MEDIUM | 2 | Fixed, awaiting QA | `--note` refused on a kept `✅`, not only `--clear-note` |
+| TASK-141-BUG-6 | MEDIUM | 2 | Fixed, awaiting QA | Id normalised in `updateRow`; a test enumerates all six id-taking commands |
 
 ### Key Findings
 
-- **TASK-141-BUG-1 (HIGH)** — the kept-accepted predicate captures `untested`, so this task's own
-  documented migration path (`--set <id> untested --note "<why>"`) leaves the row reading
-  `✅ accepted` with its `Last run` cleared. `--check` rejects that and `/qa-next` Step 0 HALTs
-  `registry-invalid`. Reproduced end to end.
-- **TASK-141-BUG-2 (MEDIUM)** — `assets/run.template.md` still names the colliding
-  `<date>-<env>/` evidence path that `SKILL.md` Step 3 replaced with `<run-file-basename>/`.
-- All ten mutation proofs went red and **none of them caught BUG-1**: no test sends `untested` to an
-  accepted row, so there was no assertion for a mutation to red.
+- **TASK-141-BUG-3 (HIGH)** — CI `validate` refuses angle brackets in a `description`, and
+  `/qa-next <id>` has them. `npm run validate` is the one command in the coding standards that
+  `npm test` does not subsume and that no pipeline gate runs.
+- **TASK-141-BUG-4 (MEDIUM)** — the cycle-1 fix made two `SKILL.md` sentences false: both still say
+  only a `fail` moves an accepted row, when `untested` now does too. Found by the refute pass's
+  documentation-transition probe, which the diff could not show.
+- **CR2-3 (LOW)** — `--run-path` creates `runs/<id>/` before validating `--env`, so a refused call
+  still writes a directory.
+- **Cycle 2's review was performed inline**: the dispatched refute reviewer was killed at ~12 minutes
+  past its budget. The independence cycle 2 is supposed to supply was lost and is recorded as such.
 
 ---
 
@@ -716,6 +720,7 @@ Both bug reports are at **Ready for QA**. CR-3 remains advisory in `recommendati
 | 2026-09-22 |         | Status → ready-for-development | review-task |
 | 2026-09-22 |         | Phases 1–5 implemented; status → ready-for-review | develop-task |
 | 2026-09-22 |         | QA gate FAIL (70/100) — 4 findings (1 HIGH, 1 MEDIUM, 2 LOW); status → in-progress | qa-task |
+| 2026-09-22 |         | QA cycle 2 refute pass — gate FAIL (70/100); 2 cycle-1 bugs verified fixed, 3 new findings | qa-task |
 
 <!-- change-log-end -->
 

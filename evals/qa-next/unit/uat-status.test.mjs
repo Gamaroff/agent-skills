@@ -737,6 +737,14 @@ test("CLI: --run-path refuses an env label that would be read as a run sequence"
   const { code, out } = run(root, "--run-path", "D.2", "--env", "ci-02");
   assert.equal(code, 2, "a usage error, not a written file");
   assert.match(out, /an env label may not end in -NN/);
+  // A refusal that has already created the directory is a refusal the caller cannot trust — and
+  // asserting the exit code alone would not have noticed: the first version of this fix validated
+  // AFTER mkdirSync and passed every assertion above.
+  assert.equal(
+    existsSync(path.join(root, "docs/qa/runs/D.2")),
+    false,
+    "a refused --run-path writes nothing at all",
+  );
   assert.equal(
     run(root, "--run-path", "D.2", "--env", "ci").code,
     0,
@@ -927,16 +935,23 @@ test("CLI: only a fail moves an ✅ accepted row — pass, blocked and n/a keep 
   assert.equal(state()[10], acceptedNote, "and so does its provenance");
   assert.equal(run(root, "--check").code, 0);
 
-  // blocked and n/a on ✅ — the rule is over the verdict set, not over "pass".
+  // blocked and n/a on ✅ — the rule is over the verdict set, not over "pass". These two MANDATE
+  // --note, which is the door the sign-off guard was missing: refusing --clear-note alone left the
+  // same cell overwritable by the two verdicts Step 2's early exits write.
   for (const verdict of ["blocked", "na"]) {
     const r = run(root, "--set", "D.2", verdict, "--note", `env: ${verdict}`);
-    assert.equal(r.code, 0);
-    assert.match(
-      r.out,
-      /✅ accepted \(kept\)/,
-      `${verdict} must not demote an accepted row`,
+    assert.equal(
+      r.code,
+      2,
+      `${verdict} --note must not overwrite the sign-off cell`,
     );
+    assert.match(r.out, /sign-off note cannot be cleared or overwritten/);
     assert.equal(state()[8], STATES.accepted);
+    assert.equal(
+      state()[10],
+      acceptedNote,
+      `the owner's sign-off survives a ${verdict} re-run byte-identical`,
+    );
   }
   assert.equal(run(root, "--check").code, 0);
 
@@ -1085,7 +1100,8 @@ test("CLI: --clear-note empties Notes / bug, and is refused where clearing would
   assert.equal(refused.code, 2);
   assert.match(
     refused.out,
-    /--clear-note cannot clear an accepted row's sign-off note/,
+    /sign-off note cannot be cleared or overwritten/,
+    "the refusal now names both doors into that cell, not only --clear-note",
   );
   assert.equal(notes("D.2"), signOff, "byte-identical — nothing was written");
   assert.equal(run(root, "--check").code, 0);
@@ -1168,7 +1184,17 @@ test("CLI: the commands task 141 does not touch keep their arguments, output and
   assert.equal(run(root, "--check").code, 0);
   assert.equal(run(root, "--coverage").code, 0);
   assert.equal(run(root, "--findings").code, 0);
-  assert.equal(run(root, "--item").code, 4, "a bare --item names no row");
+  assert.equal(
+    run(root, "--item").code,
+    2,
+    "a bare --item is a USAGE error — 'you named no row' is not 'you named a row that is not there', and Step 1 maps exit 4 to STOP unknown-item",
+  );
+  assert.equal(
+    run(root, "--item", "--json").code,
+    2,
+    "and a flag-shaped value is not an id either",
+  );
+  assert.equal(run(root, "--run-path").code, 2, "same for --run-path");
   assert.equal(
     run(root, "--clear-note").code,
     0,
@@ -1217,4 +1243,43 @@ test("the run template and SKILL.md state ONE evidence path (TASK-141-BUG-2)", (
     ["<run-file-basename>"],
     "every statement of the evidence directory, in both files, is the run-file basename",
   );
+});
+
+test("every command that takes a row id accepts it case-insensitively (TASK-141-BUG-6)", () => {
+  // The POPULATION, enumerated. `normaliseId` was added to --item and --run-path, the two commands
+  // this task introduced, and the four that already took an id kept comparing raw — each site
+  // correct alone, the set never listed. A run carrying the owner's spelling resolved and computed
+  // a run path, then failed at --set: the RECORDING step, after the function had been exercised.
+  // Sampling two of six is what let that through, so this test names all six.
+  const ID_TAKING_COMMANDS = [
+    { label: "--item", argv: (id) => ["--item", id, "--json"] },
+    { label: "--run-path", argv: (id) => ["--run-path", id, "--env", "lan"] },
+    {
+      label: "--set",
+      argv: (id) => ["--set", id, "pass", "--run", "runs/D.2/r1.md"],
+    },
+    { label: "--items", argv: (id) => ["--items", id, "D.2.1"] },
+    { label: "--automated", argv: (id) => ["--automated", id, "a/b.spec.ts"] },
+    { label: "--accept", argv: (id) => ["--accept", id] },
+  ];
+
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+
+  const rejected = [];
+  for (const { label, argv } of ID_TAKING_COMMANDS) {
+    const { code, out } = run(root, ...argv("d.2"));
+    if (code !== 0 || /no registry row/.test(out))
+      rejected.push(`${label} (${code})`);
+  }
+  assert.deepEqual(
+    rejected,
+    [],
+    "every id-taking command must accept the lowercase id the Arguments table promises",
+  );
+  // Non-vacuity: the loop above is only evidence if it actually ran every command.
+  assert.equal(ID_TAKING_COMMANDS.length, 6);
 });

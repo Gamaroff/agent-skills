@@ -1,0 +1,111 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: FAIL
+status_reason: 'CI validate is red on angle brackets in the description. Cycle 1 fixes all verified correct by execution; one made two SKILL.md sentences false. The dispatched refute reviewer found two further MEDIUM defects the inline pass missed — the sign-off guard defeated through --note, and case-insensitivity covering only the two new commands.'
+reviewer: 'QA Engineer'
+updated: '2026-09-22T19:55:00Z'
+
+top_issues:
+  - id: 'TASK-141-BUG-3'
+    severity: high
+    file: 'skills/qa-next/SKILL.md'
+    finding: 'CI `validate` fails — `qa-next — Description cannot contain angle brackets (< or >)`. The frontmatter description gained `/qa-next <id>` when the positional argument was documented; `quick_validate.py` refuses angle brackets and no local gate the pipeline runs executes it.'
+    suggested_action: 'Replace `<id>` in the description with a concrete example id, and run `npm run validate -- skills/qa-next/` before the next push.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-BUG-4'
+    severity: medium
+    file: 'skills/qa-next/SKILL.md'
+    finding: 'Two sentences still assert "Only a `fail` moves it, and it moves it from any state" (Step 4) and "Only a failure moves an accepted row" (never-does list) — both made false by the cycle-1 fix, which lets `untested` move an accepted row deliberately.'
+    suggested_action: 'Amend both to name the demotion beside the fail, as README.md § Registry states already does.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-BUG-5'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'The kept-✅ sign-off guard is defeated through a different door: --clear-note is refused on that cell, but --set <id> blocked|na --note replaces it, keeps ✅, and leaves --check green. The cycle-1 test asserts the state cell in those legs, never the note cell.'
+    suggested_action: 'Refuse --note on a kept ✅ for the same reason --clear-note is refused, and assert the note cell in the blocked/na legs.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-BUG-6'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'normaliseId is applied in cmdItem and cmdRunPath only; updateRow compares the raw id, so --set, --accept, --items and --automated reject a lowercase id. The finding is the missing population check over every id-taking command, not the four sites.'
+    suggested_action: 'Normalise once in updateRow, the single writer, and add a test enumerating all six id-taking commands.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-CR2-5'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'A bare --item resolves to an empty id and exits 4, conflating "you named no row" with "you named a row that is not there"; Step 1 maps exit 4 to STOP unknown-item, the wrong stop for a malformed call. The cycle-1 contract test enshrines the conflation.'
+    suggested_action: 'Exit 2 for a missing or flag-shaped value; keep exit 4 for a well-formed id with no row, and correct that assertion.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-CR2-3'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'cmdRunPath calls mkdirSync before runPathFor validates --env, so a refused ambiguous label still creates an empty runs/<id>/ — a refusal that writes.'
+    suggested_action: 'Compute the path before creating the directory: read `existing` via existsSync, call runPathFor, then mkdirSync on the success path only.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 3933
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged from cycle 1 and re-confirmed: no single-argument accept/reject export exists to probe. The cycle-1 --env refusal was executed against its adversarial input (`ci-02`) directly and through the CLI; it throws UsageError, main catches it, exit 2 — the refusal does not bypass the throw-never-exit discipline that keeps stdout draining.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. No network, no new walk. qa-next suite 30 tests.'
+  reliability:
+    status: CONCERNS
+    notes: 'Cycle 1 closed the registry-invalid path (BUG-1 verified fixed across the full 6x5 verdict-by-prior-state matrix). Remaining: CR2-3, a refusal that leaves an empty directory behind — cosmetic, but the skill states elsewhere that a refusal writes nothing.'
+  maintainability:
+    status: CONCERNS
+    notes: 'BUG-4 is the documentation-transition failure the refute pass exists to catch: a correct code fix made two neighbouring sentences in the same file false. BUG-6 is the enumeration class — a helper added at two call sites with the population never enumerated. The evidence-path agreement test added in cycle 1 was verified to catch drift in BOTH directions, which is the shape the rest of the prose still lacks.'
+
+recommendations:
+  immediate:
+    - action: 'Remove the angle brackets from the qa-next frontmatter description; re-run npm run validate.'
+      refs: ['skills/qa-next/SKILL.md']
+    - action: 'Amend the two SKILL.md sentences that say only a fail moves an accepted row.'
+      refs: ['skills/qa-next/SKILL.md']
+    - action: 'Refuse --note on a kept ✅ and assert the note cell in the blocked/na test legs.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+    - action: 'Normalise the row id in updateRow and enumerate every id-taking command in a test.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+  future:
+    - action: 'CR2-3: validate --env before mkdirSync so a refused --run-path writes nothing.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR2-5: exit 2 rather than 4 for a missing or flag-shaped --item value.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+    - action: 'CR-3 (carried from cycle 1, still advisory): --set exits 0 whether the row moved or was kept.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'skills/qa-next/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 4
+  fix_date: '2026-09-22'
+  total_iterations: 1
+  verification_method: 'Mutation proof (3 mutations, all red) + full 6x5 verdict-by-prior-state matrix executed against a fixture registry'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'CI validate green'
+    - 'TASK-141-BUG-4 fixed'

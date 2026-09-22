@@ -1,6 +1,6 @@
 ---
 name: qa-next
-description: "UAT loop orchestrator: selects the next untested user function from the owner's UAT registry (scripts/uat-status.mjs --next) — one row per thing a person does with the app — resolves it to checklist items (authoring them when none exist), runs the function's tagged real-stack Playwright spec when one exists, walks the rest with browser automation and HTTP probes, writes a per-run results file, records 🟡 pass / ❌ fail / ⏸ blocked, files a bug on failure, records every incidental finding in the run file's Findings table and files those too (`--findings` lists open ones), leaves an automation candidate for every pass no spec covers, commits, and reports. `--coverage` names the accepted stories no function covers. Never marks ✅ accepted — that is the owner's `--accept`. Crash-safe via a run-state file. Sibling of develop-next: that loop builds, this one verifies. Invoke with `/qa-next`, `/qa-next <id>` (re-test or regression-test one named row, any state), `/qa-next --dry-run`, or `/loop /qa-next`."
+description: "UAT loop orchestrator: selects the next untested user function from the owner's UAT registry (scripts/uat-status.mjs --next) — one row per thing a person does with the app — resolves it to checklist items (authoring them when none exist), runs the function's tagged real-stack Playwright spec when one exists, walks the rest with browser automation and HTTP probes, writes a per-run results file, records 🟡 pass / ❌ fail / ⏸ blocked, files a bug on failure, records every incidental finding in the run file's Findings table and files those too (`--findings` lists open ones), leaves an automation candidate for every pass no spec covers, commits, and reports. `--coverage` names the accepted stories no function covers. Never marks ✅ accepted — that is the owner's `--accept`. Crash-safe via a run-state file. Sibling of develop-next: that loop builds, this one verifies. Invoke with `/qa-next`, `/qa-next D.2` (re-test or regression-test one named row, any state), `/qa-next --dry-run`, or `/loop /qa-next`."
 invokes: [create-bug-report]
 ---
 
@@ -182,7 +182,7 @@ Update the state file (`phase: executed`).
    | `pass` | `⬜` `🟡` `❌` `⏸` `➖` | `--clear-note` | drops the previous verdict's bug link, which `🟡` does not require and must not keep |
    | `pass` | `✅` | neither | the cell holds the owner's `accepted <date>`; `--clear-note` is refused here |
 
-   A `pass`, `blocked` or `na` against an `✅` row **leaves `✅`** and updates only `Last run` and `Notes / bug` — the tool prints `(kept)`. The skill still never *writes* `✅`; it only declines to remove one on evidence that is not against it. Only a `fail` moves it, and it moves it from any state.
+   A `pass`, `blocked` or `na` against an `✅` row **leaves `✅`** and updates only `Last run` and `Notes / bug` — the tool prints `(kept)`. The skill still never *writes* `✅`; it only declines to remove one on evidence that is not against it. Two things move it, and only two: a `fail`, which moves it from any state, and an explicit `--set <id> untested` — the owner's deliberate demotion, which is not a verdict at all and which this skill never sends.
 5. `--check` must exit 0. It also proves every `Filed as` link in every run file resolves. If it does not, fix what it names — never proceed past a red check.
 
 Update the state file (`phase: recorded`).
@@ -240,7 +240,7 @@ Every stop leaves the registry consistent (`--check` green) — a stop is never 
 - Mark n/a on anything a user could exercise somewhere.
 - Drop an observation because it failed no item. It goes in the run file's Findings table, filed or `note`.
 - Overwrite a previous run file. The path comes from `--run-path`, which returns the next free one.
-- Re-litigate an `✅` on a pass. Only a failure moves an accepted row.
+- Re-litigate an `✅` on a pass. The only things that move an accepted row are a failure and the owner's explicit `--set <id> untested` demotion — and this skill never sends the latter.
 
 ## Running as a loop
 

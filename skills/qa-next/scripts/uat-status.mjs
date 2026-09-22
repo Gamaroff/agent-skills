@@ -653,6 +653,14 @@ export function itemById({ sections }, id) {
 // An id is case-insensitive at the boundary: the owner types `d.2`, the registry spells it `D.2`.
 const normaliseId = (s) => (s ?? "").trim().toUpperCase();
 
+// "You named no row" and "you named a row that is not there" are different answers, and /qa-next
+// stops differently on each: exit 4 maps to STOP `unknown-item`, which is the wrong stop for a
+// malformed call. A missing value, or one that is the next flag, is a usage error (exit 2).
+function requireIdValue(flag, raw) {
+  if (!raw || raw.startsWith("--")) die(`${flag} <id> is required`);
+  return normaliseId(raw);
+}
+
 // This function's earlier run files, oldest first, relative to the registry directory. Reuses
 // listRunFiles rather than walking again: two sort orders for "oldest run first" would drift, and
 // one recursive walk of a directory of Markdown files is cheap. The cost is paid on --next too,
@@ -739,7 +747,7 @@ function cmdNext(opts) {
 
 function cmdItem(opts) {
   const cfg = requireSurfaces(opts);
-  const id = normaliseId(opts.val("--item"));
+  const id = requireIdValue("--item", opts.val("--item"));
   const r = itemById(readRegistry(opts), id);
   if (!r) {
     // Exit 4, not the usage family's 2: "you named a row that is not there" is a different answer
@@ -781,7 +789,7 @@ export function runPathFor(existing, date, env) {
 
 function cmdRunPath(opts) {
   requireSurfaces(opts);
-  const id = normaliseId(opts.val("--run-path"));
+  const id = requireIdValue("--run-path", opts.val("--run-path"));
   if (!itemById(readRegistry(opts), id)) {
     console.error(`uat-status: ${id}: no registry row`);
     process.exitCode = 4;
@@ -789,13 +797,26 @@ function cmdRunPath(opts) {
   }
   const env = opts.val("--env") ?? "local";
   const dir = join(opts.root, opts.registryDir, "runs", id);
+  // Compute BEFORE creating: runPathFor refuses an ambiguous env label, and a refusal that has
+  // already made a directory is a refusal the caller cannot trust. One readdir of a single
+  // function's directory — not the recursive walk listRunFiles does.
+  const name = runPathFor(
+    existsSync(dir) ? readdirSync(dir) : [],
+    today(),
+    env,
+  );
   mkdirSync(dir, { recursive: true });
-  // One readdir of a single function's directory — not the recursive walk listRunFiles does.
-  console.log(join("runs", id, runPathFor(readdirSync(dir), today(), env)));
+  console.log(join("runs", id, name));
 }
 
-function updateRow(opts, id, mutate) {
+function updateRow(opts, rawId, mutate) {
   requireSurfaces(opts);
+  // Normalised HERE, in the single writer, so every command that writes a row — --set, --accept,
+  // --items, --automated — is case-insensitive by construction rather than by each remembering.
+  // The readers (--item, --run-path) normalise at their own call sites. The population is "every
+  // command that takes a row id", and `--item`/`--run-path` having it while these four did not is
+  // the enumeration class: each site correct alone, the set never listed.
+  const id = normaliseId(rawId);
   const reg = readRegistry(opts);
   const sec = reg.sections.find((s) => s.rows.some((r) => r.id === id));
   if (!sec) die(`${id}: no registry row`);
@@ -852,13 +873,18 @@ function cmdSet(opts) {
     const kept =
       !["fail", "untested"].includes(state) &&
       stateKey(row.state) === "accepted";
-    // Refused on the kept-✅ path. That cell is where --accept stored the owner's
-    // "accepted <date> — <why>", checkRegistry imposes NO note requirement on an accepted row,
-    // and so a passing regression re-run would erase the sign-off's provenance with --check still
-    // green. There is no stale bug link to clear on a ✅ anyway. `pass` is the only verdict that
-    // reaches here: blocked and na require --note, which --clear-note already refuses beside.
-    if (clear && kept)
-      die("--clear-note cannot clear an accepted row's sign-off note");
+    // The sign-off cell is protected against EVERY door into it, not just one. It is where
+    // --accept stored the owner's "accepted <date> — <why>", and checkRegistry imposes NO note
+    // requirement on an accepted row, so any loss here is silent. Refusing --clear-note alone left
+    // the same loss reachable through --note: `blocked` and `na` MANDATE a note, and they are the
+    // two verdicts the skill's own Step 2 early exits write, so a blocked re-run of an accepted
+    // function would have replaced the owner's sign-off with "flag off in test env" and left
+    // --check green. That is the same shape as guarding `pass` alone — one entry point closed,
+    // the other open — which is the defect the kept rule itself was written to avoid.
+    if (kept && (clear || note))
+      die(
+        "an accepted row's sign-off note cannot be cleared or overwritten — --set <id> untested first to demote it",
+      );
     if (!kept) row.state = STATES[state];
     row.keptAccepted = kept;
     if (run)
