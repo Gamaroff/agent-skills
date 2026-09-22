@@ -26,7 +26,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync, execSync } from "node:child_process";
+import { execFileSync, execSync, spawnSync } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
@@ -218,11 +218,33 @@ test(
     );
 
     // Negative control: the pre-fix bare-relative form breaks from the same subdir.
-    assert.throws(
-      () =>
-        execSync(LEGACY_STOP, { cwd: subdir, env, input: "{}", stdio: "pipe" }),
-      /No such file or directory|cannot|not found/i,
-      "the legacy bare-relative command must fail from a subdirectory (the original bug)",
+    //
+    // Assert that it FAILS, not how it phrases the failure. `sh` exits the moment
+    // it cannot find the script, which closes stdin before the `input` write has
+    // necessarily landed — so the parent sees `spawnSync /bin/sh EPIPE` instead of
+    // the shell's "No such file or directory". Which of the two surfaces is a race
+    // between the child's exit and the parent's write, and it is lost in different
+    // directions on different machines: green on macOS, red on a fast Linux CI
+    // runner (2026-09-22, run 35726913091). Both outcomes are the same fact — the
+    // command did not run — so the assertion admits both and the shell's message is
+    // checked only when there is one.
+    const legacy = spawnSync("/bin/sh", ["-c", LEGACY_STOP], {
+      cwd: subdir,
+      env,
+      input: "{}",
+      encoding: "utf-8",
+    });
+    const brokeEarly = legacy.error?.code === "EPIPE";
+    assert.ok(
+      brokeEarly || legacy.status !== 0,
+      `the legacy bare-relative command must fail from a subdirectory (the original bug); got status=${legacy.status} error=${legacy.error?.code ?? "none"}`,
     );
+    if (!brokeEarly) {
+      assert.match(
+        legacy.stderr ?? "",
+        /No such file or directory|cannot|not found/i,
+        "when the shell got far enough to report, it must be a resolution failure",
+      );
+    }
   },
 );
