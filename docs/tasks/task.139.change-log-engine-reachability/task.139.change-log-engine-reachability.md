@@ -60,7 +60,7 @@ github_issue: 463
 
 `shared/resources/document-change-log.md` § *How a writer appends a row* spells the invocation as `require("./.agents/skills/{skill}/references/change-log.js")` — the bare placeholder. It is bundled into 42 skills. 18 of them carry `change-log.js` because a `.js` they bundle for another reason requires it (`finalise`, `create-epic`, `create-story`, `create-task`, `qa-fix`, `qa-story`, `qa-task`, `review-story`, `review-task`, the `sync-jira-*` and bug skills, among others); 24 carry the contract and not the engine. Measured 2026-09-22 (review): `for d in skills/*/; do [ -f $d/references/document-change-log.md ] && [ ! -f $d/references/change-log.js ] && echo $d; done` — the test that lands re-measures it. `develop` bundles the contract and nothing that requires the engine.
 
-`skills/develop/SKILL.md` step 12/14: "**Append through `change-log.js`, never by text search** — the one-liner is in [document-change-log.md § How a writer appends a row](references/document-change-log.md)". `finalise` § 7.3 says the same and ships the engine (via `report-lint.js` / `jira-sync.js`).
+`skills/develop/SKILL.md` step 12/14: "**Append through `change-log.js`, never by text search** — the one-liner is in `[document-change-log.md § How a writer appends a row](references/document-change-log.md)`" — the link is the skill's own, relative to `skills/develop/`, and is quoted here as text. `finalise` § 7.3 says the same and ships the engine (via `report-lint.js` / `jira-sync.js`).
 
 ### Target Architecture
 
@@ -81,7 +81,7 @@ The population and the alternation are two enumerations of one fact and the test
 
 ### Important Clarifications
 
-- **Why spell the alternation rather than declare a `bundle-dependency:` line.** The `// bundle-dependency: shared/resources/X` form is for `.js`/`.mjs` files whose only citation is a comment. A shared `.md` that names `shared/resources/change-log.js` as a literal would vendor the engine into all 41 bundlers of the contract — the over-match the `create-skill` rule exists to prevent. The alternation is the form that rule names for this case, and it vendors the engine into exactly the skills that run it.
+- **Why spell the alternation rather than declare a `bundle-dependency:` line.** The `// bundle-dependency: shared/resources/X` form is for `.js`/`.mjs` files whose only citation is a comment. A shared `.md` that names `shared/resources/change-log.js` as a literal would vendor the engine into all 42 bundlers of the contract — the over-match the `create-skill` rule exists to prevent. The alternation is the form that rule names for this case, and it vendors the engine into exactly the skills that run it.
 - **Why the population is derived from prose and not listed in the test.** A list in the test is a third enumeration. The test reads `skills/*/SKILL.md` for the instruction that runs the engine (`through \`change-log.js\``, the phrase both current writers use), so a new writer that copies the phrase joins the population automatically and fails until the alternation names it. The floor of 2 is what stops a rewording of the phrase from emptying the population and passing (obs #117: a figure a test re-measures needs its definition recorded, not its number).
 - **Byte-identical, not merely present.** `bundle:check` already asserts freshness for every bundled copy; the test's identity assertion is redundant with it on a fresh bundle and non-redundant on a hand-copied file, which is the shape obs #152's workaround would have taken if it had been "fixed" in the skill directory.
 - **What this task does not do.** Eight skills instruct "Append a Change Log row" without naming the engine at all (`edit-epic`, `edit-story`, `sync-github-epic`, `sync-github-story`, `sync-github-task`, and — found at review — `enforce-standards`, `review-epic`, `review-task`). They are hand-appending against a contract that forbids it, but moving them onto the engine is a *migration* of eight call sites with their own tests — the primitive → migration seam in `create-task` § 1.2 — and is recorded in § Notes as the next task, not folded in here.
@@ -98,6 +98,7 @@ The population and the alternation are two enumerations of one fact and the test
 ✅ `skills/develop/SKILL.md` — no wording change needed if the phrase already matches the derivation; if the derivation phrase is changed, both writers change in the same commit
 ✅ `package.json` — no change needed: `tests/*.test.js` is already in the `npm test` glob (verify, do not assume — obs: a suite runs nowhere until its glob is listed)
 ✅ CHANGELOG [Unreleased]; obs #152 → `actioned` with the PR
+✅ **Scope widened at finalise (owner decision, 2026-09-22, obs #154):** `shared/resources/doc-links.js` — a document's relative Markdown links resolve from its own directory against the tracked tree (CLI `--file --json`, exit 0/1/2, `✖`/`FAIL` red markers) — bundled into `review-task`, `review-story`, `finalise`; `shared/resources/tests/doc-links.test.mjs` (fixture tests + a work-item corpus guard with a 2-entry KNOWN ratchet); `review-task` / `review-story` check 2 run it; `finalise` Step 8a admits a docs-link-check-only CI red on the work item's own document as a Docs-section finding. Motivation: this task's own § 3 quoted `develop/SKILL.md` with its relative link and reached CI red after the whole pipeline.
 
 ### Out of Scope
 
@@ -170,11 +171,19 @@ None — API stable. The engine's behaviour and interface do not change; two ski
 ### Files Generated (by `npm run bundle`)
 
 3. ✅ `skills/develop/references/change-log.js` — new copy
-4. ✅ `skills/*/references/document-change-log.md` — the 41 bundled copies of the contract, re-rendered
+4. ✅ `skills/*/references/document-change-log.md` — the 42 bundled copies of the contract, re-rendered
 
 ### Files to Modify (Documentation)
 
 5. ✅ `CHANGELOG.md`
+
+### Files Added at Finalise (obs #154 — scope widened by owner decision)
+
+6. ✅ `shared/resources/doc-links.js` — new engine; bundled copies in `skills/{review-task,review-story,finalise}/references/doc-links.js`
+7. ✅ `shared/resources/tests/doc-links.test.mjs` — fixture tests + work-item corpus guard (already in the `npm test` glob `shared/resources/tests/*.test.mjs`)
+8. ✅ `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md` — check 2 link-resolution bullet
+9. ✅ `skills/finalise/SKILL.md` — Step 8a docs-link clause; Step 6 `FAILURE` row pointer
+10. ✅ this document — line 63 quotation → code span; "41" → 42
 
 ### Files to Delete
 
@@ -249,7 +258,7 @@ None.
 ### Low Risk Areas
 
 1. **A future skill copies the phrase without meaning it** — the floor and the two-way parity turn that into a red test, which is the intended cost.
-2. **The 41 bundled copies of the contract re-render** — a one-token change in each; `bundle:check` compares them to the source.
+2. **The 42 bundled copies of the contract re-render** — a one-token change in each; `bundle:check` compares them to the source.
 
 ---
 

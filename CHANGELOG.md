@@ -51,6 +51,19 @@ All notable changes to this project will be documented in this file. Format foll
   instruct "Append a Change Log row" without naming the engine (`edit-epic`, `edit-story`,
   `enforce-standards`, `review-epic`, `review-task`, `sync-github-epic`, `sync-github-story`,
   `sync-github-task`) — that migration is the next task, recorded in task.139 § Notes.
+- **A work-item document's relative links now resolve from its own directory before CI sees them
+  (task.139, obs #154).** `shared/resources/doc-links.js` (bundled into `review-task`,
+  `review-story` and `finalise`) checks one document's relative Markdown links against the
+  **tracked** tree, skipping fences and code spans, and exits 1 with one `✖ file:line → target`
+  per dead link. `review-task` / `review-story` check 2 run it — a path check asks whether
+  `references/x.md` exists somewhere, a link check asks whether `[…](references/x.md)` resolves
+  from *this* file, and only the second is what `docs-link-check` asks. `finalise` Step 8a now
+  admits a link-check-only CI red on the work item's own document as a Docs-section finding it may
+  fix and recheck once, with the engine's pre-fix run as the mutation proof (the evaluator accepts
+  it: `proceed`, five of five). `shared/resources/tests/doc-links.test.mjs` pins the engine and
+  keeps every task/story/epic document clean (two pre-existing dead links pinned; the ratchet only
+  tightens). Found the hard way: task.139's own § 3 quoted `develop/SKILL.md` verbatim, relative
+  link included, and it survived review, two QA cycles and the PR review before CI caught it.
 
 ## [v0.49.0] - 2026-09-21
 

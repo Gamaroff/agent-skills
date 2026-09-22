@@ -854,7 +854,7 @@ done
 | `CI_ROLLUP` | Decision                                                                                                                                                                                                                                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SUCCESS`   | Proceed — CI column passes                                                                                                                                                                                                                                                                              |
-| `FAILURE`   | **Do NOT accept.** Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code."                                                                                                                                                                        |
+| `FAILURE`   | **Do NOT accept.** Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code." **One exception, and it is narrow:** a red on the docs link checker alone, reproduced by `doc-links.js` on the work item's own document and nowhere else, is a Docs-section finding that Step 8a may fix and recheck once — see the clause under *When this step applies* there. Every other red is this row. |
 | `PENDING`   | **Do NOT accept.** Gap: "CI has not finished. Re-run `/finalise` once it completes." **Waiting is the correct action; assuming is not.**                                                                                                                                                                |
 | `CANCELLED` | **Undecided, not failed.** Almost always `cancel-in-progress` superseding a run. Re-sample; if it persists after the retries, check whether a newer commit has its own run and resolve against **that** head. Never record it as a red verdict.                                                         |
 | `NONE`      | **Undecided.** Re-sample first — an empty rollup is the normal state for the seconds between a push and its run registering. Only if it persists does it mean no checks are configured, and then record it explicitly in the DoD summary as _unverified by CI_ rather than treating absence as success. |
@@ -2342,6 +2342,37 @@ sections (acceptance criteria, docs, security, compliance) is FAIL on a finding 
 execution** — a reproduced probe, a failing check with a citation — and nothing else is wrong. If
 two sections are FAIL, or the QA gate is FAIL, or CI is not green on the current head, this step does
 not apply: take Step 8.
+
+**One CI red is a Docs-section finding, not a CI verdict: a dead relative link inside the work
+item's own document (task.139, obs #154).** `docs-link-check` runs only on files the PR changed, so
+a work-item document that quotes a skill's prose *including the skill's relative link* fails CI on
+the document itself — after the whole pipeline, since `review-*` checked that paths exist rather
+than that links resolve from here, and the QA reviewer excludes the document from its diff. That
+red is about one line of the document, not about the code, and it is the shape this step exists for.
+It qualifies **only** when all of these hold, each verified rather than assumed:
+
+- `CI_ROLLUP` is `FAILURE` because of the **docs link checker alone** — every other check on the
+  head is `SUCCESS`, `SKIPPED` or `NEUTRAL` (a still-running lane is `PENDING`, and this step
+  waits for it like any other reading; it does not round it up).
+- The engine (`references/doc-links.js`, bundled beside this skill) reproduces the red on the
+  work-item document, and **nowhere else in the diff**:
+  `node references/doc-links.js --file "{document-path}"` exits 1, and the same call on every
+  other `.md` the PR changed exits 0. A dead link in a skill or a shared resource is a code finding
+  and takes the ordinary halt.
+- The finding record's `severity` is `low`, its `touched` is exactly the document, and — because
+  a work item's own document is the one file always inside its own scope — `filesSummary` lists
+  the document path for this evaluation (state that in the deviations block; the evaluator reads
+  the record it is given, and a Files Summary that omits the document it lives in is the norm).
+- The mutation proof is the engine itself: the **pre-fix** run of `doc-links.js` on the document,
+  captured to `mutationProof.run` before the edit, is the red (it prints `✖ <file>:<line> → …`
+  and `FAIL doc-links: …`, which are the markers the evaluator reads, on lines naming the file —
+  so `mutationProof.test` is the document path); the **post-fix** run exits 0. Reverting the
+  edit and re-running is the same proof a second time, and is what `redOnRevert: true` asserts.
+
+Then Steps 8a.1–8a.5 run unchanged, with the Docs section as the failed section and the engine run
+as its reproduction, and Step 6 is re-entered on the fix head — whose `link-check` must be
+`SUCCESS` in the retaken CI reading 1. Nothing here relaxes the CI gate on the acceptance head:
+reading 2 (6c) is taken exactly as before.
 
 **1. Build the finding record and run the evaluator.** `severity`, `filesSummary` and
 `otherFindingsOpen` come from things already on disk. `commits` and `touched` are the **plan** at
