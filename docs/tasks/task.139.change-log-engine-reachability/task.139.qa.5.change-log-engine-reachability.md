@@ -26,7 +26,7 @@ Re-review scope: since 2026-09-22T07:14:52Z (gate.4; default narrowing). 8 files
 | --- | --- | --- |
 | C4-CR-1 CRLF | **FIXED** | `` `o [x]…\r\n\r\n… `` → x, y, z; CRLF open fence reported at line 1; mutation-proven in 5b |
 | C4-CR-2 documentPath | **FIXED** | `README.md`, `docs/README.md`, `src/…`, `../…`, a QA report all refused; story and bug documents admitted; mutation-proven |
-| C4-CR-3 opener lookbehind | **FIXED** | `` ``[x](a.md)` then [y](b.md) `` → a, b; mutation-proven this cycle |
+| C4-CR-3 opener lookbehind | **FIXED** | a two-backtick run opening `[x](a.md)`, closed by one backtick, then `[y](b.md)` → both extracted; mutation-proven this cycle |
 | C4-CR-4 indented fence | **FIXED** | list-item fence → only `c.md` |
 | C4-CR-5 ref-def / escaped | **FIXED** | `[Note]: see below` ignored; `\[not\](a.md)` ignored |
 | C4-CR-6 repo once | **FIXED** | corpus guard ~0.4 s |

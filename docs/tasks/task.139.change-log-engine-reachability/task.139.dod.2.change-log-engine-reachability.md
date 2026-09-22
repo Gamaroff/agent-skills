@@ -52,7 +52,7 @@ CI reading 1 below is `FAILURE`, which decides the run by itself (Step 6: a red 
 - Acceptance Criteria: not re-traced this run (run 1: 7/7; SC8 accepted on gate.5 evidence)
 - PR Review & Tests: 5c run 1 APPROVE, run 2 CONCERNS (documentation consistency — applied in `4871a174`)
 - Documentation / Security / Compliance: not re-run this run (see above)
-- **CI: ❌ FAILURE** — `docs-link-check` on two **QA artifacts**: `task.139.qa.4.*.md:41` and `task.139.qa.5.*.md:29` each quote the cycle-4 reviewer's example ``[x](a.md)` then [y](b.md)` — a code span whose content contains a backtick, which ends the span early and leaves `[y](b.md)` (and in qa.5 `[x](a.md)`) as live links (`a.md`, `b.md` → 400). Reproduced by the engine: `doc-links.js` exits 1 on exactly those two files and 0 on every other changed `.md`.
+- **CI: ❌ FAILURE** — `docs-link-check` on two **QA artifacts**: `task.139.qa.4.*.md:41` and `task.139.qa.5.*.md:29` each quote the cycle-4 reviewer's example (a two-backtick run opening a bracket link, closed by one backtick, then a second bracket link) — a code span whose content contains a backtick, which ends the span early and leaves `[y](b.md)` (and in qa.5 `[x](a.md)`) as live links (`a.md`, `b.md` → 400). Reproduced by the engine: `doc-links.js` exits 1 on exactly those two files and 0 on every other changed `.md`.
 
 **Blocking Issues:**
 

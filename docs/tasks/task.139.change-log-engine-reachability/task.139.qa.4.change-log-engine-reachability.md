@@ -38,7 +38,7 @@ Re-review scope: since 2026-09-22T06:49:01Z (gate.3; default narrowing — `SAFE
 
 - **[medium/high]** `shared/resources/doc-links.js:60,118` — CRLF: no fence opens, paragraphs never split → open-fence finding cannot report; cross-paragraph swallow returns. (C4-CR-1 — promoted)
 - **[medium/medium]** `finalise-fix-and-recheck.mjs:140` — `documentPath` admits any string equal to it (`README.md` passes). (C4-CR-2)
-- **[low/high]** `doc-links.js:122` — opener lacks `(?<!`)`; `` ``[x](a.md)` then [y](b.md) `` hides `a.md`. (C4-CR-3)
+- **[low/high]** `doc-links.js:122` — the code-span opener has no negative lookbehind for a preceding backtick; a two-backtick run opening `[x](a.md)`, closed by a single backtick, then `[y](b.md)` — the engine hides `a.md`. (C4-CR-3)
 - **[low/medium]** fences indented ≥ 4 columns inside a list item unrecognised → false ✖. (C4-CR-4)
 - **[low/high]** `[Note]: see below` reads as a ref-def; `\[not\](a.md)` reads as a link. (C4-CR-5)
 - **[cleanup]** per-document `rev-parse` (~2.1 s corpus); stale header sentence; `--root /nope` reported as "cannot read <file>". (C4-CR-6..8)
