@@ -1,0 +1,81 @@
+schema: 1
+task: 'task.139.change-log-engine-reachability'
+task_title: 'The Change Log engine is unreachable from a skill whose prose runs it: spell the writer alternation and pin engine reachability with a parity test'
+gate: CONCERNS
+status_reason: 'Cycle 4 verifies every cycle-3 finding closed by execution (task.42 → 17 links; cwd-independent; exitCode; placeholders; root-anchored calls; documentPath). One new medium/high defect in the fix: on a CRLF document no fence ever opens and the paragraph splitter never fires, so the open-fence finding cannot report and the cross-paragraph code-span swallow cycle 3 removed is reintroduced. Promoted; seven advisories.'
+reviewer: 'QA Engineer'
+updated: '2026-09-22T07:14:52Z'
+
+top_issues:
+  - id: 'C4-CR-1'
+    severity: medium
+    file: 'shared/resources/doc-links.js'
+    finding: 'CRLF documents: FENCE_OPEN_RE `(.*)$` cannot match the trailing \r so no fence opens; the paragraph splitter /(\n[ \t]*\n)/ does not see \r\n\r\n — reproduced: "`open [x](x.md)\r\n\r\nnext [y](y.md) ` tail\r\n[z](z.md)" returns only z.md. The repo has 0 CRLF files; the engine is bundled into consumer installs.'
+    suggested_action: 'Normalise \r\n → \n once at the top of extractRelativeLinks; CRLF fixtures for the open-fence and cross-paragraph cases.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 11
+  phases_verified: '4/4 (original) + obs #154 addition'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged: reads files, runs git; no network, writes or secrets. C4-CR-2 (documentPath admits any string) is a scope-precondition hole in the evaluator, not a security boundary.'
+  performance:
+    status: PASS
+    notes: 'Corpus guard ~2.1 s (170 docs) — 170 rev-parse spawns the shared-set design was meant to avoid (C4-CR-6, advisory).'
+  reliability:
+    status: CONCERNS
+    notes: 'C4-CR-1: on CRLF input the engine reports clean where it did not look — the same class cycle 3 closed for LF.'
+  maintainability:
+    status: PASS
+    notes: 'Header sentence still describes whole-text code-span stripping (C4-CR-7).'
+
+code_review:
+  blocking: true
+  bugs: 5
+  cleanups: 3
+  promoted: ['C4-CR-1']
+  probes_executed: 0
+  boundary: false
+  scope: 'files changed since gate.3 (2026-09-22T06:49:01Z) — 11 files'
+  cycle_3_closures_verified_by_execution: ['TQ-1', 'CR-1', 'CR-2', 'CR-3', 'CR-4', 'CR-5', 'CR-6', 'CR-7', 'CR-8', 'CR-9', 'CR-10']
+  mutation_proven:
+    - 'open-fence finding removed → "extractor (CR-1): a fence still open at EOF is reported" red → covered'
+
+recommendations:
+  immediate:
+    - action: 'C4-CR-1: CRLF normalisation + fixtures'
+      refs: ['shared/resources/doc-links.js', 'shared/resources/tests/doc-links.test.mjs']
+  future:
+    - action: 'C4-CR-2 (medium/medium): documentPath admits any string — constrain to the work-item document shape under docs/ and require mutationProof.test === documentPath for the docs-link clause; test that README.md is not admitted'
+      refs: ['shared/resources/finalise-fix-and-recheck.mjs']
+    - action: 'C4-CR-3 (low/high): opener needs (?<!`) so a failed match cannot retry from inside a backtick run — "``[x](a.md)` then [y](b.md)" hides a.md'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'C4-CR-4 (low/medium): container-indented fences (≥4 columns inside a list item) not recognised → false ✖; strip the container prefix or document'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'C4-CR-5 (low/high): "[Note]: see below" reads as a ref-def; \[not\](a.md) escaped brackets read as a link'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'C4-CR-6 (cleanup): resolve the repo root once for a shared tracked set'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'C4-CR-7 (cleanup): header still says whole-text code-span stripping'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'C4-CR-8 (cleanup): a missing --root is reported as "cannot read <file>"'
+      refs: ['shared/resources/doc-links.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['C4-CR-1 fixed and re-reviewed']

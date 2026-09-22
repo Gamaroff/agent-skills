@@ -62,6 +62,19 @@ export const PRECONDITIONS = Object.freeze(
 
 const isList = (v) => Array.isArray(v);
 
+/** A repo-relative path to a task / story / epic / bug document under docs/. */
+const WORK_ITEM_DOC_RE =
+  /^docs\/(?:[^/]+\/)*(?:task\.\d+|story\.\d+\.\d+|epic\.\d+|bug\.\d+)\.[^/]+\.md$/;
+// A pipeline artifact beside the document (its QA report, gate, DoD, plan,
+// review…) shares the stem and is NOT the document.
+const WORK_ITEM_ARTIFACT_RE =
+  /\.(qa|gate|bug|implementation|review|dod|plan|handover|pr-review|risk|test-design)\./;
+const isWorkItemDocument = (p) =>
+  typeof p === "string" &&
+  WORK_ITEM_DOC_RE.test(p) &&
+  !WORK_ITEM_ARTIFACT_RE.test(p.slice(p.lastIndexOf("/") + 1)) &&
+  !p.includes("..");
+
 /** What a recorded red run looks like from node:test, bash test harnesses, or a
  *  hand-run assertion: a TAP `not ok`, the runner's ✖, or a `fail` count > 0. */
 const RED_MARKER = /^\s*(not ok\b|✖|ℹ fail [1-9]|FAIL\b)/;
@@ -138,11 +151,13 @@ const CHECKS = Object.freeze({
     // so a record that names it as `documentPath` may touch it (8a docs-link
     // clause, task.139 QA cycle 3 CR-5). Only that one path; anything else
     // still has to be listed.
+    // `documentPath` admits ONE path, and only a path shaped like a work item
+    // document under docs/ — a record naming README.md as its "document" is a
+    // declaration, not a fact, and the precondition would be satisfied by
+    // saying so (task.139 QA cycle 4, CR-2).
     const inScope = (p) =>
       f.filesSummary.includes(p) ||
-      (typeof f.documentPath === "string" &&
-        f.documentPath !== "" &&
-        p === f.documentPath);
+      (isWorkItemDocument(f.documentPath) && p === f.documentPath);
     const outside = f.touched.filter((p) => !inScope(p));
     return outside.length === 0
       ? null

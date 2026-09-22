@@ -300,6 +300,8 @@ None.
 | 2026-09-22 |  | DoD incomplete — 1 gap identified (CI link-check red on a quoted relative link, line 63) | finalise |
 | 2026-09-22 |  | QA gate CONCERNS (50/100) — cycle 3 on the obs #154 addition: 5 findings promoted (exit-after-write, fence desync, cwd-relative ls-files, unbound variable, bare references/ path); 6 advisory | qa-task |
 | 2026-09-22 |  | QA findings fixed (cycle 3) — doc-links engine: root anchoring, CommonMark fences, paragraph-bound code spans, more link forms, exitCode; review/finalise prose paths; evaluator documentPath; 1 iteration | qa-fix |
+| 2026-09-22 |  | QA gate CONCERNS (80/100) — cycle 4: all cycle-3 findings verified closed; 1 promoted (CRLF handling), 7 advisory | qa-task |
+| 2026-09-22 |  | QA findings fixed (cycle 4) — CRLF normalisation, documentPath constrained to work-item documents, opener lookbehind, indented fences, ref-def/escaped-bracket guards, repo once, operand errors; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ## QA Testing Results
@@ -307,21 +309,21 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-22
-**Quality Score**: 50/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.139.qa.3.change-log-engine-reachability.md](./task.139.qa.3.change-log-engine-reachability.md) (cycles 1–2: [qa.1](./task.139.qa.1.change-log-engine-reachability.md), [qa.2](./task.139.qa.2.change-log-engine-reachability.md))
-- **Gate File**: [task.139.gate.3.change-log-engine-reachability.yml](./task.139.gate.3.change-log-engine-reachability.yml) (gate.1 CONCERNS 80 → gate.2 PASS 100 → gate.3 CONCERNS 50 on the obs #154 addition)
+- **Full Report**: [task.139.qa.4.change-log-engine-reachability.md](./task.139.qa.4.change-log-engine-reachability.md) (cycles 1–3: qa.1, qa.2, qa.3)
+- **Gate File**: [task.139.gate.4.change-log-engine-reachability.yml](./task.139.gate.4.change-log-engine-reachability.yml) (gate.1 CONCERNS 80 → gate.2 PASS 100 → gate.3 CONCERNS 50 → gate.4 CONCERNS 80)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3896 (ci:fast; 1 red — exit-after-write guard on doc-links.js)
+- **Tests Executed**: 3904 (ci:fast, all green)
 - **Phases Verified**: 4/4 original + obs #154 addition
-- **Critical Issues**: 0 (5 medium promoted: TQ-1 exit-after-write; CR-1 fence desync → vacuous corpus pass; CR-2 cwd-relative ls-files; CR-3 unbound $TASK_FILE; CR-4 bare references/ path)
+- **Critical Issues**: 0 (1 medium promoted: C4-CR-1 CRLF handling in doc-links.js)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The original deliverable is unchanged since gate.2 (PASS 100). Cycle 3 gates the obs #154 addition landed after 5c: the doc-links engine ships a fence state machine that a line-initial backtick run desyncs (task.42 → 0 links), cwd-dependent resolution, and process.exit after writes; the review-skill blocks are not executable as written. Fix cycle follows.
+All eleven cycle-3 findings verified closed by execution. Cycle 4 found one defect the fix introduced — on CRLF input no fence opens and the paragraph splitter never fires — plus seven advisories (documentPath unconstrained, opener lookbehind, container-indented fences, ref-def/escaped-bracket false positives, per-doc rev-parse, stale header, wrong-operand message).
 
 ## Definition of Done - Gaps Identified
 
@@ -358,8 +360,8 @@ DoD sections: Acceptance Criteria ✅ 7/7 · Security ✅ · Compliance — N/A 
 - [x] Phase 2: spell the alternation and bundle
 - [x] Phase 3: prove the documented call runs from the bundle
 - [x] Phase 4: docs, CHANGELOG, observation
-- [x] QA: `task.139.qa.3.change-log-engine-reachability.md` (cycles 1–2: qa.1, qa.2)
-- [x] Gate: `task.139.gate.3.change-log-engine-reachability.yml` (CONCERNS on the obs #154 addition; gate.2 PASS 100 on the original deliverable)
+- [x] QA: `task.139.qa.4.change-log-engine-reachability.md` (cycles 1–3: qa.1–qa.3)
+- [x] Gate: `task.139.gate.4.change-log-engine-reachability.yml` (CONCERNS; gate.2 PASS 100 on the original deliverable)
 
 ## References
 
@@ -386,6 +388,8 @@ DoD sections: Acceptance Criteria ✅ 7/7 · Security ✅ · Compliance — N/A 
 **QA fix cycle 1 (2026-09-22)** — gate.1 CONCERNS (80): CR-1 contract paragraph reworded (the alternation names the skills whose *prose* runs the one-liner; others may carry the engine transitively and that is incidental) and re-bundled into the 42 copies; CR-2 `RUNS_ENGINE` → `/through\s+\`change-log\.js\`/` with a new test "the phrase matcher sees the instruction across a line wrap" (fixture self-check + develop/SKILL.md must match at both its sites) — mutation-proven: literal-space regex reds it; CR-3 `ALTERNATION_RE` accepts the bundler's literal single-skill form (braces stripped when present); CR-4 the five "five" mentions → eight. `ci:fast` 3891/3891; `bundle:check` 0 problems.
 
 **QA fix cycle 3 (2026-09-22)** — gate.3 CONCERNS (50) on the obs #154 addition. Engine rewritten (`shared/resources/doc-links.js`): repository-root anchoring via `git rev-parse --show-toplevel` + `ls-files --full-name` with realpath on both ends (CR-2 — from a skill directory the task doc reported 5 false dead links); CommonMark fences — a backtick opener with a backtick in its info string is a code span, closers are bare and at least as long, and a fence open at EOF is a **finding** (CR-1 — task.42's document parsed to 0 links); code spans stripped per paragraph so a wrapped quotation is code but an unmatched run (the `\`\`` on line 85 of this very document) cannot pair 291 lines later (CR-7); reference definitions, HTML `href`/`src`, nested brackets, spaced/quoted/parenthesised targets (CR-6); `--file`/`--root` without an operand → usage 2 (CR-9); `process.exitCode`, never `exit()` (TQ-1). Prose: the review-task/review-story blocks use the `{resolved … path}` placeholder and the root-anchored `.agents/skills/<skill>/references/doc-links.js` form (CR-3, CR-4); finalise's 8a clause points at itself from "When this step applies" and the record carries `documentPath`, which the evaluator's `inside-files-summary` now treats as in scope by construction — one path only (CR-5; mutation-proven). Tests: 11 fixtures (one per finding) + corpus guard keyed on `file:target` (CR-10), hermetic non-repo fixture via `GIT_CEILING_DIRECTORIES` (CR-8). `ci:fast` 3903/3903; `bundle:check` 0 (a `.json` copy the bundler refused to overwrite as AMBIGUOUS was deleted and re-bundled); `check:generated` clean.
+
+**QA fix cycle 4 (2026-09-22)** — gate.4 CONCERNS (80). C4-CR-1: CRLF normalised once at the top of `extractRelativeLinks` (mutation-proven — dropping it reds the CRLF fixture). Advisories taken in the same pass: C4-CR-2 `documentPath` admits only a task/story/epic/bug document under `docs/` that is not a pipeline artifact (mutation-proven — `README.md` refused); C4-CR-3 `(?<!\`)` opener lookbehind; C4-CR-4 fences at any indent (documented trade-off); C4-CR-5 ref-def targets must look like a path, `\\[…\\]` is not a link; C4-CR-6 `repo` passed with `tracked` (corpus guard ~0.4 s); C4-CR-7 header rewritten; C4-CR-8 `--root` and `--file` each name their own operand on failure. 15 doc-links tests, 23 evaluator tests; `ci:fast` green; `bundle:check` 0.
 
 **Deferred work**: none in scope. The eight hand-appending writers (§ Notes) are the next task.
 

@@ -119,6 +119,36 @@ test("inside-files-summary: the work item's own document is in scope when named 
     evaluateFixAndRecheck(two).failed.map((x) => x.id),
     ["inside-files-summary"],
   );
+  // documentPath must be shaped like a work item document under docs/ — any
+  // other string is a declaration the evaluator refuses (cycle 4, CR-2).
+  for (const notDoc of [
+    "README.md",
+    "docs/README.md",
+    "src/task.1.x.md",
+    "../docs/tasks/task.1.x/task.1.x.md",
+    "docs/tasks/task.1.x/task.1.qa.1.x.md",
+  ]) {
+    assert.deepEqual(
+      evaluateFixAndRecheck({
+        ...GOOD,
+        touched: [notDoc],
+        documentPath: notDoc,
+      }).failed.map((x) => x.id),
+      ["inside-files-summary"],
+      `documentPath ${notDoc} is not a work item document and must not admit itself`,
+    );
+  }
+  for (const doc2 of [
+    "docs/prd/a/b/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md",
+    "docs/bugs/bug.3.z/bug.3.z.md",
+  ]) {
+    assert.deepEqual(
+      evaluateFixAndRecheck({ ...GOOD, touched: [doc2], documentPath: doc2 })
+        .failed,
+      [],
+      doc2,
+    );
+  }
   // An empty or non-string documentPath admits nothing.
   for (const bad of ["", 42, null]) {
     assert.deepEqual(

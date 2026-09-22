@@ -44,8 +44,15 @@
  * reported the 941-line document as having no links at all); a closer is the
  * same character, at least as long, followed by nothing but spaces. A fence
  * still open at EOF is a FINDING, because everything after it was not scanned.
- * Code spans are stripped over the whole text after fences are blanked, so a
- * backticked quotation wrapped across a line break is still code. Inline links
+ * A fence may sit at any indent (inside a list item or blockquote it is
+ * indented past the three-space limit CommonMark allows at top level); the
+ * cost is that a ``` line inside an indented code block reads as a fence,
+ * which skips links — the safe direction. CRLF input is normalised to LF
+ * first (QA cycle 4: with \r on every line no fence ever opened and no
+ * paragraph ever split). Code spans are stripped per paragraph after fences
+ * are blanked — a blank line ends a span — so a backticked quotation wrapped
+ * across a line break is still code, and an unmatched backtick run is literal
+ * and cannot pair with a run in a later paragraph. Inline links
  * (nested brackets one level deep, `<target with spaces>`, balanced parentheses
  * in the target, "double" / 'single' / (paren) titles), reference definitions
  * (`[x]: target`) and HTML `href=` / `src=` attributes are all extracted;
@@ -57,13 +64,15 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const FENCE_OPEN_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
-const FENCE_CLOSE_RE = /^ {0,3}(`{3,}|~{3,})\s*$/;
+const FENCE_OPEN_RE = /^[ \t]*(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSE_RE = /^[ \t]*(`{3,}|~{3,})[ \t]*$/;
 // [text](target "title") — text may nest one level of brackets; target is
 // <…> or a run without whitespace, with one level of balanced parentheses.
 const INLINE_LINK_RE =
-  /!?\[(?:[^\[\]]|\[[^\]]*\])*\]\(\s*(?:<([^>]*)>|([^\s()]*(?:\([^\s()]*\)[^\s()]*)*))(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\)/g;
-const REF_DEF_RE = /^ {0,3}\[[^\]]+\]:\s*(?:<([^>]*)>|(\S+))/;
+  /(?<!\\)!?\[(?:[^\[\]]|\[[^\]]*\])*\]\(\s*(?:<([^>]*)>|([^\s()]*(?:\([^\s()]*\)[^\s()]*)*))(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\)/g;
+// A reference definition's target has to look like a path (a slash or a dot):
+// "[Note]: see below" is prose, and reading "see" as a link is a false ✖.
+const REF_DEF_RE = /^ {0,3}\[[^\]]+\]:\s*(?:<([^>]*)>|(\S*[./]\S*))(?:\s|$)/;
 const HTML_ATTR_RE = /\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
 const NOT_RELATIVE_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i;
 
@@ -119,7 +128,12 @@ function blankCodeSpans(text) {
     .map((part, i) =>
       i % 2
         ? part
-        : part.replace(/(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g, (m) => blank(m)),
+        : // (?<!`) on the opener: a failed match must not retry from INSIDE a
+          // backtick run — "``[x](a.md)` then …" has no 2-run closer and no
+          // 1-run closer, and both are literal (QA cycle 4, CR-3).
+          part.replace(/(?<!`)(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g, (m) =>
+            blank(m),
+          ),
     )
     .join("");
 }
@@ -135,7 +149,9 @@ function lineOf(text, index) {
  * plus `unterminatedFence` (1-based line, or null).
  */
 function extractRelativeLinks(text) {
-  const fenced = blankFences(text);
+  // CRLF → LF once: every regex below anchors on \n, and with a \r on each
+  // line no fence opened and no paragraph split (QA cycle 4, CR-1).
+  const fenced = blankFences(text.replace(/\r\n?/g, "\n"));
   const clean = blankCodeSpans(fenced.text);
   const out = [];
   const push = (target, index) => {
@@ -209,19 +225,32 @@ const toPosix = (p) => p.split(path.sep).join("/");
  */
 function checkDocument(
   file,
-  { root = process.cwd(), tracked: trackedIn } = {},
+  { root = process.cwd(), tracked: trackedIn, repo: repoIn } = {},
 ) {
   // realpath on both ends: macOS answers `git rev-parse --show-toplevel` under
   // /private/var for a /var/… cwd, and path.relative across that symlink
-  // yields a ../../../../var/… "relative" path that resolves nowhere.
-  const startDir = fs.realpathSync(path.resolve(root));
-  const abs = fs.realpathSync(
-    path.isAbsolute(file) ? file : path.join(startDir, file),
-  );
+  // yields a ../../../../var/… "relative" path that resolves nowhere. Each
+  // realpath names its own operand on failure (QA cycle 4, CR-8).
+  let startDir;
+  try {
+    startDir = fs.realpathSync(path.resolve(root));
+  } catch (e) {
+    throw new Error(`--root ${root}: ${e.message}`);
+  }
+  let abs;
+  try {
+    abs = fs.realpathSync(
+      path.isAbsolute(file) ? file : path.join(startDir, file),
+    );
+  } catch (e) {
+    throw new Error(`--file ${file}: ${e.message}`);
+  }
+  // A caller walking many documents passes `repo` with `tracked` so
+  // rev-parse runs once, not per document (QA cycle 4, CR-6).
   const repo =
-    trackedIn === undefined
-      ? repoRoot(startDir)
-      : trackedIn
+    repoIn !== undefined
+      ? repoIn
+      : trackedIn === undefined || trackedIn
         ? repoRoot(startDir)
         : null;
   const base = repo ?? startDir;
@@ -289,7 +318,7 @@ function main(argv) {
   try {
     result = checkDocument(file, { root });
   } catch (e) {
-    return usage(json, `cannot read ${file}: ${e.message}`);
+    return usage(json, e.message);
   }
   const findings = result.broken.length + (result.unterminatedFence ? 1 : 0);
   const reason = findings ? "broken" : "ok";

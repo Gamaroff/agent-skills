@@ -121,6 +121,40 @@ test("extractor (CR-7): a backticked quotation wrapped across a line break is st
   assert.deepEqual(targets(odd), ["x.md", "y.md"]);
 });
 
+test("extractor (C4-CR-1): CRLF input — fences open, paragraphs split, and an open fence is still reported", () => {
+  assert.deepEqual(
+    targets("`open [x](x.md)\r\n\r\nnext [y](y.md) ` tail\r\n[z](z.md)"),
+    ["x.md", "y.md", "z.md"],
+  );
+  assert.deepEqual(targets("```\r\n[in](a.md)\r\n```\r\n[out](b.md)\r\n"), [
+    "b.md",
+  ]);
+  assert.equal(
+    extractRelativeLinks("```\r\n[in](a.md)\r\n").unterminatedFence,
+    1,
+  );
+});
+
+test("extractor (C4-CR-3): a failed code-span match does not retry from inside a backtick run", () => {
+  assert.deepEqual(targets("``[x](a.md)` then [y](b.md)"), ["a.md", "b.md"]);
+});
+
+test("extractor (C4-CR-4): a fence indented inside a list item is a fence", () => {
+  assert.deepEqual(
+    targets(
+      "- item\n\n    ```\n    [in](a.md)\n\n    [in2](b.md)\n    ```\n[out](c.md)",
+    ),
+    ["c.md"],
+  );
+});
+
+test("extractor (C4-CR-5): a prose line shaped like a reference definition is not one; an escaped bracket is not a link", () => {
+  assert.deepEqual(
+    targets("[Note]: see below\n[ref]: refs/x.md\n\\[not\\](a.md) [yes](b.md)"),
+    ["refs/x.md", "b.md"],
+  );
+});
+
 test("extractor (CR-6): reference definitions, HTML href/src, nested brackets, <spaced targets>, titles and parenthesised targets", () => {
   const text = [
     "[ref]: references/ref.md",
@@ -267,6 +301,10 @@ test("CLI (TQ-1, CR-9): exit 1 with ✖ lines and a FAIL summary on a dead link 
     assert.equal(run(["--root"]).code, 2);
     assert.equal(run(["--file"]).code, 2);
     assert.equal(run(["--file", "missing.md"]).code, 2);
+    // C4-CR-8: a missing --root names --root, not the file.
+    const rootErr = run(["--root", "/nope", "--file", "a.md", "--json"]);
+    assert.equal(rootErr.code, 2);
+    assert.match(JSON.parse(rootErr.out).error, /^--root /);
   });
   const src = fs.readFileSync(ENGINE, "utf8");
   assert.doesNotMatch(
@@ -309,6 +347,7 @@ test("corpus: every work-item document's relative links resolve and every fence 
     docs.length >= 100,
     `only ${docs.length} work-item documents walked — the walk is broken, not the corpus clean`,
   );
+  const repo = repoRoot(REPO_ROOT);
   const tracked = trackedSet(REPO_ROOT);
   assert.ok(
     tracked && tracked.size > 1000,
@@ -318,7 +357,7 @@ test("corpus: every work-item document's relative links resolve and every fence 
   const openFences = [];
   let links = 0;
   for (const f of docs) {
-    const r = checkDocument(f, { root: REPO_ROOT, tracked });
+    const r = checkDocument(f, { root: REPO_ROOT, tracked, repo });
     links += r.links;
     for (const b of r.broken) dead.push(`${f} → ${b.target}`);
     if (r.unterminatedFence) openFences.push(`${f}:${r.unterminatedFence}`);
