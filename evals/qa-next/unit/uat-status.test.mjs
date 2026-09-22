@@ -450,7 +450,10 @@ test("CLI: set → items → automated → accept round-trip; refusals are real;
     run(root, "--automated", "D.2", "apps/portal/e2e/uat/D.2.uat.spec.ts").code,
     0,
   );
-  assert.equal(run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r.md").code, 0);
+  assert.equal(
+    run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r.md").code,
+    0,
+  );
   assert.equal(run(root, "--check").code, 1, "run file does not exist yet");
   mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
   writeFileSync(path.join(root, "docs/qa/runs/D.2/r.md"), "# run\n");
@@ -607,10 +610,17 @@ test("CLI: --findings walks runs/<id>/ recursively, oldest first across director
     ]),
   );
   writeFileSync(path.join(runs, "A.1/notes.txt"), "not a run file");
-  writeFileSync(path.join(runs, "README.md"), "# runs\n\nno Findings section here\n");
+  writeFileSync(
+    path.join(runs, "README.md"),
+    "# runs\n\nno Findings section here\n",
+  );
   assert.deepEqual(
     listRunFiles(runs),
-    ["runs/A.1/2026-09-21-lan.md", "runs/D.2/2026-09-22-lan.md", "runs/README.md"],
+    [
+      "runs/A.1/2026-09-21-lan.md",
+      "runs/D.2/2026-09-22-lan.md",
+      "runs/README.md",
+    ],
     "every .md at any depth, ordered by file name (date) before directory",
   );
 

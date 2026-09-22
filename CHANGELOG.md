@@ -65,6 +65,29 @@ All notable changes to this project will be documented in this file. Format foll
   tightens). Found the hard way: task.139's own § 3 quoted `develop/SKILL.md` verbatim, relative
   link included, and it survived review, two QA cycles and the PR review before CI caught it.
 
+### Changed
+
+- **`qa-next` indexes UAT by user function, not by story, and keeps one run directory per
+  function.** The queue shipped in v0.49.0 as one row per accepted story; stories are the pipeline's
+  unit, not the owner's — many stories build one thing a person does, and some (scaffolding, CI,
+  gateways) build nothing observable. The queue is now a **registry of user functions** — one row per
+  thing a person does with the app, in one sentence, with the stories behind it in its `Stories`
+  cell — and the rows are the owner's to author: `--init` writes the skeleton (one empty section per
+  surface) and `--sync` is gone. `--coverage` names the accepted stories no function covers (a
+  `storyNa` entry in `uat-surfaces.json` excuses one with a reason). Step 3 splits into 3a — run the
+  consumer's tagged real-stack Playwright lane (`qaNext.uatCommand --grep "@<id>\b"`) and map its
+  `results.json` onto the items as `lane:` evidence; an untagged spec is a harness finding, not a
+  pass — 3b (walk the rest) and 3c (keep selectors and assertions as an automation candidate;
+  `--automated <id> "<specs>"` fills the Automated-by cell). Run files live at
+  `runs/<function id>/<date>-<env>.md`, so `ls docs/qa/runs/D.2/` is that function's whole history,
+  oldest first; `listRunFiles` walks `runs/` recursively and `--findings` resolves each bug link
+  against its run file's own directory (the flat walker would have silently dropped a nested run and
+  reported a clean zero — mutation-proved: non-recursive walker → 17/18 red). **Config keys renamed
+  in `skills-config.yaml`**: `qaNext.trackerPath` → `registryPath` (default `docs/qa/uat-registry.md`),
+  `maxItemsPerStory` → `maxItemsPerFunction`; new `uatCommand`, `uatReportDir`, `uatSpecPattern`.
+  CLI: `--verified` → `--items`. `evals/qa-next/unit/uat-status.test.mjs` rewritten around a registry
+  (18 tests); `test:e2e:uat` allow-listed as a consumer-provided script.
+
 ## [v0.49.0] - 2026-09-21
 
 ### Added

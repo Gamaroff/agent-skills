@@ -514,7 +514,9 @@ export function listRunFiles(runsDir) {
     });
   return walk(runsDir)
     .map((p) => relative(dirname(runsDir), p))
-    .sort((a, b) => basename(a).localeCompare(basename(b)) || a.localeCompare(b));
+    .sort(
+      (a, b) => basename(a).localeCompare(basename(b)) || a.localeCompare(b),
+    );
 }
 
 // Every finding in every run file, oldest run first. `bug` is relative to the run file; `bugStatus`
