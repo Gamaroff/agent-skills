@@ -96,6 +96,34 @@ test("Step 7 updates parent linkage per mode (story / task / general registry)",
   assert.match(STEP7, /bug-registry\.md/);
 });
 
+// The registry row is a second copy of a general bug's status, and consumers
+// guard the two for equality on every push. Step 7 alone writing the row left
+// the guard red from the first code push to the close commit (three
+// occurrences). Pin that EVERY status transition names the registry, not just
+// the close: Step 3's in-progress + ready-for-qa, Step 5-6's reopened.
+test("Step 3 mirrors both of its status transitions into the general-bug registry row", () => {
+  // Same paragraph/bullet must carry the transition AND the registry — a lone
+  // mention of the registry elsewhere in the doc does not satisfy this.
+  assert.match(STEP3, /status: in-progress[^\n]*bug-registry\.md/);
+  assert.match(STEP3, /status: ready-for-qa[^\n]*bug-registry\.md/);
+  assert.match(
+    STEP3,
+    /every write of the bug file's `status:`[\s\S]{0,200}paired with the registry row/,
+  );
+});
+
+test("Step 5-6 mirrors the reopen into the general-bug registry row", () => {
+  assert.match(STEP56, /status: reopened[^\n]*bug-registry\.md/);
+});
+
+test("Step 7 treats the close as the last mirrored registry write, not the first", () => {
+  assert.match(STEP7, /last\*\* of the row's mirrored writes/);
+});
+
+test("SKILL.md Step 3 summary states the registry-mirror rule", () => {
+  assert.match(SKILL, /mirrored into the `docs\/bugs\/bug-registry\.md` row/);
+});
+
 // ---------------------------------------------------------------------------
 // Both branch models
 // ---------------------------------------------------------------------------

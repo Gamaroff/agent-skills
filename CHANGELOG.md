@@ -4,6 +4,50 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`review-task` and `review-story` verify that every documented config key has a reader (obs from
+  task.95's review).** The anti-hallucination protocol checked technologies, paths, API patterns, DB
+  schema and code examples — but not configuration. A documented knob that nothing reads is silently
+  ignored: the user sets it, nothing happens, and the documentation is the only reason they believed
+  otherwise. Task 95's review found exactly this twice — `observations.enabled` and
+  `observations.review_interval_days` were both specified for documentation and neither existed
+  anywhere in the tree. `review-task` gains Step 3 check 9 (Configuration Key Accuracy), the matching
+  hallucination pattern and Detection Rule 6, all where the reviewer actually works; `review-story`'s
+  weaker "check environment variables exist" is strengthened in place to require a reader in the code
+  and a comparison against the code's real default, rather than adding a sixth item to a five-item
+  list. `review-epic`, `review-prd` and `review-bug` carry no Detection Rules list and no
+  technical-accuracy check list, so they have no insertion point and are deliberately excluded.
+
+### Fixed
+
+- **`develop-bug` mirrors every general-bug status transition into the `bug-registry.md` row, not
+  only the close.** The registry row's Status cell is a second copy of the bug file's frontmatter
+  `status:`, and a consumer drift guard (tinker-city `check-bug-doc-consistency.js`, in `test:guard`
+  and the CI `guards` lane) asserts the two agree on every push. Step 3 wrote only the file at
+  `in-progress` and `ready-for-qa`, and Step 5–6 only the file at `reopened`, so the `guards` lane was
+  red from the first code push until Step 7's close commit finally wrote the row — a false red the
+  pipeline then had to reason past as "CI reading 2 is the real one" (bug.89, bug.90 and bug.91 in that
+  repo; the third recorded it as a pipeline gap for the second time). Step 3 now carries the rule as a
+  callout and pairs both of its transitions with the row; Step 5–6 pairs the reopen; Step 7 names the
+  close as the last mirrored write and flags a row still reading `🆕 New` as an earlier skipped mirror.
+  Story and task bugs are unchanged (no registry row). Contract tests pin each transition's
+  same-line mention of the registry, so a future edit cannot drop one write and keep the others.
+
+- **`qa-task` Step 12 writes only canonical lifecycle statuses (obs #153).** It instructed
+  `PASS or CONCERNS → Status: "Completed"` and `WAIVED → "Completed"`. `Completed` is not in the
+  canonical lifecycle (`draft → planned → ready-for-development → in-progress → ready-for-review →
+  accepted`), and inside the develop pipeline the document must stay `ready-for-review` until
+  `/finalise` writes `accepted` — which is what `qa-fix` Step 5's Status Rule already says, warning
+  in as many words against `Ready for Done`. On task.136's three QA cycles the orchestrator had to
+  notice the conflict and leave the status alone each time; a consumer that lints status vocabulary
+  goes red on `Completed`, and a `FAIL` gate writing `in-progress` moves the document backwards
+  mid-pipeline. PASS/CONCERNS/WAIVED now leave `ready-for-review` and FAIL writes `in-progress`,
+  with a callout naming the three forbidden words; Step 1's prerequisite and the Review Completion
+  Checklist row match. `skills/qa-task/tests/status-vocabulary.test.js` pins both QA skills to the
+  lifecycle vocabulary — `qa-story` already carried the rule, and its bug-report `Reopened` writes
+  are excluded by design.
+
 ## [v0.50.0] - 2026-09-22
 
 ### Added

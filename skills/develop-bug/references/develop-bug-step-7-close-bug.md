@@ -80,7 +80,7 @@ In the **parent task file**'s Bug Reports list, mark this bug ✅ Closed:
 Tasks do not use the `Reopened` status — no parent-status change needed.
 
 #### General bug
-Update the row for this bug in `docs/bugs/bug-registry.md` — set the `Status` column to `closed` and refresh **Last Updated**. Do **not** change the registry's Next Available Bug Number (numbers are never reused). The registry edit is committed atomically with the bug file in Step 8.
+Update the row for this bug in `docs/bugs/bug-registry.md` — set the `Status` column to `closed` (registry vocabulary: `✅ Closed`) and refresh **Last Updated**. Do **not** change the registry's Next Available Bug Number (numbers are never reused). The registry edit is committed atomically with the bug file in Step 8. This is the **last** of the row's mirrored writes, not the first: Step 3 wrote `🔧 In Progress` and `🔍 Ready for QA`, and Step 5–6 wrote `⚠️ Reopened` on every failed cycle (Step 3 callout). If the row still reads `🆕 New` here, an earlier step skipped its mirror — note it in the Issues Log; the close still corrects it.
 
 ### B4. Tracker close (only if linked)
 
