@@ -29,7 +29,7 @@ github_issue: 463
 
 **Scope**: `shared/resources/document-change-log.md` (the one-liner's `{skill}` placeholder becomes the spelled alternation of the skills that run it), `npm run bundle` (which then vendors the engine into those skills), and one parity test that derives the writer population from the prose and asserts each writer ships the engine — with a non-vacuity floor, so a rewording that empties the population goes red rather than green.
 
-**Key deliverables**: (1) The contract's one-liner names the running skills in the `{a|b|c}` alternation form the bundler follows out of shared text (`create-skill` § *A bundled copy nothing reaches is `UNREACHED`*), replacing the bare `{skill}` placeholder that names no skill and is invisible to discovery **by design**. (2) `references/change-log.js` present in `skills/develop/` and any other skill the population names, produced by the bundler, not by hand. (3) `tests/change-log-engine-reachability.test.js`: for every `skills/*/SKILL.md` whose text instructs appending through `change-log.js`, `skills/<skill>/references/change-log.js` exists and is byte-identical (modulo the bundler's header) to the shared source; the population is derived from the prose with a floor of ≥ 2 members (`develop`, `finalise`) so the test cannot pass on an empty set; and the alternation in the contract names every member of that population. (4) A Notes entry naming the five writers that append rows **by hand** today (`edit-epic`, `edit-story`, `sync-github-epic`, `sync-github-story`, `sync-github-task`) as the migration seam this task deliberately does not take.
+**Key deliverables**: (1) The contract's one-liner names the running skills in the `{a|b|c}` alternation form the bundler follows out of shared text (`create-skill` § *A bundled copy nothing reaches is `UNREACHED`*), replacing the bare `{skill}` placeholder that names no skill and is invisible to discovery **by design**. (2) `references/change-log.js` present in `skills/develop/` and any other skill the population names, produced by the bundler, not by hand. (3) `tests/change-log-engine-reachability.test.js`: for every `skills/*/SKILL.md` whose text instructs appending through `change-log.js`, `skills/<skill>/references/change-log.js` exists and is byte-identical (modulo the bundler's header) to the shared source; the population is derived from the prose with a floor of ≥ 2 members (`develop`, `finalise`) so the test cannot pass on an empty set; and the alternation in the contract names every member of that population. (4) A Notes entry naming the eight writers that append rows **by hand** today (`edit-epic`, `edit-story`, `sync-github-epic`, `sync-github-story`, `sync-github-task`, `enforce-standards`, `review-epic`, `review-task`) as the migration seam this task deliberately does not take.
 
 **Expected outcome**: a `/develop` run in a consumer install appends its Implemented row through the engine; a skill added later that cites the engine without shipping it turns the parity test red before it can be installed anywhere.
 
@@ -84,7 +84,7 @@ The population and the alternation are two enumerations of one fact and the test
 - **Why spell the alternation rather than declare a `bundle-dependency:` line.** The `// bundle-dependency: shared/resources/X` form is for `.js`/`.mjs` files whose only citation is a comment. A shared `.md` that names `shared/resources/change-log.js` as a literal would vendor the engine into all 41 bundlers of the contract — the over-match the `create-skill` rule exists to prevent. The alternation is the form that rule names for this case, and it vendors the engine into exactly the skills that run it.
 - **Why the population is derived from prose and not listed in the test.** A list in the test is a third enumeration. The test reads `skills/*/SKILL.md` for the instruction that runs the engine (`through \`change-log.js\``, the phrase both current writers use), so a new writer that copies the phrase joins the population automatically and fails until the alternation names it. The floor of 2 is what stops a rewording of the phrase from emptying the population and passing (obs #117: a figure a test re-measures needs its definition recorded, not its number).
 - **Byte-identical, not merely present.** `bundle:check` already asserts freshness for every bundled copy; the test's identity assertion is redundant with it on a fresh bundle and non-redundant on a hand-copied file, which is the shape obs #152's workaround would have taken if it had been "fixed" in the skill directory.
-- **What this task does not do.** Five skills instruct "Append a Change Log row" without naming the engine at all (`edit-epic`, `edit-story`, `sync-github-epic`, `sync-github-story`, `sync-github-task`). They are hand-appending against a contract that forbids it, but moving them onto the engine is a *migration* of five call sites with their own tests — the primitive → migration seam in `create-task` § 1.2 — and is recorded in § Notes as the next task, not folded in here.
+- **What this task does not do.** Eight skills instruct "Append a Change Log row" without naming the engine at all (`edit-epic`, `edit-story`, `sync-github-epic`, `sync-github-story`, `sync-github-task`, and — found at review — `enforce-standards`, `review-epic`, `review-task`). They are hand-appending against a contract that forbids it, but moving them onto the engine is a *migration* of eight call sites with their own tests — the primitive → migration seam in `create-task` § 1.2 — and is recorded in § Notes as the next task, not folded in here.
 
 ---
 
@@ -101,7 +101,7 @@ The population and the alternation are two enumerations of one fact and the test
 
 ### Out of Scope
 
-❌ Migrating the five hand-appending writers onto the engine (§ Notes — next task)
+❌ Migrating the eight hand-appending writers onto the engine (§ Notes — next task)
 ❌ Changing the bundler's discovery rules — the alternation form already exists and is tested (`tests/bundle-transitive.test.js`, `bundle-check-mode.test.js`)
 ❌ Any change to `change-log.js` itself
 ❌ Bug reports (they carry `## Status History`, engine `status-history.js`, which is reached today via the bug skills' own `.js` requires)
@@ -153,7 +153,7 @@ None — API stable. The engine's behaviour and interface do not change; two ski
 
 - [x] CHANGELOG [Unreleased]: the alternation, the test, the skills that gained the engine
 - [x] Obs #152 → `actioned` with the PR as resolution
-- [x] § Notes of this task carries the migration seam for the five hand-appending writers
+- [x] § Notes of this task carries the migration seam for the eight hand-appending writers
 
 ---
 
@@ -228,7 +228,7 @@ Not applicable.
 
 ### Migration
 
-- [x] CHANGELOG entry; obs #152 `actioned`; § Notes names the five hand-appending writers as the next task
+- [x] CHANGELOG entry; obs #152 `actioned`; § Notes names the eight hand-appending writers as the next task
 
 ---
 
@@ -285,7 +285,30 @@ None.
 | 2026-09-22 | 1.1 | Review passed (9/10) — corrected § 3 skill counts (25 carry the engine, 24 of 42 carry the contract without it) and extended the § Notes migration seam with enforce-standards, review-epic, review-task | review-task |
 | 2026-09-22 |  | Status → ready-for-development | review-task |
 | 2026-09-22 |  | Implemented — 46 files (1 contract, 1 new engine copy, 42 re-rendered contract copies, 1 test, CHANGELOG), 3 tests | develop |
+| 2026-09-22 |  | QA gate CONCERNS (80/100) — 2 findings (CR-1 contract wording, CR-2 wrapped-phrase regex); 2 advisory | qa-task |
+| 2026-09-22 |  | QA findings fixed — CR-1 contract wording, CR-2 wrap-tolerant phrase regex + regression test, CR-3 literal skill form, CR-4 counts; 1 iteration | qa-fix |
 <!-- change-log-end -->
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-22
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.139.qa.1.change-log-engine-reachability.md](./task.139.qa.1.change-log-engine-reachability.md)
+- **Gate File**: [task.139.gate.1.change-log-engine-reachability.yml](./task.139.gate.1.change-log-engine-reachability.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3891 (ci:fast) incl. 3 new
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 (2 medium code-review findings promoted: CR-1, CR-2)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+CR-1: contract paragraph claims skills outside the alternation lack the engine (false for 24 transitive carriers). CR-2: `RUNS_ENGINE` misses the line-wrapped phrase at `develop/SKILL.md:589–590`. Advisory: CR-3 (single-skill form), CR-4 (stale "five" counts).
 
 ## Progress Tracking
 
@@ -293,8 +316,8 @@ None.
 - [x] Phase 2: spell the alternation and bundle
 - [x] Phase 3: prove the documented call runs from the bundle
 - [x] Phase 4: docs, CHANGELOG, observation
-- [ ] QA: `task.139.qa.[N].change-log-engine-reachability.md`
-- [ ] Gate: `task.139.gate.[N].change-log-engine-reachability.yml`
+- [x] QA: `task.139.qa.1.change-log-engine-reachability.md`
+- [x] Gate: `task.139.gate.1.change-log-engine-reachability.yml` (CONCERNS)
 
 ## References
 
@@ -317,6 +340,8 @@ None.
 
 - Pre-fix shape (copy moved aside): `Error: Cannot find module './.agents/skills/develop/references/change-log.js'` — the task.136 Step 3 failure, reproduced.
 - Post-fix: exit 0; appended `| 2026-09-22 |  | probe — task.139 Phase 3 | develop |` inside the marker block and bumped `updated: 2026-09-22`.
+
+**QA fix cycle 1 (2026-09-22)** — gate.1 CONCERNS (80): CR-1 contract paragraph reworded (the alternation names the skills whose *prose* runs the one-liner; others may carry the engine transitively and that is incidental) and re-bundled into the 42 copies; CR-2 `RUNS_ENGINE` → `/through\s+\`change-log\.js\`/` with a new test "the phrase matcher sees the instruction across a line wrap" (fixture self-check + develop/SKILL.md must match at both its sites) — mutation-proven: literal-space regex reds it; CR-3 `ALTERNATION_RE` accepts the bundler's literal single-skill form (braces stripped when present); CR-4 the five "five" mentions → eight. `ci:fast` 3891/3891; `bundle:check` 0 problems.
 
 **Deferred work**: none in scope. The eight hand-appending writers (§ Notes) are the next task.
 

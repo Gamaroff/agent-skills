@@ -50,15 +50,24 @@ const ENGINE = "shared/resources/change-log.js";
 // 12, § Develop Story Workflow step 14) and finalise (§ 7.3) both spell it this
 // way; the population derivation depends on the phrase, so a writer that
 // rewords it drops out and the floor below turns that red.
-const RUNS_ENGINE = /through `change-log\.js`/;
+//
+// `\s+`, not a literal space: prose wraps, and develop's story-workflow site
+// already reads "Append through\n    `change-log.js`" (SKILL.md ~589). A
+// single-space matcher saw develop only because its task-workflow site happens
+// to sit on one line — a writer whose only instance is wrapped would have been
+// silently absent from the population with every test green (QA cycle 1, CR-2).
+const RUNS_ENGINE = /through\s+`change-log\.js`/;
+const RUNS_ENGINE_ALL = new RegExp(RUNS_ENGINE.source, "g");
 
-// The one-liner's require, with the `{…}` group the bundler follows. The class
-// is the bundler's own (`[A-Za-z0-9|-]`, INVOKE_REF_RE in bundle_skill.py) — a
-// space or a `_` inside the braces would make the bundler skip it silently, so
-// the test refuses the same characters rather than matching what the bundler
-// cannot.
+// The one-liner's require, with the skill segment the bundler follows: a
+// `{a|b|c}` alternation or a literal single skill name — the same two forms
+// INVOKE_REF_RE in bundle_skill.py accepts, with the same character class
+// (`[A-Za-z0-9|-]`). A space or a `_` inside the braces would make the bundler
+// skip it silently, so the test refuses the same characters rather than
+// matching what the bundler cannot; a single-writer contract spelled without
+// braces is valid to the bundler and therefore valid here (QA cycle 1, CR-3).
 const ALTERNATION_RE =
-  /require\("\.\/\.agents\/skills\/\{([A-Za-z0-9|-]+)\}\/references\/change-log\.js"\)/;
+  /require\("\.\/\.agents\/skills\/(\{[A-Za-z0-9|-]+\}|[A-Za-z0-9-]+)\/references\/change-log\.js"\)/;
 
 // The bundler's header for a `.js` copy is exactly one leading line; the shared
 // source has no shebang, so the header is line 1 (bundle_skill.py
@@ -84,17 +93,50 @@ function alternation() {
   const m = text.match(ALTERNATION_RE);
   assert.ok(
     m,
-    `${CONTRACT}: the one-liner's require carries no {a|b|c} alternation the bundler can ` +
-      `follow — a bare {placeholder} reaches nothing (create-skill § UNREACHED)`,
+    `${CONTRACT}: the one-liner's require names no skill segment the bundler can follow — ` +
+      `expected {a|b|c} or a literal skill name (create-skill § UNREACHED)`,
   );
-  const members = m[1].split("|").filter(Boolean);
+  const group = m[1].replace(/^\{|\}$/g, "");
+  const members = group.split("|").filter(Boolean);
   assert.equal(
     members.length,
     new Set(members).size,
-    `${CONTRACT}: the alternation repeats a skill — {${m[1]}}`,
+    `${CONTRACT}: the alternation repeats a skill — {${group}}`,
   );
   return members.sort();
 }
+
+test("the phrase matcher sees the instruction across a line wrap", () => {
+  // Self-check on the instrument (non-vacuity on the regex, not the inventory):
+  // both spellings the repo produces must match, and a mention that does not
+  // instruct the append must not.
+  assert.ok(
+    RUNS_ENGINE.test(
+      "**Append through `change-log.js`, never by text search**",
+    ),
+  );
+  assert.ok(
+    RUNS_ENGINE.test(
+      "**Append through\n    `change-log.js`, never by text search**",
+    ),
+  );
+  assert.ok(!RUNS_ENGINE.test("do not reach for `change-log.js` here"));
+
+  // develop instructs the append at two sites — the story workflow (wrapped)
+  // and the task workflow (one line). The derivation must see both, or a
+  // future edit that drops the one-line site leaves develop in the population
+  // by luck rather than by reading.
+  const develop = fs.readFileSync(
+    path.join(SKILLS_DIR, "develop", "SKILL.md"),
+    "utf8",
+  );
+  const hits = develop.match(RUNS_ENGINE_ALL) || [];
+  assert.ok(
+    hits.length >= 2,
+    `skills/develop/SKILL.md: expected the instruction at both the story-workflow and ` +
+      `task-workflow sites, matched ${hits.length}`,
+  );
+});
 
 test("population floor: at least two skills instruct the append through the engine", () => {
   const p = population();
