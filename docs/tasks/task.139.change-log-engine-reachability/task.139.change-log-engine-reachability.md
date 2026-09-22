@@ -302,6 +302,7 @@ None.
 | 2026-09-22 |  | QA findings fixed (cycle 3) — doc-links engine: root anchoring, CommonMark fences, paragraph-bound code spans, more link forms, exitCode; review/finalise prose paths; evaluator documentPath; 1 iteration | qa-fix |
 | 2026-09-22 |  | QA gate CONCERNS (80/100) — cycle 4: all cycle-3 findings verified closed; 1 promoted (CRLF handling), 7 advisory | qa-task |
 | 2026-09-22 |  | QA findings fixed (cycle 4) — CRLF normalisation, documentPath constrained to work-item documents, opener lookbehind, indented fences, ref-def/escaped-bracket guards, repo once, operand errors; 1 iteration | qa-fix |
+| 2026-09-22 |  | QA gate CONCERNS (90/100, no open entry) — cycle 5: cycle-4 closures verified; Maintainability reservation on the two artifact deny-lists; 4 low advisories | qa-task |
 <!-- change-log-end -->
 
 ## QA Testing Results
@@ -309,21 +310,21 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-22
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.139.qa.4.change-log-engine-reachability.md](./task.139.qa.4.change-log-engine-reachability.md) (cycles 1–3: qa.1, qa.2, qa.3)
-- **Gate File**: [task.139.gate.4.change-log-engine-reachability.yml](./task.139.gate.4.change-log-engine-reachability.yml) (gate.1 CONCERNS 80 → gate.2 PASS 100 → gate.3 CONCERNS 50 → gate.4 CONCERNS 80)
+- **Full Report**: [task.139.qa.5.change-log-engine-reachability.md](./task.139.qa.5.change-log-engine-reachability.md) (cycles 1–4: qa.1–qa.4)
+- **Gate File**: [task.139.gate.5.change-log-engine-reachability.yml](./task.139.gate.5.change-log-engine-reachability.yml) (gate.1 CONCERNS 80 → gate.2 PASS 100 → gate.3 CONCERNS 50 → gate.4 CONCERNS 80 → gate.5 CONCERNS 90, no open entry)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3904 (ci:fast, all green)
+- **Tests Executed**: 3908 (ci:fast, all green)
 - **Phases Verified**: 4/4 original + obs #154 addition
-- **Critical Issues**: 0 (1 medium promoted: C4-CR-1 CRLF handling in doc-links.js)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 (no open entries; 4 low advisories)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-All eleven cycle-3 findings verified closed by execution. Cycle 4 found one defect the fix introduced — on CRLF input no fence opens and the paragraph splitter never fires — plus seven advisories (documentPath unconstrained, opener lookbehind, container-indented fences, ref-def/escaped-bracket false positives, per-doc rev-parse, stale header, wrong-operand message).
+All cycle-4 closures verified by execution. Maintainability reservation (C5-CR-2): the evaluator and the corpus guard each keep a hand-written artifact deny-list and the two already differ — replace both with one exported predicate (basename stem == parent directory name) in the follow-up. Three further nits (C5-CR-1 indented-code-block fence false red; C5-CR-3 double-backslash escape; C5-CR-4 bug reports outside the ratchet) recorded.
 
 ## Definition of Done - Gaps Identified
 
@@ -360,8 +361,8 @@ DoD sections: Acceptance Criteria ✅ 7/7 · Security ✅ · Compliance — N/A 
 - [x] Phase 2: spell the alternation and bundle
 - [x] Phase 3: prove the documented call runs from the bundle
 - [x] Phase 4: docs, CHANGELOG, observation
-- [x] QA: `task.139.qa.4.change-log-engine-reachability.md` (cycles 1–3: qa.1–qa.3)
-- [x] Gate: `task.139.gate.4.change-log-engine-reachability.yml` (CONCERNS; gate.2 PASS 100 on the original deliverable)
+- [x] QA: `task.139.qa.5.change-log-engine-reachability.md` (cycles 1–4: qa.1–qa.4)
+- [x] Gate: `task.139.gate.5.change-log-engine-reachability.yml` (CONCERNS, no open entry; gate.2 PASS 100 on the original deliverable)
 
 ## References
 

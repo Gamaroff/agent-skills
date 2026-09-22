@@ -1,0 +1,68 @@
+schema: 1
+task: 'task.139.change-log-engine-reachability'
+task_title: 'The Change Log engine is unreachable from a skill whose prose runs it: spell the writer alternation and pin engine reachability with a parity test'
+gate: CONCERNS
+status_reason: 'Cycle 5 (last budgeted) verifies every cycle-4 closure by execution and the wider tree (1,738 tracked .md: 2 open fences, both pre-existing malformed artifacts that open under the old rule too). Four low findings, none promoted. One is recorded as a Maintainability reservation rather than a fix: the evaluator and the corpus guard each keep a hand-written artifact deny-list, and the two already disagree inside this PR — the enumeration class docs/reference/anti-patterns.md names. Nothing is open; the reservation and the three nits are the follow-up.'
+reviewer: 'QA Engineer'
+updated: '2026-09-22T07:30:05Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 15
+  phases_verified: '4/4 (original) + obs #154 addition'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged: reads files, runs git; no network, writes or secrets; documentPath now constrained to a docs/ work-item document with no ".." segment.'
+  performance:
+    status: PASS
+    notes: 'Corpus guard ~0.4 s with repo + tracked passed once.'
+  reliability:
+    status: PASS
+    notes: 'CRLF, cwd, fence and code-span closures all verified by execution; residual C5-CR-1 (a bare ``` inside a 4-space code block opens a fence) is a false red in the safe direction, 0 instances in the tree.'
+  maintainability:
+    status: CONCERNS
+    notes: 'C5-CR-2: WORK_ITEM_ARTIFACT_RE (evaluator) and ARTIFACT_RE (corpus guard) are two hand-kept deny-lists that already differ (sprint-review-summary) and both miss validate/audit — 14 real artifacts would pass isWorkItemDocument. One predicate (basename stem == parent directory name; 176/176 documents, 0/14 artifacts) exported from the evaluator and imported by the guard is the fix; recorded for the follow-up rather than a sixth cycle.'
+
+code_review:
+  blocking: true
+  bugs: 2
+  cleanups: 2
+  promoted: []
+  probes_executed: 0
+  boundary: false
+  scope: 'files changed since gate.4 (2026-09-22T07:14:52Z) — 8 files'
+  cycle_4_closures_verified_by_execution: ['C4-CR-1', 'C4-CR-2', 'C4-CR-3', 'C4-CR-4', 'C4-CR-5', 'C4-CR-6', 'C4-CR-7', 'C4-CR-8']
+  mutation_proven:
+    - 'opener lookbehind removed → "extractor (C4-CR-3)" red → covered'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'C5-CR-2 (low/high, Maintainability reservation): replace both artifact deny-lists with one exported predicate — a work-item document is the file whose basename stem equals its parent directory name — and import it in the corpus guard'
+      refs: ['shared/resources/finalise-fix-and-recheck.mjs', 'shared/resources/tests/doc-links.test.mjs']
+    - action: 'C5-CR-1 (low/high): a bare ``` inside a 4+-space indented code block (valid CommonMark, not a fence) opens a fence that never closes → false open-fence red; accept a ≥4-column opener only when it continues a container, and correct the header (the cost is a false red, not merely skipped links)'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'C5-CR-3 (cleanup): (?<!\\) treats an escaped backslash as an escape — \\[t](c.md) is never checked; consume an even run of backslashes or document'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'C5-CR-4 (cleanup): corpus guard walks no bug reports (bug\.\d+ absent from WORK_ITEM_RE; docs/bugs absent from the pathspec) while the evaluator admits them for the 8a clause'
+      refs: ['shared/resources/tests/doc-links.test.mjs']
+    - action: 'Carried: C2-CR-1..4, 5c CR-1/CR-2 (cycle 2 and the first 5c)'
+      refs: ['tests/change-log-engine-reachability.test.js', 'shared/resources/document-change-log.md', 'CHANGELOG.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
