@@ -1429,7 +1429,11 @@ test("the NEWEST bug link wins on an appended note cell (TASK-141-BUG-10)", () =
   assert.equal(run(root, "--check").code, 0);
 });
 
-test("the append does not repeat an identical consecutive segment (TASK-141-CR4-3)", () => {
+test("the append never drops a note, and repetition is the accepted cost (TASK-141-CR4-3)", () => {
+  // Duplicate suppression was removed after three formulations each dropped a genuinely new note:
+  // ` · ` is the registry's separator AND legal inside one, so no comparison can tell a tail
+  // SEGMENT from a compound note's tail. This test pins the trade that was chosen instead — never
+  // lose a note — so that a future attempt to re-add suppression has to face it.
   const root = corpus();
   run(root, "--init");
   addRows(root, "D", D_ROWS);
@@ -1444,38 +1448,56 @@ test("the append does not repeat an identical consecutive segment (TASK-141-CR4-
 
   run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r1.md");
   run(root, "--accept", "D.2", "--note", "signed off");
-  for (let i = 0; i < 12; i++)
+
+  // The ambiguous case, which every suppression rule got wrong in one direction or the other.
+  run(root, "--set", "D.2", "blocked", "--note", "spec a · spec b");
+  run(root, "--set", "D.2", "blocked", "--note", "spec b");
+  assert.match(
+    notes(),
+    /spec a · spec b · spec b$/,
+    "the atomic note is kept even though a compound note's tail reads the same — losing it would be silent data loss",
+  );
+
+  // The accepted cost, asserted so it is a documented property rather than a surprise.
+  for (let i = 0; i < 3; i++)
     run(root, "--set", "D.2", "blocked", "--note", "no credential");
   assert.equal(
     (notes().match(/no credential/g) ?? []).length,
-    1,
-    "twelve identical blocked re-runs leave one segment, not twelve",
+    3,
+    "an identical reason repeats — noise a reader can see, chosen over a rule that silently drops",
   );
-  assert.match(
+
+  // A blank note is still nothing, and never leaves a dangling separator.
+  const before = notes();
+  run(root, "--set", "D.2", "blocked", "--note", "   ");
+  assert.equal(
     notes(),
-    /^accepted \d{4}-\d{2}-\d{2} — signed off · no credential$/,
+    before,
+    "a whitespace-only note leaves the cell untouched",
   );
-  // A different reason between two identical ones is still recorded — suppression is only of an
-  // immediate repeat, so the cell stays an honest history rather than a set.
-  run(root, "--set", "D.2", "blocked", "--note", "different reason");
-  run(root, "--set", "D.2", "blocked", "--note", "no credential");
-  assert.equal((notes().match(/no credential/g) ?? []).length, 2);
+  assert.doesNotMatch(notes(), /·\s*$/);
   assert.equal(run(root, "--check").code, 0);
+  assert.ok(
+    notes().startsWith("accepted"),
+    "and the owner's sign-off is still first",
+  );
 });
 
 test("every state in STATES is classified by each of cmdSet's three rules (TASK-141-CR4-4)", () => {
-  // The append rule replaced an enumeration of FLAGS with an enumeration of STATES — a smaller and
-  // stabler population, but still a hand-listed one, and nothing forced the re-check when a state
-  // was added. This is that forcing function: the population is Object.keys(STATES), listed here
-  // once, and a seventh state fails this test until someone answers all three questions for it.
+  // The append rule replaced an enumeration of FLAGS with an enumeration of STATES. This is the
+  // forcing function for the second one: the population is Object.keys(STATES), listed once, and a
+  // seventh state fails here until all three questions are answered for it AND asserted against the
+  // tool. An earlier version probed the tool only when a requirement was TRUE and discarded the
+  // moves-accepted column entirely — so a state classified [false, false, false], the exact default
+  // the finding was raised about, passed having executed no assertion at all.
   const RULES = {
-    // state → [moves an accepted row?, requires --run, requires --note]
-    untested: [true, false, false],
-    pass: [false, true, false],
-    fail: [true, true, false],
-    blocked: [false, false, true],
-    na: [false, false, true],
-    accepted: [null, null, null], // --set refuses it outright; --accept owns this transition
+    // state → { movesAccepted, needsRun, needsNote }
+    untested: { movesAccepted: true, needsRun: false, needsNote: false },
+    pass: { movesAccepted: false, needsRun: true, needsNote: false },
+    fail: { movesAccepted: true, needsRun: true, needsNote: false },
+    blocked: { movesAccepted: false, needsRun: false, needsNote: true },
+    na: { movesAccepted: false, needsRun: false, needsNote: true },
+    accepted: null, // --set refuses it outright; --accept owns this transition
   };
   assert.deepEqual(
     Object.keys(STATES).sort(),
@@ -1494,25 +1516,169 @@ test("every state in STATES is classified by each of cmdSet's three rules (TASK-
     "---\nstatus: new\n---\n",
   );
 
-  // The rules are asserted against the tool, not merely tabulated above.
   assert.equal(
     run(root, "--set", "D.2", "accepted").code,
     2,
     "--set refuses accepted",
   );
-  for (const [state, [, needsRun, needsNote]] of Object.entries(RULES)) {
-    if (state === "accepted") continue;
-    if (needsRun)
+
+  const accept = () => {
+    run(root, "--set", "D.2", "untested", "--note", "reset");
+    run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r1.md");
+    run(root, "--accept", "D.2", "--note", "signed off");
+  };
+  const stateCell = () =>
+    readFileSync(REG(root), "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| D.2 |"))
+      .split("|")
+      .map((c) => c.trim())[8];
+
+  let asserted = 0;
+  for (const [state, rule] of Object.entries(RULES)) {
+    if (!rule) continue;
+    const { movesAccepted, needsRun, needsNote } = rule;
+
+    // BOTH polarities — a `false` is a claim too, and asserting only the `true`s is how a
+    // [false,false,false] state slips through having been tested for nothing.
+    const bare = run(root, "--set", "D.2", state);
+    if (needsRun || needsNote) {
       assert.equal(
-        run(root, "--set", "D.2", state).code,
+        bare.code,
         2,
-        `${state} requires --run`,
+        `${state} must refuse a call without its required flag`,
       );
-    if (needsNote)
-      assert.equal(
-        run(root, "--set", "D.2", state).code,
-        2,
-        `${state} requires --note`,
-      );
+    } else {
+      assert.equal(bare.code, 0, `${state} requires neither --run nor --note`);
+    }
+    asserted++;
+
+    // The moves-accepted column, asserted rather than tabulated.
+    accept();
+    const args =
+      state === "fail"
+        ? [
+            "--set",
+            "D.2",
+            "fail",
+            "--run",
+            "runs/D.2/r1.md",
+            "--bug",
+            "docs/bugs/bug.1.x.md",
+          ]
+        : needsRun
+          ? ["--set", "D.2", state, "--run", "runs/D.2/r1.md"]
+          : needsNote
+            ? ["--set", "D.2", state, "--note", `probe ${state}`]
+            : ["--set", "D.2", state, "--note", `probe ${state}`];
+    assert.equal(
+      run(root, ...args).code,
+      0,
+      `${state} against an accepted row should succeed`,
+    );
+    assert.equal(
+      stateCell() !== STATES.accepted,
+      movesAccepted,
+      `${state}: movesAccepted is tabulated as ${movesAccepted} — the tool disagrees`,
+    );
+    asserted++;
   }
+  assert.equal(
+    asserted,
+    10,
+    "five states × two assertions each, executed against the tool",
+  );
+  assert.equal(run(root, "--check").code, 0);
+});
+
+test("render and parse are inverses — a pipe does not accumulate backslashes (TASK-141-BUG-11)", () => {
+  // renderRow escapes `|`; splitCells must unescape it. Without the unescape every --set
+  // re-escaped an already-escaped pipe, so a hand-authored `a \| b` gained one backslash per
+  // rewrite, --check stayed green throughout, and --item --json handed the backslashes to the
+  // skill. The assertion is idempotence of the WHOLE round trip, which is the property the two
+  // functions have to hold jointly — asserting either one alone would have missed it.
+  const root = corpus();
+  run(root, "--init");
+  addRows(
+    root,
+    "D",
+    "| D.9 | Submit a \\| b | It posts a \\| b. | /g | 7.5 |  |  | ⬜ untested |  |  |\n",
+  );
+  mkdirSync(path.join(root, "docs/qa/runs/D.9"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.9/r1.md"), "# run\n");
+
+  const rowOf = () =>
+    readFileSync(REG(root), "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| D.9 |"));
+
+  run(root, "--set", "D.9", "blocked", "--note", "first");
+  const afterFirst = rowOf();
+  for (let i = 0; i < 5; i++)
+    run(root, "--set", "D.9", "blocked", "--note", `n${i}`);
+  const afterMany = rowOf();
+
+  const fnCell = (row) => row.split(/(?<!\\)\|/).map((c) => c.trim())[2];
+  assert.equal(
+    fnCell(afterMany),
+    fnCell(afterFirst),
+    "the Function cell is byte-identical after five further rewrites — no backslash growth",
+  );
+  assert.match(
+    fnCell(afterFirst),
+    /^Submit a \\\| b$/,
+    "and it is stored escaped exactly once",
+  );
+  assert.equal(
+    JSON.parse(run(root, "--item", "D.9", "--json").out).function,
+    "Submit a | b",
+    "the skill receives the unescaped value",
+  );
+  assert.equal(run(root, "--check").code, 0);
+});
+
+test("--check validates every bug link in the cell, including the one --item hands out (TASK-141-BUG-12)", () => {
+  // describeRow returns the LAST bug link; checkRegistry validated the FIRST. So --check could
+  // prove a different file exists from the one SKILL.md Step 4 opens to append a re-test section.
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.old.md"),
+    "---\nstatus: new\n---\n",
+  );
+
+  // A ❌ row whose cell holds a resolving FIRST link and a missing SECOND one.
+  run(
+    root,
+    "--set",
+    "D.2",
+    "fail",
+    "--run",
+    "runs/D.2/r1.md",
+    "--bug",
+    "docs/bugs/bug.1.old.md",
+  );
+  const reg = REG(root);
+  const text = readFileSync(reg, "utf8").replace(
+    "[bug.1.old](../bugs/bug.1.old.md)",
+    "[bug.1.old](../bugs/bug.1.old.md) · [bug.7.new](../bugs/bug.7.new.md)",
+  );
+  writeFileSync(reg, text);
+
+  assert.equal(
+    JSON.parse(run(root, "--item", "D.2", "--json").out).bug,
+    "../bugs/bug.7.new.md",
+    "the payload hands out the newest link",
+  );
+  const check = run(root, "--check");
+  assert.equal(
+    check.code,
+    1,
+    "and --check refuses the row, because that link does not resolve",
+  );
+  assert.match(check.out, /bug file not found: \.\.\/bugs\/bug\.7\.new\.md/);
 });

@@ -664,47 +664,43 @@ historical naming.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS (cycle 4) — all findings fixed, awaiting the cycle-5 verification gate
+**QA Status**: FAIL — QA loop limit reached (5 of 5 cycles)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-22
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 60/100
+**Gate Decision**: FAIL (loop limit)
 
 ### QA Reports
 
-- **Cycle 4**: [qa.4](./task.141.qa.4.qa-next-targeted-item.md) · [gate.4](./task.141.gate.4.qa-next-targeted-item.yml)
-- **Cycle 3**: [qa.3](./task.141.qa.3.qa-next-targeted-item.md) · [gate.3](./task.141.gate.3.qa-next-targeted-item.yml)
-- **Cycle 2**: [qa.2](./task.141.qa.2.qa-next-targeted-item.md) · [gate.2](./task.141.gate.2.qa-next-targeted-item.yml)
-- **Cycle 1**: [qa.1](./task.141.qa.1.qa-next-targeted-item.md) · [gate.1](./task.141.gate.1.qa-next-targeted-item.yml)
+| Cycle | Gate | Report | Verdict |
+| :--- | :--- | :--- | :--- |
+| 1 | [gate.1](./task.141.gate.1.qa-next-targeted-item.yml) | [qa.1](./task.141.qa.1.qa-next-targeted-item.md) | FAIL (70) |
+| 2 | [gate.2](./task.141.gate.2.qa-next-targeted-item.yml) | [qa.2](./task.141.qa.2.qa-next-targeted-item.md) | FAIL (70) — refute pass |
+| 3 | [gate.3](./task.141.gate.3.qa-next-targeted-item.yml) | [qa.3](./task.141.qa.3.qa-next-targeted-item.md) | FAIL (65) |
+| 4 | [gate.4](./task.141.gate.4.qa-next-targeted-item.yml) | [qa.4](./task.141.qa.4.qa-next-targeted-item.md) | CONCERNS (80) |
+| 5 | [gate.5](./task.141.gate.5.qa-next-targeted-item.yml) | [qa.5](./task.141.qa.5.qa-next-targeted-item.md) | FAIL (60) — **loop limit** |
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3939 (0 failures, 1 skipped); qa-next suite 36
+- **Tests Executed**: 3941 (0 failures, 1 skipped); qa-next suite 38
 - **Phases Verified**: 5/5
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
-- **CI**: all five checks green on the pushed branch
-- **Mutation proof**: 25 mutations across four cycles, every one red
+- **Mutation proof**: 29 mutations across five cycles, every one red
 
-### Key Finding — the shape, across four cycles
+### Where this stands
 
-One cell (`Notes / bug` on a kept `✅`) produced a defect in three consecutive cycles, and each was
-the same shape: **a guard that enumerated the ways in and missed one.**
+**Every known finding is fixed, mutation-proved and green — and the cycle-5 fixes have not been
+reviewed by any gate.** The loop's five-cycle budget is spent, and route 2c (the gate-the-last-fix
+half-cycle) does not apply because gate 5 raised a HIGH.
 
-| Cycle | Guard | Missed |
-| :--- | :--- | :--- |
-| 1 | `state === "pass" && accepted` | `blocked`, `na` |
-| 2 | `kept && (clear \|\| note)` | `--bug` |
-| 3 | append rather than replace | *(nothing — but `kept` is still a hand-listed state set)* |
+Thirteen defects were found and closed across the five cycles. Four of the five cycles found their
+defect in the *previous cycle's fix* rather than in the original change, which is why "fixed and
+green" is stated here without being presented as "finished".
 
-Cycle 3 replaced the flag enumeration with an **operation** — append, never replace — which holds
-for every flag present and future. Cycle 4 verified that by enumerating the *writers* of the cell
-(four, only one reachable on a kept row) rather than the flags, and found the residue the operation
-introduced: an appended cell can hold two bug links, and the payload took the first.
-
-Cycle 4's remaining criticism was fair and is now closed by a test rather than by argument: `kept`
-is still a hand-listed subset of `STATES`, so a new state would default to kept-on-accepted with
-nothing forcing a re-check. A population test now enumerates `Object.keys(STATES)` and fails until
-every state is classified by all three of `cmdSet`'s rules.
+The area is one table cell, one in-band separator and one escape — small, and unusually
+sharp-edged: a correct-looking fix has repeatedly had a consequence one layer out (escape without
+unescape; newest-link reader against first-link validator; a suppression rule that no string
+comparison can make correct).
 
 ---
 
@@ -722,6 +718,7 @@ every state is classified by all three of `cmdSet`'s rules.
 | 2026-09-22 |         | QA cycle 2 refute pass — gate FAIL (70/100); 2 cycle-1 bugs verified fixed, 3 new findings | qa-task |
 | 2026-09-22 |         | QA cycle 3 — gate FAIL (65/100); sign-off guard replaced by an append rule rather than a fourth enumeration | qa-task |
 | 2026-09-22 |         | QA cycle 4 — gate CONCERNS (80/100); append rule verified over the writer set; pipe escaping, newest-bug-link and a STATES population test | qa-task |
+| 2026-09-22 |         | QA cycle 5 — gate FAIL (60/100); render/parse idempotence, every-bug-link validation, suppression withdrawn; **loop limit reached** | qa-task |
 
 <!-- change-log-end -->
 

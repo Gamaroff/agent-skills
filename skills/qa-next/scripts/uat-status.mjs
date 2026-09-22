@@ -195,11 +195,16 @@ const SECTION = /^### ([A-Z])\. (.*)$/;
 const SEPARATOR = /^\|\s*:?-+/;
 
 function splitCells(line) {
+  // UNESCAPES what renderRow escapes. The two must be inverses: renderRow escapes `|` so a pipe in
+  // a cell cannot split the row, and every `--set` re-renders the row it just parsed — so a parse
+  // that leaves `\|` standing means the next render escapes it again, and the backslashes grow by
+  // one per rewrite. Four writes turned an authored `a \| b` into `a \\\\| b`, with --check green
+  // throughout and the backslashes handed to the skill in --item --json.
   return line
     .trim()
     .replace(/^\||\|$/g, "")
     .split(/(?<!\\)\|/)
-    .map((c) => c.trim());
+    .map((c) => c.trim().replace(/\\\|/g, "|"));
 }
 
 // Header-driven: the first `|` row under a section heading names the columns; every later `|` row
@@ -462,10 +467,18 @@ export function checkRegistry({ sections }, stories, cfg, exists = () => true) {
           errors.push(`${r.id}: run file not found: ${runLink[1]}`);
       }
       if (k === "fail") {
-        const bugLink = r.notes.match(/\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/);
-        if (!bugLink) errors.push(`${r.id}: fail requires a bug link in Notes`);
-        else if (!exists(bugLink[1]))
-          errors.push(`${r.id}: bug file not found: ${bugLink[1]}`);
+        // EVERY bug link, not the first: the note cell is appended to on a kept ✅ so it can hold
+        // several, and describeRow hands the skill the LAST one. Validating only the first proved
+        // that a different file exists from the one Step 4 opens — --check green, and the loop
+        // then appending a re-test section to a path that does not resolve.
+        const bugLinks = [
+          ...r.notes.matchAll(/\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/g),
+        ].map((m) => m[1]);
+        if (!bugLinks.length)
+          errors.push(`${r.id}: fail requires a bug link in Notes`);
+        for (const link of bugLinks)
+          if (!exists(link))
+            errors.push(`${r.id}: bug file not found: ${link}`);
       }
       if ((k === "na" || k === "blocked") && r.notes === "")
         errors.push(`${r.id}: ${k} requires a note saying why`);
@@ -852,11 +865,23 @@ function updateRow(opts, rawId, mutate) {
 // Suppressing only an immediate repeat keeps the operation an append — a different reason arriving
 // between two identical ones is still recorded twice, which is the honest history.
 function appendNote(existing, addition) {
-  if (!addition) return existing;
-  if (!existing) return addition;
-  const segments = existing.split(" · ");
-  if (segments[segments.length - 1] === addition) return existing;
-  return `${existing} · ${addition}`;
+  // A PLAIN append. Duplicate suppression was tried three ways and each traded one wrong answer
+  // for another, because ` · ` is the registry's own separator AND is legal inside a note: no
+  // string comparison can distinguish "the cell's last segment is X" from "the cell ends with a
+  // compound note whose tail reads X". Splitting on the separator dropped a genuinely new note;
+  // matching the tail dropped it too; restricting the match to atomic additions dropped it once
+  // more while letting an identical compound through twice.
+  //
+  // So the suppression is gone rather than approximated. A dropped note is data loss and is
+  // silent; a repeated segment is noise a reader can see. The cost is that a ✅ row blocked nightly
+  // by the same reason grows its cell — recorded as an accepted limitation in the gate's
+  // recommendations rather than papered over, and bounded in practice because the loop writes one
+  // segment per run.
+  const add = (addition ?? "").trim();
+  const have = (existing ?? "").trim();
+  if (!add) return have;
+  if (!have) return add;
+  return `${have} · ${add}`;
 }
 
 function linkTo(opts, repoRelPath) {
