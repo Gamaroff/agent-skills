@@ -332,7 +332,7 @@ Log the chosen approach in the QA report's "Review Methodology" section.
 Verify all prerequisites met:
 
 - [ ] Task document exists at `docs/tasks/task.[id].[name]/task.[id].[name].md`
-- [ ] Status is "Completed" or "Ready for QA"
+- [ ] Status is `ready-for-review` (the develop pipeline hands work here at that status) or `in-progress` (a re-review after a FAIL)
 - [ ] All implementation phases have checkboxes marked complete
 - [ ] Developer has marked success criteria as complete
 - [ ] Tests are passing according to task document
@@ -1158,10 +1158,21 @@ Add (or replace) the QA Results section in the task document:
 {Brief summary, or "No critical issues identified"}
 ```
 
-**Update task status based on gate decision:**
-- PASS or CONCERNS → Status: "Completed" (with notes about concerns if applicable)
-- FAIL → Status: "In Progress" (requires fixes before re-review)
-- WAIVED → Status: "Completed" (with waiver notes)
+**Update task status based on gate decision** — the same rule `qa-story` states, and the only
+vocabulary the lifecycle admits:
+
+- PASS, CONCERNS or WAIVED → Status stays `ready-for-review` (with the gate's notes in the QA
+  Results section). The task is handed **back** toward `finalise`, which is the only writer of
+  `accepted`, and only after the DoD check.
+- FAIL → Status: `in-progress` (requires fixes before re-review)
+
+> ⚠️ **Never write `Completed`, `Ready for Done` or `Reopened`.** None is in the canonical set in
+> [`document-status-lifecycle.md`](references/document-status-lifecycle.md) — `draft`, `planned`,
+> `ready-for-development`, `in-progress`, `ready-for-review`, `accepted`, `cancelled` — and a
+> consumer repo that lints its status vocabulary goes red on any of them. This table read
+> `"Completed"` until 2026-09-22; inside the develop pipeline every orchestrator had to notice the
+> conflict with `qa-fix`'s Status Rule and leave the status alone (obs #153, task.136).
+> `skills/qa-task/tests/status-vocabulary.test.js` fails on a return of the old wording.
 
 **Append the verdict row to `## Change Log`** — in the same edit as the QA Results section and the
 status update, bumping frontmatter `updated`:
@@ -1469,7 +1480,7 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 - [ ] QA report file created and saved (co-located with task)
 - [ ] Gate YAML file created and saved (co-located with task)
 - [ ] Task file `## QA Testing Results` section updated with gate status and artifact links
-- [ ] Task status updated per gate decision
+- [ ] Task status correct per gate decision — `ready-for-review` on PASS/CONCERNS/WAIVED, `in-progress` on FAIL. Never `Completed`, never `Ready for Done`, never `accepted` (that is `finalise`'s)
 - [ ] PR comment posted via the `$VCS` arm (Step 13 — BLOCKING): on GitHub, `tracker_call_with_retry gh pr comment "$PR_URL" --body-file` — confirm exit code 0 after up to 3 attempts; on Bitbucket, the single-shot REST POST to `…/pullrequests/${PR_NUMBER}/comments` — confirm exit code 0 (no retry)
 - [ ] Tracker Issue comment posted (Step 13b — graceful): `tracker-comment.js` invoked and its `reason` read (skipped if `github_issue` / `jira_key` absent or null); non-blocking on persistent failure
 - [ ] User notified with gate decision, issues summary, and next steps (Step 14 — BLOCKING)
