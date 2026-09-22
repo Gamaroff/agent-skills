@@ -2,7 +2,7 @@
 id: task.141.plan
 title: "Implementation Plan: /qa-next <id> — target a specific registry item"
 type: plan
-description: "Code-level guide for task 141: the describeRow extraction, cmdItem/cmdRunPath, the cmdSet accepted-row rule, the SKILL.md argument grammar, and the fixture-backed test groups."
+description: "Code-level guide for task 141: the describeRow extraction, cmdItem/cmdRunPath, listRunFiles' sequence-aware sort key, the cmdSet only-a-fail-moves-an-accepted-row rule, the SKILL.md argument grammar, and the fixture-backed test groups."
 task-ref: task.141.qa-next-targeted-item.md
 created: 2026-09-22
 updated: 2026-09-22
@@ -69,6 +69,12 @@ and Phase 5's tests assert against all of them.
        state: stateKey(r.state),                       // "untested" | "pass" | … | null
        lastRun: (r.run.match(/\]\(([^)]+)\)/) ?? [])[1] ?? null,
        priorRuns: priorRuns(opts, r.id),               // oldest first, relative to the registry dir
+       notes: r.notes,                                 // the Notes / bug cell, verbatim
+       // The bug link the row already carries, if any — the SAME regex checkRegistry uses, so there
+       // is one parser. Step 4's "a repeat failure reuses the open bug" needs a source, and without
+       // this the skill would re-read and re-parse the registry by hand: a second reader of the file
+       // --item exists to remove.
+       bug: (r.notes.match(/\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/) ?? [])[1] ?? null,
      };
    }
    ```
@@ -89,8 +95,10 @@ and Phase 5's tests assert against all of them.
    }
    ```
 
-   `listRunFiles` returns paths relative to the registry directory and sorted by basename, which is
-   exactly what the run file needs to cite.
+   `listRunFiles` returns paths relative to the registry directory, sorted by the sequence-aware key
+   below — which is exactly what the run file needs to cite. This is a recursive walk of `runs/` on
+   every `--item` *and* `--next`; that cost is accepted deliberately, because the alternative is a
+   second comparator, and two sort orders for "oldest run first" would drift in the worst direction.
 
 3. **`itemById`** — the sibling of `nextItem`, same return shape:
 
@@ -157,8 +165,9 @@ and Phase 5's tests assert against all of them.
    // Run files are runs/<id>/<date>-<env>.md. The date and the env label are both fixed within a
    // session, so a second run today would write the same path and take the first run's Findings
    // rows with it — and --findings is DERIVED from those files, so the loss reads as a shorter
-   // list nobody can tell is short. Sequence, zero-padded: listRunFiles sorts by basename, and
-   // "-10" must not sort before "-2".
+   // list nobody can tell is short. Sequence, zero-padded so "-10" does not sort before "-2".
+   // Padding is only half of it: run 1 carries NO suffix, and "." sorts after "-", so a plain
+   // basename sort puts the day's first run LAST. The other half is listRunFiles' sort key below.
    export function runPathFor(existing, date, env) {
      const base = `${date}-${env}`;
      const taken = new Set(existing.map((f) => basename(f)));
@@ -194,7 +203,24 @@ and Phase 5's tests assert against all of them.
 
    `mkdirSync`, `readdirSync`, `basename` and `today()` are all already imported or defined.
 
-3. **Register** `--run-path` and `--env` in `OPTIONS` and add the `dispatch` line.
+3. **`listRunFiles` — make the sort key sequence-aware.** This is the half of the scheme that
+   actually delivers "oldest run first", and it is not optional:
+
+   ```js
+   // A basename with no sequence is run 1 of its day, so compare it as "-01". Without this,
+   // ["…-lan.md","…-lan-02.md"].sort() yields ["…-lan-02.md","…-lan.md"] — "." sorts after "-" —
+   // and the day's FIRST run reads as its last, in --findings, in priorRuns and in the run file's
+   // "previous run" link. Normalising in the comparator (rather than renaming) also fixes run
+   // files already on disk, which a rename could not.
+   const seq = (p) =>
+     basename(p).replace(/^(.*?)(?:-(\d{2}))?\.md$/, (_, base, n) => `${base}-${n ?? "01"}.md`);
+   …
+   .sort((a, b) => seq(a).localeCompare(seq(b)) || a.localeCompare(b));
+   ```
+
+   Write the failing assertion **first** — it goes red against today's comparator — then apply this.
+
+4. **Register** `--run-path` and `--env` in `OPTIONS` and add the `dispatch` line.
 
 ---
 
@@ -211,11 +237,14 @@ and Phase 5's tests assert against all of them.
 
    ```js
    updateRow(opts, id, (row) => {
-     // A pass against a row the OWNER accepted is not news about the owner's judgement — ✅ means
-     // "this is the feature I wanted", and a machine re-pass agrees with it. A FAIL is news, and
-     // still overrides. The rule lives here, in the state machine, so no call site can forget it:
-     // a regression sweep over fifty accepted rows must not replace fifty signatures with 🟡.
-     const kept = state === "pass" && stateKey(row.state) === "accepted";
+     // ONLY A FAIL MOVES AN ACCEPTED ROW. ✅ means "this is the feature I wanted" — an owner's
+     // judgement. A machine re-pass agrees with it; a "blocked" says the environment could not
+     // supply a credential; an "n/a" says the function is gone. None of the three is evidence
+     // against the judgement. A FAIL is, and still overrides. Written as one predicate over the
+     // verdict rather than a special case for "pass": Step 2's two early exits write blocked and
+     // na, so guarding pass alone leaves the same defect reachable through another door — a
+     // regression sweep must not replace fifty owner signatures with fifty ⏸.
+     const kept = state !== "fail" && stateKey(row.state) === "accepted";
      if (!kept) row.state = STATES[state];
      row.keptAccepted = kept;   // read by updateRow's console line only
      …
@@ -246,18 +275,32 @@ and Phase 5's tests assert against all of them.
    ```js
    const clear = opts.has("--clear-note");
    if (clear && (bug || note)) die("--clear-note cannot be combined with --note or --bug");
+   // Refused on the kept-✅ path too. That cell is where cmdAccept stored the owner's
+   // "accepted <date> — <why>", checkRegistry imposes NO note requirement on an accepted row, and
+   // so a passing regression re-run would erase the signature's provenance with --check still
+   // green. There is no stale bug link to clear on a ✅ anyway. The guard belongs beside the
+   // kept rule, in the state machine, for the same reason the kept rule does.
+   if (clear && state === "pass" && stateKey(currentRow.state) === "accepted")
+     die("--clear-note cannot clear an accepted row's sign-off note");
    …
    if (clear) row.notes = "";
    else if (parts.length) row.notes = parts.join(" — ");
    ```
 
-   Register `--clear-note` in `OPTIONS`. The protocol then always passes one of `--note` /
-   `--clear-note`, so a bug link from a previous `❌` can never survive into a `🟡`.
+   The refusal needs the row's current state, which `cmdSet` reads only inside `updateRow`'s
+   callback — so raise it there, through `die()` (which throws; `updateRow` has not written yet at
+   that point, so nothing is persisted).
+
+   Register `--clear-note` in `OPTIONS`. The protocol passes the note flag **per verdict** (see
+   Phase 4 step 5), not as a blanket "always one of `--note` / `--clear-note`" — that blanket is
+   unsatisfiable on a `fail`, where `--bug` is mandatory and `--clear-note` is refused beside it.
 
 3. **Check the invariants still hold.** `checkRegistry` requires a resolving `Last run` link for
    `pass`, `fail` and `accepted`, and a resolving bug link for `fail`. The kept-`✅` path writes
    `Last run`, so it stays green; the `❌ → 🟡` path drops a bug link that `🟡` does not require.
-   Nothing in `checkRegistry` changes.
+   Nothing in `checkRegistry` changes. Note what it does **not** check: an `accepted` row's note.
+   That absence is precisely why the `--clear-note` refusal has to be raised in `cmdSet` — there is
+   no downstream gate that would notice the loss.
 
 ---
 
@@ -304,6 +347,16 @@ and Phase 5's tests assert against all of them.
    And in `## Run state`, add `"targeted": true` to the example object with one sentence: a resume at
    `phase: selected` re-resolves *that* id with `--item`, rather than falling back to `--next` and
    quietly testing a different function.
+
+   **In the same edit, gate the staleness rule two lines above it.** It currently reads: *"If the
+   registry row for `item` is no longer ⬜ and the phase is `selected`, someone else finished it —
+   delete the state file and start over."* For a targeted run that premise is false by
+   construction — targeting a `❌` or a `✅` is the entire point — so unamended the rule fires on
+   **every** targeted resume and throws the run away. Amend it to: *"…someone else finished it —
+   delete the state file and start over. **This applies to an untargeted run only**: under
+   `"targeted": true` the row's state is not evidence about anyone else, and the resume re-resolves
+   the id."* Adding the flag without amending the rule that needs it would leave a field nothing
+   reads — which is this repository's config-key failure exactly.
 
 3. **Step 1** — retitle *Select or resolve*:
 
@@ -352,8 +405,9 @@ and Phase 5's tests assert against all of them.
      file, relative to this one>`, or `1st run` when `priorRuns` was empty.
    - New bullet under item 2 (*On fail*):
 
-     > **A repeat failure reuses the open bug.** When the registry row already carries a bug link from
-     > an earlier `❌` and that bug is not closed, append a dated re-test section to it (what was run,
+     > **A repeat failure reuses the open bug.** The payload's `bug` field is the link (`null` when
+     > there is none) — read it there; never re-parse the registry. When it is non-null and that bug
+     > is not closed, append a dated re-test section to it (what was run,
      > what was observed, which items still fail) and link the same bug again. File a **new** bug only
      > when there is none, or when the existing one is closed — a closed bug failing again is a new
      > fact and deserves its own record. Fixing then re-testing is the main reason this argument
@@ -361,10 +415,20 @@ and Phase 5's tests assert against all of them.
    - Item 3 (findings) gains the same rule, one sentence: a finding that matches an open finding on
      this function from an earlier run (`--findings --all --json`, matched on *Where* + *What was
      observed*) reuses that bug's link in its `Filed as` cell instead of filing a duplicate.
-   - Item 4 gains: every `--set` on a re-run carries `--note` or `--clear-note`, so a previous
-     verdict's bug link cannot survive the new one; and a `pass` on an `✅` row leaves `✅` (the tool
-     prints `(kept)`) — the skill still never *writes* `✅`, it only declines to remove one on
-     agreeing evidence.
+   - Item 4 gains the note rule **per verdict** — not a blanket "always `--note` or
+     `--clear-note`", which Phase 3's two refusals make unsatisfiable on a `fail` and destructive on
+     a kept `✅`:
+
+     | Verdict | Row before | Note flag | Why |
+     | :--- | :--- | :--- | :--- |
+     | `fail` | any | `--bug` (plus `--note` when there is more to say) | `--bug` is mandatory; `--clear-note` is refused beside it |
+     | `blocked` / `na` | any | `--note` | mandatory already |
+     | `pass` | `⬜` `🟡` `❌` `⏸` `➖` | `--clear-note` | drops the previous verdict's bug link, which `🟡` does not require and must not keep |
+     | `pass` | `✅` | neither | the cell holds the owner's `accepted <date>`; `--clear-note` is refused here |
+
+     And: a `pass`, `blocked` or `na` on an `✅` row leaves `✅` (the tool prints `(kept)`) — the
+     skill still never *writes* `✅`, it only declines to remove one on evidence that is not against
+     it. Only a `fail` moves it.
 
 6. **Step 5** — commit subject for a targeted re-run:
    `qa(uat): <id> re-run <pass|fail|blocked> — <Function>`.
@@ -428,32 +492,54 @@ describe("runPathFor", () => {
   it("uses the plain name for the first run of a day", () => {
     assert.equal(runPathFor([], "2026-09-22", "lan"), "2026-09-22-lan.md");
   });
-  it("sequences, zero-padded, and stays chronological past nine", () => {
+  it("sequences, zero-padded", () => {
     let files = [];
     for (let i = 0; i < 10; i++) files.push(runPathFor(files, "2026-09-22", "lan"));
+    assert.equal(files[0], "2026-09-22-lan.md");
     assert.equal(files[1], "2026-09-22-lan-02.md");
     assert.equal(files[9], "2026-09-22-lan-10.md");
-    // the property the padding exists for:
-    assert.deepEqual([...files].sort(), files);
   });
   it("ignores a different env label", () => { … });
 });
 
+describe("listRunFiles ordering", () => {
+  // THE assertion the sequencing scheme rests on, and the one that fails against today's
+  // comparator: "." sorts after "-", so the unsuffixed first run of the day reads as its last.
+  // Write it first, watch it go red, then fix the sort key. Note the existing ordering test at
+  // uat-status.test.mjs:581 uses two DIFFERENT dates and passes either way — it is not cover here.
+  it("puts the day's unsuffixed first run before its sequenced re-runs", () => {
+    // fixture: runs/D.2/{2026-09-22-lan.md, 2026-09-22-lan-02.md, 2026-09-22-lan-10.md}
+    assert.deepEqual(listRunFiles(runs).map((p) => path.basename(p)), [
+      "2026-09-22-lan.md",
+      "2026-09-22-lan-02.md",
+      "2026-09-22-lan-10.md",
+    ]);
+  });
+  it("still orders across function directories by date", () => { … });  // the existing property
+});
+
 describe("--set on an accepted row", () => {
   it("keeps ✅ on a pass and updates Last run", () => { … });   // and asserts the "(kept)" output
-  it("sets ❌ on a fail", () => { … });
+  it("keeps ✅ on a blocked and on an n/a", () => { … });       // the rule is over the verdict set
+  it("sets ❌ on a fail — the only verdict that moves it", () => { … });
   it("leaves --check green after each", () => { … });
 });
 
 describe("--clear-note", () => {
   it("empties Notes / bug so a ❌'s bug link cannot survive into a 🟡", () => { … });
   it("is a usage error alongside --note or --bug", () => { … });
+  it("is a usage error on a pass against ✅, and the accepted note survives byte-identical", () => { … });
 });
 ```
 
+> The sketches above use `describe`/`it`; the existing suite is flat `test()` throughout. `node:test`
+> supports both, but follow the file — convert these to `test("…", …)` when writing them in.
+
 **Mutation-prove each group.** For every one: revert the behaviour in the tool (delete the `kept`
-guard; make `runPathFor` return `base + ".md"` unconditionally; drop the `padStart`; return the id
-instead of exiting 4), confirm the test goes red, restore. Record which assertion caught which
+guard; narrow it back to `state === "pass"`; drop the `--clear-note` kept-`✅` refusal; restore
+`listRunFiles`' plain `basename` comparator; make `runPathFor` return `base + ".md"`
+unconditionally; drop the `padStart`; drop `bug` from the payload; return the id instead of exiting
+4), confirm the test goes red, restore. Record which assertion caught which
 mutation in the implementation notes. A test that passes against both the fixed and the broken tool
 is holding nothing.
 
@@ -463,7 +549,7 @@ is holding nothing.
 | :--- | :--- |
 | `skills/qa-next/README.md` § Operating modes | add `` `/qa-next <id>` `` and `` `/qa-next <id> --dry-run` `` rows, with the re-test / regression sentence |
 | `skills/qa-next/README.md` § The owner's commands | add `--item` and `--run-path` to the cheat-sheet |
-| `skills/qa-next/README.md` § Registry states | note that `✅` survives a passing re-run and only a failure moves it |
+| `skills/qa-next/README.md` § Registry states | note that `✅` survives a `pass`, a `blocked` and an `n/a` re-run — only a `fail` moves it |
 | `skills/qa-next/README.md` run-history paragraph | note that `ls docs/qa/runs/D.2/` now genuinely holds several files, oldest first |
 | `docs/reference/commands.md` | add a `/qa-next <id>` row; rewrite the two existing rows, which still say "resolve the **story**'s ACs" and "the **story** `--next` would select" — stale since the registry was re-indexed by user function |
 | `docs/reference/activation-phrases.md` | add "Re-test D.2" / "QA that function again" beside the existing phrase, which still says "the next accepted **story**" |

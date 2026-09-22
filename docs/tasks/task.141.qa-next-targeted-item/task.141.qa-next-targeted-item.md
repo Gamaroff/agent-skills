@@ -5,7 +5,7 @@ type: task
 description: "Give /qa-next a positional `id` argument that runs the full UAT protocol against a named registry row regardless of its state, so a ❌ can be re-tested after the fix lands and a ✅ can be regression-tested when the code beneath it changes — with the run-file path, the accepted-row state rule and the bug-reuse rule made mechanical in uat-status.mjs rather than left to prose at the call site."
 tags: [qa-next, uat, registry, re-run, regression, cli-arguments]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-09-22
 updated: 2026-09-22
@@ -17,7 +17,9 @@ github_issue: 466
 
 # Technical Task: `/qa-next <id>` — target a specific registry item
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.141.review.1.qa-next-targeted-item.md` implemented 2026-09-22
 
 **GitHub Issue**: [#466](https://github.com/Gamaroff/agent-skills/issues/466)
 
@@ -125,16 +127,30 @@ Selection becomes **selection or resolution**, over one shared description:
   so the two commands cannot describe a row differently. Two payload builders would be two
   enumerations of "what the skill needs to know about a row", and enumerations drift in the worst
   direction — see `docs/reference/anti-patterns.md`.
-- The payload gains `state`, `lastRun` and `priorRuns`, on **both** commands. Without them the skill
-  cannot say "3rd run of this function, follows `2026-08-02-lan.md`" in the run file, which is the
-  one thing a re-run's evidence has to state.
+- The payload gains `state`, `lastRun`, `priorRuns`, `notes` and `bug`, on **both** commands. Without
+  the first three the skill cannot say "3rd run of this function, follows `2026-08-02-lan.md`" in the
+  run file, which is the one thing a re-run's evidence has to state. Without the last two, Step 4's
+  bug-reuse rule has no source and the skill would re-parse the registry by hand — a second reader of
+  the file `--item` exists to remove. `bug` is the parsed link target (or `null`), read with the
+  regex `checkRegistry` already owns, so there is one parser.
 - `--run-path <id> [--env <label>]` computes and prints the next free run file, creating
-  `runs/<id>/`. The sequence is zero-padded (`-02`, `-03`) so `listRunFiles`' basename sort stays
-  chronological past nine runs in a day.
-- `cmdSet` gains one rule: a `pass` verdict against a row that is already `✅ accepted` leaves the
-  state cell alone and updates only `Last run` and `Notes / bug`. A `fail` verdict sets `❌` from any
-  prior state, including `✅`.
-- `--clear-note` writes `Notes / bug` empty, so a re-run can always write that cell.
+  `runs/<id>/`. The sequence is zero-padded (`-02`, `-03`) **and `listRunFiles`' sort key normalises
+  a missing sequence to `-01`**. Both halves are load-bearing and only the second is obvious in
+  hindsight: padding fixes `-10` against `-2`, but run 1 carries no suffix at all and `.` sorts after
+  `-`, so a basename sort puts the day's *first* run last —
+  `["…-lan.md","…-lan-02.md"].sort()` yields `["…-lan-02.md","…-lan.md"]`. Normalising in the
+  comparator also repairs the ordering of run files already on disk, which renaming would not.
+- `cmdSet` gains one rule, stated over every verdict rather than one of them: **only a `fail` moves
+  an accepted row.** `pass`, `blocked` and `na` against a row that is already `✅ accepted` leave the
+  state cell alone and update only `Last run` and `Notes / bug`; `fail` sets `❌` from any prior
+  state, including `✅`. Guarding `pass` alone would leave the same defect reachable through a
+  different verdict — Step 2's two early exits write `blocked` and `na`, so a regression sweep in an
+  environment that cannot supply a third-party credential would demote fifty owner signatures to
+  `⏸`, which is Problem 4 arriving by another door.
+- `--clear-note` writes `Notes / bug` empty, so a re-run can always write that cell. It is **refused
+  on a kept `✅`** — verdict `pass`, state `accepted` — because that cell is where `--accept` stored
+  the `accepted <date>` provenance, `checkRegistry` imposes no note requirement on an accepted row,
+  and the loss would therefore be silent. There is no stale bug link to clear on a `✅` anyway.
 - `--item` on an id with no row exits **4**, distinct from the usage family's 2.
 
 ### Important Clarifications
@@ -154,7 +170,7 @@ Selection becomes **selection or resolution**, over one shared description:
 
 ✅ **Argument grammar**: a positional `id` on `/qa-next`, documented in an `## Arguments` section.
 ✅ **Tool**: `--item`, `--run-path`, `--clear-note`, exit 4, the shared `describeRow`, the
-`pass`-on-`✅` rule in `cmdSet`.
+only-a-`fail`-moves-`✅` rule in `cmdSet`, and `listRunFiles`' sequence-aware sort key.
 ✅ **Protocol**: Step 0 lock behaviour under an explicit id, Step 1 resolve, Step 3 run-path and
 evidence-directory naming, Step 4 bug and finding reuse, Step 5 commit subject, Step 6 report, and the
 stop-conditions and *never does* tables.
@@ -179,10 +195,13 @@ lane spec.
 
 ## 5. Breaking Changes
 
-### Breaking Change 1: `--set <id> pass` no longer demotes an accepted row
+### Breaking Change 1: only a `fail` demotes an accepted row
 
-**What Changed**: `uat-status.mjs --set <id> pass` used to write `🟡 pass` into the state cell from any
-prior state. It now leaves `✅ accepted` in place and updates only `Last run` and `Notes / bug`.
+**What Changed**: `uat-status.mjs --set <id> <verdict>` used to write the verdict's glyph into the
+state cell from any prior state. A `pass`, `blocked` or `na` against an `✅ accepted` row now leaves
+`✅` in place and updates only `Last run` and `Notes / bug`. A `fail` is unchanged and still
+overrides. `--clear-note` is additionally refused on the kept-`✅` path, so the `accepted <date>`
+provenance in `Notes / bug` cannot be erased by a passing re-run.
 
 **Before**:
 
@@ -198,12 +217,13 @@ $ uat-status.mjs --set D.2 pass --run runs/D.2/2026-09-22-lan.md
 D.2: ✅ accepted (kept) · runs/D.2/2026-09-22-lan.md
 ```
 
-**Impact**: `qa-next`'s own Step 4 is the only caller in this repository. A consumer that scripts
-`--set … pass` against accepted rows expecting a demotion would see the row unchanged.
+**Impact**: `qa-next`'s own Step 4 and Step 2 are the only callers in this repository. A consumer
+that scripts `--set … pass|blocked|na` against accepted rows expecting a demotion would see the row
+unchanged.
 
-**Migration Path**: to put an accepted row back to `🟡` deliberately, run
-`uat-status.mjs --set <id> untested --note "<why>"` first, then `--set <id> pass --run <path>`. A
-`fail` verdict is unaffected and still overrides `✅`.
+**Migration Path**: to move an accepted row deliberately, run
+`uat-status.mjs --set <id> untested --note "<why>"` first (which clears `Last run` and the note),
+then the verdict you want. A `fail` verdict is unaffected and still overrides `✅` directly.
 
 ### Breaking Change 2: none of the rest
 
@@ -227,13 +247,14 @@ does today.
 
 **Changes**:
 
-- [ ] Extract `describeRow(opts, cfg, row)` from `cmdNext`'s payload literal; `cmdNext` calls it.
-- [ ] Add `state`, `lastRun` and `priorRuns` to the payload, for both commands.
-- [ ] Add `itemById(reg, id)` and `cmdItem(opts)`; register `--item` in `OPTIONS` and in `dispatch`
+- [x] Extract `describeRow(opts, cfg, row)` from `cmdNext`'s payload literal; `cmdNext` calls it.
+- [x] Add `state`, `lastRun`, `priorRuns`, `notes` (raw cell) and `bug` (parsed link target, or
+      `null`, via the regex `checkRegistry` already owns) to the payload, for both commands.
+- [x] Add `itemById(reg, id)` and `cmdItem(opts)`; register `--item` in `OPTIONS` and in `dispatch`
       ahead of `--set`.
-- [ ] Exit 4 with a `no registry row` message when the id does not resolve; nothing is written.
-- [ ] Accept a lowercase id by upper-casing the surface letter before lookup.
-- [ ] Extend the usage header block, and correct `--accept`'s `--force` omission while in it.
+- [x] Exit 4 with a `no registry row` message when the id does not resolve; nothing is written.
+- [x] Accept a lowercase id by upper-casing the surface letter before lookup.
+- [x] Extend the usage header block, and correct `--accept`'s `--force` omission while in it.
 
 **Dependencies**: none.
 
@@ -249,13 +270,18 @@ does today.
 
 **Changes**:
 
-- [ ] Add `runPathFor(existing, date, env)` — pure: given the run files already present, return
+- [x] Add `runPathFor(existing, date, env)` — pure: given the run files already present, return
       `<date>-<env>.md`, else `<date>-<env>-02.md`, `-03`, zero-padded to two digits.
-- [ ] Add `cmdRunPath(opts)`: `mkdir -p runs/<id>/`, list it, print the path relative to the registry
+- [x] **Make `listRunFiles`' sort key sequence-aware** — normalise a basename with no sequence to
+      `-01` before comparing, so the day's first run does not sort last. Padding alone does not
+      give chronological order; this is the half that does, and it also fixes run files already
+      written. Write the failing assertion first and watch it go red against today's comparator.
+- [x] Add `cmdRunPath(opts)`: `mkdir -p runs/<id>/`, list it, print the path relative to the registry
       directory. `--env` defaults to `local`.
-- [ ] Register `--run-path` and `--env` in `OPTIONS` and `dispatch`.
+- [x] Register `--run-path` and `--env` in `OPTIONS` and `dispatch`.
 
-**Dependencies**: Phase 1 (shares the id-resolution helper and its exit 4).
+**Dependencies**: Phase 1 (shares the id-resolution helper and its exit 4). `describeRow`'s
+`priorRuns` reads through the same corrected comparator, so the sort-key fix lands with it.
 
 ---
 
@@ -269,13 +295,17 @@ does today.
 
 **Changes**:
 
-- [ ] In `cmdSet`, when the verdict is `pass` and the row's current `stateKey` is `accepted`, leave the
-      state cell and report `✅ accepted (kept)`. Comment the *why* beside the rule.
-- [ ] `fail` overrides any prior state, `✅` included.
-- [ ] Add `--clear-note`: writes `Notes / bug` empty. Refuse `--clear-note` together with `--note` or
-      `--bug`.
-- [ ] Confirm `--check` stays green across every new transition (an `✅` row still carries a resolving
-      `Last run` link; a `🟡` that follows a `❌` carries no bug link and needs none).
+- [x] In `cmdSet`, when the row's current `stateKey` is `accepted` and the verdict is anything other
+      than `fail`, leave the state cell and report `✅ accepted (kept)`. Comment the *why* beside the
+      rule, and write it as one predicate over the verdict — not a special case for `pass`.
+- [x] `fail` overrides any prior state, `✅` included. It is the only verdict that does.
+- [x] Add `--clear-note`: writes `Notes / bug` empty. Refuse `--clear-note` together with `--note` or
+      `--bug`, **and refuse it on the kept-`✅` path** — that cell holds the `accepted <date>`
+      provenance and `--check` would not notice its loss.
+- [x] Confirm `--check` stays green across every new transition (an `✅` row still carries a resolving
+      `Last run` link; a `🟡` that follows a `❌` carries no bug link and needs none). Note that
+      `checkRegistry` has **no** note requirement for `accepted` — which is exactly why the
+      `--clear-note` refusal has to live in `cmdSet` rather than be caught downstream.
 
 **Dependencies**: Phase 1.
 
@@ -292,25 +322,34 @@ does today.
 
 **Changes**:
 
-- [ ] Add `## Arguments` in the `review-code` / `review-pr` / `double-check` house style: *Invoke as
+- [x] Add `## Arguments` in the `review-code` / `review-pr` / `double-check` house style: *Invoke as
       `/qa-next [id] [--dry-run]`* plus the Arg/Values/Default/Meaning table.
-- [ ] State the two rules there: an explicit id ignores the row's state; `/loop /qa-next` stays
+- [x] State the two rules there: an explicit id ignores the row's state; `/loop /qa-next` stays
       untargeted, because a loop over a fixed id repeats one function forever.
-- [ ] Step 0: a state file for a *different* item plus an explicit id → HALT `run-in-progress`. Add
+- [x] Step 0: a state file for a *different* item plus an explicit id → HALT `run-in-progress`. Add
       `"targeted": true` to the state object so a resume at `phase: selected` re-resolves that id
       rather than falling back to `--next`.
-- [ ] Step 1 becomes *Select or resolve*: `--next` (exit 3 → `registry-complete`) or `--item <id>`
+- [x] **Gate `## Run state`'s staleness rule on `targeted`.** "If the row for `item` is no longer ⬜
+      and the phase is `selected`, someone else finished it — delete the state file and start over"
+      is false by construction for a targeted run, whose whole purpose is a non-⬜ row. Unamended it
+      fires on every targeted resume and throws the run away. It applies to an untargeted run only.
+- [x] Step 1 becomes *Select or resolve*: `--next` (exit 3 → `registry-complete`) or `--item <id>`
       (exit 4 → `unknown-item`).
-- [ ] Step 3: the run file path comes from `--run-path <id>`, never composed by hand; the evidence
+- [x] Step 3: the run file path comes from `--run-path <id>`, never composed by hand; the evidence
       directory mirrors its basename.
-- [ ] Step 4: the run-file header's new `Run` row; reuse the row's open bug on a repeat fail rather
-      than filing a second; reuse an earlier open finding's bug link on a matching finding; always
-      pass `--note` or `--clear-note`.
-- [ ] Step 5: `qa(uat): <id> re-run <verdict> — <Function>` for a targeted re-run.
-- [ ] Step 6: report the run number and link the previous run.
-- [ ] Stop-conditions table: `unknown-item`, `run-in-progress`. *What this skill never does*: overwrite
+- [x] Step 4: the run-file header's new `Run` row; reuse the row's open bug on a repeat fail (read
+      from the payload's `bug`, not by re-parsing the registry) rather than filing a second; reuse an
+      earlier open finding's bug link on a matching finding.
+- [x] Step 4: state the note rule **per verdict**, not as a blanket "always pass `--note` or
+      `--clear-note`" — that blanket is unsatisfiable on a `fail`, where `--bug` is mandatory and
+      `--clear-note` is refused alongside it. `fail` → `--bug` (plus `--note` when there is more to
+      say); `blocked`/`na` → `--note`; `pass` on a non-`✅` row → `--clear-note` to drop the previous
+      verdict's bug link; `pass` on an `✅` row → neither, and `--clear-note` is refused.
+- [x] Step 5: `qa(uat): <id> re-run <verdict> — <Function>` for a targeted re-run.
+- [x] Step 6: report the run number and link the previous run.
+- [x] Stop-conditions table: `unknown-item`, `run-in-progress`. *What this skill never does*: overwrite
       a previous run file; re-litigate an `✅` on a pass.
-- [ ] `assets/run.template.md`: the `Run` row.
+- [x] `assets/run.template.md`: the `Run` row.
 
 **Dependencies**: Phases 1–3 (the protocol quotes the commands).
 
@@ -331,13 +370,13 @@ does today.
 
 **Changes**:
 
-- [ ] Test groups per § 8, each mutation-proved.
-- [ ] README: operating modes, owner cheat-sheet, registry-states note, runs-history paragraph.
-- [ ] `commands.md`: a `/qa-next <id>` row, and fix the two story-era sentences in the existing rows.
-- [ ] `activation-phrases.md`: "re-test D.2" / "QA that function again"; the existing phrase still says
+- [x] Test groups per § 8, each mutation-proved.
+- [x] README: operating modes, owner cheat-sheet, registry-states note, runs-history paragraph.
+- [x] `commands.md`: a `/qa-next <id>` row, and fix the two story-era sentences in the existing rows.
+- [x] `activation-phrases.md`: "re-test D.2" / "QA that function again"; the existing phrase still says
       "the next accepted **story**".
-- [ ] `npm run generate-catalog`; confirm `npm run check:generated` is green.
-- [ ] `CHANGELOG.md` `[Unreleased]`.
+- [x] `npm run generate-catalog`; confirm `npm run check:generated` is green.
+- [x] `CHANGELOG.md` `[Unreleased]`.
 
 **Dependencies**: Phases 1–4.
 
@@ -348,7 +387,8 @@ does today.
 ### Files to Modify (Core Implementation)
 
 1. ✅ `skills/qa-next/scripts/uat-status.mjs` — `describeRow`, `cmdItem`, `cmdRunPath`, `runPathFor`,
-   the `cmdSet` accepted-row rule, `--clear-note`, exit 4, usage header.
+   `listRunFiles`' sequence-aware sort key, the `cmdSet` accepted-row rule, `--clear-note` (and its
+   two refusals), exit 4, usage header.
 2. ✅ `skills/qa-next/SKILL.md` — `## Arguments`; Steps 0, 1, 3, 4, 5, 6; the stop-conditions and
    *never does* tables.
 3. ✅ `skills/qa-next/assets/run.template.md` — the header table's `Run` row.
@@ -382,20 +422,28 @@ directory (the suite's existing pattern).
 
 **Actions**:
 
-- [ ] `--item <id>` returns a payload **field-identical** to `--next` for the same row. Comparing the
+- [x] `--item <id>` returns a payload **field-identical** to `--next` for the same row. Comparing the
       two objects is what pins the single `describeRow`; grepping the source for one call would prove
       the string exists, not that both commands use it.
-- [ ] `--item` on an unknown id exits 4 and leaves the registry byte-identical.
-- [ ] `--item` accepts a lowercase id.
-- [ ] `state`, `lastRun` and `priorRuns` are present and correct on both `--item` and `--next`, with
-      `priorRuns` empty for a function that has never run.
-- [ ] `--run-path`: 1st call `<date>-<env>.md`, 2nd `-02`, 10th `-10`; `listRunFiles` returns all ten
-      in chronological order (the assertion that the zero-padding is load-bearing).
-- [ ] `--set <id> pass` on `✅` leaves `✅` and updates `Last run`; on `🟡`/`❌`/`⬜` it sets `🟡`.
-- [ ] `--set <id> fail` on `✅` sets `❌`.
-- [ ] `--clear-note` empties `Notes / bug`; a `🟡` that follows a `❌` carries no stale bug link;
-      `--clear-note` with `--note` or `--bug` is a usage error.
-- [ ] `--check` exits 0 after each of the transitions above.
+- [x] `--item` on an unknown id exits 4 and leaves the registry byte-identical.
+- [x] `--item` accepts a lowercase id.
+- [x] `state`, `lastRun`, `priorRuns`, `notes` and `bug` are present and correct on both `--item` and
+      `--next`, with `priorRuns` empty and `bug` `null` for a function that has never run, and `bug`
+      equal to the link target for a row carrying one.
+- [x] `--run-path`: 1st call `<date>-<env>.md`, 2nd `-02`, 10th `-10`.
+- [x] `listRunFiles` returns all ten in chronological order — **including the unsuffixed first run**.
+      This is the assertion the whole sequencing scheme rests on, and it fails against today's
+      comparator (`["…-lan.md","…-lan-02.md"].sort()` puts `…-lan.md` second), so write it first and
+      watch it go red. The existing ordering test at `uat-status.test.mjs:581` uses two *different*
+      dates and passes either way — it is not cover for this case.
+- [x] `--set <id> pass` on `✅` leaves `✅` and updates `Last run`; on `🟡`/`❌`/`⬜` it sets `🟡`.
+- [x] `--set <id> blocked` and `--set <id> na` on `✅` also leave `✅` and write only `Last run` /
+      `Notes / bug` — the rule is over the verdict set, not over `pass`.
+- [x] `--set <id> fail` on `✅` sets `❌`.
+- [x] `--clear-note` empties `Notes / bug`; a `🟡` that follows a `❌` carries no stale bug link;
+      `--clear-note` with `--note` or `--bug` is a usage error; `--clear-note` on a `pass` against an
+      `✅` row is a usage error and the `accepted <date>` note survives byte-identical.
+- [x] `--check` exits 0 after each of the transitions above.
 
 **Command**: `npm test` (the `evals/qa-next/unit/*.test.mjs` glob).
 
@@ -409,8 +457,8 @@ directory (the suite's existing pattern).
 
 **Actions**:
 
-- [ ] `--item` → `--run-path` → write a file there → `--set … --run <that path>` → `--check` exits 0.
-- [ ] The same sequence twice in one day produces two run files, both listed by `listRunFiles`, and the
+- [x] `--item` → `--run-path` → write a file there → `--set … --run <that path>` → `--check` exits 0.
+- [x] The same sequence twice in one day produces two run files, both listed by `listRunFiles`, and the
       first one's `## Findings` rows still appear in `--findings`.
 
 **Command**: `npm test`.
@@ -423,7 +471,7 @@ directory (the suite's existing pattern).
 
 **Actions**:
 
-- [ ] `--next` payload shape, `--next` exit 3, `--accept` refusal on a non-`🟡`, `--check` exit codes
+- [x] `--next` payload shape, `--next` exit 3, `--accept` refusal on a non-`🟡`, `--check` exit codes
       and `--findings` output are unchanged — the existing assertions must pass untouched.
 
 ---
@@ -437,6 +485,10 @@ worth holding are cost properties:
 
 - `--run-path` does one `readdirSync` of a single function's directory, not a recursive walk of `runs/`.
 - `--item` reads the registry once, like `--next`.
+- `priorRuns` **does** walk `runs/` recursively, on both `--item` and `--next`, because it reuses
+   `listRunFiles` rather than duplicating its (now sequence-aware) comparator. That is a deliberate
+   trade and it is named here rather than left implied by the two bullets above: one sorted walk of
+   a directory of Markdown files is cheap, and a second comparator would be the enumeration class.
 
 **Baselines**: the tool is offline and file-local; every command today is a small number of synchronous
 reads.
@@ -462,36 +514,42 @@ reads.
 
 ### Functional
 
-- [ ] `/qa-next D.2` runs the full protocol against row `D.2` from any state — `⬜ 🟡 ❌ ⏸ ✅ ➖`.
-- [ ] `/qa-next` with no argument selects the first `⬜` row exactly as it does today.
-- [ ] `/qa-next <unknown id>` stops with `unknown-item` and writes nothing.
-- [ ] A second run of the same function on the same day writes a second run file; the first survives
-      intact, and its findings still appear in `--findings`.
-- [ ] A passing re-run of a `✅` row leaves `✅` and updates `Last run`; a failing one sets `❌`.
-- [ ] A repeat failure re-links the existing open bug instead of filing a second one.
-- [ ] A `🟡` that follows a `❌` carries no stale bug link.
+- [x] `/qa-next D.2` runs the full protocol against row `D.2` from any state — `⬜ 🟡 ❌ ⏸ ✅ ➖`.
+- [x] `/qa-next` with no argument selects the first `⬜` row exactly as it does today.
+- [x] `/qa-next <unknown id>` stops with `unknown-item` and writes nothing.
+- [x] A second run of the same function on the same day writes a second run file; the first survives
+      intact, its findings still appear in `--findings`, and it appears **first** — before the
+      sequenced runs — in `listRunFiles`, `--findings` and `priorRuns`.
+- [x] A `pass`, `blocked` or `na` re-run of a `✅` row leaves `✅` and updates `Last run`; only a
+      `fail` sets `❌`.
+- [x] A passing re-run of a `✅` row leaves its `accepted <date>` note intact — `--clear-note` is
+      refused on that path.
+- [x] A repeat failure re-links the existing open bug instead of filing a second one.
+- [x] A `🟡` that follows a `❌` carries no stale bug link.
 
 ### Performance
 
-- [ ] `--run-path` touches one function directory, not the whole `runs/` tree.
-- [ ] No command gains a network call; the tool stays offline.
-- [ ] `npm test` wall-clock for the qa-next suite stays in the same order of magnitude.
+- [x] `--run-path` touches one function directory, not the whole `runs/` tree.
+- [x] No command gains a network call; the tool stays offline.
+- [x] `npm test` wall-clock for the qa-next suite stays in the same order of magnitude.
 
 ### Code Quality
 
-- [ ] One `describeRow`; `--item` and `--next` payloads compared field-by-field in a test.
-- [ ] Every new test mutation-proved: revert the behaviour, watch that test go red, restore.
-- [ ] `npm test` green with the `.claude/skills → ../skills` symlink moved aside.
-- [ ] `npm run check:generated` and `npm run bundle -- --check` green.
-- [ ] Prettier clean on every changed file.
+- [x] One `describeRow`; `--item` and `--next` payloads compared field-by-field in a test, `notes`
+      and `bug` included.
+- [x] One sequence-aware sort key; `listRunFiles` and `priorRuns` share it rather than each sorting.
+- [x] Every new test mutation-proved: revert the behaviour, watch that test go red, restore.
+- [x] `npm test` green with the `.claude/skills → ../skills` symlink moved aside.
+- [x] `npm run check:generated` and `npm run bundle -- --check` green.
+- [x] Prettier clean on every changed file.
 
 ### Migration
 
-- [ ] `CHANGELOG.md` records the `--set pass` behaviour change with its migration line.
-- [ ] `skills/qa-next/README.md` documents the targeted form and the accepted-row rule.
-- [ ] `docs/reference/commands.md` carries a `/qa-next <id>` row and no longer describes the unit of
+- [x] `CHANGELOG.md` records the `--set pass` behaviour change with its migration line.
+- [x] `skills/qa-next/README.md` documents the targeted form and the accepted-row rule.
+- [x] `docs/reference/commands.md` carries a `/qa-next <id>` row and no longer describes the unit of
       work as a story.
-- [ ] `docs/reference/skill-catalog.md` regenerated, not hand-edited.
+- [x] `docs/reference/skill-catalog.md` regenerated, not hand-edited.
 
 ---
 
@@ -519,9 +577,13 @@ None. The tool is offline, file-local and covered by an existing unit suite; the
 - **Probability**: Low — `listRunFiles` sorts by basename and `--findings` reads content, not names.
 - **Impact**: Minor.
 - **Mitigation**: the first run of a day keeps the existing name exactly; only the second onwards gains
-  a suffix. A test asserts chronological ordering at ten runs, which is where naive sorting breaks.
+  a suffix. That unsuffixed first name is *also* where the ordering breaks — `.` sorts after `-`, so a
+  basename sort puts run 1 last — which is why `listRunFiles`' comparator normalises a missing
+  sequence to `-01`. A test asserts chronological ordering over the mixed set `[plain, -02, -10]`;
+  ten runs alone would not have caught it, because the failing element is the one with no suffix.
 - **Rollback**: revert Phase 2; the protocol falls back to composing the path, which is today's
-  behaviour.
+  behaviour. The sort-key change is safe to keep on its own — it is a no-op on a tree with no
+  sequenced files.
 
 ### Low Risk Areas
 
@@ -607,6 +669,9 @@ historical naming.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-22 | 1.0     | Initial draft | create-task |
+| 2026-09-22 | 1.1     | Review 1 (7/10 → 9/10): fixed the run-file ordering defect (`listRunFiles` sort key), widened the kept-`✅` rule to `blocked`/`na`, refused `--clear-note` on a kept `✅`, added `notes`/`bug` to the payload, gated the resume staleness rule on `targeted` | review-task |
+| 2026-09-22 |         | Status → ready-for-development | review-task |
+| 2026-09-22 |         | Phases 1–5 implemented; status → ready-for-review | develop-task |
 
 <!-- change-log-end -->
 
@@ -616,35 +681,36 @@ historical naming.
 
 ### Phase 1: Resolve a named row
 
-- [ ] `describeRow` extracted; `cmdNext` calls it
-- [ ] `state` / `lastRun` / `priorRuns` on both payloads
-- [ ] `--item` + exit 4 + lowercase id
-- [ ] Usage header updated (including `--accept --force`)
+- [x] `describeRow` extracted; `cmdNext` calls it
+- [x] `state` / `lastRun` / `priorRuns` / `notes` / `bug` on both payloads
+- [x] `--item` + exit 4 + lowercase id
+- [x] Usage header updated (including `--accept --force`)
 
 ### Phase 2: A run file path the agent cannot collide
 
-- [ ] `runPathFor` (pure) + `cmdRunPath`
-- [ ] `--run-path` / `--env` registered
+- [x] `runPathFor` (pure) + `cmdRunPath`
+- [x] `listRunFiles` sort key normalises a missing sequence to `-01` (mutation-proved first)
+- [x] `--run-path` / `--env` registered
 
 ### Phase 3: The registry state rules for a re-run
 
-- [ ] `pass` on `✅` keeps `✅`; `fail` overrides
-- [ ] `--clear-note`
-- [ ] `--check` green across every transition
+- [x] `pass` / `blocked` / `na` on `✅` keep `✅`; only `fail` overrides
+- [x] `--clear-note`, refused with `--note`/`--bug` and on a kept `✅`
+- [x] `--check` green across every transition
 
 ### Phase 4: The protocol
 
-- [ ] `## Arguments` section
-- [ ] Steps 0, 1, 3, 4, 5, 6
-- [ ] Stop-conditions + *never does* tables
-- [ ] Run template `Run` row
+- [x] `## Arguments` section
+- [x] Steps 0, 1, 3, 4, 5, 6 (including the `targeted`-gated staleness rule and the per-verdict note rule)
+- [x] Stop-conditions + *never does* tables
+- [x] Run template `Run` row
 
 ### Phase 5: Tests and the doc sweep
 
-- [ ] Five test groups, each mutation-proved
-- [ ] README, commands.md, activation-phrases.md
-- [ ] Catalog regenerated; `check:generated` green
-- [ ] CHANGELOG `[Unreleased]`
+- [x] Five test groups, each mutation-proved
+- [x] README, commands.md, activation-phrases.md
+- [x] Catalog regenerated; `check:generated` green
+- [x] CHANGELOG `[Unreleased]`
 
 ---
 
@@ -677,6 +743,10 @@ historical naming.
 
 ### Known Issues
 
+**Closed by review 1** (2026-09-22, `task.141.review.1.qa-next-targeted-item.md`): the run-file
+ordering defect (Critical), the kept-`✅` rule's verdict coverage, the `--clear-note` collisions, the
+bug-reuse rule's missing payload field, and the `targeted`-gated resume.
+
 **Open** (non-blocking):
 
 - ⚠️ `docs/reference/commands.md` rows 25–26 still describe qa-next's unit of work as a *story*,
@@ -684,6 +754,9 @@ historical naming.
 - ⚠️ `skills/qa-next/references/` exists and is empty. Out of scope here.
 - ⚠️ There is no `eval:qa-next` npm script; the suite runs only through the main `test` glob. Out of
   scope, worth a follow-up.
+- ⚠️ `--item` is one character from `--items`, which writes a cell rather than reading a row. No
+  functional collision (`dispatch` matches exact strings), but a typo hazard worth a line in the
+  usage header. Optional finding from review 1.
 
 ### Future Improvements
 
@@ -693,7 +766,7 @@ historical naming.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 
