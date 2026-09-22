@@ -11,14 +11,16 @@
 #
 # What it does (fresh release):
 #   1. Confirms working tree is clean and on main
-#   2. Runs pre-release checks (npm test, validate:all, generate-catalog, bundle)
+#   2. Warns on branches carrying commits not on develop (advisory — finished
+#      work that never merged is invisible to every other check and to CI)
+#   3. Runs pre-release checks (npm test, validate:all, generate-catalog, bundle)
 #      — auto-commits stale catalog or bundled-reference files
-#   3. Calculates next version from latest git tag
-#   4. Moves CHANGELOG [Unreleased] → [vX.Y.Z] - DATE
-#   5. Commits chore(release): vX.Y.Z
-#   6. Creates annotated tag vX.Y.Z
-#   7. Pushes main + tag  →  triggers .github/workflows/release.yml
-#   8. Syncs develop with main (merge + push); skip with --no-sync-develop
+#   4. Calculates next version from latest git tag
+#   5. Moves CHANGELOG [Unreleased] → [vX.Y.Z] - DATE
+#   6. Commits chore(release): vX.Y.Z
+#   7. Creates annotated tag vX.Y.Z
+#   8. Pushes main + tag  →  triggers .github/workflows/release.yml
+#   9. Syncs develop with main (merge + push); skip with --no-sync-develop
 #
 # What --retry does:
 #   Recovers from an "orphan tag" — a vX.Y.Z tag exists on origin but the
@@ -152,6 +154,33 @@ ok "Up to date with origin/main"
 
 # ── 2. pre-release checks ─────────────────────────────────────────────────────
 heading "Pre-release checks"
+
+# Finished work that never landed. Every other check here asks whether what IS
+# on the branch is sound; none asks what is missing from it. A branch whose work
+# is complete but was never merged passes every gate in this script and every
+# lane in CI, because neither ever looks at it — and it then misses every
+# subsequent release in silence. Three such branches were found by hand at the
+# v0.51.0 cut, one of them thirteen days old and one commit from done.
+#
+# Warn, never block: a deliberately parked branch is a legitimate state, and
+# refusing to release over one would trade a visible omission for a stuck
+# pipeline. Same temperament as the catalog/bundle steps below — surface it,
+# keep going.
+info "Checking for unmerged branches ..."
+UNMERGED=$(git branch --no-merged develop --format='%(refname:short)' 2>/dev/null \
+  | grep -v '^main$' || true)
+if [[ -n "$UNMERGED" ]]; then
+  warn "Branches with commits not on develop — is any of this meant to ship?"
+  while IFS= read -r b; do
+    [[ -z "$b" ]] && continue
+    last=$(git log -1 --format='%cs' "$b" 2>/dev/null || echo '?')
+    n=$(git rev-list --count "develop..$b" 2>/dev/null || echo '?')
+    echo "      $b  (${n} commit(s), last ${last})"
+  done <<< "$UNMERGED"
+  echo "      Merge what belongs in this release, or ignore if deliberately parked."
+else
+  ok "No unmerged branches"
+fi
 
 info "Running npm test ..."
 if [[ "$DRY_RUN" == true ]]; then

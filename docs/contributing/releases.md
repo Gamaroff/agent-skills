@@ -84,18 +84,7 @@ git pull --rebase
 git push
 ```
 
-Then advance `main`. Two options depending on your branch-protection policy:
-
-**Direct fast-forward** (solo maintainer, no branch protection on `main`):
-
-```bash
-git checkout main
-git pull --rebase
-git merge --ff-only develop
-git push
-```
-
-**PR-based** (recommended for teams with branch protection on `main`):
+Then advance `main` with a release-prep PR:
 
 ```bash
 # From develop, open a release-prep PR. Replace vX.Y.Z with the version
@@ -112,11 +101,26 @@ git checkout main
 git pull --rebase
 ```
 
-In either case (Direct FF or PR-based), `main` is now at the tip you'll release from. Run `release.sh` (see [Cutting a release](#cutting-a-release)), then sync develop forward (see [Sync develop with main after release](#sync-develop-with-main-after-release)).
+`main` is now at the tip you'll release from. Run `release.sh` (see [Cutting a release](#cutting-a-release)), then sync develop forward (see [Sync develop with main after release](#sync-develop-with-main-after-release)).
+
+> **There used to be a "Direct fast-forward" option here, for a "solo maintainer, no branch
+> protection on `main`" — and it was removed on 2026-09-22 because that parenthetical had stopped
+> being true.** `main` carries branch protection whose one required check, *PR into main comes from
+> an allowed branch*, is declared on `pull_request` only. A direct push has no PR, so the check can
+> never report, so the push is refused — and it goes through only by an admin bypass, which works
+> solely because `enforce_admins` is `false`. Four consecutive releases were promoted that way, each
+> printing `Bypassed rule violations for refs/heads/main`.
+>
+> Nothing was damaged by it: `--ff-only` from `develop` cannot give `main` a commit `develop` lacks,
+> which is the inversion the guard exists to prevent. The cost is the other kind. A required check
+> that is routinely bypassed is not a guard, it is a prompt people learn to click through — and the
+> release quietly depended on `enforce_admins` staying `false`, so tightening branch protection
+> would have broken releases for a reason nobody would have connected to the change. Keeping one
+> promotion path that clears the check on its own terms is worth the extra two minutes.
 
 ### Merge-type aesthetics
 
-Only relevant to the PR-based path. The `gh pr merge` flag affects what `main`'s history *looks* like; it does not affect whether the develop sync step is needed (it always is — see below).
+The `gh pr merge` flag affects what `main`'s history *looks* like; it does not affect whether the develop sync step is needed (it always is — see below).
 
 | Flag | Result on `main` | When to use |
 |------|------------------|-------------|
@@ -152,11 +156,12 @@ bash scripts/release.sh --patch --no-sync-develop
 
 The script:
 1. Confirms you're on `main` with a clean, up-to-date working tree
-2. Runs `npm test`, `npm run validate:all`, `npm run generate-catalog`, and `npm run bundle` — auto-commits any stale catalog or bundled-reference files
-3. Calculates `vX.Y.Z` from the latest git tag + bump type (no tags yet → starts at `v0.0.0`)
-4. Moves `## [Unreleased]` → `## [vX.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and leaves a fresh `[Unreleased]` above it
-5. Commits `chore(release): vX.Y.Z`, creates an annotated tag, and pushes both to origin
-6. Syncs `develop` with `main` (`git checkout develop && git pull --rebase && git merge main && git push && git checkout main`) — skip with `--no-sync-develop`
+2. **Warns on any branch carrying commits not on `develop`**, naming each with its commit count and last-commit date — finished work that was never merged is invisible to every other check here and to CI, because neither looks at an unmerged branch. Advisory: a parked branch is legitimate, and a stuck release is worse than a noted omission
+3. Runs `npm test`, `npm run validate:all`, `npm run generate-catalog`, and `npm run bundle` — auto-commits any stale catalog or bundled-reference files
+4. Calculates `vX.Y.Z` from the latest git tag + bump type (no tags yet → starts at `v0.0.0`)
+5. Moves `## [Unreleased]` → `## [vX.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and leaves a fresh `[Unreleased]` above it
+6. Commits `chore(release): vX.Y.Z`, creates an annotated tag, and pushes both to origin
+7. Syncs `develop` with `main` (`git checkout develop && git pull --rebase && git merge main && git push && git checkout main`) — skip with `--no-sync-develop`
 
 The GitHub Actions workflow then handles release creation. No manual `gh release create` needed.
 
