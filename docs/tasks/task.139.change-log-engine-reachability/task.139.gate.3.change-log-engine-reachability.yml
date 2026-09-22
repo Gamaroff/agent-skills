@@ -1,0 +1,117 @@
+schema: 1
+task: 'task.139.change-log-engine-reachability'
+task_title: 'The Change Log engine is unreachable from a skill whose prose runs it: spell the writer alternation and pin engine reachability with a parity test'
+gate: CONCERNS
+status_reason: 'Cycle 3 reviews the obs #154 addition (doc-links engine, its tests, three skill edits) landed after 5c approved. The engine has three medium/high defects (a fence state machine that a line-initial backtick run desyncs — task.42 parses to 0 links and the corpus guard passes vacuously on it; cwd-relative git ls-files that reports 5 false dead links from a skill directory; process.exit after stdout writes, caught by the repo exit-after-write guard now that the file is tracked) and the two review-skill blocks read an unbound variable and address the engine by a path the repo rule forbids. Five entries promoted; the original task deliverable is unchanged since gate.2.'
+reviewer: 'QA Engineer'
+updated: '2026-09-22T06:49:01Z'
+
+top_issues:
+  - id: 'TQ-1'
+    severity: medium
+    file: 'shared/resources/doc-links.js'
+    finding: 'Line 214 calls process.exit(main(...)) after writing to stdout — the bug.3 stdout-truncation-on-exit class; the repo guard "no NEW file adopts exit-after-write" is red under ci:fast (vacuously green pre-commit because the guard walks git ls-files and the file was untracked).'
+    suggested_action: 'Set process.exitCode = main(...) and return; keep the CLI contract (0/1/2).'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/doc-links.js'
+    finding: 'FENCE_RE treats any line starting with three-plus backticks as a fence opener; a line-initial inline backtick run (task.42 doc line 315, a four-backtick code span) opens a fence that never closes, so the extractor returns 0 links for a 941-line document with 18 link sites — the corpus guard passes vacuously on it.'
+    suggested_action: 'Per CommonMark: a backtick opener whose info string contains a backtick is not a fence; a closer is the marker plus optional trailing spaces only; report fence-open-at-EOF so a desynced document is a finding, not a clean pass.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/doc-links.js'
+    finding: 'trackedSet runs git ls-files without --full-name, so paths are cwd-relative while rel is also cwd-relative; launched from skills/review-task the task.139 document reports 5 false dead links and exits 1.'
+    suggested_action: 'Anchor to the repository: root = git rev-parse --show-toplevel (fallback --root/cwd outside a repo); git ls-files -z --full-name; compute rel against that root.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The new block reads $TASK_FILE (review-story twin reads $STORY_FILE); the skills bind $TASK_FILE_PATH / $STORY_FILE_PATH, so as written the call is --file "" → usage exit 2 with no ✖ line, and the promised "exits 1 with one ✖ per dead link" cannot happen.'
+    suggested_action: 'Use the {resolved task file path} placeholder the other blocks substitute (or bind the variable in the same block); drop --json or say the dead links arrive in broken[].'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'All four new invocations address the engine as a bare node references/doc-links.js; create-skill: a helper a fenced block executes is addressed from the repository root as .agents/skills/{skill}/references/<file> — from the root the bare form is MODULE_NOT_FOUND (reproduced), from the skill dir it hits CR-2. The canonical engine calls in these same skills (tracker-comment.js, qa-cycle.sh) use the root-anchored form.'
+    suggested_action: 'Spell each call node .agents/skills/{review-task|review-story|finalise}/references/doc-links.js --file "{document-path}" from the repository root.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 9
+  phases_verified: '4/4 (original) + obs #154 addition'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'doc-links.js reads files and runs git ls-files; no network, no writes, no secrets. Not a boundary in the security sense (it classifies links, not inputs that gate an action); its own tests are the harness.'
+  performance:
+    status: PASS
+    notes: 'Corpus guard 0.3 s after sharing the tracked set (was 2.8 s with per-document ls-files).'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 (vacuous pass on a desynced fence) and CR-2 (cwd-dependent answer) both make the engine report clean when it did not look — the failure mode the engine exists to remove.'
+  maintainability:
+    status: PASS
+    notes: 'Single engine, one test file, three call sites; KNOWN ratchet keyed on file:line is brittle (CR-10, advisory).'
+
+code_review:
+  blocking: true
+  bugs: 8
+  cleanups: 2
+  promoted: ['TQ-1', 'CR-1', 'CR-2', 'CR-3', 'CR-4']
+  probes_executed: 0
+  boundary: false
+  scope: 'files changed since gate.2 (2026-09-22T06:04:46Z) — 12 files; bundle re-renders excluded'
+  mutation_proven:
+    - 'code-span stripping removed → extractor test red → covered'
+    - 'tracked-tree resolution replaced by null → tracked-tree resolver test red → covered'
+    - 'task doc line 63 reverted to a live link → corpus guard red naming line 63 → covered'
+  step_4b: 'review-task, review-story, finalise SKILL.md: 1 runnable block each with bindings; remaining placeholders are pre-existing template slots; 0 findings'
+
+recommendations:
+  immediate:
+    - action: 'TQ-1: process.exitCode, not process.exit'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'CR-1: CommonMark fence rules + fence-open-at-EOF reported as a finding; add a fixture with a line-initial backtick run (task.42 shape)'
+      refs: ['shared/resources/doc-links.js', 'shared/resources/tests/doc-links.test.mjs']
+    - action: 'CR-2: repo-root anchoring via git rev-parse --show-toplevel + ls-files --full-name; add a test that runs the CLI from a subdirectory'
+      refs: ['shared/resources/doc-links.js', 'shared/resources/tests/doc-links.test.mjs']
+    - action: 'CR-3 + CR-4: root-anchored .agents/skills/{skill}/references/doc-links.js with the {resolved … path} placeholder in review-task, review-story, finalise (4 sites)'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md', 'skills/finalise/SKILL.md']
+  future:
+    - action: 'CR-5 (medium/medium): the 8a clause satisfies inside-files-summary by declaration; carry documentPath in the record and let the evaluator treat the work item document as always in scope; point the "When this step applies" sentence at the carve-out'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/finalise-fix-and-recheck.mjs']
+    - action: 'CR-6 (low): reference-style definitions, HTML anchors, nested brackets, targets with spaces, single-quoted titles, parenthesised targets are not extracted — document the unsupported forms; add a reference-definition matcher'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'CR-7 (low): code-span stripping is line-scoped; a backticked quotation wrapped across a line break is reported dead while marked treats it as code'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'CR-8 (low/low): the "not a git repo" fixture under os.tmpdir() inherits the parent repo when TMPDIR sits inside a worktree'
+      refs: ['shared/resources/tests/doc-links.test.mjs']
+    - action: 'CR-9 (cleanup): --root / --file with no operand throws instead of usage exit 2'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'CR-10 (cleanup): key KNOWN on file:target, not file:line'
+      refs: ['shared/resources/tests/doc-links.test.mjs']
+    - action: 'Carried from cycle 2 and 5c: C2-CR-1..4, 5c CR-1, 5c CR-2 (PC-1 fixed in 5022ad02)'
+      refs: ['tests/change-log-engine-reachability.test.js', 'shared/resources/document-change-log.md', 'CHANGELOG.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['TQ-1, CR-1..CR-4 fixed and re-reviewed']

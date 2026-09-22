@@ -2341,7 +2341,8 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
 sections (acceptance criteria, docs, security, compliance) is FAIL on a finding **this run produced by
 execution** — a reproduced probe, a failing check with a citation — and nothing else is wrong. If
 two sections are FAIL, or the QA gate is FAIL, or CI is not green on the current head, this step does
-not apply: take Step 8.
+not apply: take Step 8 — with one named exception to the CI clause, stated in full in the next
+paragraph: a red on the docs link checker alone, on the work item's own document.
 
 **One CI red is a Docs-section finding, not a CI verdict: a dead relative link inside the work
 item's own document (task.139, obs #154).** `docs-link-check` runs only on files the PR changed, so
@@ -2356,13 +2357,16 @@ It qualifies **only** when all of these hold, each verified rather than assumed:
   waits for it like any other reading; it does not round it up).
 - The engine (`references/doc-links.js`, bundled beside this skill) reproduces the red on the
   work-item document, and **nowhere else in the diff**:
-  `node references/doc-links.js --file "{document-path}"` exits 1, and the same call on every
-  other `.md` the PR changed exits 0. A dead link in a skill or a shared resource is a code finding
+  `node .agents/skills/finalise/references/doc-links.js --file "{document-path}"` (run from the
+  repository root, like every engine call in this skill) exits 1, and the same call on every other
+  `.md` the PR changed exits 0. A dead link in a skill or a shared resource is a code finding
   and takes the ordinary halt.
-- The finding record's `severity` is `low`, its `touched` is exactly the document, and — because
-  a work item's own document is the one file always inside its own scope — `filesSummary` lists
-  the document path for this evaluation (state that in the deviations block; the evaluator reads
-  the record it is given, and a Files Summary that omits the document it lives in is the norm).
+- The finding record's `severity` is `low`, its `touched` is exactly the document, and the record
+  carries `"documentPath": "{document-path}"`. `filesSummary` stays what is on disk (task § 7 /
+  the story's File List — which, as the norm, omits the document it lives in); the evaluator's
+  `inside-files-summary` treats the work item's own document as always in scope when
+  `documentPath` names it, so the scope claim is enforced by the engine rather than declared by
+  the record (QA cycle 3, CR-5).
 - The mutation proof is the engine itself: the **pre-fix** run of `doc-links.js` on the document,
   captured to `mutationProof.run` before the edit, is the red (it prints `✖ <file>:<line> → …`
   and `FAIL doc-links: …`, which are the markers the evaluator reads, on lines naming the file —

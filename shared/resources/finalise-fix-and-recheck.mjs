@@ -20,6 +20,8 @@
  *     "commits": 1,                             // commits the fix takes
  *     "touched": ["lib/x.sh"],                  // paths the fix changes
  *     "filesSummary": ["lib/x.sh"],             // the work item's Files Summary / File List
+ *     "documentPath": "docs/tasks/task.1.x/task.1.x.md",   // optional: the work item document —
+ *                                               // always inside its own scope (finalise 8a docs-link clause)
  *     "mutationProof": { "test": "tests/x.test.js", "redOnRevert": true,
  *                        "run": ".claude/state/mutation-proof.log" },   // the recorded red run
  *     "otherFindingsOpen": []                   // medium+ findings, or other FAIL sections
@@ -130,7 +132,17 @@ const CHECKS = Object.freeze({
       return "no `touched` paths recorded";
     }
     if (!isList(f.filesSummary)) return "no `filesSummary` recorded";
-    const outside = f.touched.filter((p) => !f.filesSummary.includes(p));
+    // The work item's own document is inside its own scope by construction —
+    // a Files Summary lists what the work changes, not the file it lives in —
+    // so a record that names it as `documentPath` may touch it (8a docs-link
+    // clause, task.139 QA cycle 3 CR-5). Only that one path; anything else
+    // still has to be listed.
+    const inScope = (p) =>
+      f.filesSummary.includes(p) ||
+      (typeof f.documentPath === "string" &&
+        f.documentPath !== "" &&
+        p === f.documentPath);
+    const outside = f.touched.filter((p) => !inScope(p));
     return outside.length === 0
       ? null
       : `outside the Files Summary: ${outside.join(", ")}`;

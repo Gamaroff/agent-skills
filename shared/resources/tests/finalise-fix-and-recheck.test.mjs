@@ -101,6 +101,38 @@ test("the evaluator's checks are exactly the table's ids — neither side can dr
   );
 });
 
+test("inside-files-summary: the work item's own document is in scope when named by documentPath, and only that path (task.139 QA cycle 3, CR-5)", () => {
+  const doc = "docs/tasks/task.1.x/task.1.x.md";
+  // The docs-link shape: the fix touches the document itself, which the Files
+  // Summary — listing what the work changes, not where it lives — omits.
+  const withDoc = { ...GOOD, touched: [doc], documentPath: doc };
+  assert.deepEqual(evaluateFixAndRecheck(withDoc).failed, []);
+  // Without documentPath the same record is outside the Files Summary.
+  const without = { ...GOOD, touched: [doc] };
+  assert.deepEqual(
+    evaluateFixAndRecheck(without).failed.map((x) => x.id),
+    ["inside-files-summary"],
+  );
+  // documentPath admits ONE path: a second unlisted file is still outside.
+  const two = { ...GOOD, touched: [doc, "README.md"], documentPath: doc };
+  assert.deepEqual(
+    evaluateFixAndRecheck(two).failed.map((x) => x.id),
+    ["inside-files-summary"],
+  );
+  // An empty or non-string documentPath admits nothing.
+  for (const bad of ["", 42, null]) {
+    assert.deepEqual(
+      evaluateFixAndRecheck({
+        ...GOOD,
+        touched: [doc],
+        documentPath: bad,
+      }).failed.map((x) => x.id),
+      ["inside-files-summary"],
+      `documentPath ${JSON.stringify(bad)} must not admit the path`,
+    );
+  }
+});
+
 test("all five hold → proceed, every id checked, nothing failed", () => {
   const r = evaluateFixAndRecheck(GOOD);
   assert.equal(r.proceed, true, JSON.stringify(r.failed));

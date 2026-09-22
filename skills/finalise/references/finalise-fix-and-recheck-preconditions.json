@@ -16,8 +16,8 @@
     },
     {
       "id": "inside-files-summary",
-      "statement": "every path the fix touches is listed in the work item's Files Summary (task §7) or File List (story)",
-      "input": "touched, filesSummary",
+      "statement": "every path the fix touches is listed in the work item's Files Summary (task §7) or File List (story) — or is the work item's own document, named by `documentPath`, which is inside its own scope by construction",
+      "input": "touched, filesSummary, documentPath",
       "why": "A fix outside the task's own file set is new scope, and scope is what QA reviewed; a fix inside it is a correction to what QA already covered."
     },
     {
