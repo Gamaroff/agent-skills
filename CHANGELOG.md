@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.51.0] - 2026-09-22
+
 ### Added
 
 - **`review-task` and `review-story` verify that every documented config key has a reader (obs from
