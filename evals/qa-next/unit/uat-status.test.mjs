@@ -1740,3 +1740,86 @@ test("--check validates repo-relative bug links on EVERY row, and leaves prose U
   );
   assert.equal(run(root, "--check").code, 0);
 });
+
+test("the link --check validates IS the link --item publishes (TASK-141-BUG-16)", () => {
+  // Cycle 6 closed the validated-vs-published divergence on the ROW-STATE axis and reopened it on
+  // the LINK-SHAPE axis: checkRegistry learned to skip a prose URL, describeRow did not, so the
+  // very fixture the cycle-6 test declares legal was --check green while the payload handed the
+  // skill `https://example.com/issues/99` — which SKILL.md Step 4 opens to append a re-test
+  // section. Both now go through one `isToolWrittenLink`, so this asserts the PROPERTY (the two
+  // agree) rather than either behaviour alone.
+  const root = corpus();
+  run(root, "--init");
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.1/r.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.real.md"),
+    "---\nstatus: new\n---\n",
+  );
+
+  addRows(
+    root,
+    "D",
+    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
+  );
+  assert.equal(
+    run(root, "--check").code,
+    0,
+    "a prose URL is not a check error",
+  );
+  assert.equal(
+    JSON.parse(run(root, "--item", "D.1", "--json").out).bug,
+    "../bugs/bug.1.real.md",
+    "and the payload publishes the tool-written link, never the prose URL",
+  );
+
+  // A fail row whose ONLY bug-shaped link is prose does not satisfy the requirement — the base
+  // exited 1 here, and skipping the link must not have quietly relaxed the rule.
+  const root2 = corpus();
+  run(root2, "--init");
+  mkdirSync(path.join(root2, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(path.join(root2, "docs/qa/runs/D.1/r.md"), "# run\n");
+  addRows(
+    root2,
+    "D",
+    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | see [bug.99 discussion](https://example.com/issues/99) |\n",
+  );
+  const only = run(root2, "--check");
+  assert.equal(
+    only.code,
+    1,
+    "a URL alone does not satisfy 'fail requires a bug link'",
+  );
+  assert.match(only.out, /D\.1: fail requires a bug link in Notes/);
+  assert.equal(JSON.parse(run(root2, "--item", "D.1", "--json").out).bug, null);
+});
+
+test("a #fragment on a repo-relative bug link resolves to the file (TASK-141-CR7-3)", () => {
+  // `../bugs/bug.1.real.md#repro` names a file that exists. Reporting it missing is a check that
+  // is wrong about the filesystem, and on a fail row it HALTs the consuming skill.
+  const root = corpus();
+  run(root, "--init");
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.1/r.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.real.md"),
+    "---\nstatus: new\n---\n",
+  );
+  addRows(
+    root,
+    "D",
+    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md#repro) |\n",
+  );
+  assert.equal(
+    run(root, "--check").code,
+    0,
+    "the fragment is stripped before the exists check",
+  );
+  assert.equal(
+    JSON.parse(run(root, "--item", "D.1", "--json").out).bug,
+    "../bugs/bug.1.real.md#repro",
+    "but the payload keeps the link verbatim — the anchor is the author's",
+  );
+});

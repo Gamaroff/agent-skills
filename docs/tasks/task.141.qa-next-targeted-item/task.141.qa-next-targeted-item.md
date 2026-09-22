@@ -8,7 +8,7 @@ category: infrastructure
 status: ready-for-review
 priority: Medium
 created: 2026-09-22
-updated: 2026-09-22
+updated: 2026-09-23
 assignee:
 estimated_effort_hours: 8
 risk_level: low
@@ -664,39 +664,45 @@ historical naming.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS (cycle 6 of 7) — findings fixed, awaiting the cycle-7 gate
+**QA Status**: CONCERNS — 7 of 7 cycles run; cycle-7 fixes ungated
 **Testing Date**: 2026-09-23
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS — no HIGH
+**Quality Score**: 85/100
+**Gate Decision**: CONCERNS — no HIGH for three consecutive gates
 
 ### QA Reports
 
-| Cycle | Gate | Report | Verdict |
-| :--- | :--- | :--- | :--- |
-| 1 | [gate.1](./task.141.gate.1.qa-next-targeted-item.yml) | [qa.1](./task.141.qa.1.qa-next-targeted-item.md) | FAIL (70) |
-| 2 | [gate.2](./task.141.gate.2.qa-next-targeted-item.yml) | [qa.2](./task.141.qa.2.qa-next-targeted-item.md) | FAIL (70) — refute pass |
-| 3 | [gate.3](./task.141.gate.3.qa-next-targeted-item.yml) | [qa.3](./task.141.qa.3.qa-next-targeted-item.md) | FAIL (65) |
-| 4 | [gate.4](./task.141.gate.4.qa-next-targeted-item.yml) | [qa.4](./task.141.qa.4.qa-next-targeted-item.md) | CONCERNS (80) |
-| 5 | [gate.5](./task.141.gate.5.qa-next-targeted-item.yml) | [qa.5](./task.141.qa.5.qa-next-targeted-item.md) | FAIL (60) — loop limit |
-| 6 | [gate.6](./task.141.gate.6.qa-next-targeted-item.yml) | [qa.6](./task.141.qa.6.qa-next-targeted-item.md) | CONCERNS (80) |
+| Cycle | Gate | Report | Verdict | HIGH |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | [gate.1](./task.141.gate.1.qa-next-targeted-item.yml) | [qa.1](./task.141.qa.1.qa-next-targeted-item.md) | FAIL (70) | 1 |
+| 2 | [gate.2](./task.141.gate.2.qa-next-targeted-item.yml) | [qa.2](./task.141.qa.2.qa-next-targeted-item.md) | FAIL (70) | 1 |
+| 3 | [gate.3](./task.141.gate.3.qa-next-targeted-item.yml) | [qa.3](./task.141.qa.3.qa-next-targeted-item.md) | FAIL (65) | 1 |
+| 4 | [gate.4](./task.141.gate.4.qa-next-targeted-item.yml) | [qa.4](./task.141.qa.4.qa-next-targeted-item.md) | CONCERNS (80) | 0 |
+| 5 | [gate.5](./task.141.gate.5.qa-next-targeted-item.yml) | [qa.5](./task.141.qa.5.qa-next-targeted-item.md) | FAIL (60) | 1 |
+| 6 | [gate.6](./task.141.gate.6.qa-next-targeted-item.yml) | [qa.6](./task.141.qa.6.qa-next-targeted-item.md) | CONCERNS (80) | 0 |
+| 7 | [gate.7](./task.141.gate.7.qa-next-targeted-item.yml) | [qa.7](./task.141.qa.7.qa-next-targeted-item.md) | CONCERNS (85) | 0 |
 
-Budget: 7 cycles (5 + 2 granted). Cycle 7 remains.
+Budget: 7 (5 + 2 granted), spent. **17 defects found and closed. 34 mutations, none survived.**
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3942 (0 failures, 1 skipped); qa-next suite 39
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
-- **Mutation proof**: 32 across six cycles, every one red
+- **Tests Executed**: 3944 (0 failures, 1 skipped); qa-next suite 41
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
-### Key Finding — cycle 5's HIGH is closed, and the trend turned
+### Key Finding — two structural changes, and one rule stated three times
 
-The render/parse round trip was verified **adversarially through the CLI** — a literal backslash, an
-escaped backslash before a pipe, a trailing backslash, a bare pipe in a note, six rewrites each,
-byte-identical. First fix in this loop confirmed by hostile input rather than by its own test.
+The loop's two turning points both replaced something that must be *maintained* with something that
+*holds itself*:
 
-Cycle 6's two MEDIUMs were both in cycle 5's every-bug-link change and both closed by **one**
-correction — validate every *repo-relative* bug link on *every* row, keeping the required-link rule
-`fail`-only. First cycle whose findings collapsed into a single change rather than a list.
+- **Cycle 3** — an enumeration of the flags that write the note cell → the operation "append, never
+  replace". Closed the class after two enumerations each missed a door.
+- **Cycle 7** — an alignment between the reader that publishes a bug link and the checker that
+  validates one → **one shared predicate**. Closed the class after cycle 6 fixed the divergence on
+  one axis and reopened it on another.
+
+Maintainability stays CONCERNS for a reason found in the last cycle: the bug-link rule was stated in
+**three** places — `checkRegistry`, the README, and the skeleton `--init` writes into every new
+registry. Cycle 6 updated one. The third had gone unnoticed for six cycles and was found by grepping
+for the rule rather than by being told about it.
 
 ---
 
@@ -716,6 +722,7 @@ correction — validate every *repo-relative* bug link on *every* row, keeping t
 | 2026-09-22 |         | QA cycle 4 — gate CONCERNS (80/100); append rule verified over the writer set; pipe escaping, newest-bug-link and a STATES population test | qa-task |
 | 2026-09-22 |         | QA cycle 5 — gate FAIL (60/100); render/parse idempotence, every-bug-link validation, suppression withdrawn; **loop limit reached** | qa-task |
 | 2026-09-23 |         | QA cycle 6 (granted 1/2) — gate CONCERNS (80/100); round trip verified adversarially; bug-link validation corrected on both axes | qa-task |
+| 2026-09-23 |         | QA cycle 7 (granted 2/2) — gate CONCERNS (85/100); validated-vs-published closed structurally by one shared predicate; budget spent | qa-task |
 
 <!-- change-log-end -->
 

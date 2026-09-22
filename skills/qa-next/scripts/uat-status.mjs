@@ -306,7 +306,7 @@ function renderSkeleton(cfg, today) {
     "",
     "**States:** `⬜ untested` → `🟡 pass` (every item behaved as expected) → `✅ accepted` (owner sign-off). `❌ fail` branches to a bug; `⏸ blocked` could not be exercised in the test environment (note says why; the loop skips it); `➖ n/a` is reachable in no environment (note required).",
     "",
-    `**Rules** (enforced by \`${tool} --check\`): 🟡 / ✅ / ❌ need a **Last run** link into \`runs/\`; ❌ needs a bug link in **Notes**; ⏸ and ➖ need a note; every \`Stories\` id is a real story; every accepted story is named by some function or listed under \`storyNa\` in \`uat-surfaces.json\` (\`--coverage\` lists the rest). Rows are authored and reordered by hand — the tool only fills cells.`,
+    `**Rules** (enforced by \`${tool} --check\`): 🟡 / ✅ / ❌ need a **Last run** link into \`runs/\`; ❌ needs a bug link in **Notes**, and every bug link the tool wrote must resolve on **any** row (a plain URL is prose and is skipped); ⏸ and ➖ need a note; every \`Stories\` id is a real story; every accepted story is named by some function or listed under \`storyNa\` in \`uat-surfaces.json\` (\`--coverage\` lists the rest). Rows are authored and reordered by hand — the tool only fills cells.`,
     "",
     `**Tooling:** \`${tool}\` (scoreboard) · \`--next\` (the \`/qa-next\` selector) · \`--set <id> <state> --run <path>\` · \`--items <id> "<items>"\` · \`--automated <id> "<specs>"\` · \`--accept <id>\` · \`--coverage\` · \`--check\` · \`--findings\`. Per-run results live under \`runs/\`, each with a Findings table for what was seen beyond the items themselves.`,
     "",
@@ -466,24 +466,17 @@ export function checkRegistry({ sections }, stories, cfg, exists = () => true) {
         else if (!exists(runLink[1]))
           errors.push(`${r.id}: run file not found: ${runLink[1]}`);
       }
-      // Every bug-shaped link in the cell, on EVERY row — not only on `fail`. describeRow
-      // publishes `bug` for a row in any state and SKILL.md Step 4 opens that path to append a
-      // re-test section, so validating only `fail` rows left the published path unchecked on four
-      // of the six states. Requiring a link AT ALL stays fail-only; that is a separate rule.
-      //
-      // And only links the tool itself could have written are required to resolve: `linkTo` always
-      // emits a repo-relative path, so a scheme-qualified or anchor link is a human's prose
-      // reference. Requiring those to exist on disk turned a legal registry into a --check error,
-      // which /qa-next Step 0 treats as HALT `registry-invalid`.
-      const bugLinks = [
-        ...r.notes.matchAll(/\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/g),
-      ].map((m) => m[1]);
+      // Every bug link THE TOOL WROTE, on EVERY row — not only on `fail`. describeRow publishes
+      // `bug` for a row in any state and SKILL.md Step 4 opens that path, so validating `fail`
+      // rows only left the published path unchecked on four of the six states. Requiring a link
+      // AT ALL stays fail-only; that is the separate rule. Both sides use `isToolWrittenLink`, so
+      // the link that is validated is by construction the link that is published.
+      const bugLinks = toolWrittenBugLinks(r.notes);
       if (k === "fail" && !bugLinks.length)
         errors.push(`${r.id}: fail requires a bug link in Notes`);
-      for (const link of bugLinks) {
-        if (/^[a-z][a-z0-9+.-]*:/i.test(link) || link.startsWith("#")) continue;
-        if (!exists(link)) errors.push(`${r.id}: bug file not found: ${link}`);
-      }
+      for (const link of bugLinks)
+        if (!exists(linkTarget(link)))
+          errors.push(`${r.id}: bug file not found: ${link}`);
       if ((k === "na" || k === "blocked") && r.notes === "")
         errors.push(`${r.id}: ${k} requires a note saying why`);
       for (const id of storyIds(r.cells.Stories)) {
@@ -507,6 +500,32 @@ export function checkRegistry({ sections }, stories, cfg, exists = () => true) {
 // A run file's `## Findings` table holds what was seen that is not an item's own result — a rough
 // edge on a passing function, a defect on another surface, a harness fault. Parsed here so
 // `--findings` can list them across every run and `--check` can prove their bug links resolve.
+
+// A link the TOOL itself wrote: repo-relative, no scheme, no anchor, no protocol-relative host.
+// `linkTo` emits nothing else, so anything failing this is a human's prose reference.
+//
+// ONE definition, used by the reader (describeRow's `bug`) and the checker (checkRegistry) alike.
+// They were aligned on the row-state axis and then diverged on the LINK-SHAPE axis: the checker
+// learned to skip a prose URL and the reader did not, so a note whose newest bug-shaped link was
+// `https://…` passed --check while the payload handed that URL to the skill, which opens it.
+// Two predicates for "is this a bug link we own" is the same defect twice.
+const isToolWrittenLink = (href) =>
+  !!href &&
+  !/^[a-z][a-z0-9+.-]*:/i.test(href) &&
+  !href.startsWith("#") &&
+  !href.startsWith("//");
+
+// The path part, without a `#fragment`: `../bugs/b.md#repro` names a file that exists.
+const linkTarget = (href) => href.replace(/#.*$/, "");
+
+const BUG_LINK_RE = /\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/g;
+
+// Every bug link the tool wrote, in cell order.
+function toolWrittenBugLinks(notes) {
+  return [...(notes ?? "").matchAll(BUG_LINK_RE)]
+    .map((m) => m[1])
+    .filter(isToolWrittenLink);
+}
 
 const FINDING_ROW = /^\|\s*(\d+)\s*\|(.*)\|(.*)\|(.*)\|(.*)\|\s*$/;
 const BUG_CLOSED = /^(closed|done|fixed|resolved)$/i;
@@ -731,12 +750,10 @@ function describeRow(opts, cfg, r) {
     lastRun: (r.run.match(/\]\(([^)]+)\)/) ?? [])[1] ?? null,
     priorRuns: priorRuns(opts, r.id),
     notes: r.notes,
-    // The LAST bug link, not the first: on a kept ✅ the note cell is appended to, so it can hold
-    // several, and Step 4's "reuse the open bug" means the most recent one. Taking the first
-    // handed back a superseded bug while the newest sat two segments to its right.
-    bug:
-      [...r.notes.matchAll(/\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/g)].at(-1)?.[1] ??
-      null,
+    // The LAST bug link the TOOL WROTE — same predicate checkRegistry validates with, so the
+    // published link and the validated link cannot name different things. Last, not first,
+    // because the note cell is appended to on a kept ✅ and Step 4 wants the most recent.
+    bug: toolWrittenBugLinks(r.notes).at(-1) ?? null,
   };
 }
 
