@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **`release.sh` warns on branches carrying commits not on `develop`, and the release-prep PR is now
+  the only documented promotion path.** Every other pre-release check asks whether what *is* on the
+  branch is sound; none asked what was missing from it, so a branch whose work was finished but never
+  merged passed every gate in the script and every lane in CI — neither looks at an unmerged branch —
+  and then missed every subsequent release in silence. Three were found by hand at the v0.51.0 cut,
+  one of them thirteen days old, one commit from done, and never opened as a PR. The check lists each
+  branch with its commit count and last-commit date, and is advisory: a parked branch is a legitimate
+  state, and refusing to release over one would trade a visible omission for a stuck pipeline.
+  Separately, `releases.md` offered a "Direct fast-forward (solo maintainer, no branch protection on
+  `main`)" path, but `main` *has* branch protection whose one required check is declared on
+  `pull_request` only — a direct push has no PR, so the check can never report and the push lands
+  only by admin bypass, which four consecutive releases used. Nothing was damaged (a `--ff-only` from
+  `develop` cannot invert the promotion direction) but a required check bypassed every four days
+  stops being a guard, and the release quietly depended on `enforce_admins` staying `false`. The
+  direct option is removed and the removal records why, so it is not re-added.
+
 ## [v0.51.0] - 2026-09-22
 
 ### Added
