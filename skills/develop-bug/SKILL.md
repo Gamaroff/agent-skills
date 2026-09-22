@@ -215,7 +215,7 @@ See [`references/develop-bug-step-2-review.md`](references/develop-bug-step-2-re
 > in this pipeline appends a Change Log row to a bug file. See
 > [document-change-log.md](references/document-change-log.md) §Exclusions.
 
-See [`references/develop-bug-step-3-investigate-fix.md`](references/develop-bug-step-3-investigate-fix.md): set bug status `new → in-progress` and open `### Iteration 1`; **reproduce** the failure (run the failing test / repro, establishing the fails-without property) and **locate the root cause** via Explore; implement the fix + a **regression test that fails without the fix** → write **Investigation** and **Fix Implementation** into the bug's Developer Fix Cycle → add a Status History row → set bug status `ready-for-qa`. Bounded loop + test-failure triage as in [`references/develop-pipeline-step-3-develop-loop.md`](references/develop-pipeline-step-3-develop-loop.md). If the bug proves **not reproducible** here (despite review-bug passing), HALT — do not fabricate a fix.
+See [`references/develop-bug-step-3-investigate-fix.md`](references/develop-bug-step-3-investigate-fix.md): set bug status `new → in-progress` and open `### Iteration 1`; **reproduce** the failure (run the failing test / repro, establishing the fails-without property) and **locate the root cause** via Explore; implement the fix + a **regression test that fails without the fix** → write **Investigation** and **Fix Implementation** into the bug's Developer Fix Cycle → add a Status History row → set bug status `ready-for-qa`. **General bug:** every status write here (`in-progress`, `ready-for-qa`) is mirrored into the `docs/bugs/bug-registry.md` row's Status cell in the same edit — the row is a second copy of the status and a consumer drift guard compares the two on every push, so a file that moves without its row is a red `guards` lane from the first code push to the close commit (three occurrences before this rule). Same rule at `reopened` (Step 5–6) and `closed` (Step 7). Bounded loop + test-failure triage as in [`references/develop-pipeline-step-3-develop-loop.md`](references/develop-pipeline-step-3-develop-loop.md). If the bug proves **not reproducible** here (despite review-bug passing), HALT — do not fabricate a fix.
 
 ### Step 4: Create PR
 
@@ -235,7 +235,7 @@ See [`references/develop-bug-step-7-close-bug.md`](references/develop-bug-step-7
 
 - **Story bug** → move the bug to **Closed Bugs** in the parent story's `## Bug Reports`; if it was the parent's only open bug, restore the parent story status from `Reopened`.
 - **Task bug** → mark the bug ✅ Closed in the parent task's Bug Reports list.
-- **General bug** → flip the `docs/bugs/bug-registry.md` row status to `closed` (commit the registry bump atomically with the bug file).
+- **General bug** → flip the `docs/bugs/bug-registry.md` row status to `closed` (commit the registry bump atomically with the bug file) — the last of the row's mirrored writes; Steps 3 and 5–6 already moved it through `in-progress` / `ready-for-qa` / `reopened`.
 
 **Lite mode applies to Step 5 only.** Step 7 (finalise + Resolution Summary + parent/registry update + any tracker close) runs in full in every mode.
 

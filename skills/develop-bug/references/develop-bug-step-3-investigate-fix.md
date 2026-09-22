@@ -1,6 +1,6 @@
 ---
 name: develop-bug-step-3-investigate-fix
-description: Step 3 (investigate & fix) for the develop-bug pipeline. Implements the fix plus a regression test that fails without the fix, writes the Fix Implementation record into the bug's Developer Fix Cycle, sets bug status ready-for-qa, and reuses the shared develop-loop's bounded-iteration + test-failure-triage mechanics.
+description: Step 3 (investigate & fix) for the develop-bug pipeline. Implements the fix plus a regression test that fails without the fix, writes the Fix Implementation record into the bug's Developer Fix Cycle, sets bug status ready-for-qa (mirroring each status transition into the general-bug registry row), and reuses the shared develop-loop's bounded-iteration + test-failure-triage mechanics.
 ---
 
 # Develop Bug Pipeline — Step 3: Investigate & Fix
@@ -13,7 +13,23 @@ Step 2 (`/review-bug`) already confirmed the report is fix-ready (complete, not 
 
 ## Reproduce & open the Developer Fix Cycle (do this first)
 
-1. **Move the bug into the fix cycle**: set bug status `new → in-progress` (frontmatter `status: in-progress`; body `**Status:** 🔄 In Progress`). If the bug arrived `reopened`, keep it and open the next iteration instead of Iteration 1.
+1. **Move the bug into the fix cycle**: set bug status `new → in-progress` (frontmatter `status: in-progress`; body `**Status:** 🔄 In Progress`). If the bug arrived `reopened`, keep it and open the next iteration instead of Iteration 1. **General bug:** mirror the same transition into the bug's row in `docs/bugs/bug-registry.md` (Status cell → `🔧 In Progress`) in the same edit — see the callout below.
+
+> **The registry row is a second copy of the status — write it at every transition, not only at close.**
+> For a **general bug**, `docs/bugs/bug-registry.md` carries the bug's status in its own Status cell, and
+> a consumer's drift guard (tinker-city's `scripts/check-bug-doc-consistency.js`, in `test:guard` and
+> the CI `guards` lane) asserts that cell equals the file's frontmatter `status:` on every push. This
+> step used to write only the file, so `guards` went red on the first code push (`🆕 New` vs
+> `ready-for-qa`) and stayed red until Step 7's close commit wrote the row — a false red the pipeline
+> then had to reason past with "reading 2 is the real one" (bug.89, bug.90 and bug.91 in that repo,
+> three occurrences). The rule that removes it: **every write of the bug file's `status:` in this
+> pipeline is paired with the registry row's Status cell in the same edit** — here at `in-progress`
+> and `ready-for-qa`, in Step 5–6 at `reopened`, in Step 7 at `closed`. Use the registry's own status
+> vocabulary, read from its existing rows (canonically `🆕 New` / `🔧 In Progress` / `🔍 Ready for QA`
+> / `✅ Closed` / `⚠️ Reopened`); leave the row's other cells and the registry's next-number line
+> alone. Story and task bugs have no registry row — their parent's Bug Reports list is updated at
+> close only, as today. The registry edit is committed with the bug file in the same commit, so
+> `git diff --stat` at each commit point shows both paths whenever the file's status moved.
 2. **Reproduce the failure** using the most deterministic available signal (in order): a **failing automated test** that encodes the bug (preferred — it becomes the regression test below); a **reproducing command** (capture stdout/stderr/exit); or, when neither is possible (env-specific/timing/external), a **precise code-path trace**. Record the reproduction evidence.
 3. **Localise the root cause** via a read-only Explore subagent (breadth: medium; "very thorough" for `Blocker`/`Critical`) — marking the wait on the lock beside the dispatch (`bash .agents/skills/develop-bug/references/set-waiting-on.sh "step-3 root-cause localisation"`) and clearing it (`… set-waiting-on.sh --clear`) once the summary is read, so the `Stop` hook reads the yielded turn as a wait and not a stall (task.130; `references/develop-pipeline-hooks.md` §"waiting_on"): start from the bug's Related Files / Evidence and the reproduction signal, trace to the function/line where Expected and Actual diverge, and return candidate root-cause file:line + the module's conventions (error handling, DI, naming). Persist the summary per [`references/subagent-summary-artifact.md`](subagent-summary-artifact.md); consume only the summary.
 4. Fill the **Investigation** subsection of the current `### Iteration {N}` under `## Developer Fix Cycle`:
@@ -80,7 +96,7 @@ Update the **bug file** (authorised sections only). In the current `### Iteratio
 
 Then:
 
-- Set bug status `in-progress → ready-for-qa` (frontmatter `status: ready-for-qa`; body `**Status:** ✅ Ready for QA`).
+- Set bug status `in-progress → ready-for-qa` (frontmatter `status: ready-for-qa`; body `**Status:** ✅ Ready for QA`). **General bug:** mirror it into the `bug-registry.md` row's Status cell (`🔍 Ready for QA`) in the same edit — the row is a second copy of the status (callout above), and the consumer's drift guard reads it on this push.
 - Add a Status History row: `| {date} | Ready for QA | develop-bug | Fix implemented + regression test |`.
 
 The section shapes above are intentionally identical to those `qa-fix` writes (see `qa-fix` "Bug Report Workflow Support"), so a bug touched by either skill reads consistently.
@@ -91,4 +107,5 @@ The section shapes above are intentionally identical to those `qa-fix` writes (s
 
 - Record in the implementation report Decisions Log: the fix summary (≤5 bullets), files touched, and the regression test name.
 - Do NOT create the PR here — Step 4 does. Do NOT mark the bug `closed` here — only Step 7 closes after verification.
+- **General bug:** before handing to Step 4, confirm the registry row's Status cell reads the same status as the file (`ready-for-qa`) — `git diff --stat` must list `docs/bugs/bug-registry.md` beside the bug file. A file that moved without its row is the exact drift the consumer's guard fails on.
 - Update Pipeline Progress: ✅ investigate-fix. Proceed to Step 4.
