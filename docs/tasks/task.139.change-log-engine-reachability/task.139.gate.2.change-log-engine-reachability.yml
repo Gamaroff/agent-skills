@@ -1,0 +1,73 @@
+schema: 1
+task: 'task.139.change-log-engine-reachability'
+task_title: 'The Change Log engine is unreachable from a skill whose prose runs it: spell the writer alternation and pin engine reachability with a parity test'
+gate: PASS
+status_reason: 'All four cycle-1 findings verified FIXED (CR-1 wording, CR-2 wrap-tolerant regex + mutation-proven regression test, CR-3 literal form, CR-4 counts). Cycle-2 refute pass over the whole branch diff returned four low-severity, medium-confidence observations — none meets the promotion bar — recorded as future recommendations. 4/4 new tests green, ci:fast 3891/3891, bundle:check 0 problems.'
+reviewer: 'QA Engineer'
+updated: '2026-09-22T06:04:46Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 4
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered (boundary: false) — a contract sentence, a bundler-generated copy and a parity test. No new dependency, auth, network or secret handling.'
+  performance:
+    status: PASS
+    notes: 'One 37 KB generated file; 42 ten-line re-renders. No runtime path changes.'
+  reliability:
+    status: PASS
+    notes: 'Floor ≥ 2 refuses a vacuous population; wrap-tolerant phrase matcher self-checked against both spellings and a non-instruction mention; over-match probe across all SKILL.md files: develop 2, finalise 1, no others.'
+  maintainability:
+    status: PASS
+    notes: 'Population derived, not listed; alternation is the declaration; test messages name the fix. Four wording/provenance nits below.'
+
+code_review:
+  blocking: true
+  bugs: 3
+  cleanups: 1
+  promoted: []
+  probes_executed: 0
+  boundary: false
+  refute_pass: true
+  mutation_proven:
+    - 'RUNS_ENGINE reverted to the literal-space form → "the phrase matcher sees the instruction across a line wrap" red → covered'
+    - 'drop develop from the alternation → parity test red → covered'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-22'
+  total_iterations: 1
+  verification_method: 'Re-read of the fixed text; wrap-tolerant regex over-match probe across skills/*/SKILL.md; mutation proof; ci:fast + bundle:check'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'C2-CR-1 (low/medium): the wrap test asserts develop matches at ≥ 2 sites — a layout fact; it cannot detect both sites becoming unwrapped and would red for the wrong reason if develop consolidated its two workflow steps. Consider dropping the count or asserting membership via population() only.'
+      refs: ['tests/change-log-engine-reachability.test.js']
+    - action: 'C2-CR-2 (low/medium): "the alternation is the only declaration" overstates — a skill citing references/change-log.js in its own SKILL.md (sync-jira-epic/story/task) is a second, non-transitive discovery path (REFS_REF_RE). Reword to "the declaration for skills whose prose runs the one-liner".'
+      refs: ['shared/resources/document-change-log.md']
+    - action: 'C2-CR-3 (low/medium): the CHANGELOG entry and the test header attribute "over-matched 38 files, measured 2026-09-17" to following the bare {skill} placeholder; the bundler records 24 skills for the placeholder-as-wildcard case (task 122) and 38 for the bare references/X form, and 2026-09-17 is the UNREACHED measurement date. State the 24-skill figure or drop the number and date.'
+      refs: ['CHANGELOG.md', 'tests/change-log-engine-reachability.test.js']
+    - action: 'C2-CR-4 (cleanup): the paragraph writes the literal references/change-log.js inside a shared source; harmless (the bundler does not follow bare references/X out of shared text; bundle:check clean) but spell it as the bare filename per the create-skill rule for shared sources.'
+      refs: ['shared/resources/document-change-log.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

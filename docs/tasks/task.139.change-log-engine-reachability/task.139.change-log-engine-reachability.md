@@ -287,28 +287,29 @@ None.
 | 2026-09-22 |  | Implemented — 46 files (1 contract, 1 new engine copy, 42 re-rendered contract copies, 1 test, CHANGELOG), 3 tests | develop |
 | 2026-09-22 |  | QA gate CONCERNS (80/100) — 2 findings (CR-1 contract wording, CR-2 wrapped-phrase regex); 2 advisory | qa-task |
 | 2026-09-22 |  | QA findings fixed — CR-1 contract wording, CR-2 wrap-tolerant phrase regex + regression test, CR-3 literal skill form, CR-4 counts; 1 iteration | qa-fix |
+| 2026-09-22 |  | QA gate PASS (100/100) — cycle 2 refute pass; cycle-1 findings verified fixed; 4 low advisories | qa-task |
 <!-- change-log-end -->
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-22
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.139.qa.1.change-log-engine-reachability.md](./task.139.qa.1.change-log-engine-reachability.md)
-- **Gate File**: [task.139.gate.1.change-log-engine-reachability.yml](./task.139.gate.1.change-log-engine-reachability.yml)
+- **Full Report**: [task.139.qa.2.change-log-engine-reachability.md](./task.139.qa.2.change-log-engine-reachability.md) (cycle 1: [qa.1](./task.139.qa.1.change-log-engine-reachability.md))
+- **Gate File**: [task.139.gate.2.change-log-engine-reachability.yml](./task.139.gate.2.change-log-engine-reachability.yml) (cycle 1: [gate.1](./task.139.gate.1.change-log-engine-reachability.yml) CONCERNS 80)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3891 (ci:fast) incl. 3 new
+- **Tests Executed**: 3892 (ci:fast) incl. 4 new
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (2 medium code-review findings promoted: CR-1, CR-2)
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-CR-1: contract paragraph claims skills outside the alternation lack the engine (false for 24 transitive carriers). CR-2: `RUNS_ENGINE` misses the line-wrapped phrase at `develop/SKILL.md:589–590`. Advisory: CR-3 (single-skill form), CR-4 (stale "five" counts).
+Cycle 1 (CONCERNS 80): CR-1 contract wording, CR-2 wrap-tolerant phrase regex — both fixed in `9f928818` and verified in cycle 2. Cycle 2 (PASS 100, refute pass): four low/medium-confidence advisories (C2-CR-1..4: site-count assertion, "only declaration", 38-file provenance figure, literal filename) recorded as future recommendations.
 
 ## Progress Tracking
 
@@ -316,8 +317,8 @@ CR-1: contract paragraph claims skills outside the alternation lack the engine (
 - [x] Phase 2: spell the alternation and bundle
 - [x] Phase 3: prove the documented call runs from the bundle
 - [x] Phase 4: docs, CHANGELOG, observation
-- [x] QA: `task.139.qa.1.change-log-engine-reachability.md`
-- [x] Gate: `task.139.gate.1.change-log-engine-reachability.yml` (CONCERNS)
+- [x] QA: `task.139.qa.2.change-log-engine-reachability.md` (cycle 1: qa.1)
+- [x] Gate: `task.139.gate.2.change-log-engine-reachability.yml` (PASS; cycle 1 gate.1 CONCERNS)
 
 ## References
 
