@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.50.0] - 2026-09-22
+
 ### Added
 
 - **`security-probe.mjs` — a `shell-fn:<path>#<function>` entry form and a `--fake-gh <dir>`
