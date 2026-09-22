@@ -116,6 +116,16 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
   entries, so the reconstructed count is 5 and `qa_max_cycles` is **7**, not a literal `5 + 2`.
   Lock restored from the halt snapshot by `grant-qa-cycles.sh`; `qa_phase` set to `5a`.
   Cycle 6's remit is bounded: review the four cycle-5 fixes.
+- Cycles 6–7 (granted) ran and are recorded in the QA Iteration History. Budget spent again at 7;
+  cycle 7's three fixes are ungated. A third process failure of my own is recorded with the other
+  two: the cycle-6 commit wrote a Change Log row dated 2026-09-23 (the date rolled over mid-run) and
+  left frontmatter `updated: 2026-09-22`; CI went red on the corpus guard while the local `npm test`
+  — run before that edit — was green. **Same ordering as the cycle-4 failure**, a different guard,
+  which is why it was appended as a recurrence to the existing observation rather than logged as a
+  new one. Repaired with `change-log.js`'s `bumpUpdated()`, which exists so the date is not set by
+  hand.
+- Filed separately during cycle 6: **bug.16** — the `main` guard is a silent no-op under a symlink,
+  at six sites across five skills. Pre-existing; it explains two confusing probes in this loop.
 
 ---
 
@@ -128,6 +138,29 @@ _Problems encountered and how they were resolved or escalated._
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### Granted cycles 6–7 (2026-09-23)
+
+| Cycle | Gate | Findings | HIGH | Where the defect came from |
+| :--- | :--- | :--- | :--- | :--- |
+| 6 | CONCERNS 80 | 4 | 0 | all 4 from cycle 5's fixes |
+| 7 | CONCERNS 85 | 3 | 0 | all 3 from cycle 6's fixes |
+
+Budget spent at 7. **17 defects found and closed; 34 mutations, none survived.** HIGH by gate across
+the whole loop: 1, 1, 1, 0, 1, 0, 0.
+
+The two turning points were both **structural** — they replaced something that has to be maintained
+with something that holds itself, and each came only after the cheaper corrections had been tried
+and failed:
+
+- **Cycle 3**: an enumeration of the flags that write the note cell → the operation *append, never
+  replace*. Two enumerations had each missed a door.
+- **Cycle 7**: an alignment between the reader that publishes a bug link and the checker that
+  validates one → **one shared predicate**. Cycle 6 had fixed the divergence on one axis and
+  reopened it on another.
+
+Cycle 7's fixes are ungated, as cycle 5's were. The difference is the trend: no HIGH for three
+gates, and the mechanisms that produced the earlier HIGHs are gone rather than patched.
 
 ### Loop Escalation — QA_MAX_CYCLES reached (2026-09-22)
 
