@@ -4,7 +4,7 @@
 > **Canonical spec.** Consumed by `create-{prd,epic,story,task}`, `review-{prd,epic,story,task}`,
 > `edit-{epic,story}`, `correct-course`, `develop`, `qa-{story,task}`, `finalise`, and the six
 > `sync-{jira,github}-{epic,story,task}` skills. Implemented by
-> [`change-log.js`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/change-log.js).
+> [`change-log.js`](change-log.js).
 
 A PRD, epic, story, or task document carries a **Change Log** section: an append-only table
 recording what changed about the document, when, and who changed it. It is the document's own
@@ -190,7 +190,7 @@ pairs and the insertion point; a writing skill calls it:
 ```bash
 command node -e '
   const fs = require("fs");
-  const CL = require("./.agents/skills/{skill}/references/change-log.js");
+  const CL = require("./.agents/skills/{develop|finalise}/references/change-log.js");
   const [file, date, version, description, author] = process.argv.slice(1);
   let c = fs.readFileSync(file, "utf8");
   c = CL.upsertChangeLog(c, { date, version, description, author });
@@ -205,6 +205,14 @@ mandatory section when there is none), preserves rows it does not recognise, mig
 same write — the two edits the contract requires to be one. The `version` argument is `""` for
 every machine writer and the bumped minor for `finalise`. A writer that cannot reach the engine
 (no `node`) reports that as a skipped step; it does not fall back to a regex.
+
+The braces are not a placeholder. `{develop|finalise}` is the alternation the bundler follows out of
+shared text (`create-skill` § "A bundled copy nothing reaches is `UNREACHED`"): every skill named
+there ships `references/change-log.js`, and no other does — a bare `{skill}` names no skill and is
+skipped by design, which is how `develop` came to instruct this call without carrying the module
+(task.139, obs #152). `tests/change-log-engine-reachability.test.js` keeps the list equal to the
+skills whose prose says "through `change-log.js`". **Name your skill here when you add a writer**,
+and substitute your own name for the group when you run it.
 
 ## Exclusions
 
@@ -257,7 +265,7 @@ anchor.
 
 ## See also
 
-- [`change-log.js`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/change-log.js) — the engine implementing this spec
+- [`change-log.js`](change-log.js) — the engine implementing this spec
 - [`open-knowledge-format.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/open-knowledge-format.md) — `updated` ≡ OKF `timestamp`
 - [`tracker-card-summary.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/tracker-card-summary.md) — why cards never carry the log
 - [`sign-off.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/sign-off.md) — the structural precedent for a config-gated document section
