@@ -239,7 +239,7 @@ Full categorised index below.
 | `ensure-task-github-issue` | Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding GitHub issue. Creates the issue if… |
 | `ensure-task-jira-issue` | Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding Jira issue. Creates it if missing… |
 | `loop-supervisor` | Run an unattended sequential loop where every iteration gets a fresh Claude process and a fresh context, and each outcome is classified from filesystem post-conditions… |
-| `qa-next` | UAT loop orchestrator: deterministically selects the next untested story from the owner's UAT tracker (via scripts/uat-status.mjs --next), resolves its acceptance criteria to executable checklist items… |
+| `qa-next` | UAT loop orchestrator: selects the next untested user function from the owner's UAT registry (scripts/uat-status.mjs --next) — one row per thing a person does with… |
 | `review-bug` | Bug report review with two modes. Interactive mode (default): asks batched clarifying questions to resolve missing reproduction detail, wrong severity/priority, and linkage gaps — use… |
 | `review-code` | Standalone adversarial diff code review of the working tree or a pull request — surfaces correctness bugs (logic, null/async/race, API misuse, broken invariants) and reuse/simplification/efficiency… |
 | `review-pr` | Reviews a pull request as a claim — does this change deliver what its story or task promised, and is the evidence behind it real?… |

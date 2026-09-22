@@ -8,13 +8,13 @@ updated: {{date}}
 
 # QA Surface Checklist — {{letter}}. {{surfaceTitle}}
 
-Executable items for this surface, grouped by story. Each item is **Persona · Steps · Expected · Automated by**. *Expected* is an observation a stranger could confirm. *Automated by* names the spec that already exercises it, or `manual only` — the `manual only` items are the ones only a human ever checks.
+Executable items for this surface, grouped by **function** (the rows of `uat-registry.md`). Each item is **Persona · Steps · Expected · Automated by**. *Expected* is an observation a stranger could confirm. *Automated by* names the spec that already exercises it, or `manual only` — the `manual only` items are the ones only a human ever checks.
 
 Results are never recorded here — they go in `runs/<date>-<env>-<id>.md`.
 
-## {{id}} — {{storyTitle}}
+## {{letter}}.{{n}} — {{Function}}
 
-### {{letter}}.{{id}}.1 {{item title}}
+### {{letter}}.{{n}}.1 {{item title}}
 
 - **Persona:** {{account or "none (signed out)"}}
 - **Steps:** {{numbered, concrete: route, click, input}}

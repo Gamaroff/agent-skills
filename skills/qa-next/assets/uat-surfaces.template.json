@@ -1,5 +1,5 @@
 {
-  "$comment": "Story→surface placement for the UAT tracker. Surfaces are the sections of the tracker (letters must be unique capitals). epicSurface maps an epic number to a surface letter; storySurface overrides one story; stories in excludedPrds (directory names under the stories root) are not part of the product to accept. defaultSurface catches unmapped epics. toolPath is how the tracker's own instructions name this tool.",
+  "$comment": "Surface map for the UAT registry. Surfaces are the registry's sections (letters must be unique capitals) and the first segment of every function id. epicSurface maps an epic number to a surface letter and storySurface overrides one story — used by --coverage to suggest where an uncovered story's function belongs. storyNa lists accepted stories with nothing a user could accept (scaffolding, CI, gateways), each with a one-line reason; every other accepted story must be named in some function's Stories cell. Stories in excludedPrds (directory names under the stories root) are not part of the product. uatSpecPattern (a regex on repo-relative paths) says which Automated-by specs are the real-stack lane /qa-next may run against the environment as evidence. toolPath is how the registry's own instructions name this tool.",
   "toolPath": ".agents/skills/qa-next/scripts/uat-status.mjs",
   "excludedPrds": [],
   "defaultSurface": "Z",
@@ -9,5 +9,7 @@
     { "letter": "Z", "title": "Unmapped — place these rows" }
   ],
   "epicSurface": { "1": "A" },
-  "storySurface": {}
+  "storySurface": {},
+  "storyNa": {},
+  "uatSpecPattern": "^apps/portal/e2e/(smoke|uat)/"
 }

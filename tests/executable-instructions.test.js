@@ -47,6 +47,10 @@ const CONSUMER_PROVIDED_NPM_SCRIPTS = new Set([
   "lint",
   "test:e2e:api",
   "test:e2e:setup",
+  // The consumer's real-stack UAT lane that qa-next runs against its environment
+  // (`qaNext.uatCommand`, illustrated in the skill's README and the config
+  // reference). This repo has no app to point it at.
+  "test:e2e:uat",
   "test:local",
   "test:local:coverage",
   "test:local:e2e",
