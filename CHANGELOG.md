@@ -44,7 +44,16 @@ All notable changes to this project will be documented in this file. Format foll
   imposes no note requirement on an accepted row, so the loss would be silent.
   **Migration**: to move an accepted row deliberately, run `--set <id> untested --note "<why>"`
   first, then the verdict you want. `qa-next`'s own Steps 2 and 4 are the only callers in this
-  repository.
+  repository. **An `untested` demotion is not a verdict and is not kept** — it is the documented way
+  to take an `✅` back, and it moves the row.
+
+  **The owner's sign-off is never lost.** On a kept `✅` the `Notes / bug` cell is **appended to**,
+  never replaced, whichever flag writes it, so a `blocked` note or a bug link joins the
+  `accepted <date> — <why>` rather than erasing it. `--clear-note` is refused there — clearing is
+  the one operation append cannot express. This is stated as an operation rather than as a list of
+  guarded flags deliberately: two earlier attempts enumerated the ways into that cell and each
+  missed one (`state === "pass"` missed `blocked`/`na`; `clear || note` missed `--bug`), because an
+  enumeration has to be re-checked every time a flag is added and nothing forces that re-check.
 
 - **`release.sh` warns on branches carrying commits not on `develop`, and the release-prep PR is now
   the only documented promotion path.** Every other pre-release check asks whether what *is* on the

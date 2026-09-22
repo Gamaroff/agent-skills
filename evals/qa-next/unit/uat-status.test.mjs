@@ -936,23 +936,46 @@ test("CLI: only a fail moves an ✅ accepted row — pass, blocked and n/a keep 
   assert.equal(run(root, "--check").code, 0);
 
   // blocked and n/a on ✅ — the rule is over the verdict set, not over "pass". These two MANDATE
-  // --note, which is the door the sign-off guard was missing: refusing --clear-note alone left the
-  // same cell overwritable by the two verdicts Step 2's early exits write.
+  // --note, so a guard that REFUSED --note here made them impossible against an accepted row,
+  // which SKILL.md and the README both say is allowed. The kept path appends instead: the verdict
+  // gets its say and the sign-off survives.
   for (const verdict of ["blocked", "na"]) {
     const r = run(root, "--set", "D.2", verdict, "--note", `env: ${verdict}`);
-    assert.equal(
-      r.code,
-      2,
-      `${verdict} --note must not overwrite the sign-off cell`,
-    );
-    assert.match(r.out, /sign-off note cannot be cleared or overwritten/);
+    assert.equal(r.code, 0, `${verdict} is legitimate against an accepted row`);
+    assert.match(r.out, /✅ accepted \(kept\)/);
     assert.equal(state()[8], STATES.accepted);
-    assert.equal(
+    assert.ok(
+      state()[10].startsWith(acceptedNote),
+      `the owner's sign-off survives a ${verdict} re-run — appended to, never replaced`,
+    );
+    assert.match(
       state()[10],
-      acceptedNote,
-      `the owner's sign-off survives a ${verdict} re-run byte-identical`,
+      new RegExp(`env: ${verdict}$`),
+      "and the verdict's note is there too",
     );
   }
+  assert.equal(run(root, "--check").code, 0);
+
+  // THE DOOR THE ENUMERATION MISSED. --bug also writes that cell, took the kept branch, and
+  // replaced the sign-off with a bug link while --check stayed green. Under the append rule no
+  // flag can reopen it, so this leg is the property test for every future one.
+  const withBug = run(
+    root,
+    "--set",
+    "D.2",
+    "pass",
+    "--run",
+    "runs/D.2/r1.md",
+    "--bug",
+    "docs/bugs/bug.1.x.md",
+  );
+  assert.equal(withBug.code, 0);
+  assert.match(withBug.out, /✅ accepted \(kept\)/);
+  assert.ok(
+    state()[10].startsWith(acceptedNote),
+    "--bug appends to the sign-off rather than replacing it",
+  );
+  assert.match(state()[10], /bug\.1\.x/);
   assert.equal(run(root, "--check").code, 0);
 
   // untested — the DEMOTION, not a verdict. It must move the row: it is the documented way to
@@ -1100,8 +1123,8 @@ test("CLI: --clear-note empties Notes / bug, and is refused where clearing would
   assert.equal(refused.code, 2);
   assert.match(
     refused.out,
-    /sign-off note cannot be cleared or overwritten/,
-    "the refusal now names both doors into that cell, not only --clear-note",
+    /--clear-note cannot empty an accepted row's sign-off note/,
+    "clearing is the one operation append cannot express, so it stays refused",
   );
   assert.equal(notes("D.2"), signOff, "byte-identical — nothing was written");
   assert.equal(run(root, "--check").code, 0);
@@ -1282,4 +1305,35 @@ test("every command that takes a row id accepts it case-insensitively (TASK-141-
   );
   // Non-vacuity: the loop above is only evidence if it actually ran every command.
   assert.equal(ID_TAKING_COMMANDS.length, 6);
+});
+
+test("a missing id is a usage error on every id-taking command, not a missing row (TASK-141-CR3-4)", () => {
+  // The same population as the case-insensitivity test, asserted for the other boundary property.
+  // `requireIdValue` was applied to the two readers only, so `--accept` with no id produced the
+  // subjectless `uat-status: : no registry row` and `--accept --force` reported
+  // `--FORCE: no registry row` — a flag read as an id. Enumerating the population is what closes it.
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  const bare = [
+    ["--item"],
+    ["--run-path"],
+    ["--set"],
+    ["--items"],
+    ["--automated"],
+    ["--accept"],
+    ["--accept", "--force"],
+  ];
+  const wrong = [];
+  for (const argv of bare) {
+    const { code, out } = run(root, ...argv);
+    if (code !== 2 || /no registry row/.test(out))
+      wrong.push(`${argv.join(" ")} (${code})`);
+  }
+  assert.deepEqual(
+    wrong,
+    [],
+    "a missing or flag-shaped id is exit 2 everywhere — 'you named no row' is never 'no such row'",
+  );
+  assert.equal(bare.length, 7);
 });

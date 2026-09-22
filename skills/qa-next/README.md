@@ -96,6 +96,6 @@ A function's verdict answers one question: did its checklist items hold. Most of
 | `✅ accepted` | **owner** | the feature is the one that was wanted              | ✅ |
 | `➖ n/a`      | qa-next / owner | reachable in no environment (retired, or a seam only) | ✅ |
 
-`✅` is the owner's, and a re-run does not take it back: a `pass`, a `⏸ blocked` or a `➖ n/a` against an accepted row leaves `✅` in place and updates only **Last run** and **Notes / bug** (the tool prints `(kept)`). Only a `❌ fail` moves an accepted row, and it moves it from any state. To demote one deliberately, `--set <id> untested --note "<why>"` first.
+`✅` is the owner's, and a re-run does not take it back: a `pass`, a `⏸ blocked` or a `➖ n/a` against an accepted row leaves `✅` in place and updates **Last run**, **appending** whatever the verdict has to say to **Notes / bug** rather than replacing it — so the `accepted <date>` sign-off is never lost (the tool prints `(kept)`). `--clear-note` is refused on that row for the same reason. Two things move an accepted row, and only two: a `❌ fail`, from any state, and the owner's explicit `--set <id> untested --note "<why>"` demotion.
 
 `--check` enforces: 🟡/✅/❌ carry a run link that resolves; ❌ carries a bug link that resolves; ⏸/➖ carry a note; every row id matches its section letter and its header's cell count; every `Stories` id is a real story. Uncovered accepted stories and referenced non-accepted stories are warnings, not errors — the loop keeps running while the owner catches the registry up.

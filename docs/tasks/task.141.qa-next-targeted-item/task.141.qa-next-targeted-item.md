@@ -664,48 +664,48 @@ historical naming.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: FAIL (cycle 3) — fixes applied, awaiting cycle 4
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-22
-**Quality Score**: 70/100
+**Quality Score**: 65/100
 **Gate Decision**: FAIL
 
 ### QA Report
 
-- **Full Report**: [task.141.qa.2.qa-next-targeted-item.md](./task.141.qa.2.qa-next-targeted-item.md)
-- **Gate File**: [task.141.gate.2.qa-next-targeted-item.yml](./task.141.gate.2.qa-next-targeted-item.yml)
+- **Cycle 3**: [task.141.qa.3.qa-next-targeted-item.md](./task.141.qa.3.qa-next-targeted-item.md) · [task.141.gate.3.qa-next-targeted-item.yml](./task.141.gate.3.qa-next-targeted-item.yml)
+- **Cycle 2**: [task.141.qa.2.qa-next-targeted-item.md](./task.141.qa.2.qa-next-targeted-item.md) · [task.141.gate.2.qa-next-targeted-item.yml](./task.141.gate.2.qa-next-targeted-item.yml)
 - **Cycle 1**: [task.141.qa.1.qa-next-targeted-item.md](./task.141.qa.1.qa-next-targeted-item.md) · [task.141.gate.1.qa-next-targeted-item.yml](./task.141.gate.1.qa-next-targeted-item.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3933 (0 failures, 1 skipped)
+- **Tests Executed**: 3935 (0 failures, 1 skipped); qa-next suite 32
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1 HIGH, 1 MEDIUM, 1 LOW new this cycle; 2 bugs fixed and verified
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **CI**: all five checks green on the pushed branch
 
 ### Bug Resolution
 
-| Bug | Severity | Cycle | Status | Verification |
-| :--- | :--- | :--- | :--- | :--- |
-| TASK-141-BUG-1 | HIGH | 1 | **Verified fixed** | Full 6×5 verdict-by-prior-state matrix executed; mutation-proved |
-| TASK-141-BUG-2 | MEDIUM | 1 | **Verified fixed** | Agreement test confirmed to catch drift in both directions; mutation-proved |
-| TASK-141-BUG-3 | HIGH | 2 | Fixed, awaiting QA | `/qa-next D.2` in the description; `quick_validate.py` green |
-| TASK-141-BUG-4 | MEDIUM | 2 | Fixed, awaiting QA | Both SKILL.md sentences name the demotion beside the fail |
-| TASK-141-BUG-5 | MEDIUM | 2 | Fixed, awaiting QA | `--note` refused on a kept `✅`, not only `--clear-note` |
-| TASK-141-BUG-6 | MEDIUM | 2 | Fixed, awaiting QA | Id normalised in `updateRow`; a test enumerates all six id-taking commands |
+| Bug | Sev | Cycle | Status |
+| :--- | :--- | :--- | :--- |
+| BUG-1 `untested` kept on an accepted row | HIGH | 1 | **Verified fixed** (6×5 matrix) |
+| BUG-2 template named the colliding evidence path | MED | 1 | **Verified fixed** (agreement test, both directions) |
+| BUG-3 angle brackets fail `validate` | HIGH | 2 | **Verified fixed** (CI `validate` green) |
+| BUG-4 SKILL.md said only a fail moves `✅` | MED | 2 | **Verified fixed** |
+| BUG-5 sign-off overwritable via `--note` | MED | 2 | Superseded by the append rule |
+| BUG-6 lowercase id rejected by four commands | MED | 2 | **Verified fixed** (population test) |
+| BUG-7 `blocked`/`na` impossible on an accepted row | HIGH | 3 | Fixed, awaiting QA |
+| BUG-8 the guard omitted `--bug` | MED | 3 | Fixed, awaiting QA |
 
-### Key Findings
+### Key Findings — the pattern, not the instances
 
-- **TASK-141-BUG-3 (HIGH)** — CI `validate` refuses angle brackets in a `description`, and
-  `/qa-next <id>` has them. `npm run validate` is the one command in the coding standards that
-  `npm test` does not subsume and that no pipeline gate runs.
-- **TASK-141-BUG-4 (MEDIUM)** — the cycle-1 fix made two `SKILL.md` sentences false: both still say
-  only a `fail` moves an accepted row, when `untested` now does too. Found by the refute pass's
-  documentation-transition probe, which the diff could not show.
-- **CR2-3 (LOW)** — `--run-path` creates `runs/<id>/` before validating `--env`, so a refused call
-  still writes a directory.
-- **Cycle 2's review was performed inline**: the dispatched refute reviewer was killed at ~12 minutes
-  past its budget. The independence cycle 2 is supposed to supply was lost and is recorded as such.
+Three cycles produced the same shape: each guard on the sign-off cell **enumerated the doors it knew
+about** and missed one. Cycle 1's guard missed `blocked`/`na`; cycle 2's missed `--bug`, and closed
+`blocked`/`na` entirely in the process — which SKILL.md and the README both still said was allowed.
+
+Cycle 3 stopped enumerating. **On a kept `✅` the note cell is appended to, never replaced** — by
+construction, for every flag present and future. `--clear-note` stays refused, because clearing is
+the one operation append cannot express. That also makes the documentation true exactly as already
+written, rather than requiring the prose to chase the code a fourth time.
 
 ---
 
@@ -721,6 +721,7 @@ historical naming.
 | 2026-09-22 |         | Phases 1–5 implemented; status → ready-for-review | develop-task |
 | 2026-09-22 |         | QA gate FAIL (70/100) — 4 findings (1 HIGH, 1 MEDIUM, 2 LOW); status → in-progress | qa-task |
 | 2026-09-22 |         | QA cycle 2 refute pass — gate FAIL (70/100); 2 cycle-1 bugs verified fixed, 3 new findings | qa-task |
+| 2026-09-22 |         | QA cycle 3 — gate FAIL (65/100); sign-off guard replaced by an append rule rather than a fourth enumeration | qa-task |
 
 <!-- change-log-end -->
 

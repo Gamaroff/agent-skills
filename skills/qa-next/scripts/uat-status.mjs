@@ -840,7 +840,10 @@ function linkTo(opts, repoRelPath) {
 
 function cmdSet(opts) {
   const i = opts.args.indexOf("--set");
-  const [id, state] = [opts.args[i + 1], opts.args[i + 2]];
+  const [id, state] = [
+    requireIdValue("--set", opts.args[i + 1]),
+    opts.args[i + 2],
+  ];
   if (!STATES[state])
     die(`state must be one of ${Object.keys(STATES).join("|")}`);
   if (state === "accepted") die("use --accept for owner sign-off");
@@ -873,17 +876,19 @@ function cmdSet(opts) {
     const kept =
       !["fail", "untested"].includes(state) &&
       stateKey(row.state) === "accepted";
-    // The sign-off cell is protected against EVERY door into it, not just one. It is where
-    // --accept stored the owner's "accepted <date> — <why>", and checkRegistry imposes NO note
-    // requirement on an accepted row, so any loss here is silent. Refusing --clear-note alone left
-    // the same loss reachable through --note: `blocked` and `na` MANDATE a note, and they are the
-    // two verdicts the skill's own Step 2 early exits write, so a blocked re-run of an accepted
-    // function would have replaced the owner's sign-off with "flag off in test env" and left
-    // --check green. That is the same shape as guarding `pass` alone — one entry point closed,
-    // the other open — which is the defect the kept rule itself was written to avoid.
-    if (kept && (clear || note))
+    // On a kept ✅ the note cell is APPENDED TO, never replaced — by construction, for every flag
+    // that writes it, present and future. That cell holds the owner's "accepted <date> — <why>",
+    // and checkRegistry imposes no note requirement on an accepted row, so any loss here is
+    // silent. Two earlier attempts guarded it by ENUMERATING the ways in, and each missed one:
+    // `state === "pass"` missed `blocked` and `na`; `clear || note` missed `--bug`, which took the
+    // kept branch and replaced the sign-off with a bug link while --check stayed green. An
+    // enumeration of doors has to be re-checked every time a flag is added and nothing forces
+    // that re-check, so the invariant is expressed as an operation instead: append. `--clear-note`
+    // is still refused here, because clearing is not appending — it is the one flag whose whole
+    // purpose is to empty the cell.
+    if (kept && clear)
       die(
-        "an accepted row's sign-off note cannot be cleared or overwritten — --set <id> untested first to demote it",
+        "--clear-note cannot empty an accepted row's sign-off note — --set <id> untested first to demote it",
       );
     if (!kept) row.state = STATES[state];
     row.keptAccepted = kept;
@@ -896,7 +901,12 @@ function cmdSet(opts) {
     if (bug) parts.push(linkTo(opts, bug));
     if (note) parts.push(note);
     if (clear) row.notes = "";
-    else if (parts.length) row.notes = parts.join(" — ");
+    else if (parts.length)
+      // The append rule above. ` · ` is the separator --accept already uses to join a sign-off to
+      // whatever preceded it, so a kept row reads as one history rather than two conventions.
+      row.notes = kept
+        ? [row.notes, parts.join(" — ")].filter(Boolean).join(" · ")
+        : parts.join(" — ");
     if (state === "untested") {
       row.run = "";
       row.notes = note ?? "";
@@ -906,7 +916,10 @@ function cmdSet(opts) {
 
 function cmdCell(opts, flag, column) {
   const i = opts.args.indexOf(flag);
-  const [id, value] = [opts.args[i + 1], opts.args[i + 2]];
+  const [id, value] = [
+    requireIdValue(flag, opts.args[i + 1]),
+    opts.args[i + 2],
+  ];
   if (!value) die(`${flag} <id> "<value>"`);
   updateRow(opts, id, (row) => {
     if (!(column in row.cells))
@@ -916,7 +929,10 @@ function cmdCell(opts, flag, column) {
 }
 
 function cmdAccept(opts) {
-  const id = opts.val("--accept");
+  // Through the same boundary as every other id-taking command — the population the comment in
+  // updateRow names is only closed if all six go through it, and `--accept --force` reported
+  // `--FORCE: no registry row` while it did not.
+  const id = requireIdValue("--accept", opts.val("--accept"));
   const note = opts.val("--note");
   updateRow(opts, id, (row) => {
     if (stateKey(row.state) !== "pass" && !opts.has("--force"))
