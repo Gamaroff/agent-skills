@@ -2362,7 +2362,11 @@ It qualifies **only** when all of these hold, each verified rather than assumed:
   `.md` the PR changed exits 0. A dead link in a skill or a shared resource is a code finding
   and takes the ordinary halt.
 - The finding record's `severity` is `low`, its `touched` is exactly the document, and the record
-  carries `"documentPath": "{document-path}"`. `filesSummary` stays what is on disk (task § 7 /
+  carries `"documentPath"` — the **repository-root-relative** path (`docs/tasks/…/task.N.x.md`), which
+  is also what `touched` and `mutationProof.test` must read: the evaluator compares against git's
+  root-relative paths and the engine prints its `✖` lines root-relative whatever `--file` received,
+  so take the value from the engine's `--json` output `file` field rather than from an absolute or
+  `./`-prefixed argument (5c run 2, CR-1). `filesSummary` stays what is on disk (task § 7 /
   the story's File List — which, as the norm, omits the document it lives in); the evaluator's
   `inside-files-summary` treats the work item's own document as always in scope when
   `documentPath` names it, so the scope claim is enforced by the engine rather than declared by
@@ -2391,6 +2395,7 @@ cat > .claude/state/finalise-fix-finding.json <<'JSON'
   "commits": 1,
   "touched": ["{every path the fix will change, repo-relative}"],
   "filesSummary": [{every path in the work item's Files Summary (task §7) / File List (story), as strings}],
+  "documentPath": "{repo-root-relative path of the work item document — only for the docs-link clause; omit otherwise}",
   "mutationProof": { "test": "{the test that must go red on revert}", "redOnRevert": false, "run": ".claude/state/finalise-mutation-proof.log" },
   "otherFindingsOpen": [{every medium-or-higher finding in any section, and every other section that is FAIL — as strings; [] when none}]
 }

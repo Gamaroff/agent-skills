@@ -27,7 +27,7 @@ github_issue: 463
 
 `shared/resources/document-change-log.md` § *How a writer appends a row* is the one statement of how a Change Log row is written: a `node -e` one-liner that `require`s `./.agents/skills/{skill}/references/change-log.js`, with the rule **"append through `change-log.js`, never by text search"** and **"a writer that cannot reach the engine reports that as a skipped step; it does not fall back to a regex"**. `develop` (§ Develop Task Workflow step 12, § Develop Story Workflow step 14) tells the agent to run exactly that, and `develop`'s bundle does not contain `change-log.js`. On task.136 (2026-09-21) the call failed `MODULE_NOT_FOUND` and the orchestrator pointed it at `shared/resources/change-log.js` instead — a path that exists only in this repository. In a consumer install the same call fails the same way, and by the contract's own rule the `Implemented — N files, M tests` row is silently skipped on every `/develop` run. Obs #152.
 
-**Scope**: `shared/resources/document-change-log.md` (the one-liner's `{skill}` placeholder becomes the spelled alternation of the skills that run it), `npm run bundle` (which then vendors the engine into those skills), and one parity test that derives the writer population from the prose and asserts each writer ships the engine — with a non-vacuity floor, so a rewording that empties the population goes red rather than green.
+**Scope**: `shared/resources/document-change-log.md` (the one-liner's `{skill}` placeholder becomes the spelled alternation of the skills that run it), `npm run bundle` (which then vendors the engine into those skills), and one parity test that derives the writer population from the prose and asserts each writer ships the engine — with a non-vacuity floor, so a rewording that empties the population goes red rather than green. **Widened at finalise** (owner decision, obs #154) — see § 4 In Scope and § 7 items 6–11: a relative-link engine for work-item documents, its corpus guard, and the review-*/finalise prose that runs it.
 
 **Key deliverables**: (1) The contract's one-liner names the running skills in the `{a|b|c}` alternation form the bundler follows out of shared text (`create-skill` § *A bundled copy nothing reaches is `UNREACHED`*), replacing the bare `{skill}` placeholder that names no skill and is invisible to discovery **by design**. (2) `references/change-log.js` present in `skills/develop/` and any other skill the population names, produced by the bundler, not by hand. (3) `tests/change-log-engine-reachability.test.js`: for every `skills/*/SKILL.md` whose text instructs appending through `change-log.js`, `skills/<skill>/references/change-log.js` exists and is byte-identical (modulo the bundler's header) to the shared source; the population is derived from the prose with a floor of ≥ 2 members (`develop`, `finalise`) so the test cannot pass on an empty set; and the alternation in the contract names every member of that population. (4) A Notes entry naming the eight writers that append rows **by hand** today (`edit-epic`, `edit-story`, `sync-github-epic`, `sync-github-story`, `sync-github-task`, `enforce-standards`, `review-epic`, `review-task`) as the migration seam this task deliberately does not take.
 
@@ -98,7 +98,7 @@ The population and the alternation are two enumerations of one fact and the test
 ✅ `skills/develop/SKILL.md` — no wording change needed if the phrase already matches the derivation; if the derivation phrase is changed, both writers change in the same commit
 ✅ `package.json` — no change needed: `tests/*.test.js` is already in the `npm test` glob (verify, do not assume — obs: a suite runs nowhere until its glob is listed)
 ✅ CHANGELOG [Unreleased]; obs #152 → `actioned` with the PR
-✅ **Scope widened at finalise (owner decision, 2026-09-22, obs #154):** `shared/resources/doc-links.js` — a document's relative Markdown links resolve from its own directory against the tracked tree (CLI `--file --json`, exit 0/1/2, `✖`/`FAIL` red markers) — bundled into `review-task`, `review-story`, `finalise`; `shared/resources/tests/doc-links.test.mjs` (fixture tests + a work-item corpus guard with a 2-entry KNOWN ratchet); `review-task` / `review-story` check 2 run it; `finalise` Step 8a admits a docs-link-check-only CI red on the work item's own document as a Docs-section finding. Motivation: this task's own § 3 quoted `develop/SKILL.md` with its relative link and reached CI red after the whole pipeline.
+✅ **Scope widened at finalise (owner decision, 2026-09-22, obs #154):** `shared/resources/doc-links.js` — a document's relative Markdown links resolve from its own directory against the tracked tree (CLI `--file --json`, exit 0/1/2, `✖`/`FAIL` red markers) — bundled into `review-task`, `review-story`, `finalise`; `shared/resources/tests/doc-links.test.mjs` (fixture tests + a work-item corpus guard with a 2-entry KNOWN ratchet); `review-task` / `review-story` check 2 run it; `finalise` Step 8a admits a docs-link-check-only CI red on the work item's own document as a Docs-section finding, and the fix-and-recheck evaluator (`shared/resources/finalise-fix-and-recheck.mjs` + preconditions) gains `documentPath` so `inside-files-summary` treats the work item's own document as in scope by construction. Motivation: this task's own § 3 quoted `develop/SKILL.md` with its relative link and reached CI red after the whole pipeline.
 
 ### Out of Scope
 
@@ -184,6 +184,7 @@ None — API stable. The engine's behaviour and interface do not change; two ski
 8. ✅ `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md` — check 2 link-resolution bullet
 9. ✅ `skills/finalise/SKILL.md` — Step 8a docs-link clause; Step 6 `FAILURE` row pointer
 10. ✅ this document — line 63 quotation → code span; "41" → 42
+11. ✅ `shared/resources/finalise-fix-and-recheck.mjs`, `shared/resources/finalise-fix-and-recheck-preconditions.json`, `shared/resources/tests/finalise-fix-and-recheck.test.mjs` (+ bundled `skills/finalise/references/` copies) — `documentPath` admission for `inside-files-summary`, constrained to a task/story/epic/bug document under `docs/`
 
 ### Files to Delete
 
@@ -206,6 +207,7 @@ None.
 ### Contract Tests
 
 - `npm run bundle:check` — 0 problems; the new copy is reached (not `UNREACHED`) because the alternation names `develop`.
+- **Widening (obs #154)**: `shared/resources/tests/doc-links.test.mjs` — one fixture per QA finding (fence rules, CRLF, code spans, link forms, cwd independence, tracked-vs-disk, CLI exit codes) plus a corpus guard over every task/story/epic document with a two-entry `KNOWN` ratchet; `shared/resources/tests/finalise-fix-and-recheck.test.mjs` — `documentPath` admits one path and only a work-item document.
 - `tests/bundle-transitive.test.js`, `tests/bundle-check-mode.test.js` — unchanged and green (the alternation form is the one they already cover).
 
 ### Performance Tests
@@ -238,6 +240,10 @@ Not applicable.
 ### Migration
 
 - [x] CHANGELOG entry; obs #152 `actioned`; § Notes names the eight hand-appending writers as the next task
+
+### Widening (obs #154 — owner decision at finalise)
+
+- [x] SC8: `node .agents/skills/<skill>/references/doc-links.js --file <work-item document>` exits 1 with one `✖ file:line → target` per dead relative link (or per fence that never closes) and 0 otherwise, resolving from the document's own directory against the tracked tree; the corpus guard in `doc-links.test.mjs` is green with its two-entry `KNOWN` ratchet; `review-task` / `review-story` check 2 and `finalise` Step 8a cite the engine by its root-anchored path; the evaluator admits `documentPath` only for a work-item document (gate.5 evidence: 15/15 + 23/23 tests, `ci:fast` green, all five QA cycles' closures verified by execution)
 
 ---
 
@@ -303,6 +309,7 @@ None.
 | 2026-09-22 |  | QA gate CONCERNS (80/100) — cycle 4: all cycle-3 findings verified closed; 1 promoted (CRLF handling), 7 advisory | qa-task |
 | 2026-09-22 |  | QA findings fixed (cycle 4) — CRLF normalisation, documentPath constrained to work-item documents, opener lookbehind, indented fences, ref-def/escaped-bracket guards, repo once, operand errors; 1 iteration | qa-fix |
 | 2026-09-22 |  | QA gate CONCERNS (90/100, no open entry) — cycle 5: cycle-4 closures verified; Maintainability reservation on the two artifact deny-lists; 4 low advisories | qa-task |
+| 2026-09-22 |  | Scope widened (owner decision, obs #154; 5022ad02) — doc-links engine + corpus guard, review-task/review-story check 2, finalise Step 8a docs-link clause, evaluator documentPath; line 63 → code span. Recorded here after 5c run 2 (PC-3) | develop-next |
 <!-- change-log-end -->
 
 ## QA Testing Results
@@ -342,13 +349,13 @@ DoD sections: Acceptance Criteria ✅ 7/7 · Security ✅ · Compliance — N/A 
 ### Missing Criteria:
 
 1. **CI green on the final head:**
-   - [ ] `docs-link-check` is red on `88c8a243`: `task.139.change-log-engine-reachability.md:63` quotes `skills/develop/SKILL.md` verbatim, and the quotation's skill-relative link `(references/document-change-log.md)` resolves to nothing from `docs/tasks/` (`Status: 400`). Present since `c99e09d7`; the checker runs on changed files only, and this PR changed the file.
+   - [x] `docs-link-check` was red on `88c8a243` — fixed in `5022ad02`: `task.139.change-log-engine-reachability.md:63` quotes `skills/develop/SKILL.md` verbatim, and the quotation's skill-relative link `(references/document-change-log.md)` resolves to nothing from `docs/tasks/` (`Status: 400`). Present since `c99e09d7`; the checker runs on changed files only, and this PR changed the file.
 
 ### Next Steps:
 
-- [ ] Render the quoted link as a code span (or drop the link target from the quote) on line 63
-- [ ] Optionally fold in 5c PC-1 (three "41" → 42 mentions) in the same commit
-- [ ] Push; wait for a green run; re-run `/finalise`
+- [x] Render the quoted link as a code span on line 63 (`5022ad02`)
+- [x] Fold in 5c PC-1 (three "41" → 42 mentions) in the same commit (`5022ad02`)
+- [ ] Push; wait for a green run; re-run `/finalise` — the fresh run replaces this section
 
 **Estimated Effort:** Small (< 15 minutes)
 
@@ -386,6 +393,8 @@ DoD sections: Acceptance Criteria ✅ 7/7 · Security ✅ · Compliance — N/A 
 - Pre-fix shape (copy moved aside): `Error: Cannot find module './.agents/skills/develop/references/change-log.js'` — the task.136 Step 3 failure, reproduced.
 - Post-fix: exit 0; appended `| 2026-09-22 |  | probe — task.139 Phase 3 | develop |` inside the marker block and bumped `updated: 2026-09-22`.
 
+**Scope widened at finalise (owner decision, obs #154, `5022ad02`)** — the first `/finalise` run halted on a CI `docs-link-check` red: § 3 of this document quoted `develop/SKILL.md` verbatim, relative link included, and nothing before CI resolved links from the document's own directory. The owner chose to land the fix on this PR: `shared/resources/doc-links.js` (bundled into review-task, review-story, finalise), its test file with a work-item corpus guard, the review-* check-2 bullet, the finalise Step 8a docs-link clause, and `documentPath` in the fix-and-recheck evaluator. QA cycles 3–5 reviewed the addition (gate.3 CONCERNS 50 → gate.4 CONCERNS 80 → gate.5 CONCERNS 90 with no open entry); the cycle-by-cycle fixes are recorded below.
+
 **QA fix cycle 1 (2026-09-22)** — gate.1 CONCERNS (80): CR-1 contract paragraph reworded (the alternation names the skills whose *prose* runs the one-liner; others may carry the engine transitively and that is incidental) and re-bundled into the 42 copies; CR-2 `RUNS_ENGINE` → `/through\s+\`change-log\.js\`/` with a new test "the phrase matcher sees the instruction across a line wrap" (fixture self-check + develop/SKILL.md must match at both its sites) — mutation-proven: literal-space regex reds it; CR-3 `ALTERNATION_RE` accepts the bundler's literal single-skill form (braces stripped when present); CR-4 the five "five" mentions → eight. `ci:fast` 3891/3891; `bundle:check` 0 problems.
 
 **QA fix cycle 3 (2026-09-22)** — gate.3 CONCERNS (50) on the obs #154 addition. Engine rewritten (`shared/resources/doc-links.js`): repository-root anchoring via `git rev-parse --show-toplevel` + `ls-files --full-name` with realpath on both ends (CR-2 — from a skill directory the task doc reported 5 false dead links); CommonMark fences — a backtick opener with a backtick in its info string is a code span, closers are bare and at least as long, and a fence open at EOF is a **finding** (CR-1 — task.42's document parsed to 0 links); code spans stripped per paragraph so a wrapped quotation is code but an unmatched run (the `\`\`` on line 85 of this very document) cannot pair 291 lines later (CR-7); reference definitions, HTML `href`/`src`, nested brackets, spaced/quoted/parenthesised targets (CR-6); `--file`/`--root` without an operand → usage 2 (CR-9); `process.exitCode`, never `exit()` (TQ-1). Prose: the review-task/review-story blocks use the `{resolved … path}` placeholder and the root-anchored `.agents/skills/<skill>/references/doc-links.js` form (CR-3, CR-4); finalise's 8a clause points at itself from "When this step applies" and the record carries `documentPath`, which the evaluator's `inside-files-summary` now treats as in scope by construction — one path only (CR-5; mutation-proven). Tests: 11 fixtures (one per finding) + corpus guard keyed on `file:target` (CR-10), hermetic non-repo fixture via `GIT_CEILING_DIRECTORIES` (CR-8). `ci:fast` 3903/3903; `bundle:check` 0 (a `.json` copy the bundler refused to overwrite as AMBIGUOUS was deleted and re-bundled); `check:generated` clean.
@@ -399,3 +408,4 @@ DoD sections: Acceptance Criteria ✅ 7/7 · Security ✅ · Compliance — N/A 
 - QA artifacts land beside this file: `task.139.qa.[N].*.md`, `task.139.bug.[N].*.md`, `task.139.gate.[N].*.yml`.
 - **Migration seam, deliberately not taken here**: `edit-epic`, `edit-story`, `sync-github-epic`, `sync-github-story` and `sync-github-task` instruct "Append a Change Log row" without naming the engine — hand appends against a contract that forbids text-search appends (task.42/43 landed a row inside a fenced example that way). The review (2026-09-22) re-ran `grep -n 'Append a Change Log row' skills/*/SKILL.md` and found three more sites of the same shape: `enforce-standards` (§ documents-only branch) and `review-epic` (Step 7), neither of which carries the engine; and `review-task` (Steps 8.5 and 9), which carries it transitively via `report-lint.js` / `jira-sync.js` and so is a phrase gap rather than a reachability gap. (The `sync-jira-*` matches are engine-backed through `jira-sync.js`.) Moving those eight onto the one-liner is one task (primitive → migration: this task ships the reachable primitive, that one moves the call sites and then joins the alternation). File it once this lands.
 - Independent of task.140 (shell-fn sentinels).
+- **Follow-up from the widening (obs #154), for the next task**: C5-CR-2 one exported "is a work-item document" predicate (basename stem == parent directory name) shared by the evaluator and the corpus guard; C5-CR-1 container-indented fences vs indented code blocks; C5-CR-3 double-backslash escapes; C5-CR-4 bug reports in the ratchet; 5c CR-2 the engine for `review-epic` / `review-prd` / `review-bug` (the population "review skills for documents CI link-checks" is not yet named anywhere — excluded here only because the pipeline's work items are tasks and stories); 5c CR-3 an `untracked: true` annotation on a ✖ whose target exists on disk; plus the cycle-2 advisories on the parity test and the first 5c's ALTERNATION_RE / identity notes.
