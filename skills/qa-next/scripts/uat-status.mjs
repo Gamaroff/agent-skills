@@ -759,6 +759,16 @@ function cmdItem(opts) {
 // those files, so the loss reads as a shorter list nobody can tell is short. Zero-padded so "-10"
 // does not sort before "-2"; the other half of the ordering is listRunFiles' seqKey above.
 export function runPathFor(existing, date, env) {
+  // An env label ending in `-NN` makes the sequence unreadable: `2026-09-22-ci-02.md` is
+  // indistinguishable from run 02 of env `ci`, so seqKey normalises it to itself and it sorts
+  // AFTER its own `-02` and `-10` re-runs — the very inversion the sort key exists to remove.
+  // The ambiguity is created at WRITE time, so it is refused here rather than guessed at read
+  // time, where nothing knows the env. (A hand-written file of that shape is still ordered
+  // wrongly; the tool simply will not add one.)
+  if (/-\d{2}$/.test(env))
+    die(
+      `--env ${env}: an env label may not end in -NN — it is indistinguishable from a run sequence`,
+    );
   const base = `${date}-${env}`;
   const taken = new Set(existing.map((f) => basename(f)));
   if (!taken.has(`${base}.md`)) return `${base}.md`;
@@ -833,7 +843,15 @@ function cmdSet(opts) {
     // verdict rather than a special case for "pass": Step 2's two early exits write blocked and
     // na, so guarding pass alone would leave the same defect reachable through another door — a
     // regression sweep must not replace fifty owner signatures with fifty ⏸.
-    const kept = state !== "fail" && stateKey(row.state) === "accepted";
+    // `untested` is excluded alongside `fail` because it is not a VERDICT — it is the deliberate
+    // demotion, the documented way to take an owner's ✅ back before re-testing from scratch
+    // (README § Registry states, and this change's own migration line). Keeping ✅ for it left the
+    // row accepted while the `state === "untested"` block below still cleared `Last run`, which
+    // --check then rejected and /qa-next Step 0 HALTed on as `registry-invalid` — so the one
+    // documented way out of an accepted row was the command that broke the registry.
+    const kept =
+      !["fail", "untested"].includes(state) &&
+      stateKey(row.state) === "accepted";
     // Refused on the kept-✅ path. That cell is where --accept stored the owner's
     // "accepted <date> — <why>", checkRegistry imposes NO note requirement on an accepted row,
     // and so a passing regression re-run would erase the sign-off's provenance with --check still

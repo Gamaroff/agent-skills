@@ -27,7 +27,7 @@ updated: {{date}}
 
 - **Command:** `{{uatCommand}} --grep "@{{id}}\b"`
 - **Exit code:** {{0|1}}
-- **Report:** `{{path under .claude/state/qa-next/<id>/<date>-<env>/ — a copy of uatReportDir}}`
+- **Report:** `{{path under .claude/state/qa-next/<id>/<run-file-basename>/ — a copy of uatReportDir}}`
 - **Tests:** {{one line per test from results.json — title · pass|fail · assertion message on fail}}
 
 ## Items
@@ -38,7 +38,7 @@ updated: {{date}}
 - **Expected:** {{from the checklist}}
 - **Observed:** {{exactly what was seen — status code, visible text, element state}}
 - **Result:** {{pass|fail|blocked}}
-- **Evidence:** `{{path under .claude/state/qa-next/<id>/<date>-<env>/}}` · or `lane: {{test title}}` when the automated run covered it
+- **Evidence:** `{{path under .claude/state/qa-next/<id>/<run-file-basename>/}}` · or `lane: {{test title}}` when the automated run covered it
 
 ## Verdict
 

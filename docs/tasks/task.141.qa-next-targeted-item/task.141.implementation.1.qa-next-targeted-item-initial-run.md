@@ -34,7 +34,7 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
 | 1. create-branch           | ✅ Done    | Branch `feature/task.141.*` exists in git                              | Branch cut at `e45d2768`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.141.review.{N}.{name}.md` exists (or skip logged)                | **Skipped** — status `Ready for Development` + `task.141.review.1.*.md` present (verdict READY TO IMPLEMENT, reviewed 2026-09-22) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1–5 implemented; 10 new tests, all 10 mutations red; full `npm test` green (3931) with the symlink moved aside | `.summaries/` n/a — surface map consumed inline |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #468: https://github.com/Gamaroff/agent-skills/pull/468 — OPEN, base `develop`, MERGEABLE | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.141.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -92,6 +92,18 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
   "one row per thing a person does with the app" gloss shortened, "against the configured
   environment" and "in the registry" dropped — both restated elsewhere in the same sentence). The
   catalog was regenerated and is byte-identical, because it truncates descriptions before that point.
+- Step 4: staging scope was `docs/tasks/task.141.qa-next-targeted-item`, `skills/qa-next`,
+  `evals/qa-next`, `docs/reference`, `CHANGELOG.md`. No out-of-scope untracked files existed, so the
+  pre-flight hold moved nothing; the post-commit leak check found nothing outside scope.
+- Step 4: committed as **two** commits rather than one so the implementation diff reads on its own —
+  `9efe0d22` (the tool, skill, template, tests and doc sweep) and `a888fc45` (the review report, the
+  plan revisions, the task document's status change and this report). The implementation report's
+  first commit belongs here, not at Step 8.
+- Step 4: the PR carries the two task-creation commits for task.141 and task.142 as well, since
+  neither was on `develop`. Agreed at Phase 0d Q2.
+- Step 4: tracker — `in-review` comment posted (`reason: posted`). The GitHub board move returned
+  `reason: stage-disabled`: `in-review` is not enabled for this project's workflow record, which is a
+  correct outcome and exits 0. The card stays In Progress.
 
 ---
 
@@ -130,7 +142,7 @@ mutations go red; a test that passes against both the fixed and the broken tool 
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.141.qa-next-targeted-item`
-**PR**: {populated after Step 4}
+**PR**: [#468](https://github.com/Gamaroff/agent-skills/pull/468)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

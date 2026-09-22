@@ -23,7 +23,11 @@ All notable changes to this project will be documented in this file. Format foll
   plain basename sort put the day's *first* run last, in `--findings`, in `priorRuns` and in the
   "previous run" link — the comparator normalises a missing sequence to `-01`, which also repairs
   run files already on disk. `--item` on an id with no row exits **4**, distinct from the usage
-  family's 2. `/loop /qa-next` stays untargeted: a loop over a fixed id repeats one function forever.
+  family's 2. `--run-path` **refuses an `--env` label ending in `-NN`** (`ci-02`): such a label is
+  indistinguishable from a run sequence, so the day's first run would sort after its own re-runs —
+  the ambiguity is created at write time and is therefore refused there, since at read time nothing
+  knows the env. `/loop /qa-next` stays untargeted: a loop over a fixed id repeats one function
+  forever.
 
 ### Changed
 

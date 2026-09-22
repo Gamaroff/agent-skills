@@ -662,6 +662,49 @@ historical naming.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-22
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.141.qa.1.qa-next-targeted-item.md](./task.141.qa.1.qa-next-targeted-item.md)
+- **Gate File**: [task.141.gate.1.qa-next-targeted-item.yml](./task.141.gate.1.qa-next-targeted-item.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3931 (0 failures, 1 skipped)
+- **Phases Verified**: 5/5 (3 PASS, 2 CONCERNS)
+- **Critical Issues**: 1 HIGH, 1 MEDIUM, 2 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Bug Resolution (cycle 1 fixes — awaiting QA verification)
+
+| Bug | Severity | Fix | Held by |
+| :--- | :--- | :--- | :--- |
+| TASK-141-BUG-1 | HIGH | `untested` excluded from the kept predicate — it is the demotion, not a verdict | New `untested`-on-`✅` leg in the accepted-row group; mutation-proved (M11) |
+| TASK-141-BUG-2 | MEDIUM | Both run-template evidence placeholders now name `<run-file-basename>` | New agreement test over `SKILL.md` + the template, with a non-vacuity floor; mutation-proved (M13) |
+| CR-4 | LOW | `--run-path` refuses an `--env` label ending in `-NN` — the ambiguity is created at write time, so it is refused there | `runPathFor` + CLI refusal tests; mutation-proved (M12) |
+
+Both bug reports are at **Ready for QA**. CR-3 remains advisory in `recommendations.future`.
+
+### Key Findings
+
+- **TASK-141-BUG-1 (HIGH)** — the kept-accepted predicate captures `untested`, so this task's own
+  documented migration path (`--set <id> untested --note "<why>"`) leaves the row reading
+  `✅ accepted` with its `Last run` cleared. `--check` rejects that and `/qa-next` Step 0 HALTs
+  `registry-invalid`. Reproduced end to end.
+- **TASK-141-BUG-2 (MEDIUM)** — `assets/run.template.md` still names the colliding
+  `<date>-<env>/` evidence path that `SKILL.md` Step 3 replaced with `<run-file-basename>/`.
+- All ten mutation proofs went red and **none of them caught BUG-1**: no test sends `untested` to an
+  accepted row, so there was no assertion for a mutation to red.
+
+---
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -672,6 +715,7 @@ historical naming.
 | 2026-09-22 | 1.1     | Review 1 (7/10 → 9/10): fixed the run-file ordering defect (`listRunFiles` sort key), widened the kept-`✅` rule to `blocked`/`na`, refused `--clear-note` on a kept `✅`, added `notes`/`bug` to the payload, gated the resume staleness rule on `targeted` | review-task |
 | 2026-09-22 |         | Status → ready-for-development | review-task |
 | 2026-09-22 |         | Phases 1–5 implemented; status → ready-for-review | develop-task |
+| 2026-09-22 |         | QA gate FAIL (70/100) — 4 findings (1 HIGH, 1 MEDIUM, 2 LOW); status → in-progress | qa-task |
 
 <!-- change-log-end -->
 

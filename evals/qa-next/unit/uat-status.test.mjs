@@ -715,6 +715,33 @@ test("runPathFor: the day's first run is unsuffixed, then -02 … -10, zero-padd
     "2026-09-22-lan-02.md",
     "existing entries are compared by basename, so full paths work too",
   );
+  // An env label ending in -NN would be indistinguishable from a run sequence, so seqKey would
+  // sort run 1 last again — the inversion the sort key exists to remove. Refused at write time,
+  // because at read time nothing knows the env.
+  assert.throws(
+    () => runPathFor([], "2026-09-22", "ci-02"),
+    /may not end in -NN/,
+    "an ambiguous env label is refused rather than written",
+  );
+  assert.equal(
+    runPathFor([], "2026-09-22", "ci-2"),
+    "2026-09-22-ci-2.md",
+    "one digit is not a sequence — only the two-digit form is ambiguous",
+  );
+});
+
+test("CLI: --run-path refuses an env label that would be read as a run sequence", () => {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  const { code, out } = run(root, "--run-path", "D.2", "--env", "ci-02");
+  assert.equal(code, 2, "a usage error, not a written file");
+  assert.match(out, /an env label may not end in -NN/);
+  assert.equal(
+    run(root, "--run-path", "D.2", "--env", "ci").code,
+    0,
+    "the ordinary label is unaffected",
+  );
 });
 
 test("listRunFiles puts the day's unsuffixed first run BEFORE its sequenced re-runs", () => {
@@ -912,6 +939,35 @@ test("CLI: only a fail moves an ✅ accepted row — pass, blocked and n/a keep 
     assert.equal(state()[8], STATES.accepted);
   }
   assert.equal(run(root, "--check").code, 0);
+
+  // untested — the DEMOTION, not a verdict. It must move the row: it is the documented way to
+  // take an owner's ✅ back, and keeping ✅ for it left an accepted row whose Last run had been
+  // cleared by the untested block below, which --check rejects (TASK-141-BUG-1). This is the leg
+  // the original group never sent, which is why all ten mutations went red and none caught it.
+  const demoted = run(root, "--set", "D.2", "untested", "--note", "reopening");
+  assert.equal(demoted.code, 0);
+  assert.doesNotMatch(
+    demoted.out,
+    /\(kept\)/,
+    "untested is the demotion — it is never kept",
+  );
+  assert.equal(state()[8], STATES.untested);
+  assert.equal(state()[9], "", "untested clears Last run, as it always has");
+  assert.equal(state()[10], "reopening");
+  assert.equal(
+    run(root, "--check").code,
+    0,
+    "an ⬜ row needs no run link — the registry is valid after the documented demotion",
+  );
+  assert.equal(
+    JSON.parse(run(root, "--item", "D.2", "--json").out).state,
+    "untested",
+    "and the demoted row is back in the selector's queue (D.1 still shadows it in file order, which is why this asserts the row's state rather than --next)",
+  );
+
+  // Put it back to ✅ for the fail leg below.
+  run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r1.md");
+  run(root, "--accept", "D.2", "--note", "re-accepted");
 
   // fail — the one verdict that moves it, from ✅ directly.
   const failed = run(
@@ -1126,4 +1182,39 @@ test("CLI: the commands task 141 does not touch keep their arguments, output and
     "--next still exits 3 when nothing is untested",
   );
   assert.equal(run(root, "--next", "--json").out.trim(), "null");
+});
+
+test("the run template and SKILL.md state ONE evidence path (TASK-141-BUG-2)", () => {
+  // The skill argues the rule; the template is what the agent fills in. Two authored statements of
+  // one path is the enumeration class, and this pair had already drifted: SKILL.md Step 3 moved to
+  // the run-file basename so a same-day re-run cannot overwrite the first run's screenshots, while
+  // the template still named `<date>-<env>/` — the colliding path the change set exists to remove.
+  // A prose fix nothing enforces drifts again, so the agreement is asserted rather than trusted.
+  const skillDir = path.resolve(__dirname, "../../../skills/qa-next");
+  const skill = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
+  const template = readFileSync(
+    path.join(skillDir, "assets", "run.template.md"),
+    "utf8",
+  );
+  const EVIDENCE_DIR = /\.claude\/state\/qa-next\/<id>\/([^/\s`}]+)\//g;
+
+  const seg = (text) => [...text.matchAll(EVIDENCE_DIR)].map((m) => m[1]);
+  const inSkill = seg(skill);
+  const inTemplate = seg(template);
+
+  // Non-vacuity floor: a regex that matches nothing would make this test pass on exactly the
+  // defect it was written for — "found nothing" and "could not look" must not be one result.
+  assert.ok(
+    inSkill.length >= 1,
+    "SKILL.md must name the evidence directory at least once — if this fails the matcher is broken, not the docs",
+  );
+  assert.ok(
+    inTemplate.length >= 2,
+    "the template names it on both its Report and Evidence lines",
+  );
+  assert.deepEqual(
+    [...new Set([...inSkill, ...inTemplate])],
+    ["<run-file-basename>"],
+    "every statement of the evidence directory, in both files, is the run-file basename",
+  );
 });
