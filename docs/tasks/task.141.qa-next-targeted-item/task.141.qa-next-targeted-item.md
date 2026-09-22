@@ -664,48 +664,47 @@ historical naming.
 
 ## QA Testing Results
 
-**QA Status**: FAIL (cycle 3) — fixes applied, awaiting cycle 4
+**QA Status**: CONCERNS (cycle 4) — all findings fixed, awaiting the cycle-5 verification gate
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-22
-**Quality Score**: 65/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
-### QA Report
+### QA Reports
 
-- **Cycle 3**: [task.141.qa.3.qa-next-targeted-item.md](./task.141.qa.3.qa-next-targeted-item.md) · [task.141.gate.3.qa-next-targeted-item.yml](./task.141.gate.3.qa-next-targeted-item.yml)
-- **Cycle 2**: [task.141.qa.2.qa-next-targeted-item.md](./task.141.qa.2.qa-next-targeted-item.md) · [task.141.gate.2.qa-next-targeted-item.yml](./task.141.gate.2.qa-next-targeted-item.yml)
-- **Cycle 1**: [task.141.qa.1.qa-next-targeted-item.md](./task.141.qa.1.qa-next-targeted-item.md) · [task.141.gate.1.qa-next-targeted-item.yml](./task.141.gate.1.qa-next-targeted-item.yml)
+- **Cycle 4**: [qa.4](./task.141.qa.4.qa-next-targeted-item.md) · [gate.4](./task.141.gate.4.qa-next-targeted-item.yml)
+- **Cycle 3**: [qa.3](./task.141.qa.3.qa-next-targeted-item.md) · [gate.3](./task.141.gate.3.qa-next-targeted-item.yml)
+- **Cycle 2**: [qa.2](./task.141.qa.2.qa-next-targeted-item.md) · [gate.2](./task.141.gate.2.qa-next-targeted-item.yml)
+- **Cycle 1**: [qa.1](./task.141.qa.1.qa-next-targeted-item.md) · [gate.1](./task.141.gate.1.qa-next-targeted-item.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3935 (0 failures, 1 skipped); qa-next suite 32
+- **Tests Executed**: 3939 (0 failures, 1 skipped); qa-next suite 36
 - **Phases Verified**: 5/5
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 - **CI**: all five checks green on the pushed branch
+- **Mutation proof**: 25 mutations across four cycles, every one red
 
-### Bug Resolution
+### Key Finding — the shape, across four cycles
 
-| Bug | Sev | Cycle | Status |
-| :--- | :--- | :--- | :--- |
-| BUG-1 `untested` kept on an accepted row | HIGH | 1 | **Verified fixed** (6×5 matrix) |
-| BUG-2 template named the colliding evidence path | MED | 1 | **Verified fixed** (agreement test, both directions) |
-| BUG-3 angle brackets fail `validate` | HIGH | 2 | **Verified fixed** (CI `validate` green) |
-| BUG-4 SKILL.md said only a fail moves `✅` | MED | 2 | **Verified fixed** |
-| BUG-5 sign-off overwritable via `--note` | MED | 2 | Superseded by the append rule |
-| BUG-6 lowercase id rejected by four commands | MED | 2 | **Verified fixed** (population test) |
-| BUG-7 `blocked`/`na` impossible on an accepted row | HIGH | 3 | Fixed, awaiting QA |
-| BUG-8 the guard omitted `--bug` | MED | 3 | Fixed, awaiting QA |
+One cell (`Notes / bug` on a kept `✅`) produced a defect in three consecutive cycles, and each was
+the same shape: **a guard that enumerated the ways in and missed one.**
 
-### Key Findings — the pattern, not the instances
+| Cycle | Guard | Missed |
+| :--- | :--- | :--- |
+| 1 | `state === "pass" && accepted` | `blocked`, `na` |
+| 2 | `kept && (clear \|\| note)` | `--bug` |
+| 3 | append rather than replace | *(nothing — but `kept` is still a hand-listed state set)* |
 
-Three cycles produced the same shape: each guard on the sign-off cell **enumerated the doors it knew
-about** and missed one. Cycle 1's guard missed `blocked`/`na`; cycle 2's missed `--bug`, and closed
-`blocked`/`na` entirely in the process — which SKILL.md and the README both still said was allowed.
+Cycle 3 replaced the flag enumeration with an **operation** — append, never replace — which holds
+for every flag present and future. Cycle 4 verified that by enumerating the *writers* of the cell
+(four, only one reachable on a kept row) rather than the flags, and found the residue the operation
+introduced: an appended cell can hold two bug links, and the payload took the first.
 
-Cycle 3 stopped enumerating. **On a kept `✅` the note cell is appended to, never replaced** — by
-construction, for every flag present and future. `--clear-note` stays refused, because clearing is
-the one operation append cannot express. That also makes the documentation true exactly as already
-written, rather than requiring the prose to chase the code a fourth time.
+Cycle 4's remaining criticism was fair and is now closed by a test rather than by argument: `kept`
+is still a hand-listed subset of `STATES`, so a new state would default to kept-on-accepted with
+nothing forcing a re-check. A population test now enumerates `Object.keys(STATES)` and fails until
+every state is classified by all three of `cmdSet`'s rules.
 
 ---
 
@@ -722,6 +721,7 @@ written, rather than requiring the prose to chase the code a fourth time.
 | 2026-09-22 |         | QA gate FAIL (70/100) — 4 findings (1 HIGH, 1 MEDIUM, 2 LOW); status → in-progress | qa-task |
 | 2026-09-22 |         | QA cycle 2 refute pass — gate FAIL (70/100); 2 cycle-1 bugs verified fixed, 3 new findings | qa-task |
 | 2026-09-22 |         | QA cycle 3 — gate FAIL (65/100); sign-off guard replaced by an append rule rather than a fourth enumeration | qa-task |
+| 2026-09-22 |         | QA cycle 4 — gate CONCERNS (80/100); append rule verified over the writer set; pipe escaping, newest-bug-link and a STATES population test | qa-task |
 
 <!-- change-log-end -->
 

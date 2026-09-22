@@ -271,7 +271,15 @@ function relFromRegistry(opts, repoRelPath) {
 }
 
 function renderRow(columns, cells) {
-  return `| ${columns.map((c) => cells[c] ?? "").join(" | ")} |`;
+  // `|` is escaped HERE, in the one place every cell the tool emits is rendered, because
+  // splitCells already honours `\\|` through its `(?<!\\)` lookbehind — so the round-trip is
+  // closed by two halves that were written for each other and never met. Unescaped, a pipe in a
+  // --note splits the row and --check reports a cell-count error, which /qa-next Step 0 treats as
+  // HALT `registry-invalid`. That corruption predates this change; what this change added is its
+  // irrecoverability, because on a kept ✅ --clear-note is refused and every later --set appends
+  // onto the already-split cell.
+  const escape = (v) => String(v ?? "").replace(/\|/g, "\\|");
+  return `| ${columns.map((c) => escape(cells[c])).join(" | ")} |`;
 }
 
 function renderSkeleton(cfg, today) {
@@ -706,7 +714,12 @@ function describeRow(opts, cfg, r) {
     lastRun: (r.run.match(/\]\(([^)]+)\)/) ?? [])[1] ?? null,
     priorRuns: priorRuns(opts, r.id),
     notes: r.notes,
-    bug: (r.notes.match(/\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/) ?? [])[1] ?? null,
+    // The LAST bug link, not the first: on a kept ✅ the note cell is appended to, so it can hold
+    // several, and Step 4's "reuse the open bug" means the most recent one. Taking the first
+    // handed back a superseded bug while the newest sat two segments to its right.
+    bug:
+      [...r.notes.matchAll(/\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/g)].at(-1)?.[1] ??
+      null,
   };
 }
 
@@ -834,6 +847,18 @@ function updateRow(opts, rawId, mutate) {
   );
 }
 
+// Append, but do not repeat: a ✅ row blocked nightly by the same missing credential would
+// otherwise grow its cell forever, and --clear-note is refused there so nothing could trim it.
+// Suppressing only an immediate repeat keeps the operation an append — a different reason arriving
+// between two identical ones is still recorded twice, which is the honest history.
+function appendNote(existing, addition) {
+  if (!addition) return existing;
+  if (!existing) return addition;
+  const segments = existing.split(" · ");
+  if (segments[segments.length - 1] === addition) return existing;
+  return `${existing} · ${addition}`;
+}
+
 function linkTo(opts, repoRelPath) {
   return `[${basename(repoRelPath).replace(/\.md$/, "")}](${relFromRegistry(opts, repoRelPath)})`;
 }
@@ -905,7 +930,7 @@ function cmdSet(opts) {
       // The append rule above. ` · ` is the separator --accept already uses to join a sign-off to
       // whatever preceded it, so a kept row reads as one history rather than two conventions.
       row.notes = kept
-        ? [row.notes, parts.join(" — ")].filter(Boolean).join(" · ")
+        ? appendNote(row.notes, parts.join(" — "))
         : parts.join(" — ");
     if (state === "untested") {
       row.run = "";

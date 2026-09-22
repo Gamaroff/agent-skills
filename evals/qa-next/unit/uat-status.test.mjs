@@ -1337,3 +1337,182 @@ test("a missing id is a usage error on every id-taking command, not a missing ro
   );
   assert.equal(bare.length, 7);
 });
+
+test("a pipe in a note survives the render/parse round-trip (TASK-141-BUG-9)", () => {
+  // renderRow and splitCells were written for each other and never met: splitCells has honoured
+  // `\|` through a (?<!\\) lookbehind all along, and renderRow emitted the raw character. A pipe
+  // in a --note therefore split the row, and --check reported a cell-count error that /qa-next
+  // Step 0 treats as HALT `registry-invalid`. On a kept ✅ that became unrepairable in-tool.
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+
+  assert.equal(
+    run(root, "--set", "D.2", "blocked", "--note", "env a | b is down").code,
+    0,
+  );
+  assert.equal(
+    run(root, "--check").code,
+    0,
+    "the row still has its header's cell count — a pipe no longer splits it",
+  );
+  const payload = JSON.parse(run(root, "--item", "D.2", "--json").out);
+  assert.equal(payload.state, "blocked");
+  assert.match(
+    readFileSync(REG(root), "utf8"),
+    /env a \\\| b is down/,
+    "the pipe is stored escaped, which is what splitCells reads back",
+  );
+});
+
+test("the NEWEST bug link wins on an appended note cell (TASK-141-BUG-10)", () => {
+  // The append rule makes Notes / bug multi-valued on a kept ✅ — `--bug` is not refused there, it
+  // appends — and SKILL.md Step 4 re-links "the open bug" from this field, so the FIRST match is
+  // the superseded one. (An earlier draft of this test used --clear-note between the two bugs and
+  // proved nothing: the clear wiped the cell, so it never held both. The cell only accumulates on
+  // the kept path, which is the path the rule created.)
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  for (const n of ["bug.1.old", "bug.7.new"])
+    writeFileSync(
+      path.join(root, `docs/bugs/${n}.md`),
+      "---\nstatus: new\n---\n",
+    );
+
+  run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r1.md");
+  run(root, "--accept", "D.2", "--note", "signed off");
+  run(
+    root,
+    "--set",
+    "D.2",
+    "pass",
+    "--run",
+    "runs/D.2/r1.md",
+    "--bug",
+    "docs/bugs/bug.1.old.md",
+  );
+  run(
+    root,
+    "--set",
+    "D.2",
+    "pass",
+    "--run",
+    "runs/D.2/r1.md",
+    "--bug",
+    "docs/bugs/bug.7.new.md",
+  );
+
+  const notes = readFileSync(REG(root), "utf8")
+    .split("\n")
+    .find((l) => l.startsWith("| D.2 |"))
+    .split("|")
+    .map((c) => c.trim())[10];
+  assert.match(
+    notes,
+    /bug\.1\.old/,
+    "the cell really does hold both — otherwise this proves nothing",
+  );
+  assert.match(notes, /bug\.7\.new/);
+
+  const payload = JSON.parse(run(root, "--item", "D.2", "--json").out);
+  assert.equal(
+    payload.bug,
+    "../bugs/bug.7.new.md",
+    "the most recent bug link, not the first one in the cell",
+  );
+  assert.equal(run(root, "--check").code, 0);
+});
+
+test("the append does not repeat an identical consecutive segment (TASK-141-CR4-3)", () => {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+  const notes = () =>
+    readFileSync(REG(root), "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| D.2 |"))
+      .split("|")
+      .map((c) => c.trim())[10];
+
+  run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r1.md");
+  run(root, "--accept", "D.2", "--note", "signed off");
+  for (let i = 0; i < 12; i++)
+    run(root, "--set", "D.2", "blocked", "--note", "no credential");
+  assert.equal(
+    (notes().match(/no credential/g) ?? []).length,
+    1,
+    "twelve identical blocked re-runs leave one segment, not twelve",
+  );
+  assert.match(
+    notes(),
+    /^accepted \d{4}-\d{2}-\d{2} — signed off · no credential$/,
+  );
+  // A different reason between two identical ones is still recorded — suppression is only of an
+  // immediate repeat, so the cell stays an honest history rather than a set.
+  run(root, "--set", "D.2", "blocked", "--note", "different reason");
+  run(root, "--set", "D.2", "blocked", "--note", "no credential");
+  assert.equal((notes().match(/no credential/g) ?? []).length, 2);
+  assert.equal(run(root, "--check").code, 0);
+});
+
+test("every state in STATES is classified by each of cmdSet's three rules (TASK-141-CR4-4)", () => {
+  // The append rule replaced an enumeration of FLAGS with an enumeration of STATES — a smaller and
+  // stabler population, but still a hand-listed one, and nothing forced the re-check when a state
+  // was added. This is that forcing function: the population is Object.keys(STATES), listed here
+  // once, and a seventh state fails this test until someone answers all three questions for it.
+  const RULES = {
+    // state → [moves an accepted row?, requires --run, requires --note]
+    untested: [true, false, false],
+    pass: [false, true, false],
+    fail: [true, true, false],
+    blocked: [false, false, true],
+    na: [false, false, true],
+    accepted: [null, null, null], // --set refuses it outright; --accept owns this transition
+  };
+  assert.deepEqual(
+    Object.keys(STATES).sort(),
+    Object.keys(RULES).sort(),
+    "a state was added to STATES without answering the three cmdSet rules for it",
+  );
+
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.x.md"),
+    "---\nstatus: new\n---\n",
+  );
+
+  // The rules are asserted against the tool, not merely tabulated above.
+  assert.equal(
+    run(root, "--set", "D.2", "accepted").code,
+    2,
+    "--set refuses accepted",
+  );
+  for (const [state, [, needsRun, needsNote]] of Object.entries(RULES)) {
+    if (state === "accepted") continue;
+    if (needsRun)
+      assert.equal(
+        run(root, "--set", "D.2", state).code,
+        2,
+        `${state} requires --run`,
+      );
+    if (needsNote)
+      assert.equal(
+        run(root, "--set", "D.2", state).code,
+        2,
+        `${state} requires --note`,
+      );
+  }
+});
