@@ -4,7 +4,43 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`/qa-next <id>` — run the UAT protocol against a named registry row, whatever state that row is
+  in.** `/qa-next` had exactly one way to choose what it tested: the first `⬜ untested` row in file
+  order. So a `❌` whose bug had been fixed and merged could not be re-tested without
+  `--set <id> untested`, which erases the `Last run` link and the failure history; and a `✅` could
+  never be regression-tested at all, which is the one thing indexing UAT by *user function* was
+  supposed to make a one-line request. The argument makes both a command. Three mechanisms a re-run
+  needs are now properties of `uat-status.mjs` rather than instructions a call site has to remember:
+  `--run-path <id>` returns the next free run file (`<date>-<env>.md`, then `-02`, `-03`), so a
+  same-day re-run cannot silently overwrite the first run's `## Findings` rows — which `--findings`
+  is derived from, so the loss would read as a shorter list nobody could tell was short; `--item
+  <id>` returns the same payload `--next` does, from a single `describeRow`, now carrying `state`,
+  `lastRun`, `priorRuns`, `notes` and `bug` so a repeat failure can re-link the open bug instead of
+  filing a second one against the same defect; and `listRunFiles`' sort key is sequence-aware.
+  That last one is not cosmetic: run 1 of a day carries no suffix and `.` sorts after `-`, so a
+  plain basename sort put the day's *first* run last, in `--findings`, in `priorRuns` and in the
+  "previous run" link — the comparator normalises a missing sequence to `-01`, which also repairs
+  run files already on disk. `--item` on an id with no row exits **4**, distinct from the usage
+  family's 2. `/loop /qa-next` stays untargeted: a loop over a fixed id repeats one function forever.
+
 ### Changed
+
+- **`uat-status.mjs --set <id> <verdict>`: only a `fail` moves an `✅ accepted` row.** A `pass`,
+  `blocked` or `na` against an accepted row now leaves `✅` in place and updates only `Last run` and
+  `Notes / bug`; the tool prints `(kept)` so the branch it took is never silent. `fail` is unchanged
+  and still overrides `✅` directly. Without this, a regression sweep over fifty accepted functions
+  would replace fifty owner signatures with fifty machine `🟡`s and bury the one row that actually
+  regressed. The rule is written over the whole verdict set rather than as a special case for
+  `pass`, because the skill's two early exits write `blocked` and `na` — guarding `pass` alone would
+  leave the same defect reachable through another door. The new `--clear-note` (which empties
+  `Notes / bug`, so a `🟡` that follows a `❌` cannot keep the bug link it just disproved) is refused
+  on that kept-`✅` path: the cell holds `--accept`'s `accepted <date>` provenance, and `--check`
+  imposes no note requirement on an accepted row, so the loss would be silent.
+  **Migration**: to move an accepted row deliberately, run `--set <id> untested --note "<why>"`
+  first, then the verdict you want. `qa-next`'s own Steps 2 and 4 are the only callers in this
+  repository.
 
 - **`release.sh` warns on branches carrying commits not on `develop`, and the release-prep PR is now
   the only documented promotion path.** Every other pre-release check asks whether what *is* on the

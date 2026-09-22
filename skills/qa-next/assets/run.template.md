@@ -11,6 +11,7 @@ updated: {{date}}
 | Field | Value |
 | :--- | :--- |
 | Function | `{{id}}` — {{function}} |
+| Run | {{1st / 2nd / …}} run of this function · previous: {{link to the previous run file, relative to this one, or _none_}} |
 | What it does | {{from the registry}} |
 | Stories | {{story ids from the registry row, linked relative to this file}} |
 | Surface | {{surface}} |

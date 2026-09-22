@@ -13,10 +13,14 @@
 //   node uat-status.mjs --coverage [--json]   accepted stories covered by no function (never writes)
 //   node uat-status.mjs --check               integrity gate (exit 1 on any error)
 //   node uat-status.mjs --next [--json]       first ⬜ row in file order (exit 3 when none)
-//   node uat-status.mjs --set <id> <state> --run <path> [--bug <path>] [--note "..."]
+//   node uat-status.mjs --item <id> [--json]  one named row, whatever its state — same payload as
+//                                             --next (exit 4 when the id is not a row).
+//                                             NOT --items, one character away, which WRITES a cell.
+//   node uat-status.mjs --run-path <id> [--env <label>]   next free run file path (creates runs/<id>/)
+//   node uat-status.mjs --set <id> <state> --run <path> [--bug <path>] [--note "..."] [--clear-note]
 //   node uat-status.mjs --items <id> "<items>"         fill the Items cell
 //   node uat-status.mjs --automated <id> "<specs>"     fill the Automated-by cell
-//   node uat-status.mjs --accept <id> [--note "..."]   🟡 pass → ✅ accepted — the owner's command
+//   node uat-status.mjs --accept <id> [--note "..."] [--force]   🟡 pass → ✅ accepted — the owner's command
 //   node uat-status.mjs --findings [--all] [--json]    open findings across every run file
 //
 // Paths: --root <dir> (default: cwd) · --registry <path> (default docs/qa/uat-registry.md) ·
@@ -79,11 +83,15 @@ const OPTIONS = new Set([
   "--coverage",
   "--check",
   "--next",
+  "--item",
+  "--run-path",
+  "--env",
   "--json",
   "--set",
   "--run",
   "--bug",
   "--note",
+  "--clear-note",
   "--items",
   "--automated",
   "--accept",
@@ -501,10 +509,22 @@ export function parseFindings(text) {
   return out;
 }
 
+// A basename with no sequence is run 1 of its day, so compare it as "-01". Without this,
+// ["…-lan.md", "…-lan-02.md"].sort() yields ["…-lan-02.md", "…-lan.md"] — "." sorts after "-" —
+// and the day's FIRST run reads as its last: in --findings, in priorRuns, and in the "previous
+// run" link a re-run's header cites. Normalising in the comparator rather than renaming also
+// repairs the ordering of run files already on disk, which a rename could not.
+const seqKey = (p) =>
+  basename(p).replace(
+    /^(.*?)(?:-(\d{2}))?\.md$/,
+    (_, base, n) => `${base}-${n ?? "01"}.md`,
+  );
+
 // Every `.md` under runs/, at any depth, as paths relative to the registry directory. Run files
 // live at runs/<function id>/<date>-<env>.md, so the walk must recurse: a flat readdir would skip
 // every nested run and report a clean zero — the one answer nobody questions. Ordered by file
-// name (the date prefix) first, so "oldest run first" holds across function directories.
+// name (the date prefix, then the run sequence) first, so "oldest run first" holds across
+// function directories.
 export function listRunFiles(runsDir) {
   const walk = (dir) =>
     readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -514,9 +534,7 @@ export function listRunFiles(runsDir) {
     });
   return walk(runsDir)
     .map((p) => relative(dirname(runsDir), p))
-    .sort(
-      (a, b) => basename(a).localeCompare(basename(b)) || a.localeCompare(b),
-    );
+    .sort((a, b) => seqKey(a).localeCompare(seqKey(b)) || a.localeCompare(b));
 }
 
 // Every finding in every run file, oldest run first. `bug` is relative to the run file; `bugStatus`
@@ -622,20 +640,39 @@ function findChecklists(opts, id, itemsCell) {
     .map((f) => join(opts.registryDir, f));
 }
 
-function cmdNext(opts) {
-  const cfg = requireSurfaces(opts);
-  const r = nextItem(readRegistry(opts));
-  if (!r) {
-    console.log(
-      opts.has("--json") ? "null" : "nothing untested — registry complete",
-    );
-    process.exitCode = 3;
-    return;
+// The row a named id resolves to, whatever state it is in. The sibling of `nextItem`, and it
+// returns the same shape — `surfaceTitle` included, which the section carries and the row does not.
+export function itemById({ sections }, id) {
+  for (const sec of sections) {
+    const r = sec.rows.find((row) => row.id === id);
+    if (r) return { ...r, surfaceTitle: sec.title };
   }
+  return null;
+}
+
+// An id is case-insensitive at the boundary: the owner types `d.2`, the registry spells it `D.2`.
+const normaliseId = (s) => (s ?? "").trim().toUpperCase();
+
+// This function's earlier run files, oldest first, relative to the registry directory. Reuses
+// listRunFiles rather than walking again: two sort orders for "oldest run first" would drift, and
+// one recursive walk of a directory of Markdown files is cheap. The cost is paid on --next too,
+// deliberately — see the task 141 notes.
+function priorRuns(opts, id) {
+  const runsDir = join(opts.root, opts.registryDir, "runs");
+  if (!existsSync(runsDir)) return [];
+  const prefix = `${join("runs", id)}/`;
+  return listRunFiles(runsDir).filter((p) => p.startsWith(prefix));
+}
+
+// The ONE description of a registry row that the skill consumes. `--next` and `--item` differ only
+// in HOW they find the row; what they say about it must be identical, so they say it here. Two
+// payload builders would be two enumerations of "what the skill needs to know about a row", and
+// enumerations drift in the worst direction — docs/reference/anti-patterns.md.
+function describeRow(opts, cfg, r) {
   const stories = loadStories(opts, cfg);
   const automatedBy = specPaths(r.cells["Automated by"]);
   const uat = new RegExp(cfg.uatSpecPattern);
-  const out = {
+  return {
     id: r.id,
     function: r.title,
     what: r.cells["What it does"] ?? "",
@@ -652,24 +689,99 @@ function cmdNext(opts) {
     automatedBy,
     uatSpecs: automatedBy.filter((p) => uat.test(p)),
     checklists: findChecklists(opts, r.id, r.cells.Items ?? ""),
+    // The re-run fields, on BOTH commands. Without state/lastRun/priorRuns the skill cannot say
+    // "3rd run of this function, follows 2026-08-02-lan.md" in the run file, which is the one
+    // thing a re-run's evidence has to state. `bug` is the link the row already carries, parsed
+    // with the SAME regex checkRegistry owns, so there is one parser: Step 4's "a repeat failure
+    // reuses the open bug" reads it here rather than re-parsing the registry by hand.
+    state: stateKey(r.state),
+    lastRun: (r.run.match(/\]\(([^)]+)\)/) ?? [])[1] ?? null,
+    priorRuns: priorRuns(opts, r.id),
+    notes: r.notes,
+    bug: (r.notes.match(/\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/) ?? [])[1] ?? null,
   };
-  if (opts.has("--json")) console.log(JSON.stringify(out, null, 2));
-  else {
-    console.log(`next: ${out.id} — ${out.function}`);
-    console.log(`  surface:    ${out.surface}. ${out.surfaceTitle}`);
-    console.log(`  what:       ${out.what}`);
-    console.log(`  entry:      ${out.entry || "(none)"}`);
+}
+
+// Printed by both commands, for the same reason the payload is shared.
+function printRow(label, out) {
+  console.log(`${label}: ${out.id} — ${out.function}`);
+  console.log(`  surface:    ${out.surface}. ${out.surfaceTitle}`);
+  console.log(`  what:       ${out.what}`);
+  console.log(`  entry:      ${out.entry || "(none)"}`);
+  console.log(`  state:      ${out.state ?? "(unknown)"}`);
+  console.log(
+    `  stories:    ${out.stories.map((s) => s.id).join(", ") || "(none)"}`,
+  );
+  console.log(
+    `  items:      ${out.items || "(none mapped — author items first)"}`,
+  );
+  console.log(`  checklists: ${out.checklists.join(", ") || "(none)"}`);
+  console.log(`  automated:  ${out.automatedBy.join(" · ") || "manual only"}`);
+  console.log(
+    `  prior runs: ${out.priorRuns.join(", ") || "(none — 1st run)"}`,
+  );
+}
+
+function cmdNext(opts) {
+  const cfg = requireSurfaces(opts);
+  const r = nextItem(readRegistry(opts));
+  if (!r) {
     console.log(
-      `  stories:    ${out.stories.map((s) => s.id).join(", ") || "(none)"}`,
+      opts.has("--json") ? "null" : "nothing untested — registry complete",
     );
-    console.log(
-      `  items:      ${out.items || "(none mapped — author items first)"}`,
-    );
-    console.log(`  checklists: ${out.checklists.join(", ") || "(none)"}`);
-    console.log(
-      `  automated:  ${out.automatedBy.join(" · ") || "manual only"}`,
-    );
+    process.exitCode = 3;
+    return;
   }
+  const out = describeRow(opts, cfg, r);
+  if (opts.has("--json")) console.log(JSON.stringify(out, null, 2));
+  else printRow("next", out);
+}
+
+function cmdItem(opts) {
+  const cfg = requireSurfaces(opts);
+  const id = normaliseId(opts.val("--item"));
+  const r = itemById(readRegistry(opts), id);
+  if (!r) {
+    // Exit 4, not the usage family's 2: "you named a row that is not there" is a different answer
+    // from "you called me wrongly", and /qa-next stops differently on each (unknown-item).
+    console.error(`uat-status: ${id}: no registry row`);
+    process.exitCode = 4;
+    return;
+  }
+  const out = describeRow(opts, cfg, r);
+  if (opts.has("--json")) console.log(JSON.stringify(out, null, 2));
+  else printRow("item", out);
+}
+
+// Pure, and therefore testable without a filesystem. Run files are runs/<id>/<date>-<env>.md. The
+// date and the env label are both fixed within a session, so a second run today would write the
+// same path and take the first run's `## Findings` rows with it — and --findings is DERIVED from
+// those files, so the loss reads as a shorter list nobody can tell is short. Zero-padded so "-10"
+// does not sort before "-2"; the other half of the ordering is listRunFiles' seqKey above.
+export function runPathFor(existing, date, env) {
+  const base = `${date}-${env}`;
+  const taken = new Set(existing.map((f) => basename(f)));
+  if (!taken.has(`${base}.md`)) return `${base}.md`;
+  for (let n = 2; n < 100; n++) {
+    const name = `${base}-${String(n).padStart(2, "0")}.md`;
+    if (!taken.has(name)) return name;
+  }
+  die(`${base}: 99 runs already recorded today`);
+}
+
+function cmdRunPath(opts) {
+  requireSurfaces(opts);
+  const id = normaliseId(opts.val("--run-path"));
+  if (!itemById(readRegistry(opts), id)) {
+    console.error(`uat-status: ${id}: no registry row`);
+    process.exitCode = 4;
+    return;
+  }
+  const env = opts.val("--env") ?? "local";
+  const dir = join(opts.root, opts.registryDir, "runs", id);
+  mkdirSync(dir, { recursive: true });
+  // One readdir of a single function's directory — not the recursive walk listRunFiles does.
+  console.log(join("runs", id, runPathFor(readdirSync(dir), today(), env)));
 }
 
 function updateRow(opts, id, mutate) {
@@ -684,7 +796,11 @@ function updateRow(opts, id, mutate) {
   row.cells["Notes / bug"] = row.notes;
   reg.lines[row.line] = renderRow(sec.columns, row.cells);
   writeRegistry(opts, reg.lines);
-  console.log(`${id}: ${row.state}${row.run ? ` · ${row.run}` : ""}`);
+  // `(kept)` is the mitigation for the one silent branch in this file: a caller that expected a
+  // verdict to move the state cell must be able to see that it did not.
+  console.log(
+    `${id}: ${row.state}${row.keptAccepted ? " (kept)" : ""}${row.run ? ` · ${row.run}` : ""}`,
+  );
 }
 
 function linkTo(opts, repoRelPath) {
@@ -706,8 +822,27 @@ function cmdSet(opts) {
     die("--bug <path to bug report> is required for fail");
   if (["na", "blocked"].includes(state) && !note)
     die(`--note <why> is required for ${state}`);
+  const clear = opts.has("--clear-note");
+  if (clear && (bug || note))
+    die("--clear-note cannot be combined with --note or --bug");
   updateRow(opts, id, (row) => {
-    row.state = STATES[state];
+    // ONLY A FAIL MOVES AN ACCEPTED ROW. ✅ means "this is the feature I wanted" — an owner's
+    // judgement. A machine re-pass agrees with it; a "blocked" says the environment could not
+    // supply a credential; an "n/a" says the function is gone. None of the three is evidence
+    // against the judgement. A fail IS, and still overrides. Written as one predicate over the
+    // verdict rather than a special case for "pass": Step 2's two early exits write blocked and
+    // na, so guarding pass alone would leave the same defect reachable through another door — a
+    // regression sweep must not replace fifty owner signatures with fifty ⏸.
+    const kept = state !== "fail" && stateKey(row.state) === "accepted";
+    // Refused on the kept-✅ path. That cell is where --accept stored the owner's
+    // "accepted <date> — <why>", checkRegistry imposes NO note requirement on an accepted row,
+    // and so a passing regression re-run would erase the sign-off's provenance with --check still
+    // green. There is no stale bug link to clear on a ✅ anyway. `pass` is the only verdict that
+    // reaches here: blocked and na require --note, which --clear-note already refuses beside.
+    if (clear && kept)
+      die("--clear-note cannot clear an accepted row's sign-off note");
+    if (!kept) row.state = STATES[state];
+    row.keptAccepted = kept;
     if (run)
       row.run = linkTo(
         opts,
@@ -716,7 +851,8 @@ function cmdSet(opts) {
     const parts = [];
     if (bug) parts.push(linkTo(opts, bug));
     if (note) parts.push(note);
-    if (parts.length) row.notes = parts.join(" — ");
+    if (clear) row.notes = "";
+    else if (parts.length) row.notes = parts.join(" — ");
     if (state === "untested") {
       row.run = "";
       row.notes = note ?? "";
@@ -820,6 +956,8 @@ function dispatch(opts) {
   if (opts.has("--coverage")) return cmdCoverage(opts);
   if (opts.has("--check")) return cmdCheck(opts);
   if (opts.has("--next")) return cmdNext(opts);
+  if (opts.has("--item")) return cmdItem(opts);
+  if (opts.has("--run-path")) return cmdRunPath(opts);
   if (opts.has("--set")) return cmdSet(opts);
   if (opts.has("--items")) return cmdCell(opts, "--items", "Items");
   if (opts.has("--automated"))
