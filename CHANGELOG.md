@@ -30,8 +30,9 @@ All notable changes to this project will be documented in this file. Format foll
   name, is byte-identical. The first real run is in the suite: `uat-status.mjs --run-path D.1 --env
   {input}` scores **`present-but-inert`** today (`x-02` refused, `../x` and `a/b` accepted), which is
   task.143's to fix. `probe-boundary-rule.md` §5 documents the form and §5.1 no longer lists a
-  multi-argument CLI among the declined sinks; both security prompts and the qa-task / qa-story
-  Step 3b paragraph name it. `node` stays off `SAFE_COMMANDS` (§2): the engine picks the
+  multi-argument CLI among the declined sinks; both security prompts, the qa-task / qa-story
+  Step 3b paragraph and `review-security`'s own limits name it, and a population test fails any
+  site that routes a non-JS entry without naming `cli:`. `node` stays off `SAFE_COMMANDS` (§2): the engine picks the
   interpreter and `--entry` fixes the script.
 
 - **`/qa-next <id>` — run the UAT protocol against a named registry row, whatever state that row is

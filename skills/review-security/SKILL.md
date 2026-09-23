@@ -152,9 +152,11 @@ clean result:
    engage on a helper the real call site bypasses. Mitigated — not closed — by citing the call site's
    `file:line`, recording the module path the engine resolved, and downgrading any citation naming no
    file in scope to `unverifiable`.
-3. **A non-JS entry point is routed to the engine's `shell:` entry form**, never recorded
-   `unverifiable` for being bash; only a script neither form reaches (stdin, two positionals,
-   network) is declined, with the reason named.
+3. **A non-JS entry point is routed to the engine's `shell:` entry form** — or `shell-fn:` for a
+   sourced library, and `cli:` with an `--argv` template for a Node CLI whose decision sits behind
+   its flags — never recorded `unverifiable` for being bash or for taking several flags; only a
+   target no form reaches (stdin, a shell script with more than one positional, network) is
+   declined, with the reason named.
 
 ## Out of scope in v1
 

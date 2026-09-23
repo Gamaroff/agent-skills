@@ -134,7 +134,11 @@
  * CLI that CRASHES (an uncaught error: Node's own `Node.js vX.Y.Z` footer on
  * stderr), is killed, or times out is `errored` — "could not look", never a
  * refusal — so a script that fails to load is declined `entry-not-probeable`
- * rather than scored as a control that rejects everything. A `--argv` shape
+ * rather than scored as a control that rejects everything. Only an UNCAUGHT
+ * error carries that footer: a CLI that catches its own failure and exits
+ * non-zero (`main().catch(e => { console.error(e); process.exitCode = 1 })`)
+ * is indistinguishable from one that refused, and is scored `rejected` — a
+ * case that must tell the two apart carries `expected`. A `--argv` shape
  * error is an argument error (exit 2, nothing runs, no record); an entry that
  * escapes the root or is not a `.mjs`/`.js` regular file is a named decline,
  * as for every other form. The record carries the template as `argv`, and a
@@ -1549,12 +1553,9 @@ function runCliCase(
 
   let fixtureDir;
   try {
-    fixtureDir =
-      fixture === null
-        ? materialiseFixture(workDir, [], c.input, { writeInput: false })
-        : materialiseFixture(workDir, fixture.controls, c.input, {
-            writeInput: true,
-          });
+    fixtureDir = materialiseFixture(workDir, fixture?.controls ?? [], c.input, {
+      writeInput: fixture !== null,
+    });
   } catch (e) {
     decline(`fixture: cannot materialise "${c.input}": ${e.message}`);
     return;

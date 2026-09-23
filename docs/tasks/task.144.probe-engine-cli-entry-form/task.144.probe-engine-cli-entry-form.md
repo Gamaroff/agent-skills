@@ -366,6 +366,7 @@ None.
 | 2026-09-23 | 1.1     | Review passed (8/10) — 1 critical + 6 important fixed: record has no `kind` field (adds `argv`), cli: control key carries the template, fixture/env reuse the shell arm sandbox, stdin out of scope, `expected` scoring defined, exit-2 vs decline split | review-task |
 | 2026-09-23 |         | Status → ready-for-development | review-task |
 | 2026-09-23 |  | Implemented — 15 files (plus bundled copies), 15 tests, 14 mutations proved; accept-all verdict corrected to absent | develop |
+| 2026-09-23 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 
 ---
 <!-- change-log-end -->
@@ -376,6 +377,33 @@ None.
 - [x] Phase 2: The run and the scoring
 - [x] Phase 3: First real consumer
 - [x] Phase 4: Documents and bundling
+
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-23
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.144.qa.1.probe-engine-cli-entry-form.md](./task.144.qa.1.probe-engine-cli-entry-form.md)
+- **Gate File**: [task.144.gate.1.probe-engine-cli-entry-form.yml](./task.144.gate.1.probe-engine-cli-entry-form.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3961 (fast gate) — 15 new, all mutation-proved
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+- CR-1 (medium): `skills/review-security/SKILL.md` limit 3 still routes a non-JS entry to `shell:` only; no population check.
+- Security measured: the `--argv` validator engages 17/17 when probed through the `cli:` form itself.
 
 ---
 

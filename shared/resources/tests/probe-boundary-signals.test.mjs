@@ -225,3 +225,44 @@ test("every site that names the JS entry form also names the shell entry form", 
     `only ${sites} site(s) name the JS entry form — the pattern no longer matches`,
   );
 });
+
+test("every site that routes a non-JS entry names the cli: form too (task.144 CR-1)", () => {
+  // The contract test above keys on sites that spell the JS `--entry` form, and
+  // review-security's SKILL.md routes non-JS entries in prose without ever
+  // spelling it — so when task.144 added `cli:`, that site kept saying `shell:`
+  // was the only route and "two positionals" the decline, and nothing noticed.
+  // This population is keyed on the ROUTING statement itself (the same
+  // predicate the BUG-10 test counts), so a site that routes non-JS entries
+  // cannot omit the form a multi-flag Node CLI takes.
+  const files = [];
+  for (const f of readdirSync(join(REPO_ROOT, "shared/resources"))) {
+    if (f.endsWith(".md")) files.push(`shared/resources/${f}`);
+  }
+  for (const d of readdirSync(join(REPO_ROOT, "skills"))) {
+    files.push(`skills/${d}/SKILL.md`);
+  }
+  const routesNonJs = (t) =>
+    /shell:/.test(t) && /non-JS|not JS|bash script/i.test(t);
+  const missing = [];
+  let sites = 0;
+  for (const rel of files) {
+    let text;
+    try {
+      text = read(rel);
+    } catch {
+      continue;
+    }
+    if (!routesNonJs(text)) continue;
+    sites += 1;
+    if (!/cli:/.test(text)) missing.push(rel);
+  }
+  assert.deepEqual(
+    missing,
+    [],
+    "these sites route a non-JS entry but never name cli: — a multi-flag Node CLI has no route from them",
+  );
+  assert.ok(
+    sites >= 5,
+    `only ${sites} site(s) route a non-JS entry — the predicate no longer matches`,
+  );
+});

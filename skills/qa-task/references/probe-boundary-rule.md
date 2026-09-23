@@ -255,7 +255,16 @@ Declining conditions, each reported with its reason:
     vX.Y.Z` footer on stderr — a kill, or a timeout is *errored*: "could not
     look". A script that fails to load therefore folds into one
     `entry-not-probeable` decline instead of scoring as a control that rejects
-    every hostile input.
+    every hostile input. **Only an uncaught error carries that footer**: a CLI
+    that catches its own failure and exits non-zero (a top-level
+    `main().catch(…)` handler) looks exactly like a refusal and is scored
+    *rejected*. When a case must tell "crashed" from "refused" on such a CLI,
+    give it an `expected` that only the refusal produces.
+  - **There is no escape for a literal `{input}`.** Every whole-element
+    `"{input}"` or `"{fixture}"` is a slot, and any other element containing
+    one is refused — so a template cannot hand its target the literal string
+    `{input}` (a CLI whose own argument is a template, the engine itself
+    included). Pass such a value as the case's input instead.
   - **A `--argv` shape error is an argument error, not a probe result:** exit 2,
     `bad-argv`, nothing runs and no record is written (`--argv` without `cli:`,
     `cli:` without `--argv`, zero or two `{input}`, an unknown or embedded
