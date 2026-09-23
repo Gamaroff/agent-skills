@@ -17,18 +17,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  ARGV_SLOTS,
+  CLI_PREFIX,
   OUTCOMES,
   VERDICTS,
   compareExpected,
@@ -37,13 +42,17 @@ import {
   expectedProblem,
   isLaunchFailure,
   main,
+  parseArgvTemplate,
   probeShells,
   readRecord,
+  recordEntriesDir,
+  recordRun,
   resolveEntry,
   runProbeSpec,
   toRecordEntry,
 } from "../security-probe.mjs";
 import { corpusFor } from "../security-input-corpus.mjs";
+import { sandboxEnv } from "../qa-execute-snippets.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = defaultRepoRoot();
@@ -1697,4 +1706,550 @@ test("shell-fn entry: expected.absent may name the case's own input — no per-c
   // The shell: form still refuses it — that form does create the file.
   const sh = runProbeSpec({ sink: "filename", entry: FIXED_SCRIPT, cases });
   assert.match(sh.declined[0].detail, /which the fixture itself creates/);
+});
+
+// ── The cli entry form (task.144) ────────────────────────────────────────────
+//
+// A boundary delivered as a MULTI-FLAG NODE CLI is reached through
+// `cli:<path>` plus an `--argv` template whose one `{input}` element carries the
+// case. The verdict is the exit status (or `expected`, when a case carries one),
+// and the sandbox is the shell arm's. The rows below guard the three things a
+// fourth entry form could get wrong without any existing row noticing: the
+// template contract (refused vs declined), the sandbox (the child's HOME, TMPDIR
+// and cwd), and the record (two templates on one script are two controls).
+
+const CLI = (name) => `cli:${FIXTURES}/cli-${name}.mjs`;
+const HOST_ARGV = ["--mode", "strict", "--host", "{input}"];
+
+/** Run `main` with stdout and stderr captured; returns { rc, out, err }. */
+function runMain(args) {
+  const out = [];
+  const err = [];
+  const w = process.stdout.write.bind(process.stdout);
+  const e = process.stderr.write.bind(process.stderr);
+  process.stdout.write = (c) => (out.push(String(c)), true);
+  process.stderr.write = (c) => (err.push(String(c)), true);
+  let rc;
+  try {
+    rc = main(args);
+  } finally {
+    process.stdout.write = w;
+    process.stderr.write = e;
+  }
+  return { rc, out: out.join(""), err: err.join("") };
+}
+
+test("cli entry: resolveEntry returns kind cli with the same containment, and refuses an export name", () => {
+  const r = resolveEntry(CLI("refuser"), REPO_ROOT);
+  assert.equal(r.ok, true);
+  assert.equal(r.kind, "cli");
+  assert.equal(r.entryPath, join(REPO_ROOT, FIXTURES, "cli-refuser.mjs"));
+  assert.equal(CLI_PREFIX, "cli:");
+  assert.equal(
+    resolveEntry("cli:../../etc/x.mjs", REPO_ROOT).reason,
+    "outside-repo-root",
+  );
+  assert.equal(
+    resolveEntry("cli:/etc/x.mjs", REPO_ROOT).reason,
+    "outside-repo-root",
+  );
+  const hashed = resolveEntry(`${CLI("refuser")}#main`, REPO_ROOT);
+  assert.equal(hashed.reason, "bad-entry");
+  assert.match(hashed.detail, /--argv/);
+  assert.equal(resolveEntry("cli:", REPO_ROOT).reason, "bad-entry");
+});
+
+test("cli entry: parseArgvTemplate accepts whole-element slots and refuses every other shape, by name", () => {
+  assert.deepEqual(ARGV_SLOTS, ["{input}", "{fixture}"]);
+  assert.deepEqual(parseArgvTemplate('["--dir","{fixture}","--x","{input}"]'), {
+    ok: true,
+    template: ["--dir", "{fixture}", "--x", "{input}"],
+  });
+  assert.equal(
+    parseArgvTemplate(["{input}", "{fixture}", "{fixture}"]).ok,
+    true,
+  );
+  const refused = {
+    "not JSON": ["[--x", /not JSON/],
+    "an object": ['{"a":1}', /JSON array of strings/],
+    "a non-string element": ['["{input}", 3]', /element 1 is number/],
+    "no {input}": ['["--x"]', /exactly one "\{input\}" element, got 0/],
+    "two {input}": ['["{input}","{input}"]', /got 2/],
+    "an unknown slot": ['["{input}","{home}"]', /unknown slot \{home\}/],
+    "an embedded slot": ['["--env={input}"]', /embeds \{input\}/],
+    "an embedded fixture": ['["{input}","{fixture}/x"]', /embeds \{fixture\}/],
+    "a NUL": [["{input}", "a\u0000b"], /NUL/],
+  };
+  for (const [name, [raw, re]] of Object.entries(refused)) {
+    const r = parseArgvTemplate(raw);
+    assert.equal(r.ok, false, `${name} must be refused`);
+    assert.match(r.detail, re, name);
+  }
+});
+
+test("cli entry: every malformed --argv / cli: combination exits 2 with bad-argv and writes no record", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-cli-argv-"));
+  try {
+    const record = join(dir, "run.json");
+    const combos = {
+      "cli: without --argv": ["--entry", CLI("refuser")],
+      "--argv on a JS entry": [
+        "--entry",
+        entry("engaging-control"),
+        "--argv",
+        '["{input}"]',
+      ],
+      "--argv on a shell: entry": [
+        "--entry",
+        FIXED_SCRIPT,
+        "--argv",
+        '["{input}"]',
+      ],
+      "two {input}": [
+        "--entry",
+        CLI("refuser"),
+        "--argv",
+        '["{input}","{input}"]',
+      ],
+      "an embedded slot": [
+        "--entry",
+        CLI("refuser"),
+        "--argv",
+        '["--h={input}"]',
+      ],
+      "non-JSON": ["--entry", CLI("refuser"), "--argv", "[oops"],
+    };
+    // Each combination names ITS rule, so a guard shadowed by a later one
+    // (the parser also refuses a missing --argv) is still proved on its own.
+    const NAMED = {
+      "cli: without --argv": /needs --argv/,
+      "--argv on a JS entry": /cli: entry form only/,
+      "--argv on a shell: entry": /cli: entry form only/,
+      "two {input}": /got 2/,
+      "an embedded slot": /embeds \{input\}/,
+      "non-JSON": /not JSON/,
+    };
+    for (const [name, args] of Object.entries(combos)) {
+      const { rc, err } = runMain([
+        "--sink",
+        "url-authority",
+        ...args,
+        "--record",
+        record,
+      ]);
+      assert.equal(rc, 2, `${name}: exit 2`);
+      assert.match(err, /^bad-argv: /, `${name}: named`);
+      assert.match(err, NAMED[name] ?? /./, `${name}: says which rule`);
+      assert.equal(existsSync(record), false, `${name}: no record`);
+      assert.equal(
+        existsSync(recordEntriesDir(record)),
+        false,
+        `${name}: no entry dir`,
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("cli entry: runProbeSpec declines bad-argv for a library caller, and never runs a case", () => {
+  const noArgv = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("refuser"),
+    cases: CASES,
+  });
+  assert.equal(noArgv.reason, "bad-argv");
+  assert.equal(noArgv.verdict, "unverifiable");
+  assert.equal(noArgv.executed, 0);
+  const onJs = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("engaging-control"),
+    cases: CASES,
+    argv: ["{input}"],
+  });
+  assert.equal(onJs.reason, "bad-argv");
+  assert.match(onJs.declined[0].detail, /cli: entry form only/);
+  const bad = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("refuser"),
+    cases: CASES,
+    argv: ["--host"],
+  });
+  assert.equal(bad.reason, "bad-argv");
+  assert.equal(bad.cases.length, 0);
+});
+
+test("cli entry: a script that is not .mjs/.js, or missing, is declined entry-not-probeable before anything spawns", () => {
+  const sh = runProbeSpec({
+    sink: "url-authority",
+    entry: `cli:${FIXTURES}/eval-names.sh`,
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(sh.reason, "entry-not-probeable");
+  assert.match(sh.declined[0].detail, /\.mjs \/ \.js/);
+  const missing = runProbeSpec({
+    sink: "url-authority",
+    entry: `cli:${FIXTURES}/cli-does-not-exist.mjs`,
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(missing.reason, "entry-not-probeable");
+  assert.equal(missing.cases.length, 0);
+});
+
+test("cli entry: a refusing CLI engages — executed equals the case count, one probe per case", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("refuser"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, CASES.length);
+  assert.equal(r.shells, null);
+  assert.deepEqual(r.argv, HOST_ARGV);
+  assert.deepEqual(r.escapes, []);
+  // Exit status is the verdict: the hostile cases exited 3, the legitimate 0.
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry: an inert CLI is present-but-inert and an unguarded one is absent", () => {
+  const inert = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("inert"),
+    cases: CASES,
+    argv: ["--host", "{input}"],
+  });
+  assert.equal(inert.verdict, "present-but-inert");
+  assert.deepEqual(inert.reproduced, ["t.slash"]);
+  const all = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("accept-all"),
+    cases: CASES,
+    argv: ["--host", "{input}"],
+  });
+  assert.equal(all.verdict, "absent");
+  assert.equal(all.executed, CASES.length);
+});
+
+test("cli entry: a CLI that crashes is errored — declined entry-not-probeable, never scored as refusing everything", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("crasher"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  // Exit 1 on every case, which is what a refusal looks like. Scored, the
+  // hostile cases would be "rejected" and the legitimate "rejected" too —
+  // rejects-every-input — and a crash-only-on-hostile CLI would read engages.
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "entry-not-probeable");
+  assert.equal(r.executed, 0);
+  assert.match(r.declined[0].detail, /crashed \(exit 1\).*cannot start/);
+});
+
+test("cli entry: a CLI that never exits is errored by the timeout, not scored", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("hangs"),
+    cases: CASES.slice(0, 1),
+    argv: HOST_ARGV,
+    timeoutMs: 300,
+  });
+  assert.equal(r.reason, "entry-not-probeable");
+  assert.match(r.declined[0].detail, /killed by SIG\w+ \(timeout 300ms\)/);
+});
+
+test("cli entry: the input reaches the CLI as ONE argv element, byte-identical, in the sandbox", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-cli-echo-"));
+  try {
+    const out = join(dir, "echo.jsonl");
+    const inputs = [
+      "two words",
+      `quote " and ' mixed`,
+      "$(touch PWNED) `id` ${HOME}",
+      "-leading-dash",
+      "--looks=like-a-flag",
+      "line\nbreak",
+      "tab\there",
+      "ünïcödé ✓",
+      "",
+    ];
+    const cases = inputs.map((input, i) => ({
+      id: `echo.${i}`,
+      input,
+      direction: "legitimate",
+    }));
+    const CANARY = "PROBE_CLI_PARENT_CANARY";
+    process.env[CANARY] = "must-not-cross";
+    let r;
+    try {
+      r = runProbeSpec({
+        sink: "url-authority",
+        entry: CLI("echo"),
+        cases,
+        argv: ["--out", out, "--x", "{input}", "--dir", "{fixture}"],
+      });
+    } finally {
+      delete process.env[CANARY];
+    }
+    assert.equal(r.executed, inputs.length, JSON.stringify(r.declined));
+    const lines = readFileSync(out, "utf8")
+      .trimEnd()
+      .split("\n")
+      .map(JSON.parse);
+    assert.equal(lines.length, inputs.length);
+    const allowed = new Set([...SANDBOX_ENV_KEYS, "LC_ALL"]);
+    lines.forEach((l, i) => {
+      assert.equal(l.argv.length, 6, `case ${i}: argv count`);
+      assert.equal(l.argv[3], inputs[i], `case ${i}: byte-identical`);
+      // {fixture} is the case's own fixture directory, and it is the cwd
+      // (compared by basename: cwd comes back realpath'd, /private/var on macOS).
+      assert.match(l.argv[5], /[/\\]work[/\\]fixture-[^/\\]+$/);
+      assert.equal(basename(l.argv[5]), basename(l.cwd));
+      // The env is the sandbox's: the parent's canary did not cross, and no
+      // key outside sandboxEnv() + LC_ALL did either — bar the one macOS
+      // CoreFoundation injects into every process it launches.
+      assert.ok(
+        !l.envKeys.includes(CANARY),
+        "the parent env leaked into the child",
+      );
+      for (const k of l.envKeys.filter((k) => !/^__CF_/.test(k)))
+        assert.ok(allowed.has(k), `unexpected env key ${k}`);
+      assert.notEqual(l.home, process.env.HOME);
+      assert.match(l.home, /security-probe-[^/]+\/home$/);
+      assert.match(l.tmp, /security-probe-[^/]+\/tmp$/);
+    });
+    // `$(touch PWNED)` was data: nothing was created anywhere the probe watches.
+    assert.deepEqual(r.escapes, []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** The keys sandboxEnv() carries — read from the function, not restated. */
+const SANDBOX_ENV_KEYS = Object.keys(sandboxEnv({ cwd: "/" }));
+
+test("cli entry: a write to os.homedir() is an escape, and exits 1 even on an engaging verdict", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("writes-home"),
+    cases: CASES,
+    argv: ["--host", "{input}"],
+  });
+  assert.equal(r.verdict, "engages");
+  assert.equal(r.escapes.length, CASES.length);
+  assert.match(r.escapes[0].path, /home[/\\]cli-probe-side-effect$/);
+  const { rc } = runMain([
+    "--sink",
+    "url-authority",
+    "--entry",
+    CLI("writes-home"),
+    "--argv",
+    '["--host","{input}"]',
+  ]);
+  assert.equal(rc, 1);
+});
+
+test("cli entry: a case carrying `expected` is compared, not exit-scored — and a malformed one is declined", () => {
+  const legit = { id: "e.ok", input: "db.internal", direction: "legitimate" };
+  // Exit-scored, an unguarded CLI accepts it (exit 0) ...
+  const byExit = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("accept-all"),
+    cases: [legit],
+    argv: ["--host", "{input}"],
+  });
+  assert.equal(byExit.cases[0].outcome, "accepted");
+  // ... compared against an `expected` it does not meet, the same run is a
+  // mismatch — over-blocked — which only the comparison can see.
+  const compared = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("accept-all"),
+    cases: [{ ...legit, expected: { stdout: "something else\n" } }],
+    argv: ["--host", "{input}"],
+  });
+  assert.equal(compared.cases[0].outcome, "rejected");
+  assert.match(compared.cases[0].detail, /stdout/);
+  // A hostile case whose `expected` the refusal matches is rejected.
+  const hostile = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("refuser"),
+    cases: [
+      {
+        id: "e.bad",
+        input: "a/b",
+        direction: "hostile",
+        expected: { exit: 3 },
+      },
+      { ...legit, expected: { exit: 0, stdout: "db.internal\n" } },
+    ],
+    argv: HOST_ARGV,
+  });
+  assert.equal(hostile.verdict, "engages", JSON.stringify(hostile.cases));
+  const malformed = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("refuser"),
+    cases: [{ ...legit, expected: { stdout: 12 } }],
+    argv: HOST_ARGV,
+  });
+  assert.equal(malformed.executed, 0);
+  assert.match(
+    malformed.declined[0].detail,
+    /expected\.stdout. must be a string/,
+  );
+});
+
+test("cli entry: the record carries the template, keys on it, and leaves every other form's entry-file name unchanged", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-cli-record-"));
+  try {
+    const record = join(dir, "run.json");
+    const a = runProbeSpec({
+      sink: "url-authority",
+      entry: CLI("refuser"),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    const b = runProbeSpec({
+      sink: "url-authority",
+      entry: CLI("refuser"),
+      cases: CASES,
+      argv: ["--host", "{input}", "--mode", "strict"],
+    });
+    const js = runProbeSpec({
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: CASES,
+    });
+    recordRun(record, a, { name: "host-a" });
+    recordRun(record, b, { name: "host-b" });
+    recordRun(record, js, { name: "js" });
+    const rec = readRecord(record);
+    assert.equal(
+      rec.controls.length,
+      3,
+      "two templates on one script are two controls",
+    );
+    const byName = Object.fromEntries(rec.controls.map((c) => [c.name, c]));
+    assert.deepEqual(byName["host-a"].argv, HOST_ARGV);
+    assert.equal(byName.js.argv, null);
+    assert.equal(toRecordEntry(js).argv, null);
+    // The template, never a substituted input.
+    assert.ok(!JSON.stringify(byName["host-a"]).includes("evil.example.com"));
+    // A JS entry's file name is the pre-task.144 key: sha256(sink \0 entry).
+    const legacy = createHash("sha256")
+      .update(`url-authority\u0000${entry("engaging-control")}`)
+      .digest("hex")
+      .slice(0, 24);
+    assert.ok(readdirSync(recordEntriesDir(record)).includes(`${legacy}.json`));
+    // Re-running one template replaces only its own entry.
+    recordRun(record, a, { name: "host-a" });
+    assert.equal(readRecord(record).controls.length, 3);
+    const { out } = runMain(["--emit-block", record]);
+    assert.match(out, /argv: \["--mode","strict","--host","\{input\}"\]/);
+    assert.match(out, /evidence: measured/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("cli entry: every cli result path returns the JS form's key set", () => {
+  const expected = Object.keys(
+    runProbeSpec({
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: CASES,
+    }),
+  ).sort();
+  const paths = {
+    success: { entry: CLI("refuser"), argv: HOST_ARGV },
+    "bad-argv": { entry: CLI("refuser") },
+    "not a script": { entry: `cli:${FIXTURES}/eval-names.sh`, argv: HOST_ARGV },
+    crashed: { entry: CLI("crasher"), argv: HOST_ARGV },
+  };
+  for (const [name, spec] of Object.entries(paths)) {
+    const r = runProbeSpec({ sink: "url-authority", cases: CASES, ...spec });
+    assert.deepEqual(Object.keys(r).sort(), expected, `${name} key set`);
+  }
+});
+
+test("cli entry: the first real consumer — uat-status.mjs --run-path D.1 --env {input} is probed, not declined", () => {
+  // The boundary task.141's finalise could not reach: `--env`'s label guard
+  // lives behind a flag parser and a three-argument function. A minimal
+  // registry is built here rather than imported from the qa-next suite.
+  const root = mkdtempSync(join(tmpdir(), "probe-cli-uat-"));
+  const dir = mkdtempSync(join(tmpdir(), "probe-cli-uat-rec-"));
+  try {
+    mkdirSync(join(root, "docs/qa"), { recursive: true });
+    writeFileSync(
+      join(root, "docs/qa/uat-surfaces.json"),
+      JSON.stringify({
+        excludedPrds: [],
+        defaultSurface: "D",
+        surfaces: [{ letter: "D", title: "Score" }],
+        epicSurface: {},
+        storySurface: {},
+        storyNa: {},
+      }),
+    );
+    writeFileSync(
+      join(root, "docs/qa/uat-registry.md"),
+      [
+        "### D. Score",
+        "",
+        "| # | Function | What it does | Entry | Stories | Items | Automated by | UAT | Last run | Notes / bug |",
+        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+        "| D.1 | Play a game | A visitor plays. | /games |  |  |  | ⬜ untested |  |  |",
+        "",
+      ].join("\n"),
+    );
+    const cases = [
+      ["env.traverse", "../x", "hostile"],
+      ["env.slash", "a/b", "hostile"],
+      ["env.seq", "x-02", "hostile"],
+      ["env.lan", "lan", "legitimate"],
+      ["env.ci", "ci", "legitimate"],
+    ].map(([id, input, direction]) => ({ id, input, direction }));
+    const casesFile = join(dir, "cases.json");
+    writeFileSync(casesFile, JSON.stringify(cases));
+    const record = join(dir, "run.json");
+    const { rc, out } = runMain([
+      "--sink",
+      "path",
+      "--entry",
+      "cli:skills/qa-next/scripts/uat-status.mjs",
+      "--argv",
+      JSON.stringify(["--root", root, "--run-path", "D.1", "--env", "{input}"]),
+      "--cases-file",
+      casesFile,
+      "--record",
+      record,
+      "--name",
+      "uat-status --env",
+      "--json",
+    ]);
+    const r = JSON.parse(out);
+    assert.equal(r.executed, cases.length, JSON.stringify(r.declined));
+    // The verdict as measured before task.143: runPathFor refuses only a
+    // trailing -NN, so `x-02` is rejected and `../x`, `a/b` are accepted — a
+    // control that demonstrably exists and demonstrably lets a hostile label
+    // through. task.143 hardens the guard and updates this assertion.
+    assert.equal(r.verdict, "present-but-inert");
+    assert.deepEqual(r.reproduced.sort(), ["env.slash", "env.traverse"]);
+    assert.equal(rc, 1);
+    const rec = readRecord(record);
+    assert.equal(rec.totals.executed, cases.length);
+    assert.equal(rec.controls[0].argv[5], "{input}");
+    // --run-path creates runs/D.1/ under --root on success. That is the test's
+    // own registry, not the sandbox, so it is not an escape — stated so a later
+    // reader does not take it for one.
+    assert.ok(existsSync(join(root, "docs/qa/runs/D.1")));
+    assert.deepEqual(r.escapes, []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

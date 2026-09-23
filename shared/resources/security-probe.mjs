@@ -7,6 +7,7 @@
  *   node <this-file> --sink <name> --entry <path#exportName> [options]
  *   node <this-file> --sink <name> --entry shell:<path>     [options]
  *   node <this-file> --sink <name> --entry shell-fn:<path>#<function> [--fake-gh <dir>] [options]
+ *   node <this-file> --sink <name> --entry cli:<path> --argv '<JSON array>' [options]
  *
  * Options:
  *   --sink <name>        one of the corpus sinks (see security-input-corpus.mjs)
@@ -19,6 +20,13 @@
  *                        LIBRARY: the file is sourced and the function called
  *                        with the case's input as its argv, per case under bash
  *                        and (when present) zsh. See "The shell-fn entry form".
+ *                        or `cli:relative/path.mjs` — a NODE CLI run with the
+ *                        `--argv` template, one probe per case. See "The cli
+ *                        entry form".
+ *   --argv <json>        the cli: form's argv template — a JSON array of strings
+ *                        with exactly one "{input}" element and optionally
+ *                        "{fixture}" elements. Required with cli:, refused
+ *                        (exit 2, `bad-argv`) with every other form
  *   --cases-file <path>  JSON array of cases, replacing the corpus for this run
  *   --fake-gh <dir>      a directory holding an executable `gh`, prepended to
  *                        PATH for every shell run (with FAKE_GH=1 in its env) so
@@ -104,6 +112,34 @@
  * answers and a real `gh` — or the network — never does. What the function
  * must print is NOT the sink corpus's `expected` (that describes a script
  * printing a gate number): the caller names a cases file with `--cases-file`.
+ *
+ * THE CLI ENTRY FORM (task.144). A boundary delivered as a MULTI-FLAG NODE CLI
+ * matched none of the three forms — the JS runner calls an export with ONE
+ * argument, and `uat-status.mjs`'s `--env` guard lives behind a three-argument
+ * function and a flag parser — so task.141's finalise recorded
+ * `probes_executed: 0` and was accepted over it. `--entry cli:<path> --argv
+ * '<JSON array>'` runs `process.execPath <path> ...argv` per case, with the
+ * template's one `{input}` element replaced by the case's input as ONE argv
+ * element (never split, never parsed by a shell) and each `{fixture}` element by
+ * that case's fixture directory. A slot is a whole element or nothing:
+ * `--x={input}` is refused rather than interpolated, so no argv element is ever
+ * built by string concatenation from probe input. The sandbox is the shell
+ * arm's — the fixture sits inside the sandbox root, HOME and TMPDIR point inside
+ * it, stdin is empty, and the script's own directory is watched — because a
+ * Node CLI can write to `os.homedir()` exactly as a shell script can write to
+ * `$HOME`. THE VERDICT IS THE EXIT STATUS: exit 0 is `accepted`, non-zero is
+ * `rejected`, which is a contract the CLI must honour — one that exits 0 while
+ * refusing is scored as accepting, and a case that needs a finer signal carries
+ * `expected`, which is then compared exactly as the shell arm compares it. A
+ * CLI that CRASHES (an uncaught error: Node's own `Node.js vX.Y.Z` footer on
+ * stderr), is killed, or times out is `errored` — "could not look", never a
+ * refusal — so a script that fails to load is declined `entry-not-probeable`
+ * rather than scored as a control that rejects everything. A `--argv` shape
+ * error is an argument error (exit 2, nothing runs, no record); an entry that
+ * escapes the root or is not a `.mjs`/`.js` regular file is a named decline,
+ * as for every other form. The record carries the template as `argv`, and a
+ * `cli:` control's key includes it, so two templates probing one script
+ * (`--env {input}`, `--clear-note {input}`) are two controls, not one.
  */
 
 import { spawnSync } from "node:child_process";
@@ -266,11 +302,14 @@ export function defaultRepoRoot() {
  * import — and returns `kind: "shell"` with no export name. The
  * `shell-fn:<path>#<function>` form takes it too and returns `kind: "shell-fn"`
  * with the function name; the name must be one a shell would accept as a
- * function name, because it is called by name after the source.
+ * function name, because it is called by name after the source. The
+ * `cli:<path>` form (task.144) takes the same containment and returns
+ * `kind: "cli"`; its arguments come from `--argv`, never from the entry.
  *
  * @returns {{ok: true, kind: "js", entryPath: string, exportName: string}
  *          |{ok: true, kind: "shell", entryPath: string}
  *          |{ok: true, kind: "shell-fn", entryPath: string, fnName: string}
+ *          |{ok: true, kind: "cli", entryPath: string}
  *          |{ok: false, reason: string, detail: string}}
  */
 export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
@@ -289,10 +328,20 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
   }
   const isShellFn = entry.startsWith(SHELL_FN_PREFIX);
   const isShell = !isShellFn && entry.startsWith(SHELL_PREFIX);
+  const isCli = entry.startsWith(CLI_PREFIX);
   let rawPath;
   let exportName = null;
   let fnName = null;
-  if (isShellFn) {
+  if (isCli) {
+    rawPath = entry.slice(CLI_PREFIX.length);
+    if (rawPath.trim() === "" || rawPath.includes("#")) {
+      return {
+        ok: false,
+        reason: "bad-entry",
+        detail: `entry must be "cli:path" with no export name — the arguments go in --argv, got "${entry}"`,
+      };
+    }
+  } else if (isShellFn) {
     const body = entry.slice(SHELL_FN_PREFIX.length);
     const hash = body.lastIndexOf("#");
     if (hash <= 0 || hash === body.length - 1) {
@@ -358,6 +407,7 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
       detail: `${entryPath} is under node_modules`,
     };
   }
+  if (isCli) return { ok: true, kind: "cli", entryPath };
   if (isShellFn) return { ok: true, kind: "shell-fn", entryPath, fnName };
   return isShell
     ? { ok: true, kind: "shell", entryPath }
@@ -368,6 +418,72 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
 export const SHELL_PREFIX = "shell:";
 /** The entry-spec prefix that selects the sourced-function form (task.136). */
 export const SHELL_FN_PREFIX = "shell-fn:";
+/** The entry-spec prefix that selects the Node CLI form (task.144). */
+export const CLI_PREFIX = "cli:";
+/**
+ * The slots a `--argv` template may carry. A slot is a WHOLE element: an
+ * element that merely contains one (`--env={input}`) is refused, so the case's
+ * input is only ever an argv element of its own, never spliced into a string.
+ */
+export const ARGV_SLOTS = Object.freeze(["{input}", "{fixture}"]);
+/** Anything shaped like a slot, known or not — used to refuse unknown and embedded ones. */
+const SLOT_SHAPE = /\{[A-Za-z_][A-Za-z0-9_-]*\}/;
+/** Script extensions the cli: form runs under `process.execPath`. */
+const CLI_EXTENSIONS = Object.freeze([".mjs", ".js"]);
+
+/**
+ * Validate a `--argv` template (task.144). Accepts the CLI's JSON text or an
+ * already-parsed array (the `runProbeSpec` boundary). One validator for both
+ * callers, so the CLI's exit 2 and the library's `bad-argv` decline cannot
+ * disagree about what a well-formed template is.
+ *
+ * @returns {{ok: true, template: string[]} | {ok: false, detail: string}}
+ */
+export function parseArgvTemplate(raw) {
+  let value = raw;
+  if (typeof raw === "string") {
+    try {
+      value = JSON.parse(raw);
+    } catch (e) {
+      return { ok: false, detail: `--argv is not JSON: ${e.message}` };
+    }
+  }
+  if (!Array.isArray(value)) {
+    return { ok: false, detail: "--argv must be a JSON array of strings" };
+  }
+  const bad = value.findIndex((a) => typeof a !== "string");
+  if (bad !== -1) {
+    return {
+      ok: false,
+      detail: `--argv element ${bad} is ${describeType(value[bad])}, not a string`,
+    };
+  }
+  // A NUL cannot be an argv element — spawnSync throws on one, out of a
+  // function whose contract is to return a verdict (the BUG-3 shape).
+  if (value.some((a) => a.includes("\0"))) {
+    return { ok: false, detail: "--argv element contains a NUL byte" };
+  }
+  for (const a of value) {
+    if (ARGV_SLOTS.includes(a)) continue;
+    const m = a.match(SLOT_SHAPE);
+    if (m) {
+      return {
+        ok: false,
+        detail: ARGV_SLOTS.includes(m[0])
+          ? `--argv element "${a}" embeds ${m[0]} — a slot must be a whole element, never part of one`
+          : `--argv element "${a}" names unknown slot ${m[0]} — known: ${ARGV_SLOTS.join(", ")}`,
+      };
+    }
+  }
+  const inputs = value.filter((a) => a === "{input}").length;
+  if (inputs !== 1) {
+    return {
+      ok: false,
+      detail: `--argv must carry exactly one "{input}" element, got ${inputs}`,
+    };
+  }
+  return { ok: true, template: [...value] };
+}
 /**
  * `gh` as a command word somewhere in a library's text — the signal that a
  * shell-fn run needs `--fake-gh` (QA cycle 2, CR-2). A mention in a comment
@@ -562,6 +678,8 @@ export function computeVerdict(caseResults) {
  * @param {Array}  [spec.cases]    caller-supplied cases in the corpus shape
  * @param {string} [spec.fakeGh]   directory holding an executable `gh`, prepended to PATH
  *                                 for every shell run (shell and shell-fn forms)
+ * @param {string[]|string} [spec.argv] the cli: form's argv template (task.144) —
+ *                                 required with cli:, a `bad-argv` decline with any other form
  * @param {number} [spec.timeoutMs] per-case timeout; defaults to the shared spawn budget
  * @param {string} [spec.repoRoot] containment root; defaults to the repository root
  * @returns {{sink, entry, verdict, reason, executed, passed, reproduced, overblocked, declined, cases}}
@@ -571,6 +689,7 @@ export function runProbeSpec({
   entry,
   cases,
   fakeGh,
+  argv,
   timeoutMs,
   repoRoot = defaultRepoRoot(),
 } = {}) {
@@ -612,6 +731,9 @@ export function runProbeSpec({
     // The directory whose `gh` answered the shell runs, or null. Stated in the
     // result so the record says what answered (task.136).
     fakeGh: null,
+    // The cli: form's argv TEMPLATE, or null (task.144). The template, never a
+    // substituted input: the record says how the CLI was called, not with what.
+    argv: null,
   };
 
   // `declined` is its own state and is NEVER folded into `executed: 0`. Both
@@ -629,7 +751,42 @@ export function runProbeSpec({
   const resolved = resolveEntry(entry, repoRoot);
   if (!resolved.ok) return decline(resolved.reason, resolved.detail);
   const isShellForm = resolved.kind === "shell" || resolved.kind === "shell-fn";
-  if (isShellForm) {
+  const isCliForm = resolved.kind === "cli";
+  // `argv` is validated HERE as well as in `main()`: this is the boundary a
+  // library caller crosses, and the CLI's exit 2 would otherwise be the only
+  // guard. The same validator, so the two cannot disagree (task.144).
+  let template = null;
+  const argvGiven = argv !== undefined && argv !== null;
+  if (isCliForm) {
+    if (!argvGiven) {
+      return decline(
+        "bad-argv",
+        'the cli: entry form needs --argv — a JSON array with one "{input}" element',
+      );
+    }
+    const parsed = parseArgvTemplate(argv);
+    if (!parsed.ok) return decline("bad-argv", parsed.detail);
+    template = parsed.template;
+  } else if (argvGiven) {
+    return decline(
+      "bad-argv",
+      "--argv applies to the cli: entry form only — the other forms take their input from the case",
+    );
+  }
+  base.argv = template;
+  if (
+    isCliForm &&
+    !CLI_EXTENSIONS.some((x) => resolved.entryPath.endsWith(x))
+  ) {
+    // Run under process.execPath, so a .sh, .py or extensionless file would be
+    // handed to node and fail to parse on every case — declined here, once, by
+    // name, rather than surfacing as N identical crashes.
+    return decline(
+      "entry-not-probeable",
+      `${resolved.entryPath} is not a ${CLI_EXTENSIONS.join(" / ")} script — the cli: form runs it with node`,
+    );
+  }
+  if (isShellForm || isCliForm) {
     // The script must be a readable regular file BEFORE anything is compared.
     // Without this a missing path made every run exit 127, every case mismatch
     // `expected`, and the verdict read `absent` with executed = cases × shells —
@@ -663,7 +820,9 @@ export function runProbeSpec({
     if (!isShellForm) {
       return decline(
         "bad-fake-gh",
-        "--fake-gh applies to the shell entry forms only (shell:, shell-fn:) — a JS export never consults PATH",
+        isCliForm
+          ? "--fake-gh applies to the shell entry forms only (shell:, shell-fn:) — a CLI that consults gh is a networked CLI, which the cli: form does not probe"
+          : "--fake-gh applies to the shell entry forms only (shell:, shell-fn:) — a JS export never consults PATH",
       );
     }
     if (typeof fakeGh !== "string" || fakeGh.trim() === "") {
@@ -737,8 +896,10 @@ export function runProbeSpec({
   // A shell child's HOME and TMPDIR live INSIDE the sandbox root, outside the
   // work dir, so a side effect written to either is an escape the sentinel
   // sees rather than a write to the reader's real home (task.128 QA cycle 3,
-  // BUG-12). The JS runner keeps sandboxEnv()'s values: its child never sees
-  // a shell.
+  // BUG-12). The cli: child gets the same (task.144) — a Node CLI writes to
+  // os.homedir() and os.tmpdir() as readily as a script writes to $HOME. The
+  // JS runner keeps sandboxEnv()'s values: its child imports one export and
+  // never sees a shell.
   const sandboxHome = join(sandboxRoot, "home");
   const sandboxTmp = join(sandboxRoot, "tmp");
   mkdirSync(sandboxHome);
@@ -749,6 +910,22 @@ export function runProbeSpec({
   const shells = isShellForm ? probeShells() : null;
   try {
     for (const c of probeCases) {
+      if (isCliForm) {
+        runCliCase(c, {
+          sink,
+          entryPath: resolved.entryPath,
+          template,
+          sandboxRoot,
+          sandboxHome,
+          sandboxTmp,
+          workDir,
+          workDirName,
+          timeoutMs: perCaseTimeout,
+          caseResults,
+          escapes,
+        });
+        continue;
+      }
       if (isShellForm) {
         runShellCase(c, {
           sink,
@@ -891,6 +1068,7 @@ export function runProbeSpec({
     escapes,
     cases: caseResults,
     fakeGh: fakeGhDir,
+    argv: template,
   };
 }
 
@@ -994,6 +1172,86 @@ function listDirStamps(dir) {
 }
 
 /**
+ * Make one case's fixture directory inside `workDir` — the sink's controls,
+ * plus (when `writeInput`) a file named by the case's input. Shared by the
+ * shell arm and the cli: arm (task.144), so the two cannot drift on how a
+ * fixture is built. THROWS on a name the filesystem refuses; the caller turns
+ * that into a declined case.
+ *
+ * The case's own name is appended RAW: `join` normalises "/" and "..", which
+ * would turn a traversal name into a write outside the fixture, so any
+ * separator in it is a decline, not a normalised path.
+ */
+function materialiseFixture(workDir, controls, input, { writeInput }) {
+  const fixtureDir = mkdtempSync(join(workDir, "fixture-"));
+  for (const control of controls) {
+    writeFileSync(join(fixtureDir, control), "");
+  }
+  if (writeInput) {
+    if (input.includes("/") || input.includes("\0")) {
+      throw new Error("name carries a path separator or NUL");
+    }
+    writeFileSync(`${fixtureDir}/${input}`, "");
+  } else if (input.includes("\0")) {
+    throw new Error("input carries a NUL");
+  }
+  return fixtureDir;
+}
+
+/**
+ * The env a sandboxed per-case child runs under: `sandboxEnv()` with HOME and
+ * TMPDIR moved inside the sandbox root (so a write to either is an escape the
+ * sentinel sees — BUG-12) and `LC_ALL=C` (so glob order is byte order). Shared
+ * by the shell and cli: arms (task.144).
+ */
+function caseEnv({ fixtureDir, sandboxHome, sandboxTmp }) {
+  return {
+    ...sandboxEnv({ cwd: fixtureDir }),
+    HOME: sandboxHome,
+    TMPDIR: sandboxTmp,
+    LC_ALL: "C",
+  };
+}
+
+/**
+ * Spawn one per-case child with its escape sentinels around it: the sandbox
+ * root (minus the work dir) and, non-recursively, the target's OWN directory —
+ * a `cd "$(dirname "$0")"` idiom, or a Node CLI resolving paths from
+ * `import.meta.url`, writes its side effect there, in the real tree, where
+ * neither the fixture check nor the sandbox sentinel looks (BUG-12). ARGV, never
+ * a string; stdin empty. Shared by the shell and cli: arms (task.144).
+ */
+function watchedSpawn(
+  command,
+  argv,
+  { cwd, env, timeoutMs },
+  { sandboxRoot, workDirName, scriptDir, escapes, escapeId, shell = null },
+) {
+  const before = snapshotTree(sandboxRoot, workDirName);
+  const scriptDirBefore = listDirStamps(scriptDir);
+  const child = spawnSync(command, argv, {
+    input: "",
+    cwd,
+    env,
+    encoding: "utf8",
+    timeout: timeoutMs,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  const tag = shell === null ? {} : { shell };
+  const after = snapshotTree(sandboxRoot, workDirName);
+  for (const [path, stamp] of after) {
+    if (before.get(path) !== stamp)
+      escapes.push({ id: escapeId, ...tag, path });
+  }
+  for (const [name, stamp] of listDirStamps(scriptDir)) {
+    if (scriptDirBefore.get(name) !== stamp) {
+      escapes.push({ id: escapeId, ...tag, path: join(scriptDir, name) });
+    }
+  }
+  return child;
+}
+
+/**
  * Run one MATERIALISED case against a shell script, once per shell.
  *
  * Pushes one entry onto `caseResults` per (case, shell) — that is the unit
@@ -1087,29 +1345,15 @@ function runShellCase(
     // not be read as one from the zsh run.
     let fixtureDir;
     try {
-      fixtureDir = mkdtempSync(join(workDir, "fixture-"));
-      for (const control of fixture.controls) {
-        writeFileSync(join(fixtureDir, control), "");
-      }
-      // The case's own name. `join` normalises "/" and "..", which would turn
-      // a traversal name into a write outside the fixture — so the name is
-      // appended raw and any separator in it is a decline, not a normalised
-      // path.
-      //
       // The shell-fn form gets the input as ARGV, not as a directory entry, so
       // it does not need the file — and must not be declined for a name a
       // file cannot carry: a real label such as `area/backend` is exactly the
       // kind of input a label filter must be probed with (task.136 QA cycle
       // 1, CR-3). The controls are still written, so `absent` and the cwd
       // sentinel keep their meaning.
-      if (fnName === null) {
-        if (c.input.includes("/") || c.input.includes("\0")) {
-          throw new Error("name carries a path separator or NUL");
-        }
-        writeFileSync(`${fixtureDir}/${c.input}`, "");
-      } else if (c.input.includes("\0")) {
-        throw new Error("input carries a NUL");
-      }
+      fixtureDir = materialiseFixture(workDir, fixture.controls, c.input, {
+        writeInput: fnName === null,
+      });
     } catch (e) {
       caseResults.push({
         id: c.id,
@@ -1121,8 +1365,6 @@ function runShellCase(
       continue;
     }
 
-    const before = snapshotTree(sandboxRoot, workDirName);
-    const scriptDirBefore = listDirStamps(scriptDir);
     // ARGV, never a string: the script path and the directory are $1 and $2
     // of a fixed one-line body. Building `bash <script> <dir>` as text would
     // put a caller-supplied path through a second parse, which is the class
@@ -1150,42 +1392,26 @@ function runShellCase(
             fnName,
             c.input,
           ];
-    const env = {
-      ...sandboxEnv({ cwd: fixtureDir }),
-      HOME: sandboxHome,
-      TMPDIR: sandboxTmp,
-      LC_ALL: "C",
-    };
+    const env = caseEnv({ fixtureDir, sandboxHome, sandboxTmp });
     if (fakeGhDir !== null) {
       // First on PATH, and armed: the fixture's `gh` refuses to run without
       // FAKE_GH=1, so a stray invocation from any other context exits 2.
       env.PATH = `${fakeGhDir}:${env.PATH}`;
       env.FAKE_GH = "1";
     }
-    const child = spawnSync(shell, argv, {
-      input: "",
-      cwd: fixtureDir,
-      env,
-      encoding: "utf8",
-      timeout: timeoutMs,
-      maxBuffer: 8 * 1024 * 1024,
-    });
-    const after = snapshotTree(sandboxRoot, workDirName);
-    for (const [path, stamp] of after) {
-      if (before.get(path) !== stamp) {
-        escapes.push({ id: `${c.id}@${shell}`, shell, path });
-      }
-    }
-    const scriptDirAfter = listDirStamps(scriptDir);
-    for (const [name, stamp] of scriptDirAfter) {
-      if (scriptDirBefore.get(name) !== stamp) {
-        escapes.push({
-          id: `${c.id}@${shell}`,
-          shell,
-          path: join(scriptDir, name),
-        });
-      }
-    }
+    const child = watchedSpawn(
+      shell,
+      argv,
+      { cwd: fixtureDir, env, timeoutMs },
+      {
+        sandboxRoot,
+        workDirName,
+        scriptDir,
+        escapes,
+        escapeId: `${c.id}@${shell}`,
+        shell,
+      },
+    );
 
     let outcome;
     let detail = null;
@@ -1243,6 +1469,160 @@ function runShellCase(
   }
 }
 
+/**
+ * Node's own footer on an uncaught error: the last stderr line reads
+ * `Node.js vX.Y.Z`. It is how a CRASH is told apart from a refusal — both exit
+ * non-zero, and only one of them is the CLI answering. Matched on the exact
+ * version the child ran under, since the child is always `process.execPath`.
+ */
+const NODE_FATAL_FOOTER = new RegExp(
+  `(?:^|\\n)Node\\.js ${escapeRegExp(process.version)}\\s*$`,
+);
+
+/**
+ * Run one case against a Node CLI through its `--argv` template (task.144).
+ *
+ * One probe per case — Node is the runtime, so there is no shell multiplicity.
+ * The template's `{input}` element becomes the case's input as ONE argv element
+ * and each `{fixture}` element becomes this case's fixture directory, which is
+ * built by the same helper the shell arm uses: the sink's controls plus the
+ * case's own name when the sink is in `MATERIALISED_SINKS`, otherwise empty.
+ *
+ * Outcome:
+ *   killed, timed out, never ran, or crashed      → "errored" (could not look)
+ *   no `expected`: exit 0                          → "accepted"
+ *   no `expected`: exit non-zero                   → "rejected"
+ *   `expected`: compared, mapped through direction → as the shell arm
+ * A crash is Node's fatal-error footer on stderr. Scoring it as a refusal
+ * would let a script that fails to LOAD read as a control that rejects every
+ * hostile input; errored, every case folds into one `entry-not-probeable`.
+ */
+function runCliCase(
+  c,
+  {
+    sink,
+    entryPath,
+    template,
+    sandboxRoot,
+    sandboxHome,
+    sandboxTmp,
+    workDir,
+    workDirName,
+    timeoutMs,
+    caseResults,
+    escapes,
+  },
+) {
+  const fixture = MATERIALISED_SINKS[c.sink ?? sink] ?? null;
+  const decline = (detail) =>
+    caseResults.push({
+      id: c.id,
+      direction: c.direction,
+      outcome: "errored",
+      detail,
+    });
+  if (typeof c.input !== "string") {
+    decline(
+      `case input is ${describeType(c.input)}, not a string — an argv element is a string`,
+    );
+    return;
+  }
+  const hasExpected = c.expected !== undefined;
+  if (hasExpected) {
+    // Declined, never scored — the BUG-8 / BUG-11 rule the shell arm applies.
+    const problem = expectedProblem(c.expected);
+    if (problem !== null) {
+      decline(`case's ${problem}`);
+      return;
+    }
+    const collides = (c.expected.absent ?? []).find(
+      (p) =>
+        fixture !== null && (fixture.controls.includes(p) || p === c.input),
+    );
+    if (collides !== undefined) {
+      decline(
+        `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
+      );
+      return;
+    }
+  }
+
+  let fixtureDir;
+  try {
+    fixtureDir =
+      fixture === null
+        ? materialiseFixture(workDir, [], c.input, { writeInput: false })
+        : materialiseFixture(workDir, fixture.controls, c.input, {
+            writeInput: true,
+          });
+  } catch (e) {
+    decline(`fixture: cannot materialise "${c.input}": ${e.message}`);
+    return;
+  }
+
+  // Whole-element substitution only — parseArgvTemplate refused any element
+  // that merely CONTAINS a slot, so nothing here builds a string from input.
+  const args = template.map((a) =>
+    a === "{input}" ? c.input : a === "{fixture}" ? fixtureDir : a,
+  );
+  const child = watchedSpawn(
+    process.execPath,
+    [entryPath, ...args],
+    {
+      cwd: fixtureDir,
+      env: caseEnv({ fixtureDir, sandboxHome, sandboxTmp }),
+      timeoutMs,
+    },
+    {
+      sandboxRoot,
+      workDirName,
+      scriptDir: dirname(entryPath),
+      escapes,
+      escapeId: c.id,
+    },
+  );
+
+  let outcome;
+  let detail = null;
+  if (neverRan(child)) {
+    outcome = "errored";
+    detail = child.signal
+      ? `killed by ${child.signal} (timeout ${timeoutMs}ms)`
+      : `never ran: ${child.error?.message ?? "no exit status"}`;
+  } else if (NODE_FATAL_FOOTER.test(child.stderr ?? "")) {
+    outcome = "errored";
+    const first = (child.stderr ?? "")
+      .split("\n")
+      .find((l) => /^\w*Error\b|^Error:/.test(l.trim()));
+    detail = `the CLI crashed (exit ${child.status}) rather than answering: ${(first ?? "uncaught error").trim().slice(0, 160)}`;
+  } else if (hasExpected) {
+    const mismatches = compareExpected(c.expected, child, fixtureDir);
+    const matched = mismatches.length === 0;
+    outcome =
+      c.direction === "hostile"
+        ? matched
+          ? "rejected"
+          : "accepted"
+        : matched
+          ? "accepted"
+          : "rejected";
+    detail = matched ? null : mismatches.join("; ");
+  } else {
+    outcome = child.status === 0 ? "accepted" : "rejected";
+    detail =
+      child.status === 0
+        ? null
+        : `exit ${child.status}: ${(child.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`;
+  }
+  caseResults.push({
+    id: c.id,
+    direction: c.direction,
+    outcome,
+    detail,
+    exit: child.status,
+  });
+}
+
 // ── The run record ───────────────────────────────────────────────────────────
 //
 // `probes_executed` and `evidence` in a review's output block used to be typed
@@ -1285,7 +1665,15 @@ export const SEVERITY_BY_VERDICT = Object.freeze({
   unverifiable: "unverifiable",
 });
 
-const controlKey = (c) => `${c.sink ?? ""}\u0000${c.entry ?? ""}`;
+// A cli: control is also keyed by its argv TEMPLATE (task.144): two templates
+// probing one script — `--env {input}` and `--clear-note {input}` — are two
+// controls, and keyed on {sink, entry} alone the second run would replace the
+// first in the fold with nothing to say so. Every other form has `argv: null`
+// (or no key, in a record written before this), so its key — and therefore its
+// entry-file name — is byte-identical to what it was.
+const controlKey = (c) =>
+  `${c.sink ?? ""}\u0000${c.entry ?? ""}` +
+  (Array.isArray(c.argv) ? `\u0000${JSON.stringify(c.argv)}` : "");
 
 /**
  * Reduce a `runProbeSpec` result to the per-control entry the record stores.
@@ -1312,6 +1700,9 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     // the record must say what answered, not leave a reader to assume the
     // real one did not.
     fake_gh: typeof result.fakeGh === "string" ? result.fakeGh : null,
+    // The cli: form's argv template (task.144), or null for every other form.
+    // Part of the control's key — see controlKey.
+    argv: Array.isArray(result.argv) ? [...result.argv] : null,
     ran_at: new Date().toISOString(),
   };
 }
@@ -1596,6 +1987,11 @@ export function emitBlock(record, { mode = "diff" } = {}) {
         ...(Array.isArray(c.shells) && c.shells.length > 0
           ? [`      shells: [${c.shells.join(", ")}]`]
           : []),
+        // A JSON array of strings is a valid YAML flow sequence. Printed so two
+        // cli: controls on one script read as two in the block (task.144).
+        ...(Array.isArray(c.argv)
+          ? [`      argv: ${JSON.stringify(c.argv)}`]
+          : []),
       );
     }
   }
@@ -1610,6 +2006,7 @@ const OPERAND_FLAGS = Object.freeze({
   "--entry": "entry",
   "--cases-file": "casesFile",
   "--fake-gh": "fakeGh",
+  "--argv": "argv",
   "--repo-root": "repoRoot",
   "--record": "record",
   "--name": "name",
@@ -1690,13 +2087,38 @@ export function main(argv = process.argv.slice(2)) {
   }
   if (!opts.entry) {
     process.stderr.write(
-      "--entry <path#exportName | shell:path | shell-fn:path#function> is required\n",
+      "--entry <path#exportName | shell:path | shell-fn:path#function | cli:path> is required\n",
     );
     return 2;
   }
   if (!opts.sink && !opts.casesFile) {
     process.stderr.write("one of --sink or --cases-file is required\n");
     return 2;
+  }
+
+  // `--argv` shape errors are ARGUMENT errors (task.144): exit 2 before any
+  // case runs and before any record is touched. runProbeSpec applies the same
+  // validator and declines `bad-argv` for a library caller; here the flag is
+  // wrong, not the probe, and a wrong flag must not write a record entry.
+  const isCliEntry = opts.entry.startsWith(CLI_PREFIX);
+  if (isCliEntry && opts.argv === undefined) {
+    process.stderr.write(
+      'bad-argv: the cli: entry form needs --argv — a JSON array with one "{input}" element\n',
+    );
+    return 2;
+  }
+  if (!isCliEntry && opts.argv !== undefined) {
+    process.stderr.write(
+      "bad-argv: --argv applies to the cli: entry form only\n",
+    );
+    return 2;
+  }
+  if (isCliEntry) {
+    const parsed = parseArgvTemplate(opts.argv);
+    if (!parsed.ok) {
+      process.stderr.write(`bad-argv: ${parsed.detail}\n`);
+      return 2;
+    }
   }
 
   let cases;
@@ -1723,6 +2145,7 @@ export function main(argv = process.argv.slice(2)) {
     entry: opts.entry,
     cases,
     fakeGh: opts.fakeGh,
+    argv: opts.argv,
     timeoutMs: opts.timeoutMs,
     ...(opts.repoRoot ? { repoRoot: resolve(opts.repoRoot) } : {}),
   });
