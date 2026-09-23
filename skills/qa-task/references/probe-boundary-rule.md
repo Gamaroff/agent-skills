@@ -258,11 +258,13 @@ Declining conditions, each reported with its reason:
     every hostile input. **Only an uncaught error carries that footer**: a CLI
     that catches its own failure and exits non-zero (a top-level
     `main().catch(…)` handler) looks exactly like a refusal and is scored
-    *rejected*. An `expected` does not rescue it: under `expected` the crash
-    simply mismatches, so a *hostile* case scores **accepted** — reported as a
-    reproduction. That is a false alarm a reader will investigate, never a false
-    pass, which is the direction the engine errs in on purpose; it is not
-    "could not look".
+    *rejected* — **a false pass** on a hostile case, because a crash reads as
+    a refusal. Give such a case an `expected` that only a genuine refusal
+    produces (the refusal's own stderr line, say): the crash then mismatches,
+    and a hostile case scores **accepted** — reported as a reproduction. That
+    turns the false pass into a false alarm a reader will investigate, which is
+    the direction to err in. Neither makes the crash *errored*: only Node's
+    uncaught-error footer, a kill or a timeout does.
   - **A materialised sink writes the case's name into the fixture.** For a sink
     in `MATERIALISED_SINKS` the fixture directory holds the sink's controls
     *and* a file named by the case's input — the cwd, and `{fixture}`, are what
@@ -280,12 +282,19 @@ Declining conditions, each reported with its reason:
     `cli:` without `--argv`, zero or two `{input}`, an unknown or embedded
     slot). An entry outside the root, or one that is not a `.mjs` / `.js`
     regular file, is a named decline like every other form's. The record carries
-    the template as `argv`, and a `cli:` control is keyed on its **guarded
-    flag** — the element before `"{input}"`, or the position of `"{input}"`
-    when it is positional — so probing `--env {input}` and
-    `--clear-note {input}` on one script records two controls, while a
-    re-run of `--env {input}` with a different scratch path or `--root`
-    replaces its own entry rather than adding a second one.
+    the template as `argv`, and a `cli:` control is keyed on its **argv
+    skeleton**: every flag and every bare positional, in order, with only the
+    *values* of flags dropped (`--root /tmp/x` → `--root *`, `--cases=/a.json` →
+    `--cases=*`) and the slots kept. So `--env {input}` and
+    `--clear-note {input}` are two controls, `--set D.1 blocked --note {input}`
+    and `--accept D.1 --note {input}` are two controls, `add {input}` and
+    `remove {input}` are two controls — and a re-run of one of them with a
+    different scratch path or `--root` replaces its own entry. The one reading
+    rule: an element that follows a flag and is neither a flag nor a slot is
+    that flag's **value**. A bare positional placed right after a *boolean* flag
+    is therefore read as its value and dropped, and a value that begins with
+    `-` is read as a flag and kept; give such a probe its own `--name` and
+    order the template so the positional does not follow a boolean flag.
 
   `cli:` does **not** touch §2: the engine chooses the interpreter
   (`process.execPath`) and the script is fixed by `--entry` and

@@ -34,6 +34,7 @@ import { fileURLToPath } from "node:url";
 import {
   ARGV_SLOTS,
   CLI_PREFIX,
+  cliControlKey,
   OUTCOMES,
   VERDICTS,
   compareExpected,
@@ -2103,7 +2104,7 @@ test("cli entry: a case carrying `expected` is compared, not exit-scored — and
   );
 });
 
-test("cli entry: the record carries the template, keys on it, and leaves every other form's entry-file name unchanged", () => {
+test("cli entry: the record carries the template, keys on its skeleton, and leaves every other form's entry-file name unchanged", () => {
   const dir = mkdtempSync(join(tmpdir(), "probe-cli-record-"));
   try {
     const record = join(dir, "run.json");
@@ -2146,7 +2147,7 @@ test("cli entry: the record carries the template, keys on it, and leaves every o
       .digest("hex")
       .slice(0, 24);
     assert.ok(readdirSync(recordEntriesDir(record)).includes(`${legacy}.json`));
-    // Re-running one template replaces only its own entry.
+    // Re-running one control replaces only its own entry.
     recordRun(record, a, { name: "host-a" });
     assert.equal(readRecord(record).controls.length, 3);
     const { out } = runMain(["--emit-block", record]);
@@ -2256,7 +2257,7 @@ test("cli entry: the first real consumer — uat-status.mjs --run-path D.1 --env
 });
 
 test("cli entry: re-running one control with a different per-run operand REPLACES its entry (task.144 QA-1)", () => {
-  // The control is the GUARDED FLAG, not the whole template. Keyed on the
+  // The control is the argv SKELETON, not the whole template. Keyed on the
   // template, a re-run whose only difference is a per-run path (a scratch
   // --cases-file, a mkdtemp --root) recorded a second control: one control run
   // twice read as two, executed was counted twice, and the first verdict stayed
@@ -2308,6 +2309,64 @@ test("cli entry: re-running one control with a different per-run operand REPLACE
       );
     }
     assert.equal(readRecord(record).controls.length, 3);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("cli entry: the control key is the template skeleton — values dropped, flags and positionals kept (task.144 QA cycle 3, CR-1)", () => {
+  // Keyed on the flag before "{input}" alone, two DIFFERENT controls that share
+  // an input flag merged: uat-status's --set … --note {input} and --accept …
+  // --note {input} both keyed as --note, and add {input} / remove {input} as
+  // #1 — the later run silently replaced the earlier. The skeleton keeps every
+  // flag and bare positional and drops only the VALUES of flags, so per-run
+  // paths still collapse while dispatch flags and subcommands stay distinct.
+  const k = cliControlKey;
+  // Different dispatch, same guarded flag → different controls.
+  assert.notEqual(
+    k(["--set", "D.1", "blocked", "--note", "{input}"]),
+    k(["--accept", "D.1", "--note", "{input}"]),
+  );
+  // Different subcommand, same slot position → different controls.
+  assert.notEqual(k(["add", "{input}"]), k(["remove", "{input}"]));
+  // Different guarded flag → different controls.
+  assert.notEqual(
+    k(["--host", "db.internal", "--mode", "{input}"]),
+    k(["--mode", "strict", "--host", "{input}"]),
+  );
+  // A flag's VALUE is dropped: a per-run path, a scratch root, a row id.
+  assert.equal(
+    k(["--root", "/tmp/a", "--run-path", "D.1", "--env", "{input}"]),
+    k(["--root", "/var/x/b", "--run-path", "D.1", "--env", "{input}"]),
+  );
+  assert.equal(
+    k(["--cases=/tmp/a.json", "--host", "{input}"]),
+    k(["--cases=/tmp/b.json", "--host", "{input}"]),
+  );
+  // A slot is kept wherever it sits, including as a flag's value.
+  assert.notEqual(
+    k(["--dir", "{fixture}", "--x", "{input}"]),
+    k(["--dir", "/d", "--x", "{input}"]),
+  );
+  // End to end: the uat-status pair lands in two record entries.
+  const dir = mkdtempSync(join(tmpdir(), "probe-cli-skeleton-"));
+  try {
+    const record = join(dir, "run.json");
+    for (const argv of [
+      ["--mode", "strict", "--set", "{input}"],
+      ["--mode", "strict", "--accept", "D.1", "--set", "{input}"],
+    ]) {
+      recordRun(
+        record,
+        runProbeSpec({
+          sink: "url-authority",
+          entry: CLI("accept-all"),
+          cases: CASES,
+          argv,
+        }),
+      );
+    }
+    assert.equal(readRecord(record).controls.length, 2);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

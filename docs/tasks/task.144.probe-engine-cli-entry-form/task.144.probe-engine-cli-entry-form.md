@@ -130,11 +130,12 @@ that name the entry forms (`probe-boundary-rule.md`, the two security prompts, a
   already named by the `entry` string's prefix, so no `kind` is added. The control key that names an
   entry file and dedupes the fold is `{sink, entry}` today, which would let two `cli:` probes of the
   same script with different templates (`--env {input}` vs `--clear-note {input}`) overwrite each
-  other; for a `cli:` entry the key also carries the **guarded flag** — the element before
-  `"{input}"`, or its position when `{input}` is positional — and for every other form it is
-  byte-identical to today's so existing entry-file names do not move (review.1, I1). Not the whole
-  template: a template carries per-run operands (a scratch `--cases-file`, a mkdtemp `--root`), and
-  keyed on those a re-run of one control recorded a second one (QA cycle 2, QA-1).
+  other; for a `cli:` entry the key also carries the **argv skeleton** — its flags and bare
+  positionals in order, with only the values of flags dropped — and for every other form it is
+  byte-identical to today's so existing entry-file names do not move (review.1, I1). Two earlier
+  keys each failed one way: the whole template kept per-run operands (a scratch `--cases-file`, a
+  mkdtemp `--root`), so a re-run of one control recorded a second one (QA cycle 2, QA-1); the flag
+  before `{input}` alone merged different controls that share an input flag (QA cycle 3, CR-1).
 
 ### Important Clarifications
 
@@ -202,7 +203,7 @@ no existing record field changes meaning, and the control key — hence every ex
 - [x] Factor the per-case materialisation **and** the per-case env (sandbox `HOME`/`TMPDIR`, `LC_ALL=C`) out of `runShellCase` into helpers both arms call (no second copy)
 - [x] `runCliCase`: per-case fixture dir inside `workDir` (materialised when the sink is in `MATERIALISED_SINKS`), argv substituted, `spawnSync(process.execPath, [script, ...argv])`, stdin empty, shared env, timeout; sandbox sentinel and script-dir snapshot around the run
 - [x] Outcome: without `expected`, exit 0 accepted / non-zero rejected; with `expected`, `expectedProblem` then `compareExpected` mapped through `direction` as the shell arm; spawn/timeout/signal errored
-- [x] Record entries carry `argv` (template, or `null`); the control key includes the guarded flag for `cli:` entries only; totals unchanged in shape
+- [x] Record entries carry `argv` (template, or `null`); the control key includes the argv skeleton for `cli:` entries only; totals unchanged in shape
 - [x] Tests: a fixture CLI that refuses correctly (`engages`), one whose guard lets one hostile case through (`present-but-inert`), one that accepts everything (`absent`), one that crashes (`errored` → `unverifiable`)
 
 **Dependencies**: Phase 1
@@ -264,7 +265,7 @@ None.
 - **Refusals** (exit 2, `bad-argv`, no record): `--argv` without `cli:`; `cli:` without `--argv`;
   zero or two `{input}`; an unknown slot; a slot inside a larger element; a non-array or non-string
   element. **Declines** (exit 1, named): a path outside `--repo-root`; a non-`.mjs`/`.js` script.
-- **Record**: `argv` holds the template, not the input; two guarded flags against one script produce
+- **Record**: `argv` holds the template, not the input; two different controls (different flags, dispatch or subcommand) against one script produce
   two entries, a re-run of one flag with a different path operand replaces its entry; a JS /
   `shell:` / `shell-fn:` entry's file name is unchanged.
 - **Scoring with `expected`**: a case carrying `expected` is compared, not exit-scored.
@@ -294,7 +295,7 @@ None.
 - [x] `--entry cli:<path> --argv '[…{input}…]'` runs every corpus case for the sink and writes a record with `probes_executed` equal to the case count
 - [x] A correct refuser scores `engages`, an inert guard `present-but-inert`, an accept-all `absent`, a crasher `unverifiable`
 - [x] Every malformed `--argv` / `cli:` combination exits 2 with `bad-argv` and writes no record; an entry outside `--repo-root` or not a `.mjs`/`.js` regular file is a named decline (`outside-repo-root` / `entry-not-probeable`), as for every other form
-- [x] Two `cli:` probes of one script with different guarded flags land in two record entries, not one; a re-run of one flag replaces its own entry
+- [x] Two different `cli:` controls on one script (a different guarded flag, dispatch flag or subcommand) land in two record entries, not one; a re-run of one control with a different path operand replaces its own entry
 - [x] A case input reaches the CLI as exactly one argv element, byte-identical
 
 ### Performance
@@ -372,6 +373,7 @@ None.
 | 2026-09-23 |  | Implemented — 15 files (plus bundled copies), 15 tests, 14 mutations proved; accept-all verdict corrected to absent | develop |
 | 2026-09-23 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-09-23 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-09-23 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 
 ---
 <!-- change-log-end -->
@@ -395,21 +397,20 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.144.qa.2.probe-engine-cli-entry-form.md](./task.144.qa.2.probe-engine-cli-entry-form.md)
-- **Gate File**: [task.144.gate.2.probe-engine-cli-entry-form.yml](./task.144.gate.2.probe-engine-cli-entry-form.yml)
-- **Previous**: [qa.1](./task.144.qa.1.probe-engine-cli-entry-form.md) · [gate.1](./task.144.gate.1.probe-engine-cli-entry-form.yml)
+- **Full Report**: [task.144.qa.3.probe-engine-cli-entry-form.md](./task.144.qa.3.probe-engine-cli-entry-form.md)
+- **Gate File**: [task.144.gate.3.probe-engine-cli-entry-form.yml](./task.144.gate.3.probe-engine-cli-entry-form.yml)
+- **Previous**: [qa.2](./task.144.qa.2.probe-engine-cli-entry-form.md) · [gate.2](./task.144.gate.2.probe-engine-cli-entry-form.yml) · [qa.1](./task.144.qa.1.probe-engine-cli-entry-form.md) · [gate.1](./task.144.gate.1.probe-engine-cli-entry-form.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3962 (fast gate) — cycle 1 fix tests mutation-proved
+- **Tests Executed**: 3963 (fast gate) — cycle 2 fix tests mutation-proved
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- QA-1 (medium, reproduced): a `cli:` control keyed on its whole template records a second control when a re-run differs only in a per-run path (2 controls, executed 4).
-- CR-2 (low): the `{sink, entry}` record-identity statements are stale for `cli:`.
+- CR-1 (medium): keying a `cli:` control on its guarded flag alone merges distinct controls that share it (`--set … --note {input}` / `--accept … --note {input}`).
 
 ---
 

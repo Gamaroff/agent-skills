@@ -165,7 +165,7 @@ the skill and is `unverifiable` before it is ever imported — and every probe i
 the same `--record <path>` (the record sits beside the
 report as `{stem}.security.{N}.run.json`; each probe writes its own control's entry file under
 `{stem}.security.{N}.run.json.d/` and the engine folds the directory — a re-run of the same
-`{sink, entry}` — and, for a `cli:` control, the same guarded flag, the element before `"{input}"` —
+`{sink, entry}` — and, for a `cli:` control, the same argv skeleton (its flags and positionals, with flag values dropped) —
 replaces only its own entry, and concurrent probes never share a write), and the
 block is the output of:
 

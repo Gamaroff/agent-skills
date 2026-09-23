@@ -138,16 +138,15 @@
  * rather than scored as a control that rejects everything. Only an UNCAUGHT
  * error carries that footer: a CLI that catches its own failure and exits
  * non-zero (`main().catch(e => { console.error(e); process.exitCode = 1 })`)
- * is indistinguishable from one that refused, and is scored `rejected`.
- * `expected` does not turn such a crash into "could not look": under it the
- * crash simply mismatches, so a HOSTILE case scores `accepted` — a reported
- * reproduction, i.e. a false alarm a reader will investigate, never a false
- * pass (QA cycle 2, CR-3). A `--argv` shape
+ * is indistinguishable from one that refused, and is scored `rejected` — a
+ * FALSE PASS on a hostile case. An `expected` that only a genuine refusal
+ * produces turns it into a false alarm (the crash mismatches, so a hostile
+ * case scores `accepted`); neither makes it `errored` (QA cycles 2–3). A `--argv` shape
  * error is an argument error (exit 2, nothing runs, no record); an entry that
  * escapes the root or is not a `.mjs`/`.js` regular file is a named decline,
  * as for every other form. The record carries the template as `argv`, and a
- * `cli:` control's key is its GUARDED FLAG (the element before "{input}"),
- * so two guarded flags probing one script
+ * `cli:` control's key is its argv SKELETON (flags and positionals kept, flag
+ * values dropped — see controlKey), so two different controls on one script
  * (`--env {input}`, `--clear-note {input}`) are two controls, not one.
  */
 
@@ -1646,7 +1645,7 @@ function runCliCase(
 //
 // One record per review, one ENTRY FILE per control. `--record <path>` writes
 // this run's control to `<path>.d/<key>.json` — an atomic temp+rename to a name
-// derived from `{sink, entry}` (plus, for a cli: control, its guarded flag —
+// derived from `{sink, entry}` (plus, for a cli: control, its argv skeleton —
 // see controlKey), so two controls never share a file and a re-run
 // of the same control replaces only its own — and then writes the folded
 // snapshot at `<path>` for readers. `readRecord` folds the entry directory,
@@ -1672,25 +1671,49 @@ export const SEVERITY_BY_VERDICT = Object.freeze({
   unverifiable: "unverifiable",
 });
 
-// A cli: control is also keyed by its GUARDED FLAG (task.144): the template
-// element immediately before "{input}" when it is a flag, else the position of
-// "{input}" — `--env {input}` and `--clear-note {input}` on one script are two
-// controls, and keyed on {sink, entry} alone the second run would replace the
-// first with nothing to say so. NOT the whole template: real templates carry
-// per-run operands (a scratch --cases-file, a mkdtemp --root), and keyed on
-// those a re-run of the same control recorded a SECOND control — one control
-// run twice read as two, executed counted twice, the first verdict never
-// retired (QA-1, reproduced). Every other form has `argv: null` (or no key, in
-// a record written before this), so its key — and therefore its entry-file
-// name — is byte-identical to what it was.
-export function cliControlSlot(template) {
-  const i = template.indexOf("{input}");
-  const prev = i > 0 ? template[i - 1] : null;
-  return typeof prev === "string" && prev.startsWith("-") ? prev : `#${i}`;
+// A cli: control is also keyed by its argv SKELETON (task.144): every flag and
+// every bare positional, in order, with only the VALUES of flags dropped
+// (`--root /tmp/x` → `--root *`, `--cases=/a.json` → `--cases=*`) and the slots
+// kept wherever they sit. Two earlier keys each failed in one direction, and
+// this is the replacement rather than a third patch:
+//   - the whole template (first design) kept per-run operands, so a re-run of
+//     ONE control with a different scratch path or mkdtemp --root recorded a
+//     second control — executed counted twice, the first verdict never retired
+//     (QA cycle 2, QA-1, reproduced);
+//   - the element before "{input}" alone (cycle 2's fix) dropped too much, so
+//     two DIFFERENT controls sharing an input flag merged — uat-status's
+//     `--set D.1 blocked --note {input}` and `--accept D.1 --note {input}` both
+//     keyed as --note, and `add {input}` / `remove {input}` as #1 (cycle 3, CR-1).
+// The skeleton's one reading rule: an element that follows a flag and is not
+// itself a flag or a slot is that flag's value. So a bare positional placed
+// right after a BOOLEAN flag reads as its value and is dropped, and a value
+// that starts with "-" reads as a flag and is kept — both stated in
+// probe-boundary-rule.md §5. Every other form has `argv: null` (or no key, in a
+// record written before this), so its key — and therefore its entry-file name
+// — is byte-identical to what it was.
+export function cliControlKey(template) {
+  const isSlot = (a) => ARGV_SLOTS.includes(a);
+  const isFlag = (a) => a.startsWith("-") && !isSlot(a);
+  const out = [];
+  for (let i = 0; i < template.length; i += 1) {
+    const a = template[i];
+    if (isSlot(a)) out.push(a);
+    else if (isFlag(a)) {
+      const eq = a.indexOf("=");
+      out.push(eq > 0 ? `${a.slice(0, eq)}=*` : a);
+    } else if (
+      i > 0 &&
+      isFlag(template[i - 1]) &&
+      !template[i - 1].includes("=")
+    ) {
+      out.push("*");
+    } else out.push(a);
+  }
+  return JSON.stringify(out);
 }
 const controlKey = (c) =>
   `${c.sink ?? ""}\u0000${c.entry ?? ""}` +
-  (Array.isArray(c.argv) ? `\u0000${cliControlSlot(c.argv)}` : "");
+  (Array.isArray(c.argv) ? `\u0000${cliControlKey(c.argv)}` : "");
 
 /**
  * Reduce a `runProbeSpec` result to the per-control entry the record stores.
@@ -1808,7 +1831,7 @@ export function readRecord(recordPath, { readdir = readdirSync } = {}) {
 }
 
 /**
- * One control per `{sink, entry}` (and guarded flag, for a cli: control),
+ * One control per `{sink, entry}` (and argv skeleton, for a cli: control),
  * latest run wins. The writer already
  * guarantees this by file name, but the fold must not depend on it: a copy of
  * an entry under another name would otherwise count one control twice (CR7-3).
@@ -1852,7 +1875,7 @@ function writeAtomic(target, text) {
 
 /**
  * Record one probe run: write this control's entry file under `<path>.d/`
- * (atomic, named from `{sink, entry}` and, for cli:, the guarded flag), then fold the directory into the
+ * (atomic, named from `{sink, entry}` and, for cli:, the argv skeleton), then fold the directory into the
  * snapshot at `<path>`. Concurrent runs of different controls write different
  * files and never contend; a re-run of the same control replaces only its own.
  * Returns the folded record.

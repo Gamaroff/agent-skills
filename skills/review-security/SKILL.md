@@ -87,7 +87,7 @@ Invoke as `/review-security [work-item] [--mode diff|full]`.
    `--repo-root "$(git rev-parse --show-toplevel)"` and
    `--record {work-item-dir}/{stem}.security.{N}.run.json` (plus `--name` and `--call-site`) for
    **every** control — `--repo-root` because an installed copy's default containment root is the
-   skill directory, and a repo-relative entry resolved there is `unverifiable` before it is imported — the record accumulates one entry per `{sink, entry}` (and guarded flag, for a `cli:` control) and is the only place the
+   skill directory, and a repo-relative entry resolved there is `unverifiable` before it is imported — the record accumulates one entry per `{sink, entry}` (and argv skeleton, for a `cli:` control) and is the only place the
    probe count is allowed to come from.
 6. **Write the report** to `{work-item-dir}/{stem}.security.{N}.{name}.md`, including the
    `security_review:` machine block — **pasted from

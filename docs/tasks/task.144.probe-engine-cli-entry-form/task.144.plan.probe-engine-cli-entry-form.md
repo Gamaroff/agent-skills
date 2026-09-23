@@ -63,11 +63,12 @@ function runCliCase(c, { sink, entryPath, template, workDir, sandboxHome, sandbo
 - One executed probe per case (no shell multiplicity — Node is the runtime).
 - Record entries: a new `argv` key — the template, not the substituted input — `null` for every
   other form. There is no `kind` field on a record entry; the `entry` prefix names the form.
-- `controlKey` (the entry-file name and the fold's dedupe key) gains the **guarded flag** for `cli:`
-  entries only (`cliControlSlot`: the element before `{input}`, else its position), so two guarded
-  flags against one script are two controls and a re-run of one replaces it; other forms' keys are
-  byte-identical. (The whole template was the first design; QA cycle 2 reproduced re-runs adding
-  controls, QA-1.)
+- `controlKey` (the entry-file name and the fold's dedupe key) gains the **argv skeleton** for `cli:`
+  entries only (`cliControlKey`: flags and bare positionals kept in order, flag values dropped,
+  slots kept), so two different controls against one script are two entries and a re-run of one
+  with a different path operand replaces it; other forms' keys are byte-identical. (Superseded
+  designs: the whole template — re-runs added controls, QA cycle 2 QA-1; the flag before `{input}`
+  alone — distinct controls sharing a flag merged, QA cycle 3 CR-1.)
 - `--argv` validation lives in one function used by `main` (exit 2 `bad-argv`, before any record
   write) and `runProbeSpec` (decline `bad-argv`).
 
