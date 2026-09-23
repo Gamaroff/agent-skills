@@ -664,10 +664,10 @@ historical naming.
 
 ## QA Testing Results
 
-**QA Status**: PASS — cycle 10 of 10 (third grant); Cosmetic-residue exit to 5c
+**QA Status**: CONCERNS — cycle 11 of 11 (fourth grant); 1 MEDIUM open
 **Testing Date**: 2026-09-23
-**Quality Score**: 100/100
-**Gate Decision**: PASS — no HIGH or MEDIUM; three LOW carried to future
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS — no HIGH for seven consecutive gates
 
 ### QA Reports
 
@@ -683,15 +683,16 @@ historical naming.
 | 8 | [gate.8](./task.141.gate.8.qa-next-targeted-item.yml) | [qa.8](./task.141.qa.8.qa-next-targeted-item.md) | CONCERNS (80) | 0 |
 | 9 | [gate.9](./task.141.gate.9.qa-next-targeted-item.yml) | [qa.9](./task.141.qa.9.qa-next-targeted-item.md) | CONCERNS (80) | 0 |
 | 10 | [gate.10](./task.141.gate.10.qa-next-targeted-item.yml) | [qa.10](./task.141.qa.10.qa-next-targeted-item.md) | PASS (100) | 0 |
+| 11 | [gate.11](./task.141.gate.11.qa-next-targeted-item.yml) | [qa.11](./task.141.qa.11.qa-next-targeted-item.md) | CONCERNS (90) | 0 |
 
-Budget: 10 (5 + 2 + 2 + 1 granted). **22 defects found and closed across ten cycles; 46 mutations, none left surviving.**
+Budget: 11 (5 + 2 + 2 + 1 + 1 granted). Cycle 10 passed; PR review 1 (CONCERNS) found 6 more, fixed in `4d805a47`; cycle 11 found the one reader that fix missed.
 
 ### Test Coverage Summary
 
 - **Tests Executed**: 3947 (0 failures, 1 skipped); qa-next suite 44
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
 
@@ -732,6 +733,7 @@ prose rule), and the loop closed those boundaries one pair at a time.
 | 2026-09-23 |  | QA cycle 8 (second grant, 1/2) — gate CONCERNS (80/100); 3 findings (2 MEDIUM, 1 LOW) — the fragment strip reopened validated-vs-published on a third axis | qa-task |
 | 2026-09-23 |  | QA cycle 9 (second grant, 2/2) — gate CONCERNS (80/100); 2 MEDIUM — `bug` does not round-trip through `--bug` (since the original commit); the rule names the wrong resolving base | qa-task |
 | 2026-09-23 |  | QA cycle 10 (third grant) — gate PASS (100/100); no defect in the cycle-9 fix; 3 LOW carried to future (Cosmetic-residue exit, route 2b) | qa-task |
+| 2026-09-23 |  | QA cycle 11 (fourth grant) — gate CONCERNS (90/100); 1 MEDIUM (Step 6 reads priorRuns after deleting the state file), 2 LOW | qa-task |
 <!-- change-log-end -->
 
 ---

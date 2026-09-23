@@ -1,0 +1,86 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: CONCERNS
+status_reason: "No HIGH for the seventh consecutive gate. The review-driven fix (4d805a47) holds on four of its five findings: the literal id, the run-path prose, the debug.log anchoring and the closed bug reports are all verified. The fifth (CR-2, the state file carries priorRuns and bug) aligned the Step 4 and Step 5 readers but missed Step 6, which prints the run number and previous link AFTER deleting the state file and has no resume entry, so it can only re-query --item and count the run just committed."
+reviewer: 'QA Engineer'
+updated: '2026-09-23T08:38:28Z'
+
+top_issues:
+  - id: 'TASK-141-BUG-22'
+    severity: medium
+    file: 'skills/qa-next/SKILL.md'
+    finding: "Step 6 prints 'which run of this function it is and a link to the previous one' (added by this PR) but deletes the state file first and does not name it as the source, and the resume map has no entry for phase committed. A resumed or literal Step 6 must re-query --item, whose priorRuns now includes the run just committed, so a 1st run is reported as a re-run whose previous link is itself. This is the reader the cycle-10 CR-2 fix did not enumerate."
+    suggested_action: 'Have Step 6 take the run number and previous link from the state file before deleting it, and add committed → Step 6 to the resume map.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+  - id: 'TASK-141-CR11-4'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "The rule says 'link text in which `bug.` starts a word', but `\\b` also treats `_` and digits as word characters, so `[x_bug.1](…)` and `[1bug.2](…)` are skipped as prose, and the clause test pins only `debug.`."
+    suggested_action: 'Say that the character before bug. must not be a letter, digit or underscore, or add clause rows for x_bug. and 1bug. to pin the \\b behaviour.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+  - id: 'TASK-141-CR11-5'
+    severity: low
+    file: 'docs/tasks/task.141.qa-next-targeted-item/task.141.bug.3.description-angle-brackets-fails-validate.md'
+    finding: 'The Status History sections added to bug.3 and bug.4 go straight from New to Closed, although both reports were fixed (In Progress → Ready for QA) in cycle 2, which bug.1 and bug.2 record.'
+    suggested_action: 'Add the In Progress and Ready for QA rows from cycle 2 to both histories.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3947
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged across eleven cycles. BUG_LINK_RE was probed in memory by the reviewer against 8 link texts; no probe engine run.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. 44 tests in the qa-next suite.'
+  reliability:
+    status: PASS
+    notes: 'The code change (\\b anchoring) is verified; M47 reds on its removal.'
+  maintainability:
+    status: CONCERNS
+    notes: "BUG-22: the executed prose still has one reader of priorRuns (Step 6) that does not use the state file, and no resume entry for phase committed."
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-23'
+  total_iterations: 11
+  verification_method: 'M49 (only letters block bug.) and M50 (README rule reverted) red; BUG-22 is prose, re-read against every priorRuns reader and every state-file lifetime statement in SKILL.md. 50 mutations across the loop, none left surviving.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-22: Step 6 reads the run number and previous link from the state file before deleting it; add committed → Step 6 to the resume map.'
+      refs: ['skills/qa-next/SKILL.md']
+  future:
+    - action: "CR11-2 (pre-existing, identical on origin/develop): nothing in SKILL.md passes --registry, so a non-default qaNext.registryPath is never seen by the tool; define <registry dir> from registryPath and pass --registry, or state that only the default is supported."
+      refs: ['skills/qa-next/SKILL.md']
+    - action: "CR11-3 (pre-existing): cmdSet's run.startsWith(registryDir) guess misreads a registry-relative path when the registry directory is a string prefix of runs/…; always join the printed path onto registryDir."
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR10-1..3 (carried from gate 10), CR9-3, CR8-2 + CR7-4, bug.16, CR-3, and the kept-✅ note growth: unchanged.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'BUG-22 fixed'

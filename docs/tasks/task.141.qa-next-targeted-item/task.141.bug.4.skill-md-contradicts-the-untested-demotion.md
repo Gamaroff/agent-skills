@@ -55,4 +55,6 @@ other statements about the same subject.
 | Date       | Status       | Changed By | Notes |
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-22 | New          | qa-task    | Found in QA cycle 2 |
+| 2026-09-22 | In Progress  | qa-fix     | Fixed in QA cycle 2 |
+| 2026-09-22 | Ready for QA | qa-fix     | Cycle-2 fix committed; verification pending |
 | 2026-09-23 | Closed       | qa-task    | Verified FIXED in QA cycle 3 ([qa.3](./task.141.qa.3.qa-next-targeted-item.md)); closure recorded late, prompted by PR review 1 PC-1 |

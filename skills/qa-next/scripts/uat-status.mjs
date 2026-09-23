@@ -552,7 +552,7 @@ function bugLinkPaths(notes) {
 // verbatim by the README, which a test holds to this string. Worded in the predicate's own terms:
 // the checker cannot know who wrote a link, only what its text and target look like.
 export const BUG_LINK_RULE =
-  "every bug link in **Notes / bug** — link text in which `bug.` starts a word, target a path relative to the registry file — must resolve, on **any** row; a `#fragment` is ignored, and a link with a scheme (`https:`), a `//host` or only an `#anchor` is prose and is skipped";
+  "every bug link in **Notes / bug** — link text in which `bug.` is not preceded by a letter, digit or underscore, target a path relative to the registry file — must resolve, on **any** row; a `#fragment` is ignored, and a link with a scheme (`https:`), a `//host` or only an `#anchor` is prose and is skipped";
 
 const FINDING_ROW = /^\|\s*(\d+)\s*\|(.*)\|(.*)\|(.*)\|(.*)\|\s*$/;
 const BUG_CLOSED = /^(closed|done|fixed|resolved)$/i;

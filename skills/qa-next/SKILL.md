@@ -79,7 +79,7 @@ Apply any project-wide command conventions from the consumer project's own CLAUD
 
 `targeted` is true when the invocation named an id. A resume at `phase: selected` then re-resolves *that* id with `--item`, rather than falling back to `--next` and quietly testing a different function.
 
-Resume on re-run: `phase: recorded` → Step 5; `executed` → Step 4; `resolved` → Step 3; `selected` → Step 2. If the registry row for `item` is no longer ⬜ and the phase is `selected`, someone else finished it — delete the state file and start over. **This applies to an untargeted run only**: under `"targeted": true` a non-⬜ row is the premise, not evidence about anyone else, so the resume re-resolves the id instead.
+Resume on re-run: `phase: committed` → Step 6; `recorded` → Step 5; `executed` → Step 4; `resolved` → Step 3; `selected` → Step 2. If the registry row for `item` is no longer ⬜ and the phase is `selected`, someone else finished it — delete the state file and start over. **This applies to an untargeted run only**: under `"targeted": true` a non-⬜ row is the premise, not evidence about anyone else, so the resume re-resolves the id instead.
 
 **`priorRuns` and `bug` are copied from the payload into the state file at selection, and every later step reads them from there — never from a fresh `--item`.** Both describe the row *as it was when this run began*. Re-querying after Step 4 writes the run file returns a `priorRuns` that includes the run just written, so a resumed first run would be numbered and committed as a re-run.
 
@@ -208,11 +208,13 @@ Push to `baseBranch`. Apply the consumer project's commit-trailer rules. Update 
 
 ## Step 6 — Report and stop
 
-Delete the state file. Print: the function, its verdict, the run file — with which run of this function it is and a link to the previous one when there was one — the bug (if any), whether the lane ran and how it went, this run's findings with what each was filed as, the scoreboard (`uat-status.mjs` with no flags — it ends with the uncovered-story and open-findings counts), and — for a 🟡 — the exact command the owner runs to accept it:
+Print — reading which run this is and the previous run's link from the **state file's** `priorRuns`, never from a fresh `--item`, which would count the run just committed — the function, its verdict, the run file with which run of this function it is and a link to the previous one when there was one, the bug (if any), whether the lane ran and how it went, this run's findings with what each was filed as, the scoreboard (`uat-status.mjs` with no flags — it ends with the uncovered-story and open-findings counts), and — for a 🟡 — the exact command the owner runs to accept it:
 
 ```bash
 node .agents/skills/qa-next/scripts/uat-status.mjs --accept <id> --note "<optional>"
 ```
+
+**Then delete the state file** — last, because until the report is printed it is the only record of `priorRuns` as it stood before this run.
 
 For a 🟡 with no lane spec, also print the hand-off: `uat-automate <id>` (or, until that skill exists in the consumer, "the run file's Automation candidate block is the spec's brief; when the spec lands, `--automated <id> "<path>"`").
 
