@@ -664,10 +664,10 @@ historical naming.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS — 7 of 7 cycles run; cycle-7 fixes ungated
+**QA Status**: CONCERNS — cycle 8 of 9 (second grant); 3 findings, all closed in-cycle (2 fixed, 1 by decision); cycle-8 fixes ungated
 **Testing Date**: 2026-09-23
-**Quality Score**: 85/100
-**Gate Decision**: CONCERNS — no HIGH for three consecutive gates
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS — no HIGH for four consecutive gates
 
 ### QA Reports
 
@@ -680,38 +680,34 @@ historical naming.
 | 5 | [gate.5](./task.141.gate.5.qa-next-targeted-item.yml) | [qa.5](./task.141.qa.5.qa-next-targeted-item.md) | FAIL (60) | 1 |
 | 6 | [gate.6](./task.141.gate.6.qa-next-targeted-item.yml) | [qa.6](./task.141.qa.6.qa-next-targeted-item.md) | CONCERNS (80) | 0 |
 | 7 | [gate.7](./task.141.gate.7.qa-next-targeted-item.yml) | [qa.7](./task.141.qa.7.qa-next-targeted-item.md) | CONCERNS (85) | 0 |
+| 8 | [gate.8](./task.141.gate.8.qa-next-targeted-item.yml) | [qa.8](./task.141.qa.8.qa-next-targeted-item.md) | CONCERNS (80) | 0 |
 
-Budget: 7 (5 + 2 granted), spent. **17 defects found and closed. 34 mutations, none survived.**
+Budget: 9 (5 + 2 + 2 granted). **17 defects closed through cycle 7; cycle 8 opened 3** (BUG-18,
+BUG-19, CR8-3).
 
 ### Test Coverage Summary
 
 - **Tests Executed**: 3944 (0 failures, 1 skipped); qa-next suite 41
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
-### Key Finding — two structural changes, and one rule stated three times
+### Key Findings
 
-The loop's two turning points both replaced something that must be *maintained* with something that
-*holds itself*:
-
-- **Cycle 3** — an enumeration of the flags that write the note cell → the operation "append, never
-  replace". Closed the class after two enumerations each missed a door.
-- **Cycle 7** — an alignment between the reader that publishes a bug link and the checker that
-  validates one → **one shared predicate**. Closed the class after cycle 6 fixed the divergence on
-  one axis and reopened it on another.
-
-Maintainability stays CONCERNS for a reason found in the last cycle: the bug-link rule was stated in
-**three** places — `checkRegistry`, the README, and the skeleton `--init` writes into every new
-registry. Cycle 6 updated one. The third had gone unnoticed for six cycles and was found by grepping
-for the rule rather than by being told about it.
+Cycle 7's shared predicate holds on the link-shape axis. Its fragment strip reopened the
+validated-vs-published divergence on a third axis: `--check` validates `linkTarget(link)` while
+`--item` publishes `link`. A `#repro` link therefore passes `--check` and is handed to Step 4 as a
+path that cannot be opened (**BUG-18**). The two prose restatements of the rule still diverge from
+the code, and the README hunk deleted a sentence that is still true (**BUG-19**). The fix that
+closes the class shares the *value*, not only the predicate. Both were fixed in-cycle: `bugLinkPaths` is the one value
+both sides consume, and `BUG_LINK_RULE` is the one wording, held by a test.
 
 ---
-
 <!-- change-log-start -->
-
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-22 | 1.0     | Initial draft | create-task |
 | 2026-09-22 | 1.1     | Review 1 (7/10 → 9/10): fixed the run-file ordering defect (`listRunFiles` sort key), widened the kept-`✅` rule to `blocked`/`na`, refused `--clear-note` on a kept `✅`, added `notes`/`bug` to the payload, gated the resume staleness rule on `targeted` | review-task |
 | 2026-09-22 |         | Status → ready-for-development | review-task |
@@ -723,7 +719,7 @@ for the rule rather than by being told about it.
 | 2026-09-22 |         | QA cycle 5 — gate FAIL (60/100); render/parse idempotence, every-bug-link validation, suppression withdrawn; **loop limit reached** | qa-task |
 | 2026-09-23 |         | QA cycle 6 (granted 1/2) — gate CONCERNS (80/100); round trip verified adversarially; bug-link validation corrected on both axes | qa-task |
 | 2026-09-23 |         | QA cycle 7 (granted 2/2) — gate CONCERNS (85/100); validated-vs-published closed structurally by one shared predicate; budget spent | qa-task |
-
+| 2026-09-23 |  | QA cycle 8 (second grant, 1/2) — gate CONCERNS (80/100); 3 findings (2 MEDIUM, 1 LOW) — the fragment strip reopened validated-vs-published on a third axis | qa-task |
 <!-- change-log-end -->
 
 ---

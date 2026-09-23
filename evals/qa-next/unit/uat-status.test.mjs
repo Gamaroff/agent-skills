@@ -43,6 +43,7 @@ const {
   runPathFor,
   STATES,
   COLUMNS,
+  BUG_LINK_RULE,
 } = await import(TOOL);
 
 const HEAD = `| # | Function | What it does | Entry | Stories | Items | Automated by | UAT | Last run | Notes / bug |
@@ -1746,8 +1747,8 @@ test("the link --check validates IS the link --item publishes (TASK-141-BUG-16)"
   // the LINK-SHAPE axis: checkRegistry learned to skip a prose URL, describeRow did not, so the
   // very fixture the cycle-6 test declares legal was --check green while the payload handed the
   // skill `https://example.com/issues/99` — which SKILL.md Step 4 opens to append a re-test
-  // section. Both now go through one `isToolWrittenLink`, so this asserts the PROPERTY (the two
-  // agree) rather than either behaviour alone.
+  // section. Both now consume one `bugLinkPaths` (predicate + fragment strip, cycle 8), so this
+  // asserts the PROPERTY (the two agree) rather than either behaviour alone.
   const root = corpus();
   run(root, "--init");
   mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
@@ -1795,9 +1796,11 @@ test("the link --check validates IS the link --item publishes (TASK-141-BUG-16)"
   assert.equal(JSON.parse(run(root2, "--item", "D.1", "--json").out).bug, null);
 });
 
-test("a #fragment on a repo-relative bug link resolves to the file (TASK-141-CR7-3)", () => {
+test("a #fragment on a repo-relative bug link resolves, and the payload is the path that was verified (TASK-141-CR7-3, BUG-18)", () => {
   // `../bugs/bug.1.real.md#repro` names a file that exists. Reporting it missing is a check that
-  // is wrong about the filesystem, and on a fail row it HALTs the consuming skill.
+  // is wrong about the filesystem, and on a fail row it HALTs the consuming skill. And the payload
+  // must publish the path --check called `exists` on, not the href: cycle 7 stripped the fragment
+  // on the checking side only, so --check passed a link whose published form Step 4 cannot open.
   const root = corpus();
   run(root, "--init");
   mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
@@ -1817,9 +1820,47 @@ test("a #fragment on a repo-relative bug link resolves to the file (TASK-141-CR7
     0,
     "the fragment is stripped before the exists check",
   );
+  const payload = JSON.parse(run(root, "--item", "D.1", "--json").out);
   assert.equal(
-    JSON.parse(run(root, "--item", "D.1", "--json").out).bug,
-    "../bugs/bug.1.real.md#repro",
-    "but the payload keeps the link verbatim — the anchor is the author's",
+    payload.bug,
+    "../bugs/bug.1.real.md",
+    "the payload is the verified path — a path ending #repro is not a file",
+  );
+  assert.ok(
+    existsSync(path.join(root, "docs/qa", payload.bug)),
+    "and it opens, relative to the registry",
+  );
+  assert.match(
+    payload.notes,
+    /bug\.1\.real\.md#repro/,
+    "the anchor as the author wrote it is still in notes",
+  );
+});
+
+test("the bug-link rule is stated once: the skeleton writes BUG_LINK_RULE and the README quotes it verbatim (TASK-141-BUG-19)", () => {
+  // The rule had three statements — the code, the README, the skeleton --init writes — and cycles
+  // 6, 7 and 8 each found one of them stale. One string, held here, is the property; re-reading
+  // three sites by hand is the alignment that kept failing.
+  assert.match(BUG_LINK_RULE, /repo-relative/);
+  assert.match(BUG_LINK_RULE, /#fragment/);
+  assert.match(BUG_LINK_RULE, /\/\/host/);
+  const root = corpus();
+  run(root, "--init");
+  assert.ok(
+    readFileSync(REG(root), "utf8").includes(BUG_LINK_RULE),
+    "the skeleton --init writes carries the rule",
+  );
+  const readme = readFileSync(
+    path.resolve(__dirname, "../../../skills/qa-next/README.md"),
+    "utf8",
+  );
+  assert.ok(
+    readme.includes(BUG_LINK_RULE),
+    "the README quotes the rule verbatim",
+  );
+  assert.match(
+    readme,
+    /are warnings, not errors/,
+    "and still says what --check only warns about",
   );
 });
