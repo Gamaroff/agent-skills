@@ -4,7 +4,7 @@
 **Bug ID**: TASK-141-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA (cycle 1, diff code review CR-1, reproduced)
 **Date Found**: 2026-09-22
 
@@ -148,3 +148,4 @@ the fix (`!["fail"]`) turns that test red.
 | 2026-09-22 | New          | qa-task    | Found in QA cycle 1 (CR-1), reproduced       |
 | 2026-09-22 | In Progress  | qa-fix     | Root cause: untested is not a verdict        |
 | 2026-09-22 | Ready for QA | qa-fix     | Predicate corrected; test leg added + proved |
+| 2026-09-23 | Closed       | qa-task    | Verified FIXED in QA cycle 2 ([qa.2](./task.141.qa.2.qa-next-targeted-item.md)); closure recorded late, prompted by PR review 1 PC-1 |

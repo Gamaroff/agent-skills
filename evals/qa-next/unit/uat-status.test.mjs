@@ -1919,6 +1919,13 @@ test("each clause of BUG_LINK_RULE is what --check does (TASK-141-BUG-20)", () =
       0,
       null,
     ],
+    [
+      "`bug.` must start a word — a debug log is not a bug link",
+      "❌ fail",
+      "[bug.1.real](../bugs/bug.1.real.md) · see [debug.log](../logs/debug.log)",
+      0,
+      "docs/bugs/bug.1.real.md",
+    ],
   ];
   // The 5th column is what the payload publishes: a skipped link is prose, so it is never handed
   // to the skill as `bug`. Exit code alone cannot see a skip removed — an anchor-only link then

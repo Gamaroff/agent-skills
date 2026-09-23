@@ -4,7 +4,7 @@
 **Bug ID**: TASK-141-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA (cycle 1, diff code review CR-2, reproduced by reading both files)
 **Date Found**: 2026-09-22
 
@@ -97,3 +97,4 @@ new test red.
 | 2026-09-22 | New          | qa-task    | Found in QA cycle 1 (CR-2)                    |
 | 2026-09-22 | In Progress  | qa-fix     | Two authored statements, one updated          |
 | 2026-09-22 | Ready for QA | qa-fix     | Both placeholders fixed; agreement now tested |
+| 2026-09-23 | Closed       | qa-task    | Verified FIXED in QA cycle 2 ([qa.2](./task.141.qa.2.qa-next-targeted-item.md)); closure recorded late, prompted by PR review 1 PC-1 |

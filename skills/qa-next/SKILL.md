@@ -73,12 +73,15 @@ Apply any project-wide command conventions from the consumer project's own CLAUD
 ```json
 { "item": "D.2", "function": "Submit a score", "surface": "D", "stories": ["7.5", "31.1"],
   "uatSpecs": ["apps/portal/e2e/smoke/play-score.smoke.spec.ts"], "lane": null, "targeted": true,
+  "priorRuns": ["runs/D.2/2026-09-01-lan.md"], "bug": "docs/bugs/bug.12.double-submit.md",
   "runFile": "<path or null>", "phase": "selected|resolved|executed|recorded|committed", "startedAt": "<iso>" }
 ```
 
 `targeted` is true when the invocation named an id. A resume at `phase: selected` then re-resolves *that* id with `--item`, rather than falling back to `--next` and quietly testing a different function.
 
 Resume on re-run: `phase: recorded` → Step 5; `executed` → Step 4; `resolved` → Step 3; `selected` → Step 2. If the registry row for `item` is no longer ⬜ and the phase is `selected`, someone else finished it — delete the state file and start over. **This applies to an untargeted run only**: under `"targeted": true` a non-⬜ row is the premise, not evidence about anyone else, so the resume re-resolves the id instead.
+
+**`priorRuns` and `bug` are copied from the payload into the state file at selection, and every later step reads them from there — never from a fresh `--item`.** Both describe the row *as it was when this run began*. Re-querying after Step 4 writes the run file returns a `priorRuns` that includes the run just written, so a resumed first run would be numbered and committed as a re-run.
 
 ## Step 0 — Preflight
 
@@ -102,12 +105,12 @@ Exit 3 → **STOP** `registry-complete` (print the scoreboard).
 **An id** — resolve it, whatever state it is in:
 
 ```bash
-node .agents/skills/qa-next/scripts/uat-status.mjs --item D.2 --json
+node .agents/skills/qa-next/scripts/uat-status.mjs --item <id> --json
 ```
 
 Exit 4 → **STOP** `unknown-item` — the id is not a row; print the scoreboard so the owner can see the ids that are.
 
-Either way, write the state file (`phase: selected`, `targeted` set accordingly) and continue with the JSON, which is **identical for both commands**: `id`, `function`, `what`, `entry`, `surface`, `stories[]` (each with `path`, `storyType`), `items`, `automatedBy[]`, `uatSpecs[]` (the subset matching `uatSpecPattern`), `checklists[]` (the `qa.*.md` files that already hold this function's items), plus `state` (the row's current verdict), `lastRun` (the link in its `Last run` cell, or `null`), `priorRuns` (this function's earlier run files, oldest first), `notes` (the `Notes / bug` cell verbatim) and `bug` (the file the newest bug link in that cell names, as a repo-relative path with any `#fragment` removed — the file `--check` checks, in the form `--bug` takes — or `null`). A non-empty `priorRuns` means this is a re-run, and Step 4 says so in the run file.
+Either way, write the state file (`phase: selected`, `targeted` set accordingly, `priorRuns` and `bug` copied from the payload) and continue with the JSON, which is **identical for both commands**: `id`, `function`, `what`, `entry`, `surface`, `stories[]` (each with `path`, `storyType`), `items`, `automatedBy[]`, `uatSpecs[]` (the subset matching `uatSpecPattern`), `checklists[]` (the `qa.*.md` files that already hold this function's items), plus `state` (the row's current verdict), `lastRun` (the link in its `Last run` cell, or `null`), `priorRuns` (this function's earlier run files, oldest first), `notes` (the `Notes / bug` cell verbatim) and `bug` (the file the newest bug link in that cell names, as a repo-relative path with any `#fragment` removed — the file `--check` checks, in the form `--bug` takes — or `null`). A non-empty `priorRuns` means this is a re-run, and Step 4 says so in the run file.
 
 ## Step 2 — Resolve the function to checklist items
 
@@ -135,7 +138,7 @@ The run file's path is **not composed here**. Ask the tool for it once, before e
 node .agents/skills/qa-next/scripts/uat-status.mjs --run-path <id> --env <envLabel>
 ```
 
-It creates `runs/<id>/` and prints the next free file: `<date>-<env>.md`, then `-02`, `-03`. A filename the tool computes cannot be a filename that collides — and a collision here would silently take the previous run's `## Findings` rows with it, which `--findings` is derived from. Keep the printed path in the state file as `runFile`.
+It creates `runs/<id>/` **beside the registry** and prints the next free file **relative to the registry's directory** — `runs/<id>/<date>-<env>.md`, then `-02`, `-03` — the same form `lastRun`, `priorRuns` and `--findings` use. From the repo root the file is at `<registry dir>/<printed path>` (`docs/qa/runs/…` by default); `--set --run` takes the printed path unchanged. A filename the tool computes cannot be a filename that collides — and a collision here would silently take the previous run's `## Findings` rows with it, which `--findings` is derived from. Keep the printed path in the state file as `runFile`.
 
 **3a — the lane, when `uatSpecs` is non-empty and `uatCommand` is set.** From the repo root:
 
@@ -163,10 +166,10 @@ Update the state file (`phase: executed`).
 
 ## Step 4 — Record
 
-1. Write the run file at the path Step 3 obtained from `--run-path` (the tool has already created `runs/<id>/` — one directory per function, so a function's whole history is one listing) from `assets/run.template.md`: header (function, the **Run** row — `<n>th run · previous: <link to the previous run file, relative to this one>`, or `1st run` when `priorRuns` was empty — what it does, stories, environment, commit under test, personas, tester = `qa-next`), the **Automated run** block (command, exit code, report path, one line per test — or `_None_`), one block per item with its observed result and evidence, the verdict, the **Findings** table (one row per Step 3 finding, `_None._` when there were none — written on every run, pass or fail; it is the only place an observation that failed no item survives), and the **Automation candidate** block (`_None — covered by <spec>_` when the lane ran).
+1. Write the run file at `<registry dir>/<the path Step 3 obtained from --run-path>` (the tool has already created `runs/<id>/` beside the registry — one directory per function, so a function's whole history is one listing) from `assets/run.template.md`: header (function, the **Run** row — `<n>th run · previous: <link to the previous run file, relative to this one>`, or `1st run` when the state file's `priorRuns` is empty — what it does, stories, environment, commit under test, personas, tester = `qa-next`), the **Automated run** block (command, exit code, report path, one line per test — or `_None_`), one block per item with its observed result and evidence, the verdict, the **Findings** table (one row per Step 3 finding, `_None._` when there were none — written on every run, pass or fail; it is the only place an observation that failed no item survives), and the **Automation candidate** block (`_None — covered by <spec>_` when the lane ran).
 2. On **fail**: invoke `/create-bug-report` in **story mode** against the story in `stories[]` whose AC the failed item exercises (the first story when it is unclear; **general mode** when the function's stories are all `storyNa`-grade infra), severity from the worst failed item, reproduction steps copied verbatim from the failing item(s). Capture the bug file path.
 
-   **A repeat failure reuses the open bug.** The payload's `bug` field is the repo-relative path of the bug the row already links, in the form `--bug` takes (`null` when there is none) — read it there; never re-parse the registry. When it is non-null and that bug is not closed, append a dated re-test section to it (what was run, what was observed, which items still fail) and link the same bug again. File a **new** bug only when there is none, or when the existing one is closed — a closed bug failing again is a new fact and deserves its own record. Fixing then re-testing is the main reason the `id` argument exists; filing bug #2, #3 and #4 against one defect is its obvious first-order failure.
+   **A repeat failure reuses the open bug.** The `bug` field — copied into the state file at selection — is the repo-relative path of the bug the row already links, in the form `--bug` takes (`null` when there is none). Read it from the state file; never re-parse the registry. When it is non-null and that bug is not closed, append a dated re-test section to it (what was run, what was observed, which items still fail) and link the same bug again. File a **new** bug only when there is none, or when the existing one is closed — a closed bug failing again is a new fact and deserves its own record. Fixing then re-testing is the main reason the `id` argument exists; filing bug #2, #3 and #4 against one defect is its obvious first-order failure.
 3. File the findings, independently of the verdict. For each row: **story mode** against the story it concerns when one of this function's stories owns it; **general mode** (`docs/bugs/`, no parent) when it belongs to another surface, to the environment or to this harness — never file a foreign defect against the story you happened to be testing. Severity as recorded; reproduction from the row. File only what a stranger could reproduce from the row alone; otherwise `Filed as` stays `note` and the row itself is the record. Put each bug's link (relative to the run file) in its row's `Filed as` cell. A finding that matches an **open** finding on this function from an earlier run (`--findings --all --json`, matched on *Where* + *What was observed*) reuses that bug's link in its `Filed as` cell instead of filing a duplicate.
 4. Registry:
    - pass → `--set <id> pass --run runs/<id>/<file>.md`
@@ -195,7 +198,7 @@ Only if `qaNext.commit` is true. Stage **only** the run file, the registry, the 
 qa(uat): <id> <pass|fail|blocked> — <Function>
 ```
 
-For a targeted re-run (`priorRuns` was non-empty):
+For a targeted re-run (the state file's `priorRuns` was non-empty):
 
 ```
 qa(uat): <id> re-run <pass|fail|blocked> — <Function>

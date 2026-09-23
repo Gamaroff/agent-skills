@@ -4,7 +4,7 @@
 **Bug ID**: TASK-141-BUG-3
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA cycle 2 (CI `validate` job, reproduced locally)
 **Date Found**: 2026-09-22
 
@@ -48,3 +48,10 @@ clearer than a metavariable in a sentence read by a matching agent.
 before commit" lists four commands; `npm run validate` is the only one `npm test` does not subsume,
 and nothing in the pipeline executes it — not `qa-task` Step 4, and not the task's own Code Quality
 criteria, which name the other three. Logged as an observation against `qa-task` and `create-task`.
+
+## Status History
+
+| Date       | Status       | Changed By | Notes |
+| ---------- | ------------ | ---------- | ----- |
+| 2026-09-22 | New          | qa-task    | Found in QA cycle 2 |
+| 2026-09-23 | Closed       | qa-task    | Verified FIXED in QA cycle 3 ([qa.3](./task.141.qa.3.qa-next-targeted-item.md)); closure recorded late, prompted by PR review 1 PC-1 |

@@ -531,7 +531,10 @@ const isToolWrittenLink = (href) =>
 // here — no bug filename create-bug-report writes contains one.
 const linkTarget = (href) => href.replace(/#.*$/, "");
 
-const BUG_LINK_RE = /\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/g;
+// `bug.` must START A WORD in the link text: `[debug.log](…)` is not a bug link. Before the
+// validation covered every row and fed the published `bug`, the unanchored match only ever saw fail
+// rows; widened, it would have validated — and handed Step 4 — a log file (PR review 1, CR-4).
+const BUG_LINK_RE = /\[[^\]]*\bbug\.[^\]]*\]\(([^)]+)\)/g;
 
 // The PATHS of a note cell's bug links, relative to the registry, in cell order: the predicate applied, then the fragment
 // removed. This is the one value both sides consume — checkRegistry calls `exists` on exactly these
@@ -549,7 +552,7 @@ function bugLinkPaths(notes) {
 // verbatim by the README, which a test holds to this string. Worded in the predicate's own terms:
 // the checker cannot know who wrote a link, only what its text and target look like.
 export const BUG_LINK_RULE =
-  "every bug link in **Notes / bug** — link text containing `bug.`, target a path relative to the registry file — must resolve, on **any** row; a `#fragment` is ignored, and a link with a scheme (`https:`), a `//host` or only an `#anchor` is prose and is skipped";
+  "every bug link in **Notes / bug** — link text in which `bug.` starts a word, target a path relative to the registry file — must resolve, on **any** row; a `#fragment` is ignored, and a link with a scheme (`https:`), a `//host` or only an `#anchor` is prose and is skipped";
 
 const FINDING_ROW = /^\|\s*(\d+)\s*\|(.*)\|(.*)\|(.*)\|(.*)\|\s*$/;
 const BUG_CLOSED = /^(closed|done|fixed|resolved)$/i;

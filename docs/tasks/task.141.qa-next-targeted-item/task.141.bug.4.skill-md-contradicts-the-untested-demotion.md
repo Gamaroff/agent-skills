@@ -4,7 +4,7 @@
 **Bug ID**: TASK-141-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA cycle 2 (refute pass — documentation-transition probe)
 **Date Found**: 2026-09-22
 
@@ -49,3 +49,10 @@ This is the documentation-transition probe from the refute pass — *what did th
 elsewhere?* — finding exactly what it is for. The diff shows the changed lines and not their
 neighbours, so the contradiction was invisible to a diff review and visible to a grep of the file for
 other statements about the same subject.
+
+## Status History
+
+| Date       | Status       | Changed By | Notes |
+| ---------- | ------------ | ---------- | ----- |
+| 2026-09-22 | New          | qa-task    | Found in QA cycle 2 |
+| 2026-09-23 | Closed       | qa-task    | Verified FIXED in QA cycle 3 ([qa.3](./task.141.qa.3.qa-next-targeted-item.md)); closure recorded late, prompted by PR review 1 PC-1 |
