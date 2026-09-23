@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file. Format foll
 ### Added
 
 - **`/qa-next <id>` — run the UAT protocol against a named registry row, whatever state that row is
-  in.** `/qa-next` had exactly one way to choose what it tested: the first `⬜ untested` row in file
+  in (task 141).** `/qa-next` had exactly one way to choose what it tested: the first `⬜ untested` row in file
   order. So a `❌` whose bug had been fixed and merged could not be re-tested without
   `--set <id> untested`, which erases the `Last run` link and the failure history; and a `✅` could
   never be regression-tested at all, which is the one thing indexing UAT by *user function* was
@@ -31,7 +31,7 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
-- **`uat-status.mjs --set <id> <verdict>`: only a `fail` moves an `✅ accepted` row.** A `pass`,
+- **`uat-status.mjs --set <id> <verdict>`: only a `fail` moves an `✅ accepted` row (task 141).** A `pass`,
   `blocked` or `na` against an accepted row now leaves `✅` in place and updates only `Last run` and
   `Notes / bug`; the tool prints `(kept)` so the branch it took is never silent. `fail` is unchanged
   and still overrides `✅` directly. Without this, a regression sweep over fifty accepted functions
