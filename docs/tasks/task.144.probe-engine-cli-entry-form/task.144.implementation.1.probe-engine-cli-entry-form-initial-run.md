@@ -3,7 +3,7 @@
 **Task**: `task.144.probe-engine-cli-entry-form.md`
 **Run Number**: 1
 **Started**: 2026-09-23 19:25
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Add a `cli:<path>` entry form with an `--argv` template to `security-probe.mjs`,
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 develop iteration; 4/4 phases; ci:fast 3961/0 (2nd run — 1st failed a population guard, fixed) | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #471: https://github.com/Gamaroff/agent-skills/pull/471 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.144.qa.{N}.*.md`; `task.144.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (5 budgeted + re-entry grant); gate 6 PASS 100; 5c CONCERNS (`task.144.pr-review.1`) | —                    |
-| 7. finalise                | ⏳ Pending | `task.144.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.144.dod.{N}.*.md`; task `status: accepted`                      | dod.1 ACCEPTED; `status: accepted` on origin; issue #470 CLOSED; board Done (already) | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | implementation report committed and pushed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -104,6 +104,15 @@ Add a `cli:<path>` entry form with an `--argv` template to `security-probe.mjs`,
 - User instruction after the loop-limit HALT: "Grant as many cycles as are required." A grant is a number, so it was recorded as k=20 — far above any expected need; the Convergence check still guards a genuine stall, and the loop exits on the first accepting gate.
 - QA loop re-entry: 20 extra cycles granted; 0 cycles run outside the loop back-filled from disk (gates 1–5 all have `### QA Cycle` entries). Lock restored from the halt snapshot by `grant-qa-cycles.sh`: QA_CYCLE=5, qa_max_cycles=25, qa_phase=5a.
 - Report status: Escalated → In Progress.
+
+### Step 7 — finalise — 2026-09-23
+
+- Resumed after the PreCompact pause (`af2f493e`); the hook had removed the pipeline lock, so the lock-cooperation calls (set-waiting-on, advance-pipeline-lock) were silent no-ops for the rest of the run.
+- `/finalise` invoked as a skill (not inlined): four parallel DoD agents — AC 12/12 PASS; security PASS (boundary `parseArgvTemplate`, probed through the engine's own `cli:` form, 35 executed, 0 reproduced, `task.144.dod.security.run.json`); compliance N/A; docs PASS.
+- CI reading 1: SUCCESS @ af2f493e1b49 over 5 checks; CI reading 2: SUCCESS @ 6c96fb62e5a9 over 5 checks after 120s (acceptance commit `6c96fb62`, carrying `status: accepted`, registry tick, DoD, sprint review).
+- Publish boundary: document, DoD and sprint review asserted tracked and on origin; PR head = pushed head; only this report dirty at the boundary.
+- PR canonical comment posted (issuecomment-5801645899). Issue #470: Document link already on `develop`; `done` comment posted (`posted`); closed, state CLOSED; board `already` Done.
+- Carried follow-up: 5c CR-1 (medium) — a named `cli:` probe declined before its `--argv` is parsed is keyed without its `--name`.
 
 ---
 
@@ -233,17 +242,17 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-23 19:50
+**Final Status**: Completed
 **Branch**: `feature/task.144.probe-engine-cli-entry-form`
 **PR**: [#471](https://github.com/Gamaroff/agent-skills/pull/471)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 6 (5 budgeted + re-entry grant; gate 6 PASS 100)
+**DoD Summary**: `task.144.dod.1.probe-engine-cli-entry-form.md` — ACCEPTED
+**Tracker debt**: none — issue #470 closed, board Done, no deferred mutations
 
 ---
 
-## Pipeline Paused — 2026-09-23T19:29:54Z
+## Pipeline Paused — 2026-09-23T19:29:54Z (resumed — Step 7 re-run and completed)
 
 ⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
 
