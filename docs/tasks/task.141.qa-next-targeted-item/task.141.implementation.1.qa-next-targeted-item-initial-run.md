@@ -35,7 +35,7 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
 | 2. review-task             | ✅ Done    | `task.141.review.{N}.{name}.md` exists (or skip logged)                | **Skipped** — status `Ready for Development` + `task.141.review.1.*.md` present (verdict READY TO IMPLEMENT, reviewed 2026-09-22) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1–5 implemented; 10 new tests, all 10 mutations red; full `npm test` green (3931) with the symlink moved aside | `.summaries/` n/a — surface map consumed inline |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #468: https://github.com/Gamaroff/agent-skills/pull/468 — OPEN, base `develop`, MERGEABLE | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at 9 of 9 cycles (loop limit; route 2c declined: `medium-not-falling`) | —                    |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Cycle 10 (granted) PASS → Cosmetic-residue exit → 5c `/review-pr` **CONCERNS** (0 HIGH, 4 MEDIUM, 2 LOW); halted for an operator decision before Step 7 | —                    |
 | 7. finalise                | ⏳ Pending | `task.141.dod.{N}.*.md`; task `status: accepted`                       | Blocked by the loop-limit escalation | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -143,12 +143,33 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
   went red on an unrelated `session-handoff` load flake that passes 3/3 in isolation; the second
   attempt was green (obs #166). (3) Both fix commits kept the implementation report out, as the
   step doc requires; this Step-8-deferred report is committed with the escalation.
+- **QA loop re-entry: 1 extra cycle granted** (operator, 2026-09-23, third grant); 0 cycles run
+  outside the loop — nine gates on disk, so `qa_max_cycles` read back from the lock is **10**. Lock
+  restored from the halt snapshot by `grant-qa-cycles.sh`; `qa_phase` 5a. Cycle 10's remit is
+  bounded: gate the cycle-9 fix `a6b9b94b` (`repoPathOf` round trip, the clause test, the rule's
+  resolving base).
 
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+### Halt at 5c — operator decision pending (2026-09-23)
+
+Cycle 10 (one granted cycle) gated `a6b9b94b` PASS 100 and left the loop by the Cosmetic-residue
+exit. Step 5c `/review-pr` ran both lenses over the whole PR and returned **CONCERNS**:
+`task.141.pr-review.1.qa-next-targeted-item.md`. There is no HIGH. Four MEDIUM findings are
+confirmed or accepted: CR-3 (SKILL.md Step 1 hard-codes `--item D.2`), CR-1 (`--run-path` prints a
+registry-relative path, and this PR removed "beside the registry" from Step 4), PC-1 (the four bug
+reports still read `Ready for QA`) and CR-2 (the state file does not persist `priorRuns` or `bug`).
+
+The pipeline's CONCERNS arm proceeds to Step 7 without blocking. It was not taken, because the
+QA budget is spent and the findings are real, user-facing defects in the shipped skill, so fixing
+them is the operator's call. **Options**: (1) grant 1 cycle to fix CR-3, CR-1 and PC-1 (plus CR-2
+and CR-4), with that cycle's gate reading the fixes; (2) finalise as-is and file all six as
+follow-ups. Lock snapshotted to `develop-pipeline.last-halt.json` (halt_reason
+`operator-decision`, step 5, qa_phase 5c).
 
 ### QA Loop Limit Reached — 2026-09-23
 
@@ -209,6 +230,19 @@ one I can name.
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 10 — 2026-09-23
+
+**Gate Result**: PASS (100/100)
+**Issues Found**: 3 LOW, all carried to future. CR10-1: the round-trip test's write-back regex
+cannot fail because the seed equals the output. CR10-2: the prose `null` column runs only on `⏸`
+rows. CR10-3: two comments overstate the same-file guarantee. There was no defect in the cycle-9
+fix: the reviewer exercised 7 registry layouts and an away-from-cwd `--root`.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — `task.141.pr-review.1.qa-next-targeted-item.md`: 0 HIGH; MEDIUM PC-1 (four bug reports still `Ready for QA`), CR-1 (`--run-path` prints a registry-relative path and SKILL.md no longer says so), CR-2 (state file does not persist `priorRuns`/`bug`), CR-3 (Step 1 hard-codes `--item D.2`); LOW PC-2, CR-4
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 10 with HIGH 0 for cycles 9 and 10; all 3 open findings are LOW and are carried to the gate's recommendations.future by id (TASK-141-CR10-1, TASK-141-CR10-2, TASK-141-CR10-3). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
 
 ### QA Cycle 9 — 2026-09-23
 
