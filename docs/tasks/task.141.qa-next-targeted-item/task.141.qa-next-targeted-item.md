@@ -664,7 +664,7 @@ historical naming.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS — cycle 12 of 12 (fifth grant); 1 MEDIUM open
+**QA Status**: CONCERNS — 12 cycles; gate 12's entries fixed in `94c28be6` but not gated. Accepted on the evidence by the operator and reviewed at 5c (`/review-pr` 2: CONCERNS, 0 HIGH)
 **Testing Date**: 2026-09-23
 **Quality Score**: 90/100
 **Gate Decision**: CONCERNS — no HIGH for eight consecutive gates
@@ -714,6 +714,16 @@ prose rule), and the loop closed those boundaries one pair at a time.
   (main guard silent under a symlink), CR-3 (`--set` exits 0 whether the row moved or was kept),
   and the accepted kept-✅ note growth.
 
+- **Follow-up task (agreed with the operator, 2026-09-23): give the `/qa-next` state file one
+  contract.** Either a schema table of field, writer step and reader steps that every step cites, or
+  ownership by `uat-status.mjs` so a test can hold it. Seeded from BUG-21/22/23 (cycles 9–12) and
+  obs #167. Carries PR review 2's CR-1 (a two-digit `--env` label passes the sequence guard) and CR-2
+  (Step 4.4's pass bullet omits `--clear-note`), and gate 12's CR12-3 (a state file from the
+  pre-task.141 skill has no `priorRuns`).
+- Routed to future by gates 11–12: CR11-2 (no `--registry` passed, so a non-default `registryPath` is
+  invisible to the tool), CR11-3 (`cmdSet`'s `startsWith` guess on `--run`), CR12-5 (gate 11 was closed
+  in place by the fixer).
+
 ---
 <!-- change-log-start -->
 ## Change Log
@@ -736,6 +746,7 @@ prose rule), and the loop closed those boundaries one pair at a time.
 | 2026-09-23 |  | QA cycle 10 (third grant) — gate PASS (100/100); no defect in the cycle-9 fix; 3 LOW carried to future (Cosmetic-residue exit, route 2b) | qa-task |
 | 2026-09-23 |  | QA cycle 11 (fourth grant) — gate CONCERNS (90/100); 1 MEDIUM (Step 6 reads priorRuns after deleting the state file), 2 LOW | qa-task |
 | 2026-09-23 |  | QA cycle 12 (fifth grant) — gate CONCERNS (90/100); 1 MEDIUM (Step 6 prints the pre-run bug), 2 LOW | qa-task |
+| 2026-09-23 |  | QA loop closed at 12 cycles on the operator's accept-on-evidence decision; PR review 2 CONCERNS (0 HIGH); state-file contract filed as a follow-up | develop-task |
 <!-- change-log-end -->
 
 ---

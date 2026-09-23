@@ -3,7 +3,7 @@
 **Task**: `task.141.qa-next-targeted-item.md`
 **Run Number**: 1
 **Started**: 2026-09-22 17:10
-**Status**: Escalated
+**Status**: In Progress
 
 ---
 
@@ -35,8 +35,8 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
 | 2. review-task             | ✅ Done    | `task.141.review.{N}.{name}.md` exists (or skip logged)                | **Skipped** — status `Ready for Development` + `task.141.review.1.*.md` present (verdict READY TO IMPLEMENT, reviewed 2026-09-22) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1–5 implemented; 10 new tests, all 10 mutations red; full `npm test` green (3931) with the symlink moved aside | `.summaries/` n/a — surface map consumed inline |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #468: https://github.com/Gamaroff/agent-skills/pull/468 — OPEN, base `develop`, MERGEABLE | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at 12 of 12 cycles. Cycle 12 gated `0c0ed980` (holds for `priorRuns`) and found BUG-23; fixed in `94c28be6`, ungated (route 2c declined: `medium-not-falling`, MEDIUM 0, 1, 1) | —                    |
-| 7. finalise                | ⏳ Pending | `task.141.dod.{N}.*.md`; task `status: accepted`                       | Blocked by the loop-limit escalation | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 12 cycles; loop limit reached at 12 with gate 12 CONCERNS (entries closed by `94c28be6`, ungated). **Operator accepted on the evidence** (Decisions Log, 2026-09-23); 5c `/review-pr` 2 **CONCERNS** (0 HIGH, 1 MEDIUM trail, 5 LOW) | —                    |
+| 7. finalise                | ⏳ Pending | `task.141.dod.{N}.*.md`; task `status: accepted`                       | Pending: proceeds under the operator decision | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -157,6 +157,12 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
   disk, so `qa_max_cycles` read back from the lock is **12**. Cycle 12's remit is bounded: gate
   `0c0ed980` alone (Step 6 reads `priorRuns` from the state file; the `\b` rule wording; the bug.3 and
   bug.4 histories).
+- **Operator decision after the cycle-12 escalation (2026-09-23): accept on the evidence and proceed to 5c
+  `/review-pr` → `/finalise`.** HIGH has been 0 for eight gates; the residue is state-file prose that
+  nothing mechanical holds. The state-file schema/ownership becomes a separate follow-up task
+  (`/create-task` after `/finalise`), seeded from the cycle 10–12 findings and obs #167. Cycle 12's fix
+  (`94c28be6`) is read by 5c's whole-PR review rather than by a gate. Lock restored from the halt
+  snapshot with `advance-pipeline-lock.sh --restore`; `qa_phase` 5c.
 
 ---
 
@@ -313,7 +319,7 @@ that is the row's pre-run link, so Step 6 prints the wrong bug. CR12-2 (LOW): `\
 the rule says "letter". CR12-4 (LOW): a stale "starts a word" comment and test label.
 **HIGH findings**: 0
 **MEDIUM findings**: 1
-**PR Review**: not reached — gate did not exit the loop
+**PR Review**: CONCERNS — `task.141.pr-review.2.qa-next-targeted-item.md`: 0 HIGH; MEDIUM PC-1 (this report's stale header, fixed with it); LOW PC-2–PC-4 (trail, fixed) and CR-1, CR-2 (deferred to the state-file follow-up). Run on the operator's accept-on-evidence decision after the cycle-12 escalation.
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop limit reached
 
