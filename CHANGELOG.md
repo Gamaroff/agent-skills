@@ -24,10 +24,11 @@ All notable changes to this project will be documented in this file. Format foll
   control that rejects everything. A `--argv` shape error is an **argument error** (exit 2,
   `bad-argv`, nothing runs, no record written); `runProbeSpec` returns the same `bad-argv` as a
   decline for a library caller. Record entries gain an **`argv`** key (the template, never the
-  input; `null` for every other form), and a `cli:` control's record key includes it, so probing
-  `--env {input}` and `--clear-note {input}` on one script records two controls rather than the
-  second silently replacing the first — every other form's key, and so every existing entry-file
-  name, is byte-identical. The first real run is in the suite: `uat-status.mjs --run-path D.1 --env
+  input; `null` for every other form), and a `cli:` control's record key includes its **guarded flag** (the element before
+  `"{input}"`), so probing `--env {input}` and `--clear-note {input}` on one script records two
+  controls rather than the second silently replacing the first, while a re-run of one flag with a
+  different scratch path replaces its own entry — every other form's key, and so every existing
+  entry-file name, is byte-identical. The first real run is in the suite: `uat-status.mjs --run-path D.1 --env
   {input}` scores **`present-but-inert`** today (`x-02` refused, `../x` and `a/b` accepted), which is
   task.143's to fix. `probe-boundary-rule.md` §5 documents the form and §5.1 no longer lists a
   multi-argument CLI among the declined sinks; both security prompts, the qa-task / qa-story

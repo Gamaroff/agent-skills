@@ -233,7 +233,11 @@ test("every site that routes a non-JS entry names the cli: form too (task.144 CR
   // was the only route and "two positionals" the decline, and nothing noticed.
   // This population is keyed on the ROUTING statement itself (the same
   // predicate the BUG-10 test counts), so a site that routes non-JS entries
-  // cannot omit the form a multi-flag Node CLI takes.
+  // cannot omit the form a multi-flag Node CLI takes. It is checked PER BLOCK —
+  // a paragraph or a list item — not per file: a file-level check passes a
+  // stale routing sentence as long as `cli:` appears anywhere else in the same
+  // file, which is every one of these files once any of them is correct (QA
+  // cycle 2, CR-4).
   const files = [];
   for (const f of readdirSync(join(REPO_ROOT, "shared/resources"))) {
     if (f.endsWith(".md")) files.push(`shared/resources/${f}`);
@@ -243,6 +247,30 @@ test("every site that routes a non-JS entry names the cli: form too (task.144 CR
   }
   const routesNonJs = (t) =>
     /shell:/.test(t) && /non-JS|not JS|bash script/i.test(t);
+  // A block ends at a blank line or where the next list item begins. A
+  // fenced block is skipped whole: a routing rule is prose, and a command
+  // inside a fence is an example of one form, not a statement of the routes.
+  const blocksOf = (text) => {
+    const blocks = [];
+    let cur = [];
+    let fenced = false;
+    const flush = () => {
+      if (cur.length) blocks.push(cur.join("\n"));
+      cur = [];
+    };
+    for (const line of text.split("\n")) {
+      if (/^\s*```/.test(line)) {
+        flush();
+        fenced = !fenced;
+        continue;
+      }
+      if (fenced) continue;
+      if (line.trim() === "" || /^\s*(?:\d+\.|[-*])\s/.test(line)) flush();
+      if (line.trim() !== "") cur.push(line);
+    }
+    flush();
+    return blocks;
+  };
   const missing = [];
   let sites = 0;
   for (const rel of files) {
@@ -252,9 +280,12 @@ test("every site that routes a non-JS entry names the cli: form too (task.144 CR
     } catch {
       continue;
     }
-    if (!routesNonJs(text)) continue;
-    sites += 1;
-    if (!/cli:/.test(text)) missing.push(rel);
+    for (const [i, block] of blocksOf(text).entries()) {
+      if (!routesNonJs(block)) continue;
+      sites += 1;
+      if (!/cli:/.test(block))
+        missing.push(`${rel} (block ${i + 1}: ${block.slice(0, 80)}…)`);
+    }
   }
   assert.deepEqual(
     missing,
@@ -263,6 +294,6 @@ test("every site that routes a non-JS entry names the cli: form too (task.144 CR
   );
   assert.ok(
     sites >= 5,
-    `only ${sites} site(s) route a non-JS entry — the predicate no longer matches`,
+    `only ${sites} routing block(s) found — the predicate no longer matches`,
   );
 });

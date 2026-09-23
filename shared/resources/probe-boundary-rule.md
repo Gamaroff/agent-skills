@@ -257,8 +257,18 @@ Declining conditions, each reported with its reason:
     every hostile input. **Only an uncaught error carries that footer**: a CLI
     that catches its own failure and exits non-zero (a top-level
     `main().catch(…)` handler) looks exactly like a refusal and is scored
-    *rejected*. When a case must tell "crashed" from "refused" on such a CLI,
-    give it an `expected` that only the refusal produces.
+    *rejected*. An `expected` does not rescue it: under `expected` the crash
+    simply mismatches, so a *hostile* case scores **accepted** — reported as a
+    reproduction. That is a false alarm a reader will investigate, never a false
+    pass, which is the direction the engine errs in on purpose; it is not
+    "could not look".
+  - **A materialised sink writes the case's name into the fixture.** For a sink
+    in `MATERIALISED_SINKS` the fixture directory holds the sink's controls
+    *and* a file named by the case's input — the cwd, and `{fixture}`, are what
+    the CLI would list — so a name a file cannot carry (one with a `/`) is
+    declined as it is in the `shell:` arm. An argv-only input such as
+    `area/backend` belongs under a non-materialised sink (or `--cases-file`
+    with one), where the fixture is empty and nothing is declined.
   - **There is no escape for a literal `{input}`.** Every whole-element
     `"{input}"` or `"{fixture}"` is a slot, and any other element containing
     one is refused — so a template cannot hand its target the literal string
@@ -269,9 +279,12 @@ Declining conditions, each reported with its reason:
     `cli:` without `--argv`, zero or two `{input}`, an unknown or embedded
     slot). An entry outside the root, or one that is not a `.mjs` / `.js`
     regular file, is a named decline like every other form's. The record carries
-    the template as `argv`, and a `cli:` control is keyed on it, so probing
-    `--env {input}` and `--clear-note {input}` on one script records two
-    controls, not one silently replacing the other.
+    the template as `argv`, and a `cli:` control is keyed on its **guarded
+    flag** — the element before `"{input}"`, or the position of `"{input}"`
+    when it is positional — so probing `--env {input}` and
+    `--clear-note {input}` on one script records two controls, while a
+    re-run of `--env {input}` with a different scratch path or `--root`
+    replaces its own entry rather than adding a second one.
 
   `cli:` does **not** touch §2: the engine chooses the interpreter
   (`process.execPath`) and the script is fixed by `--entry` and

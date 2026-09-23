@@ -2117,7 +2117,8 @@ test("cli entry: the record carries the template, keys on it, and leaves every o
       sink: "url-authority",
       entry: CLI("refuser"),
       cases: CASES,
-      argv: ["--host", "{input}", "--mode", "strict"],
+      // A DIFFERENT guarded flag: the case goes to --mode, not --host.
+      argv: ["--host", "db.internal", "--mode", "{input}"],
     });
     const js = runProbeSpec({
       sink: "url-authority",
@@ -2131,7 +2132,7 @@ test("cli entry: the record carries the template, keys on it, and leaves every o
     assert.equal(
       rec.controls.length,
       3,
-      "two templates on one script are two controls",
+      "two guarded flags on one script are two controls",
     );
     const byName = Object.fromEntries(rec.controls.map((c) => [c.name, c]));
     assert.deepEqual(byName["host-a"].argv, HOST_ARGV);
@@ -2250,6 +2251,64 @@ test("cli entry: the first real consumer — uat-status.mjs --run-path D.1 --env
     assert.deepEqual(r.escapes, []);
   } finally {
     rmSync(root, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("cli entry: re-running one control with a different per-run operand REPLACES its entry (task.144 QA-1)", () => {
+  // The control is the GUARDED FLAG, not the whole template. Keyed on the
+  // template, a re-run whose only difference is a per-run path (a scratch
+  // --cases-file, a mkdtemp --root) recorded a second control: one control run
+  // twice read as two, executed was counted twice, and the first verdict stayed
+  // in --emit-block with nothing to retire it.
+  const dir = mkdtempSync(join(tmpdir(), "probe-cli-rekey-"));
+  try {
+    const record = join(dir, "run.json");
+    for (const run of ["a", "b"]) {
+      recordRun(
+        record,
+        runProbeSpec({
+          sink: "url-authority",
+          entry: CLI("refuser"),
+          cases: CASES,
+          argv: [
+            "--mode",
+            "strict",
+            "--host",
+            "{input}",
+            "--scratch",
+            join(dir, `run-${run}`),
+          ],
+        }),
+        { name: "host guard" },
+      );
+    }
+    const rec = readRecord(record);
+    assert.equal(rec.controls.length, 1, "one control, re-run");
+    assert.equal(
+      rec.totals.executed,
+      CASES.length,
+      "executed is not counted twice",
+    );
+    // The record still carries the template of the run that won.
+    assert.equal(rec.controls[0].argv[5], join(dir, "run-b"));
+    // A positional {input} is keyed by its position: two positions, two controls.
+    for (const argv of [
+      ["{input}", "--mode", "strict"],
+      ["--mode", "strict", "x", "{input}"],
+    ]) {
+      recordRun(
+        record,
+        runProbeSpec({
+          sink: "url-authority",
+          entry: CLI("accept-all"),
+          cases: CASES,
+          argv,
+        }),
+      );
+    }
+    assert.equal(readRecord(record).controls.length, 3);
+  } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
