@@ -53,10 +53,12 @@ node .agents/skills/qa-next/scripts/uat-status.mjs --accept D.2    # 🟡 → �
 node .agents/skills/qa-next/scripts/uat-status.mjs --check         # is the registry telling the truth?
 node .agents/skills/qa-next/scripts/uat-status.mjs --coverage      # accepted stories no function covers
 node .agents/skills/qa-next/scripts/uat-status.mjs --findings      # everything the loop has seen that nobody has closed
+node .agents/skills/qa-next/scripts/uat-status.mjs --item D.2      # one named row, whatever its state (exit 4 if there is no such row)
+node .agents/skills/qa-next/scripts/uat-status.mjs --run-path D.2 --env lan   # the next free run file for D.2 (the skill asks for this; you rarely need to)
 node .agents/skills/qa-next/scripts/uat-status.mjs --automated D.2 "apps/portal/e2e/uat/D.2.uat.spec.ts"   # after a spec lands
 ```
 
-Read the run file before accepting — `runs/<id>/<date>-<env>.md` is the evidence; the 🟡 is only the summary. One directory per function, so `ls docs/qa/runs/D.2/` is that function's whole UAT history, oldest first.
+Read the run file before accepting — `runs/<id>/<date>-<env>.md` is the evidence; the 🟡 is only the summary. One directory per function, so `ls docs/qa/runs/D.2/` is that function's whole UAT history, oldest first — and with `/qa-next <id>` it genuinely holds several files: a second run on the same day is written as `<date>-<env>-02.md`, never over the first, because the first run's Findings rows are what `--findings` is derived from. The unsuffixed file is run 1 and sorts first.
 
 ## Three layers, and how a manual pass becomes a regression test
 
@@ -76,9 +78,11 @@ A function's verdict answers one question: did its checklist items hold. Most of
 
 ## Operating modes
 
-- `/qa-next` — one function.
+- `/qa-next` — one function: the first `⬜ untested` row.
+- `/qa-next <id>` — **that** function, whatever state its row is in. Re-test a `❌` after the fix lands, as many times as it takes; regression-test a `✅` when the code beneath it changes. Each run is a new file in `runs/<id>/`, and a repeat failure re-links the open bug rather than filing a second one.
+- `/qa-next <id> --dry-run` — resolve that row and stop. No writes.
 - `/qa-next --dry-run` — which function is next, whether it has items and a lane spec, whether the environment answers. No writes.
-- `/loop /qa-next` — continuous, one function per iteration, until a stop condition.
+- `/loop /qa-next` — continuous, one function per iteration, until a stop condition. Always untargeted: a loop over a fixed id would repeat one function forever.
 - Re-running after a crash resumes from the recorded phase in `.claude/state/qa-next.state.json`.
 
 ## Registry states
@@ -92,4 +96,6 @@ A function's verdict answers one question: did its checklist items hold. Most of
 | `✅ accepted` | **owner** | the feature is the one that was wanted              | ✅ |
 | `➖ n/a`      | qa-next / owner | reachable in no environment (retired, or a seam only) | ✅ |
 
-`--check` enforces: 🟡/✅/❌ carry a run link that resolves; ❌ carries a bug link that resolves; ⏸/➖ carry a note; every row id matches its section letter and its header's cell count; every `Stories` id is a real story. Uncovered accepted stories and referenced non-accepted stories are warnings, not errors — the loop keeps running while the owner catches the registry up.
+`✅` is the owner's, and a re-run does not take it back: a `pass`, a `⏸ blocked` or a `➖ n/a` against an accepted row leaves `✅` in place, updates **Last run** when the verdict carried one (`--run` is required for `pass` and `fail` only), and **appends** whatever the verdict has to say to **Notes / bug** rather than replacing it — so the `accepted <date>` sign-off is never lost (the tool prints `(kept)`). `--clear-note` is refused on that row for the same reason. Two things move an accepted row, and only two: a `❌ fail`, from any state, and the owner's explicit `--set <id> untested --note "<why>"` demotion.
+
+`--check` enforces: 🟡/✅/❌ carry a run link that resolves; ❌ carries a bug link, and every bug link in **Notes / bug** — link text in which `bug.` is not preceded by an ASCII letter, digit or underscore, target a path relative to the registry file — must resolve, on **any** row; a `#fragment` is ignored, and a link with a scheme (`https:`), a `//host` or only an `#anchor` is prose and is skipped; ⏸/➖ carry a note; every row id matches its section letter and its header's cell count; every `Stories` id is a real story. Uncovered accepted stories and referenced non-accepted stories are warnings, not errors — the loop keeps running while the owner catches the registry up.

@@ -1,6 +1,6 @@
 ---
 name: qa-next
-description: "UAT loop orchestrator: selects the next untested user function from the owner's UAT registry (scripts/uat-status.mjs --next) — one row per thing a person does with the app, in one sentence — resolves it to checklist items (authoring them when none exist), runs the function's tagged real-stack Playwright spec against the configured environment when one exists, walks the rest with browser automation and HTTP probes, writes a per-run results file, records 🟡 pass / ❌ fail / ⏸ blocked in the registry, files a bug on failure, records every incidental finding in the run file's Findings table and files those too (`--findings` lists the open ones), leaves an automation candidate for every pass no spec covers, commits, and reports. `--coverage` names the accepted stories no function covers. Never marks ✅ accepted — that is the owner's `--accept`. Crash-safe via a run-state file. Sibling of develop-next: that loop builds, this one verifies. Invoke with `/qa-next`, `/qa-next --dry-run`, or `/loop /qa-next`."
+description: "UAT loop orchestrator: selects the next untested user function from the owner's UAT registry (scripts/uat-status.mjs --next) — one row per thing a person does with the app — resolves it to checklist items (authoring them when none exist), runs the function's tagged real-stack Playwright spec when one exists, walks the rest with browser automation and HTTP probes, writes a per-run results file, records 🟡 pass / ❌ fail / ⏸ blocked, files a bug on failure, records every incidental finding in the run file's Findings table and files those too (`--findings` lists open ones), leaves an automation candidate for every pass no spec covers, commits, and reports. `--coverage` names the accepted stories no function covers. Never marks ✅ accepted — that is the owner's `--accept`. Crash-safe via a run-state file. Sibling of develop-next: that loop builds, this one verifies. Invoke with `/qa-next`, `/qa-next D.2` (re-test or regression-test one named row, any state), `/qa-next --dry-run`, or `/loop /qa-next`."
 invokes: [create-bug-report]
 ---
 
@@ -19,6 +19,19 @@ One invocation = one function taken from `⬜ untested` to `🟡 pass`, `❌ fai
 - `--dry-run`: report which function would be selected, its items, whether a lane spec exists and whether the environment is reachable, then stop. **Read-only.**
 
 Not for: story-level QA inside the development pipeline (that is `/qa-story`), code review, or re-running the automated suites. This skill verifies *behaviour in an environment*, from the owner's seat.
+
+## Arguments
+
+Invoke as `/qa-next [id] [--dry-run]`.
+
+| Arg | Values | Default | Meaning |
+| --- | --- | --- | --- |
+| `id` | a registry row id — `D.2` (case-insensitive) | the first `⬜ untested` row | Which function to exercise |
+| `--dry-run` | flag | off | Report the resolved row and stop. **Read-only** |
+
+**An explicit id ignores the row's state.** `⬜ 🟡 ❌ ⏸ ✅ ➖` are all re-runnable — that is what the argument is for: re-test a `❌` after the fix lands, as many times as it takes, and regression-test a `✅` when the code beneath it changes. "First untested" is the *default selection rule*, not an eligibility gate.
+
+**`/loop /qa-next` stays untargeted.** A loop over a fixed id repeats one function forever; the registry is the queue.
 
 ## Three layers, one index
 
@@ -59,28 +72,45 @@ Apply any project-wide command conventions from the consumer project's own CLAUD
 
 ```json
 { "item": "D.2", "function": "Submit a score", "surface": "D", "stories": ["7.5", "31.1"],
-  "uatSpecs": ["apps/portal/e2e/smoke/play-score.smoke.spec.ts"], "lane": null,
+  "uatSpecs": ["apps/portal/e2e/smoke/play-score.smoke.spec.ts"], "lane": null, "targeted": true,
+  "priorRuns": ["runs/D.2/2026-09-01-lan.md"], "bug": "docs/bugs/bug.12.double-submit.md", "filedBug": null,
   "runFile": "<path or null>", "phase": "selected|resolved|executed|recorded|committed", "startedAt": "<iso>" }
 ```
 
-Resume on re-run: `phase: recorded` → Step 5; `executed` → Step 4; `resolved` → Step 3; `selected` → Step 2. If the registry row for `item` is no longer ⬜ and the phase is `selected`, someone else finished it — delete the state file and start over.
+`targeted` is true when the invocation named an id. A resume at `phase: selected` then re-resolves *that* id with `--item`, rather than falling back to `--next` and quietly testing a different function.
+
+Resume on re-run: `phase: committed` → Step 6; `recorded` → Step 5; `executed` → Step 4; `resolved` → Step 3; `selected` → Step 2. If the registry row for `item` is no longer ⬜ and the phase is `selected`, someone else finished it — delete the state file and start over. **This applies to an untargeted run only**: under `"targeted": true` a non-⬜ row is the premise, not evidence about anyone else, so the resume re-resolves the id instead.
+
+**`priorRuns` and `bug` are copied from the payload into the state file at selection, and are read from there — never from a fresh `--item`.** Both describe the row *as it was when this run began*: re-querying after Step 4 writes the run file returns a `priorRuns` that includes the run just written, so a resumed first run would be numbered and committed as a re-run. `priorRuns` is read by Steps 4, 5 and 6. `bug` is read **only by Step 4's reuse decision** — it is the bug the row linked *before* this run. The bug this run files or re-links is a different value, `filedBug`, written in Step 4 and printed by Step 6.
 
 ## Step 0 — Preflight
 
-1. State file present → resume as above (or, under `--dry-run`, report the pending run and stop).
+1. State file present → if it names a **different** item and this invocation gave an id, **HALT** `run-in-progress`: finish that run or delete the state file. Otherwise resume as above (or, under `--dry-run`, report the pending run and stop).
 2. `git status --porcelain` non-empty → **HALT** `dirty-tree`. This skill commits docs; it must not sweep up someone's work.
 3. Check out and fast-forward `baseBranch`.
 4. Registry absent → run `--init`; if that scaffolds `uat-surfaces.json` and stops, **STOP** `surfaces-unmapped` and tell the owner to fill it in. If `--init` wrote the skeleton, **STOP** `registry-empty` — the rows are the owner's to author (one per user function; see README "Authoring the registry"). Registry present → `--check`; a non-zero `--check` is **HALT** `registry-invalid` — never test on top of a registry that is lying. Then `--coverage`: report how many accepted stories no function covers (non-fatal — the owner adds rows or `storyNa` entries in their own time).
 5. Environment: `curl -fsS --max-time 10 "$baseUrl$healthPath"` and, if `apiUrl` is set, `curl -fsS --max-time 10 "$apiUrl$apiHealthPath"` — never the bare API origin, whose root is a 404 on most frameworks and would read as down while the service is up. Either unreachable → **STOP** `env-unreachable`. Under `--dry-run` this is reported, not fatal.
 6. Browser automation: prefer the Playwright MCP tools when the session exposes them (`browser_navigate` / `browser_snapshot` / `browser_click` …); otherwise the project's own Playwright (`npx playwright` with a throwaway spec under the OS temp dir). Neither available → **STOP** `no-browser`.
 
-## Step 1 — Select
+## Step 1 — Select or resolve
+
+**No id** — the queue picks:
 
 ```bash
 node .agents/skills/qa-next/scripts/uat-status.mjs --next --json
 ```
 
-Exit 3 → **STOP** `registry-complete` (print the scoreboard). Otherwise write the state file (`phase: selected`) and continue with the JSON: `id`, `function`, `what`, `entry`, `surface`, `stories[]` (each with `path`, `storyType`), `items`, `automatedBy[]`, `uatSpecs[]` (the subset matching `uatSpecPattern`), `checklists[]` (the `qa.*.md` files that already hold this function's items).
+Exit 3 → **STOP** `registry-complete` (print the scoreboard).
+
+**An id** — resolve it, whatever state it is in:
+
+```bash
+node .agents/skills/qa-next/scripts/uat-status.mjs --item <id> --json
+```
+
+Exit 4 → **STOP** `unknown-item` — the id is not a row; print the scoreboard so the owner can see the ids that are.
+
+Either way, write the state file (`phase: selected`, `targeted` set accordingly, `priorRuns` and `bug` copied from the payload) and continue with the JSON, which is **identical for both commands**: `id`, `function`, `what`, `entry`, `surface`, `stories[]` (each with `path`, `storyType`), `items`, `automatedBy[]`, `uatSpecs[]` (the subset matching `uatSpecPattern`), `checklists[]` (the `qa.*.md` files that already hold this function's items), plus `state` (the row's current verdict), `lastRun` (the link in its `Last run` cell, or `null`), `priorRuns` (this function's earlier run files, oldest first), `notes` (the `Notes / bug` cell verbatim) and `bug` (the file the newest bug link in that cell names, as a repo-relative path with any `#fragment` removed — the file `--check` checks, in the form `--bug` takes — or `null`). A non-empty `priorRuns` means this is a re-run, and Step 4 says so in the run file.
 
 ## Step 2 — Resolve the function to checklist items
 
@@ -102,6 +132,14 @@ Update the state file (`phase: resolved`).
 
 ## Step 3 — Execute
 
+The run file's path is **not composed here**. Ask the tool for it once, before executing:
+
+```bash
+node .agents/skills/qa-next/scripts/uat-status.mjs --run-path <id> --env <envLabel>
+```
+
+It creates `runs/<id>/` **beside the registry** and prints the next free file **relative to the registry's directory** — `runs/<id>/<date>-<env>.md`, then `-02`, `-03` — the same form `lastRun`, `priorRuns` and `--findings` use. From the repo root the file is at `<registry dir>/<printed path>` (`docs/qa/runs/…` by default); `--set --run` takes the printed path unchanged. A filename the tool computes cannot be a filename that collides — and a collision here would silently take the previous run's `## Findings` rows with it, which `--findings` is derived from. Keep the printed path in the state file as `runFile`.
+
 **3a — the lane, when `uatSpecs` is non-empty and `uatCommand` is set.** From the repo root:
 
 ```bash
@@ -122,19 +160,34 @@ Record the exit code and copy `uatReportDir` (with its `results.json`) into the 
 
 Function result: **pass** only if every item passed; **fail** if any item failed; **blocked** if none failed but some could not be executed (list them in the note). Do not stop at the first failure — the owner wants the whole picture. Findings do not affect the result: a function with three findings and no failed item is still **pass**.
 
-Evidence (screenshots, response bodies, the lane report) goes under `.claude/state/qa-next/<id>/<date>-<envLabel>/` — the same shape as the run file's path, never into the repo. The run file names the paths.
+Evidence (screenshots, response bodies, the lane report) goes under `.claude/state/qa-next/<id>/<run-file-basename>/` — the run file's own name without `.md`, so a same-day re-run's screenshots do not overwrite the first run's either. Never into the repo. The run file names the paths.
 
 Update the state file (`phase: executed`).
 
 ## Step 4 — Record
 
-1. Write `runs/<id>/<date>-<envLabel>.md` beside the registry (`mkdir -p runs/<id>` first — one directory per function, so a function's whole history is one listing) from `assets/run.template.md`: header (function, what it does, stories, environment, commit under test, personas, tester = `qa-next`), the **Automated run** block (command, exit code, report path, one line per test — or `_None_`), one block per item with its observed result and evidence, the verdict, the **Findings** table (one row per Step 3 finding, `_None._` when there were none — written on every run, pass or fail; it is the only place an observation that failed no item survives), and the **Automation candidate** block (`_None — covered by <spec>_` when the lane ran).
+1. Write the run file at `<registry dir>/<the path Step 3 obtained from --run-path>` (the tool has already created `runs/<id>/` beside the registry — one directory per function, so a function's whole history is one listing) from `assets/run.template.md`: header (function, the **Run** row — `<n>th run · previous: <link to the previous run file, relative to this one>`, or `1st run` when the state file's `priorRuns` is empty — what it does, stories, environment, commit under test, personas, tester = `qa-next`), the **Automated run** block (command, exit code, report path, one line per test — or `_None_`), one block per item with its observed result and evidence, the verdict, the **Findings** table (one row per Step 3 finding, `_None._` when there were none — written on every run, pass or fail; it is the only place an observation that failed no item survives), and the **Automation candidate** block (`_None — covered by <spec>_` when the lane ran).
 2. On **fail**: invoke `/create-bug-report` in **story mode** against the story in `stories[]` whose AC the failed item exercises (the first story when it is unclear; **general mode** when the function's stories are all `storyNa`-grade infra), severity from the worst failed item, reproduction steps copied verbatim from the failing item(s). Capture the bug file path.
-3. File the findings, independently of the verdict. For each row: **story mode** against the story it concerns when one of this function's stories owns it; **general mode** (`docs/bugs/`, no parent) when it belongs to another surface, to the environment or to this harness — never file a foreign defect against the story you happened to be testing. Severity as recorded; reproduction from the row. File only what a stranger could reproduce from the row alone; otherwise `Filed as` stays `note` and the row itself is the record. Put each bug's link (relative to the run file) in its row's `Filed as` cell.
+
+   Whichever bug this run ends up linking — a new one, or the open one it reuses below — write its repo-relative path to the state file as `filedBug` before Step 4.4. A pass, a block or an n/a leaves it `null`.
+
+   **A repeat failure reuses the open bug.** The `bug` field — copied into the state file at selection — is the repo-relative path of the bug the row already links, in the form `--bug` takes (`null` when there is none). Read it from the state file; never re-parse the registry. When it is non-null and that bug is not closed, append a dated re-test section to it (what was run, what was observed, which items still fail) and link the same bug again. File a **new** bug only when there is none, or when the existing one is closed — a closed bug failing again is a new fact and deserves its own record. Fixing then re-testing is the main reason the `id` argument exists; filing bug #2, #3 and #4 against one defect is its obvious first-order failure.
+3. File the findings, independently of the verdict. For each row: **story mode** against the story it concerns when one of this function's stories owns it; **general mode** (`docs/bugs/`, no parent) when it belongs to another surface, to the environment or to this harness — never file a foreign defect against the story you happened to be testing. Severity as recorded; reproduction from the row. File only what a stranger could reproduce from the row alone; otherwise `Filed as` stays `note` and the row itself is the record. Put each bug's link (relative to the run file) in its row's `Filed as` cell. A finding that matches an **open** finding on this function from an earlier run (`--findings --all --json`, matched on *Where* + *What was observed*) reuses that bug's link in its `Filed as` cell instead of filing a duplicate.
 4. Registry:
    - pass → `--set <id> pass --run runs/<id>/<file>.md`
-   - fail → `--set <id> fail --run runs/<id>/<file>.md --bug <bug path>`
+   - fail → `--set <id> fail --run runs/<id>/<file>.md --bug <filedBug>` (the state file's)
    - blocked → `--set <id> blocked --run runs/<id>/<file>.md --note "<items and reasons>"`
+
+   The note flag is **per verdict**, not a blanket "always pass one":
+
+   | Verdict | Row before | Note flag | Why |
+   | :--- | :--- | :--- | :--- |
+   | `fail` | any | `--bug` (plus `--note` when there is more to say) | `--bug` is mandatory; `--clear-note` is refused beside it |
+   | `blocked` / `na` | any | `--note` | mandatory already |
+   | `pass` | `⬜` `🟡` `❌` `⏸` `➖` | `--clear-note` | drops the previous verdict's bug link, which `🟡` does not require and must not keep |
+   | `pass` | `✅` | neither | the note cell is appended to, never replaced, so nothing needs dropping; `--clear-note` is refused here — clearing is the one thing append cannot express |
+
+   A `pass`, `blocked` or `na` against an `✅` row **leaves `✅`**, updates `Last run` **when the verdict carried one** (`--run` is required for `pass` and `fail` only), and **appends** whatever the verdict has to say to `Notes / bug` rather than replacing it — so the owner's `accepted <date>` sign-off is never lost, whichever flag wrote the cell. The tool prints `(kept)`. The skill still never *writes* `✅`; it only declines to remove one on evidence that is not against it. Two things move it, and only two: a `fail`, which moves it from any state, and an explicit `--set <id> untested` — the owner's deliberate demotion, which is not a verdict at all and which this skill never sends.
 5. `--check` must exit 0. It also proves every `Filed as` link in every run file resolves. If it does not, fix what it names — never proceed past a red check.
 
 Update the state file (`phase: recorded`).
@@ -147,15 +200,23 @@ Only if `qaNext.commit` is true. Stage **only** the run file, the registry, the 
 qa(uat): <id> <pass|fail|blocked> — <Function>
 ```
 
+For a targeted re-run (the state file's `priorRuns` was non-empty):
+
+```
+qa(uat): <id> re-run <pass|fail|blocked> — <Function>
+```
+
 Push to `baseBranch`. Apply the consumer project's commit-trailer rules. Update the state file (`phase: committed`).
 
 ## Step 6 — Report and stop
 
-Delete the state file. Print: the function, its verdict, the run file, the bug (if any), whether the lane ran and how it went, this run's findings with what each was filed as, the scoreboard (`uat-status.mjs` with no flags — it ends with the uncovered-story and open-findings counts), and — for a 🟡 — the exact command the owner runs to accept it:
+Print — reading which run this is and the previous run's link from the **state file's** `priorRuns`, never from a fresh `--item`, which would count the run just committed — the function, its verdict, the run file with which run of this function it is and a link to the previous one when there was one, the bug this run filed or re-linked (the state file's `filedBug`, if any), whether the lane ran and how it went, this run's findings with what each was filed as, the scoreboard (`uat-status.mjs` with no flags — it ends with the uncovered-story and open-findings counts), and — for a 🟡 — the exact command the owner runs to accept it:
 
 ```bash
 node .agents/skills/qa-next/scripts/uat-status.mjs --accept <id> --note "<optional>"
 ```
+
+**Then delete the state file** — last, because until the report is printed it is the only record of `priorRuns` as it stood before this run.
 
 For a 🟡 with no lane spec, also print the hand-off: `uat-automate <id>` (or, until that skill exists in the consumer, "the run file's Automation candidate block is the spec's brief; when the spec lands, `--automated <id> "<path>"`").
 
@@ -170,6 +231,8 @@ For a 🟡 with no lane spec, also print the hand-off: `uat-automate <id>` (or, 
 | `env-unreachable`   | `baseUrl` / `apiUrl` did not answer                    | Start the environment, re-run                |
 | `no-browser`        | No browser automation available in this session        | Enable the Playwright MCP tools or install Playwright |
 | `dirty-tree`        | Uncommitted changes on the base branch                 | Commit or stash them                          |
+| `unknown-item`      | The id given is not a registry row                     | Check it against the scoreboard, re-run       |
+| `run-in-progress`   | A state file names a different function                | Finish that run, or delete `.claude/state/qa-next.state.json` |
 | bug filing failed   | `/create-bug-report` did not return a path              | The run file is written; file the bug by hand, then `--set … fail --bug …` (for a finding: file it, then put the link in its `Filed as` cell) |
 
 Every stop leaves the registry consistent (`--check` green) — a stop is never a half-recorded function.
@@ -183,6 +246,8 @@ Every stop leaves the registry consistent (`--check` green) — a stop is never 
 - Retry an item until it passes.
 - Mark n/a on anything a user could exercise somewhere.
 - Drop an observation because it failed no item. It goes in the run file's Findings table, filed or `note`.
+- Overwrite a previous run file. The path comes from `--run-path`, which returns the next free one.
+- Re-litigate an `✅` on a pass. The only things that move an accepted row are a failure and the owner's explicit `--set <id> untested` demotion — and this skill never sends the latter.
 
 ## Running as a loop
 

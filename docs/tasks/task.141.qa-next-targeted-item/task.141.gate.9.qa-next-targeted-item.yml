@@ -1,0 +1,84 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: CONCERNS
+status_reason: "No HIGH for the fifth consecutive gate. Cycle 8's value-sharing fix holds: wherever --check exits 0, the published `bug` is the string `exists` was called on. But `bug` is registry-relative and `--bug` takes a repo-relative path, so the documented repeat-failure flow (read `bug`, re-link it with `--set … fail --bug`) writes a broken link; that defect has been there since the original feature commit, and eight gates missed it. The new BUG_LINK_RULE also names the wrong base: it says 'repo-relative', and a link written that way fails --check."
+reviewer: 'QA Engineer'
+updated: '2026-09-23T05:16:52Z'
+
+top_issues:
+  - id: 'TASK-141-BUG-20'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "BUG_LINK_RULE, which the skeleton writes into every registry and the README quotes verbatim, says the target is 'a repo-relative path'. The checker resolves it against the registry's own directory (join(root, registryDir, p); the file header says 'relative to the registry's own directory'). A link written the way the rule says, `[bug.1.real](docs/bugs/bug.1.real.md)`, fails --check with 'bug file not found' (measured: rc 1). The rule-once test pins the wrong word with `/repo-relative/` and ties the constant to behaviour only through keyword regexes."
+    suggested_action: "Say 'a path relative to the registry file', and replace the keyword regexes with a table-driven test that feeds --check one link per clause of the rule (the resolving base, #fragment, scheme, //host, anchor-only), so the words are held to the behaviour and not only to the constant."
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+  - id: 'TASK-141-BUG-21'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "The payload's `bug` is relative to the registry (`../bugs/bug.1.real.md`), but `--set … --bug` takes a repo-relative path and re-relativises it. SKILL.md Step 4 says a repeat failure reads `bug` and links the same bug again, and following it literally writes `[bug.1.real](../../../bugs/bug.1.real.md)`, turns --check red and HALTs at the verification step. Measured on HEAD, on c5efbe9b and on the original feature commit 9efe0d22, so it has been present since the field was introduced and is not from cycle 8's fix. Rated MEDIUM, not HIGH: it fails loudly (--check catches it before commit), and only the repeat-failure path is affected, not re-testing in general."
+    suggested_action: "Publish `bug` in the same coordinate system `--bug` accepts (repo-relative: join the registry directory with the verified path), so that the payload round-trips; state that in SKILL.md; and add a test that feeds payload.bug back through `--set fail --bug` and requires --check to stay green."
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3945
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged across nine cycles. Offline, file-local. Link shapes were exercised through the CLI against fixtures, not through the probe engine.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. 42 tests in the qa-next suite.'
+  reliability:
+    status: CONCERNS
+    notes: "BUG-21: the payload's `bug` does not round-trip through `--bug`, so the documented repeat-failure flow writes a broken link. Cycle 8's value-sharing fix holds on its own axis (published = verified, wherever --check exits 0)."
+  maintainability:
+    status: CONCERNS
+    notes: "BUG-20: the one-wording rule names the wrong resolving base, and its test pins the wrong word. One statement of the rule is now enforced; what it says is not yet held to behaviour."
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-23'
+  total_iterations: 9
+  verification_method: '6 mutations (M41–M46), every one red; M44 first survived (no-red) and was closed by asserting the published bug per clause. 46 across nine cycles, none survived.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-21: make `bug` round-trip through `--bug`: one coordinate system for the payload and the flag.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'skills/qa-next/SKILL.md', 'evals/qa-next/unit/uat-status.test.mjs']
+    - action: 'BUG-20: say "relative to the registry file" in BUG_LINK_RULE, and hold each clause of the rule to --check behaviour with a table-driven test.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'skills/qa-next/README.md', 'evals/qa-next/unit/uat-status.test.mjs']
+  future:
+    - action: "CR9-3 (pre-existing, identical on origin/develop): `exists` is existsSync, which is true for a directory, so `[bug.1.real](../bugs/)` passes --check and is published as `bug`. Require a regular file for bug links."
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: "CR8-2 + CR7-4 (pre-existing): the run link and a run file's Filed as get neither the fragment strip nor the prose skip. One link resolver for every href cmdCheck validates would close both."
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'bug.16 (filed separately): the main guard is a silent no-op under a symlink, at six sites across five skills.'
+      refs: ['docs/bugs/bug.16.main-guard-silent-noop-under-symlink/bug.16.main-guard-silent-noop-under-symlink.md']
+    - action: 'Accepted limitation (cycle 5): the kept-✅ note cell grows by one segment per re-run.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-3 (cycle 1, still advisory): --set exits 0 whether the row moved or was kept.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'BUG-20 and BUG-21 fixed and mutation-proved'

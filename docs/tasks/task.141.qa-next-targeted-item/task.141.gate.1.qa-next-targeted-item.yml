@@ -1,0 +1,77 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: FAIL
+status_reason: 'The documented migration path (--set <id> untested) leaves an accepted row with no Last run link, which --check rejects and /qa-next Step 0 treats as registry-invalid. Everything else in the change set verified clean.'
+reviewer: 'QA Engineer'
+updated: '2026-09-22T19:05:00Z'
+
+top_issues:
+  - id: 'TASK-141-BUG-1'
+    severity: high
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'The kept-accepted predicate captures `untested`, so the documented demotion keeps ✅ while the untested block still clears Last run — producing an accepted row that --check rejects.'
+    suggested_action: 'Exclude `untested` from the kept predicate and add the missing untested-on-✅ test leg.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-BUG-2'
+    severity: medium
+    file: 'skills/qa-next/assets/run.template.md'
+    finding: 'The run template still names the colliding evidence path `<date>-<env>/` while SKILL.md Step 3 now names `<run-file-basename>/` — the template is the file the agent fills in.'
+    suggested_action: 'Change both template placeholders to the run-file-basename directory so template and Step 3 state one path.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-CR-4'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'seqKey treats any trailing -NN as the run sequence, so an env label ending in two digits (--env ci-02) re-introduces the run-1-sorts-last inversion the sort key exists to fix.'
+    suggested_action: 'Anchor the sequence group to the run-file shape, or refuse an env label ending in -NN.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 3931
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary in the probe engine sense — the change set exports no single-argument accept/reject predicate (runPathFor takes three arguments, itemById needs a parsed registry), so there is no entry point to probe. The tool is offline and file-local, takes no untrusted input, interpolates nothing into a shell, and adds no dependency. The accept/reject logic that does exist (cmdSet''s kept predicate) was executed against adversarial verdicts by hand through the CLI, which is how TASK-141-BUG-1 was reproduced. Recorded reasoned rather than measured because security-probe.mjs was not run.'
+  performance:
+    status: PASS
+    notes: 'No network, no new hot-path walk beyond the deliberate and documented priorRuns reuse of listRunFiles. --run-path does one readdirSync of a single function directory. qa-next suite 10.0s (was ~8s with 10 fewer tests); full npm test 101.7s.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-141-BUG-1 leaves the registry in a state its own integrity gate rejects, and /qa-next Step 0 HALTs on it. The rollback plan is sound (Phase 3 reverts alone). die() still throws rather than exits, so stdout drains.'
+  maintainability:
+    status: CONCERNS
+    notes: 'One describeRow, one sort key, comments carry the why. But TASK-141-BUG-2 leaves the evidence path stated twice and already drifted, and the accepted-row test group never sends `untested` — a coverage gap that let ten green mutations miss BUG-1.'
+
+recommendations:
+  immediate:
+    - action: 'Exclude untested from the kept predicate; add the untested-on-✅ test leg and mutation-prove it.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+    - action: 'Point both run-template evidence placeholders at the run-file basename directory.'
+      refs: ['skills/qa-next/assets/run.template.md']
+  future:
+    - action: 'Anchor seqKey to the run-file shape so an env label ending in -NN cannot masquerade as a sequence.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-3 (advisory): --set exits 0 whether the verdict moved the row or was kept on ✅; only the printed (kept) token distinguishes them and no SKILL.md step asserts it. Consider having Step 4 assert the printed state matches the verdict sent.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'skills/qa-next/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK-141-BUG-1 fixed and covered by a test'
+    - 'TASK-141-BUG-2 fixed'

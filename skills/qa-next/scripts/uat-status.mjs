@@ -13,10 +13,14 @@
 //   node uat-status.mjs --coverage [--json]   accepted stories covered by no function (never writes)
 //   node uat-status.mjs --check               integrity gate (exit 1 on any error)
 //   node uat-status.mjs --next [--json]       first ⬜ row in file order (exit 3 when none)
-//   node uat-status.mjs --set <id> <state> --run <path> [--bug <path>] [--note "..."]
+//   node uat-status.mjs --item <id> [--json]  one named row, whatever its state — same payload as
+//                                             --next (exit 4 when the id is not a row).
+//                                             NOT --items, one character away, which WRITES a cell.
+//   node uat-status.mjs --run-path <id> [--env <label>]   next free run file path (creates runs/<id>/)
+//   node uat-status.mjs --set <id> <state> --run <path> [--bug <path>] [--note "..."] [--clear-note]
 //   node uat-status.mjs --items <id> "<items>"         fill the Items cell
 //   node uat-status.mjs --automated <id> "<specs>"     fill the Automated-by cell
-//   node uat-status.mjs --accept <id> [--note "..."]   🟡 pass → ✅ accepted — the owner's command
+//   node uat-status.mjs --accept <id> [--note "..."] [--force]   🟡 pass → ✅ accepted — the owner's command
 //   node uat-status.mjs --findings [--all] [--json]    open findings across every run file
 //
 // Paths: --root <dir> (default: cwd) · --registry <path> (default docs/qa/uat-registry.md) ·
@@ -79,11 +83,15 @@ const OPTIONS = new Set([
   "--coverage",
   "--check",
   "--next",
+  "--item",
+  "--run-path",
+  "--env",
   "--json",
   "--set",
   "--run",
   "--bug",
   "--note",
+  "--clear-note",
   "--items",
   "--automated",
   "--accept",
@@ -187,11 +195,16 @@ const SECTION = /^### ([A-Z])\. (.*)$/;
 const SEPARATOR = /^\|\s*:?-+/;
 
 function splitCells(line) {
+  // UNESCAPES what renderRow escapes. The two must be inverses: renderRow escapes `|` so a pipe in
+  // a cell cannot split the row, and every `--set` re-renders the row it just parsed — so a parse
+  // that leaves `\|` standing means the next render escapes it again, and the backslashes grow by
+  // one per rewrite. Four writes turned an authored `a \| b` into `a \\\\| b`, with --check green
+  // throughout and the backslashes handed to the skill in --item --json.
   return line
     .trim()
     .replace(/^\||\|$/g, "")
     .split(/(?<!\\)\|/)
-    .map((c) => c.trim());
+    .map((c) => c.trim().replace(/\\\|/g, "|"));
 }
 
 // Header-driven: the first `|` row under a section heading names the columns; every later `|` row
@@ -262,8 +275,25 @@ function relFromRegistry(opts, repoRelPath) {
   return relative(opts.registryDir, repoRelPath);
 }
 
+// The inverse: a link as written in the registry (relative to its directory) → repo-relative.
+// ONE conversion, used by --check's `exists` and by describeRow's `bug`, so the file --check looks
+// for and the file the payload names are the same file by construction. Repo-relative is the form
+// `--bug` takes and `/create-bug-report` returns, so the payload round-trips: a registry-relative
+// `bug` fed back through `--bug` was re-relativised to `../../../bugs/…` (TASK-141-BUG-21).
+function repoPathOf(opts, registryRelPath) {
+  return join(opts.registryDir, registryRelPath);
+}
+
 function renderRow(columns, cells) {
-  return `| ${columns.map((c) => cells[c] ?? "").join(" | ")} |`;
+  // `|` is escaped HERE, in the one place every cell the tool emits is rendered, because
+  // splitCells already honours `\\|` through its `(?<!\\)` lookbehind — so the round-trip is
+  // closed by two halves that were written for each other and never met. Unescaped, a pipe in a
+  // --note splits the row and --check reports a cell-count error, which /qa-next Step 0 treats as
+  // HALT `registry-invalid`. That corruption predates this change; what this change added is its
+  // irrecoverability, because on a kept ✅ --clear-note is refused and every later --set appends
+  // onto the already-split cell.
+  const escape = (v) => String(v ?? "").replace(/\|/g, "\\|");
+  return `| ${columns.map((c) => escape(cells[c])).join(" | ")} |`;
 }
 
 function renderSkeleton(cfg, today) {
@@ -285,7 +315,7 @@ function renderSkeleton(cfg, today) {
     "",
     "**States:** `⬜ untested` → `🟡 pass` (every item behaved as expected) → `✅ accepted` (owner sign-off). `❌ fail` branches to a bug; `⏸ blocked` could not be exercised in the test environment (note says why; the loop skips it); `➖ n/a` is reachable in no environment (note required).",
     "",
-    `**Rules** (enforced by \`${tool} --check\`): 🟡 / ✅ / ❌ need a **Last run** link into \`runs/\`; ❌ needs a bug link in **Notes**; ⏸ and ➖ need a note; every \`Stories\` id is a real story; every accepted story is named by some function or listed under \`storyNa\` in \`uat-surfaces.json\` (\`--coverage\` lists the rest). Rows are authored and reordered by hand — the tool only fills cells.`,
+    `**Rules** (enforced by \`${tool} --check\`): 🟡 / ✅ / ❌ need a **Last run** link into \`runs/\`; ❌ needs a bug link in **Notes / bug**, and ${BUG_LINK_RULE}; ⏸ and ➖ need a note; every \`Stories\` id is a real story; every accepted story is named by some function or listed under \`storyNa\` in \`uat-surfaces.json\` (\`--coverage\` lists the rest). Rows are authored and reordered by hand — the tool only fills cells.`,
     "",
     `**Tooling:** \`${tool}\` (scoreboard) · \`--next\` (the \`/qa-next\` selector) · \`--set <id> <state> --run <path>\` · \`--items <id> "<items>"\` · \`--automated <id> "<specs>"\` · \`--accept <id>\` · \`--coverage\` · \`--check\` · \`--findings\`. Per-run results live under \`runs/\`, each with a Findings table for what was seen beyond the items themselves.`,
     "",
@@ -445,12 +475,16 @@ export function checkRegistry({ sections }, stories, cfg, exists = () => true) {
         else if (!exists(runLink[1]))
           errors.push(`${r.id}: run file not found: ${runLink[1]}`);
       }
-      if (k === "fail") {
-        const bugLink = r.notes.match(/\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/);
-        if (!bugLink) errors.push(`${r.id}: fail requires a bug link in Notes`);
-        else if (!exists(bugLink[1]))
-          errors.push(`${r.id}: bug file not found: ${bugLink[1]}`);
-      }
+      // Every bug link, on EVERY row — not only on `fail`. describeRow publishes `bug` for a row in
+      // any state and SKILL.md Step 4 opens that path, so validating `fail` rows only left the
+      // published path unchecked on four of the six states. Requiring a link AT ALL stays
+      // fail-only; that is the separate rule. Both sides consume `bugLinkPaths`, so the path
+      // `exists` is called on is by construction the path that is published.
+      const bugPaths = bugLinkPaths(r.notes);
+      if (k === "fail" && !bugPaths.length)
+        errors.push(`${r.id}: fail requires a bug link in Notes`);
+      for (const p of bugPaths)
+        if (!exists(p)) errors.push(`${r.id}: bug file not found: ${p}`);
       if ((k === "na" || k === "blocked") && r.notes === "")
         errors.push(`${r.id}: ${k} requires a note saying why`);
       for (const id of storyIds(r.cells.Stories)) {
@@ -474,6 +508,52 @@ export function checkRegistry({ sections }, stories, cfg, exists = () => true) {
 // A run file's `## Findings` table holds what was seen that is not an item's own result — a rough
 // edge on a passing function, a defect on another surface, a harness fault. Parsed here so
 // `--findings` can list them across every run and `--check` can prove their bug links resolve.
+
+// A relative link, resolved against the registry's directory: no scheme, no anchor, no
+// protocol-relative host. `linkTo` emits nothing else, so anything failing this is a human's prose
+// reference. The converse does not hold — a human's relative link passes too and is checked the
+// same way; the name says which shape the tool writes, not who wrote a given link.
+//
+// ONE definition, used by the reader (describeRow's `bug`) and the checker (checkRegistry) alike,
+// through `bugLinkPaths` below.
+// They were aligned on the row-state axis and then diverged on the LINK-SHAPE axis: the checker
+// learned to skip a prose URL and the reader did not, so a note whose newest bug-shaped link was
+// `https://…` passed --check while the payload handed that URL to the skill, which opens it.
+// Two predicates for "is this a bug link we own" is the same defect twice.
+const isToolWrittenLink = (href) =>
+  !!href &&
+  !/^[a-z][a-z0-9+.-]*:/i.test(href) &&
+  !href.startsWith("#") &&
+  !href.startsWith("//");
+
+// The path part, without a `#fragment`: `../bugs/b.md#repro` names a file that exists. A `#` in an
+// href begins a fragment (URL semantics), so a filename carrying a literal `#` is not addressable
+// here — no bug filename create-bug-report writes contains one.
+const linkTarget = (href) => href.replace(/#.*$/, "");
+
+// `bug.` must not follow an ASCII letter, digit or underscore (`\b`, which without the `u` flag is
+// ASCII-only): `[debug.log](…)` is not a bug link, and `[ébug.9](…)` is. Before the
+// validation covered every row and fed the published `bug`, the unanchored match only ever saw fail
+// rows; widened, it would have validated — and handed Step 4 — a log file (PR review 1, CR-4).
+const BUG_LINK_RE = /\[[^\]]*\bbug\.[^\]]*\]\(([^)]+)\)/g;
+
+// The PATHS of a note cell's bug links, relative to the registry, in cell order: the predicate applied, then the fragment
+// removed. This is the one value both sides consume — checkRegistry calls `exists` on exactly these
+// strings and describeRow publishes the last of them — so the published path is the verified path.
+// Sharing only the predicate was not enough: cycle 7 applied `linkTarget` on the checking side
+// alone, and `--check` passed a `#repro` link whose published form Step 4 cannot open.
+function bugLinkPaths(notes) {
+  return [...(notes ?? "").matchAll(BUG_LINK_RE)]
+    .map((m) => m[1])
+    .filter(isToolWrittenLink)
+    .map(linkTarget);
+}
+
+// The rule as the owner reads it — written into every registry `--init` creates and quoted
+// verbatim by the README, which a test holds to this string. Worded in the predicate's own terms:
+// the checker cannot know who wrote a link, only what its text and target look like.
+export const BUG_LINK_RULE =
+  "every bug link in **Notes / bug** — link text in which `bug.` is not preceded by an ASCII letter, digit or underscore, target a path relative to the registry file — must resolve, on **any** row; a `#fragment` is ignored, and a link with a scheme (`https:`), a `//host` or only an `#anchor` is prose and is skipped";
 
 const FINDING_ROW = /^\|\s*(\d+)\s*\|(.*)\|(.*)\|(.*)\|(.*)\|\s*$/;
 const BUG_CLOSED = /^(closed|done|fixed|resolved)$/i;
@@ -501,10 +581,22 @@ export function parseFindings(text) {
   return out;
 }
 
+// A basename with no sequence is run 1 of its day, so compare it as "-01". Without this,
+// ["…-lan.md", "…-lan-02.md"].sort() yields ["…-lan-02.md", "…-lan.md"] — "." sorts after "-" —
+// and the day's FIRST run reads as its last: in --findings, in priorRuns, and in the "previous
+// run" link a re-run's header cites. Normalising in the comparator rather than renaming also
+// repairs the ordering of run files already on disk, which a rename could not.
+const seqKey = (p) =>
+  basename(p).replace(
+    /^(.*?)(?:-(\d{2}))?\.md$/,
+    (_, base, n) => `${base}-${n ?? "01"}.md`,
+  );
+
 // Every `.md` under runs/, at any depth, as paths relative to the registry directory. Run files
 // live at runs/<function id>/<date>-<env>.md, so the walk must recurse: a flat readdir would skip
 // every nested run and report a clean zero — the one answer nobody questions. Ordered by file
-// name (the date prefix) first, so "oldest run first" holds across function directories.
+// name (the date prefix, then the run sequence) first, so "oldest run first" holds across
+// function directories.
 export function listRunFiles(runsDir) {
   const walk = (dir) =>
     readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -514,9 +606,7 @@ export function listRunFiles(runsDir) {
     });
   return walk(runsDir)
     .map((p) => relative(dirname(runsDir), p))
-    .sort(
-      (a, b) => basename(a).localeCompare(basename(b)) || a.localeCompare(b),
-    );
+    .sort((a, b) => seqKey(a).localeCompare(seqKey(b)) || a.localeCompare(b));
 }
 
 // Every finding in every run file, oldest run first. `bug` is relative to the run file; `bugStatus`
@@ -555,7 +645,7 @@ export function checkFindings(findings) {
 
 function cmdCheck(opts) {
   const cfg = requireSurfaces(opts);
-  const exists = (rel) => existsSync(join(opts.root, opts.registryDir, rel));
+  const exists = (rel) => existsSync(join(opts.root, repoPathOf(opts, rel)));
   const { errors, warns } = checkRegistry(
     readRegistry(opts),
     loadStories(opts, cfg),
@@ -622,20 +712,47 @@ function findChecklists(opts, id, itemsCell) {
     .map((f) => join(opts.registryDir, f));
 }
 
-function cmdNext(opts) {
-  const cfg = requireSurfaces(opts);
-  const r = nextItem(readRegistry(opts));
-  if (!r) {
-    console.log(
-      opts.has("--json") ? "null" : "nothing untested — registry complete",
-    );
-    process.exitCode = 3;
-    return;
+// The row a named id resolves to, whatever state it is in. The sibling of `nextItem`, and it
+// returns the same shape — `surfaceTitle` included, which the section carries and the row does not.
+export function itemById({ sections }, id) {
+  for (const sec of sections) {
+    const r = sec.rows.find((row) => row.id === id);
+    if (r) return { ...r, surfaceTitle: sec.title };
   }
+  return null;
+}
+
+// An id is case-insensitive at the boundary: the owner types `d.2`, the registry spells it `D.2`.
+const normaliseId = (s) => (s ?? "").trim().toUpperCase();
+
+// "You named no row" and "you named a row that is not there" are different answers, and /qa-next
+// stops differently on each: exit 4 maps to STOP `unknown-item`, which is the wrong stop for a
+// malformed call. A missing value, or one that is the next flag, is a usage error (exit 2).
+function requireIdValue(flag, raw) {
+  if (!raw || raw.startsWith("--")) die(`${flag} <id> is required`);
+  return normaliseId(raw);
+}
+
+// This function's earlier run files, oldest first, relative to the registry directory. Reuses
+// listRunFiles rather than walking again: two sort orders for "oldest run first" would drift, and
+// one recursive walk of a directory of Markdown files is cheap. The cost is paid on --next too,
+// deliberately — see the task 141 notes.
+function priorRuns(opts, id) {
+  const runsDir = join(opts.root, opts.registryDir, "runs");
+  if (!existsSync(runsDir)) return [];
+  const prefix = `${join("runs", id)}/`;
+  return listRunFiles(runsDir).filter((p) => p.startsWith(prefix));
+}
+
+// The ONE description of a registry row that the skill consumes. `--next` and `--item` differ only
+// in HOW they find the row; what they say about it must be identical, so they say it here. Two
+// payload builders would be two enumerations of "what the skill needs to know about a row", and
+// enumerations drift in the worst direction — docs/reference/anti-patterns.md.
+function describeRow(opts, cfg, r) {
   const stories = loadStories(opts, cfg);
   const automatedBy = specPaths(r.cells["Automated by"]);
   const uat = new RegExp(cfg.uatSpecPattern);
-  const out = {
+  return {
     id: r.id,
     function: r.title,
     what: r.cells["What it does"] ?? "",
@@ -652,28 +769,134 @@ function cmdNext(opts) {
     automatedBy,
     uatSpecs: automatedBy.filter((p) => uat.test(p)),
     checklists: findChecklists(opts, r.id, r.cells.Items ?? ""),
+    // The re-run fields, on BOTH commands. Without state/lastRun/priorRuns the skill cannot say
+    // "3rd run of this function, follows 2026-08-02-lan.md" in the run file, which is the one
+    // thing a re-run's evidence has to state. `bug` is the link the row already carries, parsed
+    // with the SAME regex checkRegistry owns, so there is one parser: Step 4's "a repeat failure
+    // reuses the open bug" reads it here rather than re-parsing the registry by hand.
+    state: stateKey(r.state),
+    lastRun: (r.run.match(/\]\(([^)]+)\)/) ?? [])[1] ?? null,
+    priorRuns: priorRuns(opts, r.id),
+    notes: r.notes,
+    // The file the LAST bug link names — `bugLinkPaths`, the same values checkRegistry calls
+    // `exists` on, fragment removed — converted by `repoPathOf`, the same conversion `exists` uses.
+    // Repo-relative, so it opens from the repo root and round-trips through `--bug`. Last, not
+    // first, because the note cell is appended to on a kept ✅ and Step 4 wants the most recent.
+    // The link as the author wrote it, anchor included, is still in `notes`.
+    bug: (() => {
+      const p = bugLinkPaths(r.notes).at(-1);
+      return p === undefined ? null : repoPathOf(opts, p);
+    })(),
   };
-  if (opts.has("--json")) console.log(JSON.stringify(out, null, 2));
-  else {
-    console.log(`next: ${out.id} — ${out.function}`);
-    console.log(`  surface:    ${out.surface}. ${out.surfaceTitle}`);
-    console.log(`  what:       ${out.what}`);
-    console.log(`  entry:      ${out.entry || "(none)"}`);
-    console.log(
-      `  stories:    ${out.stories.map((s) => s.id).join(", ") || "(none)"}`,
-    );
-    console.log(
-      `  items:      ${out.items || "(none mapped — author items first)"}`,
-    );
-    console.log(`  checklists: ${out.checklists.join(", ") || "(none)"}`);
-    console.log(
-      `  automated:  ${out.automatedBy.join(" · ") || "manual only"}`,
-    );
-  }
 }
 
-function updateRow(opts, id, mutate) {
+// Printed by both commands, for the same reason the payload is shared.
+function printRow(label, out) {
+  console.log(`${label}: ${out.id} — ${out.function}`);
+  console.log(`  surface:    ${out.surface}. ${out.surfaceTitle}`);
+  console.log(`  what:       ${out.what}`);
+  console.log(`  entry:      ${out.entry || "(none)"}`);
+  console.log(`  state:      ${out.state ?? "(unknown)"}`);
+  console.log(
+    `  stories:    ${out.stories.map((s) => s.id).join(", ") || "(none)"}`,
+  );
+  console.log(
+    `  items:      ${out.items || "(none mapped — author items first)"}`,
+  );
+  console.log(`  checklists: ${out.checklists.join(", ") || "(none)"}`);
+  console.log(`  automated:  ${out.automatedBy.join(" · ") || "manual only"}`);
+  console.log(
+    `  prior runs: ${out.priorRuns.join(", ") || "(none — 1st run)"}`,
+  );
+}
+
+function cmdNext(opts) {
+  const cfg = requireSurfaces(opts);
+  const r = nextItem(readRegistry(opts));
+  if (!r) {
+    console.log(
+      opts.has("--json") ? "null" : "nothing untested — registry complete",
+    );
+    process.exitCode = 3;
+    return;
+  }
+  const out = describeRow(opts, cfg, r);
+  if (opts.has("--json")) console.log(JSON.stringify(out, null, 2));
+  else printRow("next", out);
+}
+
+function cmdItem(opts) {
+  const cfg = requireSurfaces(opts);
+  const id = requireIdValue("--item", opts.val("--item"));
+  const r = itemById(readRegistry(opts), id);
+  if (!r) {
+    // Exit 4, not the usage family's 2: "you named a row that is not there" is a different answer
+    // from "you called me wrongly", and /qa-next stops differently on each (unknown-item).
+    console.error(`uat-status: ${id}: no registry row`);
+    process.exitCode = 4;
+    return;
+  }
+  const out = describeRow(opts, cfg, r);
+  if (opts.has("--json")) console.log(JSON.stringify(out, null, 2));
+  else printRow("item", out);
+}
+
+// Pure, and therefore testable without a filesystem. Run files are runs/<id>/<date>-<env>.md. The
+// date and the env label are both fixed within a session, so a second run today would write the
+// same path and take the first run's `## Findings` rows with it — and --findings is DERIVED from
+// those files, so the loss reads as a shorter list nobody can tell is short. Zero-padded so "-10"
+// does not sort before "-2"; the other half of the ordering is listRunFiles' seqKey above.
+export function runPathFor(existing, date, env) {
+  // An env label ending in `-NN` makes the sequence unreadable: `2026-09-22-ci-02.md` is
+  // indistinguishable from run 02 of env `ci`, so seqKey normalises it to itself and it sorts
+  // AFTER its own `-02` and `-10` re-runs — the very inversion the sort key exists to remove.
+  // The ambiguity is created at WRITE time, so it is refused here rather than guessed at read
+  // time, where nothing knows the env. (A hand-written file of that shape is still ordered
+  // wrongly; the tool simply will not add one.)
+  if (/-\d{2}$/.test(env))
+    die(
+      `--env ${env}: an env label may not end in -NN — it is indistinguishable from a run sequence`,
+    );
+  const base = `${date}-${env}`;
+  const taken = new Set(existing.map((f) => basename(f)));
+  if (!taken.has(`${base}.md`)) return `${base}.md`;
+  for (let n = 2; n < 100; n++) {
+    const name = `${base}-${String(n).padStart(2, "0")}.md`;
+    if (!taken.has(name)) return name;
+  }
+  die(`${base}: 99 runs already recorded today`);
+}
+
+function cmdRunPath(opts) {
   requireSurfaces(opts);
+  const id = requireIdValue("--run-path", opts.val("--run-path"));
+  if (!itemById(readRegistry(opts), id)) {
+    console.error(`uat-status: ${id}: no registry row`);
+    process.exitCode = 4;
+    return;
+  }
+  const env = opts.val("--env") ?? "local";
+  const dir = join(opts.root, opts.registryDir, "runs", id);
+  // Compute BEFORE creating: runPathFor refuses an ambiguous env label, and a refusal that has
+  // already made a directory is a refusal the caller cannot trust. One readdir of a single
+  // function's directory — not the recursive walk listRunFiles does.
+  const name = runPathFor(
+    existsSync(dir) ? readdirSync(dir) : [],
+    today(),
+    env,
+  );
+  mkdirSync(dir, { recursive: true });
+  console.log(join("runs", id, name));
+}
+
+function updateRow(opts, rawId, mutate) {
+  requireSurfaces(opts);
+  // Normalised HERE, in the single writer, so every command that writes a row — --set, --accept,
+  // --items, --automated — is case-insensitive by construction rather than by each remembering.
+  // The readers (--item, --run-path) normalise at their own call sites. The population is "every
+  // command that takes a row id", and `--item`/`--run-path` having it while these four did not is
+  // the enumeration class: each site correct alone, the set never listed.
+  const id = normaliseId(rawId);
   const reg = readRegistry(opts);
   const sec = reg.sections.find((s) => s.rows.some((r) => r.id === id));
   if (!sec) die(`${id}: no registry row`);
@@ -684,7 +907,31 @@ function updateRow(opts, id, mutate) {
   row.cells["Notes / bug"] = row.notes;
   reg.lines[row.line] = renderRow(sec.columns, row.cells);
   writeRegistry(opts, reg.lines);
-  console.log(`${id}: ${row.state}${row.run ? ` · ${row.run}` : ""}`);
+  // `(kept)` is the mitigation for the one silent branch in this file: a caller that expected a
+  // verdict to move the state cell must be able to see that it did not.
+  console.log(
+    `${id}: ${row.state}${row.keptAccepted ? " (kept)" : ""}${row.run ? ` · ${row.run}` : ""}`,
+  );
+}
+
+function appendNote(existing, addition) {
+  // A PLAIN append. Duplicate suppression was tried three ways and each traded one wrong answer
+  // for another, because ` · ` is the registry's own separator AND is legal inside a note: no
+  // string comparison can distinguish "the cell's last segment is X" from "the cell ends with a
+  // compound note whose tail reads X". Splitting on the separator dropped a genuinely new note;
+  // matching the tail dropped it too; restricting the match to atomic additions dropped it once
+  // more while letting an identical compound through twice.
+  //
+  // So the suppression is gone rather than approximated. A dropped note is data loss and is
+  // silent; a repeated segment is noise a reader can see. The cost is that a ✅ row blocked nightly
+  // by the same reason grows its cell — recorded as an accepted limitation in the gate's
+  // recommendations rather than papered over, and bounded in practice because the loop writes one
+  // segment per run.
+  const add = (addition ?? "").trim();
+  const have = (existing ?? "").trim();
+  if (!add) return have;
+  if (!have) return add;
+  return `${have} · ${add}`;
 }
 
 function linkTo(opts, repoRelPath) {
@@ -693,7 +940,10 @@ function linkTo(opts, repoRelPath) {
 
 function cmdSet(opts) {
   const i = opts.args.indexOf("--set");
-  const [id, state] = [opts.args[i + 1], opts.args[i + 2]];
+  const [id, state] = [
+    requireIdValue("--set", opts.args[i + 1]),
+    opts.args[i + 2],
+  ];
   if (!STATES[state])
     die(`state must be one of ${Object.keys(STATES).join("|")}`);
   if (state === "accepted") die("use --accept for owner sign-off");
@@ -706,8 +956,42 @@ function cmdSet(opts) {
     die("--bug <path to bug report> is required for fail");
   if (["na", "blocked"].includes(state) && !note)
     die(`--note <why> is required for ${state}`);
+  const clear = opts.has("--clear-note");
+  if (clear && (bug || note))
+    die("--clear-note cannot be combined with --note or --bug");
   updateRow(opts, id, (row) => {
-    row.state = STATES[state];
+    // ONLY A FAIL MOVES AN ACCEPTED ROW. ✅ means "this is the feature I wanted" — an owner's
+    // judgement. A machine re-pass agrees with it; a "blocked" says the environment could not
+    // supply a credential; an "n/a" says the function is gone. None of the three is evidence
+    // against the judgement. A fail IS, and still overrides. Written as one predicate over the
+    // verdict rather than a special case for "pass": Step 2's two early exits write blocked and
+    // na, so guarding pass alone would leave the same defect reachable through another door — a
+    // regression sweep must not replace fifty owner signatures with fifty ⏸.
+    // `untested` is excluded alongside `fail` because it is not a VERDICT — it is the deliberate
+    // demotion, the documented way to take an owner's ✅ back before re-testing from scratch
+    // (README § Registry states, and this change's own migration line). Keeping ✅ for it left the
+    // row accepted while the `state === "untested"` block below still cleared `Last run`, which
+    // --check then rejected and /qa-next Step 0 HALTed on as `registry-invalid` — so the one
+    // documented way out of an accepted row was the command that broke the registry.
+    const kept =
+      !["fail", "untested"].includes(state) &&
+      stateKey(row.state) === "accepted";
+    // On a kept ✅ the note cell is APPENDED TO, never replaced — by construction, for every flag
+    // that writes it, present and future. That cell holds the owner's "accepted <date> — <why>",
+    // and checkRegistry imposes no note requirement on an accepted row, so any loss here is
+    // silent. Two earlier attempts guarded it by ENUMERATING the ways in, and each missed one:
+    // `state === "pass"` missed `blocked` and `na`; `clear || note` missed `--bug`, which took the
+    // kept branch and replaced the sign-off with a bug link while --check stayed green. An
+    // enumeration of doors has to be re-checked every time a flag is added and nothing forces
+    // that re-check, so the invariant is expressed as an operation instead: append. `--clear-note`
+    // is still refused here, because clearing is not appending — it is the one flag whose whole
+    // purpose is to empty the cell.
+    if (kept && clear)
+      die(
+        "--clear-note cannot empty an accepted row's sign-off note — --set <id> untested first to demote it",
+      );
+    if (!kept) row.state = STATES[state];
+    row.keptAccepted = kept;
     if (run)
       row.run = linkTo(
         opts,
@@ -716,7 +1000,13 @@ function cmdSet(opts) {
     const parts = [];
     if (bug) parts.push(linkTo(opts, bug));
     if (note) parts.push(note);
-    if (parts.length) row.notes = parts.join(" — ");
+    if (clear) row.notes = "";
+    else if (parts.length)
+      // The append rule above. ` · ` is the separator --accept already uses to join a sign-off to
+      // whatever preceded it, so a kept row reads as one history rather than two conventions.
+      row.notes = kept
+        ? appendNote(row.notes, parts.join(" — "))
+        : parts.join(" — ");
     if (state === "untested") {
       row.run = "";
       row.notes = note ?? "";
@@ -726,7 +1016,10 @@ function cmdSet(opts) {
 
 function cmdCell(opts, flag, column) {
   const i = opts.args.indexOf(flag);
-  const [id, value] = [opts.args[i + 1], opts.args[i + 2]];
+  const [id, value] = [
+    requireIdValue(flag, opts.args[i + 1]),
+    opts.args[i + 2],
+  ];
   if (!value) die(`${flag} <id> "<value>"`);
   updateRow(opts, id, (row) => {
     if (!(column in row.cells))
@@ -736,7 +1029,10 @@ function cmdCell(opts, flag, column) {
 }
 
 function cmdAccept(opts) {
-  const id = opts.val("--accept");
+  // Through the same boundary as every other id-taking command — the population the comment in
+  // updateRow names is only closed if all six go through it, and `--accept --force` reported
+  // `--FORCE: no registry row` while it did not.
+  const id = requireIdValue("--accept", opts.val("--accept"));
   const note = opts.val("--note");
   updateRow(opts, id, (row) => {
     if (stateKey(row.state) !== "pass" && !opts.has("--force"))
@@ -820,6 +1116,8 @@ function dispatch(opts) {
   if (opts.has("--coverage")) return cmdCoverage(opts);
   if (opts.has("--check")) return cmdCheck(opts);
   if (opts.has("--next")) return cmdNext(opts);
+  if (opts.has("--item")) return cmdItem(opts);
+  if (opts.has("--run-path")) return cmdRunPath(opts);
   if (opts.has("--set")) return cmdSet(opts);
   if (opts.has("--items")) return cmdCell(opts, "--items", "Items");
   if (opts.has("--automated"))
