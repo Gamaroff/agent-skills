@@ -35,7 +35,7 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
 | 2. review-task             | ✅ Done    | `task.141.review.{N}.{name}.md` exists (or skip logged)                | **Skipped** — status `Ready for Development` + `task.141.review.1.*.md` present (verdict READY TO IMPLEMENT, reviewed 2026-09-22) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1–5 implemented; 10 new tests, all 10 mutations red; full `npm test` green (3931) with the symlink moved aside | `.summaries/` n/a — surface map consumed inline |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #468: https://github.com/Gamaroff/agent-skills/pull/468 — OPEN, base `develop`, MERGEABLE | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at 11 of 11 cycles. Cycle 10 PASS → 5c CONCERNS → review-driven fix `4d805a47` → cycle 11 CONCERNS (1 MEDIUM) → fix `0c0ed980`, ungated (route 2c declined: `medium-not-falling`) | —                    |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at 12 of 12 cycles. Cycle 12 gated `0c0ed980` (holds for `priorRuns`) and found BUG-23; fixed in `94c28be6`, ungated (route 2c declined: `medium-not-falling`, MEDIUM 0, 1, 1) | —                    |
 | 7. finalise                | ⏳ Pending | `task.141.dod.{N}.*.md`; task `status: accepted`                       | Blocked by the loop-limit escalation | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -153,12 +153,45 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
   option 1: fix the `/review-pr` findings. Re-entry is at **5b** inside cycle 10 (the review-driven
   path: the gate is not the work; the `pr_review=` report is). Cycle 11's 5a then gates the fix.
   Gate 10's carried LOWs (CR10-1..3) stay in `recommendations.future` and are not this cycle's work.
+- **QA loop re-entry: 1 extra cycle granted** (operator, 2026-09-23, fifth grant); eleven gates on
+  disk, so `qa_max_cycles` read back from the lock is **12**. Cycle 12's remit is bounded: gate
+  `0c0ed980` alone (Step 6 reads `priorRuns` from the state file; the `\b` rule wording; the bug.3 and
+  bug.4 histories).
 
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+### QA Loop Limit Reached — 2026-09-23 (fourth)
+
+12 cycles (5 + 2 + 2 + 1 + 1 + 1 granted). Route 2c **declined**: `medium-not-falling` (MEDIUM 0, 1, 1
+over cycles 10–12).
+
+**Final gate status**: CONCERNS (90/100), gate 12. All three entries are closed in-cycle by `94c28be6`,
+which **no gate has read**.
+**HIGH findings per cycle**: 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0 — flat at 0 for eight gates
+**MEDIUM findings per cycle**: 1, 3, 1, 2, 2, 2, 2, 2, 2, 0, 1, 1
+**Remaining issues**: none open. BUG-23 (MEDIUM, `skills/qa-next/SKILL.md`), CR12-2 and CR12-4 (LOW)
+are fixed but ungated.
+
+**What was attempted**: cycle 12 gated `0c0ed980` alone. It held for `priorRuns`, and the rule it relied
+on was over-broad for `bug` (BUG-23), now scoped with a separate `filedBug`.
+
+**Likely root cause**: the last three cycles each found exactly one MEDIUM, and each time it sat in
+the prose the previous cycle wrote about the state file. The state file is a small protocol described
+only in prose (fields, who writes them, who reads them, when it is deleted). Each prose fix aligned the
+readers it listed and exposed the next. Nothing mechanical checks that protocol: `uat-status.mjs` never
+reads or writes the state file, so no test can hold it. More gates will keep finding one-step-out
+wording defects at roughly one per cycle. That is a diminishing-returns signal, not a stall.
+
+**Recommended next steps**:
+1. **Accept on the evidence** and go to 5c `/review-pr` → `/finalise` (recommended). The code has had no
+   runtime defect for three gates, and what remains is state-file prose, which a fresh whole-PR review at
+   5c reads anyway.
+2. **Or file the state file as a follow-up**: give it a schema (fields, writer, readers) in one place,
+   or have `uat-status.mjs` own it so a test can hold it, instead of another prose cycle.
 
 ### QA Loop Limit Reached — 2026-09-23 (third)
 
@@ -271,6 +304,24 @@ one I can name.
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 12 — 2026-09-23
+
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 3. BUG-23 (MEDIUM): line 84 says every later step reads `bug` from the state file, but
+that is the row's pre-run link, so Step 6 prints the wrong bug. CR12-2 (LOW): `\b` is ASCII-only while
+the rule says "letter". CR12-4 (LOW): a stale "starts a word" comment and test label.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+
+**Fixes Applied**: BUG-23: the state-file rule is scoped (`bug` is the pre-run link, read only by Step 4's
+reuse decision; this run's bug is `filedBug`, which `--set … fail --bug` takes and Step 6 prints).
+CR12-2: the rule says ASCII; a clause row pins `[ébug.9]`. CR12-4: the stale wording. M51 and M52 red;
+`ci:fast` 3947, 0 fail.
+**Commit**: `94c28be6`
 
 ### QA Cycle 11 — 2026-09-23
 
