@@ -3,7 +3,7 @@
 **Task**: `task.141.qa-next-targeted-item.md`
 **Run Number**: 1
 **Started**: 2026-09-22 17:10
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -35,7 +35,7 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
 | 2. review-task             | ✅ Done    | `task.141.review.{N}.{name}.md` exists (or skip logged)                | **Skipped** — status `Ready for Development` + `task.141.review.1.*.md` present (verdict READY TO IMPLEMENT, reviewed 2026-09-22) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1–5 implemented; 10 new tests, all 10 mutations red; full `npm test` green (3931) with the symlink moved aside | `.summaries/` n/a — surface map consumed inline |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #468: https://github.com/Gamaroff/agent-skills/pull/468 — OPEN, base `develop`, MERGEABLE | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at 9 of 9 cycles (loop limit; route 2c declined: `medium-not-falling`) | —                    |
 | 7. finalise                | ⏳ Pending | `task.141.dod.{N}.*.md`; task `status: accepted`                       | Blocked by the loop-limit escalation | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -126,6 +126,23 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
   hand.
 - Filed separately during cycle 6: **bug.16** — the `main` guard is a silent no-op under a symlink,
   at six sites across five skills. Pre-existing; it explains two confusing probes in this loop.
+- **QA loop re-entry: 2 extra cycles granted** (operator, 2026-09-23, second grant); 0 cycle(s)
+  run outside the loop back-filled from disk — seven gates on disk, reconstructed count 7, so
+  `qa_max_cycles` read back from the lock is **9**. Lock restored from the halt snapshot by
+  `grant-qa-cycles.sh` (halt_reason `loop-limit`); `qa_phase` set to `5a`. Cycle 8's remit is
+  bounded: gate the three cycle-7 fixes in `c5efbe9b` — the shared `isToolWrittenLink` predicate,
+  `linkTarget`'s fragment strip, and the bug-link rule as restated in the README and
+  `renderSkeleton`.
+- Cycles 8–9 (second grant) ran and are recorded in the QA Iteration History. The budget is spent at
+  9 and route 2c was declined (`medium-not-falling`), so the run escalates (Issues Log). Cycle 9's
+  two fixes (`a6b9b94b`) are ungated.
+- Process notes from this run. (1) The qa-task default cycle-3+ scoping would have reviewed **zero
+  files** in cycle 8: gate 7's hand-written `updated:` was five hours after its own commit, and the
+  non-vacuity guard does not fire on zero files. The scope was pinned to `c5efbe9b`, recorded as obs
+  #165, and every gate since takes its timestamp from `date -u`. (2) The first cycle-8 `ci:fast` run
+  went red on an unrelated `session-handoff` load flake that passes 3/3 in isolation; the second
+  attempt was green (obs #166). (3) Both fix commits kept the implementation report out, as the
+  step doc requires; this Step-8-deferred report is committed with the escalation.
 
 ---
 
@@ -133,11 +150,116 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
 
 _Problems encountered and how they were resolved or escalated._
 
+### QA Loop Limit Reached — 2026-09-23
+
+The pipeline completed 9 qa-task/qa-fix cycles (5 + 2 + 2 granted) without a clean PASS. The
+Gate-the-last-fix half-cycle (route 2c) was evaluated first and **declined**:
+`medium-not-falling`, because MEDIUM reads 2, 2, 2 over cycles 7–9 and the route requires a strict
+fall.
+
+**Final gate status**: CONCERNS (80/100). Both entries are closed in-cycle by `a6b9b94b`, which **no
+gate has read**
+**HIGH findings per cycle**: 1, 1, 1, 0, 1, 0, 0, 0, 0 — flat at 0 from cycle 6 onward (five gates)
+**MEDIUM findings per cycle**: 1, 3, 1, 2, 2, 2, 2, 2, 2
+**Remaining issues** (from the final gate file): none open. The two cycle-9 findings are fixed and
+mutation-proved but ungated:
+- TASK-141-BUG-21 (medium, `skills/qa-next/scripts/uat-status.mjs`): `bug` did not round-trip
+  through `--bug`. It is now repo-relative, with one `repoPathOf` conversion shared by `--check` and
+  the payload.
+- TASK-141-BUG-20 (medium, `skills/qa-next/scripts/uat-status.mjs`): `BUG_LINK_RULE` named the wrong
+  resolving base. It now reads "relative to the registry file" and is held clause by clause to
+  `--check` behaviour.
+
+**What was attempted per cycle**:
+- Cycles 1–5: see the first Loop Escalation entry below (13 defects closed, 29 mutations)
+- Cycles 6–7: see "Granted cycles 6–7" below (7 defects closed; the shared predicate)
+- Cycle 8: gated cycle 7's three fixes. The fragment strip had reopened validated-vs-published on a
+  third axis (BUG-18), and the rule's prose still diverged (BUG-19). Fixed by sharing the **value**
+  (`bugLinkPaths`) and one exported `BUG_LINK_RULE`; CR8-3 was closed by decision (URL semantics).
+  M35–M40 red
+- Cycle 9: gated cycle 8's fix. It held on its axis. Found BUG-21 (from the **original commit**,
+  missed by eight gates) and BUG-20 (a wrong word in cycle 8's rule). Fixed with `repoPathOf` and a
+  table-driven clause test. M41–M46 red; M44 first survived and was closed by asserting the published
+  `bug`
+- Route classifier `reason` at the budget: `medium-not-falling`
+
+**Likely root cause**: this is not a stall on one defect. HIGH has been 0 for five gates, and every
+MEDIUM since cycle 6 is in one small area: how a bug link is **represented at each boundary** (the
+cell, `--check`, the payload, the `--bug` flag, the prose rule). Each cycle aligned one pair of
+boundaries and exposed the next. The row-state axis came in cycle 6, link shape in cycle 7, the
+fragment in cycle 8, and the coordinate system in cycle 9. Cycle 9's defect differs from the
+previous seven: it was in the **original** commit rather than in the previous fix. That points to
+coverage finally reaching the last unexamined boundary (payload → flag) rather than to fixes
+generating defects. The loop is closing an enumeration of boundaries, and there is no other untested
+one I can name.
+
+**Recommended next steps**:
+1. **Grant 1 cycle** to gate `a6b9b94b` alone. Its remit is bounded: the `repoPathOf` round trip
+   and the clause test. On this branch the dispatched reviewer has found something in every cycle,
+   so an ungated fix has not been a safe assumption.
+2. Or **accept on the evidence** and go to `/review-pr` (5c) → `/finalise`. Nothing is open; both
+   fixes are mutation-proved (M41–M46), `ci:fast` is green at 3947, and the remaining items are
+   pre-existing and routed to future (CR9-3, CR8-2+CR7-4, bug.16, CR-3, the kept-✅ growth).
+3. Whichever you choose, schedule **CR9-3** (require a regular file for bug links) as a follow-up.
+   M44's survival showed it is reachable, not only theoretical.
+
+
 ---
 
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 9 — 2026-09-23
+
+**Gate Result**: CONCERNS (80/100)
+**Issues Found**: 2. BUG-21 (MEDIUM): the payload's `bug` is registry-relative while `--bug` takes
+a repo-relative path, so SKILL.md Step 4's repeat-failure flow writes `../../../bugs/…` and turns
+`--check` red. It has been present since the original feature commit `9efe0d22`, and eight gates
+missed it. BUG-20 (MEDIUM): `BUG_LINK_RULE` says "repo-relative", which is the wrong resolving base
+(a cycle-8 wording error), and its test pins the wrong word. One pre-existing LOW went to future
+(CR9-3, a directory target passes).
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+
+Default scoping worked this cycle (gate 8's timestamp came from `date -u`). Step 4b ran on SKILL.md
+and returned `no-executable-blocks`. The dispatched reviewer returned in 2m25s.
+
+**Fixes Applied**: BUG-21: `repoPathOf` is the one registry→repo conversion used by `--check` and the
+payload, so `bug` is repo-relative and round-trips through `--bug`. BUG-20: the rule says "relative
+to the registry file" and is held clause by clause to `--check`. M41–M46 red (M44 closed after first
+surviving). `ci:fast` green, 3947 tests.
+**Commit**: `a6b9b94b`
+
+### QA Cycle 8 — 2026-09-23
+
+**Gate Result**: CONCERNS (80/100)
+**Issues Found**: 3. BUG-18 (MEDIUM): `--item` publishes the bug link with its `#fragment`, while
+`--check` validates it without one. This reopens validated-vs-published on a third axis, and the
+cause is cycle 7's CR7-3 fix. BUG-19 (MEDIUM): the rule's two prose statements still diverge from
+the predicate, and the README hunk deleted a true sentence. CR8-3 (LOW): the first-`#` cut breaks a
+`#` in a filename. One pre-existing finding was routed to future (CR8-2).
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 8 of 9)
+
+Scope was pinned to `c5efbe9b` by the operator. The skill's default since-last-gate scoping would
+have reviewed zero files, because gate 7's hand-written `updated:` postdates its own commit by five
+hours (obs #165). The dispatched reviewer returned in 1m25s. Every bug finding was reproduced on a
+fixture on HEAD and on `origin/develop`.
+
+**Fixes Applied**: BUG-18: `bugLinkPaths` is the one value both sides consume (predicate, then
+fragment strip), so the published `bug` is the path `exists` was called on. BUG-19: one exported
+`BUG_LINK_RULE`, interpolated by the skeleton, quoted verbatim by the README and held by a test;
+the warnings sentence is restored. CR8-3: closed by decision (URL semantics), open to cycle 9.
+M35–M40, 6 of 6 red. The first `ci:fast` attempt went red on an unrelated `session-handoff` load
+flake that passes 3/3 in isolation (obs #166); the second attempt was green, 3945 tests with 0 fail.
+**Commit**: `d3620877`
 
 ### Granted cycles 6–7 (2026-09-23)
 
