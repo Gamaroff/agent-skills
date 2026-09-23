@@ -35,7 +35,7 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
 | 2. review-task             | ✅ Done    | `task.141.review.{N}.{name}.md` exists (or skip logged)                | **Skipped** — status `Ready for Development` + `task.141.review.1.*.md` present (verdict READY TO IMPLEMENT, reviewed 2026-09-22) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1–5 implemented; 10 new tests, all 10 mutations red; full `npm test` green (3931) with the symlink moved aside | `.summaries/` n/a — surface map consumed inline |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #468: https://github.com/Gamaroff/agent-skills/pull/468 — OPEN, base `develop`, MERGEABLE | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Cycle 10 (granted) PASS → Cosmetic-residue exit → 5c `/review-pr` **CONCERNS** (0 HIGH, 4 MEDIUM, 2 LOW); halted for an operator decision before Step 7 | —                    |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at 11 of 11 cycles. Cycle 10 PASS → 5c CONCERNS → review-driven fix `4d805a47` → cycle 11 CONCERNS (1 MEDIUM) → fix `0c0ed980`, ungated (route 2c declined: `medium-not-falling`) | —                    |
 | 7. finalise                | ⏳ Pending | `task.141.dod.{N}.*.md`; task `status: accepted`                       | Blocked by the loop-limit escalation | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -148,12 +148,53 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
   restored from the halt snapshot by `grant-qa-cycles.sh`; `qa_phase` 5a. Cycle 10's remit is
   bounded: gate the cycle-9 fix `a6b9b94b` (`repoPathOf` round trip, the clause test, the rule's
   resolving base).
+- **QA loop re-entry: 1 extra cycle granted** (operator, 2026-09-23, fourth grant) after the 5c
+  halt; ten gates on disk, so `qa_max_cycles` read back from the lock is **11**. The operator chose
+  option 1: fix the `/review-pr` findings. Re-entry is at **5b** inside cycle 10 (the review-driven
+  path: the gate is not the work; the `pr_review=` report is). Cycle 11's 5a then gates the fix.
+  Gate 10's carried LOWs (CR10-1..3) stay in `recommendations.future` and are not this cycle's work.
 
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+### QA Loop Limit Reached — 2026-09-23 (third)
+
+The pipeline completed 11 qa-task/qa-fix cycles (5 + 2 + 2 + 1 + 1 granted) without a clean PASS on
+the head it hands over. The Gate-the-last-fix half-cycle (route 2c) was evaluated first and
+**declined**: `medium-not-falling`, with MEDIUM reading 2, 0, 1 over cycles 9–11.
+
+**Final gate status**: CONCERNS (90/100), gate 11. All three entries are closed in-cycle by `0c0ed980`,
+which **no gate has read**.
+**HIGH findings per cycle**: 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0 — flat at 0 from cycle 6 (seven gates)
+**MEDIUM findings per cycle**: 1, 3, 1, 2, 2, 2, 2, 2, 2, 0, 1
+**Remaining issues** (from the final gate file): none open. BUG-22 (MEDIUM, `skills/qa-next/SKILL.md`),
+CR11-4 and CR11-5 (LOW) are fixed but ungated.
+
+**What was attempted per cycle**:
+- Cycles 1–9: see the earlier escalation entries and QA Cycle entries below
+- Cycle 10: gated the cycle-9 fix PASS 100 and took the Cosmetic-residue exit to 5c. `/review-pr`
+  returned CONCERNS (4 MEDIUM, 2 LOW; none of the MEDIUM were in the last fix, all from the PR as a
+  whole) and the run halted for an operator decision. The operator granted cycle 11, and the
+  review's findings were fixed in a 5b re-entry (`4d805a47`)
+- Cycle 11: gated `4d805a47`; four of five fixes held. BUG-22 was the Step 6 reader the CR-2 fix
+  missed. Fixed in `0c0ed980`
+- Route classifier `reason` at the budget: `medium-not-falling`
+
+**Likely root cause**: the same one as the last two escalations, now in prose. Every finding since
+cycle 6 has been about a value crossing a boundary: first how a bug link is represented, and in
+cycles 10–11 when the state file's `priorRuns` is read relative to the run being written. Each fix
+aligned the readers it enumerated and missed one. Cycle 11's defect is the last `priorRuns` reader;
+all three are now aligned and a grep of SKILL.md finds no fourth.
+
+**Recommended next steps**:
+1. **Accept on the evidence** and go to 5c `/review-pr` → `/finalise`. The remaining open change is
+   prose in Step 6 plus a one-word regex and wording fix, all small and mutation-proved where
+   testable, and a fresh `/review-pr` at 5c will read the head either way.
+2. **Or grant 1 cycle** to gate `0c0ed980` alone. On this branch the reviewer has found something in
+   every cycle but one, so an ungated fix has rarely been a safe assumption.
 
 ### Halt at 5c — operator decision pending (2026-09-23)
 
@@ -231,6 +272,25 @@ one I can name.
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 11 — 2026-09-23
+
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 3. BUG-22 (MEDIUM): Step 6 prints the run number and previous link after deleting the
+state file, and there is no `committed` resume entry. This is the reader the cycle-10 CR-2 fix did not
+enumerate. CR11-4 (LOW): the rule wording versus `\b` for `_` and digits. CR11-5 (LOW): the bug.3 and
+bug.4 histories skip rows. Two pre-existing findings went to future (CR11-2, CR11-3).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+
+**Fixes Applied**: BUG-22: Step 6 reads `priorRuns` from the state file and deletes it last, and the
+resume map gains `committed → Step 6`. CR11-4: the rule says exactly what `\b` does, with a clause row
+for `x_bug.` and `1bug.`. CR11-5: the bug.3 and bug.4 histories are completed. M49 and M50 red;
+`ci:fast` 3947, 0 fail.
+**Commit**: `0c0ed980` (pushed together with `4d805a47`)
+
 ### QA Cycle 10 — 2026-09-23
 
 **Gate Result**: PASS (100/100)
@@ -243,6 +303,15 @@ fix: the reviewer exercised 7 registry layouts and an away-from-cwd `--root`.
 **PR Review**: CONCERNS — `task.141.pr-review.1.qa-next-targeted-item.md`: 0 HIGH; MEDIUM PC-1 (four bug reports still `Ready for QA`), CR-1 (`--run-path` prints a registry-relative path and SKILL.md no longer says so), CR-2 (state file does not persist `priorRuns`/`bug`), CR-3 (Step 1 hard-codes `--item D.2`); LOW PC-2, CR-4
 **Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 10 with HIGH 0 for cycles 9 and 10; all 3 open findings are LOW and are carried to the gate's recommendations.future by id (TASK-141-CR10-1, TASK-141-CR10-2, TASK-141-CR10-3). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
 **Action**: Proceeding to 5c (PR conformance review)
+
+**Review-driven fix (5b re-entry after the operator granted cycle 11)**: PR review 1 findings.
+CR-3: `--item D.2` → `--item <id>`. CR-1 was fixed in prose: a repo-relative `--run-path` was tried
+and reverted, because `lastRun`, `priorRuns` and `--findings` are registry-relative and one kind of
+value must not span two coordinate systems. CR-2: the state file carries `priorRuns` and `bug`.
+PC-1: bug reports 1–4 closed. CR-4: `bug.` must start a word. M47 and M48 red; `ci:fast` 3947, 0
+fail.
+**Fixes Applied**: see above
+**Commit**: `4d805a47` (unpushed; cycle 10's push was spent, so it rides on cycle 11's)
 
 ### QA Cycle 9 — 2026-09-23
 
