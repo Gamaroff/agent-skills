@@ -5,18 +5,20 @@ type: task
 description: "Add a `cli:<path>` entry form to shared/resources/security-probe.mjs that runs a Node CLI inside the engine's sandbox with an argv template carrying the case's input, scoring exit status as the verdict — so a boundary delivered as a multi-flag CLI (task.141's uat-status.mjs) is probed at QA and finalise instead of recorded as `probes_executed: 0`."
 tags: [security-probe, review-security, finalise, qa-task, follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-23
 updated: 2026-09-23
 assignee:
 estimated_effort_hours: 8
 github_issue: 470
+pr_number: 471
+completed_date: 2026-09-23
 ---
 
 # Technical Task: security-probe — a `cli:` entry form
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.144.review.1.probe-engine-cli-entry-form.md` implemented 2026-09-23
 
@@ -387,6 +389,7 @@ None.
 | 2026-09-23 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-09-23 |  | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-09-23 |  | QA findings fixed — gate PASS (100/100), 5 fix iterations (cli: record identity settled on --name) | qa-fix |
+| 2026-09-23 | 1.2 | DoD passed — accepted (PR #471) | finalise |
 
 ---
 <!-- change-log-end -->
@@ -424,6 +427,32 @@ None.
 ### Key Findings
 
 - No open findings. Three low advisory items are recorded as future work in gate 6.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.144.qa.6.probe-engine-cli-entry-form.md`
+**Gate File**: `task.144.gate.6.probe-engine-cli-entry-form.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (6 QA cycles)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 12/12 met — each traced to code and a test that runs on every PR (`npm test` via `test.yml`)
+✅ **Tests:** 19 `cli entry` tests in `shared/resources/tests/security-probe.test.mjs`, two population tests in `probe-boundary-signals.test.mjs`; fast gate 3967 pass / 0 fail; CI reading 1 SUCCESS @ `af2f493e1b49`
+✅ **PR Review:** PR #471; Step 5c `/review-pr` CONCERNS with no high/high finding — PC-1 applied, CR-1 (medium) carried as a follow-up
+✅ **Documentation:** `probe-boundary-rule.md` §5/§5.1, both security prompts, qa-task/qa-story Step 3b, review-security SKILL.md, CHANGELOG `(task 144)`; bundles fresh
+✅ **Security Review:** PASS — the `--argv` validator probed through the engine's own `cli:` form, 35 executed, 0 reproduced (`task.144.dod.security.run.json`)
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling, no personal/payment/health data, no UI
+
+**Task marked as ACCEPTED on:** 2026-09-23
+
+**Detailed Verification Log:** See `task.144.dod.1.probe-engine-cli-entry-form.md` for complete verification evidence and timestamps.
 
 ---
 
