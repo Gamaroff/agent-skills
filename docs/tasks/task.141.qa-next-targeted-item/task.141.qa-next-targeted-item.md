@@ -664,10 +664,10 @@ historical naming.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS — cycle 11 of 11 (fourth grant); 1 MEDIUM open
+**QA Status**: CONCERNS — cycle 12 of 12 (fifth grant); 1 MEDIUM open
 **Testing Date**: 2026-09-23
 **Quality Score**: 90/100
-**Gate Decision**: CONCERNS — no HIGH for seven consecutive gates
+**Gate Decision**: CONCERNS — no HIGH for eight consecutive gates
 
 ### QA Reports
 
@@ -684,8 +684,9 @@ historical naming.
 | 9 | [gate.9](./task.141.gate.9.qa-next-targeted-item.yml) | [qa.9](./task.141.qa.9.qa-next-targeted-item.md) | CONCERNS (80) | 0 |
 | 10 | [gate.10](./task.141.gate.10.qa-next-targeted-item.yml) | [qa.10](./task.141.qa.10.qa-next-targeted-item.md) | PASS (100) | 0 |
 | 11 | [gate.11](./task.141.gate.11.qa-next-targeted-item.yml) | [qa.11](./task.141.qa.11.qa-next-targeted-item.md) | CONCERNS (90) | 0 |
+| 12 | [gate.12](./task.141.gate.12.qa-next-targeted-item.yml) | [qa.12](./task.141.qa.12.qa-next-targeted-item.md) | CONCERNS (90) | 0 |
 
-Budget: 11 (5 + 2 + 2 + 1 + 1 granted). Cycle 10 passed; PR review 1 (CONCERNS) found 6 more, fixed in `4d805a47`; cycle 11 found the one reader that fix missed.
+Budget: 12 (5 + 2 + 2 + 1 + 1 + 1 granted). Cycle 12 found the `bug` half of the cycle-10 state-file rule over-broad.
 
 ### Test Coverage Summary
 
@@ -734,6 +735,7 @@ prose rule), and the loop closed those boundaries one pair at a time.
 | 2026-09-23 |  | QA cycle 9 (second grant, 2/2) — gate CONCERNS (80/100); 2 MEDIUM — `bug` does not round-trip through `--bug` (since the original commit); the rule names the wrong resolving base | qa-task |
 | 2026-09-23 |  | QA cycle 10 (third grant) — gate PASS (100/100); no defect in the cycle-9 fix; 3 LOW carried to future (Cosmetic-residue exit, route 2b) | qa-task |
 | 2026-09-23 |  | QA cycle 11 (fourth grant) — gate CONCERNS (90/100); 1 MEDIUM (Step 6 reads priorRuns after deleting the state file), 2 LOW | qa-task |
+| 2026-09-23 |  | QA cycle 12 (fifth grant) — gate CONCERNS (90/100); 1 MEDIUM (Step 6 prints the pre-run bug), 2 LOW | qa-task |
 <!-- change-log-end -->
 
 ---

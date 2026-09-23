@@ -73,7 +73,7 @@ Apply any project-wide command conventions from the consumer project's own CLAUD
 ```json
 { "item": "D.2", "function": "Submit a score", "surface": "D", "stories": ["7.5", "31.1"],
   "uatSpecs": ["apps/portal/e2e/smoke/play-score.smoke.spec.ts"], "lane": null, "targeted": true,
-  "priorRuns": ["runs/D.2/2026-09-01-lan.md"], "bug": "docs/bugs/bug.12.double-submit.md",
+  "priorRuns": ["runs/D.2/2026-09-01-lan.md"], "bug": "docs/bugs/bug.12.double-submit.md", "filedBug": null,
   "runFile": "<path or null>", "phase": "selected|resolved|executed|recorded|committed", "startedAt": "<iso>" }
 ```
 
@@ -81,7 +81,7 @@ Apply any project-wide command conventions from the consumer project's own CLAUD
 
 Resume on re-run: `phase: committed` → Step 6; `recorded` → Step 5; `executed` → Step 4; `resolved` → Step 3; `selected` → Step 2. If the registry row for `item` is no longer ⬜ and the phase is `selected`, someone else finished it — delete the state file and start over. **This applies to an untargeted run only**: under `"targeted": true` a non-⬜ row is the premise, not evidence about anyone else, so the resume re-resolves the id instead.
 
-**`priorRuns` and `bug` are copied from the payload into the state file at selection, and every later step reads them from there — never from a fresh `--item`.** Both describe the row *as it was when this run began*. Re-querying after Step 4 writes the run file returns a `priorRuns` that includes the run just written, so a resumed first run would be numbered and committed as a re-run.
+**`priorRuns` and `bug` are copied from the payload into the state file at selection, and are read from there — never from a fresh `--item`.** Both describe the row *as it was when this run began*: re-querying after Step 4 writes the run file returns a `priorRuns` that includes the run just written, so a resumed first run would be numbered and committed as a re-run. `priorRuns` is read by Steps 4, 5 and 6. `bug` is read **only by Step 4's reuse decision** — it is the bug the row linked *before* this run. The bug this run files or re-links is a different value, `filedBug`, written in Step 4 and printed by Step 6.
 
 ## Step 0 — Preflight
 
@@ -169,11 +169,13 @@ Update the state file (`phase: executed`).
 1. Write the run file at `<registry dir>/<the path Step 3 obtained from --run-path>` (the tool has already created `runs/<id>/` beside the registry — one directory per function, so a function's whole history is one listing) from `assets/run.template.md`: header (function, the **Run** row — `<n>th run · previous: <link to the previous run file, relative to this one>`, or `1st run` when the state file's `priorRuns` is empty — what it does, stories, environment, commit under test, personas, tester = `qa-next`), the **Automated run** block (command, exit code, report path, one line per test — or `_None_`), one block per item with its observed result and evidence, the verdict, the **Findings** table (one row per Step 3 finding, `_None._` when there were none — written on every run, pass or fail; it is the only place an observation that failed no item survives), and the **Automation candidate** block (`_None — covered by <spec>_` when the lane ran).
 2. On **fail**: invoke `/create-bug-report` in **story mode** against the story in `stories[]` whose AC the failed item exercises (the first story when it is unclear; **general mode** when the function's stories are all `storyNa`-grade infra), severity from the worst failed item, reproduction steps copied verbatim from the failing item(s). Capture the bug file path.
 
+   Whichever bug this run ends up linking — a new one, or the open one it reuses below — write its repo-relative path to the state file as `filedBug` before Step 4.4. A pass, a block or an n/a leaves it `null`.
+
    **A repeat failure reuses the open bug.** The `bug` field — copied into the state file at selection — is the repo-relative path of the bug the row already links, in the form `--bug` takes (`null` when there is none). Read it from the state file; never re-parse the registry. When it is non-null and that bug is not closed, append a dated re-test section to it (what was run, what was observed, which items still fail) and link the same bug again. File a **new** bug only when there is none, or when the existing one is closed — a closed bug failing again is a new fact and deserves its own record. Fixing then re-testing is the main reason the `id` argument exists; filing bug #2, #3 and #4 against one defect is its obvious first-order failure.
 3. File the findings, independently of the verdict. For each row: **story mode** against the story it concerns when one of this function's stories owns it; **general mode** (`docs/bugs/`, no parent) when it belongs to another surface, to the environment or to this harness — never file a foreign defect against the story you happened to be testing. Severity as recorded; reproduction from the row. File only what a stranger could reproduce from the row alone; otherwise `Filed as` stays `note` and the row itself is the record. Put each bug's link (relative to the run file) in its row's `Filed as` cell. A finding that matches an **open** finding on this function from an earlier run (`--findings --all --json`, matched on *Where* + *What was observed*) reuses that bug's link in its `Filed as` cell instead of filing a duplicate.
 4. Registry:
    - pass → `--set <id> pass --run runs/<id>/<file>.md`
-   - fail → `--set <id> fail --run runs/<id>/<file>.md --bug <bug path>`
+   - fail → `--set <id> fail --run runs/<id>/<file>.md --bug <filedBug>` (the state file's)
    - blocked → `--set <id> blocked --run runs/<id>/<file>.md --note "<items and reasons>"`
 
    The note flag is **per verdict**, not a blanket "always pass one":
@@ -208,7 +210,7 @@ Push to `baseBranch`. Apply the consumer project's commit-trailer rules. Update 
 
 ## Step 6 — Report and stop
 
-Print — reading which run this is and the previous run's link from the **state file's** `priorRuns`, never from a fresh `--item`, which would count the run just committed — the function, its verdict, the run file with which run of this function it is and a link to the previous one when there was one, the bug (if any), whether the lane ran and how it went, this run's findings with what each was filed as, the scoreboard (`uat-status.mjs` with no flags — it ends with the uncovered-story and open-findings counts), and — for a 🟡 — the exact command the owner runs to accept it:
+Print — reading which run this is and the previous run's link from the **state file's** `priorRuns`, never from a fresh `--item`, which would count the run just committed — the function, its verdict, the run file with which run of this function it is and a link to the previous one when there was one, the bug this run filed or re-linked (the state file's `filedBug`, if any), whether the lane ran and how it went, this run's findings with what each was filed as, the scoreboard (`uat-status.mjs` with no flags — it ends with the uncovered-story and open-findings counts), and — for a 🟡 — the exact command the owner runs to accept it:
 
 ```bash
 node .agents/skills/qa-next/scripts/uat-status.mjs --accept <id> --note "<optional>"

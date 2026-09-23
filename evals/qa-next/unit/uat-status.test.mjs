@@ -1920,7 +1920,7 @@ test("each clause of BUG_LINK_RULE is what --check does (TASK-141-BUG-20)", () =
       null,
     ],
     [
-      "`bug.` must start a word — a debug log is not a bug link",
+      "`bug.` after an ASCII letter is not a bug link — a debug log is not one",
       "❌ fail",
       "[bug.1.real](../bugs/bug.1.real.md) · see [debug.log](../logs/debug.log)",
       0,
@@ -1932,6 +1932,13 @@ test("each clause of BUG_LINK_RULE is what --check does (TASK-141-BUG-20)", () =
       "[bug.1.real](../bugs/bug.1.real.md) · [x_bug.9](../bugs/gone.md) · [1bug.9](../bugs/gone.md)",
       0,
       "docs/bugs/bug.1.real.md",
+    ],
+    [
+      "a NON-ASCII letter before `bug.` does not block it — \\b is ASCII-only, and the rule says ASCII",
+      "❌ fail",
+      "[bug.1.real](../bugs/bug.1.real.md) · [ébug.9](../bugs/gone.md)",
+      1,
+      "docs/bugs/gone.md",
     ],
   ];
   // The 5th column is what the payload publishes: a skipped link is prose, so it is never handed
