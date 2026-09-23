@@ -1,0 +1,70 @@
+schema: 1
+task: 'task.144.probe-engine-cli-entry-form'
+task_title: 'security-probe: a cli: entry form, so a multi-flag Node CLI''s boundary can be executed instead of declared unverifiable'
+gate: CONCERNS
+status_reason: 'Cycle 3''s skeleton key fixes both earlier directions, but its documented escape hatch (give such a probe its own --name) does nothing because name is not part of the key, and finalise-dod-security-prompt still states the old key. The advisory CR-1 shows that any value-dropping heuristic merges controls that differ in a behaviour-selecting flag value (--mode strict vs --mode lax on the suite''s own fixture).'
+reviewer: 'QA Engineer'
+updated: '2026-09-23T18:45:43Z'
+
+top_issues:
+  - id: CR-2
+    severity: medium
+    file: 'shared/resources/probe-boundary-rule.md'
+    finding: '§5 tells an author to give a probe whose positional follows a boolean flag its own --name, but controlKey uses only sink, entry and the argv skeleton. The name is stored but not keyed, so following the advice still merges the two controls.'
+    suggested_action: 'Make a supplied --name the identity of a cli: control, with the skeleton only as the fallback, so the advice is true. The same change gives the advisory CR-1 and CR-4 an explicit remedy.'
+    suggested_owner: dev
+    status: open
+  - id: CR-3
+    severity: medium
+    file: 'shared/resources/finalise-dod-security-prompt.md'
+    finding: 'The finalise prompt''s cli: block still says a different template is a different control in the record. The key has changed twice since that was written, and no check lists the sites that state the cli: key.'
+    suggested_action: 'Fix the finalise prompt, re-grep every shared/resources/*.md and skills/*/SKILL.md for statements of the cli: key, and pin the population with a test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 83
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    notes: 'The --argv validator engages 17 of 17 on the committed tree (task.144.qa.4.security.run.json). The cli tests pass 17 of 17 under TMPDIR=/tmp.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'CR-2 and CR-3 are carried in top_issues. The skeleton key is mutation-proved against both superseded designs.'
+  maintainability:
+    status: PASS
+    notes: 'CR-5 (cleanup): a test comment mislabels its analogue as the real uat-status pair.'
+
+recommendations:
+  immediate:
+    - action: 'CR-2: key a cli: control on --name when one is supplied, with the skeleton as fallback. Add strict/lax, positional-path and name tests.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+    - action: 'CR-3: fix the finalise prompt''s key statement and add a population test for cli: key statements.'
+      refs: ['shared/resources/finalise-dod-security-prompt.md']
+  future:
+    - action: 'CR-1 (advisory, med/med): two controls that differ only in a behaviour-selecting flag value share a skeleton. The remedy is --name, and the engine should warn when a record write replaces an entry whose full argv differs.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-4 (advisory): a per-run path passed as a bare positional is kept in the skeleton. Document that --name is the remedy.'
+      refs: ['shared/resources/probe-boundary-rule.md']
+    - action: 'CR-5 (cleanup): reword the analogue comment in the skeleton test.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-2 and CR-3 fixed']

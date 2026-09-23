@@ -130,12 +130,15 @@ that name the entry forms (`probe-boundary-rule.md`, the two security prompts, a
   already named by the `entry` string's prefix, so no `kind` is added. The control key that names an
   entry file and dedupes the fold is `{sink, entry}` today, which would let two `cli:` probes of the
   same script with different templates (`--env {input}` vs `--clear-note {input}`) overwrite each
-  other; for a `cli:` entry the key also carries the **argv skeleton** — its flags and bare
-  positionals in order, with only the values of flags dropped — and for every other form it is
+  other; for a `cli:` entry the key also carries the control's **`--name`**, or for an unnamed
+  probe its **argv skeleton** (flags and bare positionals in order, flag values dropped, with a
+  warning when an unnamed write replaces a differing argv) — and for every other form it is
   byte-identical to today's so existing entry-file names do not move (review.1, I1). Two earlier
   keys each failed one way: the whole template kept per-run operands (a scratch `--cases-file`, a
   mkdtemp `--root`), so a re-run of one control recorded a second one (QA cycle 2, QA-1); the flag
-  before `{input}` alone merged different controls that share an input flag (QA cycle 3, CR-1).
+  before `{input}` alone merged different controls that share an input flag (QA cycle 3, CR-1);
+  the skeleton merges controls whose flag values select behaviour (QA cycle 4, CR-1) — which is why
+  a stated name wins over any derived key.
 
 ### Important Clarifications
 
@@ -203,7 +206,7 @@ no existing record field changes meaning, and the control key — hence every ex
 - [x] Factor the per-case materialisation **and** the per-case env (sandbox `HOME`/`TMPDIR`, `LC_ALL=C`) out of `runShellCase` into helpers both arms call (no second copy)
 - [x] `runCliCase`: per-case fixture dir inside `workDir` (materialised when the sink is in `MATERIALISED_SINKS`), argv substituted, `spawnSync(process.execPath, [script, ...argv])`, stdin empty, shared env, timeout; sandbox sentinel and script-dir snapshot around the run
 - [x] Outcome: without `expected`, exit 0 accepted / non-zero rejected; with `expected`, `expectedProblem` then `compareExpected` mapped through `direction` as the shell arm; spawn/timeout/signal errored
-- [x] Record entries carry `argv` (template, or `null`); the control key includes the argv skeleton for `cli:` entries only; totals unchanged in shape
+- [x] Record entries carry `argv` (template, or `null`); the control key includes the `--name` (else the argv skeleton) for `cli:` entries only; totals unchanged in shape
 - [x] Tests: a fixture CLI that refuses correctly (`engages`), one whose guard lets one hostile case through (`present-but-inert`), one that accepts everything (`absent`), one that crashes (`errored` → `unverifiable`)
 
 **Dependencies**: Phase 1
@@ -374,6 +377,7 @@ None.
 | 2026-09-23 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-09-23 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-09-23 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-09-23 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 
 ---
 <!-- change-log-end -->
@@ -397,20 +401,21 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.144.qa.3.probe-engine-cli-entry-form.md](./task.144.qa.3.probe-engine-cli-entry-form.md)
-- **Gate File**: [task.144.gate.3.probe-engine-cli-entry-form.yml](./task.144.gate.3.probe-engine-cli-entry-form.yml)
-- **Previous**: [qa.2](./task.144.qa.2.probe-engine-cli-entry-form.md) · [gate.2](./task.144.gate.2.probe-engine-cli-entry-form.yml) · [qa.1](./task.144.qa.1.probe-engine-cli-entry-form.md) · [gate.1](./task.144.gate.1.probe-engine-cli-entry-form.yml)
+- **Full Report**: [task.144.qa.4.probe-engine-cli-entry-form.md](./task.144.qa.4.probe-engine-cli-entry-form.md)
+- **Gate File**: [task.144.gate.4.probe-engine-cli-entry-form.yml](./task.144.gate.4.probe-engine-cli-entry-form.yml)
+- **Previous**: [qa.3](./task.144.qa.3.probe-engine-cli-entry-form.md) · [qa.2](./task.144.qa.2.probe-engine-cli-entry-form.md) · [qa.1](./task.144.qa.1.probe-engine-cli-entry-form.md)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3963 (fast gate) — cycle 2 fix tests mutation-proved
+- **Tests Executed**: 3964 (fast gate)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- CR-1 (medium): keying a `cli:` control on its guarded flag alone merges distinct controls that share it (`--set … --note {input}` / `--accept … --note {input}`).
+- CR-2 (medium): §5 advises `--name` to separate controls, but the name is not part of the key.
+- CR-3 (medium): the finalise prompt still states the superseded template key.
 
 ---
 

@@ -177,11 +177,12 @@ node PROMPT_DIR/security-probe.mjs \
 # Exit status is the verdict — 0 accepted, non-zero rejected — so a case that
 # needs more carries `expected`; a crash is errored, never a refusal. A --argv
 # shape error exits 2 and writes no record. Probe each guarded flag as its own
-# control: a different template is a different control in the record.
+# control, and NAME it: a cli: control's identity in the record is its --name
+# (unnamed, the engine derives one from the template and warns on a collision).
 node PROMPT_DIR/security-probe.mjs \
   --sink <sink> --entry 'cli:<path-from-repo-root>' \
   --argv '["--flag-before","value","--guarded-flag","{input}"]' \
-  --cases-file <path-to-cases.json> \
+  --cases-file <path-to-cases.json> --name '<control name>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
   --record <STORY_DIR>/<stem>.dod.security.run.json --json
 ```

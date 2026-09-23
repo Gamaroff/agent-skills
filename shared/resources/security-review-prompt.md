@@ -105,7 +105,7 @@ answer to a question nobody asked.
   behind its flags is probed with `--entry 'cli:<path>' --argv '["--flag","{input}"]'` — the
   template's one `"{input}"` element is the case, the exit status is the verdict (0 accepted,
   non-zero rejected; a case carrying `expected` is compared instead), a crash is `errored`, and each
-  guarded flag is its own control. A script or CLI that reads stdin, a shell script that takes two
+  guarded flag is its own control, named with `--name`. A script or CLI that reads stdin, a shell script that takes two
   positionals, or anything that needs the network is what remains declined — say which.
 - **Called with exactly one argument** — for the JS form. The child runner calls
   `await fn(input)`. An export needing more configuration than that is not probeable as an export;
@@ -165,7 +165,7 @@ the skill and is `unverifiable` before it is ever imported — and every probe i
 the same `--record <path>` (the record sits beside the
 report as `{stem}.security.{N}.run.json`; each probe writes its own control's entry file under
 `{stem}.security.{N}.run.json.d/` and the engine folds the directory — a re-run of the same
-`{sink, entry}` — and, for a `cli:` control, the same argv skeleton (its flags and positionals, with flag values dropped) —
+`{sink, entry}` — and, for a `cli:` control, the same `--name` (or, unnamed, the same argv skeleton) —
 replaces only its own entry, and concurrent probes never share a write), and the
 block is the output of:
 

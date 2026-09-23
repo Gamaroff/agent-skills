@@ -282,19 +282,21 @@ Declining conditions, each reported with its reason:
     `cli:` without `--argv`, zero or two `{input}`, an unknown or embedded
     slot). An entry outside the root, or one that is not a `.mjs` / `.js`
     regular file, is a named decline like every other form's. The record carries
-    the template as `argv`, and a `cli:` control is keyed on its **argv
+    the template as `argv`, and **a `cli:` control's identity is its
+    `--name`**: two probes with different names are two controls, and a re-run
+    under the same name replaces its own entry whatever else in the template
+    changed. **Name every `cli:` probe** — the prompts already pass `--name` for
+    every control. An *unnamed* `cli:` control falls back to its **argv
     skeleton**: every flag and every bare positional, in order, with only the
     *values* of flags dropped (`--root /tmp/x` → `--root *`, `--cases=/a.json` →
-    `--cases=*`) and the slots kept. So `--env {input}` and
-    `--clear-note {input}` are two controls, `--set D.1 blocked --note {input}`
-    and `--accept D.1 --note {input}` are two controls, `add {input}` and
-    `remove {input}` are two controls — and a re-run of one of them with a
-    different scratch path or `--root` replaces its own entry. The one reading
-    rule: an element that follows a flag and is neither a flag nor a slot is
-    that flag's **value**. A bare positional placed right after a *boolean* flag
-    is therefore read as its value and dropped, and a value that begins with
-    `-` is read as a flag and kept; give such a probe its own `--name` and
-    order the template so the positional does not follow a boolean flag.
+    `--cases=*`) and the slots kept. The skeleton is a derived key, and every
+    derived key has a counter-example: two controls that differ only in a flag
+    **value** that selects behaviour (`--mode strict` / `--mode lax`) share one
+    skeleton, a per-run path passed as a bare positional splits re-runs, and
+    an element after a *boolean* flag is read as that flag's value. So when an
+    unnamed write replaces an entry whose full `argv` differs, the CLI prints a
+    `warning: replaced control …` line and the write still happens — the
+    remedy is `--name`, not a reordered template.
 
   `cli:` does **not** touch §2: the engine chooses the interpreter
   (`process.execPath`) and the script is fixed by `--entry` and

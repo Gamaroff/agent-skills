@@ -2348,7 +2348,8 @@ test("cli entry: the control key is the template skeleton — values dropped, fl
     k(["--dir", "{fixture}", "--x", "{input}"]),
     k(["--dir", "/d", "--x", "{input}"]),
   );
-  // End to end: the uat-status pair lands in two record entries.
+  // End to end: an analogue of the uat-status pair (a dispatch flag before a
+  // shared input flag) lands in two record entries.
   const dir = mkdtempSync(join(tmpdir(), "probe-cli-skeleton-"));
   try {
     const record = join(dir, "run.json");
@@ -2367,6 +2368,123 @@ test("cli entry: the control key is the template skeleton — values dropped, fl
       );
     }
     assert.equal(readRecord(record).controls.length, 2);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("cli entry: a supplied --name IS a cli: control's identity; without one a differing replacement is reported (task.144 QA cycle 4, CR-1/CR-2)", () => {
+  // Every value-dropping heuristic has a counter-example: the suite's own
+  // cli-refuser behaves differently under --mode strict and --mode lax, and the
+  // skeleton keys both as --mode *. Identity the caller STATES cannot be
+  // mis-derived, so a supplied --name is the key; the skeleton is only the
+  // fallback, and a fallback write that replaces an entry whose full argv
+  // differs says so instead of doing it silently.
+  const dir = mkdtempSync(join(tmpdir(), "probe-cli-name-"));
+  try {
+    const strict = ["--mode", "strict", "--host", "{input}"];
+    const lax = ["--mode", "lax", "--host", "{input}"];
+    // Named: two controls, whatever the skeleton says.
+    const named = join(dir, "named.json");
+    recordRun(
+      named,
+      runProbeSpec({
+        sink: "url-authority",
+        entry: CLI("refuser"),
+        cases: CASES,
+        argv: strict,
+      }),
+      { name: "host guard, strict" },
+    );
+    recordRun(
+      named,
+      runProbeSpec({
+        sink: "url-authority",
+        entry: CLI("refuser"),
+        cases: CASES,
+        argv: lax,
+      }),
+      { name: "host guard, lax" },
+    );
+    assert.equal(
+      readRecord(named).controls.length,
+      2,
+      "two names, two controls",
+    );
+    // Same name, a positional per-run path that the skeleton keeps: one control.
+    const pos = join(dir, "pos.json");
+    for (const run of ["a", "b"]) {
+      recordRun(
+        pos,
+        runProbeSpec({
+          sink: "url-authority",
+          entry: CLI("accept-all"),
+          cases: CASES,
+          argv: [join(dir, run), "--host", "{input}"],
+        }),
+        { name: "positional scratch" },
+      );
+    }
+    const posRec = readRecord(pos);
+    assert.equal(posRec.controls.length, 1, "one name, one control");
+    assert.equal(
+      posRec.totals.executed,
+      CASES.length,
+      "executed is not counted twice",
+    );
+    // Unnamed: the skeleton decides, and a replacement whose argv differs is reported.
+    const unnamed = join(dir, "unnamed.json");
+    const replaced = [];
+    recordRun(
+      unnamed,
+      runProbeSpec({
+        sink: "url-authority",
+        entry: CLI("refuser"),
+        cases: CASES,
+        argv: strict,
+      }),
+      { onReplace: (prev, next) => replaced.push([prev.argv, next.argv]) },
+    );
+    recordRun(
+      unnamed,
+      runProbeSpec({
+        sink: "url-authority",
+        entry: CLI("refuser"),
+        cases: CASES,
+        argv: lax,
+      }),
+      { onReplace: (prev, next) => replaced.push([prev.argv, next.argv]) },
+    );
+    assert.equal(readRecord(unnamed).controls.length, 1);
+    assert.deepEqual(replaced, [[strict, lax]]);
+    // An identical re-run is not a "differing" replacement.
+    recordRun(
+      unnamed,
+      runProbeSpec({
+        sink: "url-authority",
+        entry: CLI("refuser"),
+        cases: CASES,
+        argv: lax,
+      }),
+      { onReplace: () => replaced.push("again") },
+    );
+    assert.equal(replaced.length, 1);
+    // Through the CLI the report is a warning on stderr, and the write still happens.
+    const viaMain = join(dir, "main.json");
+    for (const argv of [strict, lax]) {
+      const { err } = runMain([
+        "--sink",
+        "url-authority",
+        "--entry",
+        CLI("refuser"),
+        "--argv",
+        JSON.stringify(argv),
+        "--record",
+        viaMain,
+      ]);
+      if (argv === lax)
+        assert.match(err, /replaced .*--mode","strict".* with .*--mode","lax"/);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

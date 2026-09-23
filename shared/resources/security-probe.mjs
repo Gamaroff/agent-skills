@@ -144,8 +144,9 @@
  * error is an argument error (exit 2, nothing runs, no record); an entry that
  * escapes the root or is not a `.mjs`/`.js` regular file is a named decline,
  * as for every other form. The record carries the template as `argv`, and a
- * `cli:` control's key is its argv SKELETON (flags and positionals kept, flag
- * values dropped — see controlKey), so two different controls on one script
+ * `cli:` control's key is its `--name` when one is given, else its argv
+ * SKELETON (flags and positionals kept, flag values dropped — see controlKey),
+ * so two different controls on one script
  * (`--env {input}`, `--clear-note {input}`) are two controls, not one.
  */
 
@@ -1710,9 +1711,22 @@ export function cliControlKey(template) {
   }
   return JSON.stringify(out);
 }
-const controlKey = (c) =>
-  `${c.sink ?? ""}\u0000${c.entry ?? ""}` +
-  (Array.isArray(c.argv) ? `\u0000${cliControlKey(c.argv)}` : "");
+// A NAMED cli: control is keyed on its name (QA cycle 4). Three cycles found a
+// derived key wrong three ways — the whole template split re-runs, the flag
+// before "{input}" merged different controls, and the skeleton merges controls
+// whose flag VALUES select behaviour (--mode strict / --mode lax). Any key that
+// drops a value has a counter-example, so identity the caller states wins, and
+// the skeleton is only the fallback for an unnamed control, where recordRun
+// reports a replacement whose full argv differs instead of making it silently.
+// The name is keyed for cli: controls ONLY: every other form's key, and so its
+// entry-file name, is unchanged.
+const controlKey = (c) => {
+  const base = `${c.sink ?? ""}\u0000${c.entry ?? ""}`;
+  if (!Array.isArray(c.argv)) return base;
+  return typeof c.name === "string" && c.name.trim() !== ""
+    ? `${base}\u0000name:${c.name}`
+    : `${base}\u0000${cliControlKey(c.argv)}`;
+};
 
 /**
  * Reduce a `runProbeSpec` result to the per-control entry the record stores.
@@ -1896,6 +1910,28 @@ function openRecordForWrite(recordPath) {
 export function recordRun(recordPath, result, opts = {}) {
   const dir = openRecordForWrite(recordPath);
   const entry = toRecordEntry(result, opts);
+  // An unnamed cli: control is keyed on a DERIVED skeleton, which can merge two
+  // controls that differ only in a dropped flag value. Such a merge is a
+  // replacement of an entry whose full argv differs: report it through
+  // `onReplace(previous, next)` rather than making it silently (QA cycle 4,
+  // CR-1). An identical re-run is not reported.
+  if (typeof opts.onReplace === "function" && Array.isArray(entry.argv)) {
+    let previous = null;
+    try {
+      previous = JSON.parse(
+        readFileSync(join(dir, entryFileName(entry)), "utf8"),
+      );
+    } catch {
+      previous = null;
+    }
+    if (
+      previous &&
+      Array.isArray(previous.argv) &&
+      JSON.stringify(previous.argv) !== JSON.stringify(entry.argv)
+    ) {
+      opts.onReplace(previous, entry);
+    }
+  }
   // This control's own file; a concurrent run of a DIFFERENT control writes a
   // different name and a re-run of the SAME control replaces this one, which
   // is the merge semantics the single file used to implement with a lock.
@@ -2202,6 +2238,11 @@ export function main(argv = process.argv.slice(2)) {
       recordRun(opts.record, result, {
         name: opts.name,
         callSite: opts.callSite,
+        onReplace: (prev, next) =>
+          process.stderr.write(
+            `warning: replaced control ${prev.name ?? "(unnamed)"} — argv ${JSON.stringify(prev.argv)} with ${JSON.stringify(next.argv)}; ` +
+              "they share a derived key — pass --name to keep them apart\n",
+          ),
       });
     } catch (e) {
       process.stderr.write(`cannot update --record: ${e.message}\n`);

@@ -24,11 +24,13 @@ All notable changes to this project will be documented in this file. Format foll
   control that rejects everything. A `--argv` shape error is an **argument error** (exit 2,
   `bad-argv`, nothing runs, no record written); `runProbeSpec` returns the same `bad-argv` as a
   decline for a library caller. Record entries gain an **`argv`** key (the template, never the
-  input; `null` for every other form), and a `cli:` control's record key includes its **argv skeleton** (its flags and bare
-  positionals, with only the values of flags dropped), so `--env {input}` and `--clear-note
-  {input}` — or `--set … --note {input}` and `--accept … --note {input}` — on one script are two
-  controls rather than the second silently replacing the first, while a re-run of one of them with a
-  different scratch path replaces its own entry — every other form's key, and so every existing
+  input; `null` for every other form), and a `cli:` control's identity in the record is its **`--name`** (a re-run under one name
+  replaces its entry; two names are two controls), falling back for an unnamed probe to its argv
+  **skeleton** — flags and bare positionals kept, flag values dropped — with a `warning: replaced
+  control` line when an unnamed write replaces an entry whose full argv differs. Three derived keys
+  were each wrong one way in QA (the whole template split re-runs; the flag before `{input}` merged
+  different controls; the skeleton merges `--mode strict` / `--mode lax`), which is why a stated
+  name wins — every other form's key, and so every existing
   entry-file name, is byte-identical. The first real run is in the suite: `uat-status.mjs --run-path D.1 --env
   {input}` scores **`present-but-inert`** today (`x-02` refused, `../x` and `a/b` accepted), which is
   task.143's to fix. `probe-boundary-rule.md` §5 documents the form and §5.1 no longer lists a

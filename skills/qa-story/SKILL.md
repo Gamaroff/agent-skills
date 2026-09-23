@@ -995,7 +995,7 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    decision sits behind its flags (task.141: `uat-status.mjs --env`) takes the cli form:
    `--entry 'cli:<path>' --argv '["--flag","{input}"]' --cases-file <cases.json>` — the
    template's one `"{input}"` element is each case, exit status is the verdict, a crash is
-   `errored`, and each guarded flag is its own control; "it takes several flags" is never a reason
+   `errored`, and each guarded flag is its own control, named with `--name`; "it takes several flags" is never a reason
    to record `boundary: false`.
    It takes the candidates from `references/security-input-corpus.mjs` (`corpusFor(<sink>)`)
    itself, imports the entry point in a sandboxed child — or materialises each case as a fixture

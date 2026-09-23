@@ -297,3 +297,60 @@ test("every site that routes a non-JS entry names the cli: form too (task.144 CR
     `only ${sites} routing block(s) found — the predicate no longer matches`,
   );
 });
+
+test("every block that states a cli: control's record identity names --name (task.144 QA cycle 4, CR-3)", () => {
+  // The cli: record key changed three times in QA — whole template, guarded
+  // flag, skeleton — and each time a site that described it was left stating
+  // the previous rule (the finalise prompt still said "a different template is
+  // a different control" after two changes). The identity is now the caller's
+  // --name, with a derived fallback; a block that describes cli: identity
+  // without naming --name is describing a superseded rule.
+  const files = [];
+  for (const f of readdirSync(join(REPO_ROOT, "shared/resources"))) {
+    if (f.endsWith(".md")) files.push(`shared/resources/${f}`);
+  }
+  for (const d of readdirSync(join(REPO_ROOT, "skills"))) {
+    files.push(`skills/${d}/SKILL.md`);
+  }
+  const KEY =
+    /identity|keyed on|record key|control in the record|replaces (?:only )?its own entry|one entry per/i;
+  const blocksOf = (text) => {
+    const blocks = [];
+    let cur = [];
+    const flush = () => {
+      if (cur.length) blocks.push(cur.join("\n"));
+      cur = [];
+    };
+    for (const line of text.split("\n")) {
+      if (line.trim() === "" || /^\s*(?:\d+\.|[-*]|```)\s?/.test(line)) flush();
+      if (line.trim() !== "") cur.push(line);
+    }
+    flush();
+    return blocks;
+  };
+  const missing = [];
+  let sites = 0;
+  for (const rel of files) {
+    let text;
+    try {
+      text = read(rel);
+    } catch {
+      continue;
+    }
+    for (const [i, block] of blocksOf(text).entries()) {
+      if (!/cli:/.test(block) || !KEY.test(block)) continue;
+      sites += 1;
+      if (!/--name/.test(block))
+        missing.push(`${rel} (block ${i + 1}: ${block.slice(0, 80)}…)`);
+    }
+  }
+  assert.deepEqual(
+    missing,
+    [],
+    "these blocks state cli: record identity without --name",
+  );
+  assert.ok(
+    sites >= 4,
+    `only ${sites} block(s) state cli: identity — the predicate no longer matches`,
+  );
+});
