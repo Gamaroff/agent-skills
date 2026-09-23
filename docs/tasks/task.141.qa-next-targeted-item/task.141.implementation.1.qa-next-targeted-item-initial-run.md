@@ -3,7 +3,7 @@
 **Task**: `task.141.qa-next-targeted-item.md`
 **Run Number**: 1
 **Started**: 2026-09-22 17:10
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1–5 implemented; 10 new tests, all 10 mutations red; full `npm test` green (3931) with the symlink moved aside | `.summaries/` n/a — surface map consumed inline |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #468: https://github.com/Gamaroff/agent-skills/pull/468 — OPEN, base `develop`, MERGEABLE | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.141.qa.{N}.*.md`; `task.141.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 12 cycles; loop limit reached at 12 with gate 12 CONCERNS (entries closed by `94c28be6`, ungated). **Operator accepted on the evidence** (Decisions Log, 2026-09-23); 5c `/review-pr` 2 **CONCERNS** (0 HIGH, 1 MEDIUM trail, 5 LOW) | —                    |
-| 7. finalise                | ⏳ Pending | `task.141.dod.{N}.*.md`; task `status: accepted`                       | Pending: proceeds under the operator decision | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done | `task.141.dod.{N}.*.md`; task `status: accepted`                       | `task.141.dod.1` ACCEPTED on the operator's decision over two DoD FAILs (CHANGELOG citation fixed in `10056197`; security probe unverifiable, LOW). CI reading 1 SUCCESS @ `10056197`, reading 2 SUCCESS @ `7162b09a`. Issue #466 closed; board already Done | —                    |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report committed and pushed (this commit) | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -163,6 +163,21 @@ Give `/qa-next` a positional `id` argument that runs the full UAT protocol again
   (`/create-task` after `/finalise`), seeded from the cycle 10–12 findings and obs #167. Cycle 12's fix
   (`94c28be6`) is read by 5c's whole-PR review rather than by a gate. Lock restored from the halt
   snapshot with `advance-pipeline-lock.sh --restore`; `qa_phase` 5c.
+- **Step 7 `/finalise` (2026-09-23).** Four DoD agents ran in parallel. AC PARTIAL: 21/21 criteria
+  met, with SC-P2, SC-P3 and SC-Q3 met by inspection, a measurement and the mutation record, and no
+  test citation. Security FAIL (LOW, **unverifiable**): the probe engine has no entry form for a
+  multi-flag CLI, so `probes_executed: 0`; the grep checks are clean. Compliance N/A. Docs FAIL:
+  CHANGELOG `[Unreleased]` did not cite `(task 141)`. **Operator decision: fix the docs and accept.**
+  The citation was added (`10056197`, drift test 6/6), and the security result was recorded as
+  unverifiable-by-probe and filed with the follow-up. Step 8a did not apply, because two FAIL sections
+  fail its `no-other-finding-open` precondition.
+- CI reading 1: SUCCESS @ `10056197ee6f` (retaken on the CHANGELOG-fix head). CI reading 2: SUCCESS @
+  `7162b09a56eb` (the acceptance head) over 5 checks after 150s. Acceptance commit `7162b09a` (document
+  `status: accepted`, DoD, sprint review, registry ticked), pushed and asserted on origin.
+- Tracker: canonical PR comment posted. Its QA-cycle line was corrected by hand from the engine's 5 to
+  12, because cycles 1–7 are recorded as tables, not `### QA Cycle` headings. Issue #466 `done` comment
+  posted and the issue closed (verified CLOSED); board `done` → `already`; the Document link was already durable.
+- Task completed.
 
 ---
 
@@ -497,10 +512,19 @@ mutations go red; a test that passes against both the fixed and the broken tool 
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-23
+**Final Status**: Completed
 **Branch**: `feature/task.141.qa-next-targeted-item`
 **PR**: [#468](https://github.com/Gamaroff/agent-skills/pull/468)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 12 (5 budgeted + 7 granted across four grants), plus one review-driven 5b re-entry in cycle 10
+**DoD Summary**: [`task.141.dod.1.qa-next-targeted-item.md`](./task.141.dod.1.qa-next-targeted-item.md), ACCEPTED on the operator's decision (see Decisions Log)
+**Tracker debt**: none. Issue #466 closed, board Done, canonical PR comment posted.
+
+**Completion Summary**: Implemented `/qa-next <id>`: `--item` (the `--next` payload for any row),
+`--run-path` (sequenced run files), the accepted-row rule (only a `fail` moves `✅`; the note cell is
+appended to, never replaced) and bug reuse (a repo-relative `bug` that round-trips through `--bug`,
+validated by one rule held clause by clause). Twelve QA cycles: HIGH went to 0 by cycle 6, and every
+later MEDIUM was a value crossing a boundary (the bug link, then the state file). Two PR reviews ran
+at 5c. The operator closed the loop on the evidence and accepted over an unverifiable-by-probe security
+check. Follow-up agreed: give the `/qa-next` state file one contract (schema or code ownership), carrying
+the LOW deferrals and the probe-engine entry-form gap.
