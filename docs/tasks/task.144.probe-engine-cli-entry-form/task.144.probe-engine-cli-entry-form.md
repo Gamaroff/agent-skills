@@ -5,18 +5,22 @@ type: task
 description: "Add a `cli:<path>` entry form to shared/resources/security-probe.mjs that runs a Node CLI inside the engine's sandbox with an argv template carrying the case's input, scoring exit status as the verdict — so a boundary delivered as a multi-flag CLI (task.141's uat-status.mjs) is probed at QA and finalise instead of recorded as `probes_executed: 0`."
 tags: [security-probe, review-security, finalise, qa-task, follow-up]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-23
 updated: 2026-09-23
 assignee:
 estimated_effort_hours: 8
 github_issue: 470
+pr_number: 471
+completed_date: 2026-09-23
 ---
 
 # Technical Task: security-probe — a `cli:` entry form
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.144.review.1.probe-engine-cli-entry-form.md` implemented 2026-09-23
 
 **GitHub Issue**: [#470](https://github.com/Gamaroff/agent-skills/issues/470)
 
@@ -97,12 +101,46 @@ that name the entry forms (`probe-boundary-rule.md`, the two security prompts, a
   `MATERIALISED_SINKS`, otherwise empty). Exactly one `{input}` is required; an unknown `{slot}` is
   refused.
 - **Run**: `process.execPath <script> ...argv` via `spawnSync` with an argv array (no shell), stdin
-  closed, `sandboxEnv()`, the engine's timeout, cwd set to the case's fixture directory.
-- **Scoring**: exit 0 → `accepted`; non-zero exit → `rejected`; spawn failure / timeout / signal →
-  `errored`. When the case carries `expected`, `compareExpected` is applied exactly as in the shell arm.
-- **Declines** (`entry-not-probeable`, named): a script that is not a `.mjs`/`.js` file, an argv
-  template without exactly one `{input}`, a CLI that reads stdin (detected by a run with stdin closed
-  producing the engine's stdin-read marker — or stated as out of scope, see Clarifications).
+  empty (`input: ""`, as the shell arm), the engine's timeout, cwd set to the case's fixture
+  directory. **The fixture directory and the env are the shell arm's, not new ones**: the fixture is
+  `mkdtempSync(join(workDir, "fixture-"))` inside the sandbox root (so the escape sentinel still
+  sees a write beside it), and the env is `sandboxEnv({ cwd: fixtureDir })` with `HOME` and `TMPDIR`
+  pointed inside the sandbox root and `LC_ALL=C` — a Node CLI can write to `os.homedir()` or
+  `os.tmpdir()` exactly as a shell script can. The script's own directory is snapshotted around the
+  run and a change is reported as an escape, as `runShellCase` does. Both the fixture and the env
+  construction are factored into helpers the two arms share (review.1, I2).
+- **Scoring**: a case **without** `expected` is scored by exit status — exit 0 → `accepted`,
+  non-zero → `rejected`. A case **with** `expected` is validated with `expectedProblem` (a malformed
+  one is declined, never scored) and compared with `compareExpected`; the match is then mapped
+  through `direction` exactly as the shell arm maps it (hostile + match → `rejected`, hostile +
+  mismatch → `accepted`, legitimate the other way round). Spawn failure / timeout / signal →
+  `errored` in both cases. One executed probe per case — no shell multiplicity.
+- **Refusals and declines** — two different things, and the form keeps them apart the way every
+  other form does:
+  - **`--argv` shape errors are argument errors**: `--argv` without `cli:`, `cli:` without `--argv`,
+    non-JSON, a non-array, a non-string element, zero or two `{input}`, an unknown `{slot}`, a slot
+    embedded in a larger element. `main` exits **2** with `bad-argv: <detail>` on stderr **before**
+    anything runs, so no record is written. `runProbeSpec` (the library boundary `task.81` calls)
+    applies the same validator and returns a named decline `bad-argv`, for a caller that bypasses
+    the CLI.
+  - **Entry problems stay declines** (`unverifiable`, exit 1), unchanged from the other forms: a path
+    outside `--repo-root` is `outside-repo-root`; a script that is not a readable regular `.mjs` /
+    `.js` file is `entry-not-probeable`.
+- **Record**: each entry gains an `argv` key — the **template**, never the substituted input — or
+  `null` for every other form. The record has **no `kind` field today** (`toRecordEntry` writes
+  `sink`, `entry`, `name`, `call_site`, verdict/counts, `shells`, `fake_gh`, `ran_at`); the form is
+  already named by the `entry` string's prefix, so no `kind` is added. The control key that names an
+  entry file and dedupes the fold is `{sink, entry}` today, which would let two `cli:` probes of the
+  same script with different templates (`--env {input}` vs `--clear-note {input}`) overwrite each
+  other; for a `cli:` entry the key also carries the control's **`--name`**, or for an unnamed
+  probe its **argv skeleton** (flags and bare positionals in order, flag values dropped, with a
+  warning when an unnamed write replaces a differing argv) — and for every other form it is
+  byte-identical to today's so existing entry-file names do not move (review.1, I1). Two earlier
+  keys each failed one way: the whole template kept per-run operands (a scratch `--cases-file`, a
+  mkdtemp `--root`), so a re-run of one control recorded a second one (QA cycle 2, QA-1); the flag
+  before `{input}` alone merged different controls that share an input flag (QA cycle 3, CR-1);
+  the skeleton merges controls whose flag values select behaviour (QA cycle 4, CR-1) — which is why
+  a stated name wins over any derived key.
 
 ### Important Clarifications
 
@@ -112,7 +150,9 @@ that name the entry forms (`probe-boundary-rule.md`, the two security prompts, a
 - **Exit status as the verdict is a contract the CLI must honour**: a CLI that exits 0 while refusing
   is scored `accepted`. The form's documentation says so, and the consumer test uses a CLI
   (`uat-status.mjs`, whose refusals go through `die(msg, code)`) that honours it.
-- **stdin-reading CLIs stay declined** in this task; detecting them reliably is its own problem.
+- **stdin-reading CLIs are out of scope and are not detected.** stdin is empty, so such a CLI reads
+  EOF and is scored on whatever it then does; `probe-boundary-rule.md` §5 states that a CLI taking
+  its input on stdin is not a `cli:` target. Detecting one reliably is its own problem.
 
 ---
 
@@ -140,9 +180,10 @@ boundary-rule paragraph in `skills/qa-task/SKILL.md` and `skills/qa-story/SKILL.
 
 ## 5. Breaking Changes
 
-None — API stable. `cli:` and `--argv` are additive; every existing entry form, flag, exit code and
-record field is unchanged. A record written by a `cli:` run carries `kind: "cli"`, a new value in an
-existing field; readers that branch on `kind` treat an unknown value as they do today.
+None — API stable. `cli:` and `--argv` are additive; every existing entry form, flag and exit code
+is unchanged. Record entries gain one key, `argv` (the template for a `cli:` run, `null` otherwise);
+no existing record field changes meaning, and the control key — hence every existing entry-file name
+— is unchanged for the JS, `shell:` and `shell-fn:` forms.
 
 ---
 
@@ -154,9 +195,9 @@ existing field; readers that branch on `kind` treat an unknown value as they do 
 
 **Risk**: Medium · **Files**: `shared/resources/security-probe.mjs`, its test
 
-- [ ] `CLI_PREFIX`; `resolveEntry` returns `kind: "cli"` with the same containment check
-- [ ] `--argv` parsing and validation: JSON array of strings, exactly one `{input}`, only known slots; refused without `cli:` and required with it
-- [ ] Tests for each refusal (exit 2, named)
+- [x] `CLI_PREFIX`; `resolveEntry` returns `kind: "cli"` with the same containment check
+- [x] `--argv` parsing and validation: JSON array of strings, exactly one `{input}`, only known slots, no slot inside a larger element; refused without `cli:` and required with it — one validator, used by `main` (exit 2, `bad-argv`, no record) and by `runProbeSpec` (decline `bad-argv`)
+- [x] Tests for each refusal (exit 2, named, no record written) and the `runProbeSpec` decline
 
 **Dependencies**: none
 
@@ -164,11 +205,11 @@ existing field; readers that branch on `kind` treat an unknown value as they do 
 
 **Risk**: Medium · **Files**: `shared/resources/security-probe.mjs`, its test
 
-- [ ] Factor the per-case materialisation out of `runShellCase` into a helper both arms call (no second copy)
-- [ ] `runCliCase`: per-case fixture dir (materialised when the sink is in `MATERIALISED_SINKS`), argv substituted, `spawnSync(process.execPath, [script, ...argv])`, stdin closed, `sandboxEnv()`, timeout
-- [ ] Outcome: exit 0 accepted, non-zero rejected, spawn/timeout/signal errored; `compareExpected` when `expected` is present
-- [ ] Record entries carry `kind: "cli"` and the argv template; totals unchanged in shape
-- [ ] Tests: a fixture CLI that refuses correctly (`engages`), one that accepts everything (`present-but-inert`), one that crashes (`errored` → `unverifiable`)
+- [x] Factor the per-case materialisation **and** the per-case env (sandbox `HOME`/`TMPDIR`, `LC_ALL=C`) out of `runShellCase` into helpers both arms call (no second copy)
+- [x] `runCliCase`: per-case fixture dir inside `workDir` (materialised when the sink is in `MATERIALISED_SINKS`), argv substituted, `spawnSync(process.execPath, [script, ...argv])`, stdin empty, shared env, timeout; sandbox sentinel and script-dir snapshot around the run
+- [x] Outcome: without `expected`, exit 0 accepted / non-zero rejected; with `expected`, `expectedProblem` then `compareExpected` mapped through `direction` as the shell arm; spawn/timeout/signal errored
+- [x] Record entries carry `argv` (template, or `null`); the control key includes the `--name` (else the argv skeleton) for `cli:` entries only; totals unchanged in shape
+- [x] Tests: a fixture CLI that refuses correctly (`engages`), one whose guard lets one hostile case through (`present-but-inert`), one that accepts everything (`absent`), one that crashes (`errored` → `unverifiable`)
 
 **Dependencies**: Phase 1
 
@@ -176,7 +217,7 @@ existing field; readers that branch on `kind` treat an unknown value as they do 
 
 **Risk**: Low · **Files**: `shared/resources/tests/security-probe.test.mjs`
 
-- [ ] Probe `skills/qa-next/scripts/uat-status.mjs` with argv `["--root","{fixture}","--run-path","D.1","--env","{input}"]` over the `path` sink against a fixture registry; record the verdict. (If task.143 has landed, hostile `..`/`/` labels are refused; if not, the test records the current verdict and is updated by task.143.)
+- [x] Probe `skills/qa-next/scripts/uat-status.mjs` with argv `["--root","<prepared registry root>","--run-path","D.1","--env","{input}"]` over the `path` sink, cases from `--cases-file`, against a fixture registry; assert `executed > 0` and record the verdict the engine computes. `--root` is the prepared registry, not `{fixture}` — the registry must exist before the run, and `path` is not a materialised sink. (task.143 has not landed: today `runPathFor` refuses only a `-NN` suffix, so a hostile `x-02` is rejected while `../x` and `a/b` are accepted — the expected current verdict is `present-but-inert`. Measure it, do not assume it; task.143 updates the assertion when it lands.)
 
 **Dependencies**: Phase 2
 
@@ -184,10 +225,10 @@ existing field; readers that branch on `kind` treat an unknown value as they do 
 
 **Risk**: Low · **Files**: `shared/resources/probe-boundary-rule.md`, `shared/resources/finalise-dod-security-prompt.md`, `shared/resources/security-review-prompt.md`, `skills/qa-task/SKILL.md` and `skills/qa-story/SKILL.md` (Step 3b boundary paragraph), `CHANGELOG.md`, bundled `references/` copies
 
-- [ ] §5 lists `cli:` with its argv-template rule and exit-status contract; §5.1 drops "a multi-argument CLI" from the declined list
-- [ ] Both security prompts gain a `cli:` invocation beside the `shell:` / `shell-fn:` ones; the qa-task and qa-story Step 3b paragraphs name it
-- [ ] `npm run bundle`; `bundle --check` clean
-- [ ] CHANGELOG `[Unreleased]` citing `(task 144)`
+- [x] §5 lists `cli:` with its argv-template rule and exit-status contract; §5.1 drops "a multi-argument CLI" from the declined list
+- [x] Both security prompts gain a `cli:` invocation beside the `shell:` / `shell-fn:` ones; the qa-task and qa-story Step 3b paragraphs name it
+- [x] `npm run bundle`; `bundle --check` clean
+- [x] CHANGELOG `[Unreleased]` citing `(task 144)`
 
 **Dependencies**: Phases 1–3
 
@@ -212,6 +253,16 @@ existing field; readers that branch on `kind` treat an unknown value as they do 
 7. ✅ `CHANGELOG.md`
 8. ✅ Bundled `skills/*/references/` copies — regenerated by `npm run bundle`, never hand-edited
 
+### Files to Add (Tests)
+
+9. ✅ `shared/resources/tests/fixtures/security-probe/cli-{refuser,inert,accept-all,crasher,echo,writes-home,hangs}.mjs` — seven fixture CLIs: engages, present-but-inert, absent, crash, argv/env echo, a HOME write, a hang
+
+### Files Modified in QA (added by the QA loop, not the original plan)
+
+10. ✅ `skills/review-security/SKILL.md` — limit 3 routes a non-JS entry to `shell:` / `shell-fn:` / `cli:` and names `--name` as a `cli:` control's identity (QA cycles 1 and 4)
+11. ✅ `skills/review-security/tests/review-security.test.js` — the limits assertion follows the new sentence and requires all three forms (QA cycle 1)
+12. ✅ `shared/resources/tests/probe-boundary-signals.test.mjs` — two population tests: every block that routes a non-JS entry names `cli:`, and every block that states a `cli:` control's record identity names `--name` (QA cycles 1, 2 and 4)
+
 ### Files to Delete
 
 None.
@@ -222,10 +273,18 @@ None.
 
 ### Unit Tests
 
-- **Refusals**: `--argv` without `cli:`; `cli:` without `--argv`; zero or two `{input}`; an unknown
-  slot; a non-array or non-string element; a path outside `--repo-root`.
+- **Refusals** (exit 2, `bad-argv`, no record): `--argv` without `cli:`; `cli:` without `--argv`;
+  zero or two `{input}`; an unknown slot; a slot inside a larger element; a non-array or non-string
+  element. **Declines** (exit 1, named): a path outside `--repo-root`; a non-`.mjs`/`.js` script.
+- **Record**: `argv` holds the template, not the input; two different controls (different flags, dispatch or subcommand) against one script produce
+  two entries, a re-run of one flag with a different path operand replaces its entry; a JS /
+  `shell:` / `shell-fn:` entry's file name is unchanged.
+- **Scoring with `expected`**: a case carrying `expected` is compared, not exit-scored.
 - **Scoring**: three fixture CLIs under `shared/resources/tests/fixtures/` — correct refuser,
-  accept-all, crasher — yield `engages`, `present-but-inert`, `unverifiable` respectively.
+  inert (rejects some hostile input, lets one through), accept-all, crasher — yield `engages`,
+  `present-but-inert`, `absent`, `unverifiable` respectively. (An accept-all CLI rejects nothing, so
+  `computeVerdict` scores it `absent`; `present-but-inert` needs a control that demonstrably rejects
+  *something* — develop, 2026-09-23.)
 - **Argv integrity**: a case input containing spaces, quotes, `$(…)` and a leading `-` reaches the CLI
   as one element, byte-identical (the CLI echoes `process.argv` to a sentinel file).
 - **Sandbox**: the child's env carries only `sandboxEnv()` keys; nothing is written outside the fixture.
@@ -244,26 +303,27 @@ None.
 
 ### Functional
 
-- [ ] `--entry cli:<path> --argv '[…{input}…]'` runs every corpus case for the sink and writes a record with `probes_executed` equal to the case count
-- [ ] A correct refuser scores `engages`, an accept-all `present-but-inert`, a crasher `unverifiable`
-- [ ] Every malformed `--argv` / entry combination exits 2 with a named reason and writes no record
-- [ ] A case input reaches the CLI as exactly one argv element, byte-identical
+- [x] `--entry cli:<path> --argv '[…{input}…]'` runs every corpus case for the sink and writes a record with `probes_executed` equal to the case count
+- [x] A correct refuser scores `engages`, an inert guard `present-but-inert`, an accept-all `absent`, a crasher `unverifiable`
+- [x] Every malformed `--argv` / `cli:` combination exits 2 with `bad-argv` and writes no record; an entry outside `--repo-root` or not a `.mjs`/`.js` regular file is a named decline (`outside-repo-root` / `entry-not-probeable`), as for every other form
+- [x] Two different `cli:` controls on one script (a different guarded flag, dispatch flag or subcommand) land in two record entries, not one; a re-run of one control with a different path operand replaces its own entry
+- [x] A case input reaches the CLI as exactly one argv element, byte-identical
 
 ### Performance
 
-- [ ] A corpus run against `uat-status.mjs` completes within the engine's existing per-case timeout budget
-- [ ] No new network access; the child runs under `sandboxEnv()`
+- [x] A corpus run against `uat-status.mjs` completes within the engine's existing per-case timeout budget
+- [x] No new network access; the child runs under `sandboxEnv()`
 
 ### Code Quality
 
-- [ ] Every new test mutation-proved
-- [ ] `qa-execute-snippets.test.mjs` "no interpreter is on the snippet allow-list" still green (§2 untouched)
-- [ ] `npm test`, `bundle --check`, `check:generated`, Prettier clean
+- [x] Every new test mutation-proved
+- [x] `qa-execute-snippets.test.mjs` "no interpreter is on the snippet allow-list" still green (§2 untouched)
+- [x] `npm test`, `bundle --check`, `check:generated`, Prettier clean
 
 ### Migration
 
-- [ ] `probe-boundary-rule.md` §5.1 no longer lists a multi-argument CLI as declined, and §5 states the exit-status contract
-- [ ] CHANGELOG `[Unreleased]` cites `(task 144)`
+- [x] `probe-boundary-rule.md` §5.1 no longer lists a multi-argument CLI as declined, and §5 states the exit-status contract
+- [x] CHANGELOG `[Unreleased]` cites `(task 144)`
 
 ---
 
@@ -313,21 +373,86 @@ None.
 - **Non-critical**: documentation wording — fix forward.
 
 ---
-
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-23 | 1.0     | Initial draft | create-task |
+| 2026-09-23 | 1.1     | Review passed (8/10) — 1 critical + 6 important fixed: record has no `kind` field (adds `argv`), cli: control key carries the template, fixture/env reuse the shell arm sandbox, stdin out of scope, `expected` scoring defined, exit-2 vs decline split | review-task |
+| 2026-09-23 |         | Status → ready-for-development | review-task |
+| 2026-09-23 |  | Implemented — 15 files (plus bundled copies), 15 tests, 14 mutations proved; accept-all verdict corrected to absent | develop |
+| 2026-09-23 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-09-23 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-09-23 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-09-23 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-09-23 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-09-23 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-09-23 |  | QA findings fixed — gate PASS (100/100), 5 fix iterations (cli: record identity settled on --name) | qa-fix |
+| 2026-09-23 | 1.2 | DoD passed — accepted (PR #471) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: Entry resolution and the argv template
-- [ ] Phase 2: The run and the scoring
-- [ ] Phase 3: First real consumer
-- [ ] Phase 4: Documents and bundling
+- [x] Phase 1: Entry resolution and the argv template
+- [x] Phase 2: The run and the scoring
+- [x] Phase 3: First real consumer
+- [x] Phase 4: Documents and bundling
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-23
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.144.qa.6.probe-engine-cli-entry-form.md](./task.144.qa.6.probe-engine-cli-entry-form.md)
+- **Gate File**: [task.144.gate.6.probe-engine-cli-entry-form.yml](./task.144.gate.6.probe-engine-cli-entry-form.yml)
+- **Previous**: [qa.5](./task.144.qa.5.probe-engine-cli-entry-form.md) · [qa.4](./task.144.qa.4.probe-engine-cli-entry-form.md) · [qa.3](./task.144.qa.3.probe-engine-cli-entry-form.md) · [qa.2](./task.144.qa.2.probe-engine-cli-entry-form.md) · [qa.1](./task.144.qa.1.probe-engine-cli-entry-form.md)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3967 (fast gate) — 19 cli-form tests, all mutation-proved
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+- No open findings. Three low advisory items are recorded as future work in gate 6.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.144.qa.6.probe-engine-cli-entry-form.md`
+**Gate File**: `task.144.gate.6.probe-engine-cli-entry-form.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (6 QA cycles)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 12/12 met — each traced to code and a test that runs on every PR (`npm test` via `test.yml`)
+✅ **Tests:** 19 `cli entry` tests in `shared/resources/tests/security-probe.test.mjs`, two population tests in `probe-boundary-signals.test.mjs`; fast gate 3967 pass / 0 fail; CI reading 1 SUCCESS @ `af2f493e1b49`
+✅ **PR Review:** PR #471; Step 5c `/review-pr` CONCERNS with no high/high finding — PC-1 applied, CR-1 (medium) carried as a follow-up
+✅ **Documentation:** `probe-boundary-rule.md` §5/§5.1, both security prompts, qa-task/qa-story Step 3b, review-security SKILL.md, CHANGELOG `(task 144)`; bundles fresh
+✅ **Security Review:** PASS — the `--argv` validator probed through the engine's own `cli:` form, 35 executed, 0 reproduced (`task.144.dod.security.run.json`)
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling, no personal/payment/health data, no UI
+
+**Task marked as ACCEPTED on:** 2026-09-23
+
+**Detailed Verification Log:** See `task.144.dod.1.probe-engine-cli-entry-form.md` for complete verification evidence and timestamps.
 
 ---
 

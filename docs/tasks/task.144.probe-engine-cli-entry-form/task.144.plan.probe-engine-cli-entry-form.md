@@ -39,15 +39,20 @@ export const ARGV_SLOTS = Object.freeze(["{input}", "{fixture}"]);
 ### Phase 2: `runCliCase`
 
 ```js
-function runCliCase({ path, template, input, sink, timeoutMs }) {
-  const fixture = mkdtempSync(join(tmpdir(), "probe-cli-"));
-  if (MATERIALISED_SINKS[sink]) materialiseCase(fixture, sink, input); // factored out of runShellCase
-  const argv = template.map((a) => (a === "{input}" ? input : a === "{fixture}" ? fixture : a));
-  const r = spawnSync(process.execPath, [path, ...argv], {
-    cwd: fixture, env: sandboxEnv(), stdio: ["ignore", "pipe", "pipe"], timeout: timeoutMs,
+// Sketch — the fixture and env come from the helpers factored out of runShellCase,
+// NOT from tmpdir()/bare sandboxEnv(): a fixture outside the sandbox root is a write
+// the escape sentinel cannot see, and a bare env leaves HOME/TMPDIR pointing at the
+// reader's real ones (review.1, I2).
+function runCliCase(c, { sink, entryPath, template, workDir, sandboxHome, sandboxTmp, timeoutMs, ... }) {
+  const fixtureDir = mkdtempSync(join(workDir, "fixture-"));
+  if (MATERIALISED_SINKS[c.sink ?? sink]) materialiseCase(fixtureDir, ...); // factored out of runShellCase
+  const argv = template.map((a) => (a === "{input}" ? c.input : a === "{fixture}" ? fixtureDir : a));
+  const r = spawnSync(process.execPath, [entryPath, ...argv], {
+    input: "", cwd: fixtureDir, env: caseEnv({ fixtureDir, sandboxHome, sandboxTmp }),
+    encoding: "utf8", timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024,
   });
-  if (r.error || r.signal) return { outcome: "errored", detail: String(r.error ?? r.signal) };
-  return { outcome: r.status === 0 ? "accepted" : "rejected", run: r, fixture };
+  // neverRan(r) → errored. With c.expected: expectedProblem → compareExpected → direction map
+  // (the shell arm's rule). Without: exit 0 accepted, non-zero rejected.
 }
 ```
 
@@ -56,7 +61,17 @@ function runCliCase({ path, template, input, sink, timeoutMs }) {
   `materialiseCase` first, keep `runShellCase` green, then call it from `runCliCase` — never a copy.
 - When the case carries `expected`, call `compareExpected(expected, run, fixture)` as the shell arm does.
 - One executed probe per case (no shell multiplicity — Node is the runtime).
-- Record entries: `kind: "cli"`, `argv: template` (the template, not the substituted input).
+- Record entries: a new `argv` key — the template, not the substituted input — `null` for every
+  other form. There is no `kind` field on a record entry; the `entry` prefix names the form.
+- `controlKey` (the entry-file name and the fold's dedupe key) gains the control's **`--name`** for
+  `cli:` entries only — or, unnamed, the **argv skeleton** (`cliControlKey`: flags and bare positionals kept in order, flag values dropped,
+  slots kept), so two different controls against one script are two entries and a re-run of one
+  with a different path operand replaces it; other forms' keys are byte-identical. (Superseded
+  designs: the whole template — re-runs added controls, QA cycle 2 QA-1; the flag before `{input}`
+  alone — distinct controls sharing a flag merged, QA cycle 3 CR-1; the skeleton alone —
+  behaviour-selecting flag values merged, QA cycle 4 CR-1.)
+- `--argv` validation lives in one function used by `main` (exit 2 `bad-argv`, before any record
+  write) and `runProbeSpec` (decline `bad-argv`).
 
 ### Phase 3: consumer test
 

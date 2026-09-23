@@ -95,18 +95,23 @@ answer to a question nobody asked.
 
 `entry` is `path#exportName`, resolved from the repository root. It must be:
 
-- **A real, importable ES module export — or a shell script via the `shell:` entry form, or a
-  sourced library via `shell-fn:`.** A bash script taking one positional argument is probed with
+- **A real, importable ES module export — or a shell script via the `shell:` entry form, a
+  sourced library via `shell-fn:`, or a Node CLI via `cli:`.** A bash script taking one positional argument is probed with
   `--entry 'shell:<path>'` (and a materialised sink such as `filename`); a **sourced library** — a
   header that says *source it*, or functions with no top-level call (the signal is stated once in
   `probe-boundary-rule.md` §5) — with `--entry 'shell-fn:<path>#<function>' --cases-file
   <cases.json>`, plus `--fake-gh <dir>` when the function's body names `gh`. "It is not JS" is
   never a reason to report `unverifiable`, and `shell:` against a library is the task.125 result
-  (sourced, never called, `absent` behind a full count). A script that reads stdin, takes two
-  positionals or needs the network is what remains declined — say which.
-- **Called with exactly one argument.** The child runner calls `await fn(input)`. An entry needing
-  more configuration than that is not probeable as-is; report `unverifiable` rather than inventing a
-  wrapper, and say what shape would be.
+  (sourced, never called, `absent` behind a full count). A **Node CLI** whose decision sits
+  behind its flags is probed with `--entry 'cli:<path>' --argv '["--flag","{input}"]'` — the
+  template's one `"{input}"` element is the case, the exit status is the verdict (0 accepted,
+  non-zero rejected; a case carrying `expected` is compared instead), a crash is `errored`, and each
+  guarded flag is its own control, named with `--name`. A script or CLI that reads stdin, a shell script that takes two
+  positionals, or anything that needs the network is what remains declined — say which.
+- **Called with exactly one argument** — for the JS form. The child runner calls
+  `await fn(input)`. An export needing more configuration than that is not probeable as an export;
+  if a Node CLI calls it, probe the CLI with `cli:` (the argv is the real interface), otherwise
+  report `unverifiable` rather than inventing a wrapper, and say what shape would be.
 - **The nearest thing to the real call site you can reach.** Cite the `file:line` of the **call
   site**, not of the helper. See §6 — this is the residual limit of the whole method.
 
@@ -149,7 +154,9 @@ re-run is an assertion, not evidence.
 A shell-script boundary takes the same row with `--entry 'shell:<path>'` in place of the
 `path#export` form (and `--sink filename` for a script that lists a directory): the engine
 materialises each case as a fixture directory and runs the script against it under bash and zsh, so
-"it is not JS" is never the reason a control row reads `unverifiable`.
+"it is not JS" is never the reason a control row reads `unverifiable`. A Node CLI takes it with
+`--entry 'cli:<path>' --argv '[…"{input}"…]'`, and "it takes several flags" is never that reason
+either.
 
 And the machine block, once per report, which is what a gate consumes. **It is printed, not
 written.** Every probe passes `--repo-root "$(git rev-parse --show-toplevel)"` — the engine's
@@ -159,7 +166,8 @@ the skill and is `unverifiable` before it is ever imported — and every probe i
 the same `--record <path>` (the record sits beside the
 report as `{stem}.security.{N}.run.json`; each probe writes its own control's entry file under
 `{stem}.security.{N}.run.json.d/` and the engine folds the directory — a re-run of the same
-`{sink, entry}` replaces only its own entry, and concurrent probes never share a write), and the
+`{sink, entry}` — and, for a `cli:` control, the same `--name` (or, unnamed, the same argv skeleton) —
+replaces only its own entry, and concurrent probes never share a write), and the
 block is the output of:
 
 ```bash
@@ -241,8 +249,11 @@ over-read a clean result.
    site's `file:line`, record the module path the engine actually resolved, and **downgrade to
    `unverifiable` any citation naming no file in scope**.
 3. **A non-JS entry point is routed to `--entry 'shell:<path>'`** — or, for a sourced library,
-   `--entry 'shell-fn:<path>#<function>'` — not recorded `unverifiable`; only a script no entry
-   form reaches (stdin, more than argv, network) is declined — and the decline names the reason.
+   `--entry 'shell-fn:<path>#<function>'`, and for a Node CLI, `--entry 'cli:<path>' --argv …`
+   — not recorded `unverifiable`; only a target no entry form reaches (stdin, a shell script with
+   more than one positional, network) is declined — and the decline names the reason. The `cli:`
+   form's verdict is only as good as the CLI's exit status: one that exits 0 while refusing is
+   scored as accepting, which a case's `expected` is the answer to.
 
 ---
 

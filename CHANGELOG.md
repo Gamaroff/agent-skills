@@ -6,6 +6,39 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`security-probe.mjs --entry cli:<path> --argv '<JSON array>'` — a boundary behind a Node CLI's
+  flags is now executed, not declared unverifiable (task 144).** The engine reached a JS export
+  called with **one** argument, a one-positional shell script and a sourced shell function; a
+  multi-flag Node CLI matched none of them, so task.141's finalise recorded `probes_executed: 0`
+  against `uat-status.mjs`'s `--env` guard and was accepted over it. The `cli:` form runs the script
+  under the engine's own `node` with an argv **template** whose one `"{input}"` element becomes each
+  case's input as one argv element — never split, never parsed by a shell — and whose optional
+  `"{fixture}"` elements become that case's fixture directory. A slot is a whole element or nothing:
+  `--env={input}` is refused rather than interpolated. The sandbox is the shell arm's (fixture as
+  cwd inside the sandbox root, `HOME` and `TMPDIR` inside it, stdin empty, the script's directory
+  watched), factored out of `runShellCase` into helpers both arms call rather than copied. **The
+  verdict is the exit status** — 0 accepted, non-zero rejected, a contract the CLI must honour —
+  and a case carrying `expected` is compared exactly as the shell arm compares it. **A crash is not
+  a refusal**: Node's `Node.js vX.Y.Z` footer on stderr, a kill or a timeout is `errored`, so a
+  script that fails to load folds into one `entry-not-probeable` decline instead of scoring as a
+  control that rejects everything. A `--argv` shape error is an **argument error** (exit 2,
+  `bad-argv`, nothing runs, no record written); `runProbeSpec` returns the same `bad-argv` as a
+  decline for a library caller. Record entries gain an **`argv`** key (the template, never the
+  input; `null` for every other form), and a `cli:` control's identity in the record is its **`--name`** (a re-run under one name
+  replaces its entry; two names are two controls), falling back for an unnamed probe to its argv
+  **skeleton** — flags and bare positionals kept, flag values dropped — with a `warning: replaced
+  control` line when an unnamed write replaces an entry whose full argv differs. Three derived keys
+  were each wrong one way in QA (the whole template split re-runs; the flag before `{input}` merged
+  different controls; the skeleton merges `--mode strict` / `--mode lax`), which is why a stated
+  name wins — every other form's key, and so every existing
+  entry-file name, is byte-identical. The first real run is in the suite: `uat-status.mjs --run-path D.1 --env
+  {input}` scores **`present-but-inert`** today (`x-02` refused, `../x` and `a/b` accepted), which is
+  task.143's to fix. `probe-boundary-rule.md` §5 documents the form and §5.1 no longer lists a
+  multi-argument CLI among the declined sinks; both security prompts, the qa-task / qa-story
+  Step 3b paragraph and `review-security`'s own limits name it, and a population test fails any
+  site that routes a non-JS entry without naming `cli:`. `node` stays off `SAFE_COMMANDS` (§2): the engine picks the
+  interpreter and `--entry` fixes the script.
+
 - **`/qa-next <id>` — run the UAT protocol against a named registry row, whatever state that row is
   in (task 141).** `/qa-next` had exactly one way to choose what it tested: the first `⬜ untested` row in file
   order. So a `❌` whose bug had been fixed and merged could not be re-tested without
