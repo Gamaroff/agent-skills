@@ -255,6 +255,12 @@ no existing record field changes meaning, and the control key — hence every ex
 
 9. ✅ `shared/resources/tests/fixtures/security-probe/cli-{refuser,inert,accept-all,crasher,echo,writes-home,hangs}.mjs` — seven fixture CLIs: engages, present-but-inert, absent, crash, argv/env echo, a HOME write, a hang
 
+### Files Modified in QA (added by the QA loop, not the original plan)
+
+10. ✅ `skills/review-security/SKILL.md` — limit 3 routes a non-JS entry to `shell:` / `shell-fn:` / `cli:` and names `--name` as a `cli:` control's identity (QA cycles 1 and 4)
+11. ✅ `skills/review-security/tests/review-security.test.js` — the limits assertion follows the new sentence and requires all three forms (QA cycle 1)
+12. ✅ `shared/resources/tests/probe-boundary-signals.test.mjs` — two population tests: every block that routes a non-JS entry names `cli:`, and every block that states a `cli:` control's record identity names `--name` (QA cycles 1, 2 and 4)
+
 ### Files to Delete
 
 None.
