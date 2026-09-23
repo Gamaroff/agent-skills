@@ -844,7 +844,7 @@ test("CLI: --item describes a named row exactly as --next describes it, and reac
   assert.deepEqual(failed.priorRuns, ["runs/D.1/2026-09-20-lan.md"]);
   assert.equal(
     failed.bug,
-    "../bugs/bug.7.x.md",
+    "docs/bugs/bug.7.x.md",
     "the bug link is parsed with checkRegistry's own regex, so Step 4 need not re-parse the registry",
   );
   assert.match(run(root, "--item", "D.1").out, /^item: D\.1 — Play a game$/m);
@@ -1424,7 +1424,7 @@ test("the NEWEST bug link wins on an appended note cell (TASK-141-BUG-10)", () =
   const payload = JSON.parse(run(root, "--item", "D.2", "--json").out);
   assert.equal(
     payload.bug,
-    "../bugs/bug.7.new.md",
+    "docs/bugs/bug.7.new.md",
     "the most recent bug link, not the first one in the cell",
   );
   assert.equal(run(root, "--check").code, 0);
@@ -1675,7 +1675,7 @@ test("--check validates every bug link in the cell, including the one --item han
 
   assert.equal(
     JSON.parse(run(root, "--item", "D.2", "--json").out).bug,
-    "../bugs/bug.7.new.md",
+    "docs/bugs/bug.7.new.md",
     "the payload hands out the newest link",
   );
   const check = run(root, "--check");
@@ -1687,7 +1687,7 @@ test("--check validates every bug link in the cell, including the one --item han
   assert.match(check.out, /bug file not found: \.\.\/bugs\/bug\.7\.new\.md/);
 });
 
-test("--check validates repo-relative bug links on EVERY row, and leaves prose URLs alone (BUG-14/BUG-15)", () => {
+test("--check validates relative bug links on EVERY row, and leaves prose URLs alone (BUG-14/BUG-15)", () => {
   // Two findings, one rule. Cycle 5 validated every bug-shaped link but only on `fail` rows, which
   // (a) made a prose URL in a fail note a hard error on a legal registry — /qa-next Step 0 HALTs
   // on a non-zero --check — and (b) left the path describeRow PUBLISHES unchecked on the other
@@ -1724,7 +1724,7 @@ test("--check validates repo-relative bug links on EVERY row, and leaves prose U
   );
   assert.equal(
     JSON.parse(run(root, "--item", "D.2", "--json").out).bug,
-    "../bugs/bug.7.gone.md",
+    "docs/bugs/bug.7.gone.md",
     "the payload publishes it, so --check must cover it",
   );
   check = run(root, "--check");
@@ -1771,7 +1771,7 @@ test("the link --check validates IS the link --item publishes (TASK-141-BUG-16)"
   );
   assert.equal(
     JSON.parse(run(root, "--item", "D.1", "--json").out).bug,
-    "../bugs/bug.1.real.md",
+    "docs/bugs/bug.1.real.md",
     "and the payload publishes the tool-written link, never the prose URL",
   );
 
@@ -1796,7 +1796,7 @@ test("the link --check validates IS the link --item publishes (TASK-141-BUG-16)"
   assert.equal(JSON.parse(run(root2, "--item", "D.1", "--json").out).bug, null);
 });
 
-test("a #fragment on a repo-relative bug link resolves, and the payload is the path that was verified (TASK-141-CR7-3, BUG-18)", () => {
+test("a #fragment on a relative bug link resolves, and the payload is the path that was verified (TASK-141-CR7-3, BUG-18)", () => {
   // `../bugs/bug.1.real.md#repro` names a file that exists. Reporting it missing is a check that
   // is wrong about the filesystem, and on a fail row it HALTs the consuming skill. And the payload
   // must publish the path --check called `exists` on, not the href: cycle 7 stripped the fragment
@@ -1823,12 +1823,12 @@ test("a #fragment on a repo-relative bug link resolves, and the payload is the p
   const payload = JSON.parse(run(root, "--item", "D.1", "--json").out);
   assert.equal(
     payload.bug,
-    "../bugs/bug.1.real.md",
+    "docs/bugs/bug.1.real.md",
     "the payload is the verified path — a path ending #repro is not a file",
   );
   assert.ok(
-    existsSync(path.join(root, "docs/qa", payload.bug)),
-    "and it opens, relative to the registry",
+    existsSync(path.join(root, payload.bug)),
+    "and it opens from the repo root",
   );
   assert.match(
     payload.notes,
@@ -1841,9 +1841,6 @@ test("the bug-link rule is stated once: the skeleton writes BUG_LINK_RULE and th
   // The rule had three statements — the code, the README, the skeleton --init writes — and cycles
   // 6, 7 and 8 each found one of them stale. One string, held here, is the property; re-reading
   // three sites by hand is the alignment that kept failing.
-  assert.match(BUG_LINK_RULE, /repo-relative/);
-  assert.match(BUG_LINK_RULE, /#fragment/);
-  assert.match(BUG_LINK_RULE, /\/\/host/);
   const root = corpus();
   run(root, "--init");
   assert.ok(
@@ -1854,13 +1851,149 @@ test("the bug-link rule is stated once: the skeleton writes BUG_LINK_RULE and th
     path.resolve(__dirname, "../../../skills/qa-next/README.md"),
     "utf8",
   );
+  const enforces = readme
+    .split("\n")
+    .find((l) => l.startsWith("`--check` enforces:"));
+  assert.ok(enforces, "the README has its --check enforces paragraph");
   assert.ok(
-    readme.includes(BUG_LINK_RULE),
-    "the README quotes the rule verbatim",
+    enforces.includes(BUG_LINK_RULE),
+    "the README quotes the rule verbatim, in the --check paragraph",
   );
   assert.match(
-    readme,
+    enforces,
     /are warnings, not errors/,
     "and still says what --check only warns about",
   );
+});
+
+test("each clause of BUG_LINK_RULE is what --check does (TASK-141-BUG-20)", () => {
+  // The constant was held to the README and the skeleton, and to behaviour only by keywords — and
+  // cycle 8 pinned the wrong one: it said "repo-relative" while links resolve against the
+  // registry. One row per clause, run through --check, so the words are held to the behaviour.
+  assert.match(BUG_LINK_RULE, /relative to the registry file/);
+  const cases = [
+    [
+      "resolves against the registry",
+      "❌ fail",
+      "[bug.1.real](../bugs/bug.1.real.md)",
+      0,
+      "docs/bugs/bug.1.real.md",
+    ],
+    [
+      "a #fragment is ignored",
+      "❌ fail",
+      "[bug.1.real](../bugs/bug.1.real.md#repro)",
+      0,
+      "docs/bugs/bug.1.real.md",
+    ],
+    [
+      "a repo-relative target is NOT the base",
+      "❌ fail",
+      "[bug.1.real](docs/bugs/bug.1.real.md)",
+      1,
+    ],
+    [
+      "on ANY row — a stale link on ⏸ fails",
+      "⏸ blocked",
+      "stale [bug.9](../bugs/bug.9.gone.md)",
+      1,
+    ],
+    [
+      "a scheme is prose, skipped",
+      "⏸ blocked",
+      "see [bug.9](https://example.com/9)",
+      0,
+      null,
+    ],
+    [
+      "a //host is prose, skipped",
+      "⏸ blocked",
+      "see [bug.9](//example.com/9)",
+      0,
+      null,
+    ],
+    [
+      "an #anchor alone is prose, skipped",
+      "⏸ blocked",
+      "see [bug.9](#nine)",
+      0,
+      null,
+    ],
+  ];
+  // The 5th column is what the payload publishes: a skipped link is prose, so it is never handed
+  // to the skill as `bug`. Exit code alone cannot see a skip removed — an anchor-only link then
+  // resolves to "" (the registry directory, which exists) and --check stays green.
+  for (const [clause, state, notes, want, wantBug] of cases) {
+    const root = corpus();
+    run(root, "--init");
+    mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+    writeFileSync(path.join(root, "docs/qa/runs/D.1/r.md"), "# run\n");
+    mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+    writeFileSync(
+      path.join(root, "docs/bugs/bug.1.real.md"),
+      "---\nstatus: new\n---\n",
+    );
+    const runCell = state === "❌ fail" ? "[r](runs/D.1/r.md)" : "";
+    addRows(
+      root,
+      "D",
+      `| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ${state} | ${runCell} | ${notes} |\n`,
+    );
+    assert.equal(run(root, "--check").code, want, clause);
+    if (wantBug !== undefined)
+      assert.equal(
+        JSON.parse(run(root, "--item", "D.1", "--json").out).bug,
+        wantBug,
+        `${clause} — published bug`,
+      );
+  }
+});
+
+test("the payload's bug round-trips through --set fail --bug (TASK-141-BUG-21)", () => {
+  // SKILL.md Step 4: a repeat failure reads `bug` and links the same bug again. The payload was
+  // registry-relative and --bug takes a repo-relative path, so following Step 4 literally wrote
+  // [bug.1.real](../../../bugs/bug.1.real.md) and turned --check red — from the original commit.
+  const root = corpus();
+  run(root, "--init");
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.1/r.md"), "# run\n");
+  writeFileSync(path.join(root, "docs/qa/runs/D.1/r2.md"), "# run 2\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.real.md"),
+    "---\nstatus: new\n---\n",
+  );
+  addRows(
+    root,
+    "D",
+    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) |\n",
+  );
+  const { bug } = JSON.parse(run(root, "--item", "D.1", "--json").out);
+  assert.equal(
+    bug,
+    "docs/bugs/bug.1.real.md",
+    "repo-relative — the form --bug takes",
+  );
+  assert.ok(
+    existsSync(path.join(root, bug)),
+    "and it opens from the repo root",
+  );
+  const set = run(
+    root,
+    "--set",
+    "D.1",
+    "fail",
+    "--run",
+    "runs/D.1/r2.md",
+    "--bug",
+    bug,
+  );
+  assert.equal(set.code, 0, set.out);
+  assert.match(
+    readFileSync(REG(root), "utf8"),
+    /\(\.\.\/bugs\/bug\.1\.real\.md\) \|/,
+    "the re-linked bug is written back in the registry's own form",
+  );
+  const check = run(root, "--check");
+  assert.equal(check.code, 0, check.out);
 });

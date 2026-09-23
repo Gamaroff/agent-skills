@@ -275,6 +275,15 @@ function relFromRegistry(opts, repoRelPath) {
   return relative(opts.registryDir, repoRelPath);
 }
 
+// The inverse: a link as written in the registry (relative to its directory) → repo-relative.
+// ONE conversion, used by --check's `exists` and by describeRow's `bug`, so the file --check looks
+// for and the file the payload names are the same file by construction. Repo-relative is the form
+// `--bug` takes and `/create-bug-report` returns, so the payload round-trips: a registry-relative
+// `bug` fed back through `--bug` was re-relativised to `../../../bugs/…` (TASK-141-BUG-21).
+function repoPathOf(opts, registryRelPath) {
+  return join(opts.registryDir, registryRelPath);
+}
+
 function renderRow(columns, cells) {
   // `|` is escaped HERE, in the one place every cell the tool emits is rendered, because
   // splitCells already honours `\\|` through its `(?<!\\)` lookbehind — so the round-trip is
@@ -500,10 +509,10 @@ export function checkRegistry({ sections }, stories, cfg, exists = () => true) {
 // edge on a passing function, a defect on another surface, a harness fault. Parsed here so
 // `--findings` can list them across every run and `--check` can prove their bug links resolve.
 
-// A repo-relative link: no scheme, no anchor, no protocol-relative host. `linkTo` emits nothing
-// else, so anything failing this is a human's prose reference. The converse does not hold — a
-// human's repo-relative link passes too and is checked the same way; the name says which shape the
-// tool writes, not who wrote a given link.
+// A relative link, resolved against the registry's directory: no scheme, no anchor, no
+// protocol-relative host. `linkTo` emits nothing else, so anything failing this is a human's prose
+// reference. The converse does not hold — a human's relative link passes too and is checked the
+// same way; the name says which shape the tool writes, not who wrote a given link.
 //
 // ONE definition, used by the reader (describeRow's `bug`) and the checker (checkRegistry) alike,
 // through `bugLinkPaths` below.
@@ -524,7 +533,7 @@ const linkTarget = (href) => href.replace(/#.*$/, "");
 
 const BUG_LINK_RE = /\[[^\]]*bug\.[^\]]*\]\(([^)]+)\)/g;
 
-// The PATHS of a note cell's bug links, in cell order: the predicate applied, then the fragment
+// The PATHS of a note cell's bug links, relative to the registry, in cell order: the predicate applied, then the fragment
 // removed. This is the one value both sides consume — checkRegistry calls `exists` on exactly these
 // strings and describeRow publishes the last of them — so the published path is the verified path.
 // Sharing only the predicate was not enough: cycle 7 applied `linkTarget` on the checking side
@@ -540,7 +549,7 @@ function bugLinkPaths(notes) {
 // verbatim by the README, which a test holds to this string. Worded in the predicate's own terms:
 // the checker cannot know who wrote a link, only what its text and target look like.
 export const BUG_LINK_RULE =
-  "every bug link in **Notes / bug** — link text containing `bug.`, target a repo-relative path — must resolve, on **any** row; a `#fragment` is ignored, and a link with a scheme (`https:`), a `//host` or only an `#anchor` is prose and is skipped";
+  "every bug link in **Notes / bug** — link text containing `bug.`, target a path relative to the registry file — must resolve, on **any** row; a `#fragment` is ignored, and a link with a scheme (`https:`), a `//host` or only an `#anchor` is prose and is skipped";
 
 const FINDING_ROW = /^\|\s*(\d+)\s*\|(.*)\|(.*)\|(.*)\|(.*)\|\s*$/;
 const BUG_CLOSED = /^(closed|done|fixed|resolved)$/i;
@@ -632,7 +641,7 @@ export function checkFindings(findings) {
 
 function cmdCheck(opts) {
   const cfg = requireSurfaces(opts);
-  const exists = (rel) => existsSync(join(opts.root, opts.registryDir, rel));
+  const exists = (rel) => existsSync(join(opts.root, repoPathOf(opts, rel)));
   const { errors, warns } = checkRegistry(
     readRegistry(opts),
     loadStories(opts, cfg),
@@ -765,11 +774,15 @@ function describeRow(opts, cfg, r) {
     lastRun: (r.run.match(/\]\(([^)]+)\)/) ?? [])[1] ?? null,
     priorRuns: priorRuns(opts, r.id),
     notes: r.notes,
-    // The path of the LAST bug link — `bugLinkPaths`, the same values checkRegistry calls `exists`
-    // on, so the published path is the verified path, fragment removed. Last, not first, because
-    // the note cell is appended to on a kept ✅ and Step 4 wants the most recent. The link as the
-    // author wrote it, anchor included, is still in `notes`.
-    bug: bugLinkPaths(r.notes).at(-1) ?? null,
+    // The file the LAST bug link names — `bugLinkPaths`, the same values checkRegistry calls
+    // `exists` on, fragment removed — converted by `repoPathOf`, the same conversion `exists` uses.
+    // Repo-relative, so it opens from the repo root and round-trips through `--bug`. Last, not
+    // first, because the note cell is appended to on a kept ✅ and Step 4 wants the most recent.
+    // The link as the author wrote it, anchor included, is still in `notes`.
+    bug: (() => {
+      const p = bugLinkPaths(r.notes).at(-1);
+      return p === undefined ? null : repoPathOf(opts, p);
+    })(),
   };
 }
 

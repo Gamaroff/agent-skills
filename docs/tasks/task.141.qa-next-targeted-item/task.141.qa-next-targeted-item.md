@@ -664,10 +664,10 @@ historical naming.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS — cycle 8 of 9 (second grant); 3 findings, all closed in-cycle (2 fixed, 1 by decision); cycle-8 fixes ungated
+**QA Status**: CONCERNS — cycle 9 of 9 (last granted); 2 MEDIUM closed in-cycle; cycle-9 fixes ungated (budget spent)
 **Testing Date**: 2026-09-23
 **Quality Score**: 80/100
-**Gate Decision**: CONCERNS — no HIGH for four consecutive gates
+**Gate Decision**: CONCERNS — no HIGH for five consecutive gates
 
 ### QA Reports
 
@@ -681,26 +681,25 @@ historical naming.
 | 6 | [gate.6](./task.141.gate.6.qa-next-targeted-item.yml) | [qa.6](./task.141.qa.6.qa-next-targeted-item.md) | CONCERNS (80) | 0 |
 | 7 | [gate.7](./task.141.gate.7.qa-next-targeted-item.yml) | [qa.7](./task.141.qa.7.qa-next-targeted-item.md) | CONCERNS (85) | 0 |
 | 8 | [gate.8](./task.141.gate.8.qa-next-targeted-item.yml) | [qa.8](./task.141.qa.8.qa-next-targeted-item.md) | CONCERNS (80) | 0 |
+| 9 | [gate.9](./task.141.gate.9.qa-next-targeted-item.yml) | [qa.9](./task.141.qa.9.qa-next-targeted-item.md) | CONCERNS (80) | 0 |
 
-Budget: 9 (5 + 2 + 2 granted). **17 defects closed through cycle 7; cycle 8 opened 3** (BUG-18,
-BUG-19, CR8-3).
+Budget: 9 (5 + 2 + 2 granted). Cycle 8 closed 3 findings; **cycle 9 opened 2** (BUG-20, BUG-21).
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3944 (0 failures, 1 skipped); qa-next suite 41
+- **Tests Executed**: 3945 (0 failures, 1 skipped); qa-next suite 42
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
 
-Cycle 7's shared predicate holds on the link-shape axis. Its fragment strip reopened the
-validated-vs-published divergence on a third axis: `--check` validates `linkTarget(link)` while
-`--item` publishes `link`. A `#repro` link therefore passes `--check` and is handed to Step 4 as a
-path that cannot be opened (**BUG-18**). The two prose restatements of the rule still diverge from
-the code, and the README hunk deleted a sentence that is still true (**BUG-19**). The fix that
-closes the class shares the *value*, not only the predicate. Both were fixed in-cycle: `bugLinkPaths` is the one value
-both sides consume, and `BUG_LINK_RULE` is the one wording, held by a test.
+Cycle 8's fix holds: wherever `--check` exits 0, the published `bug` is the string `exists` was
+called on. Two findings remain. **BUG-21** dates from the original feature commit: `bug` is
+relative to the registry, but `--bug` takes a repo-relative path, so the documented repeat-failure
+flow writes a broken link. The published value was checked against the validated value on four
+axes, and never against the value the skill feeds it back into. **BUG-20**: the one-wording
+`BUG_LINK_RULE` says "repo-relative", which is the wrong resolving base.
 
 ---
 <!-- change-log-start -->
@@ -720,6 +719,7 @@ both sides consume, and `BUG_LINK_RULE` is the one wording, held by a test.
 | 2026-09-23 |         | QA cycle 6 (granted 1/2) — gate CONCERNS (80/100); round trip verified adversarially; bug-link validation corrected on both axes | qa-task |
 | 2026-09-23 |         | QA cycle 7 (granted 2/2) — gate CONCERNS (85/100); validated-vs-published closed structurally by one shared predicate; budget spent | qa-task |
 | 2026-09-23 |  | QA cycle 8 (second grant, 1/2) — gate CONCERNS (80/100); 3 findings (2 MEDIUM, 1 LOW) — the fragment strip reopened validated-vs-published on a third axis | qa-task |
+| 2026-09-23 |  | QA cycle 9 (second grant, 2/2) — gate CONCERNS (80/100); 2 MEDIUM — `bug` does not round-trip through `--bug` (since the original commit); the rule names the wrong resolving base | qa-task |
 <!-- change-log-end -->
 
 ---
