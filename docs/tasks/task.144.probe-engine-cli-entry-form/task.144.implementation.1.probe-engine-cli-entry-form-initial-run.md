@@ -3,7 +3,7 @@
 **Task**: `task.144.probe-engine-cli-entry-form.md`
 **Run Number**: 1
 **Started**: 2026-09-23 19:25
-**Status**: Escalated
+**Status**: In Progress
 
 ---
 
@@ -35,7 +35,7 @@ Add a `cli:<path>` entry form with an `--argv` template to `security-probe.mjs`,
 | 2. review-task             | ✅ Done    | `task.144.review.{N}.{name}.md` exists (or skip logged)               | review.1 — READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 develop iteration; 4/4 phases; ci:fast 3961/0 (2nd run — 1st failed a population guard, fixed) | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #471: https://github.com/Gamaroff/agent-skills/pull/471 | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.144.qa.{N}.*.md`; `task.144.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.144.qa.{N}.*.md`; `task.144.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (5 budgeted + re-entry grant); gate 6 PASS 100; 5c CONCERNS (`task.144.pr-review.1`) | —                    |
 | 7. finalise                | ⏳ Pending | `task.144.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -98,6 +98,12 @@ Add a `cli:<path>` entry form with an `--argv` template to `security-probe.mjs`,
 - PR-opened comment on #470: `posted`. GitHub board: in-review → `stage-disabled` (the project's workflow has no in-review moment).
 - Post-PR state check: PR #471 state = OPEN. errors = 0 (read directly with `gh pr view`, not the poller subagent).
 - Lock `pr_url` updated.
+
+### QA loop re-entry — 2026-09-23
+
+- User instruction after the loop-limit HALT: "Grant as many cycles as are required." A grant is a number, so it was recorded as k=20 — far above any expected need; the Convergence check still guards a genuine stall, and the loop exits on the first accepting gate.
+- QA loop re-entry: 20 extra cycles granted; 0 cycles run outside the loop back-filled from disk (gates 1–5 all have `### QA Cycle` entries). Lock restored from the halt snapshot by `grant-qa-cycles.sh`: QA_CYCLE=5, qa_max_cycles=25, qa_phase=5a.
+- Report status: Escalated → In Progress.
 
 ---
 
@@ -213,6 +219,16 @@ _Track each QA review/fix cycle._
 
 **Convergence check**: HIGH [0, 0, 0, 0, 0] — no stall. **Route classifier**: `continue`.
 
+### QA Cycle 6 — 2026-09-23
+
+**Gate Result**: PASS
+**Issues Found**: none gating — 3 low advisory (identity population test scans .md only; stored name untrimmed; §5 does not say names are trimmed), recorded as future in gate 6. Gate 5 CR-1/CR-2 fixed and verified (named re-run replayed: 0 warnings).
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — `task.144.pr-review.1.probe-engine-cli-entry-form.md`: PC-1 (scope, low: Files Summary missing 3 QA-added files — applied before finalise), CR-1 (bug, medium/medium, reproduced: a cli: probe declined before its template is parsed is keyed without its --name, so its corrected re-run leaves a stale unverifiable entry; errs toward could-not-look, follow-up). No high/high finding → CONCERNS, non-blocking.
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
@@ -224,3 +240,22 @@ _Track each QA review/fix cycle._
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
+
+---
+
+## Pipeline Paused — 2026-09-23T19:29:54Z
+
+⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
+
+**State at pause**:
+
+- Skill: `/develop-task`
+- Branch: `feature/task.144.probe-engine-cli-entry-form`
+- Last step boundary: Step 7
+- PR: https://github.com/Gamaroff/agent-skills/pull/471
+- Tracker: github #470
+
+**Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 7.
+
+**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+
