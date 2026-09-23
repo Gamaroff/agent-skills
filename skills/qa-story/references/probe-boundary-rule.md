@@ -168,7 +168,7 @@ Declining conditions, each reported with its reason:
 - **A symlink that points out of the tree resolves at import time**, after the
   path check. Node offers no cheap pre-import realpath guarantee for a path that
   may not yet exist. This is a limit, not a defence.
-- **The engine reaches three entry forms, and "not importable" is not a decline.**
+- **The engine reaches four entry forms, and "not importable" is not a decline.**
   `path#export` imports a JS module; `shell:path` runs a **shell script that
   takes one positional argument** — `bash <script> <fixture-dir>` per case, under
   bash and (when the host has it) zsh, with the script and directory passed as
@@ -230,27 +230,71 @@ Declining conditions, each reported with its reason:
   the JS runner never consults `PATH`, and a fake it cannot reach must not be
   recorded as having answered. A stdin-reading function, or one needing more
   than argv, is still declined (§ Out of Scope, task.128).
-- **What is still declined, and recorded as declined:** a script that reads
-  stdin, takes more than one positional, or must open a socket; a live database
-  sink; anything that needs the network. These are limits of the entry forms,
+
+  **`cli:path --argv '<JSON array>'` runs a Node CLI** — a `.mjs` / `.js`
+  script — as `node <path> ...argv`, one probe per case, for the boundary that
+  lives behind a **flag parser** rather than a one-argument export (task.141's
+  `uat-status.mjs --env` guard sits behind a three-argument function; the JS
+  form could not reach it, and the gate recorded zero probes executed). The
+  template is a JSON array of strings with **exactly one `"{input}"` element**,
+  which becomes the case's input as one argv element, never split and never
+  parsed by a shell, and optionally `"{fixture}"` elements, which become the
+  case's fixture directory (the sink's controls plus the case's name for a
+  materialised sink, otherwise empty). **A slot is a whole element or nothing** —
+  `--env={input}` is refused, not interpolated — so no argument is ever built
+  by concatenating probe input into a string. The sandbox is the shell arm's:
+  the fixture is the cwd and sits inside the sandbox root, `HOME` and `TMPDIR`
+  point inside it, stdin is empty, and the script's own directory is watched.
+  Three rules the caller owns:
+  - **The verdict is the exit status.** Exit 0 is *accepted*, non-zero is
+    *rejected*. That is a contract the CLI must honour: one that exits 0 while
+    refusing is scored as accepting. A case that needs a finer signal carries
+    `expected` (stdout, exit, stderr, absent paths), which is then compared and
+    mapped through `direction` exactly as the shell arm does it.
+  - **A crash is not a refusal.** An uncaught error — Node's own `Node.js
+    vX.Y.Z` footer on stderr — a kill, or a timeout is *errored*: "could not
+    look". A script that fails to load therefore folds into one
+    `entry-not-probeable` decline instead of scoring as a control that rejects
+    every hostile input.
+  - **A `--argv` shape error is an argument error, not a probe result:** exit 2,
+    `bad-argv`, nothing runs and no record is written (`--argv` without `cli:`,
+    `cli:` without `--argv`, zero or two `{input}`, an unknown or embedded
+    slot). An entry outside the root, or one that is not a `.mjs` / `.js`
+    regular file, is a named decline like every other form's. The record carries
+    the template as `argv`, and a `cli:` control is keyed on it, so probing
+    `--env {input}` and `--clear-note {input}` on one script records two
+    controls, not one silently replacing the other.
+
+  `cli:` does **not** touch §2: the engine chooses the interpreter
+  (`process.execPath`) and the script is fixed by `--entry` and
+  containment-checked before anything spawns, exactly as the JS form already
+  runs a Node child. `node` stays off `SAFE_COMMANDS`.
+- **What is still declined, and recorded as declined:** a script or CLI that
+  reads its input from stdin, a shell script that takes more than one positional,
+  anything that must open a socket; a live database sink; anything that needs
+  the network (a CLI that consults `gh` included — `--fake-gh` is a shell-form
+  flag). These are limits of the entry forms,
   not reasons to record `boundary: false` — the boundary exists whether or not
   the engine can reach it, and §5.1 is how it is tested.
 - **No probe opens a network connection.** Both motivating defects are pure
   composers; if a target needs the network, that is a decline.
 
-The precondition — a pure-ish predicate, composer, or single-argument script —
-is what the boundary rule selects for anyway. If it turns out that most real
-controls are reachable by neither form and the engine declines almost
+The precondition — a pure-ish predicate, composer, single-argument script or
+argv-driven Node CLI — is what the boundary rule selects for anyway. If it turns
+out that most real controls are reachable by none of the forms and the engine declines almost
 everything, **that is a finding to record here in this section**, not something
 to paper over by loosening §2.
 
 ### 5.1 When the sink is declined and the reviewer probes it by hand
 
-A declined sink (a stdin-reading script, a multi-argument CLI, a networked
-control — what neither entry form reaches) is not exempt from being tested; it
-is exempt from the *engine*. **Reach for this only after `shell:` has been
-tried** — a one-argument script is the engine's job, and a by-hand probe of one
-is the self-report the engine exists to remove. When the reviewer executes such
+A declined sink (a stdin-reading script or CLI, a multi-positional shell
+script, a networked control — what no entry form reaches) is not exempt from
+being tested; it is exempt from the *engine*. **Reach for this only after the
+entry forms have been tried** — a one-argument script is `shell:`'s job and a
+Node CLI driven by its argv is `cli:`'s, and a by-hand probe of either is the
+self-report the engine exists to remove. A `cli:` probe exercises **one arm**
+— the CLI's own argv; the other arms below (a wrapper, an env-var path) still
+need the by-hand rule when they reach the same sink. When the reviewer executes such
 candidates itself, two rules apply that the engine would otherwise have enforced:
 
 **Every refused shape is re-tried through every arm that reaches the same sink.**

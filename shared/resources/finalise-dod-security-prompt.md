@@ -44,7 +44,7 @@ Signals — any **one** is sufficient:
 - a named allow-list or deny-list in any form (array, regex alternation, `switch`, set membership)
 - a function whose own tests are mostly of the shape "X is refused"
 - a work-item document whose Success Criteria contain *never*, *must not*, *fails closed*, or *refused*
-- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form — or, for a **sourced library** (a header that says *source it*, or functions with no top-level call), the `shell-fn:path#function` form with `--cases-file` and, when the body names `gh`, `--fake-gh` (Step 4; the signal that tells the two apart is stated once, in `probe-boundary-rule.md` §5) — never to `boundary: false`
+- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form — or, for a **sourced library** (a header that says *source it*, or functions with no top-level call), the `shell-fn:path#function` form with `--cases-file` and, when the body names `gh`, `--fake-gh` (Step 4; the signal that tells the two apart is stated once, in `probe-boundary-rule.md` §5); a **Node CLI** whose decision sits behind its flags routes to the `cli:path` form with an `--argv` template — never to `boundary: false`
 
 The list is data as well as prose: `probe-boundary-signals.mjs` (beside `security-probe.mjs`) exports it, and `classifyBoundaryText` applies the text-shaped signals to a header or a criteria section. Five QA gates on task.121 read a bash script that says "refuses rather than guesses" and recorded no boundary, because every signal above the last one is JS-shaped; the last one is what a script's own words match.
 
@@ -168,6 +168,21 @@ node PROMPT_DIR/security-probe.mjs \
   --cases-file <path-to-cases.json> --fake-gh <dir-holding-an-executable-gh> \
   --repo-root "$(git rev-parse --show-toplevel)" \
   --record <STORY_DIR>/<stem>.dod.security.run.json --json
+
+# A NODE CLI boundary (a .mjs/.js script whose decision sits behind its flags —
+# task.141's `uat-status.mjs --env`) takes the cli form: node runs the script
+# with the --argv template, whose ONE "{input}" element is each case's input as
+# one argv element ("{fixture}", optional, is the case's fixture directory).
+# Exit status is the verdict — 0 accepted, non-zero rejected — so a case that
+# needs more carries `expected`; a crash is errored, never a refusal. A --argv
+# shape error exits 2 and writes no record. Probe each guarded flag as its own
+# control: a different template is a different control in the record.
+node PROMPT_DIR/security-probe.mjs \
+  --sink <sink> --entry 'cli:<path-from-repo-root>' \
+  --argv '["--flag-before","value","--guarded-flag","{input}"]' \
+  --cases-file <path-to-cases.json> \
+  --repo-root "$(git rev-parse --show-toplevel)" \
+  --record <STORY_DIR>/<stem>.dod.security.run.json --json
 ```
 
 The engine imports the entry in a sandboxed child, calls it on every corpus case for the sink —
@@ -175,14 +190,16 @@ both directions — and prints a JSON result whose `executed` is the count of ca
 actually ran, whose `reproduced[]` names the hostile cases that were accepted, and whose
 `overblocked[]` names the legitimate cases that were refused. The record it writes carries the same
 counts; **`probes_executed:` below is the record's `totals.executed`, copied, never composed.** An
-entry neither form reaches (a script that reads stdin or takes two positionals, a function needing
-more than one argument, anything networked) is `verdict: unverifiable` with `executed: 0` and
+entry no form reaches (a script or CLI that reads stdin, a shell script that takes two positionals,
+anything networked) is `verdict: unverifiable` with `executed: 0` and
 takes the zero-guard below — say why in `summary`, do not fall back to a hand-written harness,
 because a count from a harness is the self-report this step removed. **"It is a bash script" is not
 such a reason**: that is the `shell:` form's case, and recording it as unverifiable is the task.121
 outcome this form exists to end. **Nor is "it is a sourced function"**: that is the `shell-fn:`
 form's case, and running `shell:` against a library instead is the task.125 outcome — `absent`
-behind a full count — that *that* form exists to end.
+behind a full count — that *that* form exists to end. **Nor is "it is a multi-flag CLI" or "the
+function takes three arguments"** when a Node CLI calls it: that is the `cli:` form's case, and
+recording it unverifiable is the task.141 outcome that form exists to end.
 
 **4. Report only what reproduced — but count everything you ran.** A candidate you did not run is not a
 finding. A candidate that ran and returned its expected verdict is not a finding either. `probes[]`
