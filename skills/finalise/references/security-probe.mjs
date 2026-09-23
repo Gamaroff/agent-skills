@@ -1646,7 +1646,7 @@ function runCliCase(
 //
 // One record per review, one ENTRY FILE per control. `--record <path>` writes
 // this run's control to `<path>.d/<key>.json` — an atomic temp+rename to a name
-// derived from `{sink, entry}` (plus, for a cli: control, its argv skeleton —
+// derived from `{sink, entry}` (plus, for a cli: control, its --name or else its argv skeleton —
 // see controlKey), so two controls never share a file and a re-run
 // of the same control replaces only its own — and then writes the folded
 // snapshot at `<path>` for readers. `readRecord` folds the entry directory,
@@ -1672,7 +1672,7 @@ export const SEVERITY_BY_VERDICT = Object.freeze({
   unverifiable: "unverifiable",
 });
 
-// A cli: control is also keyed by its argv SKELETON (task.144): every flag and
+// An UNNAMED cli: control is keyed by its argv SKELETON (task.144): every flag and
 // every bare positional, in order, with only the VALUES of flags dropped
 // (`--root /tmp/x` → `--root *`, `--cases=/a.json` → `--cases=*`) and the slots
 // kept wherever they sit. Two earlier keys each failed in one direction, and
@@ -1724,10 +1724,24 @@ export function cliControlKey(template) {
 const controlKey = (c) => {
   const base = `${c.sink ?? ""}\u0000${c.entry ?? ""}`;
   if (!Array.isArray(c.argv)) return base;
-  return typeof c.name === "string" && c.name.trim() !== ""
-    ? `${base}\u0000name:${c.name}`
+  const name = cliControlName(c);
+  return name !== null
+    ? `${base}\u0000name:${name}`
     : `${base}\u0000${cliControlKey(c.argv)}`;
 };
+
+/**
+ * A cli: control's stated identity — its `--name`, trimmed — or null when it
+ * has none. One function for the key AND the replace report, so the two can
+ * never disagree about whether a control is named (QA cycle 5, CR-1): the
+ * report is for the DERIVED key only, and a named re-run whose argv differs is
+ * an ordinary replacement. Trimmed, so "x" and " x " are one control (CR-3).
+ */
+function cliControlName(c) {
+  return typeof c.name === "string" && c.name.trim() !== ""
+    ? c.name.trim()
+    : null;
+}
 
 /**
  * Reduce a `runProbeSpec` result to the per-control entry the record stores.
@@ -1845,7 +1859,7 @@ export function readRecord(recordPath, { readdir = readdirSync } = {}) {
 }
 
 /**
- * One control per `{sink, entry}` (and argv skeleton, for a cli: control),
+ * One control per `{sink, entry}` (and --name or else argv skeleton, for a cli: control),
  * latest run wins. The writer already
  * guarantees this by file name, but the fold must not depend on it: a copy of
  * an entry under another name would otherwise count one control twice (CR7-3).
@@ -1889,7 +1903,7 @@ function writeAtomic(target, text) {
 
 /**
  * Record one probe run: write this control's entry file under `<path>.d/`
- * (atomic, named from `{sink, entry}` and, for cli:, the argv skeleton), then fold the directory into the
+ * (atomic, named from `{sink, entry}` and, for cli:, the --name or else the argv skeleton), then fold the directory into the
  * snapshot at `<path>`. Concurrent runs of different controls write different
  * files and never contend; a re-run of the same control replaces only its own.
  * Returns the folded record.
@@ -1916,7 +1930,11 @@ export function recordRun(recordPath, result, opts = {}) {
   // replacement of an entry whose full argv differs: report it through
   // `onReplace(previous, next)` rather than making it silently (QA cycle 4,
   // CR-1). An identical re-run is not reported.
-  if (typeof opts.onReplace === "function" && Array.isArray(entry.argv)) {
+  if (
+    typeof opts.onReplace === "function" &&
+    Array.isArray(entry.argv) &&
+    cliControlName(entry) === null
+  ) {
     let previous = null;
     try {
       previous = JSON.parse(

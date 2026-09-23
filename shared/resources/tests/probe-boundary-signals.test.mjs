@@ -313,7 +313,7 @@ test("every block that states a cli: control's record identity names --name (tas
     files.push(`skills/${d}/SKILL.md`);
   }
   const KEY =
-    /identity|keyed on|record key|control in the record|replaces (?:only )?its own entry|one entry per/i;
+    /identity|keyed on|record key|control in the record|replaces (?:only )?its own entry|one entry per|its own control/i;
   const blocksOf = (text) => {
     const blocks = [];
     let cur = [];
@@ -350,7 +350,7 @@ test("every block that states a cli: control's record identity names --name (tas
     "these blocks state cli: record identity without --name",
   );
   assert.ok(
-    sites >= 4,
+    sites >= 7,
     `only ${sites} block(s) state cli: identity — the predicate no longer matches`,
   );
 });

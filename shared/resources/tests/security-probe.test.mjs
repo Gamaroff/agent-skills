@@ -2489,3 +2489,46 @@ test("cli entry: a supplied --name IS a cli: control's identity; without one a d
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("cli entry: a NAMED re-run whose argv differs is a normal replacement — no warning; names are keyed trimmed (task.144 QA cycle 5, CR-1/CR-3)", () => {
+  // The replace report exists for the DERIVED key, where a skeleton can merge
+  // two controls. A named control's re-run with a new scratch path is exactly
+  // the same-name replacement §5 describes; warning "pass --name" to a caller
+  // who passed it teaches everyone to ignore the warning.
+  const dir = mkdtempSync(join(tmpdir(), "probe-cli-named-rerun-"));
+  try {
+    const record = join(dir, "run.json");
+    const errs = [];
+    for (const run of ["a", "b"]) {
+      const { err } = runMain([
+        "--sink",
+        "url-authority",
+        "--entry",
+        CLI("accept-all"),
+        "--argv",
+        JSON.stringify(["--host", "{input}", "--scratch", join(dir, run)]),
+        "--record",
+        record,
+        "--name",
+        run === "a" ? "named control" : "  named control  ",
+      ]);
+      errs.push(err);
+    }
+    assert.doesNotMatch(
+      errs.join(""),
+      /replaced control/,
+      "a named re-run is not a collision",
+    );
+    const rec = readRecord(record);
+    assert.equal(
+      rec.controls.length,
+      1,
+      "a name and its padded spelling are one control",
+    );
+    // One control, so the total is that control's own count — not doubled.
+    assert.equal(rec.totals.executed, rec.controls[0].executed);
+    assert.ok(rec.totals.executed > 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
