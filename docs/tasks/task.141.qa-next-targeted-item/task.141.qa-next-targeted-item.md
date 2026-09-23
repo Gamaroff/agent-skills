@@ -5,7 +5,9 @@ type: task
 description: "Give /qa-next a positional `id` argument that runs the full UAT protocol against a named registry row regardless of its state, so a ❌ can be re-tested after the fix lands and a ✅ can be regression-tested when the code beneath it changes — with the run-file path, the accepted-row state rule and the bug-reuse rule made mechanical in uat-status.mjs rather than left to prose at the call site."
 tags: [qa-next, uat, registry, re-run, regression, cli-arguments]
 category: infrastructure
-status: ready-for-review
+status: accepted
+completed_date: 2026-09-23
+pr_number: 468
 priority: Medium
 created: 2026-09-22
 updated: 2026-09-23
@@ -17,7 +19,7 @@ github_issue: 466
 
 # Technical Task: `/qa-next <id>` — target a specific registry item
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.141.review.1.qa-next-targeted-item.md` implemented 2026-09-22
 
@@ -725,6 +727,29 @@ prose rule), and the loop closed those boundaries one pair at a time.
   in place by the fixer).
 
 ---
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.141.qa.1` … `task.141.qa.12` · **Final Gate**: `task.141.gate.12.qa-next-targeted-item.yml`, ⚠️ CONCERNS (90/100)
+**Loop closed**: after 12 cycles, on the operator's accept-on-evidence decision (0 HIGH for eight gates).
+**PR review (5c)**: `task.141.pr-review.2.qa-next-targeted-item.md`, CONCERNS with 0 HIGH.
+
+Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** 21/21. 18 are traced to per-PR tests; SC-P2, SC-P3 and SC-Q3 are met by inspection, a measurement and the mutation record.
+✅ **Tests:** 44 in the qa-next suite; `ci:fast` 3947, 0 failures; CI reading 1 SUCCESS on `10056197`.
+✅ **Documentation:** SKILL.md, README, run template, commands.md, activation-phrases.md, and CHANGELOG citing task 141.
+⚠️ **Security Review:** grep checks clean; probe mode could not execute against a multi-flag CLI, so it is **unverifiable (LOW)** and was accepted by the operator.
+✅ **Compliance Review:** not applicable.
+
+**Task marked as ACCEPTED on:** 2026-09-23
+
+**Detailed Verification Log:** See `task.141.dod.1.qa-next-targeted-item.md` for the complete verification evidence, the acceptance decision and its recorded deviations.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
@@ -747,6 +772,7 @@ prose rule), and the loop closed those boundaries one pair at a time.
 | 2026-09-23 |  | QA cycle 11 (fourth grant) — gate CONCERNS (90/100); 1 MEDIUM (Step 6 reads priorRuns after deleting the state file), 2 LOW | qa-task |
 | 2026-09-23 |  | QA cycle 12 (fifth grant) — gate CONCERNS (90/100); 1 MEDIUM (Step 6 prints the pre-run bug), 2 LOW | qa-task |
 | 2026-09-23 |  | QA loop closed at 12 cycles on the operator's accept-on-evidence decision; PR review 2 CONCERNS (0 HIGH); state-file contract filed as a follow-up | develop-task |
+| 2026-09-23 | 1.2 | DoD passed — accepted (PR #468); operator accepted the unverifiable-by-probe security check (LOW) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -840,7 +866,7 @@ bug-reuse rule's missing payload field, and the `targeted`-gated resume.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 
