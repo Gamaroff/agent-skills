@@ -379,6 +379,8 @@ None.
 | 2026-09-23 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-09-23 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-09-23 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-09-23 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-09-23 |  | QA findings fixed — gate PASS (100/100), 5 fix iterations (cli: record identity settled on --name) | qa-fix |
 
 ---
 <!-- change-log-end -->
@@ -394,29 +396,28 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-23
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.144.qa.5.probe-engine-cli-entry-form.md](./task.144.qa.5.probe-engine-cli-entry-form.md)
-- **Gate File**: [task.144.gate.5.probe-engine-cli-entry-form.yml](./task.144.gate.5.probe-engine-cli-entry-form.yml)
-- **Previous**: [qa.4](./task.144.qa.4.probe-engine-cli-entry-form.md) · [qa.3](./task.144.qa.3.probe-engine-cli-entry-form.md) · [qa.2](./task.144.qa.2.probe-engine-cli-entry-form.md) · [qa.1](./task.144.qa.1.probe-engine-cli-entry-form.md)
+- **Full Report**: [task.144.qa.6.probe-engine-cli-entry-form.md](./task.144.qa.6.probe-engine-cli-entry-form.md)
+- **Gate File**: [task.144.gate.6.probe-engine-cli-entry-form.yml](./task.144.gate.6.probe-engine-cli-entry-form.yml)
+- **Previous**: [qa.5](./task.144.qa.5.probe-engine-cli-entry-form.md) · [qa.4](./task.144.qa.4.probe-engine-cli-entry-form.md) · [qa.3](./task.144.qa.3.probe-engine-cli-entry-form.md) · [qa.2](./task.144.qa.2.probe-engine-cli-entry-form.md) · [qa.1](./task.144.qa.1.probe-engine-cli-entry-form.md)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3966 (fast gate)
+- **Tests Executed**: 3967 (fast gate) — 19 cli-form tests, all mutation-proved
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- CR-1 (medium): the replaced-control warning fires on a named re-run, telling the caller to pass the `--name` they passed.
-- CR-2 (low): four engine comments still state the skeleton-only key.
+- No open findings. Three low advisory items are recorded as future work in gate 6.
 
 ---
 
