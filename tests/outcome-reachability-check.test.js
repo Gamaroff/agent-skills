@@ -53,21 +53,45 @@ const PLANNED_STATE = {
   name: "planned-state walk",
   re: /as the plan leaves them/,
 };
+// A planned branch counts only when a named phase STATES it — otherwise "a later
+// phase will add it" exempts anything (task.145 QA cycle 3, CR3-4).
+const NAMED_PHASE = {
+  name: "named-phase requirement for a planned branch",
+  re: /only when a named (?:phase|task) states (?:it|that branch)/,
+};
+// Anchored on the imperative, so a negated verdict ("Do not flag as Important
+// when …") fails the hold instead of satisfying it (CR3-6).
 const REVIEW_VERDICT = {
   name: "Important verdict on an unreachable outcome",
-  re: /Important when the outcome is unreachable/,
+  re: /Flag as Important when the outcome is unreachable/,
+};
+// The rule is stated twice in each review section: in the check item and in the
+// section's Common Hallucination Patterns list. Cycle 2 moved the item to the
+// planned state and left the list line saying "no branch", so a reviewer
+// following the list flagged the very outcome the item calls reachable (CR3-2).
+// These are SECTION-scoped, because the list line is outside the item.
+const PATTERN_LINE = {
+  name: "hallucination-pattern line judged against the planned state",
+  re: /❌ An outcome no current or planned branch of the named function returns for the stated input/,
+};
+const STALE_PATTERN = {
+  name: "hallucination-pattern line still judging against today's code",
+  re: /no branch of the named function returns/,
 };
 const SITES = [
   {
     file: "skills/review-task/SKILL.md",
     heading: "### Step 3: Technical Accuracy and Anti-Hallucination Review",
-    holds: [PLANNED_STATE, REVIEW_VERDICT],
+    holds: [PLANNED_STATE, NAMED_PHASE, REVIEW_VERDICT],
+    sectionHolds: [PATTERN_LINE],
+    sectionForbids: [STALE_PATTERN],
   },
   {
     file: "skills/create-task/SKILL.md",
     heading: "### 3.5 Adversarial Quality Review",
     holds: [
       PLANNED_STATE,
+      NAMED_PHASE,
       {
         name: "put-to-the-author verdict (no auto-fix)",
         re: /Put it to the author, and never auto-fix it/,
@@ -77,7 +101,9 @@ const SITES = [
   {
     file: "skills/review-story/SKILL.md",
     heading: "### Step 4: Technical Accuracy and Anti-Hallucination Review",
-    holds: [PLANNED_STATE, REVIEW_VERDICT],
+    holds: [PLANNED_STATE, NAMED_PHASE, REVIEW_VERDICT],
+    sectionHolds: [PATTERN_LINE],
+    sectionForbids: [STALE_PATTERN],
   },
   {
     file: "skills/review-bug/SKILL.md",
@@ -85,13 +111,23 @@ const SITES = [
     holds: [
       {
         name: "Important verdict on an unreachable Expected outcome",
-        re: /unreachable Expected outcome[^→]*→ Important/,
+        re: /is a fix that cannot pass its own verification → Important/,
       },
       {
         name: "stale-bug clause (already returns the Expected outcome)",
         re: /already returns the Expected outcome[^.]*\. Report it under this step's likely-already-fixed rule/,
       },
     ],
+    // The rule the stale clause routes to was gated on PREPASS_STALE alone, so
+    // the in-line finding produced NEEDS DETAIL instead of STALE (CR3-3). The
+    // widened trigger lives in the same Step 3 section.
+    sectionHolds: [
+      {
+        name: "likely-already-fixed rule widened to the in-line walk",
+        re: /reachability walk above finds that the branch that fires today already returns the Expected outcome/,
+      },
+    ],
+    sectionForbids: [],
   },
 ];
 
@@ -121,7 +157,6 @@ const FENCE_OPEN = /^(\s*)(`{3,}|~{3,})/;
 // a paragraph, not a fence (CommonMark; task.145 QA cycle 2, CR2-5). Indentation
 // is deliberately NOT capped: these SKILL.md files nest fences inside list items
 // at four or more spaces, and a top-level cap would drop real fences.
-const BACKTICK_INFO_HAS_BACKTICK = /^\s*`{3,}[^`]*`/;
 
 /**
  * Advance the fence state over one line. `open` is the opening marker while
@@ -133,7 +168,11 @@ function fenceStep(open, line) {
   if (!m) return { open, isFence: false };
   const marker = m[2];
   if (open === null) {
-    if (marker[0] === "`" && BACKTICK_INFO_HAS_BACKTICK.test(line))
+    // Only the text AFTER the whole opening run is the info string. A regex that
+    // tested "run, non-backticks, backtick" backtracked a four-backtick run into
+    // "three plus an info-string backtick" and stopped every ```` fence opening
+    // (task.145 QA cycle 3, CR3-1).
+    if (marker[0] === "`" && line.slice(m[0].length).includes("`"))
       return { open, isFence: false };
     return { open: marker, isFence: true, lead: m[1].length };
   }
@@ -240,6 +279,19 @@ function asProse(item) {
   return item.replace(/\*\*|`/g, "").replace(/\s+/g, " ");
 }
 
+/** A section's unfenced lines as prose — fenced examples are not the rule. */
+function sectionProse(sectionLines) {
+  let open = null;
+  const kept = [];
+  for (const line of sectionLines) {
+    const step = fenceStep(open, line);
+    const fenced = open !== null || step.isFence;
+    open = step.open;
+    if (!fenced) kept.push(line);
+  }
+  return asProse(kept.join("\n"));
+}
+
 function read(rel) {
   return readFileSync(join(REPO_ROOT, rel), "utf8");
 }
@@ -275,6 +327,21 @@ for (const site of SITES) {
         `${site.file} › "${site.heading}": the obs #168 check does not name the ${el.name}`,
       );
     }
+    const whole = sectionProse(section);
+    for (const el of site.sectionHolds || []) {
+      assert.match(
+        whole,
+        el.re,
+        `${site.file} › "${site.heading}": the section does not carry the ${el.name}`,
+      );
+    }
+    for (const el of site.sectionForbids || []) {
+      assert.doesNotMatch(
+        whole,
+        el.re,
+        `${site.file} › "${site.heading}": the section still carries a ${el.name}`,
+      );
+    }
   });
 }
 
@@ -284,8 +351,9 @@ test("the item reader does not reach past the citing item", () => {
   // "a branch" after the element narrowed to "branch that fires").
   const SIBLING =
     "   - a named function, a stated input, the branch that fires, as the plan leaves them;" +
-    " Important when the outcome is unreachable; Put it to the author, and never auto-fix it;" +
-    " an unreachable Expected outcome → Important; if it already returns the Expected outcome." +
+    " only when a named phase states it; Flag as Important when the outcome is unreachable;" +
+    " Put it to the author, and never auto-fix it; it is a fix that cannot pass its own verification → Important;" +
+    " if it already returns the Expected outcome." +
     " Report it under this step's likely-already-fixed rule";
   for (const el of [...ELEMENTS, ...SITES.flatMap((s) => s.holds)]) {
     assert.match(asProse(SIBLING), el.re, `fixture must carry ${el.name}`);
@@ -377,6 +445,42 @@ test("a closing fence at the item's own indentation ends the citing item", () =>
     "  - stated input, branch that fires",
   ];
   assert.equal(citingItemOf(section), "- (obs #168):\n  - a named function");
+});
+
+test("a four-backtick fence opens, and a heading quoted inside it is not structure", () => {
+  // CR3-1 (task.145 QA cycle 3): the cycle-2 info-string guard stopped every
+  // ```` fence opening, and the only long-fence case still passed because its
+  // inner and outer fences happened to pair. This one has no inner fence.
+  const H = "### Step 3: Check";
+  const text = [
+    H,
+    "````markdown",
+    "### Step 4: Quoted",
+    "````",
+    "body",
+    "### Step 4: Next",
+    "outside",
+  ].join("\n");
+  assert.deepEqual(sectionOf(text, H), [
+    "````markdown",
+    "### Step 4: Quoted",
+    "````",
+    "body",
+  ]);
+  const bare = [
+    H,
+    "````",
+    "### Step 4: Quoted",
+    "````",
+    "body",
+    "### Step 4: Next",
+  ].join("\n");
+  assert.deepEqual(sectionOf(bare, H), [
+    "````",
+    "### Step 4: Quoted",
+    "````",
+    "body",
+  ]);
 });
 
 test("a backtick line whose info string holds a backtick opens no fence", () => {

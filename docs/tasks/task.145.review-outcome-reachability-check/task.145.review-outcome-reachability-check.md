@@ -305,6 +305,34 @@ None.
 
 ## QA Testing Results
 
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-25
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.145.qa.3.review-outcome-reachability-check.md](./task.145.qa.3.review-outcome-reachability-check.md)
+- **Gate File**: [task.145.gate.3.review-outcome-reachability-check.yml](./task.145.gate.3.review-outcome-reachability-check.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 4002 (4001 pass, 0 fail, 1 skipped)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 (MEDIUM: 3, LOW: 1)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+
+- CR3-1: the fence guard regex stops four-backtick fences opening.
+- CR3-2: the hallucination-pattern lines lack the current-or-planned qualifier.
+- CR3-3: review-bug's stale routing is gated on PREPASS_STALE only.
+
+## Change Log
+
+## QA Testing Results
+
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-25
@@ -368,6 +396,8 @@ None.
 | 2026-09-25 |  | QA findings fixed — cycle 1 (CR-1, QA-2, QA-3; CR-3/CR-4 reader hardening), 1 iteration | qa-fix |
 | 2026-09-25 |  | QA gate FAIL (60/100) — 4 findings (1 high, 2 medium, 1 low); cycle-2 refute pass | qa-task |
 | 2026-09-25 |  | QA findings fixed — cycle 2 (CR2-1 planned-state reachability, CR2-2 verdict held, CR2-3 stale-bug clause, CR2-4..7) | qa-fix |
+| 2026-09-25 |  | QA gate CONCERNS (70/100) — 4 findings (3 medium, 1 low) | qa-task |
+| 2026-09-25 |  | QA findings fixed — cycle 3 (CR3-1 fence regression, CR3-2 pattern lines, CR3-3 stale routing, CR3-4 named phase, CR3-5/6) | qa-fix |
 
 ---
 <!-- change-log-end -->
@@ -439,3 +469,14 @@ None.
     "Confirm …" bullet restates the verdict's premise.
   - The hand run's controls never changed the deciding function, which is why they could not see
     CR2-1. That gap is recorded against obs #176.
+- **QA cycle 3 fixes** (gate CONCERNS):
+  - CR3-1: the cycle-2 fence guard had regressed four-backtick fences. It now tests only the text
+    after the opening run.
+  - CR3-2: the hallucination-pattern lines are judged against the planned state, and the test holds
+    them section-wide.
+  - CR3-3: review-bug's likely-already-fixed rule, STALE row and QP2 prompt also fire on the in-line
+    walk.
+  - CR3-4: a planned branch counts only when a named phase states it.
+  - CR3-5: the create-task Critical heading names the author exception.
+  - CR3-6: verdict holds are anchored on the imperative.
+  - 11 tests; 9/9 fix mutants red.

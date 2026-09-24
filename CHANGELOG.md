@@ -92,7 +92,8 @@ All notable changes to this project will be documented in this file. Format foll
   obs #168).** `/review-task` Step 3 gains check 10, *Outcome reachability*. When a success criterion
   or test case says what a named function returns for a stated input, the reviewer walks that input
   through the function's branches as the plan leaves them: today's branches plus any a planned phase
-  adds or changes. An outcome that no current or planned branch returns is reported as **Important**.
+  adds or changes. A planned branch counts only when a named phase states it. An outcome that no
+  current or planned branch returns is reported as **Important**.
   Judging against the planned state matters because a task that changes its deciding function is
   promising an outcome today's code cannot return, and that is the point of the task, not a defect.
   The same check lands where the defect is introduced: `/create-task` Step 3.5, where it is put to
@@ -104,7 +105,8 @@ All notable changes to this project will be documented in this file. Format foll
   Review read the function in full and passed the claim, and develop found it.
   `tests/outcome-reachability-check.test.js` holds each site's check item. It holds the three
   elements (stated input, named function, branch that fires), the site's verdict sentence, and its
-  planned-state (or stale-bug) clause.
+  planned-state and named-phase (or stale-bug) clauses. It also holds each section's
+  hallucination-pattern line, which restates the rule.
 - **`uat-status.mjs --set <id> <verdict>`: only a `fail` moves an `✅ accepted` row (task 141).** A `pass`,
   `blocked` or `na` against an accepted row now leaves `✅` in place and updates only `Last run` and
   `Notes / bug`; the tool prints `(kept)` so the branch it took is never silent. `fail` is unchanged

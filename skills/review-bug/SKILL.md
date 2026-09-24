@@ -83,7 +83,7 @@ This is the bug-review analog of review-task's anti-hallucination pass — the s
 - **Frequency** + **Reproducible** fields set → **Important** if absent.
 - **Evidence** (logs, stack traces, screenshots, failing command output) present → **Important** for Major+, **Optional** for Minor/Trivial. Evidence is what makes Step-3 root-cause localisation in develop-bug tractable.
 
-Incorporate `PREPASS_STALE`: if `reproduces: unlikely` and a concrete `found_at` shows the code path already handles the case, flag **Critical (likely already fixed)**.
+Incorporate `PREPASS_STALE`: if `reproduces: unlikely` and a concrete `found_at` shows the code path already handles the case, flag **Critical (likely already fixed)**. The same rule fires when the reachability walk above finds that the branch that fires today already returns the Expected outcome. That branch is the `found_at`, whatever the pre-pass said.
 
 ### QUESTION POINT 1 (interactive): Reproducibility & Duplicate
 
@@ -101,7 +101,7 @@ Cross-check the assigned `severity`/`priority` against the described Impact usin
 
 ### QUESTION POINT 2 (interactive): Classification & Linkage
 
-Batch remaining questions (severity/priority correction, linkage fixes, and — if `PREPASS_STALE` is `unlikely` — "This may already be fixed at {found_at}. Close instead of fixing?"). Incorporate answers.
+Batch remaining questions (severity/priority correction, linkage fixes, and — if `PREPASS_STALE` is `unlikely` or the Step 3 reachability walk found the Expected outcome already returned — "This may already be fixed at {found_at}. Close instead of fixing?"). Incorporate answers.
 
 ## Step 6: Generate Output
 
@@ -112,7 +112,7 @@ Compute the **fix-readiness score (1–10)** and **recommendation**:
 | ✅ **READY TO FIX** | Score ≥ 8, no Critical issues, `duplicate: none`, `reproduces: likely|unknown` |
 | ⚠️ **NEEDS DETAIL** | Score 4–7, or any Critical reproducibility/completeness gap (fixable by adding detail) |
 | 🚨 **DUPLICATE** | `PREPASS_DUP` = suspected and confirmed — recommend cancelling in favour of {id} |
-| 🚨 **STALE (already fixed)** | `PREPASS_STALE` = unlikely with concrete evidence — recommend closing the bug, not fixing |
+| 🚨 **STALE (already fixed)** | `PREPASS_STALE` = unlikely with concrete evidence, or the Step 3 reachability walk found the branch that fires today already returns the Expected outcome — recommend closing the bug, not fixing |
 
 Score breakdown: Completeness /10, Reproducibility /10, Classification /10, Linkage /10 (report the average, rounded).
 

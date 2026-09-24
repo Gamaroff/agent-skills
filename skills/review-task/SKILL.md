@@ -859,7 +859,9 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       the function, once the plan is done, can return what the document promises for that input
     - An outcome that a planned phase produces is reachable even though today's code cannot return
       it, because producing it is the task's job. Review is not the place to hold a task to the
-      behaviour it exists to change
+      behaviour it exists to change. A planned branch counts only when a named phase states it: the condition and the outcome it
+      returns. Cite that phase in the finding. A phase that only names the function, or a
+      criterion that promises a later phase will add the branch, does not count
     - Worked example: task.144 said an accept-all fixture would score `present-but-inert`.
       `computeVerdict`, which that plan did not change, returns that verdict only when some
       hostile case was rejected. An accept-all rejects none, so the `absent` branch fires.
@@ -878,7 +880,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ Database fields not in Prisma schema
 - ❌ Code patterns that violate project standards
 - ❌ Config keys, env vars or flags that no code reads
-- ❌ An outcome no branch of the named function returns for the stated input
+- ❌ An outcome no current or planned branch of the named function returns for the stated input
 
 **Issues to Flag**:
 
