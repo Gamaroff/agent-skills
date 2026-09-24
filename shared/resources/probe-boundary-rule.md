@@ -284,8 +284,10 @@ Declining conditions, each reported with its reason:
     the template as `argv`, and **a `cli:` control's identity is its
     `--name`**: two probes with different names are two controls, and a re-run
     under the same name replaces its own entry whatever else in the template
-    changed. **Name every `cli:` probe** — the prompts already pass `--name` for
-    every control. An *unnamed* `cli:` control falls back to its **argv
+    changed — including a probe **declined** before it ran (an entry outside a
+    wrong `--repo-root`), whose corrected re-run replaces the `unverifiable`
+    entry rather than recording beside it. **Name every `cli:` probe** — the
+    prompts already pass `--name` for every control. An *unnamed* `cli:` control falls back to its **argv
     skeleton**: every flag and every bare positional, in order, with only the
     *values* of flags dropped (`--root /tmp/x` → `--root *`, `--cases=/a.json` →
     `--cases=*`) and the slots kept. The skeleton is a derived key, and every

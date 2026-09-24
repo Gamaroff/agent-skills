@@ -104,6 +104,18 @@ All notable changes to this project will be documented in this file. Format foll
   stops being a guard, and the release quietly depended on `enforce_admins` staying `false`. The
   direct option is removed and the removal records why, so it is not re-added.
 
+### Fixed
+
+- **A `cli:` probe declined before it ran no longer leaves a stale `unverifiable` control in the
+  record (task 144 follow-up, 5c CR-1).** A probe whose entry escaped a wrong `--repo-root` was
+  declined before its `--argv` template reached the result, so it was recorded with `argv: null`
+  and keyed without its `--name` — its corrected re-run then wrote a second entry, and the record
+  kept both the real verdict and the declined one. A declined `cli:` result now carries its
+  template, and a control is a `cli:` control by its entry prefix, so its name is its identity even
+  when there is no template to carry (a library caller's `bad-argv` decline). It never produced a
+  false pass — the stale entry reported executed 0 — but it left a "could not look" beside a
+  "looked and held". Every other form's key, and every existing entry-file name, is unchanged.
+
 ## [v0.51.0] - 2026-09-22
 
 ### Added

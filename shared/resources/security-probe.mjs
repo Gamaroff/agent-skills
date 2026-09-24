@@ -757,7 +757,17 @@ export function runProbeSpec({
   });
 
   const resolved = resolveEntry(entry, repoRoot);
-  if (!resolved.ok) return decline(resolved.reason, resolved.detail);
+  if (!resolved.ok) {
+    // A cli: probe declined HERE (a wrong --repo-root) still carries the
+    // template it was given: the template is part of an unnamed control's key,
+    // and without it the corrected re-run keyed differently and left this
+    // `unverifiable` entry beside the real verdict (task.144 5c CR-1).
+    if (typeof entry === "string" && entry.startsWith(CLI_PREFIX)) {
+      const parsed = parseArgvTemplate(argv);
+      if (parsed.ok) base.argv = parsed.template;
+    }
+    return decline(resolved.reason, resolved.detail);
+  }
   const isShellForm = resolved.kind === "shell" || resolved.kind === "shell-fn";
   const isCliForm = resolved.kind === "cli";
   // `argv` is validated HERE as well as in `main()`: this is the boundary a
@@ -1719,14 +1729,19 @@ export function cliControlKey(template) {
 // the skeleton is only the fallback for an unnamed control, where recordRun
 // reports a replacement whose full argv differs instead of making it silently.
 // The name is keyed for cli: controls ONLY: every other form's key, and so its
-// entry-file name, is unchanged.
+// entry-file name, is unchanged. A control is a cli: control by its ENTRY
+// PREFIX, not by carrying a template: a bad-argv decline has none to carry,
+// and keying on `Array.isArray(argv)` dropped its name, so its corrected run
+// landed in a second entry (task.144 5c CR-1).
 const controlKey = (c) => {
   const base = `${c.sink ?? ""}\u0000${c.entry ?? ""}`;
-  if (!Array.isArray(c.argv)) return base;
+  const isCli =
+    Array.isArray(c.argv) ||
+    (typeof c.entry === "string" && c.entry.startsWith(CLI_PREFIX));
+  if (!isCli) return base;
   const name = cliControlName(c);
-  return name !== null
-    ? `${base}\u0000name:${name}`
-    : `${base}\u0000${cliControlKey(c.argv)}`;
+  if (name !== null) return `${base}\u0000name:${name}`;
+  return Array.isArray(c.argv) ? `${base}\u0000${cliControlKey(c.argv)}` : base;
 };
 
 /**
