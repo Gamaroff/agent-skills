@@ -70,3 +70,14 @@ Platform variance: 62/62 under the local TZ, `TMPDIR=/tmp`, `TZ=Pacific/Kiritima
 ## Final Assessment
 
 **Gate Status**: CONCERNS · **Quality Score**: 90/100 · **Deployment**: CONDITIONAL (TASK-143-QA7-1 fixed or accepted)
+
+---
+
+## Bug Resolution Summary (2026-09-24, pre-merge quick verification)
+
+| Finding | Fix | Verification | Result |
+| --- | --- | --- | --- |
+| TASK-143-QA7-1 (low) | `f8b2c958`: an Asia/Tokyo-pinned test where the recorded `runFile` is dated the day before the local start date | Dropped `state.runFile` from `stateView`'s `own` set, then ran the suite under `TZ=UTC`, which is CI's timezone. The named test went red (62/63). The file was restored from a `cp` snapshot and the suite went back to 63/63 | ✅ FIXED, entry closed in gate.7 |
+
+This was a quick verification, as `qa-task` § Re-Review After Bug Fixes allows for a test-only change. The gate stays **CONCERNS**: its NFR CONCERNS (the pre-existing `--env` labels and the documented legacy-migration limitation) are unchanged, and there are now no open entries.
+
