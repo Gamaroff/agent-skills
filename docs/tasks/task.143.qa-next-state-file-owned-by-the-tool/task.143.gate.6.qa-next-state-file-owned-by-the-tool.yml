@@ -4,7 +4,7 @@ task_title: 'qa-next: uat-status.mjs owns the run state file, so its contract is
 gate: CONCERNS
 status_reason: 'BUG-5 was fixed as specified, but the fix causes TASK-143-BUG-6. The resume map treats a file named <local start date>-<env>.md as proof of ownership. An earlier same-day run is then overwritten and dropped from priorRuns with no unverifiable flag (reproduced). One LOW: the collision assertion in the cycle-5 test is date-dependent.'
 reviewer: 'QA Engineer'
-updated: '2026-09-24T08:40:00Z'
+updated: '2026-09-24T19:23:11Z'
 
 top_issues:
   - id: 'TASK-143-BUG-6'

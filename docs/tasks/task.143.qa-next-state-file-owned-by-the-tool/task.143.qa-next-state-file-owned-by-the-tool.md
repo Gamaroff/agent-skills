@@ -411,6 +411,8 @@ None.
 | 2026-09-24 |  | QA findings fixed — 5 iterations; loop limit reached at gate CONCERNS (90/100), HIGH 0 throughout; cycle 5 fix not yet gated | qa-fix |
 | 2026-09-24 |  | QA gate CONCERNS (90/100) — 2 findings (cycle 6) | qa-task |
 | 2026-09-24 |  | QA findings fixed — cycle 6 of the re-entered loop (BUG-6, QA6-1); a legacy `priorRuns` stays `unverifiable` from `executed` on, and the resume always takes a fresh `--run-path` | qa-fix |
+| 2026-09-24 |  | QA gate CONCERNS (90/100) — 1 finding (cycle 7) | qa-task |
+| 2026-09-24 |  | QA findings fixed — cycle 7 (QA7-1: east-of-UTC runFile exclusion test); 7 iterations in all | qa-fix |
 
 ---
 <!-- change-log-end -->
@@ -434,21 +436,21 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.143.qa.6.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.6.qa-next-state-file-owned-by-the-tool.md)
-- **Gate File**: [task.143.gate.6.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.6.qa-next-state-file-owned-by-the-tool.yml)
+- **Full Report**: [task.143.qa.7.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.7.qa-next-state-file-owned-by-the-tool.md)
+- **Gate File**: [task.143.gate.7.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.7.qa-next-state-file-owned-by-the-tool.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 62 (qa-next suite, also under TMPDIR=/tmp and three timezones); 19 executed probes
+- **Tests Executed**: 62 (qa-next suite, also under TMPDIR=/tmp and four timezones); 19 executed probes
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 1 MEDIUM, 1 LOW
+- **Critical Issues**: 0 HIGH, 0 MEDIUM, 1 LOW
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-- TASK-143-BUG-5 fixed as specified.
-- TASK-143-BUG-6: the pre-upgrade `executed` resume treats a file named `<local start date>-<env>.md` as its own. An earlier same-day run is then overwritten and dropped from `priorRuns`, and the `unverifiable` flag is cleared (reproduced). The defect is confined to the pre-upgrade migration path.
-- TASK-143-QA6-1 (low): the collision assertion in the cycle-5 test depends on the date.
+- TASK-143-BUG-6 and TASK-143-QA6-1 fixed (mutation-proved).
+- TASK-143-QA7-1 (low): the `runFile` exclusion in `stateView` is now masked by the date rule, and its test goes red only east of UTC.
+- Documented limitation (reliability, routed to a follow-up): a half-written file from an interrupted v0.51.0 Step 4 stays beside this run's file, and a later run counts it as a prior run.
 - Pre-existing (not attributed to this change): `--env` accepts whitespace-only and control-character labels; routed to a follow-up.
 
 ---

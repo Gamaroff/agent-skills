@@ -2634,6 +2634,46 @@ test("a pre-upgrade run resumed at executed records a fresh run file, and priorR
   );
 });
 
+test("east of UTC a recorded runFile dated the day BEFORE the local start is still excluded (TASK-143-QA7-1)", () => {
+  // --run-path names the file by the UTC date and the legacy date rule reads the LOCAL start date. In
+  // Tokyo, 2026-09-23T20:00Z is the 24th locally while --run-path wrote 2026-09-23, so the date rule
+  // does not catch this run's own file and only the runFile exclusion does. Anywhere at or west of
+  // UTC the date rule covers it too, which is why this test pins the zone.
+  const root = stateCorpus();
+  const runs = path.join(root, "docs/qa/runs/D.1");
+  mkdirSync(runs, { recursive: true });
+  writeFileSync(path.join(runs, "2026-09-01-lan.md"), "# earlier\n");
+  writeFileSync(
+    path.join(runs, "2026-09-23-lan.md"),
+    "# this run, --run-path's UTC date\n",
+  );
+  mkdirSync(path.dirname(STATE(root)), { recursive: true });
+  writeFileSync(
+    STATE(root),
+    JSON.stringify({
+      item: "D.1",
+      runFile: "runs/D.1/2026-09-23-lan.md",
+      phase: "recorded",
+      startedAt: "2026-09-23T20:00:00Z",
+    }),
+  );
+  const out = execFileSync(
+    "node",
+    [TOOL, "--root", root, "--state-get", "--json"],
+    {
+      encoding: "utf8",
+      env: { ...process.env, TZ: "Asia/Tokyo" },
+    },
+  );
+  const state = JSON.parse(out);
+  assert.deepEqual(
+    state.priorRuns,
+    ["runs/D.1/2026-09-01-lan.md"],
+    "the recorded runFile is this run's, whatever its date",
+  );
+  assert.deepEqual(state.unverifiable, ["priorRuns"], "still a legacy answer");
+});
+
 test("a pre-upgrade executed resume never reuses an existing file: a half-written one and an earlier run look the same (TASK-143-BUG-5, BUG-6)", () => {
   // v0.51.0 set phase: executed at the end of Step 3 and wrote runs/<id>/<local date>-<env>.md at
   // Step 4.1. A file of that name on resume is EITHER this run's, half-written by an interrupted
