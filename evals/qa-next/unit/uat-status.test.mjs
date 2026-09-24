@@ -17,6 +17,7 @@ import {
   writeFileSync,
   readFileSync,
   existsSync,
+  rmSync,
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -41,6 +42,8 @@ const {
   listRunFiles,
   itemById,
   runPathFor,
+  STATE_FIELDS,
+  STATE_PHASES,
   STATES,
   COLUMNS,
   BUG_LINK_RULE,
@@ -2017,4 +2020,402 @@ test("the payload's bug round-trips through --set fail --bug (TASK-141-BUG-21)",
   );
   const check = run(root, "--check");
   assert.equal(check.code, 0, check.out);
+});
+
+// ---------- the run state file (task 143) ----------
+//
+// The state file's contract used to be sentences in SKILL.md, and each of task.141's QA cycles 10–12
+// found one defect in them (BUG-21/22/23). It is now owned by uat-status.mjs; these tests are what
+// hold it. Every population below is derived from the STATE_FIELDS export, never restated.
+
+const STATE = (root) => path.join(root, ".claude/state/qa-next.state.json");
+const readStateFile = (root) => JSON.parse(readFileSync(STATE(root), "utf8"));
+// A sample value per --state-set parser, so the loops below need no per-field table.
+const SAMPLE = {
+  phase: "resolved",
+  path: "runs/D.2/2026-09-24-lan.md",
+  json: '{"exit":0,"report":"r"}',
+};
+
+function stateCorpus() {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  return root;
+}
+
+test("STATE_FIELDS is the whole state: --state-init writes exactly its fields, --state-set writes exactly the mutable ones", () => {
+  const root = stateCorpus();
+  const init = run(root, "--state-init", "--item", "D.2", "--json");
+  assert.equal(init.code, 0, init.out);
+  const written = readStateFile(root);
+  assert.deepEqual(
+    Object.keys(written).sort(),
+    Object.keys(STATE_FIELDS).sort(),
+    "a field in the schema that init does not write, or one init writes that the schema does not name, is a reader with no writer",
+  );
+  const fields = Object.entries(STATE_FIELDS);
+  assert.ok(
+    fields.some(([, f]) => f.writer === "init") &&
+      fields.some(([, f]) => f.writer === "set"),
+    "non-vacuous: both writers are populated",
+  );
+  for (const [name, spec] of fields) {
+    const before = readStateFile(root);
+    const r = run(root, "--state-set", name, SAMPLE[spec.value] ?? "x");
+    if (spec.writer === "set") {
+      assert.equal(r.code, 0, `${name}: ${r.out}`);
+      assert.deepEqual(
+        readStateFile(root)[name],
+        spec.value === "json" ? JSON.parse(SAMPLE.json) : SAMPLE[spec.value],
+        `--state-set writes ${name}`,
+      );
+    } else {
+      assert.equal(r.code, 2, `${name} is init-only: ${r.out}`);
+      assert.match(r.out, new RegExp(`--state-set ${name}: init-only`));
+      assert.deepEqual(readStateFile(root), before, "and nothing is written");
+    }
+  }
+});
+
+test("--state-init records the payload --item and --next print, and prints it unchanged", () => {
+  const root = stateCorpus();
+  const item = run(root, "--item", "D.2", "--json");
+  const init = run(root, "--state-init", "--item", "D.2", "--json");
+  assert.equal(init.code, 0, init.out);
+  assert.equal(init.out, item.out, "the same payload, byte for byte");
+  const payload = JSON.parse(item.out);
+  const state = readStateFile(root);
+  assert.equal(state.item, payload.id);
+  assert.equal(state.function, payload.function);
+  assert.equal(state.surface, payload.surface);
+  assert.deepEqual(
+    state.stories,
+    payload.stories.map((s) => s.id),
+  );
+  assert.deepEqual(state.uatSpecs, payload.uatSpecs);
+  assert.deepEqual(state.priorRuns, payload.priorRuns);
+  assert.equal(state.bug, payload.bug);
+  assert.equal(state.targeted, true);
+  assert.equal(state.phase, "selected");
+  assert.equal(state.runFile, null);
+  assert.equal(state.filedBug, null);
+  assert.equal(state.lane, null);
+
+  const root2 = stateCorpus();
+  const next = run(root2, "--next", "--json");
+  const init2 = run(root2, "--state-init", "--next", "--json");
+  assert.equal(init2.code, 0, init2.out);
+  assert.equal(init2.out, next.out);
+  assert.equal(readStateFile(root2).targeted, false, "--next is untargeted");
+});
+
+test("--state-init: another --item exits 5 and writes nothing; the same item and --next resume; exit 3 and 4 write nothing", () => {
+  const root = stateCorpus();
+  assert.equal(run(root, "--state-init", "--item", "D.2").code, 0);
+  const before = readFileSync(STATE(root), "utf8");
+
+  const other = run(root, "--state-init", "--item", "D.1");
+  assert.equal(other.code, 5, other.out);
+  assert.match(
+    other.out,
+    /run-in-progress: the state file names D\.2, not D\.1/,
+  );
+  assert.equal(readFileSync(STATE(root), "utf8"), before, "nothing written");
+
+  for (const args of [["--item", "d.2"], ["--next"]]) {
+    const again = run(root, "--state-init", ...args, "--json");
+    assert.equal(again.code, 0, `${args}: ${again.out}`);
+    assert.equal(JSON.parse(again.out).item, "D.2", `${args} resumes D.2`);
+    assert.equal(readFileSync(STATE(root), "utf8"), before, "unchanged");
+  }
+
+  const empty = stateCorpus();
+  const unknown = run(empty, "--state-init", "--item", "Q.9");
+  assert.equal(unknown.code, 4);
+  assert.equal(existsSync(STATE(empty)), false, "exit 4 writes nothing");
+  for (const id of ["D.1", "D.2"])
+    run(empty, "--set", id, "blocked", "--note", "no env");
+  const none = run(empty, "--state-init", "--next");
+  assert.equal(none.code, 3, none.out);
+  assert.equal(existsSync(STATE(empty)), false, "exit 3 writes nothing");
+  assert.equal(run(empty, "--state-init").code, 2, "neither --item nor --next");
+});
+
+test("--state-get exits 6 with no state; --state-clear is idempotent", () => {
+  const root = stateCorpus();
+  const get = run(root, "--state-get");
+  assert.equal(get.code, 6, get.out);
+  assert.match(get.out, /no-state/);
+  assert.equal(run(root, "--state-set", "phase", "resolved").code, 6);
+  assert.equal(run(root, "--state-init", "--item", "D.2").code, 0);
+  assert.equal(run(root, "--state-get").code, 0);
+  assert.equal(run(root, "--state-clear").code, 0);
+  assert.equal(existsSync(STATE(root)), false);
+  assert.equal(run(root, "--state-clear").code, 0, "a second clear is a no-op");
+  assert.equal(run(root, "--state-get").code, 6);
+});
+
+test("--state-set: phase moves forward only; paths take null; lane takes JSON; unknown fields and values are refused", () => {
+  const root = stateCorpus();
+  run(root, "--state-init", "--item", "D.2");
+  const set = (...a) => run(root, "--state-set", ...a);
+  for (const ph of STATE_PHASES.slice(1, 3))
+    assert.equal(set("phase", ph).code, 0, ph);
+  assert.equal(
+    set("phase", "executed").code,
+    0,
+    "re-setting the current phase is a resume",
+  );
+  const back = set("phase", "resolved");
+  assert.equal(back.code, 2, back.out);
+  assert.match(back.out, /forward only \(executed → resolved is backward\)/);
+  assert.equal(
+    readStateFile(root).phase,
+    "executed",
+    "a refused move writes nothing",
+  );
+  assert.equal(set("phase", "done").code, 2, "not a phase");
+
+  assert.equal(set("filedBug", "docs/bugs/bug.1.x.md").code, 0);
+  assert.equal(set("filedBug", "null").code, 0);
+  assert.equal(
+    readStateFile(root).filedBug,
+    null,
+    "the literal null clears it",
+  );
+  assert.equal(set("runFile", "").code, 2, "an empty path is refused");
+  assert.equal(set("lane", "{not json").code, 2);
+  assert.equal(set("lane", "null").code, 0);
+  assert.equal(readStateFile(root).lane, null);
+
+  const unknown = set("colour", "red");
+  assert.equal(unknown.code, 2);
+  assert.match(unknown.out, /unknown state field/);
+  const proto = set("toString", "x");
+  assert.equal(proto.code, 2);
+  assert.match(
+    proto.out,
+    /unknown state field/,
+    "a prototype key is not a field — not an init-only one either",
+  );
+  assert.equal(set("phase").code, 2, "a missing value is a usage error");
+});
+
+test("a run through the state commands keeps the PRE-run priorRuns and bug (TASK-141-BUG-22/23 shapes)", () => {
+  const root = stateCorpus();
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  for (const b of ["bug.1.old", "bug.2.new"])
+    writeFileSync(
+      path.join(root, `docs/bugs/${b}.md`),
+      "---\nstatus: new\n---\n",
+    );
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/qa/runs/D.1/2026-09-01-lan.md"),
+    "# run\n",
+  );
+  addRows(
+    root,
+    "A",
+    "| A.9 | Placeholder | x | / | 7.5 |  |  | ⬜ untested |  |  |\n",
+  );
+  // D.1 re-shaped as a failed row linking bug.1.old — the re-run the id argument exists for.
+  const reg = readFileSync(REG(root), "utf8").replace(
+    /^\| D\.1 \|.*$/m,
+    "| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
+  );
+  writeFileSync(REG(root), reg);
+  assert.equal(run(root, "--check").code, 0, run(root, "--check").out);
+
+  assert.equal(run(root, "--state-init", "--item", "D.1").code, 0);
+  const runFile = run(root, "--run-path", "D.1", "--env", "lan").out.trim();
+  assert.equal(run(root, "--state-set", "runFile", runFile).code, 0);
+  assert.equal(run(root, "--state-set", "phase", "executed").code, 0);
+  writeFileSync(path.join(root, "docs/qa", runFile), "# run 2\n");
+  const set = run(
+    root,
+    "--set",
+    "D.1",
+    "fail",
+    "--run",
+    runFile,
+    "--bug",
+    "docs/bugs/bug.2.new.md",
+  );
+  assert.equal(set.code, 0, set.out);
+  assert.equal(
+    run(root, "--state-set", "filedBug", "docs/bugs/bug.2.new.md").code,
+    0,
+  );
+  assert.equal(run(root, "--state-set", "phase", "recorded").code, 0);
+  assert.equal(
+    run(root, "--check").code,
+    0,
+    "--check stays green through the run",
+  );
+
+  // The fresh payload has moved on: it counts the run just written and links the new bug.
+  const fresh = JSON.parse(run(root, "--item", "D.1", "--json").out);
+  assert.deepEqual(fresh.priorRuns, ["runs/D.1/2026-09-01-lan.md", runFile]);
+  assert.equal(fresh.bug, "docs/bugs/bug.2.new.md");
+  // The state has not: it is the row as it was when this run began.
+  const state = JSON.parse(run(root, "--state-get", "--json").out);
+  assert.deepEqual(
+    state.priorRuns,
+    ["runs/D.1/2026-09-01-lan.md"],
+    "BUG-22: the pre-run history",
+  );
+  assert.equal(state.bug, "docs/bugs/bug.1.old.md", "BUG-23: the pre-run bug");
+  assert.equal(
+    state.filedBug,
+    "docs/bugs/bug.2.new.md",
+    "this run's bug is a different field",
+  );
+  assert.equal(state.derived, undefined, "a current file derives nothing");
+
+  assert.equal(run(root, "--state-set", "phase", "committed").code, 0);
+  assert.equal(run(root, "--state-clear").code, 0);
+  assert.equal(run(root, "--check").code, 0);
+});
+
+test("a v0.51.0-shape state file is answered with targeted, priorRuns, bug and filedBug derived and named", () => {
+  const root = stateCorpus();
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.old.md"),
+    "---\nstatus: new\n---\n",
+  );
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/qa/runs/D.1/2026-09-01-lan.md"),
+    "# run\n",
+  );
+  writeFileSync(
+    path.join(root, "docs/qa/runs/D.1/2026-09-24-lan.md"),
+    "# this run\n",
+  );
+  writeFileSync(
+    REG(root),
+    readFileSync(REG(root), "utf8").replace(
+      /^\| D\.1 \|.*$/m,
+      "| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
+    ),
+  );
+  // Exactly the example object SKILL.md shipped in v0.51.0.
+  const legacy = (phase) => {
+    mkdirSync(path.dirname(STATE(root)), { recursive: true });
+    writeFileSync(
+      STATE(root),
+      JSON.stringify({
+        item: "D.1",
+        function: "Play a game",
+        surface: "D",
+        stories: ["7.5"],
+        uatSpecs: [],
+        lane: null,
+        runFile: "runs/D.1/2026-09-24-lan.md",
+        phase,
+        startedAt: "2026-09-24T00:00:00Z",
+      }),
+    );
+    return JSON.parse(run(root, "--state-get", "--json").out);
+  };
+
+  const mid = legacy("executed");
+  assert.deepEqual(mid.derived, ["targeted", "priorRuns", "bug", "filedBug"]);
+  assert.equal(mid.targeted, false, "v0.51.0 had no id argument");
+  assert.deepEqual(
+    mid.priorRuns,
+    ["runs/D.1/2026-09-01-lan.md"],
+    "this run's own file excluded",
+  );
+  assert.equal(
+    mid.bug,
+    "docs/bugs/bug.1.old.md",
+    "before recorded the row still links the pre-run bug",
+  );
+  assert.equal(mid.filedBug, null);
+
+  const done = legacy("recorded");
+  assert.equal(
+    done.bug,
+    null,
+    "from recorded on, the reuse decision has been made",
+  );
+  assert.equal(
+    done.filedBug,
+    "docs/bugs/bug.1.old.md",
+    "and the row's link is this run's bug",
+  );
+  assert.ok(
+    !("derived" in readStateFile(root)),
+    "derived on read, never written back",
+  );
+});
+
+test("a state file that is not one is refused by name, exit 1", () => {
+  const root = stateCorpus();
+  mkdirSync(path.dirname(STATE(root)), { recursive: true });
+  for (const body of [
+    "{not json",
+    "[]",
+    '{"item":"D.2","phase":"walking"}',
+    '{"phase":"selected"}',
+  ]) {
+    writeFileSync(STATE(root), body);
+    const r = run(root, "--state-get");
+    assert.equal(r.code, 1, `${body}: ${r.out}`);
+    assert.match(r.out, /state-malformed/);
+  }
+  rmSync(STATE(root));
+});
+
+test("--state <path> moves the state file; the default is .claude/state/ under --root", () => {
+  const root = stateCorpus();
+  assert.equal(
+    run(root, "--state-init", "--item", "D.2", "--state", "tmp/s.json").code,
+    0,
+  );
+  assert.ok(existsSync(path.join(root, "tmp/s.json")));
+  assert.equal(existsSync(STATE(root)), false);
+  assert.equal(run(root, "--state-get", "--state", "tmp/s.json").code, 0);
+});
+
+test("runPathFor judges the BUILT name: a two-digit label, an empty one and a path-steering one are refused (TASK-141 PR review 2 CR-1)", () => {
+  for (const env of ["10", "07"])
+    assert.throws(
+      () => runPathFor([], "2026-09-22", env),
+      /reads as a run sequence/,
+      env,
+    );
+  for (const env of ["", "a/b", "a\\b", "..", "../x"])
+    assert.throws(
+      () => runPathFor([], "2026-09-22", env),
+      /may not contain|non-empty/,
+      JSON.stringify(env),
+    );
+  for (const env of ["ci10", "env10", "7", "100"]) {
+    const name = runPathFor([], "2026-09-22", env);
+    assert.equal(name, `2026-09-22-${env}.md`);
+    // The built name must sort as its own day's FIRST run, ahead of a re-run.
+    const re = runPathFor([name], "2026-09-22", env);
+    const dir = mkdtempSync(path.join(os.tmpdir(), "qa-next-seq-"));
+    mkdirSync(path.join(dir, "runs"));
+    for (const f of [re, name]) writeFileSync(path.join(dir, "runs", f), "");
+    assert.deepEqual(
+      listRunFiles(path.join(dir, "runs")),
+      [`runs/${name}`, `runs/${re}`],
+      env,
+    );
+  }
+});
+
+test("CLI: --run-path refuses a two-digit or path-steering --env and creates nothing", () => {
+  const root = stateCorpus();
+  for (const env of ["10", "../x"]) {
+    const r = run(root, "--run-path", "D.2", "--env", env);
+    assert.equal(r.code, 2, r.out);
+    assert.equal(existsSync(path.join(root, "docs/qa/runs/D.2")), false, env);
+  }
 });

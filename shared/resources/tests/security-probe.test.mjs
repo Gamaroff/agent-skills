@@ -2212,6 +2212,7 @@ test("cli entry: the first real consumer — uat-status.mjs --run-path D.1 --env
       ["env.traverse", "../x", "hostile"],
       ["env.slash", "a/b", "hostile"],
       ["env.seq", "x-02", "hostile"],
+      ["env.two-digit", "10", "hostile"],
       ["env.lan", "lan", "legitimate"],
       ["env.ci", "ci", "legitimate"],
     ].map(([id, input, direction]) => ({ id, input, direction }));
@@ -2235,13 +2236,14 @@ test("cli entry: the first real consumer — uat-status.mjs --run-path D.1 --env
     ]);
     const r = JSON.parse(out);
     assert.equal(r.executed, cases.length, JSON.stringify(r.declined));
-    // The verdict as measured before task.143: runPathFor refuses only a
-    // trailing -NN, so `x-02` is rejected and `../x`, `a/b` are accepted — a
-    // control that demonstrably exists and demonstrably lets a hostile label
-    // through. task.143 hardens the guard and updates this assertion.
-    assert.equal(r.verdict, "present-but-inert");
-    assert.deepEqual(r.reproduced.sort(), ["env.slash", "env.traverse"]);
-    assert.equal(rc, 1);
+    // Before task.143 this read `present-but-inert`: runPathFor refused only a
+    // trailing -NN, so `x-02` was rejected while `../x` and `a/b` were accepted.
+    // task.143 refuses a path separator or `..` in the label, and judges the
+    // BUILT name — so a two-digit label (`10` → `<date>-10.md`, read as run 10)
+    // is refused too. Every hostile case now rejects; both legitimate ones pass.
+    assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+    assert.deepEqual(r.reproduced, []);
+    assert.equal(rc, 0);
     const rec = readRecord(record);
     assert.equal(rec.totals.executed, cases.length);
     assert.equal(rec.controls[0].argv[5], "{input}");
