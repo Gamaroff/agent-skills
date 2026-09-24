@@ -851,18 +851,23 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 
 10. **Outcome reachability** (obs #168):
     - When a success criterion, test case or Testing Strategy row states the outcome a **named
-      function** produces for a **stated input** — a verdict, an exit code, a status, a return
-      value — open the function and walk that input through its decision branches
-    - Confirm the stated outcome is the **branch that fires**. Checks 1–5 and 9 ask whether what the
-      document names exists and has the shape it claims. This one asks whether the function can
-      return what the document promises for that input
+      function** produces for a **stated input** (a verdict, an exit code, a status, a return
+      value), open the function. Walk that input through its decision branches **as the plan
+      leaves them**: the branches it has today, plus any that a planned phase adds or changes
+    - Confirm the stated outcome is the **branch that fires** on that walk. Checks 1–5 and 9 ask
+      whether what the document names exists and has the shape it claims. This check asks whether
+      the function, once the plan is done, can return what the document promises for that input
+    - An outcome that a planned phase produces is reachable even though today's code cannot return
+      it, because producing it is the task's job. Review is not the place to hold a task to the
+      behaviour it exists to change
     - Worked example: task.144 said an accept-all fixture would score `present-but-inert`.
-      `computeVerdict` returns that verdict only when some hostile case was rejected; an accept-all
-      rejects none, so the `absent` branch fires. Review read the function in full and passed the
-      claim; develop found it
-    - Flag as **Important** when the outcome is unreachable — name the branch that fires and what it
-      returns; **Optional** when the branch depends on an input the document does not pin down
-      ("state the input")
+      `computeVerdict`, which that plan did not change, returns that verdict only when some
+      hostile case was rejected. An accept-all rejects none, so the `absent` branch fires.
+      Review read the function in full and passed the claim; develop found it
+    - Flag as **Important** when the outcome is unreachable, meaning no current or planned branch
+      returns it for that input. Name the branch that fires and what it returns. Flag as
+      **Optional** when the branch depends on an input the document does not pin down ("state the
+      input")
     - Out of scope: a criterion that names no function, or no outcome of one ("the docs say X")
 
 **Common Hallucination Patterns to Detect**:

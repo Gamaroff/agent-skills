@@ -305,6 +305,35 @@ None.
 
 ## QA Testing Results
 
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-25
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.145.qa.2.review-outcome-reachability-check.md](./task.145.qa.2.review-outcome-reachability-check.md)
+- **Gate File**: [task.145.gate.2.review-outcome-reachability-check.yml](./task.145.gate.2.review-outcome-reachability-check.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 4000 (3999 pass, 0 fail, 1 skipped)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 1 HIGH (MEDIUM: 2, LOW: 1)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+
+- CR2-1 (high): the pre-implementation sites judge reachability against today's code, and create-task's auto-fix rewrites intent into current behaviour.
+- CR2-2 (medium): the population test does not hold the check's verdict.
+- CR2-3 (medium): review-bug passes a stale bug's already-returning branch as "reachable".
+- CR2-4 (low): a closing fence at the item indent does not end the item.
+
+## Change Log
+
+## QA Testing Results
+
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-25
@@ -337,6 +366,8 @@ None.
 | 2026-09-25 |  | Implemented — 6 files, 6 tests (4 review-skill sites, population test, CHANGELOG) | develop |
 | 2026-09-25 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-09-25 |  | QA findings fixed — cycle 1 (CR-1, QA-2, QA-3; CR-3/CR-4 reader hardening), 1 iteration | qa-fix |
+| 2026-09-25 |  | QA gate FAIL (60/100) — 4 findings (1 high, 2 medium, 1 low); cycle-2 refute pass | qa-task |
+| 2026-09-25 |  | QA findings fixed — cycle 2 (CR2-1 planned-state reachability, CR2-2 verdict held, CR2-3 stale-bug clause, CR2-4..7) | qa-fix |
 
 ---
 <!-- change-log-end -->
@@ -394,3 +425,17 @@ None.
     start heading outside fences, split on CRLF, and end the item at a fence opening at its own
     indentation.
   - 8 tests. Each reader fix is mutation-proven red.
+- **QA cycle 2 fixes** (qa-fix, after a refute pass returned FAIL):
+  - CR2-1 (high): the three pre-implementation sites now walk the input through the function **as
+    the plan leaves it**. §3 *Target Architecture* above says "walk that input through its decision
+    branches". The implemented check deliberately refines that wording: an outcome a planned phase
+    produces is reachable. create-task puts an unreachable outcome to the author and never
+    auto-rewrites it.
+  - CR2-2: each site's verdict sentence is held.
+  - CR2-3: review-bug routes an already-returning branch to likely-already-fixed.
+  - CR2-4, CR2-5 and CR2-6: reader and fixture hardening.
+  - CR2-7: review-story gains the hallucination-pattern line.
+  - 10 tests; 11/11 fix mutants red. One deliberate `no-red-untested`: the review-task
+    "Confirm …" bullet restates the verdict's premise.
+  - The hand run's controls never changed the deciding function, which is why they could not see
+    CR2-1. That gap is recorded against obs #176.

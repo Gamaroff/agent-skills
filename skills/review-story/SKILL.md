@@ -945,16 +945,21 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 
 7. **Outcome reachability** (obs #168):
    - When an acceptance criterion, test case or Testing row states the outcome a **named function**
-     produces for a **stated input** — a verdict, an exit code, a status, a return value — open the
-     function and walk that input through its decision branches
-   - Confirm the stated outcome is the **branch that fires**. Checks 1–6 ask whether what the story
-     names exists and has the shape it claims. This one asks whether the function can return what
-     the story promises for that input
+     produces for a **stated input** (a verdict, an exit code, a status, a return value), open the
+     function. Walk that input through its decision branches **as the plan leaves them**: the
+     branches it has today, plus any that the story's tasks add or change
+   - Confirm the stated outcome is the **branch that fires** on that walk. Checks 1–6 ask whether
+     what the story names exists and has the shape it claims. This check asks whether the function,
+     once the story is done, can return what the story promises for that input
+   - An outcome that the story's own tasks produce is reachable even though today's code cannot
+     return it, because producing it is the story's job
    - Worked example (from a task): task.144 said an accept-all fixture would score
-     `present-but-inert`; `computeVerdict` returns that verdict only when some hostile case was
-     rejected, so an accept-all takes the `absent` branch. Review passed the claim; develop found it
-   - Flag as **Important** when the outcome is unreachable — name the branch that fires and what it
-     returns; **Optional** when the branch depends on an input the story does not pin down
+     `present-but-inert`. `computeVerdict`, which that plan did not change, returns that verdict
+     only when some hostile case was rejected, so an accept-all takes the `absent` branch. Review
+     passed the claim; develop found it
+   - Flag as **Important** when the outcome is unreachable, meaning no current or planned branch
+     returns it for that input. Name the branch that fires and what it returns. Flag as
+     **Optional** when the branch depends on an input the story does not pin down
    - Out of scope: a criterion that names no function, or no outcome of one
 
 **Common Hallucination Patterns to Detect**:
@@ -966,6 +971,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ Libraries not in package.json or tech stack docs
 - ❌ Endpoints not in API specification
 - ❌ Database fields not in schema definitions
+- ❌ An outcome no branch of the named function returns for the stated input
 
 **Issues to Flag**:
 

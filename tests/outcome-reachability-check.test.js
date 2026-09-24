@@ -38,22 +38,60 @@ const { join } = require("node:path");
 
 const REPO_ROOT = join(__dirname, "..");
 
+// `holds` are the site's own load-bearing sentences, beyond the three shared
+// elements: its VERDICT (what the check decides, and at what severity) and the
+// STATE it judges against. The elements say what the check is about; a check
+// whose verdict is deleted or inverted still names all three, which is how
+// "Never flag it." passed cycle 1's suite (task.145 QA cycle 2, CR2-2).
+//
+// The three pre-implementation sites judge reachability against the function
+// AS THE PLAN LEAVES IT — today's code cannot return an outcome the plan adds,
+// and holding a task to today's behaviour is holding it to the behaviour it
+// exists to change (CR2-1). review-bug runs before the fix too, but its planned
+// change IS the fix, so its second hold is the stale-bug clause instead (CR2-3).
+const PLANNED_STATE = {
+  name: "planned-state walk",
+  re: /as the plan leaves them/,
+};
+const REVIEW_VERDICT = {
+  name: "Important verdict on an unreachable outcome",
+  re: /Important when the outcome is unreachable/,
+};
 const SITES = [
   {
     file: "skills/review-task/SKILL.md",
     heading: "### Step 3: Technical Accuracy and Anti-Hallucination Review",
+    holds: [PLANNED_STATE, REVIEW_VERDICT],
   },
   {
     file: "skills/create-task/SKILL.md",
     heading: "### 3.5 Adversarial Quality Review",
+    holds: [
+      PLANNED_STATE,
+      {
+        name: "put-to-the-author verdict (no auto-fix)",
+        re: /Put it to the author, and never auto-fix it/,
+      },
+    ],
   },
   {
     file: "skills/review-story/SKILL.md",
     heading: "### Step 4: Technical Accuracy and Anti-Hallucination Review",
+    holds: [PLANNED_STATE, REVIEW_VERDICT],
   },
   {
     file: "skills/review-bug/SKILL.md",
     heading: "### Step 3: Reproducibility Clarity (the core gate)",
+    holds: [
+      {
+        name: "Important verdict on an unreachable Expected outcome",
+        re: /unreachable Expected outcome[^→]*→ Important/,
+      },
+      {
+        name: "stale-bug clause (already returns the Expected outcome)",
+        re: /already returns the Expected outcome[^.]*\. Report it under this step's likely-already-fixed rule/,
+      },
+    ],
   },
 ];
 
@@ -79,6 +117,11 @@ const LIST_ITEM = /^(\s*)(?:\d+\.|[-*])\s/;
 // then reads the rest of the file as the wrong side of it (task.145 QA cycle 1,
 // CR-3).
 const FENCE_OPEN = /^(\s*)(`{3,}|~{3,})/;
+// A backtick fence's info string may not contain a backtick — "```js` x" is
+// a paragraph, not a fence (CommonMark; task.145 QA cycle 2, CR2-5). Indentation
+// is deliberately NOT capped: these SKILL.md files nest fences inside list items
+// at four or more spaces, and a top-level cap would drop real fences.
+const BACKTICK_INFO_HAS_BACKTICK = /^\s*`{3,}[^`]*`/;
 
 /**
  * Advance the fence state over one line. `open` is the opening marker while
@@ -89,7 +132,11 @@ function fenceStep(open, line) {
   const m = line.match(FENCE_OPEN);
   if (!m) return { open, isFence: false };
   const marker = m[2];
-  if (open === null) return { open: marker, isFence: true, lead: m[1].length };
+  if (open === null) {
+    if (marker[0] === "`" && BACKTICK_INFO_HAS_BACKTICK.test(line))
+      return { open, isFence: false };
+    return { open: marker, isFence: true, lead: m[1].length };
+  }
   const closes =
     marker[0] === open[0] &&
     marker.length >= open.length &&
@@ -169,7 +216,10 @@ function citingItemOf(sectionLines) {
     // A fence that OPENS at the item's indentation or shallower is not inside
     // the item — it ends it, like any other line at that depth. Toggling on it
     // first glued the lines after it onto the item (task.145 QA cycle 1, CR-4).
-    if (open === null && step.isFence && step.lead <= indent) break;
+    // Opening or CLOSING: a fence line at the item's depth or shallower is at
+    // the item's own level, so the item ended before it (CR2-4 — the closing
+    // side was still reachable after cycle 1's opening-only fix).
+    if (step.isFence && line.match(/^\s*/)[0].length <= indent) break;
     const fenced = open !== null || step.isFence;
     open = step.open;
     if (fenced) continue;
@@ -218,7 +268,7 @@ for (const site of SITES) {
       `${site.file} › "${site.heading}": no list item cites obs #168 — the outcome-reachability check is missing from this site`,
     );
     const prose = asProse(item);
-    for (const el of ELEMENTS) {
+    for (const el of [...ELEMENTS, ...site.holds]) {
       assert.match(
         prose,
         el.re,
@@ -229,24 +279,36 @@ for (const site of SITES) {
 }
 
 test("the item reader does not reach past the citing item", () => {
+  // The sibling text carries every element and every hold, so each
+  // doesNotMatch below can actually fail (cycle 2, CR2-6 — the fixture said
+  // "a branch" after the element narrowed to "branch that fires").
+  const SIBLING =
+    "   - a named function, a stated input, the branch that fires, as the plan leaves them;" +
+    " Important when the outcome is unreachable; Put it to the author, and never auto-fix it;" +
+    " an unreachable Expected outcome → Important; if it already returns the Expected outcome." +
+    " Report it under this step's likely-already-fixed rule";
+  for (const el of [...ELEMENTS, ...SITES.flatMap((s) => s.holds)]) {
+    assert.match(asProse(SIBLING), el.re, `fixture must carry ${el.name}`);
+  }
   // Self-test of the scope that makes the element assertions non-vacuous: text
   // naming every element in a SIBLING item must not satisfy the citing one.
   const section = [
     "1. **Other check** (obs #1):",
-    "   - a named function, a stated input, a branch",
+    SIBLING,
     "",
     "2. **The check** (obs #168):",
     "   - only the citation lives here",
     "",
     "3. **Next check**:",
-    "   - a named function, a stated input, a branch",
+    SIBLING,
   ];
   const item = citingItemOf(section);
   assert.equal(
     item,
     "2. **The check** (obs #168):\n   - only the citation lives here",
   );
-  for (const el of ELEMENTS) assert.doesNotMatch(asProse(item), el.re);
+  for (const el of [...ELEMENTS, ...SITES.flatMap((s) => s.holds)])
+    assert.doesNotMatch(asProse(item), el.re);
 });
 
 test("the section reader skips a quoted heading and survives long or tilde fences", () => {
@@ -301,6 +363,30 @@ test("the section reader skips a quoted heading and survives long or tilde fence
 
   const crlf = [H, "body", "### Step 4: Next", "outside"].join("\r\n");
   assert.deepEqual(sectionOf(crlf, H), ["body"]);
+});
+
+test("a closing fence at the item's own indentation ends the citing item", () => {
+  // CR2-4 (task.145 QA cycle 2): an inner fence opened inside the item and
+  // closed at column 0. CommonMark ends the item at the column-0 line.
+  const section = [
+    "- (obs #168):",
+    "  - a named function",
+    "  ```bash",
+    "  echo",
+    "```",
+    "  - stated input, branch that fires",
+  ];
+  assert.equal(citingItemOf(section), "- (obs #168):\n  - a named function");
+});
+
+test("a backtick line whose info string holds a backtick opens no fence", () => {
+  // CR2-5: "```js` x" is a paragraph. Treating it as a fence ran the section
+  // past the real next heading.
+  const H = "### Step 3: Check";
+  const text = [H, "```js` x", "body", "### Step 4: Next", "outside"].join(
+    "\n",
+  );
+  assert.deepEqual(sectionOf(text, H), ["```js` x", "body"]);
 });
 
 test("a fence at the item's own indentation ends the citing item", () => {

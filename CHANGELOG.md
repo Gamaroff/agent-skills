@@ -89,17 +89,22 @@ All notable changes to this project will be documented in this file. Format foll
 ### Changed
 
 - **Review checks that a criterion's stated outcome is one the deciding function can return (task 145,
-  obs #168).** `/review-task` Step 3 gains check 10, *Outcome reachability*: when a success criterion
+  obs #168).** `/review-task` Step 3 gains check 10, *Outcome reachability*. When a success criterion
   or test case says what a named function returns for a stated input, the reviewer walks that input
-  through the function's branches and confirms the promised outcome is the branch that fires, and
-  reports an unreachable one as **Important**. The same check lands where the defect is introduced
-  (`/create-task` Step 3.5, Critical) and at the two sibling sites (`/review-story` Step 4 check 7,
-  `/review-bug` Step 3). Earlier checks asked whether a named function *exists*. None asked whether
-  it can *produce* the outcome the document promises. task.144 promised `present-but-inert` for an
-  accept-all fixture, and `computeVerdict` scores that `absent`. Review read the function in full and
-  passed the claim, and develop found it. `tests/outcome-reachability-check.test.js` keeps the check
-  at all four sites, scoped to the check's own list item. Section scope would have been vacuous,
-  because `a function` already appears in two of the four sections.
+  through the function's branches as the plan leaves them: today's branches plus any a planned phase
+  adds or changes. An outcome that no current or planned branch returns is reported as **Important**.
+  Judging against the planned state matters because a task that changes its deciding function is
+  promising an outcome today's code cannot return, and that is the point of the task, not a defect.
+  The same check lands where the defect is introduced: `/create-task` Step 3.5, where it is put to
+  the author and never auto-rewritten to current behaviour. It also lands at the two sibling sites,
+  `/review-story` Step 4 check 7 and `/review-bug` Step 3. In review-bug, a branch that already returns
+  the Expected outcome is routed to the likely-already-fixed rule. Earlier checks asked whether a
+  named function *exists*; none asked whether it can *produce* what the document promises. task.144
+  promised `present-but-inert` for an accept-all fixture, and `computeVerdict` scores that `absent`.
+  Review read the function in full and passed the claim, and develop found it.
+  `tests/outcome-reachability-check.test.js` holds each site's check item. It holds the three
+  elements (stated input, named function, branch that fires), the site's verdict sentence, and its
+  planned-state (or stale-bug) clause.
 - **`uat-status.mjs --set <id> <verdict>`: only a `fail` moves an `✅ accepted` row (task 141).** A `pass`,
   `blocked` or `na` against an accepted row now leaves `✅` in place and updates only `Last run` and
   `Notes / bug`; the tool prints `(kept)` so the branch it took is never silent. `fail` is unchanged

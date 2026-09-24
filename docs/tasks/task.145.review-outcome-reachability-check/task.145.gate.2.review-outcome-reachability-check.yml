@@ -1,0 +1,86 @@
+schema: 1
+task: 'task.145.review-outcome-reachability-check'
+task_title: "review-task: trace a criterion's stated outcome through the function that decides it"
+gate: FAIL
+status_reason: 'The cycle-2 refute pass found that the three pre-implementation sites walk the input through today''s code. On a task whose plan changes the deciding function, the check flags the promised behaviour as unreachable, and create-task''s Critical auto-fix would rewrite it to the current behaviour. The population test also does not hold the check''s verdict sentence.'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T22:35:48Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: high
+    file: 'skills/create-task/SKILL.md'
+    finding: 'create-task 3.5, review-task check 10 and review-story check 7 run before implementation and tell the reviewer to walk the input through the function as it is today. When a planned phase adds or changes the deciding branch, the promised outcome is correctly unreachable today. Review flags it Important, and create-task''s Critical auto-fix ("if another branch fires, write the outcome it actually returns") rewrites the task''s intended behaviour into the behaviour it exists to change. The same wording is at skills/review-task/SKILL.md check 10 and skills/review-story/SKILL.md check 7.'
+    suggested_action: 'At all three sites, walk the input through the function as the plan leaves it: the branches it has plus those a planned phase adds or changes. Flag only an outcome that neither produces. create-task must not auto-rewrite the criterion; it raises the unreachable outcome with the author.'
+    suggested_owner: dev
+    bug_ref: 'task.145.bug.3.pre-implementation-state.md'
+  - id: 'CR2-2'
+    severity: medium
+    file: 'tests/outcome-reachability-check.test.js'
+    finding: 'The element set does not hold the check''s verdict. Replacing review-bug''s reachability decision ("The question is whether" through "→ Important") with "Never flag it." leaves the suite green, and so does deleting review-task''s "Confirm the stated outcome is the branch that fires" sentence (measured: fail 0 for both). CR-1''s narrowing plus QA-2''s rewording left the "branch that fires" phrase only in sentences that are not the verdict.'
+    suggested_action: 'Add a verdict element carried only by the decision sentence (for example /unreachable/, present at every site after rewording) and mutation-prove it by deleting that sentence, not by deleting a phrase.'
+    suggested_owner: dev
+    bug_ref: 'task.145.bug.4.verdict-not-held.md'
+  - id: 'CR2-3'
+    severity: medium
+    file: 'skills/review-bug/SKILL.md'
+    finding: '"The branch that fires today returns the Actual" is false for a stale bug. If the reproduction input already reaches a branch returning the Expected outcome, the bullet counts it as reachable and passes silently. That discards in-line evidence for Step 3''s own "Critical (likely already fixed)" rule.'
+    suggested_action: 'Add a clause: if the branch firing today already returns the Expected outcome, report it under the likely-already-fixed rule (Critical), not as reachable.'
+    suggested_owner: dev
+    bug_ref: 'task.145.bug.5.review-bug-stale-branch.md'
+  - id: 'CR2-4'
+    severity: low
+    file: 'tests/outcome-reachability-check.test.js'
+    finding: 'citingItemOf ends the item only at an opening fence at the item indent or shallower. A column-0 closing fence of an indented inner fence does not end it, so lines after it are glued onto the item.'
+    suggested_action: 'Any fence line (opening or closing) at the item indent or shallower ends the item. Add the closing-fence case to the self-test.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 4000
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false. Prose in four SKILL.md files plus a read-only test (node:fs, node:path only).'
+  performance:
+    status: PASS
+    notes: 'The test runs in about 100 ms. No runtime code.'
+  reliability:
+    status: CONCERNS
+    notes: 'The check would misfire on any task whose plan changes the deciding function (CR2-1). That is the over-firing the task''s Risk Assessment names as its rollback trigger.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The population test holds the three named elements but not the check''s verdict (CR2-2).'
+
+recommendations:
+  immediate:
+    - action: 'Evaluate reachability against the planned state at the three pre-implementation sites; no auto-rewrite in create-task (CR2-1).'
+      refs: ['skills/create-task/SKILL.md', 'skills/review-task/SKILL.md', 'skills/review-story/SKILL.md']
+    - action: 'Hold the verdict sentence with its own element and prove it by deleting the sentence (CR2-2).'
+      refs: ['tests/outcome-reachability-check.test.js']
+    - action: 'Route a branch that already returns the Expected outcome to the likely-already-fixed rule (CR2-3).'
+      refs: ['skills/review-bug/SKILL.md']
+  future:
+    - action: 'CR2-5 (advisory): fenceStep opens on a backtick line whose info string contains a backtick. Reject it. Indented-code-block handling is deliberately not capped, because list-nested fences in these files are indented 4+ spaces.'
+      refs: ['tests/outcome-reachability-check.test.js']
+    - action: 'CR2-6 (cleanup): the sibling-item self-test fixture says "a branch", so the narrowed element''s doesNotMatch cannot fail. Use "the branch that fires".'
+      refs: ['tests/outcome-reachability-check.test.js']
+    - action: 'CR2-7 (cleanup): add the Common Hallucination Patterns line to review-story as well.'
+      refs: ['skills/review-story/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'CR2-1 fixed'
