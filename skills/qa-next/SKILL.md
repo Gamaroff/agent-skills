@@ -72,14 +72,14 @@ Apply any project-wide command conventions from the consumer project's own CLAUD
 
 | Command | What it does | Exits |
 | :--- | :--- | :--- |
-| `--state-init --next --json` / `--state-init --item <id> --json` | Resolves the row exactly as `--next` / `--item` do, records it (`phase: selected`) and prints the **same payload** they print | 3 nothing untested · 4 no such row · 5 `run-in-progress` — none of them writes |
+| `--state-init --next --json` / `--state-init --item <id> --json` | Resolves the row exactly as `--next` / `--item` do, records it (`phase: selected`) and prints the **same payload** they print | 3 nothing untested · 4 no such row · 5 `run-in-progress` (a state file already exists) — none of them writes |
 | `--state-get --json` | Prints the state | 6 no run in flight · 1 `state-malformed` |
 | `--state-set <field> <value>` | Writes one mutable field: `phase` (forward only), `runFile` and `filedBug` (a path, or the literal `null`), `lane` (JSON) | 2 for an init-only or unknown field, or a backward `phase` |
 | `--state-clear` | Deletes it | always 0 |
 
 `--state-init` writes the other fields (`item`, `function`, `surface`, `stories`, `uatSpecs`, `targeted`, `priorRuns`, `bug`, `startedAt`) once, and they cannot be overwritten. They describe the row **as it was when this run began**, which is the point. After Step 4 writes the run file and the row, a fresh `--item` counts the run just written in its `priorRuns` and names this run's bug as its `bug`. So `priorRuns` (Steps 4, 5 and 6) and `bug` (Step 4's reuse decision, and nothing else) are read from `--state-get`, never from a fresh `--item`. The bug this run files or re-links is a different field, `filedBug`.
 
-`--state-init --item` conflicts (exit 5) only with a state file naming a **different** item. `--state-init --next` over any existing state is a resume: it prints that state unchanged and resolves nothing, because once the in-flight run has moved its own row the queue would pick another one.
+**`--state-init` never resumes.** Exit 0 means one thing, a fresh selection printed as the payload. A state file that already exists is a run in flight, whatever item it names, and `--state-init` refuses it with exit 5. Resuming is `--state-get`'s job, in Step 0. The file is created exclusively, so two runs that start in the same instant cannot both take the lock.
 
 `targeted` is true when the invocation named an id. A resume at `phase: selected` then re-resolves *that* id with `--item`, rather than falling back to `--next` and quietly testing a different function.
 
@@ -112,7 +112,9 @@ Exit 3 → **STOP** `registry-complete` (print the scoreboard).
 node .agents/skills/qa-next/scripts/uat-status.mjs --state-init --item <id> --json
 ```
 
-Exit 4 → **STOP** `unknown-item`: the id is not a row. Print the scoreboard so the owner can see the ids that are. Exit 5 → **HALT** `run-in-progress`: Step 0 already checked, so another run started in between.
+Exit 4 → **STOP** `unknown-item`: the id is not a row. Print the scoreboard so the owner can see the ids that are.
+
+On either command, exit 5 → **HALT** `run-in-progress`. Step 0 found no run in flight, so another run took the lock in between. Nothing was written and nothing was printed on stdout.
 
 Under `--dry-run`, call `--next --json` / `--item <id> --json` instead. They return the same payload and write nothing.
 
@@ -238,7 +240,7 @@ For a 🟡 with no lane spec, also print the hand-off: `uat-automate <id>` (or, 
 | `no-browser`        | No browser automation available in this session        | Enable the Playwright MCP tools or install Playwright |
 | `dirty-tree`        | Uncommitted changes on the base branch                 | Commit or stash them                          |
 | `unknown-item`      | The id given is not a registry row                     | Check it against the scoreboard, re-run       |
-| `run-in-progress`   | The state file names a different function (`--state-get` in Step 0, or `--state-init` exit 5) | Finish that run, or `uat-status.mjs --state-clear` |
+| `run-in-progress`   | Another run is in flight: the state file names a different function (`--state-get` in Step 0), or another run took the lock after Step 0 (`--state-init` exit 5) | Finish that run, or `uat-status.mjs --state-clear` |
 | `state-malformed`   | `--state-get` exit 1 — the state file is not one        | Inspect it, then `uat-status.mjs --state-clear` and re-run |
 | bug filing failed   | `/create-bug-report` did not return a path              | The run file is written; file the bug by hand, then `--set … fail --bug …` (for a finding: file it, then put the link in its `Filed as` cell) |
 

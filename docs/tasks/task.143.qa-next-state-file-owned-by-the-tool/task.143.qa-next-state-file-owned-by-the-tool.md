@@ -115,19 +115,21 @@ QA-cycle finding.
 - **`--state-init (--item <id> | --next) [--json]`**: resolves the row exactly as `--item` / `--next`
   do (same `describeRow`), writes the state file with every init field, `phase: selected`,
   `filedBug: null`, `runFile: null`, `lane: null`, and prints the payload — the one call replaces
-  "resolve, then write the state file". When a state file already exists:
-  - `--item <id>` naming a **different** item → exit **5** `run-in-progress`, nothing written;
-  - `--item <id>` naming the same item → a resume: prints the existing state unchanged, exit 0;
-  - `--next` → a resume, whatever item the state names: prints the existing state unchanged, exit 0,
-    without re-resolving the queue (SKILL.md Step 0 rule 1 — only an invocation that *gave an id*
-    can conflict; and once the in-flight run has moved its own row, `--next` would pick a different one).
-  With no state file, exit 3 (nothing untested) and exit 4 (no such row) keep their meaning and
-  write nothing.
+  "resolve, then write the state file". **It never resumes** (revised in QA cycle 1,
+  TASK-143-BUG-1): when a state file already exists, whatever item it names, it exits **5**
+  `run-in-progress` and writes and prints nothing. Resuming is `--state-get`'s job in Step 0, so
+  reaching `--state-init` past a state file means another run took the lock in between. The review's
+  earlier "same item / `--next` = resume" printed the stored state on exit 0, a shape Step 1 read as
+  a payload. The file is created exclusively (`link`, which fails on EEXIST), so two concurrent inits
+  cannot both win. With no state file, exit 3 (nothing untested) and exit 4 (no such row) keep their
+  meaning and write nothing.
 - **`--state-get [--json]`**: prints the state; exit **6** when none. A **legacy** state file — the
   shape released in v0.51.0, which has no `targeted`, `priorRuns`, `bug` or `filedBug` — is answered
   with each missing field **derived** and named in `derived: [...]`, never a silent default:
   - `targeted` → `false` (v0.51.0 took no id argument; every run was untargeted);
-  - `priorRuns` → the row's current `priorRuns` minus the state file's own `runFile`;
+  - `priorRuns` → the row's current `priorRuns` minus this run's own file: the state's `runFile`
+    or, when it is null (v0.51.0 never recorded one, TASK-143-BUG-2), the row's `Last run` from
+    `recorded` on and any run file written after `startedAt`;
   - `bug` → the row's current bug link while `phase` is before `recorded` (Step 4.4 has not yet
     rewritten the note cell); `null` from `recorded` on (its only reader, Step 4's reuse decision,
     has already run);
@@ -318,7 +320,7 @@ None.
 ### Functional
 
 - [x] `--state-init --item <id>` and `--state-init --next` write the state file and print the same payload `--item` / `--next` print
-- [x] A second `--state-init --item` naming a different item exits 5 and writes nothing; the same item, or `--state-init --next` over any existing state, prints the existing state unchanged
+- [x] A second `--state-init` over any existing state exits 5 `run-in-progress` and writes and prints nothing (revised in QA cycle 1 — TASK-143-BUG-1); concurrent inits: exactly one wins
 - [x] After a run file is written, `--state-get` returns the pre-run `priorRuns` and `bug`
 - [x] `--state-set` refuses init-only fields and backward `phase` moves by name
 - [x] A legacy (v0.51.0-shape) state file is answered with `targeted`, `priorRuns`, `bug` and `filedBug` derived and each named in `derived`
@@ -395,6 +397,7 @@ None.
 | 2026-09-24 | 1.1     | Review passed (9/10) — added `lane` to `STATE_FIELDS` and typed `--state-set` values; defined `--state-init --next` over an existing state as a resume; widened the legacy derivation to `targeted`, `bug`, `filedBug`; stated dispatch order | review-task |
 | 2026-09-24 |         | Status → ready-for-development | review-task |
 | 2026-09-24 |  | Implemented — 8 files, 11 new tests (qa-next suite 44 → 55; security-probe cli-consumer test now asserts engages) | develop |
+| 2026-09-24 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 
 ---
 <!-- change-log-end -->
@@ -405,6 +408,34 @@ None.
 - [x] Phase 2: SKILL.md speaks commands
 - [x] Phase 3: LOW deferrals
 - [x] Phase 4: Docs, CHANGELOG, validation
+
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-24
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.143.qa.1.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.1.qa-next-state-file-owned-by-the-tool.md)
+- **Gate File**: [task.143.gate.1.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.1.qa-next-state-file-owned-by-the-tool.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 55 (qa-next suite) + 87 (security-probe suite); 19 executed probes
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 2 MEDIUM
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+- TASK-143-BUG-1 — `--state-init` exits 0 with two indistinguishable shapes (fresh payload vs resumed state view).
+- TASK-143-BUG-2 — legacy `priorRuns` derivation counts the run's own file when `runFile` is null (every real v0.51.0 file).
+- Pre-existing (not attributed to this change): `--env` accepts newline/CR/tab labels — routed to a follow-up.
 
 ---
 

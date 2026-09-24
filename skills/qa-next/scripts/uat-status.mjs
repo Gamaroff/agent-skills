@@ -47,6 +47,7 @@ import {
   mkdirSync,
   renameSync,
   rmSync,
+  linkSync,
 } from "node:fs";
 import { join, relative, dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1226,12 +1227,38 @@ function readState(opts) {
   return state;
 }
 
-// Write-temp-then-rename: a reader never sees half a lock.
-function writeState(opts, state) {
-  const p = statePath(opts);
+// Write a per-process temp file, then move it into place, so a reader never sees half a lock and
+// two writers never share a temp name. `exclusive` (--state-init) moves it with link(), which fails
+// with EEXIST if the lock appeared since the check: the check and the create are one atomic step, so
+// two concurrent inits cannot both win. Updates (--state-set) replace with rename().
+function writeState(opts, state, { exclusive = false } = {}) {
+  writeStateFile(statePath(opts), state, { exclusive });
+}
+
+// The file-level writer, exported so the exclusive create is testable without racing processes.
+export function writeStateFile(p, state, { exclusive = false } = {}) {
+  const tmp = `${p}.${process.pid}.tmp`;
   mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(`${p}.tmp`, `${JSON.stringify(state, null, 2)}\n`);
-  renameSync(`${p}.tmp`, p);
+  writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`);
+  if (!exclusive) return renameSync(tmp, p);
+  try {
+    linkSync(tmp, p);
+  } catch (e) {
+    if (e.code !== "EEXIST") throw e;
+    let existing = null;
+    try {
+      existing = JSON.parse(readFileSync(p, "utf8"));
+    } catch {
+      // unreadable — still a run in flight; the message names no item
+    }
+    die(runInProgress(existing), 5);
+  } finally {
+    rmSync(tmp, { force: true });
+  }
+}
+
+function runInProgress(existing) {
+  return `run-in-progress: a qa-next run for ${existing?.item ?? "another item"} is in flight — resume it through --state-get (Step 0), or --state-clear it`;
 }
 
 // The state as the skill reads it. A LEGACY file — the shape released in v0.51.0, before targeted,
@@ -1248,10 +1275,25 @@ export function stateView(opts, state) {
     derived.push("targeted");
   }
   if (!has("priorRuns")) {
-    // The row's history minus this run's own file — the row as it was when the run began.
-    out.priorRuns = priorRuns(opts, state.item).filter(
-      (p) => p !== state.runFile,
-    );
+    // The row's history minus this run's own file — the row as it was when the run began. v0.51.0
+    // never told the skill to record runFile, so on a real legacy file it is null (TASK-143-BUG-2)
+    // and "this run's own file" has to be found another way: the file Step 4.4 linked as the row's
+    // Last run once the phase is `recorded`, and any run file written after the run started (Step 4
+    // writes it before `recorded`, and a resume mid-Step-4 finds it on disk).
+    const own = new Set([state.runFile].filter(Boolean));
+    if (!state.runFile) {
+      const recorded =
+        STATE_PHASES.indexOf(state.phase) >= STATE_PHASES.indexOf("recorded");
+      const r = recorded && itemById(readRegistry(opts), state.item);
+      const lastRun = r ? (r.run.match(/\]\(([^)]+)\)/) ?? [])[1] : undefined;
+      if (lastRun) own.add(lastRun);
+      const started = Date.parse(state.startedAt);
+      const base = join(opts.root, opts.registryDir);
+      if (!Number.isNaN(started))
+        for (const f of priorRuns(opts, state.item))
+          if (statSync(join(base, f)).mtimeMs >= started) own.add(f);
+    }
+    out.priorRuns = priorRuns(opts, state.item).filter((f) => !own.has(f));
     derived.push("priorRuns");
   }
   if (!has("bug") || !has("filedBug")) {
@@ -1287,38 +1329,34 @@ function printState(opts, view) {
 function cmdStateInit(opts) {
   if (!opts.has("--item") && !opts.has("--next"))
     die("--state-init needs --item <id> or --next");
+  // Exit 0 means ONE thing: a fresh selection, printed as the --next/--item payload. A state file
+  // that already exists is a run in flight whatever item it names — resuming it is --state-get's job
+  // (SKILL.md Step 0), and reaching here past Step 0 means another run started in between. Printing
+  // the stored state instead, on the same exit 0, handed Step 1 a shape it would read as a payload
+  // (TASK-143-BUG-1).
   const existing = readState(opts);
-  if (existing) {
-    // Only an invocation that NAMED an item can conflict (SKILL.md Step 0). An untargeted one
-    // resumes whatever is in flight: once that run has moved its own row, --next would pick another.
-    if (opts.has("--item")) {
-      const id = requireIdValue("--item", opts.val("--item"));
-      if (id !== existing.item)
-        die(
-          `run-in-progress: the state file names ${existing.item}, not ${id} — finish that run, or --state-clear it`,
-          5,
-        );
-    }
-    printState(opts, stateView(opts, existing)); // a resume: printed, not rewritten
-    return;
-  }
+  if (existing) die(runInProgress(existing), 5);
   const out = resolvePayload(opts);
   if (!out) return; // exit 3 / 4, and nothing written
-  writeState(opts, {
-    item: out.id,
-    function: out.function,
-    surface: out.surface,
-    stories: out.stories.map((s) => s.id),
-    uatSpecs: out.uatSpecs,
-    targeted: opts.has("--item"),
-    priorRuns: out.priorRuns,
-    bug: out.bug,
-    startedAt: new Date().toISOString(),
-    phase: "selected",
-    runFile: null,
-    lane: null,
-    filedBug: null,
-  });
+  writeState(
+    opts,
+    {
+      item: out.id,
+      function: out.function,
+      surface: out.surface,
+      stories: out.stories.map((s) => s.id),
+      uatSpecs: out.uatSpecs,
+      targeted: opts.has("--item"),
+      priorRuns: out.priorRuns,
+      bug: out.bug,
+      startedAt: new Date().toISOString(),
+      phase: "selected",
+      runFile: null,
+      lane: null,
+      filedBug: null,
+    },
+    { exclusive: true },
+  );
   printPayload(opts, out);
 }
 

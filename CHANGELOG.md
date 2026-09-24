@@ -13,13 +13,16 @@ All notable changes to this project will be documented in this file. Format foll
   task.141's QA cycles 10–12 each found one such defect (BUG-21/22/23). The tool now writes the file.
   `--state-init (--item <id> | --next)` resolves the row through the same code path as
   `--item`/`--next` and prints the same payload. It records `priorRuns` and `bug` as they stood when
-  the run began, and nothing can overwrite them. `--item` naming a different in-flight item exits
-  **5** `run-in-progress`; `--next` over an existing state is a resume. `--state-get` exits **6**
+  the run began, and nothing can overwrite them. It exits **5** `run-in-progress` whenever a state
+  file exists, whatever item it names, because resuming is `--state-get`'s job. The file is created
+  exclusively (`link`), so two concurrent inits cannot both win. `--state-get` exits **6**
   when nothing is in flight and **1** `state-malformed` on a file that is not a state file.
   `--state-set` writes only `phase` (forward only), `runFile`, `filedBug` and `lane`, and refuses an
   init-only field by name. A state file from v0.51.0, which lacks `targeted`, `priorRuns`, `bug` and
   `filedBug`, still resumes: each missing field is derived from the row, correct for the phase it is
-  read at, and named in `derived`. SKILL.md now names a command wherever it used to describe JSON.
+  read at, and named in `derived`. Its `runFile` is null (v0.51.0 never recorded one), so this run's
+  own file is found as the row's `Last run` from `recorded` on, or as a run file written after
+  `startedAt`. SKILL.md now names a command wherever it used to describe JSON.
   Tests derived from `STATE_FIELDS` cover the schema and are mutation-proved.
 
 - **`security-probe.mjs --entry cli:<path> --argv '<JSON array>'` — a boundary behind a Node CLI's
@@ -128,7 +131,8 @@ All notable changes to this project will be documented in this file. Format foll
   `priorRuns`, `--findings` and the previous-run link (task.141 PR review 2, CR-1). The label also
   accepted `/`, `\` and `..`, which could steer the printed path out of `runs/<id>/`. The task.144
   probe `security-probe --entry cli:…uat-status.mjs … --env {input}` read `present-but-inert`
-  against it and now reads `engages`. SKILL.md Step 4.4's `pass` bullet now names the note flag the
+  against it and now reads `engages` on that case set. Control characters in a label (`\n`, `\r`,
+  `\t`) are still accepted, exactly as before this change, and are left to a follow-up. SKILL.md Step 4.4's `pass` bullet now names the note flag the
   per-verdict table requires (`--clear-note` on every non-✅ row) (PR review 2, CR-2).
   **Migration:** an empty, two-digit, or `/`-, `\`- or `..`-bearing `--env` label is refused with
   exit 2. Use a label with a letter that does not end in `-NN`, such as `ci10`.

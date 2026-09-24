@@ -1,0 +1,66 @@
+schema: 1
+task: 'task.143.qa-next-state-file-owned-by-the-tool'
+task_title: 'qa-next: uat-status.mjs owns the run state file, so its contract is held by tests instead of prose'
+gate: CONCERNS
+status_reason: 'Implementation, tests and docs match the plan (4/4 phases, 55/55 suite, 3980/3980 ci:fast, 18+3 mutants covered), but two verified MEDIUM defects: --state-init prints two indistinguishable shapes on exit 0 (fresh vs resume), and the legacy priorRuns derivation counts the run own file when runFile is null.'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T04:56:56Z'
+
+top_issues:
+  - id: 'TASK-143-BUG-1'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: '--state-init exits 0 both for a fresh selection (prints the --next/--item payload) and for a resume (prints the state view, which lacks id/what/items/checklists); --next never exits 5, so the race SKILL.md Step 1 names yields the wrong shape instead of HALT run-in-progress (code review CR-1, bug + high confidence).'
+    suggested_action: 'Give the resume branch its own exit code or refuse --state-init when a state file exists, and document the response in SKILL.md Step 1.'
+    suggested_owner: dev
+    bug_ref: 'task.143.bug.1.state-init-resume-output-indistinguishable.md'
+  - id: 'TASK-143-BUG-2'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'stateView derives legacy priorRuns as the row priorRuns minus state.runFile, but v0.51.0 never wrote runFile, so a real v0.51.0 file at recorded/committed counts the run own file and reports/commits the run as a re-run (code review CR-2, verified against v0.51.0 SKILL.md).'
+    suggested_action: 'When runFile is null and phase is recorded or later, also exclude the row Last run target; add a test with runFile null.'
+    suggested_owner: dev
+    bug_ref: 'task.143.bug.2.legacy-priorruns-counts-own-run-file.md'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 55
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 19
+    notes: 'cli: probe of uat-status.mjs --run-path --env {input} (19 cases): every path, sequence, two-digit and empty case rejected, every legitimate label accepted; newline, CR and tab labels accepted — identical on origin/develop, so pre-existing (Step 5b), routed to recommendations.future. Probe verdict present-but-inert on the pre-existing control-character cases only.'
+  performance:
+    status: PASS
+    notes: 'No network calls; qa-next suite 33s for 55 tests vs 23.7s for 44 — same order of magnitude.'
+  reliability:
+    status: CONCERNS
+    notes: 'Resume path: TASK-143-BUG-1 (indistinguishable resume output) and TASK-143-BUG-2 (legacy derivation). Lock create is check-then-rename, not exclusive (advisory CR-3).'
+  maintainability:
+    status: PASS
+    notes: 'One schema export, one shared resolver and one bug-path helper; SKILL.md names commands instead of describing JSON; CHANGELOG with Migration line.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-143-BUG-1 and TASK-143-BUG-2.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'skills/qa-next/SKILL.md']
+  future:
+    - action: 'Refuse control characters (\n, \r, \t, other C0) in --env labels — pre-existing on develop, reproduced by the cli: probe; the printed run path then spans two lines. Follow-up task.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Create the state file with an exclusive create (wx) and a per-process temp name so two concurrent --state-init calls cannot both win (advisory CR-3).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-143-BUG-1 and TASK-143-BUG-2 fixed']

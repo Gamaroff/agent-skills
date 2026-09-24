@@ -10,7 +10,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execFile } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
@@ -18,6 +18,8 @@ import {
   readFileSync,
   existsSync,
   rmSync,
+  utimesSync,
+  readdirSync,
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -42,6 +44,7 @@ const {
   listRunFiles,
   itemById,
   runPathFor,
+  writeStateFile,
   STATE_FIELDS,
   STATE_PHASES,
   STATES,
@@ -2110,24 +2113,26 @@ test("--state-init records the payload --item and --next print, and prints it un
   assert.equal(readStateFile(root2).targeted, false, "--next is untargeted");
 });
 
-test("--state-init: another --item exits 5 and writes nothing; the same item and --next resume; exit 3 and 4 write nothing", () => {
+test("--state-init refuses ANY existing state with exit 5 and writes nothing; exit 3 and 4 write nothing (TASK-143-BUG-1)", () => {
+  // Exit 0 means one thing — a fresh selection printed as the payload. Resuming is --state-get's
+  // job (Step 0); a state file seen here is another run, whatever item it names. The first version
+  // printed the stored state on exit 0 for the same item or --next, a shape Step 1 read as a payload.
   const root = stateCorpus();
   assert.equal(run(root, "--state-init", "--item", "D.2").code, 0);
   const before = readFileSync(STATE(root), "utf8");
-
-  const other = run(root, "--state-init", "--item", "D.1");
-  assert.equal(other.code, 5, other.out);
-  assert.match(
-    other.out,
-    /run-in-progress: the state file names D\.2, not D\.1/,
-  );
-  assert.equal(readFileSync(STATE(root), "utf8"), before, "nothing written");
-
-  for (const args of [["--item", "d.2"], ["--next"]]) {
+  for (const args of [["--item", "D.1"], ["--item", "d.2"], ["--next"]]) {
     const again = run(root, "--state-init", ...args, "--json");
-    assert.equal(again.code, 0, `${args}: ${again.out}`);
-    assert.equal(JSON.parse(again.out).item, "D.2", `${args} resumes D.2`);
-    assert.equal(readFileSync(STATE(root), "utf8"), before, "unchanged");
+    assert.equal(again.code, 5, `${args}: ${again.out}`);
+    assert.match(
+      again.out,
+      /run-in-progress: a qa-next run for D\.2 is in flight/,
+    );
+    assert.equal(
+      again.out.includes('"id"'),
+      false,
+      `${args}: no payload printed`,
+    );
+    assert.equal(readFileSync(STATE(root), "utf8"), before, "nothing written");
   }
 
   const empty = stateCorpus();
@@ -2140,6 +2145,70 @@ test("--state-init: another --item exits 5 and writes nothing; the same item and
   assert.equal(none.code, 3, none.out);
   assert.equal(existsSync(STATE(empty)), false, "exit 3 writes nothing");
   assert.equal(run(empty, "--state-init").code, 2, "neither --item nor --next");
+});
+
+test("eight concurrent --state-init calls: exactly one wins, the rest exit 5 run-in-progress (CR-3)", async () => {
+  // With the exclusive create this holds by construction — link() lets exactly one process place the
+  // file. Without it, processes that all passed the existence check each write, and several exit 0.
+  const root = stateCorpus();
+  const one = () =>
+    new Promise((resolve) =>
+      execFile(
+        "node",
+        [TOOL, "--root", root, "--state-init", "--next", "--json"],
+        (err, stdout, stderr) =>
+          resolve({ code: err ? err.code : 0, out: stdout + stderr }),
+      ),
+    );
+  const results = await Promise.all(Array.from({ length: 8 }, one));
+  const codes = results.map((r) => r.code).sort();
+  assert.deepEqual(
+    codes,
+    [0, 5, 5, 5, 5, 5, 5, 5],
+    JSON.stringify(results.map((r) => r.out.slice(0, 80))),
+  );
+  const winner = results.find((r) => r.code === 0);
+  assert.equal(
+    readStateFile(root).item,
+    JSON.parse(winner.out).id,
+    "the file is the winner's",
+  );
+  assert.deepEqual(
+    readdirSync(path.dirname(STATE(root))),
+    ["qa-next.state.json"],
+    "no temp file left behind",
+  );
+});
+
+test("the lock is created exclusively: a state file that appears after the check is not overwritten (CR-3)", () => {
+  // --state-init checks, then creates. The create is link(), which fails if the file exists, so a
+  // second init that passed the check in the same instant loses instead of replacing the winner.
+  const dir = mkdtempSync(path.join(os.tmpdir(), "qa-next-lock-"));
+  const p = path.join(dir, "qa-next.state.json");
+  writeStateFile(p, { item: "D.1", phase: "selected" }, { exclusive: true });
+  const winner = readFileSync(p, "utf8");
+  assert.throws(
+    () =>
+      writeStateFile(
+        p,
+        { item: "D.2", phase: "selected" },
+        { exclusive: true },
+      ),
+    (e) =>
+      e.code === 5 && /run-in-progress: a qa-next run for D\.1/.test(e.message),
+  );
+  assert.equal(readFileSync(p, "utf8"), winner, "the first lock survives");
+  writeStateFile(p, { item: "D.1", phase: "resolved" });
+  assert.equal(
+    JSON.parse(readFileSync(p, "utf8")).phase,
+    "resolved",
+    "an update replaces",
+  );
+  assert.deepEqual(
+    readdirSync(dir),
+    ["qa-next.state.json"],
+    "no temp file left behind on either path",
+  );
 });
 
 test("--state-get exits 6 with no state; --state-clear is idempotent", () => {
@@ -2352,6 +2421,67 @@ test("a v0.51.0-shape state file is answered with targeted, priorRuns, bug and f
     !("derived" in readStateFile(root)),
     "derived on read, never written back",
   );
+});
+
+test("a real v0.51.0 file has runFile null: the derived priorRuns still excludes the run's own file (TASK-143-BUG-2)", () => {
+  // v0.51.0 never told the skill to record runFile. Excluding only state.runFile therefore counted
+  // this run's own file as a prior run, and the first run after an upgrade was committed as a re-run.
+  const root = stateCorpus();
+  const runs = path.join(root, "docs/qa/runs/D.1");
+  mkdirSync(runs, { recursive: true });
+  const old = path.join(runs, "2026-09-01-lan.md");
+  writeFileSync(old, "# an earlier run\n");
+  const past = new Date("2026-09-01T12:00:00Z");
+  utimesSync(old, past, past);
+  const startedAt = new Date(Date.now() - 60_000).toISOString();
+  writeFileSync(path.join(runs, "2026-09-24-lan.md"), "# this run\n"); // written after the start
+  const legacy = (phase, lastRun) => {
+    writeFileSync(
+      REG(root),
+      readFileSync(REG(root), "utf8").replace(
+        /^\| D\.1 \|.*$/m,
+        `| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | 🟡 pass | [r](${lastRun}) |  |`,
+      ),
+    );
+    mkdirSync(path.dirname(STATE(root)), { recursive: true });
+    writeFileSync(
+      STATE(root),
+      JSON.stringify({
+        item: "D.1",
+        function: "Play a game",
+        surface: "D",
+        stories: ["7.5"],
+        uatSpecs: [],
+        lane: null,
+        runFile: null,
+        phase,
+        startedAt,
+      }),
+    );
+    return JSON.parse(run(root, "--state-get", "--json").out);
+  };
+  const expected = ["runs/D.1/2026-09-01-lan.md"];
+  assert.deepEqual(
+    legacy("executed", "runs/D.1/2026-09-01-lan.md").priorRuns,
+    expected,
+    "mid-Step-4: the file written after the run started is this run's",
+  );
+  assert.deepEqual(
+    legacy("recorded", "runs/D.1/2026-09-24-lan.md").priorRuns,
+    expected,
+    "from recorded on: the row's Last run is this run's",
+  );
+  // Each exclusion holds alone. With no usable startedAt only Last run identifies the file.
+  writeFileSync(
+    STATE(root),
+    JSON.stringify({ item: "D.1", runFile: null, phase: "committed" }),
+  );
+  assert.deepEqual(
+    JSON.parse(run(root, "--state-get", "--json").out).priorRuns,
+    expected,
+    "Last run alone excludes it",
+  );
+  // (The executed case above is the time-only exclusion: at executed, Last run is not consulted.)
 });
 
 test("a state file that is not one is refused by name, exit 1", () => {
