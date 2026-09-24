@@ -127,12 +127,13 @@ QA-cycle finding.
   shape released in v0.51.0, which has no `targeted`, `priorRuns`, `bug` or `filedBug` — is answered
   with each missing field **derived** and named in `derived: [...]`, never a silent default:
   - `targeted` → `false` (v0.51.0 took no id argument; every run was untargeted);
-  - `priorRuns` → the row's current `priorRuns` minus this run's own file: the state's `runFile`,
-    or, when it is null (v0.51.0 never recorded one, TASK-143-BUG-2), the file whose
-    `<date>-<env>.md` name is dated on or after the run's start date (v0.51.0 wrote one per date;
-    the earlier of the UTC and local start dates is used). An unparseable `startedAt` names
-    `priorRuns` in `unverifiable` as well (TASK-143-BUG-3: a `Last run` / mtime heuristic misfired
-    after `na`/`blocked` early exits and refreshed mtimes);
+  - `priorRuns` → the row's current `priorRuns` minus this run's own file (`runFile`). When `runFile`
+    is null (v0.51.0 never recorded one, TASK-143-BUG-2), the answer depends on the phase. Before
+    `executed` it is exact: the run has written no file, so nothing is excluded. From `executed` on,
+    the file named on or after the run's **local** start date is excluded (v0.51.0 wrote
+    `<local date>-<env>.md`), and `priorRuns` is always named in `unverifiable`, because the env label,
+    a same-day run under another label and a mis-written `startedAt` cannot be seen
+    (TASK-143-BUG-3, BUG-4);
   - `bug` → the row's current bug link while `phase` is before `recorded` (Step 4.4 has not yet
     rewritten the note cell); `null` from `recorded` on (its only reader, Step 4's reuse decision,
     has already run);
@@ -402,6 +403,7 @@ None.
 | 2026-09-24 |  | Implemented — 8 files, 11 new tests (qa-next suite 44 → 55; security-probe cli-consumer test now asserts engages) | develop |
 | 2026-09-24 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-09-24 |  | QA gate CONCERNS (80/100) — 2 findings (cycle 2 refute pass) | qa-task |
+| 2026-09-24 |  | QA gate CONCERNS (80/100) — 3 findings (cycle 3) | qa-task |
 
 ---
 <!-- change-log-end -->
@@ -425,20 +427,19 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.143.qa.2.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.2.qa-next-state-file-owned-by-the-tool.md)
-- **Gate File**: [task.143.gate.2.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.2.qa-next-state-file-owned-by-the-tool.yml)
+- **Full Report**: [task.143.qa.3.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.3.qa-next-state-file-owned-by-the-tool.md)
+- **Gate File**: [task.143.gate.3.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.3.qa-next-state-file-owned-by-the-tool.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 58 (qa-next suite); 19 executed probes
+- **Tests Executed**: 59 (qa-next suite); 19 executed probes
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 1 MEDIUM, 1 LOW
+- **Critical Issues**: 0 HIGH, 2 MEDIUM, 1 LOW
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-- TASK-143-BUG-1 fixed; TASK-143-BUG-2 partial. Its fix's heuristics misfire (TASK-143-BUG-3).
-- TASK-143-QA2-2 — stale header comment.
+- TASK-143-BUG-3 and QA2-2 fixed. The replacement legacy date rule ignores the phase and the timezone (TASK-143-BUG-4).
 - Pre-existing (not attributed to this change): `--env` accepts newline/CR/tab labels, routed to a follow-up.
 
 ---

@@ -20,10 +20,11 @@ All notable changes to this project will be documented in this file. Format foll
   `--state-set` writes only `phase` (forward only), `runFile`, `filedBug` and `lane`, and refuses an
   init-only field by name. A state file from v0.51.0, which lacks `targeted`, `priorRuns`, `bug` and
   `filedBug`, still resumes: each missing field is derived from the row, correct for the phase it is
-  read at, and named in `derived`. Its `runFile` is null (v0.51.0 never recorded one), so this run's
-  own file is found by its name: v0.51.0 wrote one `<date>-<env>.md` per date, and a file dated on or
-  after the run's start date is this run's. When `startedAt` does not parse, `priorRuns` is also
-  named in `unverifiable`. SKILL.md now names a command wherever it used to describe JSON.
+  read at, and named in `derived`. Its `runFile` is null (v0.51.0 never recorded one). Before
+  `executed` that does not matter, because the run has written nothing yet and `priorRuns` is exact.
+  From `executed` on, the run's own file is excluded by its name (v0.51.0 wrote
+  `<local date>-<env>.md`), and `priorRuns` is also named in `unverifiable`, because nothing v0.51.0
+  recorded can confirm it. SKILL.md now names a command wherever it used to describe JSON.
   Tests derived from `STATE_FIELDS` cover the schema and are mutation-proved.
 
 - **`security-probe.mjs --entry cli:<path> --argv '<JSON array>'` — a boundary behind a Node CLI's

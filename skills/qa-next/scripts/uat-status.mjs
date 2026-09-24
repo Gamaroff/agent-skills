@@ -895,8 +895,7 @@ export function runPathFor(existing, date, env) {
   // Checked on the BUILT name, which is what seqKey reads. A label ending in -NN makes the name end
   // in -NN, and so does a two-digit label: the date itself ends in -DD, so "10" builds
   // 2026-09-22-10.md — run 10 of env "2026-09-22" to seqKey — although the label alone ends in no
-  // "-NN". A guard on the label passed it (task.141 PR review 2, CR-1). The ambiguity is created at
-  // WRITE time, so it is refused here rather than guessed at read time, where nothing knows the env.
+  // "-NN". A guard on the label passed it (task.141 PR review 2, CR-1).
   const base = `${date}-${env}`;
   if (/-\d{2}$/.test(base))
     die(
@@ -1278,17 +1277,23 @@ export function stateView(opts, state) {
   const r = legacy ? itemById(readRegistry(opts), state.item) : null;
   const history = has("priorRuns") ? null : priorRuns(opts, state.item);
   if (!has("priorRuns")) {
-    // The row's history minus this run's own file — the row as it was when the run began. v0.51.0
-    // never recorded runFile (TASK-143-BUG-2), so on a real legacy file it is null and the own file
-    // is found by NAME: v0.51.0 wrote exactly one runs/<id>/<date>-<env>.md per date, with no
-    // sequence suffix, so a file dated on or after the run's start date is this run's (or was
-    // overwritten by it). Neither the row's Last run (unchanged by a na/blocked early exit) nor an
-    // mtime (hand-written startedAt, refreshed by a checkout) can say that — TASK-143-BUG-3.
+    // The row's history minus this run's own file — the row as it was when the run began.
+    // v0.51.0 never recorded runFile (TASK-143-BUG-2), so on a real legacy file it is null. Before
+    // `executed` that does not matter: Step 4 writes the run file, so this run has written none yet
+    // and the history IS the pre-run history — exact. From `executed` on the own file may exist, and
+    // v0.51.0 kept no record that says which it is. The best available signal is its name: v0.51.0
+    // wrote one runs/<id>/<local date>-<env label>.md, so a file named on or after the run's local
+    // start date is excluded. That cannot see the env label, a same-day run under another label,
+    // or a start date the agent wrote wrongly, so the answer is flagged `unverifiable` every time
+    // rather than presented as fact (TASK-143-BUG-3, BUG-4). Neither the row's Last run (unchanged by
+    // a na/blocked early exit) nor an mtime (refreshed by a checkout) was a better signal.
     const own = new Set([state.runFile].filter(Boolean));
-    if (!state.runFile) {
-      const start = startDate(state.startedAt);
-      if (start === null) unverifiable.push("priorRuns");
-      else
+    const executed =
+      STATE_PHASES.indexOf(state.phase) >= STATE_PHASES.indexOf("executed");
+    if (!state.runFile && executed) {
+      unverifiable.push("priorRuns");
+      const start = localDate(state.startedAt);
+      if (start !== null)
         for (const f of history)
           if ((basename(f).match(/^\d{4}-\d{2}-\d{2}/) ?? [""])[0] >= start)
             own.add(f);
@@ -1318,17 +1323,14 @@ export function stateView(opts, state) {
   return out;
 }
 
-// The run's start date as YYYY-MM-DD, or null when startedAt does not parse. v0.51.0 had the agent
-// write startedAt by hand and name the run file by the local date, so the EARLIER of the UTC and the
-// local calendar date is used: a run started near midnight still counts its own file.
-function startDate(startedAt) {
+// The run's LOCAL start date as YYYY-MM-DD, or null when startedAt does not parse — the date
+// v0.51.0 put in its run file's name (TASK-143-BUG-4: a UTC fallback is too early east of UTC).
+function localDate(startedAt) {
   const t = Date.parse(startedAt ?? "");
   if (Number.isNaN(t)) return null;
   const d = new Date(t);
   const pad = (n) => String(n).padStart(2, "0");
-  const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const utc = d.toISOString().slice(0, 10);
-  return local < utc ? local : utc;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function printState(opts, view) {

@@ -83,7 +83,7 @@ Apply any project-wide command conventions from the consumer project's own CLAUD
 
 `targeted` is true when the invocation named an id. A resume at `phase: selected` then re-resolves *that* id with `--item`, rather than falling back to `--next` and quietly testing a different function.
 
-A state file written by an older release, which lacks `targeted`, `priorRuns`, `bug` and `filedBug`, still resumes. `--state-get` derives each missing field from the row, correct for the phase it is read at, and names it in `derived`. When a value cannot be established at all (the old file's `startedAt` does not parse), the field is also named in `unverifiable`. Say so in the report whenever either list is present.
+A state file written by an older release, which lacks `targeted`, `priorRuns`, `bug` and `filedBug`, still resumes. `--state-get` derives each missing field from the row, correct for the phase it is read at, and names it in `derived`. A value that is a best effort rather than a fact is also named in `unverifiable`. That is always so for `priorRuns` on an old file from `executed` on, because the old skill never recorded which run file was its own. Say so in the report whenever either list is present.
 
 Resume on re-run (Step 0, `--state-get` exit 0), by `phase`: `committed` → Step 6; `recorded` → Step 5; `executed` → Step 4; `resolved` → Step 3; `selected` → Step 2, with the payload from `--item <item> --json`. If the phase is `selected` and the row for `item` is no longer ⬜, someone else finished it: `--state-clear` and start over. **This applies to an untargeted run only.** Under `targeted: true`, a non-⬜ row is the premise, not evidence about anyone else, so the resume re-resolves the id instead.
 
