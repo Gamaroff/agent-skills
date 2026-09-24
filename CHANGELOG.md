@@ -88,6 +88,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **Review checks that a criterion's stated outcome is one the deciding function can return (task 145,
+  obs #168).** `/review-task` Step 3 gains check 10, *Outcome reachability*: when a success criterion
+  or test case says what a named function returns for a stated input, the reviewer walks that input
+  through the function's branches and confirms the promised outcome is the branch that fires, and
+  reports an unreachable one as **Important**. The same check lands where the defect is introduced
+  (`/create-task` Step 3.5, Critical) and at the two sibling sites (`/review-story` Step 4 check 7,
+  `/review-bug` Step 3). Earlier checks asked whether a named function *exists*. None asked whether
+  it can *produce* the outcome the document promises. task.144 promised `present-but-inert` for an
+  accept-all fixture, and `computeVerdict` scores that `absent`. Review read the function in full and
+  passed the claim, and develop found it. `tests/outcome-reachability-check.test.js` keeps the check
+  at all four sites, scoped to the check's own list item. Section scope would have been vacuous,
+  because `a function` already appears in two of the four sections.
 - **`uat-status.mjs --set <id> <verdict>`: only a `fail` moves an `✅ accepted` row (task 141).** A `pass`,
   `blocked` or `na` against an accepted row now leaves `✅` in place and updates only `Last run` and
   `Notes / bug`; the tool prints `(kept)` so the branch it took is never silent. `fail` is unchanged

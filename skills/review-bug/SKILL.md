@@ -79,6 +79,7 @@ This is the bug-review analog of review-task's anti-hallucination pass — the s
 - **Reproduction Steps**: numbered, concrete, self-contained; each step is an action a developer can take. Vague/narrative-only steps → **Critical** (a bug you cannot reproduce from the report cannot be reliably fixed).
 - **Environment** specified (OS/browser/device/version/test env) → **Important** if absent for a Major+ bug.
 - **Expected vs Actual** both explicit and specific → **Critical** if one is missing/ambiguous.
+- **Expected outcome is reachable** (obs #168): when the Expected Behavior names what a function returns for the reproduction input — a verdict, an exit code, a status — walk that input through the named function's decision branches and confirm a branch of the fixed code returns it. An expected outcome that no branch produces is a fix that cannot pass its own verification → **Important**, naming the branch that fires instead.
 - **Frequency** + **Reproducible** fields set → **Important** if absent.
 - **Evidence** (logs, stack traces, screenshots, failing command output) present → **Important** for Major+, **Optional** for Minor/Trivial. Evidence is what makes Step-3 root-cause localisation in develop-bug tractable.
 

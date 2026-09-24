@@ -49,8 +49,9 @@ Add to *Common Hallucination Patterns to Detect*:
   `- **An outcome the named function cannot return** (obs #168): when a criterion or test case states
   what a named function returns for a stated input, walk the input through the function's branches.
   An unreachable outcome is a criterion the developer must silently rewrite or silently fail.`
-- **review-story** § *Step 4* › *Validation Checks* — check **5. Outcome reachability** (obs #168),
-  the review-task text with "acceptance criterion" for "success criterion".
+- **review-story** § *Step 4* › *Validation Checks* — check **7. Outcome reachability** (obs #168),
+  after *6. Reference Validation* (checks 5 and 6 already exist), the review-task text with
+  "acceptance criterion" for "success criterion".
 - **review-bug** § *Step 3: Reproducibility Clarity* — one bullet after *Expected vs Actual*: when the
   Expected Behavior names what a function returns for the reproduction input, confirm a branch of the
   fixed code returns it; an unreachable expected outcome is a fix that cannot pass its own
@@ -69,12 +70,17 @@ const SITES = [
 ];
 // section(file, heading): lines from the heading to the next heading of the same or higher level,
 // skipping fenced blocks — so a mention elsewhere in the file cannot satisfy the site.
-// Assert per site: section found (floor), /obs #168/, and the three elements
-// (/stated input|reproduction input/, /named function|a function/, /branch/).
+// item(section): the list item whose first line carries `obs #168`, through to the next list item at
+// the same indentation (or the section end). The three elements are asserted on the ITEM, not the
+// section — `a function` already occurs in the review-task Step 3 and create-task 3.5 sections, so a
+// section-scoped element assertion passes with the check absent (task.145 review, finding 2).
+// Assert per site: section found (floor), /obs #168/ in the section, item found, and the three
+// elements in the item (/stated input|reproduction input/, /named function|a function/, /branch/).
 ```
 
 Mutation proof: for each site, `cp` the file, delete the check, run the test, confirm red names that
-file, restore from the snapshot.
+file, restore from the snapshot. Then, on one site, remove each element phrase from the item in turn
+and confirm red names the element.
 
 ### Phase 4: docs
 

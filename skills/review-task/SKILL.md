@@ -849,6 +849,22 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - A documented knob that nothing reads is silently ignored: the user sets it, nothing happens, and the documentation is the only reason they believed otherwise
    - Check each documented default against the code's actual default, not against surrounding prose
 
+10. **Outcome reachability** (obs #168):
+    - When a success criterion, test case or Testing Strategy row states the outcome a **named
+      function** produces for a **stated input** — a verdict, an exit code, a status, a return
+      value — open the function and walk that input through its decision branches
+    - Confirm the stated outcome is the **branch that fires**. Whether the function exists is
+      check 2's question; this one asks whether it can return what the document promises for that
+      input
+    - Worked example: task.144 said an accept-all fixture would score `present-but-inert`.
+      `computeVerdict` returns that verdict only when some hostile case was rejected; an accept-all
+      rejects none, so the `absent` branch fires. Review read the function in full and passed the
+      claim; develop found it
+    - Flag as **Important** when the outcome is unreachable — name the branch that fires and what it
+      returns; **Optional** when the branch depends on an input the document does not pin down
+      ("state the input")
+    - Out of scope: a criterion that names no function, or no outcome of one ("the docs say X")
+
 **Common Hallucination Patterns to Detect**:
 
 - ❌ Libraries not in package.json or tech stack
@@ -857,6 +873,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ Database fields not in Prisma schema
 - ❌ Code patterns that violate project standards
 - ❌ Config keys, env vars or flags that no code reads
+- ❌ An outcome no branch of the named function returns for the stated input
 
 **Issues to Flag**:
 
