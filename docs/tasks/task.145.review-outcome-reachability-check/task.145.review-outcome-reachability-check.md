@@ -303,12 +303,40 @@ None.
 <!-- change-log-start -->
 ## Change Log
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-25
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.145.qa.1.review-outcome-reachability-check.md](./task.145.qa.1.review-outcome-reachability-check.md)
+- **Gate File**: [task.145.gate.1.review-outcome-reachability-check.yml](./task.145.gate.1.review-outcome-reachability-check.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3998 (3997 pass, 0 fail, 1 skipped)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 (MEDIUM: 2, LOW: 1)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+- CR-1 (medium): the "branch that fires" element assertion is vacuous at 3 of 4 sites; "decision branches" satisfies `/\bbranch/`.
+- QA-2 (medium): the review-bug check asks a pre-fix review about "the fixed code".
+- QA-3 (low): review-task's existence-check cross-reference names the wrong check.
+
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft | create-task |
 | 2026-09-24 | 1.1     | Review passed (8/10) — review-story target renumbered check 5 → check 7 (checks 5–6 already exist); population test element assertions scoped to the check's own item (section scope was pre-satisfied) | review-task |
 | 2026-09-24 |         | Status → ready-for-development | review-task |
 | 2026-09-25 |  | Implemented — 6 files, 6 tests (4 review-skill sites, population test, CHANGELOG) | develop |
+| 2026-09-25 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-09-25 |  | QA findings fixed — cycle 1 (CR-1, QA-2, QA-3; CR-3/CR-4 reader hardening), 1 iteration | qa-fix |
 
 ---
 <!-- change-log-end -->
@@ -355,3 +383,14 @@ None.
 - **Mutation proof** (from `cp` snapshots, restored after each run): deleting the check from each of
   the 4 sites → red naming the site; removing each of the 3 elements from review-bug's item → red
   naming the element; renaming the review-bug heading → the floor goes red naming the heading.
+- **QA cycle 1 fixes** (qa-fix):
+  - CR-1: the branch element matches `/branch that fires/`. The dev proof had removed elements at
+    review-bug only, and "decision branches" kept `/\bbranch/` green at the other three sites.
+    12/12 element mutants are now red.
+  - QA-2: the review-bug bullet is reworded for a pre-fix review.
+  - QA-3: the existence-check cross-references are corrected. review-task now reads "Checks 1–5
+    and 9", review-story "Checks 1–6".
+  - CR-3 and CR-4: the readers track fences by marker kind and length (`fenceStep`), locate the
+    start heading outside fences, split on CRLF, and end the item at a fence opening at its own
+    indentation.
+  - 8 tests. Each reader fix is mutation-proven red.

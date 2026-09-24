@@ -947,9 +947,9 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - When an acceptance criterion, test case or Testing row states the outcome a **named function**
      produces for a **stated input** — a verdict, an exit code, a status, a return value — open the
      function and walk that input through its decision branches
-   - Confirm the stated outcome is the **branch that fires**. Whether the function exists is the
-     other checks' question; this one asks whether it can return what the story promises for that
-     input
+   - Confirm the stated outcome is the **branch that fires**. Checks 1–6 ask whether what the story
+     names exists and has the shape it claims. This one asks whether the function can return what
+     the story promises for that input
    - Worked example (from a task): task.144 said an accept-all fixture would score
      `present-but-inert`; `computeVerdict` returns that verdict only when some hostile case was
      rejected, so an accept-all takes the `absent` branch. Review passed the claim; develop found it

@@ -1,0 +1,77 @@
+schema: 1
+task: 'task.145.review-outcome-reachability-check'
+task_title: "review-task: trace a criterion's stated outcome through the function that decides it"
+gate: CONCERNS
+status_reason: 'All four sites carry the check and every gate command is green, but the population test does not hold its "branch that fires" element at 3 of 4 sites ("decision branches" satisfies /\bbranch/), and the review-bug wording asks a pre-fix review to check "the fixed code", which reads as flagging every bug.'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T22:16:55Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'tests/outcome-reachability-check.test.js'
+    finding: 'The "branch that fires" element regex /\bbranch/ is already met by "walk that input through its decision branches" at review-task, review-story and create-task. Replacing the "branch that fires" phrase in those items with other wording leaves the suite green (measured: fail 0 at each of the 3 sites). Success criterion 3 ("fails when any one of the three elements is removed") is therefore false for 3 of 4 sites; the dev-time element mutation ran on review-bug only.'
+    suggested_action: 'Match the element on /branch that fires/ (all four items carry that phrase) and re-run the per-element mutation proof on every site, recording the 4x3 matrix.'
+    suggested_owner: dev
+    bug_ref: 'task.145.bug.1.branch-element-vacuous.md'
+  - id: 'QA-2'
+    severity: medium
+    file: 'skills/review-bug/SKILL.md'
+    finding: 'The review-bug bullet asks the reviewer to "confirm a branch of the fixed code returns it", but review-bug runs before any fix exists and the current code returns the Actual by definition. Read literally, the branch that fires today always differs from the Expected, so every bug with a function-level Expected would be flagged Important. That is the over-firing the task names as a rollback trigger.'
+    suggested_action: 'Reword for a pre-fix review: the check is whether the Expected outcome is one the named function can return (an existing branch, or one the fix can add without contradicting another stated behaviour) for the reproduction input. State that the branch firing today is the bug''s Actual and is not a finding.'
+    suggested_owner: dev
+    bug_ref: 'task.145.bug.2.review-bug-prefix-wording.md'
+  - id: 'QA-3'
+    severity: low
+    file: 'skills/review-task/SKILL.md'
+    finding: '"Whether the function exists is check 2''s question" names the wrong check: check 2 is File Path Accuracy. The task document attributes existence to checks 2, 5 and 9. review-story''s "the other checks'' question" names none.'
+    suggested_action: 'Cite the checks that verify named things exist (review-task: checks 2, 3 and 5; review-story: checks 1, 3 and 4) or drop the cross-reference.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3998
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary in the change set (boundary: false): prose in four SKILL.md files and a read-only test that imports only node:fs and node:path. Nothing accepts or rejects input on behalf of a caller.'
+  performance:
+    status: PASS
+    notes: 'New test runs in about 135 ms (6 tests). No runtime code changed.'
+  reliability:
+    status: PASS
+    notes: 'Heading floor turns a renamed heading red. Robustness gaps in the readers (CR-3 fence handling, CR-4 fence after item) are not triggered by any current file and are recorded as advisory.'
+  maintainability:
+    status: CONCERNS
+    notes: 'One of the three element assertions is not held at 3 of 4 sites (CR-1), and the reported "8/8 mutants red" covered element removal at one site only.'
+
+recommendations:
+  immediate:
+    - action: 'Tighten the branch element to /branch that fires/ and prove all 12 element mutants red (CR-1).'
+      refs: ['tests/outcome-reachability-check.test.js']
+    - action: 'Reword the review-bug bullet for a pre-fix review (QA-2).'
+      refs: ['skills/review-bug/SKILL.md']
+  future:
+    - action: 'CR-3: skip fenced lines when locating the start heading, and match fence markers by kind/length ( / ~~~). Not triggered by any current site.'
+      refs: ['tests/outcome-reachability-check.test.js']
+    - action: 'CR-4: let a fence line at or shallower than the item indent end the citing item. Not triggered by any current site.'
+      refs: ['tests/outcome-reachability-check.test.js']
+    - action: 'Step 4b zero-blocks-executed on review-task (1 placeholder) and review-story (4 placeholders) is pre-existing: identical counts on origin/develop, and the diff adds 0 fenced blocks.'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 and QA-2 fixed'
