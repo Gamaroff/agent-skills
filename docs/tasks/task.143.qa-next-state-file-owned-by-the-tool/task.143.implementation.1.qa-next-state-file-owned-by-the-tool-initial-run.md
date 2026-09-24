@@ -3,7 +3,7 @@
 **Task**: `task.143.qa-next-state-file-owned-by-the-tool.md`
 **Run Number**: 1
 **Started**: 2026-09-24 04:31
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Give `/qa-next`'s run state file an owner: `uat-status.mjs` gains `--state-*` su
 | 2. review-task             | ✅ Done    | `task.143.review.{N}.{name}.md` exists (or skip logged)                | review.1 — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 4/4 phases; ci:fast green | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #475: https://github.com/Gamaroff/agent-skills/pull/475 | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.143.qa.{N}.*.md`; `task.143.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.143.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.143.qa.{N}.*.md`; `task.143.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 7 cycles (5 + 2 granted); gate.7 CONCERNS 90/100 accepted by user; 5c not run (user chose /finalise) | —                    |
+| 7. finalise                | ✅ Done    | `task.143.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -98,6 +98,32 @@ Give `/qa-next`'s run state file an owner: `uat-status.mjs` gains `--state-*` su
 - QA loop re-entry: 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk (highest gate on disk `gate.5`, 5 `### QA Cycle` entries — no gap).
 - User chose "Resume with 2 more cycles" at the Phase 0b escalation prompt (recommended k = 2; the escalation entry had suggested 1).
 - `grant-qa-cycles.sh`: lock restored from the halt snapshot; `QA_CYCLE=5`, `extra_cycles_granted=2`, `qa_max_cycles=7`, `qa_phase=5a`. The loop re-enters at 5a as cycle 6.
+
+### Loop Escalation Resolved — Gate Accepted — 2026-09-24
+
+- User decision after the second loop-limit halt: **"accept and run /finalise"**, which is halt option 2 (accept the current gate status and proceed with `/finalise`).
+- Gate accepted: gate.7 CONCERNS 90/100. Its one open entry, TASK-143-QA7-1 (low), is fixed in `f8b2c958` (a test-only change, mutation-proved) but not re-gated. The NFR CONCERNS are a pre-existing `--env` control-character issue and the documented legacy-migration limitation, both routed to follow-ups.
+- Step 5c (`/review-pr`) was **not run**. The user chose to proceed to `/finalise` directly rather than through the loop's exit gate. The PR has had no conformance review in this run.
+- Lock restored from the halt snapshot (`advance-pipeline-lock.sh --restore`) and advanced 5 → 7.
+
+### Step 7 — finalise — 2026-09-24
+
+- `/finalise` invoked (not inlined). The four DoD agents ran in parallel. AC PARTIAL: 6/6 functional criteria pass with CI-run tests, and 6 process criteria are met by inspection, measurement or the mutation record (suite wall-clock `develop` ≈ 24.5 s / 44 tests vs branch ≈ 36 s / 63 tests). Security PASS (47 probes; the `--state-set` field guard engages 22/22; the 5 reproduced `--env` labels are pre-existing on `develop`). Compliance NOT_APPLICABLE. Docs PASS.
+- Decision: ACCEPTED on the operator's decision, over AC PARTIAL and the absence of any PR review (no GitHub review, and Step 5c did not run). The same shape as task.141's acceptance.
+- DoD summary: `docs/tasks/task.143.qa-next-state-file-owned-by-the-tool/task.143.dod.1.qa-next-state-file-owned-by-the-tool.md` (security record `task.143.dod.1.security.run.json` beside it).
+- CI reading 1: SUCCESS @ `d52234b2` over 5 checks; CI reading 2: SUCCESS @ `f4ec8ff7` over 5 checks after 120 s (acceptance commit `f4ec8ff7`, pushed; the document, DoD and sprint review were each asserted tracked and on origin).
+- Task `status: accepted` (frontmatter and body), Change Log 1.2, registry row 143 `planned` → `accepted` (`registry-tick.js`: ticked). CHANGELOG cites (task 143) (6d).
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/475#issuecomment-5821739850. Canonical summary: https://github.com/Gamaroff/agent-skills/pull/475#issuecomment-5821729369.
+- Issue #469: Document link already on `develop`; `done` comment posted (orchestrator re-post `already`); close → performed. Post-close state check: issue #469 state = CLOSED, errors = 0. GitHub Issue #469 — close: CLOSED ✅.
+- GitHub Issue #469 — board: done → already.
+- Tracker actions journal: empty → Tracker debt: none.
+- Task completed.
+
+### Step 8 — commit-changes — 2026-09-24
+
+- Report finalised: Finished, Final Status `Completed`, QA Iterations 7, Completion Summary. `report-lint.js` ok.
+- Step 8 check 3 as written (`^\*\*Final Status:\*\*` / `^\*\*Finished:\*\*`, colon inside the bold) **fails on this template-conformant report**. The task template writes `**Final Status**:` (colon outside the bold), and only the bug variant uses the other form. Verified with the template's form instead: both lines match. The report was not bent to fit the check. The mismatch is logged as observation #173; task.139 and task.141 carry the same form.
+- Committed via `/commit-changes --scope` the work-item directory (the implementation report only; everything else went out in finalise's acceptance commit `f4ec8ff7`).
 
 ---
 
@@ -249,10 +275,12 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated — QA loop limit reached again after the re-entry grant (7 cycles, gate CONCERNS 90/100, HIGH 0 throughout, MEDIUM 0 on the last gate; cycle 7's test-only fix ungated)
+**Finished**: 2026-09-24 20:30 UTC
+**Final Status**: Completed — accepted on the operator's decision over gate.7 CONCERNS (90/100) after the QA loop limit; no PR conformance review ran; acceptance commit `f4ec8ff7`
 **Branch**: feature/task.143.qa-next-state-file-owned-by-the-tool
 **PR**: https://github.com/Gamaroff/agent-skills/pull/475
-**QA Iterations**: 7 (limit, 5 + 2 granted)
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 7 (5 + 2 granted on re-entry)
+**DoD Summary**: docs/tasks/task.143.qa-next-state-file-owned-by-the-tool/task.143.dod.1.qa-next-state-file-owned-by-the-tool.md
+**Tracker debt**: none
+
+**Completion Summary**: Implemented tool ownership of `/qa-next`'s run state file. `uat-status.mjs` gained `--state-init/--state-get/--state-set/--state-clear` and one exported `STATE_FIELDS` schema, SKILL.md Steps 0–6 now call commands instead of describing JSON, and task.141's three LOW deferrals (the two-digit `--env` guard, path separators, the Step 4.4 pass bullet) are closed. The qa-next suite went from 44 to 63 tests. The QA loop took 7 cycles (5, plus 2 granted after the first loop-limit halt) with HIGH 0 throughout. Every MEDIUM from cycle 2 on sat in one mechanism, migrating a v0.51.0 state file mid-run. Cycle 6 stopped adding ownership rules and made the tool say what it cannot know (`unverifiable`), after which the loop found only a test-coverage LOW. The operator accepted gate.7 at the second loop-limit halt and finalised without the Step 5c PR conformance review, so **PR #475 has had no conformance review**. Follow-ups: control characters in `--env` (pre-existing), a `--state-set` lock-ownership check, surfacing a stray v0.51.0 half-written file, and two test cleanups.
