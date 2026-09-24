@@ -2532,3 +2532,81 @@ test("cli entry: a NAMED re-run whose argv differs is a normal replacement — n
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("cli entry: a probe declined before its template is used keeps its identity — the corrected re-run REPLACES it (task.144 5c CR-1)", () => {
+  // A wrong --repo-root makes resolveEntry decline `outside-repo-root` before
+  // the template was ever attached to the result. That entry was recorded with
+  // argv: null, so controlKey dropped its --name (and, unnamed, its skeleton):
+  // the corrected re-run keyed differently, landed in a SECOND entry, and the
+  // stale `unverifiable` control stayed in the record beside the real verdict.
+  const dir = mkdtempSync(join(tmpdir(), "probe-cli-decline-rerun-"));
+  try {
+    const entry = `cli:${join(REPO_ROOT, FIXTURES, "cli-refuser.mjs")}`;
+    for (const named of [true, false]) {
+      const record = join(dir, `run-${named ? "named" : "unnamed"}.json`);
+      const common = [
+        "--sink",
+        "url-authority",
+        "--entry",
+        entry,
+        "--argv",
+        JSON.stringify(HOST_ARGV),
+        "--record",
+        record,
+        ...(named ? ["--name", "host guard"] : []),
+      ];
+      const wrong = runMain([...common, "--repo-root", dir]);
+      assert.notEqual(
+        wrong.rc,
+        2,
+        "a decline is a probe outcome, not an argument error",
+      );
+      let rec = readRecord(record);
+      assert.equal(rec.controls.length, 1);
+      assert.equal(rec.controls[0].verdict, "unverifiable");
+      assert.deepEqual(
+        rec.controls[0].argv,
+        HOST_ARGV,
+        "the declined control records the template it was given",
+      );
+
+      const right = runMain(common);
+      assert.equal(right.rc, 0, right.err);
+      rec = readRecord(record);
+      assert.equal(
+        rec.controls.length,
+        1,
+        `${named ? "named" : "unnamed"}: the corrected re-run replaces the declined control`,
+      );
+      assert.equal(rec.controls[0].verdict, "engages");
+      assert.equal(rec.totals.executed, rec.controls[0].executed);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("cli entry: a named cli: control is keyed on its name even when the result carries no template (task.144 5c CR-1)", () => {
+  // A library caller's bad-argv decline has no template to record. Its name is
+  // still its identity, so its corrected run lands on the same entry.
+  const dir = mkdtempSync(join(tmpdir(), "probe-cli-badargv-rerun-"));
+  try {
+    const record = join(dir, "run.json");
+    const spec = { sink: "url-authority", entry: CLI("refuser") };
+    recordRun(record, runProbeSpec({ ...spec, argv: '["--host={input}"]' }), {
+      name: "host guard",
+    });
+    recordRun(
+      record,
+      runProbeSpec({ ...spec, argv: JSON.stringify(HOST_ARGV) }),
+      {
+        name: "host guard",
+      },
+    );
+    const rec = readRecord(record);
+    assert.equal(rec.controls.length, 1);
+    assert.equal(rec.controls[0].verdict, "engages");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
