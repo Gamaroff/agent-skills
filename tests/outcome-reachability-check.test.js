@@ -60,7 +60,10 @@ const NAMED_PHASE = {
   // The whole canonical sentence, not its prefix: cycle 4 found the three sites
   // agreeing on the prefix while only one carried the exclusion and the
   // citation (task.145 QA cycle 4, CR4-2).
-  re: /only when a named (phase|task) states it: the condition and the outcome it returns\. Cite that \1 in the finding\. A \1 that only names the function, or a criterion that promises a later \1 will add the branch, does not count/,
+  // The requirement and the exclusion are held whole. The sentence between them
+  // (naming the phase) is worded per site, because create-task has no finding to
+  // cite it in (task.145 QA cycle 5, CR5-3).
+  re: /only when a named (phase|task) states it: the condition and the outcome it returns\. Name that \1 [^.]*\. A \1 that only names the function, or a criterion that promises a later \1 will add the branch, does not count/,
 };
 // Anchored on the imperative, so a negated verdict ("Do not flag as Important
 // when …") fails the hold instead of satisfying it (CR3-6).
@@ -73,13 +76,18 @@ const REVIEW_VERDICT = {
 // planned state and left the list line saying "no branch", so a reviewer
 // following the list flagged the very outcome the item calls reachable (CR3-2).
 // These are SECTION-scoped, because the list line is outside the item.
-const PATTERN_LINE = {
-  name: "hallucination-pattern line judged against the planned state",
+// One per site, each with its OWN check number: a shared "check (?:10|7)"
+// accepted review-task pointing at its check 7 (an unrelated check) and
+// review-story pointing at a check 10 it does not have (CR5-2).
+const patternLine = (check) => ({
+  name: `hallucination-pattern line judged against the planned state (check ${check})`,
   // …and carries its own severity: the line sits in a hallucination list whose
   // protocol files every hallucination as Critical, while the check says
   // Important (CR4-1).
-  re: /❌ An outcome no current or planned branch of the named function returns for the stated input\. Report it as Important under check (?:10|7), not as a Critical hallucination/,
-};
+  re: new RegExp(
+    `❌ An outcome no current or planned branch of the named function returns for the stated input\\. Report it as Important under check ${check}, not as a Critical hallucination`,
+  ),
+});
 const STALE_PATTERN = {
   name: "hallucination-pattern line still judging against today's code",
   re: /no branch of the named function returns/,
@@ -89,7 +97,7 @@ const SITES = [
     file: "skills/review-task/SKILL.md",
     heading: "### Step 3: Technical Accuracy and Anti-Hallucination Review",
     holds: [PLANNED_STATE, NAMED_PHASE, REVIEW_VERDICT],
-    sectionHolds: [PATTERN_LINE],
+    sectionHolds: [patternLine(10)],
     sectionForbids: [STALE_PATTERN],
   },
   {
@@ -108,7 +116,7 @@ const SITES = [
     file: "skills/review-story/SKILL.md",
     heading: "### Step 4: Technical Accuracy and Anti-Hallucination Review",
     holds: [PLANNED_STATE, NAMED_PHASE, REVIEW_VERDICT],
-    sectionHolds: [PATTERN_LINE],
+    sectionHolds: [patternLine(7)],
     sectionForbids: [STALE_PATTERN],
   },
   {
@@ -357,7 +365,7 @@ test("the item reader does not reach past the citing item", () => {
   // "a branch" after the element narrowed to "branch that fires").
   const SIBLING =
     "   - a named function, a stated input, the branch that fires, as the plan leaves them;" +
-    " only when a named phase states it: the condition and the outcome it returns. Cite that phase in the finding." +
+    " only when a named phase states it: the condition and the outcome it returns. Name that phase in the criterion." +
     " A phase that only names the function, or a criterion that promises a later phase will add the branch, does not count;" +
     " Flag as Important when the outcome is unreachable;" +
     " Put it to the author, and never auto-fix it; it is a fix that cannot pass its own verification → Important;" +

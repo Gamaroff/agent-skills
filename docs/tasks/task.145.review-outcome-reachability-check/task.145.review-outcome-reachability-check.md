@@ -299,10 +299,6 @@ None.
 - **Critical**: none — advisory review guidance.
 - **Non-critical**: noisy findings — fix forward.
 
----
-<!-- change-log-start -->
-## Change Log
-
 ## QA Testing Results
 
 **QA Status**: CONCERNS
@@ -313,106 +309,25 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.145.qa.4.review-outcome-reachability-check.md](./task.145.qa.4.review-outcome-reachability-check.md)
-- **Gate File**: [task.145.gate.4.review-outcome-reachability-check.yml](./task.145.gate.4.review-outcome-reachability-check.yml)
+- **Full Report**: [task.145.qa.5.review-outcome-reachability-check.md](./task.145.qa.5.review-outcome-reachability-check.md)
+- **Gate File**: [task.145.gate.5.review-outcome-reachability-check.yml](./task.145.gate.5.review-outcome-reachability-check.yml)
 
 ### Test Coverage Summary
 
 - **Tests Executed**: 4003 (4002 pass, 0 fail, 1 skipped)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0 (MEDIUM: 1, LOW: 2)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
-
-### Key Findings
-
-- CR4-1: the reachability pattern line inherits the hallucination protocol's Critical severity.
-- CR4-2: the named-phase clauses diverge across sites.
-- CR4-3: STALE vs NEEDS DETAIL precedence, and the verdict block shows only the pre-pass source.
-
-## Change Log
-
-## QA Testing Results
-
-**QA Status**: CONCERNS
-**QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-25
-**Quality Score**: 70/100
-**Gate Decision**: CONCERNS
-
-### QA Report
-
-- **Full Report**: [task.145.qa.3.review-outcome-reachability-check.md](./task.145.qa.3.review-outcome-reachability-check.md)
-- **Gate File**: [task.145.gate.3.review-outcome-reachability-check.yml](./task.145.gate.3.review-outcome-reachability-check.yml)
-
-### Test Coverage Summary
-
-- **Tests Executed**: 4002 (4001 pass, 0 fail, 1 skipped)
-- **Phases Verified**: 4/4
-- **Critical Issues**: 0 (MEDIUM: 3, LOW: 1)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
-
-### Key Findings
-
-- CR3-1: the fence guard regex stops four-backtick fences opening.
-- CR3-2: the hallucination-pattern lines lack the current-or-planned qualifier.
-- CR3-3: review-bug's stale routing is gated on PREPASS_STALE only.
-
-## Change Log
-
-## QA Testing Results
-
-**QA Status**: FAIL
-**QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-25
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
-
-### QA Report
-
-- **Full Report**: [task.145.qa.2.review-outcome-reachability-check.md](./task.145.qa.2.review-outcome-reachability-check.md)
-- **Gate File**: [task.145.gate.2.review-outcome-reachability-check.yml](./task.145.gate.2.review-outcome-reachability-check.yml)
-
-### Test Coverage Summary
-
-- **Tests Executed**: 4000 (3999 pass, 0 fail, 1 skipped)
-- **Phases Verified**: 4/4
-- **Critical Issues**: 1 HIGH (MEDIUM: 2, LOW: 1)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
-
-### Key Findings
-
-- CR2-1 (high): the pre-implementation sites judge reachability against today's code, and create-task's auto-fix rewrites intent into current behaviour.
-- CR2-2 (medium): the population test does not hold the check's verdict.
-- CR2-3 (medium): review-bug passes a stale bug's already-returning branch as "reachable".
-- CR2-4 (low): a closing fence at the item indent does not end the item.
-
-## Change Log
-
-## QA Testing Results
-
-**QA Status**: CONCERNS
-**QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-25
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
-
-### QA Report
-
-- **Full Report**: [task.145.qa.1.review-outcome-reachability-check.md](./task.145.qa.1.review-outcome-reachability-check.md)
-- **Gate File**: [task.145.gate.1.review-outcome-reachability-check.yml](./task.145.gate.1.review-outcome-reachability-check.yml)
-
-### Test Coverage Summary
-
-- **Tests Executed**: 3998 (3997 pass, 0 fail, 1 skipped)
-- **Phases Verified**: 4/4
-- **Critical Issues**: 0 (MEDIUM: 2, LOW: 1)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
 
-- CR-1 (medium): the "branch that fires" element assertion is vacuous at 3 of 4 sites; "decision branches" satisfies `/\bbranch/`.
-- QA-2 (medium): the review-bug check asks a pre-fix review about "the fixed code".
-- QA-3 (low): review-task's existence-check cross-reference names the wrong check.
+- CR5-1: this document's QA Testing Results / Change Log block was corrupted by stacked writes (rebuilt in this write).
+- CR5-2: the pattern-line hold does not tie the check number to its file.
+- CR5-3: "Cite that phase in the finding" has no finding at create-task.
+
+---
+<!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -428,6 +343,8 @@ None.
 | 2026-09-25 |  | QA findings fixed — cycle 3 (CR3-1 fence regression, CR3-2 pattern lines, CR3-3 stale routing, CR3-4 named phase, CR3-5/6) | qa-fix |
 | 2026-09-25 |  | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
 | 2026-09-25 |  | QA findings fixed — cycle 4 (CR4-1 pattern-line severity, CR4-2 canonical named-phase clause, CR4-3 STALE precedence, CR4-4) | qa-fix |
+| 2026-09-25 |  | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low); QA Testing Results / Change Log block rebuilt (CR5-1) | qa-task |
+| 2026-09-25 |  | QA findings fixed — cycle 5 (CR5-1 block rebuilt, CR5-2 per-site pattern holds, CR5-3 per-site citation) | qa-fix |
 
 ---
 <!-- change-log-end -->
@@ -518,3 +435,10 @@ None.
     source. This is outside Step 3 and not test-held.
   - CR4-4: CHANGELOG wording.
   - 8/8 fix mutants red. The restatement grep was re-run after the fix (`.claude/state/t145-fix4-grep.txt`).
+- **QA cycle 5 fixes**:
+  - CR5-1: this document's QA Testing Results / Change Log block is rebuilt (one heading of each).
+  - CR5-2: one pattern-line hold per site, each with its own check number.
+  - CR5-3: "Name that phase when you pass the criterion" (review-task, review-story) and "in the
+    criterion" (create-task). NAMED_PHASE holds the requirement and exclusion whole and leaves the
+    naming sentence to each site.
+  - 3/3 fix mutants red.

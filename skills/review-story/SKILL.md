@@ -952,7 +952,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      what the story names exists and has the shape it claims. This check asks whether the function,
      once the story is done, can return what the story promises for that input
    - An outcome that the story's own tasks produce is reachable even though today's code cannot
-     return it, because producing it is the story's job. A planned branch counts only when a named task states it: the condition and the outcome it returns. Cite that task in the finding. A task that only names the function, or a criterion that promises a later task will add the branch, does not count
+     return it, because producing it is the story's job. A planned branch counts only when a named task states it: the condition and the outcome it returns. Name that task when you pass the criterion. A task that only names the function, or a criterion that promises a later task will add the branch, does not count
    - Worked example (from a task): task.144 said an accept-all fixture would score
      `present-but-inert`. `computeVerdict`, which that plan did not change, returns that verdict
      only when some hostile case was rejected, so an accept-all takes the `absent` branch. Review
