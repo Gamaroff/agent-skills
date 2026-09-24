@@ -1280,20 +1280,22 @@ export function stateView(opts, state) {
     // The row's history minus this run's own file — the row as it was when the run began.
     // v0.51.0 never recorded runFile (TASK-143-BUG-2), so on a real legacy file it is null. Before
     // `executed` that does not matter: Step 4 writes the run file, so this run has written none yet
-    // and the history IS the pre-run history — exact. From `executed` on the own file may exist, and
-    // v0.51.0 kept no record that says which it is. (SKILL.md's resume map has a run resumed AT
-    // `executed` record its file before Step 4 — the one an interrupted v0.51.0 Step 4 already
-    // wrote, else a fresh --run-path — which makes this exact through the runFile branch; what
-    // reaches here is a file v0.51.0 wrote itself.) The best
-    // available signal is its name: v0.51.0 wrote one runs/<id>/<local date>-<env label>.md, so a file
-    // named on or after the run's local start date is excluded. That cannot see the env label, a same-day run under another label,
-    // or a start date the agent wrote wrongly, so the answer is flagged `unverifiable` every time
-    // rather than presented as fact (TASK-143-BUG-3, BUG-4). Neither the row's Last run (unchanged by
-    // a na/blocked early exit) nor an mtime (refreshed by a checkout) was a better signal.
+    // and the history IS the pre-run history — exact. From `executed` on, v0.51.0 may already have
+    // written the own file, and it kept no record that says which one it is. A runFile recorded on
+    // resume (SKILL.md's resume map: --run-path, then --state-set runFile) is excluded, but it does
+    // NOT make the answer exact: it names the file this run WILL write, not the one an interrupted
+    // v0.51.0 Step 4 may already have written, and a file of the right name may equally be an earlier
+    // same-day run (TASK-143-BUG-5, BUG-6). The best available signal for the older file is its
+    // name: v0.51.0 wrote one runs/<id>/<local date>-<env label>.md, so a file named on or after the
+    // run's local start date is excluded. That cannot see the env label, a same-day run under another
+    // label, a Step 4 that ran past midnight, or a start date the agent wrote wrongly, so from
+    // `executed` on the answer is flagged `unverifiable` every time — runFile or not — rather than
+    // presented as fact (TASK-143-BUG-3, BUG-4, BUG-6). Neither the row's Last run (unchanged by a
+    // na/blocked early exit) nor an mtime (refreshed by a checkout) was a better signal.
     const own = new Set([state.runFile].filter(Boolean));
     const executed =
       STATE_PHASES.indexOf(state.phase) >= STATE_PHASES.indexOf("executed");
-    if (!state.runFile && executed) {
+    if (executed) {
       unverifiable.push("priorRuns");
       const start = localDate(state.startedAt);
       if (start !== null)

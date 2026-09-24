@@ -46,3 +46,4 @@ Change the resume instruction to: if `runs/<id>/<local start date>-<envLabel>.md
 | ---------- | ------------ | ---------- | ----------------------- |
 | 2026-09-24 | New          | qa-task    | QA cycle 5              |
 | 2026-09-24 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 5 |
+| 2026-09-24 | Ready for QA | qa-fix | Fix superseded in cycle 6 (TASK-143-BUG-6): the file is no longer reused. A pre-upgrade executed resume takes a fresh `--run-path`, and `priorRuns` stays flagged `unverifiable`, so the half-written file is no longer counted silently |

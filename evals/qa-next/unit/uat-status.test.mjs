@@ -2593,9 +2593,10 @@ test("east of UTC the previous LOCAL day's run is kept — the start date is loc
   assert.deepEqual(JSON.parse(out).priorRuns, ["runs/D.1/2026-09-23-lan.md"]);
 });
 
-test("a pre-upgrade run resumed at executed that records its run file gets an EXACT priorRuns (TASK-143-QA4-1)", () => {
+test("a pre-upgrade run resumed at executed records a fresh run file, and priorRuns stays flagged (TASK-143-QA4-1, BUG-6)", () => {
   // SKILL.md's resume map: runFile null at executed → --run-path, then --state-set runFile, then
-  // Step 4. After that the derivation goes through the runFile branch — no date rule, no flag.
+  // Step 4. The recorded file is excluded, but it does not make the answer exact: it names the file
+  // this run WILL write, not one an interrupted v0.51.0 Step 4 may already have written.
   const root = stateCorpus();
   const runs = path.join(root, "docs/qa/runs/D.1");
   mkdirSync(runs, { recursive: true });
@@ -2626,48 +2627,64 @@ test("a pre-upgrade run resumed at executed that records its run file gets an EX
     ["runs/D.1/2026-09-01-lan.md"],
     "own file excluded by runFile",
   );
-  assert.equal(state.unverifiable, undefined, "and exact, so not flagged");
+  assert.deepEqual(
+    state.unverifiable,
+    ["priorRuns"],
+    "a legacy file is never exact from executed on, runFile or not",
+  );
 });
 
-test("a pre-upgrade run interrupted INSIDE Step 4 reuses the file it already wrote (TASK-143-BUG-5)", () => {
-  // v0.51.0 wrote runs/<id>/<local date>-<env>.md at Step 4.1 and set phase: recorded only at the
-  // end of Step 4. Resumed at executed, that file exists: --run-path would hand out -02 and the
-  // half-written file would become a "prior" run. The resume map records the existing file instead.
-  const root = stateCorpus();
-  const runs = path.join(root, "docs/qa/runs/D.1");
-  mkdirSync(runs, { recursive: true });
-  writeFileSync(path.join(runs, "2026-09-01-lan.md"), "# earlier\n");
-  writeFileSync(
-    path.join(runs, "2026-09-24-lan.md"),
-    "# half-written by the interrupted Step 4\n",
-  );
-  mkdirSync(path.dirname(STATE(root)), { recursive: true });
-  writeFileSync(
-    STATE(root),
-    JSON.stringify({
-      item: "D.1",
-      runFile: null,
-      phase: "executed",
-      startedAt: "2026-09-24T12:00:00Z",
-    }),
-  );
-  // What the wrong move would do: --run-path does not know the file is this run's.
-  assert.notEqual(
-    run(root, "--run-path", "D.1", "--env", "lan").out.trim(),
-    "runs/D.1/2026-09-24-lan.md",
-  );
-  // The resume map's move: record the file the older release already wrote.
-  assert.equal(
-    run(root, "--state-set", "runFile", "runs/D.1/2026-09-24-lan.md").code,
-    0,
-  );
-  const state = JSON.parse(run(root, "--state-get", "--json").out);
-  assert.deepEqual(
-    state.priorRuns,
-    ["runs/D.1/2026-09-01-lan.md"],
-    "the half-written file is this run's",
-  );
-  assert.equal(state.unverifiable, undefined, "exact");
+test("a pre-upgrade executed resume never reuses an existing file: a half-written one and an earlier run look the same (TASK-143-BUG-5, BUG-6)", () => {
+  // v0.51.0 set phase: executed at the end of Step 3 and wrote runs/<id>/<local date>-<env>.md at
+  // Step 4.1. A file of that name on resume is EITHER this run's, half-written by an interrupted
+  // Step 4, OR an earlier same-day run of the same item and label, when the interruption came
+  // before Step 4.1. The two are the same bytes on disk, so the resume map takes a fresh name and
+  // the answer stays flagged. The date is the UTC today() that --run-path uses (TASK-143-QA6-1), and
+  // TZ is pinned so the local start date is that same day.
+  const tz = process.env.TZ;
+  process.env.TZ = "UTC";
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const root = stateCorpus();
+    const runs = path.join(root, "docs/qa/runs/D.1");
+    mkdirSync(runs, { recursive: true });
+    writeFileSync(path.join(runs, "2026-09-01-lan.md"), "# earlier\n");
+    const sameName = path.join(runs, `${today}-lan.md`);
+    const body = "# either half-written, or an earlier run's record\n";
+    writeFileSync(sameName, body);
+    mkdirSync(path.dirname(STATE(root)), { recursive: true });
+    writeFileSync(
+      STATE(root),
+      JSON.stringify({
+        item: "D.1",
+        runFile: null,
+        phase: "executed",
+        startedAt: `${today}T12:00:00Z`,
+      }),
+    );
+    const runFile = run(root, "--run-path", "D.1", "--env", "lan").out.trim();
+    assert.equal(
+      runFile,
+      `runs/D.1/${today}-lan-02.md`,
+      "--run-path hands out a fresh name beside the existing file",
+    );
+    assert.equal(run(root, "--state-set", "runFile", runFile).code, 0);
+    assert.equal(
+      readFileSync(sameName, "utf8"),
+      body,
+      "the existing file is never taken over",
+    );
+    const state = JSON.parse(run(root, "--state-get", "--json").out);
+    assert.deepEqual(state.unverifiable, ["priorRuns"], "and not exact");
+    assert.deepEqual(
+      state.priorRuns,
+      ["runs/D.1/2026-09-01-lan.md"],
+      "best effort: the same-day file is excluded by its date, and flagged",
+    );
+  } finally {
+    if (tz === undefined) delete process.env.TZ;
+    else process.env.TZ = tz;
+  }
 });
 
 test("a state file that is not one is refused by name, exit 1", () => {

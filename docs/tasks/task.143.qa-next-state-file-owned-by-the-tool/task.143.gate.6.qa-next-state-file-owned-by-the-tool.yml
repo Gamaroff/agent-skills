@@ -1,0 +1,70 @@
+schema: 1
+task: 'task.143.qa-next-state-file-owned-by-the-tool'
+task_title: 'qa-next: uat-status.mjs owns the run state file, so its contract is held by tests instead of prose'
+gate: CONCERNS
+status_reason: 'BUG-5 was fixed as specified, but the fix causes TASK-143-BUG-6. The resume map treats a file named <local start date>-<env>.md as proof of ownership. An earlier same-day run is then overwritten and dropped from priorRuns with no unverifiable flag (reproduced). One LOW: the collision assertion in the cycle-5 test is date-dependent.'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T08:40:00Z'
+
+top_issues:
+  - id: 'TASK-143-BUG-6'
+    severity: medium
+    file: 'skills/qa-next/SKILL.md'
+    finding: 'The executed-resume step records runs/<item>/<local start date>-<envLabel>.md as runFile whenever it exists. That file may be an earlier same-day run (the interruption came before Step 4.1), or it may be misnamed (v0.51.0 used the date of the Step 4 write). Either way priorRuns loses the unverifiable flag while being wrong, and in the first case Step 4 overwrites the earlier run (CR-1 reproduced, CR-2).'
+    suggested_action: 'Do not decide ownership in prose. Keep priorRuns unverifiable for a state that had no runFile. Always use --run-path, which never overwrites. Delete the "Either way priorRuns stays exact" claim. Test the chosen behaviour.'
+    suggested_owner: dev
+    bug_ref: 'task.143.bug.6.legacy-own-file-guess-overwrites-earlier-run.md'
+  - id: 'TASK-143-QA6-1'
+    severity: low
+    file: 'evals/qa-next/unit/uat-status.test.mjs'
+    finding: 'The interrupted-Step-4 test asserts that --run-path does not return runs/D.1/2026-09-24-lan.md. It names the fixture with a fixed date while --run-path uses the UTC today(), so on any day but 2026-09-24 the assertion holds without a collision (CR-3, low/high).'
+    suggested_action: 'Name the fixture from the same UTC date --run-path uses, so the assertion exercises the collision on any day.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 62
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 19
+    notes: 'cli: probe re-run (task.143.qa.6.security.run.json, 19 env cases). Only whitespace/control-character labels reproduce (space-only, LF, CR, TAB, ESC); each is accepted identically by origin/develop, so they are pre-existing and routed to future.'
+  performance:
+    status: PASS
+    notes: 'No network calls; 62 tests.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-143-BUG-6 (pre-upgrade run interrupted between executed and the end of Step 4 only).'
+  maintainability:
+    status: PASS
+    notes: 'One advisory cleanup (CR-4: the resume map does local-date arithmetic the tool already has as localDate()).'
+
+bug_resolution:
+  TASK-143-BUG-5: 'FIXED as specified (the interrupted Step 4 file is reused); the rule it added carries TASK-143-BUG-6'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-143-BUG-6 and TASK-143-QA6-1.'
+      refs: ['skills/qa-next/SKILL.md', 'evals/qa-next/unit/uat-status.test.mjs']
+  future:
+    - action: 'Refuse whitespace-only and control-character --env labels (pre-existing; probe-reproduced on develop and HEAD).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Lock ownership check on --state-set (cycle 2 CR-1).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Expose the legacy own-file lookup through the tool (built on localDate) instead of prose date arithmetic (CR-4).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'skills/qa-next/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-143-BUG-6 fixed']

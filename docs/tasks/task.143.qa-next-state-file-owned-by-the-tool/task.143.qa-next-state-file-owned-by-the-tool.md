@@ -127,13 +127,15 @@ QA-cycle finding.
   shape released in v0.51.0, which has no `targeted`, `priorRuns`, `bug` or `filedBug` — is answered
   with each missing field **derived** and named in `derived: [...]`, never a silent default:
   - `targeted` → `false` (v0.51.0 took no id argument; every run was untargeted);
-  - `priorRuns` → the row's current `priorRuns` minus this run's own file (`runFile`). When `runFile`
-    is null (v0.51.0 never recorded one, TASK-143-BUG-2), the answer depends on the phase. Before
-    `executed` it is exact: the run has written no file, so nothing is excluded. From `executed` on,
-    the file named on or after the run's **local** start date is excluded (v0.51.0 wrote
-    `<local date>-<env>.md`), and `priorRuns` is always named in `unverifiable`, because the env label,
-    a same-day run under another label and a mis-written `startedAt` cannot be seen
-    (TASK-143-BUG-3, BUG-4);
+  - `priorRuns` → the row's current `priorRuns` minus this run's own file (`runFile`). v0.51.0 never
+    recorded `runFile` (TASK-143-BUG-2), so the answer depends on the phase. Before `executed` it is
+    exact: the run has written no file, so nothing is excluded. From `executed` on, the file named on
+    or after the run's **local** start date is excluded (v0.51.0 wrote `<local date>-<env>.md`), and
+    `priorRuns` is always named in `unverifiable`, **even after a resume records a fresh `runFile`**.
+    That file is the one this run will write. It says nothing about a file an interrupted v0.51.0
+    Step 4 already wrote, which on disk is indistinguishable from an earlier same-day run. The env
+    label, a same-day run under another label and a mis-written `startedAt` cannot be seen either
+    (TASK-143-BUG-3, BUG-4, BUG-5, BUG-6);
   - `bug` → the row's current bug link while `phase` is before `recorded` (Step 4.4 has not yet
     rewritten the note cell); `null` from `recorded` on (its only reader, Step 4's reuse decision,
     has already run);
@@ -407,6 +409,8 @@ None.
 | 2026-09-24 |  | QA gate CONCERNS (90/100) — 2 findings (cycle 4) | qa-task |
 | 2026-09-24 |  | QA gate CONCERNS (90/100) — 1 finding (cycle 5) | qa-task |
 | 2026-09-24 |  | QA findings fixed — 5 iterations; loop limit reached at gate CONCERNS (90/100), HIGH 0 throughout; cycle 5 fix not yet gated | qa-fix |
+| 2026-09-24 |  | QA gate CONCERNS (90/100) — 2 findings (cycle 6) | qa-task |
+| 2026-09-24 |  | QA findings fixed — cycle 6 of the re-entered loop (BUG-6, QA6-1); a legacy `priorRuns` stays `unverifiable` from `executed` on, and the resume always takes a fresh `--run-path` | qa-fix |
 
 ---
 <!-- change-log-end -->
@@ -430,21 +434,22 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.143.qa.5.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.5.qa-next-state-file-owned-by-the-tool.md)
-- **Gate File**: [task.143.gate.5.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.5.qa-next-state-file-owned-by-the-tool.yml)
+- **Full Report**: [task.143.qa.6.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.6.qa-next-state-file-owned-by-the-tool.md)
+- **Gate File**: [task.143.gate.6.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.6.qa-next-state-file-owned-by-the-tool.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 61 (qa-next suite, also under TMPDIR=/tmp and four timezones); 19 executed probes
+- **Tests Executed**: 62 (qa-next suite, also under TMPDIR=/tmp and three timezones); 19 executed probes
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 1 MEDIUM
+- **Critical Issues**: 0 HIGH, 1 MEDIUM, 1 LOW
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-- QA4-1 and QA4-2 fixed.
-- TASK-143-BUG-5: the `executed` resume step ignores a run file that an interrupted v0.51.0 Step 4 already wrote. It is confined to the pre-upgrade migration path.
-- Pre-existing (not attributed to this change): `--env` accepts newline/CR/tab labels, routed to a follow-up.
+- TASK-143-BUG-5 fixed as specified.
+- TASK-143-BUG-6: the pre-upgrade `executed` resume treats a file named `<local start date>-<env>.md` as its own. An earlier same-day run is then overwritten and dropped from `priorRuns`, and the `unverifiable` flag is cleared (reproduced). The defect is confined to the pre-upgrade migration path.
+- TASK-143-QA6-1 (low): the collision assertion in the cycle-5 test depends on the date.
+- Pre-existing (not attributed to this change): `--env` accepts whitespace-only and control-character labels; routed to a follow-up.
 
 ---
 
