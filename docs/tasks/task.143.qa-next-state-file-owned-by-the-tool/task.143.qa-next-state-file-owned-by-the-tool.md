@@ -405,6 +405,7 @@ None.
 | 2026-09-24 |  | QA gate CONCERNS (80/100) — 2 findings (cycle 2 refute pass) | qa-task |
 | 2026-09-24 |  | QA gate CONCERNS (80/100) — 3 findings (cycle 3) | qa-task |
 | 2026-09-24 |  | QA gate CONCERNS (90/100) — 2 findings (cycle 4) | qa-task |
+| 2026-09-24 |  | QA gate CONCERNS (90/100) — 1 finding (cycle 5) | qa-task |
 
 ---
 <!-- change-log-end -->
@@ -428,21 +429,20 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.143.qa.4.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.4.qa-next-state-file-owned-by-the-tool.md)
-- **Gate File**: [task.143.gate.4.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.4.qa-next-state-file-owned-by-the-tool.yml)
+- **Full Report**: [task.143.qa.5.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.5.qa-next-state-file-owned-by-the-tool.md)
+- **Gate File**: [task.143.gate.5.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.5.qa-next-state-file-owned-by-the-tool.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 60 (qa-next suite, also under TMPDIR=/tmp and three timezones); 19 executed probes
+- **Tests Executed**: 61 (qa-next suite, also under TMPDIR=/tmp and four timezones); 19 executed probes
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 0 MEDIUM, 2 LOW
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 1 MEDIUM
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-- TASK-143-BUG-4 fixed.
-- TASK-143-QA4-1: the SKILL resume map lacks `--run-path` + `--state-set runFile` for a pre-upgrade run resumed at `executed`.
-- TASK-143-QA4-2: one legacy test is timezone-dependent (fails under UTC+14).
+- QA4-1 and QA4-2 fixed.
+- TASK-143-BUG-5: the `executed` resume step ignores a run file that an interrupted v0.51.0 Step 4 already wrote. It is confined to the pre-upgrade migration path.
 - Pre-existing (not attributed to this change): `--env` accepts newline/CR/tab labels, routed to a follow-up.
 
 ---

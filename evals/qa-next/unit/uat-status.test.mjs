@@ -2629,6 +2629,47 @@ test("a pre-upgrade run resumed at executed that records its run file gets an EX
   assert.equal(state.unverifiable, undefined, "and exact, so not flagged");
 });
 
+test("a pre-upgrade run interrupted INSIDE Step 4 reuses the file it already wrote (TASK-143-BUG-5)", () => {
+  // v0.51.0 wrote runs/<id>/<local date>-<env>.md at Step 4.1 and set phase: recorded only at the
+  // end of Step 4. Resumed at executed, that file exists: --run-path would hand out -02 and the
+  // half-written file would become a "prior" run. The resume map records the existing file instead.
+  const root = stateCorpus();
+  const runs = path.join(root, "docs/qa/runs/D.1");
+  mkdirSync(runs, { recursive: true });
+  writeFileSync(path.join(runs, "2026-09-01-lan.md"), "# earlier\n");
+  writeFileSync(
+    path.join(runs, "2026-09-24-lan.md"),
+    "# half-written by the interrupted Step 4\n",
+  );
+  mkdirSync(path.dirname(STATE(root)), { recursive: true });
+  writeFileSync(
+    STATE(root),
+    JSON.stringify({
+      item: "D.1",
+      runFile: null,
+      phase: "executed",
+      startedAt: "2026-09-24T12:00:00Z",
+    }),
+  );
+  // What the wrong move would do: --run-path does not know the file is this run's.
+  assert.notEqual(
+    run(root, "--run-path", "D.1", "--env", "lan").out.trim(),
+    "runs/D.1/2026-09-24-lan.md",
+  );
+  // The resume map's move: record the file the older release already wrote.
+  assert.equal(
+    run(root, "--state-set", "runFile", "runs/D.1/2026-09-24-lan.md").code,
+    0,
+  );
+  const state = JSON.parse(run(root, "--state-get", "--json").out);
+  assert.deepEqual(
+    state.priorRuns,
+    ["runs/D.1/2026-09-01-lan.md"],
+    "the half-written file is this run's",
+  );
+  assert.equal(state.unverifiable, undefined, "exact");
+});
+
 test("a state file that is not one is refused by name, exit 1", () => {
   const root = stateCorpus();
   mkdirSync(path.dirname(STATE(root)), { recursive: true });

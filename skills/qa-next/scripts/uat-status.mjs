@@ -1282,8 +1282,9 @@ export function stateView(opts, state) {
     // `executed` that does not matter: Step 4 writes the run file, so this run has written none yet
     // and the history IS the pre-run history — exact. From `executed` on the own file may exist, and
     // v0.51.0 kept no record that says which it is. (SKILL.md's resume map has a run resumed AT
-    // `executed` record one with --run-path + --state-set runFile before Step 4, which makes this
-    // exact through the runFile branch; what reaches here is a file v0.51.0 wrote itself.) The best
+    // `executed` record its file before Step 4 — the one an interrupted v0.51.0 Step 4 already
+    // wrote, else a fresh --run-path — which makes this exact through the runFile branch; what
+    // reaches here is a file v0.51.0 wrote itself.) The best
     // available signal is its name: v0.51.0 wrote one runs/<id>/<local date>-<env label>.md, so a file
     // named on or after the run's local start date is excluded. That cannot see the env label, a same-day run under another label,
     // or a start date the agent wrote wrongly, so the answer is flagged `unverifiable` every time
