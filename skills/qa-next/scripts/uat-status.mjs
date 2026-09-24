@@ -23,6 +23,14 @@
 //   node uat-status.mjs --accept <id> [--note "..."] [--force]   🟡 pass → ✅ accepted — the owner's command
 //   node uat-status.mjs --findings [--all] [--json]    open findings across every run file
 //
+// The /qa-next run state file (default .claude/state/qa-next.state.json under --root; --state <path>
+// overrides) — the single-flight lock and resume record. Its fields and who writes each: STATE_FIELDS.
+//   node uat-status.mjs --state-init (--item <id> | --next) [--json]   resolve the row and write the
+//                                             file (exit 5 run-in-progress whenever a state file exists)
+//   node uat-status.mjs --state-get [--json]          print it (exit 6 when there is none)
+//   node uat-status.mjs --state-set <field> <value>   phase / runFile / filedBug / lane only
+//   node uat-status.mjs --state-clear                  delete it (idempotent)
+//
 // Paths: --root <dir> (default: cwd) · --registry <path> (default docs/qa/uat-registry.md) ·
 // --surfaces <path> (default: uat-surfaces.json beside the registry) · --stories <dir> (default docs/prd).
 // Every relative link written into the registry is relative to the registry's own directory.
@@ -37,6 +45,9 @@ import {
   statSync,
   copyFileSync,
   mkdirSync,
+  renameSync,
+  rmSync,
+  linkSync,
 } from "node:fs";
 import { join, relative, dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -97,6 +108,11 @@ const OPTIONS = new Set([
   "--accept",
   "--findings",
   "--all",
+  "--state-init",
+  "--state-get",
+  "--state-set",
+  "--state-clear",
+  "--state",
 ]);
 
 export function parseArgs(argv) {
@@ -783,11 +799,16 @@ function describeRow(opts, cfg, r) {
     // Repo-relative, so it opens from the repo root and round-trips through `--bug`. Last, not
     // first, because the note cell is appended to on a kept ✅ and Step 4 wants the most recent.
     // The link as the author wrote it, anchor included, is still in `notes`.
-    bug: (() => {
-      const p = bugLinkPaths(r.notes).at(-1);
-      return p === undefined ? null : repoPathOf(opts, p);
-    })(),
+    bug: rowBugPath(opts, r),
   };
+}
+
+// The repo-relative path of the file the row's NEWEST bug link names, or null. One definition, read
+// by describeRow's `bug` and by the state file's legacy derivation, so "the bug this row links" is
+// computed once — the derivation must name exactly the file --item would have handed out.
+function rowBugPath(opts, r) {
+  const p = bugLinkPaths(r.notes).at(-1);
+  return p === undefined ? null : repoPathOf(opts, p);
 }
 
 // Printed by both commands, for the same reason the payload is shared.
@@ -810,35 +831,47 @@ function printRow(label, out) {
   );
 }
 
-function cmdNext(opts) {
+// How --next, --item and --state-init find their row: ONE resolver, so --state-init cannot drift
+// from the commands whose payload it records. Returns the payload, or null after reporting the miss
+// exactly as the command always has (exit 3 nothing untested, exit 4 no such row).
+function resolvePayload(opts) {
   const cfg = requireSurfaces(opts);
+  if (opts.has("--item")) {
+    const id = requireIdValue("--item", opts.val("--item"));
+    const r = itemById(readRegistry(opts), id);
+    if (!r) {
+      // Exit 4, not the usage family's 2: "you named a row that is not there" is a different answer
+      // from "you called me wrongly", and /qa-next stops differently on each (unknown-item).
+      console.error(`uat-status: ${id}: no registry row`);
+      process.exitCode = 4;
+      return null;
+    }
+    return describeRow(opts, cfg, r);
+  }
   const r = nextItem(readRegistry(opts));
   if (!r) {
     console.log(
       opts.has("--json") ? "null" : "nothing untested — registry complete",
     );
     process.exitCode = 3;
-    return;
+    return null;
   }
-  const out = describeRow(opts, cfg, r);
+  return describeRow(opts, cfg, r);
+}
+
+function printPayload(opts, out) {
   if (opts.has("--json")) console.log(JSON.stringify(out, null, 2));
-  else printRow("next", out);
+  else printRow(opts.has("--item") ? "item" : "next", out);
+}
+
+function cmdNext(opts) {
+  const out = resolvePayload(opts);
+  if (out) printPayload(opts, out);
 }
 
 function cmdItem(opts) {
-  const cfg = requireSurfaces(opts);
-  const id = requireIdValue("--item", opts.val("--item"));
-  const r = itemById(readRegistry(opts), id);
-  if (!r) {
-    // Exit 4, not the usage family's 2: "you named a row that is not there" is a different answer
-    // from "you called me wrongly", and /qa-next stops differently on each (unknown-item).
-    console.error(`uat-status: ${id}: no registry row`);
-    process.exitCode = 4;
-    return;
-  }
-  const out = describeRow(opts, cfg, r);
-  if (opts.has("--json")) console.log(JSON.stringify(out, null, 2));
-  else printRow("item", out);
+  const out = resolvePayload(opts);
+  if (out) printPayload(opts, out);
 }
 
 // Pure, and therefore testable without a filesystem. Run files are runs/<id>/<date>-<env>.md. The
@@ -853,11 +886,21 @@ export function runPathFor(existing, date, env) {
   // The ambiguity is created at WRITE time, so it is refused here rather than guessed at read
   // time, where nothing knows the env. (A hand-written file of that shape is still ordered
   // wrongly; the tool simply will not add one.)
-  if (/-\d{2}$/.test(env))
+  // The label is part of a file name under runs/<id>/, so it can neither be empty nor steer the
+  // path out of that directory.
+  if (!env || /[/\\]/.test(env) || env.includes(".."))
     die(
-      `--env ${env}: an env label may not end in -NN — it is indistinguishable from a run sequence`,
+      `--env ${JSON.stringify(env)}: an env label must be non-empty and may not contain "/", "\\" or ".." — it becomes part of a file name under runs/<id>/`,
     );
+  // Checked on the BUILT name, which is what seqKey reads. A label ending in -NN makes the name end
+  // in -NN, and so does a two-digit label: the date itself ends in -DD, so "10" builds
+  // 2026-09-22-10.md — run 10 of env "2026-09-22" to seqKey — although the label alone ends in no
+  // "-NN". A guard on the label passed it (task.141 PR review 2, CR-1).
   const base = `${date}-${env}`;
+  if (/-\d{2}$/.test(base))
+    die(
+      `--env ${env}: the run file would be ${base}.md, which reads as a run sequence — an env label may not end in -NN or be two digits; use one with a letter that does not (e.g. ci10)`,
+    );
   const taken = new Set(existing.map((f) => basename(f)));
   if (!taken.has(`${base}.md`)) return `${base}.md`;
   for (let n = 2; n < 100; n++) {
@@ -1099,6 +1142,304 @@ function cmdScoreboard(opts) {
   if (open) console.log(`findings: ${open} open — --findings to list them`);
 }
 
+// ---------- the /qa-next run state file ----------
+//
+// The single-flight lock and resume record, created at selection and deleted last in Step 6. It used
+// to be a JSON shape described across SKILL.md Steps 0–6, and a contract that existed only as
+// sentences produced one defect per QA cycle (task.141 BUG-21/22/23): a reader drifted from its
+// writer and nothing mechanical could see it. The fields, who writes each and who reads it are
+// stated ONCE, here; the skill calls the four commands below and describes no JSON.
+
+export const STATE_PHASES = Object.freeze([
+  "selected",
+  "resolved",
+  "executed",
+  "recorded",
+  "committed",
+]);
+
+// `writer`: "init" — written once by --state-init from the --item/--next payload and never again, so
+// it describes the row AS IT WAS WHEN THE RUN BEGAN; or "set" — mutable through --state-set, whose
+// `value` says how the argument is parsed. `readers`: the SKILL.md steps that read the field.
+export const STATE_FIELDS = Object.freeze({
+  item: Object.freeze({ writer: "init", readers: ["0", "resume"] }),
+  function: Object.freeze({ writer: "init", readers: ["5", "6"] }),
+  surface: Object.freeze({ writer: "init", readers: ["2"] }),
+  stories: Object.freeze({ writer: "init", readers: ["4"] }),
+  uatSpecs: Object.freeze({ writer: "init", readers: ["3"] }),
+  targeted: Object.freeze({ writer: "init", readers: ["resume"] }),
+  priorRuns: Object.freeze({ writer: "init", readers: ["4", "5", "6"] }),
+  // The bug the row linked BEFORE this run — Step 4's reuse decision only. This run's bug is filedBug.
+  bug: Object.freeze({ writer: "init", readers: ["4"] }),
+  startedAt: Object.freeze({ writer: "init", readers: [] }),
+  phase: Object.freeze({
+    writer: "set",
+    value: "phase",
+    readers: ["0", "resume"],
+  }),
+  runFile: Object.freeze({
+    writer: "set",
+    value: "path",
+    readers: ["4", "legacy"],
+  }),
+  lane: Object.freeze({ writer: "set", value: "json", readers: ["4", "6"] }),
+  filedBug: Object.freeze({
+    writer: "set",
+    value: "path",
+    readers: ["4", "6"],
+  }),
+});
+
+const STATE_DEFAULT = ".claude/state/qa-next.state.json";
+
+function statePath(opts) {
+  return join(opts.root, opts.val("--state") ?? STATE_DEFAULT);
+}
+
+// null when there is no state file; a file that is not a state file is refused by name (exit 1)
+// rather than read as whatever each step would make of it.
+function readState(opts) {
+  const p = statePath(opts);
+  if (!existsSync(p)) return null;
+  let state;
+  try {
+    state = JSON.parse(readFileSync(p, "utf8"));
+  } catch (e) {
+    die(
+      `state-malformed: ${p} is not JSON (${e.message}) — --state-clear it and start over`,
+      1,
+    );
+  }
+  if (
+    !state ||
+    typeof state !== "object" ||
+    Array.isArray(state) ||
+    typeof state.item !== "string" ||
+    !STATE_PHASES.includes(state.phase)
+  )
+    die(
+      `state-malformed: ${p} names no item or no known phase (${STATE_PHASES.join(" → ")}) — --state-clear it and start over`,
+      1,
+    );
+  return state;
+}
+
+// Write a per-process temp file, then move it into place, so a reader never sees half a lock and
+// two writers never share a temp name. `exclusive` (--state-init) moves it with link(), which fails
+// with EEXIST if the lock appeared since the check: the check and the create are one atomic step, so
+// two concurrent inits cannot both win. Updates (--state-set) replace with rename().
+function writeState(opts, state, { exclusive = false } = {}) {
+  writeStateFile(statePath(opts), state, { exclusive });
+}
+
+// The file-level writer, exported so the exclusive create is testable without racing processes.
+export function writeStateFile(p, state, { exclusive = false } = {}) {
+  const tmp = `${p}.${process.pid}.tmp`;
+  mkdirSync(dirname(p), { recursive: true });
+  writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`);
+  if (!exclusive) return renameSync(tmp, p);
+  try {
+    linkSync(tmp, p);
+  } catch (e) {
+    if (e.code !== "EEXIST") throw e;
+    let existing = null;
+    try {
+      existing = JSON.parse(readFileSync(p, "utf8"));
+    } catch {
+      // unreadable — still a run in flight; the message names no item
+    }
+    die(runInProgress(existing), 5);
+  } finally {
+    rmSync(tmp, { force: true });
+  }
+}
+
+function runInProgress(existing) {
+  return `run-in-progress: a qa-next run for ${existing?.item ?? "another item"} is in flight — resume it through --state-get (Step 0), or --state-clear it`;
+}
+
+// The state as the skill reads it. A LEGACY file — the shape released in v0.51.0, before targeted,
+// priorRuns, bug and filedBug existed — is answered with each missing field DERIVED and named in
+// `derived`, never a silent default: an empty priorRuns reports a re-run as a first run, and a null
+// bug files a duplicate on a repeat failure. Derived on every read, never written back, so each
+// answer is computed against the phase it is read at.
+export function stateView(opts, state) {
+  const has = (k) => Object.hasOwn(state, k);
+  const out = { ...state };
+  const derived = [];
+  const unverifiable = [];
+  if (!has("targeted")) {
+    out.targeted = false; // v0.51.0 took no id argument: every run was untargeted
+    derived.push("targeted");
+  }
+  // The row and its run history are read once, and only for a file that needs a derivation.
+  const legacy = ["priorRuns", "bug", "filedBug"].some((k) => !has(k));
+  const r = legacy ? itemById(readRegistry(opts), state.item) : null;
+  const history = has("priorRuns") ? null : priorRuns(opts, state.item);
+  if (!has("priorRuns")) {
+    // The row's history minus this run's own file — the row as it was when the run began.
+    // v0.51.0 never recorded runFile (TASK-143-BUG-2), so on a real legacy file it is null. Before
+    // `executed` that does not matter: Step 4 writes the run file, so this run has written none yet
+    // and the history IS the pre-run history — exact. From `executed` on, v0.51.0 may already have
+    // written the own file, and it kept no record that says which one it is. A runFile recorded on
+    // resume (SKILL.md's resume map: --run-path, then --state-set runFile) is excluded, but it does
+    // NOT make the answer exact: it names the file this run WILL write, not the one an interrupted
+    // v0.51.0 Step 4 may already have written, and a file of the right name may equally be an earlier
+    // same-day run (TASK-143-BUG-5, BUG-6). The best available signal for the older file is its
+    // name: v0.51.0 wrote one runs/<id>/<local date>-<env label>.md, so a file named on or after the
+    // run's local start date is excluded. That cannot see the env label, a same-day run under another
+    // label, a Step 4 that ran past midnight, or a start date the agent wrote wrongly, so from
+    // `executed` on the answer is flagged `unverifiable` every time — runFile or not — rather than
+    // presented as fact (TASK-143-BUG-3, BUG-4, BUG-6). Neither the row's Last run (unchanged by a
+    // na/blocked early exit) nor an mtime (refreshed by a checkout) was a better signal.
+    const own = new Set([state.runFile].filter(Boolean));
+    const executed =
+      STATE_PHASES.indexOf(state.phase) >= STATE_PHASES.indexOf("executed");
+    if (executed) {
+      unverifiable.push("priorRuns");
+      const start = localDate(state.startedAt);
+      if (start !== null)
+        for (const f of history)
+          if ((basename(f).match(/^\d{4}-\d{2}-\d{2}/) ?? [""])[0] >= start)
+            own.add(f);
+    }
+    out.priorRuns = history.filter((f) => !own.has(f));
+    derived.push("priorRuns");
+  }
+  if (!has("bug") || !has("filedBug")) {
+    const current = r ? rowBugPath(opts, r) : null;
+    // Step 4.4 rewrites the note cell and the phase then moves to `recorded`: before that the row's
+    // link IS the pre-run bug; from then on it is this run's, and the pre-run one has been read.
+    const recorded =
+      STATE_PHASES.indexOf(state.phase) >= STATE_PHASES.indexOf("recorded");
+    if (!has("bug")) {
+      out.bug = recorded ? null : current;
+      derived.push("bug");
+    }
+    if (!has("filedBug")) {
+      out.filedBug =
+        recorded && r && stateKey(r.state) === "fail" ? current : null;
+      derived.push("filedBug");
+    }
+  }
+  if (derived.length) out.derived = derived;
+  // Derived, but from nothing the tool could check — the report must say so rather than present it.
+  if (unverifiable.length) out.unverifiable = unverifiable;
+  return out;
+}
+
+// The run's LOCAL start date as YYYY-MM-DD, or null when startedAt does not parse — the date
+// v0.51.0 put in its run file's name (TASK-143-BUG-4: a UTC fallback is too early east of UTC).
+function localDate(startedAt) {
+  const t = Date.parse(startedAt ?? "");
+  if (Number.isNaN(t)) return null;
+  const d = new Date(t);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function printState(opts, view) {
+  if (opts.has("--json")) {
+    console.log(JSON.stringify(view, null, 2));
+    return;
+  }
+  for (const [k, v] of Object.entries(view))
+    console.log(`  ${k.padEnd(10)} ${JSON.stringify(v)}`);
+}
+
+function cmdStateInit(opts) {
+  if (!opts.has("--item") && !opts.has("--next"))
+    die("--state-init needs --item <id> or --next");
+  // Exit 0 means ONE thing: a fresh selection, printed as the --next/--item payload. A state file
+  // that already exists is a run in flight whatever item it names — resuming it is --state-get's job
+  // (SKILL.md Step 0), and reaching here past Step 0 means another run started in between. Printing
+  // the stored state instead, on the same exit 0, handed Step 1 a shape it would read as a payload
+  // (TASK-143-BUG-1).
+  const existing = readState(opts);
+  if (existing) die(runInProgress(existing), 5);
+  const out = resolvePayload(opts);
+  if (!out) return; // exit 3 / 4, and nothing written
+  writeState(
+    opts,
+    {
+      item: out.id,
+      function: out.function,
+      surface: out.surface,
+      stories: out.stories.map((s) => s.id),
+      uatSpecs: out.uatSpecs,
+      targeted: opts.has("--item"),
+      priorRuns: out.priorRuns,
+      bug: out.bug,
+      startedAt: new Date().toISOString(),
+      phase: "selected",
+      runFile: null,
+      lane: null,
+      filedBug: null,
+    },
+    { exclusive: true },
+  );
+  printPayload(opts, out);
+}
+
+function cmdStateGet(opts) {
+  const state = readState(opts);
+  if (!state) die(`no-state: no qa-next run in flight (${statePath(opts)})`, 6);
+  printState(opts, stateView(opts, state));
+}
+
+function cmdStateSet(opts) {
+  const i = opts.args.indexOf("--state-set");
+  const field = opts.args[i + 1];
+  const raw = opts.args[i + 2];
+  if (!field || field.startsWith("--") || raw === undefined)
+    die("--state-set <field> <value> — both are required");
+  if (!Object.hasOwn(STATE_FIELDS, field))
+    die(
+      `--state-set ${field}: unknown state field — the fields are ${Object.keys(STATE_FIELDS).join(", ")}`,
+    );
+  const spec = STATE_FIELDS[field];
+  if (spec.writer !== "set")
+    die(
+      `--state-set ${field}: init-only — --state-init wrote it from the row as it was when the run began, and the run has changed the row since`,
+    );
+  const state = readState(opts);
+  if (!state) die(`no-state: no qa-next run in flight (${statePath(opts)})`, 6);
+  let value;
+  if (spec.value === "phase") {
+    if (!STATE_PHASES.includes(raw))
+      die(
+        `--state-set phase ${raw}: the phases are ${STATE_PHASES.join(" → ")}`,
+      );
+    if (STATE_PHASES.indexOf(raw) < STATE_PHASES.indexOf(state.phase))
+      die(
+        `--state-set phase ${raw}: phase moves forward only (${state.phase} → ${raw} is backward) — --state-clear and re-init to start the run over`,
+      );
+    value = raw;
+  } else if (spec.value === "path") {
+    if (raw === "") die(`--state-set ${field}: a path, or the literal null`);
+    value = raw === "null" ? null : raw;
+  } else {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      die(
+        `--state-set ${field}: the value must be JSON (e.g. '{"exit":0,"report":"…"}' or null)`,
+      );
+    }
+  }
+  writeState(opts, { ...state, [field]: value });
+  if (opts.has("--json"))
+    printState(opts, stateView(opts, { ...state, [field]: value }));
+  else console.log(`state: ${field} = ${JSON.stringify(value)}`);
+}
+
+function cmdStateClear(opts) {
+  const p = statePath(opts);
+  const had = existsSync(p);
+  rmSync(p, { force: true });
+  console.log(had ? `state: cleared ${p}` : "state: none to clear");
+}
+
 export function main(argv) {
   try {
     return dispatch(parseArgs(argv));
@@ -1112,6 +1453,12 @@ export function main(argv) {
 function dispatch(opts) {
   const unknown = opts.args.find((a) => a.startsWith("--") && !OPTIONS.has(a));
   if (unknown) die(`unknown option ${unknown}`);
+  // The state commands first: `--state-init --item D.2` also carries --item, and must not be taken
+  // for a read-only --item.
+  if (opts.has("--state-init")) return cmdStateInit(opts);
+  if (opts.has("--state-get")) return cmdStateGet(opts);
+  if (opts.has("--state-set")) return cmdStateSet(opts);
+  if (opts.has("--state-clear")) return cmdStateClear(opts);
   if (opts.has("--init")) return cmdInit(opts);
   if (opts.has("--coverage")) return cmdCoverage(opts);
   if (opts.has("--check")) return cmdCheck(opts);

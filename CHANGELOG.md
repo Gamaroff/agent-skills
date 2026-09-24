@@ -6,6 +6,30 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`uat-status.mjs` owns `/qa-next`'s run state file — `--state-init`, `--state-get`,
+  `--state-set`, `--state-clear` and an exported `STATE_FIELDS` schema (task 143).**
+  `.claude/state/qa-next.state.json` (the single-flight lock and resume record) was a JSON shape
+  that SKILL.md Steps 0–6 described in prose. No test could see a reader drift from its writer, and
+  task.141's QA cycles 10–12 each found one such defect (BUG-21/22/23). The tool now writes the file.
+  `--state-init (--item <id> | --next)` resolves the row through the same code path as
+  `--item`/`--next` and prints the same payload. It records `priorRuns` and `bug` as they stood when
+  the run began, and nothing can overwrite them. It exits **5** `run-in-progress` whenever a state
+  file exists, whatever item it names, because resuming is `--state-get`'s job. The file is created
+  exclusively (`link`), so two concurrent inits cannot both win. `--state-get` exits **6**
+  when nothing is in flight and **1** `state-malformed` on a file that is not a state file.
+  `--state-set` writes only `phase` (forward only), `runFile`, `filedBug` and `lane`, and refuses an
+  init-only field by name. A state file from v0.51.0, which lacks `targeted`, `priorRuns`, `bug` and
+  `filedBug`, still resumes: each missing field is derived from the row, correct for the phase it is
+  read at, and named in `derived`. Its `runFile` is null (v0.51.0 never recorded one). Before
+  `executed` that does not matter, because the run has written nothing yet and `priorRuns` is exact.
+  A run resumed at `executed` records a fresh `--run-path` as its file before Step 4, and never reuses
+  an existing file. A file named for the same item, date and label may be one an interrupted v0.51.0
+  Step 4 wrote, or an earlier run's committed record, and nothing tells them apart. From `executed`
+  on, whether or not a `runFile` was recorded, the file v0.51.0 wrote is excluded by its name
+  (`<local date>-<env>.md`), and `priorRuns` is also named in `unverifiable`, because nothing v0.51.0
+  recorded can confirm it. SKILL.md now names a command wherever it used to describe JSON.
+  Tests derived from `STATE_FIELDS` cover the schema and are mutation-proved.
+
 - **`security-probe.mjs --entry cli:<path> --argv '<JSON array>'` — a boundary behind a Node CLI's
   flags is now executed, not declared unverifiable (task 144).** The engine reached a JS export
   called with **one** argument, a one-positional shell script and a sourced shell function; a
@@ -105,6 +129,18 @@ All notable changes to this project will be documented in this file. Format foll
   direct option is removed and the removal records why, so it is not re-added.
 
 ### Fixed
+
+- **`uat-status.mjs --run-path --env` judges the run file name it builds, not only the label
+  (task 143).** The guard refused a label ending in `-NN`, but a two-digit label (`--env 10`) builds
+  `<date>-10.md`, which the run-file sort key reads as run 10 of env `<date>`. That mis-orders
+  `priorRuns`, `--findings` and the previous-run link (task.141 PR review 2, CR-1). The label also
+  accepted `/`, `\` and `..`, which could steer the printed path out of `runs/<id>/`. The task.144
+  probe `security-probe --entry cli:…uat-status.mjs … --env {input}` read `present-but-inert`
+  against it and now reads `engages` on that case set. Control characters in a label (`\n`, `\r`,
+  `\t`) are still accepted, exactly as before this change, and are left to a follow-up. SKILL.md Step 4.4's `pass` bullet now names the note flag the
+  per-verdict table requires (`--clear-note` on every non-✅ row) (PR review 2, CR-2).
+  **Migration:** an empty, two-digit, or `/`-, `\`- or `..`-bearing `--env` label is refused with
+  exit 2. Use a label with a letter that does not end in `-NN`, such as `ci10`.
 
 - **A `cli:` probe declined before it ran no longer leaves a stale `unverifiable` control in the
   record (task 144 follow-up, 5c CR-1).** A probe whose entry escaped a wrong `--repo-root` was

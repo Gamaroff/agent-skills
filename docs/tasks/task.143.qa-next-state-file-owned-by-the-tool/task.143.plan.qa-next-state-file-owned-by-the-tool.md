@@ -82,7 +82,7 @@ if (!env || /[\/\\]|\.\./.test(env) || /^\d{2}$/.test(env) || /-\d{2}$/.test(env
   die(`--env ${env}: …`);
 ```
 
-- Test the built name: `runPathFor([], "2026-09-22", "10")` refuses; `"env-10"` accepts and
+- Test the built name: `runPathFor([], "2026-09-22", "10")` refuses; `"ci10"` accepts (not `"env-10"` — the existing `-NN` label rule refuses it) and
   `seqKey` of the result keeps sequence `01`.
 - SKILL.md Step 4.4: `- pass → --set <id> pass --run … ` + "(plus the note flag the table below
   gives for the row's current state)".

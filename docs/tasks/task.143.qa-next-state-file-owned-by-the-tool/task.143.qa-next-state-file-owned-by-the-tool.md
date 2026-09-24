@@ -5,18 +5,22 @@ type: task
 description: "Move /qa-next's run state file (.claude/state/qa-next.state.json) from a JSON shape described across SKILL.md Steps 0–6 into uat-status.mjs subcommands with one field schema in code, so every field's writer and reader is tested — and close the three LOW deferrals task.141 left in the same area."
 tags: [qa-next, uat-status, state-file, follow-up]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-24
 assignee:
 estimated_effort_hours: 6
 github_issue: 469
+completed_date: 2026-09-24
+pr_number: 475
 ---
 
 # Technical Task: qa-next — `uat-status.mjs` owns the run state file
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.143.review.1.qa-next-state-file-owned-by-the-tool.md` implemented 2026-09-24
 
 **GitHub Issue**: [#469](https://github.com/Gamaroff/agent-skills/issues/469)
 
@@ -61,6 +65,8 @@ QA-cycle finding.
    the file, so no test can see a reader drift from its writer.
 3. **A pre-task.141 state file has no `priorRuns`** (task.141 gate 12, CR12-3). Resumed under the
    new Step 6 it reads as empty and reports a re-run as a first run; the prose says nothing about it.
+   The released v0.51.0 shape also lacks `targeted`, `bug` and `filedBug` — a missing `bug` makes a
+   repeat failure file a duplicate bug, the failure task.141 introduced `bug` to prevent.
 4. **A two-digit `--env` label passes the run-sequence guard** (task.141 PR review 2, CR-1).
    `runPathFor` refuses an env ending `-NN`, but `--env 10` builds `2026-09-22-10.md`, which `seqKey`
    reads as run 10 of env `2026-09-22`, mis-ordering `priorRuns`, `--findings` and the previous-run
@@ -104,22 +110,49 @@ QA-cycle finding.
 ### Target Architecture
 
 - **`STATE_FIELDS`** (exported, frozen): one entry per field — `item`, `function`, `surface`,
-  `stories`, `uatSpecs`, `targeted`, `priorRuns`, `bug`, `filedBug`, `runFile`, `phase`, `startedAt`
-  — each with its writer (`init` or a named `--state-set` field), whether it is mutable after init,
-  and its readers (SKILL.md step numbers, for the record the test checks).
+  `stories`, `uatSpecs`, `targeted`, `priorRuns`, `bug`, `filedBug`, `runFile`, `lane`, `phase`,
+  `startedAt` — each with its writer (`init` or a named `--state-set` field), whether it is mutable
+  after init, and its readers (SKILL.md step numbers, for the record the test checks). `lane` is the
+  `{exit, report}` object Step 3a stores; it is `null` at init.
 - **`--state-init (--item <id> | --next) [--json]`**: resolves the row exactly as `--item` / `--next`
   do (same `describeRow`), writes the state file with every init field, `phase: selected`,
-  `filedBug: null`, `runFile: null`, and prints the payload — the one call replaces "resolve, then
-  write the state file". Refuses with exit **5** `run-in-progress` when a state file names a different
-  item; with the same item it is a resume and prints the existing state unchanged.
-- **`--state-get [--json]`**: prints the state; exit **6** when none. A legacy file lacking
-  `priorRuns` is answered with `priorRuns` **derived** — the row's current `priorRuns` minus the state
-  file's own `runFile` — and `derived: ["priorRuns"]` in the output, never a silent empty list.
+  `filedBug: null`, `runFile: null`, `lane: null`, and prints the payload — the one call replaces
+  "resolve, then write the state file". **It never resumes** (revised in QA cycle 1,
+  TASK-143-BUG-1): when a state file already exists, whatever item it names, it exits **5**
+  `run-in-progress` and writes and prints nothing. Resuming is `--state-get`'s job in Step 0, so
+  reaching `--state-init` past a state file means another run took the lock in between. The review's
+  earlier "same item / `--next` = resume" printed the stored state on exit 0, a shape Step 1 read as
+  a payload. The file is created exclusively (`link`, which fails on EEXIST), so two concurrent inits
+  cannot both win. With no state file, exit 3 (nothing untested) and exit 4 (no such row) keep their
+  meaning and write nothing.
+- **`--state-get [--json]`**: prints the state; exit **6** when none. A **legacy** state file — the
+  shape released in v0.51.0, which has no `targeted`, `priorRuns`, `bug` or `filedBug` — is answered
+  with each missing field **derived** and named in `derived: [...]`, never a silent default:
+  - `targeted` → `false` (v0.51.0 took no id argument; every run was untargeted);
+  - `priorRuns` → the row's current `priorRuns` minus this run's own file (`runFile`). v0.51.0 never
+    recorded `runFile` (TASK-143-BUG-2), so the answer depends on the phase. Before `executed` it is
+    exact: the run has written no file, so nothing is excluded. From `executed` on, the file named on
+    or after the run's **local** start date is excluded (v0.51.0 wrote `<local date>-<env>.md`), and
+    `priorRuns` is always named in `unverifiable`, **even after a resume records a fresh `runFile`**.
+    That file is the one this run will write. It says nothing about a file an interrupted v0.51.0
+    Step 4 already wrote, which on disk is indistinguishable from an earlier same-day run. The env
+    label, a same-day run under another label and a mis-written `startedAt` cannot be seen either
+    (TASK-143-BUG-3, BUG-4, BUG-5, BUG-6);
+  - `bug` → the row's current bug link while `phase` is before `recorded` (Step 4.4 has not yet
+    rewritten the note cell); `null` from `recorded` on (its only reader, Step 4's reuse decision,
+    has already run);
+  - `filedBug` → `null` before `recorded`; from `recorded` on, the row's current bug link when the
+    row reads `fail`, else `null`.
 - **`--state-set <field> <value>`**: only the mutable fields (`phase`, `runFile`, `filedBug`, `lane`);
-  `phase` moves forward only through `selected → resolved → executed → recorded → committed`; an
-  init-only field (`priorRuns`, `bug`, …) is refused by name — the pre-run values cannot be
-  overwritten after the run changes the row.
+  `phase` takes one of the five phases and moves forward only through
+  `selected → resolved → executed → recorded → committed` (re-setting the current phase is allowed —
+  a resume re-enters its step); `runFile` / `filedBug` take a path or the literal `null`; `lane` takes
+  a JSON value. An init-only field (`priorRuns`, `bug`, …) is refused by name — the pre-run values
+  cannot be overwritten after the run changes the row — and an unknown field is refused as unknown
+  (both exit 2).
 - **`--state-clear`**: deletes the file (Step 6, last); idempotent.
+- **Dispatch order**: `--state-init --item D.2` also carries `--item`, so the four `--state-*`
+  branches are dispatched **before** `--item` / `--next` in `main`.
 - **`runPathFor`** refuses an env that is empty, two digits, ends `-NN`, or contains `/`, `\` or `..`
   — tested against the built name, not only the label.
 
@@ -142,7 +175,7 @@ QA-cycle finding.
 
 ✅ `--state-init`, `--state-get`, `--state-set`, `--state-clear` and exported `STATE_FIELDS` in
 `skills/qa-next/scripts/uat-status.mjs`
-✅ Legacy state file (no `priorRuns`): derived on read, marked `derived`
+✅ Legacy state file (the v0.51.0 shape — no `targeted`, `priorRuns`, `bug`, `filedBug`): each derived on read, named in `derived`
 ✅ SKILL.md Steps 0–6, § "State file", the resume map and the stop-condition table rewritten to name
 commands; the example JSON object removed
 ✅ `runPathFor` env guard on the built name, plus path-separator refusal (task.141 PR review 2 CR-1,
@@ -177,7 +210,8 @@ After:                     uat-status.mjs --state-init --item <id> --json   # or
 **Impact**: consumers who run `/qa-next` get the new protocol when they install the new skill; the
 file's path and shape are unchanged, so an in-flight run started by the old skill resumes.
 **Migration**: none for new runs. An in-flight state file from the old skill is read by
-`--state-get`; if it lacks `priorRuns` the value is derived (see Target Architecture).
+`--state-get`; each field the v0.51.0 shape lacks (`targeted`, `priorRuns`, `bug`, `filedBug`) is
+derived and named in `derived` (see Target Architecture).
 
 ### Breaking Change 2: some `--env` labels are refused
 
@@ -185,7 +219,7 @@ file's path and shape are unchanged, so an in-flight run started by the old skil
 (already refused), or contains `/`, `\` or `..`.
 
 **Impact**: an owner or config using a purely numeric env label.
-**Migration**: use a label with a letter (`env-10`, `ci10`). The refusal message names the rule; the
+**Migration**: use a label with a letter that does not end in `-NN` (`ci10`, `env10` — not `env-10`, which the existing `-NN` rule already refuses). The refusal message names the rule; the
 CHANGELOG entry carries a **Migration** line.
 
 ---
@@ -198,13 +232,13 @@ CHANGELOG entry carries a **Migration** line.
 
 **Risk**: Medium · **Files**: `skills/qa-next/scripts/uat-status.mjs`, `evals/qa-next/unit/uat-status.test.mjs`
 
-- [ ] Export frozen `STATE_FIELDS` (field → writer, mutable, readers)
-- [ ] `--state-init (--item <id> | --next)`: `describeRow`, write file, print payload; exit 5 `run-in-progress` on a different item; same item → print existing state
-- [ ] `--state-get`: exit 6 when absent; legacy `priorRuns` derived (row `priorRuns` minus `runFile`), `derived` marker
-- [ ] `--state-set <field> <value>`: mutable fields only; `phase` forward-only; init-only fields refused by name
-- [ ] `--state-clear`: idempotent delete
-- [ ] `--state <path>` override (default `.claude/state/qa-next.state.json` under `--root`); add every new flag to `OPTIONS`
-- [ ] Tests for each command, each refusal, the legacy derivation, and a schema-coverage test (every `STATE_FIELDS` field has a writer that a test exercises)
+- [x] Export frozen `STATE_FIELDS` (field → writer, mutable, readers)
+- [x] `--state-init (--item <id> | --next)`: `describeRow`, write file, print payload; exit 5 `run-in-progress` when `--item` names a different item; same item, or `--next` over any existing state → print existing state; exit 3 / 4 write nothing
+- [x] `--state-get`: exit 6 when absent; legacy v0.51.0 shape: `targeted`, `priorRuns`, `bug`, `filedBug` derived per the Target Architecture rules, each named in `derived`
+- [x] `--state-set <field> <value>`: mutable fields only (`phase`, `runFile`, `filedBug`, `lane`); `phase` forward-only (same phase allowed); `lane` parsed as JSON; `null` literal for `runFile`/`filedBug`; init-only and unknown fields refused by name
+- [x] `--state-clear`: idempotent delete
+- [x] `--state <path>` override (default `.claude/state/qa-next.state.json` under `--root`); add every new flag to `OPTIONS`; dispatch the `--state-*` branches before `--item` / `--next`
+- [x] Tests for each command, each refusal, the legacy derivation, and a schema-coverage test (every `STATE_FIELDS` field has a writer that a test exercises)
 
 **Dependencies**: none
 
@@ -212,11 +246,11 @@ CHANGELOG entry carries a **Migration** line.
 
 **Risk**: Medium (executed prose — a sentence is a call site) · **Files**: `skills/qa-next/SKILL.md`, `skills/qa-next/README.md`
 
-- [ ] § "State file": replace the example object with a pointer to `STATE_FIELDS` and the four commands
-- [ ] Step 0 preflight and the resume map read `--state-get`; `run-in-progress` maps to exit 5
-- [ ] Step 1 calls `--state-init`; Steps 3–5 call `--state-set`; Step 6 prints from `--state-get` then `--state-clear` last
-- [ ] Every remaining "state file" sentence names a command (grep: no JSON field is described as written or read in prose without its command)
-- [ ] README owner-commands block lists the state subcommands
+- [x] § "State file": replace the example object with a pointer to `STATE_FIELDS` and the four commands
+- [x] Step 0 preflight and the resume map read `--state-get`; `run-in-progress` maps to exit 5
+- [x] Step 1 calls `--state-init`; Steps 3–5 call `--state-set`; Step 6 prints from `--state-get` then `--state-clear` last
+- [x] Every remaining "state file" sentence names a command (grep: no JSON field is described as written or read in prose without its command)
+- [x] README owner-commands block lists the state subcommands
 
 **Dependencies**: Phase 1
 
@@ -224,17 +258,17 @@ CHANGELOG entry carries a **Migration** line.
 
 **Risk**: Low · **Files**: `skills/qa-next/scripts/uat-status.mjs`, `skills/qa-next/SKILL.md`, tests
 
-- [ ] `runPathFor` refuses empty, two-digit, `-NN`-ending, and `/` `\` `..`-containing env labels; tests on the built name
-- [ ] SKILL.md Step 4.4 `pass` bullet defers to the per-verdict flag table (`--clear-note` on non-✅ rows)
+- [x] `runPathFor` refuses empty, two-digit, `-NN`-ending, and `/` `\` `..`-containing env labels; tests on the built name
+- [x] SKILL.md Step 4.4 `pass` bullet defers to the per-verdict flag table (`--clear-note` on non-✅ rows)
 
 **Dependencies**: none (can run in parallel with Phases 1–2)
 
 ### Phase 4: Docs, CHANGELOG, validation
 
-**Risk**: Low · **Files**: `CHANGELOG.md`, `docs/reference/commands.md` (if it lists uat-status flags)
+**Risk**: Low · **Files**: `CHANGELOG.md` (`docs/reference/commands.md` checked at review — it lists no uat-status flags; no change)
 
-- [ ] CHANGELOG `[Unreleased]` entry citing `(task 143)`, with a **Migration** line for the env refusal
-- [ ] `npm run validate -- skills/qa-next/`, `check:generated`, `bundle --check`, Prettier
+- [x] CHANGELOG `[Unreleased]` entry citing `(task 143)`, with a **Migration** line for the env refusal
+- [x] `npm run validate -- skills/qa-next/`, `check:generated`, `bundle --check`, Prettier
 
 **Dependencies**: Phases 1–3
 
@@ -250,12 +284,13 @@ CHANGELOG entry carries a **Migration** line.
 ### Files to Modify (Tests)
 
 3. ✅ `evals/qa-next/unit/uat-status.test.mjs` — state commands, refusals, legacy derivation, schema coverage, env guard
+3a. ✅ `shared/resources/tests/security-probe.test.mjs` — task.144's first real `cli:` probe against `--run-path --env {input}` asserted `present-but-inert` "until task.143 hardens the guard"; it now asserts `engages`, with a two-digit hostile case added (added during develop — not in the original plan)
 
 ### Files to Modify (Documentation)
 
 4. ✅ `skills/qa-next/README.md` — owner commands
 5. ✅ `CHANGELOG.md` — `[Unreleased]`, `(task 143)`, Migration line
-6. ✅ `docs/reference/commands.md` — only if it enumerates `uat-status.mjs` flags
+6. ~~`docs/reference/commands.md`~~ — checked at review: it does not enumerate `uat-status.mjs` flags (rows 25–27 describe `/qa-next` only), so no change
 
 ### Files to Delete
 
@@ -292,28 +327,28 @@ None.
 
 ### Functional
 
-- [ ] `--state-init --item <id>` and `--state-init --next` write the state file and print the same payload `--item` / `--next` print
-- [ ] A second `--state-init` naming a different item exits 5 and writes nothing; the same item prints the existing state unchanged
-- [ ] After a run file is written, `--state-get` returns the pre-run `priorRuns` and `bug`
-- [ ] `--state-set` refuses init-only fields and backward `phase` moves by name
-- [ ] A legacy state file without `priorRuns` is answered with a derived value and a `derived` marker
-- [ ] `--env 10`, `--env a/b`, `--env ..` are refused before anything is written
+- [x] `--state-init --item <id>` and `--state-init --next` write the state file and print the same payload `--item` / `--next` print
+- [x] A second `--state-init` over any existing state exits 5 `run-in-progress` and writes and prints nothing (revised in QA cycle 1 — TASK-143-BUG-1); concurrent inits: exactly one wins
+- [x] After a run file is written, `--state-get` returns the pre-run `priorRuns` and `bug`
+- [x] `--state-set` refuses init-only fields and backward `phase` moves by name
+- [x] A legacy (v0.51.0-shape) state file is answered with `targeted`, `priorRuns`, `bug` and `filedBug` derived and each named in `derived`
+- [x] `--env 10`, `--env a/b`, `--env ..` are refused before anything is written
 
 ### Performance
 
-- [ ] No command gains a network call; the tool stays offline
-- [ ] qa-next suite wall-clock stays within the same order of magnitude
+- [x] No command gains a network call; the tool stays offline
+- [x] qa-next suite wall-clock stays within the same order of magnitude
 
 ### Code Quality
 
-- [ ] Every new test mutation-proved (revert the behaviour, the named test goes red)
-- [ ] `npm test` green with the gitignored `.claude/skills` symlink moved aside
-- [ ] `check:generated`, `bundle --check`, `npm run validate -- skills/qa-next/` and Prettier clean
+- [x] Every new test mutation-proved (revert the behaviour, the named test goes red)
+- [x] `npm test` green with the gitignored `.claude/skills` symlink moved aside
+- [x] `check:generated`, `bundle --check`, `npm run validate -- skills/qa-next/` and Prettier clean
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 143)` and carries a **Migration** line for the env refusal
-- [ ] SKILL.md describes no state-file field as written or read without naming the command that does it
+- [x] CHANGELOG `[Unreleased]` cites `(task 143)` and carries a **Migration** line for the env refusal
+- [x] SKILL.md describes no state-file field as written or read without naming the command that does it
 
 ---
 
@@ -329,7 +364,7 @@ None.
 
 ### Medium Risk Areas
 
-1. **In-flight runs across the upgrade** — mitigated by the legacy derivation and unchanged path/shape.
+1. **In-flight runs across the upgrade** — mitigated by the legacy derivation (all four fields the v0.51.0 shape lacks) and unchanged path/shape.
 2. **Forward-only `phase`** could strand a run that legitimately re-enters a step — the resume map is
    forward-only today; if a backward move is needed, `--state-clear` and re-init is the stated recovery.
 
@@ -361,21 +396,90 @@ None.
 - **Non-critical**: wording or README gaps — fix forward.
 
 ---
-
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-23 | 1.0     | Initial draft | create-task |
+| 2026-09-24 | 1.1     | Review passed (9/10) — added `lane` to `STATE_FIELDS` and typed `--state-set` values; defined `--state-init --next` over an existing state as a resume; widened the legacy derivation to `targeted`, `bug`, `filedBug`; stated dispatch order | review-task |
+| 2026-09-24 |         | Status → ready-for-development | review-task |
+| 2026-09-24 |  | Implemented — 8 files, 11 new tests (qa-next suite 44 → 55; security-probe cli-consumer test now asserts engages) | develop |
+| 2026-09-24 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-09-24 |  | QA gate CONCERNS (80/100) — 2 findings (cycle 2 refute pass) | qa-task |
+| 2026-09-24 |  | QA gate CONCERNS (80/100) — 3 findings (cycle 3) | qa-task |
+| 2026-09-24 |  | QA gate CONCERNS (90/100) — 2 findings (cycle 4) | qa-task |
+| 2026-09-24 |  | QA gate CONCERNS (90/100) — 1 finding (cycle 5) | qa-task |
+| 2026-09-24 |  | QA findings fixed — 5 iterations; loop limit reached at gate CONCERNS (90/100), HIGH 0 throughout; cycle 5 fix not yet gated | qa-fix |
+| 2026-09-24 |  | QA gate CONCERNS (90/100) — 2 findings (cycle 6) | qa-task |
+| 2026-09-24 |  | QA findings fixed — cycle 6 of the re-entered loop (BUG-6, QA6-1); a legacy `priorRuns` stays `unverifiable` from `executed` on, and the resume always takes a fresh `--run-path` | qa-fix |
+| 2026-09-24 |  | QA gate CONCERNS (90/100) — 1 finding (cycle 7) | qa-task |
+| 2026-09-24 |  | QA findings fixed — cycle 7 (QA7-1: east-of-UTC runFile exclusion test); 7 iterations in all | qa-fix |
+| 2026-09-24 | 1.2 | DoD verified — accepted on the operator's decision over gate.7 CONCERNS (90/100) after the QA loop limit; no PR conformance review ran (PR #475) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: State schema and subcommands
-- [ ] Phase 2: SKILL.md speaks commands
-- [ ] Phase 3: LOW deferrals
-- [ ] Phase 4: Docs, CHANGELOG, validation
+- [x] Phase 1: State schema and subcommands
+- [x] Phase 2: SKILL.md speaks commands
+- [x] Phase 3: LOW deferrals
+- [x] Phase 4: Docs, CHANGELOG, validation
+
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-24
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.143.qa.7.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.7.qa-next-state-file-owned-by-the-tool.md)
+- **Gate File**: [task.143.gate.7.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.7.qa-next-state-file-owned-by-the-tool.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 62 (qa-next suite, also under TMPDIR=/tmp and four timezones); 19 executed probes
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 0 MEDIUM, 1 LOW
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+- TASK-143-BUG-6 and TASK-143-QA6-1 fixed (mutation-proved).
+- TASK-143-QA7-1 (low): the `runFile` exclusion in `stateView` is now masked by the date rule, and its test goes red only east of UTC.
+- Documented limitation (reliability, routed to a follow-up): a half-written file from an interrupted v0.51.0 Step 4 stays beside this run's file, and a later run counts it as a prior run.
+- Pre-existing (not attributed to this change): `--env` accepts whitespace-only and control-character labels; routed to a follow-up.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED, on the operator's decision (2026-09-24)
+
+### QA Report Summary
+
+**QA Report**: `task.143.qa.7.qa-next-state-file-owned-by-the-tool.md`
+**Gate File**: `task.143.gate.7.qa-next-state-file-owned-by-the-tool.yml`
+**Gate Status**: ⚠️ CONCERNS, accepted by the operator at the QA loop limit (7 cycles, HIGH 0 throughout)
+**Quality Score**: 90/100
+
+✅ **Functional criteria:** 6/6 pass, each with code and a test that CI runs on every PR
+⚠️ **Process criteria:** SC-P1, SC-P2, SC-CQ1, SC-M1 and SC-M2 are met by inspection, measurement or the mutation record, and have no executable per-PR test
+✅ **Tests:** qa-next suite 63/63; `npm run ci:fast` 3988 pass, 0 fail; CI reading 1 SUCCESS @ `d52234b2`
+⚠️ **PR Review:** none. There is no GitHub review, and the Step 5c `/review-pr` conformance review **did not run** because the operator finalised from the loop-limit halt
+✅ **Documentation:** SKILL.md, README and CHANGELOG (with a Migration line)
+✅ **Security Review:** PASS. 47 probes; the 5 reproduced `--env` labels are pre-existing on `develop`
+⚠️ **Compliance Review:** not applicable
+
+**Task marked as ACCEPTED on:** 2026-09-24
+
+**Detailed Verification Log:** See `task.143.dod.1.qa-next-state-file-owned-by-the-tool.md` for the full verification evidence.
 
 ---
 
@@ -389,6 +493,15 @@ None.
 ---
 
 ## Notes
+
+### Implementation Notes (develop, 2026-09-24)
+
+- **Shared resolver, not a second payload builder.** `cmdNext`/`cmdItem` now call `resolvePayload`, and `--state-init` calls the same function, so the recorded payload cannot drift from what `--next`/`--item` print. `describeRow`'s bug computation moved into `rowBugPath`, which `stateView`'s legacy derivation also uses.
+- **Writes go through temp-then-rename**, so a reader never sees half a lock. The state file is `malformed` (exit 1) when it is not JSON, is not an object, or names no string `item` or no known `phase`.
+- **Legacy derivation is computed on every read and never written back**, so each answer is computed against the phase it is read at.
+- **Deviation: the migration label.** The plan and §5 suggested `env-10` as a replacement label, but the existing `-NN` rule already refuses it. The docs now say `ci10`/`env10`, and so does the refusal message.
+- **Deviation: `security-probe.test.mjs`.** task.144 had pinned `present-but-inert` on this guard and handed the update to this task. That test now asserts `engages` and was proved red against the pre-task tool.
+- **Mutation proofs**: 18 mutants (exit 5, init-only refusal, backward phase, each legacy field, the built-name check, path characters, `lane` init, dispatch order, `--next` resume, exit 3 writing nothing, malformed refusal, the `Object.hasOwn` prototype guard, the `null` literal, pre-run `priorRuns`). All are killed. The `Object.hasOwn` mutant survived at first and was killed by asserting the refusal message instead of the exit code alone.
 
 ### Important Reminders
 

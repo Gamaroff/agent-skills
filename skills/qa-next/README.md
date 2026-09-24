@@ -58,6 +58,15 @@ node .agents/skills/qa-next/scripts/uat-status.mjs --run-path D.2 --env lan   # 
 node .agents/skills/qa-next/scripts/uat-status.mjs --automated D.2 "apps/portal/e2e/uat/D.2.uat.spec.ts"   # after a spec lands
 ```
 
+The run in flight, if any — `.claude/state/qa-next.state.json`, the skill's single-flight lock and resume record. The skill drives it through these commands; you need them when a run was abandoned:
+
+```bash
+node .agents/skills/qa-next/scripts/uat-status.mjs --state-get     # what is in flight, and at which phase (exit 6 if nothing)
+node .agents/skills/qa-next/scripts/uat-status.mjs --state-clear   # abandon it, so the next /qa-next starts fresh
+```
+
+The skill's own calls are `--state-init (--next | --item <id>)`, which records the row as it was when the run began, and `--state-set <field> <value>` for `phase`, `runFile`, `filedBug` and `lane`. The fields and who writes each are `STATE_FIELDS` in `scripts/uat-status.mjs`. `--env` takes a label with a letter in it (`lan`, `ci10`); a two-digit label, or one containing `/`, `\` or `..`, is refused.
+
 Read the run file before accepting — `runs/<id>/<date>-<env>.md` is the evidence; the 🟡 is only the summary. One directory per function, so `ls docs/qa/runs/D.2/` is that function's whole UAT history, oldest first — and with `/qa-next <id>` it genuinely holds several files: a second run on the same day is written as `<date>-<env>-02.md`, never over the first, because the first run's Findings rows are what `--findings` is derived from. The unsuffixed file is run 1 and sorts first.
 
 ## Three layers, and how a manual pass becomes a regression test
