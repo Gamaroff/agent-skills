@@ -404,6 +404,7 @@ None.
 | 2026-09-24 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-09-24 |  | QA gate CONCERNS (80/100) — 2 findings (cycle 2 refute pass) | qa-task |
 | 2026-09-24 |  | QA gate CONCERNS (80/100) — 3 findings (cycle 3) | qa-task |
+| 2026-09-24 |  | QA gate CONCERNS (90/100) — 2 findings (cycle 4) | qa-task |
 
 ---
 <!-- change-log-end -->
@@ -422,24 +423,26 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-24
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.143.qa.3.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.3.qa-next-state-file-owned-by-the-tool.md)
-- **Gate File**: [task.143.gate.3.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.3.qa-next-state-file-owned-by-the-tool.yml)
+- **Full Report**: [task.143.qa.4.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.4.qa-next-state-file-owned-by-the-tool.md)
+- **Gate File**: [task.143.gate.4.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.4.qa-next-state-file-owned-by-the-tool.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 59 (qa-next suite); 19 executed probes
+- **Tests Executed**: 60 (qa-next suite, also under TMPDIR=/tmp and three timezones); 19 executed probes
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 2 MEDIUM, 1 LOW
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 0 MEDIUM, 2 LOW
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- TASK-143-BUG-3 and QA2-2 fixed. The replacement legacy date rule ignores the phase and the timezone (TASK-143-BUG-4).
+- TASK-143-BUG-4 fixed.
+- TASK-143-QA4-1: the SKILL resume map lacks `--run-path` + `--state-set runFile` for a pre-upgrade run resumed at `executed`.
+- TASK-143-QA4-2: one legacy test is timezone-dependent (fails under UTC+14).
 - Pre-existing (not attributed to this change): `--env` accepts newline/CR/tab labels, routed to a follow-up.
 
 ---

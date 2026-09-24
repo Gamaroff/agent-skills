@@ -22,8 +22,9 @@ All notable changes to this project will be documented in this file. Format foll
   `filedBug`, still resumes: each missing field is derived from the row, correct for the phase it is
   read at, and named in `derived`. Its `runFile` is null (v0.51.0 never recorded one). Before
   `executed` that does not matter, because the run has written nothing yet and `priorRuns` is exact.
-  From `executed` on, the run's own file is excluded by its name (v0.51.0 wrote
-  `<local date>-<env>.md`), and `priorRuns` is also named in `unverifiable`, because nothing v0.51.0
+  A run resumed at `executed` records its file first (`--run-path`, then `--state-set runFile`), which
+  keeps the value exact. Otherwise, from `executed` on, the file v0.51.0 wrote is excluded by its name
+  (`<local date>-<env>.md`), and `priorRuns` is also named in `unverifiable`, because nothing v0.51.0
   recorded can confirm it. SKILL.md now names a command wherever it used to describe JSON.
   Tests derived from `STATE_FIELDS` cover the schema and are mutation-proved.
 

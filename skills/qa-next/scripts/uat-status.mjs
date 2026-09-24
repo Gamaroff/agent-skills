@@ -1281,9 +1281,11 @@ export function stateView(opts, state) {
     // v0.51.0 never recorded runFile (TASK-143-BUG-2), so on a real legacy file it is null. Before
     // `executed` that does not matter: Step 4 writes the run file, so this run has written none yet
     // and the history IS the pre-run history — exact. From `executed` on the own file may exist, and
-    // v0.51.0 kept no record that says which it is. The best available signal is its name: v0.51.0
-    // wrote one runs/<id>/<local date>-<env label>.md, so a file named on or after the run's local
-    // start date is excluded. That cannot see the env label, a same-day run under another label,
+    // v0.51.0 kept no record that says which it is. (SKILL.md's resume map has a run resumed AT
+    // `executed` record one with --run-path + --state-set runFile before Step 4, which makes this
+    // exact through the runFile branch; what reaches here is a file v0.51.0 wrote itself.) The best
+    // available signal is its name: v0.51.0 wrote one runs/<id>/<local date>-<env label>.md, so a file
+    // named on or after the run's local start date is excluded. That cannot see the env label, a same-day run under another label,
     // or a start date the agent wrote wrongly, so the answer is flagged `unverifiable` every time
     // rather than presented as fact (TASK-143-BUG-3, BUG-4). Neither the row's Last run (unchanged by
     // a na/blocked early exit) nor an mtime (refreshed by a checkout) was a better signal.

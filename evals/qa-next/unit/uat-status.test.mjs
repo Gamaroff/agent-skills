@@ -2424,103 +2424,112 @@ test("a v0.51.0-shape state file is answered with targeted, priorRuns, bug and f
 });
 
 test("a real v0.51.0 file has runFile null: its own file is found by the file-name date (TASK-143-BUG-2, BUG-3)", () => {
-  // v0.51.0 never recorded runFile, and wrote exactly one runs/<id>/<date>-<env>.md per date. The
-  // own file is therefore the one dated on or after the run's start — not the row's Last run (a
-  // na/blocked early exit leaves it naming the PREVIOUS run) and not an mtime (a checkout refreshes
-  // those, and v0.51.0's startedAt was hand-written). Cycle 1 used both heuristics; each misfired.
-  const root = stateCorpus();
-  const runs = path.join(root, "docs/qa/runs/D.1");
-  mkdirSync(runs, { recursive: true });
-  const prev = path.join(runs, "2026-09-01-lan.md");
-  writeFileSync(prev, "# an earlier run\n"); // mtime NOW — as a checkout leaves it
-  const startedAt = "2026-09-24T12:00:00Z"; // the same calendar date in every timezone within ±12h
-  const legacy = (phase, lastRun, extra = {}) => {
-    writeFileSync(
-      REG(root),
-      readFileSync(REG(root), "utf8").replace(
-        /^\| D\.1 \|.*$/m,
-        `| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | 🟡 pass | [r](${lastRun}) |  |`,
-      ),
-    );
-    mkdirSync(path.dirname(STATE(root)), { recursive: true });
-    writeFileSync(
-      STATE(root),
-      JSON.stringify({
-        item: "D.1",
-        function: "Play a game",
-        surface: "D",
-        stories: ["7.5"],
-        uatSpecs: [],
-        lane: null,
-        runFile: null,
-        phase,
-        startedAt,
-        ...extra,
-      }),
-    );
-    return JSON.parse(run(root, "--state-get", "--json").out);
-  };
+  // The start date is LOCAL, so this test pins the timezone its child processes run in: under
+  // TZ=Pacific/Kiritimati (UTC+14) 2026-09-24T12:00Z is the 25th and the own file is not excluded
+  // (TASK-143-QA4-2). The two tests below pin their own zones for the same reason.
+  const tz = process.env.TZ;
+  process.env.TZ = "UTC";
+  try {
+    // v0.51.0 never recorded runFile, and wrote exactly one runs/<id>/<date>-<env>.md per date. The
+    // own file is therefore the one dated on or after the run's start — not the row's Last run (a
+    // na/blocked early exit leaves it naming the PREVIOUS run) and not an mtime (a checkout refreshes
+    // those, and v0.51.0's startedAt was hand-written). Cycle 1 used both heuristics; each misfired.
+    const root = stateCorpus();
+    const runs = path.join(root, "docs/qa/runs/D.1");
+    mkdirSync(runs, { recursive: true });
+    const prev = path.join(runs, "2026-09-01-lan.md");
+    writeFileSync(prev, "# an earlier run\n"); // mtime NOW — as a checkout leaves it
+    const startedAt = "2026-09-24T12:00:00Z"; // the same calendar date in every timezone within ±12h
+    const legacy = (phase, lastRun, extra = {}) => {
+      writeFileSync(
+        REG(root),
+        readFileSync(REG(root), "utf8").replace(
+          /^\| D\.1 \|.*$/m,
+          `| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | 🟡 pass | [r](${lastRun}) |  |`,
+        ),
+      );
+      mkdirSync(path.dirname(STATE(root)), { recursive: true });
+      writeFileSync(
+        STATE(root),
+        JSON.stringify({
+          item: "D.1",
+          function: "Play a game",
+          surface: "D",
+          stories: ["7.5"],
+          uatSpecs: [],
+          lane: null,
+          runFile: null,
+          phase,
+          startedAt,
+          ...extra,
+        }),
+      );
+      return JSON.parse(run(root, "--state-get", "--json").out);
+    };
 
-  // A na/blocked early exit: no run file this run, Last run still names the previous run.
-  // Before `executed` this run has written nothing: the history is exact, same-day files included
-  // (TASK-143-BUG-4 — the date rule used to drop a same-day PRIOR run here).
-  writeFileSync(
-    path.join(runs, "2026-09-24-ci.md"),
-    "# an earlier run today, another env\n",
-  );
-  for (const phase of ["selected", "resolved"]) {
-    const early = legacy(phase, "runs/D.1/2026-09-24-ci.md");
+    // Before `executed` this run has written nothing: the history is exact, same-day files included
+    // (TASK-143-BUG-4 — the date rule used to drop a same-day PRIOR run here).
+    writeFileSync(
+      path.join(runs, "2026-09-24-ci.md"),
+      "# an earlier run today, another env\n",
+    );
+    for (const phase of ["selected", "resolved"]) {
+      const early = legacy(phase, "runs/D.1/2026-09-24-ci.md");
+      assert.deepEqual(
+        early.priorRuns,
+        ["runs/D.1/2026-09-01-lan.md", "runs/D.1/2026-09-24-ci.md"],
+        `${phase}: nothing excluded — this run has written no file`,
+      );
+      assert.equal(
+        early.unverifiable,
+        undefined,
+        `${phase}: exact, so not flagged`,
+      );
+    }
+    rmSync(path.join(runs, "2026-09-24-ci.md"));
+
+    // A na/blocked early exit: no run file this run, Last run still names the previous run.
+    const early = legacy("recorded", "runs/D.1/2026-09-01-lan.md");
     assert.deepEqual(
       early.priorRuns,
-      ["runs/D.1/2026-09-01-lan.md", "runs/D.1/2026-09-24-ci.md"],
-      `${phase}: nothing excluded — this run has written no file`,
-    );
-    assert.equal(
-      early.unverifiable,
-      undefined,
-      `${phase}: exact, so not flagged`,
-    );
-  }
-  rmSync(path.join(runs, "2026-09-24-ci.md"));
-
-  // A na/blocked early exit: no run file this run, Last run still names the previous run.
-  const early = legacy("recorded", "runs/D.1/2026-09-01-lan.md");
-  assert.deepEqual(
-    early.priorRuns,
-    ["runs/D.1/2026-09-01-lan.md"],
-    "the previous run is kept",
-  );
-  assert.deepEqual(
-    early.unverifiable,
-    ["priorRuns"],
-    "from executed on it is always flagged",
-  );
-
-  // A run that wrote its file: excluded by its date, at executed (not yet linked) and after.
-  writeFileSync(path.join(runs, "2026-09-24-lan.md"), "# this run\n");
-  for (const [phase, lastRun] of [
-    ["executed", "runs/D.1/2026-09-01-lan.md"],
-    ["recorded", "runs/D.1/2026-09-24-lan.md"],
-  ])
-    assert.deepEqual(
-      legacy(phase, lastRun).priorRuns,
       ["runs/D.1/2026-09-01-lan.md"],
-      `${phase}: own file excluded, the earlier run kept whatever its mtime`,
+      "the previous run is kept",
     );
-  assert.deepEqual(
-    legacy("executed", "runs/D.1/2026-09-01-lan.md").unverifiable,
-    ["priorRuns"],
-  );
+    assert.deepEqual(
+      early.unverifiable,
+      ["priorRuns"],
+      "from executed on it is always flagged",
+    );
 
-  // No usable startedAt: nothing can identify the own file, and the answer says so.
-  const blind = legacy("committed", "runs/D.1/2026-09-24-lan.md", {
-    startedAt: "whenever",
-  });
-  assert.deepEqual(blind.unverifiable, ["priorRuns"]);
-  assert.deepEqual(blind.priorRuns, [
-    "runs/D.1/2026-09-01-lan.md",
-    "runs/D.1/2026-09-24-lan.md",
-  ]);
+    // A run that wrote its file: excluded by its date, at executed (not yet linked) and after.
+    writeFileSync(path.join(runs, "2026-09-24-lan.md"), "# this run\n");
+    for (const [phase, lastRun] of [
+      ["executed", "runs/D.1/2026-09-01-lan.md"],
+      ["recorded", "runs/D.1/2026-09-24-lan.md"],
+    ])
+      assert.deepEqual(
+        legacy(phase, lastRun).priorRuns,
+        ["runs/D.1/2026-09-01-lan.md"],
+        `${phase}: own file excluded, the earlier run kept whatever its mtime`,
+      );
+    assert.deepEqual(
+      legacy("executed", "runs/D.1/2026-09-01-lan.md").unverifiable,
+      ["priorRuns"],
+    );
+
+    // No usable startedAt: nothing can identify the own file, and the answer says so.
+    const blind = legacy("committed", "runs/D.1/2026-09-24-lan.md", {
+      startedAt: "whenever",
+    });
+    assert.deepEqual(blind.unverifiable, ["priorRuns"]);
+    assert.deepEqual(blind.priorRuns, [
+      "runs/D.1/2026-09-01-lan.md",
+      "runs/D.1/2026-09-24-lan.md",
+    ]);
+  } finally {
+    if (tz === undefined) delete process.env.TZ;
+    else process.env.TZ = tz;
+  }
 });
 
 test("a legacy run started near midnight counts the file named by its LOCAL date", () => {
@@ -2582,6 +2591,42 @@ test("east of UTC the previous LOCAL day's run is kept — the start date is loc
     },
   );
   assert.deepEqual(JSON.parse(out).priorRuns, ["runs/D.1/2026-09-23-lan.md"]);
+});
+
+test("a pre-upgrade run resumed at executed that records its run file gets an EXACT priorRuns (TASK-143-QA4-1)", () => {
+  // SKILL.md's resume map: runFile null at executed → --run-path, then --state-set runFile, then
+  // Step 4. After that the derivation goes through the runFile branch — no date rule, no flag.
+  const root = stateCorpus();
+  const runs = path.join(root, "docs/qa/runs/D.1");
+  mkdirSync(runs, { recursive: true });
+  writeFileSync(path.join(runs, "2026-09-01-lan.md"), "# earlier\n");
+  mkdirSync(path.dirname(STATE(root)), { recursive: true });
+  writeFileSync(
+    STATE(root),
+    JSON.stringify({
+      item: "D.1",
+      runFile: null,
+      phase: "executed",
+      startedAt: "2026-09-24T12:00:00Z",
+    }),
+  );
+  assert.deepEqual(
+    JSON.parse(run(root, "--state-get", "--json").out).unverifiable,
+    ["priorRuns"],
+  );
+  const runFile = run(root, "--run-path", "D.1", "--env", "lan").out.trim();
+  assert.equal(run(root, "--state-set", "runFile", runFile).code, 0);
+  writeFileSync(
+    path.join(root, "docs/qa", runFile),
+    "# this run, written in Step 4\n",
+  );
+  const state = JSON.parse(run(root, "--state-get", "--json").out);
+  assert.deepEqual(
+    state.priorRuns,
+    ["runs/D.1/2026-09-01-lan.md"],
+    "own file excluded by runFile",
+  );
+  assert.equal(state.unverifiable, undefined, "and exact, so not flagged");
 });
 
 test("a state file that is not one is refused by name, exit 1", () => {
