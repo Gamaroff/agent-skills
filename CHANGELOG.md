@@ -105,8 +105,9 @@ All notable changes to this project will be documented in this file. Format foll
   Review read the function in full and passed the claim, and develop found it.
   `tests/outcome-reachability-check.test.js` holds each site's check item. It holds the three
   elements (stated input, named function, branch that fires), the site's verdict sentence, and its
-  planned-state and named-phase (or stale-bug) clauses. It also holds each section's
-  hallucination-pattern line, which restates the rule.
+  planned-state and named-phase (or stale-bug) clauses. It also holds the review-task and review-story
+  hallucination-pattern lines, which restate the rule and carry its Important severity, and review-bug's widened
+  likely-already-fixed trigger. In review-bug, STALE outranks NEEDS DETAIL.
 - **`uat-status.mjs --set <id> <verdict>`: only a `fail` moves an `✅ accepted` row (task 141).** A `pass`,
   `blocked` or `na` against an accepted row now leaves `✅` in place and updates only `Last run` and
   `Notes / bug`; the tool prints `(kept)` so the branch it took is never silent. `fail` is unchanged

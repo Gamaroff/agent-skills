@@ -112,7 +112,9 @@ Compute the **fix-readiness score (1–10)** and **recommendation**:
 | ✅ **READY TO FIX** | Score ≥ 8, no Critical issues, `duplicate: none`, `reproduces: likely|unknown` |
 | ⚠️ **NEEDS DETAIL** | Score 4–7, or any Critical reproducibility/completeness gap (fixable by adding detail) |
 | 🚨 **DUPLICATE** | `PREPASS_DUP` = suspected and confirmed — recommend cancelling in favour of {id} |
-| 🚨 **STALE (already fixed)** | `PREPASS_STALE` = unlikely with concrete evidence, or the Step 3 reachability walk found the branch that fires today already returns the Expected outcome — recommend closing the bug, not fixing |
+| 🚨 **STALE (already fixed)** | `PREPASS_STALE` = unlikely with concrete evidence, or the Step 3 reachability walk found the branch that fires today already returns the Expected outcome — recommend closing the bug, not fixing. **Outranks NEEDS DETAIL** |
+
+A likely-already-fixed Critical also matches the NEEDS DETAIL row's "any Critical reproducibility gap". **STALE outranks NEEDS DETAIL**: no added detail can make an already-fixed bug ready to fix.
 
 Score breakdown: Completeness /10, Reproducibility /10, Classification /10, Linkage /10 (report the average, rounded).
 
@@ -125,7 +127,7 @@ Score breakdown: Completeness /10, Reproducibility /10, Classification /10, Link
 Bug: {BUG_PREFIX} ({MODE_KIND})
 Fix-readiness: {score}/10 — {RECOMMENDATION}
 Critical: {c}  Important: {i}  Optional: {o}
-Duplicate: {none|suspected id}   Reproduces: {likely|unlikely|unknown}
+Duplicate: {none|suspected id}   Reproduces: {likely|unlikely|unknown}   Stale source: {none|pre-pass|reachability walk}
 Top blockers: {1-3 lines, or "none"}
 ```
 `APPLY=false` → stop here (read-only). `APPLY=true` → continue to Step 6.5, then write a `.review.{N}.*.md` report.

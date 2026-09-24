@@ -57,7 +57,10 @@ const PLANNED_STATE = {
 // phase will add it" exempts anything (task.145 QA cycle 3, CR3-4).
 const NAMED_PHASE = {
   name: "named-phase requirement for a planned branch",
-  re: /only when a named (?:phase|task) states (?:it|that branch)/,
+  // The whole canonical sentence, not its prefix: cycle 4 found the three sites
+  // agreeing on the prefix while only one carried the exclusion and the
+  // citation (task.145 QA cycle 4, CR4-2).
+  re: /only when a named (phase|task) states it: the condition and the outcome it returns\. Cite that \1 in the finding\. A \1 that only names the function, or a criterion that promises a later \1 will add the branch, does not count/,
 };
 // Anchored on the imperative, so a negated verdict ("Do not flag as Important
 // when …") fails the hold instead of satisfying it (CR3-6).
@@ -72,7 +75,10 @@ const REVIEW_VERDICT = {
 // These are SECTION-scoped, because the list line is outside the item.
 const PATTERN_LINE = {
   name: "hallucination-pattern line judged against the planned state",
-  re: /❌ An outcome no current or planned branch of the named function returns for the stated input/,
+  // …and carries its own severity: the line sits in a hallucination list whose
+  // protocol files every hallucination as Critical, while the check says
+  // Important (CR4-1).
+  re: /❌ An outcome no current or planned branch of the named function returns for the stated input\. Report it as Important under check (?:10|7), not as a Critical hallucination/,
 };
 const STALE_PATTERN = {
   name: "hallucination-pattern line still judging against today's code",
@@ -351,7 +357,9 @@ test("the item reader does not reach past the citing item", () => {
   // "a branch" after the element narrowed to "branch that fires").
   const SIBLING =
     "   - a named function, a stated input, the branch that fires, as the plan leaves them;" +
-    " only when a named phase states it; Flag as Important when the outcome is unreachable;" +
+    " only when a named phase states it: the condition and the outcome it returns. Cite that phase in the finding." +
+    " A phase that only names the function, or a criterion that promises a later phase will add the branch, does not count;" +
+    " Flag as Important when the outcome is unreachable;" +
     " Put it to the author, and never auto-fix it; it is a fix that cannot pass its own verification → Important;" +
     " if it already returns the Expected outcome." +
     " Report it under this step's likely-already-fixed rule";

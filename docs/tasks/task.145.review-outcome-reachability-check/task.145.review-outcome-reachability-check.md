@@ -308,6 +308,34 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-25
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.145.qa.4.review-outcome-reachability-check.md](./task.145.qa.4.review-outcome-reachability-check.md)
+- **Gate File**: [task.145.gate.4.review-outcome-reachability-check.yml](./task.145.gate.4.review-outcome-reachability-check.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 4003 (4002 pass, 0 fail, 1 skipped)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 (MEDIUM: 1, LOW: 2)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+- CR4-1: the reachability pattern line inherits the hallucination protocol's Critical severity.
+- CR4-2: the named-phase clauses diverge across sites.
+- CR4-3: STALE vs NEEDS DETAIL precedence, and the verdict block shows only the pre-pass source.
+
+## Change Log
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-25
 **Quality Score**: 70/100
 **Gate Decision**: CONCERNS
 
@@ -398,6 +426,8 @@ None.
 | 2026-09-25 |  | QA findings fixed — cycle 2 (CR2-1 planned-state reachability, CR2-2 verdict held, CR2-3 stale-bug clause, CR2-4..7) | qa-fix |
 | 2026-09-25 |  | QA gate CONCERNS (70/100) — 4 findings (3 medium, 1 low) | qa-task |
 | 2026-09-25 |  | QA findings fixed — cycle 3 (CR3-1 fence regression, CR3-2 pattern lines, CR3-3 stale routing, CR3-4 named phase, CR3-5/6) | qa-fix |
+| 2026-09-25 |  | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
+| 2026-09-25 |  | QA findings fixed — cycle 4 (CR4-1 pattern-line severity, CR4-2 canonical named-phase clause, CR4-3 STALE precedence, CR4-4) | qa-fix |
 
 ---
 <!-- change-log-end -->
@@ -480,3 +510,11 @@ None.
   - CR3-5: the create-task Critical heading names the author exception.
   - CR3-6: verdict holds are anchored on the imperative.
   - 11 tests; 9/9 fix mutants red.
+- **QA cycle 4 fixes**:
+  - CR4-1: the pattern lines carry "Important under check 10/7, not as a Critical hallucination".
+  - CR4-2: one canonical named-phase sentence (condition and outcome stated, cite the phase,
+    later-phase promises excluded) at all three sites, held whole.
+  - CR4-3: in review-bug, STALE outranks NEEDS DETAIL, and the verdict block names the stale
+    source. This is outside Step 3 and not test-held.
+  - CR4-4: CHANGELOG wording.
+  - 8/8 fix mutants red. The restatement grep was re-run after the fix (`.claude/state/t145-fix4-grep.txt`).
