@@ -1,0 +1,333 @@
+---
+id: task.145
+title: "[Task 145] review-task: trace a criterion's stated outcome through the function that decides it"
+type: task
+description: "Add an outcome-reachability check to review-task Step 3 (and its authoring and sibling counterparts): when a success criterion or test case states the outcome a named function produces for a named input, walk that input through the function's decision branches and confirm the outcome is one it can return — so a criterion that cannot be met is caught at review, not discovered at develop."
+tags: [review-task, review-story, review-bug, create-task, anti-hallucination, observation]
+category: documentation
+status: planned
+priority: Medium
+created: 2026-09-24
+updated: 2026-09-24
+assignee:
+estimated_effort_hours: 8
+github_issue: 473
+---
+
+# Technical Task: review-task — trace a criterion's stated outcome through the function that decides it
+
+**Status:** Planned
+
+**GitHub Issue**: [#473](https://github.com/Gamaroff/agent-skills/issues/473)
+
+---
+
+## 1. Overview
+
+`/review-task` Step 3 verifies that the functions, files and flags a task names **exist**. It does not
+verify that the **outcomes** a task promises are ones those functions can **produce**. This task adds
+that check — *outcome reachability* — to review-task Step 3, to the authoring-time review in
+create-task Step 3.5 where the defect is introduced, and to the matching steps of review-story and
+review-bug, with a population test that holds the check in every site.
+
+**Scope**: prose checks in four `SKILL.md` files; one population test; CHANGELOG.
+
+**Key deliverables**:
+
+1. review-task Step 3 gains check 10, **Outcome reachability** (obs #168), beside checks 6–8.
+2. create-task Step 3.5 gains the same check as a Critical item; review-story Step 4 and review-bug
+   Step 3 gain their shape of it.
+3. `tests/outcome-reachability-check.test.js` holds all four sites, with a non-vacuity floor.
+
+**Expected outcome**: a criterion that names a verdict, exit code or status the deciding function
+cannot return for the stated input is reported at review as **Important**, with the branch that
+actually fires named — instead of being silently rewritten or silently failed at develop.
+
+---
+
+## 2. Motivation
+
+### Current Problems
+
+1. **A criterion that could not be met passed review.** task.144's Success Criteria and Testing
+   Strategy said an accept-all fixture CLI would score `present-but-inert`. `computeVerdict` in
+   `shared/resources/security-probe.mjs` cannot produce that: `present-but-inert` requires a control
+   that demonstrably rejects *some* hostile input, and an accept-all rejects none, so it scores
+   `absent`. `/review-task` read `computeVerdict` in full, verified seven other claims against the
+   code, and passed this one (obs #168). It surfaced only at develop, when the fixture test went
+   green on `absent`, and the criterion was corrected in the implementation commit.
+2. **Existence is checked; reachability is not.** Step 3's nine checks ask whether a library, path,
+   anchor, link, config key or sibling mechanism is real. None asks whether a *claimed output* is an
+   output the named procedure has a branch for.
+3. **The two defects look identical from outside.** A developer facing an unreachable criterion either
+   rewrites it (the task changes under review's feet, unrecorded) or fails it (a QA cycle spent on a
+   document defect). Both cost more than the review-time check.
+
+### Benefits of Solution
+
+- The class "the outcome named is not one this function can return for this input" is caught where it
+  is cheapest — the deciding function is usually already open for the rest of Step 3.
+- Authoring-time coverage (create-task Step 3.5), matching the precedent that obs #103 / #117 / #102
+  set: each landed in create-task Step 3.5 **and** review-task Step 3.
+- The check's four sites are held by one test, so a later edit that drops one is red.
+
+---
+
+## 3. Technical Background
+
+### Current Architecture
+
+- `skills/review-task/SKILL.md` § *Step 3: Technical Accuracy and Anti-Hallucination Review* —
+  **Validation Checks** 1–9: Technology Inventory, File Path Accuracy (incl. line anchors, obs #22, and
+  relative links, obs #154), API Pattern Accuracy, Database Schema Accuracy, Code Example Accuracy,
+  Same-class mechanism inventory (obs #103), Figures that a test will re-measure (obs #117),
+  Path-filtered workflow triggers (obs #102), Configuration Key Accuracy.
+- `skills/create-task/SKILL.md` § *3.5 Adversarial Quality Review* → *🚨 Critical* — carries obs #103,
+  #117 and #102 as bullets, the authoring-time twins of review-task checks 6–8.
+- `skills/review-story/SKILL.md` § *Step 4: Technical Accuracy and Anti-Hallucination Review* —
+  checks 1–4 (Source Verification, Technology Inventory, API Specification Accuracy, Data Model
+  Accuracy); no outcome check.
+- `skills/review-bug/SKILL.md` § *Step 3: Reproducibility Clarity (the core gate)* — requires
+  *Expected vs Actual* to be explicit; does not check that the Expected Behavior is an outcome the
+  code path can produce for the reproduction input.
+- No test pins any of review-task's numbered Step 3 checks today (`grep -rln 'obs #103' tests evals
+  shared/resources/tests skills/*/tests` matches nothing).
+
+### Target Architecture
+
+- review-task Step 3 check **10. Outcome reachability** (obs #168): *when a success criterion, test
+  case or Testing Strategy row states the outcome a named function produces for a named input — a
+  verdict, an exit code, a status, a return value — open the function, walk that input through its
+  decision branches, and confirm the stated outcome is the branch that fires.* Report an unreachable
+  outcome as **Important**, naming the branch that does fire and the outcome it returns; report an
+  outcome whose branch depends on an input the document does not pin down as **Optional** ("state the
+  input"). The worked example is task.144's accept-all → `present-but-inert`.
+- create-task Step 3.5 *Critical*: the same check, one bullet, citing obs #168.
+- review-story Step 4 check 5: the same check, worded for acceptance criteria.
+- review-bug Step 3: one bullet — when the Expected Behavior names what a function returns for the
+  reproduction input, confirm the fixed code can return it (an expected outcome that no branch
+  produces is a fix that cannot pass its own verification).
+
+### Same-class mechanism inventory (obs #103)
+
+Step 3 already carries checks of the same kind — each asks "is this claim true of the code?". Check 10
+**sits beside** them: checks 2, 5 and 9 verify that a named thing exists or reads a value; none walks
+an input through a decision. It does not replace check 5 (*Code Example Accuracy*), which verifies
+syntax and imports of examples the document contains, not outcomes it promises.
+
+---
+
+## 4. Scope
+
+### In Scope
+
+- ✅ review-task Step 3 check 10; create-task Step 3.5 Critical bullet
+- ✅ review-story Step 4 check 5; review-bug Step 3 bullet
+- ✅ `tests/outcome-reachability-check.test.js`
+- ✅ CHANGELOG `[Unreleased]`
+
+### Out of Scope
+
+- ❌ A mechanical engine that extracts outcome claims from criteria — the claims are free prose, and
+  deciding which function "decides" a criterion is a reading judgement. The check is a reviewer step;
+  the test holds its presence, not its execution (see § 8 for the behavioural evidence).
+- ❌ create-story / review-epic / review-prd — no numbered technical-accuracy checks of this shape;
+  revisit if an instance appears there.
+- ❌ Re-reviewing existing planned tasks against the new check.
+
+---
+
+## 5. Breaking Changes
+
+None — additive review guidance. A review may now report one more **Important** finding on a
+document that states an unreachable outcome; no gate, score cap or verdict rule changes.
+
+---
+
+## 6. Implementation Plan
+
+> Detailed implementation guide: [task.145.plan.review-outcome-reachability-check.md](task.145.plan.review-outcome-reachability-check.md)
+
+### Phase 1: review-task check 10 (Risk: Low)
+
+**Files**: `skills/review-task/SKILL.md`
+
+- [ ] Add **10. Outcome reachability** (obs #168) after check 9 in Step 3 Validation Checks
+- [ ] Add a line to *Common Hallucination Patterns to Detect*: an outcome no branch of the named function returns for the stated input
+- [ ] Severity: unreachable → Important; input not pinned down → Optional
+
+### Phase 2: authoring and sibling sites (Risk: Low)
+
+**Files**: `skills/create-task/SKILL.md`, `skills/review-story/SKILL.md`, `skills/review-bug/SKILL.md`
+
+- [ ] create-task Step 3.5 *Critical*: **An outcome the named function cannot return** (obs #168)
+- [ ] review-story Step 4: check 5, worded for acceptance criteria
+- [ ] review-bug Step 3: Expected Behavior bullet
+
+### Phase 3: population test (Risk: Low)
+
+**Files**: `tests/outcome-reachability-check.test.js`
+
+- [ ] Each of the four sites names the check (`obs #168`) inside the section it belongs to — section-scoped, not file-scoped
+- [ ] Each site's text carries the three load-bearing elements: the **stated input**, the **deciding function**, the **branch that fires**
+- [ ] Non-vacuity floor: the site list is 4, and the test fails if the section extractor finds fewer than 4 sections
+- [ ] Mutation-prove: delete the check from each site in turn → red naming that site
+
+### Phase 4: docs and validation (Risk: Low)
+
+**Files**: `CHANGELOG.md`
+
+- [ ] CHANGELOG `[Unreleased]` › Changed cites `(task 145)`
+- [ ] `npm run ci:fast`, `format:check`, `npm run validate` on the four skills
+
+---
+
+## 7. Files Summary
+
+### Files to Modify (Core Implementation)
+
+1. ✅ `skills/review-task/SKILL.md` — Step 3 check 10; Common Hallucination Patterns line
+2. ✅ `skills/create-task/SKILL.md` — Step 3.5 Critical bullet
+3. ✅ `skills/review-story/SKILL.md` — Step 4 check 5
+4. ✅ `skills/review-bug/SKILL.md` — Step 3 Expected Behavior bullet
+
+### Files to Add (Tests)
+
+5. ✅ `tests/outcome-reachability-check.test.js` — the four-site population test (already inside the `tests/*.test.js` glob in `package.json`)
+
+### Files to Modify (Documentation)
+
+6. ✅ `CHANGELOG.md`
+
+### Files to Delete
+
+None.
+
+---
+
+## 8. Testing Strategy
+
+### Unit Tests
+
+- **Scope**: `tests/outcome-reachability-check.test.js` — for each site, extract the named section
+  (heading to next same-level heading, fences skipped) and assert it names `obs #168` and the three
+  elements. Sites and their headings live in one array in the test; the floor asserts the extractor
+  found each heading.
+- **Command**: `command node --test tests/outcome-reachability-check.test.js`
+
+### Behavioural evidence (recorded, not automated)
+
+The population test proves the check is **stated** in every site, not that a reviewer **applies** it
+(the assert-behaviour-not-source-text rule; this repository has no eval layer for the review skills).
+So the implementation report records one hand run: `/review-task --validate` against a scratch copy of
+task.144 with its pre-fix criterion restored (the accept-all fixture scoring `present-but-inert`),
+showing the review reports it as **Important** and names the `absent` branch. Recorded as evidence of
+applicability, and stated as not held by CI.
+
+### Regression
+
+- `npm test` — no existing test pins the Step 3 numbering; `skill-frontmatter` and bundle checks cover
+  the edited SKILL.md files.
+
+---
+
+## 9. Success Criteria
+
+### Functional
+
+- [ ] review-task Step 3 carries check 10 *Outcome reachability*, citing obs #168, with task.144's accept-all → `present-but-inert` as its worked example and Important / Optional severities stated
+- [ ] create-task Step 3.5, review-story Step 4 and review-bug Step 3 each carry their form of the check
+- [ ] The population test fails when the check is removed from any one of the four sections, and names that section
+
+### Performance
+
+- [ ] The test runs in under one second (pure file reads)
+- [ ] No network access
+
+### Code Quality
+
+- [ ] Every new assertion mutation-proved (remove the check from each site → red)
+- [ ] `npm run ci:fast`, `format:check`, `bundle --check` clean
+
+### Migration
+
+- [ ] CHANGELOG `[Unreleased]` cites `(task 145)`
+- [ ] The implementation report records the hand run against the task.144 pre-fix criterion
+
+---
+
+## 10. Risk Assessment
+
+### High Risk Areas
+
+None.
+
+### Medium Risk Areas
+
+1. **Over-firing on prose outcomes**
+   - Risk: reviewers apply the check to criteria that state no function-level outcome ("the docs say X"), producing noise.
+   - Probability: Medium · Impact: Low
+   - Mitigation: the check's trigger is explicit — a **named function** and a **stated outcome** for a **stated input**; everything else is out of its scope, and the text says so.
+
+### Low Risk Areas
+
+1. **Section drift** — a later rename of a Step heading breaks the extractor; the floor turns that into a red test rather than a silent pass.
+
+---
+
+## 11. Rollback Plan
+
+### Immediate Rollback (< 1 hour)
+
+- **Triggers**: the check produces false Important findings on correct documents in normal use.
+- **Steps**: revert the PR — prose and one test, no runtime code.
+- **Validation**: `npm test` green on the reverted tree.
+
+### Partial Rollback (1–2 hours)
+
+- Revert a sibling site (review-story / review-bug) alone if its wording misfires; keep review-task and create-task.
+
+### Forward Fix
+
+- Tighten the trigger wording at the site that misfires; add the counter-example to the check's text.
+
+### Rollback Triggers
+
+- **Critical**: none — advisory review guidance.
+- **Non-critical**: noisy findings — fix forward.
+
+---
+
+## Change Log
+
+| Date       | Version | Description   | Author      |
+| ---------- | ------- | ------------- | ----------- |
+| 2026-09-24 | 1.0     | Initial draft | create-task |
+
+---
+
+## Progress Tracking
+
+- [ ] Phase 1: review-task check 10
+- [ ] Phase 2: authoring and sibling sites
+- [ ] Phase 3: population test
+- [ ] Phase 4: docs and validation
+
+---
+
+## References
+
+- Observation #168 — review-task does not trace a criterion's stated outcome through the deciding function
+- task.144 — [`task.144.probe-engine-cli-entry-form.md`](../task.144.probe-engine-cli-entry-form/task.144.probe-engine-cli-entry-form.md) (PR #471): the accept-all criterion, corrected at develop
+- `shared/resources/security-probe.mjs` `computeVerdict` — the function the worked example walks
+- task.146 — the QA-loop counterpart for identity rules (obs #169); independent of this task
+
+---
+
+## Notes
+
+### Important Reminders
+
+- QA artifacts land in this directory: `task.145.qa.{N}.review-outcome-reachability-check.md`,
+  `task.145.gate.{N}.review-outcome-reachability-check.yml`, bug reports `task.145.bug.{N}.{name}.md`.
+- Observation #168 is resolved (`set-status --status actioned`) when this task's PR merges.
