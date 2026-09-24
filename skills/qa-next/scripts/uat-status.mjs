@@ -48,6 +48,7 @@ import {
   renameSync,
   rmSync,
   linkSync,
+  realpathSync,
 } from "node:fs";
 import { join, relative, dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1474,8 +1475,20 @@ function dispatch(opts) {
   return cmdScoreboard(opts);
 }
 
-if (
-  process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-)
-  main(process.argv);
+// Resolve BOTH sides through realpath: invoked as `.agents/skills/qa-next/scripts/uat-status.mjs`
+// through a symlinked install, argv[1] is the symlink path and import.meta.url the real one, and a
+// `resolve()` compare never matched — no output, exit 0, every /qa-next call silently empty
+// (obs #126's class; held for every engine by the entrypoint-guard-realpath.test.mjs suite).
+function isInvokedDirectly() {
+  if (!process.argv[1]) return false;
+  try {
+    return (
+      realpathSync(process.argv[1]) ===
+      realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  }
+}
+
+if (isInvokedDirectly()) main(process.argv);

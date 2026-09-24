@@ -130,6 +130,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`security-probe.mjs` and `uat-status.mjs` now run when invoked through the `.agents/skills`
+  symlink (obs #126).** Each engine decided whether it was the entry point by comparing
+  `process.argv[1]`, the symlinked path the caller typed, with `import.meta.url`, which Node has
+  already resolved. Through `.agents/skills/…` the two never matched, so `main()` never ran: no
+  output and exit 0. For the probe engine that is a probe that never executed reading as a clean
+  one. For `/qa-next` it meant every `uat-status.mjs` call returned nothing. Both now compare real
+  paths (`realpathSync`), the form `finalise-fix-and-recheck.mjs`, `qa-execute-snippets.mjs` and four
+  other engines already used. `shared/resources/tests/entrypoint-guard-realpath.test.mjs` holds the
+  whole population: every ESM engine and bundled copy with such a guard must resolve real paths, and
+  both engines are invoked through a symlinked directory and must refuse an unknown flag.
 - **`uat-status.mjs --run-path --env` judges the run file name it builds, not only the label
   (task 143).** The guard refused a label ending in `-NN`, but a two-digit label (`--env 10`) builds
   `<date>-10.md`, which the run-file sort key reads as run 10 of env `<date>`. That mis-orders

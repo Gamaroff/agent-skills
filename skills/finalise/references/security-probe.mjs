@@ -161,6 +161,7 @@ import {
   existsSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -2312,9 +2313,24 @@ export function main(argv = process.argv.slice(2)) {
   return result.verdict === "engages" ? 0 : 1;
 }
 
-if (
-  process.argv[1] &&
-  pathToFileURL(process.argv[1]).href === import.meta.url
-) {
+// Resolve BOTH sides through realpath: `.agents/skills` is a symlink to `../skills` here and in
+// symlinked consumer installs, so argv[1] arrives symlinked while import.meta.url is already real.
+// Compared raw (`pathToFileURL(argv[1]).href === import.meta.url`), main() never ran through the
+// documented path — no output, exit 0, a probe that never executed reading as a clean one
+// (obs #126). Same form as finalise-fix-and-recheck.mjs and qa-execute-snippets.mjs; held for the
+// whole population by tests/entrypoint-guard-realpath.test.mjs.
+function isInvokedDirectly() {
+  if (!process.argv[1]) return false;
+  try {
+    return (
+      realpathSync(process.argv[1]) ===
+      realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  }
+}
+
+if (isInvokedDirectly()) {
   process.exitCode = main();
 }
