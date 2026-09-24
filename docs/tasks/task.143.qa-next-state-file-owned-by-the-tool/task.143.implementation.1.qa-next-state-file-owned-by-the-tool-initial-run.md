@@ -93,6 +93,12 @@ Give `/qa-next`'s run state file an owner: `uat-status.mjs` gains `--state-*` su
 - Issue #469 `in-review` comment: posted. GitHub board: in-review → stage-disabled.
 - Post-PR state check (inline, `gh pr view`): PR #475 state = OPEN. errors = 0.
 
+### QA Loop Re-entry — 2026-09-24
+
+- QA loop re-entry: 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk (highest gate on disk `gate.5`, 5 `### QA Cycle` entries — no gap).
+- User chose "Resume with 2 more cycles" at the Phase 0b escalation prompt (recommended k = 2; the escalation entry had suggested 1).
+- `grant-qa-cycles.sh`: lock restored from the halt snapshot; `QA_CYCLE=5`, `extra_cycles_granted=2`, `qa_max_cycles=7`, `qa_phase=5a`. The loop re-enters at 5a as cycle 6.
+
 ---
 
 ## Issues Log
@@ -123,6 +129,29 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS. Route 2c (g
 1. Grant one more cycle (Phase 0b: "Resume at 5a with 1 more cycle") so cycle 5's fix is gated; the expected outcome is a CONCERNS gate with no open entry (route 3 → 5c).
 2. Or: accept the migration residue as a documented limitation — a v0.51.0 run interrupted mid-flight and resumed after upgrading — and proceed to `/finalise`; the tool already flags the uncertain value as `unverifiable`.
 3. Either way, file the follow-ups: control characters in `--env` (pre-existing), and a lock-ownership check on `--state-set` (cycle 2 CR-1).
+
+### QA Loop Limit Reached (re-entry) — 2026-09-24
+
+The pipeline completed 7 qa-task/qa-fix cycles (5 original plus 2 granted on re-entry) without a clean PASS. Route 2c (gate-the-last-fix half-cycle) was evaluated and declined: `medium-not-falling`. MEDIUM reads 1, 1, 0 over cycles 5–7, and route 2c needs it strictly falling.
+
+**Final gate status**: CONCERNS (gate.7, 90/100). Its one entry, TASK-143-QA7-1 (low), was fixed in cycle 7's 5b (`f8b2c958`, a test-only change). No gate has read that fix.
+**HIGH findings per cycle**: 0, 0, 0, 0, 0, 0, 0. No cycle raised a blocker.
+**MEDIUM findings per cycle**: 2, 1, 2, 0, 1, 1, 0.
+**Remaining issues** (from final gate file):
+- TASK-143-QA7-1 (low, `evals/qa-next/unit/uat-status.test.mjs`): the `runFile` exclusion was untested outside east-of-UTC timezones. **Fixed in `f8b2c958`, not gated.** Mutation-proved in the local TZ and in UTC.
+- Security NFR CONCERNS: whitespace and control-character `--env` labels are accepted. This is identical on `develop`, so it is pre-existing and not attributable to this change; routed to a follow-up.
+- Reliability NFR CONCERNS (a documented limitation, not a queue entry): a half-written file from an interrupted v0.51.0 Step 4 stays beside the fresh one, and a later run counts it (gate.7 CR-1). This is bug 6's recorded trade-off against overwriting an earlier committed run.
+
+**What was attempted per cycle** (cycles 1–5: see the first escalation entry above):
+- Cycle 6: BUG-6. Cycle 5's ownership rule was reached by two indistinguishable disk states and could overwrite an earlier run. The fix stopped claiming exactness: a legacy `priorRuns` is flagged from `executed` on regardless of `runFile`, the resume always takes a fresh `--run-path`, and the date assertion is dated from UTC `today()` (QA6-1).
+- Cycle 7: QA7-1. Cycle 6's unconditional date rule masked the `runFile` exclusion in the tests, so an east-of-UTC test was added. Route 2c was considered at the budget and declined: `medium-not-falling`.
+
+**Likely root cause**: unchanged from the first escalation. Every MEDIUM from cycle 2 onward sits in the v0.51.0 legacy-migration path. Cycle 6 changed the approach: instead of adding a seventh ownership rule, the tool now says it cannot know and flags the value. Cycle 7 found only a test-coverage LOW that follows from that change. The loop has converged in substance (HIGH 0 throughout, MEDIUM 0 on the last gate, no production-code finding on gate 7), but the budget ended on a fix, as it did at cycle 5.
+
+**Recommended next steps**:
+1. Accept gate.7 and proceed to `/finalise` (halt option 2). The only open entry is a LOW test addition that is already committed and mutation-proved, and both NFR CONCERNS are a pre-existing issue and a documented limitation.
+2. Or grant 1 more cycle (Phase 0b: "Resume at 5a with 1 more cycle") so `f8b2c958` is gated. The expected outcome is CONCERNS with no open entry (route 3), then 5c.
+3. Either way, file the follow-ups: whitespace and control characters in `--env` (pre-existing), a lock-ownership check on `--state-set`, surfacing the stray half-written v0.51.0 file to the owner (CR-1), and the test clock/restating assertion cleanups (CR-3, CR-4).
 
 ---
 
@@ -192,14 +221,38 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: BUG-5 → the resume map records the run file an interrupted v0.51.0 Step 4 already wrote (`<local start date>-<envLabel>.md`), else `--run-path`; comment/CHANGELOG to match; 1 test added (61 → 62). Fast gate green (3987/0). This fix has no gate — the half-cycle was declined.
 **Commit**: `386e586d`
 
+### QA Cycle 6 — 2026-09-24
+
+**Gate Result**: CONCERNS
+**Issues Found**: 1 MEDIUM + 1 LOW. TASK-143-BUG-6 (the pre-upgrade `executed` resume treats an existing `<local start date>-<env>.md` as its own; an earlier same-day run is overwritten and dropped from `priorRuns` with no `unverifiable` flag; CR-1 reproduced, CR-2 folded in). TASK-143-QA6-1 (the collision assertion is date-dependent; CR-3). BUG-5 FIXED as specified. Advisory: CR-4 (prose date arithmetic duplicates `localDate()`). Security probe: 19 executed; 5 whitespace/control labels reproduce identically on `develop` (pre-existing, routed to future).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 6 of 7)
+**Fixes Applied**: BUG-6 → `stateView` flags a legacy `priorRuns` as `unverifiable` from `executed` on, whether or not a `runFile` was recorded since; the SKILL.md resume map always takes a fresh `--run-path` (it never reuses an existing file, which may be an earlier run's record); the "stays exact" claim is deleted; CHANGELOG and task design text updated to match. QA6-1 → collision fixture dated from the UTC `today()`. The QA4-1 test was rewritten and a new test covers both indistinguishable disk states (62 tests). Mutation: restoring `!state.runFile && executed` turns both red. Fast gate: attempt 1 red (doc-links on the tracked tree; gate.6/qa.6 not yet staged, the same effect cycle 1 hit), attempt 2 green (3987/0, symlinks moved aside). `check:generated`, `bundle:check` and `validate` clean. Orchestrator note passed to qa-fix: no seventh ownership rule. The move was to stop claiming exactness. Ingester skipped: 5a had just written the findings in this session, so this pass is not independent.
+**Commit**: `ec620781`
+
+### QA Cycle 7 — 2026-09-24
+
+**Gate Result**: CONCERNS
+**Issues Found**: 1 LOW. TASK-143-QA7-1: cycle 6's unconditional date rule masks the `runFile` exclusion; the mutation is green in the local TZ and UTC and red only under Pacific/Kiritimati (CR-2, verified). BUG-6 and QA6-1 FIXED (mutation-proved). Routed to future: CR-1 (a half-written v0.51.0 file left beside the fresh one is counted by later runs; bug 6's documented trade-off), CR-3 (the test clock can straddle UTC midnight), CR-4 (a restating assertion). Gate 6's hand-written `updated` (08:40Z) was corrected to 19:23:11Z; the scope was unaffected.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: QA7-1 → an Asia/Tokyo-pinned test with a recorded `runFile` dated the day before the local start date (the UTC date `--run-path` uses) asserts that it is excluded from `priorRuns`. Dropping `state.runFile` from `own` now turns it red in the local TZ and in UTC (62 → 63). No production code changed. Suite 63/63 under the local TZ, TMPDIR=/tmp, Kiritimati, Pago_Pago and Tokyo. Fast gate green on the first attempt (3988/0, symlinks moved aside). This fix has no gate: the half-cycle was declined (`medium-not-falling`).
+**Commit**: `f8b2c958`
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: Escalated — QA loop limit reached (5 cycles, gate CONCERNS 90/100, HIGH 0 throughout; cycle 5's fix ungated)
+**Final Status**: Escalated — QA loop limit reached again after the re-entry grant (7 cycles, gate CONCERNS 90/100, HIGH 0 throughout, MEDIUM 0 on the last gate; cycle 7's test-only fix ungated)
 **Branch**: feature/task.143.qa-next-state-file-owned-by-the-tool
 **PR**: https://github.com/Gamaroff/agent-skills/pull/475
-**QA Iterations**: 5 (limit)
+**QA Iterations**: 7 (limit, 5 + 2 granted)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
