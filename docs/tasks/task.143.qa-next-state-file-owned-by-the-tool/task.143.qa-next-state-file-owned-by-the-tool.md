@@ -127,9 +127,12 @@ QA-cycle finding.
   shape released in v0.51.0, which has no `targeted`, `priorRuns`, `bug` or `filedBug` — is answered
   with each missing field **derived** and named in `derived: [...]`, never a silent default:
   - `targeted` → `false` (v0.51.0 took no id argument; every run was untargeted);
-  - `priorRuns` → the row's current `priorRuns` minus this run's own file: the state's `runFile`
-    or, when it is null (v0.51.0 never recorded one, TASK-143-BUG-2), the row's `Last run` from
-    `recorded` on and any run file written after `startedAt`;
+  - `priorRuns` → the row's current `priorRuns` minus this run's own file: the state's `runFile`,
+    or, when it is null (v0.51.0 never recorded one, TASK-143-BUG-2), the file whose
+    `<date>-<env>.md` name is dated on or after the run's start date (v0.51.0 wrote one per date;
+    the earlier of the UTC and local start dates is used). An unparseable `startedAt` names
+    `priorRuns` in `unverifiable` as well (TASK-143-BUG-3: a `Last run` / mtime heuristic misfired
+    after `na`/`blocked` early exits and refreshed mtimes);
   - `bug` → the row's current bug link while `phase` is before `recorded` (Step 4.4 has not yet
     rewritten the note cell); `null` from `recorded` on (its only reader, Step 4's reuse decision,
     has already run);
@@ -398,6 +401,7 @@ None.
 | 2026-09-24 |         | Status → ready-for-development | review-task |
 | 2026-09-24 |  | Implemented — 8 files, 11 new tests (qa-next suite 44 → 55; security-probe cli-consumer test now asserts engages) | develop |
 | 2026-09-24 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-09-24 |  | QA gate CONCERNS (80/100) — 2 findings (cycle 2 refute pass) | qa-task |
 
 ---
 <!-- change-log-end -->
@@ -421,21 +425,21 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.143.qa.1.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.1.qa-next-state-file-owned-by-the-tool.md)
-- **Gate File**: [task.143.gate.1.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.1.qa-next-state-file-owned-by-the-tool.yml)
+- **Full Report**: [task.143.qa.2.qa-next-state-file-owned-by-the-tool.md](./task.143.qa.2.qa-next-state-file-owned-by-the-tool.md)
+- **Gate File**: [task.143.gate.2.qa-next-state-file-owned-by-the-tool.yml](./task.143.gate.2.qa-next-state-file-owned-by-the-tool.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 55 (qa-next suite) + 87 (security-probe suite); 19 executed probes
+- **Tests Executed**: 58 (qa-next suite); 19 executed probes
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 2 MEDIUM
+- **Critical Issues**: 0 HIGH, 1 MEDIUM, 1 LOW
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-- TASK-143-BUG-1 — `--state-init` exits 0 with two indistinguishable shapes (fresh payload vs resumed state view).
-- TASK-143-BUG-2 — legacy `priorRuns` derivation counts the run's own file when `runFile` is null (every real v0.51.0 file).
-- Pre-existing (not attributed to this change): `--env` accepts newline/CR/tab labels — routed to a follow-up.
+- TASK-143-BUG-1 fixed; TASK-143-BUG-2 partial. Its fix's heuristics misfire (TASK-143-BUG-3).
+- TASK-143-QA2-2 — stale header comment.
+- Pre-existing (not attributed to this change): `--env` accepts newline/CR/tab labels, routed to a follow-up.
 
 ---
 

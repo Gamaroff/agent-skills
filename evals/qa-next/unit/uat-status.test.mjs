@@ -2423,19 +2423,18 @@ test("a v0.51.0-shape state file is answered with targeted, priorRuns, bug and f
   );
 });
 
-test("a real v0.51.0 file has runFile null: the derived priorRuns still excludes the run's own file (TASK-143-BUG-2)", () => {
-  // v0.51.0 never told the skill to record runFile. Excluding only state.runFile therefore counted
-  // this run's own file as a prior run, and the first run after an upgrade was committed as a re-run.
+test("a real v0.51.0 file has runFile null: its own file is found by the file-name date (TASK-143-BUG-2, BUG-3)", () => {
+  // v0.51.0 never recorded runFile, and wrote exactly one runs/<id>/<date>-<env>.md per date. The
+  // own file is therefore the one dated on or after the run's start — not the row's Last run (a
+  // na/blocked early exit leaves it naming the PREVIOUS run) and not an mtime (a checkout refreshes
+  // those, and v0.51.0's startedAt was hand-written). Cycle 1 used both heuristics; each misfired.
   const root = stateCorpus();
   const runs = path.join(root, "docs/qa/runs/D.1");
   mkdirSync(runs, { recursive: true });
-  const old = path.join(runs, "2026-09-01-lan.md");
-  writeFileSync(old, "# an earlier run\n");
-  const past = new Date("2026-09-01T12:00:00Z");
-  utimesSync(old, past, past);
-  const startedAt = new Date(Date.now() - 60_000).toISOString();
-  writeFileSync(path.join(runs, "2026-09-24-lan.md"), "# this run\n"); // written after the start
-  const legacy = (phase, lastRun) => {
+  const prev = path.join(runs, "2026-09-01-lan.md");
+  writeFileSync(prev, "# an earlier run\n"); // mtime NOW — as a checkout leaves it
+  const startedAt = "2026-09-24T12:00:00Z"; // the same calendar date in every timezone within ±12h
+  const legacy = (phase, lastRun, extra = {}) => {
     writeFileSync(
       REG(root),
       readFileSync(REG(root), "utf8").replace(
@@ -2456,32 +2455,71 @@ test("a real v0.51.0 file has runFile null: the derived priorRuns still excludes
         runFile: null,
         phase,
         startedAt,
+        ...extra,
       }),
     );
     return JSON.parse(run(root, "--state-get", "--json").out);
   };
-  const expected = ["runs/D.1/2026-09-01-lan.md"];
+
+  // A na/blocked early exit: no run file this run, Last run still names the previous run.
+  const early = legacy("recorded", "runs/D.1/2026-09-01-lan.md");
   assert.deepEqual(
-    legacy("executed", "runs/D.1/2026-09-01-lan.md").priorRuns,
-    expected,
-    "mid-Step-4: the file written after the run started is this run's",
+    early.priorRuns,
+    ["runs/D.1/2026-09-01-lan.md"],
+    "the previous run is kept",
   );
-  assert.deepEqual(
-    legacy("recorded", "runs/D.1/2026-09-24-lan.md").priorRuns,
-    expected,
-    "from recorded on: the row's Last run is this run's",
-  );
-  // Each exclusion holds alone. With no usable startedAt only Last run identifies the file.
+  assert.equal(early.unverifiable, undefined);
+
+  // A run that wrote its file: excluded by its date, at executed (not yet linked) and after.
+  writeFileSync(path.join(runs, "2026-09-24-lan.md"), "# this run\n");
+  for (const [phase, lastRun] of [
+    ["executed", "runs/D.1/2026-09-01-lan.md"],
+    ["recorded", "runs/D.1/2026-09-24-lan.md"],
+  ])
+    assert.deepEqual(
+      legacy(phase, lastRun).priorRuns,
+      ["runs/D.1/2026-09-01-lan.md"],
+      `${phase}: own file excluded, the earlier run kept whatever its mtime`,
+    );
+
+  // No usable startedAt: nothing can identify the own file, and the answer says so.
+  const blind = legacy("committed", "runs/D.1/2026-09-24-lan.md", {
+    startedAt: "whenever",
+  });
+  assert.deepEqual(blind.unverifiable, ["priorRuns"]);
+  assert.deepEqual(blind.priorRuns, [
+    "runs/D.1/2026-09-01-lan.md",
+    "runs/D.1/2026-09-24-lan.md",
+  ]);
+});
+
+test("a legacy run started near midnight counts the file named by its LOCAL date", () => {
+  // v0.51.0 named the run file by the local date; 02:00Z is still the 23rd in New York, so a start
+  // date taken from UTC alone would miss the run's own 2026-09-23 file.
+  const root = stateCorpus();
+  const runs = path.join(root, "docs/qa/runs/D.1");
+  mkdirSync(runs, { recursive: true });
+  writeFileSync(path.join(runs, "2026-09-01-lan.md"), "# earlier\n");
+  writeFileSync(path.join(runs, "2026-09-23-lan.md"), "# this run\n");
+  mkdirSync(path.dirname(STATE(root)), { recursive: true });
   writeFileSync(
     STATE(root),
-    JSON.stringify({ item: "D.1", runFile: null, phase: "committed" }),
+    JSON.stringify({
+      item: "D.1",
+      runFile: null,
+      phase: "executed",
+      startedAt: "2026-09-24T02:00:00Z",
+    }),
   );
-  assert.deepEqual(
-    JSON.parse(run(root, "--state-get", "--json").out).priorRuns,
-    expected,
-    "Last run alone excludes it",
+  const out = execFileSync(
+    "node",
+    [TOOL, "--root", root, "--state-get", "--json"],
+    {
+      encoding: "utf8",
+      env: { ...process.env, TZ: "America/New_York" },
+    },
   );
-  // (The executed case above is the time-only exclusion: at executed, Last run is not consulted.)
+  assert.deepEqual(JSON.parse(out).priorRuns, ["runs/D.1/2026-09-01-lan.md"]);
 });
 
 test("a state file that is not one is refused by name, exit 1", () => {

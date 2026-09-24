@@ -57,3 +57,4 @@ When `runFile` is null and the phase is `recorded` or later, also exclude the ro
 | ---------- | ------------ | ---------- | ---------------------- |
 | 2026-09-24 | New          | qa-task    | QA cycle 1             |
 | 2026-09-24 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 1 |
+| 2026-09-24 | Ready for QA | qa-fix     | Cycle 2: the cycle-1 heuristics were replaced by the file-name date rule (TASK-143-BUG-3) |

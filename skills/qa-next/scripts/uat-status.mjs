@@ -26,7 +26,7 @@
 // The /qa-next run state file (default .claude/state/qa-next.state.json under --root; --state <path>
 // overrides) — the single-flight lock and resume record. Its fields and who writes each: STATE_FIELDS.
 //   node uat-status.mjs --state-init (--item <id> | --next) [--json]   resolve the row and write the
-//                                             file (exit 5 run-in-progress when --item names another item)
+//                                             file (exit 5 run-in-progress whenever a state file exists)
 //   node uat-status.mjs --state-get [--json]          print it (exit 6 when there is none)
 //   node uat-status.mjs --state-set <field> <value>   phase / runFile / filedBug / lane only
 //   node uat-status.mjs --state-clear                  delete it (idempotent)
@@ -892,17 +892,15 @@ export function runPathFor(existing, date, env) {
     die(
       `--env ${JSON.stringify(env)}: an env label must be non-empty and may not contain "/", "\\" or ".." — it becomes part of a file name under runs/<id>/`,
     );
-  if (/-\d{2}$/.test(env))
-    die(
-      `--env ${env}: an env label may not end in -NN — it is indistinguishable from a run sequence`,
-    );
-  // Checked on the BUILT name, which is what seqKey reads: the date itself ends in -DD, so a
-  // two-digit label ("10") builds 2026-09-22-10.md — run 10 of env "2026-09-22" to seqKey — although
-  // the label alone ends in no "-NN". A guard on the label passed it (task.141 PR review 2, CR-1).
+  // Checked on the BUILT name, which is what seqKey reads. A label ending in -NN makes the name end
+  // in -NN, and so does a two-digit label: the date itself ends in -DD, so "10" builds
+  // 2026-09-22-10.md — run 10 of env "2026-09-22" to seqKey — although the label alone ends in no
+  // "-NN". A guard on the label passed it (task.141 PR review 2, CR-1). The ambiguity is created at
+  // WRITE time, so it is refused here rather than guessed at read time, where nothing knows the env.
   const base = `${date}-${env}`;
   if (/-\d{2}$/.test(base))
     die(
-      `--env ${env}: the run file would be ${base}.md, which reads as a run sequence — an env label may not be two digits; use one with a letter (e.g. env-${env})`,
+      `--env ${env}: the run file would be ${base}.md, which reads as a run sequence — an env label may not end in -NN or be two digits; use one with a letter that does not (e.g. ci10)`,
     );
   const taken = new Set(existing.map((f) => basename(f)));
   if (!taken.has(`${base}.md`)) return `${base}.md`;
@@ -1270,34 +1268,35 @@ export function stateView(opts, state) {
   const has = (k) => Object.hasOwn(state, k);
   const out = { ...state };
   const derived = [];
+  const unverifiable = [];
   if (!has("targeted")) {
     out.targeted = false; // v0.51.0 took no id argument: every run was untargeted
     derived.push("targeted");
   }
+  // The row and its run history are read once, and only for a file that needs a derivation.
+  const legacy = ["priorRuns", "bug", "filedBug"].some((k) => !has(k));
+  const r = legacy ? itemById(readRegistry(opts), state.item) : null;
+  const history = has("priorRuns") ? null : priorRuns(opts, state.item);
   if (!has("priorRuns")) {
     // The row's history minus this run's own file — the row as it was when the run began. v0.51.0
-    // never told the skill to record runFile, so on a real legacy file it is null (TASK-143-BUG-2)
-    // and "this run's own file" has to be found another way: the file Step 4.4 linked as the row's
-    // Last run once the phase is `recorded`, and any run file written after the run started (Step 4
-    // writes it before `recorded`, and a resume mid-Step-4 finds it on disk).
+    // never recorded runFile (TASK-143-BUG-2), so on a real legacy file it is null and the own file
+    // is found by NAME: v0.51.0 wrote exactly one runs/<id>/<date>-<env>.md per date, with no
+    // sequence suffix, so a file dated on or after the run's start date is this run's (or was
+    // overwritten by it). Neither the row's Last run (unchanged by a na/blocked early exit) nor an
+    // mtime (hand-written startedAt, refreshed by a checkout) can say that — TASK-143-BUG-3.
     const own = new Set([state.runFile].filter(Boolean));
     if (!state.runFile) {
-      const recorded =
-        STATE_PHASES.indexOf(state.phase) >= STATE_PHASES.indexOf("recorded");
-      const r = recorded && itemById(readRegistry(opts), state.item);
-      const lastRun = r ? (r.run.match(/\]\(([^)]+)\)/) ?? [])[1] : undefined;
-      if (lastRun) own.add(lastRun);
-      const started = Date.parse(state.startedAt);
-      const base = join(opts.root, opts.registryDir);
-      if (!Number.isNaN(started))
-        for (const f of priorRuns(opts, state.item))
-          if (statSync(join(base, f)).mtimeMs >= started) own.add(f);
+      const start = startDate(state.startedAt);
+      if (start === null) unverifiable.push("priorRuns");
+      else
+        for (const f of history)
+          if ((basename(f).match(/^\d{4}-\d{2}-\d{2}/) ?? [""])[0] >= start)
+            own.add(f);
     }
-    out.priorRuns = priorRuns(opts, state.item).filter((f) => !own.has(f));
+    out.priorRuns = history.filter((f) => !own.has(f));
     derived.push("priorRuns");
   }
   if (!has("bug") || !has("filedBug")) {
-    const r = itemById(readRegistry(opts), state.item);
     const current = r ? rowBugPath(opts, r) : null;
     // Step 4.4 rewrites the note cell and the phase then moves to `recorded`: before that the row's
     // link IS the pre-run bug; from then on it is this run's, and the pre-run one has been read.
@@ -1314,7 +1313,22 @@ export function stateView(opts, state) {
     }
   }
   if (derived.length) out.derived = derived;
+  // Derived, but from nothing the tool could check — the report must say so rather than present it.
+  if (unverifiable.length) out.unverifiable = unverifiable;
   return out;
+}
+
+// The run's start date as YYYY-MM-DD, or null when startedAt does not parse. v0.51.0 had the agent
+// write startedAt by hand and name the run file by the local date, so the EARLIER of the UTC and the
+// local calendar date is used: a run started near midnight still counts its own file.
+function startDate(startedAt) {
+  const t = Date.parse(startedAt ?? "");
+  if (Number.isNaN(t)) return null;
+  const d = new Date(t);
+  const pad = (n) => String(n).padStart(2, "0");
+  const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const utc = d.toISOString().slice(0, 10);
+  return local < utc ? local : utc;
 }
 
 function printState(opts, view) {
