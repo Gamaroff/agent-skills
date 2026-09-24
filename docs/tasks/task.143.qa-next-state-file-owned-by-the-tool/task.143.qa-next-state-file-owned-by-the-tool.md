@@ -406,6 +406,7 @@ None.
 | 2026-09-24 |  | QA gate CONCERNS (80/100) — 3 findings (cycle 3) | qa-task |
 | 2026-09-24 |  | QA gate CONCERNS (90/100) — 2 findings (cycle 4) | qa-task |
 | 2026-09-24 |  | QA gate CONCERNS (90/100) — 1 finding (cycle 5) | qa-task |
+| 2026-09-24 |  | QA findings fixed — 5 iterations; loop limit reached at gate CONCERNS (90/100), HIGH 0 throughout; cycle 5 fix not yet gated | qa-fix |
 
 ---
 <!-- change-log-end -->

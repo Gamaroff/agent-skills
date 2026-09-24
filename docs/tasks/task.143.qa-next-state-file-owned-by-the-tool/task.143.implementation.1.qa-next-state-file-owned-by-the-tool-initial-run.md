@@ -3,7 +3,7 @@
 **Task**: `task.143.qa-next-state-file-owned-by-the-tool.md`
 **Run Number**: 1
 **Started**: 2026-09-24 04:31
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -34,8 +34,8 @@ Give `/qa-next`'s run state file an owner: `uat-status.mjs` gains `--state-*` su
 | 1. create-branch           | ✅ Done    | Branch `feature/task.143.*` exists in git                              | Branch created at `0569cee2` | —                    |
 | 2. review-task             | ✅ Done    | `task.143.review.{N}.{name}.md` exists (or skip logged)                | review.1 — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 4/4 phases; ci:fast green | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.143.qa.{N}.*.md`; `task.143.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #475: https://github.com/Gamaroff/agent-skills/pull/475 | —                    |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.143.qa.{N}.*.md`; `task.143.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.143.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -84,11 +84,45 @@ Give `/qa-next`'s run state file an owner: `uat-status.mjs` gains `--state-*` su
 - **Deviation**: the plan's `env-10` migration example is itself refused by the existing `-NN` rule; the task doc, plan, CHANGELOG and refusal message now say `ci10`.
 - Development completion comment posted to github issue 469.
 
+### Step 4 — create-pr — 2026-09-24
+
+- SCOPE_PATHS: `docs/tasks/task.143.qa-next-state-file-owned-by-the-tool`, `skills/qa-next`, `evals/qa-next/unit`, `shared/resources/tests/security-probe.test.mjs`, `CHANGELOG.md` (root file named explicitly — the dirname rule yields `.` and skips it). No out-of-scope untracked files held.
+- Commits: `e1afee1a` feat(qa-next) — code, tests, SKILL/README/CHANGELOG, security-probe test; `b2db0c42` docs(task.143) — task, plan, review report, implementation report (first commit of the report). Leak check: OK (every committed path is in scope).
+- PR body written from the verified run record rather than by the Explore summariser (the diff's content was already established in Steps 2–3).
+- PR created: #475 https://github.com/Gamaroff/agent-skills/pull/475 (base `develop`, `Closes #469`). Lock `pr_url` updated.
+- Issue #469 `in-review` comment: posted. GitHub board: in-review → stage-disabled.
+- Post-PR state check (inline, `gh pr view`): PR #475 state = OPEN. errors = 0.
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+### QA Loop Limit Reached — 2026-09-24
+
+The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS. Route 2c (gate-the-last-fix half-cycle) was evaluated and declined: `medium-not-falling` — MEDIUM reads 2, 0, 1 over cycles 3–5.
+
+**Final gate status**: CONCERNS (gate.5, 90/100) — its one finding (TASK-143-BUG-5) was fixed in cycle 5's 5b (`386e586d`), which no gate has read.
+**HIGH findings per cycle**: 0, 0, 0, 0, 0 — no blocker at any point.
+**MEDIUM findings per cycle**: 2, 1, 2, 0, 1.
+**Remaining issues** (from final gate file):
+- TASK-143-BUG-5 (medium, `skills/qa-next/SKILL.md`) — executed-resume ignored a run file an interrupted v0.51.0 Step 4 wrote — **fixed in `386e586d`, ungated**.
+- Security NFR CONCERNS — pre-existing `--env` control-character pass-through (identical on `develop`), not attributable to this change; routed to a follow-up.
+
+**What was attempted per cycle**:
+- Cycle 1: BUG-1 (`--state-init` resume output indistinguishable → refuse any existing state, exit 5; exclusive `link()` lock) and BUG-2 (legacy `priorRuns` counted own file when `runFile` null → `Last run` + mtime heuristics).
+- Cycle 2 (refute pass): BUG-3 — cycle 1's heuristics misfired (na/blocked early exit, refreshed mtime) → file-name date rule; header comment; redundant check folded.
+- Cycle 3: BUG-4 — the date rule ignored phase, used earlier-of-UTC/local, could not see the env label → exact before `executed`, local date, always `unverifiable` after.
+- Cycle 4: QA4-1 (executed-resume had no instruction to record its run file → `--run-path` + `--state-set runFile`) and QA4-2 (legacy test failed under UTC+14 → TZ pinned).
+- Cycle 5: BUG-5 — the QA4-1 instruction ignored a file an interrupted v0.51.0 Step 4 already wrote → reuse it, else `--run-path`.
+
+**Likely root cause**: every finding from cycle 2 onward sits in one mechanism — migrating a state file written by v0.51.0 (no `targeted`/`priorRuns`/`bug`/`filedBug`, `runFile` never recorded) mid-run across the upgrade. v0.51.0 did not record the fact the derivation needs, so each more precise rule exposed a narrower case (early exit → phase → timezone → env label → interrupted Step 4). The current-shape path (`--state-init` … `--state-clear`, the task's actual deliverable) has had no finding since cycle 1's two were fixed, and the reviewers' findings have narrowed to a pre-upgrade run that is interrupted *and* resumed after the upgrade.
+
+**Recommended next steps**:
+1. Grant one more cycle (Phase 0b: "Resume at 5a with 1 more cycle") so cycle 5's fix is gated; the expected outcome is a CONCERNS gate with no open entry (route 3 → 5c).
+2. Or: accept the migration residue as a documented limitation — a v0.51.0 run interrupted mid-flight and resumed after upgrading — and proceed to `/finalise`; the tool already flags the uncertain value as `unverifiable`.
+3. Either way, file the follow-ups: control characters in `--env` (pre-existing), and a lock-ownership check on `--state-set` (cycle 2 CR-1).
 
 ---
 
@@ -96,14 +130,76 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-09-24
+
+**Gate Result**: CONCERNS
+**Issues Found**: 2 MEDIUM — TASK-143-BUG-1 (`--state-init` resume vs fresh output indistinguishable, CR-1), TASK-143-BUG-2 (legacy `priorRuns` counts own run file when `runFile` null, CR-2); advisory CR-3 (non-exclusive lock); pre-existing `--env` control-char pass-through → future
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: BUG-1 → `--state-init` refuses any existing state (exit 5), exclusive `link()` lock creation (also closes CR-3); BUG-2 → legacy `priorRuns` excludes the row's `Last run` (from `recorded` on) and files written after `startedAt` when `runFile` is null; SKILL.md/CHANGELOG/task contract updated; 3 tests added (55 → 58). Fast gate: attempt 1 red (doc-links on the tracked tree: gate.1/qa.1 were not yet staged), attempt 2 green after staging them (3983/0).
+**Commit**: `f0682730`
+
+### QA Cycle 2 — 2026-09-24
+
+**Gate Result**: CONCERNS
+**Issues Found**: 1 MEDIUM — TASK-143-BUG-3 (cycle-1 legacy own-file heuristics misfire: `Last run` after a v0.51.0 na/blocked early exit, mtime vs hand-written `startedAt`; refute CR-2+CR-3); 1 LOW — TASK-143-QA2-2 (stale header comment). BUG-1 FIXED, BUG-2 PARTIAL. Advisory: CR-1 (lock ownership on `--state-set`), CR-5, CR-6.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: BUG-3 → legacy own file identified by the v0.51.0 file-name date (≥ start date, earlier of UTC/local); `unverifiable` when `startedAt` does not parse; QA2-2 header comment; CR-5/CR-6 folded in; 1 test added + legacy test rewritten (58 → 59). Fast gate green on the first attempt (cycle artifacts staged before the gate — obs #171).
+**Commit**: `1b926a42`
+
+### QA Cycle 3 — 2026-09-24
+
+**Gate Result**: CONCERNS
+**Issues Found**: 2 MEDIUM + 1 LOW — TASK-143-BUG-4 (legacy file-name date rule ignores phase — CR-1; earlier-of-UTC/local wrong east of UTC — CR-2, platform variance; cannot see env label — CR-3). BUG-3 and QA2-2 FIXED. Advisory CR-4 (duplicate comment).
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+**Fixes Applied**: BUG-4 → no legacy exclusion before `executed` (exact); from `executed` on, local-date name exclusion + `priorRuns` always `unverifiable`; `localDate` replaces earlier-of-UTC/local; CR-4 comment; 1 test added + legacy test extended (59 → 60). Fast gate green on the first attempt.
+**Commit**: `2adabb11`
+
+> Pattern noted for the record: three consecutive cycles found MEDIUM defects in one mechanism (the v0.51.0 `runFile: null` own-file derivation). No HIGH, so no third strike and no convergence trip. The cycle-3 fix changes the mechanism's claim rather than adding a heuristic: exact before `executed`, and a flagged best effort (`unverifiable`) from `executed` on.
+
+### QA Cycle 4 — 2026-09-24
+
+**Gate Result**: CONCERNS
+**Issues Found**: 2 LOW — TASK-143-QA4-1 (SKILL resume map lacks `--run-path` + `--state-set runFile` for a pre-upgrade run resumed at `executed`; CR-1 verified against UTC `today()`), TASK-143-QA4-2 (legacy test TZ-dependent — fails under UTC+14, found by QA's timezone sweep). BUG-4 FIXED. Advisory CR-2 (copied test comment).
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+**Fixes Applied**: QA4-1 → SKILL resume map: executed-resume with `runFile: null` calls `--run-path` + `--state-set runFile` before Step 4 (exact `priorRuns`); comment/CHANGELOG premise narrowed; QA4-2 → TZ-pinned legacy test (passes under UTC, +14, −11, Tokyo); CR-2 comment; 1 test added (60 → 61).
+**Commit**: `76481715`
+
+### QA Cycle 5 — 2026-09-24
+
+**Gate Result**: CONCERNS
+**Issues Found**: 1 MEDIUM — TASK-143-BUG-5 (executed-resume step ignores a run file an interrupted v0.51.0 Step 4 already wrote; CR-1 medium/high). QA4-1 FIXED as specified, QA4-2 FIXED.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: Loop route: continue (medium-not-falling) — MEDIUM reads 2, 0, 1 over cycles 3–5 — route 2c needs it strictly falling, which is the evidence that one more gate would clear.
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: BUG-5 → the resume map records the run file an interrupted v0.51.0 Step 4 already wrote (`<local start date>-<envLabel>.md`), else `--run-path`; comment/CHANGELOG to match; 1 test added (61 → 62). Fast gate green (3987/0). This fix has no gate — the half-cycle was declined.
+**Commit**: `386e586d`
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Final Status**: Escalated — QA loop limit reached (5 cycles, gate CONCERNS 90/100, HIGH 0 throughout; cycle 5's fix ungated)
 **Branch**: feature/task.143.qa-next-state-file-owned-by-the-tool
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/475
+**QA Iterations**: 5 (limit)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
