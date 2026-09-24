@@ -5,18 +5,20 @@ type: task
 description: "Move /qa-next's run state file (.claude/state/qa-next.state.json) from a JSON shape described across SKILL.md Steps 0–6 into uat-status.mjs subcommands with one field schema in code, so every field's writer and reader is tested — and close the three LOW deferrals task.141 left in the same area."
 tags: [qa-next, uat-status, state-file, follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-23
 updated: 2026-09-24
 assignee:
 estimated_effort_hours: 6
 github_issue: 469
+completed_date: 2026-09-24
+pr_number: 475
 ---
 
 # Technical Task: qa-next — `uat-status.mjs` owns the run state file
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.143.review.1.qa-next-state-file-owned-by-the-tool.md` implemented 2026-09-24
 
@@ -413,6 +415,7 @@ None.
 | 2026-09-24 |  | QA findings fixed — cycle 6 of the re-entered loop (BUG-6, QA6-1); a legacy `priorRuns` stays `unverifiable` from `executed` on, and the resume always takes a fresh `--run-path` | qa-fix |
 | 2026-09-24 |  | QA gate CONCERNS (90/100) — 1 finding (cycle 7) | qa-task |
 | 2026-09-24 |  | QA findings fixed — cycle 7 (QA7-1: east-of-UTC runFile exclusion test); 7 iterations in all | qa-fix |
+| 2026-09-24 | 1.2 | DoD verified — accepted on the operator's decision over gate.7 CONCERNS (90/100) after the QA loop limit; no PR conformance review ran (PR #475) | finalise |
 
 ---
 <!-- change-log-end -->
@@ -452,6 +455,31 @@ None.
 - TASK-143-QA7-1 (low): the `runFile` exclusion in `stateView` is now masked by the date rule, and its test goes red only east of UTC.
 - Documented limitation (reliability, routed to a follow-up): a half-written file from an interrupted v0.51.0 Step 4 stays beside this run's file, and a later run counts it as a prior run.
 - Pre-existing (not attributed to this change): `--env` accepts whitespace-only and control-character labels; routed to a follow-up.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED, on the operator's decision (2026-09-24)
+
+### QA Report Summary
+
+**QA Report**: `task.143.qa.7.qa-next-state-file-owned-by-the-tool.md`
+**Gate File**: `task.143.gate.7.qa-next-state-file-owned-by-the-tool.yml`
+**Gate Status**: ⚠️ CONCERNS, accepted by the operator at the QA loop limit (7 cycles, HIGH 0 throughout)
+**Quality Score**: 90/100
+
+✅ **Functional criteria:** 6/6 pass, each with code and a test that CI runs on every PR
+⚠️ **Process criteria:** SC-P1, SC-P2, SC-CQ1, SC-M1 and SC-M2 are met by inspection, measurement or the mutation record, and have no executable per-PR test
+✅ **Tests:** qa-next suite 63/63; `npm run ci:fast` 3988 pass, 0 fail; CI reading 1 SUCCESS @ `d52234b2`
+⚠️ **PR Review:** none. There is no GitHub review, and the Step 5c `/review-pr` conformance review **did not run** because the operator finalised from the loop-limit halt
+✅ **Documentation:** SKILL.md, README and CHANGELOG (with a Migration line)
+✅ **Security Review:** PASS. 47 probes; the 5 reproduced `--env` labels are pre-existing on `develop`
+⚠️ **Compliance Review:** not applicable
+
+**Task marked as ACCEPTED on:** 2026-09-24
+
+**Detailed Verification Log:** See `task.143.dod.1.qa-next-state-file-owned-by-the-tool.md` for the full verification evidence.
 
 ---
 
