@@ -1,0 +1,68 @@
+schema: 1
+task: 'task.147.develop-pipeline-step-mechanics'
+task_title: 'develop pipeline: five steps that fail or overreach on correct input'
+gate: PASS
+status_reason: 'Granted cycle 6 (re-entry after the loop-limit escalation) reads the cycle-5 replacement. All six gate-5 findings are verified fixed, and bug.14 is closed. 38 by-hand probes of the new scope gate in a sandbox repo produced no vacuous pass: every glob, case-folded, :/, symlink-component, .. and nonexistent spelling is refused, and every real spelling is judged. Both new tests are mutation-proven. ci:fast, bundle:check and lint:shell pass on a clean checkout. The review found no correctness bug, only two LOW cleanups.'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T13:21:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 4105
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: []
+  code_review:
+    findings: 2
+    bugs: 0
+    cleanups: 2
+    promoted: []
+    reviewer: 'inline (subagent killed at 11 minutes, budget 10; independence lost)'
+  boundary: true
+  probes_executed: 38
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-25'
+  total_iterations: 5
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 38
+    notes: 'The --scope gate is a refusal predicate (a boundary under probe-boundary-rule). The engine shell: form was tried, and all 28 of its cases stopped at argument parsing with "unknown argument": the script takes flags, not one positional. So the sink was probed by hand per probe-boundary-rule §5.1, under env -i with a throwaway HOME, in a scratch repo with a bare origin. 38 candidates (28 at the root, 10 from a subdirectory, with multiple scopes and an uncommitted deletion): 0 vacuous passes.'
+  performance:
+    status: PASS
+    notes: 'Scope gate on this repo (4240 tracked files): a refused scope takes 1.16s end to end. Linear in path count, with each path listed twice (CR-1, advisory).'
+  reliability:
+    status: PASS
+    notes: 'No vacuous scope reachable (38 probes). The same results under /bin/bash 3.2 and bash 5. An unreadable directory makes ls-files and status warn and succeed together, so the LISTED=false deferral cannot diverge from check 3.'
+  maintainability:
+    status: PASS
+    notes: 'One path_under() predicate now serves the gate and check 3, replacing the per-spelling normaliser patches. The five bundled copies are identical to the source.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cleanup): the scope gate lists each tracked path twice (index plus HEAD) and scans it in a per-scope bash read loop. Deduplicate, or read HEAD only when the index scan finds nothing, before the gate is used in large repositories.'
+      refs: ['shared/resources/verify-push-state.sh']
+    - action: 'CR-2 (cleanup): the "names no path git knows" refusal prints the normalised scope, not the spelling passed. Every other refusal in the block prints $raw, so print both.'
+      refs: ['shared/resources/verify-push-state.sh']
+    - action: 'Pre-existing on this branch (cycle 2, outside this scope): a ../x scope from a subdirectory is refused as "contains .." although it names a path inside the repository. The refusal is conservative and the message could say so.'
+      refs: ['shared/resources/verify-push-state.sh']
+    - action: 'Carried from gates 1-5: a new untracked directory held at Step 4, unbound PR_NUMBER and Step-0 variables (pre-existing), cross-repository heads, joined-string dedupe, and the Step 4b {template}-slot limit (obs #186).'
+      refs: ['shared/resources/develop-pipeline-step-4-create-pr.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-147-BUG-14
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 5, CR-3 with its members CR-1, CR-2 and CR-4)
 **Date Found**: 2026-09-25
 
@@ -44,3 +44,4 @@ Accept a scope only when check 3's own `in_scope` predicate matches at least one
 | ---------- | ------------ | ---------- | -------------------------------------------------- |
 | 2026-09-25 | New          | qa-task    | QA cycle 5                                         |
 | 2026-09-25 | Ready for QA | qa-fix     | Mechanism replaced; mutation-proved               |
+| 2026-09-25 | Closed       | qa-task    | QA cycle 6: 38 by-hand probes, 0 vacuous passes; cases 28–32 mutation-proven |

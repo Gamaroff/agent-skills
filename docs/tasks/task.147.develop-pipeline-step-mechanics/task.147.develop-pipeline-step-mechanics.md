@@ -630,27 +630,27 @@ None.
 ---
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-25
-**Quality Score**: 60/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.147.qa.5.develop-pipeline-step-mechanics.md](./task.147.qa.5.develop-pipeline-step-mechanics.md)
-- **Gate File**: [task.147.gate.5.develop-pipeline-step-mechanics.yml](./task.147.gate.5.develop-pipeline-step-mechanics.yml)
+- **Full Report**: [task.147.qa.6.develop-pipeline-step-mechanics.md](./task.147.qa.6.develop-pipeline-step-mechanics.md)
+- **Gate File**: [task.147.gate.6.develop-pipeline-step-mechanics.yml](./task.147.gate.6.develop-pipeline-step-mechanics.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 94 node tests + 27 shell cases
+- **Tests Executed**: 4105 (ci:fast on a clean checkout, with observation-log re-run from the real checkout) + 32 verify-push-state shell cases + 38 by-hand scope probes
 - **Phases Verified**: 7/7
-- **Critical Issues**: 0 HIGH, 4 MEDIUM (one mechanism, filed as bug.14), 2 LOW; bugs 1–13 closed
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0 HIGH, 0 MEDIUM, 2 LOW cleanups (advisory); bugs 1–14 closed
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-HIGH has been 0 for three consecutive gates. The `verify-push-state --scope` gate uses the wrong predicate: glob, case-folded and `:/` spellings exist but match nothing, so the scope check passes vacuously (bug.14). The fix replaces the gate rather than patching another spelling.
+Granted cycle 6 reads the cycle-5 replacement of the `verify-push-state --scope` gate. All six gate-5 findings are verified fixed. 38 by-hand probes produced no vacuous pass, and both new tests are mutation-proven. The code review was performed inline, because the reviewer was killed at 11 minutes against a 10-minute budget, so independence was lost.
 
 ---
 <!-- change-log-start -->
@@ -667,6 +667,7 @@ HIGH has been 0 for three consecutive gates. The `verify-push-state --scope` gat
 | 2026-09-25 |  | QA gate CONCERNS (70/100) — 0 HIGH, 3 MEDIUM, 2 LOW; bugs 7-9 closed | qa-task |
 | 2026-09-25 |  | QA gate CONCERNS (90/100) — 0 HIGH, 1 MEDIUM; bugs 10-12 closed, bug.13 filed | qa-task |
 | 2026-09-25 |  | QA gate CONCERNS (60/100) — 0 HIGH, 4 MEDIUM (one mechanism, bug.14), 2 LOW; bug.13 closed | qa-task |
+| 2026-09-25 |  | QA gate PASS (100/100) — 0 findings open, 2 LOW cleanups advisory; bug.14 closed (granted cycle 6) | qa-task |
 <!-- change-log-end -->
 
 ---
