@@ -1,0 +1,77 @@
+schema: 1
+task: 'task.143.qa-next-state-file-owned-by-the-tool'
+task_title: 'qa-next: uat-status.mjs owns the run state file, so its contract is held by tests instead of prose'
+gate: CONCERNS
+status_reason: 'TASK-143-BUG-3 and QA2-2 fixed, but the replacement file-name date rule ignores the phase (drops a same-day prior run before this run wrote anything) and uses the earlier of UTC/local dates, wrong east of UTC; it also cannot see the env label. All three are in the legacy (v0.51.0, runFile null) derivation only.'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T05:25:46Z'
+
+top_issues:
+  - id: 'TASK-143-BUG-4-PHASE'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'The legacy date exclusion ignores phase: at selected/resolved this run has written no file, so a same-day prior run is dropped from priorRuns and the resumed run is recorded as the 1st (CR-1, bug + high confidence).'
+    suggested_action: 'Apply no exclusion before executed; test a same-date prior file read at selected/resolved.'
+    suggested_owner: dev
+    bug_ref: 'task.143.bug.4.legacy-date-rule-phase-and-timezone.md'
+  - id: 'TASK-143-BUG-4-TZ'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'platform-variance: startDate takes the earlier of the UTC and local dates, too early east of UTC; v0.51.0 named files by the local date, so TZ=Asia/Tokyo excludes a genuine previous-local-day run (CR-2, bug + high confidence).'
+    suggested_action: 'Use the local calendar date only; add a UTC+ TZ test that keeps the previous-local-day file.'
+    suggested_owner: dev
+    bug_ref: 'task.143.bug.4.legacy-date-rule-phase-and-timezone.md'
+  - id: 'TASK-143-BUG-4-ENV'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'v0.51.0 wrote one file per date AND env label; the date-only match also drops a same-day run under another label, which the tool cannot distinguish (CR-3).'
+    suggested_action: 'Flag the from-executed derivation as unverifiable rather than presenting it as exact.'
+    suggested_owner: dev
+    bug_ref: 'task.143.bug.4.legacy-date-rule-phase-and-timezone.md'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 59
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 19
+    notes: 'cli: probe re-run (task.143.qa.3.security.run.json): unchanged; only the pre-existing control-character labels reproduce (identical on develop), routed to future.'
+  performance:
+    status: PASS
+    notes: 'No network calls; suite 59 tests; TMPDIR=/tmp run 59/59.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-143-BUG-4 (legacy derivation only). Advisory CR-1 of cycle 2 (lock ownership on --state-set) still routed to future.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory: duplicated comment sentence in runPathFor (CR-4).'
+
+bug_resolution:
+  TASK-143-BUG-3: 'FIXED as specified (heuristics removed); the replacement rule has its own defects, TASK-143-BUG-4'
+  TASK-143-QA2-2: 'FIXED'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-143-BUG-4: no exclusion before executed; local date only; unverifiable from executed on.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+  future:
+    - action: 'Refuse control characters in --env labels (pre-existing; probe-reproduced).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Lock ownership check on --state-set (cycle 2 CR-1).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-143-BUG-4 fixed']
