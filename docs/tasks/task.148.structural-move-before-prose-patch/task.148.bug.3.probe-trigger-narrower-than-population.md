@@ -4,7 +4,7 @@
 **Bug ID**: TASK-148-BUG-3 (QA cycle 2 code review CR-1)
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 2, refute pass)
 **Date Found**: 2026-09-25
 
@@ -79,3 +79,4 @@ Move: consolidate (see above)
 | ---- | ------ | ---------- | ----- |
 | 2026-09-25 | New | QA Engineer | QA cycle 2 (refute pass) |
 | 2026-09-25 | Ready for QA | qa-fix | Consolidated; mutation-proved |
+| 2026-09-25 | Closed | QA Engineer | Verified in QA cycle 3 |

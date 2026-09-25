@@ -1,0 +1,65 @@
+schema: 1
+task: 'task.148.structural-move-before-prose-patch'
+task_title: 'qa-fix and the QA loop: offer a structural move before another prose patch'
+gate: PASS
+status_reason: 'Gate-2 finding (probe trigger narrower than population) fixed and verified; the reproduced reliability findings (cwd-relative population, unbound input read as a verdict) are fixed, so every NFR is PASS. The cycle-3 review raised no high-confidence bug; its six advisory findings are recorded under recommendations.future.'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T21:15:34Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 121
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false, reason unchanged from cycle 1. The verdict gates only an advisory prompt block; its input is gate YAML the pipeline writes.'
+  performance:
+    status: PASS
+    notes: 'Pure predicate; unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Gate-2 CONCERNS resolved: the population is cwd-independent and 0 means the probe did not run; every could-not-look reason reports SIGNAL=error. Both are mutation-proved.'
+  maintainability:
+    status: PASS
+    notes: 'The executed-document set has one definition, held equal to the trigger by a test.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (medium/medium): "a population of 0 means the probe did not run ... never record 0" is false when the fix removes or renames the phrase in the edited file, and when the edited file is new and untracked (git grep reads tracked files only). Require the edited file in the result or search the pre-edit phrase; allow a recorded 0 with a reason. Follow-up: fold into the next qa-fix change, or raise as a task.'
+      refs: ['skills/qa-fix/SKILL.md']
+    - action: 'CR-2 (low): the Step 7 escaping rule omits backslash; a pasted population command loses its line-continuation backslashes inside the double-quoted template.'
+      refs: ['skills/qa-fix/SKILL.md']
+    - action: 'CR-3 (low): the Diminishing-returns table says LATEST_GATE is resolved in Loop Setup; the resolver is Finding the Latest Gate File.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR-4 (cleanup): the trigger-equals-population test is one-directional; deep-equal the two sets.'
+      refs: ['tests/qa-fix-structural-move.test.js']
+    - action: 'CR-5 (cleanup): rename the gate-driven-entry test so it reads as "stated", not "enforced".'
+      refs: ['evals/shared/tests/qa-narrowing-offer-wiring.test.mjs']
+    - action: 'CR-6 (cleanup): split the error log line into two, and print the mapped reason to stderr.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-25'
+  total_iterations: 2
+  verification_method: 'Mutation-proved tests (8 + 7) and review of the files changed since gate 2'

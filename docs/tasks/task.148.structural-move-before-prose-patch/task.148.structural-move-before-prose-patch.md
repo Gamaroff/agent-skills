@@ -568,25 +568,26 @@ None.
 ---
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-25
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.148.qa.2.structural-move-before-prose-patch.md](./task.148.qa.2.structural-move-before-prose-patch.md)
-- **Gate File**: [task.148.gate.2.structural-move-before-prose-patch.yml](./task.148.gate.2.structural-move-before-prose-patch.yml)
+- **Full Report**: [task.148.qa.3.structural-move-before-prose-patch.md](./task.148.qa.3.structural-move-before-prose-patch.md)
+- **Gate File**: [task.148.gate.3.structural-move-before-prose-patch.yml](./task.148.gate.3.structural-move-before-prose-patch.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 115
+- **Tests Executed**: 121
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (1 MEDIUM)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Both gate-1 findings are fixed. The Step 3.5 probe trigger was not widened alongside its population
-(bug 3). Two reproduced advisory findings are in the QA report.
+Bugs 1–3 are fixed and closed across three QA cycles. Six advisory findings remain in the gate's
+`recommendations.future`. The most significant says the "never record a population of 0" rule
+misreads a fix that removes the phrase, or a file that is untracked.
 
 ---
 
@@ -602,6 +603,7 @@ Both gate-1 findings are fixed. The Step 3.5 probe trigger was not widened along
 | 2026-09-25 |  | Implemented — 3 source files + CHANGELOG, 4 test files (36 new tests), 13 fixtures + README | develop |
 | 2026-09-25 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-09-25 |  | QA gate CONCERNS (80/100) — 1 finding (cycle 2) | qa-task |
+| 2026-09-25 |  | QA gate PASS (100/100) — 0 findings, 6 advisory (cycle 3) | qa-task |
 <!-- change-log-end -->
 
 ---
