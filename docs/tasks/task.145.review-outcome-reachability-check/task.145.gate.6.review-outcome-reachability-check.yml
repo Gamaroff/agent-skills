@@ -14,6 +14,9 @@ top_issues:
     suggested_action: 'Make NAMED_PHASE a per-site factory like patternLine(check) that takes each site''s own naming sentence. Keep the requirement and exclusion shared and held in full. Mutation-prove it with M3 and M5.'
     suggested_owner: dev
     bug_ref: 'task.145.bug.11.named-phase-hold-verb-only.md'
+    status: closed
+    fixed_date: '2026-09-25'
+    resolution: 'Fixed after acceptance, before merge, in 9018ac1a: NAMED_PHASE is a per-site hold with the site noun and naming sentence. M3, M5 and a wrong-noun mutant go red. Bug 11 closed.'
 
 waiver:
   active: false
@@ -59,8 +62,8 @@ recommendations:
       refs: ['docs/tasks/task.145.review-outcome-reachability-check/task.145.bug.10.task-doc-stacked-sections.md']
 
 bug_resolution:
-  bugs_fixed: 10
-  bugs_remaining: 1
+  bugs_fixed: 11
+  bugs_remaining: 0
   fix_date: '2026-09-25'
   total_iterations: 5
   verification_method: 'ci:fast (4003 tests, 4002 pass, 0 fail), bundle:check clean, 5 mutation proofs this cycle'
