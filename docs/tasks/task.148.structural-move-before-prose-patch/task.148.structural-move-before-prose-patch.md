@@ -314,7 +314,7 @@ field, cycle-entry row, route or escalation trigger changes.
 
 - [x] Add `classifyNarrowingResidue` and `describeNarrowingResidue`; export both
 - [x] HIGH is read only from `highCounts`, so the engine's source guard stays green
-- [x] Fixture table of 13 rows (listed in § 8), each mutation-proved
+- [x] Fixture table of 13 rows (listed in § 8), each mutation-proved — shipped as 16 (see Implementation Record)
 
 ### Phase 2: route-table pins (Risk: Low)
 
@@ -430,7 +430,10 @@ These are the fixture rows added to `ROWS`. Both assert that the new signal is *
   **execute it** in a temporary git repository. The repository has the phrase in `skills/a/SKILL.md`,
   `skills/b/SKILL.md` and `shared/resources/x.md` (these count). It also has the phrase in
   `skills/a/references/x.md`, `shared/resources/tests/fixtures/y.md` and `docs/tasks/t.md` (these must
-  not count). Assert exactly 3 paths.
+  not count). Assert exactly 3 paths. *As shipped (QA cycles 1–2):* a hand-authored
+  `skills/b/references/hand.md` also counts, and `skills/a/references/x.md` carries the
+  generated-copy marker; the test asserts exactly **4** paths, from the repository root and from a
+  subdirectory.
 
 ### Wiring test: loop document (`evals/shared/tests/qa-narrowing-offer-wiring.test.mjs`)
 
@@ -466,7 +469,7 @@ expected to record a Step 2.6 move, and the report says which one.
 - [x] `classifyLoopRoute` is unchanged on task.143's shape: the 2 new `ROWS` in `qa-loop-route.test.mjs`
 - [x] The loop's 5b offer runs from a consumer-shaped cwd and returns `signal: true` on task.143 cycle 3: `qa-narrowing-offer-wiring.test.mjs`
 - [x] `qa-fix` Step 2.6 carries the triggers, the four moves and the fix-summary shape: `qa-fix-structural-move.test.js`
-- [x] The Step 3.5 population command returns exactly the 3 restating files in the fixture repository: `qa-fix-structural-move.test.js`
+- [x] The Step 3.5 population command returns exactly the restating files in the fixture repository: 4 hand-authored paths, as widened in QA cycle 1, from any cwd (QA cycle 2): `qa-fix-structural-move.test.js`
 - [x] Step 3.5 row 1 requires a `Probe:` block recording the command and every hit's disposition, and cites obs #177: `qa-fix-structural-move.test.js`
 
 ### Performance
@@ -637,7 +640,8 @@ requires a `Probe:` block. The route classifier is unchanged, and two new route-
   floor. The input carries exactly two gates, so raising it to 3 moves only the floor (mutation: rows
   1, 8 and 9 go red). It returns `input-unreadable` when reading the input throws, which is one reason
   beyond the task's list. Two synthetic rows were added (14: two files inside one gate; 15:
-  `highCounts` shorter than the cycle), so there are 15 rows, not 13.
+  `highCounts` shorter than the cycle), so there were 15 rows at develop time. QA cycle 2 added row 16
+  (`cycle-missing` for a non-integer cycle), so there are **16**, not 13.
 - **Phase 2.** Two rows appended to `ROWS`, reading the new fixtures directory through `nr()`.
 - **Phase 3.** The section binds `$CYCLE`, `$HIGH_SEQUENCE_JSON`, `$GATE_N` and `$GATE_N1` in its
   own Variable table (review 1, I-1). The plan's "the third-strike rule binds them" was not true, and
