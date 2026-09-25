@@ -44,6 +44,10 @@ while IFS= read -r f; do
   # A root-level file (CHANGELOG.md, package.json) is scoped by its own path. Skipping "." dropped
   # it from every Step 4 commit (task.146 named its CHANGELOG by hand to get it in).
   [[ "$dir" == "." ]] && dir="$f"
+  # Under .claude/ the directory is the pipeline's own state (lock, step4 records): scope the
+  # changed file itself, never the directory, or the Step 4 commit would carry that state where
+  # .claude/ is not gitignored (task.147 QA-3, CR-5).
+  case "$dir" in .claude|.claude/*) dir="$f";; esac
   # avoid adding a dir that is already under {work-item-dir}, or one already in the array
   case "$dir" in "{work-item-dir}"*) continue;; esac
   case " ${SCOPE_PATHS[*]} " in *" $dir "*) continue;; esac
@@ -119,9 +123,12 @@ while IFS= read -r f; do
   fi
 done < <(git status --porcelain | grep '^??' | awk '{print $2}')
 
+# Printed, not written to disk: copy these lines into the report's Issues Log. A `tee -a Issues Log`
+# here wrote untracked files named `Issues` and `Log` at the repo root, which a guard re-run then
+# held and Step 8 failed on (task.147 QA-3, CR-1).
 if [ ${#HELD[@]} -gt 0 ]; then
-  echo "Pre-flight: ${#HELD[@]} out-of-scope file(s) held in $HOLD_DIR" | tee -a Issues Log
-  printf '  - %s\n' "${HELD[@]}" | tee -a Issues Log
+  echo "Pre-flight: ${#HELD[@]} out-of-scope file(s) held in $HOLD_DIR"
+  printf '  - %s\n' "${HELD[@]}"
 fi
 ```
 
@@ -221,7 +228,7 @@ HOLD_DIR=$(cat .claude/state/step4-hold-dir.txt 2>/dev/null)
 if [ -n "$HOLD_DIR" ] && [ -d "$HOLD_DIR" ] && [ -n "$(ls -A "$HOLD_DIR" 2>/dev/null)" ]; then
   cp -r "$HOLD_DIR"/. .
   rm -rf "$HOLD_DIR"
-  echo "Restored held files from $HOLD_DIR" | tee -a Issues Log
+  echo "Restored held files from $HOLD_DIR"
 fi
 rm -f .claude/state/step4-hold-dir.txt
 ```

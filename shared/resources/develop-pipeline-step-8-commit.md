@@ -222,6 +222,16 @@ if [ "$(head -1 "$HELD_REC" 2>/dev/null)" = "{work-item-dir}" ]; then
     p="${p%/}"
     [ -n "$p" ] && [ -e "$p" ] && SCOPE_ARGS+=(--scope "$p")
   done < <(tail -n +2 "$HELD_REC")
+elif [ -s "$HELD_REC" ]; then
+  # Named, never silent: a record for another work item is not applied here (task.147 QA-3, CR-2).
+  echo "⚠️  $HELD_REC names $(head -1 "$HELD_REC"), not {work-item-dir} — its held paths are not checked"
+fi
+# Restore deletes the hold-dir record, so a record that still names a non-empty directory means
+# held files were never restored. Absent from the tree, they would slip past the scope above, and
+# the cleanup below would delete the only pointer to them (task.147 QA-3, CR-3).
+HOLD_REC_DIR=$(cat .claude/state/step4-hold-dir.txt 2>/dev/null)
+if [ -n "$HOLD_REC_DIR" ] && [ -n "$(ls -A "$HOLD_REC_DIR" 2>/dev/null)" ]; then
+  echo "❌ Step 8 incomplete: Step 4 held files were never restored — run the Restore Held Files block (they are in $HOLD_REC_DIR)"; exit 1
 fi
 bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" "${SCOPE_ARGS[@]}" ${PR_NUMBER:+--pr "$PR_NUMBER"}
 VERIFY_EXIT=$?

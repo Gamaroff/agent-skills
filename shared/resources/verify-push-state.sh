@@ -91,6 +91,14 @@ if [ ${#SCOPES[@]} -gt 0 ]; then
     # A '..' segment would pass the existence check and then match no porcelain path, which is a
     # vacuous pass. Refuse it rather than guess what it meant.
     case "/$s/" in */../*) echo "verify-push-state: --scope '$raw' contains '..' — pass a path inside the repository" >&2; exit 2 ;; esac
+    # Collapse what porcelain never prints: repeated slashes and '.' segments. Without this,
+    # `docs/./tasks` or `docs//tasks` passed the existence check and matched nothing, which is a
+    # vacuous pass, the sibling of the '..' case (task.147 QA-3, CR-4).
+    while [ "${s#*//}" != "$s" ]; do s="${s%%//*}/${s#*//}"; done
+    while [ "${s#*/./}" != "$s" ]; do s="${s%%/./*}/${s#*/./}"; done
+    while [ "${s#./}" != "$s" ]; do s="${s#./}"; done
+    [ "$s" = "." ] && s=""
+    s="${s%/.}"
     while [ "${s%/}" != "$s" ]; do s="${s%/}"; done
     [ -n "$s" ] || { echo "verify-push-state: --scope '$raw' names the whole repository — omit --scope instead" >&2; exit 2; }
     if [ ! -e "$TOP/$s" ] && [ -z "$(git -C "$TOP" ls-files -- "$s" 2>/dev/null)" ]; then

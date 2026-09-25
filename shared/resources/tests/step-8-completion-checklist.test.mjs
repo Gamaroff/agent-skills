@@ -302,6 +302,53 @@ describe("executed against fixtures", { concurrency: true }, () => {
       }
     });
 
+    test(`[${sh}] held files that were never restored fail Step 8, and their pointer survives`, async () => {
+      const fx = await setup(finished("Task"));
+      try {
+        const s4 = readDoc(STEP4);
+        const p4 = { "{work-item-dir}": WORK_ITEM, "{Q2_answer}": "develop" };
+        write(fx.work, "stray/notes.txt", "held and forgotten\n");
+        for (const anchor of [
+          "Scope-derivation",
+          "Every path this guard holds is recorded",
+        ]) {
+          const r = await runAsync(sh, bind(blockBy(s4, anchor), p4), {
+            cwd: fx.work,
+          });
+          assert.equal(r.status, 0, r.stdout + r.stderr);
+        }
+        // Restore is skipped.
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 1, r.stdout);
+        assert.match(r.stdout, /never restored/);
+        assert.ok(
+          fs.existsSync(path.join(fx.work, ".claude/state/step4-hold-dir.txt")),
+          "the pointer to the held files was deleted",
+        );
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    test(`[${sh}] a held record for another work item is named, not applied silently`, async () => {
+      const fx = await setup(finished("Task"));
+      try {
+        write(
+          fx.work,
+          ".claude/state/step4-held-paths.txt",
+          "docs/tasks/task.1.other\nstray/\n",
+        );
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 0, r.stdout);
+        assert.match(
+          r.stdout,
+          /names docs\/tasks\/task\.1\.other, not docs\/tasks\/task\.9\.fx — its held paths are not checked/,
+        );
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
     test(`[${sh}] a passing checklist removes Step 4's records`, async () => {
       const fx = await setup(finished("Task"));
       try {

@@ -194,9 +194,21 @@ for (const sh of SHELLS) {
         );
         assert.equal(fs.readFileSync(path.join(fx.work, p), "utf8"), v);
       }
+      for (const junk of ["Issues", "Log"]) {
+        assert.equal(
+          fs.existsSync(path.join(fx.work, junk)),
+          false,
+          `the guard wrote a "${junk}" file into the repo root`,
+        );
+      }
       const held = fs.readFileSync(
         path.join(fx.work, ".claude/state/step4-held-paths.txt"),
         "utf8",
+      );
+      assert.deepEqual(
+        held.trim().split("\n").slice(1).sort(),
+        ["stray/", "stray2/"],
+        "the held record lists more than the fixture's strays",
       );
       assert.match(held, /stray\//);
       assert.match(held, /stray2\//);

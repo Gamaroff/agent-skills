@@ -630,27 +630,31 @@ None.
 ---
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-25
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.147.qa.2.develop-pipeline-step-mechanics.md](./task.147.qa.2.develop-pipeline-step-mechanics.md)
-- **Gate File**: [task.147.gate.2.develop-pipeline-step-mechanics.yml](./task.147.gate.2.develop-pipeline-step-mechanics.yml)
+- **Full Report**: [task.147.qa.3.develop-pipeline-step-mechanics.md](./task.147.qa.3.develop-pipeline-step-mechanics.md)
+- **Gate File**: [task.147.gate.3.develop-pipeline-step-mechanics.yml](./task.147.gate.3.develop-pipeline-step-mechanics.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 76 new node tests + 20 shell cases; CI 5/5 green on `f4dee2d2`
-- **Phases Verified**: 7/7 implemented; 5/7 without issues
-- **Critical Issues**: 1 HIGH, 2 MEDIUM, 4 LOW (all gate-1 findings fixed; bugs 1–6 closed)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Tests Executed**: 88 node tests + 23 shell cases (also under `TMPDIR=/tmp`)
+- **Phases Verified**: 7/7 implemented; 6/7 without issues
+- **Critical Issues**: 0 HIGH, 3 MEDIUM, 2 LOW (bugs 1–9 closed)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-The cycle-2 refute pass found a defect in the combination of two changes. The Step 4 guard holds and restores a new untracked file of the run's own, and the scoped Step 8 check 5 then passes it as a warning, so Step 8 reports unpushed work as pushed (bug.7). The cycle-1 state files can be moved by the guard when `.claude/` is not ignored (bug.8), and overwritten by a guard re-run (bug.9).
+HIGH per gate: 2, 1, 0. There are three MEDIUM edge defects in the Step 4 state records and in scope normalisation:
+
+- a pre-existing `tee -a Issues Log` whose output files a guard re-run would hold;
+- held files that were never restored lose their pointer;
+- `.` segments give a vacuous scope.
 
 ---
 <!-- change-log-start -->
@@ -664,6 +668,7 @@ The cycle-2 refute pass found a defect in the combination of two changes. The St
 | 2026-09-25 |  | Implemented — 18 source files (+16 bundled copies), 58 node tests + 4 shell cases; all fixes mutation-proved | develop |
 | 2026-09-25 |  | QA gate FAIL (20/100) — 2 HIGH, 4 MEDIUM, 3 LOW; bugs 1-6 filed | qa-task |
 | 2026-09-25 |  | QA gate FAIL (60/100) — 1 HIGH, 2 MEDIUM, 4 LOW; bugs 1-6 closed, bugs 7-9 filed | qa-task |
+| 2026-09-25 |  | QA gate CONCERNS (70/100) — 0 HIGH, 3 MEDIUM, 2 LOW; bugs 7-9 closed | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -770,6 +775,8 @@ The harness now shares one `gh` stub per process (symlinked, with a sourced per-
 - CR-9: an absolute scope is canonicalised to its physical path, and `..` is refused.
 
 `verify-push-state.test.sh` has 23 cases (was 20).
+
+**QA cycle 3 fixes (qa-fix).** Gate 3 was CONCERNS, with 3 MEDIUM and 2 LOW findings. All five are fixed and mutation-proved (7 mutants): CR-1 replaces the `tee -a Issues Log` with echo; CR-3 makes an unrestored hold fail Step 8; CR-4 normalises `.` and `//` in scopes; CR-2 names a mismatched held record; CR-5 scopes `.claude/` changes by path. `verify-push-state.test.sh` now has 26 cases.
 
 **Deferred work.** None of the scope. The Step 3 inline branch is held as a statement, not as
 an orchestrator applying it (§ 8, Honest limit). The review's O3, bare-prefix path matching in

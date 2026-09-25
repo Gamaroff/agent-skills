@@ -4,7 +4,7 @@
 **Bug ID**: TASK-147-BUG-9
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 2 refute pass, CR-3)
 **Date Found**: 2026-09-25
 
@@ -61,3 +61,8 @@ Reuse the directory an existing record names, and add a guard, guard, restore te
 | 2026-09-25 | New          | qa-task    | QA cycle 2                          |
 | 2026-09-25 | In Progress  | qa-fix     | Investigation started               |
 | 2026-09-25 | Ready for QA | qa-fix     | Fix implemented and mutation-proved |
+
+## QA Verification
+
+**Date**: 2026-09-25 (QA cycle 3)
+**Result**: ✅ Verified fixed. The executed test runs the shipped Step 4 and Step 8 blocks one per shell, the mutation proof goes red, and the suite passes under `TMPDIR=/tmp`.

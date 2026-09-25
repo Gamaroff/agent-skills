@@ -142,6 +142,31 @@ for (const sh of SHELLS) {
     }
   });
 
+  test(`[${sh}] a tracked change under .claude/ is scoped by its own path, never the directory`, () => {
+    const fx = baseWith([`${WORK_ITEM}/task.md`]);
+    try {
+      write(fx.work, ".claude/settings.json", "{}\n");
+      git(fx.work, "add", "-f", ".claude/settings.json");
+      git(fx.work, "commit", "-q", "-m", "settings");
+      git(fx.work, "update-ref", "refs/heads/develop", "HEAD");
+      write(fx.work, ".claude/settings.json", '{"edited":true}\n');
+      const r = run(
+        sh,
+        derivation() + '\nprintf "%s\\n" "${SCOPE_PATHS[@]}"\n',
+        { cwd: fx.work },
+      );
+      assert.equal(r.status, 0, r.stderr);
+      const scope = r.stdout.split("\n").filter(Boolean);
+      assert.ok(scope.includes(".claude/settings.json"), `scope: ${scope}`);
+      assert.ok(
+        !scope.includes(".claude"),
+        "the whole .claude directory entered the scope",
+      );
+    } finally {
+      cleanup(fx.dir);
+    }
+  });
+
   test(`[${sh}] committed and uncommitted edits both reach the scope, once each`, () => {
     const fx = baseWith([`${WORK_ITEM}/task.md`, "src/a.js", "src/b.js"]);
     try {
