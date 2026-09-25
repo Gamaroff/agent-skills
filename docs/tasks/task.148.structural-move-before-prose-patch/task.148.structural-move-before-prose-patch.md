@@ -5,18 +5,20 @@ type: task
 description: "Give qa-fix a step that offers a structural move — consolidate the contract into one enumerable place, or scope a best-effort claim down — before it patches the same subject again; give the QA loop a checkable narrowing-residue signal (HIGH 0 on two consecutive gates, every MEDIUM on one file) that hands qa-fix that offer instead of letting the loop run to its budget; and widen qa-fix Step 3.5's documentation probe from the edited file to every executed document that restates the subject."
 tags: [qa-fix, qa-loop, develop-task, develop-story, observation]
 category: other
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-25
 assignee:
 estimated_effort_hours: 16
 github_issue: 478
+completed_date: 2026-09-25
+pr_number: 492
 ---
 
 # Technical Task: qa-fix and the QA loop — offer a structural move before another prose patch
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.148.review.1.structural-move-before-prose-patch.md` implemented 2026-09-25
 
@@ -593,6 +595,32 @@ Bugs 1–3 are fixed and closed across three QA cycles. Six advisory findings re
 misreads a fix that removes the phrase, or a file that is untracked.
 
 ---
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.148.qa.3.structural-move-before-prose-patch.md`
+**Gate File**: `task.148.gate.3.structural-move-before-prose-patch.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (3 cycles; bugs 1–3 fixed and closed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 14/14 implementation criteria met. AC15 (observations actioned on merge) is post-merge by its own wording.
+✅ **Tests:** 36 new tests at first review, 121 across the affected suites. Every rule is mutation-proved (14 + 8 + 7 mutants). `ci:fast` 4152/0.
+✅ **PR Review:** PR #492. The Step 5c `/review-pr` verdict was CONCERNS (advisory): PC-1 fixed, PC-2 resolved here, CR-1 carried as a follow-up.
+✅ **CI:** SUCCESS on `94dfc46d` (reading 1). Reading 2 is taken on the acceptance commit.
+✅ **Documentation:** qa-fix SKILL.md, the QA-loop document and the engine, with bundled copies regenerated; CHANGELOG `[Unreleased]` cites (task 148).
+✅ **Security Review:** PASS. `boundary: false`, agreed independently by QA and the DoD agent.
+✅ **Compliance Review:** NOT_APPLICABLE (internal skill tooling).
+
+**Task marked as ACCEPTED on:** 2026-09-25
+
+**Detailed Verification Log:** See `task.148.dod.1.structural-move-before-prose-patch.md` for the verification evidence and timestamps.
+
+---
 
 <!-- change-log-start -->
 ## Change Log
@@ -607,6 +635,8 @@ misreads a fix that removes the phrase, or a file that is untracked.
 | 2026-09-25 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-09-25 |  | QA gate CONCERNS (80/100) — 1 finding (cycle 2) | qa-task |
 | 2026-09-25 |  | QA gate PASS (100/100) — 0 findings, 6 advisory (cycle 3) | qa-task |
+| 2026-09-25 |  | QA findings fixed — gate PASS (100/100), 2 iterations | qa-fix |
+| 2026-09-25 | 1.3 | DoD passed — accepted (PR #492) | finalise |
 <!-- change-log-end -->
 
 ---
