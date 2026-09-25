@@ -5,18 +5,20 @@ type: task
 description: "Fix five mechanical defects in the develop pipeline's shared step documents and their helpers, each of which fails or overreaches on a correct run: the Step 4 leak check reads commit-message lines as file paths; Step 8 stages, verifies and (in develop-next) merges across the whole checkout, not the run's scope; Step 3 names /develop with no stated inline path; the QA loop runs its fast gate before the cycle's gate and QA report are staged; and Step 8 check 3 greps a Final Status form the report template never writes. Each fix ships with a test that executes the prose block against a fixture and goes red without it."
 tags: [develop-task, develop-story, develop-next, develop-batch, commit-changes, develop-pipeline, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-09-24
 updated: 2026-09-25
 assignee:
 estimated_effort_hours: 16
 github_issue: 477
+completed_date: 2026-09-25
+pr_number: 489
 ---
 
 # Technical Task: develop pipeline — five steps that fail or overreach on correct input
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.147.review.1.develop-pipeline-step-mechanics.md` implemented 2026-09-25
 
@@ -653,6 +655,32 @@ None.
 Granted cycle 6 reads the cycle-5 replacement of the `verify-push-state --scope` gate. All six gate-5 findings are verified fixed. 38 by-hand probes produced no vacuous pass, and both new tests are mutation-proven. The code review was performed inline, because the reviewer was killed at 11 minutes against a 10-minute budget, so independence was lost.
 
 ---
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.147.qa.6.develop-pipeline-step-mechanics.md`
+**Gate File**: `task.147.gate.6.develop-pipeline-step-mechanics.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**Step 5c PR review**: ✅ APPROVE (`task.147.pr-review.1.develop-pipeline-step-mechanics.md`, 4 LOW advisory)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 16/16 (AC12 mutation record and AC15 CHANGELOG adjudicated with citations)
+✅ **Tests & CI:** PR #489: 5/5 checks SUCCESS at `4128c288`; ci:fast, bundle:check and lint:shell green on a clean checkout
+✅ **Documentation:** CHANGELOG `[Unreleased]` (Changed :91, Fixed :196); `/commit-changes` SKILL.md and the shared step docs
+✅ **Security Review:** ✅ PASS. 38 executed `--scope` boundary candidates, 0 reproduced (by hand per probe-boundary-rule §5.1; the engine has no multi-flag shell form, obs #189)
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal pipeline tooling)
+✅ **QA:** 6 cycles (5 plus 1 of 2 granted after the loop-limit halt); bugs 1–14 closed
+
+**Task marked as ACCEPTED on:** 2026-09-25
+
+**Detailed Verification Log:** See `task.147.dod.1.develop-pipeline-step-mechanics.md` for the complete verification evidence and timestamps.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
@@ -668,6 +696,7 @@ Granted cycle 6 reads the cycle-5 replacement of the `verify-push-state --scope`
 | 2026-09-25 |  | QA gate CONCERNS (90/100) — 0 HIGH, 1 MEDIUM; bugs 10-12 closed, bug.13 filed | qa-task |
 | 2026-09-25 |  | QA gate CONCERNS (60/100) — 0 HIGH, 4 MEDIUM (one mechanism, bug.14), 2 LOW; bug.13 closed | qa-task |
 | 2026-09-25 |  | QA gate PASS (100/100) — 0 findings open, 2 LOW cleanups advisory; bug.14 closed (granted cycle 6) | qa-task |
+| 2026-09-25 | 1.2 | DoD passed — accepted (PR #489) | finalise |
 <!-- change-log-end -->
 
 ---
