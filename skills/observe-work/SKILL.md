@@ -205,6 +205,12 @@ the literal `none` is correct where the target belongs to no family, and it is a
 rather than a missing one. There is deliberately **no `--id` flag**; ids are always derived, and the
 call rejects one.
 
+**A date, a duration or a count in the Issue is measured before it is written, and the command
+that measured it is named in the text** — `git log --date=short -- <path>`, a file's mtime, a
+test's own count. "Months later" or "for a long time" with no instrument behind it is a composed
+figure, and a review that stages a rule from this entry will carry it into the skill as the rule's
+worked example (obs #160).
+
 **Before writing, look for the entry that already says this.** `--siblings-checked` asks about
 sibling *skills*; nothing in it asks about prior *entries*, and the same tracker-comment defect was
 written eight times in five days by sessions that each phrased it afresh (#66, #70, #75, #78, #80,
