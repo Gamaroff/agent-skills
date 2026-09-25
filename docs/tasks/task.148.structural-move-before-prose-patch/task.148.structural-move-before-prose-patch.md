@@ -8,7 +8,7 @@ category: other
 status: planned
 priority: Medium
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-25
 assignee:
 estimated_effort_hours: 16
 github_issue: 478
@@ -43,7 +43,9 @@ engine, one wiring subsection in the loop document, four test files, CHANGELOG.
    route: `classifyLoopRoute` is unchanged (obs #172).
 3. `qa-fix` Step 3.5, documentation row 1: the population is **every executed document that restates the
    subject**, found by a named command. The population size is recorded, and a population above 1 leads
-   to the consolidate move (obs #174).
+   to the consolidate move (obs #174). The fix summary records the command and every hit with its
+   disposition (updated, or unaffected and why), because a probe that leaves no record cannot be told
+   apart from one that was skipped (obs #177).
 
 **Expected outcome**: on task.143's own gates, the predicate fires at cycles 2, 3 and 6. Those are the
 cycles whose fixes had to change the mechanism's claim by judgement. At each of them, `/qa-fix` is
@@ -84,6 +86,13 @@ prompted with the structural move before it writes another rule.
    found that the previous prose fix to the "who restores the lock" rule made a sibling false. The
    siblings were in **other** files. task.130 collapsed that one rule. The probe still reads the one
    file, so the next rule restated across files will repeat the pattern.
+4. **The probe is read, not run, and nothing shows the difference (obs #177).** On task.145 (develop-next
+   T145, 2026-09-25), QA cycle 2 changed the rule "flag an outcome no branch returns" to "no *current or
+   planned* branch" in the check item at review-task Step 3 and review-story Step 4. It left the same rule
+   unchanged, eight lines later, in each section's *Common Hallucination Patterns* list. That is the
+   **same** file, so the existing probe covered it. The fix summary said the adversarial pass had run, but
+   it recorded no phrase and no hits. QA cycle 3 found the survivor (CR3-2, medium). Widening the
+   population (problem 3) does not help a probe nobody executes; the output has to show that it ran.
 
 ### Benefits of Solution
 
@@ -316,6 +325,7 @@ field, cycle-entry row, route or escalation trigger changes.
 
 - [ ] Add Step 2.6, with its two triggers, the four-move menu and the fixed fix-summary shape; cite obs #167 and #172
 - [ ] Step 3.5: change the lead paragraph to "in this file or in another file that restates it"; row 1 gets the population command, the population-size requirement and the pointer to Step 2.6; cite obs #174
+- [ ] Step 3.5 row 1: the fix summary records the population command and every hit with its disposition (`Probe:` block: command, then one line per hit, `updated` or `unaffected — {why}`). A documentation fix whose summary has no `Probe:` block has not run the probe. Cite obs #177
 
 ### Phase 5: docs and validation (Risk: Low)
 
@@ -402,7 +412,8 @@ These are the fixture rows added to `ROWS`. Both assert that the new signal is *
 - Extract Step 2.6 (from its heading to the next `### `). Assert that it has the four move names, the two
   triggers, the fix-summary shape (`Narrowing residue:` / `Move:`), and `obs #167` and `obs #172`.
 - Extract Step 3.5. Assert that row 1 no longer says `Grep the file`, that it carries the population
-  command, and that it names the population size and Step 2.6.
+  command, and that it names the population size and Step 2.6. Also assert that it requires the `Probe:`
+  block (command plus per-hit disposition) and cites `obs #177`.
 - **Behaviour**: extract the population command from the fenced `bash` block directly under the
   documentation table (row 1 points to it; a table cell cannot hold a fence), substitute a phrase, and
   **execute it** in a temporary git repository. The repository has the phrase in `skills/a/SKILL.md`,
@@ -445,6 +456,7 @@ expected to record a Step 2.6 move, and the report says which one.
 - [ ] The loop's 5b offer runs from a consumer-shaped cwd and returns `signal: true` on task.143 cycle 3: `qa-narrowing-offer-wiring.test.mjs`
 - [ ] `qa-fix` Step 2.6 carries the triggers, the four moves and the fix-summary shape: `qa-fix-structural-move.test.js`
 - [ ] The Step 3.5 population command returns exactly the 3 restating files in the fixture repository: `qa-fix-structural-move.test.js`
+- [ ] Step 3.5 row 1 requires a `Probe:` block recording the command and every hit's disposition, and cites obs #177: `qa-fix-structural-move.test.js`
 
 ### Performance
 
@@ -459,6 +471,7 @@ expected to record a Step 2.6 move, and the report says which one.
   - allow two files → row 10 goes red;
   - drop `:(glob)` → the population test counts 4 and goes red;
   - restore `Grep the file` → the qa-fix test goes red;
+  - delete the `Probe:` block requirement → the qa-fix test goes red;
   - paste the menu into the loop document → the single-statement test goes red;
   - fold the signal into `classifyLoopRoute` as a route → a route-table row goes red.
 - [ ] `qa-diminishing-returns.test.mjs` group 7 stays green, because the engine still counts no HIGH
@@ -468,7 +481,7 @@ expected to record a Step 2.6 move, and the report says which one.
 
 - [ ] CHANGELOG `[Unreleased]` cites `(task 148)`
 - [ ] The implementation report records the Step 2.6 hand run
-- [ ] Observations #167, #172 and #174 are set to `actioned` on merge. #172's resolution names Open Question 2 as the remaining work.
+- [ ] Observations #167, #172, #174 and #177 are set to `actioned` on merge. #172's resolution names Open Question 2 as the remaining work.
 
 ---
 
@@ -541,15 +554,13 @@ None.
 - **Non-critical**: noisy offers. Fix forward.
 
 ---
-
 <!-- change-log-start -->
-
 ## Change Log
 
-| Date       | Version | Description                                                                                  | Author      |
-| ---------- | ------- | -------------------------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #167, #172, #174 (2026-09-24 observation review)       | create-task |
-
+| 2026-09-25 | 1.1 | Scope widened: obs #177 folded in. Step 3.5 row 1 also requires a Probe: block (command plus per-hit disposition), with a matching test assertion, mutation and success criterion | observe-work |
 <!-- change-log-end -->
 
 ---
@@ -569,6 +580,7 @@ None.
 - Observation #167: a skill-internal record described only in prose yields one defect per QA cycle
 - Observation #172: the QA loop spent its budget narrowing a best-effort migration mechanism
 - Observation #174: the qa-fix Step 3.5 documentation probe greps the edited file
+- Observation #177: the qa-fix Step 3.5 probe was read, not run, and a same-file restatement survived the fix (task.145 QA cycle 2 → 3, CR3-2)
 - task.143: [`task.143.qa-next-state-file-owned-by-the-tool.md`](../task.143.qa-next-state-file-owned-by-the-tool/task.143.qa-next-state-file-owned-by-the-tool.md) (PR #475). Its implementation report's Issues Log and QA Iteration History are the worked evidence.
 - task.130: the one-statement-plus-citations collapse, held by `shared/resources/tests/who-restores-single-statement.test.mjs`
 - task.146: [`task.146.identity-rule-fix-probe.md`](../task.146.identity-rule-fix-probe/task.146.identity-rule-fix-probe.md), which also edits qa-fix Step 3.5
