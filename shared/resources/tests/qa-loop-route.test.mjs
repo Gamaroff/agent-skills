@@ -344,8 +344,12 @@ const ROWS = [
     reason: "high-on-last-gate",
   },
 
-  // ── task.148: the narrowing-residue signal is an OFFER, not a route ──
-  // Fold a narrowing route into classifyLoopRoute and the first row goes red.
+  // ── task.148: task.143's real route decisions, pinned ──
+  // These pin what the route classifier returns on the narrowing shape; they
+  // do not by themselves prove the signal is not a route (a route folded in
+  // after the PASS-token check would leave the CONCERNS row green). That
+  // property is held in qa-narrowing-residue.test.mjs: a source read of
+  // classifyLoopRoute, and deep-equal pairs on a PASS gate where the signal fires.
   {
     label:
       "task.143 cycle 3 — narrowing residue on a CONCERNS gate still routes continue (obs #172: an offer, not a route)",

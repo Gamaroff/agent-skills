@@ -107,7 +107,8 @@ test("Step 2.6 carries the four moves, as table rows", () => {
 
 test("Step 2.6 carries both triggers", () => {
   assert.match(step26, /\*\*\(a\) the pipeline offer\*\*/);
-  assert.match(step26, /Narrowing residue: …/);
+  // The loop's prompt block opens with describeNarrowingResidue's own text.
+  assert.match(step26, /opening `Narrowing residue — …`/);
   assert.match(step26, /\*\*\(b\) a repeat subject\*\*/);
 });
 
@@ -140,7 +141,10 @@ test("row 1 no longer greps the edited file; it names the population, its size a
   assert.doesNotMatch(row1, /Grep the file/);
   assert.match(row1, /population command below/);
   assert.match(row1, /population size/);
-  assert.match(row1, /Step 2\.6's \*\*consolidate\*\* move/);
+  assert.match(row1, /Step 2\.6's \*\*consolidate\*\* move exists for/);
+  // CR-3: an offer, not a verdict — the fixer records the move it chose.
+  assert.match(row1, /which move you chose/);
+  assert.doesNotMatch(row1, /A population above 1 is Step 2\.6/);
   assert.match(row1, /obs #174/);
 });
 
@@ -152,14 +156,15 @@ test("row 1 requires a Probe: block with the command and every hit's disposition
   // The shape is shown, not only named.
   assert.match(docBlock, /^Probe: /m);
   assert.match(docBlock, /^Population: \{N\}$/m);
+  assert.match(docBlock, /^Move: \{when N > 1 — /m);
 });
 
 // ── behaviour: the population command returns exactly the restating files ──
 
-test("the population command returns exactly the 3 restating files in a fixture repository", () => {
+test("the population command returns exactly the 4 hand-authored restating files in a fixture repository", () => {
   const cmd = populationCommand();
   assert.ok(
-    cmd.startsWith("git grep"),
+    cmd.startsWith("comm -23"),
     `no population command found: ${JSON.stringify(cmd)}`,
   );
   assert.match(
@@ -177,7 +182,11 @@ test("the population command returns exactly the 3 restating files in a fixture 
       "skills/b/SKILL.md": `Also: ${phrase.toUpperCase()} — restated.\n`,
       "shared/resources/x.md": `The contract says ${phrase}.\n`,
       // must not count
-      "skills/a/references/x.md": `Generated copy: ${phrase}.\n`,
+      // a HAND-AUTHORED reference counts (CR-1: 70 of the repo's 478 are)
+      "skills/b/references/hand.md": `---\nname: hand\n---\n\nStep doc: ${phrase}.\n`,
+      // a generated copy does not — known by its marker line (here at line 5, after
+      // frontmatter, as the bundler writes it), not by its directory
+      "skills/a/references/x.md": `---\nname: x\ndescription: copy\n---\n<!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/x.md. Regenerate via npm run bundle. -->\n\nGenerated copy: ${phrase}.\n`,
       "shared/resources/tests/fixtures/y.md": `Fixture: ${phrase}.\n`,
       "docs/tasks/t.md": `History: ${phrase}.\n`,
     };
@@ -200,8 +209,28 @@ test("the population command returns exactly the 3 restating files in a fixture 
       "shared/resources/x.md",
       "skills/a/SKILL.md",
       "skills/b/SKILL.md",
+      "skills/b/references/hand.md",
     ]);
   } finally {
     fs.rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+// ── CR-5: the posted fix summary has somewhere to put these blocks ──────────
+
+test("the Step 7 fix-summary template carries a slot for Probe:, Narrowing residue: and Struck mechanism:", () => {
+  // The whole file, not stepSection: the template itself holds `### ` headings,
+  // which would end a heading-to-heading slice inside it. FIX_SUMMARY= occurs once.
+  const m = read(QA_FIX).match(/FIX_SUMMARY="([\s\S]*?)\n"\n/);
+  assert.ok(m, "no FIX_SUMMARY template in Step 7");
+  const tpl = m[1];
+  assert.match(tpl, /### 🔎 Probe and structural move/);
+  for (const block of [
+    "Probe:",
+    "Narrowing residue:",
+    "Move:",
+    "Struck mechanism:",
+  ]) {
+    assert.ok(tpl.includes(block), `the template does not name ${block}`);
   }
 });

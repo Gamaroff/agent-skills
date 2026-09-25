@@ -566,6 +566,30 @@ None.
 - **Non-critical**: noisy offers. Fix forward.
 
 ---
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-25
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.148.qa.1.structural-move-before-prose-patch.md](./task.148.qa.1.structural-move-before-prose-patch.md)
+- **Gate File**: [task.148.gate.1.structural-move-before-prose-patch.yml](./task.148.gate.1.structural-move-before-prose-patch.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 109
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 (2 MEDIUM)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Two MEDIUM code-review bugs: the Step 3.5 population misses hand-authored `skills/*/references/*.md`
+(bug 1), and the 5b offer snippet fails silently on a malformed HIGH sequence (bug 2).
+
+---
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -576,6 +600,7 @@ None.
 | 2026-09-25 | 1.2 | Review passed (9/10) — task.146 recorded as merged (risk 2 rewritten); the 5b offer binds its own four inputs in a Variable table ($GATE_N/$GATE_N1 are bound nowhere today); two drifted loop-document anchors corrected (:1301, :1372) | review-task |
 | 2026-09-25 |  | Status → ready-for-development | review-task |
 | 2026-09-25 |  | Implemented — 3 source files + CHANGELOG, 4 test files (36 new tests), 13 fixtures + README | develop |
+| 2026-09-25 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -663,6 +688,27 @@ finding's own suggested action on the same gate. Recorded as:
 Narrowing residue: v0.51.0 legacy date-exclusion derivation of priorRuns (pipeline offer)
 Move: scope the claim — the derivation lacks the runFile v0.51.0 never recorded, so flag it unverifiable instead of adding a phase and a timezone rule
 ```
+
+**QA cycle 1 fixes** (gate 1 CONCERNS, 2 MEDIUM promoted from code review, plus advisory findings
+taken where they touched the same block):
+
+- **CR-1**: the Step 3.5 population now includes the 70 hand-authored `skills/*/references/*.md`, and
+  drops generated copies by their marker line rather than by directory.
+- **CR-2**: the offer snippet hands an unparseable HIGH sequence to the engine (`high-counts-missing`)
+  and reports `SIGNAL=error` when the engine did not run.
+- **CR-3**: a population above 1 asks for the Step 2.6 move chosen, recorded as a `Move:` line in
+  `Probe:`; it no longer says the population *is* that move.
+- **CR-4**: the offer's inputs are described as substituted from the table.
+- **CR-5**: Step 7's fix-summary template has a slot for the Probe, Narrowing residue and Struck
+  mechanism blocks.
+- **CR-6**: the prompt block no longer doubles its prefix.
+- **CR-7**: the not-a-route property is held by a source read of `classifyLoopRoute` and by
+  deep-equal pairs on a PASS gate where the signal fires. The route-table comment no longer claims
+  more than those rows pin.
+
+Eight mutations, each red on its named test. The Step 3.5 probe, run on this cycle's own edits,
+found that Step 2.6 trigger (a) still described the old `Narrowing residue: …` prefix. It was fixed
+in the same cycle.
 
 **Deferred work.** Open Question 1 (escalating an unanswered offer) and Open Question 2 (authoring-side
 exact vs best-effort declaration, obs #172 improvement 3) remain. Observations #167, #172, #174 and

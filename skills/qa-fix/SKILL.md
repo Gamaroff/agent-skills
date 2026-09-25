@@ -596,7 +596,7 @@ it — before the third patch, not after it.
 
 **Two triggers.** Apply this step when either holds:
 
-- **(a) the pipeline offer** — the invocation carries a `Narrowing residue: …` block. The QA loop
+- **(a) the pipeline offer** — the invocation carries a block opening `Narrowing residue — …`. The QA loop
   sends it when every MEDIUM on the last two gates names one `file:` at HIGH 0.
 - **(b) a repeat subject** — the Findings Summary shows a finding whose subject the previous cycle's
   fix edited: a bug that cites the prior bug's fix, or a gate entry on the same function, section or
@@ -677,15 +677,20 @@ made a sibling false in **another** file (obs #174):
 
 | Probe | Ask |
 | ----- | --- |
-| **What did this edit make false elsewhere?** | Find every executed document that restates the subject — run the population command below, not a grep of the edited file — and check each hit against the new text. Record the population size. A population above 1 is Step 2.6's **consolidate** move (obs #174). The fix summary carries a `Probe:` block: the command as run, then one line per hit, `updated` or `unaffected — {why}`. A documentation fix whose summary has no `Probe:` block has not run the probe (obs #177) |
+| **What did this edit make false elsewhere?** | Find every executed document that restates the subject — run the population command below, not a grep of the edited file — and check each hit against the new text. Record the population size. A population above 1 means the rule is restated at several sites, which is the shape Step 2.6's **consolidate** move exists for: say in the `Probe:` block which move you chose for it and why (obs #174). The fix summary carries a `Probe:` block: the command as run, then one line per hit, `updated` or `unaffected — {why}`. A documentation fix whose summary has no `Probe:` block has not run the probe (obs #177) |
 | **Does the edit's own claim survive its neighbours?** | A table whose rows are internally consistent can still contradict independent statements in the same file — check each row against them, not against each other |
 | **Did the fix create a record the template does not define, or a default that is false in some branch?** | A new row or field needs a definition; a default sentence must hold on the ordinary path, not only the one the finding described |
 
 ```bash
-# Population for row 1: every executed document that restates the subject. `:(glob)` keeps `*`
-# from crossing `/` (without it, references/tests/fixtures/** joins the population);
-# generated skills/*/references/ copies and docs/ task history are excluded by construction.
-git grep -l -F -i -e '<subject phrase>' -- ':(glob)skills/*/SKILL.md' ':(glob)shared/resources/*.md'
+# Population for row 1: every executed document that restates the subject — every SKILL.md, every
+# shared resource, and every HAND-AUTHORED skills/*/references/*.md (70 of the 478 carry no
+# generated-copy marker; develop-bug's own step documents are among them). `:(glob)` keeps `*` from
+# crossing `/` (without it, the test fixtures under the shared resources' tests/ directory join the
+# population). Generated copies are removed by their marker line, not by their directory; docs/ task
+# history is excluded by construction.
+comm -23 \
+  <(git grep -l -F -i -e '<subject phrase>' -- ':(glob)skills/*/SKILL.md' ':(glob)skills/*/references/*.md' ':(glob)shared/resources/*.md' | sort) \
+  <(git grep -l -e '^<!-- AUTO-GENERATED — DO NOT EDIT' -- ':(glob)skills/*/references/*.md' | sort)
 ```
 
 The `Probe:` block the row requires, so a probe that ran can be told apart from one that was read:
@@ -695,6 +700,7 @@ Probe: {the population command, as run, with its phrase}
   {path} — updated
   {path} — unaffected — {why: e.g. cites the rule, restates nothing}
 Population: {N}
+Move: {when N > 1 — consolidate | scope the claim | waive | patch — one sentence why}
 ```
 
 On task.145 the fix summary said the pass had run and recorded no phrase and no hits; the same rule
@@ -879,6 +885,12 @@ FIX_SUMMARY="**Status**: ✅ Fixes Complete - Ready for Re-Review 🔄
 \`\`\`
 
 **Coverage**: [X%] (target: [Y%])
+
+### 🔎 Probe and structural move
+
+[Only the blocks that apply — omit this section when none does: the Step 3.5 \`Probe:\` block for a
+documentation fix, the Step 2.6 \`Narrowing residue:\` / \`Move:\` block, the Step 2.5
+\`Struck mechanism:\` block. Paste each in its fixed shape.]
 
 ### 🎯 Bug Report Updates
 

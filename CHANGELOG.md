@@ -18,11 +18,13 @@ All notable changes to this project will be documented in this file. Format foll
   edited (obs #167, #172).
 - **qa-fix Step 3.5's documentation probe reaches every file that restates the subject, and leaves a
   record (task 148).** Row 1 said "grep the file", so a restatement in another file went unseen
-  (task.124's four-cycle chain, obs #174). It now names a `git grep` population command over
-  `skills/*/SKILL.md` and `shared/resources/*.md` (with `:(glob)`, which keeps test fixtures out). It
-  requires the population size, points to Step 2.6's consolidate move when the population is above 1,
-  and requires a `Probe:` block in the fix summary: the command, then each hit as `updated` or
-  `unaffected — {why}` (obs #177).
+  (task.124's four-cycle chain, obs #174). It now names a `git grep` population command over every
+  `skills/*/SKILL.md`, every `shared/resources/*.md` and every hand-authored
+  `skills/*/references/*.md` (generated copies are removed by their marker line; `:(glob)` keeps test
+  fixtures out). It requires the population size, asks for the Step 2.6 move chosen when the
+  population is above 1, and requires a `Probe:` block in the fix summary: the command, then each hit
+  as `updated` or `unaffected — {why}` (obs #177). Step 7's fix-summary template gains a slot for
+  these blocks.
 - **`uat-status.mjs` owns `/qa-next`'s run state file — `--state-init`, `--state-get`,
   `--state-set`, `--state-clear` and an exported `STATE_FIELDS` schema (task 143).**
   `.claude/state/qa-next.state.json` (the single-flight lock and resume record) was a JSON shape

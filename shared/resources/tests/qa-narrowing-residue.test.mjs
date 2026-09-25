@@ -274,19 +274,57 @@ test("a firing result carries the MEDIUM ids in gate order, previous gate first,
 
 // ── an offer, not a route ───────────────────────────────────────────────────
 
-test("classifyLoopRoute's result is the same whether or not the signal fires (it is not a route)", () => {
-  const input = {
-    cycle: 3,
-    highCounts: [0, 0, 0],
-    latestGateContent: t143(3),
-    testArtifactGlobs: [],
-  };
-  const signal = classifyNarrowingResidue({
-    ...input,
-    previousGateContent: t143(2),
-  });
-  assert.equal(signal.signal, true);
-  assert.equal(classifyLoopRoute(input).route, "continue");
+test("classifyLoopRoute never calls the narrowing predicate (it is an offer, not a route)", () => {
+  // Read the route classifier's own body, from its declaration to its closing
+  // top-level brace (a line that is exactly "}"). A narrowing route folded in anywhere in it — before or
+  // after the PASS-token check — has to name the predicate, and this goes red.
+  const src = readFileSync(MODULE_PATH, "utf8");
+  const start = src.indexOf("function classifyLoopRoute(");
+  assert.ok(start !== -1, "classifyLoopRoute not found");
+  const end = src.indexOf("\n}\n", start);
+  const body = src.slice(start, end === -1 ? undefined : end);
+  assert.ok(
+    body.length > 500,
+    "extracted body is implausibly short — the slice is wrong",
+  );
+  assert.doesNotMatch(body, /classifyNarrowingResidue|narrowing/i);
+});
+
+test("a firing signal leaves classifyLoopRoute's result deep-equal (pairs, on a PASS gate and on task.143)", () => {
+  // On each input the predicate FIRES (asserted), and the route result is the
+  // same with and without the gate the predicate reads. The PASS gate is the
+  // case a folded-in route could change without meeting the not-a-pass-gate guard.
+  const pass = fx("medium-closed.yml").replace(
+    /^gate: CONCERNS$/m,
+    "gate: PASS",
+  );
+  const cases = [
+    {
+      cycle: 3,
+      highCounts: [0, 0, 0],
+      latestGateContent: t143(3),
+      previous: t143(2),
+    },
+    { cycle: 2, highCounts: [0, 0], latestGateContent: pass, previous: pass },
+  ];
+  for (const c of cases) {
+    assert.equal(
+      classifyNarrowingResidue({ ...c, previousGateContent: c.previous })
+        .signal,
+      true,
+      "the pair is only meaningful where the signal fires",
+    );
+    const base = {
+      cycle: c.cycle,
+      highCounts: c.highCounts,
+      latestGateContent: c.latestGateContent,
+      testArtifactGlobs: [],
+    };
+    assert.deepEqual(
+      classifyLoopRoute({ ...base, previousGateContent: c.previous }),
+      classifyLoopRoute(base),
+    );
+  }
 });
 
 // ── never throws; the describer is assertable ───────────────────────────────

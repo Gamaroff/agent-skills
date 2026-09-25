@@ -37,6 +37,8 @@ import {
   spawnBudget,
   neverRan,
 } from "../../../shared/resources/spawn-budget.mjs";
+// The shipped, memoised zsh probe — reused rather than re-derived.
+import { zshAvailable } from "../../../shared/resources/qa-execute-snippets.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -86,13 +88,17 @@ const REFS = join(CONSUMER_ROOT, ".agents/skills/develop-task/references");
 mkdirSync(REFS, { recursive: true });
 copyFileSync(join(repoRoot, ENGINE), join(REFS, "qa-diminishing-returns.js"));
 
-function runSnippet(env) {
+// A cwd with NO engine in it — the "engine did not run" case (CR-2).
+const EMPTY_ROOT = mkdtempSync(join(tmpdir(), "qa-narrowing-offer-empty-"));
+after(() => rmSync(EMPTY_ROOT, { recursive: true, force: true }));
+
+function runSnippet(env, { shell = "bash", cwd = CONSUMER_ROOT } = {}) {
   const code = bashBlock(section).split(PLACEHOLDER).join("develop-task");
   const script = `${code}\nprintf '%s\\n' "$NARROWING_JSON"\nprintf 'SIGNAL=%s\\n' "$NARROWING_SIGNAL"\n`;
   let r;
   for (let attempt = 0; attempt <= SPAWN_RETRIES; attempt++) {
-    r = spawnSync("bash", ["-c", script], {
-      cwd: CONSUMER_ROOT,
+    r = spawnSync(shell, ["-c", script], {
+      cwd,
       env: { ...process.env, ...env },
       encoding: "utf-8",
       timeout: SPAWN_TIMEOUT_MS,
@@ -147,21 +153,76 @@ test("single statement: the loop document restates no Step 2.6 move menu", () =>
 
 // ── behaviour: the snippet runs from a consumer-shaped cwd ──────────────────
 
-test("the snippet returns signal: true on task.143 cycle 3 (gates 2 → 3)", () => {
-  const r = runSnippet({
-    CYCLE: "3",
-    HIGH_SEQUENCE_JSON: "[0,0,0]",
-    GATE_N: join(FIXTURES, "task143-gate-3.yml"),
-    GATE_N1: join(FIXTURES, "task143-gate-2.yml"),
+for (const shell of ["bash", "zsh"]) {
+  test(`the snippet returns signal: true on task.143 cycle 3 (gates 2 → 3) — ${shell}`, (t) => {
+    if (shell === "zsh" && !zshAvailable())
+      return t.skip("zsh not installed on this host");
+    const r = runSnippet(
+      {
+        CYCLE: "3",
+        HIGH_SEQUENCE_JSON: "[0,0,0]",
+        GATE_N: join(FIXTURES, "task143-gate-3.yml"),
+        GATE_N1: join(FIXTURES, "task143-gate-2.yml"),
+      },
+      { shell },
+    );
+    assert.equal(r.status, 0, `snippet failed: ${r.stderr}`);
+    const [jsonLine, signalLine] = r.stdout.trim().split("\n");
+    const out = JSON.parse(jsonLine);
+    assert.equal(out.signal, true, jsonLine);
+    assert.equal(out.reason, "narrowing-residue");
+    assert.equal(out.file, "skills/qa-next/scripts/uat-status.mjs");
+    assert.match(out.message, /OFFER to qa-fix Step 2\.6/);
+    assert.equal(signalLine, "SIGNAL=true");
   });
-  assert.equal(r.status, 0, `snippet failed: ${r.stderr}`);
-  const [jsonLine, signalLine] = r.stdout.trim().split("\n");
-  const out = JSON.parse(jsonLine);
-  assert.equal(out.signal, true, jsonLine);
-  assert.equal(out.reason, "narrowing-residue");
-  assert.equal(out.file, "skills/qa-next/scripts/uat-status.mjs");
-  assert.match(out.message, /OFFER to qa-fix Step 2\.6/);
-  assert.equal(signalLine, "SIGNAL=true");
+}
+
+// ── CR-2: a check that could not look must not read as a quiet cycle ────────
+
+test("a blank or malformed HIGH sequence reaches the engine and answers high-counts-missing", () => {
+  for (const seq of ["", "not json", "[0,"]) {
+    const r = runSnippet({
+      CYCLE: "3",
+      HIGH_SEQUENCE_JSON: seq,
+      GATE_N: join(FIXTURES, "task143-gate-3.yml"),
+      GATE_N1: join(FIXTURES, "task143-gate-2.yml"),
+    });
+    assert.equal(
+      r.status,
+      0,
+      `snippet failed on ${JSON.stringify(seq)}: ${r.stderr}`,
+    );
+    const [jsonLine, signalLine] = r.stdout.trim().split("\n");
+    assert.ok(
+      jsonLine,
+      `no verdict for HIGH_SEQUENCE_JSON=${JSON.stringify(seq)}`,
+    );
+    assert.equal(JSON.parse(jsonLine).reason, "high-counts-missing", jsonLine);
+    assert.equal(signalLine, "SIGNAL=false");
+  }
+});
+
+test("with no engine installed the snippet says so: SIGNAL=error, never an empty signal", () => {
+  const r = runSnippet(
+    {
+      CYCLE: "3",
+      HIGH_SEQUENCE_JSON: "[0,0,0]",
+      GATE_N: join(FIXTURES, "task143-gate-3.yml"),
+      GATE_N1: join(FIXTURES, "task143-gate-2.yml"),
+    },
+    { cwd: EMPTY_ROOT },
+  );
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^SIGNAL=error$/m);
+  assert.match(r.stderr, /narrowing offer: engine did not run/);
+});
+
+// ── CR-6: the prompt block does not double its own prefix ───────────────────
+
+test("the /qa-fix prompt block opens with {message} alone, which already carries the prefix", () => {
+  const block = section.match(/```\n(\{message\}[\s\S]*?)\n```/);
+  assert.ok(block, "no prompt block opening with {message}");
+  assert.doesNotMatch(section, /^Narrowing residue: \{message\}/m);
 });
 
 test("the snippet declines at cycle 1 with an empty $GATE_N1 (no substitute gate)", () => {
