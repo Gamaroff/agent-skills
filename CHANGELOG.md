@@ -88,6 +88,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **Two authoring rules for skills and observations, installed from the observation review (obs #159,
+  #160).** `create-skill` gains *A skill's behaviour is restated in `docs/reference/`, and nothing reaches
+  it*: a change to what a skill does obliges a `grep` of `docs/reference/commands.md` and
+  `docs/reference/activation-phrases.md`, the two hand-written documents that cite skills by name.
+  `qa-next`'s re-index from stories to user functions left both reference rows describing stories. Its
+  *Three Rules the Corpus Learned by Failing* preamble and `observe-work`'s *How to log* now require a
+  date, duration or count in a failure narrative or an observation's Issue to be measured, with the
+  command named. The staged form of the #159 rule said "four months later"; `git log` put it at one
+  day. The mechanical half of #159 is task.142.
+
 - **Review checks that a criterion's stated outcome is one the deciding function can return (task 145,
   obs #168).** `/review-task` Step 3 gains check 10, *Outcome reachability*. When a success criterion
   or test case says what a named function returns for a stated input, the reviewer walks that input
