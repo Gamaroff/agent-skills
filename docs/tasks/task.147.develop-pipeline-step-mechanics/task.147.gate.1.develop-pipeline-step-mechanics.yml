@@ -1,0 +1,118 @@
+schema: 1
+task: 'task.147.develop-pipeline-step-mechanics'
+task_title: 'develop pipeline: five steps that fail or overreach on correct input'
+gate: FAIL
+status_reason: 'Two HIGH defects introduced by the change set, both reproduced by execution: on a dirty tree a failed develop-next merge still deletes the unmerged PR head branch (HALT is prose, not a function), and scoped Step 8 staging leaves develop-bug general-bug registry closes uncommitted. Four MEDIUM defects, also reproduced, in the Step 4 derivation, the leak check, the merge-site exit status and verify-push-state rename handling.'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T09:18:31Z'
+
+top_issues:
+  - id: 'T147-QA1-CR1'
+    severity: high
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The new merge guard writes `[ -n "$HEAD_BRANCH" ] || HALT` and `gh pr merge … || HALT`, but HALT is prose in develop-next, not a shell function. Run as shipped, a failed merge on a dirty tree prints "command not found" and continues to `git push origin --delete "$HEAD_BRANCH"`, deleting the head branch of an UNMERGED PR. Reproduced: a merge stub exiting 1 leaves exit 0 and origin feature/x deleted. merge-delete-branch-guard.test.mjs cannot see it because its PRELUDE defines HALT().'
+    suggested_action: 'Give both guard sites real bodies (`{ echo "…"; exit 1; }`), as develop-batch does. Remove the injected HALT() from the test PRELUDE so the block runs as shipped. Add a failed-merge case asserting the remote branch survives.'
+    suggested_owner: dev
+  - id: 'T147-QA1-CR2'
+    severity: high
+    file: 'shared/resources/develop-pipeline-step-8-commit.md'
+    finding: 'Step 8 now stages only {work-item-dir}. develop-bug Step 7 B3 edits docs/bugs/bug-registry.md (outside the bug directory) and says the edit "is committed atomically with the bug file in Step 8". Only the removed whole-tree `git add -u` ever committed it, so a general-bug close now leaves the registry row uncommitted, and scoped check 5 downgrades it to a warning and passes.'
+    suggested_action: 'Name the extra scope where the writer lives. develop-bug Step 8 (general-bug mode) passes `--scope docs/bugs/bug-registry.md` to /commit-changes, and Step 8 check 5 accepts an extra scope list. State in the step-8 doc which callers write outside their work-item dir, and hold the develop-bug case with a test.'
+    suggested_owner: dev
+  - id: 'T147-QA1-CR4'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-4-create-pr.md'
+    finding: 'The leak check reads ${SCOPE_PATHS[@]}, which only the derivation block binds, and an agent runs each fenced block in a fresh shell with the /create-pr invocation in between. Run as shipped, the array is empty and every committed file prints LEAK, so the obs #141 false positive persists. step-4-leak-check.test.mjs prepends its own SCOPE_PATHS and cannot see this.'
+    suggested_action: 'Persist the derived array to a state file (for example .claude/state/step4-scope-paths.txt) in the derivation block, have the Pre-flight Guard and the leak check read it back, and have the test run the leak block with no injected array.'
+    suggested_owner: dev
+  - id: 'T147-QA1-CR5'
+    severity: medium
+    file: 'skills/develop-batch/SKILL.md'
+    finding: 'On the dirty-tree path the merge block exits with `git push origin --delete` status. When the branch is already gone (GitHub "automatically delete head branches"), a successful merge ends the block with exit 1, which develop-batch reads as a merge failure (halted) and develop-next as not merged. Reproduced: exit 1 after one successful merge call. The same shape is at skills/develop-next/SKILL.md.'
+    suggested_action: 'Make the remote delete non-fatal at both sites (`… || echo "warn: remote branch not deleted"`) so the block status is the merge status, and add an already-deleted fixture case.'
+    suggested_owner: dev
+  - id: 'T147-QA1-CR6'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-4-create-pr.md'
+    finding: 'A path deleted in a commit before Step 4 enters SCOPE_PATHS (a root-level file by its own path, a removed directory by its dirname). The pathspec `git add -- <scopes>` then dies with exit 128 and stages nothing. Reproduced: a committed `git rm package.json` gives `fatal: pathspec package.json did not match any files`.'
+    suggested_action: 'In the derivation, skip entries that exist in neither the working tree nor the index (an uncommitted deletion is still in the index and must stay). Add a committed-deletion fixture.'
+    suggested_owner: dev
+  - id: 'T147-QA1-QA1'
+    severity: medium
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'Scoped check 3 skips the source path of a rename/copy entry. A staged move from inside the scope to outside it (a pending removal from the work item) is judged only by its outside destination and passes as "clean within scope". Reproduced under bash 5 and /bin/bash 3.2: exit 0 with the warning for moved-out.md. The code reviewer flagged the same thing independently (CR-10).'
+    suggested_action: 'Classify both paths of a rename/copy entry and count it inside when either path is inside. Add verify-push-state.test.sh cases for inside→outside and outside→inside renames.'
+    suggested_owner: dev
+  - id: 'T147-QA1-CR7'
+    severity: low
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'In scoped mode the exit status of mktemp and of `git status --porcelain -z` is discarded, so an unreadable status reads as an empty list, which reports "clean within scope". That contradicts the script header ("every check captures the command own status").'
+    suggested_action: 'Check both statuses, and fail check 3 when either command fails.'
+    suggested_owner: dev
+  - id: 'T147-QA1-CR8'
+    severity: low
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'A --scope value is only stripped of one trailing slash. A `./`-prefixed or absolute scope matches no porcelain path, so all dirt, including the run own unfinished edits, is classified as outside and check 3 passes. There is no non-vacuity floor.'
+    suggested_action: 'Normalise each scope to repo-root-relative (strip ./, resolve absolute against the toplevel), and exit 2 when a scope names nothing in the index or working tree.'
+    suggested_owner: dev
+  - id: 'T147-QA1-QA2'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-4-create-pr.md'
+    finding: 'The Build Staging Scope prose now promises "the directory of every file this branch changed, committed or not", but the derivation reads tracked diffs only. A new untracked file in a directory with no tracked edit is still held by the Pre-flight Guard, which is pre-existing behaviour (CR-3; identical on the base). The sentence overclaims it.'
+    suggested_action: 'Say "every tracked file", and name the untracked-new-directory case with its remedy (an extra --scope, or commit it before Step 4).'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 20
+
+evidence:
+  tests_reviewed: 58
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [2, 4, 5]
+  code_review:
+    findings: 11
+    bugs: 10
+    cleanups: 1
+    promoted: ['CR-1', 'CR-2', 'CR-4', 'CR-5', 'CR-6', 'CR-7', 'CR-8']
+    pre_existing: ['CR-3', 'CR-9']
+  boundary: false
+  probes_executed: 0
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No security boundary (classifyBoundaryText: no signal in the Success Criteria or the verify-push-state.sh header). The --scope classifier decides report accuracy, not access. Hostile path names were executed directly against it (sibling prefix, space, newline, leading dash, renames) outside the probe engine, so the verdict stays reasoned.'
+  performance:
+    status: PASS
+    notes: 'The six new suites run in 0.1-8.0s each, all under the 10s criterion. Full ci:fast is green.'
+  reliability:
+    status: FAIL
+    notes: 'CR-1: a failed merge deletes an unmerged PR branch. CR-2: a general-bug registry close is lost. CR-5 and CR-6: a successful merge is misreported, and Step 4 staging aborts on a committed deletion.'
+  maintainability:
+    status: PASS
+    notes: 'One shared harness serves the six suites, every fix is mutation-proved, and the deviations are recorded in the task.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and CR-2 (HIGH), then CR-4, CR-5, CR-6 and QA-1 (MEDIUM), each with a test that runs the block as shipped'
+      refs: ['skills/develop-next/SKILL.md', 'shared/resources/develop-pipeline-step-8-commit.md', 'shared/resources/develop-pipeline-step-4-create-pr.md', 'skills/develop-batch/SKILL.md', 'shared/resources/verify-push-state.sh']
+  future:
+    - action: 'CR-3 (pre-existing): a new untracked file in a directory with no tracked edit is held by the Step 4 Pre-flight Guard and left out of the PR. Identical on the base. Follow-up: source created files from the pre-develop surface map.'
+      refs: ['shared/resources/develop-pipeline-step-4-create-pr.md']
+    - action: 'CR-9 (pre-existing): Step 8 check 5 expands ${PR_NUMBER:+--pr …} with no writer, so the PR-head check never runs. Identical on the base. Bind PR_NUMBER beside BASE_BRANCH.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'CR-11 (cleanup): the SCOPE_PATHS dedupe matches on a space-joined string. Compare elements exactly.'
+      refs: ['shared/resources/develop-pipeline-step-4-create-pr.md']
+    - action: 'Step 4b cannot execute {template}-slot blocks (--bind sets shell variables only). The executed-prose harness bind() fills that gap for the blocks this task touched.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

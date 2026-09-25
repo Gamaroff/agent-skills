@@ -267,16 +267,23 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
    else
      # Bind the head branch BEFORE the merge, and refuse an empty one: `git push origin --delete ""`
      # is not a thing to run by accident (obs #133: a block that reads a name must bind it).
+     # These two exits are REAL shell exits, not the prose HALT used elsewhere in this file: a
+     # bare `|| HALT` runs as "command not found" and falls through to the remote delete, which
+     # then deletes the head branch of a PR that did not merge (task.147 QA-1, CR-1).
      HEAD_BRANCH=$(gh pr view "$PR_ID" --json headRefName -q .headRefName)
-     [ -n "$HEAD_BRANCH" ] || HALT
+     [ -n "$HEAD_BRANCH" ] || { echo "HALT: cannot bind the head branch of PR #$PR_ID"; exit 1; }
      if [ -z "$(git status --porcelain)" ]; then
        gh pr merge "$PR_ID" --"$mergeStrategy" --delete-branch
      else
        # Dirty tree (another session's edits): --delete-branch switches the local branch, the
        # switch aborts, and the remote delete is skipped with it (obs #142). Merge without it and
        # delete the remote branch directly — no local checkout is touched.
-       gh pr merge "$PR_ID" --"$mergeStrategy" || HALT
-       git push origin --delete "$HEAD_BRANCH"
+       gh pr merge "$PR_ID" --"$mergeStrategy" || { echo "HALT: gh pr merge failed for PR #$PR_ID"; exit 1; }
+       # The merge has happened. A delete that fails here (GitHub's "automatically delete head
+       # branches" already removed it) is a warning, never the block's status: a non-zero exit would
+       # read as "not merged" (task.147 QA-1, CR-5).
+       git push origin --delete "$HEAD_BRANCH" \
+         || echo "⚠️  merged, but the remote branch $HEAD_BRANCH was not deleted (already gone?)"
      fi
    fi
    ```

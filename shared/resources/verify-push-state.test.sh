@@ -172,6 +172,58 @@ EXIT=$(run_guard "$R")
 [ "$EXIT" = "1" ] && pass "no --scope, dirt outside any work item → exit 1 (unchanged)" \
                   || fail "no --scope, dirt outside any work item → exit 1 (unchanged)" "got exit $EXIT"
 
+# ── 14–20. --scope edge cases (task.147 QA cycle 1) ───────────────────────────
+# A move out of the work item is a pending removal from it: both sides of a rename are judged.
+R=$(scoped_repo rename-out)
+( cd "$R" && git mv docs/tasks/task.1/r.md moved-out.md )
+OUT=$( cd "$R" && bash "$SCRIPT" --base main --scope docs/tasks/task.1 2>&1 ); EXIT=$?
+if [ "$EXIT" = "1" ] && printf '%s\n' "$OUT" | grep -q "docs/tasks/task.1/r.md (moved or copied away)"; then
+  pass "--scope, staged rename inside → outside → exit 1, source named"
+else
+  fail "--scope, staged rename inside → outside → exit 1, source named" "got exit $EXIT: $OUT"
+fi
+
+R=$(scoped_repo rename-in)
+( cd "$R" && git mv package.json docs/tasks/task.1/package.json )
+EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope docs/tasks/task.1 >/dev/null 2>&1; echo $? )
+[ "$EXIT" = "1" ] && pass "--scope, staged rename outside → inside → exit 1" \
+                  || fail "--scope, staged rename outside → inside → exit 1" "got exit $EXIT"
+
+# A ./-prefixed or absolute scope is normalised to what porcelain prints, not left matching nothing.
+R=$(scoped_repo dot-scope)
+( cd "$R" && echo edited > docs/tasks/task.1/r.md )
+EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope ./docs/tasks/task.1/ >/dev/null 2>&1; echo $? )
+[ "$EXIT" = "1" ] && pass "--scope ./dir/ is normalised — inside dirt → exit 1" \
+                  || fail "--scope ./dir/ is normalised — inside dirt → exit 1" "got exit $EXIT"
+
+R=$(scoped_repo abs-scope)
+( cd "$R" && echo edited > docs/tasks/task.1/r.md )
+EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope "$(pwd -P)/docs/tasks/task.1" >/dev/null 2>&1; echo $? )
+[ "$EXIT" = "1" ] && pass "--scope <absolute path> is normalised — inside dirt → exit 1" \
+                  || fail "--scope <absolute path> is normalised — inside dirt → exit 1" "got exit $EXIT"
+
+# A scope that names nothing, or a path outside the repository, is a usage error — never a
+# vacuous pass.
+R=$(scoped_repo no-such-scope)
+( cd "$R" && echo edited > docs/tasks/task.1/r.md )
+EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope docs/tasks/task.99 >/dev/null 2>&1; echo $? )
+[ "$EXIT" = "2" ] && pass "--scope naming nothing → exit 2" \
+                  || fail "--scope naming nothing → exit 2" "got exit $EXIT"
+
+EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope /tmp >/dev/null 2>&1; echo $? )
+[ "$EXIT" = "2" ] && pass "--scope outside the repository → exit 2" \
+                  || fail "--scope outside the repository → exit 2" "got exit $EXIT"
+
+# An unreadable status is a failure, never an empty (clean) list.
+R=$(scoped_repo bad-index)
+( cd "$R" && printf 'garbage' > "$(git rev-parse --git-dir)/index" )
+OUT=$( cd "$R" && bash "$SCRIPT" --base main --scope docs/tasks/task.1 2>&1 ); EXIT=$?
+if [ "$EXIT" = "1" ] && printf '%s\n' "$OUT" | grep -q "could not read the working-tree status"; then
+  pass "--scope, unreadable git status → exit 1, named"
+else
+  fail "--scope, unreadable git status → exit 1, named" "got exit $EXIT: $OUT"
+fi
+
 echo
 echo "  $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

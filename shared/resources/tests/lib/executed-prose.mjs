@@ -73,6 +73,22 @@ export function git(cwd, ...args) {
   return r.stdout;
 }
 
+// git without blocking the event loop — for setup inside a concurrent suite, where a sync spawn
+// serialises every case behind it.
+export function gitAsync(cwd, ...args) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "git",
+      args,
+      { cwd, encoding: "utf8", timeout: timeoutMs },
+      (error, stdout, stderr) => {
+        if (error) reject(new Error(`git ${args.join(" ")} failed: ${stderr}`));
+        else resolve(stdout);
+      },
+    );
+  });
+}
+
 // A clone of a bare origin: one base commit on `develop`, plus `feature/x` pushed with upstream
 // and checked out. Returns { dir, work, origin }.
 //
@@ -94,6 +110,8 @@ function buildTemplate() {
   git(work, "checkout", "-q", "-b", "develop");
   fs.writeFileSync(path.join(work, "README.md"), "base\n");
   fs.writeFileSync(path.join(work, "package.json"), "{}\n");
+  // Pipeline state lives in .claude/state and is gitignored in every repo the pipelines run in.
+  fs.writeFileSync(path.join(work, ".gitignore"), ".claude/\n");
   git(work, "add", "-A");
   git(work, "commit", "-q", "-m", "base");
   git(work, "push", "-q", "-u", "origin", "develop");
@@ -122,16 +140,32 @@ export function write(work, rel, content) {
 
 // An executable `gh` in `<dir>/bin`. Every call appends its argv (one line) to `<dir>/gh.argv`,
 // then runs `body` — a POSIX sh fragment that sees the arguments as "$@".
-export function ghStub(dir, body) {
-  const bin = path.join(dir, "bin");
-  fs.mkdirSync(bin, { recursive: true });
-  const argvLog = path.join(dir, "gh.argv");
+//
+// ONE executable per process, symlinked into each test's bin. macOS scans a newly written executable
+// on its first exec (about half a second each), and a fresh stub per case made two suites miss the
+// ten-second budget. The per-test behaviour lives in a SOURCED body file, which is not an exec, so
+// it is never scanned. The stub finds its own directory through the symlink path ($0).
+let sharedGh = null;
+
+function sharedGhStub() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "executed-prose-gh-"));
+  const gh = path.join(dir, "gh");
   fs.writeFileSync(
-    path.join(bin, "gh"),
-    `#!/bin/sh\necho "$*" >> "${argvLog}"\n${body}\n`,
+    gh,
+    '#!/bin/sh\nhere=$(cd "$(dirname "$0")/.." && pwd)\necho "$*" >> "$here/gh.argv"\n. "$here/gh-body.sh"\n',
     { mode: 0o755 },
   );
-  return { bin, argvLog };
+  process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));
+  return gh;
+}
+
+export function ghStub(dir, body) {
+  sharedGh ??= sharedGhStub();
+  const bin = path.join(dir, "bin");
+  fs.mkdirSync(bin, { recursive: true });
+  fs.symlinkSync(sharedGh, path.join(bin, "gh"));
+  fs.writeFileSync(path.join(dir, "gh-body.sh"), `${body}\n`);
+  return { bin, argvLog: path.join(dir, "gh.argv") };
 }
 
 export function ghCalls(argvLog) {

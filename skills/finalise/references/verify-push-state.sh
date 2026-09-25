@@ -53,7 +53,7 @@ while [ $# -gt 0 ]; do
     --remote) REMOTE="${2:-}"; shift 2 ;;
     --scope)
       [ -n "${2:-}" ] || { echo "verify-push-state: --scope needs a path" >&2; exit 2; }
-      SCOPES+=("${2%/}"); shift 2 ;;
+      SCOPES+=("$2"); shift 2 ;;
     -h|--help)
       sed -n '28,39p' "$0"; exit 0 ;;
     *) echo "verify-push-state: unknown argument '$1'" >&2; exit 2 ;;
@@ -64,6 +64,31 @@ done
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
   || { echo "verify-push-state: not a git repository" >&2; exit 2; }
+
+# Normalise each --scope to the repo-root-relative form porcelain prints, then refuse one that names
+# nothing. A `./`-prefixed, absolute or mistyped scope used to match no path, which classed every
+# dirty path as outside and passed check 3 with nothing checked (task.147 QA-1, CR-8).
+if [ ${#SCOPES[@]} -gt 0 ]; then
+  TOP=$(git rev-parse --show-toplevel)
+  PREFIX=$(git rev-parse --show-prefix)
+  NORMALISED=()
+  for s in "${SCOPES[@]}"; do
+    raw="$s"
+    case "$s" in
+      "$TOP")   s="" ;;
+      "$TOP"/*) s="${s#"$TOP"/}" ;;
+      /*)       echo "verify-push-state: --scope '$raw' is outside this repository" >&2; exit 2 ;;
+      *)        s="${PREFIX}${s#./}" ;;
+    esac
+    while [ "${s%/}" != "$s" ]; do s="${s%/}"; done
+    [ -n "$s" ] || { echo "verify-push-state: --scope '$raw' names the whole repository — omit --scope instead" >&2; exit 2; }
+    if [ ! -e "$TOP/$s" ] && [ -z "$(git -C "$TOP" ls-files -- "$s" 2>/dev/null)" ]; then
+      echo "verify-push-state: --scope '$raw' names nothing in the working tree or the index" >&2; exit 2
+    fi
+    NORMALISED+=("$s")
+  done
+  SCOPES=("${NORMALISED[@]}")
+fi
 
 FAILURES=0
 note() { printf '  %s\n' "$1"; }
@@ -132,21 +157,38 @@ else
     done
     return 1
   }
-  STATUS_FILE=$(mktemp)
-  git status --porcelain -z --untracked-files=all > "$STATUS_FILE" 2>/dev/null
-  RENAME_SRC=false
-  while IFS= read -r -d '' entry; do
-    if [ "$RENAME_SRC" = true ]; then RENAME_SRC=false; continue; fi   # a rename's source path
-    XY="${entry:0:2}"
-    P="${entry:3}"
-    case "$XY" in R*|C*) RENAME_SRC=true ;; esac
-    if in_scope "$P"; then INSIDE+=("$P"); else OUTSIDE+=("$P"); fi
-  done < "$STATUS_FILE"
-  rm -f "$STATUS_FILE"
+  # Each command's own status is captured: an unreadable status must fail check 3, never read as an
+  # empty list, which would report "clean within scope" (task.147 QA-1, CR-7).
+  STATUS_READ=false
+  if STATUS_FILE=$(mktemp); then
+    git status --porcelain -z --untracked-files=all > "$STATUS_FILE" 2>/dev/null
+    GS_STATUS=$?
+    if [ "$GS_STATUS" -eq 0 ]; then STATUS_READ=true; fi
+  fi
+  if [ "$STATUS_READ" = true ]; then
+    # With -z, a rename or copy is "XY <dest>" followed by a separate "<source>" entry. BOTH paths
+    # are judged: a move from inside the scope to outside it is a pending removal from the work
+    # item, and judging only the destination passed it as a warning (task.147 QA-1).
+    RENAME_SRC=false
+    while IFS= read -r -d '' entry; do
+      if [ "$RENAME_SRC" = true ]; then
+        RENAME_SRC=false
+        in_scope "$entry" && INSIDE+=("$entry (moved or copied away)")
+        continue
+      fi
+      XY="${entry:0:2}"
+      P="${entry:3}"
+      case "$XY" in R*|C*) RENAME_SRC=true ;; esac
+      if in_scope "$P"; then INSIDE+=("$P"); else OUTSIDE+=("$P"); fi
+    done < "$STATUS_FILE"
+  fi
+  [ -n "${STATUS_FILE:-}" ] && rm -f "$STATUS_FILE"
   for P in ${OUTSIDE[@]+"${OUTSIDE[@]}"}; do
     note "! outside scope (warning): $P"
   done
-  if [ ${#INSIDE[@]} -gt 0 ]; then
+  if [ "$STATUS_READ" != true ]; then
+    fail "could not read the working-tree status — cannot establish that the scope is clean"
+  elif [ ${#INSIDE[@]} -gt 0 ]; then
     fail "working tree is DIRTY within scope — ${#INSIDE[@]} uncommitted path(s):"
     printf '      %s\n' "${INSIDE[@]}" | head -20
   else

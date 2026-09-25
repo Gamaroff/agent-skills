@@ -8,15 +8,22 @@
 // (task.128: "printed a false LEAK; re-checked with `git show --name-only --pretty=format:` → no
 // leak").
 //
-// The block is cut from the shipped step document by its `LEAK DETECTED` anchor and run in a
-// fixture repo, under bash and zsh, against commits with a one-line and a multi-line message.
+// Each block runs as an agent runs it: ITS OWN SHELL, one `run()` per block, binding only the
+// documented placeholders. QA cycle 1 found the first version of this test prepending
+// `SCOPE_PATHS=(…)` to the leak block. The shipped block read an array that only the derivation
+// block, a separate shell, had bound, so as shipped it judged every file a LEAK, and the test could
+// not see it (task.147 CR-4). The scope now travels in `.claude/state/step4-scope-paths.txt`; the
+// held-file directory travels the same way, from the Pre-flight Guard to the Restore block.
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import {
   SHELLS,
   readDoc,
   blockBy,
+  bind,
   fixtureRepo,
   write,
   git,
@@ -25,31 +32,48 @@ import {
 } from "./lib/executed-prose.mjs";
 
 const STEP4 = "shared/resources/develop-pipeline-step-4-create-pr.md";
+const WORK_ITEM = "docs/tasks/task.9.fx";
 const TAIL = `done | grep -q 'LEAK' && echo "LEAK DETECTED" || echo "OK"`;
+const PLACEHOLDERS = { "{work-item-dir}": WORK_ITEM, "{Q2_answer}": "develop" };
+
+const md = readDoc(STEP4);
+const derivation = () => bind(blockBy(md, "Scope-derivation"), PLACEHOLDERS);
+const guard = () => bind(blockBy(md, "HOLD_DIR=$(mktemp -d"), PLACEHOLDERS);
+const restore = () => bind(blockBy(md, 'cp -r "$HOLD_DIR"/. .'), PLACEHOLDERS);
 
 function leakBlock() {
-  const code = blockBy(readDoc(STEP4), "LEAK DETECTED");
+  const code = blockBy(md, "LEAK DETECTED");
   assert.ok(
     code.includes(TAIL),
     "the leak check's verdict line moved or changed",
   );
   return code;
 }
+// The shipped block prints one verdict; the per-line form (verdict stripped) prints each LEAK, so
+// a test can see WHICH paths the loop judged out of scope.
+const verdict = () => leakBlock();
+const perLine = () => leakBlock().replace(TAIL, "done");
 
-// SCOPE_PATHS is built earlier in Step 4; the leak check only reads it.
-const SCOPE = 'SCOPE_PATHS=("docs/tasks/task.9.fx" "src")\n';
-
-// The block as shipped prints one verdict; the per-line form (verdict stripped) prints each LEAK
-// so a test can see WHICH paths the loop judged out of scope.
-const verdict = () => SCOPE + leakBlock();
-const perLine = () => SCOPE + leakBlock().replace(TAIL, "done");
-
-function commitWith(files, message) {
+// A branch whose work sits in the work item and in src/, left UNCOMMITTED — the normal state at
+// Step 4 — so the derivation block sees it and writes the scope file.
+function stepFourFixture() {
   const fx = fixtureRepo();
-  for (const f of files) write(fx.work, f, `${f}\n`);
+  write(fx.work, `${WORK_ITEM}/task.md`, "v1\n");
+  write(fx.work, "src/b.js", "v1\n");
+  git(fx.work, "add", "-A");
+  git(fx.work, "commit", "-q", "-m", "base files");
+  git(fx.work, "update-ref", "refs/heads/develop", "HEAD");
+  write(fx.work, `${WORK_ITEM}/task.md`, "v2\n");
+  write(fx.work, "src/b.js", "v2\n");
+  return fx;
+}
+
+function deriveThenCommit(sh, fx, extraFiles, message) {
+  const d = run(sh, derivation(), { cwd: fx.work });
+  assert.equal(d.status, 0, `derivation block failed: ${d.stderr}`);
+  for (const f of extraFiles) write(fx.work, f, `${f}\n`);
   git(fx.work, "add", "-A");
   git(fx.work, "commit", "-q", "-m", message);
-  return fx;
 }
 
 const MULTILINE = [
@@ -62,10 +86,22 @@ const MULTILINE = [
   "Refs #9",
 ].join("\n");
 
+test("the leak check and the guard read the scope from the file the derivation block writes", () => {
+  assert.match(derivation(), /step4-scope-paths\.txt/);
+  assert.match(leakBlock(), /step4-scope-paths\.txt/);
+  assert.match(guard(), /step4-scope-paths\.txt/);
+  assert.doesNotMatch(
+    leakBlock(),
+    /SCOPE_PATHS=\("/,
+    "the leak block binds its own literal scope",
+  );
+});
+
 for (const sh of SHELLS) {
-  test(`[${sh}] an in-scope commit with a multi-line message → OK`, () => {
-    const fx = commitWith(["docs/tasks/task.9.fx/a.md", "src/b.js"], MULTILINE);
+  test(`[${sh}] an in-scope commit with a multi-line message → OK, in a fresh shell`, () => {
+    const fx = stepFourFixture();
     try {
+      deriveThenCommit(sh, fx, [], MULTILINE);
       const r = run(sh, verdict(), { cwd: fx.work });
       assert.equal(r.stdout.trim(), "OK", `stderr: ${r.stderr}`);
       assert.equal(run(sh, perLine(), { cwd: fx.work }).stdout.trim(), "");
@@ -74,9 +110,10 @@ for (const sh of SHELLS) {
     }
   });
 
-  test(`[${sh}] an in-scope commit with a one-line subject → OK`, () => {
-    const fx = commitWith(["src/b.js"], "fix: one line");
+  test(`[${sh}] an in-scope commit with a one-line subject → OK, in a fresh shell`, () => {
+    const fx = stepFourFixture();
     try {
+      deriveThenCommit(sh, fx, [], "fix: one line");
       assert.equal(run(sh, verdict(), { cwd: fx.work }).stdout.trim(), "OK");
     } finally {
       cleanup(fx.dir);
@@ -84,8 +121,9 @@ for (const sh of SHELLS) {
   });
 
   test(`[${sh}] an out-of-scope file → LEAK DETECTED, naming exactly that file`, () => {
-    const fx = commitWith(["src/b.js", "other/c.txt"], MULTILINE);
+    const fx = stepFourFixture();
     try {
+      deriveThenCommit(sh, fx, ["other/c.txt"], MULTILINE);
       assert.equal(
         run(sh, verdict(), { cwd: fx.work }).stdout.trim(),
         "LEAK DETECTED",
@@ -93,6 +131,43 @@ for (const sh of SHELLS) {
       assert.equal(
         run(sh, perLine(), { cwd: fx.work }).stdout.trim(),
         "LEAK: other/c.txt",
+      );
+    } finally {
+      cleanup(fx.dir);
+    }
+  });
+
+  test(`[${sh}] with no scope file the leak check refuses, rather than judging every file a LEAK`, () => {
+    const fx = stepFourFixture();
+    try {
+      git(fx.work, "commit", "-q", "-am", "work");
+      const r = run(sh, verdict(), { cwd: fx.work });
+      assert.equal(r.status, 1);
+      assert.match(r.stdout, /step4-scope-paths\.txt is missing/);
+      assert.doesNotMatch(r.stdout, /LEAK DETECTED/);
+    } finally {
+      cleanup(fx.dir);
+    }
+  });
+
+  test(`[${sh}] a file the guard holds in one shell is restored by the Restore block in another`, () => {
+    const fx = stepFourFixture();
+    try {
+      assert.equal(run(sh, derivation(), { cwd: fx.work }).status, 0);
+      write(fx.work, "stray/notes.txt", "another session\n");
+      const g = run(sh, guard(), { cwd: fx.work });
+      assert.equal(g.status, 0, g.stderr);
+      assert.equal(
+        fs.existsSync(path.join(fx.work, "stray/notes.txt")),
+        false,
+        "the guard did not hold it",
+      );
+      const r = run(sh, restore(), { cwd: fx.work });
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(
+        fs.readFileSync(path.join(fx.work, "stray/notes.txt"), "utf8"),
+        "another session\n",
+        "the held file was stranded, not restored",
       );
     } finally {
       cleanup(fx.dir);

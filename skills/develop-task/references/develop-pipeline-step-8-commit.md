@@ -45,7 +45,22 @@ Engine: `references/report-lint.js`; expected sections come from `references/imp
 
 ## Invoke /commit-changes
 
-Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`. This stages new, modified and deleted files **inside the work-item dir only** (`git add -- {work-item-dir}`), including the finalised implementation report. It sweeps in neither unrelated untracked paths nor another session's tracked edits in a shared checkout (obs #142):
+Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`, plus one `--scope` for each path in `{extra-scope-paths}` (below). This stages new, modified and deleted files **inside those paths only** (`git add -- {work-item-dir} …`), including the finalised implementation report. It sweeps in neither unrelated untracked paths nor another session's tracked edits in a shared checkout (obs #142).
+
+> **`{extra-scope-paths}` — the writes this pipeline makes outside its work item.** Scoped staging
+> carries only what it is told to carry. Before task.147 a whole-tree `git add -u` swept these in
+> silently, and one caller depended on it without saying so (task.147 QA-1, CR-2):
+>
+> | Caller | `{extra-scope-paths}` | Written by |
+> | --- | --- | --- |
+> | `develop-story`, `develop-task` | *(empty)* | — (`/finalise` commits the task registry itself, at its Step 7 action 6a) |
+> | `develop-bug`, story or task bug | *(empty)* | — |
+> | `develop-bug`, **general** bug | `docs/bugs/bug-registry.md` | Step 7 B3 (the registry row's close) |
+>
+> A caller that adds a write outside its work item adds a row here in the same change. The same
+> list is passed to check 5, so an uncommitted write there fails the step rather than reading as
+> another session's dirt.
+
 
 > **What this commit carries changed with task.115.** The acceptance artefacts — the document with
 > `status: accepted`, the DoD summary, `sprint-review-summary.md` and (tasks) the ticked registry —
@@ -63,7 +78,7 @@ Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`. This sta
 > re-verifies the final head before merging.
 
 ```
-/commit-changes --scope {work-item-dir}
+/commit-changes --scope {work-item-dir} [--scope <each path in {extra-scope-paths}>]
 ```
 
 The implementation report and all other work-item artifacts must be staged and included in this commit.
@@ -183,9 +198,14 @@ grep -q "⏳ Pending" "$REPORT" && { echo "❌ Step 8 incomplete: Pipeline Progr
 #    has a PR, and this is the first source the resume contract's probe reads too. It was read
 #    unbound (`${BASE_BRANCH:?}`) through five green cycles because every host ran a feature
 #    branch off develop (obs #133, task.132); a block that reads a name must bind it.
+#    The scope is the work item PLUS the caller's {extra-scope-paths} (the table above): a write
+#    this pipeline made outside its work item is its own unfinished work, not another session's.
 BASE_BRANCH=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)
 [ -n "$BASE_BRANCH" ] || { echo "❌ Step 8 incomplete: cannot bind BASE_BRANCH — no PR on this branch (gh pr view --json baseRefName)"; exit 1; }
-bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" --scope "{work-item-dir}" ${PR_NUMBER:+--pr "$PR_NUMBER"}
+EXTRA_SCOPES=({extra-scope-paths})
+SCOPE_ARGS=(--scope "{work-item-dir}")
+for s in "${EXTRA_SCOPES[@]}"; do SCOPE_ARGS+=(--scope "$s"); done
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" "${SCOPE_ARGS[@]}" ${PR_NUMBER:+--pr "$PR_NUMBER"}
 VERIFY_EXIT=$?
 [ "$VERIFY_EXIT" -eq 0 ] || { echo "❌ Step 8 incomplete: verify-push-state failed (exit $VERIFY_EXIT)"; exit 1; }
 
@@ -209,7 +229,7 @@ The develop-batch merge gate's head-SHA check would have refused the merge, so n
 ⚠️ **Read the script's own exit status — never a pipeline's.** The same session produced *three* separate false passes from exactly that mistake: `npm test 2>&1 | tail -80` reported `tail`'s exit 0 over a suite that had failed, and twice more from wrapper scripts whose status came from a trailing `grep`/`echo`. If the output is large, redirect to a file and read the file:
 
 ```bash
-bash .../verify-push-state.sh --base "$BASE_BRANCH" --scope "{work-item-dir}" > /tmp/verify.log 2>&1; VERIFY_EXIT=$?
+bash .../verify-push-state.sh --base "$BASE_BRANCH" "${SCOPE_ARGS[@]}" > /tmp/verify.log 2>&1; VERIFY_EXIT=$?
 ```
 
 Each `! outside scope (warning): <path>` line the scoped run prints names a dirty path this run did not make. Paste those lines too: they are how an operator sees a concurrent session, or a file `/develop` edited that Step 4's scope did not reach.

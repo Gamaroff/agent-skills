@@ -22,6 +22,7 @@ import {
   fixtureRepo,
   write,
   git,
+  gitAsync,
   ghStub,
   ghCalls,
   runAsync,
@@ -63,9 +64,12 @@ test("the merge-site population is non-vacuous (floor 2)", () => {
   );
 });
 
-// Everything a site's block reads, bound. `HALT` is prose in develop-next; give it a body.
-const PRELUDE =
-  'HALT() { echo "HALT"; exit 1; }\nVCS=github\nPR_ID=7\nmergeStrategy=squash\n';
+// The block's documented INPUTS, and nothing else: VCS (Step 0), PR_ID (Step 3) and mergeStrategy
+// (skills-config). Nothing the block itself should provide is supplied here. QA cycle 1 found this
+// PRELUDE defining HALT(), a prose pseudo-command in develop-next, which gave the test a working
+// exit that the shipped block did not have. A failed merge then fell through to the remote delete,
+// and the test could not see it (task.147 CR-1).
+const PRELUDE = "VCS=github\nPR_ID=7\nmergeStrategy=squash\n";
 
 function siteScript(site) {
   const code = blockBy(
@@ -78,9 +82,20 @@ function siteScript(site) {
 
 const GH_OK = 'case "$*" in *headRefName*) echo feature/x ;; esac\nexit 0';
 const GH_NO_HEAD = "exit 0";
+// The merge is refused (a conflict, or branch protection); every other gh call answers.
+const GH_MERGE_FAILS =
+  'case "$*" in *headRefName*) echo feature/x ;; *"pr merge"*) echo "merge refused" >&2; exit 1 ;; esac\nexit 0';
 
 function mergeCalls(argvLog) {
   return ghCalls(argvLog).filter((c) => c.startsWith("pr merge"));
+}
+
+async function remoteHasAsync(fx, branch) {
+  return (
+    (
+      await gitAsync(fx.work, "ls-remote", "--heads", "origin", branch)
+    ).trim() !== ""
+  );
 }
 
 function remoteHas(fx, branch) {
@@ -93,7 +108,7 @@ describe("executed against fixtures", { concurrency: true }, () => {
       test(`[${sh}] ${site.file} — clean tree keeps --delete-branch`, async () => {
         const fx = fixtureRepo();
         try {
-          git(fx.work, "checkout", "-q", "develop");
+          await gitAsync(fx.work, "checkout", "-q", "develop");
           const gh = ghStub(fx.dir, GH_OK);
           const r = await runAsync(sh, siteScript(site), {
             cwd: fx.work,
@@ -115,11 +130,11 @@ describe("executed against fixtures", { concurrency: true }, () => {
       test(`[${sh}] ${site.file} — dirty tree merges without --delete-branch and deletes the remote branch`, async () => {
         const fx = fixtureRepo();
         try {
-          git(fx.work, "checkout", "-q", "develop");
+          await gitAsync(fx.work, "checkout", "-q", "develop");
           write(fx.work, "package.json", '{"another":"session"}\n');
           const gh = ghStub(fx.dir, GH_OK);
           assert.ok(
-            remoteHas(fx, "feature/x"),
+            await remoteHasAsync(fx, "feature/x"),
             "fixture: origin must hold feature/x",
           );
           const r = await runAsync(sh, siteScript(site), {
@@ -135,14 +150,67 @@ describe("executed against fixtures", { concurrency: true }, () => {
           );
           assert.doesNotMatch(calls[0], /--delete-branch/);
           assert.equal(
-            remoteHas(fx, "feature/x"),
+            await remoteHasAsync(fx, "feature/x"),
             false,
             "the remote branch survived the merge",
           );
           assert.equal(
-            git(fx.work, "rev-parse", "--abbrev-ref", "HEAD").trim(),
+            (
+              await gitAsync(fx.work, "rev-parse", "--abbrev-ref", "HEAD")
+            ).trim(),
             "develop",
           );
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+
+      test(`[${sh}] ${site.file} — a refused merge on a dirty tree halts and deletes nothing`, async () => {
+        const fx = fixtureRepo();
+        try {
+          await gitAsync(fx.work, "checkout", "-q", "develop");
+          write(fx.work, "package.json", '{"another":"session"}\n');
+          const gh = ghStub(fx.dir, GH_MERGE_FAILS);
+          const r = await runAsync(sh, siteScript(site), {
+            cwd: fx.work,
+            bin: gh.bin,
+          });
+          assert.notEqual(r.status, 0, "a refused merge must not exit 0");
+          assert.ok(
+            await remoteHasAsync(fx, "feature/x"),
+            "the head branch of an UNMERGED PR was deleted",
+          );
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+
+      test(`[${sh}] ${site.file} — a merged PR whose branch is already gone still exits 0`, async () => {
+        const fx = fixtureRepo();
+        try {
+          await gitAsync(fx.work, "checkout", "-q", "develop");
+          write(fx.work, "package.json", '{"another":"session"}\n');
+          // GitHub's "automatically delete head branches" removed it at merge time.
+          await gitAsync(
+            fx.work,
+            "push",
+            "-q",
+            "origin",
+            "--delete",
+            "feature/x",
+          );
+          const gh = ghStub(fx.dir, GH_OK);
+          const r = await runAsync(sh, siteScript(site), {
+            cwd: fx.work,
+            bin: gh.bin,
+          });
+          assert.equal(
+            r.status,
+            0,
+            `a merge that happened must not read as failed: ${r.stdout}${r.stderr}`,
+          );
+          assert.equal(mergeCalls(gh.argvLog).length, 1);
+          assert.match(r.stdout + r.stderr, /not deleted/);
         } finally {
           cleanup(fx.dir);
         }
@@ -159,7 +227,7 @@ describe("executed against fixtures", { concurrency: true }, () => {
           assert.notEqual(r.status, 0);
           assert.deepEqual(mergeCalls(gh.argvLog), []);
           assert.ok(
-            remoteHas(fx, "feature/x"),
+            await remoteHasAsync(fx, "feature/x"),
             "a branch was deleted on an empty binding",
           );
         } finally {

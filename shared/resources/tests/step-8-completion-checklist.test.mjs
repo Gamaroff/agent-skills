@@ -29,6 +29,7 @@ import {
   fixtureRepo,
   write,
   git,
+  gitAsync,
   ghStub,
   runAsync,
   cleanup,
@@ -90,12 +91,18 @@ function finished(variant) {
 
 const VERIFY = path.join(ROOT, "shared", "resources", "verify-push-state.sh");
 
-function checklist() {
+// {extra-scope-paths} is the caller's documented list of writes outside its work item (the table in
+// the step document): empty for develop-story and develop-task, and the bug registry for a
+// develop-bug general bug (task.147 QA-1, CR-2).
+const GENERAL_BUG_EXTRA = "docs/bugs/bug-registry.md";
+
+function checklist(extra = "") {
   const code = blockBy(readDoc(STEP8), "✅ Step 8 post-conditions verified");
   return bind(code, {
     ".agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh":
       VERIFY,
     "{work-item-dir}": WORK_ITEM,
+    "{extra-scope-paths}": extra,
   });
 }
 
@@ -111,8 +118,8 @@ function setup(reportText) {
   return { ...fx, ...gh };
 }
 
-function runChecklist(shell, fx) {
-  return runAsync(shell, checklist(), {
+function runChecklist(shell, fx, extra = "") {
+  return runAsync(shell, checklist(extra), {
     cwd: fx.work,
     bin: fx.bin,
     env: { IMPLEMENTATION_REPORT: REPORT },
@@ -125,11 +132,27 @@ test("the extracted checklist carries check 3 and a scoped check 5", () => {
   const code = checklist();
   assert.match(code, /Final Status/);
   assert.match(code, /Finished/);
+  assert.match(code, /EXTRA_SCOPES=\(\)/);
+  assert.match(code, new RegExp(`SCOPE_ARGS=\\(--scope "${WORK_ITEM}"\\)`));
   assert.match(
     code,
-    new RegExp(
-      `verify-push-state\\.sh --base "\\$BASE_BRANCH" --scope "${WORK_ITEM}"`,
+    /verify-push-state\.sh --base "\$BASE_BRANCH" "\$\{SCOPE_ARGS\[@\]\}"/,
+  );
+});
+
+test("the step document names the general-bug registry as develop-bug's extra scope", () => {
+  const doc = readDoc(STEP8);
+  assert.ok(
+    doc.includes(
+      `| \`develop-bug\`, **general** bug | \`${GENERAL_BUG_EXTRA}\` |`,
     ),
+    "the {extra-scope-paths} table no longer names the general-bug registry",
+  );
+  assert.ok(
+    readDoc("skills/develop-bug/SKILL.md").includes(
+      `\`{extra-scope-paths}\` = \`${GENERAL_BUG_EXTRA}\` for a general bug`,
+    ),
+    "develop-bug Step 8 no longer passes the registry as an extra scope",
   );
 });
 
@@ -207,6 +230,31 @@ describe("executed against fixtures", { concurrency: true }, () => {
         assert.equal(r.status, 0, `stdout: ${r.stdout}`);
         assert.match(r.stdout, /! outside scope \(warning\): package\.json/);
         assert.match(r.stdout, /! outside scope \(warning\): other\/new\.txt/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    test(`[${sh}] a general bug's uncommitted registry close fails check 5 once named as an extra scope`, async () => {
+      const fx = setup(finished("Bug"));
+      try {
+        write(fx.work, GENERAL_BUG_EXTRA, "| 1 | a bug | closed |\n");
+        await gitAsync(fx.work, "add", "-A");
+        await gitAsync(fx.work, "commit", "-q", "-m", "registry row");
+        await gitAsync(fx.work, "push", "-q");
+        // Step 7 B3 edits the row; nothing has committed it yet.
+        write(fx.work, GENERAL_BUG_EXTRA, "| 1 | a bug | ✅ Closed |\n");
+        const named = await runChecklist(sh, fx, `"${GENERAL_BUG_EXTRA}"`);
+        assert.equal(named.status, 1, `stdout: ${named.stdout}`);
+        assert.match(named.stdout, /DIRTY within scope/);
+        // Without the extra scope the same edit reads as another session's dirt, and the step
+        // passes. That is the regression the extra scope closes.
+        const unnamed = await runChecklist(sh, fx);
+        assert.equal(unnamed.status, 0);
+        assert.match(
+          unnamed.stdout,
+          /! outside scope \(warning\): docs\/bugs\/bug-registry\.md/,
+        );
       } finally {
         cleanup(fx.dir);
       }

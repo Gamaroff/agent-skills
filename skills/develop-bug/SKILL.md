@@ -241,7 +241,7 @@ See [`references/develop-bug-step-7-close-bug.md`](references/develop-bug-step-7
 
 ### Step 8: Commit Changes
 
-Follow [`references/develop-pipeline-step-8-commit.md`](references/develop-pipeline-step-8-commit.md) with **work-item dir = bug directory**: final implementation-report update (Finished, Final Status, QA/fix iterations, Completion Summary), `/commit-changes --scope {bug-directory}`, final push, Pipeline Progress ✅, lock removal, and the Step 8 completion checklist.
+Follow [`references/develop-pipeline-step-8-commit.md`](references/develop-pipeline-step-8-commit.md) with **work-item dir = bug directory** and **`{extra-scope-paths}` = `docs/bugs/bug-registry.md` for a general bug** (Step 7 B3 edits that row, outside the bug directory; empty for a story or task bug): final implementation-report update (Finished, Final Status, QA/fix iterations, Completion Summary), `/commit-changes --scope {bug-directory}` (plus `--scope docs/bugs/bug-registry.md` for a general bug), final push, Pipeline Progress ✅, lock removal, and the Step 8 completion checklist.
 
 ---
 

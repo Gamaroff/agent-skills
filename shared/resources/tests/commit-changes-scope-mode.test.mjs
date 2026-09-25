@@ -164,6 +164,29 @@ for (const sh of SHELLS) {
     }
   });
 
+  test(`[${sh}] a path deleted in an earlier commit is left out, and staging still succeeds`, () => {
+    const fx = baseWith([`${WORK_ITEM}/task.md`, "old/gone.js", "src/a.js"]);
+    try {
+      // Committed before Step 4: a root file and a whole directory removed.
+      git(fx.work, "rm", "-q", "package.json", "old/gone.js");
+      git(fx.work, "commit", "-q", "-m", "drop package.json and old/");
+      write(fx.work, "src/a.js", "edited\n");
+      // An UNCOMMITTED deletion is still in the index: it must stay in scope so its removal stages.
+      fs.rmSync(path.join(fx.work, WORK_ITEM, "task.md"));
+
+      const script = derivation() + "\n" + scopeStage('"${SCOPE_PATHS[@]}"');
+      const r = run(sh, script, { cwd: fx.work });
+      assert.equal(
+        r.status,
+        0,
+        `a committed deletion must not abort staging: ${r.stderr}`,
+      );
+      assert.deepEqual(staged(fx.work), [`${WORK_ITEM}/task.md`, "src/a.js"]);
+    } finally {
+      cleanup(fx.dir);
+    }
+  });
+
   test(`[${sh}] derived scope + scope mode: the Step 4 commit carries the run's code`, () => {
     const fx = baseWith([
       `${WORK_ITEM}/task.md`,

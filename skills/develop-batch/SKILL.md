@@ -448,7 +448,10 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      # A dirty main checkout: --delete-branch's local switch would abort and skip the remote
      # delete (obs #142). Merge without it, then delete the remote branch directly.
      gh pr merge <PR#> --<mergeStrategy> || exit 1
-     git push origin --delete "$HEAD_BRANCH"
+     # The merge has happened; a failed delete (already auto-deleted) is a warning, never the
+     # block's status, or a merged item reads as halted (task.147 QA-1, CR-5).
+     git push origin --delete "$HEAD_BRANCH" \
+       || echo "⚠️  merged, but the remote branch $HEAD_BRANCH was not deleted (already gone?)"
    fi
    ```
 

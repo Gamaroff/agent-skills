@@ -420,6 +420,7 @@ Each phase closes one observation, touches a disjoint set of lines and can be re
 6. ✅ `skills/commit-changes/SKILL.md` — scope-mode staging
 7. ✅ `skills/develop-next/SKILL.md` — merge guard; Step 4 re-sync
 8. ✅ `skills/develop-batch/SKILL.md` — merge guard
+8a. ✅ `skills/develop-bug/SKILL.md`, `skills/develop-bug/references/develop-bug-step-7-close-bug.md` — a general bug names `docs/bugs/bug-registry.md` as Step 8's `{extra-scope-paths}` (QA cycle 1, CR-2)
 
 ### Files to Add (Tests)
 
@@ -627,6 +628,31 @@ None.
   precondition. Fix these forward.
 
 ---
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-25
+**Quality Score**: 20/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.147.qa.1.develop-pipeline-step-mechanics.md](./task.147.qa.1.develop-pipeline-step-mechanics.md)
+- **Gate File**: [task.147.gate.1.develop-pipeline-step-mechanics.yml](./task.147.gate.1.develop-pipeline-step-mechanics.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 58 new node tests + 13 shell cases; `ci:fast` 4068/0; PR CI 5/5
+- **Phases Verified**: 7/7 implemented, 4/7 without issues
+- **Critical Issues**: 2 HIGH, 4 MEDIUM, 3 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+
+### Key Findings
+
+Two HIGH defects were reproduced by execution. On a dirty tree, a failed develop-next merge deletes the unmerged PR head branch (bug.1). Scoped Step 8 staging leaves develop-bug's general-bug registry close uncommitted (bug.2). MEDIUM: the leak check reads an unbound array (bug.3); a failed remote delete reads as a failed merge (bug.4); a committed deletion aborts staging (bug.5); a rename source is skipped by `--scope` (bug.6). The tests missed CR-1 and CR-4 because they inject the names the shipped blocks leave unbound.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
@@ -636,6 +662,7 @@ None.
 | 2026-09-25 | 1.1     | Review 1: 7/10 as reviewed, 9/10 after fixes. C1: Step 4 scope derivation widened, since a scoped `add -u` dropped all uncommitted code. I1: `HEAD_BRANCH` bound at both merge sites. I2: the resume-contract line dropped from the sweep. O1: zsh probe named | review-task |
 | 2026-09-25 |         | Status → ready-for-development | review-task |
 | 2026-09-25 |  | Implemented — 18 source files (+16 bundled copies), 58 node tests + 4 shell cases; all fixes mutation-proved | develop |
+| 2026-09-25 |  | QA gate FAIL (20/100) — 2 HIGH, 4 MEDIUM, 3 LOW; bugs 1-6 filed | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -715,6 +742,21 @@ develop-batch and commit-changes.
 | empty-`HEAD_BRANCH` guard dropped (each site) | that site's unbindable case |
 | develop-next re-sync chained to a commit | the re-sync structure test and both run cases |
 | a cited `/develop` checklist label renamed / a loop-body pointer deleted / both plan log lines renamed | the corresponding inline-branch assertion |
+
+**QA cycle 1 fixes (qa-fix).** Gate 1 was FAIL, with 2 HIGH, 4 MEDIUM and 3 LOW findings. All nine are fixed. Each is held by a test that runs the shipped block binding only its documented placeholders, and each is mutation-proved (every mutant reds its named test):
+
+- CR-1: real exits at develop-next's merge guard; the test PRELUDE no longer defines HALT().
+- CR-2: Step 8 `{extra-scope-paths}` (table + check 5), wired into develop-bug.
+- CR-4: `SCOPE_PATHS` is persisted to `.claude/state/step4-scope-paths.txt` for the guard and the leak check.
+- **Found by qa-fix's adversarial pass:** `HOLD_DIR` had the same cross-shell shape. The Restore block would have stranded held files in /tmp, so it is now persisted too.
+- CR-5: a failed remote delete is a warning at both sites.
+- CR-6: the derivation skips paths that are gone from both the tree and the index.
+- QA-1: both sides of a rename are judged.
+- CR-7: exit statuses are captured.
+- CR-8: scopes are normalised, and a scope that names nothing exits 2.
+- QA-2: the Step 4 prose says "tracked".
+
+The harness now shares one `gh` stub per process (symlinked, with a sourced per-test body), because macOS scans every new executable on its first exec. That took the merge suite from 12.5s to 2.0s. `verify-push-state.test.sh` has 20 cases (was 13).
 
 **Deferred work.** None of the scope. The Step 3 inline branch is held as a statement, not as
 an orchestrator applying it (§ 8, Honest limit). The review's O3, bare-prefix path matching in
