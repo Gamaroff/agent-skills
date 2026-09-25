@@ -4,7 +4,7 @@
 **Bug ID**: TASK-147-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 1, CR-4)
 **Date Found**: 2026-09-25
 
@@ -61,3 +61,8 @@ Persist the derived array to a state file in the derivation block, read it back 
 | 2026-09-25 | New          | qa-task    | QA cycle 1                              |
 | 2026-09-25 | In Progress  | qa-fix     | Investigation started                   |
 | 2026-09-25 | Ready for QA | qa-fix     | Fix implemented and mutation-proved     |
+
+## QA Verification
+
+**Date**: 2026-09-25 (QA cycle 2)
+**Result**: ✅ Verified fixed. The cycle-1 reproduction was re-run against `f4dee2d2`, the new test runs the shipped block with nothing injected, and the mutation proof is recorded. CI is 5/5 green.

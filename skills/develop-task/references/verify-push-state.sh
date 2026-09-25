@@ -74,12 +74,24 @@ if [ ${#SCOPES[@]} -gt 0 ]; then
   NORMALISED=()
   for s in "${SCOPES[@]}"; do
     raw="$s"
+    # An absolute scope is compared against the PHYSICAL toplevel, so canonicalise it the same way
+    # first: a logical path through a symlink (macOS /tmp → /private/tmp) is inside the repo
+    # (task.147 QA-2, CR-9).
+    case "$s" in
+      /*)
+        if [ -d "$s" ]; then s=$(cd "$s" 2>/dev/null && pwd -P) || s="$raw"
+        elif [ -d "$(dirname "$s")" ]; then s="$(cd "$(dirname "$s")" 2>/dev/null && pwd -P)/$(basename "$s")"
+        fi ;;
+    esac
     case "$s" in
       "$TOP")   s="" ;;
       "$TOP"/*) s="${s#"$TOP"/}" ;;
       /*)       echo "verify-push-state: --scope '$raw' is outside this repository" >&2; exit 2 ;;
       *)        s="${PREFIX}${s#./}" ;;
     esac
+    # A '..' segment would pass the existence check and then match no porcelain path, which is a
+    # vacuous pass. Refuse it rather than guess what it meant.
+    case "/$s/" in */../*) echo "verify-push-state: --scope '$raw' contains '..' — pass a path inside the repository" >&2; exit 2 ;; esac
     while [ "${s%/}" != "$s" ]; do s="${s%/}"; done
     [ -n "$s" ] || { echo "verify-push-state: --scope '$raw' names the whole repository — omit --scope instead" >&2; exit 2; }
     if [ ! -e "$TOP/$s" ] && [ -z "$(git -C "$TOP" ls-files -- "$s" 2>/dev/null)" ]; then
@@ -178,7 +190,9 @@ else
       fi
       XY="${entry:0:2}"
       P="${entry:3}"
-      case "$XY" in R*|C*) RENAME_SRC=true ;; esac
+      # Either column: a worktree-side rename (" R", as for an intent-to-add path) also carries a
+      # separate source record (task.147 QA-2, CR-8).
+      case "$XY" in R?|C?|?R|?C) RENAME_SRC=true ;; esac
       if in_scope "$P"; then INSIDE+=("$P"); else OUTSIDE+=("$P"); fi
     done < "$STATUS_FILE"
   fi

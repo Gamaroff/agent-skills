@@ -335,13 +335,16 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
 behind it:
 
 ```bash
-git checkout <baseBranch> && git pull --ff-only origin <baseBranch>
+git checkout <baseBranch> && git pull --ff-only origin <baseBranch> \
+  || { echo "HALT: re-sync to <baseBranch> failed — the tick must not run off <baseBranch>"; exit 1; }
 ```
 
 Run this **alone**, never chained with `&&` to the merge or to the tick's `git commit`. A merge
 with `--delete-branch` rewrites the checkout as it switches branches, and a commit chained to it
-raced the index lock three times on 2026-09-21, losing two acceptance commits (obs #142). A
-non-ff pull is a HALT with the git output, as in Step 0.
+raced the index lock three times on 2026-09-21, losing two acceptance commits (obs #142). **Any
+non-zero exit from this block is a HALT**, whether the `checkout` failed (a dirty tree whose edits
+conflict with the switch) or the pull was non-ff. Otherwise the run would stay on the feature
+branch, whose remote Step 3 just deleted, and the tick commit would land there (task.147 QA-2, CR-6).
 
 Then, on `<baseBranch>`: **Branch on `item.source`** — the `source`
 field of the run-state file, written at Step 1 so a resume into this step (`merged: true, ticked:

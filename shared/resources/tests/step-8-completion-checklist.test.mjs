@@ -39,6 +39,7 @@ const require = createRequire(import.meta.url);
 const { fencedRanges } = require("../change-log.js");
 
 const STEP8 = "shared/resources/develop-pipeline-step-8-commit.md";
+const STEP4 = "shared/resources/develop-pipeline-step-4-create-pr.md";
 const TEMPLATE = "shared/resources/implementation-report-template.md";
 const WORK_ITEM = "docs/tasks/task.9.fx";
 const REPORT = `${WORK_ITEM}/task.9.implementation.1.fx.md`;
@@ -108,12 +109,13 @@ function checklist(extra = "") {
 
 // A fixture repo whose feature branch carries the report, committed and pushed, with a `gh` that
 // answers the PR's base. No lock, no test logs, no halt snapshot — checks 1, 2 and 2b pass.
-function setup(reportText) {
+// Async, so the concurrent cases below overlap instead of queueing behind sync git spawns.
+async function setup(reportText) {
   const fx = fixtureRepo();
   write(fx.work, REPORT, reportText);
-  git(fx.work, "add", "-A");
-  git(fx.work, "commit", "-q", "-m", "report");
-  git(fx.work, "push", "-q");
+  await gitAsync(fx.work, "add", "-A");
+  await gitAsync(fx.work, "commit", "-q", "-m", "report");
+  await gitAsync(fx.work, "push", "-q");
   const gh = ghStub(fx.dir, 'case "$*" in *baseRefName*) echo develop ;; esac');
   return { ...fx, ...gh };
 }
@@ -162,7 +164,7 @@ describe("executed against fixtures", { concurrency: true }, () => {
   for (const sh of SHELLS) {
     for (const variant of ["Task", "Story", "Bug"]) {
       test(`[${sh}] a finished ${variant.toLowerCase()}-variant report built from the template passes`, async () => {
-        const fx = setup(finished(variant));
+        const fx = await setup(finished(variant));
         try {
           const r = await runChecklist(sh, fx);
           assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
@@ -174,7 +176,9 @@ describe("executed against fixtures", { concurrency: true }, () => {
     }
 
     test(`[${sh}] the unfilled task template fails check 3 on Final Status`, async () => {
-      const fx = setup(must(variantBody("Task"), "⏳ Pending", "✅ Done"));
+      const fx = await setup(
+        must(variantBody("Task"), "⏳ Pending", "✅ Done"),
+      );
       try {
         const r = await runChecklist(sh, fx);
         assert.equal(r.status, 1);
@@ -185,7 +189,7 @@ describe("executed against fixtures", { concurrency: true }, () => {
     });
 
     test(`[${sh}] a report still In Progress fails check 3`, async () => {
-      const fx = setup(
+      const fx = await setup(
         finished("Task").replace(
           "**Final Status**: Completed",
           "**Final Status**: In Progress",
@@ -201,7 +205,7 @@ describe("executed against fixtures", { concurrency: true }, () => {
     });
 
     test(`[${sh}] a finished report with no Finished timestamp fails check 3`, async () => {
-      const fx = setup(
+      const fx = await setup(
         finished("Story").replace(
           `**Finished**: ${STAMP}`,
           "**Finished**: {populated at end}",
@@ -219,7 +223,7 @@ describe("executed against fixtures", { concurrency: true }, () => {
     // ── check 5 — dirt is judged against the work item ─────────────────────────
 
     test(`[${sh}] another session's dirt outside the work item passes, named as a warning`, async () => {
-      const fx = setup(finished("Task"));
+      const fx = await setup(finished("Task"));
       try {
         fs.writeFileSync(
           path.join(fx.work, "package.json"),
@@ -236,7 +240,7 @@ describe("executed against fixtures", { concurrency: true }, () => {
     });
 
     test(`[${sh}] a general bug's uncommitted registry close fails check 5 once named as an extra scope`, async () => {
-      const fx = setup(finished("Bug"));
+      const fx = await setup(finished("Bug"));
       try {
         write(fx.work, GENERAL_BUG_EXTRA, "| 1 | a bug | closed |\n");
         await gitAsync(fx.work, "add", "-A");
@@ -260,8 +264,65 @@ describe("executed against fixtures", { concurrency: true }, () => {
       }
     });
 
+    test(`[${sh}] a new file Step 4 held and restored, still uncommitted, fails check 5 by name`, async () => {
+      const fx = await setup(finished("Task"));
+      try {
+        // Step 4 as an agent runs it: derivation, guard, restore — three blocks, three shells.
+        const s4 = readDoc(STEP4);
+        const p4 = { "{work-item-dir}": WORK_ITEM, "{Q2_answer}": "develop" };
+        write(fx.work, "newdir/own.test.mjs", "the run's own new test\n");
+        for (const anchor of [
+          "Scope-derivation",
+          "Every path this guard holds is recorded",
+          'cp -r "$HOLD_DIR"/. .',
+        ]) {
+          const r = await runAsync(sh, bind(blockBy(s4, anchor), p4), {
+            cwd: fx.work,
+          });
+          assert.equal(
+            r.status,
+            0,
+            `Step 4 block (${anchor}) failed: ${r.stdout}${r.stderr}`,
+          );
+        }
+        assert.ok(
+          fs.existsSync(path.join(fx.work, "newdir/own.test.mjs")),
+          "fixture: the file was not restored",
+        );
+        const r = await runChecklist(sh, fx);
+        assert.equal(
+          r.status,
+          1,
+          `a held own file that is not on the remote passed check 5: ${r.stdout}`,
+        );
+        assert.match(r.stdout, /newdir\/own\.test\.mjs/);
+        assert.doesNotMatch(r.stdout, /! outside scope \(warning\): newdir/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    test(`[${sh}] a passing checklist removes Step 4's records`, async () => {
+      const fx = await setup(finished("Task"));
+      try {
+        write(fx.work, ".claude/state/step4-scope-paths.txt", `${WORK_ITEM}\n`);
+        write(fx.work, ".claude/state/step4-held-paths.txt", `${WORK_ITEM}\n`);
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 0, r.stdout);
+        for (const rec of ["step4-scope-paths.txt", "step4-held-paths.txt"]) {
+          assert.equal(
+            fs.existsSync(path.join(fx.work, ".claude/state", rec)),
+            false,
+            `${rec} survived a passing Step 8`,
+          );
+        }
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
     test(`[${sh}] this run's own uncommitted edit inside the work item fails check 5`, async () => {
-      const fx = setup(finished("Task"));
+      const fx = await setup(finished("Task"));
       try {
         fs.appendFileSync(path.join(fx.work, REPORT), "late edit\n");
         const r = await runChecklist(sh, fx);

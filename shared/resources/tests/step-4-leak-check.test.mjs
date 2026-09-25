@@ -42,7 +42,7 @@ const guard = () => bind(blockBy(md, "HOLD_DIR=$(mktemp -d"), PLACEHOLDERS);
 const restore = () => bind(blockBy(md, 'cp -r "$HOLD_DIR"/. .'), PLACEHOLDERS);
 
 function leakBlock() {
-  const code = blockBy(md, "LEAK DETECTED");
+  const code = bind(blockBy(md, "LEAK DETECTED"), PLACEHOLDERS);
   assert.ok(
     code.includes(TAIL),
     "the leak check's verdict line moved or changed",
@@ -169,6 +169,79 @@ for (const sh of SHELLS) {
         "another session\n",
         "the held file was stranded, not restored",
       );
+    } finally {
+      cleanup(fx.dir);
+    }
+  });
+
+  test(`[${sh}] a guard run twice (a Step 4 retry), then Restore, brings every held file back`, () => {
+    const fx = stepFourFixture();
+    try {
+      assert.equal(run(sh, derivation(), { cwd: fx.work }).status, 0);
+      write(fx.work, "stray/first.txt", "first\n");
+      assert.equal(run(sh, guard(), { cwd: fx.work }).status, 0);
+      // The retry: the first file is already held; a second arrives.
+      write(fx.work, "stray2/second.txt", "second\n");
+      assert.equal(run(sh, guard(), { cwd: fx.work }).status, 0);
+      assert.equal(run(sh, restore(), { cwd: fx.work }).status, 0);
+      for (const [p, v] of [
+        ["stray/first.txt", "first\n"],
+        ["stray2/second.txt", "second\n"],
+      ]) {
+        assert.ok(
+          fs.existsSync(path.join(fx.work, p)),
+          `${p} was stranded by the second guard run`,
+        );
+        assert.equal(fs.readFileSync(path.join(fx.work, p), "utf8"), v);
+      }
+      const held = fs.readFileSync(
+        path.join(fx.work, ".claude/state/step4-held-paths.txt"),
+        "utf8",
+      );
+      assert.match(held, /stray\//);
+      assert.match(held, /stray2\//);
+    } finally {
+      cleanup(fx.dir);
+    }
+  });
+
+  test(`[${sh}] where .claude/ is not gitignored, the guard leaves the pipeline's own state in place`, () => {
+    const fx = stepFourFixture();
+    try {
+      write(fx.work, ".gitignore", "");
+      git(fx.work, "add", ".gitignore");
+      git(fx.work, "commit", "-q", "-m", "no .claude ignore");
+      git(fx.work, "update-ref", "refs/heads/develop", "HEAD");
+      assert.equal(run(sh, derivation(), { cwd: fx.work }).status, 0);
+      assert.equal(run(sh, guard(), { cwd: fx.work }).status, 0);
+      assert.ok(
+        fs.existsSync(
+          path.join(fx.work, ".claude/state/step4-scope-paths.txt"),
+        ),
+        "the guard moved .claude/ — the scope record is gone",
+      );
+      const leak = run(sh, verdict(), { cwd: fx.work });
+      assert.doesNotMatch(leak.stdout, /is missing/);
+    } finally {
+      cleanup(fx.dir);
+    }
+  });
+
+  test(`[${sh}] a scope record for another work item is refused by the guard and the leak check`, () => {
+    const fx = stepFourFixture();
+    try {
+      write(
+        fx.work,
+        ".claude/state/step4-scope-paths.txt",
+        "docs/tasks/task.1.other\nsrc\n",
+      );
+      const g = run(sh, guard(), { cwd: fx.work });
+      assert.equal(g.status, 1);
+      assert.match(g.stdout, /stale record/);
+      git(fx.work, "commit", "-q", "-am", "work");
+      const l = run(sh, verdict(), { cwd: fx.work });
+      assert.equal(l.status, 1);
+      assert.match(l.stdout, /stale record/);
     } finally {
       cleanup(fx.dir);
     }

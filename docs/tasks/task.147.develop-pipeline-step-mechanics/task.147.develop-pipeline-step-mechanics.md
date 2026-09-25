@@ -633,24 +633,24 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-25
-**Quality Score**: 20/100
+**Quality Score**: 60/100
 **Gate Decision**: FAIL
 
 ### QA Report
 
-- **Full Report**: [task.147.qa.1.develop-pipeline-step-mechanics.md](./task.147.qa.1.develop-pipeline-step-mechanics.md)
-- **Gate File**: [task.147.gate.1.develop-pipeline-step-mechanics.yml](./task.147.gate.1.develop-pipeline-step-mechanics.yml)
+- **Full Report**: [task.147.qa.2.develop-pipeline-step-mechanics.md](./task.147.qa.2.develop-pipeline-step-mechanics.md)
+- **Gate File**: [task.147.gate.2.develop-pipeline-step-mechanics.yml](./task.147.gate.2.develop-pipeline-step-mechanics.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 58 new node tests + 13 shell cases; `ci:fast` 4068/0; PR CI 5/5
-- **Phases Verified**: 7/7 implemented, 4/7 without issues
-- **Critical Issues**: 2 HIGH, 4 MEDIUM, 3 LOW
+- **Tests Executed**: 76 new node tests + 20 shell cases; CI 5/5 green on `f4dee2d2`
+- **Phases Verified**: 7/7 implemented; 5/7 without issues
+- **Critical Issues**: 1 HIGH, 2 MEDIUM, 4 LOW (all gate-1 findings fixed; bugs 1–6 closed)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
 
 ### Key Findings
 
-Two HIGH defects were reproduced by execution. On a dirty tree, a failed develop-next merge deletes the unmerged PR head branch (bug.1). Scoped Step 8 staging leaves develop-bug's general-bug registry close uncommitted (bug.2). MEDIUM: the leak check reads an unbound array (bug.3); a failed remote delete reads as a failed merge (bug.4); a committed deletion aborts staging (bug.5); a rename source is skipped by `--scope` (bug.6). The tests missed CR-1 and CR-4 because they inject the names the shipped blocks leave unbound.
+The cycle-2 refute pass found a defect in the combination of two changes. The Step 4 guard holds and restores a new untracked file of the run's own, and the scoped Step 8 check 5 then passes it as a warning, so Step 8 reports unpushed work as pushed (bug.7). The cycle-1 state files can be moved by the guard when `.claude/` is not ignored (bug.8), and overwritten by a guard re-run (bug.9).
 
 ---
 <!-- change-log-start -->
@@ -663,6 +663,7 @@ Two HIGH defects were reproduced by execution. On a dirty tree, a failed develop
 | 2026-09-25 |         | Status → ready-for-development | review-task |
 | 2026-09-25 |  | Implemented — 18 source files (+16 bundled copies), 58 node tests + 4 shell cases; all fixes mutation-proved | develop |
 | 2026-09-25 |  | QA gate FAIL (20/100) — 2 HIGH, 4 MEDIUM, 3 LOW; bugs 1-6 filed | qa-task |
+| 2026-09-25 |  | QA gate FAIL (60/100) — 1 HIGH, 2 MEDIUM, 4 LOW; bugs 1-6 closed, bugs 7-9 filed | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -757,6 +758,18 @@ develop-batch and commit-changes.
 - QA-2: the Step 4 prose says "tracked".
 
 The harness now shares one `gh` stub per process (symlinked, with a sourced per-test body), because macOS scans every new executable on its first exec. That took the merge suite from 12.5s to 2.0s. `verify-push-state.test.sh` has 20 cases (was 13).
+
+**QA cycle 2 fixes (qa-fix).** Gate 2 was FAIL, with 1 HIGH, 2 MEDIUM and 4 LOW findings. All seven are fixed, each with an executed test and a mutation proof (9 mutants; each turns its named test red):
+
+- CR-1: the guard records held paths, and Step 8 check 5 scopes those still present, so a held own file cannot pass as another session's dirt.
+- CR-2: the guard skips `.claude/`.
+- CR-3: the guard reuses an existing hold directory.
+- CR-6: a failed re-sync is an explicit HALT.
+- CR-7: record readers refuse a stale first line, and a passing Step 8 removes the records.
+- CR-8: either porcelain column can mark a rename.
+- CR-9: an absolute scope is canonicalised to its physical path, and `..` is refused.
+
+`verify-push-state.test.sh` has 23 cases (was 20).
 
 **Deferred work.** None of the scope. The Step 3 inline branch is held as a statement, not as
 an orchestrator applying it (§ 8, Honest limit). The review's O3, bare-prefix path matching in

@@ -59,6 +59,15 @@ Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`, plus one
 > A caller that adds a write outside its work item adds a row here in the same change. The same
 > list is passed to check 5, so an uncommitted write there fails the step rather than reading as
 > another session's dirt.
+>
+> Check 5 adds one more set on its own: every path Step 4's Pre-flight Guard **held and restored**
+> (`.claude/state/step4-held-paths.txt`) that still exists. The guard holds any untracked path
+> outside the Step 4 scope. That includes a new file of the run's own in a directory with no tracked
+> change. Unscoped, check 5 used to fail on it; scoped, it would read as another session's dirt and
+> pass while the file is not on the remote (task.147 QA-2, CR-1). A held file that really is another
+> session's therefore fails here too, and is named. That is a deliberate trade: the pipeline moved
+> it, so it cannot claim it did not see it. Commit it, move it out of the checkout, or delete the
+> record line for it, and re-run the checklist.
 
 
 > **What this commit carries changed with task.115.** The acceptance artefacts — the document with
@@ -204,9 +213,23 @@ BASE_BRANCH=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)
 EXTRA_SCOPES=({extra-scope-paths})
 SCOPE_ARGS=(--scope "{work-item-dir}")
 for s in "${EXTRA_SCOPES[@]}"; do SCOPE_ARGS+=(--scope "$s"); done
+# Paths Step 4's guard held and restored: scoped, so one still uncommitted fails (see above). Only a
+# record for THIS work item is read (first line), and only paths that still exist are passed,
+# because verify-push-state refuses a scope that names nothing.
+HELD_REC=.claude/state/step4-held-paths.txt
+if [ "$(head -1 "$HELD_REC" 2>/dev/null)" = "{work-item-dir}" ]; then
+  while IFS= read -r p; do
+    p="${p%/}"
+    [ -n "$p" ] && [ -e "$p" ] && SCOPE_ARGS+=(--scope "$p")
+  done < <(tail -n +2 "$HELD_REC")
+fi
 bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" "${SCOPE_ARGS[@]}" ${PR_NUMBER:+--pr "$PR_NUMBER"}
 VERIFY_EXIT=$?
 [ "$VERIFY_EXIT" -eq 0 ] || { echo "❌ Step 8 incomplete: verify-push-state failed (exit $VERIFY_EXIT)"; exit 1; }
+
+# Every check passed: Step 4's records have done their job. A record left behind would be read as
+# current by the next run in this checkout (task.147 QA-2, CR-7).
+rm -f .claude/state/step4-scope-paths.txt .claude/state/step4-held-paths.txt .claude/state/step4-hold-dir.txt
 
 echo "✅ Step 8 post-conditions verified"
 ```

@@ -284,5 +284,30 @@ describe("executed against fixtures", { concurrency: true }, () => {
         cleanup(fx.dir);
       }
     });
+
+    test(`[${sh}] a re-sync whose checkout the dirty tree blocks halts, and the run stays put`, async () => {
+      const fx = fixtureRepo();
+      try {
+        // develop moves README on; the feature checkout has an uncommitted README edit, so the
+        // switch to develop would overwrite it and git refuses.
+        git(fx.work, "checkout", "-q", "develop");
+        write(fx.work, "README.md", "moved on\n");
+        git(fx.work, "commit", "-q", "-am", "develop moves");
+        git(fx.work, "push", "-q", "origin", "develop");
+        git(fx.work, "checkout", "-q", "feature/x");
+        write(fx.work, "README.md", "another session's edit\n");
+        const md = readDoc("skills/develop-next/SKILL.md");
+        const code = bind(blockBy(md, RESYNC), { "<baseBranch>": "develop" });
+        const r = await runAsync(sh, code, { cwd: fx.work });
+        assert.notEqual(r.status, 0, "a failed checkout must not exit 0");
+        assert.match(r.stdout, /HALT: re-sync/);
+        assert.equal(
+          git(fx.work, "rev-parse", "--abbrev-ref", "HEAD").trim(),
+          "feature/x",
+        );
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
   }
 });

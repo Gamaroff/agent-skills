@@ -76,18 +76,36 @@ With the scope set determined, detect any untracked paths in the working tree th
 
 ```bash
 # The scope, from the file the Build Staging Scope block wrote. A fresh shell has no SCOPE_PATHS.
+# Its first line is always {work-item-dir}; a file whose first line is anything else is a stale record
+# from another work item, never this run's scope (task.147 QA-2, CR-7).
 [ -s .claude/state/step4-scope-paths.txt ] || { echo "Pre-flight: run the Build Staging Scope block first — .claude/state/step4-scope-paths.txt is missing"; exit 1; }
+[ "$(head -1 .claude/state/step4-scope-paths.txt)" = "{work-item-dir}" ] || { echo "Pre-flight: .claude/state/step4-scope-paths.txt is a stale record for another work item — re-run the Build Staging Scope block"; exit 1; }
 SCOPE_PATHS=()
 while IFS= read -r p; do [ -n "$p" ] && SCOPE_PATHS+=("$p"); done < .claude/state/step4-scope-paths.txt
 
-HOLD_DIR=$(mktemp -d /tmp/pipeline-hold-XXXXXX)
-# The Restore Held Files block runs in another shell. Without this record it sees no HOLD_DIR and
-# restores nothing, which strands the held files in /tmp.
-printf '%s\n' "$HOLD_DIR" > .claude/state/step4-hold-dir.txt
+# The Restore Held Files block runs in another shell, so HOLD_DIR travels in a record. A record that
+# names an existing directory is REUSED: a second guard run (a retry after a failed /create-pr) finds
+# the first run's files already moved, and a fresh directory would overwrite the record and strand
+# them (task.147 QA-2, CR-3).
+HOLD_DIR=$(cat .claude/state/step4-hold-dir.txt 2>/dev/null)
+if [ -z "$HOLD_DIR" ] || [ ! -d "$HOLD_DIR" ]; then
+  HOLD_DIR=$(mktemp -d /tmp/pipeline-hold-XXXXXX)
+  printf '%s\n' "$HOLD_DIR" > .claude/state/step4-hold-dir.txt
+fi
+# Every path this guard holds is recorded for Step 8, which checks each one still present: a held
+# file of the run's own that is still uncommitted there must fail the step, not pass as another
+# session's dirt (task.147 QA-2, CR-1). Same first-line rule as the scope file, and appended to,
+# never truncated, so a retry keeps the first run's list.
+[ "$(head -1 .claude/state/step4-held-paths.txt 2>/dev/null)" = "{work-item-dir}" ] \
+  || printf '%s\n' "{work-item-dir}" > .claude/state/step4-held-paths.txt
 HELD=()
 
 while IFS= read -r f; do
   [[ -z "$f" ]] && continue
+  # The pipeline's own state is never held. In a repo that does not gitignore .claude/, it is an
+  # untracked out-of-scope path, and holding it would move the lock and these records away
+  # (task.147 QA-2, CR-2).
+  case "$f" in .claude|.claude/*) continue;; esac
   IN_SCOPE=false
   for sp in "${SCOPE_PATHS[@]}"; do
     case "$f" in "${sp}"*) IN_SCOPE=true; break;; esac
@@ -96,6 +114,7 @@ while IFS= read -r f; do
     mkdir -p "$HOLD_DIR/$(dirname "$f")"
     mv "$f" "$HOLD_DIR/$f"
     HELD+=("$f")
+    printf '%s\n' "$f" >> .claude/state/step4-held-paths.txt
   fi
 done < <(git status --porcelain | grep '^??' | awk '{print $2}')
 
@@ -146,6 +165,7 @@ After create-pr completes, verify no out-of-scope path leaked into the commit:
 # The scope, from the file the Build Staging Scope block wrote. This block runs after /create-pr,
 # in a fresh shell: an empty SCOPE_PATHS here judged every committed file a LEAK (task.147 QA-1, CR-4).
 [ -s .claude/state/step4-scope-paths.txt ] || { echo "Leak check: .claude/state/step4-scope-paths.txt is missing — cannot judge scope"; exit 1; }
+[ "$(head -1 .claude/state/step4-scope-paths.txt)" = "{work-item-dir}" ] || { echo "Leak check: .claude/state/step4-scope-paths.txt is a stale record for another work item"; exit 1; }
 SCOPE_PATHS=()
 while IFS= read -r p; do [ -n "$p" ] && SCOPE_PATHS+=("$p"); done < .claude/state/step4-scope-paths.txt
 

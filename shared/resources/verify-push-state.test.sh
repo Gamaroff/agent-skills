@@ -224,6 +224,33 @@ else
   fail "--scope, unreadable git status → exit 1, named" "got exit $EXIT: $OUT"
 fi
 
+# ── 21–23. QA cycle 2: worktree rename, symlinked absolute path, '..' ─────────
+# A worktree-side rename (" R", an intent-to-add destination) carries a source record too.
+R=$(scoped_repo worktree-rename)
+( cd "$R" && seq 1 50 > docs/tasks/task.1/long.md && git add docs/tasks/task.1/long.md \
+    && git commit --quiet -m long && git push --quiet 2>/dev/null \
+    && mv docs/tasks/task.1/long.md moved-away.md && git add -N moved-away.md )
+OUT=$( cd "$R" && bash "$SCRIPT" --base main --scope docs/tasks/task.1 2>&1 ); EXIT=$?
+if [ "$EXIT" = "1" ] && printf '%s\n' "$OUT" | grep -q "docs/tasks/task.1/long.md (moved or copied away)"; then
+  pass "--scope, worktree-side rename inside → outside → exit 1, source named"
+else
+  fail "--scope, worktree-side rename inside → outside → exit 1, source named" "got exit $EXIT: $OUT"
+fi
+
+# An absolute scope through a symlinked path to the repo is canonicalised, not refused.
+R=$(scoped_repo symlinked-abs)
+LINK="$TMPROOT/link-to-symlinked-abs"
+ln -s "$R" "$LINK"
+( cd "$R" && echo edited > docs/tasks/task.1/r.md )
+EXIT=$( cd "$LINK" && bash "$SCRIPT" --base main --scope "$LINK/docs/tasks/task.1" >/dev/null 2>&1; echo $? )
+[ "$EXIT" = "1" ] && pass "--scope via a symlinked absolute path is canonicalised — inside dirt → exit 1" \
+                  || fail "--scope via a symlinked absolute path is canonicalised — inside dirt → exit 1" "got exit $EXIT"
+
+# A '..' segment would match no porcelain path: refused, never a vacuous pass.
+EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope docs/tasks/../tasks/task.1 >/dev/null 2>&1; echo $? )
+[ "$EXIT" = "2" ] && pass "--scope containing '..' → exit 2" \
+                  || fail "--scope containing '..' → exit 2" "got exit $EXIT"
+
 echo
 echo "  $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1
