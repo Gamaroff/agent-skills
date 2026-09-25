@@ -1,0 +1,75 @@
+schema: 1
+task: 'task.145.review-outcome-reachability-check'
+task_title: "review-task: trace a criterion's stated outcome through the function that decides it"
+gate: CONCERNS
+status_reason: 'The cycle-5 fixes hold. The document block is rebuilt (one heading of each), the per-site pattern-line holds are mutation-proven at both sites, and the suite is green. One medium: loosening NAMED_PHASE for CR5-3 left it holding only the verb, so a reworded or hedged naming sentence, including the CR5-3 wording with only its verb changed, passes (mutations M3 and M5 green).'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T06:45:00Z'
+
+top_issues:
+  - id: 'CR6-1'
+    severity: medium
+    file: 'tests/outcome-reachability-check.test.js'
+    finding: 'NAMED_PHASE (line 66) now reads "Name that \1 [^.]*\.", which checks only the verb. "Name that phase in the finding." at create-task (the CR5-3 defect with only its verb changed) and "Name that phase only if the author asks." at review-task both leave the suite green. The comment says the sentence is worded per site, but no test checks the wording at any site.'
+    suggested_action: 'Make NAMED_PHASE a per-site factory like patternLine(check) that takes each site''s own naming sentence. Keep the requirement and exclusion shared and held in full. Mutation-prove it with M3 and M5.'
+    suggested_owner: dev
+    bug_ref: 'task.145.bug.11.named-phase-hold-verb-only.md'
+    status: closed
+    fixed_date: '2026-09-25'
+    resolution: 'Fixed after acceptance, before merge, in 9018ac1a: NAMED_PHASE is a per-site hold with the site noun and naming sentence. M3, M5 and a wrong-noun mutant go red. Bug 11 closed.'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 4003
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false. The change set is review prose and a test file, with no accept/reject function delivered.'
+  performance:
+    status: PASS
+    notes: 'The population test runs in about 100 ms.'
+  reliability:
+    status: PASS
+    notes: 'CR5-1 is fixed: exactly one QA Testing Results heading and one Change Log heading. No behavioural contradiction remains across the four skills.'
+  maintainability:
+    status: PASS
+    notes: 'The document structure is restored. The weaker NAMED_PHASE hold is tracked as CR6-1 in top_issues.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR6-1 (residual, diminishing-returns exit at cycle 6): make the NAMED_PHASE naming sentence a per-site hold, so M3 and M5 go red. Tracked in bug 11.'
+      refs: ['tests/outcome-reachability-check.test.js', 'docs/tasks/task.145.review-outcome-reachability-check/task.145.bug.11.named-phase-hold-verb-only.md']
+      carried_from: 'top_issues (route 2, cycle 6)'
+    - action: 'CR-2 (advisory): "Name that phase when you pass the criterion" gives no place to record it. The Technical Accuracy report templates in review-task and review-story have only Critical/Important buckets. Add a slot, or say where the passing phase is recorded.'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md']
+    - action: 'CR-3 (advisory): create-task''s "Name that phase in the criterion." is directly followed by the exclusion of a criterion that promises a later phase. Word it so the phase must state the branch and the criterion''s pointer is only a cross-reference.'
+      refs: ['skills/create-task/SKILL.md']
+    - action: 'CR-4 (advisory): patternLine(10)/patternLine(7) hard-code the check number. Read it from the citing item''s list marker so renumbering the item without the pattern line goes red.'
+      refs: ['tests/outcome-reachability-check.test.js']
+    - action: 'CR-5 (advisory): bug 10''s fix description claims the write "now anchors on the change-log marker", but no skill changed. The qa-task Step 12 placement rule is task.155 (#486).'
+      refs: ['docs/tasks/task.145.review-outcome-reachability-check/task.145.bug.10.task-doc-stacked-sections.md']
+
+bug_resolution:
+  bugs_fixed: 11
+  bugs_remaining: 0
+  fix_date: '2026-09-25'
+  total_iterations: 5
+  verification_method: 'ci:fast (4003 tests, 4002 pass, 0 fail), bundle:check clean, 5 mutation proofs this cycle'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR6-1 fixed'

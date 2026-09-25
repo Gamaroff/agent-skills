@@ -943,6 +943,25 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - Check internal story links work
    - Verify external document references exist
 
+7. **Outcome reachability** (obs #168):
+   - When an acceptance criterion, test case or Testing row states the outcome a **named function**
+     produces for a **stated input** (a verdict, an exit code, a status, a return value), open the
+     function. Walk that input through its decision branches **as the plan leaves them**: the
+     branches it has today, plus any that the story's tasks add or change
+   - Confirm the stated outcome is the **branch that fires** on that walk. Checks 1–6 ask whether
+     what the story names exists and has the shape it claims. This check asks whether the function,
+     once the story is done, can return what the story promises for that input
+   - An outcome that the story's own tasks produce is reachable even though today's code cannot
+     return it, because producing it is the story's job. A planned branch counts only when a named task states it: the condition and the outcome it returns. Name that task when you pass the criterion. A task that only names the function, or a criterion that promises a later task will add the branch, does not count
+   - Worked example (from a task): task.144 said an accept-all fixture would score
+     `present-but-inert`. `computeVerdict`, which that plan did not change, returns that verdict
+     only when some hostile case was rejected, so an accept-all takes the `absent` branch. Review
+     passed the claim; develop found it
+   - Flag as **Important** when the outcome is unreachable, meaning no current or planned branch
+     returns it for that input. Name the branch that fires and what it returns. Flag as
+     **Optional** when the branch depends on an input the story does not pin down
+   - Out of scope: a criterion that names no function, or no outcome of one
+
 **Common Hallucination Patterns to Detect**:
 
 - ❌ "Uses the standard React patterns" (vague, no source)
@@ -952,6 +971,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ Libraries not in package.json or tech stack docs
 - ❌ Endpoints not in API specification
 - ❌ Database fields not in schema definitions
+- ❌ An outcome no current or planned branch of the named function returns for the stated input. Report it as **Important** under check 7, not as a Critical hallucination
 
 **Issues to Flag**:
 

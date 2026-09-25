@@ -1,0 +1,70 @@
+schema: 1
+task: 'task.145.review-outcome-reachability-check'
+task_title: "review-task: trace a criterion's stated outcome through the function that decides it"
+gate: CONCERNS
+status_reason: 'The cycle-4 fixes hold (no HIGH; gates green). One medium: the task document''s QA Testing Results / Change Log block is corrupted, with four stacked QA sections and four empty Change Log headings, by the orchestrator''s cycle-2 to cycle-4 section replacement. Two lows: the pattern-line hold does not tie the check number to its file, and "Cite that phase in the finding" has no finding to attach to at create-task.'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T23:14:51Z'
+
+top_issues:
+  - id: 'CR5-1'
+    severity: medium
+    file: 'docs/tasks/task.145.review-outcome-reachability-check/task.145.review-outcome-reachability-check.md'
+    finding: 'Between the change-log markers the task document carried four empty "## Change Log" headings, each followed by a stacked "## QA Testing Results" (gates 4, 3, 2 and 1), with the one Change Log table under cycle 1''s Key Findings. Cause: cycle 1''s write inserted the QA section after the "## Change Log" heading, and cycles 2–4 replaced slice(indexOf("## QA Testing Results"), indexOf("## Change Log")) with the heading index BEFORE the section index, so each replacement duplicated a block. qa-task Step 12 requires the whole section to be replaced, never added.'
+    suggested_action: 'Rebuild the block: one "## QA Testing Results" (gate 5) before the change-log start marker, and one "## Change Log" heading directly above its table. Verify by counting headings (exactly one of each).'
+    suggested_owner: dev
+    bug_ref: 'task.145.bug.10.task-doc-stacked-sections.md'
+  - id: 'CR5-2'
+    severity: low
+    file: 'tests/outcome-reachability-check.test.js'
+    finding: 'PATTERN_LINE is shared and accepts "check (?:10|7)" at both sites. review-task''s line reading "check 7" (its check 7 is Figures that a test will re-measure) and review-story''s reading "check 10" (it has no check 10) both pass.'
+    suggested_action: 'Give each site its own pattern-line hold with its own check number.'
+    suggested_owner: dev
+  - id: 'CR5-3'
+    severity: low
+    file: 'skills/create-task/SKILL.md'
+    finding: '"Cite that phase in the finding" names no finding in the case it applies to. A named phase that states the branch makes the outcome reachable, so nothing is flagged. create-task produces no findings report at all; its obs #168 item goes to the author. NAMED_PHASE holds the sentence word for word at all three sites, so no site can word it for its own context.'
+    suggested_action: 'Word the citation for each site ("Name that phase when you pass the criterion"; at create-task, when resolving it with the author). Loosen NAMED_PHASE to hold the requirement and exclusion, not the citation''s wording.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 4003
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false.'
+  performance:
+    status: PASS
+    notes: 'Test about 100 ms.'
+  reliability:
+    status: PASS
+    notes: 'No behavioural contradiction remains in the four skills. The reviewer checked the protocol, template, validate floor rule and verdict-block consumers (none parse its fields).'
+  maintainability:
+    status: CONCERNS
+    notes: 'The work-item document structure is corrupted (CR5-1).'
+
+recommendations:
+  immediate:
+    - action: 'CR5-1: rebuild the QA Testing Results and Change Log block, verified by heading counts.'
+      refs: ['docs/tasks/task.145.review-outcome-reachability-check/task.145.review-outcome-reachability-check.md']
+    - action: 'CR5-2 and CR5-3: per-site pattern-line holds; per-site citation wording.'
+      refs: ['tests/outcome-reachability-check.test.js', 'skills/create-task/SKILL.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR5-1 fixed'

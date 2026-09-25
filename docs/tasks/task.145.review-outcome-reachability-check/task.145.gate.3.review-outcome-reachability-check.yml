@@ -1,0 +1,80 @@
+schema: 1
+task: 'task.145.review-outcome-reachability-check'
+task_title: "review-task: trace a criterion's stated outcome through the function that decides it"
+gate: CONCERNS
+status_reason: 'The cycle-2 fixes hold for what they addressed (no HIGH). Three medium defects remain: the cycle-2 info-string guard stops four-backtick fences opening; the planned-state rule was not carried into the hallucination-pattern lines; review-bug routes the in-line stale finding to a rule gated on PREPASS_STALE only.'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T22:49:07Z'
+
+top_issues:
+  - id: 'CR3-1'
+    severity: medium
+    file: 'tests/outcome-reachability-check.test.js'
+    finding: 'BACKTICK_INFO_HAS_BACKTICK (/^\s*`{3,}[^`]*`/) backtracks so that the fourth backtick of a four-backtick opener counts as an info-string backtick. Measured: "````" and "````markdown" both test true, so no fence of four or more backticks opens. This undoes cycle 1''s CR-3 fix. The long-fence self-test still passes only because its inner and outer fences happen to pair.'
+    suggested_action: 'Test only the text after the whole opening run (capture the run, then check the rest for a backtick). Add a long-fence case with a quoted heading, not a nested fence, inside a four-backtick fence.'
+    suggested_owner: dev
+    bug_ref: 'task.145.bug.6.four-backtick-fence.md'
+  - id: 'CR3-2'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The hallucination-pattern lines at review-task Step 3 and review-story Step 4 still read "An outcome no branch of the named function returns for the stated input", with no current-or-planned qualifier. A reviewer following that list flags the plan-added outcome that check 10 and check 7 now call reachable. The CR2-1 defect survives at a second site in each section.'
+    suggested_action: 'Reword both lines to "no current or planned branch". Hold the qualifier in the test by scanning the section for every restatement of the rule, not only the obs #168 item.'
+    suggested_owner: dev
+    bug_ref: 'task.145.bug.7.hallucination-line-planned-state.md'
+  - id: 'CR3-3'
+    severity: medium
+    file: 'skills/review-bug/SKILL.md'
+    finding: 'The stale-bug clause routes to "this step''s likely-already-fixed rule (Critical)". That rule (line 86), the STALE recommendation row (line 115) and the QUESTION POINT 2 close prompt (line 104) all fire only on PREPASS_STALE = unlikely. When the in-line walk finds the Expected outcome already returned but the pre-pass said otherwise, the Critical produces NEEDS DETAIL, not STALE, and develop-bug halts as "lacks reproducibility detail".'
+    suggested_action: 'Widen the line-86 rule, the STALE row and the QP2 prompt to fire on either PREPASS_STALE = unlikely or an in-line walk showing the current branch already returns the Expected outcome, with that branch as found_at.'
+    suggested_owner: dev
+    bug_ref: 'task.145.bug.8.review-bug-stale-routing.md'
+  - id: 'CR3-4'
+    severity: low
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The planned-state exemption counts any branch "a planned phase adds or changes" without requiring that phase to state the branch. A phase that only says "update computeVerdict", or a criterion that asserts a later phase will add it, can be taken as making an unreachable outcome reachable. The same applies at review-story check 7 and create-task 3.5.'
+    suggested_action: 'At all three sites, a planned branch counts only when a named phase states it (the condition and the outcome returned), and the finding cites that phase.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 4002
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false. Prose plus a read-only test.'
+  performance:
+    status: PASS
+    notes: 'Test about 100 ms.'
+  reliability:
+    status: CONCERNS
+    notes: 'A second statement of the rule in each section contradicts the planned-state check (CR3-2). review-bug''s stale routing misclassifies (CR3-3).'
+  maintainability:
+    status: CONCERNS
+    notes: 'The fence guard regressed four-backtick fences (CR3-1).'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR3-1, CR3-2 and CR3-3; add the named-phase requirement (CR3-4).'
+      refs: ['tests/outcome-reachability-check.test.js', 'skills/review-task/SKILL.md', 'skills/review-story/SKILL.md', 'skills/review-bug/SKILL.md', 'skills/create-task/SKILL.md']
+  future:
+    - action: 'CR3-5 (cleanup): make the create-task Critical heading name the obs #168 exception.'
+      refs: ['skills/create-task/SKILL.md']
+    - action: 'CR3-6 (cleanup): anchor verdict holds on the leading imperative ("Flag as Important when …") so a negated verdict fails.'
+      refs: ['tests/outcome-reachability-check.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR3-1, CR3-2 and CR3-3 fixed'

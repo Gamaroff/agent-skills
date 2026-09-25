@@ -419,7 +419,7 @@ After the Implementation Plan and Technical Background are populated, decide whe
 
 **CRITICAL / BLOCKING**: This step is mandatory and must not be skipped. Do not proceed to Section 4 (Document Generation) until this review is complete. Perform an adversarial re-analysis of all collected content as if reviewing someone else's work. Goal: make implementation mistakes **impossible**.
 
-#### 🚨 Critical (auto-fix before document generation)
+#### 🚨 Critical (fix before document generation; the obs #168 item goes to the author)
 
 - **Wheel reinvention**: Does the implementation plan direct the developer toward existing code, services, or utilities they should extend rather than re-implement? Search the codebase for related functionality.
 - **Wrong libraries or versions**: Are all library/framework references consistent with `package.json`? No fabricated or outdated dependencies.
@@ -430,6 +430,7 @@ After the Implementation Plan and Technical Background are populated, decide whe
 - **Second mechanism for a job the file already does** (obs #103): when a phase adds a function whose purpose is to dedupe, heal, migrate, retry, normalise or reconcile, grep the target file for existing functions of that kind. The Technical Background must name them and say whether the new one replaces, extends or sits beside each — and "sits beside" needs a sentence.
 - **A figure the test will re-measure** (obs #117): a count stated in prose decays within days. Record the **definition** (what is scanned, with which pattern and exclusions) and the **command**, and let the test record the number. Where a guard is scoped over several file classes, name the mechanism that reaches each class — a scan wider than the hazard opens with an allowlist of false positives, and an allowlist nobody believes is a guard nobody reads.
 - **A widened check inside a path-filtered workflow** (obs #102): when a phase adds a path or file class to a check that runs in an existing CI workflow, read the workflow's `on.<event>.paths` and list the new path there too — or the widened check never runs on the changes it was widened for.
+- **An outcome the named function cannot return** (obs #168): when a success criterion or test case states what a named function returns for a stated input (a verdict, an exit code, a status), walk that input through the function's decision branches as the plan leaves them. That means the branches it has today plus any a planned phase adds or changes. Confirm the stated outcome is the branch that fires on that walk. An outcome a planned phase produces is reachable even though today's code cannot return it. A planned branch counts only when a named phase states it: the condition and the outcome it returns. Name that phase in the criterion as a cross-reference: the phase states the branch, and the criterion only points at it. A phase that only names the function, or a criterion that promises a later phase will add the branch, does not count. An unreachable outcome is one no current or planned branch returns. It is a criterion the developer would have to silently rewrite or silently fail. **Put it to the author, and never auto-fix it** by rewriting the criterion to what today's code returns: that rewrite turns the behaviour the task exists to deliver into the behaviour it exists to change. (task.144 promised `present-but-inert` for an accept-all fixture; `computeVerdict`, which that plan did not change, scores it `absent`.)
 
 #### ⚡ Should Add (present to user for confirmation)
 
@@ -442,7 +443,7 @@ After the Implementation Plan and Technical Background are populated, decide whe
 - **Clarity**: Are phase descriptions specific enough that a developer not involved in planning can execute them?
 - **Checklist completeness**: Do all checkboxes in the Implementation Plan cover the full scope?
 
-Fix all Critical items in the collected content before proceeding. Present Should Add and Nice to Have to the user.
+Fix all Critical items in the collected content before proceeding. The one exception is a Critical item that needs the author's decision (the obs #168 item): put it to the author and apply their answer, never a guess. Present Should Add and Nice to Have to the user.
 
 ### 4. Document Generation
 

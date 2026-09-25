@@ -849,6 +849,27 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - A documented knob that nothing reads is silently ignored: the user sets it, nothing happens, and the documentation is the only reason they believed otherwise
    - Check each documented default against the code's actual default, not against surrounding prose
 
+10. **Outcome reachability** (obs #168):
+    - When a success criterion, test case or Testing Strategy row states the outcome a **named
+      function** produces for a **stated input** (a verdict, an exit code, a status, a return
+      value), open the function. Walk that input through its decision branches **as the plan
+      leaves them**: the branches it has today, plus any that a planned phase adds or changes
+    - Confirm the stated outcome is the **branch that fires** on that walk. Checks 1–5 and 9 ask
+      whether what the document names exists and has the shape it claims. This check asks whether
+      the function, once the plan is done, can return what the document promises for that input
+    - An outcome that a planned phase produces is reachable even though today's code cannot return
+      it, because producing it is the task's job. Review is not the place to hold a task to the
+      behaviour it exists to change. A planned branch counts only when a named phase states it: the condition and the outcome it returns. Name that phase when you pass the criterion. A phase that only names the function, or a criterion that promises a later phase will add the branch, does not count
+    - Worked example: task.144 said an accept-all fixture would score `present-but-inert`.
+      `computeVerdict`, which that plan did not change, returns that verdict only when some
+      hostile case was rejected. An accept-all rejects none, so the `absent` branch fires.
+      Review read the function in full and passed the claim; develop found it
+    - Flag as **Important** when the outcome is unreachable, meaning no current or planned branch
+      returns it for that input. Name the branch that fires and what it returns. Flag as
+      **Optional** when the branch depends on an input the document does not pin down ("state the
+      input")
+    - Out of scope: a criterion that names no function, or no outcome of one ("the docs say X")
+
 **Common Hallucination Patterns to Detect**:
 
 - ❌ Libraries not in package.json or tech stack
@@ -857,6 +878,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ Database fields not in Prisma schema
 - ❌ Code patterns that violate project standards
 - ❌ Config keys, env vars or flags that no code reads
+- ❌ An outcome no current or planned branch of the named function returns for the stated input. Report it as **Important** under check 10, not as a Critical hallucination
 
 **Issues to Flag**:
 
