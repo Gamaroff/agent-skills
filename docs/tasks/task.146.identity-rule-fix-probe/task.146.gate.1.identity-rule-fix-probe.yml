@@ -4,7 +4,7 @@ task_title: 'qa-fix: a fix to an identity rule must prove both directions — sh
 gate: CONCERNS
 status_reason: 'The deliverable is in place and every stated criterion holds, but the change leaves a sibling description of the cycle-2 refute directive incomplete, and the new four-bullet assertion has a vacuous path (a fifth bullet after the paragraph passes). Two medium, one low, all introduced by this diff.'
 reviewer: 'QA Engineer'
-updated: '2026-09-25T09:20:00Z'
+updated: '2026-09-25T07:20:00Z'
 
 top_issues:
   - id: 'QA-1'

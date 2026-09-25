@@ -4,7 +4,7 @@ task_title: 'qa-fix: a fix to an identity rule must prove both directions — sh
 gate: CONCERNS
 status_reason: 'All three cycle-1 findings are fixed and QA re-proved each. The cycle-2 refute pass found that the task document''s QA Testing Results section sits inside the change-log marker block, between the Change Log heading and its table (medium), and that the four-bullet count keys on the • glyph only (low).'
 reviewer: 'QA Engineer'
-updated: '2026-09-25T09:35:00Z'
+updated: '2026-09-25T07:35:00Z'
 
 top_issues:
   - id: 'QA-4'
@@ -62,7 +62,7 @@ nfr_validation:
 
 bug_resolution:
   bugs_fixed: 2
-  bugs_remaining: 0
+  bugs_remaining: 1 # bug 3 (QA-4), filed by this gate. bugs_fixed counts cycle 1 bugs 1 and 2 (corrected in QA cycle 3, CR-2)
   fix_date: '2026-09-25'
   total_iterations: 1
   verification_method: 'QA re-mutation: a fifth bullet after the paragraph and the identity phrase leaked into the template each turned red the predicted test'

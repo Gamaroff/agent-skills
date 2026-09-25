@@ -150,7 +150,11 @@ test("the shared cycle-2 description names both refute probes", () => {
   const text = read("shared/resources/code-review-prompt.md");
   const start = text.indexOf("So on **cycle 2 only**");
   assert.ok(start !== -1, "code-review-prompt.md cycle-2 section not found");
-  const section = text.slice(start, text.indexOf("\nCycles 3+", start));
+  // Floor the END anchor too: indexOf → -1 would slice to the end of the file
+  // and let these assertions match text outside the section (task.146 QA-7).
+  const end = text.indexOf("\nCycles 3+", start);
+  assert.ok(end !== -1, "code-review-prompt.md cycle-2 section end not found");
+  const section = text.slice(start, end);
   assert.match(section, /teardown ·\s+in-flight · error path · reconnect/);
   assert.match(
     section,
