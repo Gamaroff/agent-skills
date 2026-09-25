@@ -1,0 +1,25 @@
+schema: 1
+task: "task.SYNTH.medium-two-files"
+gate: CONCERNS
+status_reason: "Two MEDIUMs on two different files. Not one mechanism by the only checkable measure, so it must not fire."
+reviewer: "QA Engineer"
+updated: "2026-09-25T12:00:00Z"
+
+top_issues:
+  - id: "TF-001"
+    severity: medium
+    file: "skills/example/scripts/derive.mjs"
+    finding: "The derivation mislabels one legacy case."
+    suggested_owner: dev
+    status: open
+  - id: "TF-002"
+    severity: medium
+    file: "skills/example/SKILL.md"
+    finding: "The prose describing the derivation is out of date."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80

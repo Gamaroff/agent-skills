@@ -5,18 +5,22 @@ type: task
 description: "Give qa-fix a step that offers a structural move — consolidate the contract into one enumerable place, or scope a best-effort claim down — before it patches the same subject again; give the QA loop a checkable narrowing-residue signal (HIGH 0 on two consecutive gates, every MEDIUM on one file) that hands qa-fix that offer instead of letting the loop run to its budget; and widen qa-fix Step 3.5's documentation probe from the edited file to every executed document that restates the subject."
 tags: [qa-fix, qa-loop, develop-task, develop-story, observation]
 category: other
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-25
 assignee:
 estimated_effort_hours: 16
 github_issue: 478
+completed_date: 2026-09-25
+pr_number: 492
 ---
 
 # Technical Task: qa-fix and the QA loop — offer a structural move before another prose patch
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.148.review.1.structural-move-before-prose-patch.md` implemented 2026-09-25
 
 **GitHub Issue**: [#478](https://github.com/Gamaroff/agent-skills/issues/478)
 
@@ -123,8 +127,10 @@ prompted with the structural move before it writes another rule.
 - `:607` *(`### Step 3.5: Adversarial pass over the fixes themselves`)*. The documentation-deliverable
   table starts at `:631` and scopes the problem to "a *sentence elsewhere in the same file*". Row 1 is
   at `:638` (`Grep the file for other statements about the same subject`).
-- Sibling in flight: **task.146** (planned) adds an identity-rule table to the same Step 3.5, after the
-  documentation table. The two tasks touch adjacent lines of one section and are otherwise independent.
+- Sibling, already merged: **task.146** (`accepted`; `6090aea6`, `b6bf41d5`) added an identity-rule table
+  to the same Step 3.5, after the documentation table. The anchors above are measured on the tree that
+  carries it. This task edits the documentation table's lead paragraph and row 1 only, and leaves
+  task.146's table untouched.
 
 **The QA loop** (`shared/resources/develop-pipeline-step-5-6-qa-loop.md`, bundled into
 `skills/develop-task/references/` and `skills/develop-story/references/` by `npm run bundle`):
@@ -134,11 +140,11 @@ prompted with the structural move before it writes another rule.
 | Convergence check        | `:530` *(`From cycle 3 onward, if \`HIGH_N > 0\``)*               | HIGH was 0 on all 7 gates                             |
 | Diminishing-returns exit | `:630` *(`` `HIGH_N == 0` **and** `HIGH_{N-1} == 0` ``)*          | needs every `file:` in `qa.testArtifactGlobs`         |
 | Cosmetic residue (2b)    | `:685` heading                                                    | PASS-only; every task.143 gate read CONCERNS          |
-| Gate-the-last-fix (2c)   | `:1351` *(`MEDIUM_N < MEDIUM_{N-1} < MEDIUM_{N-2}`)*              | declined twice as `medium-not-falling`                |
+| Gate-the-last-fix (2c)   | `:1372` *(`MEDIUM_N < MEDIUM_{N-1} < MEDIUM_{N-2}`)*              | declined twice as `medium-not-falling`                |
 | Third strike             | `:814` *(`The permitted moves are exactly three`)*                | HIGH `file:` only                                     |
 | Pre-strike shape         | `:825` *(`A recognisable pre-strike shape`)*                      | HIGH only                                             |
 
-Two standing constraints bind any new guard. First, there is exactly one escalation path (`:1280`,
+Two standing constraints bind any new guard. First, there is exactly one escalation path (`:1301`,
 *There is deliberately no second escalation path*). Escalating a HIGH-0 run "would misreport finished
 work as stalled" (`:580`); that is the task.110 precedent behind the Convergence precondition. Second,
 a trigger must be checkable against the diff, never a field the constrained party fills in (`:859`,
@@ -238,7 +244,14 @@ Reasons: `narrowing-residue`, `below-cycle-floor`, `high-counts-missing`, `high-
 
 **Loop document, 5b: `#### Narrowing-residue offer`** (new, after the third-strike rule and before
 *Where the gate and QA report get committed*). It calls the predicate with `$CYCLE`,
-`$HIGH_SEQUENCE_JSON`, `$GATE_N` and `$GATE_N1`, which the third-strike rule already binds. When
+`$HIGH_SEQUENCE_JSON`, `$GATE_N` and `$GATE_N1`, and **binds them in its own `| Variable | Where it
+comes from |` table**, in the shape the Diminishing-returns exit (`:593`) and route 2c (`:1354`) use.
+None of the four is bound where this section sits: `$CYCLE` and `$HIGH_SEQUENCE_JSON` are bound in
+5a's Diminishing-returns table, and `$GATE_N` / `$GATE_N1` appear in the third-strike snippet (`:810`)
+with no binding anywhere in the document. So the table states each: `$CYCLE` = the Loop Setup counter,
+`$HIGH_SEQUENCE_JSON` = the `**HIGH findings**` rows as in 5a, `$GATE_N` = cycle N's gate (the
+Loop Setup gate path), `$GATE_N1` = cycle N-1's gate (`…gate.{N-1}.{name}.yml`; absent at cycle 1,
+which the predicate reads as `below-cycle-floor`). When
 `signal` is true, it appends one prompt block to the `/qa-fix` invocation. The block names the file,
 the two cycles and the MEDIUM ids, and says *"apply qa-fix Step 2.6"*. It **cites** the menu and does
 not restate it (the obs #174 principle applied to this task's own text). No route, cycle-entry row or
@@ -301,38 +314,38 @@ field, cycle-entry row, route or escalation trigger changes.
 
 **Files**: `shared/resources/qa-diminishing-returns.js`, `shared/resources/tests/qa-narrowing-residue.test.mjs`, `shared/resources/tests/fixtures/qa-narrowing-residue/`
 
-- [ ] Add `classifyNarrowingResidue` and `describeNarrowingResidue`; export both
-- [ ] HIGH is read only from `highCounts`, so the engine's source guard stays green
-- [ ] Fixture table of 13 rows (listed in § 8), each mutation-proved
+- [x] Add `classifyNarrowingResidue` and `describeNarrowingResidue`; export both
+- [x] HIGH is read only from `highCounts`, so the engine's source guard stays green
+- [x] Fixture table of 13 rows (listed in § 8), each mutation-proved — shipped as 16 (see Implementation Record)
 
 ### Phase 2: route-table pins (Risk: Low)
 
 **Files**: `shared/resources/tests/qa-loop-route.test.mjs`
 
-- [ ] Add 2 rows to `ROWS` pinning that task.143's shape still routes `continue` (§ 8)
+- [x] Add 2 rows to `ROWS` pinning that task.143's shape still routes `continue` (§ 8)
 
 ### Phase 3: loop wiring (Risk: Medium)
 
 **Files**: `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `evals/shared/tests/qa-narrowing-offer-wiring.test.mjs`
 
-- [ ] Add `#### Narrowing-residue offer` in 5b after the third-strike rule, with the `command node -e` call and the prompt block
-- [ ] The prompt block cites `qa-fix` Step 2.6 and does not restate its menu
-- [ ] `npm run bundle` refreshes both `references/` copies
+- [x] Add `#### Narrowing-residue offer` in 5b after the third-strike rule, with its own `| Variable | Where it comes from |` table (`$CYCLE`, `$HIGH_SEQUENCE_JSON`, `$GATE_N`, `$GATE_N1`), the `command node -e` call and the prompt block
+- [x] The prompt block cites `qa-fix` Step 2.6 and does not restate its menu
+- [x] `npm run bundle` refreshes both `references/` copies
 
 ### Phase 4: qa-fix (Risk: Low)
 
 **Files**: `skills/qa-fix/SKILL.md`, `tests/qa-fix-structural-move.test.js`
 
-- [ ] Add Step 2.6, with its two triggers, the four-move menu and the fixed fix-summary shape; cite obs #167 and #172
-- [ ] Step 3.5: change the lead paragraph to "in this file or in another file that restates it"; row 1 gets the population command, the population-size requirement and the pointer to Step 2.6; cite obs #174
-- [ ] Step 3.5 row 1: the fix summary records the population command and every hit with its disposition (`Probe:` block: command, then one line per hit, `updated` or `unaffected — {why}`). A documentation fix whose summary has no `Probe:` block has not run the probe. Cite obs #177
+- [x] Add Step 2.6, with its two triggers, the four-move menu and the fixed fix-summary shape; cite obs #167 and #172
+- [x] Step 3.5: change the lead paragraph to "in this file or in another file that restates it"; row 1 gets the population command, the population-size requirement and the pointer to Step 2.6; cite obs #174
+- [x] Step 3.5 row 1: the fix summary records the population command and every hit with its disposition (`Probe:` block: command, then one line per hit, `updated` or `unaffected — {why}`). A documentation fix whose summary has no `Probe:` block has not run the probe. Cite obs #177
 
 ### Phase 5: docs and validation (Risk: Low)
 
 **Files**: `CHANGELOG.md`
 
-- [ ] Cite `(task 148)` under CHANGELOG `[Unreleased]`
-- [ ] Run `npm run ci:fast`, `npm run bundle:check`, and `npm run validate` on qa-fix, develop-task and develop-story
+- [x] Cite `(task 148)` under CHANGELOG `[Unreleased]`
+- [x] Run `npm run ci:fast`, `npm run bundle:check`, and `npm run validate` on qa-fix, develop-task and develop-story
 
 ---
 
@@ -419,12 +432,15 @@ These are the fixture rows added to `ROWS`. Both assert that the new signal is *
   **execute it** in a temporary git repository. The repository has the phrase in `skills/a/SKILL.md`,
   `skills/b/SKILL.md` and `shared/resources/x.md` (these count). It also has the phrase in
   `skills/a/references/x.md`, `shared/resources/tests/fixtures/y.md` and `docs/tasks/t.md` (these must
-  not count). Assert exactly 3 paths.
+  not count). Assert exactly 3 paths. *As shipped (QA cycles 1–2):* a hand-authored
+  `skills/b/references/hand.md` also counts, and `skills/a/references/x.md` carries the
+  generated-copy marker; the test asserts exactly **4** paths, from the repository root and from a
+  subdirectory.
 
 ### Wiring test: loop document (`evals/shared/tests/qa-narrowing-offer-wiring.test.mjs`)
 
-- The 5b section contains `#### Narrowing-residue offer`, calls `classifyNarrowingResidue`, and names
-  `qa-fix` Step 2.6.
+- The 5b section contains `#### Narrowing-residue offer`, calls `classifyNarrowingResidue`, names
+  `qa-fix` Step 2.6, and binds every variable its snippet reads in the section's own Variable table.
 - **Single statement**: the loop document has no `Scope the claim` or `Consolidate the contract` menu
   row. The menu lives only in `qa-fix`.
 - **Behaviour**: extract the section's `command node -e` block and run it from a consumer-shaped
@@ -450,22 +466,22 @@ expected to record a Step 2.6 move, and the report says which one.
 
 ### Functional
 
-- [ ] `classifyNarrowingResidue` fires on task.143 at cycles 2, 3 and 6 and at no other cycle: rows 1–7 of `qa-narrowing-residue.test.mjs`
-- [ ] The predicate declines on HIGH present, on files that differ, on a missing `file:` and on unreadable input, and it counts closed MEDIUMs: rows 8, 10, 11, 12 and 13 of `qa-narrowing-residue.test.mjs`
-- [ ] `classifyLoopRoute` is unchanged on task.143's shape: the 2 new `ROWS` in `qa-loop-route.test.mjs`
-- [ ] The loop's 5b offer runs from a consumer-shaped cwd and returns `signal: true` on task.143 cycle 3: `qa-narrowing-offer-wiring.test.mjs`
-- [ ] `qa-fix` Step 2.6 carries the triggers, the four moves and the fix-summary shape: `qa-fix-structural-move.test.js`
-- [ ] The Step 3.5 population command returns exactly the 3 restating files in the fixture repository: `qa-fix-structural-move.test.js`
-- [ ] Step 3.5 row 1 requires a `Probe:` block recording the command and every hit's disposition, and cites obs #177: `qa-fix-structural-move.test.js`
+- [x] `classifyNarrowingResidue` fires on task.143 at cycles 2, 3 and 6 and at no other cycle: rows 1–7 of `qa-narrowing-residue.test.mjs`
+- [x] The predicate declines on HIGH present, on files that differ, on a missing `file:` and on unreadable input, and it counts closed MEDIUMs: rows 8, 10, 11, 12 and 13 of `qa-narrowing-residue.test.mjs`
+- [x] `classifyLoopRoute` is unchanged on task.143's shape: the 2 new `ROWS` in `qa-loop-route.test.mjs`
+- [x] The loop's 5b offer runs from a consumer-shaped cwd and returns `signal: true` on task.143 cycle 3: `qa-narrowing-offer-wiring.test.mjs`
+- [x] `qa-fix` Step 2.6 carries the triggers, the four moves and the fix-summary shape: `qa-fix-structural-move.test.js`
+- [x] The Step 3.5 population command returns exactly the restating files in the fixture repository: 4 hand-authored paths, as widened in QA cycle 1, from any cwd (QA cycle 2): `qa-fix-structural-move.test.js`
+- [x] Step 3.5 row 1 requires a `Probe:` block recording the command and every hit's disposition, and cites obs #177: `qa-fix-structural-move.test.js`
 
 ### Performance
 
-- [ ] The predicate and route tests run in under one second (pure, no I/O in the engine)
-- [ ] The git-fixture and snippet tests use only a temporary directory and no network
+- [x] The predicate and route tests run in under one second (pure, no I/O in the engine)
+- [x] The git-fixture and snippet tests use only a temporary directory and no network
 
 ### Code Quality
 
-- [ ] Every assertion is mutation-proved, and the implementation report records each result:
+- [x] Every assertion is mutation-proved, and the implementation report records each result:
   - drop condition 2 → row 8 goes red;
   - use open-only counting → row 12 goes red;
   - allow two files → row 10 goes red;
@@ -474,13 +490,13 @@ expected to record a Step 2.6 move, and the report says which one.
   - delete the `Probe:` block requirement → the qa-fix test goes red;
   - paste the menu into the loop document → the single-statement test goes red;
   - fold the signal into `classifyLoopRoute` as a route → a route-table row goes red.
-- [ ] `qa-diminishing-returns.test.mjs` group 7 stays green, because the engine still counts no HIGH
-- [ ] `npm run ci:fast`, `npm run bundle:check` and `npm run validate` pass for qa-fix, develop-task and develop-story
+- [x] `qa-diminishing-returns.test.mjs` group 7 stays green, because the engine still counts no HIGH
+- [x] `npm run ci:fast`, `npm run bundle:check` and `npm run validate` pass for qa-fix, develop-task and develop-story
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 148)`
-- [ ] The implementation report records the Step 2.6 hand run
+- [x] CHANGELOG `[Unreleased]` cites `(task 148)`
+- [x] The implementation report records the Step 2.6 hand run
 - [ ] Observations #167, #172, #174 and #177 are set to `actioned` on merge. #172's resolution names Open Question 2 as the remaining work.
 
 ---
@@ -500,12 +516,13 @@ None.
    - Mitigation: **patch** is a named move, and its "why" line is required. The fixture table records
      task.117 as a firing row with that answer. The signal changes no route, so a false positive costs
      one line in the fix summary.
-2. **Merge conflict with task.146 in qa-fix Step 3.5**
-   - Risk: both tasks edit Step 3.5. task.146 appends a table after the documentation table, and this
-     task rewrites that table's row 1 and lead paragraph.
-   - Probability: Medium · Impact: Low
-   - Mitigation: the edits are adjacent but not overlapping. Whichever task lands second rebases. Each
-     task's test extracts the section by heading, not by line number.
+2. **Collision with task.146's Step 3.5 table (merged)**
+   - Risk: task.146 appended an identity-rule table after the documentation table, and its test
+     (`tests/identity-rule-probe.test.js`) reads Step 3.5. Rewriting row 1 and the lead paragraph could
+     disturb what that test extracts.
+   - Probability: Low · Impact: Low
+   - Mitigation: edit only the lead paragraph and row 1; run `tests/identity-rule-probe.test.js` after
+     Phase 4. This task's own test extracts the section by heading, not by line number.
 
 ### Low Risk Areas
 
@@ -554,6 +571,57 @@ None.
 - **Non-critical**: noisy offers. Fix forward.
 
 ---
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-25
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.148.qa.3.structural-move-before-prose-patch.md](./task.148.qa.3.structural-move-before-prose-patch.md)
+- **Gate File**: [task.148.gate.3.structural-move-before-prose-patch.yml](./task.148.gate.3.structural-move-before-prose-patch.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 121
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Bugs 1–3 are fixed and closed across three QA cycles. Six advisory findings remain in the gate's
+`recommendations.future`. The most significant says the "never record a population of 0" rule
+misreads a fix that removes the phrase, or a file that is untracked.
+
+---
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.148.qa.3.structural-move-before-prose-patch.md`
+**Gate File**: `task.148.gate.3.structural-move-before-prose-patch.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (3 cycles; bugs 1–3 fixed and closed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 14/14 implementation criteria met. AC15 (observations actioned on merge) is post-merge by its own wording.
+✅ **Tests:** 36 new tests at first review, 121 across the affected suites. Every rule is mutation-proved (14 + 8 + 7 mutants). `ci:fast` 4152/0.
+✅ **PR Review:** PR #492. The Step 5c `/review-pr` verdict was CONCERNS (advisory): PC-1 fixed, PC-2 resolved here, CR-1 carried as a follow-up.
+✅ **CI:** SUCCESS on `94dfc46d` (reading 1). Reading 2 is taken on the acceptance commit.
+✅ **Documentation:** qa-fix SKILL.md, the QA-loop document and the engine, with bundled copies regenerated; CHANGELOG `[Unreleased]` cites (task 148).
+✅ **Security Review:** PASS. `boundary: false`, agreed independently by QA and the DoD agent.
+✅ **Compliance Review:** NOT_APPLICABLE (internal skill tooling).
+
+**Task marked as ACCEPTED on:** 2026-09-25
+
+**Detailed Verification Log:** See `task.148.dod.1.structural-move-before-prose-patch.md` for the verification evidence and timestamps.
+
+---
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -561,17 +629,137 @@ None.
 |------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #167, #172, #174 (2026-09-24 observation review)       | create-task |
 | 2026-09-25 | 1.1 | Scope widened: obs #177 folded in. Step 3.5 row 1 also requires a Probe: block (command plus per-hit disposition), with a matching test assertion, mutation and success criterion | observe-work |
+| 2026-09-25 | 1.2 | Review passed (9/10) — task.146 recorded as merged (risk 2 rewritten); the 5b offer binds its own four inputs in a Variable table ($GATE_N/$GATE_N1 are bound nowhere today); two drifted loop-document anchors corrected (:1301, :1372) | review-task |
+| 2026-09-25 |  | Status → ready-for-development | review-task |
+| 2026-09-25 |  | Implemented — 3 source files + CHANGELOG, 4 test files (36 new tests), 13 fixtures + README | develop |
+| 2026-09-25 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-09-25 |  | QA gate CONCERNS (80/100) — 1 finding (cycle 2) | qa-task |
+| 2026-09-25 |  | QA gate PASS (100/100) — 0 findings, 6 advisory (cycle 3) | qa-task |
+| 2026-09-25 |  | QA findings fixed — gate PASS (100/100), 2 iterations | qa-fix |
+| 2026-09-25 | 1.3 | DoD passed — accepted (PR #492) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: engine predicate
-- [ ] Phase 2: route-table pins
-- [ ] Phase 3: loop wiring
-- [ ] Phase 4: qa-fix
-- [ ] Phase 5: docs and validation
+- [x] Phase 1: engine predicate
+- [x] Phase 2: route-table pins
+- [x] Phase 3: loop wiring
+- [x] Phase 4: qa-fix
+- [x] Phase 5: docs and validation
+
+---
+
+## Implementation Record
+
+**Implementation Summary.** The engine has a new pure predicate, `classifyNarrowingResidue`, and a
+describer. The QA loop's 5b has a *Narrowing-residue offer* that binds its own four inputs, runs the
+predicate and appends a prompt block to `/qa-fix` when it fires. `qa-fix` has a new Step 2.6 that
+holds the four-move menu, and Step 3.5's documentation row 1 now names a population command and
+requires a `Probe:` block. The route classifier is unchanged, and two new route-table rows pin that.
+
+**Start / completion date.** 2026-09-25 / 2026-09-25 (`/develop-task` run 1, dispatched by
+`/develop-next`).
+
+**Implementation approach.**
+
+- **Phase 1.** `classifyNarrowingResidue` sits beside `classifyLoopRoute` and reuses `readTopIssues`,
+  `allInts` and `normalisePath`. HIGH is read only from `highCounts`, so the group 7 source guard
+  stays green. `NARROWING_WINDOW = 2` is the number of gates compared, and it is also the cycle
+  floor. The input carries exactly two gates, so raising it to 3 moves only the floor (mutation: rows
+  1, 8 and 9 go red). It returns `input-unreadable` when reading the input throws, which is one reason
+  beyond the task's list. Two synthetic rows were added (14: two files inside one gate; 15:
+  `highCounts` shorter than the cycle), so there were 15 rows at develop time. QA cycle 2 added row 16
+  (`cycle-missing` for a non-integer cycle), so there are **16**, not 13.
+- **Phase 2.** Two rows appended to `ROWS`, reading the new fixtures directory through `nr()`.
+- **Phase 3.** The section binds `$CYCLE`, `$HIGH_SEQUENCE_JSON`, `$GATE_N` and `$GATE_N1` in its
+  own Variable table (review 1, I-1). The plan's "the third-strike rule binds them" was not true, and
+  the review caught it before implementation. The section logs `.message` in the Decisions Log, not on
+  the cycle entry's `**Action**` row, because route 2c reads that row and requires it to begin
+  `Running qa-fix`.
+- **Phase 4.** Step 2.6 sits between Step 2.5's fix-summary block and Step 3. Step 3.5 row 1
+  points to a `bash` block directly under the table (a table cell cannot hold a fence), followed by
+  the `Probe:` shape. The `Probe:` example uses placeholders, not a real phrase: an example that
+  quotes a real phrase with a made-up population would be a false claim in the one place this row
+  exists to stop them.
+- **Phase 5.** CHANGELOG `[Unreleased]` › Added: two entries citing `(task 148)`.
+
+**Testing results.** New: `qa-narrowing-residue.test.mjs` (20), two `qa-loop-route.test.mjs` rows,
+`qa-narrowing-offer-wiring.test.mjs` (5) and `qa-fix-structural-move.test.js` (9), 36 in all.
+Together with the existing route table, the four files run 68/68. `tests/identity-rule-probe.test.js`
+(task.146's Step 3.5 test) still passes 7/7. `npm run ci:fast` (format:check and `npm test`, with the
+`.agents/skills` symlink moved aside): 4140 passed, 0 failed. Also clean: `npm run bundle:check`, and
+`quick_validate` on qa-fix, develop-task and develop-story.
+
+**Mutation proofs** (each mutant restored from a `cp` snapshot; `diff -q` confirmed the restore):
+
+| Mutation | Test that went red |
+| :--- | :--- |
+| Drop the HIGH condition | row 8 |
+| Count open MEDIUMs only | row 12 |
+| Allow two files | rows 10 and 14 |
+| `NARROWING_WINDOW = 3` | rows 1, 8 and 9 |
+| Drop the missing-`file:` check | row 11 |
+| Fold a narrowing route into `classifyLoopRoute` | the task.143 cycle 3 route row |
+| Paste a menu row into the loop document | single-statement test |
+| Unbind `$GATE_N1` in the Variable table | the binding test |
+| Misspell the export in the snippet | both snippet-execution tests |
+| Rename the loop section | the presence, binding and snippet tests |
+| Drop `:(glob)` | the population test (the fixture file joins, so there are 4 hits) |
+| Restore `Grep the file` in row 1 | the row 1 test |
+| Delete the `Probe:` requirement | the Probe test |
+| Delete Step 2.6 | all five Step 2.6 tests |
+
+**Behavioural evidence: the Step 2.6 hand run.** This was a desk application, not a live `/qa-fix`
+invocation. A live run against task.143's gate 3 would rewrite task.143's shipped code. The
+predicate fires on gates 2→3 (trigger (a), `skills/qa-next/scripts/uat-status.mjs`,
+TASK-143-BUG-4-PHASE / -TZ). The subject is the v0.51.0 legacy date-exclusion derivation of
+`priorRuns`. It lacks the fact it needs: v0.51.0 recorded no `runFile`, and a date-and-env filename
+cannot distinguish an interrupted run's file from an earlier committed one. That fits **scope the
+claim**, not another phase rule plus a timezone rule. It is the move task.143 reached by judgement at
+cycles 3 and 6: it flagged the from-`executed` derivation `unverifiable`. That is also the LOW
+finding's own suggested action on the same gate. Recorded as:
+
+```
+Narrowing residue: v0.51.0 legacy date-exclusion derivation of priorRuns (pipeline offer)
+Move: scope the claim — the derivation lacks the runFile v0.51.0 never recorded, so flag it unverifiable instead of adding a phase and a timezone rule
+```
+
+**QA cycle 1 fixes** (gate 1 CONCERNS, 2 MEDIUM promoted from code review, plus advisory findings
+taken where they touched the same block):
+
+- **CR-1**: the Step 3.5 population now includes the 70 hand-authored `skills/*/references/*.md`, and
+  drops generated copies by their marker line rather than by directory.
+- **CR-2**: the offer snippet hands an unparseable HIGH sequence to the engine (`high-counts-missing`)
+  and reports `SIGNAL=error` when the engine did not run.
+- **CR-3**: a population above 1 asks for the Step 2.6 move chosen, recorded as a `Move:` line in
+  `Probe:`; it no longer says the population *is* that move.
+- **CR-4**: the offer's inputs are described as substituted from the table.
+- **CR-5**: Step 7's fix-summary template has a slot for the Probe, Narrowing residue and Struck
+  mechanism blocks.
+- **CR-6**: the prompt block no longer doubles its prefix.
+- **CR-7**: the not-a-route property is held by a source read of `classifyLoopRoute` and by
+  deep-equal pairs on a PASS gate where the signal fires. The route-table comment no longer claims
+  more than those rows pin.
+
+Eight mutations, each red on its named test. The Step 3.5 probe, run on this cycle's own edits,
+found that Step 2.6 trigger (a) still described the old `Narrowing residue: …` prefix. It was fixed
+in the same cycle.
+
+**QA cycle 2 fixes** (gate 2 CONCERNS, 1 MEDIUM, from the refute pass). The documentation-probe
+trigger now names the population command as the one definition of the executed-document set, and a
+test holds the two sets equal. This is qa-fix Step 2.6 trigger (b), move **consolidate** — the first
+use of the step this task adds, on its own finding. Reproduced advisory findings were fixed in the
+same cycle: the population is cwd-independent (`:(top,glob)`, `--full-name`), and a population of 0
+is a probe that did not run; an unbound cycle is `cycle-missing`, and every could-not-look reason
+reports `SIGNAL=error`. Also fixed: gate-driven entry only; the real binders named; the escaping rule;
+the test header. Deferred: a `:line` suffix on `file:` and the marker's header position. Seven
+mutations, all covered.
+
+**Deferred work.** Open Question 1 (escalating an unanswered offer) and Open Question 2 (authoring-side
+exact vs best-effort declaration, obs #172 improvement 3) remain. Observations #167, #172, #174 and
+#177 are set to `actioned` on merge, which is the post-merge Migration criterion.
 
 ---
 

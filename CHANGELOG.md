@@ -6,6 +6,25 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **qa-fix Step 2.6 and the QA loop's narrowing-residue offer — a structural move before another
+  prose patch (task 148).** A loop could spend its budget at HIGH 0 with each cycle's MEDIUM narrowing
+  one mechanism (task.143: 7 cycles, MEDIUM `2, 1, 2, 0, 1, 1, 0`), and none of its four guards fit
+  that shape. `classifyNarrowingResidue` in `qa-diminishing-returns.js` now fires when every MEDIUM on
+  the last two gates names one `file:` at HIGH 0 (on task.143: cycles 2, 3 and 6). The loop's new 5b
+  *Narrowing-residue offer* passes the result to `/qa-fix` as a prompt block. It is an **offer, not a
+  route**: `classifyLoopRoute` is unchanged, and nothing escalates on it. `qa-fix` Step 2.6 holds the
+  menu (consolidate the contract, scope the claim, waive, patch) and records the chosen move in a
+  fixed fix-summary shape. It also runs when the fixer sees a finding on a subject the previous fix
+  edited (obs #167, #172).
+- **qa-fix Step 3.5's documentation probe reaches every file that restates the subject, and leaves a
+  record (task 148).** Row 1 said "grep the file", so a restatement in another file went unseen
+  (task.124's four-cycle chain, obs #174). It now names a `git grep` population command over every
+  `skills/*/SKILL.md`, every `shared/resources/*.md` and every hand-authored
+  `skills/*/references/*.md` (generated copies are removed by their marker line; `:(glob)` keeps test
+  fixtures out). It requires the population size, asks for the Step 2.6 move chosen when the
+  population is above 1, and requires a `Probe:` block in the fix summary: the command, then each hit
+  as `updated` or `unaffected — {why}` (obs #177). Step 7's fix-summary template gains a slot for
+  these blocks.
 - **`uat-status.mjs` owns `/qa-next`'s run state file — `--state-init`, `--state-get`,
   `--state-set`, `--state-clear` and an exported `STATE_FIELDS` schema (task 143).**
   `.claude/state/qa-next.state.json` (the single-flight lock and resume record) was a JSON shape

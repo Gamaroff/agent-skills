@@ -864,6 +864,86 @@ constrains and is unfalsifiable: an agent that classifies its residual findings 
 the loop a cycle sooner and nothing can catch it. Keep any future trigger for this rule on the same
 footing.
 
+#### Narrowing-residue offer — a structural move before another patch (obs #172)
+
+The third strike above is HIGH-only, and so is its pre-strike shape. A loop can also spend its budget
+at **HIGH 0**, with each cycle's MEDIUM narrowing one mechanism: task.143 ran 7 cycles, MEDIUM
+`2, 1, 2, 0, 1, 1, 0`, every MEDIUM from cycle 2 in one legacy-migration derivation, and none of the
+Convergence check, the third strike, route 2 or route 2c fits that shape. This check **does not stop
+the loop**. It tells `/qa-fix` that the shape is present, so the fixer is offered a change of shape
+before it writes another correction.
+
+**Run it only when 5b is entered from 5a** — a gate with open findings. On a 5c `REQUEST CHANGES`
+re-entry, skip it: there the review's findings are the work, and the gate's residue has already been
+routed. A gate-derived offer would reopen what route 2 or 2b declined.
+
+Its four inputs come from the table below. None is assigned inside the block, and none is bound
+where this section sits: `$CYCLE` is the Loop Setup counter, `$HIGH_SEQUENCE_JSON` is the value the
+Diminishing-returns exit's table defines, and the third-strike snippet above reads `$GATE_N` /
+`$GATE_N1` without binding them. Substitute each from its row before running the block:
+
+| Variable | Where it comes from |
+| :--- | :--- |
+| `$CYCLE` | the QA cycle counter from **Loop Setup** — the cycle whose gate was just written |
+| `$HIGH_SEQUENCE_JSON` | the `**HIGH findings**` rows of the `### QA Cycle {N}` entries in QA Iteration History, oldest first, as a JSON array — the same value the Diminishing-returns exit reads; do **not** recount it from the gates |
+| `$GATE_N` | cycle `N`'s gate — the path **Finding the Latest Gate File** resolves (`…gate.{N}.{name}.yml`); the same path the Diminishing-returns exit's table names `$LATEST_GATE` |
+| `$GATE_N1` | cycle `N-1`'s gate (`…gate.{N-1}.{name}.yml`, same directory). **Empty at cycle 1**, which the engine reads as `below-cycle-floor` — do not substitute another gate |
+
+```bash
+NARROWING_JSON=$(command node -e '
+  const fs = require("fs");
+  const { classifyNarrowingResidue, describeNarrowingResidue } =
+    require("./.agents/skills/{develop-story|develop-task}/references/qa-diminishing-returns.js");
+  const read = (p) => (p && fs.existsSync(p) ? fs.readFileSync(p, "utf8") : null);
+  // A sequence that does not parse is handed over raw: the engine answers high-counts-missing,
+  // which the case below reports as error. A throw here would print nothing at all.
+  let highCounts;
+  try { highCounts = JSON.parse(process.argv[2]); } catch { highCounts = process.argv[2]; }
+  const r = classifyNarrowingResidue({
+    cycle:               Number(process.argv[1]),
+    highCounts,
+    latestGateContent:   read(process.argv[3]),
+    previousGateContent: read(process.argv[4]),
+  });
+  console.log(JSON.stringify({ ...r, message: describeNarrowingResidue(r) }));
+' "$CYCLE" "$HIGH_SEQUENCE_JSON" "$GATE_N" "$GATE_N1")
+if [ -n "$NARROWING_JSON" ]; then
+  NARROWING_SIGNAL=$(printf '%s' "$NARROWING_JSON" | jq -r '.signal')
+  # Reasons that mean the check could not look are not verdicts: an unbound or malformed input,
+  # or a gate that did not read. They report as error, never as "no offer".
+  case "$(printf '%s' "$NARROWING_JSON" | jq -r '.reason')" in
+    cycle-missing|high-counts-missing|gate-unreadable|input-unreadable) NARROWING_SIGNAL=error ;;
+  esac
+else
+  # The engine did not run (not installed, or node failed). Say so; never read it as "no offer".
+  NARROWING_SIGNAL=error
+  echo "⚠️  narrowing offer: engine did not run — no verdict this cycle" >&2
+fi
+```
+
+When `NARROWING_SIGNAL` is `true`, append this block to the `/qa-fix` prompt, filling `{message}` from
+`.message` (it already opens `Narrowing residue — `) and `{file}` from `.file`:
+
+```
+{message}
+Apply qa-fix Step 2.6 before patching {file} again, and record the move in the fix summary.
+```
+
+The offer is **not a route and not an escalation** — `classifyLoopRoute` never reads it, and the loop
+continues exactly as it would without it. It changes one thing: what 5b tells the fixer. **The move
+menu lives in `qa-fix` Step 2.6 and is not restated here**; a second copy is the cross-file
+restatement obs #174 describes. When the signal is `false`, append nothing. When it is `error`, append nothing and log
+`narrowing offer: could not look ({reason}, or engine did not run)` in the Decisions Log — a check that could not look is recorded
+as such, never as a quiet cycle. Otherwise log
+`.message` in the Decisions Log — not on the cycle entry's `**Action**` row, which route 2c reads
+and requires to begin `Running qa-fix`.
+
+Keyed on `file:`, the signal cannot tell narrowing a side mechanism from refining the deliverable:
+task.117 gates 1→2 fire, and the right answer there was to patch. That is why the offer's menu
+includes **patch** with a stated reason, and why nothing here constrains the fix. The engine's fixture
+table — `qa-narrowing-residue.test.mjs`, beside the engine's suite under `tests/` — is the spec this
+section is written from.
+
 #### Where the gate and QA report get committed (one commit, one push, per cycle)
 
 **This cycle's gate `.yml` and QA report `.md` are evidence for this cycle's fix, and belong in the

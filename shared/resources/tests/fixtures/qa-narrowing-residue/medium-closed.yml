@@ -1,0 +1,25 @@
+schema: 1
+task: "task.SYNTH.medium-closed"
+gate: CONCERNS
+status_reason: "Two MEDIUMs on one file, both closed by this cycle's own fixes. Raised is what counts, not open."
+reviewer: "QA Engineer"
+updated: "2026-09-25T12:00:00Z"
+
+top_issues:
+  - id: "MC-001"
+    severity: medium
+    file: "skills/example/scripts/derive.mjs"
+    finding: "The derivation mislabels one legacy case."
+    suggested_owner: dev
+    status: closed
+  - id: "MC-002"
+    severity: medium
+    file: "skills/example/scripts/derive.mjs"
+    finding: "The fix for MC-001 exposes a narrower legacy case."
+    suggested_owner: dev
+    status: closed
+
+waiver:
+  active: false
+
+quality_score: 85

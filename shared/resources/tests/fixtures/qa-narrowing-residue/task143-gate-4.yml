@@ -1,0 +1,67 @@
+schema: 1
+task: 'task.143.qa-next-state-file-owned-by-the-tool'
+task_title: 'qa-next: uat-status.mjs owns the run state file, so its contract is held by tests instead of prose'
+gate: CONCERNS
+status_reason: 'TASK-143-BUG-4 fixed (phase, local date, unverifiable). Two LOW findings: SKILL.md gives a pre-upgrade run resumed at executed (runFile null) no instruction to obtain and record its run file, and one legacy test is timezone-dependent (fails under UTC+14). Security NFR stays CONCERNS on the pre-existing control-character labels only.'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T05:36:12Z'
+
+top_issues:
+  - id: 'TASK-143-QA4-1'
+    severity: low
+    file: 'skills/qa-next/SKILL.md'
+    finding: 'A v0.51.0 run resumed at executed has runFile null and v0.51.0 wrote its run file in Step 4, so on resume the file comes from this release --run-path (UTC today()), not the local date the derivation assumes; SKILL.md gives that resume no instruction to call --run-path and --state-set runFile, which would make priorRuns exact (CR-1, verified).'
+    suggested_action: 'In the resume map, tell a resumed run whose runFile is null to call --run-path and --state-set runFile before Step 4; limit the local-date premise in the comment/CHANGELOG to files v0.51.0 itself wrote.'
+    suggested_owner: dev
+  - id: 'TASK-143-QA4-2'
+    severity: low
+    file: 'evals/qa-next/unit/uat-status.test.mjs'
+    finding: 'platform-variance: the legacy runFile-null test pins startedAt 2026-09-24T12:00Z assuming every timezone is within 12h of UTC; under TZ=Pacific/Kiritimati (UTC+14) its local date is the 25th and the test fails (reproduced: TZ=Pacific/Kiritimati node --test evals/qa-next/unit/uat-status.test.mjs → 1 fail).'
+    suggested_action: 'Run that test''s tool calls under an explicit TZ, as the near-midnight tests do.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 60
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 19
+    notes: 'cli: probe re-run (task.143.qa.4.security.run.json): unchanged; only the pre-existing control-character labels reproduce (identical on develop), routed to future.'
+  performance:
+    status: PASS
+    notes: 'No network calls; 60 tests.'
+  reliability:
+    status: PASS
+    notes: 'The legacy derivation is exact before executed and flagged unverifiable after; the executed-resume gap (QA4-1) is LOW and disclosed by the flag.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory: a copied comment in the legacy test (CR-2).'
+
+bug_resolution:
+  TASK-143-BUG-4: 'FIXED — phase guard, local date, always-unverifiable from executed; mutation-proved'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-143-QA4-1 and TASK-143-QA4-2.'
+      refs: ['skills/qa-next/SKILL.md', 'evals/qa-next/unit/uat-status.test.mjs']
+  future:
+    - action: 'Refuse control characters in --env labels (pre-existing; probe-reproduced).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Lock ownership check on --state-set (cycle 2 CR-1).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-143-QA4-1 and QA4-2 fixed']

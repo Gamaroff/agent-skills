@@ -850,6 +850,173 @@ function classifyLoopRoute(input) {
   );
 }
 
+// ── the narrowing-residue signal (task.148, obs #172) ───────────────────────
+
+const NARROWING_WINDOW = 2; // gates compared: cycle N's and cycle N-1's (task.148 Open Question 3)
+
+function narrowing(signal, reason, detail, extra) {
+  return Object.assign(
+    { signal, reason, detail, file: null, ids: [], cycles: [] },
+    extra || {},
+  );
+}
+
+/**
+ * Is the loop narrowing one mechanism at HIGH 0? An OFFER to qa-fix Step 2.6,
+ * never a route: `classifyLoopRoute` does not call this, nothing here decides
+ * where the loop goes, and no escalation reads it. What it changes is what 5b
+ * tells the fixer.
+ *
+ * Fires only when ALL hold, over the last NARROWING_WINDOW gates:
+ *   1. cycle >= 2
+ *   2. HIGH 0 on both cycles — read from `highCounts`, never from the gates
+ *      (property 2: this module counts no HIGH; group 7 of the suite reads the
+ *      source for it). With HIGH present, the third strike and the Convergence
+ *      check own the run, so the two signals are disjoint by construction.
+ *   3. both gates RAISED at least one MEDIUM — `status: closed` included, as
+ *      `countRaised` counts, because a gate is updated in place after its own
+ *      cycle's fixes and an open-only reading sees every mature gate as empty
+ *   4. every MEDIUM on both gates names a `file:`, and there is exactly one
+ *      distinct `file:` across them. A missing `file:` fails the rule: the
+ *      signal needs positive evidence, as condition 2 of route 2 does.
+ *
+ * Keyed on `file:`, it cannot tell "narrowing a side mechanism" (task.143)
+ * from "refining the deliverable" (task.117 gates 1→2). That is why it is an
+ * offer whose menu includes `patch`, and not a constraint.
+ *
+ * @param {object} input
+ * @param {number}   input.cycle                the cycle whose gate was last read (1-based)
+ * @param {number[]} input.highCounts           HIGH_N per cycle from QA Iteration History (index 0 = cycle 1)
+ * @param {string|null} input.latestGateContent    full text of cycle N's gate
+ * @param {string|null} input.previousGateContent  full text of cycle N-1's gate
+ * @returns {{signal: boolean, reason: string, detail: string, file: string|null,
+ *            ids: string[], cycles: number[]}}
+ */
+function classifyNarrowingResidue(input) {
+  let cycle;
+  let highCounts;
+  let latestGateContent;
+  let previousGateContent;
+  try {
+    cycle = input && input.cycle;
+    highCounts = input && input.highCounts;
+    latestGateContent = input && input.latestGateContent;
+    previousGateContent = input && input.previousGateContent;
+  } catch {
+    return narrowing(false, "input-unreadable", "the inputs could not be read");
+  }
+
+  // 0 — a cycle that is not a positive integer is an unbound input, not cycle 1
+  if (!Number.isInteger(cycle) || cycle < 1) {
+    return narrowing(
+      false,
+      "cycle-missing",
+      `cycle ${describe(cycle)} is not a positive integer`,
+    );
+  }
+
+  // 1 — two gates to compare
+  if (cycle < NARROWING_WINDOW) {
+    return narrowing(
+      false,
+      "below-cycle-floor",
+      `cycle ${describe(cycle)} — the signal compares ${NARROWING_WINDOW} consecutive gates, so it is evaluated from cycle ${NARROWING_WINDOW}`,
+    );
+  }
+  const cycles = [cycle - 1, cycle];
+
+  // 2 — HIGH is an input
+  if (!allInts(highCounts, cycle)) {
+    return narrowing(
+      false,
+      "high-counts-missing",
+      `highCounts must hold an integer for each of cycles 1–${cycle}; got ${describe(
+        Array.isArray(highCounts) ? JSON.stringify(highCounts) : highCounts,
+      )}`,
+      { cycles },
+    );
+  }
+  const highPair = [highCounts[cycle - 2], highCounts[cycle - 1]];
+  if (highPair[0] !== 0 || highPair[1] !== 0) {
+    return narrowing(
+      false,
+      "high-findings-remain",
+      `HIGH reads ${highPair.join(", ")} over cycles ${cycles.join("–")} — with a HIGH present the third strike and the Convergence check own the run`,
+      { cycles },
+    );
+  }
+
+  // 3 — both gates readable, both raised a MEDIUM
+  const previous = readTopIssues(previousGateContent);
+  const latest = readTopIssues(latestGateContent);
+  if (previous === null || latest === null) {
+    return narrowing(
+      false,
+      "gate-unreadable",
+      `the gate for cycle ${previous === null ? cycle - 1 : cycle} could not be read`,
+      { cycles },
+    );
+  }
+  const mediums = [previous, latest].map((issues) =>
+    issues.filter((e) => e.severity === "medium"),
+  );
+  const empty = mediums.findIndex((m) => m.length === 0);
+  if (empty !== -1) {
+    return narrowing(
+      false,
+      "no-medium",
+      `the gate for cycle ${cycles[empty]} raised no MEDIUM`,
+      { cycles },
+    );
+  }
+
+  // 4 — every MEDIUM names a file, and it is one file
+  const all = mediums[0].concat(mediums[1]);
+  const unnamed = all.filter((e) => !e.file);
+  if (unnamed.length > 0) {
+    return narrowing(
+      false,
+      "medium-file-missing",
+      `${unnamed.length} MEDIUM entr${unnamed.length === 1 ? "y names" : "ies name"} no \`file:\` — the signal needs positive evidence`,
+      { cycles },
+    );
+  }
+  const files = [...new Set(all.map((e) => normalisePath(e.file)))];
+  if (files.length !== 1) {
+    return narrowing(
+      false,
+      "medium-files-differ",
+      `the MEDIUMs over cycles ${cycles.join("–")} name ${files.length} files: ${files.join(", ")}`,
+      { cycles },
+    );
+  }
+
+  const ids = all.map((e) => e.id).filter((id) => id);
+  return narrowing(
+    true,
+    "narrowing-residue",
+    `every MEDIUM on gates ${cycles.join(" and ")} names ${files[0]}; HIGH 0 on both`,
+    { file: files[0], ids, cycles },
+  );
+}
+
+/**
+ * One line for the `/qa-fix` prompt block and the implementation report.
+ */
+function describeNarrowingResidue(result) {
+  if (!result || typeof result !== "object") {
+    return "Narrowing residue: no verdict was produced";
+  }
+  if (!result.signal) {
+    return `Narrowing residue: not signalled (${result.reason}) — ${result.detail}.`;
+  }
+  const ids =
+    Array.isArray(result.ids) && result.ids.length > 0
+      ? ` (${result.ids.join(", ")})`
+      : "";
+  return `Narrowing residue — every MEDIUM on gates ${result.cycles.join(" and ")} names ${result.file}${ids}; HIGH 0 on both. This is an OFFER to qa-fix Step 2.6, not a route and not an escalation.`;
+}
+
 /**
  * One line per route for the cycle entry's `**Loop exit**` row. The
  * Diminishing-returns text is delegated verbatim so the pins on that message hold.
@@ -889,10 +1056,13 @@ module.exports = {
   // classify
   classifyDiminishingReturns,
   classifyLoopRoute,
+  classifyNarrowingResidue,
+  NARROWING_WINDOW,
   VERDICTS,
   ROUTES,
   CYCLE_FLOOR,
   // report
   describeDiminishingReturns,
   describeLoopRoute,
+  describeNarrowingResidue,
 };

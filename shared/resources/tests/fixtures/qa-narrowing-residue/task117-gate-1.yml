@@ -1,0 +1,86 @@
+schema: 1
+task: 'task.117.card-preflight-heading-only'
+task_title: 'The card preflight passes a Success Criteria block that renders as a bold label with nothing under it — 15 of 106 task docs'
+gate: CONCERNS
+status_reason: 'All five phases delivered and the corpus proof holds (29 → 0, mutation-proven red at 28). CONCERNS on three reproduced medium defects in the new heading-only property: its list-item half is inert because it reads post-collapse text (CR-1), terminator-less prose is taken as a label (CR-3), and the epic transform runs before the bold-label drop so epic cards are not fixed at all (CR-2). All three are in the queue for qa-fix.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T21:03:56Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/jira-sync.js'
+    finding: 'The no-list-item half of isLabelOnly is inert: it receives the summariser prose text whose newlines were already collapsed to spaces, so a lead-in ending in a colon with bullets directly beneath ("The task is done when all of:\n- a\n- b") raises a Critical heading-only finding.'
+    suggested_action: 'Evaluate the property against the pre-collapse section lines (return a hasListItems flag from summariseSection, or pass the dropped-heading lines), and add a fixture for lead-in colon + bullets with no blank line.'
+    suggested_owner: dev
+    bug_ref: 'task.117.bug.1.label-property-overbroad.md'
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/jira-sync.js'
+    finding: 'EPIC_CARD_SECTIONS.Summary.transform rewrites **Label:** to Label: BEFORE summariseSection, so the bold-label drop never sees an epic standalone label — the epic card still publishes "Existing System Context:" and stops, and the preflight now reports it as heading-only plus no-body although a list sits under the label.'
+    suggested_action: 'Drop standalone label lines before the transform (run dropHeadingLines on the raw section first, then transform), so the transform only sees mid-paragraph bold; add an epic fixture beside C2.'
+    suggested_owner: dev
+    bug_ref: 'task.117.bug.2.epic-transform-precedes-label-drop.md'
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'shared/resources/jira-sync.js'
+    finding: 'No sentence terminator alone is taken as proof of a label: a one-line Summary without a full stop, a Breaking Changes reading None, or a truncated paragraph ending in … becomes a heading-only finding that the review-* skills escalate to Critical (QA-promoted: reviewer confidence medium, all four shapes reproduced by QA).'
+    suggested_action: 'Tighten the property to describe a label rather than unpunctuated prose — trailing colon, or short and with omitted content beneath — and add fixtures for the one-line summary and None shapes.'
+    suggested_owner: dev
+    bug_ref: 'task.117.bug.1.label-property-overbroad.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 515
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+  corpus_before_fix: '29 of 120 task documents (heading-only on Success Criteria or Breaking Changes)'
+  corpus_after_fix: '0 of 120'
+  mutation_proofs: 2
+  security_probes: 161
+  snippet_blocks_executed: 3
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 161
+    notes: '73 corpus cases from all five sinks fed raw and wrapped as **label** + list through summariseSection and checkCardSections, plus 15 classifier-specific shapes (200k-char bold lines, 100k stars, alternating bold ×20k, ****, **:**, CRLF, unicode, indented, bold-in-list, null, **Ready?**). No throw; every probe under 50 ms (RE_BOLD_LABEL is linear — the character class excludes *, so no backtracking). 3 deviations, none introduced by this diff: **** with a list beneath is refused as heading-only rather than passed (safe direction); CRLF lists were never detected as lists because RE_BULLET (.*)$ cannot cross \r (pre-existing, untouched). No untrusted input reaches a shell — the classifier only decides what text reaches an ADF/markdown body.'
+  performance:
+    status: PASS
+    notes: 'One extra regex test per non-fence line in dropHeadingLines, linear. Probed with a 200,000-character bold line and 100,000 asterisks: < 50 ms each.'
+  reliability:
+    status: PASS
+    notes: 'The corpus test carries a non-vacuity floor (≥ 100 documents) and the 29 → 0 → 28 sequence was measured, not asserted. The rollback is one revert plus bundle, and the test names the state it would leave.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The affected-document count is stated four ways across the change (26 / 15 / 29 of 120 / 28 of 120) with no single definition (CR-5), and the heading-only message says "nothing under it" even when the summariser stopped in front of content (CR-4). Both are cleanups, both cheap; recorded so qa-fix takes them with the property rewrite rather than leaving two figures to drift.'
+
+recommendations:
+  immediate:
+    - action: 'Rewrite the heading-only property to read pre-collapse section lines and to describe a label (trailing colon, or short with omitted content beneath) rather than any terminator-less prose; fixtures for lead-in colon + bullets, one-line summary, Breaking Changes None, truncated paragraph (CR-1, CR-3)'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/tests/jira-sync-card-summary.test.mjs']
+    - action: 'Run dropHeadingLines before spec.transform so epic standalone labels are dropped; epic fixture beside C2 (CR-2)'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/tests/jira-sync-card-summary.test.mjs']
+  future:
+    - action: 'Branch the heading-only message on omitted: "content under the label did not reach the card" when omitted > 0 (CR-4); state the corpus figure once with its definition or cite the corpus test (CR-5)'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/authoring-card-preflight.md', 'CHANGELOG.md']
+    - action: 'RE_BULLET / RE_ORDERED cannot match a CRLF line ((.*)$ stops at \r) — pre-existing, found by the probe; normalise line endings once in extractSection or the parsers'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'skills/review-story/SKILL.md:2321 — the documented block ends in a false [ … ] && guard and so exits 1 in both shells; append || true (pre-existing, outside this diff)'
+      refs: ['skills/review-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1, CR-2, CR-3 fixed and mutation-proven; corpus test and the four sync-jira-* suites green'
