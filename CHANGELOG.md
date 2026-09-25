@@ -218,6 +218,14 @@ All notable changes to this project will be documented in this file. Format foll
     surface map, both recorded this run) and owes `/develop`'s own Story or Task Completion
     Checklist. `/develop` was the only named route before, so task.141's inline run had no stated
     path.
+  - **Added during QA, cycles 1–6: new ways a run can stop.** Step 8 check 5 now also fails when
+    Step 4's Pre-flight Guard held files that were never restored. The guard holds untracked paths
+    outside the Step 4 scope and records them in `.claude/state/step4-*.txt`. `verify-push-state.sh
+    --scope` exits 2 on a scope that matches no path git knows: a glob, `:/` magic, a case-folded
+    or symlinked spelling, `..` or the whole repository. The scope check and check 3 share one
+    `path_under` predicate, so no spelling passes vacuously. Step 8 takes `{extra-scope-paths}`,
+    which carries `docs/bugs/bug-registry.md` for a develop-bug general bug. A failed remote-branch
+    delete no longer reads as a failed merge.
 
 - **`security-probe.mjs` and `uat-status.mjs` now run when invoked through the `.agents/skills`
   symlink (obs #126).** Each engine decided whether it was the entry point by comparing
