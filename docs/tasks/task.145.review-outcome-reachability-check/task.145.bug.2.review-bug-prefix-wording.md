@@ -4,7 +4,7 @@
 **Bug ID**: TASK-145-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1; raised by code review CR-2 at medium confidence, confirmed by QA)
 **Date Found**: 2026-09-25
 
@@ -72,3 +72,4 @@ branch that fires). Say explicitly that the branch firing today is the Actual.
 | --- | --- | --- | --- |
 | 2026-09-25 | New | QA Engineer | QA cycle 1 (QA-2) |
 | 2026-09-25 | Ready for QA | qa-fix | Reworded for a pre-fix review |
+| 2026-09-25 | Closed | QA Engineer | verified FIXED at QA cycle 4 (residue CR3-3); holds at QA cycle 6 (suite 4002/4003 pass, 0 fail) |

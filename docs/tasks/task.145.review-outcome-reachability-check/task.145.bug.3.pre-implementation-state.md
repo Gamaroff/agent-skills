@@ -4,7 +4,7 @@
 **Bug ID**: TASK-145-BUG-3
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 2 refute pass, CR2-1)
 **Date Found**: 2026-09-25
 
@@ -72,3 +72,4 @@ finding with the author instead of rewriting it.
 | --- | --- | --- | --- |
 | 2026-09-25 | New | QA Engineer | QA cycle 2 |
 | 2026-09-25 | Ready for QA | qa-fix | cycle 2 fix |
+| 2026-09-25 | Closed | QA Engineer | verified FIXED at QA cycle 4 (residue CR3-2); holds at QA cycle 6 (suite 4002/4003 pass, 0 fail) |

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-145-BUG-9
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 4, CR4-1, confirmed by QA)
 **Date Found**: 2026-09-25
 
@@ -37,3 +37,4 @@ Attach "→ Important (check 10/7), not Critical" to the pattern line at both si
 | --- | --- | --- | --- |
 | 2026-09-25 | New | QA Engineer | QA cycle 4 |
 | 2026-09-25 | Ready for QA | qa-fix | cycle 4 fix |
+| 2026-09-25 | Closed | QA Engineer | verified FIXED at QA cycle 5; holds at QA cycle 6 (suite 4002/4003 pass, 0 fail) |

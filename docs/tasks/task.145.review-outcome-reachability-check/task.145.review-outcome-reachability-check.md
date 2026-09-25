@@ -309,21 +309,20 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.145.qa.5.review-outcome-reachability-check.md](./task.145.qa.5.review-outcome-reachability-check.md)
-- **Gate File**: [task.145.gate.5.review-outcome-reachability-check.yml](./task.145.gate.5.review-outcome-reachability-check.yml)
+- **Full Report**: [task.145.qa.6.review-outcome-reachability-check.md](./task.145.qa.6.review-outcome-reachability-check.md)
+- **Gate File**: [task.145.gate.6.review-outcome-reachability-check.yml](./task.145.gate.6.review-outcome-reachability-check.yml)
 
 ### Test Coverage Summary
 
 - **Tests Executed**: 4003 (4002 pass, 0 fail, 1 skipped)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (MEDIUM: 1, LOW: 2)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0 (MEDIUM: 1, LOW: 0 blocking; 4 advisory)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- CR5-1: this document's QA Testing Results / Change Log block was corrupted by stacked writes (rebuilt in this write).
-- CR5-2: the pattern-line hold does not tie the check number to its file.
-- CR5-3: "Cite that phase in the finding" has no finding at create-task.
+- The cycle-5 fixes hold: one heading of each (CR5-1), per-site pattern-line holds (CR5-2), per-site naming wording (CR5-3).
+- CR6-1: the loosened NAMED_PHASE hold checks only the verb, so a reworded naming sentence passes (bug 11).
 
 ---
 <!-- change-log-start -->
@@ -345,6 +344,7 @@ None.
 | 2026-09-25 |  | QA findings fixed — cycle 4 (CR4-1 pattern-line severity, CR4-2 canonical named-phase clause, CR4-3 STALE precedence, CR4-4) | qa-fix |
 | 2026-09-25 |  | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low); QA Testing Results / Change Log block rebuilt (CR5-1) | qa-task |
 | 2026-09-25 |  | QA findings fixed — cycle 5 (CR5-1 block rebuilt, CR5-2 per-site pattern holds, CR5-3 per-site citation) | qa-fix |
+| 2026-09-25 |  | QA gate CONCERNS (90/100) — 1 finding (1 medium); cycle 6 (granted); bugs 1–10 closed | qa-task |
 
 ---
 <!-- change-log-end -->
@@ -368,6 +368,16 @@ None.
 ---
 
 ## Notes
+
+### Deferred Work (QA cycle 6, diminishing-returns exit)
+
+- **CR6-1** ([bug 11](./task.145.bug.11.named-phase-hold-verb-only.md), medium): in
+  `tests/outcome-reachability-check.test.js`, `NAMED_PHASE` holds only the verb `Name that phase|task`,
+  so a reworded naming sentence passes. The loop exited on route 2 because the only open finding is in
+  test machinery and HIGH was 0 for cycles 5 and 6. Fix: a per-site naming-sentence hold.
+- Advisory from the cycle-6 code review, not in the gate: CR-2 (no slot for the passing-phase note in
+  the review report templates), CR-3 (create-task naming sentence beside the exclusion), CR-4 (check
+  number hard-coded in `patternLine`). The Step 12 section writer (CR-5) is task.155.
 
 ### Important Reminders
 

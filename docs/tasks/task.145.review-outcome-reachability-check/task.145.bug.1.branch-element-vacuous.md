@@ -4,7 +4,7 @@
 **Bug ID**: TASK-145-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-1)
 **Date Found**: 2026-09-25
 
@@ -76,3 +76,4 @@ record the 4x3 matrix.
 | --- | --- | --- | --- |
 | 2026-09-25 | New | QA Engineer | QA cycle 1 (CR-1) |
 | 2026-09-25 | Ready for QA | qa-fix | Element regex tightened; 12/12 element mutants red |
+| 2026-09-25 | Closed | QA Engineer | verified FIXED at QA cycle 2; holds at QA cycle 6 (suite 4002/4003 pass, 0 fail) |

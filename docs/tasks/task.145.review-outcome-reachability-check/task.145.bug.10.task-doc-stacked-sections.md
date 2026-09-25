@@ -4,7 +4,7 @@
 **Bug ID**: TASK-145-BUG-10
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 5, CR5-1)
 **Date Found**: 2026-09-25
 
@@ -49,3 +49,4 @@ Rebuild the block, and verify with a heading count.
 | --- | --- | --- | --- |
 | 2026-09-25 | New | QA Engineer | QA cycle 5 |
 | 2026-09-25 | Ready for QA | qa-fix | Block rebuilt and verified |
+| 2026-09-25 | Closed | QA Engineer | verified FIXED at QA cycle 6: one heading of each; holds at QA cycle 6 (suite 4002/4003 pass, 0 fail) |
