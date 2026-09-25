@@ -128,6 +128,50 @@ NOGIT="$TMPROOT/plain"; mkdir -p "$NOGIT"
 [ "$EXIT" = "2" ] && pass "not a git repository → exit 2" \
                   || fail "not a git repository → exit 2" "got exit $EXIT"
 
+# ── 10–13. --scope: dirt is judged against the run's own paths (obs #142) ─────
+# A checkout another session is editing: that session's package.json is outside the
+# scope and must be named, not failed on. The run's own unfinished edit inside the
+# scope still fails. Without --scope nothing changes: any dirt fails.
+scoped_repo() {
+  local R; R=$(new_repo "$1"); commit_work "$R"
+  ( cd "$R" && mkdir -p docs/tasks/task.1 && echo r > docs/tasks/task.1/r.md \
+      && git add docs/tasks/task.1/r.md && git commit --quiet -m "report" \
+      && echo pkg > package.json && git add package.json && git commit --quiet -m pkg \
+      && git push --quiet -u origin feature/x 2>/dev/null )
+  echo "$R"
+}
+
+R=$(scoped_repo scoped-outside)
+( cd "$R" && echo edited > package.json && echo new > other-session.txt )
+OUT=$( cd "$R" && bash "$SCRIPT" --base main --scope docs/tasks/task.1 2>&1 ); EXIT=$?
+if [ "$EXIT" = "0" ] && printf '%s\n' "$OUT" | grep -q "! outside scope (warning): package.json" \
+   && printf '%s\n' "$OUT" | grep -q "! outside scope (warning): other-session.txt"; then
+  pass "--scope, dirt only outside scope → exit 0 with each path named"
+else
+  fail "--scope, dirt only outside scope → exit 0 with each path named" "got exit $EXIT: $OUT"
+fi
+
+R=$(scoped_repo scoped-inside)
+( cd "$R" && echo edited > docs/tasks/task.1/r.md && echo edited > package.json )
+OUT=$( cd "$R" && bash "$SCRIPT" --base main --scope docs/tasks/task.1/ 2>&1 ); EXIT=$?
+if [ "$EXIT" = "1" ] && printf '%s\n' "$OUT" | grep -q "DIRTY within scope"; then
+  pass "--scope, dirt inside scope → exit 1"
+else
+  fail "--scope, dirt inside scope → exit 1" "got exit $EXIT: $OUT"
+fi
+
+R=$(scoped_repo scoped-newdir)
+( cd "$R" && mkdir -p docs/tasks/task.1/sub && echo n > docs/tasks/task.1/sub/new.md )
+EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope docs/tasks/task.1 >/dev/null 2>&1; echo $? )
+[ "$EXIT" = "1" ] && pass "--scope, new untracked file in a new dir inside scope → exit 1" \
+                  || fail "--scope, new untracked file in a new dir inside scope → exit 1" "got exit $EXIT"
+
+R=$(scoped_repo unscoped-outside)
+( cd "$R" && echo edited > package.json )
+EXIT=$(run_guard "$R")
+[ "$EXIT" = "1" ] && pass "no --scope, dirt outside any work item → exit 1 (unchanged)" \
+                  || fail "no --scope, dirt outside any work item → exit 1 (unchanged)" "got exit $EXIT"
+
 echo
 echo "  $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

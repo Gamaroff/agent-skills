@@ -28,7 +28,11 @@
 # Every check here captures the command's own status directly.
 #
 # Usage:
-#   verify-push-state.sh --base <branch> [--pr <number>] [--remote <name>]
+#   verify-push-state.sh --base <branch> [--pr <number>] [--remote <name>] [--scope <path>]...
+#
+#   --scope (repeatable) narrows check 3 to the named paths: a dirty path inside a scope fails,
+#   a dirty path outside every scope is printed as a named warning and does not. Without
+#   --scope, any dirty path fails. For a checkout another session is also editing (obs #142).
 #
 # Exit codes:
 #   0  every check passed — the reported state is real
@@ -40,14 +44,18 @@ set -uo pipefail
 BASE=""
 PR=""
 REMOTE="origin"
+SCOPES=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --base)   BASE="${2:-}"; shift 2 ;;
     --pr)     PR="${2:-}"; shift 2 ;;
     --remote) REMOTE="${2:-}"; shift 2 ;;
+    --scope)
+      [ -n "${2:-}" ] || { echo "verify-push-state: --scope needs a path" >&2; exit 2; }
+      SCOPES+=("${2%/}"); shift 2 ;;
     -h|--help)
-      sed -n '28,36p' "$0"; exit 0 ;;
+      sed -n '28,39p' "$0"; exit 0 ;;
     *) echo "verify-push-state: unknown argument '$1'" >&2; exit 2 ;;
   esac
 done
@@ -101,12 +109,49 @@ fi
 # ── 3. Working tree is clean ──────────────────────────────────────────────────
 # Uncommitted work is work that will not reach the PR, however green the suite was
 # when it ran against the working tree.
-DIRTY=$(git status --porcelain 2>/dev/null)
-if [ -n "$DIRTY" ]; then
-  fail "working tree is DIRTY — $(printf '%s\n' "$DIRTY" | grep -c .) uncommitted path(s):"
-  printf '%s\n' "$DIRTY" | head -20 | sed 's/^/      /'
+if [ ${#SCOPES[@]} -eq 0 ]; then
+  DIRTY=$(git status --porcelain 2>/dev/null)
+  if [ -n "$DIRTY" ]; then
+    fail "working tree is DIRTY — $(printf '%s\n' "$DIRTY" | grep -c .) uncommitted path(s):"
+    printf '%s\n' "$DIRTY" | head -20 | sed 's/^/      /'
+  else
+    ok "working tree clean"
+  fi
 else
-  ok "working tree clean"
+  # Scoped: only dirt inside a scope is this run's unfinished work. Dirt outside every scope
+  # belongs to someone else in a shared checkout — name it, never fail on it (obs #142).
+  # -z and --untracked-files=all: file-level entries with no quoting, so a new directory is
+  # judged by its files rather than by a directory entry that may straddle a scope.
+  INSIDE=()
+  OUTSIDE=()
+  in_scope() {
+    local p="$1" s
+    for s in "${SCOPES[@]}"; do
+      [ "$p" = "$s" ] && return 0
+      case "$p" in "$s"/*) return 0 ;; esac
+    done
+    return 1
+  }
+  STATUS_FILE=$(mktemp)
+  git status --porcelain -z --untracked-files=all > "$STATUS_FILE" 2>/dev/null
+  RENAME_SRC=false
+  while IFS= read -r -d '' entry; do
+    if [ "$RENAME_SRC" = true ]; then RENAME_SRC=false; continue; fi   # a rename's source path
+    XY="${entry:0:2}"
+    P="${entry:3}"
+    case "$XY" in R*|C*) RENAME_SRC=true ;; esac
+    if in_scope "$P"; then INSIDE+=("$P"); else OUTSIDE+=("$P"); fi
+  done < "$STATUS_FILE"
+  rm -f "$STATUS_FILE"
+  for P in ${OUTSIDE[@]+"${OUTSIDE[@]}"}; do
+    note "! outside scope (warning): $P"
+  done
+  if [ ${#INSIDE[@]} -gt 0 ]; then
+    fail "working tree is DIRTY within scope — ${#INSIDE[@]} uncommitted path(s):"
+    printf '      %s\n' "${INSIDE[@]}" | head -20
+  else
+    ok "working tree clean within scope (${#OUTSIDE[@]} path(s) outside scope, listed above)"
+  fi
 fi
 
 # ── 4. Local HEAD is on the remote ────────────────────────────────────────────

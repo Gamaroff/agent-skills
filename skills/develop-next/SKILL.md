@@ -265,7 +265,19 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      # scope error) carries an `error.message` — surface it verbatim.
      [ "$(echo "$MERGE_RESULT" | jq -r '.state')" = "MERGED" ] || HALT
    else
-     gh pr merge "$PR_ID" --"$mergeStrategy" --delete-branch
+     # Bind the head branch BEFORE the merge, and refuse an empty one: `git push origin --delete ""`
+     # is not a thing to run by accident (obs #133: a block that reads a name must bind it).
+     HEAD_BRANCH=$(gh pr view "$PR_ID" --json headRefName -q .headRefName)
+     [ -n "$HEAD_BRANCH" ] || HALT
+     if [ -z "$(git status --porcelain)" ]; then
+       gh pr merge "$PR_ID" --"$mergeStrategy" --delete-branch
+     else
+       # Dirty tree (another session's edits): --delete-branch switches the local branch, the
+       # switch aborts, and the remote delete is skipped with it (obs #142). Merge without it and
+       # delete the remote branch directly — no local checkout is touched.
+       gh pr merge "$PR_ID" --"$mergeStrategy" || HALT
+       git push origin --delete "$HEAD_BRANCH"
+     fi
    fi
    ```
 
@@ -312,7 +324,19 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
 
 ## Step 4 — Record the acceptance
 
-On `<baseBranch>` (pull first if Step 3 merged into it). **Branch on `item.source`** — the `source`
+**First, re-sync — as a step of its own.** Step 3 merged on the platform; the local base is now
+behind it:
+
+```bash
+git checkout <baseBranch> && git pull --ff-only origin <baseBranch>
+```
+
+Run this **alone**, never chained with `&&` to the merge or to the tick's `git commit`. A merge
+with `--delete-branch` rewrites the checkout as it switches branches, and a commit chained to it
+raced the index lock three times on 2026-09-21, losing two acceptance commits (obs #142). A
+non-ff pull is a HALT with the git output, as in Step 0.
+
+Then, on `<baseBranch>`: **Branch on `item.source`** — the `source`
 field of the run-state file, written at Step 1 so a resume into this step (`merged: true, ticked:
 false`) has it without re-deriving anything — the roadmap and the registries are different documents
 with different owners, and the step used to know only the first. Five registry-sourced runs each improvised the second (#30, #31,

@@ -45,7 +45,7 @@ Engine: `references/report-lint.js`; expected sections come from `references/imp
 
 ## Invoke /commit-changes
 
-Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`. This stages tracked modifications across the whole tree (`git add -u`) plus any remaining new artifacts inside the work-item dir (including the finalised implementation report), without sweeping unrelated untracked paths:
+Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`. This stages new, modified and deleted files **inside the work-item dir only** (`git add -- {work-item-dir}`), including the finalised implementation report. It sweeps in neither unrelated untracked paths nor another session's tracked edits in a shared checkout (obs #142):
 
 > **What this commit carries changed with task.115.** The acceptance artefacts — the document with
 > `status: accepted`, the DoD summary, `sprint-review-summary.md` and (tasks) the ticked registry —
@@ -162,16 +162,22 @@ if [ -f .claude/state/develop-pipeline.last-halt.json ]; then
     && { echo "❌ Step 8 incomplete: halt snapshot for this work item still present"; exit 1; }
 fi
 
-# 3. Implementation report finalised — Final Status must be 'Completed' or 'Accepted', Finished must NOT be '—'
+# 3. Implementation report finalised — Final Status must be 'Completed' or 'Accepted', Finished must NOT be '—'.
+#    Both bold forms: the template's story and task variants write `**Final Status**:` (colon
+#    outside the bold) and the bug variant's header writes `**Final Status:**` (inside). A regex
+#    for one form failed every report written from the other (obs #173).
 REPORT="${IMPLEMENTATION_REPORT:?must be set from lock or context}"
-grep -qE "^\*\*Final Status:\*\* (Completed|Accepted)" "$REPORT" || { echo "❌ Step 8 incomplete: Final Status not set to Completed/Accepted in $REPORT"; exit 1; }
-grep -qE "^\*\*Finished:\*\* [0-9]" "$REPORT" || { echo "❌ Step 8 incomplete: Finished timestamp missing in $REPORT"; exit 1; }
+grep -qE "^\*\*Final Status(:\*\*|\*\*:) (Completed|Accepted)" "$REPORT" || { echo "❌ Step 8 incomplete: Final Status not set to Completed/Accepted in $REPORT"; exit 1; }
+grep -qE "^\*\*Finished(:\*\*|\*\*:) [0-9]" "$REPORT" || { echo "❌ Step 8 incomplete: Finished timestamp missing in $REPORT"; exit 1; }
 
 # 4. Pipeline Progress table has no ⏳ Pending rows
 grep -q "⏳ Pending" "$REPORT" && { echo "❌ Step 8 incomplete: Pipeline Progress still has ⏳ Pending rows"; exit 1; } || true
 
-# 5. The work actually exists on the remote — commits present, tree clean,
-#    local HEAD == remote HEAD, and (when a PR is open) PR head == local HEAD.
+# 5. The work actually exists on the remote — commits present, tree clean WITHIN THE WORK ITEM,
+#    local HEAD == remote HEAD, and (when a PR is open) PR head == local HEAD. --scope names dirt
+#    outside {work-item-dir} as a warning instead of failing on it: in a checkout another session
+#    is editing, that dirt is not this run's, and failing on it made the step unpassable on a
+#    correct run (obs #142, task.128).
 #    Run it UNPIPED and read its own exit status; see the note below.
 #    BASE_BRANCH is bound HERE, from the PR's own base — Step 8 runs after Step 4, so the branch
 #    has a PR, and this is the first source the resume contract's probe reads too. It was read
@@ -179,7 +185,7 @@ grep -q "⏳ Pending" "$REPORT" && { echo "❌ Step 8 incomplete: Pipeline Progr
 #    branch off develop (obs #133, task.132); a block that reads a name must bind it.
 BASE_BRANCH=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)
 [ -n "$BASE_BRANCH" ] || { echo "❌ Step 8 incomplete: cannot bind BASE_BRANCH — no PR on this branch (gh pr view --json baseRefName)"; exit 1; }
-bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" ${PR_NUMBER:+--pr "$PR_NUMBER"}
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" --scope "{work-item-dir}" ${PR_NUMBER:+--pr "$PR_NUMBER"}
 VERIFY_EXIT=$?
 [ "$VERIFY_EXIT" -eq 0 ] || { echo "❌ Step 8 incomplete: verify-push-state failed (exit $VERIFY_EXIT)"; exit 1; }
 
@@ -203,7 +209,9 @@ The develop-batch merge gate's head-SHA check would have refused the merge, so n
 ⚠️ **Read the script's own exit status — never a pipeline's.** The same session produced *three* separate false passes from exactly that mistake: `npm test 2>&1 | tail -80` reported `tail`'s exit 0 over a suite that had failed, and twice more from wrapper scripts whose status came from a trailing `grep`/`echo`. If the output is large, redirect to a file and read the file:
 
 ```bash
-bash .../verify-push-state.sh --base "$BASE_BRANCH" > /tmp/verify.log 2>&1; VERIFY_EXIT=$?
+bash .../verify-push-state.sh --base "$BASE_BRANCH" --scope "{work-item-dir}" > /tmp/verify.log 2>&1; VERIFY_EXIT=$?
 ```
+
+Each `! outside scope (warning): <path>` line the scoped run prints names a dirty path this run did not make. Paste those lines too: they are how an operator sees a concurrent session, or a file `/develop` edited that Step 4's scope did not reach.
 
 `{skill}` above is the pipeline's own skill directory (`develop-story`, `develop-task` or `develop-bug`) — each vendors its own copy of the script under `references/`.

@@ -27,26 +27,38 @@ The PR base branch (`--base {Q2_answer}`) is derived in Phase 0d and differs by 
 
 ## Build Staging Scope
 
-Before invoking `/create-pr`, build the set of paths that should be staged in the auto-commit. Start with the work-item dir, then add the top-level dirs of any new or changed code files since the base branch:
+Before invoking `/create-pr`, build the set of paths that should be staged in the auto-commit. Start with the work-item dir, then add the directory of every file this branch changed, **committed or not**:
 
 ```bash
 # SCOPE_PATHS: always include the work-item dir
 SCOPE_PATHS=("{work-item-dir}")
 
-# Add top-level dirs of files changed/added since the base branch
-# (the pre-develop surface map provides these; fall back to git diff)
-CHANGED_DIRS=$(git diff --name-only "{Q2_answer}...HEAD" \
-  | xargs -I{} dirname {} \
-  | sort -u)
-while IFS= read -r dir; do
-  [[ -z "$dir" || "$dir" == "." ]] && continue
-  # avoid adding a dir that is already under {work-item-dir}
+# Scope-derivation: the committed diff since the base PLUS the uncommitted tracked diff.
+# On a normal run nothing is committed before Step 4, so the committed diff alone yields only
+# {work-item-dir} — and /commit-changes --scope stages nothing outside SCOPE_PATHS, so every code
+# edit would be left out of the PR (obs #142; task.147 review 1).
+CHANGED=$( { git diff --name-only "{Q2_answer}...HEAD"; git diff --name-only HEAD; } | sort -u )
+while IFS= read -r f; do
+  [[ -z "$f" ]] && continue
+  dir=$(dirname "$f")
+  # A root-level file (CHANGELOG.md, package.json) is scoped by its own path. Skipping "." dropped
+  # it from every Step 4 commit (task.146 named its CHANGELOG by hand to get it in).
+  [[ "$dir" == "." ]] && dir="$f"
+  # avoid adding a dir that is already under {work-item-dir}, or one already in the array
   case "$dir" in "{work-item-dir}"*) continue;; esac
+  case " ${SCOPE_PATHS[*]} " in *" $dir "*) continue;; esac
   SCOPE_PATHS+=("$dir")
-done <<< "$CHANGED_DIRS"
+done <<< "$CHANGED"
 ```
 
 Log the final `SCOPE_PATHS` array in the Decisions Log before proceeding.
+
+> **What this scope can and cannot tell apart.** It includes every tracked modification in the
+> checkout, because an uncommitted edit carries no record of which session made it. So in a
+> checkout another session is editing, Step 4 still stages that session's tracked edits, exactly as
+> the whole-tree `git add -u` did before. What scoping buys is at Step 8, whose scope is the work
+> item alone, and at the merge. A tracked edit that should **not** ride here must be committed,
+> stashed or reverted by its owner before Step 4 runs.
 
 ---
 
@@ -115,7 +127,7 @@ This pre-supplies the target branch via create-pr's Step 0, skipping the interac
 After create-pr completes, verify no out-of-scope path leaked into the commit:
 
 ```bash
-git log -1 --name-only HEAD | tail -n +3 | while IFS= read -r f; do
+git diff-tree --no-commit-id --name-only -r HEAD | while IFS= read -r f; do
   [[ -z "$f" ]] && continue
   IN_SCOPE=false
   for sp in "${SCOPE_PATHS[@]}"; do
@@ -124,6 +136,8 @@ git log -1 --name-only HEAD | tail -n +3 | while IFS= read -r f; do
   [ "$IN_SCOPE" = false ] && echo "LEAK: $f"
 done | grep -q 'LEAK' && echo "LEAK DETECTED" || echo "OK"
 ```
+
+`git diff-tree --no-commit-id --name-only -r` prints the commit's file names and nothing else. Never parse `git log` output by position: its header and message have variable length, and `git log -1 --name-only HEAD | tail -n +3` fed the `Date:` line and every message line into this loop as paths, so every commit reported a LEAK (obs #141). Step 4's commit is never a merge, and `diff-tree` on a merge would print nothing without `-m`.
 
 If the verification prints any LEAK lines, note them in the Issues Log (does not warrant a halt — investigate before the next pipeline run).
 

@@ -705,16 +705,18 @@ test("#3+#4 — step-8 doc has BLOCKING post-condition checklist", async () => {
     /\[\s*!\s*-f\s+\.claude\/state\/develop-pipeline\.lock\s*\]/,
     "lock-absence post-condition assertion missing",
   );
-  // Final Status post-condition
+  // Final Status post-condition — both bold forms (obs #173, task.147). The behaviour is held by
+  // shared/resources/tests/step-8-completion-checklist.test.mjs, which runs the block against
+  // reports built from the template; this pin only keeps the assertion in the document.
   assert.match(
     content,
-    /Final Status:\\\*\\\*\s*\(Completed\|Accepted\)/,
+    /Final Status\(:\\\*\\\*\|\\\*\\\*:\)\s*\(Completed\|Accepted\)/,
     "Final Status post-condition assertion missing",
   );
   // Finished timestamp post-condition
   assert.match(
     content,
-    /Finished:\\\*\\\*\s*\[0-9\]/,
+    /Finished\(:\\\*\\\*\|\\\*\\\*:\)\s*\[0-9\]/,
     "Finished-timestamp post-condition assertion missing",
   );
 });

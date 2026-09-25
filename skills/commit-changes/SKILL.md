@@ -24,7 +24,7 @@ Make commits that are easy to review and safe to ship:
 | Flag | Description | Example |
 |------|-------------|---------|
 | `--exclude <path>` | Exclude a file from staging (repeatable). Switches from patch staging to full-tree staging with explicit pathspec exclusion. | `--exclude docs/task.14.impl.md` |
-| `--scope <path>` | Allowlist paths for staging (repeatable). Switches to `git add -u` plus explicit `git add -- <paths>`; `git add -A` is never called in scope mode. | `--scope docs/tasks/task.5/` |
+| `--scope <path>` | Allowlist paths for staging (repeatable). Switches to `git add -- <paths>`, which stages new, modified and deleted files **inside the paths only**; nothing outside them is staged, and `git add -A` is never called in scope mode. | `--scope docs/tasks/task.5/` |
 
 ### `--exclude` mode
 
@@ -48,12 +48,13 @@ git add -A -- '.' ':(exclude)path/to/file.md' && git diff --cached --name-only |
 When one or more `--scope <path>` flags are passed, collect all values into an array and use allowlist-mode staging in step 3 instead of patch staging:
 
 ```bash
-git add -u                              # tracked modifications (any path) — safe
-git add -- "scope/one" "scope/two" ... # explicit new artifacts / work-item dirs
-# git add -A is NEVER called in scope mode
+git add -- "scope/one" "scope/two" ...   # new, modified and deleted files INSIDE the scope only
+# No bare `git add -u`, and git add -A is NEVER called in scope mode
 ```
 
-`git add -u` picks up tracked modifications across the whole tree. The explicit `git add -- <path>` calls add any new untracked files inside the named dirs. New untracked files outside the named scope dirs are NOT staged — the caller must list them explicitly via additional `--scope` flags.
+The allowlist bounds **everything** scope mode stages. A pathspec `git add` (git ≥ 2.0) records new, modified and deleted files under each named path, and nothing else. A tracked modification outside every scope stays unstaged, and so does a new file outside it. The caller lists any other path that must ride along with an additional `--scope` flag.
+
+> **Why not `git add -u` as well.** Scope mode used to run a bare `git add -u` first, which staged tracked modifications across the **whole tree**. In a checkout another session is editing, that swept the other session's `package.json`, `CHANGELOG.md` and `README.md` into this commit (obs #142, task.128). A scoped `git add -u -- <paths>` is no better: it exits 128 on a scope directory that holds only untracked files (`pathspec … did not match any file(s) known to git`), and the pathspec `git add` above already covers what it would stage.
 
 **Precedence with `--exclude`** — the two flags coexist. Stage the scope set first, then remove any `--exclude` path from within it ("exclude wins inside scope"):
 
@@ -65,10 +66,10 @@ If a path appears in both `--scope` and `--exclude`, it is staged by the scope p
 
 **With neither `--scope` nor `--exclude`**: behaviour unchanged (patch staging / existing advisory rule).
 
-**Smoke test** (an unrelated sibling must NOT be staged under `--scope`):
+**Smoke test** (an unrelated sibling, tracked or new, must NOT be staged under `--scope`):
 ```bash
-git add -u && git add -- docs/tasks/task.X/
-git diff --cached --name-only | grep -q 'task.Y' && echo "LEAK" || echo "OK"
+git add -- docs/tasks/task.X/
+git diff --cached --name-only | grep -qv '^docs/tasks/task.X/' && echo "LEAK" || echo "OK"
 ```
 
 ## Workflow (checklist)

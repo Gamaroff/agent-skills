@@ -439,7 +439,17 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
 3. **Merge** with the configured strategy:
 
    ```bash
-   gh pr merge <PR#> --<mergeStrategy> --delete-branch
+   # Bind the head branch before the merge; an empty binding is a halt, never a delete of "".
+   HEAD_BRANCH=$(gh pr view <PR#> --json headRefName -q .headRefName)
+   [ -n "$HEAD_BRANCH" ] || { echo "cannot bind the PR head branch"; exit 1; }
+   if [ -z "$(git status --porcelain)" ]; then
+     gh pr merge <PR#> --<mergeStrategy> --delete-branch
+   else
+     # A dirty main checkout: --delete-branch's local switch would abort and skip the remote
+     # delete (obs #142). Merge without it, then delete the remote branch directly.
+     gh pr merge <PR#> --<mergeStrategy> || exit 1
+     git push origin --delete "$HEAD_BRANCH"
+   fi
    ```
 
    On merge failure (conflict, protection): mark the item `halted`, report, continue. Mark
