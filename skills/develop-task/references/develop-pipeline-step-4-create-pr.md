@@ -27,26 +27,51 @@ The PR base branch (`--base {Q2_answer}`) is derived in Phase 0d and differs by 
 
 ## Build Staging Scope
 
-Before invoking `/create-pr`, build the set of paths that should be staged in the auto-commit. Start with the work-item dir, then add the top-level dirs of any new or changed code files since the base branch:
+Before invoking `/create-pr`, build the set of paths that should be staged in the auto-commit. Start with the work-item dir, then add the directory of every **tracked** file this branch changed, **committed or not**. A new untracked file in a directory with no tracked change is not in that set. The Pre-flight Guard below holds it out of the commit, so pass its directory as an extra `--scope`, or commit it before Step 4.
 
 ```bash
 # SCOPE_PATHS: always include the work-item dir
 SCOPE_PATHS=("{work-item-dir}")
 
-# Add top-level dirs of files changed/added since the base branch
-# (the pre-develop surface map provides these; fall back to git diff)
-CHANGED_DIRS=$(git diff --name-only "{Q2_answer}...HEAD" \
-  | xargs -I{} dirname {} \
-  | sort -u)
-while IFS= read -r dir; do
-  [[ -z "$dir" || "$dir" == "." ]] && continue
-  # avoid adding a dir that is already under {work-item-dir}
+# Scope-derivation: the committed diff since the base PLUS the uncommitted tracked diff.
+# On a normal run nothing is committed before Step 4, so the committed diff alone yields only
+# {work-item-dir} — and /commit-changes --scope stages nothing outside SCOPE_PATHS, so every code
+# edit would be left out of the PR (obs #142; task.147 review 1).
+CHANGED=$( { git diff --name-only "{Q2_answer}...HEAD"; git diff --name-only HEAD; } | sort -u )
+while IFS= read -r f; do
+  [[ -z "$f" ]] && continue
+  dir=$(dirname "$f")
+  # A root-level file (CHANGELOG.md, package.json) is scoped by its own path. Skipping "." dropped
+  # it from every Step 4 commit (task.146 named its CHANGELOG by hand to get it in).
+  [[ "$dir" == "." ]] && dir="$f"
+  # Under .claude/ the directory is the pipeline's own state (lock, step4 records): scope the
+  # changed file itself, never the directory, or the Step 4 commit would carry that state where
+  # .claude/ is not gitignored (task.147 QA-3, CR-5).
+  case "$dir" in .claude|.claude/*) dir="$f";; esac
+  # avoid adding a dir that is already under {work-item-dir}, or one already in the array
   case "$dir" in "{work-item-dir}"*) continue;; esac
+  case " ${SCOPE_PATHS[*]} " in *" $dir "*) continue;; esac
+  # A path the branch deleted in an earlier commit is in neither the working tree nor the index,
+  # and a pathspec `git add` on it exits 128 and stages nothing (task.147 QA-1, CR-6). An
+  # UNCOMMITTED deletion is still in the index and is kept, so its removal is staged.
+  [ -e "$dir" ] || git ls-files --error-unmatch -- "$dir" >/dev/null 2>&1 || continue
   SCOPE_PATHS+=("$dir")
-done <<< "$CHANGED_DIRS"
+done <<< "$CHANGED"
+
+# Persist it. Every fenced block runs in its own shell, so the Pre-flight Guard and the leak check
+# below cannot see this array. They read this file instead (task.147 QA-1, CR-4).
+mkdir -p .claude/state
+printf '%s\n' "${SCOPE_PATHS[@]}" > .claude/state/step4-scope-paths.txt
 ```
 
-Log the final `SCOPE_PATHS` array in the Decisions Log before proceeding.
+Log the final `SCOPE_PATHS` array in the Decisions Log before proceeding. `.claude/state/step4-scope-paths.txt` is its one copy on disk, and the Pre-flight Guard, the `/create-pr` invocation and the leak check all read it.
+
+> **What this scope can and cannot tell apart.** It includes every tracked modification in the
+> checkout, because an uncommitted edit carries no record of which session made it. So in a
+> checkout another session is editing, Step 4 still stages that session's tracked edits, exactly as
+> the whole-tree `git add -u` did before. What scoping buys is at Step 8, whose scope is the work
+> item alone, and at the merge. A tracked edit that should **not** ride here must be committed,
+> stashed or reverted by its owner before Step 4 runs.
 
 ---
 
@@ -55,11 +80,37 @@ Log the final `SCOPE_PATHS` array in the Decisions Log before proceeding.
 With the scope set determined, detect any untracked paths in the working tree that fall outside every scope dir. Move them to a temporary hold dir before the PR so they are not accidentally staged; restore them after.
 
 ```bash
-HOLD_DIR=$(mktemp -d /tmp/pipeline-hold-XXXXXX)
+# The scope, from the file the Build Staging Scope block wrote. A fresh shell has no SCOPE_PATHS.
+# Its first line is always {work-item-dir}; a file whose first line is anything else is a stale record
+# from another work item, never this run's scope (task.147 QA-2, CR-7).
+[ -s .claude/state/step4-scope-paths.txt ] || { echo "Pre-flight: run the Build Staging Scope block first — .claude/state/step4-scope-paths.txt is missing"; exit 1; }
+[ "$(head -1 .claude/state/step4-scope-paths.txt)" = "{work-item-dir}" ] || { echo "Pre-flight: .claude/state/step4-scope-paths.txt is a stale record for another work item — re-run the Build Staging Scope block"; exit 1; }
+SCOPE_PATHS=()
+while IFS= read -r p; do [ -n "$p" ] && SCOPE_PATHS+=("$p"); done < .claude/state/step4-scope-paths.txt
+
+# The Restore Held Files block runs in another shell, so HOLD_DIR travels in a record. A record that
+# names an existing directory is REUSED: a second guard run (a retry after a failed /create-pr) finds
+# the first run's files already moved, and a fresh directory would overwrite the record and strand
+# them (task.147 QA-2, CR-3).
+HOLD_DIR=$(cat .claude/state/step4-hold-dir.txt 2>/dev/null)
+if [ -z "$HOLD_DIR" ] || [ ! -d "$HOLD_DIR" ]; then
+  HOLD_DIR=$(mktemp -d /tmp/pipeline-hold-XXXXXX)
+  printf '%s\n' "$HOLD_DIR" > .claude/state/step4-hold-dir.txt
+fi
+# Every path this guard holds is recorded for Step 8, which checks each one still present: a held
+# file of the run's own that is still uncommitted there must fail the step, not pass as another
+# session's dirt (task.147 QA-2, CR-1). Same first-line rule as the scope file, and appended to,
+# never truncated, so a retry keeps the first run's list.
+[ "$(head -1 .claude/state/step4-held-paths.txt 2>/dev/null)" = "{work-item-dir}" ] \
+  || printf '%s\n' "{work-item-dir}" > .claude/state/step4-held-paths.txt
 HELD=()
 
 while IFS= read -r f; do
   [[ -z "$f" ]] && continue
+  # The pipeline's own state is never held. In a repo that does not gitignore .claude/, it is an
+  # untracked out-of-scope path, and holding it would move the lock and these records away
+  # (task.147 QA-2, CR-2).
+  case "$f" in .claude|.claude/*) continue;; esac
   IN_SCOPE=false
   for sp in "${SCOPE_PATHS[@]}"; do
     case "$f" in "${sp}"*) IN_SCOPE=true; break;; esac
@@ -68,12 +119,16 @@ while IFS= read -r f; do
     mkdir -p "$HOLD_DIR/$(dirname "$f")"
     mv "$f" "$HOLD_DIR/$f"
     HELD+=("$f")
+    printf '%s\n' "$f" >> .claude/state/step4-held-paths.txt
   fi
 done < <(git status --porcelain | grep '^??' | awk '{print $2}')
 
+# Printed, not written to disk: copy these lines into the report's Issues Log. A `tee -a Issues Log`
+# here wrote untracked files named `Issues` and `Log` at the repo root, which a guard re-run then
+# held and Step 8 failed on (task.147 QA-3, CR-1).
 if [ ${#HELD[@]} -gt 0 ]; then
-  echo "Pre-flight: ${#HELD[@]} out-of-scope file(s) held in $HOLD_DIR" | tee -a Issues Log
-  printf '  - %s\n' "${HELD[@]}" | tee -a Issues Log
+  echo "Pre-flight: ${#HELD[@]} out-of-scope file(s) held in $HOLD_DIR"
+  printf '  - %s\n' "${HELD[@]}"
 fi
 ```
 
@@ -83,7 +138,7 @@ fi
 
 ## Invoke /create-pr
 
-Invoke the `/create-pr` skill passing `--base {Q2_answer}`, one `--scope` flag per entry in `SCOPE_PATHS`, and conditionally `--issue`. Branch on tracker platform for the `--issue` flag:
+Invoke the `/create-pr` skill passing `--base {Q2_answer}`, one `--scope` flag per line of `.claude/state/step4-scope-paths.txt` (the `SCOPE_PATHS` the Build Staging Scope block derived), and conditionally `--issue`. Branch on tracker platform for the `--issue` flag:
 
 - **GitHub** (`TRACKER=github`): also pass `--issue {TRACKER_ISSUE}` — `create-pr` will add `Closes #N` to the PR body and comment on the GitHub issue.
 - **Jira** (`TRACKER=jira`): omit `--issue` — `create-pr` handles Bitbucket PR creation natively; Bitbucket Issues are not enabled for this project, so passing `--issue` would cause a failed comment attempt.
@@ -115,7 +170,14 @@ This pre-supplies the target branch via create-pr's Step 0, skipping the interac
 After create-pr completes, verify no out-of-scope path leaked into the commit:
 
 ```bash
-git log -1 --name-only HEAD | tail -n +3 | while IFS= read -r f; do
+# The scope, from the file the Build Staging Scope block wrote. This block runs after /create-pr,
+# in a fresh shell: an empty SCOPE_PATHS here judged every committed file a LEAK (task.147 QA-1, CR-4).
+[ -s .claude/state/step4-scope-paths.txt ] || { echo "Leak check: .claude/state/step4-scope-paths.txt is missing — cannot judge scope"; exit 1; }
+[ "$(head -1 .claude/state/step4-scope-paths.txt)" = "{work-item-dir}" ] || { echo "Leak check: .claude/state/step4-scope-paths.txt is a stale record for another work item"; exit 1; }
+SCOPE_PATHS=()
+while IFS= read -r p; do [ -n "$p" ] && SCOPE_PATHS+=("$p"); done < .claude/state/step4-scope-paths.txt
+
+git diff-tree --no-commit-id --name-only -r HEAD | while IFS= read -r f; do
   [[ -z "$f" ]] && continue
   IN_SCOPE=false
   for sp in "${SCOPE_PATHS[@]}"; do
@@ -124,6 +186,8 @@ git log -1 --name-only HEAD | tail -n +3 | while IFS= read -r f; do
   [ "$IN_SCOPE" = false ] && echo "LEAK: $f"
 done | grep -q 'LEAK' && echo "LEAK DETECTED" || echo "OK"
 ```
+
+`git diff-tree --no-commit-id --name-only -r` prints the commit's file names and nothing else. Never parse `git log` output by position: its header and message have variable length, and `git log -1 --name-only HEAD | tail -n +3` fed the `Date:` line and every message line into this loop as paths, so every commit reported a LEAK (obs #141). Step 4's commit is never a merge, and `diff-tree` on a merge would print nothing without `-m`.
 
 If the verification prints any LEAK lines, note them in the Issues Log (does not warrant a halt — investigate before the next pipeline run).
 
@@ -158,11 +222,15 @@ Its final state is captured in the dedicated Step 8 commit.
 After PR creation (and the leak check above), restore any files the pre-flight guard moved aside:
 
 ```bash
-if [ -d "$HOLD_DIR" ] && [ -n "$(ls -A "$HOLD_DIR" 2>/dev/null)" ]; then
+# HOLD_DIR, from the record the Pre-flight Guard wrote. A fresh shell has none, and restoring from an
+# unset HOLD_DIR restores nothing and strands the held files in /tmp.
+HOLD_DIR=$(cat .claude/state/step4-hold-dir.txt 2>/dev/null)
+if [ -n "$HOLD_DIR" ] && [ -d "$HOLD_DIR" ] && [ -n "$(ls -A "$HOLD_DIR" 2>/dev/null)" ]; then
   cp -r "$HOLD_DIR"/. .
   rm -rf "$HOLD_DIR"
-  echo "Restored held files from $HOLD_DIR" | tee -a Issues Log
+  echo "Restored held files from $HOLD_DIR"
 fi
+rm -f .claude/state/step4-hold-dir.txt
 ```
 
 ---

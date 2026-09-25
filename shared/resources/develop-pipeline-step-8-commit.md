@@ -44,7 +44,31 @@ Engine: `shared/resources/report-lint.js`; expected sections come from `shared/r
 
 ## Invoke /commit-changes
 
-Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`. This stages tracked modifications across the whole tree (`git add -u`) plus any remaining new artifacts inside the work-item dir (including the finalised implementation report), without sweeping unrelated untracked paths:
+Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`, plus one `--scope` for each path in `{extra-scope-paths}` (below). This stages new, modified and deleted files **inside those paths only** (`git add -- {work-item-dir} …`), including the finalised implementation report. It sweeps in neither unrelated untracked paths nor another session's tracked edits in a shared checkout (obs #142).
+
+> **`{extra-scope-paths}` — the writes this pipeline makes outside its work item.** Scoped staging
+> carries only what it is told to carry. Before task.147 a whole-tree `git add -u` swept these in
+> silently, and one caller depended on it without saying so (task.147 QA-1, CR-2):
+>
+> | Caller | `{extra-scope-paths}` | Written by |
+> | --- | --- | --- |
+> | `develop-story`, `develop-task` | *(empty)* | — (`/finalise` commits the task registry itself, at its Step 7 action 6a) |
+> | `develop-bug`, story or task bug | *(empty)* | — |
+> | `develop-bug`, **general** bug | `docs/bugs/bug-registry.md` | Step 7 B3 (the registry row's close) |
+>
+> A caller that adds a write outside its work item adds a row here in the same change. The same
+> list is passed to check 5, so an uncommitted write there fails the step rather than reading as
+> another session's dirt.
+>
+> Check 5 adds one more set on its own: every path Step 4's Pre-flight Guard **held and restored**
+> (`.claude/state/step4-held-paths.txt`) that still exists. The guard holds any untracked path
+> outside the Step 4 scope. That includes a new file of the run's own in a directory with no tracked
+> change. Unscoped, check 5 used to fail on it; scoped, it would read as another session's dirt and
+> pass while the file is not on the remote (task.147 QA-2, CR-1). A held file that really is another
+> session's therefore fails here too, and is named. That is a deliberate trade: the pipeline moved
+> it, so it cannot claim it did not see it. Commit it, move it out of the checkout, or delete the
+> record line for it, and re-run the checklist.
+
 
 > **What this commit carries changed with task.115.** The acceptance artefacts — the document with
 > `status: accepted`, the DoD summary, `sprint-review-summary.md` and (tasks) the ticked registry —
@@ -62,7 +86,7 @@ Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`. This sta
 > re-verifies the final head before merging.
 
 ```
-/commit-changes --scope {work-item-dir}
+/commit-changes --scope {work-item-dir} [--scope <each path in {extra-scope-paths}>]
 ```
 
 The implementation report and all other work-item artifacts must be staged and included in this commit.
@@ -161,26 +185,61 @@ if [ -f .claude/state/develop-pipeline.last-halt.json ]; then
     && { echo "❌ Step 8 incomplete: halt snapshot for this work item still present"; exit 1; }
 fi
 
-# 3. Implementation report finalised — Final Status must be 'Completed' or 'Accepted', Finished must NOT be '—'
+# 3. Implementation report finalised — Final Status must be 'Completed' or 'Accepted', Finished must NOT be '—'.
+#    Both bold forms: the template's story and task variants write `**Final Status**:` (colon
+#    outside the bold) and the bug variant's header writes `**Final Status:**` (inside). A regex
+#    for one form failed every report written from the other (obs #173).
 REPORT="${IMPLEMENTATION_REPORT:?must be set from lock or context}"
-grep -qE "^\*\*Final Status:\*\* (Completed|Accepted)" "$REPORT" || { echo "❌ Step 8 incomplete: Final Status not set to Completed/Accepted in $REPORT"; exit 1; }
-grep -qE "^\*\*Finished:\*\* [0-9]" "$REPORT" || { echo "❌ Step 8 incomplete: Finished timestamp missing in $REPORT"; exit 1; }
+grep -qE "^\*\*Final Status(:\*\*|\*\*:) (Completed|Accepted)" "$REPORT" || { echo "❌ Step 8 incomplete: Final Status not set to Completed/Accepted in $REPORT"; exit 1; }
+grep -qE "^\*\*Finished(:\*\*|\*\*:) [0-9]" "$REPORT" || { echo "❌ Step 8 incomplete: Finished timestamp missing in $REPORT"; exit 1; }
 
 # 4. Pipeline Progress table has no ⏳ Pending rows
 grep -q "⏳ Pending" "$REPORT" && { echo "❌ Step 8 incomplete: Pipeline Progress still has ⏳ Pending rows"; exit 1; } || true
 
-# 5. The work actually exists on the remote — commits present, tree clean,
-#    local HEAD == remote HEAD, and (when a PR is open) PR head == local HEAD.
+# 5. The work actually exists on the remote — commits present, tree clean WITHIN THE WORK ITEM,
+#    local HEAD == remote HEAD, and (when a PR is open) PR head == local HEAD. --scope names dirt
+#    outside {work-item-dir} as a warning instead of failing on it: in a checkout another session
+#    is editing, that dirt is not this run's, and failing on it made the step unpassable on a
+#    correct run (obs #142, task.128).
 #    Run it UNPIPED and read its own exit status; see the note below.
 #    BASE_BRANCH is bound HERE, from the PR's own base — Step 8 runs after Step 4, so the branch
 #    has a PR, and this is the first source the resume contract's probe reads too. It was read
 #    unbound (`${BASE_BRANCH:?}`) through five green cycles because every host ran a feature
 #    branch off develop (obs #133, task.132); a block that reads a name must bind it.
+#    The scope is the work item PLUS the caller's {extra-scope-paths} (the table above): a write
+#    this pipeline made outside its work item is its own unfinished work, not another session's.
 BASE_BRANCH=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)
 [ -n "$BASE_BRANCH" ] || { echo "❌ Step 8 incomplete: cannot bind BASE_BRANCH — no PR on this branch (gh pr view --json baseRefName)"; exit 1; }
-bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" ${PR_NUMBER:+--pr "$PR_NUMBER"}
+EXTRA_SCOPES=({extra-scope-paths})
+SCOPE_ARGS=(--scope "{work-item-dir}")
+for s in "${EXTRA_SCOPES[@]}"; do SCOPE_ARGS+=(--scope "$s"); done
+# Paths Step 4's guard held and restored: scoped, so one still uncommitted fails (see above). Only a
+# record for THIS work item is read (first line), and only paths that still exist are passed,
+# because verify-push-state refuses a scope that names nothing.
+HELD_REC=.claude/state/step4-held-paths.txt
+if [ "$(head -1 "$HELD_REC" 2>/dev/null)" = "{work-item-dir}" ]; then
+  while IFS= read -r p; do
+    p="${p%/}"
+    [ -n "$p" ] && [ -e "$p" ] && SCOPE_ARGS+=(--scope "$p")
+  done < <(tail -n +2 "$HELD_REC")
+elif [ -s "$HELD_REC" ]; then
+  # Named, never silent: a record for another work item is not applied here (task.147 QA-3, CR-2).
+  echo "⚠️  $HELD_REC names $(head -1 "$HELD_REC"), not {work-item-dir} — its held paths are not checked"
+fi
+# Restore deletes the hold-dir record, so a record that still names a non-empty directory means
+# held files were never restored. Absent from the tree, they would slip past the scope above, and
+# the cleanup below would delete the only pointer to them (task.147 QA-3, CR-3).
+HOLD_REC_DIR=$(cat .claude/state/step4-hold-dir.txt 2>/dev/null)
+if [ -n "$HOLD_REC_DIR" ] && [ -n "$(ls -A "$HOLD_REC_DIR" 2>/dev/null)" ]; then
+  echo "❌ Step 8 incomplete: Step 4 held files were never restored — run the Restore Held Files block (they are in $HOLD_REC_DIR)"; exit 1
+fi
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" "${SCOPE_ARGS[@]}" ${PR_NUMBER:+--pr "$PR_NUMBER"}
 VERIFY_EXIT=$?
 [ "$VERIFY_EXIT" -eq 0 ] || { echo "❌ Step 8 incomplete: verify-push-state failed (exit $VERIFY_EXIT)"; exit 1; }
+
+# Every check passed: Step 4's records have done their job. A record left behind would be read as
+# current by the next run in this checkout (task.147 QA-2, CR-7).
+rm -f .claude/state/step4-scope-paths.txt .claude/state/step4-held-paths.txt .claude/state/step4-hold-dir.txt
 
 echo "✅ Step 8 post-conditions verified"
 ```
@@ -202,7 +261,9 @@ The develop-batch merge gate's head-SHA check would have refused the merge, so n
 ⚠️ **Read the script's own exit status — never a pipeline's.** The same session produced *three* separate false passes from exactly that mistake: `npm test 2>&1 | tail -80` reported `tail`'s exit 0 over a suite that had failed, and twice more from wrapper scripts whose status came from a trailing `grep`/`echo`. If the output is large, redirect to a file and read the file:
 
 ```bash
-bash .../verify-push-state.sh --base "$BASE_BRANCH" > /tmp/verify.log 2>&1; VERIFY_EXIT=$?
+bash .../verify-push-state.sh --base "$BASE_BRANCH" "${SCOPE_ARGS[@]}" > /tmp/verify.log 2>&1; VERIFY_EXIT=$?
 ```
+
+Each `! outside scope (warning): <path>` line the scoped run prints names a dirty path this run did not make. Paste those lines too: they are how an operator sees a concurrent session, or a file `/develop` edited that Step 4's scope did not reach.
 
 `{skill}` above is the pipeline's own skill directory (`develop-story`, `develop-task` or `develop-bug`) — each vendors its own copy of the script under `references/`.

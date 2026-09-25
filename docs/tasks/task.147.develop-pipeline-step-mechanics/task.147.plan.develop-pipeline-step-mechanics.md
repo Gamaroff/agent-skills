@@ -31,7 +31,8 @@ Follow `shared/resources/tests/probe-base-binding.test.mjs`:
   branch pushed. It is the same shape as `new_repo` in `shared/resources/verify-push-state.test.sh`.
 - `ghStub(dir, script)` writes an executable `gh` into `dir/bin` and prepends that to `PATH`. The
   stub appends `"$@"` to `dir/gh.argv` and prints canned JSON for `pr view`.
-- Run each case under `bash` and, when `zshAvailable()` is true, `zsh`. Take timeouts from
+- Run each case under `bash` and, when zsh is present (the local `hasZsh` probe from
+  `probe-base-binding.test.mjs:44`; there is no shared helper), `zsh`. Take timeouts from
   `spawnBudget("<NAME>")` in `shared/resources/spawn-budget.mjs`, never a literal.
 
 If two or more tests need the same helpers, put them in
@@ -155,31 +156,41 @@ every hit if you do.
 **4a. `skills/commit-changes/SKILL.md` § "`--scope` mode"** (lines 46-72):
 
 ```bash
-git add -u -- "scope/one" "scope/two" ...   # tracked modifications INSIDE the scope only
-git add -- "scope/one" "scope/two" ...      # new files inside the scope
-# git add -A is NEVER called in scope mode
+git add -- "scope/one" "scope/two" ...   # new, modified and deleted files INSIDE the scope only
+# No bare `git add -u`, and git add -A is NEVER called in scope mode
 ```
+
+(As implemented. The two-command `git add -u -- <scope>` form first drafted here exits 128 on a
+scope directory that holds only new files; see the task's § 3.)
 
 Rewrite the paragraph at line 56 to say the allowlist bounds both halves, and why (obs #142: a
 second session's tracked edits in a shared checkout). Update the flags-table row at line 27 and the
 smoke test at line 70, which adds a tracked sibling edit that must stay unstaged.
 
 **4b. Prose restatements.** In `develop-pipeline-step-8-commit.md:47`, change "stages tracked
-modifications across the whole tree (`git add -u`)" to the scoped wording. In
-`develop-pipeline-resume-contract.md:194`, change "Step 8's `/commit-changes --scope` sweeps the
-work-item directory" and check the clause still reads true.
+modifications across the whole tree (`git add -u`)" to the scoped wording. Leave
+`develop-pipeline-resume-contract.md:194` alone: its `add -u` sentence is about `/develop`, and its
+scope-mode clause is already accurate (review 1, I2).
 
-**4c. Step 4 Pre-flight Guard** (`develop-pipeline-step-4-create-pr.md`, after the untracked-hold
-loop). Report tracked modifications outside `SCOPE_PATHS` and move nothing:
+**4c. Step 4 `SCOPE_PATHS` derivation** (`develop-pipeline-step-4-create-pr.md` § "Build Staging Scope";
+review 1, C1). Nothing is committed before Step 4 on a normal run, so the committed diff alone
+yields just `{work-item-dir}`, and a scoped `git add -u` would drop every code edit. Derive from
+the union of the two diffs, and keep root-level files by path:
 
 ```bash
+SCOPE_PATHS=("{work-item-dir}")
 while IFS= read -r f; do
   [[ -z "$f" ]] && continue
-  IN_SCOPE=false
-  for sp in "${SCOPE_PATHS[@]}"; do case "$f" in "${sp}"*) IN_SCOPE=true; break;; esac; done
-  [ "$IN_SCOPE" = false ] && echo "Pre-flight: tracked modification outside scope, NOT staged: $f"
-done < <(git diff --name-only HEAD)
+  d=$(dirname "$f")
+  [[ "$d" == "." ]] && d="$f"            # root-level file: scope it by its own path
+  case "$d" in "{work-item-dir}"*) continue;; esac
+  SCOPE_PATHS+=("$d")
+done < <( { git diff --name-only "{Q2_answer}...HEAD"; git diff --name-only HEAD; } | sort -u )
 ```
+
+(De-duplicate `SCOPE_PATHS` itself too; two files in one dir must not add the dir twice.) The
+derivation test runs this block in a fixture with nothing committed since base, a tracked edit in
+`skills/x/` and in root `CHANGELOG.md`, and asserts both are in the array.
 
 **4d. `shared/resources/verify-push-state.sh`.**
 

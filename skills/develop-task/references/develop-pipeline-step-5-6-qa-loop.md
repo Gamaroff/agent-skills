@@ -932,6 +932,27 @@ After fixes are applied:
    - **Commit this cycle's gate `.yml` and QA report `.md` first**, then push once — per path 2 above. A HALT is a handover to a person: evidence left uncommitted is not on the PR they will read, and does not survive a branch switch. **Skip this when the cycle reached 5b via a 5c `REQUEST CHANGES` verdict** — it arrived through path 1, which already committed and pushed both files earlier in the same cycle, and repeating it produces an empty commit or a redundant push.
    - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
 
+0-stage. **Stage this cycle's evidence before the gate.** The fast gate's doc-links check reads the
+   **tracked** tree (`git ls-files`), and `/qa-task` / `/qa-story` have just linked the work item to
+   this cycle's gate and QA report, which are still untracked. Gating before they are staged reports
+   both links dead, and spends one of step 0a's two bounded attempts on the cycle's own evidence
+   (obs #171; task.143 cycles 1 and 6: "attempt 1 red … gate.1/qa.1 were not yet staged, attempt 2
+   green after staging them"). Staging them here makes the gate measure the tree the `fix(...)`
+   commit will carry:
+
+   ```bash
+   # Stage-before-gate: this cycle's gate and QA report, and nothing else.
+   GATE_FILE="{the latest gate file — resolved per §Finding the Latest Gate File}"
+   QA_FILE="{this cycle's QA report — the .qa. file carrying the gate's cycle number}"
+   git add -- "$GATE_FILE" "$QA_FILE"
+   ```
+
+   **After step 0, never before it.** A staged new file shows in `git diff --stat HEAD`, so staging
+   first would make step 0's no-change HALT unreachable. Step 1 unstages only the implementation
+   report, so these two stay staged into the commit. On a cycle that reached 5b through a 5c
+   `REQUEST CHANGES` verdict both files are already committed (path 1), and this `git add` is a
+   no-op.
+
 0a. **Run the fast gate before committing.** Only reached when step 0 found changes — there is
    nothing to gate otherwise, and step 0's no-change path HALTs before this point. Capture to a log
    rather than streaming:

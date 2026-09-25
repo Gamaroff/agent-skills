@@ -88,6 +88,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`/commit-changes --scope` stages inside the scope only (task 147, obs #142).** Scope mode ran a
+  bare `git add -u` before its allowlist, so it staged tracked modifications across the whole tree.
+  In a checkout another session was editing, that swept the other session's `package.json`,
+  `CHANGELOG.md` and `README.md` into the commit (task.128). Scope mode is now one pathspec
+  `git add -- <scope paths>`, which stages new, modified and deleted files under the named paths and
+  nothing else. A scoped `git add -u -- <paths>` was not used: it exits 128 on a scope directory that
+  holds only new files. **Behaviour change:** a caller that relied on scope mode to sweep a tracked
+  edit outside its scopes must now pass that path as another `--scope`. Step 4 of the develop
+  pipelines needs none. Its scope derivation now adds the uncommitted tracked diff and scopes
+  root-level files by their own path. Before, it read the committed diff only, and on a normal run
+  nothing is committed before Step 4, so a bounded stage would have left the run's code out of the
+  PR (task 147 review, C1). `verify-push-state.sh` gains a repeatable `--scope`: dirt inside a scope
+  fails check 3, and dirt outside every scope is printed as `! outside scope (warning): <path>`.
+  Without the flag, behaviour is unchanged. Step 8 check 5 passes `--scope "{work-item-dir}"`.
+
 - **A fix to an identity rule proves both directions (task 146, obs #169).** `qa-fix` Step 3.5 gains
   a third probe table, *For a fix to an identity rule, probe both directions*. A change to a dedupe
   key, cache key, record identity, normaliser or equality predicate now owes one test pair that must
@@ -177,6 +192,40 @@ All notable changes to this project will be documented in this file. Format foll
   direct option is removed and the removal records why, so it is not re-added.
 
 ### Fixed
+
+- **Five develop-pipeline steps that failed or overreached on a correct run (task 147).** Each fix is
+  held by a test that cuts the block out of the shipped document and runs it in a fixture repository
+  under bash and zsh (`shared/resources/tests/lib/executed-prose.mjs`), and each is
+  mutation-proved.
+  - **Step 4 leak check (obs #141).** `git log -1 --name-only HEAD | tail -n +3` fed the `Date:`
+    header and every commit-message line into the loop as paths, so every commit reported a LEAK.
+    It now reads `git diff-tree --no-commit-id --name-only -r HEAD`.
+  - **Step 8 check 3 (obs #173).** The check grepped `**Final Status:**` (colon inside the bold),
+    but the template's story and task variants write `**Final Status**:`, so 105 of 147 completed
+    reports failed it. It now accepts both forms, and the test builds its reports from the template
+    itself.
+  - **Merging on a dirty tree (obs #142).** `gh pr merge --delete-branch` switches the local branch,
+    and on a tree dirty with another session's edits the switch aborted and skipped the remote delete.
+    Both merge sites (develop-next, develop-batch) now pass `--delete-branch` only on a clean tree.
+    Otherwise they merge and delete the remote branch with `git push origin --delete`. The head
+    branch is bound before the merge, and an empty binding halts. develop-next Step 4 re-syncs the
+    base as a step of its own, never chained to the merge or to the tick's commit. That chain raced
+    the index lock three times on 2026-09-21.
+  - **QA loop §5b (obs #171).** The fast gate ran before the cycle's gate and QA report were staged,
+    and the doc-links check reads the tracked tree, so every cycle's first attempt was red. A new
+    step 0-stage stages both files after step 0's no-change check and before the gate.
+  - **Step 3 (obs #162).** The inline route now has a two-fact precondition (a plan file found and a
+    surface map, both recorded this run) and owes `/develop`'s own Story or Task Completion
+    Checklist. `/develop` was the only named route before, so task.141's inline run had no stated
+    path.
+  - **Added during QA, cycles 1–6: new ways a run can stop.** Step 8 check 5 now also fails when
+    Step 4's Pre-flight Guard held files that were never restored. The guard holds untracked paths
+    outside the Step 4 scope and records them in `.claude/state/step4-*.txt`. `verify-push-state.sh
+    --scope` exits 2 on a scope that matches no path git knows: a glob, `:/` magic, a case-folded
+    or symlinked spelling, `..` or the whole repository. The scope check and check 3 share one
+    `path_under` predicate, so no spelling passes vacuously. Step 8 takes `{extra-scope-paths}`,
+    which carries `docs/bugs/bug-registry.md` for a develop-bug general bug. A failed remote-branch
+    delete no longer reads as a failed merge.
 
 - **`security-probe.mjs` and `uat-status.mjs` now run when invoked through the `.agents/skills`
   symlink (obs #126).** Each engine decided whether it was the entry point by comparing

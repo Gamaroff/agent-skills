@@ -1,0 +1,114 @@
+schema: 1
+task: 'task.147.develop-pipeline-step-mechanics'
+task_title: 'develop pipeline: five steps that fail or overreach on correct input'
+gate: FAIL
+status_reason: 'All nine cycle-1 findings are verified fixed (bugs 1-6 closed; reproductions re-run; CI 5/5 green on f4dee2d2). The cycle-2 refute pass found one new HIGH created by the COMBINATION of two changes. The Pre-flight Guard holds and restores the run own new untracked file, and scoped check 5 now downgrades it to a warning, so Step 8 reports the work pushed when it is not. The old unscoped check failed on it. Two MEDIUM findings are in the cycle-1 state-file fix (CR-2, CR-3).'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T09:49:12Z'
+
+top_issues:
+  - id: 'T147-QA2-CR1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-step-8-commit.md'
+    finding: 'Two changes combine to hide unpushed work. Step 4 derives scope from tracked changes only, so the Pre-flight Guard holds a new untracked file in a directory with no tracked edit and later restores it, still untracked. Step 8 stages only the work item, and the scoped check 5 prints that file as "! outside scope (warning)" and exits 0, so the checklist says the work is on the remote when that file is not. Before this change set the unscoped check 5 failed on it.'
+    suggested_action: 'Make the files Step 4 held a scope of check 5. The guard records each held path in .claude/state/step4-held-paths.txt, and Step 8 adds those paths to SCOPE_ARGS, so one still uncommitted at Step 8 fails the step and is named. Another session stray file that Step 4 moved is then a loud, named failure, not a silent pass. State that in the step-8 table.'
+    suggested_owner: dev
+  - id: 'T147-QA2-CR2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-4-create-pr.md'
+    finding: 'In a repo that does not gitignore .claude/, porcelain lists "?? .claude/" as untracked and out of scope, and the Pre-flight Guard moves it into HOLD_DIR. That takes the new scope record, the hold record and the pipeline lock with it. /create-pr and the leak check then find no scope file, and Restore finds no hold record. The test fixture gitignores .claude/, so it cannot see this.'
+    suggested_action: 'The guard skips .claude/ explicitly (the pipeline own state). Add a guard test on a fixture whose .gitignore does not name .claude/.'
+    suggested_owner: dev
+  - id: 'T147-QA2-CR3'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-4-create-pr.md'
+    finding: 'Re-running the Pre-flight Guard (resume after a failed /create-pr, or a Step 4 retry) makes a new, empty HOLD_DIR and overwrites step4-hold-dir.txt, because the first run already moved the files. Restore then restores nothing from the empty dir and deletes the record, stranding the first hold. That is the outcome the cycle-1 HOLD_DIR fix exists to prevent.'
+    suggested_action: 'When step4-hold-dir.txt names an existing directory, the guard reuses it rather than creating a new one, so held files accumulate in one place. Add a test that runs the guard twice, then Restore, and asserts both files come back.'
+    suggested_owner: dev
+  - id: 'T147-QA2-CR6'
+    severity: low
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The Step 4 re-sync prose makes only a non-ff pull a HALT. A `git checkout <baseBranch>` that fails (a dirty tree whose edits conflict with the switch) leaves the run on the feature branch, and the tick commit would land there.'
+    suggested_action: 'State that any non-zero exit from the re-sync block is a HALT, whether checkout or pull failed.'
+    suggested_owner: dev
+  - id: 'T147-QA2-CR7'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-4-create-pr.md'
+    finding: 'step4-scope-paths.txt is never removed, so the readers existence check passes on a stale file from an earlier work item in the same checkout.'
+    suggested_action: 'Readers refuse a scope file whose first line is not {work-item-dir} (the derivation always writes it first). Step 8 cleanup removes the step4-*.txt records.'
+    suggested_owner: dev
+  - id: 'T147-QA2-CR8'
+    severity: low
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'Rename/copy detection tests only the X column. A worktree-side rename (" R", as emitted for intent-to-add paths) is missed, and its source NUL record is parsed as its own entry with three characters cut off.'
+    suggested_action: 'Treat either column of XY being R or C as a rename or copy.'
+    suggested_owner: dev
+  - id: 'T147-QA2-CR9'
+    severity: low
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'An absolute --scope is compared textually against the physical toplevel, so a logical path through a symlink (macOS /tmp) is refused with exit 2. A "../x" scope is not normalised, so it passes the existence check and matches no porcelain path, which is a vacuous pass.'
+    suggested_action: 'Canonicalise an absolute scope to its physical path before comparing, and reject any scope that still contains a ".." segment.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 96
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [4, 5]
+  code_review:
+    findings: 10
+    bugs: 10
+    cleanups: 0
+    promoted: ['CR-1', 'CR-2', 'CR-3', 'CR-6', 'CR-7', 'CR-8', 'CR-9']
+    pre_existing: ['CR-4', 'CR-5']
+    not_applicable: ['CR-10']
+  boundary: false
+  probes_executed: 0
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-09-25'
+  total_iterations: 1
+  verification_method: 'Cycle-1 reproductions re-run against f4dee2d2 (CR-1 exits 1 with the branch intact; CR-5 and CR-6 exit 0). New tests run the blocks as shipped. Nine mutation proofs. CI 5/5 green.'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary (unchanged from gate 1). No security surface is touched.'
+  performance:
+    status: PASS
+    notes: 'The suites run 0.1-4.6s each (merge guard 2.0s after the shared gh stub). With TMPDIR=/tmp, 76/76 node tests and 20/20 shell cases pass.'
+  reliability:
+    status: FAIL
+    notes: 'CR-1: Step 8 can report unpushed work as pushed. CR-2 and CR-3: the state records can be moved or overwritten, stranding held files.'
+  maintainability:
+    status: PASS
+    notes: 'Tests bind only documented placeholders. One harness serves the suites.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (HIGH), CR-2 and CR-3 (MEDIUM), and the four LOW findings, each with an executed test'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md', 'shared/resources/develop-pipeline-step-4-create-pr.md', 'shared/resources/verify-push-state.sh', 'skills/develop-next/SKILL.md']
+  future:
+    - action: 'CR-4 (pre-existing; gate 1 CR-9): check 5 reads ${PR_NUMBER:+…} with no writer. It is identical on origin/develop.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'CR-5 (pre-existing): the develop-next merge block reads VCS, PR_ID and mergeStrategy from Step 0 and config rather than binding them. origin/develop reads them the same way.'
+      refs: ['skills/develop-next/SKILL.md']
+    - action: 'CR-10: cross-repository PR heads would need isCrossRepository before the remote delete. Not reachable from this pipeline, which always pushes its branch to origin.'
+      refs: ['skills/develop-batch/SKILL.md']
+    - action: 'Carried from gate 1: CR-3 (a new untracked dir held at Step 4), CR-11 (dedupe on a joined string), and the {template}-slot limit of Step 4b.'
+      refs: ['shared/resources/develop-pipeline-step-4-create-pr.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []
