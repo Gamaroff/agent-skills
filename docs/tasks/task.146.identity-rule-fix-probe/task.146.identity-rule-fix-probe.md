@@ -310,17 +310,17 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-25
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.146.qa.3.identity-rule-fix-probe.md](./task.146.qa.3.identity-rule-fix-probe.md)
-- **Gate File**: [task.146.gate.3.identity-rule-fix-probe.yml](./task.146.gate.3.identity-rule-fix-probe.yml)
-- Previous cycles: [qa.1](./task.146.qa.1.identity-rule-fix-probe.md) · [gate.1](./task.146.gate.1.identity-rule-fix-probe.yml) · [qa.2](./task.146.qa.2.identity-rule-fix-probe.md) · [gate.2](./task.146.gate.2.identity-rule-fix-probe.yml)
+- **Full Report**: [task.146.qa.4.identity-rule-fix-probe.md](./task.146.qa.4.identity-rule-fix-probe.md)
+- **Gate File**: [task.146.gate.4.identity-rule-fix-probe.yml](./task.146.gate.4.identity-rule-fix-probe.yml)
+- Previous cycles: [qa.1](./task.146.qa.1.identity-rule-fix-probe.md) · [qa.2](./task.146.qa.2.identity-rule-fix-probe.md) · [qa.3](./task.146.qa.3.identity-rule-fix-probe.md)
 
 ### Test Coverage Summary
 
@@ -331,9 +331,8 @@ None.
 
 ### Key Findings
 
-- Cycles 1–2: QA-1 to QA-5 fixed. Bugs [1](./task.146.bug.1.refute-description-omits-identity.md), [2](./task.146.bug.2.four-bullet-count-vacuous.md) and [3](./task.146.bug.3.qa-results-inside-change-log.md) are Ready for QA and re-proved. This section now sits above the Change Log markers.
-- QA-6 (medium): the single qa-fix Change Log row sits above the gate row it answers ([bug 4](./task.146.bug.4.qa-fix-row-out-of-order.md)).
-- QA-7 (low): the shared-description test's end anchor has no floor.
+- Four cycles found and fixed QA-1 to QA-7. Bugs [1](./task.146.bug.1.refute-description-omits-identity.md), [2](./task.146.bug.2.four-bullet-count-vacuous.md), [3](./task.146.bug.3.qa-results-inside-change-log.md) and [4](./task.146.bug.4.qa-fix-row-out-of-order.md) are Ready for QA and re-proved.
+- One pre-existing finding: qa-fix's "one Change Log row on exiting the loop" rule is keyed to a moment qa-fix cannot observe. It is routed to observation #183 and is not a defect of this branch.
 
 ---
 <!-- change-log-start -->
@@ -349,6 +348,7 @@ None.
 | 2026-09-25 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low); cycle-2 refute pass | qa-task |
 | 2026-09-25 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low); cycle 3 | qa-task |
 | 2026-09-25 |  | QA findings fixed — cycles 1–3 (QA-1 shared cycle-2 description, QA-2/QA-5 list-item count, QA-3 lifecycle subject, QA-4 QA Results moved out of the change-log block, QA-6 this row kept last, QA-7 end-anchor floor), 3 iterations | qa-fix |
+| 2026-09-25 |  | QA gate PASS (100/100) — 0 open findings; cycle 4 (1 pre-existing routed to obs #183) | qa-task |
 
 ---
 <!-- change-log-end -->
