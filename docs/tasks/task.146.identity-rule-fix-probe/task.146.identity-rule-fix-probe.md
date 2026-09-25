@@ -5,18 +5,20 @@ type: task
 description: "Add an identity-rule probe to qa-fix Step 3.5 and to the qa-task / qa-story cycle-2 refute directive: when a fix changes a rule that decides whether two things are the same (a dedupe key, cache key, record identity, normaliser or equality predicate), its tests must carry a should-merge pair and a should-not-merge pair drawn from real call sites — so a key stops oscillating between splitting too much and merging too much, one QA cycle per direction."
 tags: [qa-fix, qa-task, qa-story, refute-pass, identity, observation]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-25
 assignee:
 estimated_effort_hours: 8
 github_issue: 474
+pr_number: 488
+completed_date: 2026-09-25
 ---
 
 # Technical Task: qa-fix — a fix to an identity rule must prove both directions
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.146.review.1.identity-rule-fix-probe.md` implemented 2026-09-25
 
 **GitHub Issue**: [#474](https://github.com/Gamaroff/agent-skills/issues/474)
@@ -349,6 +351,7 @@ None.
 | 2026-09-25 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low); cycle 3 | qa-task |
 | 2026-09-25 |  | QA findings fixed — cycles 1–3 (QA-1 shared cycle-2 description, QA-2/QA-5 list-item count, QA-3 lifecycle subject, QA-4 QA Results moved out of the change-log block, QA-6 this row kept last, QA-7 end-anchor floor), 3 iterations | qa-fix |
 | 2026-09-25 |  | QA gate PASS (100/100) — 0 open findings; cycle 4 (1 pre-existing routed to obs #183) | qa-task |
+| 2026-09-25 | 1.2 | DoD passed — accepted (PR #488) | finalise |
 
 ---
 <!-- change-log-end -->
@@ -359,6 +362,33 @@ None.
 - [x] Phase 2: refute directive
 - [x] Phase 3: test
 - [x] Phase 4: docs and validation
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.146.qa.4.identity-rule-fix-probe.md`
+**Gate File**: `task.146.gate.4.identity-rule-fix-probe.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100. Over 4 cycles, 7 findings were raised and fixed, with HIGH 0 throughout.
+**PR Review (Step 5c)**: `task.146.pr-review.1.identity-rule-fix-probe.md` — ⚠️ CONCERNS (non-blocking; PC-1 resolved, 3 low follow-ups)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 9/9. The qa-fix identity-rule table, the refute paragraph in both skills (byte-identical, outside the four-item list), and a test mutation-proved against every placement and drift it guards.
+✅ **Tests:** `tests/identity-rule-probe.test.js` (7 tests, ~0.2s, no network); `npm run ci:fast` 4011/0; CI reading 1 SUCCESS @ `228d34c7`.
+✅ **PR Review:** PR #488. The review of record is `/review-pr` (CONCERNS, no high/high finding).
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task 146. The shared cycle-2 description names the identity pair.
+✅ **Security Review:** PASS. `boundary: false` (verified by the classifier); no secrets or unsafe patterns.
+⚠️ **Compliance Review:** NOT_APPLICABLE (no personal data, payments, health data or UI).
+
+**Task marked as ACCEPTED on:** 2026-09-25
+
+**Detailed Verification Log:** See `task.146.dod.1.identity-rule-fix-probe.md` for the complete verification evidence and timestamps.
 
 ---
 
