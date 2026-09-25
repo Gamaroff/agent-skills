@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-09-25
-**Next Available Task Number:** **156**
+**Next Available Task Number:** **158**
 
 ## How to use
 
@@ -196,6 +196,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 153 | [Release gate reads CI's verdict; load-sensitive tests name themselves](task.153.release-ci-gate-load-sensitive-tests/task.153.release-ci-gate-load-sensitive-tests.md) | planned | infrastructure | Medium | 2026-09-24 | [#483](https://github.com/Gamaroff/agent-skills/issues/483) | Obs #150, #157, #166: release.sh reads CI's verdict, load-sensitive assertions name themselves, CR-6 pid-file race. #158 dropped (fixed in 62c9190e) |
 | 154 | [Bundler and snippet-test hygiene: attributed warning, symlink-free test run](task.154.bundler-and-snippet-test-hygiene/task.154.bundler-and-snippet-test-hygiene.md) | planned | testing | Medium | 2026-09-24 | [#484](https://github.com/Gamaroff/agent-skills/issues/484) | Obs #149, #151: attributed bundler warning (the literal is in observation-log-contract.md), consumer-root helper + `test:clean-checkout` |
 | 155 | [QA Testing Results section: one write engine, one placement, refused when duplicated](task.155.qa-results-section-engine/task.155.qa-results-section-engine.md) | planned | refactoring | Medium | 2026-09-25 | [#486](https://github.com/Gamaroff/agent-skills/issues/486) | Obs #178: `qa-results.js` beside `change-log.js`, qa-task/qa-story Step 12 wired, corpus guard, task.65 repair (3 stacked copies) |
+| 156 | [session-handoff continue mode: a continuation file a fresh context resumes from](task.156.session-handoff-continue-mode/task.156.session-handoff-continue-mode.md) | planned | infrastructure | Medium | 2026-09-25 | [#490](https://github.com/Gamaroff/agent-skills/issues/490) | — |
+| 157 | [Context-pressure trigger: recommend a continuation handoff before the context fills](task.157.context-pressure-handoff-trigger/task.157.context-pressure-handoff-trigger.md) | planned | infrastructure | Medium | 2026-09-25 | [#491](https://github.com/Gamaroff/agent-skills/issues/491) | task.156 |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -234,5 +236,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - **Tasks 133–135 were cut from task.130's residue (PR #441)** — one shippable unit each, all independent of one another. 133 gathers the eleven advisory findings the loop carried (grouped by file, five phases); 134 changes one clause in `qa-diminishing-returns.js` (route 2c reads gate N's HIGH count, not the whole history); 135 puts `head:` on the gate and scopes cycle N+1 from it. None depends on another; 133 and 135 both touch `pr-conformance-prompt.md` § D (different rows) and should not be developed in the same worktree at once. Task.128 owns the shell probe sink (obs #138) and is deliberately not restated in 133.
 
 - **Tasks 136–138 were cut from the 2026-09-21 observation review (task.125's follow-ups)** — one shippable unit each, independent of one another in outcome. 136 extends task.128's `shell:` probe form with `shell-fn:` and a fake-`gh` fixture (obs #138) and shares `security-probe.mjs` with task.131 — land one, rebase the other. 137 sweeps the 31 `ls`-glob sites the staged obs #144 ratchet pins (obs #145); its Phase 0 installs that one test file if the staged skill-updates PR has not landed. 138 closes `finalise --bug`'s low residuals and records the feature's first end-to-end run (obs #146). 137 and 138 both edit `skills/finalise/SKILL.md` 7.6b (different lines) — land one, rebase the other; not in one worktree.
+
+- **Tasks 156–157 are the context-pressure handoff** — one shippable unit each, in dependency order: 156 ships `session-handoff` continue mode (a continuation file plus resume prompt) and is usable by hand before anything triggers it; 157 adds the measured trigger (status line recorder, `UserPromptSubmit` hook, user-level installer) whose note recommends 156's mode, so land 156 first.
 
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
