@@ -96,9 +96,12 @@ for (const rel of [TASK, STORY]) {
     // block's only list is the one "these four" introduces, so a bullet
     // anywhere in it — including after the Identity rules paragraph — makes
     // "four" false (task.146 QA-2: a count that stopped at the paragraph
-    // passed with a fifth bullet placed after it).
-    const all = block.match(/^\s*• /gm) || [];
-    const before = block.slice(intro, identity).match(/^\s*• /gm) || [];
+    // passed with a fifth bullet placed after it). Any list-item marker counts,
+    // not only the list's own `•`: a fifth item written `-` would otherwise make
+    // "four" false while the count still read 4 (task.146 QA-5).
+    const ITEM = /^\s*(?:[•*+-]|\d+[.)])\s/gm;
+    const all = block.match(ITEM) || [];
+    const before = block.slice(intro, identity).match(ITEM) || [];
     assert.equal(
       all.length,
       4,

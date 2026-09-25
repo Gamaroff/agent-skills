@@ -307,36 +307,37 @@ None.
 - **Non-critical**: noisy probes — fix forward.
 
 ---
-<!-- change-log-start -->
-## Change Log
 
 ## QA Testing Results
 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-25
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.146.qa.1.identity-rule-fix-probe.md](./task.146.qa.1.identity-rule-fix-probe.md)
-- **Gate File**: [task.146.gate.1.identity-rule-fix-probe.yml](./task.146.gate.1.identity-rule-fix-probe.yml)
+- **Full Report**: [task.146.qa.2.identity-rule-fix-probe.md](./task.146.qa.2.identity-rule-fix-probe.md)
+- **Gate File**: [task.146.gate.2.identity-rule-fix-probe.yml](./task.146.gate.2.identity-rule-fix-probe.yml)
+- Previous cycle: [qa.1](./task.146.qa.1.identity-rule-fix-probe.md) · [gate.1](./task.146.gate.1.identity-rule-fix-probe.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 36
+- **Tests Executed**: 52
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- QA-1 (medium): `shared/resources/code-review-prompt.md`'s description of the cycle-2 refute pass omits Identity rules ([bug 1](./task.146.bug.1.refute-description-omits-identity.md)).
-- QA-2 (medium): the four-bullet assertion passes with a fifth bullet after the paragraph ([bug 2](./task.146.bug.2.four-bullet-count-vacuous.md)).
-- QA-3 (low): "this shape" after the new paragraph has a drifting referent.
+- Cycle 1's QA-1, QA-2 and QA-3 are fixed (bugs [1](./task.146.bug.1.refute-description-omits-identity.md) and [2](./task.146.bug.2.four-bullet-count-vacuous.md) are Ready for QA, re-proved).
+- QA-4 (medium): this section sits inside the change-log marker block ([bug 3](./task.146.bug.3.qa-results-inside-change-log.md)).
+- QA-5 (low): the four-item count keys on the `•` glyph only.
 
 ---
+<!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -345,7 +346,8 @@ None.
 | 2026-09-25 |         | Status → ready-for-development | review-task |
 | 2026-09-25 |  | Implemented — 5 files, 6 tests (qa-fix Step 3.5 table, qa-task/qa-story refute paragraph, identity-rule-probe test, CHANGELOG) | develop |
 | 2026-09-25 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
-| 2026-09-25 |  | QA findings fixed — cycle 1 (QA-1 shared cycle-2 description names the identity pair, QA-2 whole-block bullet count, QA-3 lifecycle subject named), 1 iteration | qa-fix |
+| 2026-09-25 |  | QA findings fixed — cycles 1–2 (QA-1 shared cycle-2 description, QA-2/QA-5 list-item count, QA-3 lifecycle subject, QA-4 QA Results moved out of the change-log block), 2 iterations | qa-fix |
+| 2026-09-25 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low); cycle-2 refute pass | qa-task |
 
 ---
 <!-- change-log-end -->
