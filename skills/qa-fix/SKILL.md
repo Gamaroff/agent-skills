@@ -659,7 +659,7 @@ sites** rather than synthetic strings — each counter-example above was a real 
 | **Should not merge** | Two inputs a real call site treats as two — does the new rule still give them two? |
 | **Which direction did the last fix move?** | A fix for a split pushes toward merging, and vice versa — the test must carry the pair for the direction the finding did **not** name |
 
-**Review the combination, not only each fix.** At least one real defect of this shape was caused by
+**Review the combination, not only each fix.** At least one real lifecycle defect was caused by
 two earlier fixes that were each correct alone. After the last fix in a cycle, re-read the full diff
 as one change.
 

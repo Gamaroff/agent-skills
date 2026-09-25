@@ -33,7 +33,7 @@ task adds an **identity-rule probe** to qa-fix Step 3.5 and to the cycle-2 refut
 qa-task and qa-story share, and a test that holds both — including the byte-parity of the two refute
 directives, which nothing guards today.
 
-**Scope**: prose in three `SKILL.md` files; one test; CHANGELOG.
+**Scope**: prose in three `SKILL.md` files and one sentence of the shared reviewer contract's cycle-2 description; one test; CHANGELOG.
 
 **Key deliverables**:
 
@@ -90,8 +90,9 @@ test, so the direction the fix did not name is exercised in the same cycle inste
   (`REFUTE_PASS=true`) — refute, do not review.** A fenced `REFUTE PASS.` directive appended to the
   code reviewer's prompt: the four lifecycle transitions and *Review the COMBINATION*. The two blocks
   are byte-identical today.
-- `shared/resources/code-review-prompt.md` — the shared reviewer prompt the directive is appended to;
-  unchanged by this task.
+- `shared/resources/code-review-prompt.md` — the shared reviewer prompt the directive is appended to.
+  Its Prompt Template is unchanged by this task. Its cycle-2 section *describes* the refute directive
+  ("Probe the four transitions …"), and that description gains the identity pair (QA cycle 1, QA-1).
 - No test references `REFUTE PASS` or the Step 3.5 tables (`grep -rln 'REFUTE PASS' --include='*.js'
   --include='*.mjs' .` finds only an unrelated consumer-profile test).
 
@@ -135,7 +136,8 @@ directions.
 
 ### Out of Scope
 
-- ❌ `shared/resources/code-review-prompt.md` — the general reviewer. The probe belongs where a fix is
+- ❌ `shared/resources/code-review-prompt.md`'s Prompt Template — the general reviewer. (Its cycle-2
+  *description* of the refute directive is in scope: it restates the directive's content.) The probe belongs where a fix is
   judged (qa-fix) and where the loop is refuted (cycle 2); adding it to every review is a wider change
   with its own noise cost. Revisit if an identity-rule defect escapes both.
 - ❌ develop-bug's verify loop — no Step 3.5 of its own; revisit on an instance.
@@ -169,7 +171,7 @@ cycle budget or verdict rule changes.
 
 - [x] Add the **Identity rules** paragraph to the `REFUTE PASS.` block in both files, after the
       four-transition list and before *Review the COMBINATION*, byte-identical
-- [x] Keep the block's existing four bullets, their *"these four"* introduction and the closing paragraph unchanged
+- [x] Keep the block's existing four bullets, and their *"these four"* introduction unchanged; the closing *Review the COMBINATION* sentence changes only to name its subject ("lifecycle defect of the shape above", QA-3)
 
 ### Phase 3: test (Risk: Low)
 
@@ -196,6 +198,7 @@ cycle budget or verdict rule changes.
 1. ✅ `skills/qa-fix/SKILL.md` — Step 3.5 identity-rule table
 2. ✅ `skills/qa-task/SKILL.md` — Step 3b refute directive paragraph
 3. ✅ `skills/qa-story/SKILL.md` — Step 3b refute directive paragraph
+3a. ✅ `shared/resources/code-review-prompt.md` — cycle-2 description names the identity pair (QA-1; `npm run bundle` refreshes the 6 `references/` copies)
 
 ### Files to Add (Tests)
 
@@ -307,12 +310,42 @@ None.
 <!-- change-log-start -->
 ## Change Log
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-25
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.146.qa.1.identity-rule-fix-probe.md](./task.146.qa.1.identity-rule-fix-probe.md)
+- **Gate File**: [task.146.gate.1.identity-rule-fix-probe.yml](./task.146.gate.1.identity-rule-fix-probe.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 36
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+- QA-1 (medium): `shared/resources/code-review-prompt.md`'s description of the cycle-2 refute pass omits Identity rules ([bug 1](./task.146.bug.1.refute-description-omits-identity.md)).
+- QA-2 (medium): the four-bullet assertion passes with a fifth bullet after the paragraph ([bug 2](./task.146.bug.2.four-bullet-count-vacuous.md)).
+- QA-3 (low): "this shape" after the new paragraph has a drifting referent.
+
+---
+
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft | create-task |
 | 2026-09-25 | 1.1     | Review passed (9/10) — refute Identity rules entry moved out of the four-transition list into its own paragraph; test gains a four-bullet count assertion | review-task |
 | 2026-09-25 |         | Status → ready-for-development | review-task |
 | 2026-09-25 |  | Implemented — 5 files, 6 tests (qa-fix Step 3.5 table, qa-task/qa-story refute paragraph, identity-rule-probe test, CHANGELOG) | develop |
+| 2026-09-25 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-09-25 |  | QA findings fixed — cycle 1 (QA-1 shared cycle-2 description names the identity pair, QA-2 whole-block bullet count, QA-3 lifecycle subject named), 1 iteration | qa-fix |
 
 ---
 <!-- change-log-end -->

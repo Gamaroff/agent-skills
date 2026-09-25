@@ -92,11 +92,22 @@ for (const rel of [TASK, STORY]) {
       identity > intro,
       "the Identity rules entry must follow the transition list",
     );
-    const bullets = block.slice(intro, identity).match(/^\s*• /gm) || [];
+    // Count across the WHOLE block, then the part before the paragraph. The
+    // block's only list is the one "these four" introduces, so a bullet
+    // anywhere in it — including after the Identity rules paragraph — makes
+    // "four" false (task.146 QA-2: a count that stopped at the paragraph
+    // passed with a fifth bullet placed after it).
+    const all = block.match(/^\s*• /gm) || [];
+    const before = block.slice(intro, identity).match(/^\s*• /gm) || [];
     assert.equal(
-      bullets.length,
+      all.length,
       4,
       "'these four' must introduce exactly four bullets",
+    );
+    assert.equal(
+      before.length,
+      4,
+      "all four transition bullets precede the Identity rules paragraph",
     );
     assert.doesNotMatch(
       block,
@@ -126,4 +137,40 @@ test("qa-fix Step 3.5 probes both directions of an identity rule", () => {
   }
   assert.match(section, /drawn from real call\s+sites/);
   assert.match(section, /\(obs #169\)/);
+});
+
+// The shared reviewer contract describes, in prose, what the cycle-2 refute
+// directive probes. That description is a second statement of the directive's
+// content, so it must name the identity pair too (task.146 QA-1). It lives
+// OUTSIDE the prompt template: the general reviewer's checks stay unchanged.
+test("the shared cycle-2 description names both refute probes", () => {
+  const text = read("shared/resources/code-review-prompt.md");
+  const start = text.indexOf("So on **cycle 2 only**");
+  assert.ok(start !== -1, "code-review-prompt.md cycle-2 section not found");
+  const section = text.slice(start, text.indexOf("\nCycles 3+", start));
+  assert.match(section, /teardown ·\s+in-flight · error path · reconnect/);
+  assert.match(
+    section,
+    /one pair that must be the same and one that must differ/,
+  );
+  // The template is the FENCED block after its heading — fence to fence. It
+  // carries `## Inputs` etc. inside the fence, so slicing to the next `## `
+  // heading would stop a few lines in and could never see a leak.
+  const heading = text.indexOf("## Prompt Template");
+  const open = text.indexOf("\n```\n", heading);
+  const close = text.indexOf("\n```\n", open + 1);
+  assert.ok(
+    heading !== -1 && open !== -1 && close > open,
+    "prompt template fence not found",
+  );
+  const template = text.slice(open, close);
+  assert.ok(
+    template.includes("## Output contract"),
+    "template slice must span the whole prompt",
+  );
+  assert.doesNotMatch(
+    template,
+    /one pair that must be the same/,
+    "the identity probe stays out of the general reviewer's prompt",
+  );
 });

@@ -100,7 +100,9 @@ All notable changes to this project will be documented in this file. Format foll
   identity rule shares neither the count nor the trigger. `tests/identity-rule-probe.test.js` holds
   the table and the paragraph, and that the list still holds four bullets. It also holds that the two
   refute directives are one text in two files, which no test guarded before (an edit to one alone
-  passed CI).
+  passed CI). `shared/resources/code-review-prompt.md`'s cycle-2 section describes that directive in
+  prose, so the same edit adds the identity pair there, outside the prompt template, where the general
+  reviewer's checks stay unchanged. The test holds that too.
 
 - **Two authoring rules for skills and observations, installed from the observation review (obs #159,
   #160).** `create-skill` gains *A skill's behaviour is restated in `docs/reference/`, and nothing reaches

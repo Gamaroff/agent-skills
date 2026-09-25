@@ -445,8 +445,8 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    predicate, whether or not it touches a lifecycle: find one pair that must be the same and one
    that must differ. A key changed to fix one direction has usually broken the other.
 
-   Review the COMBINATION, not only each change: at least one real defect of this shape was caused
-   by two earlier fixes that were each correct alone.
+   Review the COMBINATION, not only each change: at least one real lifecycle defect of the shape
+   above was caused by two earlier fixes that were each correct alone.
    ```
 
    This costs more than a narrowed cycle-2 pass and is expected to pay for itself, because the
