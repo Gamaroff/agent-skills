@@ -633,24 +633,24 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-25
-**Quality Score**: 90/100
+**Quality Score**: 60/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.147.qa.4.develop-pipeline-step-mechanics.md](./task.147.qa.4.develop-pipeline-step-mechanics.md)
-- **Gate File**: [task.147.gate.4.develop-pipeline-step-mechanics.yml](./task.147.gate.4.develop-pipeline-step-mechanics.yml)
+- **Full Report**: [task.147.qa.5.develop-pipeline-step-mechanics.md](./task.147.qa.5.develop-pipeline-step-mechanics.md)
+- **Gate File**: [task.147.gate.5.develop-pipeline-step-mechanics.yml](./task.147.gate.5.develop-pipeline-step-mechanics.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 94 node tests + 26 shell cases (also under `TMPDIR=/tmp`)
+- **Tests Executed**: 94 node tests + 27 shell cases
 - **Phases Verified**: 7/7
-- **Critical Issues**: 0 HIGH, 1 MEDIUM (bugs 1–12 closed)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 4 MEDIUM (one mechanism, filed as bug.14), 2 LOW; bugs 1–13 closed
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
 
-The HIGH count per gate was 2, 1, 0 and 0. One MEDIUM remains: a relative `.//docs` scope normalises to `/docs` and passes vacuously (bug.13).
+HIGH has been 0 for three consecutive gates. The `verify-push-state --scope` gate uses the wrong predicate: glob, case-folded and `:/` spellings exist but match nothing, so the scope check passes vacuously (bug.14). The fix replaces the gate rather than patching another spelling.
 
 ---
 <!-- change-log-start -->
@@ -666,6 +666,7 @@ The HIGH count per gate was 2, 1, 0 and 0. One MEDIUM remains: a relative `.//do
 | 2026-09-25 |  | QA gate FAIL (60/100) — 1 HIGH, 2 MEDIUM, 4 LOW; bugs 1-6 closed, bugs 7-9 filed | qa-task |
 | 2026-09-25 |  | QA gate CONCERNS (70/100) — 0 HIGH, 3 MEDIUM, 2 LOW; bugs 7-9 closed | qa-task |
 | 2026-09-25 |  | QA gate CONCERNS (90/100) — 0 HIGH, 1 MEDIUM; bugs 10-12 closed, bug.13 filed | qa-task |
+| 2026-09-25 |  | QA gate CONCERNS (60/100) — 0 HIGH, 4 MEDIUM (one mechanism, bug.14), 2 LOW; bug.13 closed | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -776,6 +777,8 @@ The harness now shares one `gh` stub per process (symlinked, with a sourced per-
 **QA cycle 3 fixes (qa-fix).** Gate 3 was CONCERNS, with 3 MEDIUM and 2 LOW findings. All five are fixed and mutation-proved (7 mutants): CR-1 replaces the `tee -a Issues Log` with echo; CR-3 makes an unrestored hold fail Step 8; CR-4 normalises `.` and `//` in scopes; CR-2 names a mismatched held record; CR-5 scopes `.claude/` changes by path. `verify-push-state.test.sh` now has 26 cases.
 
 **QA cycle 4 fixes (qa-fix).** Gate 4 was CONCERNS, with 1 MEDIUM. CR-1 is fixed: a relative `.//x` scope no longer keeps a leading `/`. The advisory CR-2 cleanup test now seeds `step4-hold-dir.txt`. Both fixes are mutation-proved. `verify-push-state.test.sh` now has 27 cases.
+
+**QA cycle 5 fixes (qa-fix).** Gate 5 was CONCERNS. It found 4 MEDIUM findings from one mechanism, plus 2 LOW. The fix **replaces** the verify-push-state scope gate instead of patching another spelling. A scope is now accepted only when check 3's own predicate matches a path git reports, so the glob, case-folded, `:/` and symlink-component spellings are refused with exit 2. `--help` prints by markers. There are 4 mutation proofs, and `verify-push-state.test.sh` now has 32 cases.
 
 **Deferred work.** None of the scope. The Step 3 inline branch is held as a statement, not as
 an orchestrator applying it (§ 8, Honest limit). The review's O3, bare-prefix path matching in

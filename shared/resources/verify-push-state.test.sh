@@ -267,6 +267,35 @@ EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope . >/dev/null 2>&1; echo $?
 [ "$EXIT" = "2" ] && pass "--scope . (the whole repository) → exit 2" \
                   || fail "--scope . (the whole repository) → exit 2" "got exit $EXIT"
 
+# ── 28–32. QA cycle 5: the scope gate is check 3's own predicate over git's path list ──────
+# Each of these spellings exists to the filesystem or to a pathspec, and matched no porcelain path:
+# check 3 passed vacuously. They must now be refused.
+R=$(scoped_repo gate-spellings)
+( cd "$R" && echo edited > docs/tasks/task.1/r.md )
+for sc in 'docs/tasks/task.1*' ':/docs/tasks/task.1' 'DOCS/tasks/task.1'; do
+  EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope "$sc" >/dev/null 2>&1; echo $? )
+  [ "$EXIT" = "2" ] && pass "--scope '$sc' names no path git knows → exit 2 (never a vacuous pass)" \
+                    || fail "--scope '$sc' names no path git knows → exit 2 (never a vacuous pass)" "got exit $EXIT"
+done
+
+# A path beneath a tracked symlinked directory is not a path git knows.
+R=$(scoped_repo symlink-component)
+( cd "$R" && ln -s docs/tasks/task.1 linkdir && git add linkdir && git commit --quiet -m link \
+    && git push --quiet 2>/dev/null && echo edited > docs/tasks/task.1/r.md )
+EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope linkdir/r.md >/dev/null 2>&1; echo $? )
+[ "$EXIT" = "2" ] && pass "--scope through a tracked symlinked directory → exit 2" \
+                  || fail "--scope through a tracked symlinked directory → exit 2" "got exit $EXIT"
+
+# --help survives the header the bundler prepends to every copy under skills/*/references/.
+HCOPY="$TMPROOT/bundled-copy.sh"
+{ head -1 "$SCRIPT"; echo "# <!-- AUTO-GENERATED — DO NOT EDIT -->"; tail -n +2 "$SCRIPT"; } > "$HCOPY"
+HELP=$(bash "$HCOPY" -h 2>&1)
+if printf '%s\n' "$HELP" | grep -q '2  usage error' && printf '%s\n' "$HELP" | grep -q 'Usage:'; then
+  pass "--help prints the whole block even with a bundler header prepended"
+else
+  fail "--help prints the whole block even with a bundler header prepended" "got: $HELP"
+fi
+
 echo
 echo "  $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

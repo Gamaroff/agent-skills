@@ -54,7 +54,9 @@ while [ $# -gt 0 ]; do
       [ -n "${2:-}" ] || { echo "verify-push-state: --scope needs a path" >&2; exit 2; }
       SCOPES+=("$2"); shift 2 ;;
     -h|--help)
-      sed -n '28,39p' "$0"; exit 0 ;;
+      # By markers, not line numbers: the bundler prepends a header to every copy under
+      # skills/*/references/, and a fixed range there dropped the last line (task.147 QA-5, CR-6).
+      sed -n '/^# Usage:/,/^#   2 /p' "$0"; exit 0 ;;
     *) echo "verify-push-state: unknown argument '$1'" >&2; exit 2 ;;
   esac
 done
@@ -63,6 +65,16 @@ done
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
   || { echo "verify-push-state: not a git repository" >&2; exit 2; }
+
+# ONE predicate decides "is path P inside scope S", for both the scope gate below and check 3. They
+# used to disagree: the gate used filesystem and pathspec semantics, check 3 compared strings. Every
+# spelling they disagreed on (a glob, a case-folded path, :/ magic, a symlinked component) was a
+# scope that existed but matched nothing, so check 3 passed vacuously (task.147 QA-5, CR-3).
+path_under() {
+  [ "$1" = "$2" ] && return 0
+  case "$1" in "$2"/*) return 0 ;; esac
+  return 1
+}
 
 # Normalise each --scope to the repo-root-relative form porcelain prints, then refuse one that names
 # nothing. A `./`-prefixed, absolute or mistyped scope used to match no path, which classed every
@@ -85,7 +97,7 @@ if [ ${#SCOPES[@]} -gt 0 ]; then
     case "$s" in
       "$TOP")   s="" ;;
       "$TOP"/*) s="${s#"$TOP"/}" ;;
-      /*)       echo "verify-push-state: --scope '$raw' is outside this repository" >&2; exit 2 ;;
+      /*)       echo "verify-push-state: --scope '$raw' is outside this repository, or does not resolve to a path inside it" >&2; exit 2 ;;
       *)        s="${PREFIX}${s#./}" ;;
     esac
     # A '..' segment would pass the existence check and then match no porcelain path, which is a
@@ -105,12 +117,35 @@ if [ ${#SCOPES[@]} -gt 0 ]; then
     while [ "${s#/}" != "$s" ]; do s="${s#/}"; done
     while [ "${s%/}" != "$s" ]; do s="${s%/}"; done
     [ -n "$s" ] || { echo "verify-push-state: --scope '$raw' names the whole repository — omit --scope instead" >&2; exit 2; }
-    if [ ! -e "$TOP/$s" ] && [ -z "$(git -C "$TOP" ls-files -- "$s" 2>/dev/null)" ]; then
-      echo "verify-push-state: --scope '$raw' names nothing in the working tree or the index" >&2; exit 2
-    fi
     NORMALISED+=("$s")
   done
   SCOPES=("${NORMALISED[@]}")
+
+  # The gate is check 3's own predicate over git's own path list: case-exact, no globbing, no
+  # symlink following. The list is the index and the untracked-not-ignored files (so an uncommitted
+  # deletion counts) plus HEAD's tree (so a scope whose files were all renamed away still counts).
+  # A scope that no such path falls under can only ever match nothing: refuse it (exit 2).
+  PATHS_FILE=$(mktemp) || { echo "verify-push-state: mktemp failed — cannot validate --scope" >&2; exit 2; }
+  if git -C "$TOP" ls-files -z --cached --others --exclude-standard > "$PATHS_FILE" 2>/dev/null; then
+    git -C "$TOP" ls-tree -r -z --name-only HEAD >> "$PATHS_FILE" 2>/dev/null
+    LISTED=true
+  else
+    # An unreadable index is check 3's to report: it reads the same index and fails on it. Skipping
+    # validation here cannot produce a vacuous pass, and exiting 2 would misreport it as a usage error.
+    LISTED=false
+  fi
+  for s in "${SCOPES[@]}"; do
+    [ "$LISTED" = true ] || break
+    FOUND=false
+    while IFS= read -r -d '' p; do
+      if path_under "$p" "$s"; then FOUND=true; break; fi
+    done < "$PATHS_FILE"
+    if [ "$FOUND" != true ]; then
+      rm -f "$PATHS_FILE"
+      echo "verify-push-state: --scope '$s' names no path git knows (tracked or untracked, case-exact, no globbing)" >&2; exit 2
+    fi
+  done
+  rm -f "$PATHS_FILE"
 fi
 
 FAILURES=0
@@ -173,11 +208,8 @@ else
   INSIDE=()
   OUTSIDE=()
   in_scope() {
-    local p="$1" s
-    for s in "${SCOPES[@]}"; do
-      [ "$p" = "$s" ] && return 0
-      case "$p" in "$s"/*) return 0 ;; esac
-    done
+    local s
+    for s in "${SCOPES[@]}"; do path_under "$1" "$s" && return 0; done
     return 1
   }
   # Each command's own status is captured: an unreadable status must fail check 3, never read as an

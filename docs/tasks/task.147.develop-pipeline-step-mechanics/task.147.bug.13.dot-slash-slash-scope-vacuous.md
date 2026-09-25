@@ -4,7 +4,7 @@
 **Bug ID**: TASK-147-BUG-13
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 4, CR-1)
 **Date Found**: 2026-09-25
 
@@ -44,3 +44,8 @@ After the collapse loops, strip any leading `/` from a relative scope. Add a `./
 | ---------- | ------------ | ---------- | ----------------------------------- |
 | 2026-09-25 | New          | qa-task    | QA cycle 4                          |
 | 2026-09-25 | Ready for QA | qa-fix     | Fix implemented and mutation-proved |
+
+## QA Verification
+
+**Date**: 2026-09-25 (QA cycle 5)
+**Result**: ✅ Verified fixed (case 27; the mutation goes red). The same review found that the gate behind it admits other vacuous spellings, filed as bug.14.
