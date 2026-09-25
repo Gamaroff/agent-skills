@@ -236,3 +236,12 @@ _Probe mode did not fire — the deliverable is not a boundary._
 
 - Task is ready for Sprint Review and merge
 - The follow-ups above are open work, not acceptance blockers
+
+---
+
+## Post-acceptance fix (2026-09-25, before merge)
+
+**Deviations recorded, not hidden:**
+
+1. On the maintainer's instruction, after acceptance at `074afc1e` and before merge, three findings were fixed on the branch: 5c CR-1 (review-bug's walk-only STALE now guarded by the pre-pass), 5c PC-2 (task §3/§4/§5/§7 record the review-bug verdict-rule change), and CR6-1 / bug 11 with 5c CR-2 (per-site `NAMED_PHASE` hold). CR-3 (create-task naming sentence) went in too. They were verified inline, not by a further QA cycle or an independent reviewer: fast gate green, 8/8 mutants red, each on the predicted test.
+2. The acceptance decision above was taken on `d523fa69` / `074afc1e` and is not re-run. The fix touches `skills/review-bug/SKILL.md`, `skills/create-task/SKILL.md`, `tests/outcome-reachability-check.test.js`, `CHANGELOG.md` and this task's documents, all inside the Files Summary. Security (no boundary), compliance (N/A) and docs (CHANGELOG updated) are unaffected. The merge gate re-verifies CI on the final head.

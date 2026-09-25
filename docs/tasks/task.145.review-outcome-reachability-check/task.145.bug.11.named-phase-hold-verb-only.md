@@ -4,7 +4,7 @@
 **Bug ID**: TASK-145-BUG-11
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 6, CR6-1)
 **Date Found**: 2026-09-25
 
@@ -52,3 +52,4 @@ both edits above.
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-09-25 | New | QA Engineer | QA cycle 6 (code review CR-1, confirmed by mutations M3 and M5) |
+| 2026-09-25 | Closed | develop-task | Fixed after acceptance, before merge: NAMED_PHASE is a per-site hold with the site noun and naming sentence; M3, M5 and wrong-noun M6 red |

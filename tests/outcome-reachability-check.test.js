@@ -55,15 +55,35 @@ const PLANNED_STATE = {
 };
 // A planned branch counts only when a named phase STATES it — otherwise "a later
 // phase will add it" exempts anything (task.145 QA cycle 3, CR3-4).
+//
+// The whole canonical sentence, not its prefix: cycle 4 found the three sites
+// agreeing on the prefix while only one carried the exclusion and the citation
+// (CR4-2). The sentence between requirement and exclusion (naming the phase) is
+// worded per site, because create-task has no finding to cite it in (CR5-3) —
+// so it is held PER SITE, with the site's own noun. A shared `(phase|task)` and a
+// `Name that \1 [^.]*\.` wildcard let a hedged or reverted naming sentence, and
+// the wrong site's noun, pass (task.145 QA cycle 6, CR6-1 / bug 11; 5c CR-2).
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const namedPhaseSentence = (noun, naming) =>
+  `only when a named ${noun} states it: the condition and the outcome it returns. ${naming} ` +
+  `A ${noun} that only names the function, or a criterion that promises a later ${noun} will add the branch, does not count`;
+const namedPhase = (noun, naming) => ({
+  name: `named-${noun} requirement for a planned branch ("${naming}")`,
+  re: new RegExp(escapeRe(namedPhaseSentence(noun, naming))),
+});
 const NAMED_PHASE = {
-  name: "named-phase requirement for a planned branch",
-  // The whole canonical sentence, not its prefix: cycle 4 found the three sites
-  // agreeing on the prefix while only one carried the exclusion and the
-  // citation (task.145 QA cycle 4, CR4-2).
-  // The requirement and the exclusion are held whole. The sentence between them
-  // (naming the phase) is worded per site, because create-task has no finding to
-  // cite it in (task.145 QA cycle 5, CR5-3).
-  re: /only when a named (phase|task) states it: the condition and the outcome it returns\. Name that \1 [^.]*\. A \1 that only names the function, or a criterion that promises a later \1 will add the branch, does not count/,
+  "skills/review-task/SKILL.md": namedPhase(
+    "phase",
+    "Name that phase when you pass the criterion.",
+  ),
+  "skills/create-task/SKILL.md": namedPhase(
+    "phase",
+    "Name that phase in the criterion as a cross-reference: the phase states the branch, and the criterion only points at it.",
+  ),
+  "skills/review-story/SKILL.md": namedPhase(
+    "task",
+    "Name that task when you pass the criterion.",
+  ),
 };
 // Anchored on the imperative, so a negated verdict ("Do not flag as Important
 // when …") fails the hold instead of satisfying it (CR3-6).
@@ -96,7 +116,11 @@ const SITES = [
   {
     file: "skills/review-task/SKILL.md",
     heading: "### Step 3: Technical Accuracy and Anti-Hallucination Review",
-    holds: [PLANNED_STATE, NAMED_PHASE, REVIEW_VERDICT],
+    holds: [
+      PLANNED_STATE,
+      NAMED_PHASE["skills/review-task/SKILL.md"],
+      REVIEW_VERDICT,
+    ],
     sectionHolds: [patternLine(10)],
     sectionForbids: [STALE_PATTERN],
   },
@@ -105,7 +129,7 @@ const SITES = [
     heading: "### 3.5 Adversarial Quality Review",
     holds: [
       PLANNED_STATE,
-      NAMED_PHASE,
+      NAMED_PHASE["skills/create-task/SKILL.md"],
       {
         name: "put-to-the-author verdict (no auto-fix)",
         re: /Put it to the author, and never auto-fix it/,
@@ -115,7 +139,11 @@ const SITES = [
   {
     file: "skills/review-story/SKILL.md",
     heading: "### Step 4: Technical Accuracy and Anti-Hallucination Review",
-    holds: [PLANNED_STATE, NAMED_PHASE, REVIEW_VERDICT],
+    holds: [
+      PLANNED_STATE,
+      NAMED_PHASE["skills/review-story/SKILL.md"],
+      REVIEW_VERDICT,
+    ],
     sectionHolds: [patternLine(7)],
     sectionForbids: [STALE_PATTERN],
   },
@@ -128,20 +156,34 @@ const SITES = [
         re: /is a fix that cannot pass its own verification → Important/,
       },
       {
-        name: "stale-bug clause (already returns the Expected outcome)",
-        re: /already returns the Expected outcome[^.]*\. Report it under this step's likely-already-fixed rule/,
+        name: "stale-bug clause, gated on the pre-pass",
+        re: /Unless PREPASS_STALE reads reproduces: likely, report it under this step's likely-already-fixed rule/,
+      },
+      // A function that already returns the Expected outcome is also what a LIVE
+      // bug looks like when its defect sits outside that function. The walk-only
+      // STALE overrode a pre-pass that traced the whole path to `likely`, and
+      // develop-bug then HALTed recommending the bug be closed (task.145 5c, CR-1).
+      {
+        name: "walk never overrides a pre-pass reproduces: likely",
+        re: /When the pre-pass traced the path to reproduces: likely, the walk contradicts it: report Important[\s\S]*?never route it to STALE/,
       },
     ],
     // The rule the stale clause routes to was gated on PREPASS_STALE alone, so
     // the in-line finding produced NEEDS DETAIL instead of STALE (CR3-3). The
-    // widened trigger lives in the same Step 3 section.
+    // widened trigger lives in the same Step 3 section — and carries the same
+    // pre-pass guard (CR-1).
     sectionHolds: [
       {
-        name: "likely-already-fixed rule widened to the in-line walk",
-        re: /reachability walk above finds that the branch that fires today already returns the Expected outcome/,
+        name: "likely-already-fixed rule widened to the in-line walk, guarded by the pre-pass",
+        re: /reachability walk above finds that the branch that fires today already returns the Expected outcome, unless the pre-pass reads reproduces: likely/,
       },
     ],
-    sectionForbids: [],
+    sectionForbids: [
+      {
+        name: "walk-only trigger that overrides the pre-pass",
+        re: /whatever the pre-pass said/,
+      },
+    ],
   },
 ];
 
@@ -363,14 +405,24 @@ test("the item reader does not reach past the citing item", () => {
   // The sibling text carries every element and every hold, so each
   // doesNotMatch below can actually fail (cycle 2, CR2-6 — the fixture said
   // "a branch" after the element narrowed to "branch that fires").
+  // The named-phase sentences come from the same builder the holds use: this
+  // test is about SCOPE, and each site's wording is held by the site tests.
   const SIBLING =
     "   - a named function, a stated input, the branch that fires, as the plan leaves them;" +
-    " only when a named phase states it: the condition and the outcome it returns. Name that phase in the criterion." +
-    " A phase that only names the function, or a criterion that promises a later phase will add the branch, does not count;" +
+    [
+      ["phase", "Name that phase when you pass the criterion."],
+      [
+        "phase",
+        "Name that phase in the criterion as a cross-reference: the phase states the branch, and the criterion only points at it.",
+      ],
+      ["task", "Name that task when you pass the criterion."],
+    ]
+      .map(([noun, naming]) => ` ${namedPhaseSentence(noun, naming)};`)
+      .join("") +
     " Flag as Important when the outcome is unreachable;" +
     " Put it to the author, and never auto-fix it; it is a fix that cannot pass its own verification → Important;" +
-    " if it already returns the Expected outcome." +
-    " Report it under this step's likely-already-fixed rule";
+    " Unless `PREPASS_STALE` reads `reproduces: likely`, report it under this step's likely-already-fixed rule;" +
+    " When the pre-pass traced the path to `reproduces: likely`, the walk contradicts it: report **Important**, and never route it to STALE";
   for (const el of [...ELEMENTS, ...SITES.flatMap((s) => s.holds)]) {
     assert.match(asProse(SIBLING), el.re, `fixture must carry ${el.name}`);
   }
@@ -524,5 +576,32 @@ test("a fence at the item's own indentation ends the citing item", () => {
   assert.equal(
     citingItemOf(section),
     "- **The check** (obs #168):\n  only the citation lives here",
+  );
+});
+
+test("review-bug Step 6: a walk that contradicts a pre-pass `likely` is NEEDS DETAIL, never STALE", () => {
+  // The recommendation table is what develop-bug Step 2 acts on: a STALE row
+  // that fires on the walk alone HALTs the pipeline recommending the bug be
+  // closed, while the pre-pass says it still reproduces (task.145 5c, CR-1).
+  const H = "## Step 6: Generate Output";
+  const section = sectionOf(read("skills/review-bug/SKILL.md"), H);
+  assert.ok(section, `skills/review-bug/SKILL.md: heading "${H}" not found`);
+  const row = (label) => {
+    // Keyed on the FIRST cell: the STALE row also says "Outranks NEEDS DETAIL".
+    const rows = section.filter(
+      (l) => l.startsWith("|") && (l.split("|")[1] || "").includes(label),
+    );
+    assert.equal(rows.length, 1, `exactly one ${label} row in the table`);
+    return asProse(rows[0]);
+  };
+  assert.match(
+    row("STALE (already fixed)"),
+    /reachability walk found the branch that fires today already returns the Expected outcome and PREPASS_STALE is not likely/,
+    "the STALE row's walk trigger must be guarded by the pre-pass",
+  );
+  assert.match(
+    row("NEEDS DETAIL"),
+    /reachability walk contradicts a pre-pass reproduces: likely \(the report names the wrong function or input\)/,
+    "the NEEDS DETAIL row must catch a walk that contradicts a pre-pass likely",
   );
 });

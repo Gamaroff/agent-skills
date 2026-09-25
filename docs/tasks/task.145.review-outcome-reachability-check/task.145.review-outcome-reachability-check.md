@@ -112,6 +112,12 @@ actually fires named — instead of being silently rewritten or silently failed 
 - review-bug Step 3: one bullet — when the Expected Behavior names what a function returns for the
   reproduction input, confirm the fixed code can return it (an expected outcome that no branch
   produces is a fix that cannot pass its own verification).
+- review-bug recommendation (added in QA cycles 2–4, guarded after 5c): a walk that finds the branch
+  that fires today already returns the Expected outcome feeds the likely-already-fixed rule, so it can
+  recommend **STALE**. STALE outranks NEEDS DETAIL, and the validate-mode verdict block gains a
+  `Stale source` field. The walk never overrides a pre-pass that traced the bug to `reproduces: likely`:
+  then the report names the wrong function or input, which is an Important finding and a NEEDS DETAIL
+  recommendation (5c CR-1).
 
 ### Same-class mechanism inventory (obs #103)
 
@@ -128,6 +134,9 @@ syntax and imports of examples the document contains, not outcomes it promises.
 
 - ✅ review-task Step 3 check 10; create-task Step 3.5 Critical bullet
 - ✅ review-story Step 4 check 7; review-bug Step 3 bullet
+- ✅ review-bug likely-already-fixed rule, QUESTION POINT 2 prompt and Step 6 recommendation table
+  (STALE and NEEDS DETAIL rows), plus the verdict block's `Stale source` field. Scope widened in QA
+  cycles 2–4 and recorded here after the 5c review (PC-2)
 - ✅ `tests/outcome-reachability-check.test.js`
 - ✅ CHANGELOG `[Unreleased]`
 
@@ -144,8 +153,16 @@ syntax and imports of examples the document contains, not outcomes it promises.
 
 ## 5. Breaking Changes
 
-None — additive review guidance. A review may now report one more **Important** finding on a
-document that states an unreachable outcome; no gate, score cap or verdict rule changes.
+Additive review guidance, with one verdict-rule change, in review-bug. A review may now report one
+more **Important** finding on a document that states an unreachable outcome. Review-task,
+review-story and create-task gain no new gate, score cap or verdict rule.
+
+**review-bug's recommendation rules change.** A reachability walk that finds the Expected outcome is
+already returned now triggers **STALE**, unless the pre-pass says `reproduces: likely`. STALE
+outranks NEEDS DETAIL. A walk that contradicts a pre-pass `likely` yields **NEEDS DETAIL**. This
+opens a new path to develop-bug Step 2's STALE HALT, which recommends closing the bug. The
+validate-mode verdict block gains `Stale source: {none|pre-pass|reachability walk}`. No consumer
+parses the block's fields: QA cycle 4 grepped develop-bug, its references, the tests and the scripts.
 
 ---
 
@@ -168,6 +185,7 @@ document that states an unreachable outcome; no gate, score cap or verdict rule 
 - [x] create-task Step 3.5 *Critical*: **An outcome the named function cannot return** (obs #168)
 - [x] review-story Step 4: check 7 (after check 6, *Reference Validation*), worded for acceptance criteria
 - [x] review-bug Step 3: Expected Behavior bullet
+- [x] review-bug: likely-already-fixed rule, QP2 prompt, Step 6 STALE/NEEDS DETAIL rows guarded by the pre-pass (5c CR-1)
 
 ### Phase 3: population test (Risk: Low)
 
@@ -194,7 +212,7 @@ document that states an unreachable outcome; no gate, score cap or verdict rule 
 1. ✅ `skills/review-task/SKILL.md` — Step 3 check 10; Common Hallucination Patterns line
 2. ✅ `skills/create-task/SKILL.md` — Step 3.5 Critical bullet
 3. ✅ `skills/review-story/SKILL.md` — Step 4 check 7
-4. ✅ `skills/review-bug/SKILL.md` — Step 3 Expected Behavior bullet
+4. ✅ `skills/review-bug/SKILL.md` — Step 3 Expected Behavior bullet; likely-already-fixed rule, QP2 prompt, Step 6 table, verdict block
 
 ### Files to Add (Tests)
 
@@ -348,6 +366,7 @@ None.
 | 2026-09-25 |  | QA findings fixed — cycle 5 (CR5-1 block rebuilt, CR5-2 per-site pattern holds, CR5-3 per-site citation) | qa-fix |
 | 2026-09-25 |  | QA gate CONCERNS (90/100) — 1 finding (1 medium); cycle 6 (granted); bugs 1–10 closed | qa-task |
 | 2026-09-25 | 1.2 | DoD passed — accepted (PR #485); gate CONCERNS 90, residual CR6-1 (bug 11) | finalise |
+| 2026-09-25 |  | Post-acceptance fix before merge — review-bug STALE guarded by the pre-pass (5c CR-1), scope recorded (PC-2), per-site NAMED_PHASE hold (bug 11, CR-2), create-task naming (CR-3) | develop-task |
 
 ---
 <!-- change-log-end -->
@@ -360,7 +379,6 @@ None.
 - [x] Phase 4: docs and validation
 
 ---
-
 
 ## Definition of Done - PASSED ✅
 
@@ -383,7 +401,7 @@ All Definition of Done criteria have been verified:
 ✅ **Security Review:** PASS. No boundary deliverable; no secrets or unsafe patterns.
 ⚠️ **Compliance Review:** NOT_APPLICABLE.
 
-**Follow-ups (non-blocking):** CR6-1 / bug 11 (per-site `NAMED_PHASE` hold); 5c CR-1 (review-bug STALE trigger overrides a pre-pass `reproduces: likely`); 5c PC-2 (record review-bug precedence changes in scope); CR-3/CR-4 advisory. See the Deferred Work notes.
+**Follow-ups:** CR6-1 / bug 11, 5c CR-1, 5c PC-2 and CR-3 were fixed after acceptance, before merge. See the Post-acceptance fix note. CR-4 (check number hard-coded in `patternLine`) remains advisory.
 
 **Task marked as ACCEPTED on:** 2026-09-25
 
@@ -400,7 +418,20 @@ All Definition of Done criteria have been verified:
 
 ## Notes
 
-### Deferred Work (QA cycle 6, diminishing-returns exit)
+### Post-acceptance fix (2026-09-25, before merge)
+
+On the maintainer's instruction, three findings were fixed on the branch after acceptance and before
+merge, verified inline (fast gate, 8/8 mutants red), not by a further QA cycle:
+
+- **5c CR-1**: review-bug's walk-only STALE no longer overrides a pre-pass `reproduces: likely`.
+  A contradicting walk is an Important wrong-function-or-input finding and NEEDS DETAIL. Held at
+  Step 3 (two item holds, one section hold, one forbid) and at the Step 6 table (new test).
+- **5c PC-2**: §3, §4, §5 and §7 record review-bug's recommendation-rule changes.
+- **CR6-1 / bug 11 and 5c CR-2**: `NAMED_PHASE` is a per-site hold with the site's own noun and
+  naming sentence. CR-3: create-task's naming sentence now says the criterion only points at the
+  phase.
+
+### Deferred Work (QA cycle 6, diminishing-returns exit) — resolved by the post-acceptance fix above
 
 - **CR6-1** ([bug 11](./task.145.bug.11.named-phase-hold-verb-only.md), medium): in
   `tests/outcome-reachability-check.test.js`, `NAMED_PHASE` holds only the verb `Name that phase|task`,

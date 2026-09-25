@@ -79,11 +79,11 @@ This is the bug-review analog of review-task's anti-hallucination pass — the s
 - **Reproduction Steps**: numbered, concrete, self-contained; each step is an action a developer can take. Vague/narrative-only steps → **Critical** (a bug you cannot reproduce from the report cannot be reliably fixed).
 - **Environment** specified (OS/browser/device/version/test env) → **Important** if absent for a Major+ bug.
 - **Expected vs Actual** both explicit and specific → **Critical** if one is missing/ambiguous.
-- **Expected outcome is reachable** (obs #168): when the Expected Behavior names what a function returns for the reproduction input (a verdict, an exit code, a status), walk that input through the named function's decision branches. Normally the branch that fires **today** returns the Actual. That is the bug, not a finding. The question is whether the Expected outcome is one the function can return for that input, either from a branch it already has or from one the fix can add without breaking another behaviour the report or the function's contract states. An unreachable Expected outcome is one no branch could return. It is a fix that cannot pass its own verification → **Important**; name the branch that fires and the contract that rules the Expected outcome out. If the branch that fires today **already returns the Expected outcome**, the bug may already be fixed. Report it under this step's likely-already-fixed rule (**Critical**), not as reachable.
+- **Expected outcome is reachable** (obs #168): when the Expected Behavior names what a function returns for the reproduction input (a verdict, an exit code, a status), walk that input through the named function's decision branches. Normally the branch that fires **today** returns the Actual. That is the bug, not a finding. The question is whether the Expected outcome is one the function can return for that input, either from a branch it already has or from one the fix can add without breaking another behaviour the report or the function's contract states. An unreachable Expected outcome is one no branch could return. It is a fix that cannot pass its own verification → **Important**; name the branch that fires and the contract that rules the Expected outcome out. If the branch that fires today **already returns the Expected outcome**, the bug may already be fixed, or the defect may sit outside the walked function: a caller passes a different input or drops the result, or the report names the wrong function. The pre-pass decides which. Unless `PREPASS_STALE` reads `reproduces: likely`, report it under this step's likely-already-fixed rule (**Critical**), not as reachable. When the pre-pass traced the path to `reproduces: likely`, the walk contradicts it: report **Important**, because the report names the wrong function or input. Cite the branch that fires and the pre-pass's `found_at`, and never route it to STALE.
 - **Frequency** + **Reproducible** fields set → **Important** if absent.
 - **Evidence** (logs, stack traces, screenshots, failing command output) present → **Important** for Major+, **Optional** for Minor/Trivial. Evidence is what makes Step-3 root-cause localisation in develop-bug tractable.
 
-Incorporate `PREPASS_STALE`: if `reproduces: unlikely` and a concrete `found_at` shows the code path already handles the case, flag **Critical (likely already fixed)**. The same rule fires when the reachability walk above finds that the branch that fires today already returns the Expected outcome. That branch is the `found_at`, whatever the pre-pass said.
+Incorporate `PREPASS_STALE`: if `reproduces: unlikely` and a concrete `found_at` shows the code path already handles the case, flag **Critical (likely already fixed)**. The same rule fires when the reachability walk above finds that the branch that fires today already returns the Expected outcome, unless the pre-pass reads `reproduces: likely`. That branch is the `found_at`. A walk that contradicts a pre-pass `likely` is the Important wrong-function-or-input finding above, never a STALE.
 
 ### QUESTION POINT 1 (interactive): Reproducibility & Duplicate
 
@@ -101,7 +101,7 @@ Cross-check the assigned `severity`/`priority` against the described Impact usin
 
 ### QUESTION POINT 2 (interactive): Classification & Linkage
 
-Batch remaining questions (severity/priority correction, linkage fixes, and — if `PREPASS_STALE` is `unlikely` or the Step 3 reachability walk found the Expected outcome already returned — "This may already be fixed at {found_at}. Close instead of fixing?"). Incorporate answers.
+Batch remaining questions (severity/priority correction, linkage fixes, and — if `PREPASS_STALE` is `unlikely`, or the Step 3 reachability walk found the Expected outcome already returned and the pre-pass did not read `likely` — "This may already be fixed at {found_at}. Close instead of fixing?"). Incorporate answers.
 
 ## Step 6: Generate Output
 
@@ -110,9 +110,9 @@ Compute the **fix-readiness score (1–10)** and **recommendation**:
 | Recommendation | When |
 |----------------|------|
 | ✅ **READY TO FIX** | Score ≥ 8, no Critical issues, `duplicate: none`, `reproduces: likely|unknown` |
-| ⚠️ **NEEDS DETAIL** | Score 4–7, or any Critical reproducibility/completeness gap (fixable by adding detail) |
+| ⚠️ **NEEDS DETAIL** | Score 4–7, or any Critical reproducibility/completeness gap (fixable by adding detail), or the Step 3 reachability walk contradicts a pre-pass `reproduces: likely` (the report names the wrong function or input) |
 | 🚨 **DUPLICATE** | `PREPASS_DUP` = suspected and confirmed — recommend cancelling in favour of {id} |
-| 🚨 **STALE (already fixed)** | `PREPASS_STALE` = unlikely with concrete evidence, or the Step 3 reachability walk found the branch that fires today already returns the Expected outcome — recommend closing the bug, not fixing. **Outranks NEEDS DETAIL** |
+| 🚨 **STALE (already fixed)** | `PREPASS_STALE` = unlikely with concrete evidence, or the Step 3 reachability walk found the branch that fires today already returns the Expected outcome and `PREPASS_STALE` is not `likely` — recommend closing the bug, not fixing. **Outranks NEEDS DETAIL** |
 
 A likely-already-fixed Critical also matches the NEEDS DETAIL row's "any Critical reproducibility gap". **STALE outranks NEEDS DETAIL**: no added detail can make an already-fixed bug ready to fix.
 

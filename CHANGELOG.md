@@ -99,7 +99,9 @@ All notable changes to this project will be documented in this file. Format foll
   The same check lands where the defect is introduced: `/create-task` Step 3.5, where it is put to
   the author and never auto-rewritten to current behaviour. It also lands at the two sibling sites,
   `/review-story` Step 4 check 7 and `/review-bug` Step 3. In review-bug, a branch that already returns
-  the Expected outcome is routed to the likely-already-fixed rule. Earlier checks asked whether a
+  the Expected outcome is routed to the likely-already-fixed rule, unless the pre-pass traced the bug to
+  `reproduces: likely`. In that case the report names the wrong function or input, so it is an Important
+  finding (NEEDS DETAIL) and never STALE. Earlier checks asked whether a
   named function *exists*; none asked whether it can *produce* what the document promises. task.144
   promised `present-but-inert` for an accept-all fixture, and `computeVerdict` scores that `absent`.
   Review read the function in full and passed the claim, and develop found it.
@@ -107,7 +109,7 @@ All notable changes to this project will be documented in this file. Format foll
   elements (stated input, named function, branch that fires), the site's verdict sentence, and its
   planned-state and named-phase (or stale-bug) clauses. It also holds the review-task and review-story
   hallucination-pattern lines, which restate the rule and carry its Important severity, and review-bug's widened
-  likely-already-fixed trigger. In review-bug, STALE outranks NEEDS DETAIL.
+  likely-already-fixed trigger and the pre-pass guard on it. In review-bug, STALE outranks NEEDS DETAIL.
 - **`uat-status.mjs --set <id> <verdict>`: only a `fail` moves an `✅ accepted` row (task 141).** A `pass`,
   `blocked` or `na` against an accepted row now leaves `✅` in place and updates only `Last run` and
   `Notes / bug`; the tool prints `(kept)` so the branch it took is never silent. `fail` is unchanged
