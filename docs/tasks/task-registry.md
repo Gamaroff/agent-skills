@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-09-24
-**Next Available Task Number:** **155**
+**Last Updated:** 2026-09-25
+**Next Available Task Number:** **156**
 
 ## How to use
 
@@ -195,6 +195,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 152 | [finalise: bug-mode gaps path and co-located artifacts in 8a and link guard](task.152.finalise-gaps-path-and-artifact-links/task.152.finalise-gaps-path-and-artifact-links.md) | planned | refactoring | Medium | 2026-09-24 | [#482](https://github.com/Gamaroff/agent-skills/issues/482) | Obs #148, #155: finalise bug-mode GAPS path (incl. Step 8.5 self-guard), co-located artifacts in 8a + doc-links corpus guard |
 | 153 | [Release gate reads CI's verdict; load-sensitive tests name themselves](task.153.release-ci-gate-load-sensitive-tests/task.153.release-ci-gate-load-sensitive-tests.md) | planned | infrastructure | Medium | 2026-09-24 | [#483](https://github.com/Gamaroff/agent-skills/issues/483) | Obs #150, #157, #166: release.sh reads CI's verdict, load-sensitive assertions name themselves, CR-6 pid-file race. #158 dropped (fixed in 62c9190e) |
 | 154 | [Bundler and snippet-test hygiene: attributed warning, symlink-free test run](task.154.bundler-and-snippet-test-hygiene/task.154.bundler-and-snippet-test-hygiene.md) | planned | testing | Medium | 2026-09-24 | [#484](https://github.com/Gamaroff/agent-skills/issues/484) | Obs #149, #151: attributed bundler warning (the literal is in observation-log-contract.md), consumer-root helper + `test:clean-checkout` |
+| 155 | [QA Testing Results section: one write engine, one placement, refused when duplicated](task.155.qa-results-section-engine/task.155.qa-results-section-engine.md) | planned | refactoring | Medium | 2026-09-25 | [#486](https://github.com/Gamaroff/agent-skills/issues/486) | Obs #178: `qa-results.js` beside `change-log.js`, qa-task/qa-story Step 12 wired, corpus guard, task.65 repair (3 stacked copies) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
