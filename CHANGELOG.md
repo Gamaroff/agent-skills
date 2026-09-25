@@ -88,6 +88,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **A fix to an identity rule proves both directions (task 146, obs #169).** `qa-fix` Step 3.5 gains
+  a third probe table, *For a fix to an identity rule, probe both directions*. A change to a dedupe
+  key, cache key, record identity, normaliser or equality predicate now owes one test pair that must
+  merge and one that must stay apart, drawn from real call sites, including the pair for the
+  direction the finding did not name. On task.144, four of five QA cycles circled one record key.
+  Each fix split what was one or merged what was two, and each fix's test proved only the direction
+  its finding named. The cycle-2 `REFUTE PASS.` directive in `qa-task` and `qa-story` gains an
+  **Identity rules** paragraph. It is placed after the four-transition list and is not a fifth
+  bullet: the list is introduced as "probe these four transitions" for lifecycle changes, and an
+  identity rule shares neither the count nor the trigger. `tests/identity-rule-probe.test.js` holds
+  the table and the paragraph, and that the list still holds four bullets. It also holds that the two
+  refute directives are one text in two files, which no test guarded before (an edit to one alone
+  passed CI).
+
 - **Two authoring rules for skills and observations, installed from the observation review (obs #159,
   #160).** `create-skill` gains *A skill's behaviour is restated in `docs/reference/`, and nothing reaches
   it*: a change to what a skill does obliges a `grep` of `docs/reference/commands.md` and
