@@ -260,6 +260,9 @@ EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope docs/./tasks/task.1 >/dev/
 EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope docs//tasks/task.1 >/dev/null 2>&1; echo $? )
 [ "$EXIT" = "1" ] && pass "--scope docs//tasks/task.1 is normalised — inside dirt → exit 1" \
                   || fail "--scope docs//tasks/task.1 is normalised — inside dirt → exit 1" "got exit $EXIT"
+EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope .//docs/tasks/task.1 >/dev/null 2>&1; echo $? )
+[ "$EXIT" = "1" ] && pass "--scope .//docs/tasks/task.1 is normalised — inside dirt → exit 1" \
+                  || fail "--scope .//docs/tasks/task.1 is normalised — inside dirt → exit 1" "got exit $EXIT"
 EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope . >/dev/null 2>&1; echo $? )
 [ "$EXIT" = "2" ] && pass "--scope . (the whole repository) → exit 2" \
                   || fail "--scope . (the whole repository) → exit 2" "got exit $EXIT"

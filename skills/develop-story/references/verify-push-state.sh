@@ -100,6 +100,10 @@ if [ ${#SCOPES[@]} -gt 0 ]; then
     while [ "${s#./}" != "$s" ]; do s="${s#./}"; done
     [ "$s" = "." ] && s=""
     s="${s%/.}"
+    # Relative by now (the toplevel was stripped above). A leading '/' can only be left over from a
+    # `.//x` spelling whose `./` was stripped before the collapse; kept, it matched no porcelain path
+    # and check 3 passed vacuously (task.147 QA-4, CR-1).
+    while [ "${s#/}" != "$s" ]; do s="${s#/}"; done
     while [ "${s%/}" != "$s" ]; do s="${s%/}"; done
     [ -n "$s" ] || { echo "verify-push-state: --scope '$raw' names the whole repository — omit --scope instead" >&2; exit 2; }
     if [ ! -e "$TOP/$s" ] && [ -z "$(git -C "$TOP" ls-files -- "$s" 2>/dev/null)" ]; then

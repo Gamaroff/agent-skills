@@ -4,7 +4,7 @@
 **Bug ID**: TASK-147-BUG-12
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 3, CR-4)
 **Date Found**: 2026-09-25
 
@@ -34,3 +34,8 @@ Collapse `//` and `.` segments, and refuse a scope that means the whole reposito
 | ---------- | ------------ | ---------- | ----------------------------------- |
 | 2026-09-25 | New          | qa-task    | QA cycle 3                          |
 | 2026-09-25 | Ready for QA | qa-fix     | Fix implemented and mutation-proved |
+
+## QA Verification
+
+**Date**: 2026-09-25 (QA cycle 4)
+**Result**: ✅ Verified fixed. The executed test passes, the mutation proof goes red, and the suite passes under `TMPDIR=/tmp`.

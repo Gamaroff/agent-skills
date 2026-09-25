@@ -354,9 +354,20 @@ describe("executed against fixtures", { concurrency: true }, () => {
       try {
         write(fx.work, ".claude/state/step4-scope-paths.txt", `${WORK_ITEM}\n`);
         write(fx.work, ".claude/state/step4-held-paths.txt", `${WORK_ITEM}\n`);
+        // An empty hold dir: Restore ran; the record must still be removed.
+        fs.mkdirSync(path.join(fx.dir, "hold-empty"));
+        write(
+          fx.work,
+          ".claude/state/step4-hold-dir.txt",
+          `${path.join(fx.dir, "hold-empty")}\n`,
+        );
         const r = await runChecklist(sh, fx);
         assert.equal(r.status, 0, r.stdout);
-        for (const rec of ["step4-scope-paths.txt", "step4-held-paths.txt"]) {
+        for (const rec of [
+          "step4-scope-paths.txt",
+          "step4-held-paths.txt",
+          "step4-hold-dir.txt",
+        ]) {
           assert.equal(
             fs.existsSync(path.join(fx.work, ".claude/state", rec)),
             false,

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-147-BUG-11
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 3, CR-3)
 **Date Found**: 2026-09-25
 
@@ -34,3 +34,8 @@ Check 5 fails while step4-hold-dir.txt names a non-empty directory. Add a test t
 | ---------- | ------------ | ---------- | ----------------------------------- |
 | 2026-09-25 | New          | qa-task    | QA cycle 3                          |
 | 2026-09-25 | Ready for QA | qa-fix     | Fix implemented and mutation-proved |
+
+## QA Verification
+
+**Date**: 2026-09-25 (QA cycle 4)
+**Result**: ✅ Verified fixed. The executed test passes, the mutation proof goes red, and the suite passes under `TMPDIR=/tmp`.
