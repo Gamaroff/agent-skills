@@ -35,9 +35,9 @@ Add an outcome-reachability check (obs #168) to review-task Step 3, create-task 
 | 2. review-task             | ✅ Done    | `task.145.review.{N}.{name}.md` exists (or skip logged)               | `task.145.review.1.review-outcome-reachability-check.md` — READY TO IMPLEMENT 8/10; Planned → Ready for Development | — (pre-pass B/C returned inline YAML) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 4/4 phases; ci:fast green; 8/8 mutants red; hand run recorded | — (loop audit inline; hand-run agent result recorded in Decisions Log) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #485: https://github.com/Gamaroff/agent-skills/pull/485 (commit `d80622a7`) | — |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.145.qa.{N}.*.md`; `task.145.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Loop limit reached after 5 cycles; route 2c declined (medium-not-falling); fix `c02048a6` ungated | `.summaries/step-5-traceability-mapper.json` |
-| 7. finalise                | ⏳ Pending | `task.145.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.145.qa.{N}.*.md`; `task.145.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (1 granted after loop-limit HALT at 5); gate 6 CONCERNS 90 → diminishing-returns exit; 5c `/review-pr` CONCERNS (`task.145.pr-review.1.*.md`); residual CR6-1 (bug 11) | `.summaries/step-5-traceability-mapper.json` |
+| 7. finalise                | ✅ Done    | `task.145.dod.{N}.*.md`; task `status: accepted`                      | `task.145.dod.1.review-outcome-reachability-check.md`: ACCEPTED; acceptance commit `074afc1e`; CI 1 SUCCESS @ d523fa69, CI 2 SUCCESS @ 074afc1e; issue #473 closed | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed (hash in the commit log) | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -123,6 +123,14 @@ An independent general-purpose agent with fresh context was given only the updat
 - Traceability mapper dispatched (standard mode, Success Criteria present). The read-only agent returned the matrix content; the orchestrator wrote it to `.summaries/qa-traceability-matrix.md` (gitignored) with 9 criteria: 2 full, 3 partial, 1 unit, 3 none.
 - GitHub board: QA-start re-assert → `stage-disabled`.
 - QA Cycle 1: `/qa-task` with `code_review_blocking=true` → CONCERNS 80/100. PR comment posted; tracker `qa-gate-1` posted.
+
+### Resume — 2026-09-25 (QA loop re-entry)
+
+- Operator re-invoked `/develop-task` with "Resume at 5a with 1 more cycle" after the `loop-limit` HALT at Step 5 (`qa_phase: 5b`, halted 2026-09-24T23:20:58Z).
+- QA loop re-entry: 1 extra cycle granted; 0 cycle(s) run outside the loop back-filled from disk (highest gate on disk = 5, `### QA Cycle` entries = 5).
+- `grant-qa-cycles.sh` restored the lock from the halt snapshot and wrote `extra_cycles_granted: 1`, `qa_max_cycles: 6`, `qa_phase: 5a`. Re-entering at 5a as cycle 6, which gates the ungated fix `c02048a6`.
+- Cycle 6: gate CONCERNS 90/100 (CR6-1 medium, test machinery) → diminishing-returns exit → 5c `/review-pr --effort medium --comment` → CONCERNS (PC-2, CR-1 medium; PC-1, CR-2 low). Report `task.145.pr-review.1.review-outcome-reachability-check.md`; PR summary comment posted. GitHub board: ready-for-merge → `stage-disabled`. PC-1 (stale progress row / Completion) fixed in this report.
+- Step 7 `/finalise`: DoD ACCEPTED (AC8 adjudicated PASS, held by `changelog-entry-drift.test.mjs`; the review of record is 5c `/review-pr`, following task.144). CI reading 1: SUCCESS @ d523fa69 (5 checks); CI reading 2: SUCCESS @ 074afc1e (5 checks, 120 s). Acceptance commit `074afc1e` (document, DoD, sprint review, pr-review.1, registry ticked). Canonical PR comment posted. Issue #473: completion comment posted, closed (state CLOSED); board `done` → `already`. Doc link already on a durable branch.
 
 
 ---
@@ -224,14 +232,30 @@ _Track each QA review/fix cycle._
 **Fix**: `c02048a6`, covering CR5-1 through CR5-3. Artifacts were staged before the gate; attempt 1 green (4003 tests, 4002 pass, 0 fail). 3/3 fix mutants red. PR comment and tracker `qa-fix-5` posted. Route 2c (gate-the-last-fix) was evaluated with `budgetSpent: true` and declined (`medium-not-falling`).
 **Convergence check**: HIGH sequence [0, 1, 0, 0, 0]; HIGH_N = 0 → no trip. Route classifier: `continue` (not-a-pass-gate).
 
+### QA Cycle 6 — 2026-09-25
+
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1 in the gate. CR6-1 (medium): the cycle-5 fix loosened `NAMED_PHASE` until it holds only the verb, so a reworded or hedged naming sentence passes (mutations M3, M5 green). Advisory: CR-2, CR-3 (medium/medium), CR-4, CR-5 (low). All three cycle-5 findings are FIXED. Bugs 1–10 are closed; bug 11 is new.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: CONCERNS — `task.145.pr-review.1.review-outcome-reachability-check.md` (PC-2 medium scope, CR-1 medium review-bug STALE override, PC-1/CR-2 low); not blocking
+**Loop exit**: Diminishing-returns exit taken — HIGH is 0 for cycles 5 and 6, and all 1 remaining findings are in test machinery — the loop has finished working rather than stopped working. This is a CLEAN exit, not a stall: nothing was blocked and nothing is being accepted over. The residue is recorded in the gate's `recommendations.future`.
+**Action**: Proceeding to 5c (PR conformance review)
+**Evidence**: The granted cycle, which gates `c02048a6`. `ci:fast` EXIT 0 (4003 tests, 4002 pass, 0 fail); `bundle:check` clean; PR CI green. Mutation proofs: M1, M2, M4 `covered`; M3, M5 `no-red-untested` (CR6-1). The code reviewer was an Explore subagent over the scoped diff (9 files since gate 5). PR comment and tracker `qa-gate-6` posted.
+**Convergence check**: HIGH sequence [0, 1, 0, 0, 0, 0]; HIGH_N = 0 → no trip. Route classifier: `diminishing-returns` (qa.testArtifactGlobs matched `tests/**`; all NFR PASS).
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated — QA loop limit reached (5 cycles; last fix `c02048a6` ungated)
+**Finished**: 2026-09-25T04:40Z
+**Final Status**: Completed
 **Branch**: feature/task.145.review-outcome-reachability-check
 **PR**: https://github.com/Gamaroff/agent-skills/pull/485
-**QA Iterations**: 5 (gates: CONCERNS 80, FAIL 60, CONCERNS 70, CONCERNS 90, CONCERNS 90)
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 6 (gates: CONCERNS 80, FAIL 60, CONCERNS 70, CONCERNS 90, CONCERNS 90, CONCERNS 90); PR review CONCERNS
+**DoD Summary**: `task.145.dod.1.review-outcome-reachability-check.md`: ✅ ACCEPTED (9/9 criteria; security PASS; compliance N/A; docs PASS)
+**Tracker debt**: none (`access.tracker: full`; issue #473 closed, board already Done)
+
+### Completion Summary
+
+Implemented the outcome-reachability check (obs #168) at four sites: review-task Step 3 check 10, create-task 3.5, review-story Step 4 check 7 and review-bug Step 3. A four-site population test holds each site. The QA loop ran 6 cycles; cycle 6 was granted after a loop-limit HALT at cycle 5. It reached no HIGH finding after cycle 2 and exited on the diminishing-returns route at gate 6 (CONCERNS 90), with one test-strength residual, CR6-1 (bug 11). The Step 5c `/review-pr` returned CONCERNS. Two findings are follow-ups: review-bug's walk-only STALE trigger can override a pre-pass `reproduces: likely` (CR-1), and that precedence change is not recorded in the task's scope (PC-2). Notable decisions: reachability is judged against the planned state (cycle 2); per-site pattern-line holds (cycle 5); bugs 1–10 closed at cycle 6.
