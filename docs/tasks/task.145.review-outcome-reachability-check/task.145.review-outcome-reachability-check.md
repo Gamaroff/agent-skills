@@ -5,10 +5,12 @@ type: task
 description: "Add an outcome-reachability check to review-task Step 3 (and its authoring and sibling counterparts): when a success criterion or test case states the outcome a named function produces for a named input, walk that input through the function's decision branches and confirm the outcome is one it can return — so a criterion that cannot be met is caught at review, not discovered at develop."
 tags: [review-task, review-story, review-bug, create-task, anti-hallucination, observation]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-25
+completed_date: 2026-09-25
+pr_number: 485
 assignee:
 estimated_effort_hours: 8
 github_issue: 473
@@ -16,7 +18,7 @@ github_issue: 473
 
 # Technical Task: review-task — trace a criterion's stated outcome through the function that decides it
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.145.review.1.review-outcome-reachability-check.md` implemented 2026-09-24
 
@@ -345,6 +347,7 @@ None.
 | 2026-09-25 |  | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low); QA Testing Results / Change Log block rebuilt (CR5-1) | qa-task |
 | 2026-09-25 |  | QA findings fixed — cycle 5 (CR5-1 block rebuilt, CR5-2 per-site pattern holds, CR5-3 per-site citation) | qa-fix |
 | 2026-09-25 |  | QA gate CONCERNS (90/100) — 1 finding (1 medium); cycle 6 (granted); bugs 1–10 closed | qa-task |
+| 2026-09-25 | 1.2 | DoD passed — accepted (PR #485); gate CONCERNS 90, residual CR6-1 (bug 11) | finalise |
 
 ---
 <!-- change-log-end -->
@@ -357,6 +360,34 @@ None.
 - [x] Phase 4: docs and validation
 
 ---
+
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.145.qa.6.review-outcome-reachability-check.md`
+**Gate File**: `task.145.gate.6.review-outcome-reachability-check.yml`
+**Gate Status**: ⚠️ CONCERNS. The one open finding, CR6-1, is in test machinery; the QA loop took the diminishing-returns exit at cycle 6.
+**Quality Score**: 90/100
+**PR Conformance Review**: `task.145.pr-review.1.review-outcome-reachability-check.md` — ⚠️ CONCERNS (advisory)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 9/9 Success Criteria met. AC8, the CHANGELOG citation, is held by `changelog-entry-drift.test.mjs`.
+✅ **Tests:** 4003 tests, 0 failures. The population test is `tests/outcome-reachability-check.test.js`, mutation-proven per cycle.
+✅ **PR Review:** PR #485. The review of record is the Step 5c `/review-pr` (no GitHub review on this solo-maintained repository). CI is green.
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry; the four SKILL.md sites and their bundled copies.
+✅ **Security Review:** PASS. No boundary deliverable; no secrets or unsafe patterns.
+⚠️ **Compliance Review:** NOT_APPLICABLE.
+
+**Follow-ups (non-blocking):** CR6-1 / bug 11 (per-site `NAMED_PHASE` hold); 5c CR-1 (review-bug STALE trigger overrides a pre-pass `reproduces: likely`); 5c PC-2 (record review-bug precedence changes in scope); CR-3/CR-4 advisory. See the Deferred Work notes.
+
+**Task marked as ACCEPTED on:** 2026-09-25
+
+**Detailed Verification Log:** See `task.145.dod.1.review-outcome-reachability-check.md` for the verification evidence and timestamps.
 
 ## References
 
