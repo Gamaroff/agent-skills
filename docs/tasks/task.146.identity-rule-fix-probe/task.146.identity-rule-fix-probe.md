@@ -5,10 +5,10 @@ type: task
 description: "Add an identity-rule probe to qa-fix Step 3.5 and to the qa-task / qa-story cycle-2 refute directive: when a fix changes a rule that decides whether two things are the same (a dedupe key, cache key, record identity, normaliser or equality predicate), its tests must carry a should-merge pair and a should-not-merge pair drawn from real call sites — so a key stops oscillating between splitting too much and merging too much, one QA cycle per direction."
 tags: [qa-fix, qa-task, qa-story, refute-pass, identity, observation]
 category: documentation
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-25
 assignee:
 estimated_effort_hours: 8
 github_issue: 474
@@ -16,7 +16,8 @@ github_issue: 474
 
 # Technical Task: qa-fix — a fix to an identity rule must prove both directions
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.146.review.1.identity-rule-fix-probe.md` implemented 2026-09-25
 
 **GitHub Issue**: [#474](https://github.com/Gamaroff/agent-skills/issues/474)
 
@@ -37,8 +38,9 @@ directives, which nothing guards today.
 **Key deliverables**:
 
 1. qa-fix Step 3.5 gains a third probe table, **For a fix to an identity rule** (obs #169).
-2. The qa-task and qa-story `REFUTE PASS` directive gains an **Identity rules** bullet, identical in both.
-3. `tests/identity-rule-probe.test.js` holds the qa-fix table, the refute bullet, and the two refute
+2. The qa-task and qa-story `REFUTE PASS` directive gains an **Identity rules** paragraph after its
+   four-transition list, identical in both.
+3. `tests/identity-rule-probe.test.js` holds the qa-fix table, the refute entry, and the two refute
    directives' byte-parity.
 
 **Expected outcome**: a fix to an identity rule arrives with a should-merge **and** a should-not-merge
@@ -107,10 +109,11 @@ test, so the direction the fix did not name is exercised in the same cycle inste
   key, record identity, normaliser, equality or hash-of-key function. Pairs are drawn from **real call
   sites**, not synthetic strings, because the counter-examples that bit task.144 (`--set … --note` vs
   `--accept … --note`, `--mode strict` vs `--mode lax`) were each a real consumer's argv.
-- The refute directive, one bullet after *Reconnect*:
-  `• Identity rules — for every change to a dedupe/cache/record key, normaliser or equality
-  predicate, find one pair that must be the same and one that must differ; a key changed to fix one
-  direction has usually broken the other.`
+- The refute directive, one **Identity rules** paragraph after the four-transition list and before
+  *Review the COMBINATION* — **not** a fifth bullet. The list is introduced as *"probe these four
+  transitions"* for changes that touch emission, subscription, caching or any lifecycle; a fifth
+  bullet would make "four" false and gate the identity probe on a lifecycle trigger a normaliser or
+  equality-predicate change does not share (review.1). Text: the plan's Phase 2 snippet.
 
 ### Same-class mechanism inventory (obs #103)
 
@@ -126,7 +129,7 @@ directions.
 ### In Scope
 
 - ✅ qa-fix Step 3.5 identity-rule table
-- ✅ qa-task and qa-story refute directive bullet (identical)
+- ✅ qa-task and qa-story refute directive Identity rules paragraph (identical)
 - ✅ `tests/identity-rule-probe.test.js`, including refute-directive parity
 - ✅ CHANGELOG `[Unreleased]`
 
@@ -156,32 +159,33 @@ cycle budget or verdict rule changes.
 
 **Files**: `skills/qa-fix/SKILL.md`
 
-- [ ] Add the **For a fix to an identity rule** paragraph and three-row table after the documentation table
-- [ ] Cite obs #169 and the task.144 cycles 2–5 sequence as the worked example
-- [ ] State the trigger list and the real-call-site rule
+- [x] Add the **For a fix to an identity rule** paragraph and three-row table after the documentation table
+- [x] Cite obs #169 and the task.144 cycles 2–5 sequence as the worked example
+- [x] State the trigger list and the real-call-site rule
 
 ### Phase 2: refute directive (Risk: Low)
 
 **Files**: `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`
 
-- [ ] Add the **Identity rules** bullet to the `REFUTE PASS.` block in both files, byte-identical
-- [ ] Keep the block's existing four bullets and closing paragraph unchanged
+- [x] Add the **Identity rules** paragraph to the `REFUTE PASS.` block in both files, after the
+      four-transition list and before *Review the COMBINATION*, byte-identical
+- [x] Keep the block's existing four bullets, their *"these four"* introduction and the closing paragraph unchanged
 
 ### Phase 3: test (Risk: Low)
 
 **Files**: `tests/identity-rule-probe.test.js`
 
-- [ ] qa-fix Step 3.5 section carries the table with **Should merge** and **Should not merge** rows and cites obs #169
-- [ ] Each refute block carries the **Identity rules** bullet
-- [ ] The two `REFUTE PASS.` blocks are byte-identical (extracted fence-to-fence); a floor asserts both were found
-- [ ] Mutation-prove each assertion
+- [x] qa-fix Step 3.5 section carries the table with **Should merge** and **Should not merge** rows and cites obs #169
+- [x] Each refute block carries the **Identity rules** paragraph, and its list under *"these four"* still holds exactly four `•` bullets
+- [x] The two `REFUTE PASS.` blocks are byte-identical (extracted fence-to-fence); a floor asserts both were found
+- [x] Mutation-prove each assertion
 
 ### Phase 4: docs and validation (Risk: Low)
 
 **Files**: `CHANGELOG.md`
 
-- [ ] CHANGELOG `[Unreleased]` › Changed cites `(task 146)`
-- [ ] `npm run ci:fast`, `format:check`, `bundle --check`
+- [x] CHANGELOG `[Unreleased]` › Changed cites `(task 146)`
+- [x] `npm run ci:fast`, `format:check`, `bundle --check`
 
 ---
 
@@ -190,12 +194,12 @@ cycle budget or verdict rule changes.
 ### Files to Modify (Core Implementation)
 
 1. ✅ `skills/qa-fix/SKILL.md` — Step 3.5 identity-rule table
-2. ✅ `skills/qa-task/SKILL.md` — Step 3b refute directive bullet
-3. ✅ `skills/qa-story/SKILL.md` — Step 3b refute directive bullet
+2. ✅ `skills/qa-task/SKILL.md` — Step 3b refute directive paragraph
+3. ✅ `skills/qa-story/SKILL.md` — Step 3b refute directive paragraph
 
 ### Files to Add (Tests)
 
-4. ✅ `tests/identity-rule-probe.test.js` — table, bullet and parity assertions (inside the existing `tests/*.test.js` glob)
+4. ✅ `tests/identity-rule-probe.test.js` — table, refute-entry, four-bullet count and parity assertions (inside the existing `tests/*.test.js` glob)
 
 ### Files to Modify (Documentation)
 
@@ -214,7 +218,8 @@ None.
 - **Scope**: `tests/identity-rule-probe.test.js`
   - extract qa-fix's Step 3.5 section (heading to next `### `), assert the three table rows and `obs #169`;
   - extract each `REFUTE PASS.` fenced block from qa-task and qa-story, assert the Identity rules
-    bullet in each and `assert.equal(taskBlock, storyBlock)`; the floor asserts each extraction is
+    paragraph in each, that the list under *"these four"* still holds exactly four `•` bullets
+    (the entry sits outside it), and `assert.equal(taskBlock, storyBlock)`; the floor asserts each extraction is
     non-empty, so a renamed fence fails rather than comparing two empty strings.
 - **Command**: `command node --test tests/identity-rule-probe.test.js`
 
@@ -237,24 +242,24 @@ defect one cycle early.
 
 ### Functional
 
-- [ ] qa-fix Step 3.5 carries the identity-rule table (Should merge / Should not merge / Which direction did the last fix move?), its trigger list and the real-call-site rule, citing obs #169
-- [ ] qa-task's and qa-story's `REFUTE PASS.` blocks both carry the Identity rules bullet and are byte-identical
-- [ ] The test fails when either block drifts from the other, when the bullet is removed from either, or when a qa-fix table row is removed
+- [x] qa-fix Step 3.5 carries the identity-rule table (Should merge / Should not merge / Which direction did the last fix move?), its trigger list and the real-call-site rule, citing obs #169
+- [x] qa-task's and qa-story's `REFUTE PASS.` blocks both carry the Identity rules paragraph outside the four-transition list (which still holds four bullets) and are byte-identical
+- [x] The test fails when either block drifts from the other, when the entry is removed from either or moved into the four-transition list, or when a qa-fix table row is removed
 
 ### Performance
 
-- [ ] The test runs in under one second (pure file reads)
-- [ ] No network access
+- [x] The test runs in under one second (pure file reads)
+- [x] No network access
 
 ### Code Quality
 
-- [ ] Every new assertion mutation-proved
-- [ ] `npm run ci:fast`, `format:check`, `bundle --check` clean
+- [x] Every new assertion mutation-proved
+- [x] `npm run ci:fast`, `format:check`, `bundle --check` clean
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 146)`
-- [ ] The implementation report records the worked application against task.144's cycle-3 key
+- [x] CHANGELOG `[Unreleased]` cites `(task 146)`
+- [x] The implementation report records the worked application against task.144's cycle-3 key
 
 ---
 
@@ -281,13 +286,13 @@ None.
 
 ### Immediate Rollback (< 1 hour)
 
-- **Triggers**: the refute directive's new bullet measurably displaces lifecycle findings in cycle-2 reviews.
+- **Triggers**: the refute directive's new paragraph measurably displaces lifecycle findings in cycle-2 reviews.
 - **Steps**: revert the PR — prose and one test, no runtime code.
 - **Validation**: `npm test` green on the reverted tree.
 
 ### Partial Rollback (1–2 hours)
 
-- Revert Phase 2 alone (the refute bullet) and keep the qa-fix table and the parity assertion.
+- Revert Phase 2 alone (the refute paragraph) and keep the qa-fix table and the parity assertion.
 
 ### Forward Fix
 
@@ -299,21 +304,25 @@ None.
 - **Non-critical**: noisy probes — fix forward.
 
 ---
-
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft | create-task |
+| 2026-09-25 | 1.1     | Review passed (9/10) — refute Identity rules entry moved out of the four-transition list into its own paragraph; test gains a four-bullet count assertion | review-task |
+| 2026-09-25 |         | Status → ready-for-development | review-task |
+| 2026-09-25 |  | Implemented — 5 files, 6 tests (qa-fix Step 3.5 table, qa-task/qa-story refute paragraph, identity-rule-probe test, CHANGELOG) | develop |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: qa-fix Step 3.5
-- [ ] Phase 2: refute directive
-- [ ] Phase 3: test
-- [ ] Phase 4: docs and validation
+- [x] Phase 1: qa-fix Step 3.5
+- [x] Phase 2: refute directive
+- [x] Phase 3: test
+- [x] Phase 4: docs and validation
 
 ---
 
