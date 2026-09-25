@@ -575,18 +575,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.148.qa.1.structural-move-before-prose-patch.md](./task.148.qa.1.structural-move-before-prose-patch.md)
-- **Gate File**: [task.148.gate.1.structural-move-before-prose-patch.yml](./task.148.gate.1.structural-move-before-prose-patch.yml)
+- **Full Report**: [task.148.qa.2.structural-move-before-prose-patch.md](./task.148.qa.2.structural-move-before-prose-patch.md)
+- **Gate File**: [task.148.gate.2.structural-move-before-prose-patch.yml](./task.148.gate.2.structural-move-before-prose-patch.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 109
+- **Tests Executed**: 115
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (2 MEDIUM)
+- **Critical Issues**: 0 (1 MEDIUM)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Two MEDIUM code-review bugs: the Step 3.5 population misses hand-authored `skills/*/references/*.md`
-(bug 1), and the 5b offer snippet fails silently on a malformed HIGH sequence (bug 2).
+Both gate-1 findings are fixed. The Step 3.5 probe trigger was not widened alongside its population
+(bug 3). Two reproduced advisory findings are in the QA report.
 
 ---
 
@@ -601,6 +601,7 @@ Two MEDIUM code-review bugs: the Step 3.5 population misses hand-authored `skill
 | 2026-09-25 |  | Status → ready-for-development | review-task |
 | 2026-09-25 |  | Implemented — 3 source files + CHANGELOG, 4 test files (36 new tests), 13 fixtures + README | develop |
 | 2026-09-25 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-09-25 |  | QA gate CONCERNS (80/100) — 1 finding (cycle 2) | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -709,6 +710,16 @@ taken where they touched the same block):
 Eight mutations, each red on its named test. The Step 3.5 probe, run on this cycle's own edits,
 found that Step 2.6 trigger (a) still described the old `Narrowing residue: …` prefix. It was fixed
 in the same cycle.
+
+**QA cycle 2 fixes** (gate 2 CONCERNS, 1 MEDIUM, from the refute pass). The documentation-probe
+trigger now names the population command as the one definition of the executed-document set, and a
+test holds the two sets equal. This is qa-fix Step 2.6 trigger (b), move **consolidate** — the first
+use of the step this task adds, on its own finding. Reproduced advisory findings were fixed in the
+same cycle: the population is cwd-independent (`:(top,glob)`, `--full-name`), and a population of 0
+is a probe that did not run; an unbound cycle is `cycle-missing`, and every could-not-look reason
+reports `SIGNAL=error`. Also fixed: gate-driven entry only; the real binders named; the escaping rule;
+the test header. Deferred: a `:line` suffix on `file:` and the marker's header position. Seven
+mutations, all covered.
 
 **Deferred work.** Open Question 1 (escalating an unanswered offer) and Open Question 2 (authoring-side
 exact vs best-effort declaration, obs #172 improvement 3) remain. Observations #167, #172, #174 and

@@ -179,7 +179,7 @@ for (const shell of ["bash", "zsh"]) {
 
 // ── CR-2: a check that could not look must not read as a quiet cycle ────────
 
-test("a blank or malformed HIGH sequence reaches the engine and answers high-counts-missing", () => {
+test("a blank or malformed HIGH sequence reaches the engine, and could-not-look reports as error", () => {
   for (const seq of ["", "not json", "[0,"]) {
     const r = runSnippet({
       CYCLE: "3",
@@ -198,8 +198,35 @@ test("a blank or malformed HIGH sequence reaches the engine and answers high-cou
       `no verdict for HIGH_SEQUENCE_JSON=${JSON.stringify(seq)}`,
     );
     assert.equal(JSON.parse(jsonLine).reason, "high-counts-missing", jsonLine);
-    assert.equal(signalLine, "SIGNAL=false");
+    assert.equal(signalLine, "SIGNAL=error");
   }
+});
+
+test("an unbound CYCLE is cycle-missing and reports as error, never as cycle 1 (QA2 CR-4)", () => {
+  for (const cyc of ["", "three"]) {
+    const r = runSnippet({
+      CYCLE: cyc,
+      HIGH_SEQUENCE_JSON: "[0,0,0]",
+      GATE_N: join(FIXTURES, "task143-gate-3.yml"),
+      GATE_N1: join(FIXTURES, "task143-gate-2.yml"),
+    });
+    const [jsonLine, signalLine] = r.stdout.trim().split("\n");
+    assert.equal(JSON.parse(jsonLine).reason, "cycle-missing", jsonLine);
+    assert.equal(signalLine, "SIGNAL=error");
+  }
+  // Anti-vacuity: a real cycle 1 is still a verdict, not an error.
+  const one = runSnippet({
+    CYCLE: "1",
+    HIGH_SEQUENCE_JSON: "[0]",
+    GATE_N: join(FIXTURES, "task143-gate-1.yml"),
+    GATE_N1: "",
+  });
+  assert.match(one.stdout, /^SIGNAL=false$/m);
+});
+
+test("the offer runs only on gate-driven entry to 5b, never on a 5c REQUEST CHANGES re-entry (QA2 CR-3)", () => {
+  assert.match(section, /Run it only when 5b is entered from 5a/);
+  assert.match(section, /On a 5c `REQUEST CHANGES`\s+re-entry, skip it/);
 });
 
 test("with no engine installed the snippet says so: SIGNAL=error, never an empty signal", () => {

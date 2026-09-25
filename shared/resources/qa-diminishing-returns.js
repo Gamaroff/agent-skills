@@ -906,8 +906,17 @@ function classifyNarrowingResidue(input) {
     return narrowing(false, "input-unreadable", "the inputs could not be read");
   }
 
+  // 0 — a cycle that is not a positive integer is an unbound input, not cycle 1
+  if (!Number.isInteger(cycle) || cycle < 1) {
+    return narrowing(
+      false,
+      "cycle-missing",
+      `cycle ${describe(cycle)} is not a positive integer`,
+    );
+  }
+
   // 1 — two gates to compare
-  if (!Number.isInteger(cycle) || cycle < NARROWING_WINDOW) {
+  if (cycle < NARROWING_WINDOW) {
     return narrowing(
       false,
       "below-cycle-floor",

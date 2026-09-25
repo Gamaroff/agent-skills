@@ -669,8 +669,11 @@ explicitly — they are the states the original finding never mentioned:
 | **Reconnect** | After a drop and re-establish, does it converge to correct state, or resume from a stale one? |
 
 **For a documentation deliverable, the four probes above are the wrong shape — use these.** When
-the fix touches a `SKILL.md` or a `shared/resources/*.md`, the transition that breaks is not a
-lifecycle but a *sentence elsewhere, in this file or in another file that restates it*. On one task
+the fix touches an **executed document** — any file the population command below searches: every
+`SKILL.md`, every `shared/resources/*.md`, and every hand-authored `skills/*/references/*.md` — the
+transition that breaks is not a lifecycle but a *sentence elsewhere, in this file or in another
+file that restates it*. That command is the one definition of the set; this sentence names it and
+must not drift from it. On one task
 three consecutive QA cycles each found a defect introduced by the previous cycle's prose fix, and
 every one was one grep away; on task.124 four consecutive cycles each found the previous fix had
 made a sibling false in **another** file (obs #174):
@@ -687,11 +690,17 @@ made a sibling false in **another** file (obs #174):
 # generated-copy marker; develop-bug's own step documents are among them). `:(glob)` keeps `*` from
 # crossing `/` (without it, the test fixtures under the shared resources' tests/ directory join the
 # population). Generated copies are removed by their marker line, not by their directory; docs/ task
-# history is excluded by construction.
+# history is excluded by construction. `top` and --full-name make the result the same from any
+# directory inside the repository.
 comm -23 \
-  <(git grep -l -F -i -e '<subject phrase>' -- ':(glob)skills/*/SKILL.md' ':(glob)skills/*/references/*.md' ':(glob)shared/resources/*.md' | sort) \
-  <(git grep -l -e '^<!-- AUTO-GENERATED — DO NOT EDIT' -- ':(glob)skills/*/references/*.md' | sort)
+  <(git grep --full-name -l -F -i -e '<subject phrase>' -- ':(top,glob)skills/*/SKILL.md' ':(top,glob)skills/*/references/*.md' ':(top,glob)shared/resources/*.md' | sort) \
+  <(git grep --full-name -l -e '^<!-- AUTO-GENERATED — DO NOT EDIT' -- ':(top,glob)skills/*/references/*.md' | sort)
 ```
+
+**A population of 0 means the probe did not run, not that nothing restates the subject.** The
+edited file restates it by definition, so a working run finds at least one file. An empty result
+comes from a wrong phrase or from a cwd outside the repository, where the failing `git grep` is
+swallowed by the process substitution. Fix the phrase or the cwd and re-run. Never record 0.
 
 The `Probe:` block the row requires, so a probe that ran can be told apart from one that was read:
 
@@ -890,7 +899,9 @@ FIX_SUMMARY="**Status**: ✅ Fixes Complete - Ready for Re-Review 🔄
 
 [Only the blocks that apply — omit this section when none does: the Step 3.5 \`Probe:\` block for a
 documentation fix, the Step 2.6 \`Narrowing residue:\` / \`Move:\` block, the Step 2.5
-\`Struck mechanism:\` block. Paste each in its fixed shape.]
+\`Struck mechanism:\` block. Paste each in its fixed shape. This template is a double-quoted
+string: escape every backtick, \$ and double quote you paste, or the shell runs or empties it and
+the posted record no longer matches what ran.]
 
 ### 🎯 Bug Report Updates
 

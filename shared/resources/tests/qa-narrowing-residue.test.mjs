@@ -223,6 +223,18 @@ const ROWS = [
     reason: "medium-files-differ",
   },
   {
+    label:
+      "row 16 — cycle not a positive integer (unbound input): cycle-missing, not cycle 1",
+    input: {
+      cycle: Number(""),
+      highCounts: zeros(2),
+      previousGateContent: t143(1),
+      latestGateContent: t143(2),
+    },
+    signal: false,
+    reason: "cycle-missing",
+  },
+  {
     label: "row 15 — highCounts shorter than the cycle: high-counts-missing",
     input: {
       cycle: 3,

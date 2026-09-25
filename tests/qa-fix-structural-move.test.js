@@ -15,9 +15,12 @@
  *     from one that was skipped.
  *
  * The population command is not only asserted to be present: it is EXTRACTED
- * and RUN in a throwaway git repository whose layout has three files that count
- * and three that must not (a generated references/ copy, a test fixture, task
- * history). Dropping `:(glob)` lets the fixture in and the count becomes 4.
+ * and RUN in a throwaway git repository whose layout has four files that count
+ * (two SKILL.md, a shared resource, a hand-authored reference) and three that
+ * must not (a generated references/ copy, a test fixture, task history) — from
+ * the repository root AND from a subdirectory. Dropping `:(glob)` lets the
+ * fixture in and the count becomes 5. The trigger sentence that decides whether
+ * the probe runs names exactly the sets the command searches (QA cycle 2).
  *
  * This holds that the step is STATED and that its command WORKS. It cannot hold
  * that a fixer CHOOSES well; that evidence is the hand run recorded in the
@@ -132,7 +135,7 @@ test("Step 2.6 cites obs #167 and obs #172, and yields to Step 2.5", () => {
 // ── Step 3.5 row 1 is rewritten ─────────────────────────────────────────────
 
 test("Step 3.5's documentation lead paragraph reaches other files", () => {
-  assert.match(docBlock, /in this file or in another file that restates it/);
+  assert.match(docBlock, /in this file or in another\s+file that restates it/);
   assert.doesNotMatch(docBlock, /\*sentence elsewhere in the same file\*/);
 });
 
@@ -181,9 +184,9 @@ test("the population command returns exactly the 4 hand-authored restating files
       "skills/a/SKILL.md": `Rule: ${phrase} is the orchestrator.\n`,
       "skills/b/SKILL.md": `Also: ${phrase.toUpperCase()} — restated.\n`,
       "shared/resources/x.md": `The contract says ${phrase}.\n`,
-      // must not count
       // a HAND-AUTHORED reference counts (CR-1: 70 of the repo's 478 are)
       "skills/b/references/hand.md": `---\nname: hand\n---\n\nStep doc: ${phrase}.\n`,
+      // must not count
       // a generated copy does not — known by its marker line (here at line 5, after
       // frontmatter, as the bundler writes it), not by its directory
       "skills/a/references/x.md": `---\nname: x\ndescription: copy\n---\n<!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/x.md. Regenerate via npm run bundle. -->\n\nGenerated copy: ${phrase}.\n`,
@@ -200,17 +203,22 @@ test("the population command returns exactly the 4 hand-authored restating files
     git("add", ".");
 
     const run = cmd.split("<subject phrase>").join(phrase);
-    const out = execFileSync("bash", ["-c", run], {
-      cwd: repo,
-      encoding: "utf8",
-    });
-    const hits = out.trim().split("\n").filter(Boolean).sort();
-    assert.deepEqual(hits, [
-      "shared/resources/x.md",
-      "skills/a/SKILL.md",
-      "skills/b/SKILL.md",
-      "skills/b/references/hand.md",
-    ]);
+    // From the root and from a subdirectory: the answer must not depend on the cwd
+    // (QA cycle 2 — a cwd-relative pathspec returned 0 from a subdirectory).
+    for (const cwd of [repo, path.join(repo, "skills", "b")]) {
+      const out = execFileSync("bash", ["-c", run], { cwd, encoding: "utf8" });
+      const hits = out.trim().split("\n").filter(Boolean).sort();
+      assert.deepEqual(
+        hits,
+        [
+          "shared/resources/x.md",
+          "skills/a/SKILL.md",
+          "skills/b/SKILL.md",
+          "skills/b/references/hand.md",
+        ],
+        `cwd ${path.relative(repo, cwd) || "."}`,
+      );
+    }
   } finally {
     fs.rmSync(repo, { recursive: true, force: true });
   }
@@ -233,4 +241,39 @@ test("the Step 7 fix-summary template carries a slot for Probe:, Narrowing resid
   ]) {
     assert.ok(tpl.includes(block), `the template does not name ${block}`);
   }
+});
+
+// ── QA cycle 2: the probe's trigger and its population are one set ──────────
+
+test("the documentation-probe trigger names exactly the file sets the population command searches", () => {
+  const cmd = populationCommand();
+  // The globs of the command's FIRST git grep arm — the searched set.
+  const firstArm =
+    cmd.split("\n").find((l) => l.includes("<subject phrase>")) || "";
+  const globs = [...firstArm.matchAll(/':\(top,glob\)([^']+)'/g)].map(
+    (m) => m[1],
+  );
+  assert.equal(
+    globs.length,
+    3,
+    `expected 3 searched globs, got ${JSON.stringify(globs)}`,
+  );
+  const lead = docBlock.split("\n\n")[0];
+  for (const g of globs) {
+    // skills/*/SKILL.md is named as `SKILL.md`; the others by their own glob.
+    const named = g === "skills/*/SKILL.md" ? "`SKILL.md`" : "`" + g + "`";
+    assert.ok(lead.includes(named), `the trigger does not name ${named}`);
+  }
+  assert.match(lead, /the one definition of the set/);
+});
+
+test("a population of 0 is a probe that did not run, never a result", () => {
+  assert.match(step35, /A population of 0 means the probe did not run/);
+  assert.match(step35, /Never record 0\./);
+});
+
+test("the Step 7 slot tells the fixer to escape what it pastes into the double-quoted template", () => {
+  const m = read(QA_FIX).match(/FIX_SUMMARY="([\s\S]*?)\n"\n/);
+  assert.ok(m);
+  assert.match(m[1], /escape every backtick, \\\$ and double quote you paste/);
 });

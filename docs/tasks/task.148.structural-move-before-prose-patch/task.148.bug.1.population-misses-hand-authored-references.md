@@ -4,7 +4,7 @@
 **Bug ID**: TASK-148-BUG-1 (code review CR-1)
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 1, diff code review)
 **Date Found**: 2026-09-25
 
@@ -65,3 +65,4 @@ Population command rewritten as `comm -23 <(git grep -l … SKILL.md, references
 | 2026-09-25 | New | QA Engineer | QA cycle 1 |
 | 2026-09-25 | In Progress | qa-fix | Root cause confirmed by reproduction |
 | 2026-09-25 | Ready for QA | qa-fix | Fixed in QA cycle 1; mutation-proved |
+| 2026-09-25 | Closed | QA Engineer | Verified in QA cycle 2 (refute pass) |
