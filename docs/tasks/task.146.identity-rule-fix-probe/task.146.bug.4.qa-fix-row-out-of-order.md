@@ -4,7 +4,7 @@
 **Bug ID**: TASK-146-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 3, scoped review CR-1)
 **Date Found**: 2026-09-25
 
@@ -52,3 +52,10 @@ and the row always follows the latest gate.
 | Date       | Status       | Changed By | Notes               |
 | ---------- | ------------ | ---------- | ------------------- |
 | 2026-09-25 | Ready for QA | qa-fix     | Fixed in QA cycle 3 |
+| 2026-09-25 | Closed       | QA         | Verified — qa.4 |
+
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-25
+
+**Result**: Fixed. Verified in qa.4 — structural check: exactly one `| qa-fix |` row, positioned after the last `| qa-task |` gate row. Closed after the 5c PR review flagged the status as stale (PC-1).

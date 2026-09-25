@@ -4,7 +4,7 @@
 **Bug ID**: TASK-146-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 1, from code review CR-3, mutation-verified)
 **Date Found**: 2026-09-25
 
@@ -51,3 +51,10 @@ Count every `•` bullet in the block and assert exactly four. Mutation-prove it
 | Date       | Status       | Changed By | Notes               |
 | ---------- | ------------ | ---------- | ------------------- |
 | 2026-09-25 | Ready for QA | qa-fix     | Fixed in QA cycle 1 |
+| 2026-09-25 | Closed       | QA         | Verified — qa.2 and qa.3 |
+
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-25
+
+**Result**: Fixed. Verified in qa.2 and qa.3 — a fifth item after the paragraph written •, -, *, +, 1. and 2) each turned both "sits outside the four-transition list" tests red (covered). Closed after the 5c PR review flagged the status as stale (PC-1).

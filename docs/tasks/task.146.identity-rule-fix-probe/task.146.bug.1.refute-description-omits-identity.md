@@ -4,7 +4,7 @@
 **Bug ID**: TASK-146-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 1, from code review CR-1)
 **Date Found**: 2026-09-25
 
@@ -54,3 +54,10 @@ probe out of the general reviewer's checks; the task scopes that out.
 | Date       | Status       | Changed By | Notes               |
 | ---------- | ------------ | ---------- | ------------------- |
 | 2026-09-25 | Ready for QA | qa-fix     | Fixed in QA cycle 1 |
+| 2026-09-25 | Closed       | QA         | Verified — qa.2 |
+
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-25
+
+**Result**: Fixed. Verified in qa.2 — identity-pair phrase inserted into the template Discipline list turned "the shared cycle-2 description names both refute probes" red (covered); the section and template-fence assertions hold on f86387a3. Closed after the 5c PR review flagged the status as stale (PC-1).
