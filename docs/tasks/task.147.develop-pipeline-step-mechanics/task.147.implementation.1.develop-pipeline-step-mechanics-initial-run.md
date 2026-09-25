@@ -3,7 +3,7 @@
 **Task**: `task.147.develop-pipeline-step-mechanics.md`
 **Run Number**: 1
 **Started**: 2026-09-25 08:36
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -36,9 +36,9 @@ Fix five mechanical defects in the develop pipeline's shared step documents (obs
 | 2. review-task             | ✅ Done    | `task.147.review.{N}.{name}.md` exists (or skip logged)               | `task.147.review.1.develop-pipeline-step-mechanics.md` — 7/10 → 9/10, READY TO IMPLEMENT; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | ITER 1/5 → Ready for Review; 7/7 phases; 58 node tests + 4 shell cases, all fixes mutation-proved; `ci:fast` 4068/0 with the symlink moved aside | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #489: https://github.com/Gamaroff/agent-skills/pull/489 — commits bf0e8282, 074ebf6e, 2149f7af; leak check OK ×3 | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.147.qa.{N}.*.md`; `task.147.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.147.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.147.qa.{N}.*.md`; `task.147.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (5 + 1 of 2 granted after the loop-limit halt); gate.6 PASS 100; 5c review-pr APPROVE (pr-review.1, 4 LOW) | —                    |
+| 7. finalise                | ✅ Done    | `task.147.dod.{N}.*.md`; task `status: accepted`                      | dod.1 ACCEPTED; CI SUCCESS ×2 (4128c288, a28b5a9f); #477 closed, board Done | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Terminal docs commit (implementation report + pr-review.1), scoped to the work-item dir; pushed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -130,6 +130,33 @@ Fix five mechanical defects in the develop pipeline's shared step documents (obs
 - Cycles 2, 3, 4 and 5 were each fixed, mutation-proved, gated by §5b 0-stage and then 0a (green on the first attempt every cycle), committed once and pushed once: `c3ad4687`, `0170615d`, `411aa92f`, `a7f93126`. qa-fix was invoked as a skill for cycles 1–2. Cycles 3–5 followed the same loaded procedure inline, without re-invoking it.
 - One process slip. During cycle 5 the mutation run was moved to the background (it outlived the 120s tool timeout), and I yielded the turn **without** marking the wait on the lock. The Stop hook then fired and re-prompted 5b. I re-asserted the lock and resumed where I had stopped, without restarting qa-fix. Every wait after that was marked with `set-waiting-on.sh`.
 - Loop limit: route 2c was evaluated by the engine with `budgetSpent: true`, MEDIUM counts [4,2,3,1,4] and lastCycleAction "Running qa-fix (cycle 5 of 5)". It returned `continue` (`medium-not-falling`): MEDIUM reads 3, 1, 4 over cycles 3–5, and the half-cycle needs it strictly falling. **Escalation.**
+
+### Resume after loop-limit escalation — 2026-09-25
+
+- Operator decision (asked interactively before re-invocation): **Resume at 5a with 2 more cycles**. The halt message's option 1, as recommended.
+- Phase 0a resume detector (Explore): source `halt_snapshot`, halt_reason `loop-limit`, recommended_step 6, blocking_issues none. Persisted to `.summaries/step-0a-resume-detector.json` and validated. The loop-limit re-entry rule overrides recommended_step, so the run re-enters at 5a.
+- Working-tree probe: clean, so no classification was needed.
+- QA loop re-entry: 2 extra cycles granted; 0 cycles run outside the loop were back-filled from disk (gate.5 highest, 5 `### QA Cycle` entries). `grant-qa-cycles.sh`: lock restored from the halt snapshot; QA_CYCLE=5, extra_cycles_granted=2, qa_max_cycles=7, qa_phase=5a.
+- Loop-setup tracker signals (`in-qa` / QA-start re-assert) were not repeated. They run once per loop, and cycle 1 ran them.
+
+### Step 5c — review-pr (2026-09-25)
+
+- `/review-pr --effort medium --comment` on PR #489. Work item resolved via the branch stem. The diff was 49 files and 5908 lines, excluding 17 `*/references/*` bundled copies (the Files Summary counts them as bundle output). Both lenses ran as independent Explore subagents within budget (conformance about 75s, code about 196s).
+- Verdict: ✅ **APPROVE**. All 4 findings are LOW: PC-1 (the AC14 wording), PC-2 (the CHANGELOG does not name the QA-cycle additions), CR-1 (a guard-retry held-path collision in Step 4), CR-2 (the scope-gate scan cost). Report: `task.147.pr-review.1.develop-pipeline-step-mechanics.md`. The summary comment was posted with the `agent-skills-pr-review` marker.
+- `ready-for-merge` stage: `stage-disabled` (expected, since the board has no merge-queue column).
+- Deviation: the 5c procedure gives no commit point for the `pr-review` report. It was not committed before `/finalise`, and committing it afterwards would move the acceptance head that CI reading 2 verified. So it rides in Step 8's docs-only commit together with this report.
+
+### Step 7 — finalise (2026-09-25)
+
+- `/finalise` was invoked. DoD summary: `docs/tasks/task.147.develop-pipeline-step-mechanics/task.147.dod.1.develop-pipeline-step-mechanics.md`.
+- CI reading 1: SUCCESS @ 4128c288358d (5 checks); CI reading 2: SUCCESS @ a28b5a9f4c78 (5 checks, after 150s). Acceptance commit `a28b5a9f`: the document, the DoD, the sprint review, and the ticked registry (`registry-tick`: `ticked`).
+- DoD agents: AC PARTIAL (14/16) was adjudicated PASS, because AC12 (mutation record) and AC15 (CHANGELOG plus the drift test) failed the per-PR citation rule alone (the task.144–146 precedent). Security: the agent returned FAIL on the zero-execution guard, because it is read-only and cannot build the scratch repo, and the engine has no multi-flag shell form. The orchestrator executed 38 candidates at 4128c288 per §5.1 (`.claude/state/dod-sec-probe.log`: 38 OK, 0 mismatch), so security is PASS and **independence is lost on this axis**. Compliance: N/A. Docs: PASS.
+- PR number: the task had no `pr_number:`, so Step 3a's body fallback would have matched an unrelated `PR #207` (obs #184 recurrence). #489 was used, and `pr_number: 489` was written at acceptance.
+- Canonical PR comment posted: https://github.com/Gamaroff/agent-skills/pull/489#issuecomment-5833400191
+- DoD body posted to PR: https://github.com/Gamaroff/agent-skills/pull/489#issuecomment-5833408755
+- Tracker #477: the Document link was already on `develop`; the `done` comment was `posted` (the orchestrator repeat returned `already`); close: CLOSED ✅ (verified by `gh issue view`); board: done → `already` (the board read shows Done).
+- Accept gap: the deferred-mutation journal is empty (`access.tracker: full`), so tracker debt is none.
+- Task completed: status `accepted` in the frontmatter and the body; Change Log acceptance row v1.2.
 
 ---
 
@@ -228,14 +255,31 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: CR-3 **replaced the mechanism**. The verify-push-state scope gate is now check 3's own `path_under` predicate over git's path list (index, untracked-not-ignored and HEAD's tree), so glob, `:/`, case-folded and symlink-component spellings are refused. CR-6 (help by markers) and CR-5 (message) are also fixed. 4 mutation proofs; 32 cases; 0a green on attempt 1 (4104/0).
 **Commit**: `a7f93126`
 
+### QA Cycle 6 — 2026-09-25
+**Origin**: granted re-entry after the loop-limit escalation (+2 cycles, budget 7)
+**Gate Result**: PASS
+**Issues Found**: none open. All six gate-5 findings are verified fixed and bug.14 is closed. There are 2 LOW cleanups (advisory, not in `top_issues[]`): a duplicated path list, and the refusal printing the normalised scope.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — `task.147.pr-review.1.develop-pipeline-step-mechanics.md`: 4 LOW (PC-1 criterion wording, PC-2 CHANGELOG omits the QA-cycle additions, CR-1 guard-retry held-path collision, CR-2 scope-gate scan); both lenses independent and within budget
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**Code review**: subagent killed at 11 minutes (budget 10). The pass was performed inline; independence was lost. It was dispatched at 13:08 and killed at 13:19.
+**Boundary probe**: the engine `shell:` form did not apply (28/28 cases stopped at `unknown argument`). There were 38 by-hand probes per §5.1, with 0 vacuous passes.
+**Tests**: ci:fast on a clean checkout: 4051/4053. The 1 failing file is observation-log, which refuses a `/tmp` scratch base by design and passes 53/53 from the real checkout. bundle:check: 0 problems. lint:shell: clean. 2 mutation proofs → covered.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated (QA loop limit reached — awaiting an operator decision)
+**Finished**: 2026-09-25 13:44 UTC
+**Final Status**: Completed (accepted after a granted QA re-entry: escalated at the 5-cycle limit, resumed with +2 cycles, cycle 6 PASS)
 **Branch**: feature/task.147.develop-pipeline-step-mechanics
 **PR**: https://github.com/Gamaroff/agent-skills/pull/489
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 6 (5 budgeted + 1 of 2 granted)
+**DoD Summary**: docs/tasks/task.147.develop-pipeline-step-mechanics/task.147.dod.1.develop-pipeline-step-mechanics.md
+**Tracker debt**: none
+
+### Completion Summary
+
+Implemented the five develop-pipeline step fixes (obs #141, #142, #162, #171, #173). Step 8 check 3 now reads both Completion templates. The Step 4 leak check handles one-line commits. §5b stages the gate before the fast gate. `/commit-changes --scope` stages only inside its scope. Merges on a dirty tree drop `--delete-branch`. Each fix is held by an executed-prose test. QA added a `verify-push-state.sh --scope` mode and hardened its scope gate across cycles 2–5. The fixes followed a pre-strike pattern, one spelling per cycle, until cycle 5 replaced the gate with check 3's own `path_under` predicate. The run escalated at the 5-cycle limit with that replacement ungated. The operator granted 2 cycles, and cycle 6 verified the replacement: PASS 100, 38 by-hand boundary probes, both cycle-5 tests mutation-proven. Step 5c returned APPROVE (4 LOW), and `/finalise` accepted the task with both CI readings green. The deviations are recorded above: two review passes performed inline (the QA 6 code reviewer was killed at 11 min; the DoD security execution was done by the orchestrator), and the pr-review report was committed at Step 8. Follow-ups: PC-2, CR-1, CR-2, obs #184 and obs #189.
