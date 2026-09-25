@@ -584,6 +584,46 @@ Move: delete | replace | waive — {one sentence why}
 Other findings in {file}: fixed as usual ({N}) | none
 ```
 
+### Step 2.6: Offer the structural move before another patch
+
+**Why this exists.** On task.141, QA cycles 10–12 each found one MEDIUM in the prose that described a
+state file the skill passed between its own steps; each fix aligned the readers it listed and exposed
+the next one, and the loop ended only when task.143 moved the state file into the skill's script
+(obs #167). On task.143, cycles 2–7 narrowed one best-effort migration derivation at HIGH 0; the
+cycles that converged were the ones whose fix stopped claiming exactness (obs #172). Both loops ended
+on a change of shape, not on a further correction, and no rule offered the change. This step offers
+it — before the third patch, not after it.
+
+**Two triggers.** Apply this step when either holds:
+
+- **(a) the pipeline offer** — the invocation carries a `Narrowing residue: …` block. The QA loop
+  sends it when every MEDIUM on the last two gates names one `file:` at HIGH 0.
+- **(b) a repeat subject** — the Findings Summary shows a finding whose subject the previous cycle's
+  fix edited: a bug that cites the prior bug's fix, or a gate entry on the same function, section or
+  rule. This is your judgement, and it is allowed here because this step only *offers*; it exits
+  nothing and forbids nothing.
+
+**The four moves.** Choose one, and record it in the fix plan:
+
+| Move | When it is right |
+| ---- | ---------------- |
+| **Consolidate the contract** | The subject is a record the skill passes between its own steps (a state file, run-state JSON, a handoff record), or a rule stated at several sites. Define it once: a field / writer / readers table; ownership moved into the skill's script so a test holds it; or one statement plus citations plus a single-statement test (task.130). |
+| **Scope the claim** | The subject is a best-effort derivation (compatibility, migration, inference) that lacks the fact it needs. Flag the value `unverifiable`, document the limitation, or drop the precision. Do not add another rule (task.143 cycles 3 and 6). |
+| **Waive** | As in Step 2.5, with the reason stated. |
+| **Patch** | Allowed. Say why neither structural move applies — for example, the findings are distinct defects in the deliverable itself (task.117 gates 1→2, where the offer fires and patch is the right answer). |
+
+The fix summary carries the choice in a fixed shape, so the next cycle can see a change of shape
+without re-reading the diff:
+
+```
+Narrowing residue: {subject} ({trigger: pipeline offer | repeat subject})
+Move: consolidate | scope the claim | waive | patch — {one sentence why}
+```
+
+**How this differs from Step 2.5.** A third strike *forbids* the patch; this step only *asks why*.
+The two cannot both come from the pipeline — the offer requires HIGH 0 on both gates, the strike
+requires HIGH on three — but trigger (b) can meet a strike. When both apply, Step 2.5 wins.
+
 ### Step 3: Apply Changes
 
 **Pre-fix codebase mapping (do this before any code changes):**
@@ -630,14 +670,35 @@ explicitly — they are the states the original finding never mentioned:
 
 **For a documentation deliverable, the four probes above are the wrong shape — use these.** When
 the fix touches a `SKILL.md` or a `shared/resources/*.md`, the transition that breaks is not a
-lifecycle but a *sentence elsewhere in the same file*. On one task three consecutive QA cycles each
-found a defect introduced by the previous cycle's prose fix, and every one was one grep away:
+lifecycle but a *sentence elsewhere, in this file or in another file that restates it*. On one task
+three consecutive QA cycles each found a defect introduced by the previous cycle's prose fix, and
+every one was one grep away; on task.124 four consecutive cycles each found the previous fix had
+made a sibling false in **another** file (obs #174):
 
 | Probe | Ask |
 | ----- | --- |
-| **What did this edit make false elsewhere?** | Grep the file for other statements about the same subject; check each against the new text |
+| **What did this edit make false elsewhere?** | Find every executed document that restates the subject — run the population command below, not a grep of the edited file — and check each hit against the new text. Record the population size. A population above 1 is Step 2.6's **consolidate** move (obs #174). The fix summary carries a `Probe:` block: the command as run, then one line per hit, `updated` or `unaffected — {why}`. A documentation fix whose summary has no `Probe:` block has not run the probe (obs #177) |
 | **Does the edit's own claim survive its neighbours?** | A table whose rows are internally consistent can still contradict independent statements in the same file — check each row against them, not against each other |
 | **Did the fix create a record the template does not define, or a default that is false in some branch?** | A new row or field needs a definition; a default sentence must hold on the ordinary path, not only the one the finding described |
+
+```bash
+# Population for row 1: every executed document that restates the subject. `:(glob)` keeps `*`
+# from crossing `/` (without it, references/tests/fixtures/** joins the population);
+# generated skills/*/references/ copies and docs/ task history are excluded by construction.
+git grep -l -F -i -e '<subject phrase>' -- ':(glob)skills/*/SKILL.md' ':(glob)shared/resources/*.md'
+```
+
+The `Probe:` block the row requires, so a probe that ran can be told apart from one that was read:
+
+```
+Probe: {the population command, as run, with its phrase}
+  {path} — updated
+  {path} — unaffected — {why: e.g. cites the rule, restates nothing}
+Population: {N}
+```
+
+On task.145 the fix summary said the pass had run and recorded no phrase and no hits; the same rule
+survived unchanged eight lines below the edit, in the same file, and the next cycle found it (obs #177).
 
 In a document that is *executed* rather than read, a section is a call site: editing one can break
 another exactly as a code change can, and the neighbours are the blind spot because the diff does
