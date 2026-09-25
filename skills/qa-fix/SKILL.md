@@ -643,7 +643,23 @@ In a document that is *executed* rather than read, a section is a call site: edi
 another exactly as a code change can, and the neighbours are the blind spot because the diff does
 not show them. (obs #21)
 
-**Review the combination, not only each fix.** At least one real defect of this shape was caused by
+**For a fix to an identity rule, probe both directions.** When the fix changes a rule that decides
+whether two things are the same — a dedupe key, a cache key, a record identity, a normaliser, an
+equality or hash-of-key function — the rule can fail by **splitting** what is one or **merging** what
+is two, and a fix for one direction pushes toward the other. On one task, four of five QA cycles
+circled a single record key: the whole template split re-runs; keying on the flag before the input
+merged different controls; the argv skeleton merged `--mode strict` and `--mode lax`; and the PR
+review then found a declined probe split from its corrected re-run. Each fix's test proved only the
+direction its finding named (obs #169). The fix's tests carry both pairs, **drawn from real call
+sites** rather than synthetic strings — each counter-example above was a real consumer's argv:
+
+| Probe | Ask |
+| ----- | --- |
+| **Should merge** | Two inputs a real call site treats as one — does the new rule give them one key? |
+| **Should not merge** | Two inputs a real call site treats as two — does the new rule still give them two? |
+| **Which direction did the last fix move?** | A fix for a split pushes toward merging, and vice versa — the test must carry the pair for the direction the finding did **not** name |
+
+**Review the combination, not only each fix.** At least one real lifecycle defect was caused by
 two earlier fixes that were each correct alone. After the last fix in a cycle, re-read the full diff
 as one change.
 

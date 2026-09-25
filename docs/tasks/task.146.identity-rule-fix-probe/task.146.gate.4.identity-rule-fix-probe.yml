@@ -1,0 +1,61 @@
+schema: 1
+task: 'task.146.identity-rule-fix-probe'
+task_title: 'qa-fix: a fix to an identity rule must prove both directions — should-merge and should-not-merge'
+gate: PASS
+status_reason: 'Cycle-3 findings QA-6 and QA-7 are fixed and QA re-proved both. The scoped review''s one finding lives in qa-fix''s existing Change Log contract, which is unchanged on this branch. It is pre-existing and routed to recommendations.future (obs #183). No open entries.'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T07:51:29Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 127
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary in the change set (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'The test file runs in ~0.2s with file reads only.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast gave 4011/0 on f86387a3. Every slice in the test is now floored at both ends.'
+  maintainability:
+    status: PASS
+    notes: 'The Change Log reads in order, with exactly one qa-fix row, placed after the last gate row.'
+
+bug_resolution:
+  bugs_fixed: 1 # bug 4 (QA-6), fixed in f86387a3
+  bugs_remaining: 0
+  fix_date: '2026-09-25'
+  total_iterations: 3
+  verification_method: 'Structural check (one qa-fix row, after the last qa-task row) and QA re-mutation (end anchor renamed, so the shared-description test turns red)'
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Pre-existing, not introduced here: qa-fix's "ONE row on exiting the fix loop" rule
+        (skills/qa-fix/SKILL.md:685 and :1090, identical on origin/develop) is keyed to a moment qa-fix
+        cannot observe, so every multi-cycle run improvises. Named follow-up: observation #183 (scoped
+        review CR-1, medium/medium).
+      refs: ['skills/qa-fix/SKILL.md']
+    - action: 'Process observations raised during this loop: #181 (mktemp suffix), #171 recurrence (gate before staging), #178 recurrence (Step 12 section engine), #182 (hand-written gate timestamp scope).'
+      refs: ['skills/qa-task/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

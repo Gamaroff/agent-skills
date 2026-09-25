@@ -1,0 +1,78 @@
+schema: 1
+task: 'task.146.identity-rule-fix-probe'
+task_title: 'qa-fix: a fix to an identity rule must prove both directions — should-merge and should-not-merge'
+gate: CONCERNS
+status_reason: 'Cycle-2 findings QA-4 and QA-5 are fixed and QA re-proved both. The scoped review found that the single qa-fix Change Log row was updated in place at its cycle-1 position, so it now reports cycle-2 fixes above the gate row that raised them (medium, high confidence, so it gates). It also found a missing end-anchor floor in the test (low).'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T07:43:00Z'
+
+top_issues:
+  - id: 'QA-6'
+    severity: medium
+    file: 'docs/tasks/task.146.identity-rule-fix-probe/task.146.identity-rule-fix-probe.md'
+    finding: >-
+      The Change Log's one qa-fix row ("QA findings fixed — cycles 1–2 …") was rewritten in place at
+      the position where cycle 1 appended it. It now sits above "QA gate CONCERNS (90/100) … cycle-2
+      refute pass", the row whose findings (QA-4, QA-5) it reports fixed, so the log reads out of order
+      (from scoped review CR-1, bug + high confidence).
+    suggested_action: >-
+      Keep qa-fix's one-row-per-loop rule, and on each update move that single row to the END of the
+      table (after the latest qa-task row), so it always follows the gates it answers.
+    suggested_owner: dev
+  - id: 'QA-7'
+    severity: low
+    file: 'tests/identity-rule-probe.test.js'
+    finding: >-
+      The shared-description test slices to `text.indexOf("\nCycles 3+", start)` with no floor. A
+      renamed anchor returns -1, the slice runs to the end of the file, and the assertions can match
+      text outside the cycle-2 section (from scoped review CR-4).
+    suggested_action: 'Assert that the end anchor was found before slicing, as the start anchor and the template fence already are.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 127
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary in the change set (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'The test file runs in ~0.2s with file reads only.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast gave 4011/0 on 9c378f3c.'
+  maintainability:
+    status: PASS
+    notes: 'QA-6 and QA-7 are tracked. Resolved by QA this cycle: CR-2, where gate 2 bugs_remaining was corrected to 1, and CR-3, where the Step 12 rewrite restated the Key Findings.'
+
+bug_resolution:
+  bugs_fixed: 1 # bug 3 (QA-4), fixed in 9c378f3c and re-verified structurally this cycle
+  bugs_remaining: 1 # bug 4 (QA-6), filed by this gate
+  fix_date: '2026-09-25'
+  total_iterations: 2
+  verification_method: 'QA re-mutation (+ and 2) glyphs → count red) and a structural check (marker block holds one heading)'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA-6 (move the single qa-fix row to the end) and QA-7 (end-anchor floor).'
+      refs: ['docs/tasks/task.146.identity-rule-fix-probe/task.146.identity-rule-fix-probe.md', 'tests/identity-rule-probe.test.js']
+  future:
+    - action: 'Pre-existing and process: obs #182 (the cycle-3 scope comes from the hand-written gate updated:; gates 1 and 2 carried local time labelled Z and emptied the scope, corrected this cycle), #181, #171, #178.'
+      refs: ['skills/qa-task/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-6 fixed']

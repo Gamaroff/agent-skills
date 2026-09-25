@@ -1,0 +1,83 @@
+schema: 1
+task: 'task.146.identity-rule-fix-probe'
+task_title: 'qa-fix: a fix to an identity rule must prove both directions — should-merge and should-not-merge'
+gate: CONCERNS
+status_reason: 'All three cycle-1 findings are fixed and QA re-proved each. The cycle-2 refute pass found that the task document''s QA Testing Results section sits inside the change-log marker block, between the Change Log heading and its table (medium), and that the four-bullet count keys on the • glyph only (low).'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T07:35:00Z'
+
+top_issues:
+  - id: 'QA-4'
+    severity: medium
+    file: 'docs/tasks/task.146.identity-rule-fix-probe/task.146.identity-rule-fix-probe.md'
+    finding: >-
+      `## QA Testing Results` sits inside `<!-- change-log-start -->`…`<!-- change-log-end -->`,
+      between the `## Change Log` heading and its table. The Change Log heading renders empty and its
+      table renders under Key Findings. A section replace that runs to the next `## ` heading
+      (`## Progress Tracking`, past the end marker) would also delete the log table and the end
+      marker (from refute review CR-1, verified by reading lines 310-350; obs #178 recurrence).
+    suggested_action: >-
+      Move the QA Testing Results section above `<!-- change-log-start -->`, so the Change Log
+      heading and its table are adjacent again and the whole marker block holds only the log.
+    suggested_owner: dev
+  - id: 'QA-5'
+    severity: low
+    file: 'tests/identity-rule-probe.test.js'
+    finding: >-
+      The four-item count matches only `•`. A fifth transition written as `     - Replay — …` in both
+      blocks keeps the count at 4 and the suite green while "these four" becomes false (from refute
+      review CR-2).
+    suggested_action: >-
+      Count any list-item line (•, -, *, +, or N.) across the block and assert exactly four.
+      Mutation-prove it with a `-` item after the paragraph.
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 52
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Prose, a read-only test and task docs. No boundary in the change set (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'The test file runs in ~0.2s with file reads only.'
+  reliability:
+    status: PASS
+    notes: 'Floors fail loudly on a renamed fence or heading (F5). ci:fast gave 4011/0 on the fix commit.'
+  maintainability:
+    status: PASS
+    notes: 'QA-4 is a document-structure defect in the work item, tracked in top_issues.'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1 # bug 3 (QA-4), filed by this gate. bugs_fixed counts cycle 1 bugs 1 and 2 (corrected in QA cycle 3, CR-2)
+  fix_date: '2026-09-25'
+  total_iterations: 1
+  verification_method: 'QA re-mutation: a fifth bullet after the paragraph and the identity phrase leaked into the template each turned red the predicted test'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA-4 (move the QA Testing Results section out of the change-log marker block) and QA-5.'
+      refs: ['docs/tasks/task.146.identity-rule-fix-probe/task.146.identity-rule-fix-probe.md', 'tests/identity-rule-probe.test.js']
+  future:
+    - action: 'Pre-existing: Step 4b zero-blocks-executed on the qa-fix/qa-task/qa-story SKILL.md (identical on base); code-review-prompt.md reports no-executable-blocks, on base too.'
+      refs: ['skills/qa-task/SKILL.md']
+    - action: 'Pre-existing: obs #181 (BSD mktemp suffix template), obs #171 (5b gate runs before QA artifacts are tracked), obs #178 (Step 12 has no section engine; this cycle is a recurrence).'
+      refs: ['skills/qa-task/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-4 fixed']
