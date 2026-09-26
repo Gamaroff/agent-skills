@@ -384,3 +384,53 @@ test("corpus: every work-item document's relative links resolve and every fence 
     `KNOWN entries no longer dead — delete them so the ratchet tightens:\n  ${healed.join("\n  ")}`,
   );
 });
+
+test("state (task.149, obs #164): a broken link says whether the target is untracked on disk or missing, and the red markers are unchanged", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[report](report.md) [gate](gate.yml) [ok](b.md)\n",
+    );
+    fs.writeFileSync(path.join(dir, "docs", "b.md"), "# b\n");
+    fs.writeFileSync(
+      path.join(dir, "docs", "report.md"),
+      "# written, not committed\n",
+    );
+    execFileSync("git", ["add", "docs/a.md", "docs/b.md"], { cwd: dir });
+
+    const r = checkDocument("docs/a.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => [b.target, b.state]),
+      [
+        ["report.md", "untracked"],
+        ["gate.yml", "missing"],
+      ],
+    );
+
+    let out;
+    try {
+      execFileSync("node", [ENGINE, "--file", "docs/a.md"], {
+        cwd: dir,
+        encoding: "utf8",
+      });
+    } catch (e) {
+      out = e.stdout;
+    }
+    assert.match(out, /^✖ docs\/a\.md:1 → report\.md .*\[untracked\]$/m);
+    assert.match(out, /^✖ docs\/a\.md:1 → gate\.yml .*\[missing\]$/m);
+    assert.match(out, /^FAIL doc-links: 2 finding\(s\) in docs\/a\.md$/m);
+  });
+});
+
+test("state (task.149): outside a repository the disk was already read, so a broken link can only be missing", () => {
+  withNonRepoFixture((dir) => {
+    fs.writeFileSync(path.join(dir, "a.md"), "[x](x.md)\n");
+    const r = checkDocument("a.md", { root: dir });
+    assert.equal(r.tracked, false);
+    assert.deepEqual(
+      r.broken.map((b) => b.state),
+      ["missing"],
+    );
+  });
+});
