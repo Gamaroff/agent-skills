@@ -5,10 +5,12 @@ type: task
 description: "Close four places where qa-task and qa-story record a claim that no check ever reads back: the snippet engine cannot seed a path-addressed directory, so correct discovery blocks fail (obs #143); a module-private predicate is recorded as `boundary: false` instead of being exported and probed (obs #156); the one standards-named validation command `npm test` does not cover is run by no QA step (obs #163); and the task document is edited to link QA artifacts after the last check ran, so a missing report or a stale `updated:` ships green (obs #164)."
 tags: [qa-task, qa-story, create-task, qa-execute-snippets, security-probe, doc-links, change-log, observation]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-26
+completed_date: 2026-09-26
+pr_number: 493
 assignee:
 estimated_effort_hours: 16
 github_issue: 479
@@ -16,7 +18,7 @@ github_issue: 479
 
 # Technical Task: QA evidence integrity — qa-task/qa-story claims that no check reads back
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.149.review.1.qa-evidence-integrity.md` implemented 2026-09-26
 
@@ -550,12 +552,11 @@ None.
 - No open findings. Closed: BUG-1 … BUG-11.
 - Follow-up (pre-existing on develop): the QA skills' `find -name` gate lookups miss a zero-padded gate that `qa-cycle.sh` counts — switch them to `qa-cycle.sh --path` (gate 8 `recommendations.future`).
 
-
 ---
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status (run 1):** IN PROGRESS — all three gaps closed in `8a7d7603`; superseded by the run-2 verdict below.
 
 ### QA Gate Status
 
@@ -584,12 +585,38 @@ All other sections pass. Acceptance criteria are 12/12 (AC13 is post-merge by de
 **QA Gate Reference**: See `task.149.gate.8.qa-evidence-integrity.yml`
 
 **Detailed Verification Log:** See `task.149.dod.1.qa-evidence-integrity.md` for complete verification evidence.
+
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.149.qa.8.qa-evidence-integrity.md`
+**Gate File**: `task.149.gate.8.qa-evidence-integrity.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (8 QA cycles; the loop-limit escalation at cycle 5 was re-entered with user-granted cycles)
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Acceptance Criteria:** 12/12 pre-merge criteria met with per-PR tests; the "observations actioned on merge" criterion is post-merge by its own wording
+✅ **PR Review:** Step 5c `/review-pr` — CONCERNS, advisory (`task.149.pr-review.1.qa-evidence-integrity.md`); its documentation findings closed, CR-1 carried as a follow-up
+✅ **Documentation:** CHANGELOG, the qa-cycle.sh header, and this document's § 3 / Phase 4 / § 7 match what shipped
+✅ **Security Review:** 4 boundaries probed — 84 candidates executed, 0 reproduced
+✅ **Compliance Review:** not applicable (internal QA tooling)
+✅ **CI:** 5/5 SUCCESS @ `8a7d7603`
+
+**Task marked as ACCEPTED on:** 2026-09-26
+
+**Detailed Verification Log:** See `task.149.dod.2.qa-evidence-integrity.md` for complete verification evidence (run 1: `task.149.dod.1.qa-evidence-integrity.md`).
+---
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                                          | Author      |
-| ---------- | ------- | ---------------------------------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #143, #156, #163, #164 (2026-09-24 observation review) | create-task |
 | 2026-09-26 | 1.1     | Review passed (9/10) — doc-links bundling claim and task.146 status corrected, 14 line anchors re-pointed, no-tracked-tree `state` stated | review-task |
 | 2026-09-26 |         | Status → ready-for-development | review-task |
@@ -605,8 +632,10 @@ All other sections pass. Acceptance criteria are 12/12 (AC13 is post-merge by de
 | 2026-09-26 |         | QA findings fixed — gate PASS (100/100), 7 fix cycles | qa-fix |
 | 2026-09-26 |  | DoD incomplete — 3 gaps identified (documentation) | finalise |
 | 2026-09-26 |  | DoD gaps closed — § 3, Phase 4 and § 7 name what shipped; CHANGELOG and qa-cycle.sh header corrected | develop |
+| 2026-09-26 | 1.2 | DoD passed — accepted (PR #493) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
