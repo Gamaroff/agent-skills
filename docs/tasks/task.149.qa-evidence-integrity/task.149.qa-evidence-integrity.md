@@ -531,6 +531,40 @@ None.
 - No open findings. Closed: BUG-1 … BUG-11.
 - Follow-up (pre-existing on develop): the QA skills' `find -name` gate lookups miss a zero-padded gate that `qa-cycle.sh` counts — switch them to `qa-cycle.sh --path` (gate 8 `recommendations.future`).
 
+
+---
+
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.149.qa.8.qa-evidence-integrity.md`
+**Gate File**: `task.149.gate.8.qa-evidence-integrity.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Documentation:**
+   - [ ] PC-3 — the `shared/resources/qa-cycle.sh` header says `--path` is "the only definition of this cycle's file", while `skills/qa-task/SKILL.md` and `skills/qa-story/SKILL.md` still resolve the gate with `find -name`. Reword it to "the definition qa-read-back.js uses", and name the follow-up.
+   - [ ] PC-4 — `CHANGELOG.md` `[Unreleased]` does not mention the new `qa-cycle.sh <dir> --path gate|qa` mode.
+   - [ ] PC-6 — § 3 Target Architecture, Phase 4 and § 7 Files Summary do not name `qa-read-back.js`, `qa-cycle.sh --path`, `shared/resources/tests/qa-read-back.test.mjs`, `tests/qa-read-back-block.test.js`, `tests/qa-cycle.test.js` or `tests/lib/markdown-section.js`. Phase 4 still says the steps "run both CLIs".
+
+All other sections pass. Acceptance criteria are 12/12 (AC13 is post-merge by design). Security passed with 84 probes and 0 reproduced. Compliance is not applicable, and CI is 5/5 green.
+
+### Next Steps:
+
+- [ ] Make the three documentation corrections above in one docs commit
+- [ ] Re-run `/finalise`
+
+**Estimated Effort:** Small (under 30 minutes). These are documentation corrections only.
+
+**Gap Report Generated:** 2026-09-26
+**QA Gate Reference**: See `task.149.gate.8.qa-evidence-integrity.yml`
+
+**Detailed Verification Log:** See `task.149.dod.1.qa-evidence-integrity.md` for complete verification evidence.
 ---
 
 ## Change Log
@@ -550,6 +584,7 @@ None.
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium | qa-task |
 | 2026-09-26 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-09-26 |         | QA findings fixed — gate PASS (100/100), 7 fix cycles | qa-fix |
+| 2026-09-26 |  | DoD incomplete — 3 gaps identified (documentation) | finalise |
 
 ---
 

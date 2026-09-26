@@ -3,7 +3,7 @@
 **Task**: `task.149.qa-evidence-integrity.md`
 **Run Number**: 1
 **Started**: 2026-09-26 04:10
-**Status**: Escalated
+**Status**: Halted — finalise DoD gaps (documentation)
 
 ---
 
@@ -35,8 +35,8 @@ Give each of four unread QA claims (obs #143, #156, #163, #164) a check that exe
 | 2. review-task             | ✅ Done    | `task.149.review.{N}.{name}.md` exists (or skip logged)                | 9/10 READY TO IMPLEMENT; Planned → Ready for Development; 2 Important + 2 Optional fixes applied | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; audit ready-for-review 20/20 | .summaries/step-3-iteration-audit.json |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #493: https://github.com/Gamaroff/agent-skills/pull/493 | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.149.qa.{N}.*.md`; `task.149.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.149.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.149.qa.{N}.*.md`; `task.149.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 8 cycles (5 + 3 granted); gate 8 PASS 100; PR review CONCERNS (pr-review.1) | —                    |
+| 7. finalise                | ❌ Failed | `task.149.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: 3 low documentation items (PC-3, PC-4, PC-6); dod.1 written; fix-and-recheck refused | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -127,11 +127,39 @@ Give each of four unread QA claims (obs #143, #156, #163, #164) a check that exe
 - QA Cycle 4 — /qa-fix: Step 2.6 trigger (a) pipeline offer — Move: consolidate (read-back → one bundled script). The fast gate exceeded the 10-minute tool timeout and finished in the background: 4216 tests, 4215 pass, 0 fail, 1 skipped (count down 23: the 52-case block test became a 14-case wiring test + 14 direct script cases + QA-27). Commit 032ef191 pushed; qa-fix-4 comments posted.
 - QA Cycle 5 — /qa-task scoped since gate 4 (19 files): reviewer 11:24 → 11:26; probes 48, 0 reproduced (containment 24/24 incl. SRC "/", coherence 14/14, qa-read-back verdict 10/10); TMPDIR=/tmp 166 pass. Step 12b now IS qa-read-back.js — it staged the two new bug reports and read clean. Convergence: HIGH_N 0. Route: continue. Narrowing offer: false (medium-files-differ). changes-requested: stage-disabled.
 
+### Resume after loop-limit escalation — 2026-09-26
+
+- Re-invoked by `/develop-next` (resume of T149, run-state `dispatched: true, merged: false`) under the AUTONOMOUS RUN directive. The user authorised raising the QA cycle limit "as needed".
+- Phase 0b: halt snapshot `halt_reason` = loop-limit → re-entry offer auto-answered "Resume at 5a with 2 more cycles" (recommended k = 2; user-authorised, no AskUserQuestion issued). Further grants will be made the same way if the loop reaches the new limit.
+- Reconstruction: highest gate on disk = 5, `### QA Cycle` entries = 5 → 0 cycles run outside the loop, nothing back-filled.
+- QA loop re-entry: 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk. `grant-qa-cycles.sh` restored the lock from the halt snapshot → `qa_max_cycles` = 7, `qa_phase` = 5a.
+- QA Cycle 6 — /qa-task scoped since gate 5 (3 source files, 843-line diff): reviewer returned in 204 s; CR-1 and CR-4 reproduced before gating. Probes 52, 0 reproduced, 1 overblocked (copy-as.dotdot-name = CR6-4). CI full suite green at 4bc9da7f. Step 12b clean. Convergence: HIGH 1,1,0,0,0,0 → HIGH_N 0, no trip. Route: continue (not-a-pass-gate; route 2 declined: product-defect-signal).
+- QA Cycle 6 — changes-requested: stage-disabled. Narrowing offer: signal TRUE (every MEDIUM on gates 5–6 names shared/resources/qa-read-back.js) — passed to /qa-fix.
+- QA Cycle 6 — /qa-fix: findings ingested inline (gate authored in this session; independence lost on ingest only). Step 2.6 trigger (a) pipeline offer — Move: scope the claim (exit 2 = the run could not complete; per-link states HALT with their own remedy), not a fourth addition to the exit-2 set. Fast gate (`ci:fast`, `.agents/skills` moved aside) attempt 1 green: 4226 tests, 4225 pass, 0 fail, 1 skipped. Commit a72aa4ac pushed; qa-fix-6 PR + issue comments posted; post-fix PR state OPEN (inline `gh pr view`).
+- QA Cycle 7 — /qa-task scoped since gate 6 (4 source files; fix diff isolated first): reviewer returned in 263 s; CR-1 reproduced before gating; CR-2 provenance: pre-existing on origin/develop → future. Probes 54, 0 reproduced, 0 overblocked. CI test SUCCESS at a72aa4ac. Step 12b clean. Convergence: HIGH_N 0. Route: continue (not-a-pass-gate).
+- QA Cycle 7 — budget: cycle 7 = qa_max_cycles 7, gate open → the loop would escalate after this fix with route 2c declined (MEDIUM 2, 1, 1 not strictly falling), leaving the fix ungated. Per the user's standing authorisation ("increase cycle limit as needed"), 2 further cycles granted in-flight via grant-qa-cycles.sh (base 7 → qa_max_cycles 9) instead of halting and re-entering. QA loop re-entry: 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk.
+- QA Cycle 7 — changes-requested: stage-disabled. Narrowing offer: signal TRUE (every MEDIUM on gates 6–7 names shared/resources/qa-read-back.js) — passed to /qa-fix.
+- QA Cycle 7 — /qa-fix: findings inline (gate authored this session). Step 2.6 trigger (a) — Move: consolidate (the gate/report grammar had two definitions and the copy drifted three times). Fast gate attempt 1 green: 4238 tests, 4237 pass, 0 fail, 1 skipped. First `git commit` silently did not land (output suppressed; likely the transient index.lock) — retried, landed as 2892f50b, pushed; qa-fix-7 comments posted; PR OPEN.
+- QA Cycle 8 — /qa-task scoped since gate 7 (4 source files; fix diff first): reviewer returned in 240 s, every fix claim confirmed, no high-confidence bug; CR-1 (medium/medium) reproduced and found pre-existing on origin/develop → future. Probes 84 (qa-cycle.sh shell probe 28/28 added), 0 reproduced. CI 5/5 at 2892f50b. Step 12b clean. Gate PASS 100, no open entry → route 1 → 5c.
+- Step 5c — gate 8 + QA report committed (5fb8e2e0) and pushed; trail asserted on origin. /review-pr --effort medium --comment: both lenses dispatched in parallel. Verdict ⚠️ CONCERNS (deterministic: CR-1 medium/medium, no high/high). CR-1 (read-back from cycle 2 does not require the document to link THIS cycle's gate/report) reproduced by the orchestrator (rc=0 on an un-re-edited doc) — recorded as a follow-up, not a block, per the 5c verdict table. Report: task.149.pr-review.1.qa-evidence-integrity.md; PR summary comment posted. ready-for-merge: stage-disabled. Loop exit → Step 7.
+- Step 7 — /finalise: 4 DoD agents in parallel (AC PARTIAL 12/13 — AC13 post-merge by design, treated as deferred per task.148; Security PASS 84 probes; Compliance N/A; Docs FAIL 3 low). CI reading 1: SUCCESS @ 5fb8e2e0dbb1 over 5 checks. Fix-and-recheck evaluator: exit 1 (inside-files-summary, mutation-proved). Decision: GAPS → Step 8: dod.1 finalized, gap report + gaps Change Log row in the task doc, dod-gaps PR comment posted. Status unchanged (ready-for-review). Pipeline HALT (DoD gaps). Tracker blocked stage: not signalled (TRACKER=github; the stage is Jira-only).
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+### Finalise — DoD Gaps Identified — 2026-09-26
+
+`/finalise` (dod.1) did not accept. Every section except Docs passed: AC 12/12 with AC13 post-merge by design, Security PASS with 84 probes and 0 reproduced, Compliance N/A, QA gate 8 PASS 100, and CI reading 1 SUCCESS @ 5fb8e2e0dbb1 over 5 checks. Docs FAIL on three low-severity gaps, all first raised by the Step 5c review:
+- PC-3: the `shared/resources/qa-cycle.sh` header says `--path` is "the only definition" while the QA skills' `find -name` lookups remain.
+- PC-4: CHANGELOG `[Unreleased]` does not mention `qa-cycle.sh --path`.
+- PC-6: the task document's § 3, Phase 4 and § 7 do not name qa-read-back.js, qa-cycle.sh --path or the added tests.
+
+Step 8a fix-and-recheck was evaluated and refused (exit 1), for two reasons. `inside-files-summary` failed because qa-cycle.sh is not in § 7, which is itself part of PC-6. `mutation-proved` failed because a prose correction has no behaviour a test can hold.
+
+**Recommended next step**: one docs commit that makes the three corrections, then re-run `/develop-task` (resume at Step 7) or `/finalise` directly. That run writes dod.2.
 
 ### QA Loop Limit Reached — 2026-09-26
 
@@ -229,14 +257,45 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: BUG-8 every could-not-look → exit 2 (non-regular --doc, tracked-false fallback, uncaught throws); BUG-9 qa-cycle.sh gate grammar; CR-5, CR-6 cleanups
 **Commit**: `45b07cf2`
 
+### QA Cycle 6 — 2026-09-26
+**Gate Result**: CONCERNS
+**Issues Found**: 3 — TASK-149-BUG-10 (MEDIUM: an unverifiable link exits 1 with a missing-artifact remedy, not exit 2; reproduced), CR6-2 (low: artifact() takes the first .gate.N., qa-cycle.sh the last), CR6-4 (low: isWithin refuses ..name — regression from cycle 5's CR-6; probe overblocked). BUG-8, BUG-9 closed (mutation-proved 4/5; the misnamed branch is untested, CR-5).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 6 of 7)
+**Fixes Applied**: BUG-10 — Step 2.6 move "scope the claim": exit 2 = the run could not complete; every unconfirmed link is a HALT with its own remedy (REMEDY table), matching Step 12b / 3e; CR6-2 artifact() uses qa-cycle.sh's greedy grammar, literal extension, regular files only; CR6-4 isWithin treats ..name as a child (both files); CR-5 misnamed-branch test. 5 tests + QA-27 assertions; 5/5 mutation-proved; probe copy-as 24/24
+**Commit**: `a72aa4ac`
+
+### QA Cycle 7 — 2026-09-26
+**Gate Result**: CONCERNS
+**Issues Found**: 1 — TASK-149-BUG-11 (MEDIUM: artifact() chooses a same-cycle dotfile as the gate; qa-cycle.sh's glob never counts one; reproduced). BUG-10, CR6-2, CR6-4 closed (5/5 mutation-proved). Pre-existing CR-2 (security-probe.mjs bare startsWith(".."), on develop at 400/853) routed to recommendations.future; CR-3/4/5 advisory.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 7 of 9)
+**Fixes Applied**: BUG-11 — Step 2.6 move "consolidate the contract": qa-cycle.sh --path gate|qa is the one definition of this cycle's file (same glob + sed, regular files only, ambiguity refused); qa-read-back.js artifact() asks it and its regex is deleted (closes advisory CR-3). Tests in both suites; M11–M14 covered
+**Commit**: `2892f50b`
+
+### QA Cycle 8 — 2026-09-26
+**Gate Result**: PASS
+**Issues Found**: none in the gate — BUG-11 closed. Advisory: pre-existing `find -name` gate lookups in the QA skills (on develop; routed to future), --path prefix (low/low), CR-3/4/5 cleanups.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — task.149.pr-review.1.qa-evidence-integrity.md (1 medium/medium code finding CR-1, reproduced; 6 low conformance; 1 cleanup)
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: 2026-09-26 (halted at Steps 5–6)
-**Final Status**: Escalated — QA loop limit reached
+**Finished**: 2026-09-26 (halted at Step 7 — DoD gaps; the Steps 5–6 escalation at cycle 5 was re-entered and the loop exited clean at cycle 8)
+**Final Status**: Halted — finalise DoD gaps (3 low documentation items)
 **Branch**: `feature/task.149.qa-evidence-integrity`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/493
-**QA Iterations**: 5 (gates FAIL 70, FAIL 60, CONCERNS 80, CONCERNS 80, CONCERNS 80); cycle 5's fix (45b07cf2) is ungated
+**QA Iterations**: 8 (gates FAIL 70, FAIL 60, CONCERNS 80 ×5, PASS 100); every fix gated; Step 5c PR review CONCERNS (pr-review.1)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
