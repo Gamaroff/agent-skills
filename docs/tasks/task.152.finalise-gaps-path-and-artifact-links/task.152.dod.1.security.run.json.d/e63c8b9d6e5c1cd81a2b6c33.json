@@ -1,0 +1,22 @@
+{
+  "sink": "path",
+  "entry": "cli:.claude/state/t152-fvc-wrapper.mjs",
+  "name": "fill-verification-complete.sh gaps refusal",
+  "call_site": "shared/resources/fill-verification-complete.sh:64",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 12,
+  "passed": 12,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": [
+    "{fixture}",
+    "content",
+    "{input}"
+  ],
+  "ran_at": "2026-09-26T20:24:27.892Z"
+}

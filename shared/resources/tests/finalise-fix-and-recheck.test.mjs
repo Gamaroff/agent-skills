@@ -30,6 +30,7 @@ import {
   evaluateFixAndRecheck,
   gitFacts,
   isWorkItemDocument,
+  isCoLocatedArtifact,
 } from "../finalise-fix-and-recheck.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -198,6 +199,119 @@ test("inside-files-summary: the work item's own document is in scope when named 
       `documentPath ${JSON.stringify(bad)} must not admit the path`,
     );
   }
+});
+
+// ── task.152 (obs #155): co-located artifacts, admitted only through the document ──
+const TASK_DOC = "docs/tasks/task.139.x/task.139.x.md";
+const QA4 = "docs/tasks/task.139.x/task.139.qa.4.x.md";
+const failedIds = (rec) => evaluateFixAndRecheck(rec).failed.map((x) => x.id);
+
+test("inside-files-summary: a co-located QA report named in artifactPaths is in scope (task.152, obs #155)", () => {
+  // The task.139 run-2 shape: the red is on two QA reports beside the document.
+  const QA5 = "docs/tasks/task.139.x/task.139.qa.5.x.md";
+  assert.deepEqual(
+    failedIds({
+      ...GOOD,
+      touched: [QA4, QA5],
+      documentPath: TASK_DOC,
+      artifactPaths: [QA4, QA5],
+    }),
+    [],
+  );
+  // Document and artifact together, as 8a records a red on both.
+  assert.deepEqual(
+    failedIds({
+      ...GOOD,
+      touched: [TASK_DOC, QA4],
+      documentPath: TASK_DOC,
+      artifactPaths: [QA4],
+    }),
+    [],
+  );
+  // Every artifact kind the 8a clause names, for a story too.
+  const story = "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md";
+  for (const kind of [
+    "qa.1",
+    "dod.2",
+    "implementation.1",
+    "review.1",
+    "pr-review.1",
+    "sprint-review-summary",
+  ]) {
+    const p = `docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.${kind}.y.md`;
+    assert.equal(isCoLocatedArtifact(story, p), true, p);
+  }
+});
+
+test("inside-files-summary: artifactPaths refuses every path outside the document's own directory and stem (task.152)", () => {
+  const refused = {
+    "another directory": "docs/tasks/task.140.y/task.139.qa.4.x.md",
+    // Named so the stem check alone would pass it: only the same-directory rule refuses.
+    "a subdirectory": "docs/tasks/task.139.x/task.139.old/task.139.qa.4.x.md",
+    "another stem": "docs/tasks/task.139.x/task.140.qa.4.x.md",
+    "a longer id sharing the prefix":
+      "docs/tasks/task.139.x/task.1390.qa.1.x.md",
+    "a co-located .bug. report": "docs/tasks/task.139.x/task.139.bug.2.x.md",
+    "a .yml gate": "docs/tasks/task.139.x/task.139.gate.4.x.yml",
+    "a .. path": "docs/tasks/task.139.x/../task.139.x/task.139.qa.4.x.md",
+    "a NUL path": "docs/tasks/task.139.x/task.139.qa.4.x.md\u0000.md",
+    "a non-artifact file in the same directory":
+      "docs/tasks/task.139.x/task.139.notes.md",
+  };
+  for (const [why, p] of Object.entries(refused)) {
+    assert.equal(isCoLocatedArtifact(TASK_DOC, p), false, why);
+    assert.deepEqual(
+      failedIds({
+        ...GOOD,
+        touched: [p],
+        documentPath: TASK_DOC,
+        artifactPaths: [p],
+      }),
+      ["inside-files-summary"],
+      `${why}: ${p} must not be admitted`,
+    );
+  }
+});
+
+test("inside-files-summary: artifactPaths admits nothing without a valid documentPath, and a listed path is not enough on its own (task.152)", () => {
+  // No documentPath: the anchor is missing, so the artifact is outside.
+  assert.deepEqual(
+    failedIds({ ...GOOD, touched: [QA4], artifactPaths: [QA4] }),
+    ["inside-files-summary"],
+  );
+  // A documentPath that is itself an artifact, or a task's co-located bug
+  // report, is not a work item document — nothing is anchored to it.
+  for (const notDoc of [QA4, "docs/tasks/task.67.x/task.67.bug.3.z.md"]) {
+    const art = notDoc.replace(/[^/]+$/, "task.67.qa.1.z.md");
+    assert.equal(isCoLocatedArtifact(notDoc, art), false, notDoc);
+  }
+  // Touching an artifact that is NOT in artifactPaths stays outside, even when
+  // it would qualify — the record states what it touches.
+  assert.deepEqual(
+    failedIds({
+      ...GOOD,
+      touched: [QA4],
+      documentPath: TASK_DOC,
+      artifactPaths: [],
+    }),
+    ["inside-files-summary"],
+  );
+  // A non-list artifactPaths admits nothing.
+  assert.deepEqual(
+    failedIds({
+      ...GOOD,
+      touched: [QA4],
+      documentPath: TASK_DOC,
+      artifactPaths: QA4,
+    }),
+    ["inside-files-summary"],
+  );
+});
+
+test("the preconditions table states the artifactPaths input", () => {
+  const p = PRECONDITIONS.find((x) => x.id === "inside-files-summary");
+  assert.equal(p.input, "touched, filesSummary, documentPath, artifactPaths");
+  assert.match(p.statement, /artifactPaths/);
 });
 
 test("all five hold → proceed, every id checked, nothing failed", () => {
@@ -587,4 +701,105 @@ test("the security agent's schema carries `severity` on probes and FAIL checks",
     output.includes("**Severity rule**"),
     "the severity rule paragraph is gone",
   );
+});
+
+test("a sprint-review summary is a co-located artifact, never a work-item document — the evaluator and the corpus guard share one artifact set (task.152 QA cycle 1, QA-1)", () => {
+  const story = "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md";
+  const summary =
+    "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.sprint-review-summary.md";
+  assert.equal(isWorkItemDocument(summary), false, "not a document");
+  assert.equal(
+    isCoLocatedArtifact(story, summary),
+    true,
+    "an artifact of its story",
+  );
+  assert.deepEqual(
+    failedIds({ ...GOOD, touched: [summary], documentPath: summary }),
+    ["inside-files-summary"],
+    "and it cannot admit itself as the document",
+  );
+  // One definition: the doc-links corpus guards import this regex rather than
+  // restating it, so the two cannot disagree again.
+  const guard = read("shared/resources/tests/doc-links.test.mjs");
+  assert.match(
+    guard,
+    /import \{[^}]*\bWORK_ITEM_ARTIFACT_RE\b[^}]*\} from "\.\.\/finalise-fix-and-recheck\.mjs"/,
+  );
+  assert.match(guard, /const ARTIFACT_RE = WORK_ITEM_ARTIFACT_RE;/);
+  assert.doesNotMatch(guard, /const ARTIFACT_RE =\s*\//, "no second literal");
+});
+
+test("the unprefixed sprint-review-summary.md finalise writes beside a document is a co-located artifact — and only there (task.152 QA cycle 2, CR-2)", () => {
+  const story = "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md";
+  const dir = "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/";
+  assert.equal(
+    isCoLocatedArtifact(story, dir + "sprint-review-summary.md"),
+    true,
+    "the real filename",
+  );
+  assert.equal(
+    isCoLocatedArtifact(
+      TASK_DOC,
+      "docs/tasks/task.139.x/sprint-review-summary.md",
+    ),
+    true,
+  );
+  for (const [why, p] of Object.entries({
+    "another directory":
+      "docs/prd/a/epics/epic.2.x/stories/story.2.2.z/sprint-review-summary.md",
+    "a subdirectory": dir + "old/sprint-review-summary.md",
+    "a .yml": dir + "sprint-review-summary.yml",
+    "a lookalike name": dir + "xsprint-review-summary.md",
+    "a .. path": dir + "../story.2.1.y/sprint-review-summary.md",
+  })) {
+    assert.equal(isCoLocatedArtifact(story, p), false, why);
+  }
+  assert.equal(
+    isCoLocatedArtifact("README.md", "sprint-review-summary.md"),
+    false,
+    "no valid document, no anchor",
+  );
+  const guard = read("shared/resources/tests/doc-links.test.mjs");
+  assert.match(
+    guard,
+    /UNPREFIXED_ARTIFACTS\.includes\(/,
+    "the corpus walk reads the same list",
+  );
+});
+
+test("a raw LF or CR in a path is refused by both predicates — one string here, two paths to a line-oriented reader (task.152 finalise DoD security probe)", () => {
+  const story = "docs/prd/p/epics/epic.1.x/stories/story.1.2.x/story.1.2.x.md";
+  for (const p of [
+    TASK_DOC.replace(/[^/]+$/, "task.139.qa.1.x.md\nREADME.md"),
+    TASK_DOC.replace(/[^/]+$/, "task.139.qa.1.x.md\r\n.md"),
+    TASK_DOC.replace(/[^/]+$/, "task.139.qa.1.x.md\r.md"),
+  ]) {
+    assert.equal(isCoLocatedArtifact(TASK_DOC, p), false, JSON.stringify(p));
+    assert.deepEqual(
+      failedIds({
+        ...GOOD,
+        touched: [p],
+        documentPath: TASK_DOC,
+        artifactPaths: [p],
+      }),
+      ["inside-files-summary"],
+      JSON.stringify(p),
+    );
+  }
+  assert.equal(
+    isCoLocatedArtifact(
+      story,
+      story.replace(/[^/]+$/, "story.1.2.qa.1.x.md\nx.md"),
+    ),
+    false,
+    "story anchor",
+  );
+  for (const doc of [
+    TASK_DOC + "\n.md",
+    "docs/tasks/task.1.x/task.1.x.md\r\n.md",
+  ]) {
+    assert.equal(isWorkItemDocument(doc), false, JSON.stringify(doc));
+  }
+  // The guard does not over-block: the ordinary artifact still passes.
+  assert.equal(isCoLocatedArtifact(TASK_DOC, QA4), true);
 });

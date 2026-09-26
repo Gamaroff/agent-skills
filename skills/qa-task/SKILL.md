@@ -1159,6 +1159,21 @@ Statements: X% | Branches: Y% | Functions: Z% | Lines: W%
 **Next Steps**: {fixes / deployment / follow-up}
 ```
 
+**Check the report's links before leaving this step.** CI's `docs-link-check` reads every changed
+`docs/**/*.md` — a QA report as much as the document beside it — and a quoted finding that contains a
+bracket-paren shape renders as a live link (task.139 run 2 went red on two QA reports; task.152,
+obs #155). The engine resolves against the git index, so a sibling this run wrote reads as dead
+until it is staged — stage first:
+
+```bash
+git add "{task-directory}/task.{id}.qa.{number}.{name}.md" "{task-directory}/task.{id}.gate.{number}.{name}.yml"
+node .agents/skills/qa-task/references/doc-links.js --file "{task-directory}/task.{id}.qa.{number}.{name}.md"
+```
+
+Exit 1 → fix the quotation (put it in a fence, or break the `[..](..)` shape so it no longer reads
+as a link) and re-run until it exits 0. Exit 2 is a usage error: fix the call. `git add` only
+stages — the pipeline commits these files next anyway, and staging is reversible.
+
 ### Step 12: Update Task File
 
 **Replace the whole `## QA Testing Results` section from the gate just written — never patch it
