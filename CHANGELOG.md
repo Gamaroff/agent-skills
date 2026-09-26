@@ -6,6 +6,28 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/finalise --bug` covers Step 8, the GAPS path (task 152).** The bug-mode skip table stopped at
+  Step 7, so a `--bug` run that found gaps doubled the `## Verification Complete` heading, appended
+  the Change Log row bug mode forbids, wrote a second verdict into the bug report, and then could not
+  post its PR comment (obs #148). Five new rows and markers — `gaps-verification-complete`,
+  `gaps-change-log-row` (skip, forbidden), `gaps-status-history-row`, `gaps-body-section` (skip),
+  `gaps-pr-comment` — held two-way by `finalise-bug-mode.test.mjs`. The `## Verification Complete`
+  fill is now one bundled helper, `fill-verification-complete.sh <DOD_PATH> <accepted|gaps>`, called
+  from 7.1 and 8.1; it refuses a doubled file and a file that already reads the other verdict. In bug
+  mode 8.5 reads the gap list from the DoD file's `## Step 5: Acceptance Decision`.
+- **Co-located pipeline artifacts are link-checked where CI checks them (task 152).** CI's
+  `docs-link-check` reads every changed `docs/**/*.md`, but finalise 8a, the fix-and-recheck
+  evaluator and the corpus guard stopped at the work-item document, so task.139 run 2 halted on a CI
+  red in two QA reports that 8a could not admit (obs #155). The evaluator's finding record takes an
+  optional `artifactPaths`, admitted only through `isCoLocatedArtifact` (same directory, same id
+  stem, a `.md` pipeline artifact, never a `.bug.` report); the 8a clause and the CI-table row
+  admit a red on the document or its artifacts. `doc-links.test.mjs` walks the 1,000+ artifacts
+  under their own ratchet (`KNOWN_ARTIFACT_LINKS` / `KNOWN_ARTIFACT_FENCES`, 11 links and 2 fences
+  pinned). `qa-task` Step 11, `qa-story` Output 1 and `review-pr` Step 7 now stage the report
+  they wrote and run `doc-links.js --file` on it.
+- **`status-history.js --json` (task 152).** The last pipeline engine without the shared `reason`
+  contract: `--json` prints `{reason: "updated" | "unchanged", exitCode: 0, file, status}`. The
+  module API is unchanged.
 - **qa-fix Step 2.6 and the QA loop's narrowing-residue offer — a structural move before another
   prose patch (task 148).** A loop could spend its budget at HIGH 0 with each cycle's MEDIUM narrowing
   one mechanism (task.143: 7 cycles, MEDIUM `2, 1, 2, 0, 1, 1, 0`), and none of its four guards fit
@@ -107,6 +129,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **Breaking — `status-history.js` usage errors exit 2, not 1 (task 152).** An unknown flag, a
+  missing `--file`, a value flag with no operand or an unreadable file now exits **2** (and prints
+  `{"reason":"usage",…}` under `--json`), matching `doc-links.js` and `tracker-comment.js`. The two
+  in-tree call sites (`finalise` 7.3, `ensure-bug-github-issue` B8) read neither the code nor
+  stdout; an out-of-tree caller that branched on exit 1 must read 2.
+- **Breaking — the `status-history.js` CLI writes lifecycle statuses in Title Case (task 152).**
+  `new`, `in-progress`, `ready-for-qa`, `closed` and `reopened` are written as `New`,
+  `In Progress`, `Ready for QA`, `Closed` and `Reopened` — the case 734 of the corpus's 737
+  Status History rows already use. Any other value passes through. Existing rows are untouched, and
+  the exported `upsertStatusHistory` still writes what it is given.
 - **`qa-execute-snippets.mjs --copy-as SRC:DEST` seeds a directory at the path a block addresses
   (task 149).** `--copy <dir>` places the directory's contents at the temp root, so a correct block
   that runs `find docs/tasks …` (the `sync-github-*` discovery blocks) failed whatever was copied, and
@@ -269,6 +301,10 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`qa-story`'s QA report template closed its fence early (task 152).** A stray four-backtick fence line
+  after *Test Commands Executed* ended the four-backtick template there, so *Coverage Report* onward
+  rendered as real headings of the skill and the template's own closing fence opened one that never
+  closed. Found when the writer-site population test read the section as CommonMark does.
 - **Five develop-pipeline steps that failed or overreached on a correct run (task 147).** Each fix is
   held by a test that cuts the block out of the shipped document and runs it in a fixture repository
   under bash and zsh (`shared/resources/tests/lib/executed-prose.mjs`), and each is

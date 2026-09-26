@@ -5,10 +5,10 @@ type: task
 description: "Close two scope edges in /finalise found on real runs. (A) Bug mode's skip table stops at Step 7, so a --bug run that reaches Step 8 (the GAPS path) doubles the Verification Complete heading, appends a forbidden Change Log row and writes a body verdict; extend the table to Step 8, share one verdict-parameterised fill between 7.1 and 8.1, and give status-history.js a --json reason contract and Title Case statuses. (B) Step 8a's docs-link clause, the fix-and-recheck evaluator and the doc-links corpus guard all stop at the work-item document, while CI link-checks every co-located pipeline artifact the PR changes; widen all three to co-located artifacts, and have the three report writers (qa-task, qa-story, review-pr) run doc-links.js on the report they just wrote."
 tags: [finalise, bug-mode, doc-links, qa-task, qa-story, review-pr, status-history, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-26
 assignee:
 estimated_effort_hours: 16
 github_issue: 482
@@ -16,7 +16,9 @@ github_issue: 482
 
 # Technical Task: finalise — bug-mode gaps path and the co-located-document blind spot in 8a and the doc-links guard
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.152.review.1.finalise-gaps-path-and-artifact-links.md` implemented 2026-09-26
 
 **GitHub Issue**: [#482](https://github.com/Gamaroff/agent-skills/issues/482)
 
@@ -195,7 +197,7 @@ carrying 1,461 relative links, 11 dead targets across 5 files, and 2 unterminate
 `task.139.qa.4`/`qa.5` are clean now: run 2 fixed them. The measurement sizes the ratchet only.
 The test records the real list.
 
-**The engine resolves against the git index.** `trackedSet()` (`doc-links.js:197`) is
+**The engine resolves against the git index.** `trackedSet()` (`doc-links.js:204`) is
 `git ls-files`. A sibling that a report links to and that has not been staged, such as the gate
 file written one step earlier, reads as dead. Staged files resolve.
 
@@ -229,7 +231,7 @@ file written one step earlier, reads as dead. Staged files resolve.
   - `--json` prints one line, `{"reason":"updated"|"unchanged","exitCode":0,"file":…,"status":…}`.
   - Usage errors, unknown flags and missing operands exit **2**, and under `--json` print
     `{"reason":"usage","exitCode":2,"error":…}`. This matches `doc-links.js`'s `usage()`
-    (`doc-links.js:287`).
+    (`doc-links.js:362`).
   - `--status` is normalised to Title Case for the five lifecycle tokens: `new → New`,
     `in-progress → In Progress`, `ready-for-qa → Ready for QA`, `closed → Closed`,
     `reopened → Reopened`. Any other value passes through unchanged.
@@ -369,12 +371,12 @@ Step 8a and the CI table for Part B).
 **Files**: `shared/resources/fill-verification-complete.sh`, `skills/finalise/SKILL.md` (7.1),
 `evals/shared/tests/finalise-bug-mode.test.mjs`
 
-- [ ] Write the helper with `<DOD_PATH> <accepted|gaps>`. It halts on unbound or placeholder
+- [x] Write the helper with `<DOD_PATH> <accepted|gaps>`. It halts on unbound or placeholder
       arguments, on an unreadable file, on a doubled heading, and on a filled file whose verdict
       differs from the one requested.
-- [ ] 7.1's bug-mode block sources or calls the helper through `.agents/skills/finalise/references/`,
+- [x] 7.1's bug-mode block sources or calls the helper through `.agents/skills/finalise/references/`,
       keeping its `DOC_KIND` / `DOD_PATH` binding guard.
-- [ ] Tests: the helper fills `gaps` and `accepted` on the template, is idempotent, refuses the
+- [x] Tests: the helper fills `gaps` and `accepted` on the template, is idempotent, refuses the
       other verdict and refuses a doubled file. `fillBlock()` still executes 7.1 end-to-end. There
       is one definition (the `newest-numbered.sh` pattern).
 
@@ -383,21 +385,28 @@ Step 8a and the CI table for Part B).
 **Files**: `skills/finalise/SKILL.md` (table, 8.1, 8.3, 8.4, 8.5, Step 8 checklist),
 `evals/shared/tests/finalise-bug-mode.test.mjs`
 
-- [ ] Add the five rows from § 3 to the skip table, and a marker beside each Step 8 item.
-- [ ] 8.5: bind `DOC_KIND`. In bug mode, set `GAP_REPORT_BODY` from the DoD file's
+- [x] Add the five rows from § 3 to the skip table, and a marker beside each Step 8 item.
+- [x] Every **new** fenced-block call in Step 8 addresses its helper from the repository root, as
+      `.agents/skills/finalise/references/<file>` — the 8.1 `gaps` fill
+      (`fill-verification-complete.sh`) and the 8.3 `gaps-status-history-row` call
+      (`status-history.js`). Never the bare `references/<file>` form the neighbouring 7.3 block
+      uses (`create-skill` § "A helper a fenced block executes is addressed from the repository
+      root"). While editing the 8.5 block, re-address its `stakeholder-summary-cli.js` call the same
+      way (review O2).
+- [x] 8.5: bind `DOC_KIND`. In bug mode, set `GAP_REPORT_BODY` from the DoD file's
       `## Step 5: Acceptance Decision` section, bounded at the next `## `. The empty-body
       post-condition stays as it is.
-- [ ] Add a bug-mode qualifier to the Step 8 Completion Checklist, without a marker.
-- [ ] Add the five keys to `EXPECTED_VERBS`. Add an executed test of the 8.5 block in bug mode
+- [x] Add a bug-mode qualifier to the Step 8 Completion Checklist, without a marker.
+- [x] Add the five keys to `EXPECTED_VERBS`. Add an executed test of the 8.5 block in bug mode
       against a filled-`gaps` DoD fixture.
 
 ### Phase 3: `status-history.js` CLI contract (Risk: Low)
 
 **Files**: `shared/resources/status-history.js`, `shared/resources/tests/status-history-cli.test.mjs` (new)
 
-- [ ] Add `--json`, the usage exit code 2 with `reason: "usage"`, and the exported
+- [x] Add `--json`, the usage exit code 2 with `reason: "usage"`, and the exported
       `normaliseStatus`, applied in `main()` only.
-- [ ] Tests: `--json` reason for `updated` and `unchanged`, the unknown-flag exit code, all five
+- [x] Tests: `--json` reason for `updated` and `unchanged`, the unknown-flag exit code, all five
       tokens mapped, and a non-token passed through.
 
 ### Phase 4: evaluator `artifactPaths` (Risk: Medium)
@@ -406,10 +415,10 @@ Step 8a and the CI table for Part B).
 `shared/resources/finalise-fix-and-recheck-preconditions.json`,
 `shared/resources/tests/finalise-fix-and-recheck.test.mjs`
 
-- [ ] Add `isCoLocatedArtifact(documentPath, p)` and admit `artifactPaths` entries in
+- [x] Add `isCoLocatedArtifact(documentPath, p)` and admit `artifactPaths` entries in
       `inside-files-summary` only through it.
-- [ ] Update the preconditions statement and `input` (`touched, filesSummary, documentPath, artifactPaths`).
-- [ ] Tests: a co-located QA report is admitted. Each of these is refused: another directory,
+- [x] Update the preconditions statement and `input` (`touched, filesSummary, documentPath, artifactPaths`).
+- [x] Tests: a co-located QA report is admitted. Each of these is refused: another directory,
       another stem, a `.bug.` report, a `.yml` gate, a `..` path, an artifact given without a
       `documentPath`, and a non-artifact file in the same directory.
 
@@ -418,9 +427,9 @@ Step 8a and the CI table for Part B).
 **Files**: `skills/finalise/SKILL.md` (8a clause, CI-table row at `:857`),
 `shared/resources/tests/doc-links.test.mjs`
 
-- [ ] Widen the 8a clause and the CI row to cover co-located `.md` artifacts. The finding record
+- [x] Widen the 8a clause and the CI row to cover co-located `.md` artifacts. The finding record
       example gains `artifactPaths`. Explain the multi-file `mutationProof.run`.
-- [ ] Add the artifact corpus test with `KNOWN_ARTIFACT_LINKS` / `KNOWN_ARTIFACT_FENCES`, seeded
+- [x] Add the artifact corpus test with `KNOWN_ARTIFACT_LINKS` / `KNOWN_ARTIFACT_FENCES`, seeded
       from the list the test prints on its first red run, and with floors.
 
 ### Phase 6: writer-site checks (Risk: Low)
@@ -428,17 +437,18 @@ Step 8a and the CI table for Part B).
 **Files**: `skills/qa-task/SKILL.md` (Step 11), `skills/qa-story/SKILL.md` (Output 1),
 `skills/review-pr/SKILL.md` (Step 7), `shared/resources/tests/doc-links.test.mjs`
 
-- [ ] Add the stage-then-check block at each of the three sites.
-- [ ] Add a section-scoped population test: each site's section names `references/doc-links.js --file`
+- [x] Add the stage-then-check block at each of the three sites.
+- [x] Add a section-scoped population test: each site's section names `references/doc-links.js --file`
       and `git add`, with a floor of 3 sections found.
-- [ ] `npm run bundle`. `bundle:check` must report no `UNREACHED`.
+- [x] `npm run bundle`. `bundle:check` must report no `UNREACHED`.
 
 ### Phase 7: docs and validation (Risk: Low)
 
 **Files**: `CHANGELOG.md`
 
-- [ ] Add an `[Unreleased]` entry citing `(task 152)`, including both breaking changes.
-- [ ] Run `npm run ci:fast`, `npm run format:check`, `npm run bundle:check`, and
+- [x] Add an `[Unreleased]` entry citing `(task 152)`, including both breaking changes.
+- [x] Run `npm run ci:fast`, `npm run format:check`, `npm run bundle:check`, `npm run lint:shell`
+      (ShellCheck over the new `fill-verification-complete.sh`), and
       `python skills/create-skill/scripts/quick_validate.py` on the four edited skills.
 
 ---
@@ -531,42 +541,44 @@ exit 0. The report states that CI does not hold this.
 
 ### Functional
 
-- [ ] The skip table has 22 rows. The five `gaps-*` rows read as in § 3. `EXPECTED_VERBS` enumerates
+- [x] The skip table has 22 rows. The five `gaps-*` rows read as in § 3. `EXPECTED_VERBS` enumerates
       all 22, and the parity tests pass in both directions (`evals/shared/tests/finalise-bug-mode.test.mjs`).
-- [ ] The helper fills `gaps` on the template with exactly one heading and one
+- [x] The helper fills `gaps` on the template with exactly one heading and one
       `**Final Status:** ❌ GAPS IDENTIFIED - NOT ACCEPTED` line. It is idempotent, refuses to
       overwrite `ACCEPTED`, and 7.1 still fills `ACCEPTED` through it (`finalise-bug-mode.test.mjs`).
-- [ ] In bug mode, the 8.5 block builds a non-empty comment body from the DoD file's
+- [x] In bug mode, the 8.5 block builds a non-empty comment body from the DoD file's
       `## Step 5: Acceptance Decision` section, and its `GAP_COUNT` equals the gap lines
       (`finalise-bug-mode.test.mjs`, executed in bash and zsh).
-- [ ] `status-history.js --json` prints `reason` `updated` / `unchanged` and exits 0. An unknown flag
+- [x] `status-history.js --json` prints `reason` `updated` / `unchanged` and exits 0. _(`unchanged` is
+      unreachable through the CLI today: `upsertStatusHistory` always appends, so a repeated row reports
+      `updated` — asserted as it is, per the plan's Phase 3 note.)_ An unknown flag
       exits 2 with `reason: "usage"`. The five lifecycle tokens write Title Case
       (`shared/resources/tests/status-history-cli.test.mjs`).
-- [ ] The evaluator admits a co-located `.md` artifact named in `artifactPaths`, and refuses every
+- [x] The evaluator admits a co-located `.md` artifact named in `artifactPaths`, and refuses every
       case listed in Phase 4 (`shared/resources/tests/finalise-fix-and-recheck.test.mjs`).
-- [ ] The artifact corpus test walks at least 1,000 artifacts and 1,000 links, and fails on a new
+- [x] The artifact corpus test walks at least 1,000 artifacts and 1,000 links, and fails on a new
       dead link, a new open fence, or a healed `KNOWN_ARTIFACT_*` entry
       (`shared/resources/tests/doc-links.test.mjs`).
-- [ ] Each of the three writer sections runs `doc-links.js --file` after `git add`. Removing it from
+- [x] Each of the three writer sections runs `doc-links.js --file` after `git add`. Removing it from
       any one of them fails the population test and names that site (`doc-links.test.mjs`).
 
 ### Performance
 
-- [ ] The artifact corpus test completes in under 10 seconds locally. The measured time goes in
+- [x] The artifact corpus test completes in under 10 seconds locally. The measured time goes in
       the implementation report.
-- [ ] No network access in any new test.
+- [x] No network access in any new test.
 
 ### Code Quality
 
-- [ ] Every fix above is mutation-proved as listed in § 8, with the red run recorded in the
+- [x] Every fix above is mutation-proved as listed in § 8, with the red run recorded in the
       implementation report.
-- [ ] `npm run ci:fast`, `format:check` and `bundle:check` are clean, with no `UNREACHED`.
-- [ ] Neither CLI calls `process.exit()`: `status-history.js` keeps `process.exitCode`.
+- [x] `npm run ci:fast`, `format:check`, `bundle:check` and `lint:shell` are clean, with no `UNREACHED`.
+- [x] Neither CLI calls `process.exit()`: `status-history.js` keeps `process.exitCode`.
 
 ### Migration
 
-- [ ] The CHANGELOG `[Unreleased]` entry cites `(task 152)` and names both breaking changes in § 5.
-- [ ] Observations #148 and #155 are set `actioned` when the PR merges.
+- [x] The CHANGELOG `[Unreleased]` entry cites `(task 152)` and names both breaking changes in § 5.
+- [ ] Observations #148 and #155 are set `actioned` when the PR merges. _(post-merge)_
 
 ---
 
@@ -659,19 +671,22 @@ None.
 | Date       | Version | Description                                                                          | Author      |
 | ---------- | ------- | ------------------------------------------------------------------------------------ | ----------- |
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #148, #155 (2026-09-24 observation review)     | create-task |
+| 2026-09-26 | 1.1     | Review passed (9/10) — pinned root-anchored helper paths for new Step 8 calls; added `lint:shell` to Phase 7; corrected two `doc-links.js` anchors | review-task |
+| 2026-09-26 |         | Status → ready-for-development                                                       | review-task |
+| 2026-09-26 |         | Implemented — 1 new helper, 2 engines, 4 SKILL.md, 4 test files (1 new), 25 new tests | develop     |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: the shared fill helper
-- [ ] Phase 2: Step 8 bug-mode rows and markers
-- [ ] Phase 3: `status-history.js` CLI contract
-- [ ] Phase 4: evaluator `artifactPaths`
-- [ ] Phase 5: 8a clause and the artifact corpus guard
-- [ ] Phase 6: writer-site checks
-- [ ] Phase 7: docs and validation
+- [x] Phase 1: the shared fill helper
+- [x] Phase 2: Step 8 bug-mode rows and markers
+- [x] Phase 3: `status-history.js` CLI contract
+- [x] Phase 4: evaluator `artifactPaths`
+- [x] Phase 5: 8a clause and the artifact corpus guard
+- [x] Phase 6: writer-site checks
+- [x] Phase 7: docs and validation
 
 ---
 
