@@ -667,29 +667,29 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-26
-**Quality Score**: 50/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.152.qa.1.finalise-gaps-path-and-artifact-links.md](./task.152.qa.1.finalise-gaps-path-and-artifact-links.md)
-- **Gate File**: [task.152.gate.1.finalise-gaps-path-and-artifact-links.yml](./task.152.gate.1.finalise-gaps-path-and-artifact-links.yml)
+- **Full Report**: [task.152.qa.2.finalise-gaps-path-and-artifact-links.md](./task.152.qa.2.finalise-gaps-path-and-artifact-links.md)
+- **Gate File**: [task.152.gate.2.finalise-gaps-path-and-artifact-links.yml](./task.152.gate.2.finalise-gaps-path-and-artifact-links.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 4263
+- **Tests Executed**: 4268
 - **Phases Verified**: 7/7
-- **Critical Issues**: 1
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
 
-CI is red on PR #495: the implementation report quotes the task.139 link shape unfenced (QA-2, HIGH).
-Medium: qa-story's writer check stages a gate not yet written (CR-1); the bug-mode 8.5 post-condition
-is vacuous (CR-2); the evaluator's artifact regex omits `sprint-review-summary` (QA-1).
+All six cycle-1 findings fixed; CI green. Two medium: the bug-mode zero-gap refusal runs after 8.1/8.3
+have written (CR-1); the shared artifact set misses the unprefixed `sprint-review-summary.md` finalise
+writes (CR-2). One low: an unreachable `unchanged` is documented (CR-3).
 
 ---
 
@@ -703,6 +703,7 @@ is vacuous (CR-2); the evaluator's artifact regex omits `sprint-review-summary` 
 | 2026-09-26 |         | Status → ready-for-development                                                       | review-task |
 | 2026-09-26 |         | Implemented — 1 new helper, 2 engines, 4 SKILL.md, 4 test files (1 new), 25 new tests | develop     |
 | 2026-09-26 |         | QA gate FAIL (50/100) — 6 findings (1 high, 3 medium, 2 low)                         | qa-task     |
+| 2026-09-26 |         | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low)                                | qa-task     |
 <!-- change-log-end -->
 
 ---

@@ -2175,7 +2175,9 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    helper 7.1 uses, with the verdict `gaps`. The bug DoD template already carries the block, so an
    append here doubles the heading exactly as 7.1's once did (obs #148). Write the gaps first, each as
    a `- [ ] {gap}` line replacing the `**Outcome:**` placeholder under `## Step 5: Acceptance
-   Decision` — 8.5 reads and counts those lines — then fill:
+   Decision` — 8.3 and 8.5 read and count those lines — then fill. The helper refuses a file with
+   no gap line **before** it writes anything, so a missing gap list stops the run here, ahead of
+   the two writes that cannot be undone (this fill, and 8.3's row):
 
    ```bash
    DOD_PATH="{dod-path — the running summary Step 0 created}"
@@ -2209,20 +2211,25 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    ```bash
    DOC_FILE="{the bug report path}"
    BUG_STATUS="{the bug's current status, unchanged — as bug-doc.js reports it}"
-   GAP_TOTAL="{gap-count — the number of '- [ ]' lines 8.1 wrote}"
-   DOD_NAME="{the DoD file's name — bug-prefix.dod.run.name.md, as Step 0 created it}"
-   # Every value this block writes into the row is bound HERE and refused when a placeholder
-   # survives: an unsubstituted status would otherwise be written as a literal row.
-   case "$DOC_FILE|$BUG_STATUS|$GAP_TOTAL|$DOD_NAME" in
-     *'{'* | '|'* | *'||'* | *'|') echo "HALT: DOC_FILE, BUG_STATUS, GAP_TOTAL and DOD_NAME must be bound in this block"; exit 1 ;;
+   DOD_PATH="{dod-path — the running summary Step 0 created}"
+   # The inputs are bound HERE and refused while a placeholder survives: an unsubstituted status
+   # would otherwise be written as a literal row.
+   case "$DOC_FILE|$BUG_STATUS|$DOD_PATH" in
+     *'{'* | '|'* | *'||'* | *'|') echo "HALT: DOC_FILE, BUG_STATUS and DOD_PATH must be bound in this block"; exit 1 ;;
    esac
+   # The count and the file name are DERIVED from the DoD file 8.1 filled, never supplied: the
+   # helper's `count` is the one definition of "the gap list".
+   GAP_TOTAL=$(bash .agents/skills/finalise/references/fill-verification-complete.sh "$DOD_PATH" count) || exit 1
+   DOD_NAME=$(basename "$DOD_PATH")
    node .agents/skills/finalise/references/status-history.js --file "$DOC_FILE" --json \
      --date "$(date -u +%Y-%m-%d)" --status "$BUG_STATUS" \
      --changed-by finalise --notes "DoD incomplete — $GAP_TOTAL gap(s) — $DOD_NAME"
    ```
 
-   Read `reason`: `updated` and `unchanged` are both success (exit 0); `usage` (exit 2) is a
-   HALT — the call is wrong, not the bug report.
+   Read `reason`: `updated` is success (exit 0); `usage` (exit 2) is a HALT — the call is wrong,
+   not the bug report. The engine **appends** and never deduplicates, so a re-run of this block
+   writes a second row: it cannot report `unchanged`, and a resumed run must check the table for
+   today's row before calling it again.
 
 4. **Add Gap Report to Document Body:**
    - Add a "## Definition of Done - Gaps Identified" section
@@ -2333,9 +2340,8 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    GAP_COUNT=$(printf '%s' "$GAP_REPORT_BODY" | grep -c '^- \[ \]' || true)
    GAP_COUNT=${GAP_COUNT:-0}
    # Bug mode: the template always fills Step 5 (Decision, QA record, CI rollup), so the
-   # empty-body post-condition below can never fire there. What says the gaps were written is
-   # the gap lines themselves — 8.1 puts each under **Outcome:** as `- [ ]` — so a bug-mode
-   # body with none is refused here rather than posted as "gaps identified" with no gaps.
+   # empty-body post-condition below can never fire there. 8.1's helper already refused a DoD
+   # with no gap line before its fill; this is the backstop for a DoD edited after it.
    if [ "$DOC_KIND" = "bug" ] && [ "$GAP_COUNT" -eq 0 ]; then
      echo "HALT: bug mode — no '- [ ]' gap line under Step 5 Outcome in $DOD_PATH; 8.1 writes them before the fill"; exit 1
    fi
@@ -2427,7 +2433,8 @@ It qualifies **only** when all of these hold, each verified rather than assumed:
   `node .agents/skills/finalise/references/doc-links.js --file "{document-or-artifact-path}"` (run
   from the repository root, like every engine call in this skill) exits 1 on each reproduced file,
   and the same call on every other `.md` the PR changed exits 0. A co-located artifact is a `.md`
-  file in the document's own directory whose name starts with the document's id and is a pipeline
+  file in the document's own directory that is either the unprefixed `sprint-review-summary.md`
+  finalise writes there, or a file whose name starts with the document's id and is a pipeline
   artifact (`.qa.`, `.dod.`, `.implementation.`, `.review.`, `.pr-review.` …) — never a
   `.bug.` report, which is a work item of its own. A dead link in a skill or a shared resource is a
   code finding and takes the ordinary halt.

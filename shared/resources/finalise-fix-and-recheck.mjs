@@ -97,6 +97,15 @@ export const isWorkItemDocument = (p) =>
  *   5. it ends in `.md` (docs-link-check reads nothing else — a gate `.yml` is out);
  *   6. it carries no `..` and no NUL.
  */
+/**
+ * Artifacts the pipeline writes beside a work item WITHOUT the id prefix — the
+ * basename alone. finalise Step 7 saves `{document-directory}/sprint-review-summary.md`
+ * (112 tracked; only 5 legacy files carry an id). One definition, imported by the
+ * doc-links artifact corpus guard, so the walk and the admission rule read the
+ * same set (task.152 QA cycle 2, CR-2).
+ */
+export const UNPREFIXED_ARTIFACTS = Object.freeze(["sprint-review-summary.md"]);
+
 export const isCoLocatedArtifact = (documentPath, p) => {
   if (!isWorkItemDocument(documentPath) || typeof p !== "string") return false;
   if (p.includes("..") || p.includes("\0") || !p.endsWith(".md")) return false;
@@ -104,6 +113,7 @@ export const isCoLocatedArtifact = (documentPath, p) => {
   if (!p.startsWith(dir)) return false;
   const base = p.slice(dir.length);
   if (base.includes("/")) return false;
+  if (UNPREFIXED_ARTIFACTS.includes(base)) return true;
   const id = documentPath
     .slice(dir.length)
     .match(/^(task\.\d+|story\.\d+\.\d+|epic\.\d+|bug\.\d+)\./);

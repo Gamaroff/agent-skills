@@ -2,6 +2,7 @@
 # fill-verification-complete.sh — the ONE fill of a bug DoD's `## Verification Complete` block.
 #
 #   bash .agents/skills/finalise/references/fill-verification-complete.sh <DOD_PATH> <accepted|gaps>
+#   bash .agents/skills/finalise/references/fill-verification-complete.sh <DOD_PATH> count
 #
 # `assets/bug-dod-template.md` already ends with the block and its
 # `**Final Status:** {…}` placeholder, so the block is FILLED in place, never
@@ -9,6 +10,15 @@
 # (task.125 5c CR-2, obs #146). Called from finalise 7.1 with `accepted` and from
 # 8.1 with `gaps` — two inline copies with the verdict hard-coded is how the GAPS
 # path came to write ACCEPTED or a doubled heading (obs #148, task.152).
+#
+# The gap list is ONE thing with ONE count: the `- [ ]` lines under
+# `## Step 5: Acceptance Decision` (8.1 writes them under **Outcome:**). `count`
+# prints that number and writes nothing, so 8.3's Status History row is derived
+# from the file, never supplied. `gaps` refuses a file with none BEFORE it writes
+# anything: the template always fills Step 5 (Decision, QA record, CI rollup), so
+# "the section is non-empty" cannot tell a gap list from no gap list, and a
+# refusal after the fill would leave a decided GAPS file with no gaps in it
+# (task.152 QA cycle 2, CR-1).
 #
 # Idempotent: a second run with the same verdict matches no placeholder and
 # changes nothing. A file that already reads the OTHER verdict is a HALT — a
@@ -23,6 +33,27 @@ case "$DOD_PATH" in '' | *'{'*)
   ;;
 esac
 case "$VERDICT" in
+  count | gaps | accepted) ;;
+  *)
+    echo "HALT: bug mode — VERDICT must be accepted, gaps or count (got '$VERDICT')"
+    exit 1
+    ;;
+esac
+[ -r "$DOD_PATH" ] || {
+  echo "HALT: bug mode — $DOD_PATH is not readable; Step 0 creates it from the template"
+  exit 1
+}
+GAP_LINES=$(awk '/^## Step 5: Acceptance Decision/{f=1;next} /^## /{f=0} f' "$DOD_PATH" | grep -c '^- \[ \]' || true)
+GAP_LINES=${GAP_LINES:-0}
+if [ "$VERDICT" = count ]; then
+  echo "$GAP_LINES"
+  exit 0
+fi
+if [ "$VERDICT" = gaps ] && [ "$GAP_LINES" -eq 0 ]; then
+  echo "HALT: bug mode — no '- [ ]' gap line under Step 5 Outcome in $DOD_PATH; write the gaps before the fill"
+  exit 1
+fi
+case "$VERDICT" in
   accepted)
     LINE='✅ ACCEPTED'
     OTHER='❌ GAPS IDENTIFIED - NOT ACCEPTED'
@@ -31,15 +62,7 @@ case "$VERDICT" in
     LINE='❌ GAPS IDENTIFIED - NOT ACCEPTED'
     OTHER='✅ ACCEPTED'
     ;;
-  *)
-    echo "HALT: bug mode — VERDICT must be accepted or gaps (got '$VERDICT')"
-    exit 1
-    ;;
 esac
-[ -r "$DOD_PATH" ] || {
-  echo "HALT: bug mode — $DOD_PATH is not readable; Step 0 creates it from the template"
-  exit 1
-}
 if grep -qxF "**Final Status:** $OTHER" "$DOD_PATH"; then
   echo "HALT: bug mode — $DOD_PATH already reads $OTHER; a decided file is not re-decided (a re-run writes dod.{N+1})"
   exit 1

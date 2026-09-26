@@ -14,20 +14,25 @@ All notable changes to this project will be documented in this file. Format foll
   `gaps-pr-comment` — held two-way by `finalise-bug-mode.test.mjs`. The `## Verification Complete`
   fill is now one bundled helper, `fill-verification-complete.sh <DOD_PATH> <accepted|gaps>`, called
   from 7.1 and 8.1; it refuses a doubled file and a file that already reads the other verdict. In bug
-  mode 8.5 reads the gap list from the DoD file's `## Step 5: Acceptance Decision`.
+  mode 8.5 reads the gap list from the DoD file's `## Step 5: Acceptance Decision`. The helper owns
+  the gap count: `gaps` refuses a DoD with no `- [ ]` gap line before it writes anything, and
+  `count` is what 8.3's Status History row reports.
 - **Co-located pipeline artifacts are link-checked where CI checks them (task 152).** CI's
   `docs-link-check` reads every changed `docs/**/*.md`, but finalise 8a, the fix-and-recheck
   evaluator and the corpus guard stopped at the work-item document, so task.139 run 2 halted on a CI
   red in two QA reports that 8a could not admit (obs #155). The evaluator's finding record takes an
-  optional `artifactPaths`, admitted only through `isCoLocatedArtifact` (same directory, same id
-  stem, a `.md` pipeline artifact, never a `.bug.` report); the 8a clause and the CI-table row
+  optional `artifactPaths`, admitted only through `isCoLocatedArtifact` (same directory; the same id
+  stem or the unprefixed `sprint-review-summary.md` finalise writes there; a `.md` pipeline
+  artifact, never a `.bug.` report). The artifact set is defined once in the evaluator
+  (`WORK_ITEM_ARTIFACT_RE`, `UNPREFIXED_ARTIFACTS`) and imported by the corpus guards; the 8a clause and the CI-table row
   admit a red on the document or its artifacts. `doc-links.test.mjs` walks the 1,000+ artifacts
   under their own ratchet (`KNOWN_ARTIFACT_LINKS` / `KNOWN_ARTIFACT_FENCES`, 11 links and 2 fences
   pinned). `qa-task` Step 11, `qa-story` Output 1 and `review-pr` Step 7 now stage the report
   they wrote and run `doc-links.js --file` on it.
 - **`status-history.js --json` (task 152).** The last pipeline engine without the shared `reason`
-  contract: `--json` prints `{reason: "updated" | "unchanged", exitCode: 0, file, status}`. The
-  module API is unchanged.
+  contract: `--json` prints `{reason, exitCode: 0, file, status}`. The engine appends and never
+  deduplicates, so a repeated call reports `updated` and writes a second row. The module API is
+  unchanged.
 - **qa-fix Step 2.6 and the QA loop's narrowing-residue offer — a structural move before another
   prose patch (task 148).** A loop could spend its budget at HIGH 0 with each cycle's MEDIUM narrowing
   one mechanism (task.143: 7 cycles, MEDIUM `2, 1, 2, 0, 1, 1, 0`), and none of its four guards fit

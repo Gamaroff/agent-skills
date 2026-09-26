@@ -12,7 +12,10 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { WORK_ITEM_ARTIFACT_RE } from "../finalise-fix-and-recheck.mjs";
+import {
+  UNPREFIXED_ARTIFACTS,
+  WORK_ITEM_ARTIFACT_RE,
+} from "../finalise-fix-and-recheck.mjs";
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -426,7 +429,12 @@ function artifactDocs() {
     .split("\0")
     .filter(
       (f) =>
-        f && WORK_ITEM_RE.test(f) && ARTIFACT_RE.test(f) && f.endsWith(".md"),
+        f &&
+        f.endsWith(".md") &&
+        ((WORK_ITEM_RE.test(f) && ARTIFACT_RE.test(f)) ||
+          // The unprefixed artifacts finalise writes beside a document — the
+          // evaluator's own list, so the walk and 8a admit the same files.
+          UNPREFIXED_ARTIFACTS.includes(f.slice(f.lastIndexOf("/") + 1))),
     );
 }
 
@@ -435,6 +443,15 @@ test("corpus: every co-located pipeline artifact's relative links resolve and ev
   assert.ok(
     docs.length >= 1000,
     `only ${docs.length} artifacts walked — the walk is broken, not the corpus clean`,
+  );
+  // The unprefixed sprint-review summaries finalise writes are walked too
+  // (112 tracked on 2026-09-26) — the floor holds the walk to the shared list.
+  const unprefixed = docs.filter((f) =>
+    f.endsWith("/sprint-review-summary.md"),
+  );
+  assert.ok(
+    unprefixed.length >= 100,
+    `only ${unprefixed.length} unprefixed sprint-review summaries walked — the walk has dropped UNPREFIXED_ARTIFACTS`,
   );
   const repo = repoRoot(REPO_ROOT);
   const tracked = trackedSet(REPO_ROOT);

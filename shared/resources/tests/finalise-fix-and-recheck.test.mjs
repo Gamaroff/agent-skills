@@ -723,8 +723,46 @@ test("a sprint-review summary is a co-located artifact, never a work-item docume
   const guard = read("shared/resources/tests/doc-links.test.mjs");
   assert.match(
     guard,
-    /import \{ WORK_ITEM_ARTIFACT_RE \} from "\.\.\/finalise-fix-and-recheck\.mjs"/,
+    /import \{[^}]*\bWORK_ITEM_ARTIFACT_RE\b[^}]*\} from "\.\.\/finalise-fix-and-recheck\.mjs"/,
   );
   assert.match(guard, /const ARTIFACT_RE = WORK_ITEM_ARTIFACT_RE;/);
   assert.doesNotMatch(guard, /const ARTIFACT_RE =\s*\//, "no second literal");
+});
+
+test("the unprefixed sprint-review-summary.md finalise writes beside a document is a co-located artifact — and only there (task.152 QA cycle 2, CR-2)", () => {
+  const story = "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md";
+  const dir = "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/";
+  assert.equal(
+    isCoLocatedArtifact(story, dir + "sprint-review-summary.md"),
+    true,
+    "the real filename",
+  );
+  assert.equal(
+    isCoLocatedArtifact(
+      TASK_DOC,
+      "docs/tasks/task.139.x/sprint-review-summary.md",
+    ),
+    true,
+  );
+  for (const [why, p] of Object.entries({
+    "another directory":
+      "docs/prd/a/epics/epic.2.x/stories/story.2.2.z/sprint-review-summary.md",
+    "a subdirectory": dir + "old/sprint-review-summary.md",
+    "a .yml": dir + "sprint-review-summary.yml",
+    "a lookalike name": dir + "xsprint-review-summary.md",
+    "a .. path": dir + "../story.2.1.y/sprint-review-summary.md",
+  })) {
+    assert.equal(isCoLocatedArtifact(story, p), false, why);
+  }
+  assert.equal(
+    isCoLocatedArtifact("README.md", "sprint-review-summary.md"),
+    false,
+    "no valid document, no anchor",
+  );
+  const guard = read("shared/resources/tests/doc-links.test.mjs");
+  assert.match(
+    guard,
+    /UNPREFIXED_ARTIFACTS\.includes\(/,
+    "the corpus walk reads the same list",
+  );
 });

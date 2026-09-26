@@ -1536,7 +1536,7 @@ for (const shell of SHELLS) {
     const dir = mkdtempSync(path.join(tmpdir(), "finalise-fill-"));
     try {
       const dod = path.join(dir, "bug.14.dod.1.x.md");
-      writeFileSync(dod, TEMPLATE_TEXT);
+      writeFileSync(dod, withGaps(["regression test missing", "CI red"]));
       const r = runHelper(dod, "gaps");
       assert.equal(r.status, 0, r.stdout + r.stderr);
       const once = readFileSync(dod, "utf8");
@@ -1560,7 +1560,7 @@ for (const shell of SHELLS) {
     const dir = mkdtempSync(path.join(tmpdir(), "finalise-fill-"));
     try {
       const dod = path.join(dir, "bug.14.dod.1.x.md");
-      writeFileSync(dod, TEMPLATE_TEXT);
+      writeFileSync(dod, withGaps(["one gap"]));
       assert.equal(runHelper(dod, "accepted").status, 0);
       const accepted = readFileSync(dod, "utf8");
       const r = runHelper(dod, "gaps");
@@ -1569,10 +1569,54 @@ for (const shell of SHELLS) {
       assert.equal(readFileSync(dod, "utf8"), accepted);
       const bad = runHelper(dod, "ACCEPTED");
       assert.equal(bad.status, 1);
-      assert.match(bad.stdout + bad.stderr, /VERDICT must be accepted or gaps/);
+      assert.match(
+        bad.stdout + bad.stderr,
+        /VERDICT must be accepted, gaps or count/,
+      );
       const unbound = runHelper("{dod-path}", "gaps");
       assert.equal(unbound.status, 1);
       assert.match(unbound.stdout + unbound.stderr, /DOD_PATH must be bound/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+for (const shell of SHELLS) {
+  const runHelper = (dod, verdict) =>
+    spawnSync(shell, [FILL_HELPER, dod, verdict], {
+      encoding: "utf8",
+      cwd: CONSUMER_ROOT,
+      env: { PATH: process.env.PATH },
+    });
+
+  test(`[${shell}] the helper refuses GAPS on a DoD with no gap line BEFORE writing, and \`count\` reports the gap list without writing (task.152 QA cycle 2, CR-1)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-fill-"));
+    try {
+      const dod = path.join(dir, "bug.14.dod.1.x.md");
+      writeFileSync(dod, TEMPLATE_TEXT);
+      const r = runHelper(dod, "gaps");
+      assert.equal(r.status, 1);
+      assert.match(
+        r.stdout + r.stderr,
+        /no '- \[ \]' gap line under Step 5 Outcome/,
+      );
+      assert.equal(
+        readFileSync(dod, "utf8"),
+        TEMPLATE_TEXT,
+        "nothing was written",
+      );
+      const zero = runHelper(dod, "count");
+      assert.equal(zero.status, 0, zero.stdout + zero.stderr);
+      assert.equal(zero.stdout.trim(), "0");
+      writeFileSync(dod, withGaps(["a", "b", "c"]));
+      const before = readFileSync(dod, "utf8");
+      const three = runHelper(dod, "count");
+      assert.equal(three.stdout.trim(), "3");
+      assert.equal(readFileSync(dod, "utf8"), before, "count writes nothing");
+      // ACCEPTED does not need a gap list: its Outcome is prose.
+      writeFileSync(dod, TEMPLATE_TEXT);
+      assert.equal(runHelper(dod, "accepted").status, 0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -1703,15 +1747,14 @@ for (const shell of SHELLS) {
     const dir = mkdtempSync(path.join(tmpdir(), "finalise-85-"));
     try {
       const dod = path.join(dir, "bug.14.dod.1.x.md");
-      // Filled with the gaps verdict but 8.1 never wrote the gap lines: Step 5
-      // still carries Decision / QA record / CI rollup, so it is not empty.
-      writeFileSync(dod, TEMPLATE_TEXT);
-      const fill = spawnSync(shell, [FILL_HELPER, dod, "gaps"], {
-        encoding: "utf8",
-        cwd: CONSUMER_ROOT,
-        env: { PATH: process.env.PATH },
-      });
-      assert.equal(fill.status, 0, fill.stdout + fill.stderr);
+      // A GAPS-decided DoD with no gap line — the helper now refuses to make
+      // one (CR-1, cycle 2), so it is written directly: 8.5 is the backstop for
+      // a DoD edited after 8.1. Step 5 still carries Decision / QA record / CI
+      // rollup, so it is not empty.
+      writeFileSync(
+        dod,
+        TEMPLATE_TEXT.replace(/^\*\*Final Status:\*\* \{[^\n]*\}$/m, GAPS_LINE),
+      );
       const r = run85({ KIND_IN: "bug", DOD: dod, DOCF: "" });
       assert.equal(r.status, 1, r.stdout + r.stderr);
       assert.match(
@@ -1754,12 +1797,11 @@ function statusHistoryBlock() {
     .replace(/^ {3}/gm, "")
     .replace(/DOC_FILE="\{[^\n]*\}"/, 'DOC_FILE="${DOCF-}"')
     .replace(/BUG_STATUS="\{[^\n]*\}"/, 'BUG_STATUS="${ST-}"')
-    .replace(/GAP_TOTAL="\{[^\n]*\}"/, 'GAP_TOTAL="${GT-}"')
-    .replace(/DOD_NAME="\{[^\n]*\}"/, 'DOD_NAME="${DN-}"');
+    .replace(/DOD_PATH="\{[^\n]*\}"/, 'DOD_PATH="${DOD-}"');
 }
 
 for (const shell of SHELLS) {
-  test(`[${shell}] 8.3 bug mode writes a Title Case Status History row through the engine, and refuses any unbound value (task.152 QA cycle 1, CR-5)`, () => {
+  test(`[${shell}] 8.3 bug mode writes a Title Case Status History row whose gap count and DoD name are DERIVED from the DoD file, and refuses any unbound input (task.152 QA cycles 1–2, CR-5 / CR-1)`, () => {
     const dir = mkdtempSync(path.join(tmpdir(), "finalise-83-"));
     try {
       const bug = path.join(dir, "bug.14.x.md");
@@ -1767,6 +1809,8 @@ for (const shell of SHELLS) {
         bug,
         "# Bug 14\n\n## Status History\n\n| Date | Status | Changed By | Notes |\n| --- | --- | --- | --- |\n| 2026-09-20 | New | qa | filed |\n",
       );
+      const dod = path.join(dir, "bug.14.dod.3.x.md");
+      writeFileSync(dod, withGaps(["one", "two"]));
       const run = (env) =>
         spawnSync(shell, ["-s", "--"], {
           input: statusHistoryBlock(),
@@ -1774,30 +1818,24 @@ for (const shell of SHELLS) {
           cwd: CONSUMER_ROOT,
           env: { PATH: process.env.PATH, ...env },
         });
-      const ok = run({
-        DOCF: bug,
-        ST: "in-progress",
-        GT: "2",
-        DN: "bug.14.dod.1.x.md",
-      });
+      const good = { DOCF: bug, ST: "in-progress", DOD: dod };
+      const ok = run(good);
       assert.equal(ok.status, 0, ok.stdout + ok.stderr);
       assert.equal(JSON.parse(ok.stdout).reason, "updated");
       assert.match(
         readFileSync(bug, "utf8"),
-        /\| In Progress \| finalise \| DoD incomplete — 2 gap\(s\) — bug\.14\.dod\.1\.x\.md \|/,
+        /\| In Progress \| finalise \| DoD incomplete — 2 gap\(s\) — bug\.14\.dod\.3\.x\.md \|/,
+        "count and name come from the DoD file, not from the caller",
       );
-      for (const missing of ["DOCF", "ST", "GT", "DN"]) {
-        const env = {
-          DOCF: bug,
-          ST: "in-progress",
-          GT: "2",
-          DN: "bug.14.dod.1.x.md",
-        };
-        const unbound = run({ ...env, [missing]: "{still a placeholder}" });
+      for (const missing of Object.keys(good)) {
+        const unbound = run({ ...good, [missing]: "{still a placeholder}" });
         assert.equal(unbound.status, 1, `${missing} placeholder must halt`);
         assert.match(unbound.stdout, /must be bound in this block/);
-        const empty = run({ ...env, [missing]: "" });
-        assert.equal(empty.status, 1, `${missing} empty must halt`);
+        assert.equal(
+          run({ ...good, [missing]: "" }).status,
+          1,
+          `${missing} empty must halt`,
+        );
       }
     } finally {
       rmSync(dir, { recursive: true, force: true });

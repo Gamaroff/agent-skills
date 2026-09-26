@@ -227,7 +227,9 @@ function normaliseStatus(status) {
 // ---------------------------------------------------------------------------
 // The shared `reason` contract of its sibling engines (doc-links.js,
 // tracker-comment.js, registry-tick.js): `--json` prints one line,
-// `{reason, exitCode, …}`; 0 is `updated` / `unchanged`; 2 is a usage error —
+// `{reason, exitCode, …}`; 0 is `updated` (or `unchanged` should a writer ever return the
+// content untouched — upsertStatusHistory always appends, so today it never does, and a
+// repeated call writes a second row); 2 is a usage error —
 // a missing `--file`, an unknown flag, a value flag with no operand, or a file
 // that cannot be read. Usage errors were exit 1 until task.152.
 const USAGE =
