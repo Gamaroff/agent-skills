@@ -433,7 +433,9 @@ function artifactDocs() {
         f.endsWith(".md") &&
         ((WORK_ITEM_RE.test(f) && ARTIFACT_RE.test(f)) ||
           // The unprefixed artifacts finalise writes beside a document — the
-          // evaluator's own list, so the walk and 8a admit the same files.
+          // evaluator's own list. The walk is a SUPERSET of what 8a admits: it
+          // also reads `.bug.` reports and summaries with no document beside
+          // them, because CI link-checks those too; 8a refuses both.
           UNPREFIXED_ARTIFACTS.includes(f.slice(f.lastIndexOf("/") + 1))),
     );
 }

@@ -1614,6 +1614,23 @@ for (const shell of SHELLS) {
       const three = runHelper(dod, "count");
       assert.equal(three.stdout.trim(), "3");
       assert.equal(readFileSync(dod, "utf8"), before, "count writes nothing");
+      // No Step 5 section at all is "could not look", not "no gaps" (CR-4, cycle 3),
+      // and the reason goes to stderr (CR-1, cycle 3).
+      const noStep5 = TEMPLATE_TEXT.replace(
+        /^## Step 5: Acceptance Decision$/m,
+        "## Step 5: Something Else",
+      );
+      writeFileSync(dod, noStep5);
+      for (const v of ["count", "gaps"]) {
+        const r5 = runHelper(dod, v);
+        assert.equal(r5.status, 1, `${v} on a DoD with no Step 5`);
+        assert.equal(
+          r5.stdout,
+          "",
+          "nothing on stdout — a captured count must not swallow the reason",
+        );
+        assert.match(r5.stderr, /no '## Step 5: Acceptance Decision' section/);
+      }
       // ACCEPTED does not need a gap list: its Outcome is prose.
       writeFileSync(dod, TEMPLATE_TEXT);
       assert.equal(runHelper(dod, "accepted").status, 0);
@@ -1643,6 +1660,17 @@ test("the Verification Complete fill has ONE definition — the bundled helper �
     (skill.match(call("gaps")) || []).length,
     1,
     "8.1 calls it once",
+  );
+  // The bug-mode gap count has one definition — the helper's `count` — used at
+  // 8.3 and 8.5 (task.152 QA cycle 3, CR-6).
+  const counts =
+    skill.match(
+      /\$\(bash \.agents\/skills\/finalise\/references\/fill-verification-complete\.sh "\$DOD_PATH" count\) \|\| exit 1/g,
+    ) || [];
+  assert.equal(
+    counts.length,
+    2,
+    "8.3 and 8.5 both take the count from the helper",
   );
   const gapsAt = skill.search(call("gaps"));
   assert.ok(
@@ -1827,6 +1855,18 @@ for (const shell of SHELLS) {
         /\| In Progress \| finalise \| DoD incomplete — 2 gap\(s\) — bug\.14\.dod\.3\.x\.md \|/,
         "count and name come from the DoD file, not from the caller",
       );
+      // An unreadable DoD: the helper's reason reaches the terminal, not the
+      // captured count (CR-1, cycle 3).
+      const gone = run({ ...good, DOD: path.join(dir, "absent.dod.md") });
+      assert.equal(gone.status, 1);
+      assert.match(gone.stderr, /is not readable/);
+      // A DoD whose Step 5 has no gap line: 8.3 refuses 0 rather than writing
+      // "0 gap(s)" (CR-4, cycle 3).
+      const empty = path.join(dir, "bug.14.dod.4.x.md");
+      writeFileSync(empty, TEMPLATE_TEXT);
+      const zero = run({ ...good, DOD: empty });
+      assert.equal(zero.status, 1);
+      assert.match(zero.stdout + zero.stderr, /carries no gap line/);
       for (const missing of Object.keys(good)) {
         const unbound = run({ ...good, [missing]: "{still a placeholder}" });
         assert.equal(unbound.status, 1, `${missing} placeholder must halt`);

@@ -2220,6 +2220,8 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    # The count and the file name are DERIVED from the DoD file 8.1 filled, never supplied: the
    # helper's `count` is the one definition of "the gap list".
    GAP_TOTAL=$(bash .agents/skills/finalise/references/fill-verification-complete.sh "$DOD_PATH" count) || exit 1
+   # 8.1 refused a DoD with no gap line before its fill, so 0 here means the file changed since.
+   [ "$GAP_TOTAL" -gt 0 ] || { echo "HALT: bug mode — $DOD_PATH carries no gap line; 8.1 writes them before the fill"; exit 1; }
    DOD_NAME=$(basename "$DOD_PATH")
    node .agents/skills/finalise/references/status-history.js --file "$DOC_FILE" --json \
      --date "$(date -u +%Y-%m-%d)" --status "$BUG_STATUS" \
@@ -2337,8 +2339,13 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    # Unmet criteria across every section of the gap report — an unchecked box.
    # `grep -c` prints 0 and EXITS 1 when it matches nothing, so `|| true` (never
    # `|| echo 0`, which would append a second zero and make the value "0\n0").
-   GAP_COUNT=$(printf '%s' "$GAP_REPORT_BODY" | grep -c '^- \[ \]' || true)
-   GAP_COUNT=${GAP_COUNT:-0}
+   if [ "$DOC_KIND" = "bug" ]; then
+     # The helper's `count` is the one definition of the bug-mode gap list (8.1, 8.3 and here).
+     GAP_COUNT=$(bash .agents/skills/finalise/references/fill-verification-complete.sh "$DOD_PATH" count) || exit 1
+   else
+     GAP_COUNT=$(printf '%s' "$GAP_REPORT_BODY" | grep -c '^- \[ \]' || true)
+     GAP_COUNT=${GAP_COUNT:-0}
+   fi
    # Bug mode: the template always fills Step 5 (Decision, QA record, CI rollup), so the
    # empty-body post-condition below can never fire there. 8.1's helper already refused a DoD
    # with no gap line before its fill; this is the backstop for a DoD edited after it.

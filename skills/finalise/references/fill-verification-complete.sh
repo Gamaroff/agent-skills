@@ -21,6 +21,10 @@
 # refusal after the fill would leave a decided GAPS file with no gaps in it
 # (task.152 QA cycle 2, CR-1).
 #
+# Every HALT goes to stderr: 8.3 captures `count` in a command substitution, and a
+# reason printed to stdout would be swallowed into the captured value (task.152 QA
+# cycle 3, CR-1).
+#
 # Idempotent: a second run with the same verdict matches no placeholder and
 # changes nothing. A file that already reads the OTHER verdict is a HALT — a
 # decided file is not re-decided; a re-run writes dod.{N+1} (finalise Step 0).
@@ -29,21 +33,28 @@
 DOD_PATH="${1:-}"
 VERDICT="${2:-}"
 case "$DOD_PATH" in '' | *'{'*)
-  echo "HALT: bug mode — DOD_PATH must be bound (got '$DOD_PATH')"
+  echo "HALT: bug mode — DOD_PATH must be bound (got '$DOD_PATH')" >&2
   exit 1
   ;;
 esac
 case "$VERDICT" in
   count | gaps | accepted) ;;
   *)
-    echo "HALT: bug mode — VERDICT must be accepted, gaps or count (got '$VERDICT')"
+    echo "HALT: bug mode — VERDICT must be accepted, gaps or count (got '$VERDICT')" >&2
     exit 1
     ;;
 esac
 [ -r "$DOD_PATH" ] || {
-  echo "HALT: bug mode — $DOD_PATH is not readable; Step 0 creates it from the template"
+  echo "HALT: bug mode — $DOD_PATH is not readable; Step 0 creates it from the template" >&2
   exit 1
 }
+# "No Step 5 section" and "no gap line in it" are different states — the first means
+# the file is not the template's shape, so nothing here can count it — and must not
+# both read 0 (task.152 QA cycle 3, CR-4).
+if [ "$VERDICT" != accepted ] && ! grep -q '^## Step 5: Acceptance Decision$' "$DOD_PATH"; then
+  echo "HALT: bug mode — $DOD_PATH has no '## Step 5: Acceptance Decision' section to read the gap list from" >&2
+  exit 1
+fi
 GAP_LINES=$(awk '/^## Step 5: Acceptance Decision/{f=1;next} /^## /{f=0} f' "$DOD_PATH" | grep -c '^- \[ \]' || true)
 GAP_LINES=${GAP_LINES:-0}
 if [ "$VERDICT" = count ]; then
@@ -51,7 +62,7 @@ if [ "$VERDICT" = count ]; then
   exit 0
 fi
 if [ "$VERDICT" = gaps ] && [ "$GAP_LINES" -eq 0 ]; then
-  echo "HALT: bug mode — no '- [ ]' gap line under Step 5 Outcome in $DOD_PATH; write the gaps before the fill"
+  echo "HALT: bug mode — no '- [ ]' gap line under Step 5 Outcome in $DOD_PATH; write the gaps before the fill" >&2
   exit 1
 fi
 case "$VERDICT" in
@@ -65,7 +76,7 @@ case "$VERDICT" in
     ;;
 esac
 if grep -qxF "**Final Status:** $OTHER" "$DOD_PATH"; then
-  echo "HALT: bug mode — $DOD_PATH already reads $OTHER; a decided file is not re-decided (a re-run writes dod.{N+1})"
+  echo "HALT: bug mode — $DOD_PATH already reads $OTHER; a decided file is not re-decided (a re-run writes dod.{N+1})" >&2
   exit 1
 fi
 # Neither LINE contains `/` or `&`, so both are safe as sed replacement text.
@@ -73,15 +84,15 @@ TMP=$(mktemp) && sed -E \
   -e "s/^\*\*Final Status:\*\* \{.*\}$/**Final Status:** $LINE/" \
   -e "s/^\*\*Completion Time:\*\* \{YYYY-MM-DDTHH:MMZ\}$/**Completion Time:** $(date -u +%Y-%m-%dT%H:%MZ)/" \
   "$DOD_PATH" >"$TMP" && mv "$TMP" "$DOD_PATH" || {
-  echo "HALT: bug mode — could not rewrite $DOD_PATH"
+  echo "HALT: bug mode — could not rewrite $DOD_PATH" >&2
   exit 1
 }
 # Exactly one heading and one status line, on the WRITTEN file.
 [ "$(grep -c '^## Verification Complete$' "$DOD_PATH")" = 1 ] && [ "$(grep -c '^\*\*Final Status:\*\*' "$DOD_PATH")" = 1 ] || {
-  echo "HALT: bug mode — $DOD_PATH must carry exactly one ## Verification Complete heading and one **Final Status:** line"
+  echo "HALT: bug mode — $DOD_PATH must carry exactly one ## Verification Complete heading and one **Final Status:** line" >&2
   exit 1
 }
 grep -qxF "**Final Status:** $LINE" "$DOD_PATH" || {
-  echo "HALT: bug mode — the Final Status placeholder in $DOD_PATH was not filled (is the template's line intact?)"
+  echo "HALT: bug mode — the Final Status placeholder in $DOD_PATH was not filled (is the template's line intact?)" >&2
   exit 1
 }
