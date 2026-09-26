@@ -1,0 +1,92 @@
+schema: 1
+task: 'task.152.finalise-gaps-path-and-artifact-links'
+task_title: 'finalise: bug-mode gaps path and co-located artifacts in 8a and link guard'
+gate: PASS
+status_reason: 'All four cycle-3 findings are fixed and mutation-proved (H1–H4), and CI is green on 03809419. The scoped review found no high or medium defect in this change. Its medium finding is the docs/bugs walk gap, which task § 4 scopes out and which is routed to future a second time with a named follow-up. What remains open is three LOW entries: an overstated walk comment and two duplication cleanups.'
+reviewer: 'QA Engineer'
+updated: '2026-09-26T22:48:00Z'
+
+top_issues:
+  - id: CR-1
+    severity: low
+    file: 'shared/resources/tests/doc-links.test.mjs'
+    finding: 'The walk comment added in cycle 3 calls the walk a SUPERSET of what 8a admits. That is false for general bugs: the walk lists only docs/tasks, docs/prd and docs/development, so the 38 tracked docs/bugs artifacts are never walked, while isCoLocatedArtifact admits a bug.N document''s artifacts.'
+    suggested_action: 'Scope the claim. The comment should name docs/bugs as the one population the walk does not cover, and cite task § 4 and the follow-up.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: CR-2
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The 8.5 bug branch extracts the Step 5 body with its own awk, the same section boundary the helper uses to count. The posted body and the count therefore come from two copies of one extractor.'
+    suggested_action: 'Add a `body` verb to the helper (print the Step 5 section) and take GAP_REPORT_BODY from it.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: CR-3
+    severity: low
+    file: 'evals/shared/tests/finalise-bug-mode.test.mjs'
+    finding: 'The same `runHelper` closure is defined in two consecutive per-shell loops, and the 8.5 fixtures spawn the helper inline a third time.'
+    suggested_action: 'Hoist one `runHelper(shell, dod, verdict)` to module scope.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 4271
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [2, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 49
+    notes: 'isCoLocatedArtifact re-probed on 03809419 (the predicate is unchanged since cycle 3): 49 cases, 0 reproduced, 0 over-blocked. Record: task.152.qa.4.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Cycle-3 CR-1 fixed: refusals reach stderr; no-Step-5 is refused, not counted as zero.'
+  maintainability:
+    status: PASS
+    notes: 'Three LOW entries remain: one comment and two duplication cleanups.'
+
+bug_resolution:
+  fixed_this_cycle: ['CR-1 (gate 3)', 'CR-4 (gate 3)', 'CR-6 (gate 3)', 'CR-7 (gate 3)']
+  fix_commit: '03809419'
+  verification: 'CI green on 03809419; qa-fix mutation proofs H1–H4'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 — scope the doc-links artifact-walk comment: name docs/bugs as the one population the walk does not cover (task § 4 follow-up).'
+      refs: ['shared/resources/tests/doc-links.test.mjs']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - action: 'CR-2 — add a `body` verb to fill-verification-complete.sh and take 8.5''s bug-mode GAP_REPORT_BODY from it, so the posted body and the count share one extractor.'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/fill-verification-complete.sh']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - action: 'CR-3 — hoist one runHelper(shell, dod, verdict) to module scope in finalise-bug-mode.test.mjs.'
+      refs: ['evals/shared/tests/finalise-bug-mode.test.mjs']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - action: 'Walk docs/bugs artifacts in the doc-links artifact guard (38 tracked; WORK_ITEM_RE has no bug.N). Raised at QA cycles 3 and 4; out of scope by task § 4. Needs its own task.'
+      refs: ['shared/resources/tests/doc-links.test.mjs']
+    - action: 'finalise engine calls use two path conventions (bare references/ vs .agents/skills/finalise/references/); migrate them together behind a population test (gate-1 CR-3, gate-3 CR-3).'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Guard 8.3 against a second Status History row on re-run (the rule is prose only; gate-3 CR-5).'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Carried: sync-jira-bug lowercase statuses via the module API (gate-1 CR-4); an unreadable --file reported as `usage` (gate-1 CR-6).'
+      refs: ['skills/sync-jira-bug/scripts/sync-jira-bug.js', 'shared/resources/status-history.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

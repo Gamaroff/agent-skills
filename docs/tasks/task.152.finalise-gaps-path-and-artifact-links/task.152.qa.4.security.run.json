@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": ".claude/state/t152-probe-wrapper.mjs#admitsArtifact",
+      "name": "isCoLocatedArtifact",
+      "call_site": "shared/resources/finalise-fix-and-recheck.mjs",
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 49,
+      "passed": 49,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-26T20:11:24.133Z"
+    }
+  ],
+  "totals": {
+    "executed": 49,
+    "reproduced": 0
+  },
+  "updated_at": "2026-09-26T20:11:24.133Z"
+}

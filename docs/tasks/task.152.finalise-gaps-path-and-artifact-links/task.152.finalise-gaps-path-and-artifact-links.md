@@ -667,28 +667,43 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-26
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.152.qa.3.finalise-gaps-path-and-artifact-links.md](./task.152.qa.3.finalise-gaps-path-and-artifact-links.md)
-- **Gate File**: [task.152.gate.3.finalise-gaps-path-and-artifact-links.yml](./task.152.gate.3.finalise-gaps-path-and-artifact-links.yml)
+- **Full Report**: [task.152.qa.4.finalise-gaps-path-and-artifact-links.md](./task.152.qa.4.finalise-gaps-path-and-artifact-links.md)
+- **Gate File**: [task.152.gate.4.finalise-gaps-path-and-artifact-links.yml](./task.152.gate.4.finalise-gaps-path-and-artifact-links.yml)
 
 ### Test Coverage Summary
 
 - **Tests Executed**: 4271
 - **Phases Verified**: 7/7
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Cycle-2 findings all fixed; CI green. One medium: the fill helper prints refusals to stdout, so 8.3's
-command substitution swallows them (CR-1). Three low (CR-4, CR-6, CR-7).
+No high or medium findings in the change; CI green. Three LOW entries open (a walk comment that
+overstates coverage, two duplication cleanups). The docs/bugs artifact walk is out of scope (§ 4) and
+routed to a follow-up.
+
+---
+
+## Deferred Work
+
+Carried by the QA loop's cosmetic-residue exit (route 2b, cycle 4) to
+[gate 4](./task.152.gate.4.finalise-gaps-path-and-artifact-links.yml)'s `recommendations.future`:
+
+- **CR-1** — the doc-links artifact-walk comment overstates coverage; docs/bugs is not walked.
+- **CR-2** — finalise 8.5's bug branch duplicates the fill helper's Step 5 extractor.
+- **CR-3** — `runHelper` is defined twice in `finalise-bug-mode.test.mjs`.
+
+Also in `recommendations.future` (raised in QA, out of scope by § 4 or pre-existing): walk the
+docs/bugs artifacts; one engine-path convention in finalise; a re-run guard on 8.3.
 
 ---
 
@@ -704,6 +719,7 @@ command substitution swallows them (CR-1). Three low (CR-4, CR-6, CR-7).
 | 2026-09-26 |         | QA gate FAIL (50/100) — 6 findings (1 high, 3 medium, 2 low)                         | qa-task     |
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low)                                | qa-task     |
 | 2026-09-26 |         | QA gate CONCERNS (90/100) — 4 findings (1 medium, 3 low)                                | qa-task     |
+| 2026-09-26 |         | QA gate PASS (100/100) — 3 low findings                                                 | qa-task     |
 <!-- change-log-end -->
 
 ---
