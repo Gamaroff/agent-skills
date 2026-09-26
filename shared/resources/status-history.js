@@ -197,10 +197,54 @@ function upsertStatusHistory(content, entry) {
 }
 
 // ---------------------------------------------------------------------------
+// Status normalisation — the CLI's, not the module's
+// ---------------------------------------------------------------------------
+// Callers pass a bug's status as `bug-doc.js` reports it — the lowercase
+// lifecycle token (docs/standards/bug-documents.md) — into a table whose rows are
+// Title Case (734 of 737 corpus rows, task.152). The five lifecycle tokens map;
+// anything else passes through unchanged, because an unknown status is the
+// caller's to spell. Applied in main() only: upsertStatusHistory() and fmtEntry()
+// write exactly what they are given, and sync-jira-bug's module use is untouched.
+const LIFECYCLE_TITLE = Object.freeze({
+  new: "New",
+  "in-progress": "In Progress",
+  "ready-for-qa": "Ready for QA",
+  closed: "Closed",
+  reopened: "Reopened",
+});
+
+function normaliseStatus(status) {
+  const key = String(status == null ? "" : status)
+    .trim()
+    .toLowerCase();
+  return Object.prototype.hasOwnProperty.call(LIFECYCLE_TITLE, key)
+    ? LIFECYCLE_TITLE[key]
+    : status;
+}
+
+// ---------------------------------------------------------------------------
 // CLI — for the prose-only skills (the GitHub sync path) that cannot require()
 // ---------------------------------------------------------------------------
+// The shared `reason` contract of its sibling engines (doc-links.js,
+// tracker-comment.js, registry-tick.js): `--json` prints one line,
+// `{reason, exitCode, …}`; 0 is `updated` / `unchanged`; 2 is a usage error —
+// a missing `--file`, an unknown flag, a value flag with no operand, or a file
+// that cannot be read. Usage errors were exit 1 until task.152.
+const USAGE =
+  "Usage: status-history.js --file <bug.md> --date <YYYY-MM-DD> --status <s> --changed-by <who> --notes <text> [--json]";
+
+function usage(json, error) {
+  process.stderr.write(`${error}\n${USAGE}\n`);
+  if (json)
+    process.stdout.write(
+      JSON.stringify({ reason: "usage", exitCode: 2, error }) + "\n",
+    );
+  return 2;
+}
+
 function main(argv) {
   const args = argv.slice(2);
+  const json = args.includes("--json");
   const opts = { file: "", date: "", status: "", changedBy: "", notes: "" };
   const map = {
     "--file": "file",
@@ -210,24 +254,33 @@ function main(argv) {
     "--notes": "notes",
   };
   for (let i = 0; i < args.length; i++) {
-    const key = map[args[i]];
-    if (key) opts[key] = args[++i];
-    else if (args[i].startsWith("-")) {
-      process.stderr.write(`Unknown option: ${args[i]}\n`);
-      return 1;
-    }
+    const a = args[i];
+    if (a === "--json") continue;
+    const key = map[a];
+    if (key) {
+      const v = args[++i];
+      if (v === undefined || v.startsWith("--"))
+        return usage(json, `${a} needs an operand`);
+      opts[key] = v;
+    } else if (a.startsWith("-")) return usage(json, `Unknown option: ${a}`);
   }
-  if (!opts.file) {
-    process.stderr.write(
-      "Usage: status-history.js --file <bug.md> --date <YYYY-MM-DD> --status <s> --changed-by <who> --notes <text>\n",
-    );
-    return 1;
-  }
+  if (!opts.file) return usage(json, "--file is required");
   const fs = require("fs");
-  const before = fs.readFileSync(opts.file, "utf-8");
-  const after = upsertStatusHistory(before, opts);
+  let before;
+  try {
+    before = fs.readFileSync(opts.file, "utf-8");
+  } catch (e) {
+    return usage(json, `cannot read ${opts.file}: ${e.code || e.message}`);
+  }
+  const status = normaliseStatus(opts.status);
+  const after = upsertStatusHistory(before, { ...opts, status });
   if (after !== before) fs.writeFileSync(opts.file, after, "utf-8");
-  process.stdout.write(after === before ? "unchanged\n" : "updated\n");
+  const reason = after === before ? "unchanged" : "updated";
+  process.stdout.write(
+    json
+      ? JSON.stringify({ reason, exitCode: 0, file: opts.file, status }) + "\n"
+      : `${reason}\n`,
+  );
   return 0;
 }
 
@@ -254,5 +307,6 @@ if (require.main === module) {
     findStatusHistory,
     extractEntries,
     upsertStatusHistory,
+    normaliseStatus,
   };
 }
