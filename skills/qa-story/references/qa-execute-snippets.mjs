@@ -13,7 +13,9 @@
  *   --copy <dir>         seed the temp working directory from this directory
  *                        (its CONTENTS land at the temp root)
  *   --copy-as SRC:DEST   copy SRC to DEST inside the temp working directory;
- *                        repeatable. DEST must be relative and stay inside it —
+ *                        repeatable. DEST must be relative, stay inside it, not
+ *                        pass through a symlink, and not exist yet (it seeds a
+ *                        fresh path; it never merges) —
  *                        seed `docs` at `docs/` for a block that runs
  *                        `find docs/tasks …` (obs #143)
  *   --timeout <ms>       per-block, per-shell timeout (default 10000)
@@ -1656,7 +1658,7 @@ export function executeFile(filePath, opts = {}) {
       if (typeof dest !== "string" || dest === "" || isAbsolute(dest))
         throw new Error(`--copy-as DEST must be a relative path: ${dest}`);
       const target = resolve(tmp, dest);
-      if (target !== tmp && !target.startsWith(tmp + sep))
+      if (!target.startsWith(tmp + sep))
         throw new Error(
           `--copy-as DEST escapes the working directory: ${dest}`,
         );
@@ -1667,6 +1669,22 @@ export function executeFile(filePath, opts = {}) {
       // existing component below the working copy that is a symlink — dangling
       // or not, final component included — before anything is created.
       refuseSymlinkedPath(tmp, target, dest);
+      // TASK-149-BUG-1, reopened — a DEST that already exists (`.`, or `docs`
+      // seeded by `--copy`) makes cpSync MERGE into it, and the merge follows any
+      // symlink already inside it. Checking that tree would be the second
+      // correction to one mechanism; instead the mechanism changes: --copy-as
+      // seeds a FRESH path only. With nothing at the target, cpSync creates it
+      // and walks no existing tree, so there is nothing for it to follow.
+      let exists = true;
+      try {
+        lstatSync(target);
+      } catch {
+        exists = false;
+      }
+      if (exists)
+        throw new Error(
+          `--copy-as DEST already exists — --copy-as seeds a fresh path, it never merges: ${dest}`,
+        );
       mkdirSync(dirname(target), { recursive: true });
       cpSync(src, target, { recursive: true });
     }

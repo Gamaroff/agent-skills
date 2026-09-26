@@ -24,8 +24,9 @@
  *                                with its state appended — `[untracked]` (on
  *                                disk, not in the tracked tree: commit it),
  *                                `[ignored]` (on disk but gitignored: it can
- *                                never be committed) or `[missing]` (not on
- *                                disk: write it) — and
+ *                                never be committed), `[outside-repo]`,
+ *                                `[unverifiable]` or `[missing]` (not on disk
+ *                                under that exact name: write it) — and
  *                                carries the same `state` in `--json` `broken[]`
  *                                and the summary reads
  *                                `FAIL doc-links: N finding(s) in <file>` — the
@@ -207,20 +208,50 @@ function trackedSet(root) {
 }
 
 /**
- * Why a link that failed against the tracked tree failed (obs #164). Three
- * defects that printed one line, each with a different remedy:
- *   - `untracked` — the target is on disk and not in the index: commit it.
- *   - `ignored`   — on disk, but gitignored, so it can NEVER be committed and CI
- *                   stays red (TASK-149 CR-2): the link or the ignore rule is wrong.
- *   - `missing`   — not on disk: the artifact was never written.
+ * Why a link that failed against the tracked tree failed (obs #164). Only
+ * `untracked` is benign — the QA read-back stages it and checks again — so
+ * every state that is not certainly "on disk, inside the repository, and
+ * committable" must be something else:
+ *   - `untracked`    — on disk under that exact name, not ignored: commit it.
+ *   - `ignored`      — on disk, but gitignored: it can NEVER be committed and CI
+ *                      stays red (TASK-149 CR-2).
+ *   - `outside-repo` — resolves above the repository root: no commit carries it
+ *                      (TASK-149-BUG-4).
+ *   - `missing`      — not on disk under that exact name. The name is compared
+ *                      component by component against the directory listing, so a
+ *                      case-insensitive filesystem cannot read `Report.md` as
+ *                      `report.md` here and pass a link that is dead on Linux CI
+ *                      (TASK-149-BUG-4).
+ *   - `unverifiable` — `git check-ignore` answered neither yes (0) nor no (1).
  * With no tracked set (outside a repository) the check already read the disk,
  * so only `missing` is possible there.
  */
 function linkState(tracked, base, resolved) {
-  if (!tracked || !fs.existsSync(path.join(base, resolved))) return "missing";
-  return git(["check-ignore", "--", resolved], base) !== null
-    ? "ignored"
-    : "untracked";
+  if (!tracked) return "missing";
+  if (resolved === ".." || resolved.startsWith("../")) return "outside-repo";
+  if (!existsExactly(base, resolved)) return "missing";
+  const r = spawnSync("git", ["check-ignore", "-q", "--", resolved], {
+    cwd: base,
+  });
+  if (r.status === 0) return "ignored";
+  if (r.status === 1) return "untracked";
+  return "unverifiable";
+}
+
+/** Every component of `rel` exists under `base` with exactly this spelling. */
+function existsExactly(base, rel) {
+  let dir = base;
+  for (const part of rel.split("/").filter(Boolean)) {
+    let names;
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      return false;
+    }
+    if (!names.includes(part)) return false;
+    dir = path.join(dir, part);
+  }
+  return true;
 }
 
 function dirSet(tracked) {

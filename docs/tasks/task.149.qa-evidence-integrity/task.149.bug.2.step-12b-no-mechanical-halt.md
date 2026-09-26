@@ -4,7 +4,7 @@
 **Bug ID**: TASK-149-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 1, code review CR-1, verified)
 **Date Found**: 2026-09-26
 
@@ -74,6 +74,10 @@ reports the QA Results section links.
 **Verification Steps for QA**: `node --test tests/qa-read-back-block.test.js`; run Step 12b for real
 on this task after the cycle-2 gate is written.
 
+#### QA Verification (cycle 2) — Closed
+
+The block now decides and halts itself: `tests/qa-read-back-block.test.js` runs it under bash and zsh (clean 0, missing 1, ignored 1, stale 1, unset input named) and the population test requires the `HALT` line at both sites. Gaps the fix left — empty output, the untracked residue — are TASK-149-BUG-3.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -81,3 +85,4 @@ on this task after the cycle-2 gate is written.
 | 2026-09-26 | New | QA Engineer | Found in QA cycle 1 |
 | 2026-09-26 | In Progress | qa-fix | Investigation started |
 | 2026-09-26 | Ready for QA | qa-fix | Fix implemented (qa-fix cycle 1) |
+| 2026-09-26 | Closed | QA Engineer | Verified in QA cycle 2 |

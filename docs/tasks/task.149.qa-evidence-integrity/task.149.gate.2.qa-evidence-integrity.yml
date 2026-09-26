@@ -1,0 +1,98 @@
+schema: 1
+task: 'task.149.qa-evidence-integrity'
+task_title: 'QA evidence integrity: qa-task/qa-story claims that no check reads back'
+gate: FAIL
+status_reason: 'Cycle 1 closed the path-to-DEST escape but not the merge: --copy-as into an existing DEST follows a symlink seeded inside it and writes outside the sandbox (reproduced by the probe engine, 16/18). The read-back decision passes on empty output under zsh, and linkState files two uncommittable targets as untracked.'
+reviewer: 'QA Engineer'
+updated: '2026-09-26T05:15:00Z'
+
+top_issues:
+  - id: TASK-149-BUG-1
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'Reopened: when DEST already exists (. or a --copy-seeded docs/), cpSync merges SRC into it and follows a symlink seeded inside it, writing outside the temp root (probe cases copy-as.merge-into-dot-through-seeded-link and copy-as.merge-into-seeded-dir-through-link accepted; refute review CR-1).'
+    suggested_action: 'Replace the mechanism rather than patch it a second time: seed fresh paths only (refuse a DEST that already exists), which removes merging, the only operation that walks an existing tree; keep the ancestor walk; add the two merge cases as tests.'
+    suggested_owner: dev
+    bug_ref: 'task.149.bug.1.copy-as-symlink-escape.md'
+  - id: TASK-149-BUG-3
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Step 12b / item 3e read empty doc-links output as clean under zsh ([ "" -eq 0 ] is true, jq on empty input exits 0), and the untracked exemption now excuses only linked files the block did not stage (refute review CR-2, CR-5).'
+    suggested_action: 'Require non-empty output and a numeric BLOCKING (jq -e); stage every untracked target the JSON names, re-run doc-links, and halt on any broken link in the second pass; add block-test scenarios for an unloadable engine and an unstaged linked file.'
+    suggested_owner: dev
+    bug_ref: 'task.149.bug.3.read-back-decision-gaps.md'
+  - id: TASK-149-BUG-4
+    severity: medium
+    file: 'shared/resources/doc-links.js'
+    finding: 'linkState reads a case-mismatched link (existsSync is case-insensitive on macOS) and a ../ link resolving outside the repository (check-ignore exits 128) as untracked, the one non-blocking state (refute review CR-3, CR-4).'
+    suggested_action: 'Compare the exact basename against readdirSync of its directory; give a resolved path beginning with .. and any check-ignore status other than 0/1 a blocking state; test each.'
+    suggested_owner: dev
+    bug_ref: 'task.149.bug.4.link-state-misclassifies.md'
+  - id: CR-6
+    severity: low
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'The Step 12b block reads ${TASK_DIR:?} with no writer in the block (item 3e: STORY_FILE, no writer in its file); the block test injects it through env, so a fresh-shell run is not exercised.'
+    suggested_action: 'Either bind the input in the block from a placeholder, or record it as a declared block input consistent with the file''s existing Step 13 / 13b convention and say so beside the guard.'
+    suggested_owner: dev
+  - id: CR-7
+    severity: low
+    file: 'tests/work-item-artifact-naming.test.js'
+    finding: '§5 now reads through the same checkUpdatedCoherence the QA read-back runs, so a Change Log heading extractEntries does not recognise reads no-log in both and is skipped by both.'
+    suggested_action: 'Add a floor to §5: a document with a heading containing "Change Log" followed by date rows that checkUpdatedCoherence reports as no-log fails the test.'
+    suggested_owner: dev
+  - id: QA-2-M1
+    severity: low
+    file: 'tests/qa-read-back-block.test.js'
+    finding: 'Removing the bug-report staging line from Step 12b leaves every block test green (mutation no-red-untested): the clean scenario accepts either "untracked: …bug…" or "read-back clean".'
+    suggested_action: 'Assert in the clean scenario that the bug report is NOT listed as untracked, so the staging is held.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 4202
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 4]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 32
+    notes: '--copy-as DEST containment present-but-inert 16/18 (both merge-through-seeded-link cases reproduced; every lexical, ancestor-symlink and dangling case now refused); change-log --check-updated engages 14/14.'
+  performance:
+    status: PASS
+    notes: 'Block test adds ~6 s (20 spawned shells); population test ~0.5 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'Read-back decision gaps (TASK-149-BUG-3, TASK-149-BUG-4).'
+  maintainability:
+    status: PASS
+    notes: 'Blocks held by an executing test; section reader shared.'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_reopened: 1
+  bugs_new: 2
+
+recommendations:
+  immediate:
+    - action: 'Replace --copy-as merging with fresh-path seeding (TASK-149-BUG-1).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Close the read-back decision gaps (TASK-149-BUG-3) and linkState misfiling (TASK-149-BUG-4).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'shared/resources/doc-links.js']
+  future:
+    - action: 'Step 4b zero-blocks-executed on qa-task / qa-story — pre-existing on develop.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'Change Log read-back for the other writers (cycle-1 CR-5) — outside this task''s scope.'
+      refs: ['skills/qa-fix/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

@@ -1109,7 +1109,8 @@ always happens in that temp copy — never the live tree.
 
 `--copy <dir>` places the directory's **contents** at the temp root. When a block addresses a path —
 `find docs/tasks …` in the `sync-github-*` discovery blocks — seed it at that path instead with
-`--copy-as docs:docs` (`SRC:DEST`, repeatable; `DEST` must be relative and stay inside the temp copy).
+`--copy-as docs:docs` (`SRC:DEST`, repeatable; `DEST` must be relative, stay inside the temp copy and
+not exist yet — it seeds a fresh path and never merges).
 A block that fails only because it was seeded at the wrong path is a harness finding, not a prose
 finding (obs #143).
 
@@ -1816,8 +1817,8 @@ After review:
    ```bash
    # One cwd per block — the repository root — and every value re-derived here: each
    # fenced block runs as its own shell, so a name bound in an earlier block does not
-   # exist in this one. The only INPUT is $STORY_FILE; the guard names it when it is
-   # unset, instead of letting it surface as a usage error from the engines.
+   # exist in this one. The only INPUT is $STORY_FILE — the resolved story file the skill runs on, which the agent re-binds as Phase 0 and item 6 do. The guard names
+   # it when it is unset, instead of letting it surface as a usage error from the engines.
    : "${STORY_FILE:?item 3e needs STORY_FILE — the resolved story file}"
    DOC="$STORY_FILE"
    DOC_DIR=$(dirname "$STORY_FILE")
@@ -1826,41 +1827,59 @@ After review:
    THIS_GATE=$(find "$DOC_DIR" -maxdepth 1 -name "*.gate.${QA_CYCLE:-none}.*.yml" 2>/dev/null | head -1)
    THIS_REPORT=$(find "$DOC_DIR" -maxdepth 1 -name "*.qa.${QA_CYCLE:-none}.*.md" 2>/dev/null | head -1)
 
-   # Stage what this run wrote: the engine resolves links against the INDEX, so an
-   # unstaged artifact reads as broken. That is the document, this cycle's gate and
-   # report, and every bug report beside them — the QA Results section links those
-   # too. An empty name is skipped, never passed: a report that was never written
-   # has no path to stage, and the link check below is what names it.
-   for f in "$DOC" "$THIS_GATE" "$THIS_REPORT"; do
-     [ -n "$f" ] && [ -e "$f" ] && git add -- "$f"
-   done
-   find "$DOC_DIR" -maxdepth 1 -name '*.bug.*.md' -exec git add -- {} +
+   # A stage that fails HALTS. The link check reads the index, so a failed `git add`
+   # (a held .git/index.lock) would otherwise leave every artifact untracked — and a
+   # check that tolerated that printed "clean" over nothing staged (TASK-149-BUG-3).
+   stage() { git add -- "${1}" || { echo "item 3e: HALT — could not stage ${1} (a held .git/index.lock?); retry" >&2; exit 1; }; }
+   links() { node .agents/skills/qa-story/references/doc-links.js --file "$DOC" --json; }
+   ran() { [ "${1}" -le 1 ] && [ -n "${2}" ] || { echo "item 3e: HALT — doc-links did not run (rc=${1}, $([ -n "${2}" ] && echo output || echo no output)); nothing was checked" >&2; exit 1; }; }
 
-   # The decision is made HERE, not by whoever reads the output. doc-links exits 1
-   # for an `untracked` link (expected here) and for a `missing` or `ignored` one
-   # (a halt), so its exit code alone cannot say which happened (TASK-149-BUG-2).
-   LINKS_JSON=$(node .agents/skills/qa-story/references/doc-links.js --file "$DOC" --json); LINKS_RC=$?
-   [ "$LINKS_RC" -le 1 ] || { echo "item 3e: doc-links usage error (rc=$LINKS_RC) — fix the call" >&2; exit 1; }
+   # Pass 1 — stage what this run wrote, then every link the document makes to a file
+   # that exists, inside the repository, under that exact name and not ignored
+   # (`untracked`): the QA Results section links the report, the gate and the bug
+   # reports, and a linked file left out of the commit is a dead link in CI.
+   for f in "$DOC" "$THIS_GATE" "$THIS_REPORT"; do
+     [ -n "$f" ] && [ -e "$f" ] && stage "$f"
+   done
+   LINKS_JSON=$(links); ran $? "$LINKS_JSON"
+   while IFS= read -r f; do
+     [ -n "$f" ] && stage "$f"
+   done < <(printf '%s' "$LINKS_JSON" | jq -r '.broken[]? | select(.state == "untracked") | .resolved')
+
+   # Pass 2 — the decision, made HERE rather than by whoever reads the output. After
+   # pass 1 every broken link is one staging cannot fix: missing, ignored,
+   # outside-repo, unverifiable — or untracked because staging did not take.
+   LINKS_JSON=$(links); ran $? "$LINKS_JSON"
    BLOCKING=$(printf '%s' "$LINKS_JSON" \
-     | jq -r '([.broken[]? | select(.state != "untracked")] | length) + (if .unterminatedFence then 1 else 0 end)') \
+     | jq -e '(.broken | length) + (if .unterminatedFence then 1 else 0 end)') \
      || { echo "item 3e: HALT — doc-links output unreadable, so nothing was checked" >&2; exit 1; }
    printf '%s' "$LINKS_JSON" | jq -r '.broken[]? | "  \(.state): \(.target) (line \(.line))"'
-   node .agents/skills/qa-story/references/change-log.js --check-updated --file "$DOC"; LOG_RC=$?
-   [ "$BLOCKING" -eq 0 ] || { echo "item 3e: HALT — $BLOCKING link(s) missing or ignored in $DOC; write the artifact (or fix the link), then re-run. Do not post the QA summary (item 6)." >&2; exit 1; }
-   [ "$LOG_RC" -eq 0 ] || { echo "item 3e: HALT — change-log --check-updated rc=$LOG_RC; apply bumpUpdated with the newest row's date, then re-run." >&2; exit 1; }
-   echo "item 3e: read-back clean — any untracked link listed above rides in this cycle's commit"
+
+   # change-log's verdict is read from its --json reason, never from rc 1 alone: a
+   # module that fails to load also exits non-zero, and "apply bumpUpdated" is the
+   # wrong remedy for that.
+   LOG_REASON=$(node .agents/skills/qa-story/references/change-log.js --check-updated --file "$DOC" --json \
+     | jq -r '.reason // empty' 2>/dev/null)
+   [ "$BLOCKING" -eq 0 ] || { echo "item 3e: HALT — $BLOCKING link(s) in $DOC cannot resolve in the commit (states above); write the artifact or fix the link, then re-run. Do not post the QA summary (item 6)." >&2; exit 1; }
+   case "$LOG_REASON" in
+     ok|no-log|no-updated) ;;
+     stale-updated) echo "item 3e: HALT — the newest Change Log row is dated after updated:; apply bumpUpdated with that row's date, then re-run." >&2; exit 1 ;;
+     *) echo "item 3e: HALT — change-log --check-updated did not answer (reason '${LOG_REASON}'); nothing was checked" >&2; exit 1 ;;
+   esac
+   echo "item 3e: read-back clean — every link resolves against the index"
    ```
 
-   The block decides and halts itself; its output is the record. A broken link carries `state`.
-   **`untracked`** means the file exists and is not in the index — expected here, listed, and
-   committed with the cycle. **`missing`** names an artifact that was never written — write it (re-run
-   the step that owns it), then re-run this one. **`ignored`** is on disk but gitignored, so it can
-   never be committed: the link or the ignore rule is wrong. The block exits 1 on either, and on a
-   `stale-updated` Change Log (`LOG_RC` 1 — the newest row dated after `updated:`; apply
-   `bumpUpdated(content, <that row's date>)`). **Do not post the QA summary (item 6) over a item 3e HALT**: that is the
-   task.141 shape — a PR comment linking a report that did not exist, found only by CI's `link-check`,
-   and a row dated after `updated:`, found only by CI's `work-item-artifact-naming` §5. Exit 2 from
-   either CLI is a broken invocation, not a finding: fix the call. (obs #164)
+   The block decides and halts itself; its output is the record. It stages what this run wrote and
+   every linked file that is on disk, inside the repository, under that exact name and not ignored
+   (`untracked`), then checks again: after that pass **any** broken link halts, whatever its `state` —
+   **`missing`** (never written, or a case-mismatched name that only a case-insensitive disk found),
+   **`ignored`** (gitignored, so it can never be committed), **`outside-repo`**, **`unverifiable`**, or an
+   `untracked` link whose staging did not take. A `git add` that fails halts, empty or unreadable
+   `doc-links` output halts as "nothing was checked", and change-log's `stale-updated` (the newest row
+   dated after `updated:` — apply `bumpUpdated(content, <that row's date>)`) is told apart from a
+   change-log that did not answer. **Do not post the QA summary (item 6) over a item 3e HALT**: that is the task.141
+   shape — a PR comment linking a report that did not exist, found only by CI's `link-check`, and a row
+   dated after `updated:`, found only by CI's `work-item-artifact-naming` §5. (obs #164)
 
 4. Recommend next action based on gate decision
 5. If files were modified during refactoring, list them in QA report and ask Dev to update File List

@@ -456,3 +456,32 @@ test("state (task.149 CR-2): a gitignored target on disk is ignored, not untrack
     );
   });
 });
+
+test("state (TASK-149-BUG-4): a case-mismatched link is missing on every filesystem, and a link above the repository is outside-repo — never untracked", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[r](Report.md) [d](../Docs/b.md) [o](../../outside.md) [ok](new.md)\n",
+    );
+    fs.writeFileSync(path.join(dir, "docs", "report.md"), "# r\n");
+    fs.writeFileSync(path.join(dir, "docs", "b.md"), "# b\n");
+    fs.writeFileSync(path.join(dir, "docs", "new.md"), "# new\n");
+    fs.writeFileSync(path.join(path.dirname(dir), "outside.md"), "# o\n");
+    try {
+      execFileSync("git", ["add", "docs/a.md"], { cwd: dir });
+      const r = checkDocument("docs/a.md", { root: dir });
+      assert.deepEqual(
+        r.broken.map((b) => [b.target, b.state]),
+        [
+          ["Report.md", "missing"],
+          ["../Docs/b.md", "missing"],
+          ["../../outside.md", "outside-repo"],
+          ["new.md", "untracked"],
+        ],
+      );
+    } finally {
+      fs.rmSync(path.join(path.dirname(dir), "outside.md"), { force: true });
+    }
+  });
+});

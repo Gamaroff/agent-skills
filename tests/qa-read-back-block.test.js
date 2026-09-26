@@ -12,11 +12,14 @@
  * it, in a consumer-shaped temporary repository (its own `.agents/skills/<skill>/
  * references/` holding the engines), under bash and — when present — zsh.
  *
- * Four scenarios, each with the exit status and the line the block must print:
+ * Scenarios, each with the exit status and the line the block must print:
  *   clean   — report, gate and bug report on disk and staged by the block → 0
  *   missing — the linked report was never written                         → 1
  *   ignored — a linked file is on disk but gitignored                     → 1
  *   stale   — the newest Change Log row is dated after `updated:`         → 1
+ *   a linked file nobody staged → staged by pass 1, clean                  → 0
+ *   a case-mismatched link, a stage that fails, an engine that does not
+ *   load (doc-links or change-log)                                         → 1
  * plus the unset-input guard, which must name the variable.
  */
 
@@ -25,7 +28,22 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
+
+/** An async shell run, so concurrent cases do not queue behind a blocking spawnSync. */
+function run(shell, block, opts) {
+  return new Promise((resolve) => {
+    const child = spawn(shell, ["-c", block], {
+      ...opts,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (d) => (stdout += d));
+    child.stderr.on("data", (d) => (stderr += d));
+    child.on("close", (status) => resolve({ status, stdout, stderr }));
+  });
+}
 const { sectionOf } = require("./lib/markdown-section");
 
 const REPO_ROOT = path.join(__dirname, "..");
@@ -111,7 +129,7 @@ function consumerRepo(skill, mutate) {
   fs.writeFileSync(path.join(dir, "task.9.gate.1.x.yml"), "gate: FAIL\n");
   fs.writeFileSync(path.join(dir, "task.9.qa.1.x.md"), "# r\n");
   fs.writeFileSync(path.join(dir, "task.9.bug.1.y.md"), "# b\n");
-  if (mutate) mutate(dir);
+  if (mutate) mutate(dir, skill);
   return root;
 }
 
@@ -135,7 +153,7 @@ const SCENARIOS = [
   {
     name: "stale",
     exit: 1,
-    says: /HALT — change-log --check-updated rc=1/,
+    says: /HALT — the newest Change Log row is dated after updated:/,
     mutate: (dir) => {
       const f = path.join(dir, "task.9.x.md");
       fs.writeFileSync(
@@ -146,55 +164,141 @@ const SCENARIOS = [
       );
     },
   },
+  // TASK-149-BUG-3 — a linked file the block did not write is staged by pass 1,
+  // and the second pass reads it as resolved.
+  {
+    name: "linked file nobody staged",
+    exit: 0,
+    says: /read-back clean/,
+    mutate: (dir) => {
+      fs.appendFileSync(path.join(dir, "task.9.x.md"), "[n](./notes.md)\n");
+      fs.writeFileSync(path.join(dir, "notes.md"), "# n\n");
+    },
+    after: (root) =>
+      assert.match(
+        spawnSync("git", ["ls-files", "--", DOC_DIR], {
+          cwd: root,
+          encoding: "utf8",
+        }).stdout,
+        /notes\.md/,
+        "pass 1 must stage the linked file",
+      ),
+  },
+  {
+    name: "case-mismatched link",
+    exit: 1,
+    says: /missing: \.\/Task\.9\.qa\.1\.x\.md[\s\S]*HALT/,
+    mutate: (dir) =>
+      fs.appendFileSync(
+        path.join(dir, "task.9.x.md"),
+        "[c](./Task.9.qa.1.x.md)\n",
+      ),
+  },
+  {
+    name: "a stage that fails",
+    exit: 1,
+    says: /HALT — could not stage/,
+    mutate: (dir) =>
+      fs.writeFileSync(
+        path.join(dir, "..", "..", "..", ".git", "index.lock"),
+        "",
+      ),
+  },
+  {
+    name: "doc-links that does not load",
+    exit: 1,
+    says: /HALT — doc-links did not run/,
+    mutate: (dir, skill) =>
+      fs.writeFileSync(
+        path.join(
+          dir,
+          "..",
+          "..",
+          "..",
+          ".agents",
+          "skills",
+          skill,
+          "references",
+          "doc-links.js",
+        ),
+        "throw new Error('broken install');\n",
+      ),
+  },
+  {
+    name: "change-log that does not load",
+    exit: 1,
+    says: /HALT — change-log --check-updated did not answer/,
+    mutate: (dir, skill) =>
+      fs.writeFileSync(
+        path.join(
+          dir,
+          "..",
+          "..",
+          "..",
+          ".agents",
+          "skills",
+          skill,
+          "references",
+          "change-log.js",
+        ),
+        "throw new Error('broken install');\n",
+      ),
+  },
 ];
 
 const SHELLS = ["bash"].concat(
   spawnSync("zsh", ["-c", "true"]).status === 0 ? ["zsh"] : [],
 );
 
-for (const s of SKILLS) {
-  const block = blockOf(s.skill, s.heading, s.label);
-  for (const shell of SHELLS) {
-    for (const sc of SCENARIOS) {
-      test(`${s.skill} ${s.label} under ${shell}: ${sc.name} → exit ${sc.exit}`, () => {
-        const root = consumerRepo(s.skill, sc.mutate);
+// Every case builds and removes its own repository, so the cases are independent
+// and run concurrently: sequential, the file took ~16 s of 40 spawned shells.
+test.describe("read-back blocks", { concurrency: true }, () => {
+  for (const s of SKILLS) {
+    const block = blockOf(s.skill, s.heading, s.label);
+    for (const shell of SHELLS) {
+      for (const sc of SCENARIOS) {
+        test(`${s.skill} ${s.label} under ${shell}: ${sc.name} → exit ${sc.exit}`, async () => {
+          const root = consumerRepo(s.skill, sc.mutate);
+          try {
+            const r = await run(shell, block, {
+              cwd: root,
+              encoding: "utf8",
+              env: { ...process.env, ...s.input(DOC_DIR) },
+            });
+            const out = `${r.stdout}${r.stderr}`;
+            assert.equal(r.status, sc.exit, out);
+            assert.match(out, sc.says);
+            if (sc.exit === 0)
+              assert.doesNotMatch(
+                out,
+                /untracked:/,
+                "nothing may be left untracked on a clean read-back",
+              );
+            if (sc.after) sc.after(root);
+          } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+          }
+        });
+      }
+      test(`${s.skill} ${s.label} under ${shell}: an unset input is named, not a usage error`, async () => {
+        const root = consumerRepo(s.skill);
         try {
-          const r = spawnSync(shell, ["-c", block], {
+          const env = { ...process.env };
+          delete env[s.inputName];
+          const r = await run(shell, block, {
             cwd: root,
             encoding: "utf8",
-            env: { ...process.env, ...s.input(DOC_DIR) },
+            env,
           });
-          const out = `${r.stdout}${r.stderr}`;
-          assert.equal(r.status, sc.exit, out);
-          assert.match(out, sc.says);
-          if (sc.name === "clean")
-            assert.match(
-              out,
-              /untracked: \.\/task\.9\.bug\.1\.y\.md|read-back clean/,
-            );
+          assert.notEqual(r.status, 0);
+          assert.match(
+            `${r.stdout}${r.stderr}`,
+            new RegExp(`${s.inputName}: ${s.label} needs`),
+          );
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
         }
       });
     }
-    test(`${s.skill} ${s.label} under ${shell}: an unset input is named, not a usage error`, () => {
-      const root = consumerRepo(s.skill);
-      try {
-        const env = { ...process.env };
-        delete env[s.inputName];
-        const r = spawnSync(shell, ["-c", block], {
-          cwd: root,
-          encoding: "utf8",
-          env,
-        });
-        assert.notEqual(r.status, 0);
-        assert.match(
-          `${r.stdout}${r.stderr}`,
-          new RegExp(`${s.inputName}: ${s.label} needs`),
-        );
-      } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-      }
-    });
   }
-}
+});

@@ -2645,3 +2645,56 @@ test("QA-23: a symlink placed by an EARLIER --copy-as pair is refused by a later
   );
   assert.deepEqual(readdirSync(outside), []);
 });
+
+test("QA-24: --copy-as never merges — an existing DEST is refused, so a link seeded inside it is never followed (TASK-149-BUG-1 reopened)", () => {
+  const outside = tmp();
+  const seed = tmp();
+  mkdirSync(join(seed, "docs"));
+  symlinkSync(outside, join(seed, "out"));
+  symlinkSync(outside, join(seed, "docs", "out"));
+  const srcDot = tmp();
+  mkdirSync(join(srcDot, "out"));
+  writeFileSync(join(srcDot, "out", "x"), "x\n");
+  const srcDocs = tmp();
+  mkdirSync(join(srcDocs, "out"));
+  writeFileSync(join(srcDocs, "out", "y"), "y\n");
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("echo ok"));
+  const count = () =>
+    readdirSync(tmpdir()).filter((n) => /^qa-snippets-[^t]/.test(n)).length;
+  const before = count();
+  for (const [src, dest] of [
+    [srcDot, "."],
+    [srcDot, "./"],
+    [srcDocs, "docs"],
+  ]) {
+    assert.throws(
+      () =>
+        executeFile(file, {
+          allowZsh: false,
+          copyFrom: seed,
+          copyAs: [{ src, dest }],
+        }),
+      /escapes the working directory|already exists/,
+      `DEST ${dest} must be refused`,
+    );
+  }
+  // Two pairs into one DEST: the second finds the first's tree and is refused.
+  assert.throws(
+    () =>
+      executeFile(file, {
+        allowZsh: false,
+        copyAs: [
+          { src: srcDot, dest: "stage" },
+          { src: srcDocs, dest: "stage" },
+        ],
+      }),
+    /already exists/,
+  );
+  assert.deepEqual(
+    readdirSync(outside),
+    [],
+    "nothing may be written through a seeded link",
+  );
+  assert.equal(count(), before, "a refused DEST may not leak a temp dir");
+});

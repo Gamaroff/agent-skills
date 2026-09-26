@@ -77,6 +77,47 @@ and asserts the refusal and that nothing appears at the link's target.
 **Verification Steps for QA**: re-run the probe from the QA report with `copy-as.cases.json`; run
 `node --test --test-name-pattern='QA-2[23]' shared/resources/tests/qa-execute-snippets.test.mjs`.
 
+#### QA Verification (cycle 2) — Reopened
+
+The lstat walk covers the components from the working copy down to DEST, but not the tree **beneath**
+an existing DEST. When DEST already exists (`.`, or `docs` seeded by `--copy`), `cpSync` merges SRC
+into it and follows a symlink seeded inside it. Reproduced by execution and by the probe engine
+(`task.149.qa.2.security.run.json`, cases `copy-as.merge-into-dot-through-seeded-link` and
+`copy-as.merge-into-seeded-dir-through-link` accepted, 16/18, files written outside):
+
+```bash
+X=$(mktemp -d); mkdir -p $X/seed $X/src/out $X/OUT; ln -s $X/OUT $X/seed/out; echo hi > $X/src/out/x
+printf '```bash\necho ok\n```\n' > $X/S.md
+node shared/resources/qa-execute-snippets.mjs --file $X/S.md --no-zsh --copy $X/seed --copy-as "$X/src:."
+ls $X/OUT   # → x
+```
+
+Code review CR-1 (cycle 2) named the same mechanism from Node's `cpSyncCopyDir`. Two HIGH findings on
+one mechanism in two cycles: **replace it rather than patch it again** — e.g. `--copy-as` seeds a
+**fresh** path only (refuse a DEST that already exists), which removes merging, the only operation
+that walks an existing tree.
+
+### Iteration 2
+
+#### Re-Investigation (Reopened → In Progress)
+
+Cycle 1 checked the path **to** DEST; a merge walks the tree **under** an existing DEST, which cycle 1
+never examined. Two HIGH findings on one mechanism in two cycles → **replace**, not patch (qa-fix
+Step 2.5 menu, offered early per the pre-strike shape).
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+- **Move: replace.** `--copy-as` seeds a **fresh** path only: a DEST that already exists (`.`, `./`, a
+  directory `--copy` seeded, a path an earlier pair wrote) is refused with exit 2. With nothing at the
+  target, `cpSync` creates it and walks no existing tree, so it has nothing to follow. The ancestor
+  walk stays, for links on the path.
+- QA-24: `.`, `./` and a seeded `docs/` holding a link are refused; two pairs into one DEST are refused;
+  nothing is written through a seeded link; no temp leak. Mutation: allowing the merge turns QA-24 red.
+- Probe with the cycle-2 cases (plus fresh-path legitimate cases): **engages 20/20**, nothing written
+  outside.
+- Contract (`qa-runnable-prose-detection.md`), header comment and both Step 4b / Phase 1.7 paragraphs
+  state the fresh-path rule.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -84,3 +125,5 @@ and asserts the refusal and that nothing appears at the link's target.
 | 2026-09-26 | New | QA Engineer | Found in QA cycle 1 |
 | 2026-09-26 | In Progress | qa-fix | Investigation started |
 | 2026-09-26 | Ready for QA | qa-fix | Fix implemented (qa-fix cycle 1) |
+| 2026-09-26 | Reopened | QA Engineer | Merge into an existing DEST follows seeded links (QA cycle 2) |
+| 2026-09-26 | Ready for QA | qa-fix | Mechanism replaced: fresh-path seeding (qa-fix cycle 2) |

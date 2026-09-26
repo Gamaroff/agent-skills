@@ -514,23 +514,25 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-26
-**Quality Score**: 70/100
+**Quality Score**: 60/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.149.qa.1.qa-evidence-integrity.md](./task.149.qa.1.qa-evidence-integrity.md)
-- **Gate File**: [task.149.gate.1.qa-evidence-integrity.yml](./task.149.gate.1.qa-evidence-integrity.yml)
+- **Full Report**: [task.149.qa.2.qa-evidence-integrity.md](./task.149.qa.2.qa-evidence-integrity.md)
+- **Gate File**: [task.149.gate.2.qa-evidence-integrity.yml](./task.149.gate.2.qa-evidence-integrity.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 4179 (4178 pass, 0 fail, 1 skipped); 27 boundary probes
+- **Tests Executed**: 4202 (4201 pass, 0 fail, 1 skipped); 32 boundary probes
 - **Phases Verified**: 5/5
 - **Critical Issues**: 1
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- HIGH — [TASK-149-BUG-1](./task.149.bug.1.copy-as-symlink-escape.md): `--copy-as` DEST containment is lexical; a symlink seeded by `--copy` writes outside the sandbox (probe-reproduced).
-- MEDIUM — [TASK-149-BUG-2](./task.149.bug.2.step-12b-no-mechanical-halt.md): Step 12b / item 3e never act on the read-back result.
-- LOW — ignored targets read `untracked` (CR-2); unguarded block inputs (CR-4).
+- HIGH — [TASK-149-BUG-1](./task.149.bug.1.copy-as-symlink-escape.md) reopened: merging into an existing DEST follows a seeded symlink (probe 16/18).
+- MEDIUM — [TASK-149-BUG-3](./task.149.bug.3.read-back-decision-gaps.md): read-back passes on empty output under zsh; untracked residue exempted.
+- MEDIUM — [TASK-149-BUG-4](./task.149.bug.4.link-state-misclassifies.md): case-mismatch and outside-repo links read `untracked`.
+- Closed — [TASK-149-BUG-2](./task.149.bug.2.step-12b-no-mechanical-halt.md).
+- LOW — CR-6 (block input binding), CR-7 (§5 shares its reader), QA-2-M1 (staging untested).
 
 ---
 
@@ -543,6 +545,7 @@ None.
 | 2026-09-26 |         | Status → ready-for-development | review-task |
 | 2026-09-26 |         | Implemented — 4 engines, 11 prose sites, 1 new population test + shared section reader; 26 tests added | develop |
 | 2026-09-26 |         | QA gate FAIL (70/100) — 1 high, 1 medium, 2 low | qa-task |
+| 2026-09-26 |         | QA gate FAIL (60/100) — 1 high (reopened), 2 medium, 3 low | qa-task |
 
 ---
 
