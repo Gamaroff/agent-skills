@@ -150,7 +150,11 @@ All notable changes to this project will be documented in this file. Format foll
 
   Each SKILL.md block is one call with a `{placeholder}` path. The read-back was a fenced block in
   both skills for three QA cycles, and each cycle found a new gap in it, so it became one script
-  tested directly. `doc-links.js` now labels each broken link `untracked`, `ignored` (gitignored,
+  tested directly. It finds the cycle's gate and QA report by asking the new
+  `qa-cycle.sh <dir> --path gate|qa`, which names the one regular file of the current cycle with the
+  same glob and sed that count the cycle, and refuses when none or more than one matches. Exit 2 is
+  reserved for a run that could not complete; every link the run cannot confirm, `unverifiable`
+  included, halts with its own remedy. `doc-links.js` now labels each broken link `untracked`, `ignored` (gitignored,
   never committable), `outside-repo`, `unverifiable` or `missing`. `missing` is compared component
   by component against the directory listing, so a case-insensitive disk cannot pass a link that is
   dead on Linux, and a symlinked target counts only when it leads inside the repository. The state

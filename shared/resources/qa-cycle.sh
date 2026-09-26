@@ -29,11 +29,13 @@
 #
 # qa-cycle.sh <dir> --path gate|qa — print the ONE file of the current cycle: the
 # gate (`*.gate.{N}.*.yml`) or the QA report (`*.qa.{N}.*.md`) whose number is the
-# cycle above. This is the only definition of "this cycle's file" (task.149
-# BUG-11): qa-read-back.js calls it rather than keep a second grammar, which drifted
-# three times (BUG-9, CR6-2, BUG-11 — leading zeros, the greedy segment, dotfiles).
-# The same glob and the same sed decide both the cycle and the file, so they cannot
-# disagree. Candidates are regular files only — not a directory named like a gate,
+# cycle above. It is the definition qa-read-back.js uses (task.149 BUG-11), in
+# place of a second grammar that drifted three times (BUG-9, CR6-2, BUG-11 — leading
+# zeros, the greedy segment, dotfiles). The same glob and the same sed decide both the
+# cycle and the file, so they cannot disagree. It is NOT yet the only definition: the
+# QA skills' Phase 0 and Step 13b blocks still find the gate with
+# `find -name "*.gate.${N}.*.yml"`, which misses a zero-padded gate this mode names;
+# moving them onto --path is a recorded follow-up (task.149 gate 8). Candidates are regular files only — not a directory named like a gate,
 # not a symlink. Exit 1, nothing on stdout, one ⚠️ line on stderr when no file
 # matches or when more than one does: an ambiguous cycle is refused, never picked.
 set -u
