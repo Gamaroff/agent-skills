@@ -36,8 +36,8 @@ Close /finalise's two scope edges: bug mode through Step 8 (GAPS path) with a sh
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration (inline); commits fac47f6, debdd6e, a9709ab, c796370; audit 20/20 | `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #495: https://github.com/Gamaroff/agent-skills/pull/495 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.152.qa.{N}.*.md`; `task.152.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.152.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.152.dod.{N}.*.md`; task `status: accepted`                       | ACCEPTED; dod.1; CI 2 SUCCESS @ 36d13300; issue #482 closed; board Done (already) | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -115,6 +115,21 @@ Close /finalise's two scope edges: bug mode through Step 8 (GAPS path) with a sh
 - PR body written by the orchestrator from the Step 3 record rather than the diff-summariser subagent: the four feature commits already carry per-file bodies and the Decisions Log holds the full change list, so a fresh read of a ~1,000-line diff would add nothing.
 - PR #495 opened (state OPEN). Tracker comment in-review: posted. GitHub board: in-review → stage-disabled (the board's ladder does not enable this moment).
 
+### Step 7 — finalise — 2026-09-26
+
+- `/finalise` invoked (skill, not inlined). Four DoD agents: AC 13/14 (MIG2 due at merge), Security FAIL → fixed under Step 8a fix-and-recheck (`a42541d5`: raw LF/CR refused in co-located artifact and document paths; mutation-proved; evaluator exit 0 plain and with `--git-base`), Docs PASS, Compliance N/A. Deviation recorded in dod.1.
+- DoD summary: docs/tasks/task.152.finalise-gaps-path-and-artifact-links/task.152.dod.1.finalise-gaps-path-and-artifact-links.md
+- CI reading 1: SUCCESS @ `a42541d5b1c1` (acceptance decision, 5 checks) / CI reading 2: SUCCESS @ `36d133001a54` (pushed acceptance head `0419a24a` + the PreCompact pause commit, 5 checks)
+- Acceptance commit `0419a24a` (task doc accepted, dod.1 + security run record, sprint-review-summary.md, registry ticked). 6b tracked-and-pushed assertions held; 6d CHANGELOG cites task 152.
+- PreCompact hook fired 4 s after the acceptance commit: committed this report (`36d13300`) and snapshotted the lock; restored with `advance-pipeline-lock.sh --restore` at step 7 and resumed in place.
+- Canonical PR comment posted: https://github.com/Gamaroff/agent-skills/pull/495#issuecomment-5849685019 (Final Gate PASS, QA Cycles 4).
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/495#issuecomment-5849689057
+- Tracker comment `done`: posted (finalise); orchestrator's call → `already`. Document link already on `develop`.
+- GitHub Issue #482 — close: CLOSED ✅ (verified with `gh issue view --json state`).
+- GitHub Issue #482 — board: done → already.
+- Dirty-path check after /finalise: only the implementation report dirty. Accept gap: no deferred-mutation journal → tracker debt none.
+- Task completed.
+
 ---
 
 ## Issues Log
@@ -184,13 +199,15 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-26T20:50Z
+**Final Status**: Completed
 **Branch**: feature/task.152.finalise-gaps-path-and-artifact-links
 **PR**: https://github.com/Gamaroff/agent-skills/pull/495
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 4 (FAIL 50 → CONCERNS 80 → CONCERNS 90 → PASS 100; cosmetic-residue exit, 3 LOWs carried to future)
+**DoD Summary**: docs/tasks/task.152.finalise-gaps-path-and-artifact-links/task.152.dod.1.finalise-gaps-path-and-artifact-links.md
+**Tracker debt**: none
+
+**Completion Summary**: Implemented /finalise bug mode through Step 8 (the gaps path) with one `fill-verification-complete.sh` helper owning the Verification Complete fill and the gap count, gave `status-history.js` the shared `--json` reason contract, and widened Step 8a, the fix-and-recheck evaluator and the doc-links corpus guard to co-located pipeline artifacts (one exported artifact set, `isCoLocatedArtifact`), with stage-then-check link blocks at the qa-task, qa-story and review-pr writer sites. Four QA cycles; every fix mutation-proved. /finalise's security probe found a raw LF/CR admitted by `isCoLocatedArtifact`, fixed in place under Step 8a (`a42541d5`). Follow-ups (docs/bugs walk, writer-site population, finalise engine-path convention, 8.3 re-run guard, three carried LOWs) are in gate 4 `recommendations.future` and the task's Deferred Work.
 
 ---
 
@@ -209,4 +226,6 @@ _Track each QA review/fix cycle._
 **Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 7.
 
 **Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+
+**Resumed in place** — 2026-09-26: lock restored from the halt snapshot at step 7; Step 7 completed from the publish boundary (the acceptance commit had already landed).
 
