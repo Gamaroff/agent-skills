@@ -1584,6 +1584,17 @@ export function runBlock(
 // ── File-level orchestration ──────────────────────────────────────────────────
 
 /**
+ * True when `child` is `parent` or lies beneath it. Built on path.relative
+ * rather than a string prefix: `parent + sep` is `//` for the filesystem root,
+ * which no absolute path starts with, so a prefix test let SRC `/` through the
+ * SRC-contains-sandbox refusal (TASK-149 CR4-4). Pure — no filesystem access.
+ */
+export function isWithin(parent, child) {
+  const rel = relative(parent, child);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+/**
  * Throw when any path component between `root` (exclusive) and `target`
  * (inclusive) exists and is a symlink. Components that do not exist yet end the
  * walk: nothing below a missing directory can be a link. `lstat`, never `stat`,
@@ -1702,7 +1713,7 @@ export function executeFile(filePath, opts = {}) {
         throw new Error(`--copy-as SRC is not readable: ${src} (${e.message})`);
       }
       const rootReal = realpathSync(tmpRoot);
-      if (rootReal === srcReal || rootReal.startsWith(srcReal + sep))
+      if (isWithin(srcReal, rootReal))
         throw new Error(
           `--copy-as SRC contains the sandbox itself — copying it would copy into its own output: ${src}`,
         );

@@ -46,6 +46,7 @@ const {
   executeFile,
   extractBlocks,
   extractTableCellCommands,
+  isWithin,
   runBlock,
   sandboxEnv,
   snapshotTree,
@@ -2755,4 +2756,21 @@ test("QA-26: an SRC that contains the sandbox under another spelling is refused 
     [],
     "the sandbox inside SRC is removed on the refusal",
   );
+});
+
+test("QA-27: isWithin is containment on real paths — the filesystem root contains everything (TASK-149 CR4-4)", () => {
+  assert.equal(
+    isWithin("/", "/var/folders/x/qa-snippets-1"),
+    true,
+    "SRC / contains the sandbox",
+  );
+  assert.equal(isWithin("/a/b", "/a/b"), true);
+  assert.equal(isWithin("/a/b", "/a/b/c"), true);
+  assert.equal(
+    isWithin("/a/b", "/a/bc"),
+    false,
+    "a sibling sharing a prefix is not inside",
+  );
+  assert.equal(isWithin("/a/b/c", "/a/b"), false);
+  assert.equal(isWithin("/a/b", "/a/..b/c"), false);
 });

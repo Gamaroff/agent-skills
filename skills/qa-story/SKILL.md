@@ -1815,78 +1815,36 @@ After review:
    back, and a check that runs before the claim is written cannot check it.
 
    ```bash
-   # One cwd per block — the repository root — and every value re-derived here: each
-   # fenced block runs as its own shell, so a name bound in an earlier block does not
-   # exist in this one. The only INPUT is $STORY_FILE — the resolved story file the skill runs on, which the agent re-binds as Phase 0 and item 6 do. The guard names
-   # it when it is unset, instead of letting it surface as a usage error from the engines.
-   : "${STORY_FILE:?item 3e needs STORY_FILE — the resolved story file}"
-   DOC="$STORY_FILE"
-   DOC_DIR=$(dirname "$STORY_FILE")
-   QA_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$DOC_DIR"); rc=$?
-   [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
-   THIS_GATE=$(find "$DOC_DIR" -maxdepth 1 -name "*.gate.${QA_CYCLE:-none}.*.yml" 2>/dev/null | head -1)
-   THIS_REPORT=$(find "$DOC_DIR" -maxdepth 1 -name "*.qa.${QA_CYCLE:-none}.*.md" 2>/dev/null | head -1)
-   # This step runs after the gate, the report and the verdict row must exist, so an
-   # absent one is the finding, not a case to skip (TASK-149-BUG-5).
-   [ -n "$QA_CYCLE" ] || { echo "item 3e: HALT — no numbered gate in $DOC_DIR; item 2 did not write one" >&2; exit 1; }
-   [ -n "$THIS_GATE" ] || { echo "item 3e: HALT — no gate for cycle $QA_CYCLE in $DOC_DIR (item 2)" >&2; exit 1; }
-   [ -n "$THIS_REPORT" ] || { echo "item 3e: HALT — no QA report for cycle $QA_CYCLE in $DOC_DIR; write it (item 1), then re-run" >&2; exit 1; }
-
-   # A stage that fails HALTS. The link check reads the index, so a failed `git add`
-   # (a held .git/index.lock) would otherwise leave every artifact untracked — and a
-   # check that tolerated that printed "clean" over nothing staged (TASK-149-BUG-3).
-   stage() { git add -- "${1}" || { echo "item 3e: HALT — could not stage ${1} (a held .git/index.lock?); retry" >&2; exit 1; }; }
-   links() { node .agents/skills/qa-story/references/doc-links.js --file "$DOC" --json; }
-   ran() { [ "${1}" -le 1 ] && [ -n "${2}" ] || { echo "item 3e: HALT — doc-links did not run (rc=${1}, $([ -n "${2}" ] && echo output || echo no output)); nothing was checked" >&2; exit 1; }; }
-
-   # Pass 1 — stage what this run wrote, then every link the document makes to a file
-   # that exists, inside the repository, under that exact name and not ignored
-   # (`untracked`): the QA Results section links the report, the gate and the bug
-   # reports, and a linked file left out of the commit is a dead link in CI.
-   for f in "$DOC" "$THIS_GATE" "$THIS_REPORT"; do
-     [ -n "$f" ] && [ -e "$f" ] && stage "$f"
-   done
-   LINKS_JSON=$(links); ran $? "$LINKS_JSON"
-   while IFS= read -r f; do
-     [ -n "$f" ] && stage "$f"
-   done < <(printf '%s' "$LINKS_JSON" | jq -r '.broken[]? | select(.state == "untracked") | .resolved')
-
-   # Pass 2 — the decision, made HERE rather than by whoever reads the output. After
-   # pass 1 every broken link is one staging cannot fix: missing, ignored,
-   # outside-repo, unverifiable — or untracked because staging did not take.
-   LINKS_JSON=$(links); ran $? "$LINKS_JSON"
-   BLOCKING=$(printf '%s' "$LINKS_JSON" \
-     | jq -e '(.broken | length) + (if .unterminatedFence then 1 else 0 end)') \
-     || { echo "item 3e: HALT — doc-links output unreadable, so nothing was checked" >&2; exit 1; }
-   printf '%s' "$LINKS_JSON" | jq -r '.broken[]? | "  \(.state): \(.target) (line \(.line))"'
-
-   # change-log's verdict is read from its --json reason, never from rc 1 alone: a
-   # module that fails to load also exits non-zero, and "apply bumpUpdated" is the
-   # wrong remedy for that.
-   LOG_REASON=$(node .agents/skills/qa-story/references/change-log.js --check-updated --file "$DOC" --json \
-     | jq -r '.reason // empty' 2>/dev/null)
-   [ "$BLOCKING" -eq 0 ] || { echo "item 3e: HALT — $BLOCKING link(s) in $DOC cannot resolve in the commit (states above); write the artifact or fix the link, then re-run. Do not post the QA summary (item 6)." >&2; exit 1; }
-   case "$LOG_REASON" in
-     ok|no-updated) ;;
-     no-log) echo "item 3e: HALT — no Change Log row in $DOC; the verdict row (item 3d) did not land" >&2; exit 1 ;;
-     stale-updated) echo "item 3e: HALT — the newest Change Log row is dated after updated:; apply bumpUpdated with that row's date, then re-run." >&2; exit 1 ;;
-     *) echo "item 3e: HALT — change-log --check-updated did not answer (reason '${LOG_REASON}'); nothing was checked" >&2; exit 1 ;;
-   esac
-   echo "item 3e: read-back clean — every link resolves against the index"
+   # From the repository root. {story-file} is the story (or task) document items 3a–3d just edited — substitute it; the script
+   # refuses an unsubstituted placeholder (exit 2), so a block run as delivered
+   # cannot pass by reading nothing.
+   node .agents/skills/qa-story/references/qa-read-back.js --doc "{story-file}"
    ```
 
-   The block decides and halts itself; its output is the record. It stages what this run wrote and
-   every linked file that is on disk, inside the repository, under that exact name and not ignored
-   (`untracked`), then checks again: after that pass **any** broken link halts, whatever its `state` —
-   **`missing`** (never written, or a case-mismatched name that only a case-insensitive disk found),
-   **`ignored`** (gitignored, so it can never be committed), **`outside-repo`**, **`unverifiable`**, or an
-   `untracked` link whose staging did not take. A `git add` that fails halts, empty or unreadable
-   `doc-links` output halts as "nothing was checked", and change-log's `stale-updated` (the newest row
-   dated after `updated:` — apply `bumpUpdated(content, <that row's date>)`) is told apart from a
-   change-log that did not answer. The step runs after the gate, the report and the verdict row must
-   exist, so an absent gate, report or Change Log row halts too, naming which (TASK-149-BUG-5). **Do not post the QA summary (item 6) over a item 3e HALT**: that is the task.141
-   shape — a PR comment linking a report that did not exist, found only by CI's `link-check`, and a row
-   dated after `updated:`, found only by CI's `work-item-artifact-naming` §5. (obs #164)
+   `qa-read-back.js` is the read-back, defined once for both QA skills and tested directly
+   (`references/tests/qa-read-back.test.mjs`). It **decides**: exit 0 is clean, exit 1 is a
+   item 3e HALT with each problem and its remedy printed, and exit 2 is "could not look" (bad
+   arguments, an unreadable document, a sibling engine that did not load). Exit 2 is never a pass. It
+   checks four things:
+
+   1. **The claims exist.** This cycle's gate and QA report are in the work item's directory, and the
+      document has a Change Log row. An absent one halts, named.
+   2. **What this run wrote is staged.** The link check reads the index, so the script stages the
+      document, gate and report, plus every linked target that is **`untracked`** and a regular file
+      under the work item's own directory. A `git add` that fails halts. An untracked target elsewhere
+      is left alone and reported, so unrelated work never rides into the QA commit.
+   3. **Every link resolves against the index.** It uses `doc-links.js`, where **`missing`** means
+      never written, or a case-mismatched name that only a case-insensitive disk found. **`ignored`**
+      means gitignored, so it can never be committed. **`outside-repo`** and **`unverifiable`** also
+      halt.
+   4. **`updated:` accounts for the newest row** (`change-log.js` `checkUpdatedCoherence`). When it
+      does not, apply `bumpUpdated(content, <that row's date>)` and re-run.
+
+   **Do not post the QA summary (item 6) over exit 1 or 2.** Posting over it reproduces task.141: a PR comment linked
+   a report that did not exist, found only by CI's `link-check`, and a row was dated after `updated:`,
+   found only by CI's `work-item-artifact-naming` §5. The read-back was a fenced block in both skills
+   for three QA cycles, and each cycle found a new gap in it (task.149 BUG-2, -3, -5, -6, -7). One
+   script replaced the two copies. (obs #164)
 
 4. Recommend next action based on gate decision
 5. If files were modified during refactoring, list them in QA report and ask Dev to update File List

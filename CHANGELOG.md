@@ -136,28 +136,30 @@ All notable changes to this project will be documented in this file. Format foll
   record it; a non-zero result is a `category: bug` finding. qa-story Phase 4 points at the standards
   file the pipeline loads instead of a `docs/coding-standards.md` that does not exist here. create-task's
   Section 9 prompt and `task-template.md` list the commands under Code Quality.
-- **QA reads the document's claims back after it writes them — qa-task Step 12b, qa-story Review
-  Completion item 3e (task 149).** Step 12 linked the QA report and gate and appended a Change Log row,
-  and nothing read either claim back. On task.141 a linked report was never written (CI `link-check`
-  red), and a row was dated after `updated:` (CI §5 red) (obs #164). The new step stages what the run
-  wrote (bug reports included), then runs `doc-links.js` and `change-log.js --check-updated` on the
-  document and **decides in the block**. It stages every linked file it can, re-checks, and exits 1 on
-  any link still broken, on a failed `git add`, on empty engine output, on a stale `updated:`, or on an
-  absent gate, report or Change Log row (the step runs after all three must exist). The PR comment
-  does not post. `doc-links.js` now labels each broken link `untracked` (on disk, not in
-  the index), `ignored` (gitignored, so it can never be committed), `outside-repo`, `unverifiable` or
-  `missing`, the last compared component by component against the directory listing so a
-  case-insensitive disk cannot pass a link that is dead on Linux. The state appears in `--json` and
-  on the `✖` line; the `✖` / `FAIL doc-links:` markers are
-  unchanged. `tests/qa-read-back-block.test.js` lifts both blocks out of their SKILL.md and runs them
-  in a consumer-shaped repository under bash and zsh — the first version of the halt failed closed on
-  every input and only execution showed it. `change-log.js` gains `checkUpdatedCoherence()` and its first CLI. The corpus test's
-  §5 now uses it. The private reader it replaced skipped task.42 and task.44 (132 documents checked,
-  up from 130; 0 offenders). The self-assessed checklist item "QA report file created and saved" is
-  replaced by the measured one. `tests/qa-evidence-integrity.test.js` holds all eleven prose sites,
-  section-scoped. Its section reader moved to `tests/lib/markdown-section.js`, shared with
-  `outcome-reachability-check.test.js`.
+- **QA reads the document's claims back after it writes them — `qa-read-back.js`, run by qa-task
+  Step 12b and qa-story Review Completion item 3e (task 149).** Step 12 linked the QA report and gate
+  and appended a Change Log row, and nothing read either claim back. On task.141 a linked report was
+  never written (CI `link-check` red), and a row was dated after `updated:` (CI §5 red) (obs #164).
+  `shared/resources/qa-read-back.js --doc <work-item>` now **decides**: exit 0 clean, 1 halt, 2 could
+  not look. It checks four things:
+  - This cycle's gate, report and Change Log row exist.
+  - What the run wrote is staged: the document, gate, report, and linked untracked regular files
+    under the work item only. A failed `git add` halts.
+  - Every link resolves against the index.
+  - `updated:` accounts for the newest row.
 
+  Each SKILL.md block is one call with a `{placeholder}` path. The read-back was a fenced block in
+  both skills for three QA cycles, and each cycle found a new gap in it, so it became one script
+  tested directly. `doc-links.js` now labels each broken link `untracked`, `ignored` (gitignored,
+  never committable), `outside-repo`, `unverifiable` or `missing`. `missing` is compared component
+  by component against the directory listing, so a case-insensitive disk cannot pass a link that is
+  dead on Linux, and a symlinked target counts only when it leads inside the repository. The state
+  appears in `--json` and on the `✖` line; the `✖` / `FAIL doc-links:` markers are unchanged.
+  `change-log.js` gains `checkUpdatedCoherence()` and its first CLI. The corpus test's §5 now uses
+  it, with an independent witness for any Change Log the shared reader cannot see. The self-assessed
+  checklist item "QA report file created and saved" is replaced by the measured one.
+  `tests/qa-evidence-integrity.test.js` holds all eleven prose sites, section-scoped, and
+  `tests/qa-read-back-block.test.js` runs each delivered block under bash and zsh.
 - **`/commit-changes --scope` stages inside the scope only (task 147, obs #142).** Scope mode ran a
   bare `git add -u` before its allowlist, so it staged tracked modifications across the whole tree.
   In a checkout another session was editing, that swept the other session's `package.json`,

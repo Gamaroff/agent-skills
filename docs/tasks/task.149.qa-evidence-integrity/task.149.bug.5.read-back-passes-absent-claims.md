@@ -4,7 +4,7 @@
 **Bug ID**: TASK-149-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 3, safety re-probe review CR-2 and CR-3; verified by reading the blocks)
 **Date Found**: 2026-09-26
 
@@ -44,9 +44,14 @@ passing arm. Add block-test scenarios for each.
   That makes 52 cases.
 - Mutation-proved: removing the report halt, and letting `no-log` pass, each turn their scenarios red.
 
+#### QA Verification (cycle 4) — Closed
+
+The no-gate, no-report and no-row scenarios halt under bash and zsh (52 cases), and both mutations turn them red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-26 | New | QA Engineer | Found in QA cycle 3 |
 | 2026-09-26 | Ready for QA | qa-fix | Fixed in qa-fix cycle 3 |
+| 2026-09-26 | Closed | QA Engineer | Verified in QA cycle 4 |
