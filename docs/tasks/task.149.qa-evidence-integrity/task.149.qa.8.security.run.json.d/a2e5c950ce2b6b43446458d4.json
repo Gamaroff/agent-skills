@@ -1,0 +1,21 @@
+{
+  "sink": "filename",
+  "entry": "shell:shared/resources/qa-cycle.sh",
+  "name": "qa-cycle.sh cycle derivation",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 28,
+  "passed": 28,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-26T12:28:06.349Z"
+}

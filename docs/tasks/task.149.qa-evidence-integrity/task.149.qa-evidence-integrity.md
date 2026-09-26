@@ -5,10 +5,12 @@ type: task
 description: "Close four places where qa-task and qa-story record a claim that no check ever reads back: the snippet engine cannot seed a path-addressed directory, so correct discovery blocks fail (obs #143); a module-private predicate is recorded as `boundary: false` instead of being exported and probed (obs #156); the one standards-named validation command `npm test` does not cover is run by no QA step (obs #163); and the task document is edited to link QA artifacts after the last check ran, so a missing report or a stale `updated:` ships green (obs #164)."
 tags: [qa-task, qa-story, create-task, qa-execute-snippets, security-probe, doc-links, change-log, observation]
 category: testing
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-26
+completed_date: 2026-09-26
+pr_number: 493
 assignee:
 estimated_effort_hours: 16
 github_issue: 479
@@ -16,7 +18,9 @@ github_issue: 479
 
 # Technical Task: QA evidence integrity — qa-task/qa-story claims that no check reads back
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.149.review.1.qa-evidence-integrity.md` implemented 2026-09-26
 
 **GitHub Issue**: [#479](https://github.com/Gamaroff/agent-skills/issues/479)
 
@@ -68,26 +72,26 @@ red — is caught by a QA step on the same run, or turns a named test red.
    finalise agent applied the same rule to the same diff, got `entry-not-probeable` because the
    predicate was a module-private `const`, and the fix (`d25adf2e`, 2026-09-22) was to export it — at
    which point a null-byte hole surfaced. Step 3b step 3 already says "it is bash" and "it takes
-   several flags" are never reasons for `boundary: false` (`skills/qa-task/SKILL.md:469–491`); it says
+   several flags" are never reasons for `boundary: false` (`skills/qa-task/SKILL.md:474–496`); it says
    nothing about "it is not exported", and the engine's decline reads only
    `export <name> is not a function` (`shared/resources/security-probe.mjs:247–251`).
 3. **A standards-named check that no gate runs** (obs #163, 2026-09-22).
    `docs/architecture/concepts/coding-standards.md:69` lists `npm run validate -- skills/<changed-skill>/`
    first under *Validation before commit*; `npm test` does not run it (`package.json` `"validate"` is
    `quick_validate.py`, absent from the `"test"` script). qa-task Step 4 names only
-   `nx test` / `nx build` / `nx lint` (`skills/qa-task/SKILL.md:612`), and qa-story Phase 4 points at a
-   path that does not exist in this layout (`skills/qa-story/SKILL.md:1236`, `docs/coding-standards.md`).
+   `nx test` / `nx build` / `nx lint` (`skills/qa-task/SKILL.md:622`), and qa-story Phase 4 points at a
+   path that does not exist in this layout (`skills/qa-story/SKILL.md:1240`, `docs/coding-standards.md`).
    On task.141 every local gate was green and CI's `validate` job went red on an angle bracket in a
    `description`. Authoring does not compensate: of the 109 task documents (out of 146) that name a
    `skills/*/SKILL.md`, 23 name `npm run validate` or `quick_validate` — measured with the loop in
    § 8 *Baselines*.
 4. **The last check runs before the last write** (obs #164, 2026-09-22, recurrence 2026-09-23).
    qa-task Step 12 edits the task document to link the QA report and gate
-   (`skills/qa-task/SKILL.md:1153`) and appends a Change Log row, and nothing afterwards reads those
+   (`skills/qa-task/SKILL.md:1157`) and appends a Change Log row, and nothing afterwards reads those
    claims back. On task.141 cycle 4 the linked report was never written (CI `link-check` red); on
    cycle 6 the row was dated a day after `updated:` (CI `tests/work-item-artifact-naming.test.js` §5
    red). The checklist item that should catch the first — "QA report file created and saved"
-   (`skills/qa-task/SKILL.md:1485`, `skills/qa-story/SKILL.md:2048`) — is ticked from memory.
+   (`skills/qa-task/SKILL.md:1489`, `skills/qa-story/SKILL.md:2052`) — is ticked from memory.
 
 ### Benefits of Solution
 
@@ -109,27 +113,29 @@ red — is caught by a QA step on the same run, or turns a named test red.
   `copyFrom` is set, `cpSync(copyFrom, tmp, { recursive: true })`
   (`shared/resources/qa-execute-snippets.mjs:1617`). One `--copy <dir>`, not repeatable
   (`:1757`, `case "--copy":`). Documented at `shared/resources/qa-runnable-prose-detection.md:350` and
-  in the Step 4b / Phase 1.7 paragraphs (`skills/qa-task/SKILL.md:661`,
-  `skills/qa-story/SKILL.md:1096`). Existing test: `QA-11` (a failing `--copy` removes its temp
+  in the Step 4b / Phase 1.7 paragraphs (`skills/qa-task/SKILL.md:665`,
+  `skills/qa-story/SKILL.md:1100`). Existing test: `QA-11` (a failing `--copy` removes its temp
   directory) in `shared/resources/tests/qa-execute-snippets.test.mjs`.
 - **Boundary decisions** — qa-task Step 3b step 3 (*Apply the boundary rule — execute, do not only
-  read*, `skills/qa-task/SKILL.md:469`) and the identical qa-story Phase 1.6 step 3
-  (`skills/qa-story/SKILL.md:978`) route bash, sourced-library and CLI boundaries to entry forms and
-  call `boundary: false` "the common case and a legitimate skip" (`:502` / `:1010`). The decline
+  read*, `skills/qa-task/SKILL.md:474`) and the identical qa-story Phase 1.6 step 3
+  (`skills/qa-story/SKILL.md:982`) route bash, sourced-library and CLI boundaries to entry forms and
+  call `boundary: false` "the common case and a legitimate skip" (`:506` / `:1014`). The decline
   vocabulary is `probe-boundary-rule.md` §4 (`shared/resources/probe-boundary-rule.md:139`,
   `entry-not-probeable` — "the module would not import, or the export is not a function"). The engine's
   child returns one message for an absent export and for a non-function export
   (`shared/resources/security-probe.mjs:247–251`).
-- **Test/validation step** — qa-task Step 4 (`skills/qa-task/SKILL.md:612`) and qa-story Phase 4
-  *Standards Compliance Check* (`skills/qa-story/SKILL.md:1234`). The coding standards are loaded on
+- **Test/validation step** — qa-task Step 4 (`skills/qa-task/SKILL.md:622`) and qa-story Phase 4
+  *Standards Compliance Check* (`skills/qa-story/SKILL.md:1238`). The coding standards are loaded on
   every pipeline run via `devLoadAlwaysFiles` (`docs/standards/architecture-docs.md:27`,
   `coding-standards.md` "Required — always loaded"). create-task's Section 9 prompt lists CODE QUALITY as
-  coverage / lint / TypeScript (`skills/create-task/SKILL.md:816`), mirrored in
+  coverage / lint / TypeScript (`skills/create-task/SKILL.md:817`), mirrored in
   `skills/create-task/resources/task-template.md:274`.
 - **Link and timestamp checks** — `shared/resources/doc-links.js` resolves a document's relative links
   against the **tracked** tree (`checkDocument`, `:271–273`: `tracked.has(resolved) || dirs.has(resolved)`),
   so an artifact that exists but is uncommitted and one that was never written yield the same
-  `✖ … (resolves to …)` line. It is bundled into `finalise` only. `shared/resources/change-log.js`
+  `✖ … (resolves to …)` line. It is bundled into `finalise`, `review-story` and `review-task` — neither QA skill
+  carries a copy. With no tracked tree (not a git checkout) it falls back to `fs.existsSync`, so there every
+  broken link can only be `missing`; `untracked` is reachable only when the tracked set is read. `shared/resources/change-log.js`
   exports `bumpUpdated()` (`:786`) but has no CLI (`grep -c "require.main"
   shared/resources/change-log.js` → 0) and no coherence check; the only `updated:`-vs-row check is the
   corpus test's private `changeLogRowDates` (`tests/work-item-artifact-naming.test.js:274`, §5 at
@@ -154,13 +160,18 @@ red — is caught by a QA step on the same run, or turns a named test red.
   in the prose: this repository's `npm run validate -- skills/<changed-skill>/`. qa-story Phase 4's
   path becomes the standards file the pipeline actually loads.
 - **Read-back step** — qa-task **Step 12b** (between Step 12 and Step 13) and qa-story Review Completion
-  item **3e** stage the artifacts this run wrote (task.152's convention), then run, against the
-  document just edited:
-  `doc-links.js --file <doc> --json` → each broken link now carries `state: missing | untracked`;
-  `missing` halts before the PR comment (write the artifact), `untracked` lists files to commit.
-  `change-log.js --check-updated --file <doc>` → exit 1 when the newest row is dated after
-  `updated:`; the remedy is `bumpUpdated()`, which Step 12 now names. The self-assessed checklist item
-  becomes "every artifact the document links to resolves (Step 12b)".
+  item **3e** are one call each: `node …/qa-read-back.js --doc <doc>` (**shipped**: the read-back was a
+  fenced block for QA cycles 1–3 and each cycle found a gap in it — BUG-2, -3, -5, -6, -7 — so it
+  became one script, `shared/resources/qa-read-back.js`, tested directly). The script finds this
+  cycle's gate and QA report through `qa-cycle.sh <dir> --path gate|qa` (BUG-11), checks they and a
+  Change Log row exist, stages what the run wrote (the document, gate, report, and linked untracked
+  regular files under the work item only), then reads back with the two engines:
+  `doc-links.js` → each broken link carries a `state` (`missing`, `untracked`, `ignored`,
+  `outside-repo`, `unverifiable`), and `change-log.js` `checkUpdatedCoherence` → the newest row
+  must not be dated after `updated:` (remedy `bumpUpdated()`, which Step 12 now names). Exit 0
+  clean, 1 HALT (every unconfirmed claim, with its own remedy), 2 could not look (the run did not
+  complete) — never a pass. The self-assessed checklist item becomes "every artifact the document
+  links to resolves (Step 12b)".
 - `tests/work-item-artifact-naming.test.js` §5 imports the new `checkUpdatedCoherence` rather than
   keeping its own row reader, so the corpus guard and the QA read-back cannot disagree.
 
@@ -243,10 +254,10 @@ all four.
 **Files**: `shared/resources/qa-execute-snippets.mjs`, `shared/resources/qa-runnable-prose-detection.md`,
 `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, `shared/resources/tests/qa-execute-snippets.test.mjs`
 
-- [ ] `--copy-as <src>:<dest>`, repeatable; `executeFile` option `copyAs: [{ src, dest }]`
-- [ ] Reject an absolute `<dest>` or one resolving outside the working copy — exit 2, temp root removed
-- [ ] Usage string, header comment and `qa-runnable-prose-detection.md` document the form
-- [ ] qa-task Step 4b and qa-story Phase 1.7 name `--copy-as docs:docs` for the `sync-github-*`
+- [x] `--copy-as <src>:<dest>`, repeatable; `executeFile` option `copyAs: [{ src, dest }]`
+- [x] Reject an absolute `<dest>` or one resolving outside the working copy — exit 2, temp root removed
+- [x] Usage string, header comment and `qa-runnable-prose-detection.md` document the form
+- [x] qa-task Step 4b and qa-story Phase 1.7 name `--copy-as docs:docs` for the `sync-github-*`
       discovery blocks, citing obs #143
 
 ### Phase 2: an unexported predicate is exported and probed (obs #156) (Risk: Low)
@@ -254,12 +265,12 @@ all four.
 **Files**: `shared/resources/security-probe.mjs`, `shared/resources/probe-boundary-rule.md`,
 `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, `shared/resources/tests/security-probe.test.mjs`
 
-- [ ] Child: `!(spec.exportName in mod)` → `<name> is not exported by <path> — … export it and re-run`;
+- [x] Child: `!(spec.exportName in mod)` → `<name> is not exported by <path> — … export it and re-run`;
       a present non-function keeps `is not a function`
-- [ ] §4 table: the `entry-not-probeable` row names the unexported case and its remedy
-- [ ] Step 3b / Phase 1.6 step 3: "it is not exported" joins "it is bash" and "it takes several flags"
+- [x] §4 table: the `entry-not-probeable` row names the unexported case and its remedy
+- [x] Step 3b / Phase 1.6 step 3: "it is not exported" joins "it is bash" and "it takes several flags"
       as never a reason for `boundary: false`, with task.139's `isWorkItemDocument` as the example
-- [ ] A `boundary: false` record lists each predicate-shaped function the diff adds and the reason it
+- [x] A `boundary: false` record lists each predicate-shaped function the diff adds and the reason it
       is not a boundary
 
 ### Phase 3: run the standards-named validation commands (obs #163) (Risk: Low)
@@ -267,36 +278,39 @@ all four.
 **Files**: `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, `skills/create-task/SKILL.md`,
 `skills/create-task/resources/task-template.md`
 
-- [ ] qa-task Step 4: run each validation command the coding standards name that the test run does
+- [x] qa-task Step 4: run each validation command the coding standards name that the test run does
       not cover; record each; non-zero → `category: bug`, `high`
-- [ ] qa-story Phase 4: the same, and replace `docs/coding-standards.md` with the loaded standards path
-- [ ] create-task Section 9 CODE QUALITY and `task-template.md` Code Quality: "every validation command
+- [x] qa-story Phase 4: the same, and replace `docs/coding-standards.md` with the loaded standards path
+- [x] create-task Section 9 CODE QUALITY and `task-template.md` Code Quality: "every validation command
       the coding standards name for the files this task touches"
 
 ### Phase 4: read the claims back after the write (obs #164) (Risk: Medium)
 
-**Files**: `shared/resources/doc-links.js`, `shared/resources/change-log.js`, `skills/qa-task/SKILL.md`,
-`skills/qa-story/SKILL.md`, `tests/work-item-artifact-naming.test.js`,
-`shared/resources/tests/doc-links.test.mjs`, `shared/resources/tests/change-log.test.mjs`
+**Files**: `shared/resources/doc-links.js`, `shared/resources/change-log.js`,
+`shared/resources/qa-read-back.js` (new, QA cycle 4), `shared/resources/qa-cycle.sh` (`--path`, QA cycle 7),
+`skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, `tests/work-item-artifact-naming.test.js`,
+`shared/resources/tests/doc-links.test.mjs`, `shared/resources/tests/change-log.test.mjs`,
+`shared/resources/tests/qa-read-back.test.mjs`, `tests/qa-read-back-block.test.js`, `tests/qa-cycle.test.js`
 
-- [ ] `doc-links.js`: each broken link carries `state` — `untracked` (on disk, not tracked) or
-      `missing`; the `✖` line appends it
-- [ ] `change-log.js`: `checkUpdatedCoherence(content)` and `--check-updated --file <doc> [--json]`
+- [x] `doc-links.js`: each broken link carries `state` — `untracked` (on disk, not tracked) or
+      `missing`; the `✖` line appends it. With no tracked tree every broken link is `missing`
+- [x] `change-log.js`: `checkUpdatedCoherence(content)` and `--check-updated --file <doc> [--json]`
       (exit 0 `ok`, 1 `stale-updated`, 2 `usage`)
-- [ ] qa-task Step 12 names `bumpUpdated()` for the `updated:` bump
-- [ ] qa-task **Step 12b** and qa-story Review Completion **3e**: run both CLIs on the edited document;
-      `missing` or `stale-updated` halts before the PR comment; `untracked` is listed for commit
-- [ ] Both checklists: "QA report file created and saved" → "every artifact the document links to
+- [x] qa-task Step 12 names `bumpUpdated()` for the `updated:` bump
+- [x] qa-task **Step 12b** and qa-story Review Completion **3e**: one `qa-read-back.js --doc` call on the
+      edited document (it runs both engines); any unconfirmed claim halts before the PR comment
+      (as shipped — the two-CLI prose block was consolidated into the script at QA cycle 4)
+- [x] Both checklists: "QA report file created and saved" → "every artifact the document links to
       resolves (Step 12b)"
-- [ ] §5 of `tests/work-item-artifact-naming.test.js` uses `checkUpdatedCoherence`
+- [x] §5 of `tests/work-item-artifact-naming.test.js` uses `checkUpdatedCoherence`
 
 ### Phase 5: population test, bundle, docs (Risk: Low)
 
 **Files**: `tests/qa-evidence-integrity.test.js` (new), `CHANGELOG.md`, bundled `references/` (generated)
 
-- [ ] Section-scoped population test over the eleven prose sites (§ 8)
-- [ ] `npm run bundle` — `doc-links.js` now reaches `qa-task` and `qa-story`
-- [ ] CHANGELOG `[Unreleased]` › Changed cites `(task 149)`
+- [x] Section-scoped population test over the eleven prose sites (§ 8)
+- [x] `npm run bundle` — `doc-links.js` now reaches `qa-task` and `qa-story`
+- [x] CHANGELOG `[Unreleased]` › Changed cites `(task 149)`
 
 ---
 
@@ -329,6 +343,17 @@ all four.
 
 17. ✅ `CHANGELOG.md`
 18. ✅ `skills/*/references/*` — regenerated by `npm run bundle`, never hand-edited
+
+### Files Added / Modified During the QA Loop
+
+These were not in the plan. Each one traces to a bug report or QA cycle:
+
+19. ✅ `shared/resources/qa-read-back.js` — **new**. The Step 12b / 3e read-back, as one tested script (BUG-6, BUG-7; cycle 4).
+20. ✅ `shared/resources/qa-cycle.sh` — `--path gate|qa`, the cycle's file (BUG-11; cycle 7).
+21. ✅ `shared/resources/tests/qa-read-back.test.mjs` — **new**. Tests the script directly.
+22. ✅ `tests/qa-read-back-block.test.js` — **new**. Runs the delivered SKILL.md blocks under bash and zsh (BUG-2, BUG-3).
+23. ✅ `tests/qa-cycle.test.js` — `--path` cases under bash and zsh (BUG-11).
+24. ✅ `tests/lib/markdown-section.js` — **new**. The section reader shared by the population tests (Step 3), with `tests/outcome-reachability-check.test.js` updated to use it.
 
 ### Files to Delete
 
@@ -396,34 +421,35 @@ None.
 
 ### Functional
 
-- [ ] `--copy-as docs:docs` makes an `ls docs/tasks` block pass that `--copy docs` fails, and an
+- [x] `--copy-as docs:docs` makes an `ls docs/tasks` block pass that `--copy docs` fails, and an
       escaping or absolute `dest` is exit 2 with no temp leak — `shared/resources/tests/qa-execute-snippets.test.mjs`
-- [ ] Probing an unexported predicate yields `entry-not-probeable` with a `detail` naming "not exported"
+- [x] Probing an unexported predicate yields `entry-not-probeable` with a `detail` naming "not exported"
       and "export it"; a non-function export keeps its message — `shared/resources/tests/security-probe.test.mjs`
-- [ ] `doc-links.js --json` labels each broken link `untracked` or `missing` correctly, markers
+- [x] `doc-links.js --json` labels each broken link `untracked` or `missing` correctly, markers
       unchanged — `shared/resources/tests/doc-links.test.mjs`
-- [ ] `change-log.js --check-updated` exits 1 on a row dated after `updated:`, 0 otherwise, and ignores
+- [x] `change-log.js --check-updated` exits 1 on a row dated after `updated:`, 0 otherwise, and ignores
       fenced rows — `shared/resources/tests/change-log.test.mjs`
-- [ ] All eleven prose sites carry their rule, section-scoped — `tests/qa-evidence-integrity.test.js`
+- [x] All eleven prose sites carry their rule, section-scoped — `tests/qa-evidence-integrity.test.js`
 
 ### Performance
 
-- [ ] `tests/qa-evidence-integrity.test.js` runs in under one second (file reads only, no network)
-- [ ] The new engine tests add no network access and clean every temp directory they create
+- [x] `tests/qa-evidence-integrity.test.js` runs in under one second (file reads only, no network)
+- [x] The new engine tests add no network access and clean every temp directory they create
 
 ### Code Quality
 
-- [ ] Every new assertion mutation-proved: revert each engine change and remove each prose site in turn
+- [x] Every new assertion mutation-proved: revert each engine change and remove each prose site in turn
       → the named test goes red naming it; the runs are recorded in the implementation report
-- [ ] `npm run ci:fast`, `npm run bundle -- --check`, `npm run check:generated` clean
-- [ ] `npm run validate -- skills/qa-task/`, `skills/qa-story/`, `skills/create-task/` clean — the
+- [x] `npm run ci:fast`, `npm run bundle -- --check`, `npm run check:generated` clean
+- [x] `npm run validate -- skills/qa-task/`, `skills/qa-story/`, `skills/create-task/` clean — the
       command this task makes QA run
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 149)`
-- [ ] §5 of `tests/work-item-artifact-naming.test.js` reports the same `checked` count before and after
-      switching to `checkUpdatedCoherence` (both recorded in the implementation report)
+- [x] CHANGELOG `[Unreleased]` cites `(task 149)`
+- [x] §5 of `tests/work-item-artifact-naming.test.js` reports the same `checked` count before and after
+      switching to `checkUpdatedCoherence` (both recorded in the implementation report) — 130 before, 132 after:
+      the two are documents the old reader missed (task.42, task.44), explained per Risk 1's mitigation
 - [ ] Observations #143, #163 and #164 set to `actioned` on merge; #156 per Open Question 2
 
 ---
@@ -448,8 +474,8 @@ None.
    - Probability: Low · Impact: Medium
    - Mitigation: that link is already a CI red; the halt message names the link, and the remedy
      (write or fix it) is the same one CI would demand one push later.
-3. **Conflicts with planned siblings** — task.146 edits Step 3b step 2 of both QA skills (this task
-   edits step 3); task.152 adds `doc-links.js` to qa-task Step 11 / qa-story *Output 1*, bundles it
+3. **Conflicts with siblings** — task.146 (edits Step 3b step 2 of both QA skills; this task edits step 3)
+   is **merged** (`status: accepted`, `b6bf41d5`), so its edits are already in the base; task.152 adds `doc-links.js` to qa-task Step 11 / qa-story *Output 1*, bundles it
    into both QA skills and widens `doc-links.test.mjs`; task.153 adds a marker at
    `shared/resources/tests/qa-execute-snippets.test.mjs:795`. Found with
    `grep -n -e qa-execute-snippets -e doc-links -e change-log.js -e security-probe` over the
@@ -504,21 +530,120 @@ None.
 
 ---
 
-## Change Log
+## QA Testing Results
 
-| Date       | Version | Description                                                                                          | Author      |
-| ---------- | ------- | ---------------------------------------------------------------------------------------------------- | ----------- |
-| 2026-09-24 | 1.0     | Initial draft — cut from observations #143, #156, #163, #164 (2026-09-24 observation review) | create-task |
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-26
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.149.qa.8.qa-evidence-integrity.md](./task.149.qa.8.qa-evidence-integrity.md)
+- **Gate File**: [task.149.gate.8.qa-evidence-integrity.yml](./task.149.gate.8.qa-evidence-integrity.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 4238 (4237 pass, 0 fail, 1 skipped; CI 5/5 SUCCESS at 2892f50b); 84 boundary probes, 0 reproduced
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- No open findings. Closed: BUG-1 … BUG-11.
+- Follow-up (pre-existing on develop): the QA skills' `find -name` gate lookups miss a zero-padded gate that `qa-cycle.sh` counts — switch them to `qa-cycle.sh --path` (gate 8 `recommendations.future`).
 
 ---
 
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
+
+**Status (run 1):** IN PROGRESS — all three gaps closed in `8a7d7603`; superseded by the run-2 verdict below.
+
+### QA Gate Status
+
+**QA Report**: `task.149.qa.8.qa-evidence-integrity.md`
+**Gate File**: `task.149.gate.8.qa-evidence-integrity.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Documentation:**
+   - [x] PC-3 — the `shared/resources/qa-cycle.sh` header says `--path` is "the only definition of this cycle's file", while `skills/qa-task/SKILL.md` and `skills/qa-story/SKILL.md` still resolve the gate with `find -name`. Reword it to "the definition qa-read-back.js uses", and name the follow-up.
+   - [x] PC-4 — `CHANGELOG.md` `[Unreleased]` does not mention the new `qa-cycle.sh <dir> --path gate|qa` mode.
+   - [x] PC-6 — § 3 Target Architecture, Phase 4 and § 7 Files Summary do not name `qa-read-back.js`, `qa-cycle.sh --path`, `shared/resources/tests/qa-read-back.test.mjs`, `tests/qa-read-back-block.test.js`, `tests/qa-cycle.test.js` or `tests/lib/markdown-section.js`. Phase 4 still says the steps "run both CLIs".
+
+All other sections pass. Acceptance criteria are 12/12 (AC13 is post-merge by design). Security passed with 84 probes and 0 reproduced. Compliance is not applicable, and CI is 5/5 green.
+
+### Next Steps:
+
+- [x] Make the three documentation corrections above in one docs commit
+- [ ] Re-run `/finalise`
+
+**Estimated Effort:** Small (under 30 minutes). These are documentation corrections only.
+
+**Gap Report Generated:** 2026-09-26
+**QA Gate Reference**: See `task.149.gate.8.qa-evidence-integrity.yml`
+
+**Detailed Verification Log:** See `task.149.dod.1.qa-evidence-integrity.md` for complete verification evidence.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.149.qa.8.qa-evidence-integrity.md`
+**Gate File**: `task.149.gate.8.qa-evidence-integrity.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (8 QA cycles; the loop-limit escalation at cycle 5 was re-entered with user-granted cycles)
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Acceptance Criteria:** 12/12 pre-merge criteria met with per-PR tests; the "observations actioned on merge" criterion is post-merge by its own wording
+✅ **PR Review:** Step 5c `/review-pr` — CONCERNS, advisory (`task.149.pr-review.1.qa-evidence-integrity.md`); its documentation findings closed, CR-1 carried as a follow-up
+✅ **Documentation:** CHANGELOG, the qa-cycle.sh header, and this document's § 3 / Phase 4 / § 7 match what shipped
+✅ **Security Review:** 4 boundaries probed — 84 candidates executed, 0 reproduced
+✅ **Compliance Review:** not applicable (internal QA tooling)
+✅ **CI:** 5/5 SUCCESS @ `8a7d7603`
+
+**Task marked as ACCEPTED on:** 2026-09-26
+
+**Detailed Verification Log:** See `task.149.dod.2.qa-evidence-integrity.md` for complete verification evidence (run 1: `task.149.dod.1.qa-evidence-integrity.md`).
+---
+<!-- change-log-start -->
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2026-09-24 | 1.0     | Initial draft — cut from observations #143, #156, #163, #164 (2026-09-24 observation review) | create-task |
+| 2026-09-26 | 1.1     | Review passed (9/10) — doc-links bundling claim and task.146 status corrected, 14 line anchors re-pointed, no-tracked-tree `state` stated | review-task |
+| 2026-09-26 |         | Status → ready-for-development | review-task |
+| 2026-09-26 |         | Implemented — 4 engines, 11 prose sites, 1 new population test + shared section reader; 26 tests added | develop |
+| 2026-09-26 |         | QA gate FAIL (70/100) — 1 high, 1 medium, 2 low | qa-task |
+| 2026-09-26 |         | QA gate FAIL (60/100) — 1 high (reopened), 2 medium, 3 low | qa-task |
+| 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium, 3 low | qa-task |
+| 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 2 medium, 1 low | qa-task |
+| 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 2 medium | qa-task |
+| 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium, 2 low | qa-task |
+| 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium | qa-task |
+| 2026-09-26 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-09-26 |         | QA findings fixed — gate PASS (100/100), 7 fix cycles | qa-fix |
+| 2026-09-26 |  | DoD incomplete — 3 gaps identified (documentation) | finalise |
+| 2026-09-26 |  | DoD gaps closed — § 3, Phase 4 and § 7 name what shipped; CHANGELOG and qa-cycle.sh header corrected | develop |
+| 2026-09-26 | 1.2 | DoD passed — accepted (PR #493) | finalise |
+
+---
+<!-- change-log-end -->
+
 ## Progress Tracking
 
-- [ ] Phase 1: seed at the addressed path (obs #143)
-- [ ] Phase 2: an unexported predicate is exported and probed (obs #156)
-- [ ] Phase 3: run the standards-named validation commands (obs #163)
-- [ ] Phase 4: read the claims back after the write (obs #164)
-- [ ] Phase 5: population test, bundle, docs
+- [x] Phase 1: seed at the addressed path (obs #143)
+- [x] Phase 2: an unexported predicate is exported and probed (obs #156)
+- [x] Phase 3: run the standards-named validation commands (obs #163)
+- [x] Phase 4: read the claims back after the write (obs #164)
+- [x] Phase 5: population test, bundle, docs
 
 ---
 
@@ -530,7 +655,7 @@ None.
 - Observation #163 — `npm run validate` is named in the standards and run by no gate (2026-09-22, task.141)
 - Observation #164 — qa-task links the QA report without checking it exists; recurrence on the
   Change Log date (2026-09-22 / 2026-09-23, task.141)
-- task.146 — adjacent edit to Step 3b step 2 of both QA skills (see Risk 3)
+- task.146 — adjacent edit to Step 3b step 2 of both QA skills; merged, already in the base (see Risk 3)
 - task.152 — `doc-links.js` at the QA report writer sites; staging convention reused by Step 12b
   (see § 3 and Risk 3)
 

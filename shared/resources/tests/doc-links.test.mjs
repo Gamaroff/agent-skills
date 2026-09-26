@@ -384,3 +384,128 @@ test("corpus: every work-item document's relative links resolve and every fence 
     `KNOWN entries no longer dead — delete them so the ratchet tightens:\n  ${healed.join("\n  ")}`,
   );
 });
+
+test("state (task.149, obs #164): a broken link says whether the target is untracked on disk or missing, and the red markers are unchanged", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[report](report.md) [gate](gate.yml) [ok](b.md)\n",
+    );
+    fs.writeFileSync(path.join(dir, "docs", "b.md"), "# b\n");
+    fs.writeFileSync(
+      path.join(dir, "docs", "report.md"),
+      "# written, not committed\n",
+    );
+    execFileSync("git", ["add", "docs/a.md", "docs/b.md"], { cwd: dir });
+
+    const r = checkDocument("docs/a.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => [b.target, b.state]),
+      [
+        ["report.md", "untracked"],
+        ["gate.yml", "missing"],
+      ],
+    );
+
+    let out;
+    try {
+      execFileSync("node", [ENGINE, "--file", "docs/a.md"], {
+        cwd: dir,
+        encoding: "utf8",
+      });
+    } catch (e) {
+      out = e.stdout;
+    }
+    assert.match(out, /^✖ docs\/a\.md:1 → report\.md .*\[untracked\]$/m);
+    assert.match(out, /^✖ docs\/a\.md:1 → gate\.yml .*\[missing\]$/m);
+    assert.match(out, /^FAIL doc-links: 2 finding\(s\) in docs\/a\.md$/m);
+  });
+});
+
+test("state (task.149): outside a repository the disk was already read, so a broken link can only be missing", () => {
+  withNonRepoFixture((dir) => {
+    fs.writeFileSync(path.join(dir, "a.md"), "[x](x.md)\n");
+    const r = checkDocument("a.md", { root: dir });
+    assert.equal(r.tracked, false);
+    assert.deepEqual(
+      r.broken.map((b) => b.state),
+      ["missing"],
+    );
+  });
+});
+
+test("state (task.149 CR-2): a gitignored target on disk is ignored, not untracked — it can never be committed", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(path.join(dir, ".gitignore"), "*.log\n");
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[log](run.log) [new](new.md)\n",
+    );
+    fs.writeFileSync(path.join(dir, "docs", "run.log"), "x\n");
+    fs.writeFileSync(path.join(dir, "docs", "new.md"), "# new\n");
+    execFileSync("git", ["add", ".gitignore", "docs/a.md"], { cwd: dir });
+    const r = checkDocument("docs/a.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => [b.target, b.state]),
+      [
+        ["run.log", "ignored"],
+        ["new.md", "untracked"],
+      ],
+    );
+  });
+});
+
+test("state (TASK-149-BUG-4): a case-mismatched link is missing on every filesystem, and a link above the repository is outside-repo — never untracked", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[r](Report.md) [d](../Docs/b.md) [o](../../outside.md) [ok](new.md)\n",
+    );
+    fs.writeFileSync(path.join(dir, "docs", "report.md"), "# r\n");
+    fs.writeFileSync(path.join(dir, "docs", "b.md"), "# b\n");
+    fs.writeFileSync(path.join(dir, "docs", "new.md"), "# new\n");
+    fs.writeFileSync(path.join(path.dirname(dir), "outside.md"), "# o\n");
+    try {
+      execFileSync("git", ["add", "docs/a.md"], { cwd: dir });
+      const r = checkDocument("docs/a.md", { root: dir });
+      assert.deepEqual(
+        r.broken.map((b) => [b.target, b.state]),
+        [
+          ["Report.md", "missing"],
+          ["../Docs/b.md", "missing"],
+          ["../../outside.md", "outside-repo"],
+          ["new.md", "untracked"],
+        ],
+      );
+    } finally {
+      fs.rmSync(path.join(path.dirname(dir), "outside.md"), { force: true });
+    }
+  });
+});
+
+test("state (TASK-149 CR3-1): a symlinked link target is untracked only when it leads to something real inside the repository", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "docs", "real.md"), "# r\n");
+    fs.symlinkSync("real.md", path.join(dir, "docs", "inside.md"));
+    fs.symlinkSync("nowhere.md", path.join(dir, "docs", "dangling.md"));
+    fs.symlinkSync(os.tmpdir(), path.join(dir, "docs", "ext"));
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[i](inside.md) [d](dangling.md) [e](ext)\n",
+    );
+    execFileSync("git", ["add", "docs/a.md", "docs/real.md"], { cwd: dir });
+    const r = checkDocument("docs/a.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => [b.target, b.state]),
+      [
+        ["inside.md", "untracked"],
+        ["dangling.md", "missing"],
+        ["ext", "outside-repo"],
+      ],
+    );
+  });
+});

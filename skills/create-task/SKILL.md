@@ -818,6 +818,7 @@ CODE QUALITY:
 - [ ] Test coverage maintained 80%+
 - [ ] All linting passes
 - [ ] No TypeScript errors
+- [ ] Every validation command the coding standards name for the files this task touches (e.g. `npm run validate -- skills/<skill>/` when a `SKILL.md` changes)
 
 MIGRATION:
 - [ ] CHANGELOG.md updated

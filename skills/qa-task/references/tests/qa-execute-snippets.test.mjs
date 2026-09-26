@@ -46,6 +46,7 @@ const {
   executeFile,
   extractBlocks,
   extractTableCellCommands,
+  isWithin,
   runBlock,
   sandboxEnv,
   snapshotTree,
@@ -2475,4 +2476,316 @@ test("TASK87-001 and TASK87-002 hold together, not just separately", () => {
     extractTableCellCommands(doc).map((b) => b.code),
     ["echo both"],
   );
+});
+
+// ── task.149 — --copy-as seeds at the path a block addresses (obs #143) ───────
+
+// A fixture tree whose `docs/tasks/a.md` a block reaches as `docs/tasks`.
+function docsFixture() {
+  const root = tmp();
+  mkdirSync(join(root, "docs", "tasks"), { recursive: true });
+  writeFileSync(join(root, "docs", "tasks", "a.md"), "x\n");
+  return root;
+}
+
+test("QA-18: --copy-as seeds a directory at the path the block addresses; --copy does not", () => {
+  const root = docsFixture();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("ls docs/tasks"));
+
+  const seeded = executeFile(file, {
+    allowZsh: false,
+    copyAs: [{ src: join(root, "docs"), dest: "docs" }],
+  });
+  assert.deepEqual(
+    seeded.findings,
+    [],
+    "a correct block seeded at its addressed path must pass",
+  );
+
+  // Both directions, so a harness that ignored copyAs could not pass the first.
+  const contents = executeFile(file, {
+    allowZsh: false,
+    copyFrom: join(root, "docs"),
+  });
+  assert.ok(
+    contents.findings.some((f) => f.kind === "execution-failure"),
+    "--copy places the directory's CONTENTS at the root, so docs/tasks is absent",
+  );
+});
+
+test("QA-19: --copy-as is repeatable and every pair lands", () => {
+  const root = docsFixture();
+  mkdirSync(join(root, "skills", "x"), { recursive: true });
+  writeFileSync(join(root, "skills", "x", "SKILL.md"), "y\n");
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("ls docs/tasks/a.md skills/x/SKILL.md"));
+  const r = executeFile(file, {
+    allowZsh: false,
+    copyAs: [
+      { src: join(root, "docs"), dest: "docs" },
+      { src: join(root, "skills"), dest: "skills" },
+    ],
+  });
+  assert.deepEqual(r.findings, []);
+});
+
+test("QA-20: an absolute or escaping --copy-as DEST is refused, with nothing written outside and no temp leak", () => {
+  const root = docsFixture();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("echo ok"));
+  const count = () =>
+    readdirSync(tmpdir()).filter((n) => /^qa-snippets-[^t]/.test(n)).length;
+  const before = count();
+  const marker = `qa-copy-as-escape-${process.pid}`;
+  for (const dest of [
+    `../${marker}`,
+    `../../${marker}`,
+    join(tmpdir(), marker),
+  ]) {
+    assert.throws(
+      () =>
+        executeFile(file, {
+          allowZsh: false,
+          copyAs: [{ src: join(root, "docs"), dest }],
+        }),
+      /--copy-as DEST/,
+      `DEST ${dest} must be refused`,
+    );
+  }
+  assert.equal(count(), before, "a refused DEST may not leak a temp dir");
+  assert.ok(
+    !readdirSync(tmpdir()).includes(marker),
+    "nothing may be written outside the sandbox",
+  );
+});
+
+test("QA-21: the CLI parses --copy-as SRC:DEST, repeatably, and rejects a malformed pair", () => {
+  const root = docsFixture();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("ls docs/tasks"));
+  const ok = main([
+    "--file",
+    file,
+    "--no-zsh",
+    "--copy-as",
+    `${join(root, "docs")}:docs`,
+  ]);
+  assert.equal(ok.exitCode, 0, JSON.stringify(ok.report?.findings));
+  for (const bad of ["docs", ":docs", `${root}:`]) {
+    const r = main(["--file", file, "--no-zsh", "--copy-as", bad]);
+    assert.equal(r.exitCode, 2, `--copy-as ${bad} must be a usage error`);
+    assert.match(r.error, /bad --copy-as/);
+  }
+  const escape = main([
+    "--file",
+    file,
+    "--no-zsh",
+    "--copy-as",
+    `${root}:../x`,
+  ]);
+  assert.equal(escape.exitCode, 2);
+  assert.match(escape.error, /escapes the working directory/);
+});
+
+test("QA-22: a --copy-as DEST that passes through a symlink --copy seeded is refused, and nothing lands at the link's target (TASK-149-BUG-1)", () => {
+  const root = docsFixture();
+  const outside = tmp();
+  const seed = tmp();
+  symlinkSync(outside, join(seed, "out"));
+  symlinkSync(join(outside, "nope"), join(seed, "dangling"));
+  mkdirSync(join(seed, "real"));
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("echo ok"));
+  const count = () =>
+    readdirSync(tmpdir()).filter((n) => /^qa-snippets-[^t]/.test(n)).length;
+  const before = count();
+  for (const dest of ["out/sub", "out", "dangling/sub", "dangling"]) {
+    assert.throws(
+      () =>
+        executeFile(file, {
+          allowZsh: false,
+          copyFrom: seed,
+          copyAs: [{ src: join(root, "docs"), dest }],
+        }),
+      /passes through a symlink/,
+      `DEST ${dest} must be refused`,
+    );
+  }
+  assert.deepEqual(
+    readdirSync(outside),
+    [],
+    "nothing may be written through the link",
+  );
+  assert.equal(count(), before, "a refused DEST may not leak a temp dir");
+  // The legitimate direction: a real directory beside the links is still a valid DEST.
+  const ok = executeFile(file, {
+    allowZsh: false,
+    copyFrom: seed,
+    copyAs: [{ src: join(root, "docs"), dest: "real/docs" }],
+  });
+  assert.deepEqual(ok.findings, []);
+});
+
+test("QA-23: a symlink placed by an EARLIER --copy-as pair is refused by a later pair that writes through it", () => {
+  const outside = tmp();
+  const withLink = tmp();
+  symlinkSync(outside, join(withLink, "link"));
+  const root = docsFixture();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("echo ok"));
+  assert.throws(
+    () =>
+      executeFile(file, {
+        allowZsh: false,
+        copyAs: [
+          { src: withLink, dest: "stage" },
+          { src: join(root, "docs"), dest: "stage/link/sub" },
+        ],
+      }),
+    /passes through a symlink/,
+  );
+  assert.deepEqual(readdirSync(outside), []);
+});
+
+test("QA-24: --copy-as never merges — an existing DEST is refused, so a link seeded inside it is never followed (TASK-149-BUG-1 reopened)", () => {
+  const outside = tmp();
+  const seed = tmp();
+  mkdirSync(join(seed, "docs"));
+  symlinkSync(outside, join(seed, "out"));
+  symlinkSync(outside, join(seed, "docs", "out"));
+  const srcDot = tmp();
+  mkdirSync(join(srcDot, "out"));
+  writeFileSync(join(srcDot, "out", "x"), "x\n");
+  const srcDocs = tmp();
+  mkdirSync(join(srcDocs, "out"));
+  writeFileSync(join(srcDocs, "out", "y"), "y\n");
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("echo ok"));
+  const count = () =>
+    readdirSync(tmpdir()).filter((n) => /^qa-snippets-[^t]/.test(n)).length;
+  const before = count();
+  for (const [src, dest] of [
+    [srcDot, "."],
+    [srcDot, "./"],
+    [srcDocs, "docs"],
+  ]) {
+    const why =
+      dest === "docs"
+        ? /already exists/
+        : /already exists — it is the working copy itself/;
+    assert.throws(
+      () =>
+        executeFile(file, {
+          allowZsh: false,
+          copyFrom: seed,
+          copyAs: [{ src, dest }],
+        }),
+      why,
+      `DEST ${dest} must be refused`,
+    );
+  }
+  // Two pairs into one DEST: the second finds the first's tree and is refused.
+  assert.throws(
+    () =>
+      executeFile(file, {
+        allowZsh: false,
+        copyAs: [
+          { src: srcDot, dest: "stage" },
+          { src: srcDocs, dest: "stage" },
+        ],
+      }),
+    /already exists/,
+  );
+  assert.deepEqual(
+    readdirSync(outside),
+    [],
+    "nothing may be written through a seeded link",
+  );
+  assert.equal(count(), before, "a refused DEST may not leak a temp dir");
+});
+
+const CLI = join(__dirname, "..", "qa-execute-snippets.mjs");
+
+test("QA-25: a relative TMPDIR does not make every --copy-as DEST read as escaping (TASK-149 CR3-4)", () => {
+  const work = tmp();
+  mkdirSync(join(work, "rel"));
+  mkdirSync(join(work, "src", "tasks"), { recursive: true });
+  writeFileSync(join(work, "src", "tasks", "a.md"), "x\n");
+  writeFileSync(join(work, "SKILL.md"), bash("ls docs/tasks"));
+  const r = spawnSync(
+    process.execPath,
+    [CLI, "--file", "SKILL.md", "--no-zsh", "--copy-as", "src:docs"],
+    {
+      cwd: work,
+      encoding: "utf8",
+      env: { ...process.env, TMPDIR: "rel" },
+      timeout: CLI_BUDGET.timeoutMs,
+    },
+  );
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+});
+
+test("QA-26: an SRC that contains the sandbox under another spelling is refused before any copy (TASK-149 CR3-5)", () => {
+  const real = tmp();
+  const alias = join(tmp(), "alias");
+  symlinkSync(real, alias);
+  writeFileSync(join(real, "SKILL.md"), bash("echo ok"));
+  // TMPDIR spelled through the link, SRC spelled as the real path: lexically
+  // unrelated, the same directory on disk.
+  const r = spawnSync(
+    process.execPath,
+    [
+      CLI,
+      "--file",
+      join(real, "SKILL.md"),
+      "--no-zsh",
+      "--copy-as",
+      `${real}:dup`,
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, TMPDIR: alias },
+      timeout: CLI_BUDGET.timeoutMs,
+    },
+  );
+  assert.equal(r.status, 2, r.stderr + r.stdout);
+  assert.match(r.stderr, /contains the sandbox itself/);
+  assert.deepEqual(
+    readdirSync(real).filter((n) => n.startsWith("qa-snippets-")),
+    [],
+    "the sandbox inside SRC is removed on the refusal",
+  );
+});
+
+test("QA-27: isWithin is containment on real paths — the filesystem root contains everything (TASK-149 CR4-4)", () => {
+  assert.equal(
+    isWithin("/", "/var/folders/x/qa-snippets-1"),
+    true,
+    "SRC / contains the sandbox",
+  );
+  assert.equal(isWithin("/a/b", "/a/b"), true);
+  assert.equal(isWithin("/a/b", "/a/b/c"), true);
+  assert.equal(
+    isWithin("/a/b", "/a/bc"),
+    false,
+    "a sibling sharing a prefix is not inside",
+  );
+  assert.equal(isWithin("/a/b/c", "/a/b"), false);
+  assert.equal(isWithin("/a/b", "/a/..b/c"), false);
+  // CR6-4 — a child whose name begins with two dots is inside; `..` itself is not.
+  assert.equal(isWithin("/a/b", "/a/b/..c"), true);
+  assert.equal(isWithin("/a/b", "/a/b/..c/d"), true);
+  assert.equal(isWithin("/a/b", "/a"), false);
+});
+
+test("QA-28: a --copy-as DEST whose name begins with two dots is seeded, not refused as an escape (TASK-149 CR6-4)", () => {
+  const root = docsFixture();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("ls ..seed/tasks/a.md"));
+  const r = executeFile(file, {
+    allowZsh: false,
+    copyAs: [{ src: join(root, "docs"), dest: "..seed" }],
+  });
+  assert.deepEqual(r.findings, []);
 });

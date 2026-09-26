@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": null,
+      "entry": "cli:shared/resources/qa-execute-snippets.mjs",
+      "name": "qa-execute-snippets --copy-as DEST containment",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 24,
+      "passed": 24,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--file",
+        "/private/tmp/claude-501/-Users-gamaroff-Development-Projects-agent-skills/3e798f25-c5d1-4a77-92c3-4aa6f7ed4819/scratchpad/probe/SKILL.md",
+        "--no-zsh",
+        "--copy",
+        "/private/tmp/claude-501/-Users-gamaroff-Development-Projects-agent-skills/3e798f25-c5d1-4a77-92c3-4aa6f7ed4819/scratchpad/probe/seed",
+        "--copy-as",
+        "{input}"
+      ],
+      "ran_at": "2026-09-26T12:27:58.992Z"
+    },
+    {
+      "sink": null,
+      "entry": "cli:shared/resources/qa-read-back.js",
+      "name": "qa-read-back verdict",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 18,
+      "passed": 18,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--doc",
+        "{input}"
+      ],
+      "ran_at": "2026-09-26T12:28:05.048Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shell:shared/resources/qa-cycle.sh",
+      "name": "qa-cycle.sh cycle derivation",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 28,
+      "passed": 28,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-26T12:28:06.349Z"
+    },
+    {
+      "sink": null,
+      "entry": "cli:shared/resources/change-log.js",
+      "name": "change-log --check-updated coherence",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 14,
+      "passed": 14,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--check-updated",
+        "--file",
+        "{input}"
+      ],
+      "ran_at": "2026-09-26T12:28:00.464Z"
+    }
+  ],
+  "totals": {
+    "executed": 84,
+    "reproduced": 0
+  },
+  "updated_at": "2026-09-26T12:28:06.349Z"
+}

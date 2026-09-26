@@ -1,0 +1,22 @@
+{
+  "sink": null,
+  "entry": "cli:shared/resources/change-log.js",
+  "name": "change-log --check-updated coherence",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 14,
+  "passed": 14,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": [
+    "--check-updated",
+    "--file",
+    "{input}"
+  ],
+  "ran_at": "2026-09-26T11:57:36.883Z"
+}

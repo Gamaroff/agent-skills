@@ -541,3 +541,77 @@ test('[fix_cycle] the verify-loop reference documents the invocation as Skill(qa
   );
   assert.match(s, /Skill\(qa-fix, args="\{bug-file-path\} fix_cycle=\{N\}"\)/);
 });
+
+// ── --path gate|qa — the one definition of "this cycle's file" (task.149 BUG-11) ──
+
+/** `bash references/qa-cycle.sh "$DIR" --path <kind>`, from `shell`. */
+function runPath(shell, dir, kind) {
+  const r = spawnSync(
+    shell,
+    [
+      "-c",
+      `bash ${JSON.stringify(HELPER)} ${JSON.stringify(dir)} --path ${kind}`,
+    ],
+    { encoding: "utf8" },
+  );
+  return { status: r.status, stdout: r.stdout, stderr: r.stderr };
+}
+
+for (const shell of SHELLS) {
+  test(`[${shell}] --path names the current cycle's gate and QA report, by the same grammar that counted the cycle`, () => {
+    const dir = fixture([
+      "task.9.gate.1.a.yml",
+      "task.9.gate.02.b.yml",
+      "task.9.qa.1.a.md",
+      "task.9.qa.2.b.md",
+    ]);
+    assert.equal(
+      runPath(shell, dir, "gate").stdout,
+      `${dir}/task.9.gate.02.b.yml\n`,
+    );
+    assert.equal(runPath(shell, dir, "qa").stdout, `${dir}/task.9.qa.2.b.md\n`);
+  });
+
+  test(`[${shell}] --path reads the LAST .gate.N. segment, as the cycle count does`, () => {
+    const dir = fixture(["task.9.gate.1.b.gate.2.yml", "task.9.qa.2.x.md"]);
+    assert.equal(
+      runPath(shell, dir, "gate").stdout,
+      `${dir}/task.9.gate.1.b.gate.2.yml\n`,
+    );
+  });
+
+  test(`[${shell}] --path never names a dotfile, a directory or a symlink`, () => {
+    const dir = fixture(["task.9.gate.1.x.yml", "._task.9.gate.1.x.yml"]);
+    assert.equal(
+      runPath(shell, dir, "gate").stdout,
+      `${dir}/task.9.gate.1.x.yml\n`,
+    );
+    fs.rmSync(path.join(dir, "task.9.gate.1.x.yml"));
+    fs.mkdirSync(path.join(dir, "task.9.gate.1.x.yml"));
+    const asDir = runPath(shell, dir, "gate");
+    assert.equal(asDir.status, 1);
+    assert.equal(asDir.stdout, "");
+    assert.match(asDir.stderr, /no regular gate file for cycle 1/);
+    const linked = fixture(["real.yml"]);
+    fs.symlinkSync(
+      path.join(linked, "real.yml"),
+      path.join(linked, "task.9.gate.1.x.yml"),
+    );
+    assert.equal(runPath(shell, linked, "gate").status, 1);
+  });
+
+  test(`[${shell}] --path refuses an ambiguous cycle rather than choosing`, () => {
+    const dir = fixture(["task.9.gate.1.x.yml", "task.9.gate.01.old.yml"]);
+    const r = runPath(shell, dir, "gate");
+    assert.equal(r.status, 1);
+    assert.equal(r.stdout, "");
+    assert.match(r.stderr, /2 gate files claim cycle 1 .*refusing to choose/);
+  });
+
+  test(`[${shell}] --path with an unknown kind is a usage error (exit 2), not a refusal`, () => {
+    const dir = fixture(["task.9.gate.1.x.yml"]);
+    const r = runPath(shell, dir, "bug");
+    assert.equal(r.status, 2);
+    assert.equal(r.stdout, "");
+  });
+}

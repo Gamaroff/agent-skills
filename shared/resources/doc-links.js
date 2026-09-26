@@ -20,6 +20,13 @@
  *     exit 0, reason `ok`      — every relative link resolves (or there are none)
  *     exit 1, reason `broken`  — at least one does not, or a fence never closes;
  *                                each is printed as `✖ <file>:<line> → <target>`
+ *                                with its state appended — `[untracked]` (on
+ *                                disk, not in the tracked tree: commit it),
+ *                                `[ignored]` (on disk but gitignored: it can
+ *                                never be committed), `[outside-repo]`,
+ *                                `[unverifiable]` or `[missing]` (not on disk
+ *                                under that exact name: write it) — and
+ *                                carries the same `state` in `--json` `broken[]`
  *                                and the summary reads
  *                                `FAIL doc-links: N finding(s) in <file>` — the
  *                                ✖ / FAIL markers are what
@@ -199,6 +206,68 @@ function trackedSet(root) {
   return out === null ? null : new Set(out.split("\0").filter(Boolean));
 }
 
+/**
+ * Why a link that failed against the tracked tree failed (obs #164). Only
+ * `untracked` is benign — the QA read-back stages it and checks again — so
+ * every state that is not certainly "on disk, inside the repository, and
+ * committable" must be something else:
+ *   - `untracked`    — on disk under that exact name, not ignored: commit it.
+ *   - `ignored`      — on disk, but gitignored: it can NEVER be committed and CI
+ *                      stays red (TASK-149 CR-2).
+ *   - `outside-repo` — resolves above the repository root: no commit carries it
+ *                      (TASK-149-BUG-4).
+ *   - `missing`      — not on disk under that exact name. The name is compared
+ *                      component by component against the directory listing, so a
+ *                      case-insensitive filesystem cannot read `Report.md` as
+ *                      `report.md` here and pass a link that is dead on Linux CI
+ *                      (TASK-149-BUG-4).
+ *   - `unverifiable` — `git check-ignore` answered neither yes (0) nor no (1).
+ * With no tracked set (outside a repository) the check already read the disk,
+ * so only `missing` is possible there.
+ */
+function linkState(tracked, base, resolved) {
+  if (!tracked) return "missing";
+  if (resolved === ".." || resolved.startsWith("../")) return "outside-repo";
+  if (!existsExactly(base, resolved)) return "missing";
+  // TASK-149 CR3-1 — a readdir listing names a symlink whether or not it
+  // resolves. A link to a symlink is committable only when the symlink leads to
+  // something real inside the repository; a checkout of a dangling one, or of
+  // one that leaves the repository, resolves to nothing.
+  if (fs.lstatSync(path.join(base, resolved)).isSymbolicLink()) {
+    let real;
+    try {
+      real = fs.realpathSync(path.join(base, resolved));
+    } catch {
+      return "missing";
+    }
+    const rel = path.relative(fs.realpathSync(base), real);
+    if (rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel))
+      return "outside-repo";
+  }
+  const r = spawnSync("git", ["check-ignore", "-q", "--", resolved], {
+    cwd: base,
+  });
+  if (r.status === 0) return "ignored";
+  if (r.status === 1) return "untracked";
+  return "unverifiable";
+}
+
+/** Every component of `rel` exists under `base` with exactly this spelling. */
+function existsExactly(base, rel) {
+  let dir = base;
+  for (const part of rel.split("/").filter(Boolean)) {
+    let names;
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      return false;
+    }
+    if (!names.includes(part)) return false;
+    dir = path.join(dir, part);
+  }
+  return true;
+}
+
 function dirSet(tracked) {
   const dirs = new Set();
   for (const f of tracked) {
@@ -272,7 +341,13 @@ function checkDocument(
     const exists = tracked
       ? tracked.has(resolved) || dirs.has(resolved)
       : fs.existsSync(path.join(base, resolved));
-    if (!exists) broken.push({ line, target, resolved });
+    if (!exists)
+      broken.push({
+        line,
+        target,
+        resolved,
+        state: linkState(tracked, base, resolved),
+      });
   }
   return {
     file: rel,
@@ -331,7 +406,7 @@ function main(argv) {
   }
   for (const b of result.broken) {
     process.stdout.write(
-      `✖ ${result.file}:${b.line} → ${b.target} (resolves to ${b.resolved})\n`,
+      `✖ ${result.file}:${b.line} → ${b.target} (resolves to ${b.resolved}) [${b.state}]\n`,
     );
   }
   if (result.unterminatedFence) {

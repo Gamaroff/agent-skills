@@ -10,6 +10,13 @@
  *   --file <path>        markdown file to analyse (required)
  *   --bind NAME=VALUE    bind a caller-supplied variable; repeatable
  *   --copy <dir>         seed the temp working directory from this directory
+ *                        (its CONTENTS land at the temp root)
+ *   --copy-as SRC:DEST   copy SRC to DEST inside the temp working directory;
+ *                        repeatable. DEST must be relative, stay inside it, not
+ *                        pass through a symlink, and not exist yet (it seeds a
+ *                        fresh path; it never merges) —
+ *                        seed `docs` at `docs/` for a block that runs
+ *                        `find docs/tasks …` (obs #143)
  *   --timeout <ms>       per-block, per-shell timeout (default 10000)
  *   --no-zsh             force the bash arm only (testing / mutation proving)
  *   --json               emit one JSON object on stdout
@@ -30,6 +37,7 @@
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -39,7 +47,7 @@ import {
   statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ── Extraction ────────────────────────────────────────────────────────────────
@@ -1574,11 +1582,48 @@ export function runBlock(
 
 // ── File-level orchestration ──────────────────────────────────────────────────
 
+/**
+ * True when `child` is `parent` or lies beneath it. Built on path.relative
+ * rather than a string prefix: `parent + sep` is `//` for the filesystem root,
+ * which no absolute path starts with, so a prefix test let SRC `/` through the
+ * SRC-contains-sandbox refusal (TASK-149 CR4-4). `..name` is a child, not an
+ * escape: only `..` itself or a `../` prefix leaves (TASK-149 CR6-4 — a bare
+ * startsWith("..") refused `--copy-as SRC:..seed`). Pure — no filesystem access.
+ */
+export function isWithin(parent, child) {
+  const rel = relative(parent, child);
+  return !(rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel));
+}
+
+/**
+ * Throw when any path component between `root` (exclusive) and `target`
+ * (inclusive) exists and is a symlink. Components that do not exist yet end the
+ * walk: nothing below a missing directory can be a link. `lstat`, never `stat`,
+ * so a dangling link is seen rather than read as absent.
+ */
+function refuseSymlinkedPath(root, target, dest) {
+  let cursor = root;
+  for (const part of relative(root, target).split(sep).filter(Boolean)) {
+    cursor = join(cursor, part);
+    let st;
+    try {
+      st = lstatSync(cursor);
+    } catch {
+      return;
+    }
+    if (st.isSymbolicLink())
+      throw new Error(
+        `--copy-as DEST passes through a symlink in the working directory: ${dest}`,
+      );
+  }
+}
+
 export function executeFile(filePath, opts = {}) {
   const {
     bindings = {},
     timeout = 10_000,
     copyFrom = null,
+    copyAs = [],
     allowZsh = true,
   } = opts;
 
@@ -1602,7 +1647,10 @@ export function executeFile(filePath, opts = {}) {
   //
   // The sandbox is a directory INSIDE the temp root, so the root can act as the
   // containment sentinel in `runBlock`.
-  const tmpRoot = mkdtempSync(join(tmpdir(), "qa-snippets-"));
+  // Absolute, always: os.tmpdir() returns a relative TMPDIR verbatim, and the
+  // --copy-as containment test compares resolve(tmp, dest) against this prefix —
+  // relative, it refused every DEST as escaping (TASK-149 CR3-4).
+  const tmpRoot = resolve(mkdtempSync(join(tmpdir(), "qa-snippets-")));
   const tmp = join(tmpRoot, "work");
 
   const results = [];
@@ -1615,6 +1663,64 @@ export function executeFile(filePath, opts = {}) {
   try {
     mkdirSync(tmp, { recursive: true });
     if (copyFrom) cpSync(copyFrom, tmp, { recursive: true });
+    // obs #143 — `--copy` places a directory's CONTENTS at the temp root, so a
+    // block that addresses a path (`find docs/tasks …`) found nothing whatever was
+    // copied. `--copy-as` seeds at the path the block addresses. The destination is
+    // itself a boundary: an absolute or escaping DEST would write outside the
+    // sandbox, so it is refused here, inside the try, where the temp root is still
+    // removed on the throw (the CR-11 contract).
+    for (const { src, dest } of copyAs) {
+      if (typeof dest !== "string" || dest === "" || isAbsolute(dest))
+        throw new Error(`--copy-as DEST must be a relative path: ${dest}`);
+      const target = resolve(tmp, dest);
+      if (target === tmp)
+        throw new Error(
+          `--copy-as DEST already exists — it is the working copy itself; --copy-as seeds a fresh path, it never merges: ${dest}`,
+        );
+      if (!isWithin(tmp, target))
+        throw new Error(
+          `--copy-as DEST escapes the working directory: ${dest}`,
+        );
+      // TASK-149-BUG-1 — the check above is lexical, and mkdirSync / cpSync follow
+      // symlinks. `--copy` copies a seeded directory's symlinks as symlinks, and
+      // an earlier --copy-as pair can place one too, so a DEST that passes the
+      // string test can still write through `out -> /elsewhere`. Refuse any
+      // existing component below the working copy that is a symlink — dangling
+      // or not, final component included — before anything is created.
+      refuseSymlinkedPath(tmp, target, dest);
+      // TASK-149-BUG-1, reopened — a DEST that already exists (`.`, or `docs`
+      // seeded by `--copy`) makes cpSync MERGE into it, and the merge follows any
+      // symlink already inside it. Checking that tree would be the second
+      // correction to one mechanism; instead the mechanism changes: --copy-as
+      // seeds a FRESH path only. With nothing at the target, cpSync creates it
+      // and walks no existing tree, so there is nothing for it to follow.
+      let exists = true;
+      try {
+        lstatSync(target);
+      } catch {
+        exists = false;
+      }
+      if (exists)
+        throw new Error(
+          `--copy-as DEST already exists — --copy-as seeds a fresh path, it never merges: ${dest}`,
+        );
+      // TASK-149 CR3-5 — an SRC that contains the sandbox under another spelling
+      // (a symlinked TMPDIR, /var vs /private/var) passes a lexical subdirectory
+      // test, and the copy would then walk into its own output. Compare real paths.
+      let srcReal;
+      try {
+        srcReal = realpathSync(src);
+      } catch (e) {
+        throw new Error(`--copy-as SRC is not readable: ${src} (${e.message})`);
+      }
+      const rootReal = realpathSync(tmpRoot);
+      if (isWithin(srcReal, rootReal))
+        throw new Error(
+          `--copy-as SRC contains the sandbox itself — copying it would copy into its own output: ${src}`,
+        );
+      mkdirSync(dirname(target), { recursive: true });
+      cpSync(src, target, { recursive: true });
+    }
     for (const block of blocks) {
       const { klass, reason } = classifyBlock(block.code, bindings);
       if (klass !== "runnable") {
@@ -1739,11 +1845,12 @@ export function executeFile(filePath, opts = {}) {
 
 const USAGE =
   "Usage: qa-execute-snippets --file <path.md> [--bind NAME=VALUE]... " +
-  "[--copy <dir>] [--timeout <ms>] [--no-zsh] [--json]";
+  "[--copy <dir>] [--copy-as SRC:DEST]... [--timeout <ms>] [--no-zsh] [--json]";
 
 export function main(argv = process.argv.slice(2)) {
   let file = null;
   let copyFrom = null;
+  const copyAs = [];
   let timeout = 10_000;
   let allowZsh = true;
   let json = false;
@@ -1757,6 +1864,19 @@ export function main(argv = process.argv.slice(2)) {
       case "--copy":
         copyFrom = argv[++i];
         break;
+      case "--copy-as": {
+        // Split on the LAST colon: DEST is a relative path and never holds one,
+        // while SRC may (a Windows drive letter).
+        const pair = argv[++i] ?? "";
+        const colon = pair.lastIndexOf(":");
+        if (colon < 1 || colon === pair.length - 1)
+          return {
+            exitCode: 2,
+            error: `bad --copy-as (want SRC:DEST): ${pair}`,
+          };
+        copyAs.push({ src: pair.slice(0, colon), dest: pair.slice(colon + 1) });
+        break;
+      }
       case "--timeout": {
         // Unvalidated, `--timeout abc` yielded NaN and `--timeout -1` a negative;
         // spawnSync applies NO timeout for either, so a typo silently disabled the
@@ -1799,7 +1919,13 @@ export function main(argv = process.argv.slice(2)) {
 
   let report;
   try {
-    report = executeFile(file, { bindings, timeout, copyFrom, allowZsh });
+    report = executeFile(file, {
+      bindings,
+      timeout,
+      copyFrom,
+      copyAs,
+      allowZsh,
+    });
   } catch (e) {
     return { exitCode: 2, error: e.message };
   }
