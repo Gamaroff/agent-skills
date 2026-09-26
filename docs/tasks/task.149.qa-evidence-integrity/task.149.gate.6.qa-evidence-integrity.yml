@@ -1,0 +1,75 @@
+schema: 1
+task: 'task.149.qa-evidence-integrity'
+task_title: 'QA evidence integrity: qa-task/qa-story claims that no check reads back'
+gate: CONCERNS
+status_reason: 'BUG-8 and BUG-9 closed: the three named could-not-look paths exit 2 and the zero-padded / unnamed gate is found (mutation-proved). One further state, an unverifiable link, still exits 1 with the wrong remedy (MEDIUM). Two LOW grammar/containment edges, one a regression from cycle 5''s isWithin switch.'
+reviewer: 'QA Engineer'
+updated: '2026-09-26T12:25:00Z'
+
+top_issues:
+  - id: TASK-149-BUG-10
+    severity: medium
+    file: 'shared/resources/qa-read-back.js'
+    finding: 'A link doc-links reports as unverifiable (git check-ignore exit 128, e.g. a pathspec beyond a committed directory symlink) is pushed as an ordinary HALT (exit 1) with the remedy "write the artifact or fix the link"; the header says a git that did not answer is exit 2 (review CR-1, reproduced).'
+    suggested_action: 'Make one contract: map unverifiable to exit 2 could-not-look, or keep it a HALT with its own message and correct the header; state it the same way in Step 12b; test with a link through a committed directory symlink.'
+    suggested_owner: dev
+    bug_ref: 'task.149.bug.10.read-back-unverifiable-link-exit-1.md'
+  - id: CR6-2
+    severity: low
+    file: 'shared/resources/qa-read-back.js'
+    finding: 'artifact() is not qa-cycle.sh''s grammar: the JS regex is unanchored (first .gate.N.) where the sed is greedy (last), and .*yml$ lacks the literal dot; task.9.gate.1.b.gate.2.yml is counted as cycle 2 by qa-cycle.sh and not found here (false "misnamed" HALT, probe case gate-twogates).'
+    suggested_action: 'Anchor and make greedy with a literal extension (^.*\.gate\.([0-9]{1,9})\..*\.yml$, \.md$ for the report); add the double-segment name to the BUG-9 test loop and a test that reaches the "misnamed" branch (CR-5).'
+    suggested_owner: dev
+  - id: CR6-4
+    severity: low
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'isWithin tests rel.startsWith(".."), so a child whose name begins with two dots reads as escaping: --copy-as SRC:..seed is refused (probe case copy-as.dotdot-name overblocked — a regression from cycle 5''s CR-6 switch of the DEST check onto isWithin). qa-read-back.js:213 has the same test and treats an untracked ..notes.md inside the work item as outside it.'
+    suggested_action: 'rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel); have qa-read-back use the same containment test.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 19
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 52
+    notes: 'qa-read-back verdict engages 14/14 (4 new BUG-8/9 cases; a directory --doc stages nothing); change-log --check-updated engages 14/14; --copy-as DEST containment engages 23/24, 0 reproduced, 1 overblocked (copy-as.dotdot-name, CR6-4 — fails closed). CI test job green on Linux (/tmp) at 4bc9da7f.'
+  performance:
+    status: PASS
+    notes: 'qa-read-back suite 19 cases ~5 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-149-BUG-10 (unverifiable link exits 1 with the wrong remedy); CR6-2 and CR6-4 fail closed.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory: CR-3 exit-2 result drops out.staged after a late throw; CR-5 the "misnamed gate" branch has no test (mutation reds nothing).'
+
+bug_resolution:
+  bugs_closed: ['TASK-149-BUG-8', 'TASK-149-BUG-9']
+  bugs_new: 1
+
+recommendations:
+  immediate:
+    - action: 'One contract for unverifiable links (TASK-149-BUG-10).'
+      refs: ['shared/resources/qa-read-back.js']
+  future:
+    - action: 'CR-3: carry out.staged into the exit-2 result so a late throw does not misreport a modified index as untouched.'
+      refs: ['shared/resources/qa-read-back.js']
+    - action: 'CR-5: a test that reaches the "no gate for cycle N … misnamed" branch.'
+      refs: ['shared/resources/tests/qa-read-back.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-149-BUG-10 fixed']

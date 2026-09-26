@@ -4,7 +4,7 @@
 **Bug ID**: TASK-149-BUG-9
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 5)
 **Date Found**: 2026-09-26
 
@@ -39,3 +39,4 @@ itself. Test both spellings.
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-26 | New | QA Engineer | Found in QA cycle 5 |
 | 2026-09-26 | Ready for QA | qa-fix | Fixed in qa-fix cycle 5 |
+| 2026-09-26 | Closed | QA Engineer | Verified in QA cycle 6 — fix holds, mutation-proved |

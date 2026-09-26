@@ -518,19 +518,19 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.149.qa.5.qa-evidence-integrity.md](./task.149.qa.5.qa-evidence-integrity.md)
-- **Gate File**: [task.149.gate.5.qa-evidence-integrity.yml](./task.149.gate.5.qa-evidence-integrity.yml)
+- **Full Report**: [task.149.qa.6.qa-evidence-integrity.md](./task.149.qa.6.qa-evidence-integrity.md)
+- **Gate File**: [task.149.gate.6.qa-evidence-integrity.yml](./task.149.gate.6.qa-evidence-integrity.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 4216 (4215 pass, 0 fail, 1 skipped); 48 boundary probes, 0 reproduced
+- **Tests Executed**: 19 read-back cases (33 with the wiring test under TMPDIR=/tmp); CI full suite green at 4bc9da7f; 52 boundary probes, 0 reproduced
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- MEDIUM — [TASK-149-BUG-8](./task.149.bug.8.read-back-could-not-look-not-exit-2.md): three could-not-look states in `qa-read-back.js` do not exit 2.
-- MEDIUM — [TASK-149-BUG-9](./task.149.bug.9.read-back-gate-grammar.md): a gate `qa-cycle.sh` counted is not found, and nothing halts.
-- Closed — BUG-1 … BUG-7.
+- MEDIUM — [TASK-149-BUG-10](./task.149.bug.10.read-back-unverifiable-link-exit-1.md): an unverifiable link exits 1 with a missing-artifact remedy, not exit 2.
+- LOW — CR6-2 (gate grammar on a two-segment name), CR6-4 (`isWithin` refuses `..name`; regression from cycle 5).
+- Closed — BUG-1 … BUG-9.
 
 ---
 
@@ -547,6 +547,7 @@ None.
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium, 3 low | qa-task |
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 2 medium, 1 low | qa-task |
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 2 medium | qa-task |
+| 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium, 2 low | qa-task |
 
 ---
 

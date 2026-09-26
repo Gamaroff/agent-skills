@@ -1587,11 +1587,13 @@ export function runBlock(
  * True when `child` is `parent` or lies beneath it. Built on path.relative
  * rather than a string prefix: `parent + sep` is `//` for the filesystem root,
  * which no absolute path starts with, so a prefix test let SRC `/` through the
- * SRC-contains-sandbox refusal (TASK-149 CR4-4). Pure — no filesystem access.
+ * SRC-contains-sandbox refusal (TASK-149 CR4-4). `..name` is a child, not an
+ * escape: only `..` itself or a `../` prefix leaves (TASK-149 CR6-4 — a bare
+ * startsWith("..") refused `--copy-as SRC:..seed`). Pure — no filesystem access.
  */
 export function isWithin(parent, child) {
   const rel = relative(parent, child);
-  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+  return !(rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel));
 }
 
 /**

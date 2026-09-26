@@ -25,9 +25,17 @@
  *             for the newest row
  *     exit 1  HALT — one of those does not hold; each problem is printed with the
  *             remedy. Do not post the PR comment / QA summary over it.
- *     exit 2  could not look — bad arguments, an unreadable document, a sibling
- *             engine that did not load, or a git that did not answer. Never a
- *             pass: nothing was checked.
+ *     exit 2  could not look — the check as a whole could not run: bad arguments,
+ *             a document that is not a readable regular file, a sibling engine
+ *             that did not load, no repository, an index git cannot read, or an
+ *             error nothing anticipated. Never a pass: nothing was checked.
+ *
+ * Exit 2 is about the RUN, not about one link (TASK-149-BUG-10). Once the check
+ * runs, every link it cannot confirm — missing, ignored, outside-repo, and
+ * unverifiable (git answered neither yes nor no for that one path) — is a HALT,
+ * exit 1, with a remedy for that state. Both codes stop the QA comment; the split
+ * tells the caller whether to fix a link or fix the environment. qa-task Step 12b
+ * and qa-story item 3e state the same contract.
  *
  * Staging (TASK-149-BUG-7). The link check reads the INDEX, so the script stages
  * what this cycle wrote — the document, the cycle's gate and report — and then
@@ -76,24 +84,59 @@ function qaCycle(dir) {
 }
 
 /**
- * This cycle's gate or report, matched with qa-cycle.sh's own grammar —
- * `.gate.<digits>.` anywhere in the name, compared as a NUMBER — so a gate the
- * helper counted (`x.gate.4.yml`, `x.gate.04.name.yml`) is always one this finds
- * (TASK-149-BUG-9).
+ * This cycle's gate or report, matched with qa-cycle.sh's own grammar — a name
+ * ending `.yml` (`.md` for the report) whose LAST `.gate.<digits>.` segment,
+ * compared as a NUMBER, is the cycle: the sed there is greedy, so this is too.
+ * A gate the helper counted (`x.gate.4.yml`, `x.gate.04.name.yml`,
+ * `x.gate.1.b.gate.2.yml`) is always one this finds (TASK-149-BUG-9, CR6-2).
+ * Regular files only: a directory named like a gate is never staged whole.
  */
 function artifact(dir, kind, cycle) {
-  const re = new RegExp(
-    `\\.${kind}\\.([0-9]{1,9})\\..*${kind === "gate" ? "yml" : "md"}$`,
-  );
+  const ext = kind === "gate" ? ".yml" : ".md";
+  const re = new RegExp(`^.*\\.${kind}\\.([0-9]{1,9})\\..*$`);
   const hit = fs.readdirSync(dir).find((n) => {
+    if (!n.endsWith(ext)) return false;
     const m = n.match(re);
-    return m !== null && Number(m[1]) === Number(cycle);
+    return (
+      m !== null &&
+      Number(m[1]) === Number(cycle) &&
+      fs.lstatSync(path.join(dir, n)).isFile()
+    );
   });
   return hit ? path.join(dir, hit) : "";
 }
 
+/**
+ * True when `child` is `parent` or beneath it. `..name` is a child, not an
+ * escape: only `..` itself or a `../` prefix leaves (CR6-4) — the same test
+ * qa-execute-snippets.mjs isWithin() applies.
+ */
+function isWithin(parent, child) {
+  const rel = path.relative(parent, child);
+  return !(
+    rel === ".." ||
+    rel.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(rel)
+  );
+}
+
+// One remedy per link state, so the caller is told what to fix (TASK-149-BUG-10).
+// `unverifiable` is not a missing artifact: git answered neither yes nor no for
+// that path — most often a link that passes through a symlinked directory.
+const REMEDY = {
+  untracked: (d) =>
+    `is untracked and outside ${d} (or not a regular file) — stage it deliberately if it belongs in this commit`,
+  missing: () => "is missing — write the artifact or fix the link",
+  ignored: () =>
+    "is ignored — gitignored, so it can never be committed; move the artifact or fix the link",
+  "outside-repo": () =>
+    "is outside-repo — link to a path inside the repository",
+  unverifiable: () =>
+    "is unverifiable — git answered neither yes nor no for this path (a link through a symlinked directory?); it is not a missing artifact, so link to the real path",
+};
+
 function readBack(docArg) {
-  // TASK-149-BUG-8 — "could not look" is exit 2 whatever the cause. An error the
+  // TASK-149-BUG-8 — a run that could not complete is exit 2. An error the
   // body did not anticipate (an unreadable file, a throw from an engine) would
   // otherwise exit 1 with a stack trace and read as a HALT.
   try {
@@ -170,7 +213,7 @@ function readBackUnguarded(docArg) {
     );
   else if (!gate)
     out.problems.push(
-      `no gate for cycle ${c.cycle} in ${rel(dir)} that this script can read — the gate file is misnamed`,
+      `no gate file for cycle ${c.cycle} in ${rel(dir)} that this script can read — the gate is misnamed or not a regular file`,
     );
   if (c.cycle && !report)
     out.problems.push(
@@ -210,7 +253,7 @@ function readBackUnguarded(docArg) {
   for (const b of links.broken) {
     if (b.state !== "untracked") continue;
     const abs = path.join(root, b.resolved);
-    const inside = !path.relative(dir, abs).startsWith("..");
+    const inside = isWithin(dir, abs);
     if (inside && fs.lstatSync(abs).isFile()) stage(abs);
   }
 
@@ -222,9 +265,7 @@ function readBackUnguarded(docArg) {
     // Already reported as "could not stage" in pass 1 — one problem, one message.
     if (b.state === "untracked" && failedStage.has(b.resolved)) continue;
     out.problems.push(
-      b.state === "untracked"
-        ? `${b.target} (line ${b.line}) is untracked and outside ${rel(dir)} (or not a regular file) — stage it deliberately if it belongs in this commit`
-        : `${b.target} (line ${b.line}) is ${b.state} — write the artifact or fix the link`,
+      `${b.target} (line ${b.line}) ${REMEDY[b.state] ? REMEDY[b.state](rel(dir)) : `is ${b.state} — write the artifact or fix the link`}`,
     );
   }
   if (links.unterminatedFence)

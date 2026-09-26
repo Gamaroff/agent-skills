@@ -303,3 +303,101 @@ for (const name of ["task.9.gate.1.yml", "task.9.gate.01.x.yml"]) {
     }
   });
 }
+
+// TASK-149 CR6-2 — the LAST `.gate.N.` segment is the cycle, as qa-cycle.sh's greedy sed reads it.
+test("a gate name with two .gate.N. segments is read by its last one, as qa-cycle.sh counts it", () => {
+  const w = repo("task", ({ dir, doc }) => {
+    const gate = "task.9.gate.1.b.gate.2.yml";
+    fs.renameSync(path.join(dir, "task.9.gate.1.x.yml"), path.join(dir, gate));
+    fs.renameSync(
+      path.join(dir, "task.9.qa.1.x.md"),
+      path.join(dir, "task.9.qa.2.x.md"),
+    );
+    edit(doc, "./task.9.gate.1.x.yml", `./${gate}`);
+    edit(doc, "./task.9.qa.1.x.md", "./task.9.qa.2.x.md");
+  });
+  try {
+    const r = readBack(w.doc);
+    assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+    assert.equal(r.cycle, "2");
+    assert.equal(path.basename(r.gate), "task.9.gate.1.b.gate.2.yml");
+  } finally {
+    w.done();
+  }
+});
+
+// TASK-149 CR-5 — the "misnamed" branch: qa-cycle.sh counts the name, but it is no regular file.
+test("a directory named like the cycle's gate halts as misnamed, and nothing under it is staged", () => {
+  const w = repo("task", ({ dir }) => {
+    const gate = path.join(dir, "task.9.gate.1.x.yml");
+    fs.rmSync(gate);
+    fs.mkdirSync(gate);
+    fs.writeFileSync(path.join(gate, "inner.md"), "# i\n");
+  });
+  try {
+    const r = readBack(w.doc);
+    assert.equal(r.exitCode, 1, JSON.stringify(r));
+    assert.match(
+      r.problems.join("\n"),
+      /no gate file for cycle 1 .* misnamed or not a regular file/,
+    );
+    const indexed = execFileSync("git", ["ls-files"], {
+      cwd: w.root,
+      encoding: "utf8",
+    });
+    assert.doesNotMatch(indexed, /inner\.md/);
+  } finally {
+    w.done();
+  }
+});
+
+// TASK-149 CR6-4 — `..notes.md` is a child of the work item, not an escape from it.
+test("an untracked link target whose name begins with two dots is inside the work item and is staged", () => {
+  const w = repo("task", ({ dir, doc }) => {
+    fs.writeFileSync(path.join(dir, "..notes.md"), "# n\n");
+    append(doc, "[n](./..notes.md)\n");
+  });
+  try {
+    const r = readBack(w.doc);
+    assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+    assert.ok(
+      r.staged.some((s) => s.endsWith("/..notes.md")),
+      r.staged.join(),
+    );
+  } finally {
+    w.done();
+  }
+});
+
+// TASK-149-BUG-10 — an unverifiable link is a HALT (the check ran), with a remedy that says
+// what happened; it is not "write the artifact", and it is not exit 2 (the run did not fail).
+test("a link git cannot verify halts with its own remedy, not the missing-artifact one", () => {
+  const w = repo("task", ({ root, dir, doc }) => {
+    fs.mkdirSync(path.join(root, "docs", "other"), { recursive: true });
+    fs.writeFileSync(path.join(root, "docs", "other", "file.md"), "# f\n");
+    fs.symlinkSync("../../other", path.join(dir, "sub"));
+    execFileSync(
+      "git",
+      ["add", "docs/other", path.relative(root, path.join(dir, "sub"))],
+      { cwd: root },
+    );
+    execFileSync(
+      "git",
+      ["-c", "user.email=a@b", "-c", "user.name=a", "commit", "-qm", "s"],
+      { cwd: root },
+    );
+    append(doc, "[s](./sub/file.md)\n");
+  });
+  try {
+    const r = readBack(w.doc);
+    assert.equal(r.exitCode, 1, JSON.stringify(r));
+    const said = r.problems.join("\n");
+    assert.match(
+      said,
+      /sub\/file\.md .*is unverifiable — git answered neither yes nor no/,
+    );
+    assert.doesNotMatch(said, /sub\/file\.md .*write the artifact/);
+  } finally {
+    w.done();
+  }
+});

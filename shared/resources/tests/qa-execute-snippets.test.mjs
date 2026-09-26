@@ -2772,4 +2772,19 @@ test("QA-27: isWithin is containment on real paths — the filesystem root conta
   );
   assert.equal(isWithin("/a/b/c", "/a/b"), false);
   assert.equal(isWithin("/a/b", "/a/..b/c"), false);
+  // CR6-4 — a child whose name begins with two dots is inside; `..` itself is not.
+  assert.equal(isWithin("/a/b", "/a/b/..c"), true);
+  assert.equal(isWithin("/a/b", "/a/b/..c/d"), true);
+  assert.equal(isWithin("/a/b", "/a"), false);
+});
+
+test("QA-28: a --copy-as DEST whose name begins with two dots is seeded, not refused as an escape (TASK-149 CR6-4)", () => {
+  const root = docsFixture();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("ls ..seed/tasks/a.md"));
+  const r = executeFile(file, {
+    allowZsh: false,
+    copyAs: [{ src: join(root, "docs"), dest: "..seed" }],
+  });
+  assert.deepEqual(r.findings, []);
 });

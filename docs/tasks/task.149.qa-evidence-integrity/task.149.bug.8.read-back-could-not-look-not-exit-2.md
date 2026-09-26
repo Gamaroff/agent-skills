@@ -4,7 +4,7 @@
 **Bug ID**: TASK-149-BUG-8
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 5)
 **Date Found**: 2026-09-26
 
@@ -45,3 +45,4 @@ exit 2. Wrap the body in try/catch and map unexpected errors to exit 2. Test eac
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-26 | New | QA Engineer | Found in QA cycle 5 |
 | 2026-09-26 | Ready for QA | qa-fix | Fixed in qa-fix cycle 5 |
+| 2026-09-26 | Closed | QA Engineer | Verified in QA cycle 6 — fix holds, mutation-proved |
