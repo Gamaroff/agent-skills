@@ -213,6 +213,13 @@ file written one step earlier, reads as dead. Staged files resolve.
   holds the **other** verdict halts, because a decided file is not re-decided (re-runs write
   `dod.{N+1}`). 7.1's block calls it with `accepted`. The new 8.1 marker calls it with `gaps`.
   Nothing else changes in 7.1.
+
+  *As shipped (QA cycles 2–3):* the helper also owns the bug-mode **gap count** — the `- [ ]` lines
+  under `## Step 5: Acceptance Decision`. A third verb, `count`, prints it and writes nothing; 8.3
+  derives its Status History row's gap count from it, and 8.5's bug branch takes `GAP_COUNT` from
+  it. `gaps` refuses a DoD with no gap line **before** writing anything; `count` and `gaps` refuse a
+  DoD with no Step 5 section. Every refusal goes to stderr, so a captured `count` never swallows
+  its reason.
 - Five new skip-table rows and markers. The keys are new because the parity test allows one marker
   per key:
 
@@ -245,7 +252,9 @@ file written one step earlier, reads as dead. Staged files resolve.
   1. `isWorkItemDocument(documentPath)` holds.
   2. The path is in the **same directory** as `documentPath`.
   3. Its basename starts with the document's id prefix plus `.` (`task.139.`, `story.2.1.`,
-     `epic.1.`, `bug.14.`).
+     `epic.1.`, `bug.14.`) — **or** it is exactly `sprint-review-summary.md`, which finalise Step 7
+     writes beside the document with no id prefix (`UNPREFIXED_ARTIFACTS`, exported beside
+     `WORK_ITEM_ARTIFACT_RE` and read by the corpus walk too; added at QA cycle 2).
   4. It matches `WORK_ITEM_ARTIFACT_RE`, excluding `bug`.
   5. It ends in `.md`.
   6. It has no `..` and no NUL.
@@ -373,7 +382,8 @@ Step 8a and the CI table for Part B).
 
 - [x] Write the helper with `<DOD_PATH> <accepted|gaps>`. It halts on unbound or placeholder
       arguments, on an unreadable file, on a doubled heading, and on a filled file whose verdict
-      differs from the one requested.
+      differs from the one requested. *(As shipped: a `count` verb as well, and `gaps` refuses a DoD
+      with no gap line before writing — see § 3 Part A.)*
 - [x] 7.1's bug-mode block sources or calls the helper through `.agents/skills/finalise/references/`,
       keeping its `DOC_KIND` / `DOD_PATH` binding guard.
 - [x] Tests: the helper fills `gaps` and `accepted` on the template, is idempotent, refuses the
@@ -595,7 +605,8 @@ None.
      an artifact from another task's directory.
    - Probability: Low · Impact: High
    - Mitigation: admission is anchored to a valid `documentPath`, the same directory and the same id
-     stem, and each condition has its own refusal test (Phase 4). A record with `artifactPaths` and
+     stem (or the one unprefixed name finalise writes there, `sprint-review-summary.md`), and each
+     condition has its own refusal test (Phase 4). A record with `artifactPaths` and
      no `documentPath` admits nothing.
    - Rollback: revert Phase 4 and Phase 5's 8a prose together. `documentPath` behaviour is unchanged.
 2. **Step 8 edits sit beside the most-tested prose in the repository.**
@@ -720,6 +731,7 @@ docs/bugs artifacts; one engine-path convention in finalise; a re-run guard on 8
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low)                                | qa-task     |
 | 2026-09-26 |         | QA gate CONCERNS (90/100) — 4 findings (1 medium, 3 low)                                | qa-task     |
 | 2026-09-26 |         | QA gate PASS (100/100) — 3 low findings                                                 | qa-task     |
+| 2026-09-26 |         | § 3 Part A/B, Phase 1 and Risk 1 describe what shipped (helper `count` verb; unprefixed sprint-review exception) — PR review PC-1/PC-2 | develop     |
 <!-- change-log-end -->
 
 ---
