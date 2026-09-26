@@ -107,6 +107,42 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`qa-execute-snippets.mjs --copy-as SRC:DEST` seeds a directory at the path a block addresses
+  (task 149).** `--copy <dir>` places the directory's contents at the temp root, so a correct block
+  that runs `find docs/tasks …` (the `sync-github-*` discovery blocks) failed whatever was copied, and
+  QA routed the finding to `future` by hand every cycle (obs #143). `--copy-as` is repeatable and
+  additive; `--copy` is unchanged. An absolute or escaping `DEST` is exit 2, with the temp root still
+  removed. qa-task Step 4b, qa-story Phase 1.7 and `qa-runnable-prose-detection.md` name
+  `--copy-as docs:docs`.
+- **An unexported predicate is exported and probed, never recorded as `boundary: false` (task 149).**
+  `security-probe.mjs` returned one message, `export X is not a function`, for an absent export and a
+  non-function one. On task.139 QA recorded `boundary: false` for five cycles over a module-private
+  `isWorkItemDocument`; finalise exported it and found a null-byte hole (obs #156). The decline now
+  says `X is not exported by <path> — … export it and re-run` (same `entry-not-probeable` reason).
+  `probe-boundary-rule.md` §4 and qa-task Step 3b / qa-story Phase 1.6 step 3 state that "it is not
+  exported" is never a reason for `boundary: false`. A `boundary: false` record names each
+  predicate-shaped function the diff adds.
+- **QA runs the validation commands the coding standards name, not only the test runner (task 149).**
+  `coding-standards.md` lists `npm run validate -- skills/<changed-skill>/` first under *Validation
+  before commit*. `npm test` does not run it and no QA step did, so task.141 went green locally and red
+  in CI's `validate` job (obs #163). qa-task Step 4 and qa-story Phase 4 now run each such command and
+  record it; a non-zero result is a `category: bug` finding. qa-story Phase 4 points at the standards
+  file the pipeline loads instead of a `docs/coding-standards.md` that does not exist here. create-task's
+  Section 9 prompt and `task-template.md` list the commands under Code Quality.
+- **QA reads the document's claims back after it writes them — qa-task Step 12b, qa-story Review
+  Completion item 3e (task 149).** Step 12 linked the QA report and gate and appended a Change Log row,
+  and nothing read either claim back. On task.141 a linked report was never written (CI `link-check`
+  red), and a row was dated after `updated:` (CI §5 red) (obs #164). The new step stages what the run
+  wrote, then runs `doc-links.js` and `change-log.js --check-updated` on the document. A `missing`
+  link stops the PR comment. `doc-links.js` now labels each broken link `untracked` (on disk, not in
+  the index) or `missing`, in `--json` and on the `✖` line; the `✖` / `FAIL doc-links:` markers are
+  unchanged. `change-log.js` gains `checkUpdatedCoherence()` and its first CLI. The corpus test's
+  §5 now uses it. The private reader it replaced skipped task.42 and task.44 (132 documents checked,
+  up from 130; 0 offenders). The self-assessed checklist item "QA report file created and saved" is
+  replaced by the measured one. `tests/qa-evidence-integrity.test.js` holds all eleven prose sites,
+  section-scoped. Its section reader moved to `tests/lib/markdown-section.js`, shared with
+  `outcome-reachability-check.test.js`.
+
 - **`/commit-changes --scope` stages inside the scope only (task 147, obs #142).** Scope mode ran a
   bare `git add -u` before its allowlist, so it staged tracked modifications across the whole tree.
   In a checkout another session was editing, that swept the other session's `package.json`,
