@@ -352,5 +352,6 @@ directory with `--copy <dir>`, and set the per-block timeout with `--timeout <ms
 `--copy <dir>` places the directory's **contents** at the temp root, so a block that addresses a
 path — `find docs/tasks …` — finds nothing whatever is copied. Seed at the addressed path with
 `--copy-as SRC:DEST` (repeatable), e.g. `--copy-as docs:docs`. `DEST` must be relative and resolve
-inside the temp copy; an absolute or escaping `DEST` is a hard error (exit 2) and the temp root is
-still removed (obs #143).
+inside the temp copy; an absolute or escaping `DEST`, or one that passes through a symlink already in
+the temp copy (a `--copy`-seeded link included), is a hard error (exit 2) and the temp root is still
+removed (obs #143, TASK-149-BUG-1).

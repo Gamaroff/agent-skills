@@ -22,8 +22,10 @@
  *     exit 1, reason `broken`  — at least one does not, or a fence never closes;
  *                                each is printed as `✖ <file>:<line> → <target>`
  *                                with its state appended — `[untracked]` (on
- *                                disk, not in the tracked tree: commit it) or
- *                                `[missing]` (not on disk: write it) — and
+ *                                disk, not in the tracked tree: commit it),
+ *                                `[ignored]` (on disk but gitignored: it can
+ *                                never be committed) or `[missing]` (not on
+ *                                disk: write it) — and
  *                                carries the same `state` in `--json` `broken[]`
  *                                and the summary reads
  *                                `FAIL doc-links: N finding(s) in <file>` — the
@@ -204,6 +206,23 @@ function trackedSet(root) {
   return out === null ? null : new Set(out.split("\0").filter(Boolean));
 }
 
+/**
+ * Why a link that failed against the tracked tree failed (obs #164). Three
+ * defects that printed one line, each with a different remedy:
+ *   - `untracked` — the target is on disk and not in the index: commit it.
+ *   - `ignored`   — on disk, but gitignored, so it can NEVER be committed and CI
+ *                   stays red (TASK-149 CR-2): the link or the ignore rule is wrong.
+ *   - `missing`   — not on disk: the artifact was never written.
+ * With no tracked set (outside a repository) the check already read the disk,
+ * so only `missing` is possible there.
+ */
+function linkState(tracked, base, resolved) {
+  if (!tracked || !fs.existsSync(path.join(base, resolved))) return "missing";
+  return git(["check-ignore", "--", resolved], base) !== null
+    ? "ignored"
+    : "untracked";
+}
+
 function dirSet(tracked) {
   const dirs = new Set();
   for (const f of tracked) {
@@ -282,16 +301,7 @@ function checkDocument(
         line,
         target,
         resolved,
-        // obs #164 — a link that fails against the tracked tree is one of two
-        // different defects: an artifact that exists and is not yet committed
-        // (`untracked` — commit it), or one that was never written (`missing` —
-        // write it). They printed the same line. With no tracked set (outside a
-        // repository) the check already read the disk, so only `missing` is
-        // possible there.
-        state:
-          tracked && fs.existsSync(path.join(base, resolved))
-            ? "untracked"
-            : "missing",
+        state: linkState(tracked, base, resolved),
       });
   }
   return {

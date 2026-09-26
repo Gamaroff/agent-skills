@@ -434,3 +434,25 @@ test("state (task.149): outside a repository the disk was already read, so a bro
     );
   });
 });
+
+test("state (task.149 CR-2): a gitignored target on disk is ignored, not untracked — it can never be committed", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(path.join(dir, ".gitignore"), "*.log\n");
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[log](run.log) [new](new.md)\n",
+    );
+    fs.writeFileSync(path.join(dir, "docs", "run.log"), "x\n");
+    fs.writeFileSync(path.join(dir, "docs", "new.md"), "# new\n");
+    execFileSync("git", ["add", ".gitignore", "docs/a.md"], { cwd: dir });
+    const r = checkDocument("docs/a.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => [b.target, b.state]),
+      [
+        ["run.log", "ignored"],
+        ["new.md", "untracked"],
+      ],
+    );
+  });
+});

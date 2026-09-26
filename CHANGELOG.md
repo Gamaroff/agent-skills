@@ -112,7 +112,9 @@ All notable changes to this project will be documented in this file. Format foll
   that runs `find docs/tasks …` (the `sync-github-*` discovery blocks) failed whatever was copied, and
   QA routed the finding to `future` by hand every cycle (obs #143). `--copy-as` is repeatable and
   additive; `--copy` is unchanged. An absolute or escaping `DEST` is exit 2, with the temp root still
-  removed. qa-task Step 4b, qa-story Phase 1.7 and `qa-runnable-prose-detection.md` name
+  removed. So is a `DEST` that passes through a symlink already in the working copy: the lexical check
+  alone let `--copy`-seeded `out -> /elsewhere` carry a write outside the sandbox, which QA cycle 1
+  reproduced with the probe engine (TASK-149-BUG-1). qa-task Step 4b, qa-story Phase 1.7 and `qa-runnable-prose-detection.md` name
   `--copy-as docs:docs`.
 - **An unexported predicate is exported and probed, never recorded as `boundary: false` (task 149).**
   `security-probe.mjs` returned one message, `export X is not a function`, for an absent export and a
@@ -133,10 +135,14 @@ All notable changes to this project will be documented in this file. Format foll
   Completion item 3e (task 149).** Step 12 linked the QA report and gate and appended a Change Log row,
   and nothing read either claim back. On task.141 a linked report was never written (CI `link-check`
   red), and a row was dated after `updated:` (CI §5 red) (obs #164). The new step stages what the run
-  wrote, then runs `doc-links.js` and `change-log.js --check-updated` on the document. A `missing`
-  link stops the PR comment. `doc-links.js` now labels each broken link `untracked` (on disk, not in
-  the index) or `missing`, in `--json` and on the `✖` line; the `✖` / `FAIL doc-links:` markers are
-  unchanged. `change-log.js` gains `checkUpdatedCoherence()` and its first CLI. The corpus test's
+  wrote (bug reports included), then runs `doc-links.js` and `change-log.js --check-updated` on the
+  document and **decides in the block**: it exits 1 on a `missing` or `ignored` link or a stale
+  `updated:`, and the PR comment does not post. `doc-links.js` now labels each broken link
+  `untracked` (on disk, not in the index), `ignored` (on disk but gitignored, so it can never be
+  committed) or `missing`, in `--json` and on the `✖` line; the `✖` / `FAIL doc-links:` markers are
+  unchanged. `tests/qa-read-back-block.test.js` lifts both blocks out of their SKILL.md and runs them
+  in a consumer-shaped repository under bash and zsh — the first version of the halt failed closed on
+  every input and only execution showed it. `change-log.js` gains `checkUpdatedCoherence()` and its first CLI. The corpus test's
   §5 now uses it. The private reader it replaced skipped task.42 and task.44 (132 documents checked,
   up from 130; 0 offenders). The self-assessed checklist item "QA report file created and saved" is
   replaced by the measured one. `tests/qa-evidence-integrity.test.js` holds all eleven prose sites,

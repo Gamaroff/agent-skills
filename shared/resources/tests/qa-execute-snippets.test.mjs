@@ -2585,3 +2585,63 @@ test("QA-21: the CLI parses --copy-as SRC:DEST, repeatably, and rejects a malfor
   assert.equal(escape.exitCode, 2);
   assert.match(escape.error, /escapes the working directory/);
 });
+
+test("QA-22: a --copy-as DEST that passes through a symlink --copy seeded is refused, and nothing lands at the link's target (TASK-149-BUG-1)", () => {
+  const root = docsFixture();
+  const outside = tmp();
+  const seed = tmp();
+  symlinkSync(outside, join(seed, "out"));
+  symlinkSync(join(outside, "nope"), join(seed, "dangling"));
+  mkdirSync(join(seed, "real"));
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("echo ok"));
+  const count = () =>
+    readdirSync(tmpdir()).filter((n) => /^qa-snippets-[^t]/.test(n)).length;
+  const before = count();
+  for (const dest of ["out/sub", "out", "dangling/sub", "dangling"]) {
+    assert.throws(
+      () =>
+        executeFile(file, {
+          allowZsh: false,
+          copyFrom: seed,
+          copyAs: [{ src: join(root, "docs"), dest }],
+        }),
+      /passes through a symlink/,
+      `DEST ${dest} must be refused`,
+    );
+  }
+  assert.deepEqual(
+    readdirSync(outside),
+    [],
+    "nothing may be written through the link",
+  );
+  assert.equal(count(), before, "a refused DEST may not leak a temp dir");
+  // The legitimate direction: a real directory beside the links is still a valid DEST.
+  const ok = executeFile(file, {
+    allowZsh: false,
+    copyFrom: seed,
+    copyAs: [{ src: join(root, "docs"), dest: "real/docs" }],
+  });
+  assert.deepEqual(ok.findings, []);
+});
+
+test("QA-23: a symlink placed by an EARLIER --copy-as pair is refused by a later pair that writes through it", () => {
+  const outside = tmp();
+  const withLink = tmp();
+  symlinkSync(outside, join(withLink, "link"));
+  const root = docsFixture();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("echo ok"));
+  assert.throws(
+    () =>
+      executeFile(file, {
+        allowZsh: false,
+        copyAs: [
+          { src: withLink, dest: "stage" },
+          { src: join(root, "docs"), dest: "stage/link/sub" },
+        ],
+      }),
+    /passes through a symlink/,
+  );
+  assert.deepEqual(readdirSync(outside), []);
+});

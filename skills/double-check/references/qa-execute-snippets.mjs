@@ -36,6 +36,7 @@
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -45,7 +46,7 @@ import {
   statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ── Extraction ────────────────────────────────────────────────────────────────
@@ -1580,6 +1581,29 @@ export function runBlock(
 
 // ── File-level orchestration ──────────────────────────────────────────────────
 
+/**
+ * Throw when any path component between `root` (exclusive) and `target`
+ * (inclusive) exists and is a symlink. Components that do not exist yet end the
+ * walk: nothing below a missing directory can be a link. `lstat`, never `stat`,
+ * so a dangling link is seen rather than read as absent.
+ */
+function refuseSymlinkedPath(root, target, dest) {
+  let cursor = root;
+  for (const part of relative(root, target).split(sep).filter(Boolean)) {
+    cursor = join(cursor, part);
+    let st;
+    try {
+      st = lstatSync(cursor);
+    } catch {
+      return;
+    }
+    if (st.isSymbolicLink())
+      throw new Error(
+        `--copy-as DEST passes through a symlink in the working directory: ${dest}`,
+      );
+  }
+}
+
 export function executeFile(filePath, opts = {}) {
   const {
     bindings = {},
@@ -1636,6 +1660,13 @@ export function executeFile(filePath, opts = {}) {
         throw new Error(
           `--copy-as DEST escapes the working directory: ${dest}`,
         );
+      // TASK-149-BUG-1 — the check above is lexical, and mkdirSync / cpSync follow
+      // symlinks. `--copy` copies a seeded directory's symlinks as symlinks, and
+      // an earlier --copy-as pair can place one too, so a DEST that passes the
+      // string test can still write through `out -> /elsewhere`. Refuse any
+      // existing component below the working copy that is a symlink — dangling
+      // or not, final component included — before anything is created.
+      refuseSymlinkedPath(tmp, target, dest);
       mkdirSync(dirname(target), { recursive: true });
       cpSync(src, target, { recursive: true });
     }

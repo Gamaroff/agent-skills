@@ -1234,35 +1234,52 @@ Step 13**: a check that runs before the claim is written cannot check it.
 
 ```bash
 # One cwd per block — the repository root — and every value re-derived here: each
-# fenced block runs as its own shell, so a name bound in Step 13b (or Step 12's
-# rendering) does not exist in this one. The only INPUT is $TASK_DIR.
+# fenced block runs as its own shell, so a name bound in an earlier block does not
+# exist in this one. The only INPUT is $TASK_DIR; the guard names it when it is
+# unset, instead of letting it surface as a usage error from the engines.
+: "${TASK_DIR:?Step 12b needs TASK_DIR — the task directory}"
+DOC_DIR="$TASK_DIR"
 DOC="$TASK_DIR/$(basename "$TASK_DIR").md"   # task.{id}.{name}/task.{id}.{name}.md
-QA_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR"); rc=$?
+QA_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$DOC_DIR"); rc=$?
 [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
-THIS_GATE=$(find "$TASK_DIR" -maxdepth 1 -name "*.gate.${QA_CYCLE:-none}.*.yml" 2>/dev/null | head -1)
-THIS_REPORT=$(find "$TASK_DIR" -maxdepth 1 -name "*.qa.${QA_CYCLE:-none}.*.md" 2>/dev/null | head -1)
+THIS_GATE=$(find "$DOC_DIR" -maxdepth 1 -name "*.gate.${QA_CYCLE:-none}.*.yml" 2>/dev/null | head -1)
+THIS_REPORT=$(find "$DOC_DIR" -maxdepth 1 -name "*.qa.${QA_CYCLE:-none}.*.md" 2>/dev/null | head -1)
 
 # Stage what this run wrote: the engine resolves links against the INDEX, so an
-# unstaged artifact reads as broken. An empty name is skipped, never passed —
-# a report that was never written has no path to stage, and the link check
-# below is what names it.
+# unstaged artifact reads as broken. That is the document, this cycle's gate and
+# report, and every bug report beside them — the QA Results section links those
+# too. An empty name is skipped, never passed: a report that was never written
+# has no path to stage, and the link check below is what names it.
 for f in "$DOC" "$THIS_GATE" "$THIS_REPORT"; do
   [ -n "$f" ] && [ -e "$f" ] && git add -- "$f"
 done
+find "$DOC_DIR" -maxdepth 1 -name '*.bug.*.md' -exec git add -- {} +
 
-node .agents/skills/qa-task/references/doc-links.js --file "$DOC" --json; LINKS_RC=$?
+# The decision is made HERE, not by whoever reads the output. doc-links exits 1
+# for an `untracked` link (expected here) and for a `missing` or `ignored` one
+# (a halt), so its exit code alone cannot say which happened (TASK-149-BUG-2).
+LINKS_JSON=$(node .agents/skills/qa-task/references/doc-links.js --file "$DOC" --json); LINKS_RC=$?
+[ "$LINKS_RC" -le 1 ] || { echo "Step 12b: doc-links usage error (rc=$LINKS_RC) — fix the call" >&2; exit 1; }
+BLOCKING=$(printf '%s' "$LINKS_JSON" \
+  | jq -r '([.broken[]? | select(.state != "untracked")] | length) + (if .unterminatedFence then 1 else 0 end)') \
+  || { echo "Step 12b: HALT — doc-links output unreadable, so nothing was checked" >&2; exit 1; }
+printf '%s' "$LINKS_JSON" | jq -r '.broken[]? | "  \(.state): \(.target) (line \(.line))"'
 node .agents/skills/qa-task/references/change-log.js --check-updated --file "$DOC"; LOG_RC=$?
+[ "$BLOCKING" -eq 0 ] || { echo "Step 12b: HALT — $BLOCKING link(s) missing or ignored in $DOC; write the artifact (or fix the link), then re-run. Do not post the PR comment (Step 13)." >&2; exit 1; }
+[ "$LOG_RC" -eq 0 ] || { echo "Step 12b: HALT — change-log --check-updated rc=$LOG_RC; apply bumpUpdated with the newest row's date, then re-run." >&2; exit 1; }
+echo "Step 12b: read-back clean — any untracked link listed above rides in this cycle's commit"
 ```
 
-A broken link carries `state`. **`missing`** names an artifact that was never written — write
-it (re-run the step that owns it), then re-run this one. **Do not post the PR comment (Step 13) over a `missing`
-link**: that is the task.141 cycle-4 shape, a PR comment linking a report that did not exist,
-found only by CI's `link-check`. **`untracked`** means the file exists and is not in the index
-(staging was skipped or failed) — list it for the commit; it is not a defect. `LOG_RC` 1
-(`stale-updated`) means the newest Change Log row is dated after `updated:` — the task.141
-cycle-6 shape, CI's `work-item-artifact-naming` §5 red — apply `bumpUpdated(content, <that row's
-date>)` and re-run. Exit 2 from either CLI is a broken invocation, not a finding: fix the call.
-(obs #164)
+The block decides and halts itself; its output is the record. A broken link carries `state`.
+**`untracked`** means the file exists and is not in the index — expected here, listed, and
+committed with the cycle. **`missing`** names an artifact that was never written — write it (re-run
+the step that owns it), then re-run this one. **`ignored`** is on disk but gitignored, so it can
+never be committed: the link or the ignore rule is wrong. The block exits 1 on either, and on a
+`stale-updated` Change Log (`LOG_RC` 1 — the newest row dated after `updated:`; apply
+`bumpUpdated(content, <that row's date>)`). **Do not post the PR comment (Step 13) over a Step 12b HALT**: that is the
+task.141 shape — a PR comment linking a report that did not exist, found only by CI's `link-check`,
+and a row dated after `updated:`, found only by CI's `work-item-artifact-naming` §5. Exit 2 from
+either CLI is a broken invocation, not a finding: fix the call. (obs #164)
 
 ### Step 13: Post PR Comment — Best-effort, non-blocking
 

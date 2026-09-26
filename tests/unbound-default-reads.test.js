@@ -42,6 +42,10 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 // Declared inputs — `file#NAME`: why the document may read it unbound.
 const INPUTS = new Map([
   [
+    "skills/qa-story/SKILL.md#STORY_FILE",
+    "the resolved story file the skill is invoked on; item 3e guards it with :? so an unset input is named (task.149 CR-4)",
+  ],
+  [
     "skills/create-issue/SKILL.md#JIRA_PROJECT_KEY",
     "environment knob (Jira project), documented in the skill's env table",
   ],
