@@ -136,7 +136,7 @@ Declining conditions, each reported with its reason:
 | `bad-entry` | The entry spec is not `path#exportName`. |
 | `outside-repo-root` | The resolved path escapes the containment root. |
 | `unknown-sink` | No corpus for that sink. `corpusFor` throws rather than returning `[]`, deliberately. |
-| `entry-not-probeable` | The module would not import, or the export is not a function. |
+| `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). |
 | `case-errored` | One case timed out or its child never ran. |
 
 ## 5. Containment, and what it does not cover

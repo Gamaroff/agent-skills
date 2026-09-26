@@ -242,6 +242,29 @@ test("an export that is not a function is declined, with the reason", () => {
   assert.match(r.declined[0].detail, /not a function/);
 });
 
+test("an unexported predicate is declined with the remedy — export it — not as not-a-function (obs #156)", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("module-private"),
+    cases: CASES,
+  });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.declined[0].reason, "entry-not-probeable");
+  assert.match(r.declined[0].detail, /not exported/);
+  assert.match(r.declined[0].detail, /export it/);
+  assert.doesNotMatch(r.declined[0].detail, /not a function/);
+});
+
+test("a present non-function export keeps its own message, not the not-exported one", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("not-a-function"),
+    cases: CASES,
+  });
+  assert.match(r.declined[0].detail, /is not a function/);
+  assert.doesNotMatch(r.declined[0].detail, /not exported/);
+});
+
 test("an unknown sink is declined rather than yielding an empty corpus", () => {
   const r = runProbeSpec({
     sink: "not-a-real-sink",
