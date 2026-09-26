@@ -348,3 +348,9 @@ distinction too, which is why the split reaches the exit code and not just the p
 
 Bind caller values with repeated `--bind NAME=VALUE`, seed the temp working directory from a real
 directory with `--copy <dir>`, and set the per-block timeout with `--timeout <ms>`.
+
+`--copy <dir>` places the directory's **contents** at the temp root, so a block that addresses a
+path — `find docs/tasks …` — finds nothing whatever is copied. Seed at the addressed path with
+`--copy-as SRC:DEST` (repeatable), e.g. `--copy-as docs:docs`. `DEST` must be relative and resolve
+inside the temp copy; an absolute or escaping `DEST` is a hard error (exit 2) and the temp root is
+still removed (obs #143).

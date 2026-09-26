@@ -10,6 +10,11 @@
  *   --file <path>        markdown file to analyse (required)
  *   --bind NAME=VALUE    bind a caller-supplied variable; repeatable
  *   --copy <dir>         seed the temp working directory from this directory
+ *                        (its CONTENTS land at the temp root)
+ *   --copy-as SRC:DEST   copy SRC to DEST inside the temp working directory;
+ *                        repeatable. DEST must be relative and stay inside it —
+ *                        seed `docs` at `docs/` for a block that runs
+ *                        `find docs/tasks …` (obs #143)
  *   --timeout <ms>       per-block, per-shell timeout (default 10000)
  *   --no-zsh             force the bash arm only (testing / mutation proving)
  *   --json               emit one JSON object on stdout
@@ -39,7 +44,7 @@ import {
   statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ── Extraction ────────────────────────────────────────────────────────────────
@@ -1579,6 +1584,7 @@ export function executeFile(filePath, opts = {}) {
     bindings = {},
     timeout = 10_000,
     copyFrom = null,
+    copyAs = [],
     allowZsh = true,
   } = opts;
 
@@ -1615,6 +1621,23 @@ export function executeFile(filePath, opts = {}) {
   try {
     mkdirSync(tmp, { recursive: true });
     if (copyFrom) cpSync(copyFrom, tmp, { recursive: true });
+    // obs #143 — `--copy` places a directory's CONTENTS at the temp root, so a
+    // block that addresses a path (`find docs/tasks …`) found nothing whatever was
+    // copied. `--copy-as` seeds at the path the block addresses. The destination is
+    // itself a boundary: an absolute or escaping DEST would write outside the
+    // sandbox, so it is refused here, inside the try, where the temp root is still
+    // removed on the throw (the CR-11 contract).
+    for (const { src, dest } of copyAs) {
+      if (typeof dest !== "string" || dest === "" || isAbsolute(dest))
+        throw new Error(`--copy-as DEST must be a relative path: ${dest}`);
+      const target = resolve(tmp, dest);
+      if (target !== tmp && !target.startsWith(tmp + sep))
+        throw new Error(
+          `--copy-as DEST escapes the working directory: ${dest}`,
+        );
+      mkdirSync(dirname(target), { recursive: true });
+      cpSync(src, target, { recursive: true });
+    }
     for (const block of blocks) {
       const { klass, reason } = classifyBlock(block.code, bindings);
       if (klass !== "runnable") {
@@ -1739,11 +1762,12 @@ export function executeFile(filePath, opts = {}) {
 
 const USAGE =
   "Usage: qa-execute-snippets --file <path.md> [--bind NAME=VALUE]... " +
-  "[--copy <dir>] [--timeout <ms>] [--no-zsh] [--json]";
+  "[--copy <dir>] [--copy-as SRC:DEST]... [--timeout <ms>] [--no-zsh] [--json]";
 
 export function main(argv = process.argv.slice(2)) {
   let file = null;
   let copyFrom = null;
+  const copyAs = [];
   let timeout = 10_000;
   let allowZsh = true;
   let json = false;
@@ -1757,6 +1781,19 @@ export function main(argv = process.argv.slice(2)) {
       case "--copy":
         copyFrom = argv[++i];
         break;
+      case "--copy-as": {
+        // Split on the LAST colon: DEST is a relative path and never holds one,
+        // while SRC may (a Windows drive letter).
+        const pair = argv[++i] ?? "";
+        const colon = pair.lastIndexOf(":");
+        if (colon < 1 || colon === pair.length - 1)
+          return {
+            exitCode: 2,
+            error: `bad --copy-as (want SRC:DEST): ${pair}`,
+          };
+        copyAs.push({ src: pair.slice(0, colon), dest: pair.slice(colon + 1) });
+        break;
+      }
       case "--timeout": {
         // Unvalidated, `--timeout abc` yielded NaN and `--timeout -1` a negative;
         // spawnSync applies NO timeout for either, so a typo silently disabled the
@@ -1799,7 +1836,13 @@ export function main(argv = process.argv.slice(2)) {
 
   let report;
   try {
-    report = executeFile(file, { bindings, timeout, copyFrom, allowZsh });
+    report = executeFile(file, {
+      bindings,
+      timeout,
+      copyFrom,
+      copyAs,
+      allowZsh,
+    });
   } catch (e) {
     return { exitCode: 2, error: e.message };
   }
