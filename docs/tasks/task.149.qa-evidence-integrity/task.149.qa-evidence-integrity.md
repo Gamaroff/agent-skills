@@ -511,25 +511,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-26
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.149.qa.7.qa-evidence-integrity.md](./task.149.qa.7.qa-evidence-integrity.md)
-- **Gate File**: [task.149.gate.7.qa-evidence-integrity.yml](./task.149.gate.7.qa-evidence-integrity.yml)
+- **Full Report**: [task.149.qa.8.qa-evidence-integrity.md](./task.149.qa.8.qa-evidence-integrity.md)
+- **Gate File**: [task.149.gate.8.qa-evidence-integrity.yml](./task.149.gate.8.qa-evidence-integrity.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 4226 (4225 pass, 0 fail, 1 skipped; CI test SUCCESS at a72aa4ac); 54 boundary probes, 0 reproduced, 0 overblocked
+- **Tests Executed**: 4238 (4237 pass, 0 fail, 1 skipped; CI 5/5 SUCCESS at 2892f50b); 84 boundary probes, 0 reproduced
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- MEDIUM — [TASK-149-BUG-11](./task.149.bug.11.read-back-picks-dotfile-gate.md): `artifact()` chooses a same-cycle dotfile as the gate; `qa-cycle.sh`'s glob never counts one.
-- Closed — BUG-1 … BUG-10.
+- No open findings. Closed: BUG-1 … BUG-11.
+- Follow-up (pre-existing on develop): the QA skills' `find -name` gate lookups miss a zero-padded gate that `qa-cycle.sh` counts — switch them to `qa-cycle.sh --path` (gate 8 `recommendations.future`).
 
 ---
 
@@ -548,6 +548,8 @@ None.
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 2 medium | qa-task |
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium, 2 low | qa-task |
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium | qa-task |
+| 2026-09-26 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-09-26 |         | QA findings fixed — gate PASS (100/100), 7 fix cycles | qa-fix |
 
 ---
 

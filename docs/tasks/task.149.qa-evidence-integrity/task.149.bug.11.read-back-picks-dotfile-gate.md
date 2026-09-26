@@ -4,7 +4,7 @@
 **Bug ID**: TASK-149-BUG-11
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 7)
 **Date Found**: 2026-09-26
 
@@ -74,3 +74,4 @@ the copy, this fix removes it.
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-26 | New | QA Engineer | Found in QA cycle 7 (review CR-1, reproduced) |
 | 2026-09-26 | Ready for QA | qa-fix | Fixed in qa-fix cycle 7 (consolidate: qa-cycle.sh --path) |
+| 2026-09-26 | Closed | QA Engineer | Verified in QA cycle 8 — probe + tests, mutation-proved |
