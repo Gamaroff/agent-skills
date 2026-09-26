@@ -157,6 +157,13 @@ const EXPECTED_VERBS = {
   "ci-reading-2": "run",
   "pr-comment": "run",
   "tracker-done": "run",
+  // Step 8 — the GAPS path (task.152, obs #148). New keys, because a key may
+  // carry only one marker and Step 7's markers are already spent.
+  "gaps-verification-complete": "run",
+  "gaps-change-log-row": "skip",
+  "gaps-status-history-row": "run",
+  "gaps-body-section": "skip",
+  "gaps-pr-comment": "run",
 };
 
 test("the skip table carries exactly the expected keys, each with its expected verb", () => {
@@ -1498,5 +1505,206 @@ printf 'EMPTY=[%s]\\n' "$(newest_numbered "$DIR" qa -name "task.7.qa.*")"`;
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+}
+
+// ── task.152 (obs #148): the GAPS path — one fill helper, Step 8 in bug mode ─────────────
+
+const FILL_HELPER = path.join(
+  REPO_ROOT,
+  "skills/finalise/references/fill-verification-complete.sh",
+);
+const GAPS_LINE = "**Final Status:** ❌ GAPS IDENTIFIED - NOT ACCEPTED";
+const ACCEPTED_LINE = "**Final Status:** ✅ ACCEPTED";
+// A template-shaped DoD whose Step 5 Outcome carries two gap lines — what 8.1
+// writes before it fills the verdict.
+const withGaps = (gaps) =>
+  TEMPLATE_TEXT.replace(
+    /^\*\*Outcome:\*\* \{[^\n]*\}$/m,
+    "**Outcome:**\n\n" + gaps.map((g) => `- [ ] ${g}`).join("\n"),
+  );
+
+for (const shell of SHELLS) {
+  const runHelper = (dod, verdict) =>
+    spawnSync(shell, [FILL_HELPER, dod, verdict], {
+      encoding: "utf8",
+      cwd: CONSUMER_ROOT,
+      env: { PATH: process.env.PATH },
+    });
+
+  test(`[${shell}] the fill helper writes GAPS on the template, is idempotent, and refuses to overwrite it with ACCEPTED (task.152)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-fill-"));
+    try {
+      const dod = path.join(dir, "bug.14.dod.1.x.md");
+      writeFileSync(dod, TEMPLATE_TEXT);
+      const r = runHelper(dod, "gaps");
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      const once = readFileSync(dod, "utf8");
+      assert.equal(countHeadings(once), 1);
+      assert.equal(countStatus(once), 1);
+      assert.ok(once.split("\n").includes(GAPS_LINE), "the line reads GAPS");
+      assert.ok(!once.includes(ACCEPTED_LINE), "and never ACCEPTED");
+      const r2 = runHelper(dod, "gaps");
+      assert.equal(r2.status, 0, r2.stdout + r2.stderr);
+      assert.equal(readFileSync(dod, "utf8"), once, "idempotent");
+      const r3 = runHelper(dod, "accepted");
+      assert.equal(r3.status, 1, "a decided file is not re-decided");
+      assert.match(r3.stdout + r3.stderr, /already reads ❌ GAPS/);
+      assert.equal(readFileSync(dod, "utf8"), once, "and is left untouched");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] the fill helper refuses GAPS over ACCEPTED, an unknown verdict and an unbound path (task.152)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-fill-"));
+    try {
+      const dod = path.join(dir, "bug.14.dod.1.x.md");
+      writeFileSync(dod, TEMPLATE_TEXT);
+      assert.equal(runHelper(dod, "accepted").status, 0);
+      const accepted = readFileSync(dod, "utf8");
+      const r = runHelper(dod, "gaps");
+      assert.equal(r.status, 1);
+      assert.match(r.stdout + r.stderr, /already reads ✅ ACCEPTED/);
+      assert.equal(readFileSync(dod, "utf8"), accepted);
+      const bad = runHelper(dod, "ACCEPTED");
+      assert.equal(bad.status, 1);
+      assert.match(bad.stdout + bad.stderr, /VERDICT must be accepted or gaps/);
+      const unbound = runHelper("{dod-path}", "gaps");
+      assert.equal(unbound.status, 1);
+      assert.match(unbound.stdout + unbound.stderr, /DOD_PATH must be bound/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("the Verification Complete fill has ONE definition — the bundled helper — called from 7.1 (accepted) and 8.1 (gaps) (task.152, obs #148)", () => {
+  assert.doesNotMatch(
+    skill,
+    /s\/\^\\\*\\\*Final Status/,
+    "no inline Final Status sed left in SKILL.md",
+  );
+  const call = (v) =>
+    new RegExp(
+      `bash \\.agents/skills/finalise/references/fill-verification-complete\\.sh "\\$DOD_PATH" ${v} \\|\\| exit 1`,
+      "g",
+    );
+  assert.equal(
+    (skill.match(call("accepted")) || []).length,
+    1,
+    "7.1 calls it once",
+  );
+  assert.equal(
+    (skill.match(call("gaps")) || []).length,
+    1,
+    "8.1 calls it once",
+  );
+  const gapsAt = skill.search(call("gaps"));
+  assert.ok(
+    gapsAt > skill.indexOf("### Step 8: Report Gaps") &&
+      gapsAt < skill.indexOf("### Step 8a:"),
+    "the gaps call sits in Step 8",
+  );
+  const shared = readFileSync(
+    path.join(REPO_ROOT, "shared/resources/fill-verification-complete.sh"),
+    "utf8",
+  );
+  assert.equal(
+    readFileSync(FILL_HELPER, "utf8").replace(/^# AUTO-GENERATED[^\n]*\n/m, ""),
+    shared,
+    "the bundled copy is the shared source (banner aside)",
+  );
+});
+
+// 8.5: extracted from the DOC_KIND binding to the fence end, placeholders fed
+// through env. The block calls the real bundled stakeholder-summary-cli.js
+// through the consumer root, so the lead is rendered, not stubbed.
+function gapsCommentBlock() {
+  const needle = 'DOC_FILE="{story-or-task-file}"';
+  const at = skill.indexOf(needle);
+  assert.ok(at > -1, "8.5's block is present");
+  const start = skill.lastIndexOf('DOC_KIND="{', at);
+  assert.ok(
+    start > skill.indexOf("### Step 8: Report Gaps"),
+    "8.5 binds DOC_KIND",
+  );
+  const end = skill.indexOf("   ```", at);
+  return (
+    skill
+      .slice(start, end)
+      .replace(/^ {3}/gm, "")
+      .replace(/DOC_KIND="\{[^\n]*\}"/, 'DOC_KIND="${KIND_IN:-}"')
+      .replace(/DOC_FILE="\{[^\n]*\}"/, 'DOC_FILE="${DOCF:-}"')
+      .replace(/DOD_PATH="\{[^\n]*\}"/, 'DOD_PATH="${DOD:-}"') +
+    '\nprintf "GAP_COUNT=%s\\n" "$GAP_COUNT"\nprintf "%s\\n" "$PR_COMMENT_BODY"\n'
+  );
+}
+
+for (const shell of SHELLS) {
+  const run85 = (env) =>
+    spawnSync(shell, ["-s", "--"], {
+      input: gapsCommentBlock(),
+      encoding: "utf8",
+      cwd: CONSUMER_ROOT,
+      env: { PATH: process.env.PATH, ...env },
+    });
+
+  test(`[${shell}] 8.5 in bug mode builds the comment from the DoD file's Step 5 — GAP_COUNT is the gap lines (task.152)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-85-"));
+    try {
+      const dod = path.join(dir, "bug.14.dod.1.x.md");
+      writeFileSync(
+        dod,
+        withGaps(["regression test missing", "CI red on lint"]),
+      );
+      const fill = spawnSync(shell, [FILL_HELPER, dod, "gaps"], {
+        encoding: "utf8",
+        cwd: CONSUMER_ROOT,
+        env: { PATH: process.env.PATH },
+      });
+      assert.equal(fill.status, 0, fill.stdout + fill.stderr);
+      // The bug report has no gap section — 8.4 is skipped in bug mode.
+      const bugDoc = path.join(dir, "bug.14.x.md");
+      writeFileSync(bugDoc, "# Bug 14\n\n## Status History\n");
+      const r = run85({ KIND_IN: "bug", DOD: dod, DOCF: bugDoc });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stdout, /^GAP_COUNT=2$/m);
+      assert.match(r.stdout, /- \[ \] regression test missing/);
+      assert.match(r.stdout, /- \[ \] CI red on lint/);
+      assert.doesNotMatch(
+        r.stdout,
+        /## Verification Complete/,
+        "bounded at the next ## — Verification Complete is not pasted in",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 8.5 for a story/task still reads the document body, bounded at the next ## (task.152)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-85-"));
+    try {
+      const doc = path.join(dir, "task.7.x.md");
+      writeFileSync(
+        doc,
+        "# Task 7\n\n## Definition of Done - Gaps Identified\n\n- [ ] one\n- [ ] two\n- [ ] three\n\n## Progress Tracking\n\n- [ ] not a gap\n",
+      );
+      const r = run85({ KIND_IN: "task", DOCF: doc, DOD: "" });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stdout, /^GAP_COUNT=3$/m);
+      assert.doesNotMatch(r.stdout, /not a gap/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 8.5 refuses an unbound DOC_KIND, and a bug run with an unbound DoD path (task.152)`, () => {
+    const r = run85({ KIND_IN: "" });
+    assert.equal(r.status, 1);
+    assert.match(r.stdout + r.stderr, /DOC_KIND must be bound/);
+    const r2 = run85({ KIND_IN: "bug", DOD: "" });
+    assert.equal(r2.status, 1);
+    assert.match(r2.stdout + r2.stderr, /DOD_PATH must be bound/);
   });
 }

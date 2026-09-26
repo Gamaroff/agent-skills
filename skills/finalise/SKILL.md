@@ -112,6 +112,11 @@ apply to a bug?" a lookup instead of a judgement.
 | `ci-reading-2` | Step 7.6c — CI reading 2 | run | run |
 | `pr-comment` | Step 7.7 — canonical PR comment | run | run — `DOD_PATH` on `${STEM}`, `FINAL_GATE` from the verify-loop verdict |
 | `tracker-done` | Step 7.8 — tracker comment, close, board `done` | run | run — one writer; develop-bug Part B4 verifies rather than repeats |
+| `gaps-verification-complete` | Step 8.1 — the `## Verification Complete` block | run — append | run — **fill** via `fill-verification-complete.sh` with `gaps`; the gaps go under `## Step 5` `**Outcome:**` as `- [ ]` lines |
+| `gaps-change-log-row` | Step 8.3 — Change Log gaps row | run | **skip — forbidden** — same grounds as `change-log-row` |
+| `gaps-status-history-row` | Step 8.3 — Status History row | — | run — `status-history.js`, status unchanged, notes `DoD incomplete — N gap(s) — {dod file}` |
+| `gaps-body-section` | Step 8.4 — gap report in the document body | run | **skip** — the gap report lives in the DoD file; a body section is a second verdict |
+| `gaps-pr-comment` | Step 8.5 — gaps PR comment | run | run — `GAP_REPORT_BODY` from the DoD file's `## Step 5: Acceptance Decision`, not the bug body |
 
 A skipped step logs `skipped — bug mode (\`key\`)` in the running summary's Verification Complete
 block, so the file says which steps did not run and why, rather than reading as if they never existed.
@@ -854,7 +859,7 @@ done
 | `CI_ROLLUP` | Decision                                                                                                                                                                                                                                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SUCCESS`   | Proceed — CI column passes                                                                                                                                                                                                                                                                              |
-| `FAILURE`   | **Do NOT accept.** Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code." **One exception, and it is narrow:** a red on the docs link checker alone, reproduced by `doc-links.js` on the work item's own document and nowhere else, is a Docs-section finding that Step 8a may fix and recheck once — see the clause under *When this step applies* there. Every other red is this row. |
+| `FAILURE`   | **Do NOT accept.** Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code." **One exception, and it is narrow:** a red on the docs link checker alone, reproduced by `doc-links.js` on the work item's own document and/or its co-located `.md` pipeline artifacts and nowhere else, is a Docs-section finding that Step 8a may fix and recheck once — see the clause under *When this step applies* there. Every other red is this row. |
 | `PENDING`   | **Do NOT accept.** Gap: "CI has not finished. Re-run `/finalise` once it completes." **Waiting is the correct action; assuming is not.**                                                                                                                                                                |
 | `CANCELLED` | **Undecided, not failed.** Almost always `cancel-in-progress` superseding a run. Re-sample; if it persists after the retries, check whether a newer commit has its own run and resolve against **that** head. Never record it as a red verdict.                                                         |
 | `NONE`      | **Undecided.** Re-sample first — an empty rollup is the normal state for the seconds between a push and its run registering. Only if it persists does it mean no checks are configured, and then record it explicitly in the DoD summary as _unverified by CI_ rather than treating absence as success. |
@@ -955,26 +960,19 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    **Bug mode (`verification-complete`):** run — **fill**, never append. `assets/bug-dod-template.md`
    already ends with the block and its `**Final Status:** {…}` placeholder; a verbatim append wrote a
-   second heading and a second status line (task.125 5c CR-2, obs #146). Replace the placeholders in
-   place, and prove the once-only rule on the file this run wrote — the template alone proving it is
-   what let the doubled file through:
+   second heading and a second status line (task.125 5c CR-2, obs #146). The fill is one bundled
+   helper, shared with 8.1's GAPS path, which takes the verdict as its argument and proves the
+   once-only rule on the file this run wrote — the template alone proving it is what let the doubled
+   file through (task.152, obs #148):
 
    ```bash
    DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
    DOD_PATH="{dod-path — the running summary Step 0 created}"
    case "$DOC_KIND$DOD_PATH" in *'{'*) echo "HALT: DOC_KIND and DOD_PATH must be bound in this block"; exit 1 ;; esac
    if [ "$DOC_KIND" = "bug" ]; then
-     [ -r "$DOD_PATH" ] || { echo "HALT: bug mode — $DOD_PATH is not readable; Step 0 creates it from the template"; exit 1; }
-     TMP=$(mktemp) && sed -E \
-       -e 's/^\*\*Final Status:\*\* \{.*\}$/**Final Status:** ✅ ACCEPTED/' \
-       -e "s/^\*\*Completion Time:\*\* \{YYYY-MM-DDTHH:MMZ\}$/**Completion Time:** $(date -u +%Y-%m-%dT%H:%MZ)/" \
-       "$DOD_PATH" > "$TMP" && mv "$TMP" "$DOD_PATH"
-     # Exactly one heading and one status line, on the WRITTEN file. Idempotent: a second run
-     # matches neither placeholder and changes nothing.
-     [ "$(grep -c '^## Verification Complete$' "$DOD_PATH")" = 1 ] && [ "$(grep -c '^\*\*Final Status:\*\*' "$DOD_PATH")" = 1 ] \
-       || { echo "HALT: bug mode — $DOD_PATH must carry exactly one ## Verification Complete heading and one **Final Status:** line"; exit 1; }
-     grep -q '^\*\*Final Status:\*\* ✅ ACCEPTED$' "$DOD_PATH" \
-       || { echo "HALT: bug mode — the Final Status placeholder in $DOD_PATH was not filled (is the template's line intact?)"; exit 1; }
+     # One fill, two verdicts (7.1 accepted, 8.1 gaps). Idempotent; refuses a doubled file and a
+     # file that already reads the other verdict.
+     bash .agents/skills/finalise/references/fill-verification-complete.sh "$DOD_PATH" accepted || exit 1
    fi
    ```
 
@@ -2173,6 +2171,18 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    - Re-run verification after fixes are implemented
    ```
 
+   **Bug mode (`gaps-verification-complete`):** run — **fill**, never append, through the same
+   helper 7.1 uses, with the verdict `gaps`. The bug DoD template already carries the block, so an
+   append here doubles the heading exactly as 7.1's once did (obs #148). Write the gaps first, each as
+   a `- [ ] {gap}` line replacing the `**Outcome:**` placeholder under `## Step 5: Acceptance
+   Decision` — 8.5 reads and counts those lines — then fill:
+
+   ```bash
+   DOD_PATH="{dod-path — the running summary Step 0 created}"
+   case "$DOD_PATH" in *'{'*) echo "HALT: DOD_PATH must be bound in this block"; exit 1 ;; esac
+   bash .agents/skills/finalise/references/fill-verification-complete.sh "$DOD_PATH" gaps || exit 1
+   ```
+
 2. **Do NOT Update Story Status:**
    - Keep the current status (e.g., `in_progress`, `code_review`, `testing`)
    - Do NOT mark as `accepted`
@@ -2189,12 +2199,34 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    the next run does accept. Canonical format:
    [document-change-log.md](references/document-change-log.md).
 
+   **Bug mode (`gaps-change-log-row`):** skip — **forbidden**, on the same grounds as
+   `change-log-row` in 7.3: bug reports never carry a Change Log.
+
+   **Bug mode (`gaps-status-history-row`):** run — the bug counterpart of the gaps row is a
+   `## Status History` row, through the same engine 7.3 uses. The status is unchanged, as it is on
+   this whole path:
+
+   ```bash
+   DOC_FILE="{the bug report path}"
+   case "$DOC_FILE" in *'{'* | '') echo "HALT: DOC_FILE must be bound in this block"; exit 1 ;; esac
+   node .agents/skills/finalise/references/status-history.js --file "$DOC_FILE" --json \
+     --date "$(date -u +%Y-%m-%d)" --status "{the bug's current status, unchanged}" \
+     --changed-by finalise --notes "DoD incomplete — {N} gap(s) — {bug-prefix}.dod.{N}.{name}.md"
+   ```
+
+   Read `reason`: `updated` and `unchanged` are both success (exit 0); `usage` (exit 2) is a
+   HALT — the call is wrong, not the bug report.
+
 4. **Add Gap Report to Document Body:**
    - Add a "## Definition of Done - Gaps Identified" section
    - List all specific gaps by category
    - **If QA reports exist**, include QA gate findings and top issues
    - Provide actionable next steps
    - Estimate effort to close gaps (Small/Medium/Large)
+
+   **Bug mode (`gaps-body-section`):** skip — the gap report is the DoD file's `## Step 5` section,
+   written at 8.1. A `## Definition of Done - Gaps Identified` section in the bug report would be a
+   second verdict, the same reason `body-dod-section` skips at 7.4–7.5.
 
    **Example Gap Report with QA Gate (use format from `references/definition-of-done-checklist.md`):**
 
@@ -2257,22 +2289,37 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    - Build the body **once**, with the lead above the arm split, then post it with the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6)
    - Request changes to address gaps
 
+   **Bug mode (`gaps-pr-comment`):** run — the block reads the gap body from the DoD file's
+   `## Step 5: Acceptance Decision` section when `DOC_KIND=bug`: 8.4 wrote no body section, so the
+   story/task source would be empty and the post-condition below would refuse to post.
+
    ```bash
-   # Bind the two values this block interpolates, HERE, before use. Step 4 writes
-   # the gap report into the document body; it does not leave it in a variable, so
-   # capture it back out of the document rather than assuming it is in scope.
+   # Bind the values this block interpolates, HERE, before use. Step 4 writes the
+   # gap report into the document body (bug mode: 8.1 writes it into the DoD file);
+   # neither leaves it in a variable, so capture it back out of the file rather than
+   # assuming it is in scope.
    #
    # An unbound name does NOT fail here — it expands to the empty string, the
    # numeric slot is silently dropped, and the comment posts as a heading, a lead
    # and a bare horizontal rule with no gaps under it. That is the silent shape
    # this whole page keeps warning about, so the binding is not optional tidiness.
+   DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
    DOC_FILE="{story-or-task-file}"
+   DOD_PATH="{dod-path — the running summary Step 0 created}"
+   case "$DOC_KIND" in *'{'* | '') echo "HALT: DOC_KIND must be bound in this block"; exit 1 ;; esac
    # Bounded to the section: set the flag AFTER the heading (`next`), and clear it
    # at the NEXT `## ` heading. Without the stop condition this captures to
    # end-of-file — dragging Change Log, Progress Tracking, References and Notes
    # into the comment, and counting THEIR checkboxes as gaps. Measured on a
    # two-gap fixture: 5 counted instead of 2, four unrelated sections pasted in.
-   GAP_REPORT_BODY=$(awk '/^## Definition of Done - Gaps Identified/{f=1;next} /^## /{f=0} f' "$DOC_FILE")
+   if [ "$DOC_KIND" = "bug" ]; then
+     # Bug mode (gaps-body-section skips 8.4): the gaps live in the DoD file's Step 5.
+     case "$DOD_PATH" in *'{'* | '') echo "HALT: DOD_PATH must be bound in this block"; exit 1 ;; esac
+     GAP_REPORT_BODY=$(awk '/^## Step 5: Acceptance Decision/{f=1;next} /^## /{f=0} f' "$DOD_PATH")
+   else
+     case "$DOC_FILE" in *'{'* | '') echo "HALT: DOC_FILE must be bound in this block"; exit 1 ;; esac
+     GAP_REPORT_BODY=$(awk '/^## Definition of Done - Gaps Identified/{f=1;next} /^## /{f=0} f' "$DOC_FILE")
+   fi
    # Unmet criteria across every section of the gap report — an unchecked box.
    # `grep -c` prints 0 and EXITS 1 when it matches nothing, so `|| true` (never
    # `|| echo 0`, which would append a second zero and make the value "0\n0").
@@ -2281,7 +2328,7 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
 
    # Omit nothing: the catalogue drops a zero as absent, so a count of 0 renders
    # the shorter true sentence rather than "(0 of them)".
-   LEAD=$(node references/stakeholder-summary-cli.js --stage dod-gaps --slot count="${GAP_COUNT}") || exit 1
+   LEAD=$(node .agents/skills/finalise/references/stakeholder-summary-cli.js --stage dod-gaps --slot count="${GAP_COUNT}") || exit 1
    PR_COMMENT_BODY=$(printf '## ⚠️ Definition of Done - Gaps Identified\n\n%s\n\n---\n\n%s' "$LEAD" "$GAP_REPORT_BODY")
 
    # Post-condition: refuse to post a body whose gap section is empty. A reviewer
@@ -2342,39 +2389,53 @@ sections (acceptance criteria, docs, security, compliance) is FAIL on a finding 
 execution** — a reproduced probe, a failing check with a citation — and nothing else is wrong. If
 two sections are FAIL, or the QA gate is FAIL, or CI is not green on the current head, this step does
 not apply: take Step 8 — with one named exception to the CI clause, stated in full in the next
-paragraph: a red on the docs link checker alone, on the work item's own document.
+paragraph: a red on the docs link checker alone, on the work item's own document or a co-located
+`.md` pipeline artifact (its QA report, DoD, implementation report, review or PR review).
 
 **One CI red is a Docs-section finding, not a CI verdict: a dead relative link inside the work
-item's own document (task.139, obs #154).** `docs-link-check` runs only on files the PR changed, so
+item's own document or one of its co-located pipeline artifacts (task.139, obs #154; task.152,
+obs #155).** `docs-link-check` runs only on files the PR changed, so
 a work-item document that quotes a skill's prose *including the skill's relative link* fails CI on
 the document itself — after the whole pipeline, since `review-*` checked that paths exist rather
 than that links resolve from here, and the QA reviewer excludes the document from its diff. That
 red is about one line of the document, not about the code, and it is the shape this step exists for.
+The artifacts the pipeline writes beside the document are the same shape and more common: CI reads
+every changed `docs/**/*.md`, and a QA report that quotes a finding containing a bracket-paren span
+renders it as a live link (task.139 run 2 went red on `task.139.qa.4` and `qa.5` and halted, because
+this clause then admitted the document alone).
 It qualifies **only** when all of these hold, each verified rather than assumed:
 
 - `CI_ROLLUP` is `FAILURE` because of the **docs link checker alone** — every other check on the
   head is `SUCCESS`, `SKIPPED` or `NEUTRAL` (a still-running lane is `PENDING`, and this step
   waits for it like any other reading; it does not round it up).
 - The engine (`references/doc-links.js`, bundled beside this skill) reproduces the red on the
-  work-item document, and **nowhere else in the diff**:
-  `node .agents/skills/finalise/references/doc-links.js --file "{document-path}"` (run from the
-  repository root, like every engine call in this skill) exits 1, and the same call on every other
-  `.md` the PR changed exits 0. A dead link in a skill or a shared resource is a code finding
-  and takes the ordinary halt.
-- The finding record's `severity` is `low`, its `touched` is exactly the document, and the record
-  carries `"documentPath"` — the **repository-root-relative** path (`docs/tasks/…/task.N.x.md`), which
-  is also what `touched` and `mutationProof.test` must read: the evaluator compares against git's
+  work-item document and/or its co-located artifacts, and **on nothing else in the diff**:
+  `node .agents/skills/finalise/references/doc-links.js --file "{document-or-artifact-path}"` (run
+  from the repository root, like every engine call in this skill) exits 1 on each reproduced file,
+  and the same call on every other `.md` the PR changed exits 0. A co-located artifact is a `.md`
+  file in the document's own directory whose name starts with the document's id and is a pipeline
+  artifact (`.qa.`, `.dod.`, `.implementation.`, `.review.`, `.pr-review.` …) — never a
+  `.bug.` report, which is a work item of its own. A dead link in a skill or a shared resource is a
+  code finding and takes the ordinary halt.
+- The finding record's `severity` is `low`, its `touched` is exactly the reproduced files, and
+  the record carries `"documentPath"` — and, for each reproduced artifact, an entry in
+  `"artifactPaths"`, which the evaluator admits only when it is co-located with `documentPath`
+  (same directory, same id stem; `isCoLocatedArtifact`). Every one of these paths is the
+  **repository-root-relative** path (`docs/tasks/…/task.N.x.md`), which is also what `touched` and
+  `mutationProof.test` must read: the evaluator compares against git's
   root-relative paths and the engine prints its `✖` lines root-relative whatever `--file` received,
   so take the value from the engine's `--json` output `file` field rather than from an absolute or
   `./`-prefixed argument (5c run 2, CR-1). `filesSummary` stays what is on disk (task § 7 /
   the story's File List — which, as the norm, omits the document it lives in); the evaluator's
   `inside-files-summary` treats the work item's own document as always in scope when
   `documentPath` names it, so the scope claim is enforced by the engine rather than declared by
-  the record (QA cycle 3, CR-5).
-- The mutation proof is the engine itself: the **pre-fix** run of `doc-links.js` on the document,
-  captured to `mutationProof.run` before the edit, is the red (it prints `✖ <file>:<line> → …`
-  and `FAIL doc-links: …`, which are the markers the evaluator reads, on lines naming the file —
-  so `mutationProof.test` is the document path); the **post-fix** run exits 0. Reverting the
+  the record (QA cycle 3, CR-5). `documentPath` is required even when the red is on artifacts only:
+  it is the anchor every `artifactPaths` entry is checked against.
+- The mutation proof is the engine itself: the **pre-fix** run of `doc-links.js` on **every**
+  reproduced file, appended to `mutationProof.run` in turn before the edit, is the red (each prints
+  `✖ <file>:<line> → …` and `FAIL doc-links: …`, which are the markers the evaluator reads, on lines
+  naming the file — so `mutationProof.test` is the **first** reproduced file, whose name already
+  sits beside a red marker); the **post-fix** run on each exits 0. Reverting the
   edit and re-running is the same proof a second time, and is what `redOnRevert: true` asserts.
 
 Then Steps 8a.1–8a.5 run unchanged, with the Docs section as the failed section and the engine run
@@ -2396,6 +2457,7 @@ cat > .claude/state/finalise-fix-finding.json <<'JSON'
   "touched": ["{every path the fix will change, repo-relative}"],
   "filesSummary": [{every path in the work item's Files Summary (task §7) / File List (story), as strings}],
   "documentPath": "{repo-root-relative path of the work item document — only for the docs-link clause; omit otherwise}",
+  "artifactPaths": [{co-located artifacts the docs-link red is on, repo-root-relative — only for the docs-link clause; omit otherwise}],
   "mutationProof": { "test": "{the test that must go red on revert}", "redOnRevert": false, "run": ".claude/state/finalise-mutation-proof.log" },
   "otherFindingsOpen": [{every medium-or-higher finding in any section, and every other section that is FAIL — as strings; [] when none}]
 }
@@ -2485,7 +2547,7 @@ provable gap under a rule; it is not a develop loop.
 
 - [ ] Running summary file finalized (status = COMPLETED - GAPS IDENTIFIED)
 - [ ] Story status NOT changed (kept at current status, not set to accepted)
-- [ ] Gap report section added to story document body
+- [ ] Gap report section added to story document body (bug mode: none — the gaps are the DoD file's Step 5 Outcome lines instead)
 - [ ] PR comment posted on the active platform (GitHub: `gh pr comment` / Bitbucket: REST POST) (skip only if no PR exists)
 - [ ] User notified with clear NOT ACCEPTED message, gap list, and next steps
 

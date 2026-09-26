@@ -22,6 +22,9 @@
  *     "filesSummary": ["lib/x.sh"],             // the work item's Files Summary / File List
  *     "documentPath": "docs/tasks/task.1.x/task.1.x.md",   // optional: the work item document —
  *                                               // always inside its own scope (finalise 8a docs-link clause)
+ *     "artifactPaths": ["docs/tasks/task.1.x/task.1.qa.2.x.md"],   // optional: co-located .md pipeline
+ *                                               // artifacts of that document — inside scope only through
+ *                                               // isCoLocatedArtifact (task.152, obs #155)
  *     "mutationProof": { "test": "tests/x.test.js", "redOnRevert": true,
  *                        "run": ".claude/state/mutation-proof.log" },   // the recorded red run
  *     "otherFindingsOpen": []                   // medium+ findings, or other FAIL sections
@@ -75,6 +78,34 @@ export const isWorkItemDocument = (p) =>
   !p.includes("..") &&
   // A null byte is not `/`, so the regex alone accepts `task.1.x.md\0.md`.
   !p.includes("\0");
+
+/**
+ * A co-located `.md` pipeline artifact of `documentPath` — its QA report, DoD,
+ * implementation report, review or PR review — which CI's docs-link-check reads
+ * as it reads the document (task.152, obs #155). Anchored to the document, so it
+ * can admit nothing outside that document's own directory and id stem:
+ *   1. `documentPath` is a work item document (isWorkItemDocument);
+ *   2. `p` is in the same directory — not a subdirectory, not a sibling tree;
+ *   3. its basename starts with the document's id and a dot (`task.139.`,
+ *      `story.2.1.`, `epic.1.`, `bug.14.`) — so `task.1.` never admits `task.10.`;
+ *   4. it is a pipeline artifact (WORK_ITEM_ARTIFACT_RE) but not a `.bug.` report,
+ *      which is a work item with its own lifecycle and its own `/finalise --bug`;
+ *   5. it ends in `.md` (docs-link-check reads nothing else — a gate `.yml` is out);
+ *   6. it carries no `..` and no NUL.
+ */
+export const isCoLocatedArtifact = (documentPath, p) => {
+  if (!isWorkItemDocument(documentPath) || typeof p !== "string") return false;
+  if (p.includes("..") || p.includes("\0") || !p.endsWith(".md")) return false;
+  const dir = documentPath.slice(0, documentPath.lastIndexOf("/") + 1);
+  if (!p.startsWith(dir)) return false;
+  const base = p.slice(dir.length);
+  if (base.includes("/")) return false;
+  const id = documentPath
+    .slice(dir.length)
+    .match(/^(task\.\d+|story\.\d+\.\d+|epic\.\d+|bug\.\d+)\./);
+  if (!id || !base.startsWith(`${id[1]}.`)) return false;
+  return WORK_ITEM_ARTIFACT_RE.test(base) && !/\.bug\./.test(base);
+};
 
 /** What a recorded red run looks like from node:test, bash test harnesses, or a
  *  hand-run assertion: a TAP `not ok`, the runner's ✖, or a `fail` count > 0. */
@@ -156,9 +187,16 @@ const CHECKS = Object.freeze({
     // document under docs/ — a record naming README.md as its "document" is a
     // declaration, not a fact, and the precondition would be satisfied by
     // saying so (task.139 QA cycle 4, CR-2).
+    // `artifactPaths` extends that one path to the document's co-located `.md`
+    // pipeline artifacts — a path listed there is admitted only when
+    // isCoLocatedArtifact holds for it, so listing a file is never enough
+    // (task.152, obs #155).
     const inScope = (p) =>
       f.filesSummary.includes(p) ||
-      (isWorkItemDocument(f.documentPath) && p === f.documentPath);
+      (isWorkItemDocument(f.documentPath) && p === f.documentPath) ||
+      (isList(f.artifactPaths) &&
+        f.artifactPaths.includes(p) &&
+        isCoLocatedArtifact(f.documentPath, p));
     const outside = f.touched.filter((p) => !inScope(p));
     return outside.length === 0
       ? null
