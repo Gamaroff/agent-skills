@@ -1,0 +1,30 @@
+{
+  "sink": "filename",
+  "entry": "cli:shared/resources/status-history.js",
+  "name": "status-history.js trailing flag",
+  "call_site": "shared/resources/status-history.js:255",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 8,
+  "passed": 8,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": [
+    "--file",
+    "!.gate.3.control.yml",
+    "--date",
+    "2026-09-26",
+    "--status",
+    "closed",
+    "--changed-by",
+    "probe",
+    "--notes",
+    "n",
+    "{input}"
+  ],
+  "ran_at": "2026-09-26T20:24:23.407Z"
+}

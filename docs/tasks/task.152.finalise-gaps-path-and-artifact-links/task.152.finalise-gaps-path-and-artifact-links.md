@@ -5,18 +5,20 @@ type: task
 description: "Close two scope edges in /finalise found on real runs. (A) Bug mode's skip table stops at Step 7, so a --bug run that reaches Step 8 (the GAPS path) doubles the Verification Complete heading, appends a forbidden Change Log row and writes a body verdict; extend the table to Step 8, share one verdict-parameterised fill between 7.1 and 8.1, and give status-history.js a --json reason contract and Title Case statuses. (B) Step 8a's docs-link clause, the fix-and-recheck evaluator and the doc-links corpus guard all stop at the work-item document, while CI link-checks every co-located pipeline artifact the PR changes; widen all three to co-located artifacts, and have the three report writers (qa-task, qa-story, review-pr) run doc-links.js on the report they just wrote."
 tags: [finalise, bug-mode, doc-links, qa-task, qa-story, review-pr, status-history, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-26
 assignee:
 estimated_effort_hours: 16
 github_issue: 482
+pr_number: 495
+completed_date: 2026-09-26
 ---
 
 # Technical Task: finalise — bug-mode gaps path and the co-located-document blind spot in 8a and the doc-links guard
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.152.review.1.finalise-gaps-path-and-artifact-links.md` implemented 2026-09-26
 
@@ -718,11 +720,35 @@ docs/bugs artifacts; one engine-path convention in finalise; a re-run guard on 8
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.152.qa.1` … `task.152.qa.4.finalise-gaps-path-and-artifact-links.md` (4 cycles)
+**Gate File**: `task.152.gate.4.finalise-gaps-path-and-artifact-links.yml`
+**Gate Status**: ✅ PASS · **Quality Score**: 100/100 (cosmetic-residue exit; 3 LOW carried to follow-up)
+**PR Review (5c)**: ⚠️ CONCERNS — `task.152.pr-review.1.finalise-gaps-path-and-artifact-links.md` (advisory; PC-1/PC-2 fixed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 13/14 PASS with code and per-PR test citations. MIG2 (observations #148/#155 → `actioned`) is due at merge by its own wording.
+✅ **Tests & CI:** PR #495. CI is green (5 checks) on the fix head `a42541d5`. There was no human review; the merge gate is `npm run ci`.
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites (task 152) and both breaking changes. Four SKILL.md files were updated.
+✅ **Security Review:** 9 probe controls engage, 144 cases executed, 0 reproduced. One LF/CR admission was found by execution and fixed under Step 8a (`a42541d5`).
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal tooling).
+
+**Detailed Verification Log:** See `task.152.dod.1.finalise-gaps-path-and-artifact-links.md` for the complete verification evidence, the Step 8a deviations block, and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-09-26
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                          | Author      |
-| ---------- | ------- | ------------------------------------------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #148, #155 (2026-09-24 observation review)     | create-task |
 | 2026-09-26 | 1.1     | Review passed (9/10) — pinned root-anchored helper paths for new Step 8 calls; added `lint:shell` to Phase 7; corrected two `doc-links.js` anchors | review-task |
 | 2026-09-26 |         | Status → ready-for-development                                                       | review-task |
@@ -732,6 +758,8 @@ docs/bugs artifacts; one engine-path convention in finalise; a re-run guard on 8
 | 2026-09-26 |         | QA gate CONCERNS (90/100) — 4 findings (1 medium, 3 low)                                | qa-task     |
 | 2026-09-26 |         | QA gate PASS (100/100) — 3 low findings                                                 | qa-task     |
 | 2026-09-26 |         | § 3 Part A/B, Phase 1 and Risk 1 describe what shipped (helper `count` verb; unprefixed sprint-review exception) — PR review PC-1/PC-2 | develop     |
+| 2026-09-26 |  | QA findings fixed — gate PASS (100/100), 3 fix cycles (cosmetic-residue exit at cycle 4) | qa-fix |
+| 2026-09-26 | 1.2 | DoD passed — accepted (PR #495); security LF/CR guard fixed under fix-and-recheck (a42541d5) | finalise |
 <!-- change-log-end -->
 
 ---
