@@ -3,7 +3,7 @@
 **Task**: `task.149.qa-evidence-integrity.md`
 **Run Number**: 1
 **Started**: 2026-09-26 04:10
-**Status**: Halted — finalise DoD gaps (documentation)
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Give each of four unread QA claims (obs #143, #156, #163, #164) a check that exe
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; audit ready-for-review 20/20 | .summaries/step-3-iteration-audit.json |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #493: https://github.com/Gamaroff/agent-skills/pull/493 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.149.qa.{N}.*.md`; `task.149.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 8 cycles (5 + 3 granted); gate 8 PASS 100; PR review CONCERNS (pr-review.1) | —                    |
-| 7. finalise                | ❌ Failed | `task.149.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: 3 low documentation items (PC-3, PC-4, PC-6); dod.1 written; fix-and-recheck refused | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done | `task.149.dod.{N}.*.md`; task `status: accepted`                       | dod.2 ACCEPTED (run 1 found 3 doc gaps, closed in 8a7d7603); CI reading 1 SUCCESS @ 8a7d7603, reading 2 SUCCESS @ 8efb8b82; issue #479 closed | —                    |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -143,6 +143,12 @@ Give each of four unread QA claims (obs #143, #156, #163, #164) a check that exe
 - QA Cycle 8 — /qa-task scoped since gate 7 (4 source files; fix diff first): reviewer returned in 240 s, every fix claim confirmed, no high-confidence bug; CR-1 (medium/medium) reproduced and found pre-existing on origin/develop → future. Probes 84 (qa-cycle.sh shell probe 28/28 added), 0 reproduced. CI 5/5 at 2892f50b. Step 12b clean. Gate PASS 100, no open entry → route 1 → 5c.
 - Step 5c — gate 8 + QA report committed (5fb8e2e0) and pushed; trail asserted on origin. /review-pr --effort medium --comment: both lenses dispatched in parallel. Verdict ⚠️ CONCERNS (deterministic: CR-1 medium/medium, no high/high). CR-1 (read-back from cycle 2 does not require the document to link THIS cycle's gate/report) reproduced by the orchestrator (rc=0 on an un-re-edited doc) — recorded as a follow-up, not a block, per the 5c verdict table. Report: task.149.pr-review.1.qa-evidence-integrity.md; PR summary comment posted. ready-for-merge: stage-disabled. Loop exit → Step 7.
 - Step 7 — /finalise: 4 DoD agents in parallel (AC PARTIAL 12/13 — AC13 post-merge by design, treated as deferred per task.148; Security PASS 84 probes; Compliance N/A; Docs FAIL 3 low). CI reading 1: SUCCESS @ 5fb8e2e0dbb1 over 5 checks. Fix-and-recheck evaluator: exit 1 (inside-files-summary, mutation-proved). Decision: GAPS → Step 8: dod.1 finalized, gap report + gaps Change Log row in the task doc, dod-gaps PR comment posted. Status unchanged (ready-for-review). Pipeline HALT (DoD gaps). Tracker blocked stage: not signalled (TRACKER=github; the stage is Jira-only).
+
+### Resume after DoD gaps — 2026-09-26
+
+- The user approved closing the three documentation gaps ("Go ahead"). Commit 8a7d7603 fixed them: PC-3 reworded the qa-cycle.sh header, PC-4 added a CHANGELOG sentence, and PC-6 updated § 3, Phase 4 and § 7. The bundle was regenerated. Afterwards bundle:check, shellcheck, prettier, doc-links and --check-updated were all clean, and 81/81 affected tests passed.
+- Lock restored from the halt snapshot (`advance-pipeline-lock.sh --restore`, current_step 7). Resuming at Step 7: `/finalise` re-run, writing dod.2.
+- Step 7 (run 2) — /finalise: 4 DoD agents re-run afresh. AC PARTIAL (12/12 plus AC13 post-merge, deferred per task.148). Security PASS (84 probes). Compliance N/A. Docs PASS (PC-3/4/6 verified closed). CI reading 1: SUCCESS @ 8a7d7603dd9d over 5 checks. It first read PENDING, and a re-read after the agents gave SUCCESS. Decision ACCEPTED. The task document now reads status accepted, with completed_date, pr_number 493, a PASSED section, and the run-1 gap section marked historical. Change Log 1.2. Registry: ticked. Sprint review written. 6a acceptance commit 8efb8b82 (the first `git add` hit a transient index.lock; retried and landed). 6b assertions ok. CI reading 2: SUCCESS @ 8efb8b8214fe over 5 checks after 120s (background poll). 6d: (task 149) cited. Canonical PR comment posted. Tracker: doc link already on develop, done comment posted, issue #479 closed (verified CLOSED), board `done` already.
 
 ---
 
@@ -292,10 +298,12 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: 2026-09-26 (halted at Step 7 — DoD gaps; the Steps 5–6 escalation at cycle 5 was re-entered and the loop exited clean at cycle 8)
-**Final Status**: Halted — finalise DoD gaps (3 low documentation items)
+**Finished**: 2026-09-26 12:53 UTC
+**Final Status**: Completed
 **Branch**: `feature/task.149.qa-evidence-integrity`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/493
 **QA Iterations**: 8 (gates FAIL 70, FAIL 60, CONCERNS 80 ×5, PASS 100); every fix gated; Step 5c PR review CONCERNS (pr-review.1)
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**DoD Summary**: task.149.dod.2.qa-evidence-integrity.md (ACCEPTED; run 1 = dod.1, 3 documentation gaps)
+**Tracker debt**: none. Issue #479 is closed and the board is Done. AC13 (mark observations #143, #156, #163 and #164 actioned) is due on merge.
+
+**Completion Summary**: The task gave the QA skills' four unread claims a check that executes: `--copy-as` seeding, export-and-probe, standards-named validation, and a post-edit read-back. It took 8 QA cycles. At cycle 5 the loop hit its limit, and it was re-entered with 4 user-granted cycles. The two HIGH findings were sandbox escapes in `--copy-as`, closed by replacing the mechanism at cycle 2. The long MEDIUM tail was the read-back's failure taxonomy. It was closed by consolidating the read-back into `qa-read-back.js` (cycle 4), scoping its exit-2 claim (cycle 6), and giving the cycle's file a single definition in `qa-cycle.sh --path` (cycle 7). Carried follow-ups: 5c CR-1 (the read-back should require links to this cycle's gate and report), moving the QA skills' `find -name` gate lookups to `--path`, and security-probe's bare `..` containment, which predates this branch.
