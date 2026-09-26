@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-09-25
-**Next Available Task Number:** **158**
+**Next Available Task Number:** **159**
 
 ## How to use
 
@@ -198,6 +198,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 155 | [QA Testing Results section: one write engine, one placement, refused when duplicated](task.155.qa-results-section-engine/task.155.qa-results-section-engine.md) | planned | refactoring | Medium | 2026-09-25 | [#486](https://github.com/Gamaroff/agent-skills/issues/486) | Obs #178: `qa-results.js` beside `change-log.js`, qa-task/qa-story Step 12 wired, corpus guard, task.65 repair (3 stacked copies) |
 | 156 | [session-handoff continue mode: a continuation file a fresh context resumes from](task.156.session-handoff-continue-mode/task.156.session-handoff-continue-mode.md) | planned | infrastructure | Medium | 2026-09-25 | [#490](https://github.com/Gamaroff/agent-skills/issues/490) | — |
 | 157 | [Context-pressure trigger: recommend a continuation handoff before the context fills](task.157.context-pressure-handoff-trigger/task.157.context-pressure-handoff-trigger.md) | planned | infrastructure | Medium | 2026-09-25 | [#491](https://github.com/Gamaroff/agent-skills/issues/491) | task.156 |
+| 158 | [QA read-back requires this cycle's links; one definition each for the cycle's gate file and for path containment](task.158.cycle-file-and-containment-definitions/task.158.cycle-file-and-containment-definitions.md) | planned | refactoring | Medium | 2026-09-26 | [#494](https://github.com/Gamaroff/agent-skills/issues/494) | task.149 follow-ups (5c CR-1; gate 8 / gate 7 future): read-back checks this cycle's links, `qa-cycle.sh` for every current-gate lookup, one `isWithin` per module system |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
