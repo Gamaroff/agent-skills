@@ -766,3 +766,40 @@ test("the unprefixed sprint-review-summary.md finalise writes beside a document 
     "the corpus walk reads the same list",
   );
 });
+
+test("a raw LF or CR in a path is refused by both predicates — one string here, two paths to a line-oriented reader (task.152 finalise DoD security probe)", () => {
+  const story = "docs/prd/p/epics/epic.1.x/stories/story.1.2.x/story.1.2.x.md";
+  for (const p of [
+    TASK_DOC.replace(/[^/]+$/, "task.139.qa.1.x.md\nREADME.md"),
+    TASK_DOC.replace(/[^/]+$/, "task.139.qa.1.x.md\r\n.md"),
+    TASK_DOC.replace(/[^/]+$/, "task.139.qa.1.x.md\r.md"),
+  ]) {
+    assert.equal(isCoLocatedArtifact(TASK_DOC, p), false, JSON.stringify(p));
+    assert.deepEqual(
+      failedIds({
+        ...GOOD,
+        touched: [p],
+        documentPath: TASK_DOC,
+        artifactPaths: [p],
+      }),
+      ["inside-files-summary"],
+      JSON.stringify(p),
+    );
+  }
+  assert.equal(
+    isCoLocatedArtifact(
+      story,
+      story.replace(/[^/]+$/, "story.1.2.qa.1.x.md\nx.md"),
+    ),
+    false,
+    "story anchor",
+  );
+  for (const doc of [
+    TASK_DOC + "\n.md",
+    "docs/tasks/task.1.x/task.1.x.md\r\n.md",
+  ]) {
+    assert.equal(isWorkItemDocument(doc), false, JSON.stringify(doc));
+  }
+  // The guard does not over-block: the ordinary artifact still passes.
+  assert.equal(isCoLocatedArtifact(TASK_DOC, QA4), true);
+});

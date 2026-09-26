@@ -81,8 +81,10 @@ export const isWorkItemDocument = (p) =>
   WORK_ITEM_DOC_RE.test(p) &&
   !WORK_ITEM_ARTIFACT_RE.test(p.slice(p.lastIndexOf("/") + 1)) &&
   !p.includes("..") &&
-  // A null byte is not `/`, so the regex alone accepts `task.1.x.md\0.md`.
-  !p.includes("\0");
+  // A null byte is not `/`, so the regex alone accepts `task.1.x.md\0.md`. A raw
+  // LF/CR is the same shape for every line-oriented reader: one string here, two
+  // paths to `git`, `xargs` or a log (task.152 finalise DoD security probe).
+  !/[\0\r\n]/.test(p);
 
 /**
  * A co-located `.md` pipeline artifact of `documentPath` — its QA report, DoD,
@@ -109,7 +111,8 @@ export const UNPREFIXED_ARTIFACTS = Object.freeze(["sprint-review-summary.md"]);
 
 export const isCoLocatedArtifact = (documentPath, p) => {
   if (!isWorkItemDocument(documentPath) || typeof p !== "string") return false;
-  if (p.includes("..") || p.includes("\0") || !p.endsWith(".md")) return false;
+  if (p.includes("..") || /[\0\r\n]/.test(p) || !p.endsWith(".md"))
+    return false;
   const dir = documentPath.slice(0, documentPath.lastIndexOf("/") + 1);
   if (!p.startsWith(dir)) return false;
   const base = p.slice(dir.length);
