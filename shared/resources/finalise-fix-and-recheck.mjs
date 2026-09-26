@@ -68,9 +68,13 @@ const isList = (v) => Array.isArray(v);
 const WORK_ITEM_DOC_RE =
   /^docs\/(?:[^/]+\/)*(?:task\.\d+|story\.\d+\.\d+|epic\.\d+|bug\.\d+)\.[^/]+\.md$/;
 // A pipeline artifact beside the document (its QA report, gate, DoD, plan,
-// review…) shares the stem and is NOT the document.
-const WORK_ITEM_ARTIFACT_RE =
-  /\.(qa|gate|bug|implementation|review|dod|plan|handover|pr-review|risk|test-design)\./;
+// review, sprint-review summary…) shares the stem and is NOT the document.
+// Exported because it is the ONE definition of the set: the doc-links corpus
+// guards import it rather than restating it, so "what CI checks beside a
+// document" and "what 8a may admit" cannot drift apart (task.152 QA-1 — they had:
+// `sprint-review-summary` was in the guard and not here).
+export const WORK_ITEM_ARTIFACT_RE =
+  /\.(qa|gate|bug|implementation|review|dod|plan|handover|pr-review|risk|test-design|sprint-review-summary)\./;
 export const isWorkItemDocument = (p) =>
   typeof p === "string" &&
   WORK_ITEM_DOC_RE.test(p) &&

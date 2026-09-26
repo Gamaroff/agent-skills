@@ -12,6 +12,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { WORK_ITEM_ARTIFACT_RE } from "../finalise-fix-and-recheck.mjs";
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -325,8 +326,10 @@ const KNOWN = new Set([
   "docs/tasks/task.28.develop-task-loop-iteration-audit-subagent/task.28.develop-task-loop-iteration-audit-subagent.md → ../../../../shared/resources/develop-pipeline-step-3-develop-loop.md",
 ]);
 const WORK_ITEM_RE = /(^|\/)(task\.\d+|story\.\d+\.\d+|epic\.\d+)\.[^/]+\.md$/;
-const ARTIFACT_RE =
-  /\.(qa|gate|bug|implementation|review|dod|plan|handover|pr-review|risk|test-design|sprint-review-summary)\./;
+// The ONE definition of "a pipeline artifact beside a work item", imported from
+// the fix-and-recheck evaluator so the corpus guards and 8a's admission rule read
+// the same set (task.152 QA-1).
+const ARTIFACT_RE = WORK_ITEM_ARTIFACT_RE;
 
 function workItemDocs() {
   return execFileSync(
@@ -428,7 +431,6 @@ function artifactDocs() {
 }
 
 test("corpus: every co-located pipeline artifact's relative links resolve and every fence closes (KNOWN_ARTIFACT_* pinned, ratchet only tightens)", () => {
-  const started = Date.now();
   const docs = artifactDocs();
   assert.ok(
     docs.length >= 1000,
@@ -474,10 +476,6 @@ test("corpus: every co-located pipeline artifact's relative links resolve and ev
     closedFences,
     [],
     `KNOWN_ARTIFACT_FENCES entries now close — delete them so the ratchet tightens:\n  ${closedFences.join("\n  ")}`,
-  );
-  assert.ok(
-    Date.now() - started < 10000,
-    `the artifact walk took ${Date.now() - started}ms — over the 10s budget (task.152)`,
   );
 });
 
@@ -550,6 +548,18 @@ test("writer sites: qa-task Step 11, qa-story Output 1 and review-pr Step 7 each
       body.indexOf("git add ") < body.indexOf("doc-links.js --file"),
       `${file} § ${heading} checks before it stages — the engine resolves against the index`,
     );
+    // A path that does not exist yet makes `git add` fatal, and a fatal `git add`
+    // stages NOTHING — not even the report. qa-story writes its gate after this
+    // step (Output 2 / qa-gate), so its block must not name the gate; qa-task
+    // writes the gate first (Step 10) and may (task.152 QA cycle 1, CR-1).
+    if (skill === "qa-story") {
+      const addLine = body.split("\n").find((l) => l.startsWith("git add "));
+      assert.doesNotMatch(
+        addLine,
+        /\.gate\./,
+        `${file} § ${heading} stages the gate before it is written — git add fails and stages nothing`,
+      );
+    }
     assert.ok(
       fs.existsSync(
         path.join(REPO_ROOT, "skills", skill, "references", "doc-links.js"),

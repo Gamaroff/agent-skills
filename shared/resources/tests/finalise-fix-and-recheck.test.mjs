@@ -236,6 +236,7 @@ test("inside-files-summary: a co-located QA report named in artifactPaths is in 
     "implementation.1",
     "review.1",
     "pr-review.1",
+    "sprint-review-summary",
   ]) {
     const p = `docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.${kind}.y.md`;
     assert.equal(isCoLocatedArtifact(story, p), true, p);
@@ -700,4 +701,30 @@ test("the security agent's schema carries `severity` on probes and FAIL checks",
     output.includes("**Severity rule**"),
     "the severity rule paragraph is gone",
   );
+});
+
+test("a sprint-review summary is a co-located artifact, never a work-item document — the evaluator and the corpus guard share one artifact set (task.152 QA cycle 1, QA-1)", () => {
+  const story = "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md";
+  const summary =
+    "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.sprint-review-summary.md";
+  assert.equal(isWorkItemDocument(summary), false, "not a document");
+  assert.equal(
+    isCoLocatedArtifact(story, summary),
+    true,
+    "an artifact of its story",
+  );
+  assert.deepEqual(
+    failedIds({ ...GOOD, touched: [summary], documentPath: summary }),
+    ["inside-files-summary"],
+    "and it cannot admit itself as the document",
+  );
+  // One definition: the doc-links corpus guards import this regex rather than
+  // restating it, so the two cannot disagree again.
+  const guard = read("shared/resources/tests/doc-links.test.mjs");
+  assert.match(
+    guard,
+    /import \{ WORK_ITEM_ARTIFACT_RE \} from "\.\.\/finalise-fix-and-recheck\.mjs"/,
+  );
+  assert.match(guard, /const ARTIFACT_RE = WORK_ITEM_ARTIFACT_RE;/);
+  assert.doesNotMatch(guard, /const ARTIFACT_RE =\s*\//, "no second literal");
 });

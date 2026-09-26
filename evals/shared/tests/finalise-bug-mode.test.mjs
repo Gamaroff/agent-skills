@@ -1699,6 +1699,35 @@ for (const shell of SHELLS) {
     }
   });
 
+  test(`[${shell}] 8.5 in bug mode refuses a DoD whose Step 5 carries no gap line — the non-empty check alone cannot see it (task.152 QA cycle 1, CR-2)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-85-"));
+    try {
+      const dod = path.join(dir, "bug.14.dod.1.x.md");
+      // Filled with the gaps verdict but 8.1 never wrote the gap lines: Step 5
+      // still carries Decision / QA record / CI rollup, so it is not empty.
+      writeFileSync(dod, TEMPLATE_TEXT);
+      const fill = spawnSync(shell, [FILL_HELPER, dod, "gaps"], {
+        encoding: "utf8",
+        cwd: CONSUMER_ROOT,
+        env: { PATH: process.env.PATH },
+      });
+      assert.equal(fill.status, 0, fill.stdout + fill.stderr);
+      const r = run85({ KIND_IN: "bug", DOD: dod, DOCF: "" });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(
+        r.stdout + r.stderr,
+        /no '- \[ \]' gap line under Step 5 Outcome/,
+      );
+      assert.doesNotMatch(
+        r.stdout,
+        /^GAP_COUNT=/m,
+        "nothing was built for posting",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(`[${shell}] 8.5 refuses an unbound DOC_KIND, and a bug run with an unbound DoD path (task.152)`, () => {
     const r = run85({ KIND_IN: "" });
     assert.equal(r.status, 1);
@@ -1706,5 +1735,72 @@ for (const shell of SHELLS) {
     const r2 = run85({ KIND_IN: "bug", DOD: "" });
     assert.equal(r2.status, 1);
     assert.match(r2.stdout + r2.stderr, /DOD_PATH must be bound/);
+  });
+}
+
+// 8.3's bug-mode Status History call: every value it writes is bound in the
+// block and refused while a placeholder survives (task.152 QA cycle 1, CR-5).
+function statusHistoryBlock() {
+  const needle = 'BUG_STATUS="{';
+  const at = skill.indexOf(needle);
+  assert.ok(
+    at > skill.indexOf("### Step 8: Report Gaps"),
+    "8.3's bug-mode block is in Step 8",
+  );
+  const start = skill.lastIndexOf('DOC_FILE="{', at);
+  const end = skill.indexOf("   ```", at);
+  return skill
+    .slice(start, end)
+    .replace(/^ {3}/gm, "")
+    .replace(/DOC_FILE="\{[^\n]*\}"/, 'DOC_FILE="${DOCF-}"')
+    .replace(/BUG_STATUS="\{[^\n]*\}"/, 'BUG_STATUS="${ST-}"')
+    .replace(/GAP_TOTAL="\{[^\n]*\}"/, 'GAP_TOTAL="${GT-}"')
+    .replace(/DOD_NAME="\{[^\n]*\}"/, 'DOD_NAME="${DN-}"');
+}
+
+for (const shell of SHELLS) {
+  test(`[${shell}] 8.3 bug mode writes a Title Case Status History row through the engine, and refuses any unbound value (task.152 QA cycle 1, CR-5)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-83-"));
+    try {
+      const bug = path.join(dir, "bug.14.x.md");
+      writeFileSync(
+        bug,
+        "# Bug 14\n\n## Status History\n\n| Date | Status | Changed By | Notes |\n| --- | --- | --- | --- |\n| 2026-09-20 | New | qa | filed |\n",
+      );
+      const run = (env) =>
+        spawnSync(shell, ["-s", "--"], {
+          input: statusHistoryBlock(),
+          encoding: "utf8",
+          cwd: CONSUMER_ROOT,
+          env: { PATH: process.env.PATH, ...env },
+        });
+      const ok = run({
+        DOCF: bug,
+        ST: "in-progress",
+        GT: "2",
+        DN: "bug.14.dod.1.x.md",
+      });
+      assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+      assert.equal(JSON.parse(ok.stdout).reason, "updated");
+      assert.match(
+        readFileSync(bug, "utf8"),
+        /\| In Progress \| finalise \| DoD incomplete — 2 gap\(s\) — bug\.14\.dod\.1\.x\.md \|/,
+      );
+      for (const missing of ["DOCF", "ST", "GT", "DN"]) {
+        const env = {
+          DOCF: bug,
+          ST: "in-progress",
+          GT: "2",
+          DN: "bug.14.dod.1.x.md",
+        };
+        const unbound = run({ ...env, [missing]: "{still a placeholder}" });
+        assert.equal(unbound.status, 1, `${missing} placeholder must halt`);
+        assert.match(unbound.stdout, /must be bound in this block/);
+        const empty = run({ ...env, [missing]: "" });
+        assert.equal(empty.status, 1, `${missing} empty must halt`);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 }

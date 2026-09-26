@@ -665,6 +665,34 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-26
+**Quality Score**: 50/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.152.qa.1.finalise-gaps-path-and-artifact-links.md](./task.152.qa.1.finalise-gaps-path-and-artifact-links.md)
+- **Gate File**: [task.152.gate.1.finalise-gaps-path-and-artifact-links.yml](./task.152.gate.1.finalise-gaps-path-and-artifact-links.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 4263
+- **Phases Verified**: 7/7
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+
+CI is red on PR #495: the implementation report quotes the task.139 link shape unfenced (QA-2, HIGH).
+Medium: qa-story's writer check stages a gate not yet written (CR-1); the bug-mode 8.5 post-condition
+is vacuous (CR-2); the evaluator's artifact regex omits `sprint-review-summary` (QA-1).
+
+---
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -674,6 +702,7 @@ None.
 | 2026-09-26 | 1.1     | Review passed (9/10) — pinned root-anchored helper paths for new Step 8 calls; added `lint:shell` to Phase 7; corrected two `doc-links.js` anchors | review-task |
 | 2026-09-26 |         | Status → ready-for-development                                                       | review-task |
 | 2026-09-26 |         | Implemented — 1 new helper, 2 engines, 4 SKILL.md, 4 test files (1 new), 25 new tests | develop     |
+| 2026-09-26 |         | QA gate FAIL (50/100) — 6 findings (1 high, 3 medium, 2 low)                         | qa-task     |
 <!-- change-log-end -->
 
 ---

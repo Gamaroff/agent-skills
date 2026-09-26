@@ -2208,10 +2208,17 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
 
    ```bash
    DOC_FILE="{the bug report path}"
-   case "$DOC_FILE" in *'{'* | '') echo "HALT: DOC_FILE must be bound in this block"; exit 1 ;; esac
+   BUG_STATUS="{the bug's current status, unchanged — as bug-doc.js reports it}"
+   GAP_TOTAL="{gap-count — the number of '- [ ]' lines 8.1 wrote}"
+   DOD_NAME="{the DoD file's name — bug-prefix.dod.run.name.md, as Step 0 created it}"
+   # Every value this block writes into the row is bound HERE and refused when a placeholder
+   # survives: an unsubstituted status would otherwise be written as a literal row.
+   case "$DOC_FILE|$BUG_STATUS|$GAP_TOTAL|$DOD_NAME" in
+     *'{'* | '|'* | *'||'* | *'|') echo "HALT: DOC_FILE, BUG_STATUS, GAP_TOTAL and DOD_NAME must be bound in this block"; exit 1 ;;
+   esac
    node .agents/skills/finalise/references/status-history.js --file "$DOC_FILE" --json \
-     --date "$(date -u +%Y-%m-%d)" --status "{the bug's current status, unchanged}" \
-     --changed-by finalise --notes "DoD incomplete — {N} gap(s) — {bug-prefix}.dod.{N}.{name}.md"
+     --date "$(date -u +%Y-%m-%d)" --status "$BUG_STATUS" \
+     --changed-by finalise --notes "DoD incomplete — $GAP_TOTAL gap(s) — $DOD_NAME"
    ```
 
    Read `reason`: `updated` and `unchanged` are both success (exit 0); `usage` (exit 2) is a
@@ -2325,6 +2332,13 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    # `|| echo 0`, which would append a second zero and make the value "0\n0").
    GAP_COUNT=$(printf '%s' "$GAP_REPORT_BODY" | grep -c '^- \[ \]' || true)
    GAP_COUNT=${GAP_COUNT:-0}
+   # Bug mode: the template always fills Step 5 (Decision, QA record, CI rollup), so the
+   # empty-body post-condition below can never fire there. What says the gaps were written is
+   # the gap lines themselves — 8.1 puts each under **Outcome:** as `- [ ]` — so a bug-mode
+   # body with none is refused here rather than posted as "gaps identified" with no gaps.
+   if [ "$DOC_KIND" = "bug" ] && [ "$GAP_COUNT" -eq 0 ]; then
+     echo "HALT: bug mode — no '- [ ]' gap line under Step 5 Outcome in $DOD_PATH; 8.1 writes them before the fill"; exit 1
+   fi
 
    # Omit nothing: the catalogue drops a zero as absent, so a count of 0 renders
    # the shorter true sentence rather than "(0 of them)".
