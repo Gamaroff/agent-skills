@@ -35,7 +35,7 @@ Close /finalise's two scope edges: bug mode through Step 8 (GAPS path) with a sh
 | 2. review-task             | ✅ Done    | `task.152.review.{N}.{name}.md` exists (or skip logged)                | `task.152.review.1.*.md` — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration (inline); commits fac47f6, debdd6e, a9709ab, c796370; audit 20/20 | `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #495: https://github.com/Gamaroff/agent-skills/pull/495 | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.152.qa.{N}.*.md`; `task.152.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.152.qa.{N}.*.md`; `task.152.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.152.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -142,6 +142,43 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: QA-2 fenced the report quote; CR-1 qa-story stages the report alone; CR-2 bug-mode 8.5 refuses GAP_COUNT=0; QA-1 one exported WORK_ITEM_ARTIFACT_RE (+ sprint-review-summary) imported by the doc-links guards; CR-5 8.3 binds and guards every value; CR-7 timing assertion dropped. Each mutation-proved (F1–F5). Fast gate green (4,267 pass, 0 fail, symlink aside). The implementation report rode in this fix commit once — it is QA-2's subject and CI was red on it (deviation from the Step 8 deferral, recorded here). changes-requested: stage-disabled. PR state after push: OPEN.
+**Commit**: `b4c9c8b7`
+
+### QA Cycle 2 — 2026-09-26
+
+**Gate Result**: CONCERNS
+**Issues Found**: 3 — CR-1 (bug-mode zero-gap refusal ordered after 8.1/8.3 writes; 8.3 values self-reported), CR-2 (unprefixed sprint-review-summary.md outside the shared artifact set), CR-3 (documented `unchanged` unreachable, low). All six cycle-1 findings verified fixed; CI green on b4c9c8b7.
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: CR-1 (consolidate) the fill helper owns the gap count — `gaps` refuses zero before writing, `count` feeds 8.3, which derives GAP_TOTAL/DOD_NAME; CR-2 (consolidate) UNPREFIXED_ARTIFACTS shared by isCoLocatedArtifact and the artifact walk (floor 100); CR-3 append documented. Mutation-proved G1–G4. Fast gate green (4,270 pass, 0 fail, symlink aside). `npm run bundle` again left the preconditions JSON copy stale (obs #199) — deleted and re-bundled. changes-requested: stage-disabled.
+**Commit**: `80ef8f8f`
+
+### QA Cycle 3 — 2026-09-26
+
+**Gate Result**: CONCERNS
+**Issues Found**: 4 — CR-1 (helper HALT reasons on stdout, swallowed by 8.3's command substitution), CR-4 (count 0 ambiguous; 8.3 does not refuse 0, low), CR-6 (8.5 keeps a second gap count, low), CR-7 (walk comment overstates "same set", low). Cycle-2 findings all verified fixed; CI green on 80ef8f8f. Routed to future: docs/bugs walk (out of scope § 4), engine-path conventions, 8.3 re-run guard.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+**Fixes Applied**: CR-1 helper HALTs to stderr; CR-4 count/gaps halt on a missing Step 5 section, 8.3 refuses 0; CR-6 8.5 bug branch reads the helper's count (one definition at 8.1/8.3/8.5); CR-7 walk comment. Mutation-proved H1–H4. Fast gate green (4,270 pass, 0 fail, symlink aside). qa-fix protocol followed inline (skill already loaded twice this run; findings are gate 3's four entries). A first attempt at the helper edit used String.replace and `$'` spliced the file's tail into it — caught by ShellCheck before any test ran; restored from HEAD and redone with split/join.
+**Commit**: `03809419`
+
+### QA Cycle 4 — 2026-09-26
+
+**Gate Result**: PASS
+**Issues Found**: 3 LOW — CR-1 (walk comment overstates coverage: docs/bugs not walked), CR-2 (8.5 duplicates the helper's Step 5 extractor), CR-3 (runHelper defined twice). The reviewer's medium (docs/bugs artifacts not walked) routed to future: out of scope by task § 4, raised at cycles 3 and 4. Cycle-3 findings verified fixed; CI green on 03809419.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 4 with HIGH 0 for cycles 3 and 4; all 3 open findings are LOW and are carried to the gate's recommendations.future by id (CR-1, CR-2, CR-3). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+**5c**: `/review-pr --effort medium --comment` → CONCERNS (`task.152.pr-review.1.finalise-gaps-path-and-artifact-links.md`): PC-1/PC-2 task § 3 drift (fixed in the task document before Step 7, commit after 7a4ebe85), CR-1 writer-site population hand-listed (follow-up; obs #198 covers the implementation-report writer), CR-2 misplaced JSDoc (cleanup). Not blocking. ready-for-merge: stage-disabled.
 
 ---
 
@@ -154,3 +191,22 @@ _Track each QA review/fix cycle._
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+
+---
+
+## Pipeline Paused — 2026-09-26T20:35:00Z
+
+⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
+
+**State at pause**:
+
+- Skill: `/develop-task`
+- Branch: `feature/task.152.finalise-gaps-path-and-artifact-links`
+- Last step boundary: Step 7
+- PR: https://github.com/Gamaroff/agent-skills/pull/495
+- Tracker: github #482
+
+**Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 7.
+
+**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+
