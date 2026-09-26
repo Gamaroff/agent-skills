@@ -1001,6 +1001,11 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    template's one `"{input}"` element is each case, exit status is the verdict, a crash is
    `errored`, and each guarded flag is its own control, named with `--name`; "it takes several flags" is never a reason
    to record `boundary: false`.
+   A predicate the engine cannot import because it is **not exported** — a module-private `const` —
+   takes the same answer: export it (one word) and probe it. "It is not exported" is never a reason to
+   record `boundary: false`; the engine's `entry-not-probeable` detail names the remedy. On task.139
+   QA recorded `boundary: false` for five cycles over `isWorkItemDocument`; finalise exported it and
+   found a null-byte hole (obs #156).
    It takes the candidates from `references/security-input-corpus.mjs` (`corpusFor(<sink>)`)
    itself, imports the entry point in a sandboxed child — or materialises each case as a fixture
    directory and runs the script against it under bash and zsh — and scores each candidate.
@@ -1012,7 +1017,9 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    `nfr_validation.security.evidence` may read `measured` only when that total is positive. An empty
    findings list with `probes_executed: 0` is a review that read the boundary and did not test it,
    which is the defect this item closes. `boundary: false` is the common case and a legitimate skip — record it in the QA
-   report's `## Code Review` section rather than leaving `probes_executed` absent. A boundary that is
+   report's `## Code Review` section rather than leaving `probes_executed` absent. The record names
+   each predicate-shaped function the diff adds and the signal it lacks — a `boundary: false` with no
+   candidates named is not a decision (obs #156). A boundary that is
    read at QA and executed only at the Step 7 DoD probe lands its defect after the gate that should
    have covered it: a 14-star glob compiled to `[^/]*` × 14 passed five green cycles and was found at
    finalise (obs #20).
@@ -1099,6 +1106,12 @@ node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json
 Bind any caller values the documented snippets expect with repeated `--bind NAME=VALUE`, and seed the
 temp working directory from a real directory with `--copy <dir>` so the blocks see real data. Execution
 always happens in that temp copy — never the live tree.
+
+`--copy <dir>` places the directory's **contents** at the temp root. When a block addresses a path —
+`find docs/tasks …` in the `sync-github-*` discovery blocks — seed it at that path instead with
+`--copy-as docs:docs` (`SRC:DEST`, repeatable; `DEST` must be relative and stay inside the temp copy).
+A block that fails only because it was seeded at the wrong path is a harness finding, not a prose
+finding (obs #143).
 
 Record in the QA report:
 
@@ -1237,13 +1250,25 @@ See NFR Assessment section below for detailed process.
 
 #### Phase 4: Standards Compliance Check
 
-- Verify adherence to `docs/coding-standards.md`
+- Verify adherence to the coding standards file the pipeline loads —
+  `${ARCH_ROOT}/concepts/coding-standards.md` (default `docs/architecture/concepts/coding-standards.md`)
 - Check compliance with `docs/unified-project-structure.md`
 - Validate testing approach against `docs/testing-strategy.md`
 - Ensure all guidelines mentioned in the story are followed
 - **Review TypeScript Compliance Agent findings (Phase 1.5)** against project TypeScript standards
 - **Review Accessibility Agent findings (Phase 1.5)** against project accessibility standards
 - **Cross-check Definition of Done Agent (Phase 1.5)** for standards compliance
+
+**Run the validation commands your coding standards name, not only the test runner.** The coding
+standards file is loaded on every pipeline run (`devLoadAlwaysFiles`). For each command it lists
+under validation (in this repository, `docs/architecture/concepts/coding-standards.md` § *Validation
+before commit*) that the test run the review ran does not already execute, run it over the change set and
+list it under *Test Commands Executed*. Here that is `npm run validate -- skills/<changed-skill>/`
+for each changed skill — the one `npm test` does not cover. A non-zero result is a `category: bug`
+finding at `high` confidence, the shape Step 4b failures already take. A named command you did not
+run is recorded as **not run, with the reason**; a project whose standards name none records "no
+standards-named validation commands". (obs #163: every local gate green, CI's `validate` job red on
+an angle bracket in a `description`.)
 
 #### Phase 5: Acceptance Criteria Validation
 
@@ -1774,13 +1799,52 @@ After review:
    | 2026-05-14 |  | QA gate CONCERNS (6/10) — 2 findings | qa-story |
    ```
 
-   One row per QA cycle. `Version` stays blank — only `/finalise` bumps it. Name the decision, the
-   score and the finding count; the detail lives in the QA report this row sits alongside. A clean
+   One row per QA cycle. `Version` stays blank — only `/finalise` bumps it. Set `updated:` with
+   `change-log.js`'s `bumpUpdated(content, <row date>)`, never by hand — item 3e reads it back.
+   Name the decision, the score and the finding count; the detail lives in the QA report this row
+   sits alongside. A clean
    cycle still writes a row. Canonical format:
    [document-change-log.md](references/document-change-log.md).
 
    **For Tasks - Update similar sections** in task file with QA assessment results (the Change Log
    row is written by `qa-task` in its Step 12, with `Author` = `qa-task`)
+
+   e. **Read the claims back** — after (a)–(d), before item 6 posts anything. The edit above wrote
+   links to the report and gate and a Change Log row paired with `updated:`; nothing read them
+   back, and a check that runs before the claim is written cannot check it.
+
+   ```bash
+   # One cwd per block — the repository root — and every value re-derived here: each
+   # fenced block runs as its own shell, so a name bound in Phase 0 or in item 6's
+   # block does not exist in this one. The only INPUT is $STORY_FILE.
+   DOC="$STORY_FILE"
+   STORY_DIR=$(dirname "$STORY_FILE")
+   QA_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR"); rc=$?
+   [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
+   THIS_GATE=$(find "$STORY_DIR" -maxdepth 1 -name "*.gate.${QA_CYCLE:-none}.*.yml" 2>/dev/null | head -1)
+   THIS_REPORT=$(find "$STORY_DIR" -maxdepth 1 -name "*.qa.${QA_CYCLE:-none}.*.md" 2>/dev/null | head -1)
+
+   # Stage what this run wrote: the engine resolves links against the INDEX, so an
+   # unstaged artifact reads as broken. An empty name is skipped, never passed —
+   # a report that was never written has no path to stage, and the link check
+   # below is what names it.
+   for f in "$DOC" "$THIS_GATE" "$THIS_REPORT"; do
+     [ -n "$f" ] && [ -e "$f" ] && git add -- "$f"
+   done
+
+   node .agents/skills/qa-story/references/doc-links.js --file "$DOC" --json; LINKS_RC=$?
+   node .agents/skills/qa-story/references/change-log.js --check-updated --file "$DOC"; LOG_RC=$?
+   ```
+
+   A broken link carries `state`. **`missing`** names an artifact that was never written — write
+   it (re-run the step that owns it), then re-run this one. **Do not post the QA summary (item 6) over a `missing`
+   link**: that is the task.141 cycle-4 shape, a PR comment linking a report that did not exist,
+   found only by CI's `link-check`. **`untracked`** means the file exists and is not in the index
+   (staging was skipped or failed) — list it for the commit; it is not a defect. `LOG_RC` 1
+   (`stale-updated`) means the newest Change Log row is dated after `updated:` — the task.141
+   cycle-6 shape, CI's `work-item-artifact-naming` §5 red — apply `bumpUpdated(content, <that row's
+   date>)` and re-run. Exit 2 from either CLI is a broken invocation, not a finding: fix the call.
+   (obs #164)
 
 4. Recommend next action based on gate decision
 5. If files were modified during refactoring, list them in QA report and ask Dev to update File List
@@ -2049,7 +2113,7 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 
 **Review Completion Checklist — tick off each before marking the review done:**
 
-- [ ] QA report file created and saved (co-located with story/task)
+- [ ] Every artifact the document links to resolves — item 3e ran after the edit: no `missing` link, no `stale-updated`
 - [ ] Gate YAML file created and saved (co-located with story/task)
 - [ ] Story/task `## QA Testing Results` section updated with gate status, quality score, and links to artifacts
 - [ ] Story/task status correct per gate decision — `ready-for-review` on PASS/CONCERNS/WAIVED, `in-progress` on FAIL. Never `Ready for Done`, never `Reopened`, never `accepted` (that is `finalise`'s)
