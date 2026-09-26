@@ -141,7 +141,7 @@ const HALTS = [
       fs.rmSync(path.join(dir, `${stem}.qa.1.x.md`));
       edit(doc, `[r](./${stem}.qa.1.x.md) `, "");
     },
-    /no QA report for cycle 1/,
+    /cycle 1 QA report: no regular qa file for cycle 1/,
   ],
   [
     "no gate",
@@ -339,7 +339,7 @@ test("a directory named like the cycle's gate halts as misnamed, and nothing und
     assert.equal(r.exitCode, 1, JSON.stringify(r));
     assert.match(
       r.problems.join("\n"),
-      /no gate file for cycle 1 .* misnamed or not a regular file/,
+      /cycle 1 gate: no regular gate file for cycle 1/,
     );
     const indexed = execFileSync("git", ["ls-files"], {
       cwd: w.root,
@@ -397,6 +397,39 @@ test("a link git cannot verify halts with its own remedy, not the missing-artifa
       /sub\/file\.md .*is unverifiable — git answered neither yes nor no/,
     );
     assert.doesNotMatch(said, /sub\/file\.md .*write the artifact/);
+  } finally {
+    w.done();
+  }
+});
+
+// TASK-149-BUG-11 — one definition of "this cycle's file": qa-cycle.sh --path. A dotfile the
+// glob never counts is never chosen, and two files claiming one cycle are refused, not picked.
+test("a same-cycle dotfile beside the gate is ignored — the real gate is read and only it is staged", () => {
+  const w = repo("task", ({ dir }) =>
+    fs.writeFileSync(path.join(dir, "._task.9.gate.1.x.yml"), "x"),
+  );
+  try {
+    const r = readBack(w.doc);
+    assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+    assert.equal(path.basename(r.gate), "task.9.gate.1.x.yml");
+    assert.ok(!r.staged.some((p) => p.includes("._task")), r.staged.join());
+  } finally {
+    w.done();
+  }
+});
+
+test("two regular files claiming the cycle's gate halt, naming both, and neither is staged as the gate", () => {
+  const w = repo("task", ({ dir }) =>
+    fs.writeFileSync(path.join(dir, "task.9.gate.01.old.yml"), "gate: FAIL\n"),
+  );
+  try {
+    const r = readBack(w.doc);
+    assert.equal(r.exitCode, 1, JSON.stringify(r));
+    assert.match(
+      r.problems.join("\n"),
+      /cycle 1 gate: 2 gate files claim cycle 1 .*refusing to choose/,
+    );
+    assert.equal(r.gate, "");
   } finally {
     w.done();
   }

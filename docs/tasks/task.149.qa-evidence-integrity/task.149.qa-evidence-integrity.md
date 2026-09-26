@@ -518,19 +518,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.149.qa.6.qa-evidence-integrity.md](./task.149.qa.6.qa-evidence-integrity.md)
-- **Gate File**: [task.149.gate.6.qa-evidence-integrity.yml](./task.149.gate.6.qa-evidence-integrity.yml)
+- **Full Report**: [task.149.qa.7.qa-evidence-integrity.md](./task.149.qa.7.qa-evidence-integrity.md)
+- **Gate File**: [task.149.gate.7.qa-evidence-integrity.yml](./task.149.gate.7.qa-evidence-integrity.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 19 read-back cases (33 with the wiring test under TMPDIR=/tmp); CI full suite green at 4bc9da7f; 52 boundary probes, 0 reproduced
+- **Tests Executed**: 4226 (4225 pass, 0 fail, 1 skipped; CI test SUCCESS at a72aa4ac); 54 boundary probes, 0 reproduced, 0 overblocked
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- MEDIUM — [TASK-149-BUG-10](./task.149.bug.10.read-back-unverifiable-link-exit-1.md): an unverifiable link exits 1 with a missing-artifact remedy, not exit 2.
-- LOW — CR6-2 (gate grammar on a two-segment name), CR6-4 (`isWithin` refuses `..name`; regression from cycle 5).
-- Closed — BUG-1 … BUG-9.
+- MEDIUM — [TASK-149-BUG-11](./task.149.bug.11.read-back-picks-dotfile-gate.md): `artifact()` chooses a same-cycle dotfile as the gate; `qa-cycle.sh`'s glob never counts one.
+- Closed — BUG-1 … BUG-10.
 
 ---
 
@@ -548,6 +547,7 @@ None.
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 2 medium, 1 low | qa-task |
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 2 medium | qa-task |
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium, 2 low | qa-task |
+| 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium | qa-task |
 
 ---
 

@@ -84,26 +84,26 @@ function qaCycle(dir) {
 }
 
 /**
- * This cycle's gate or report, matched with qa-cycle.sh's own grammar — a name
- * ending `.yml` (`.md` for the report) whose LAST `.gate.<digits>.` segment,
- * compared as a NUMBER, is the cycle: the sed there is greedy, so this is too.
- * A gate the helper counted (`x.gate.4.yml`, `x.gate.04.name.yml`,
- * `x.gate.1.b.gate.2.yml`) is always one this finds (TASK-149-BUG-9, CR6-2).
- * Regular files only: a directory named like a gate is never staged whole.
+ * This cycle's gate or QA report — asked of qa-cycle.sh `--path`, the one
+ * definition of "this cycle's file" (TASK-149-BUG-11). A second grammar here
+ * drifted from the helper three times: leading zeros (BUG-9), the greedy segment
+ * (CR6-2) and dotfiles (BUG-11). The helper answers with the same glob and sed
+ * that counted the cycle, regular files only, and refuses an ambiguous cycle.
+ * Returns { path } or { problem } (the helper's refusal, verbatim); throws when
+ * the helper cannot run, which the caller reports as could-not-look.
  */
-function artifact(dir, kind, cycle) {
-  const ext = kind === "gate" ? ".yml" : ".md";
-  const re = new RegExp(`^.*\\.${kind}\\.([0-9]{1,9})\\..*$`);
-  const hit = fs.readdirSync(dir).find((n) => {
-    if (!n.endsWith(ext)) return false;
-    const m = n.match(re);
-    return (
-      m !== null &&
-      Number(m[1]) === Number(cycle) &&
-      fs.lstatSync(path.join(dir, n)).isFile()
-    );
-  });
-  return hit ? path.join(dir, hit) : "";
+function artifact(dir, kind) {
+  const r = spawnSync(
+    "bash",
+    [path.join(__dirname, "qa-cycle.sh"), dir, "--path", kind],
+    { encoding: "utf8" },
+  );
+  if (r.status === 0) return { path: r.stdout.trim() };
+  if (r.status === 1)
+    return {
+      problem: (r.stderr || "").replace(/^⚠️\s*qa-cycle:\s*/, "").trim(),
+    };
+  throw new Error(`qa-cycle.sh --path ${kind} not runnable (rc ${r.status})`);
 }
 
 /**
@@ -205,19 +205,21 @@ function readBackUnguarded(docArg) {
       reason: "qa-cycle-unavailable",
       error: c.error,
     };
-  const gate = c.cycle ? artifact(dir, "gate", c.cycle) : "";
-  const report = c.cycle ? artifact(dir, "qa", c.cycle) : "";
+  const g = c.cycle ? artifact(dir, "gate") : {};
+  const q = c.cycle ? artifact(dir, "qa") : {};
+  const gate = g.path || "";
+  const report = q.path || "";
   if (!c.cycle)
     out.problems.push(
       `no numbered gate in ${rel(dir)} — the gate step did not write one`,
     );
   else if (!gate)
     out.problems.push(
-      `no gate file for cycle ${c.cycle} in ${rel(dir)} that this script can read — the gate is misnamed or not a regular file`,
+      `cycle ${c.cycle} gate: ${g.problem} — rename or remove the stray file, then re-run`,
     );
   if (c.cycle && !report)
     out.problems.push(
-      `no QA report for cycle ${c.cycle} in ${rel(dir)} — write it, then re-run`,
+      `cycle ${c.cycle} QA report: ${q.problem} — write it (or remove the stray file), then re-run`,
     );
   out.cycle = c.cycle || null;
 
