@@ -1,0 +1,82 @@
+schema: 1
+task: 'task.149.qa-evidence-integrity'
+task_title: 'QA evidence integrity: qa-task/qa-story claims that no check reads back'
+gate: CONCERNS
+status_reason: 'Both boundaries now engage under the probe engine (37 cases, 0 reproduced) and the unscoped safety re-probe found no new escape; BUG-1, BUG-3 and BUG-4 are closed. The read-back still passes when a gate, report or Change Log row it exists to check is absent (MEDIUM), plus three low edge cases.'
+reviewer: 'QA Engineer'
+updated: '2026-09-26T05:35:00Z'
+
+top_issues:
+  - id: TASK-149-BUG-5
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Step 12b / item 3e accept qa-cycle.sh rc 1 and an empty THIS_GATE / THIS_REPORT, and pass change-log no-log, so an absent gate, report or Change Log row reads clean at a step that runs after they must have been written (safety re-probe CR-2, CR-3).'
+    suggested_action: 'Halt when qa-cycle.sh refuses or THIS_GATE / THIS_REPORT is empty, and remove no-log from the passing arm, naming the absent artifact; add block-test scenarios for each.'
+    suggested_owner: dev
+    bug_ref: 'task.149.bug.5.read-back-passes-absent-claims.md'
+  - id: CR3-1
+    severity: low
+    file: 'shared/resources/doc-links.js'
+    finding: 'A final-component symlink that dangles or points outside the repository is listed by readdir, so linkState reads it untracked and the read-back stages it as resolved.'
+    suggested_action: 'lstat the resolved path; for a symlink, realpath it and return outside-repo when it escapes the repository, missing when it dangles; test both.'
+    suggested_owner: dev
+  - id: CR3-4
+    severity: low
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'platform-variance: tmp comes from mkdtempSync(join(tmpdir(), …)) unresolved, and os.tmpdir() returns a relative TMPDIR verbatim, so every --copy-as is refused as escaping under a relative TMPDIR.'
+    suggested_action: 'Absolutise the sandbox root once (resolve(mkdtempSync(…))) and test with a relative TMPDIR.'
+    suggested_owner: dev
+  - id: CR3-5
+    severity: low
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'Nothing refuses an SRC that contains the temp root under a different spelling (realpath vs tmpdir()), where cpSync could recurse into its own output (unreproduced — a reproduction would copy all of $TMPDIR).'
+    suggested_action: 'realpath SRC and the temp root and refuse the pair when the temp root equals or lies beneath SRC; test with the realpath spelling of tmpdir().'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 4224
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 37
+    notes: '--copy-as DEST containment engages 23/23 (lexical, path-link, merge and SRC-side cases; nothing written outside); change-log --check-updated engages 14/14. Unscoped SAFETY RE-PROBE review found no new escape; CR3-5 (unreproduced SRC recursion) recorded low.'
+  performance:
+    status: PASS
+    notes: 'Block test 40 cases ~3.5 s concurrently.'
+  reliability:
+    status: CONCERNS
+    notes: 'Read-back passes on absent gate / report / Change Log row (TASK-149-BUG-5).'
+  maintainability:
+    status: PASS
+    notes: 'Cleanup CR3-6 (duplicate lstat; . refused with the "escapes" message while the contract says "already exists") is advisory.'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_closed: ['TASK-149-BUG-1', 'TASK-149-BUG-3', 'TASK-149-BUG-4']
+  bugs_new: 1
+
+recommendations:
+  immediate:
+    - action: 'Halt the read-back on an absent gate, report or Change Log row (TASK-149-BUG-5).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future:
+    - action: 'CR3-6 cleanup: give target === tmp its own "already exists" message so QA-24 and the contract assert one outcome.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Step 4b zero-blocks-executed on qa-task / qa-story — pre-existing on develop.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-149-BUG-5 fixed']

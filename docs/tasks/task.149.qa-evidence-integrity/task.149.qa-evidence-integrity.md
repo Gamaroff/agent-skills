@@ -511,28 +511,26 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-26
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.149.qa.2.qa-evidence-integrity.md](./task.149.qa.2.qa-evidence-integrity.md)
-- **Gate File**: [task.149.gate.2.qa-evidence-integrity.yml](./task.149.gate.2.qa-evidence-integrity.yml)
+- **Full Report**: [task.149.qa.3.qa-evidence-integrity.md](./task.149.qa.3.qa-evidence-integrity.md)
+- **Gate File**: [task.149.gate.3.qa-evidence-integrity.yml](./task.149.gate.3.qa-evidence-integrity.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 4202 (4201 pass, 0 fail, 1 skipped); 32 boundary probes
+- **Tests Executed**: 4224 (4223 pass, 0 fail, 1 skipped); 37 boundary probes, 0 reproduced
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- HIGH — [TASK-149-BUG-1](./task.149.bug.1.copy-as-symlink-escape.md) reopened: merging into an existing DEST follows a seeded symlink (probe 16/18).
-- MEDIUM — [TASK-149-BUG-3](./task.149.bug.3.read-back-decision-gaps.md): read-back passes on empty output under zsh; untracked residue exempted.
-- MEDIUM — [TASK-149-BUG-4](./task.149.bug.4.link-state-misclassifies.md): case-mismatch and outside-repo links read `untracked`.
-- Closed — [TASK-149-BUG-2](./task.149.bug.2.step-12b-no-mechanical-halt.md).
-- LOW — CR-6 (block input binding), CR-7 (§5 shares its reader), QA-2-M1 (staging untested).
+- MEDIUM — [TASK-149-BUG-5](./task.149.bug.5.read-back-passes-absent-claims.md): the read-back passes on an absent gate, report or Change Log row.
+- LOW — CR3-1 (symlinked link target), CR3-4 (relative TMPDIR), CR3-5 (SRC spelling recursion, unreproduced).
+- Closed — [BUG-1](./task.149.bug.1.copy-as-symlink-escape.md), [BUG-2](./task.149.bug.2.step-12b-no-mechanical-halt.md), [BUG-3](./task.149.bug.3.read-back-decision-gaps.md), [BUG-4](./task.149.bug.4.link-state-misclassifies.md).
 
 ---
 
@@ -546,6 +544,7 @@ None.
 | 2026-09-26 |         | Implemented — 4 engines, 11 prose sites, 1 new population test + shared section reader; 26 tests added | develop |
 | 2026-09-26 |         | QA gate FAIL (70/100) — 1 high, 1 medium, 2 low | qa-task |
 | 2026-09-26 |         | QA gate FAIL (60/100) — 1 high (reopened), 2 medium, 3 low | qa-task |
+| 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium, 3 low | qa-task |
 
 ---
 

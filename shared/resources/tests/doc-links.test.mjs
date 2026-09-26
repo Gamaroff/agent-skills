@@ -485,3 +485,27 @@ test("state (TASK-149-BUG-4): a case-mismatched link is missing on every filesys
     }
   });
 });
+
+test("state (TASK-149 CR3-1): a symlinked link target is untracked only when it leads to something real inside the repository", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "docs", "real.md"), "# r\n");
+    fs.symlinkSync("real.md", path.join(dir, "docs", "inside.md"));
+    fs.symlinkSync("nowhere.md", path.join(dir, "docs", "dangling.md"));
+    fs.symlinkSync(os.tmpdir(), path.join(dir, "docs", "ext"));
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[i](inside.md) [d](dangling.md) [e](ext)\n",
+    );
+    execFileSync("git", ["add", "docs/a.md", "docs/real.md"], { cwd: dir });
+    const r = checkDocument("docs/a.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => [b.target, b.state]),
+      [
+        ["inside.md", "untracked"],
+        ["dangling.md", "missing"],
+        ["ext", "outside-repo"],
+      ],
+    );
+  });
+});

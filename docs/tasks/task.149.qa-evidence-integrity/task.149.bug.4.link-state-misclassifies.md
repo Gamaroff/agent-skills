@@ -4,7 +4,7 @@
 **Bug ID**: TASK-149-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 2, refute review CR-3 and CR-4; verified)
 **Date Found**: 2026-09-26
 
@@ -49,9 +49,14 @@ resolved path beginning with `..` as `outside-repo`. Map check-ignore's 0 to `ig
   case-insensitive host (on Linux `existsSync` is already exact), and dropping the `outside-repo`
   branch turns it red.
 
+#### QA Verification (cycle 3) — Closed
+
+Case-mismatch and outside-repo links now block (test plus two mutations). A final-component symlink that dangles or points outside still reads `untracked` (cycle-3 CR-1, low).
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-26 | New | QA Engineer | Found in QA cycle 2 |
 | 2026-09-26 | Ready for QA | qa-fix | Fixed in qa-fix cycle 2 |
+| 2026-09-26 | Closed | QA Engineer | Verified in QA cycle 3 |

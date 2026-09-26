@@ -1634,7 +1634,10 @@ export function executeFile(filePath, opts = {}) {
   //
   // The sandbox is a directory INSIDE the temp root, so the root can act as the
   // containment sentinel in `runBlock`.
-  const tmpRoot = mkdtempSync(join(tmpdir(), "qa-snippets-"));
+  // Absolute, always: os.tmpdir() returns a relative TMPDIR verbatim, and the
+  // --copy-as containment test compares resolve(tmp, dest) against this prefix —
+  // relative, it refused every DEST as escaping (TASK-149 CR3-4).
+  const tmpRoot = resolve(mkdtempSync(join(tmpdir(), "qa-snippets-")));
   const tmp = join(tmpRoot, "work");
 
   const results = [];
@@ -1657,6 +1660,10 @@ export function executeFile(filePath, opts = {}) {
       if (typeof dest !== "string" || dest === "" || isAbsolute(dest))
         throw new Error(`--copy-as DEST must be a relative path: ${dest}`);
       const target = resolve(tmp, dest);
+      if (target === tmp)
+        throw new Error(
+          `--copy-as DEST already exists — it is the working copy itself; --copy-as seeds a fresh path, it never merges: ${dest}`,
+        );
       if (!target.startsWith(tmp + sep))
         throw new Error(
           `--copy-as DEST escapes the working directory: ${dest}`,
@@ -1683,6 +1690,20 @@ export function executeFile(filePath, opts = {}) {
       if (exists)
         throw new Error(
           `--copy-as DEST already exists — --copy-as seeds a fresh path, it never merges: ${dest}`,
+        );
+      // TASK-149 CR3-5 — an SRC that contains the sandbox under another spelling
+      // (a symlinked TMPDIR, /var vs /private/var) passes a lexical subdirectory
+      // test, and the copy would then walk into its own output. Compare real paths.
+      let srcReal;
+      try {
+        srcReal = realpathSync(src);
+      } catch (e) {
+        throw new Error(`--copy-as SRC is not readable: ${src} (${e.message})`);
+      }
+      const rootReal = realpathSync(tmpRoot);
+      if (rootReal === srcReal || rootReal.startsWith(srcReal + sep))
+        throw new Error(
+          `--copy-as SRC contains the sandbox itself — copying it would copy into its own output: ${src}`,
         );
       mkdirSync(dirname(target), { recursive: true });
       cpSync(src, target, { recursive: true });

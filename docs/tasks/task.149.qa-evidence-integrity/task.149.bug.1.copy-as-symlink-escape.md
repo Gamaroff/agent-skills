@@ -4,7 +4,7 @@
 **Bug ID**: TASK-149-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 1, Step 3b probe; code review CR-3)
 **Date Found**: 2026-09-26
 
@@ -118,6 +118,10 @@ Step 2.5 menu, offered early per the pre-strike shape).
 - Contract (`qa-runnable-prose-detection.md`), header comment and both Step 4b / Phase 1.7 paragraphs
   state the fresh-path rule.
 
+#### QA Verification (cycle 3) — Closed
+
+Fresh-path seeding holds. The probe engine reads **engages 23/23** (`task.149.qa.3.security.run.json`): every lexical escape, every link on the path, both merge cases, and three SRC-side cases (SRC contains the temp root, SRC missing, SRC is a symlink). Nothing is written outside. The unscoped safety re-probe review found no new escape in DEST handling. Two adjacent lows remain: a relative `TMPDIR` falsely refuses (CR-4), and an unreproduced SRC-spelling recursion (CR-5).
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -127,3 +131,4 @@ Step 2.5 menu, offered early per the pre-strike shape).
 | 2026-09-26 | Ready for QA | qa-fix | Fix implemented (qa-fix cycle 1) |
 | 2026-09-26 | Reopened | QA Engineer | Merge into an existing DEST follows seeded links (QA cycle 2) |
 | 2026-09-26 | Ready for QA | qa-fix | Mechanism replaced: fresh-path seeding (qa-fix cycle 2) |
+| 2026-09-26 | Closed | QA Engineer | Verified in QA cycle 3 |

@@ -229,6 +229,21 @@ function linkState(tracked, base, resolved) {
   if (!tracked) return "missing";
   if (resolved === ".." || resolved.startsWith("../")) return "outside-repo";
   if (!existsExactly(base, resolved)) return "missing";
+  // TASK-149 CR3-1 — a readdir listing names a symlink whether or not it
+  // resolves. A link to a symlink is committable only when the symlink leads to
+  // something real inside the repository; a checkout of a dangling one, or of
+  // one that leaves the repository, resolves to nothing.
+  if (fs.lstatSync(path.join(base, resolved)).isSymbolicLink()) {
+    let real;
+    try {
+      real = fs.realpathSync(path.join(base, resolved));
+    } catch {
+      return "missing";
+    }
+    const rel = path.relative(fs.realpathSync(base), real);
+    if (rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel))
+      return "outside-repo";
+  }
   const r = spawnSync("git", ["check-ignore", "-q", "--", resolved], {
     cwd: base,
   });

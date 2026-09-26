@@ -4,7 +4,7 @@
 **Bug ID**: TASK-149-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 2, refute review CR-2 and CR-5; verified)
 **Date Found**: 2026-09-26
 
@@ -59,9 +59,14 @@ tolerated stage failure, tolerated empty output, and no pass-1 staging each turn
 explicit bug-report `find` was removed, since pass 1 stages every linked file (QA-2-M1 is moot). The
 input guard is documented as a block input under the same contract Steps 13 / 13b state (CR-6).
 
+#### QA Verification (cycle 3) — Closed
+
+The 40-case block test passes under bash and zsh, and the three mutations turn it red. Gaps the review found next to this (absent gate/report, `no-log`) are TASK-149-BUG-5.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-26 | New | QA Engineer | Found in QA cycle 2 |
 | 2026-09-26 | Ready for QA | qa-fix | Fixed in qa-fix cycle 2 |
+| 2026-09-26 | Closed | QA Engineer | Verified in QA cycle 3 |

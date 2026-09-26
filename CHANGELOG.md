@@ -113,7 +113,9 @@ All notable changes to this project will be documented in this file. Format foll
   QA routed the finding to `future` by hand every cycle (obs #143). `--copy-as` is repeatable and
   additive; `--copy` is unchanged. An absolute or escaping `DEST` is exit 2, with the temp root still
   removed. So is a `DEST` that passes through a symlink already in the working copy, and so is a `DEST`
-  that already exists: `--copy-as` seeds a fresh path and never merges. QA reproduced both escapes
+  that already exists: `--copy-as` seeds a fresh path and never merges. So is an SRC that contains the sandbox under
+  another spelling (a symlinked `TMPDIR`), which would copy into its own output. The sandbox root is
+  absolute even under a relative `TMPDIR`. QA reproduced both escapes
   with the probe engine. In cycle 1 a `--copy`-seeded `out -> /elsewhere` carried a write outside the
   sandbox. In cycle 2 a merge into `.` or a seeded `docs/` followed a link inside it (TASK-149-BUG-1).
   Refusing merges replaced checking the tree a merge would walk, rather than correcting the same
@@ -140,8 +142,9 @@ All notable changes to this project will be documented in this file. Format foll
   red), and a row was dated after `updated:` (CI §5 red) (obs #164). The new step stages what the run
   wrote (bug reports included), then runs `doc-links.js` and `change-log.js --check-updated` on the
   document and **decides in the block**. It stages every linked file it can, re-checks, and exits 1 on
-  any link still broken, on a failed `git add`, on empty engine output, or on a stale `updated:`. The
-  PR comment does not post. `doc-links.js` now labels each broken link `untracked` (on disk, not in
+  any link still broken, on a failed `git add`, on empty engine output, on a stale `updated:`, or on an
+  absent gate, report or Change Log row (the step runs after all three must exist). The PR comment
+  does not post. `doc-links.js` now labels each broken link `untracked` (on disk, not in
   the index), `ignored` (gitignored, so it can never be committed), `outside-repo`, `unverifiable` or
   `missing`, the last compared component by component against the directory listing so a
   case-insensitive disk cannot pass a link that is dead on Linux. The state appears in `--json` and

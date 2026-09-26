@@ -2668,6 +2668,10 @@ test("QA-24: --copy-as never merges — an existing DEST is refused, so a link s
     [srcDot, "./"],
     [srcDocs, "docs"],
   ]) {
+    const why =
+      dest === "docs"
+        ? /already exists/
+        : /already exists — it is the working copy itself/;
     assert.throws(
       () =>
         executeFile(file, {
@@ -2675,7 +2679,7 @@ test("QA-24: --copy-as never merges — an existing DEST is refused, so a link s
           copyFrom: seed,
           copyAs: [{ src, dest }],
         }),
-      /escapes the working directory|already exists/,
+      why,
       `DEST ${dest} must be refused`,
     );
   }
@@ -2697,4 +2701,57 @@ test("QA-24: --copy-as never merges — an existing DEST is refused, so a link s
     "nothing may be written through a seeded link",
   );
   assert.equal(count(), before, "a refused DEST may not leak a temp dir");
+});
+
+const CLI = join(__dirname, "..", "qa-execute-snippets.mjs");
+
+test("QA-25: a relative TMPDIR does not make every --copy-as DEST read as escaping (TASK-149 CR3-4)", () => {
+  const work = tmp();
+  mkdirSync(join(work, "rel"));
+  mkdirSync(join(work, "src", "tasks"), { recursive: true });
+  writeFileSync(join(work, "src", "tasks", "a.md"), "x\n");
+  writeFileSync(join(work, "SKILL.md"), bash("ls docs/tasks"));
+  const r = spawnSync(
+    process.execPath,
+    [CLI, "--file", "SKILL.md", "--no-zsh", "--copy-as", "src:docs"],
+    {
+      cwd: work,
+      encoding: "utf8",
+      env: { ...process.env, TMPDIR: "rel" },
+      timeout: CLI_BUDGET.timeoutMs,
+    },
+  );
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+});
+
+test("QA-26: an SRC that contains the sandbox under another spelling is refused before any copy (TASK-149 CR3-5)", () => {
+  const real = tmp();
+  const alias = join(tmp(), "alias");
+  symlinkSync(real, alias);
+  writeFileSync(join(real, "SKILL.md"), bash("echo ok"));
+  // TMPDIR spelled through the link, SRC spelled as the real path: lexically
+  // unrelated, the same directory on disk.
+  const r = spawnSync(
+    process.execPath,
+    [
+      CLI,
+      "--file",
+      join(real, "SKILL.md"),
+      "--no-zsh",
+      "--copy-as",
+      `${real}:dup`,
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, TMPDIR: alias },
+      timeout: CLI_BUDGET.timeoutMs,
+    },
+  );
+  assert.equal(r.status, 2, r.stderr + r.stdout);
+  assert.match(r.stderr, /contains the sandbox itself/);
+  assert.deepEqual(
+    readdirSync(real).filter((n) => n.startsWith("qa-snippets-")),
+    [],
+    "the sandbox inside SRC is removed on the refusal",
+  );
 });

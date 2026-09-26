@@ -14,7 +14,8 @@
  *
  * Scenarios, each with the exit status and the line the block must print:
  *   clean   — report, gate and bug report on disk and staged by the block → 0
- *   missing — the linked report was never written                         → 1
+ *   missing — a linked bug report was never written                       → 1
+ *   no QA report / no gate / no Change Log row (TASK-149-BUG-5)            → 1
  *   ignored — a linked file is on disk but gitignored                     → 1
  *   stale   — the newest Change Log row is dated after `updated:`         → 1
  *   a linked file nobody staged → staged by pass 1, clean                  → 0
@@ -138,8 +139,47 @@ const SCENARIOS = [
   {
     name: "missing",
     exit: 1,
-    says: /missing: \.\/task\.9\.qa\.1\.x\.md[\s\S]*HALT/,
-    mutate: (dir) => fs.rmSync(path.join(dir, "task.9.qa.1.x.md")),
+    says: /missing: \.\/task\.9\.bug\.1\.y\.md[\s\S]*HALT/,
+    mutate: (dir) => fs.rmSync(path.join(dir, "task.9.bug.1.y.md")),
+  },
+  // TASK-149-BUG-5 — the step runs after these must exist; absent, it halts.
+  {
+    name: "no QA report",
+    exit: 1,
+    says: /HALT — no QA report for cycle 1/,
+    mutate: (dir) => {
+      fs.rmSync(path.join(dir, "task.9.qa.1.x.md"));
+      const f = path.join(dir, "task.9.x.md");
+      fs.writeFileSync(
+        f,
+        fs.readFileSync(f, "utf8").replace("[r](./task.9.qa.1.x.md) ", ""),
+      );
+    },
+  },
+  {
+    name: "no gate",
+    exit: 1,
+    says: /HALT — no numbered gate/,
+    mutate: (dir) => {
+      fs.rmSync(path.join(dir, "task.9.gate.1.x.yml"));
+      const f = path.join(dir, "task.9.x.md");
+      fs.writeFileSync(
+        f,
+        fs.readFileSync(f, "utf8").replace("[g](./task.9.gate.1.x.yml) ", ""),
+      );
+    },
+  },
+  {
+    name: "no Change Log row",
+    exit: 1,
+    says: /HALT — no Change Log row/,
+    mutate: (dir) => {
+      const f = path.join(dir, "task.9.x.md");
+      fs.writeFileSync(
+        f,
+        fs.readFileSync(f, "utf8").replace(/## Change Log[\s\S]*$/, ""),
+      );
+    },
   },
   {
     name: "ignored",

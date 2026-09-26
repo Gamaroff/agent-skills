@@ -1245,6 +1245,11 @@ QA_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$DOC_DIR"); rc=$?
 [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
 THIS_GATE=$(find "$DOC_DIR" -maxdepth 1 -name "*.gate.${QA_CYCLE:-none}.*.yml" 2>/dev/null | head -1)
 THIS_REPORT=$(find "$DOC_DIR" -maxdepth 1 -name "*.qa.${QA_CYCLE:-none}.*.md" 2>/dev/null | head -1)
+# This step runs after the gate, the report and the verdict row must exist, so an
+# absent one is the finding, not a case to skip (TASK-149-BUG-5).
+[ -n "$QA_CYCLE" ] || { echo "Step 12b: HALT — no numbered gate in $DOC_DIR; Step 10 did not write one" >&2; exit 1; }
+[ -n "$THIS_GATE" ] || { echo "Step 12b: HALT — no gate for cycle $QA_CYCLE in $DOC_DIR (Step 10)" >&2; exit 1; }
+[ -n "$THIS_REPORT" ] || { echo "Step 12b: HALT — no QA report for cycle $QA_CYCLE in $DOC_DIR; write it (Step 11), then re-run" >&2; exit 1; }
 
 # A stage that fails HALTS. The link check reads the index, so a failed `git add`
 # (a held .git/index.lock) would otherwise leave every artifact untracked — and a
@@ -1281,7 +1286,8 @@ LOG_REASON=$(node .agents/skills/qa-task/references/change-log.js --check-update
   | jq -r '.reason // empty' 2>/dev/null)
 [ "$BLOCKING" -eq 0 ] || { echo "Step 12b: HALT — $BLOCKING link(s) in $DOC cannot resolve in the commit (states above); write the artifact or fix the link, then re-run. Do not post the PR comment (Step 13)." >&2; exit 1; }
 case "$LOG_REASON" in
-  ok|no-log|no-updated) ;;
+  ok|no-updated) ;;
+  no-log) echo "Step 12b: HALT — no Change Log row in $DOC; the verdict row (Step 12) did not land" >&2; exit 1 ;;
   stale-updated) echo "Step 12b: HALT — the newest Change Log row is dated after updated:; apply bumpUpdated with that row's date, then re-run." >&2; exit 1 ;;
   *) echo "Step 12b: HALT — change-log --check-updated did not answer (reason '${LOG_REASON}'); nothing was checked" >&2; exit 1 ;;
 esac
@@ -1296,7 +1302,8 @@ every linked file that is on disk, inside the repository, under that exact name 
 `untracked` link whose staging did not take. A `git add` that fails halts, empty or unreadable
 `doc-links` output halts as "nothing was checked", and change-log's `stale-updated` (the newest row
 dated after `updated:` — apply `bumpUpdated(content, <that row's date>)`) is told apart from a
-change-log that did not answer. **Do not post the PR comment (Step 13) over a Step 12b HALT**: that is the task.141
+change-log that did not answer. The step runs after the gate, the report and the verdict row must
+exist, so an absent gate, report or Change Log row halts too, naming which (TASK-149-BUG-5). **Do not post the PR comment (Step 13) over a Step 12b HALT**: that is the task.141
 shape — a PR comment linking a report that did not exist, found only by CI's `link-check`, and a row
 dated after `updated:`, found only by CI's `work-item-artifact-naming` §5. (obs #164)
 
