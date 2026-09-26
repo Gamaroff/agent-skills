@@ -75,16 +75,43 @@ function qaCycle(dir) {
   return { error: `qa-cycle.sh not runnable (rc ${r.status})` };
 }
 
+/**
+ * This cycle's gate or report, matched with qa-cycle.sh's own grammar —
+ * `.gate.<digits>.` anywhere in the name, compared as a NUMBER — so a gate the
+ * helper counted (`x.gate.4.yml`, `x.gate.04.name.yml`) is always one this finds
+ * (TASK-149-BUG-9).
+ */
 function artifact(dir, kind, cycle) {
   const re = new RegExp(
-    `\\.${kind}\\.${cycle}\\.[^/]*\\.${kind === "gate" ? "yml" : "md"}$`,
+    `\\.${kind}\\.([0-9]{1,9})\\..*${kind === "gate" ? "yml" : "md"}$`,
   );
-  const hit = fs.readdirSync(dir).find((n) => re.test(n));
+  const hit = fs.readdirSync(dir).find((n) => {
+    const m = n.match(re);
+    return m !== null && Number(m[1]) === Number(cycle);
+  });
   return hit ? path.join(dir, hit) : "";
 }
 
 function readBack(docArg) {
-  const out = { problems: [], staged: [], links: [], unstaged: [] };
+  // TASK-149-BUG-8 — "could not look" is exit 2 whatever the cause. An error the
+  // body did not anticipate (an unreadable file, a throw from an engine) would
+  // otherwise exit 1 with a stack trace and read as a HALT.
+  try {
+    return readBackUnguarded(docArg);
+  } catch (e) {
+    return {
+      problems: [],
+      staged: [],
+      links: [],
+      exitCode: 2,
+      reason: "could-not-look",
+      error: e.message,
+    };
+  }
+}
+
+function readBackUnguarded(docArg) {
+  const out = { problems: [], staged: [], links: [] };
   const engines = load();
   if (engines.error)
     return {
@@ -105,6 +132,15 @@ function readBack(docArg) {
       error: `--doc ${docArg}: ${e.message}`,
     };
   }
+  // A directory passes realpath, and `git add` on it would stage everything under
+  // it before the read failed — the sweep TASK-149-BUG-7 closed (TASK-149-BUG-8).
+  if (!fs.statSync(doc).isFile())
+    return {
+      ...out,
+      exitCode: 2,
+      reason: "usage",
+      error: `--doc ${docArg} is not a regular file`,
+    };
   const dir = path.dirname(doc);
   const top = git(["rev-parse", "--show-toplevel"], dir);
   if (top.status !== 0)
@@ -132,15 +168,21 @@ function readBack(docArg) {
     out.problems.push(
       `no numbered gate in ${rel(dir)} — the gate step did not write one`,
     );
-  else if (!report)
+  else if (!gate)
+    out.problems.push(
+      `no gate for cycle ${c.cycle} in ${rel(dir)} that this script can read — the gate file is misnamed`,
+    );
+  if (c.cycle && !report)
     out.problems.push(
       `no QA report for cycle ${c.cycle} in ${rel(dir)} — write it, then re-run`,
     );
   out.cycle = c.cycle || null;
 
+  const failedStage = new Set();
   const stage = (abs) => {
     const r = git(["add", "--", rel(abs)], root);
     if (r.status !== 0) {
+      failedStage.add(rel(abs));
       out.problems.push(
         `could not stage ${rel(abs)} (${r.stderr.trim() || `git exit ${r.status}`}) — a held .git/index.lock? retry`,
       );
@@ -153,7 +195,18 @@ function readBack(docArg) {
   for (const f of [doc, gate, report]) if (f) stage(f);
 
   // Pass 1 — stage the untracked link targets that belong to this work item.
-  let links = engines.docLinks.checkDocument(doc, { root });
+  // Both passes must have read the index. checkDocument falls back to the disk
+  // when its git calls fail, and on the disk an untracked file reads as present —
+  // a clean verdict that never looked at the index (TASK-149-BUG-8).
+  const readLinks = () => {
+    const l = engines.docLinks.checkDocument(doc, { root });
+    if (!l.tracked)
+      throw new Error(
+        "doc-links could not read the index (git failed) — nothing was checked",
+      );
+    return l;
+  };
+  let links = readLinks();
   for (const b of links.broken) {
     if (b.state !== "untracked") continue;
     const abs = path.join(root, b.resolved);
@@ -163,9 +216,11 @@ function readBack(docArg) {
 
   // Pass 2 — the decision. After pass 1, every broken link is one staging here
   // cannot or must not fix.
-  links = engines.docLinks.checkDocument(doc, { root });
+  links = readLinks();
   for (const b of links.broken) {
     out.links.push({ line: b.line, target: b.target, state: b.state });
+    // Already reported as "could not stage" in pass 1 — one problem, one message.
+    if (b.state === "untracked" && failedStage.has(b.resolved)) continue;
     out.problems.push(
       b.state === "untracked"
         ? `${b.target} (line ${b.line}) is untracked and outside ${rel(dir)} (or not a regular file) — stage it deliberately if it belongs in this commit`

@@ -235,3 +235,71 @@ test("the CLI: exit 0 / 1 / 2, and an unsubstituted placeholder or a missing sib
     fs.rmSync(lonely, { recursive: true, force: true });
   }
 });
+
+// TASK-149-BUG-8 — every "could not look" is exit 2, never a pass and never a HALT.
+test("a directory --doc is refused with exit 2 before anything is staged", () => {
+  const w = repo("task", ({ dir }) =>
+    fs.writeFileSync(path.join(dir, "wip.md"), "# w\n"),
+  );
+  try {
+    const r = readBack(w.dir);
+    assert.equal(r.exitCode, 2, JSON.stringify(r));
+    assert.match(r.error, /not a regular file/);
+    const staged = execFileSync("git", ["diff", "--cached", "--name-only"], {
+      cwd: w.root,
+      encoding: "utf8",
+    });
+    assert.equal(staged, "", "nothing may be staged");
+  } finally {
+    w.done();
+  }
+});
+
+test("an index git cannot read is could-not-look, not a clean read on the disk", () => {
+  const w = repo("task", ({ root }) =>
+    fs.writeFileSync(path.join(root, ".git", "index"), "garbage"),
+  );
+  try {
+    const r = readBack(w.doc);
+    assert.equal(r.exitCode, 2, JSON.stringify(r));
+    assert.equal(r.reason, "could-not-look");
+  } finally {
+    w.done();
+  }
+});
+
+test("an unreadable document is exit 2 from the CLI, not a stack trace read as a HALT", () => {
+  const w = repo("task");
+  try {
+    fs.chmodSync(w.doc, 0o000);
+    if (process.getuid && process.getuid() === 0) return; // root reads anything
+    const r = spawnSync(process.execPath, [ENGINE, "--doc", w.doc], {
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /could not look/);
+  } finally {
+    fs.chmodSync(w.doc, 0o644);
+    w.done();
+  }
+});
+
+// TASK-149-BUG-9 — the gate grammar is qa-cycle.sh's.
+for (const name of ["task.9.gate.1.yml", "task.9.gate.01.x.yml"]) {
+  test(`a gate named ${name} — counted by qa-cycle.sh — is found, staged and read clean`, () => {
+    const w = repo("task", ({ dir, doc }) => {
+      fs.renameSync(
+        path.join(dir, "task.9.gate.1.x.yml"),
+        path.join(dir, name),
+      );
+      edit(doc, "./task.9.gate.1.x.yml", `./${name}`);
+    });
+    try {
+      const r = readBack(w.doc);
+      assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+      assert.equal(path.basename(r.gate), name);
+    } finally {
+      w.done();
+    }
+  });
+}

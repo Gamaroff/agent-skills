@@ -1676,7 +1676,7 @@ export function executeFile(filePath, opts = {}) {
         throw new Error(
           `--copy-as DEST already exists — it is the working copy itself; --copy-as seeds a fresh path, it never merges: ${dest}`,
         );
-      if (!target.startsWith(tmp + sep))
+      if (!isWithin(tmp, target))
         throw new Error(
           `--copy-as DEST escapes the working directory: ${dest}`,
         );

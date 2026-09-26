@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": null,
+      "entry": "cli:shared/resources/qa-execute-snippets.mjs",
+      "name": "qa-execute-snippets --copy-as DEST containment",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 24,
+      "passed": 24,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--file",
+        "/private/tmp/claude-501/-Users-gamaroff-Development-Projects-agent-skills/76cf100f-11e9-4b1a-9566-ce0ce7311073/scratchpad/probe/SKILL.md",
+        "--no-zsh",
+        "--copy",
+        "/private/tmp/claude-501/-Users-gamaroff-Development-Projects-agent-skills/76cf100f-11e9-4b1a-9566-ce0ce7311073/scratchpad/probe/seed",
+        "--copy-as",
+        "{input}"
+      ],
+      "ran_at": "2026-09-26T11:25:21.306Z"
+    },
+    {
+      "sink": null,
+      "entry": "cli:shared/resources/qa-read-back.js",
+      "name": "qa-read-back verdict",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 10,
+      "passed": 10,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--doc",
+        "{input}"
+      ],
+      "ran_at": "2026-09-26T11:25:25.193Z"
+    },
+    {
+      "sink": null,
+      "entry": "cli:shared/resources/change-log.js",
+      "name": "change-log --check-updated coherence",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 14,
+      "passed": 14,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--check-updated",
+        "--file",
+        "{input}"
+      ],
+      "ran_at": "2026-09-26T11:25:22.813Z"
+    }
+  ],
+  "totals": {
+    "executed": 48,
+    "reproduced": 0
+  },
+  "updated_at": "2026-09-26T11:25:25.193Z"
+}

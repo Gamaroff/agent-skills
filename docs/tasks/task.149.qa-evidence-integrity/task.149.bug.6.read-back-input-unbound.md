@@ -4,7 +4,7 @@
 **Bug ID**: TASK-149-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 4)
 **Date Found**: 2026-09-26
 
@@ -39,9 +39,14 @@ exit 2. `tests/qa-read-back-block.test.js` now substitutes the placeholder in th
 the block (bash + zsh). It also asserts the block reads no `$VAR`, and that the raw block exits 2. The
 `STORY_FILE` INPUTS entry in `unbound-default-reads.test.js` is removed, because no such read remains.
 
+#### QA Verification (cycle 5) — Closed
+
+The read-back is one script. Its CLI was probed through the engine and **engages 10/10**: task- and story-shaped clean cases, a linked untracked file inside the work item, missing, stale, no report, no Change Log, untracked outside, ignored, and case-mismatch. The wiring test runs each delivered block with its placeholder substituted (bash + zsh), and the raw block exits 2. Adjacent could-not-look gaps are TASK-149-BUG-8; the gate filename grammar is TASK-149-BUG-9.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-26 | New | QA Engineer | Found in QA cycle 4 |
 | 2026-09-26 | Ready for QA | qa-fix | Fixed in qa-fix cycle 4 |
+| 2026-09-26 | Closed | QA Engineer | Verified in QA cycle 5 |

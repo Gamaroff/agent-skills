@@ -518,20 +518,19 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.149.qa.4.qa-evidence-integrity.md](./task.149.qa.4.qa-evidence-integrity.md)
-- **Gate File**: [task.149.gate.4.qa-evidence-integrity.yml](./task.149.gate.4.qa-evidence-integrity.yml)
+- **Full Report**: [task.149.qa.5.qa-evidence-integrity.md](./task.149.qa.5.qa-evidence-integrity.md)
+- **Gate File**: [task.149.gate.5.qa-evidence-integrity.yml](./task.149.gate.5.qa-evidence-integrity.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 4239 (4238 pass, 0 fail, 1 skipped); 37 boundary probes, 0 reproduced
+- **Tests Executed**: 4216 (4215 pass, 0 fail, 1 skipped); 48 boundary probes, 0 reproduced
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- MEDIUM — [TASK-149-BUG-6](./task.149.bug.6.read-back-input-unbound.md): the read-back input has no writer in the block.
-- MEDIUM — [TASK-149-BUG-7](./task.149.bug.7.read-back-stages-outside-work-item.md): pass 1 stages untracked targets outside the work item.
-- LOW — CR4-4: a root SRC slips the containment prefix.
-- Closed — BUG-1 … BUG-5.
+- MEDIUM — [TASK-149-BUG-8](./task.149.bug.8.read-back-could-not-look-not-exit-2.md): three could-not-look states in `qa-read-back.js` do not exit 2.
+- MEDIUM — [TASK-149-BUG-9](./task.149.bug.9.read-back-gate-grammar.md): a gate `qa-cycle.sh` counted is not found, and nothing halts.
+- Closed — BUG-1 … BUG-7.
 
 ---
 
@@ -547,6 +546,7 @@ None.
 | 2026-09-26 |         | QA gate FAIL (60/100) — 1 high (reopened), 2 medium, 3 low | qa-task |
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 1 medium, 3 low | qa-task |
 | 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 2 medium, 1 low | qa-task |
+| 2026-09-26 |         | QA gate CONCERNS (80/100) — 0 high, 2 medium | qa-task |
 
 ---
 
