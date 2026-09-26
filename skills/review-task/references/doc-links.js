@@ -21,6 +21,10 @@
  *     exit 0, reason `ok`      — every relative link resolves (or there are none)
  *     exit 1, reason `broken`  — at least one does not, or a fence never closes;
  *                                each is printed as `✖ <file>:<line> → <target>`
+ *                                with its state appended — `[untracked]` (on
+ *                                disk, not in the tracked tree: commit it) or
+ *                                `[missing]` (not on disk: write it) — and
+ *                                carries the same `state` in `--json` `broken[]`
  *                                and the summary reads
  *                                `FAIL doc-links: N finding(s) in <file>` — the
  *                                ✖ / FAIL markers are what
@@ -273,7 +277,22 @@ function checkDocument(
     const exists = tracked
       ? tracked.has(resolved) || dirs.has(resolved)
       : fs.existsSync(path.join(base, resolved));
-    if (!exists) broken.push({ line, target, resolved });
+    if (!exists)
+      broken.push({
+        line,
+        target,
+        resolved,
+        // obs #164 — a link that fails against the tracked tree is one of two
+        // different defects: an artifact that exists and is not yet committed
+        // (`untracked` — commit it), or one that was never written (`missing` —
+        // write it). They printed the same line. With no tracked set (outside a
+        // repository) the check already read the disk, so only `missing` is
+        // possible there.
+        state:
+          tracked && fs.existsSync(path.join(base, resolved))
+            ? "untracked"
+            : "missing",
+      });
   }
   return {
     file: rel,
@@ -332,7 +351,7 @@ function main(argv) {
   }
   for (const b of result.broken) {
     process.stdout.write(
-      `✖ ${result.file}:${b.line} → ${b.target} (resolves to ${b.resolved})\n`,
+      `✖ ${result.file}:${b.line} → ${b.target} (resolves to ${b.resolved}) [${b.state}]\n`,
     );
   }
   if (result.unterminatedFence) {

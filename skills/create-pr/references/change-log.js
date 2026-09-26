@@ -802,6 +802,43 @@ function bumpUpdated(content, date) {
   return content;
 }
 
+/**
+ * Is the newest Change Log row accounted for by frontmatter `updated:`?
+ *
+ * The READER beside `bumpUpdated` (the writer). `document-change-log.md`: every
+ * entry bumps `updated:` in the same edit, so a row dated AFTER `updated:` is a
+ * write the frontmatter does not know about. Only that direction is a defect —
+ * `updated:` newer than the newest row is common (an edit that adds no row).
+ *
+ * Reads rows through `extractEntries`, so a fenced example row is never read as
+ * history — the same classifier the write path uses. Dates compare on the
+ * `YYYY-MM-DD` part; a row's optional ` HH:MM` is ignored.
+ *
+ *   { ok: true,  reason: "no-log" }                        no Change Log rows
+ *   { ok: true,  reason: "no-updated", newest }            rows, no `updated:`
+ *   { ok: true,  reason: "ok", newest, updated }
+ *   { ok: false, reason: "stale-updated", newest, updated }
+ *
+ * `no-updated` passes here on purpose: a missing `updated:` is an OKF gap the
+ * review-* skills enforce, and reporting it as a stale date would name one defect
+ * as another. (task.149, obs #164)
+ */
+function checkUpdatedCoherence(content) {
+  const text = String(content);
+  const dates = extractEntries(text)
+    .map((row) => (row.match(/^\|\s*(\d{4}-\d{2}-\d{2})/) || [])[1])
+    .filter(Boolean);
+  if (dates.length === 0) return { ok: true, reason: "no-log" };
+  const newest = dates.sort()[dates.length - 1];
+  const fm = text.slice(0, bodyStart(text));
+  const updated = (fm.match(/^updated:[ \t]*['"]?(\d{4}-\d{2}-\d{2})/m) ||
+    [])[1];
+  if (!updated) return { ok: true, reason: "no-updated", newest };
+  return newest > updated
+    ? { ok: false, reason: "stale-updated", newest, updated }
+    : { ok: true, reason: "ok", newest, updated };
+}
+
 // ---------------------------------------------------------------------------
 // Legacy row parsing
 // ---------------------------------------------------------------------------
@@ -867,4 +904,68 @@ module.exports = {
   ANCHORS,
   upsertChangeLog,
   bumpUpdated,
+  // check
+  checkUpdatedCoherence,
 };
+
+// ---------------------------------------------------------------------------
+// CLI — the module stays side-effect-free on require; this runs only when the
+// file is executed directly.
+//
+//   node change-log.js --check-updated --file <doc> [--json]
+//     exit 0  ok / no-log / no-updated
+//     exit 1  stale-updated — the newest row is dated after `updated:`; apply
+//             bumpUpdated(content, <newest row date>) and re-run
+//     exit 2  usage — no --check-updated, no --file, or the file is unreadable
+// ---------------------------------------------------------------------------
+
+function main(argv) {
+  const json = argv.includes("--json");
+  const say = (obj, text, stream = process.stdout) => {
+    stream.write(json ? JSON.stringify(obj) + "\n" : text + "\n");
+    return obj.exitCode;
+  };
+  const usage = (error) =>
+    say(
+      { reason: "usage", exitCode: 2, error },
+      `change-log: ${error}\nusage: change-log.js --check-updated --file <doc> [--json]`,
+      json ? process.stdout : process.stderr,
+    );
+  let file = null;
+  let check = false;
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === "--json") continue;
+    if (a === "--check-updated") {
+      check = true;
+      continue;
+    }
+    if (a === "--file") {
+      const v = argv[i + 1];
+      if (v === undefined || v.startsWith("--"))
+        return usage("--file needs an operand");
+      file = v;
+      i += 1;
+      continue;
+    }
+    return usage(`unknown argument ${a}`);
+  }
+  if (!check) return usage("--check-updated is the only mode");
+  if (!file) return usage("--file is required");
+  let content;
+  try {
+    content = require("fs").readFileSync(file, "utf8");
+  } catch (e) {
+    return usage(`--file ${file}: ${e.message}`);
+  }
+  const r = checkUpdatedCoherence(content);
+  const exitCode = r.ok ? 0 : 1;
+  const text = r.ok
+    ? `ok change-log: ${file} — ${r.reason}${r.newest ? ` (newest row ${r.newest}${r.updated ? `, updated: ${r.updated}` : ""})` : ""}`
+    : `FAIL change-log: ${file} — newest row ${r.newest} is dated after updated: ${r.updated}; apply bumpUpdated(content, "${r.newest}")`;
+  return say({ ...r, file, exitCode }, text);
+}
+
+// process.exitCode, never a hard exit: exiting after a stdout write truncates
+// the write when the caller pipes it (bug.3).
+if (require.main === module) process.exitCode = main(process.argv.slice(2));

@@ -2476,3 +2476,113 @@ test("TASK87-001 and TASK87-002 hold together, not just separately", () => {
     ["echo both"],
   );
 });
+
+// ── task.149 — --copy-as seeds at the path a block addresses (obs #143) ───────
+
+// A fixture tree whose `docs/tasks/a.md` a block reaches as `docs/tasks`.
+function docsFixture() {
+  const root = tmp();
+  mkdirSync(join(root, "docs", "tasks"), { recursive: true });
+  writeFileSync(join(root, "docs", "tasks", "a.md"), "x\n");
+  return root;
+}
+
+test("QA-18: --copy-as seeds a directory at the path the block addresses; --copy does not", () => {
+  const root = docsFixture();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("ls docs/tasks"));
+
+  const seeded = executeFile(file, {
+    allowZsh: false,
+    copyAs: [{ src: join(root, "docs"), dest: "docs" }],
+  });
+  assert.deepEqual(
+    seeded.findings,
+    [],
+    "a correct block seeded at its addressed path must pass",
+  );
+
+  // Both directions, so a harness that ignored copyAs could not pass the first.
+  const contents = executeFile(file, {
+    allowZsh: false,
+    copyFrom: join(root, "docs"),
+  });
+  assert.ok(
+    contents.findings.some((f) => f.kind === "execution-failure"),
+    "--copy places the directory's CONTENTS at the root, so docs/tasks is absent",
+  );
+});
+
+test("QA-19: --copy-as is repeatable and every pair lands", () => {
+  const root = docsFixture();
+  mkdirSync(join(root, "skills", "x"), { recursive: true });
+  writeFileSync(join(root, "skills", "x", "SKILL.md"), "y\n");
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("ls docs/tasks/a.md skills/x/SKILL.md"));
+  const r = executeFile(file, {
+    allowZsh: false,
+    copyAs: [
+      { src: join(root, "docs"), dest: "docs" },
+      { src: join(root, "skills"), dest: "skills" },
+    ],
+  });
+  assert.deepEqual(r.findings, []);
+});
+
+test("QA-20: an absolute or escaping --copy-as DEST is refused, with nothing written outside and no temp leak", () => {
+  const root = docsFixture();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("echo ok"));
+  const count = () =>
+    readdirSync(tmpdir()).filter((n) => /^qa-snippets-[^t]/.test(n)).length;
+  const before = count();
+  const marker = `qa-copy-as-escape-${process.pid}`;
+  for (const dest of [
+    `../${marker}`,
+    `../../${marker}`,
+    join(tmpdir(), marker),
+  ]) {
+    assert.throws(
+      () =>
+        executeFile(file, {
+          allowZsh: false,
+          copyAs: [{ src: join(root, "docs"), dest }],
+        }),
+      /--copy-as DEST/,
+      `DEST ${dest} must be refused`,
+    );
+  }
+  assert.equal(count(), before, "a refused DEST may not leak a temp dir");
+  assert.ok(
+    !readdirSync(tmpdir()).includes(marker),
+    "nothing may be written outside the sandbox",
+  );
+});
+
+test("QA-21: the CLI parses --copy-as SRC:DEST, repeatably, and rejects a malformed pair", () => {
+  const root = docsFixture();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("ls docs/tasks"));
+  const ok = main([
+    "--file",
+    file,
+    "--no-zsh",
+    "--copy-as",
+    `${join(root, "docs")}:docs`,
+  ]);
+  assert.equal(ok.exitCode, 0, JSON.stringify(ok.report?.findings));
+  for (const bad of ["docs", ":docs", `${root}:`]) {
+    const r = main(["--file", file, "--no-zsh", "--copy-as", bad]);
+    assert.equal(r.exitCode, 2, `--copy-as ${bad} must be a usage error`);
+    assert.match(r.error, /bad --copy-as/);
+  }
+  const escape = main([
+    "--file",
+    file,
+    "--no-zsh",
+    "--copy-as",
+    `${root}:../x`,
+  ]);
+  assert.equal(escape.exitCode, 2);
+  assert.match(escape.error, /escapes the working directory/);
+});

@@ -243,6 +243,21 @@ async function run() {
     return { stage: "import", error: String(e && e.message) };
   }
 
+  // obs #156 — an ABSENT export is told apart from a non-function one. A
+  // module-private predicate is still a boundary; the remedy is one word
+  // (export), and a decline that says only "is not a function" reads as a
+  // reason to record boundary: false instead. (No backticks here: this child
+  // source is itself a template literal.)
+  if (spec.exportName !== "default" && !(spec.exportName in mod)) {
+    return {
+      stage: "export",
+      error:
+        spec.exportName +
+        " is not exported by " +
+        spec.entryPath +
+        " — a module-private predicate is still a boundary: export it and re-run",
+    };
+  }
   const fn =
     spec.exportName === "default" ? (mod.default ?? mod) : mod[spec.exportName];
   if (typeof fn !== "function") {
