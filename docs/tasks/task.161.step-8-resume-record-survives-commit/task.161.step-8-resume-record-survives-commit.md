@@ -5,7 +5,9 @@ type: task
 description: "/commit-changes removes the pipeline lock at the Step 8 commit, so a pause, crash or HALT during Step 8's push, Cleanup or Completion Checklist leaves no resume record, and a Step 8 HALT writes no snapshot. Keep the lock until the checklist passes, make the resume detector recommend step 8 for a record at step 8, and fix two orchestrator restatements that task.160's review found."
 tags: [develop-pipeline, step-8, resume, pipeline-lock, follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
+completed_date: 2026-09-27
+pr_number: 501
 priority: Medium
 created: 2026-09-27
 updated: 2026-09-27
@@ -16,7 +18,7 @@ github_issue: 500
 
 # Technical Task: Step 8 keeps its resume record until the Completion Checklist passes
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.161.review.1.step-8-resume-record-survives-commit.md` implemented 2026-09-27
 
@@ -376,6 +378,39 @@ No gating finding: the gate queue is empty. The reliability concerns are advisor
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.161.qa.3.step-8-resume-record-survives-commit.md`
+**Gate File**: `task.161.gate.3.step-8-resume-record-survives-commit.yml`
+**Gate Status**: ⚠️ CONCERNS, with an empty queue. Reliability is advisory only.
+**Quality Score**: 90/100 (3 QA cycles: 80 → 80 → 90)
+**PR review (Step 5c)**: ⚠️ CONCERNS, with no high/high finding (`task.161.pr-review.1.step-8-resume-record-survives-commit.md`)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 15/15. Each has code and a test that runs per PR. AC14 (the CHANGELOG entry) is guarded by `changelog-entry-drift.test.mjs`.
+✅ **Tests & CI:** CI green on `8610c2f5` (5 checks). Local `ci:fast` 4331 pass / 0 fail.
+✅ **Documentation:** the step-8 doc, hooks reference, lock-cooperation docs, orchestrator SKILL.md files, detector prompt, resume contract and CHANGELOG are updated.
+✅ **Security Review:** PASS. Not a boundary. The fail-closed parse gate was re-executed on corrupt locks.
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal tooling).
+
+**Carried forward (non-blocking):**
+- The develop-bug Step 7-tail wording in the Stop hook's step-8 reason (medium confidence; raised twice).
+- The pre-existing "Step 7/8 ✅ complete" status line at lock 8.
+- The no-jq test PATH cleanup.
+
+All three are in gate.3 `recommendations.future`.
+
+**Task marked as ACCEPTED on:** 2026-09-27
+
+**Detailed Verification Log:** See `task.161.dod.1.step-8-resume-record-survives-commit.md` for complete verification evidence and timestamps.
+
+---
+
 ## Implementation Summary
 
 **Completed**: 2026-09-27
@@ -402,11 +437,11 @@ No gating finding: the gate queue is empty. The reliability concerns are advisor
 **Deferred work.** task.160 CR6-1 and CR6-2, as listed under Out of Scope.
 
 ---
-
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-27 | 1.0     | Initial draft | create-task |
 | 2026-09-27 | 1.1 | Review passed (8/10) — added the Stop hook's step-8 reason, the hooks reference, the "For Step 8 → completion" restatements and the three tests that pin the old lock lifetime to scope | review-task |
 | 2026-09-27 |  | Status → ready-for-development | review-task |
@@ -416,9 +451,10 @@ No gating finding: the gate queue is empty. The reliability concerns are advisor
 | 2026-09-27 |  | QA gate CONCERNS (80/100) — 1 finding (CR-1, medium) | qa-task |
 | 2026-09-27 |  | QA findings fixed — CR-1 (at step 8 the Stop hook follows the resume contract's step-8 rule, so an unfinished Step 7 is finished first), CR-2 (at step 8 the hook sends the orchestrator to the whole step-8 doc and never tells it to run `--complete`), CR-3/CR-4 (test hygiene); 5 new or tightened assertions; 2 iterations total | qa-fix |
 | 2026-09-27 |  | QA gate CONCERNS (90/100) — 0 gated findings, 2 advisory, 1 pre-existing | qa-task |
-<!-- change-log-end -->
+| 2026-09-27 | 1.2 | DoD passed — accepted (PR #501) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
@@ -466,7 +502,7 @@ No gating finding: the gate queue is empty. The reliability concerns are advisor
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.161.step-8-resume-record-survives-commit/task.161.step-8-resume-record-survives-commit.md`
