@@ -273,7 +273,7 @@ match the source.
 ### Migration
 
 - [x] CHANGELOG `[Unreleased]` entry cites (task 159), and names the two tightenings in § 5
-- [ ] Observation #200 set to `actioned` after merge
+- [x] Observation #200 set to `actioned` after merge
 
 ---
 
@@ -384,6 +384,7 @@ All Definition of Done criteria have been verified:
 | 2026-09-27 |         | Implemented — 6 files, 9 tests (1 non-vacuity + 4 cases × bash/zsh); 3 mutation proofs | develop |
 | 2026-09-27 |         | QA gate PASS (100/100) — 0 gate findings; 3 advisory code-review findings to future | qa-task |
 | 2026-09-27 | 1.2 | DoD passed — accepted (PR #497); Status-cell fix landed at finalise (fix-and-recheck) | finalise |
+| 2026-09-27 |  | Post-merge: observation #200 set to actioned (PR #497 merged, ec49c461) | develop-task |
 <!-- change-log-end -->
 
 ---
