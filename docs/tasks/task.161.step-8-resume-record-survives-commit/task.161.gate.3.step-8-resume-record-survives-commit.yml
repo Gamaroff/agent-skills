@@ -1,0 +1,52 @@
+schema: 1
+task: 'task.161.step-8-resume-record-survives-commit'
+task_title: '[Task 161] Step 8 keeps its resume record until the Completion Checklist passes'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes hold: at step 8 the Stop hook follows the resume contract step-8 rule, and no gating finding remains. Reliability stays CONCERNS on advisory items. The develop-bug Step 7-tail wording is medium confidence, and the pre-existing status line still reads Step 7/8 complete at lock 8, identical on base.'
+reviewer: 'QA Engineer'
+updated: '2026-09-27T18:18:03Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 4332
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false, unchanged. Cycle 2 changed only the Stop hook message selection (NEXT=8 branches) and tests.'
+  performance:
+    status: PASS
+    notes: 'No change.'
+  reliability:
+    status: CONCERNS
+    notes: 'Advisory CR-2 (medium confidence): the shared step-8 line describes the Step 7 tail as the DoD body, the tracker update and the Step 7 checklist, but the develop-bug Step 7 tail is its bug-close routine. Pre-existing CR-1: the status block reads Step 7/8 complete at lock 8, identical on origin/develop.'
+  maintainability:
+    status: PASS
+    notes: 'CR-3 cleanup: the no-jq PATH links more commands than the pre-gate arms run, and printf resolves to a builtin.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-2 (advisory): make the Stop hook step-8 Step 7-tail parenthetical skill-aware. For develop-bug, name the bug-close routine (Resolution Summary, status closed, parent/registry linkage), and assert it in on-stop test 5b.'
+      refs: ['shared/resources/develop-pipeline-on-stop.sh', 'shared/resources/develop-pipeline-on-stop.test.sh']
+    - action: 'CR-1 (pre-existing, follow-up): at lock 8 the Stop hook status block says Step 7/8 complete before its step-8 routing, identical on origin/develop. Make the position line step-aware, or put the routing ahead of it.'
+      refs: ['shared/resources/develop-pipeline-on-stop.sh']
+    - action: 'CR-3 (cleanup): in scenario 4b link only rm and dirname, and skip any name command -v does not resolve to an absolute path.'
+      refs: ['shared/resources/advance-pipeline-lock.test.sh']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

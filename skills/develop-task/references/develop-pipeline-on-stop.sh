@@ -222,12 +222,45 @@ else
   fi
 fi
 
+# At Step 8 the thing to run is the whole step-8 doc, not /commit-changes alone: the lock
+# outlives the Step 8 commit (task 161), so a stop after it is still Step 8, and "invoke
+# /commit-changes" would send the orchestrator back to the one part already done
+# (task.161 QA cycle 2, CR-2). Same for develop-bug, which follows the same step doc.
+if [ "$NEXT" = "8" ]; then
+  NEXT_SKILL="Step 8 per the step-8 doc (report update → /commit-changes → push → Cleanup → Completion Checklist)"
+fi
+
 # The completion sentence. Inside the story/task QA loop it is the sub-step's own
-# (THEN_WHAT, above); everywhere else it is the generic advance.
+# (THEN_WHAT, above); at Step 8 it is the Completion Checklist; everywhere else it
+# is the generic advance.
+#
+# Step 8 does NOT end when /commit-changes returns. The lock outlives that commit
+# (task 161) and is removed only by the `--complete` at the end of the step doc's
+# Completion Checklist, after checks 2–5 pass. The generic line — "once
+# /commit-changes has completed … `--complete`" — would hand an orchestrator that
+# yielded during the push or the checklist the one instruction that skips the
+# checklist. Same for all three orchestrators: develop-bug follows the same step doc.
+#
+# The lock reads 8 from the end of /finalise, before Step 7's tail and before Step 8's own
+# report update, so the line may not assume either ran (task.161 QA cycle 1, CR-2). It does
+# not invent a finer rule for where to resume: it states the resume contract's one step-8
+# rule (an unfinished row at or below Step 7 wins; otherwise re-run Step 8 from its start).
+# A finer rule written here sent a Step 7-tail stall to Step 8's report update, which ticks
+# row 7 without the tail ever running (task.161 QA cycle 2, CR-1).
 if [ "$NEXT" = "5" ] && [ "$SKILL" != "develop-bug" ]; then
   COMPLETION_LINE="$THEN_WHAT"
+elif [ "$NEXT" = "8" ]; then
+  COMPLETION_LINE="Step 8 is NOT finished when /commit-changes returns. Resume by the step-8 rule the resume contract states (Phase 0b): a lock at 8 is not evidence that Step 7 finished, because /finalise moves it there before Step 7's tail runs. If a Pipeline Progress row at or below Step 7 in \`${REPORT}\` is unfinished, finish that step first (for Step 7: the DoD body to the PR, the tracker update, the Step 7 checklist). Otherwise run Step 8 from its start; re-running it is safe. Step 8 ends only when its Completion Checklist passes, and the checklist runs \`advance-pipeline-lock.sh --complete\` itself as its last action. Never run \`--complete\` on your own because the commit landed."
 else
   COMPLETION_LINE="Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to ${ADVANCE_TO} (or \`--complete\` if that was Step 8)."
+fi
+
+# "Advance the lock yourself" means `--complete` at Step 8, which only the Completion
+# Checklist may run (task.161 QA cycle 2, CR-2).
+if [ "$NEXT" = "8" ]; then
+  ALREADY_DONE="**If Step 8 has genuinely already finished**, re-run its Completion Checklist: the checklist, not you, runs \`--complete\`."
+else
+  ALREADY_DONE="**If Step ${NEXT} has genuinely already finished, do NOT skip ahead on the strength of this message**: advance the lock yourself and continue from the real next step."
 fi
 
 REASON=$(cat <<EOF
@@ -241,7 +274,7 @@ Then: emit the Remaining Work Status block (position \`Step $((NEXT - 1))/8 ✅ 
 
 ${COMPLETION_LINE}
 
-⚠️ This hook names the step the lock says is PENDING. It cannot tell whether you stalled during that step or just after it, so it always assumes during — repeating a step is recoverable, skipping one is not. **If Step ${NEXT} has genuinely already finished, do NOT skip ahead on the strength of this message**: advance the lock yourself and continue from the real next step.
+⚠️ This hook names the step the lock says is PENDING. It cannot tell whether you stalled during that step or just after it, so it always assumes during — repeating a step is recoverable, skipping one is not. ${ALREADY_DONE}
 
 Cannot continue? Apply terminal HALT (SKILL.md): /commit-changes report, snapshot lock to develop-pipeline.last-halt.json, rm lock, surface halt banner. An interruption (a question, a pause, a denied permission) is NOT a blockage — do not signal the tracker blocked for one.
 EOF

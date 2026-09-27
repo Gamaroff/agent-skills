@@ -77,10 +77,10 @@ find {task-directory} -maxdepth 1 -name "task.{id}.implementation.*.md" 2>/dev/n
 ```
 
 1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.
+   **Exception — a record at step 8 (read before items 2–4, which it overrides).** When the lock's `current_step` (surviving or restored) or the snapshot's `halt_step` is 8, the Step 8 row is not evidence and items 2–3 do not verify it: the record means Step 8's Completion Checklist had not passed, and the detector recommends 8 for it. Resume from the first unfinished row at or below Step 7 if there is one (`/finalise` moves the lock to 8 before Step 7's tail completes); that row wins over `recommended_step` 8. Otherwise re-run Step 8 from the start, whatever the Step 8 row says (`references/develop-pipeline-resume-contract.md` Phase 0b states the rule once).
 2. **Verify each ✅ step's artifact exists up to `recommended_step - 1`** (see `references/develop-pipeline-resume-contract.md` — Phase 0b for the full contract). Steps at or after `recommended_step` are treated as ⏳ Pending. If Phase 0a failed validation, fall back to verifying all steps using `current_step` from the lock as the upper bound.
 3. Output: "⚠️ Context recovery — last verified step: Step {recommended_step - 1}. Resuming from recommended step {recommended_step}."
-4. Continue from `recommended_step` — do NOT re-run steps already verified, do NOT skip any pending steps.
-   **Exception — a record at step 8.** When the lock's `current_step` (surviving or restored) or the snapshot's `halt_step` is 8, the Step 8 row is not evidence. Resume from the first unfinished row at or below Step 7 if there is one (`/finalise` moves the lock to 8 before Step 7's tail completes). Otherwise re-run Step 8 from the start, whatever `recommended_step` or the Step 8 row says (`references/develop-pipeline-resume-contract.md` Phase 0b states the rule once; the detector's `LOCK_STEP + 1` would name a step 9 that does not exist).
+4. Continue from `recommended_step` — do NOT re-run steps already verified, do NOT skip any pending steps. For a record at step 8, the exception under item 1 names the step.
 
 **This recovery is mandatory even if the user did not explicitly re-invoke `/develop-task`.** If you are in a conversation where `develop-task` was previously running and context was then compressed, you are still the develop-task orchestrator and must complete all remaining steps. A context summary saying "next step: create-pr" does NOT mean the pipeline ends after create-pr — it means Step 4 is next, and Steps 5–8 still follow.
 
@@ -130,7 +130,7 @@ This prevents context accumulation across the 8-step pipeline.
 
 Every step ends with the same four actions, executed *in order, with no text output between them*:
 
-1. **Bash tool call** advancing the lock to the next step (use the helper: `bash .agents/skills/develop-task/references/advance-pipeline-lock.sh {N+1}`). **This must be the first call** — it is the binding side-effect that anchors the orchestrator into "still working" mode and signals to the `Stop` hook that the pipeline has advanced. If the just-completed step was Step 8, use `--complete` instead, which removes the lock. (This call is idempotent: a sub-skill normally self-advances the lock as its own last action, so this re-advance noops — but issuing it unconditionally is the deterministic, single-instruction behaviour.)
+1. **Bash tool call** advancing the lock to the next step (use the helper: `bash .agents/skills/develop-task/references/advance-pipeline-lock.sh {N+1}`). **This must be the first call** — it is the binding side-effect that anchors the orchestrator into "still working" mode and signals to the `Stop` hook that the pipeline has advanced. After Step 8, issue `--complete` instead of a number (a numeric advance with no lock is an error): Step 8's Completion Checklist already ran `--complete` as its last action, so this one is a no-op — the helper exits 0 when there is no lock (task 161). (This call is idempotent: a sub-skill normally self-advances the lock as its own last action, so this re-advance noops — but issuing it unconditionally is the deterministic, single-instruction behaviour.)
 2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`), then **read it back**. **After Step 8 this edit is a no-op:** Step 8 set its own row to `✅ Done` before its commit (step-8 doc § Final Implementation Report Update), and the Completion Checklist's check 5 has already required a clean tree, so any change here would be uncommitted dirt. Confirm the row is finished by check 4's own test (its Status cell starts with `✅`, or reads `⏭️ Skipped`) and change nothing (task 160). A row that fails that test after Step 8 is a **HALT, not an edit**: the Completion Checklist should have refused it, so something wrote the report after the checklist ran. The read-back is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
 
    ```bash
@@ -178,7 +178,7 @@ This creates persistent checkpoints that survive context compression and make th
 ```bash
 bash .agents/skills/develop-task/references/advance-pipeline-lock.sh {N+1}
 ```
-For Step 8 → completion: `... advance-pipeline-lock.sh --complete` (removes the lock).
+For Step 8 → completion: `... advance-pipeline-lock.sh --complete` — a no-op by then, because Step 8 already ran it as its Completion Checklist's last action, after checks 2–5 passed (task 161).
 
 **Steps 5–6 are one step to the lock.** `current_step` goes `4 → 5` when the QA loop is entered and
 `5 → 7` when 5c returns APPROVE or CONCERNS; `advance-pipeline-lock.sh 6` is **never** issued. Inside
@@ -191,7 +191,7 @@ writes it as the reconstructed cycle count plus `extra_cycles_granted` (Phase 0b
 
 Skip this for Step 1 (the lock is created at the *end* of Step 1, after the feature branch exists — see Step 1 below).
 
-After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠️ Needs Attention / ⏸️ Paused — see Graceful Pause section) and log any decisions or issues before moving on.
+After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠️ Needs Attention / ⏸️ Paused — see Graceful Pause section) and log any decisions or issues before moving on. After Step 8 this is a no-op — Step 8 set its own row before its commit; see the Step Transition Protocol, action 2.
 
 ### Step 1: Create Branch
 

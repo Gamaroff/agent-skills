@@ -1,6 +1,6 @@
 ---
 name: develop-pipeline-step-8-commit
-description: Step 8 (commit-changes + lock removal) shared by develop-story and develop-task. Covers final implementation report update (Finished timestamp, Final Status, QA Iterations, Completion Summary, and every Pipeline Progress row including Step 8's own, all before the commit), /commit-changes invocation, final push, and pipeline lock file removal. Nothing edits the report after the commit. Near-identical for both orchestrators — one variant noted for Completion Summary wording.
+description: Step 8 (commit-changes + lock removal) shared by develop-story and develop-task. Covers final implementation report update (Finished timestamp, Final Status, QA Iterations, Completion Summary, and every Pipeline Progress row including Step 8's own, all before the commit), /commit-changes invocation, final push, and the Completion Checklist, which ends in the pipeline lock's one terminal removal (`--complete`). Nothing edits the report after the commit. Near-identical for both orchestrators — one variant noted for Completion Summary wording.
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/develop-pipeline-step-8-commit.md. Regenerate via `npm run bundle`. -->
 
@@ -26,8 +26,8 @@ Before invoking `/commit-changes`, update the implementation report one final ti
 
 **The Step 8 row is written before the step's work, so it is not the evidence that Step 8 finished — and neither is the git state.** A PreCompact pause commits **and pushes** the report, so after one the row reads `✅` and the branch can look exactly like a finished run. The evidence is the **resume record**. This is the one statement of the rule; the resume contract cites it.
 
-- **What the record covers.** The lock stays at `current_step` 8 from the start of Step 8 until the Step 8 commit. At the end of that commit, `/commit-changes`' lock cooperation (`advance-pipeline-lock.sh --skill commit-changes`, at `current_step` ≥ 8) removes it. Cleanup removes this run's halt snapshot. The record reaches 8 slightly early: `/finalise` moves the lock to 8 as its last action, before the orchestrator finishes Step 7's tail. A lock (surviving or restored), halt snapshot or orphaned claim at step 8 for this work item therefore means Step 8 had not got past its commit, and possibly that Step 7's tail was unfinished. A resume from it goes back to the first unfinished row at or below Step 7, and otherwise re-runs Step 8 from the start, whatever the Step 8 row reads (resume contract, Phase 0b).
-- **What it does not cover (a known gap, older than this rule).** After the Step 8 commit there is no lock. A pause, crash or HALT during the push, Cleanup or a failing Completion Checklist leaves no record to resume from. A HALT whose commit runs `/commit-changes` leaves none either, because that commit removes the lock before the HALT rule's snapshot runs. A HALT whose report fails lint skips that commit, so its lock survives at 8, its snapshot records step 8, and it is resumable. Both follow from the step-8 lock removal in `a284dfdd` (2026-06-08), not from this rule, and are tracked as a follow-up task. On those paths the Completion Checklist's fix-and-recheck is the only guard.
+- **What the record covers: all of Step 8.** The lock stays at `current_step` 8 from the start of Step 8 until its Completion Checklist passes. The checklist's last action is `advance-pipeline-lock.sh --complete`, which is the lock's one terminal remover. `/commit-changes`' lock cooperation (`advance-pipeline-lock.sh --skill commit-changes`) removes nothing at any step, so the lock survives the Step 8 commit, the push and Cleanup, and a failed check exits before `--complete` (task 161). The record reaches 8 slightly early: `/finalise` moves the lock to 8 as its last action, before the orchestrator finishes Step 7's tail. A lock (surviving or restored), halt snapshot or orphaned claim at step 8 for this work item therefore means Step 8's checklist had not passed, and possibly that Step 7's tail was unfinished. A resume from it goes back to the first unfinished row at or below Step 7, and otherwise re-runs Step 8 from the start, whatever the Step 8 row reads (resume contract, Phase 0b).
+- **Every Step 8 HALT is resumable.** The HALT rule commits the report through `/commit-changes`, then snapshots the lock. The lock is still there at step 8, so the snapshot records `halt_step: 8` like a HALT at any other step. Cleanup removes this run's halt snapshot only once the run reaches it.
 
 Re-running Step 8 is safe, but it is not a no-op. It writes a new **Finished** value, which costs one extra docs commit. It also leaves any `## Pipeline Paused` section the hook appended, which records the pause and is not rewritten. `/commit-changes` commits only what changed, the push is a no-op when nothing is new, and Cleanup and the Completion Checklist are idempotent.
 
@@ -116,7 +116,7 @@ The Pipeline Progress row for Step 8 was already set before the commit (§ Final
 
 ## Cleanup Transient State
 
-Pipeline finished cleanly — no further pause possible. Remove the lock file and any leftover test-output logs from this run:
+Remove any leftover test-output logs and this run's own halt snapshot. **The lock is not removed here.** It stays at `current_step` 8 until the Completion Checklist below passes, so a pause, crash or HALT during Cleanup or the checklist still leaves a record to resume from (task 161):
 
 ```bash
 # Remove transient test-output logs from Step 3 develop loop iterations.
@@ -166,22 +166,15 @@ if [ -f "$SNAPSHOT" ]; then
     fi
   fi
 fi
-
-# Remove the pipeline lock — must be last so a crash mid-cleanup still leaves
-# the lock available for resume.
-rm -f .claude/state/develop-pipeline.lock
 ```
 
 ---
 
 ## Step 8 Completion Checklist (BLOCKING — verify before emitting the Phase 2 Completion banner)
 
-Run these post-condition checks. **If any fails, do NOT emit "Story/Task Development Complete" — fix the gap and re-check.**
+Run these post-condition checks. **If any fails, do NOT emit "Story/Task Development Complete" — fix the gap and re-check.** Checks 2–5 run first. Only when all of them pass does the block run `advance-pipeline-lock.sh --complete`, and check 1 then confirms the lock is gone. A failed check exits before `--complete`, so the lock stays at `current_step` 8: the Stop hook keeps guarding the step, and a HALT from here snapshots it as `halt_step: 8` (task 161).
 
 ```bash
-# 1. Lock file removed
-[ ! -f .claude/state/develop-pipeline.lock ] || { echo "❌ Step 8 incomplete: lock file still present"; exit 1; }
-
 # 2. Test-output logs cleaned (`find`, not `ls <glob>`: an unmatched glob aborts under zsh)
 [ -z "$(find .claude/state -maxdepth 1 -name 'test-output-*.log' 2>/dev/null)" ] || { echo "❌ Step 8 incomplete: test-output logs remain"; exit 1; }
 
@@ -272,10 +265,18 @@ VERIFY_EXIT=$?
 # current by the next run in this checkout (task.147 QA-2, CR-7).
 rm -f .claude/state/step4-scope-paths.txt .claude/state/step4-held-paths.txt .claude/state/step4-hold-dir.txt
 
+# Checks 2–5 passed: end the run. `--complete` is the lock's one terminal remover — `/commit-changes`
+# left the lock in place at step 8 (task 161). It runs HERE, after every check, never earlier: a
+# failed check above exits with the lock still at 8, which is what keeps a resume possible.
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --complete
+
+# 1. Lock file removed — by --complete, the one terminal remover, only after checks 2–5 passed
+[ ! -f .claude/state/develop-pipeline.lock ] || { echo "❌ Step 8 incomplete: lock file still present"; exit 1; }
+
 echo "✅ Step 8 post-conditions verified"
 ```
 
-Checks 1–4 (and 2b) address regressions #3 and #4 from the live-github-test and obs #88 (impl report stuck at "In Progress / Finished: —", lock file not removed). Treat the bash assertions as binding — emit the Phase 2 Completion banner only after all five pass.
+Checks 1–4 (and 2b) address regressions #3 and #4 from the live-github-test and obs #88 (impl report stuck at "In Progress / Finished: —", lock file not removed). Treat the bash assertions as binding — emit the Phase 2 Completion banner only after all five pass. Check 1 runs last because the lock it asserts absent is removed by the block itself, after checks 2–5.
 
 ---
 

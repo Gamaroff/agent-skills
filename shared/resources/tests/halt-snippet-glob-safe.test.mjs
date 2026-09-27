@@ -151,7 +151,7 @@ function step8Cleanup() {
   const blocks = extractBlocks(md).filter(
     (b) =>
       /legacy snapshot \(no directory\) removed/.test(b.code) &&
-      /rm -f \.claude\/state\/develop-pipeline\.lock/.test(b.code),
+      /halt snapshot for this run removed/.test(b.code),
   );
   assert.equal(
     blocks.length,
@@ -212,7 +212,12 @@ for (const sh of SHELLS) {
       `legacy snapshot still present — stderr: ${r.stderr}`,
     );
     assert.match(r.stdout, /legacy snapshot \(no directory\) removed/);
-    assert.equal(r.lock, false, "lock not removed at the end of cleanup");
+    // Cleanup leaves the lock: only the Completion Checklist's `--complete` removes it (task 161).
+    assert.equal(
+      r.lock,
+      true,
+      "Cleanup removed the lock — the record must outlive it",
+    );
   });
   test(`F2 [${sh}] — step-8: a legacy snapshot beside a .pausing.* claim is KEPT and the kept case is NAMED`, () => {
     const r = runStep8(sh, {

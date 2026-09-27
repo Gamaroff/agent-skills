@@ -1,0 +1,62 @@
+schema: 1
+task: 'task.161.step-8-resume-record-survives-commit'
+task_title: '[Task 161] Step 8 keeps its resume record until the Completion Checklist passes'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes hold: --complete now removes the lock without jq, and the corrupt-lock no-op is proven. The cycle-2 refute pass found that the new conditional Stop-hook step-8 line names the Step 7-tail window yet still routes it to Step 8 report update, which ticks row 7 without the tail running (CR-1).'
+reviewer: 'QA Engineer'
+updated: '2026-09-27T18:06:05Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/develop-pipeline-on-stop.sh'
+    finding: 'The conditional step-8 COMPLETION_LINE acknowledges that the lock reads 8 before Step 7 tail has run (DoD body to PR, tracker update, Step 7 checklist), yet routes that stall to the step-8 doc Final Implementation Report Update. That update marks every row done, including row 7, so the tail is skipped and check 4 passes on an unearned row. This contradicts the resume contract rule that an unfinished Step 7 row still wins.'
+    suggested_action: 'Make the step-8 line send an unfinished Step 7 row back to Step 7 tail first, then Step 8 report update, and assert in on-stop test 5b that the reason names Step 7 tail.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 4332
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false, unchanged from cycle 1. The cycle-1 fix moves two parse-free arms above the jq gate and adds no accept/reject predicate. The Stop hook change selects message text only.'
+  performance:
+    status: PASS
+    notes: 'No loop or I/O added.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a stop during Step 7 tail (lock already 8) is routed past the tail. CR-2 (advisory): at step 8, the hook fixed text still says invoke /commit-changes and advance the lock yourself, which contradicts the checklist-owned --complete.'
+  maintainability:
+    status: PASS
+    notes: 'CR-3/CR-4 are test cleanups: one sub-assertion cannot fail, and the test header is stale.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: at step 8, route an unfinished Step 7 row to Step 7 tail before Step 8 report update; test that the reason names Step 7 tail.'
+      refs: ['shared/resources/develop-pipeline-on-stop.sh', 'shared/resources/develop-pipeline-on-stop.test.sh']
+  future:
+    - action: 'CR-2 (advisory, fix alongside): at step 8, point the invoke target and the "advance the lock yourself" sentence at the step-8 doc and its Completion Checklist, not /commit-changes and a manual advance.'
+      refs: ['shared/resources/develop-pipeline-on-stop.sh']
+    - action: 'CR-3 (cleanup): scenario 4b no-jq commit-changes assertion passes on any version; assert the pre-gate arm stderr line and the absence of "jq not installed".'
+      refs: ['shared/resources/advance-pipeline-lock.test.sh']
+    - action: 'CR-4 (cleanup): the test header still says only the Step 8 invocation may remove the lock; reword it.'
+      refs: ['shared/resources/advance-pipeline-lock.test.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 fixed: a Step 8 stall with an unfinished Step 7 row goes back to Step 7 tail'

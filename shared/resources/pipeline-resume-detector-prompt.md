@@ -155,8 +155,11 @@ whose step number is in `1..LOCK_STEP`:
 
 Build `EXPECTED` = the set of `(step, path)` pairs the table names. Then:
 
-- **Every expected summary present and valid**: `recommended_step = LOCK_STEP + 1`
+- **Every expected summary present and valid**: `recommended_step = min(LOCK_STEP + 1, 8)`
   - Rationale: lock was written at end of step N meaning step N completed; resume at N+1
+  - **A record at step 8 recommends 8, never 9.** There is no step 9. A lock, snapshot or claim at
+    step 8 means Step 8 has not passed its Completion Checklist — the checklist's own `--complete`
+    is the lock's one terminal remover (task 161) — so recommend 8: re-run Step 8
 - **An expected summary for `LOCK_STEP` is missing**: `recommended_step = LOCK_STEP` (re-execute)
   - Rationale: lock was updated but step may not have fully completed (interrupted mid-step)
 - **An expected summary for an earlier step is missing**: add to `blocking_issues`:
@@ -204,10 +207,10 @@ Emit the result object with all fields. Do NOT emit any other text.
 | Condition | `recommended_step` |
 |-----------|-------------------|
 | Lock absent / unreadable | 1 |
-| Every summary the report's `Subagent summary ref` column names is present and valid (a `—` cell expects nothing) | LOCK_STEP + 1 |
+| Every summary the report's `Subagent summary ref` column names is present and valid (a `—` cell expects nothing) | LOCK_STEP + 1, or 8 when LOCK_STEP is 8 |
 | The report names a summary for LOCK_STEP and it is absent | LOCK_STEP (re-execute) |
 | The report names a summary for an earlier step and it is absent | LOCK_STEP (conservative) + blocking_issue |
-| Report without the `Subagent summary ref` column | LOCK_STEP + 1 (nothing expected) + a `deltas_since_pause` note |
+| Report without the `Subagent summary ref` column | LOCK_STEP + 1, or 8 when LOCK_STEP is 8 (nothing expected) + a `deltas_since_pause` note |
 | Report missing or unreadable | LOCK_STEP (conservative) + blocking_issue |
 | Branch missing | Same as above + blocking_issue |
 | A `last-halt.json` for this document whose PR is `MERGED` | not a candidate — reported as `stale-snapshot`; the orchestrator deletes |

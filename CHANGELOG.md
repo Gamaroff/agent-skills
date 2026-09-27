@@ -306,6 +306,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Step 8 keeps its resume record until the Completion Checklist passes (task 161).** The pipeline
+  lock now lives until Step 8's Completion Checklist passes. `advance-pipeline-lock.sh --skill
+  commit-changes` used to remove it at `current_step` 8, which was the Step 8 commit (`a284dfdd`).
+  The push, Cleanup and the blocking checklist after that commit then ran with no lock. A pause or
+  crash there left nothing to resume from, a Step 8 HALT wrote no snapshot, and the Stop hook had
+  nothing to guard. The `commit-changes` arm now removes nothing at any step. The checklist runs
+  checks 2–5, then `--complete` (the one terminal remover), then check 1, so a failed check exits
+  with the lock still at 8. Cleanup no longer removes the lock. The Stop hook's step-8 reason names
+  the checklist, not `/commit-changes` returning, as the end of the step. `develop-pipeline-hooks.md`
+  now says the hook guards step 8, as the script's `-gt 8` always has. The resume detector
+  recommends 8, never a step 9, for a record at step 8. In all three orchestrators the recovery
+  exception now comes before the items it overrides (task.160 pr-review CR-2). Every generic
+  Pipeline Progress update and every `--complete` mention now carries the Step 8 rule (CR-1). Two
+  tests enumerate those populations. Executed tests, under bash and zsh, cover the passing and
+  failing checklist, a HALT at step 8, and `--restore`.
+
 - **Step 8 check 4 allowlists finished rows instead of denying two unfinished ones (task 160).**
   Check 4 refused a Status cell only when it read `⏳ Pending` or `⏸ Paused`, so every state the
   list did not name passed: `❌ Failed`, `⚠️ Needs Attention`, `🔄 …`, an empty cell. It now finds the

@@ -1,0 +1,60 @@
+schema: 1
+task: 'task.161.step-8-resume-record-survives-commit'
+task_title: '[Task 161] Step 8 keeps its resume record until the Completion Checklist passes'
+gate: CONCERNS
+status_reason: 'Every phase delivered and every guard mutation-proven, but on a host with no jq the lock can no longer be removed: --complete exits 0 at the jq gate before its own arm, and the Cleanup rm that used to cover it is gone, so Step 8 can never pass there (CR-1).'
+reviewer: 'QA Engineer'
+updated: '2026-09-27T17:51:47Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: 'advance-pipeline-lock.sh returns exit 0 at its "jq not installed" gate before reaching the --complete arm, so with the Cleanup rm removed, a jq-less host never removes the lock: check 1 fails with "lock file still present" on every run, and the lock left behind collides with the next run.'
+    suggested_action: 'Handle --complete (a removal that needs no parse) before the jq gate, and add a test that runs --complete with jq off PATH and asserts the lock is gone.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 4332
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false. The diff adds no accept/reject predicate. The commit-changes arm loses its only decision; the Stop hook adds an elif on NEXT=8 that selects a message and refuses nothing; the Completion Checklist predicates are unchanged, and only their order moves. No input handling or secrets are touched.'
+  performance:
+    status: PASS
+    notes: 'One --complete call added and one rm removed. No loop or I/O added.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: on a host with no jq the lock can no longer be removed, because --complete is gated on jq. CR-2 (advisory): at current_step 8 the Stop hook says Step 8 row is already done, which is false while the lock is at 8 but Step 7 tail or Step 8 report update has not run.'
+  maintainability:
+    status: PASS
+    notes: 'Two population tests (generic Pipeline Progress updates, --complete mentions) and a detector clamp guard replace named-line checks; all mutation-proven.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: move --complete ahead of the jq gate (it removes without parsing) and test it with jq off PATH.'
+      refs: ['shared/resources/advance-pipeline-lock.sh', 'shared/resources/advance-pipeline-lock.test.sh']
+  future:
+    - action: 'CR-2 (advisory, cheap, fix alongside CR-1): make the Stop hook step-8 completion line conditional. If the final report update and the Step 8 commit have run, do push, Cleanup and the checklist; otherwise start Step 8 from its report update. Do not assert the row is already done.'
+      refs: ['shared/resources/develop-pipeline-on-stop.sh']
+    - action: 'CR-3 (cleanup): the commit-changes arm is a no-op but still parses the lock only to print current_step, so a corrupt lock makes it exit 1. Read current_step best-effort, or handle the arm before the jq gate with CR-1.'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 fixed: --complete removes the lock on a host without jq'
