@@ -5,18 +5,20 @@ type: task
 description: "At current_step 8 the Stop hook describes Step 7's tail in develop-story/develop-task terms and asserts 'Step 7/8 ✅ complete' before its own routing; make both skill- and step-aware, drop an unreachable --complete clause, and tighten task.161's no-jq test PATH."
 tags: [develop-pipeline, stop-hook, step-8, develop-bug, follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-09-27
 updated: 2026-09-27
 assignee:
 estimated_effort_hours: 4
 github_issue: 502
+pr_number: 503
+completed_date: 2026-09-27
 ---
 
 # Technical Task: The Stop hook's step-8 reason fits every orchestrator
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.162.review.1.stop-hook-step-8-reason-fits-every-orchestrator.md` implemented 2026-09-27
 
@@ -312,6 +314,33 @@ No critical issues identified. Three LOW advisories (CR-1, CR-2, QA-L1) recorded
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.162.qa.1.stop-hook-step-8-reason-fits-every-orchestrator.md`
+**Gate File**: `task.162.gate.1.stop-hook-step-8-reason-fits-every-orchestrator.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: `task.162.pr-review.1.stop-hook-step-8-reason-fits-every-orchestrator.md` — ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 9/9 — 7 held by per-PR tests; the CHANGELOG and hooks-doc criteria are documentation criteria, verified present and accurate
+✅ **Tests:** 43 hook scenarios, 95 lock scenarios, 88 checklist tests; ci:fast 4331/0; 5 mutation proofs covered/absorbed
+✅ **PR Review:** PR #503 — conformance review APPROVE; CI 5/5 SUCCESS
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed; resume contract; bundled copies regenerated
+✅ **Security Review:** PASS — no boundary, no secrets, reason still JSON-escaped through `jq --arg`
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling
+
+**Task marked as ACCEPTED on:** 2026-09-27
+
+**Detailed Verification Log:** See `task.162.dod.1.stop-hook-step-8-reason-fits-every-orchestrator.md` for complete verification evidence and timestamps.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -321,6 +350,7 @@ No critical issues identified. Three LOW advisories (CR-1, CR-2, QA-L1) recorded
 | 2026-09-27 |         | Status → ready-for-development | review-task |
 | 2026-09-27 |         | Implemented — 8 source files (hook, 3 tests, resume contract, CHANGELOG), 6 new test assertions; bundled copies regenerated | develop |
 | 2026-09-27 |         | QA gate PASS (100/100) — 0 blocking findings, 3 LOW advisories | qa-task |
+| 2026-09-27 | 1.2     | DoD passed — accepted (PR #503) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -368,7 +398,7 @@ No critical issues identified. Three LOW advisories (CR-1, CR-2, QA-L1) recorded
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. (done) `/develop-task docs/tasks/task.162.stop-hook-step-8-reason-fits-every-orchestrator/task.162.stop-hook-step-8-reason-fits-every-orchestrator.md`
