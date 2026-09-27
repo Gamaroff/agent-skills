@@ -1,0 +1,52 @@
+schema: 1
+task: 'task.159.step-8-check-4-reads-the-progress-table'
+task_title: 'Step 8 check 4 reads the Pipeline Progress table, not the whole report'
+gate: PASS
+status_reason: 'All 11 success criteria met: 9 verified by execution, and the observation #200 criterion is post-merge. The 4 new check-4 cases pass under bash and zsh, and each of the 3 branches is mutation-proved covered. The code review raised 3 findings, none high-confidence; all three go to future recommendations.'
+reviewer: 'QA Engineer'
+updated: '2026-09-27T09:55:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 37
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false. Check 4 is a completion predicate over a pipeline-owned implementation report. The report path comes from the lock or the orchestrator, and nothing untrusted reaches it. It lives as a fenced block in prose, not as an importable export or a script entry. The executed-prose harness runs it under bash and zsh against adversarial report shapes: prose tokens outside the table, a Pending row, a Paused row, and no table.'
+  performance:
+    status: PASS
+    notes: 'One awk pass over one file, plus a grep over its captured rows.'
+  reliability:
+    status: PASS
+    notes: 'Check 4 fails closed on a missing table. The paused-and-resumed false failure is removed. Rollback is a revert plus npm run bundle.'
+  maintainability:
+    status: PASS
+    notes: 'The test fixture runs the hook own append block, so a reword of the hook reaches the test. The non-vacuity guard asserts both trap tokens outside the table. The awk braces are spaced and commented so they cannot read as a placeholder.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-3: match the Paused clause without the U+FE0F variation selector (for example `⏸[^|]*Paused`), so a row written as `⏸ Paused` also fails check 4. It is reproduced against task.152 with row 8 set to U+23F8 + " Paused" and passes the new check today. Add a fixture case for it.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md', 'shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - action: 'CR-1 (pre-existing, not introduced here): check 4 does not refuse `❌ Failed`, `⚠️ Needs Attention` or `🔄 In Progress` rows, and the base check did not either. Consider an allowlist, where every step row Status cell must read `✅ Done`, as a follow-up task. The new comment says "no unfinished row", which is narrower in practice than it reads.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'CR-2: base the no-table guard on at least one step row rather than any `|` line, so a header-only section does not satisfy it.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

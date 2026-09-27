@@ -28,6 +28,7 @@ import {
   bind,
   fixtureRepo,
   write,
+  run,
   git,
   gitAsync,
   ghStub,
@@ -87,6 +88,115 @@ function finished(variant) {
   }
   return t;
 }
+
+// ── Check 4 fixtures — a paused-and-resumed report (task 159, obs #200) ──────
+
+const HOOK = "shared/resources/develop-pipeline-on-precompact.sh";
+
+// The pause section, written by EXECUTING the hook's own append block with its inputs bound — so a
+// reword of the hook reaches this fixture instead of leaving a stale copy of its prose here.
+function pauseSection() {
+  const src = readDoc(HOOK);
+  const start = src.indexOf("# Append pause entry to report");
+  assert.ok(start >= 0, "hook no longer carries its pause-append block");
+  const from = src.indexOf("{", start);
+  const to = src.indexOf('>> "$REPORT"', from);
+  assert.ok(from > 0 && to > from, "pause-append block shape changed");
+  // The `{ … }` group only: without its `>> "$REPORT"` redirect it writes to stdout.
+  const block = src.slice(from, src.lastIndexOf("}", to) + 1);
+  const r = run("bash", block, {
+    cwd: ROOT,
+    env: {
+      NOW: "2026-09-26T20:35:00Z",
+      SKILL: "develop-task",
+      BRANCH: "feature/task.9.fx",
+      CURRENT_STEP: "7",
+      PR_URL: "https://example.invalid/pr/1",
+      LOCK_TRACKER: "github",
+      TRACKER_ISSUE: "1",
+    },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout;
+}
+
+// Every table row `✅ Done`; the unfinished-state tokens appear only in prose — a Decisions Log line
+// and the hook's pause section. This is the report task.152 carried into Step 8.
+function pausedAndResumed() {
+  const base = must(
+    finished("Task"),
+    "## Decisions Log\n",
+    "## Decisions Log\n\n- Resumed: Step 7 was `⏳ Pending` at the pause and re-ran from the start.\n",
+  );
+  return base + pauseSection();
+}
+
+// The `|` rows under `## Pipeline Progress`, up to the next `## ` heading.
+function progressRows(text) {
+  const at = text.search(/^## Pipeline Progress\s*$/m);
+  assert.ok(at >= 0, "report has no ## Pipeline Progress heading");
+  const rest = text.slice(at).split("\n").slice(1);
+  const end = rest.findIndex((l) => l.startsWith("## "));
+  return rest
+    .slice(0, end < 0 ? undefined : end)
+    .filter((l) => l.startsWith("|"));
+}
+
+// Set ONE table row's status. `finished()` made every row `✅ Done`, so a global replace would touch
+// all of them: split on the row's own label, and assert both counts.
+function setRow(text, label, state) {
+  const lines = text.split("\n");
+  const hits = lines.flatMap((l, i) => (l.startsWith(`| ${label}`) ? [i] : []));
+  assert.equal(
+    hits.length,
+    1,
+    `expected one "${label}" row, found ${hits.length}`,
+  );
+  const parts = lines[hits[0]].split("✅ Done");
+  assert.equal(
+    parts.length,
+    2,
+    `the "${label}" row does not read ✅ Done once`,
+  );
+  lines[hits[0]] = parts.join(state);
+  return lines.join("\n");
+}
+
+// Write ONE row's Notes cell (the Task variant's fourth column). The cell must be empty first, so a
+// template that moves or fills the column turns the case red instead of silently testing another cell.
+function setNotes(text, label, notes) {
+  const lines = text.split("\n");
+  const hits = lines.flatMap((l, i) => (l.startsWith(`| ${label}`) ? [i] : []));
+  assert.equal(
+    hits.length,
+    1,
+    `expected one "${label}" row, found ${hits.length}`,
+  );
+  const cells = lines[hits[0]].split("|");
+  assert.equal(
+    cells[4].trim(),
+    "",
+    `the "${label}" row's Notes cell is not empty`,
+  );
+  cells[4] = ` ${notes} `;
+  lines[hits[0]] = cells.join("|");
+  return lines.join("\n");
+}
+
+// Remove `## Pipeline Progress` through the line before the next `## ` heading.
+function withoutProgressTable(text) {
+  const lines = text.split("\n");
+  const at = lines.findIndex((l) => /^## Pipeline Progress\s*$/.test(l));
+  assert.ok(at >= 0, "report has no ## Pipeline Progress heading to remove");
+  const next = lines.findIndex((l, i) => i > at && l.startsWith("## "));
+  assert.ok(next > at, "no heading follows ## Pipeline Progress");
+  return [...lines.slice(0, at), ...lines.slice(next)].join("\n");
+}
+
+const CHECK4_UNFINISHED =
+  /❌ Step 8 incomplete: Pipeline Progress still has an unfinished \(⏳ Pending \/ ⏸️ Paused\) row/;
+const CHECK4_NO_TABLE =
+  /❌ Step 8 incomplete: no Pipeline Progress table found/;
 
 // ── The block, from the step document ─────────────────────────────────────────
 
@@ -158,6 +268,29 @@ test("the step document names the general-bug registry as develop-bug's extra sc
   );
 });
 
+// The paused-and-resumed case can only pass for the right reason if the fixture carries the trap:
+// both unfinished-state tokens outside the table, neither inside it.
+test("the paused-and-resumed fixture carries both unfinished tokens outside the table only", () => {
+  const t = pausedAndResumed();
+  const rows = progressRows(t).join("\n");
+  assert.ok(rows.length > 0, "fixture has no Pipeline Progress rows");
+  assert.doesNotMatch(rows, /⏳ Pending|⏸️ Paused/, "the table must be clean");
+  const outside = t.split(rows).join("");
+  assert.ok(
+    outside.includes("⏳ Pending"),
+    "⏳ Pending must appear outside the table",
+  );
+  assert.ok(
+    outside.includes("⏸️ Paused"),
+    "⏸️ Paused must appear outside the table",
+  );
+  assert.match(
+    t,
+    /^## Pipeline Paused — /m,
+    "the hook's pause section is missing",
+  );
+});
+
 // ── check 3 — every template variant, finished, passes ────────────────────────
 
 describe("executed against fixtures", { concurrency: true }, () => {
@@ -215,6 +348,69 @@ describe("executed against fixtures", { concurrency: true }, () => {
         const r = await runChecklist(sh, fx);
         assert.equal(r.status, 1);
         assert.match(r.stdout, /Finished timestamp missing/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // ── check 4 — the Pipeline Progress table, not the whole report ────────────
+
+    test(`[${sh}] a paused-and-resumed report whose table is all ✅ Done passes`, async () => {
+      const fx = await setup(pausedAndResumed());
+      try {
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+        assert.match(r.stdout, /✅ Step 8 post-conditions verified/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // "⏸ Paused" is the paused state WITHOUT its U+FE0F variation selector — emoji output often
+    // drops it, and a literal `⏸️ Paused` pattern never matched it (finalise DoD probe, task.159).
+    for (const state of ["⏳ Pending", "⏸️ Paused", "⏸ Paused"]) {
+      test(`[${sh}] a table row left at ${state} fails check 4`, async () => {
+        const fx = await setup(
+          setRow(finished("Task"), "8. commit-changes", state),
+        );
+        try {
+          const r = await runChecklist(sh, fx);
+          assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+          assert.match(r.stdout, CHECK4_UNFINISHED);
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+    }
+
+    // A Notes cell is prose inside the table: naming a state there is the obs #200 trap moved one
+    // level in, and must not fail a finished row. Check 4 matches the Status CELL, not the token.
+    for (const notes of [
+      "resumed after ⏸️ Paused at compaction",
+      "was ⏳ Pending before the resume",
+    ]) {
+      test(`[${sh}] a ✅ Done row whose Notes read "${notes}" passes check 4`, async () => {
+        const fx = await setup(
+          setNotes(finished("Task"), "7. finalise", notes),
+        );
+        try {
+          const r = await runChecklist(sh, fx);
+          assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+          assert.match(r.stdout, /✅ Step 8 post-conditions verified/);
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+    }
+
+    // Check 3 still passes on this report (Final Status and Finished are set), so the run reaches
+    // check 4 — and the message, not the exit status alone, is what proves it stopped there.
+    test(`[${sh}] a report with no Pipeline Progress table fails check 4`, async () => {
+      const fx = await setup(withoutProgressTable(finished("Task")));
+      try {
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+        assert.match(r.stdout, CHECK4_NO_TABLE);
       } finally {
         cleanup(fx.dir);
       }
