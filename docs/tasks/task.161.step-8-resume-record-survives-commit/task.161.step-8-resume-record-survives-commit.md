@@ -356,12 +356,12 @@ None identified.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-27
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.161.qa.2.step-8-resume-record-survives-commit.md](./task.161.qa.2.step-8-resume-record-survives-commit.md)
-- **Gate File**: [task.161.gate.2.step-8-resume-record-survives-commit.yml](./task.161.gate.2.step-8-resume-record-survives-commit.yml)
+- **Full Report**: [task.161.qa.3.step-8-resume-record-survives-commit.md](./task.161.qa.3.step-8-resume-record-survives-commit.md)
+- **Gate File**: [task.161.gate.3.step-8-resume-record-survives-commit.yml](./task.161.gate.3.step-8-resume-record-survives-commit.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 4332
@@ -370,7 +370,9 @@ None identified.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's fixes hold. CR-1 (medium): the conditional Stop-hook step-8 line sends a stall during Step 7's tail to Step 8's report update, which ticks row 7 without the tail running. Advisory: CR-2 (the hook's fixed text at step 8 still says invoke `/commit-changes` and advance the lock yourself), and CR-3/CR-4 (test hygiene).
+No gating finding: the gate queue is empty. The reliability concerns are advisory:
+- CR-2: the Stop hook's step-8 line describes Step 7's tail in develop-task terms; for develop-bug that tail is the bug-close routine.
+- CR-1: pre-existing, identical on `origin/develop`. The status block at lock 8 reads "Step 7/8 ✅ complete".
 
 ---
 
@@ -413,6 +415,7 @@ Cycle 1's fixes hold. CR-1 (medium): the conditional Stop-hook step-8 line sends
 | 2026-09-27 |  | QA findings fixed — CR-1 (`--complete` and the no-op `commit-changes` arm run before the `jq` gate), CR-2 (the Stop hook's step-8 line is conditional), CR-3 (the no-op arm no longer parses the lock); 4 new tests; 1 iteration | qa-fix |
 | 2026-09-27 |  | QA gate CONCERNS (80/100) — 1 finding (CR-1, medium) | qa-task |
 | 2026-09-27 |  | QA findings fixed — CR-1 (at step 8 the Stop hook follows the resume contract's step-8 rule, so an unfinished Step 7 is finished first), CR-2 (at step 8 the hook sends the orchestrator to the whole step-8 doc and never tells it to run `--complete`), CR-3/CR-4 (test hygiene); 5 new or tightened assertions; 2 iterations total | qa-fix |
+| 2026-09-27 |  | QA gate CONCERNS (90/100) — 0 gated findings, 2 advisory, 1 pre-existing | qa-task |
 <!-- change-log-end -->
 
 ---
