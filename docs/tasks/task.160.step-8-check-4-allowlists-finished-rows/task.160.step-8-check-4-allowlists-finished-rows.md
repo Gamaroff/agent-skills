@@ -334,24 +334,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-27
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.160.qa.5.step-8-check-4-allowlists-finished-rows.md](./task.160.qa.5.step-8-check-4-allowlists-finished-rows.md)
-- **Gate File**: [task.160.gate.5.step-8-check-4-allowlists-finished-rows.yml](./task.160.gate.5.step-8-check-4-allowlists-finished-rows.yml)
+- **Full Report**: [task.160.qa.6.step-8-check-4-allowlists-finished-rows.md](./task.160.qa.6.step-8-check-4-allowlists-finished-rows.md)
+- **Gate File**: [task.160.gate.6.step-8-check-4-allowlists-finished-rows.yml](./task.160.gate.6.step-8-check-4-allowlists-finished-rows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 78
+- **Tests Executed**: 80
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 4's findings are fixed. There are two new medium findings. The step-8 resume rule can skip an unfinished Step 7, because /finalise moves the lock to 8 before Step 7's remaining work is done (CR5-1). The rule does not name a surviving lock (CR5-2). There are also two low wording findings (CR5-3, CR5-4). Check 4 remains measured correct.
+Cycle 5's four findings are fixed. The step-8 resume rule now overrides only the Step 8 row: an unfinished Step 7 still wins, and a surviving lock counts. Two low advisory items (CR6-1, CR6-2) and the pre-existing post-commit resume gap (follow-up task.161) are in recommendations.future. Check 4 remains measured correct (probe 21/21).
 
 ---
 
@@ -376,6 +376,7 @@ Cycle 4's findings are fixed. There are two new medium findings. The step-8 resu
 | 2026-09-27 |         | QA findings fixed — CR4-1 (Step 8 claim scoped: the record ends at the Step 8 commit; the older post-commit gap is named), CR4-2 (recovery exception in 3 orchestrators), CR4-3 (test runs the real lock helper and Cleanup); 4 iterations total | qa-fix |
 | 2026-09-27 |         | QA gate CONCERNS (90/100) — 4 findings (CR5-1, CR5-2 medium; CR5-3, CR5-4 low) | qa-task |
 | 2026-09-27 |         | QA findings fixed — CR5-1 (the step-8 rule overrides only the Step 8 row; an unfinished Step 7 still wins), CR5-2 (surviving lock named), CR5-3 (lint-failed HALT keeps its record), CR5-4 (step-0 points at the rule); 5 iterations total | qa-fix |
+| 2026-09-27 |         | QA gate PASS (100/100) — 0 open findings; 2 advisory (CR6-1 low, CR6-2 cleanup) | qa-task |
 
 <!-- change-log-end -->
 
