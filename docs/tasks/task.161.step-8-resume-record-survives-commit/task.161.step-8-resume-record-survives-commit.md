@@ -5,7 +5,7 @@ type: task
 description: "/commit-changes removes the pipeline lock at the Step 8 commit, so a pause, crash or HALT during Step 8's push, Cleanup or Completion Checklist leaves no resume record, and a Step 8 HALT writes no snapshot. Keep the lock until the checklist passes, make the resume detector recommend step 8 for a record at step 8, and fix two orchestrator restatements that task.160's review found."
 tags: [develop-pipeline, step-8, resume, pipeline-lock, follow-up]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-09-27
 updated: 2026-09-27
@@ -16,7 +16,9 @@ github_issue: 500
 
 # Technical Task: Step 8 keeps its resume record until the Completion Checklist passes
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.161.review.1.step-8-resume-record-survives-commit.md` implemented 2026-09-27
 
 **GitHub Issue**: [#500](https://github.com/Gamaroff/agent-skills/issues/500)
 
@@ -125,7 +127,9 @@ Step 8 target (lock timeline)
 ✅ `shared/resources/develop-pipeline-step-8-commit.md`: Cleanup no longer removes the lock; the checklist runs checks 2–5, then `--complete`, then check 1; the "What the record covers" paragraph is rewritten to cover the whole step; the "What it does not cover" paragraph is deleted
 ✅ `skills/commit-changes/SKILL.md` § Pipeline Lock Cooperation and `shared/resources/pipeline-lock-cooperation.md`: the step-8 removal is described as `--complete`'s
 ✅ `shared/resources/pipeline-resume-detector-prompt.md`: `recommended_step` is 8 for a record at step 8, in both the Step 3 rules and the summary table
-✅ `skills/develop-{task,story,bug}/SKILL.md`: CR-1 (the generic post-step Pipeline Progress line); CR-2 (the order of the recovery exception); the step-8 exception reduced to what the detector no longer covers
+✅ `skills/develop-{task,story,bug}/SKILL.md`: CR-1 (the generic post-step Pipeline Progress line); CR-2 (the order of the recovery exception); the step-8 exception reduced to what the detector no longer covers; both `--complete` restatements (the Step Transition Protocol's action 1 and the "For Step 8 → completion" line in the lock-update paragraph) (review I-4)
+✅ `shared/resources/develop-pipeline-on-stop.sh`: at `current_step` 8, the completion line names the Completion Checklist ("Only once Step 8's Completion Checklist has passed: `--complete`"), not `/commit-changes` returning; a case in `develop-pipeline-on-stop.test.sh` (review I-1)
+✅ `shared/resources/develop-pipeline-hooks.md`: the Stop hook's trigger condition and escape-valve table say it guards `current_step` 8, matching the script's `-gt 8` (review I-2)
 ✅ `shared/resources/develop-pipeline-resume-contract.md` Phase 0b: the sentence naming the post-commit gap is removed; the step-8 rule's `LOCK_STEP + 1` aside is removed
 ✅ Tests in `shared/resources/advance-pipeline-lock.test.sh` and `shared/resources/tests/step-8-completion-checklist.test.mjs`; a CHANGELOG `[Unreleased]` entry citing (task 161)
 
@@ -154,12 +158,15 @@ None to any public interface. One behaviour changes: the pipeline lock now outli
 
 **Files**: `shared/resources/advance-pipeline-lock.sh`, `shared/resources/advance-pipeline-lock.test.sh`, `shared/resources/develop-pipeline-step-8-commit.md`, `shared/resources/pipeline-lock-cooperation.md`, `skills/commit-changes/SKILL.md`
 
-- [ ] Population check first. List every reader of `develop-pipeline.lock` presence or absence (`grep -rln develop-pipeline.lock skills/*/SKILL.md skills/*/scripts shared/resources`) and record, in the plan, what each does when the lock lives until `--complete`. Proceed only when none reads "lock absent" as "Step 8's checklist passed"
-- [ ] `commit-changes)` arm: at `current_step` ≥ 8, leave the lock in place. It no-ops at every step. Update the arm's comment and the file's header usage
-- [ ] Step 8 doc § Cleanup Transient State: drop `rm -f .claude/state/develop-pipeline.lock`, and keep the log and this-run snapshot sweeps
-- [ ] Step 8 doc § Step 8 Completion Checklist: run checks 2, 2b, 3, 4 and 5; on pass, `advance-pipeline-lock.sh --complete`; then check 1 (lock absent). The "BLOCKING" semantics are unchanged: a failed check exits before `--complete`, so the lock survives for resume
-- [ ] Step 8 doc § Final Implementation Report Update: rewrite "What the record covers" so the record spans Step 8 from `/finalise`'s advance to the checklist pass, and delete "What it does not cover". Rewrite the Step Transition Protocol's `--complete` mention in the three SKILL.md files as a no-op after Step 8, since Step 8 already called it
-- [ ] `skills/commit-changes/SKILL.md` and `pipeline-lock-cooperation.md`: at step 8 the cooperation call is a no-op, and `--complete` ends the run
+- [x] Population check first. List every reader of `develop-pipeline.lock` presence or absence (`grep -rln develop-pipeline.lock skills/*/SKILL.md skills/*/scripts shared/resources`) and record, in the implementation report, what each does when the lock lives until `--complete`. Proceed only when none reads "lock absent" as "Step 8's checklist passed"
+- [x] `commit-changes)` arm: at `current_step` ≥ 8, leave the lock in place. It no-ops at every step. Update the arm's comment and the file's header usage
+- [x] Step 8 doc § Cleanup Transient State: drop `rm -f .claude/state/develop-pipeline.lock`, and keep the log and this-run snapshot sweeps
+- [x] Step 8 doc § Step 8 Completion Checklist: run checks 2, 2b, 3, 4 and 5; on pass, `advance-pipeline-lock.sh --complete`; then check 1 (lock absent). The "BLOCKING" semantics are unchanged: a failed check exits before `--complete`, so the lock survives for resume
+- [x] Step 8 doc § Final Implementation Report Update: rewrite "What the record covers" so the record spans Step 8 from `/finalise`'s advance to the checklist pass, and delete "What it does not cover". Rewrite the Step Transition Protocol's `--complete` mention in the three SKILL.md files as a no-op after Step 8, since Step 8 already called it
+- [x] `skills/commit-changes/SKILL.md` and `pipeline-lock-cooperation.md`: at step 8 the cooperation call is a no-op, and `--complete` ends the run
+- [x] The "For Step 8 → completion: `... advance-pipeline-lock.sh --complete`" line in each orchestrator's lock-update paragraph says Step 8 already ran `--complete` after its checklist (review I-4)
+- [x] `develop-pipeline-on-stop.sh`: at `current_step` 8 the completion line reads "Only once Step 8's Completion Checklist has passed", never "once commit-changes has completed"; `develop-pipeline-on-stop.test.sh` asserts it. `develop-pipeline-hooks.md`: correct the `[1, 7]` trigger condition and the `current_step >= 8` escape valve (review I-1, I-2)
+- [x] Update, don't add: the tests that pin the old lifetime — `advance-pipeline-lock.test.sh` Scenario 4 ("terminal commit-changes at step 8 removes lock") is inverted; in `step-8-completion-checklist.test.mjs`, "the step document names the resume record, not the row or git, as Step 8's evidence" drops its `What it does not cover` and `A HALT whose report fails lint skips that commit` assertions, and "[sh] the Step 8 commit ends the record and Cleanup removes this run's snapshot" is inverted (review I-3)
 
 ### Phase 2: A Step 8 HALT is resumable
 
@@ -167,9 +174,9 @@ None to any public interface. One behaviour changes: the pipeline lock now outli
 
 **Files**: `shared/resources/tests/step-8-completion-checklist.test.mjs`, `shared/resources/develop-pipeline-step-8-commit.md`
 
-- [ ] Executed test: set up a lock at step 8, run the real commit-changes cooperation call, then the HALT rule's snapshot block verbatim, cut from `skills/develop-task/SKILL.md`. Assert a snapshot exists with `halt_step` = 8 and the lock is gone. Under bash and zsh
-- [ ] Executed test: a failing checklist check (for example an unfinished row) exits before `--complete`, and the lock survives at 8
-- [ ] Executed test: a lock at step 8 restored from that snapshot by `advance-pipeline-lock.sh --restore` reads `current_step` 8
+- [x] Executed test: set up a lock at step 8, run the real commit-changes cooperation call, then the HALT rule's snapshot block verbatim, cut from `skills/develop-task/SKILL.md`. Assert a snapshot exists with `halt_step` = 8 and the lock is gone. Under bash and zsh
+- [x] Executed test: a failing checklist check (for example an unfinished row) exits before `--complete`, and the lock survives at 8
+- [x] Executed test: a lock at step 8 restored from that snapshot by `advance-pipeline-lock.sh --restore` reads `current_step` 8
 
 ### Phase 3: Resume names step 8, and the orchestrators say so once
 
@@ -177,23 +184,25 @@ None to any public interface. One behaviour changes: the pipeline lock now outli
 
 **Files**: `shared/resources/pipeline-resume-detector-prompt.md`, `shared/resources/develop-pipeline-resume-contract.md`, `skills/develop-{task,story,bug}/SKILL.md`, `shared/resources/tests/step-8-completion-checklist.test.mjs`
 
-- [ ] Detector: when `LOCK_STEP` is 8, `recommended_step` is 8, in Step 3's rules and in the summary table. The schema's (1–8) now holds for every row
-- [ ] Resume contract Phase 0b: delete the "(the detector's `LOCK_STEP + 1` would name a step 9 …)" aside and the post-commit-gap sentences
-- [ ] CR-2: in each orchestrator's Context Compression Recovery, state the step-8 exception before items 2–3, or have items 2–3 defer to it. With the detector fixed, the exception reduces to "an unfinished row at or below Step 7 still wins"
-- [ ] CR-1: give each "After each step: update the Pipeline Progress table" line (develop-task, develop-story, develop-bug) the Step 8 exception, or a pointer to action 2
-- [ ] Enumerating test (CR-1's missing population check): scan `skills/develop-*/SKILL.md` and `shared/resources/develop-pipeline-*.md` for every instruction that updates the Pipeline Progress table. The pattern and its exclusions are recorded in the test. Assert each carries the Step 8 exception or a pointer to action 2. Non-vacuity floor: the scan finds at least the three known lines
+- [x] Detector: when `LOCK_STEP` is 8, `recommended_step` is 8, in Step 3's rules and in the summary table. The schema's (1–8) now holds for every row
+- [x] Resume contract Phase 0b: delete the "(the detector's `LOCK_STEP + 1` would name a step 9 …)" aside and the post-commit-gap sentences
+- [x] CR-2: in each orchestrator's Context Compression Recovery, state the step-8 exception before items 2–3, or have items 2–3 defer to it. With the detector fixed, the exception reduces to "an unfinished row at or below Step 7 still wins"
+- [x] CR-1: give each "After each step: update the Pipeline Progress table" line (develop-task, develop-story, develop-bug) the Step 8 exception, or a pointer to action 2
+- [x] Enumerating test (CR-1's missing population check): scan `skills/develop-*/SKILL.md` and `shared/resources/develop-pipeline-*.md` for every instruction that updates the Pipeline Progress table. The pattern and its exclusions are recorded in the test. Assert each carries the Step 8 exception or a pointer to action 2. Non-vacuity floor: the scan finds at least the three known lines
+- [x] The same test, or a sibling, enumerates every orchestrator instruction that runs `--complete` after Step 8 and asserts each says Step 8 already ran it. Floor: 2 sites in each of the 3 orchestrators (review I-5)
 
 ### Phase 4: Proof and gates
 
 **Risk**: Low.
 
-- [ ] Mutation-prove each branch under bash, with `cp` snapshots of a real array and restore checked with `cmp`:
+- [x] Mutation-prove each branch under bash, with `cp` snapshots of a real array and restore checked with `cmp`:
   - restore the `rm -f "$LOCK"` in the `commit-changes` arm (Phase 1 lock-survives test red)
   - move `--complete` before check 4 (failing-checklist test red)
   - restore `LOCK_STEP + 1` for step 8 (detector prose guard red)
   - drop one orchestrator's Step 8 exception (enumerating test red)
-- [ ] `npm run bundle`; then `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell`, `npm run bundle:check`, `npm run check:generated`, and `npm run validate -- skills/<skill>/` for commit-changes and develop-{task,story,bug}
-- [ ] CHANGELOG `[Unreleased]` entry citing (task 161)
+  - restore the Stop hook's "once commit-changes has completed" line at step 8 (`develop-pipeline-on-stop.test.sh` red)
+- [x] `npm run bundle`; then `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell`, `npm run bundle:check`, `npm run check:generated`, and `npm run validate -- skills/<skill>/` for commit-changes and develop-{task,story,bug}
+- [x] CHANGELOG `[Unreleased]` entry citing (task 161)
 
 ---
 
@@ -207,11 +216,15 @@ None to any public interface. One behaviour changes: the pipeline lock now outli
 4. ✅ `shared/resources/pipeline-resume-detector-prompt.md`: `recommended_step` 8 for a record at step 8
 5. ✅ `shared/resources/develop-pipeline-resume-contract.md`: gap and step-9 asides removed
 6. ✅ `skills/commit-changes/SKILL.md`: Pipeline Lock Cooperation prose
-7. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md`: CR-1, CR-2, the Step Transition Protocol's `--complete` note
+7. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md`: CR-1, CR-2, both `--complete` restatements
+7a. ✅ `shared/resources/develop-pipeline-on-stop.sh`: the step-8 completion line names the checklist
+7b. ✅ `shared/resources/develop-pipeline-hooks.md`: the Stop hook guards step 8
 
 ### Files to Modify (Tests)
 
-8. ✅ `shared/resources/advance-pipeline-lock.test.sh`: the `commit-changes` arm at step 8 leaves the lock
+8. ✅ `shared/resources/advance-pipeline-lock.test.sh`: Scenario 4 inverted — the `commit-changes` arm at step 8 leaves the lock
+8a. ✅ `shared/resources/develop-pipeline-on-stop.test.sh`: the step-8 reason names the Completion Checklist
+8b. ✅ `shared/resources/tests/halt-snippet-glob-safe.test.mjs`: F1–F4 locate Cleanup by its snapshot sweep, not its lock `rm`, and F1 asserts Cleanup leaves the lock (found by `ci:fast`, not the review)
 9. ✅ `shared/resources/tests/step-8-completion-checklist.test.mjs`: lock lifecycle through the checklist, Step 8 HALT snapshot, restore, detector guard, enumerating CR-1 test
 
 ### Files to Modify (Dependencies)
@@ -261,28 +274,30 @@ Not applicable. No loop or I/O is added.
 
 ### Functional
 
-- [ ] `advance-pipeline-lock.sh --skill commit-changes` on a lock at `current_step` 8 exits 0 and leaves the lock in place (Phase 1 changes the arm)
-- [ ] The Step 8 checklist, run on a correct fixture, removes the lock only through `--complete` after checks 2–5 pass. Check 1 then passes (Phase 1)
-- [ ] A Step 8 checklist that fails (an unfinished row) exits before `--complete`, and the lock remains at `current_step` 8 (Phase 1)
-- [ ] The HALT rule's snapshot block, run at step 8 after the commit-changes cooperation call, writes a snapshot with `halt_step` 8 under bash and zsh (Phase 2 test; the behaviour comes from Phase 1)
-- [ ] The detector prompt states `recommended_step` 8 for a record at step 8, and no row of its summary table can yield 9 (Phase 3)
-- [ ] Every post-step Pipeline Progress instruction in `skills/develop-*/SKILL.md` and `shared/resources/develop-pipeline-*.md` carries the Step 8 exception (Phase 3 enumerating test, with a floor of 3)
-- [ ] Context Compression Recovery in all three orchestrators states the step-8 exception before the items it overrides (Phase 3)
+- [x] `advance-pipeline-lock.sh --skill commit-changes` on a lock at `current_step` 8 exits 0 and leaves the lock in place (Phase 1 changes the arm)
+- [x] The Step 8 checklist, run on a correct fixture, removes the lock only through `--complete` after checks 2–5 pass. Check 1 then passes (Phase 1)
+- [x] A Step 8 checklist that fails (an unfinished row) exits before `--complete`, and the lock remains at `current_step` 8 (Phase 1)
+- [x] The HALT rule's snapshot block, run at step 8 after the commit-changes cooperation call, writes a snapshot with `halt_step` 8 under bash and zsh (Phase 2 test; the behaviour comes from Phase 1)
+- [x] The detector prompt states `recommended_step` 8 for a record at step 8, and no row of its summary table can yield 9 (Phase 3)
+- [x] Every post-step Pipeline Progress instruction in `skills/develop-*/SKILL.md` and `shared/resources/develop-pipeline-*.md` carries the Step 8 exception (Phase 3 enumerating test, with a floor of 3)
+- [x] Context Compression Recovery in all three orchestrators states the step-8 exception before the items it overrides (Phase 3)
+- [x] The Stop hook's reason at `current_step` 8 names the Completion Checklist as Step 8's completion, and `develop-pipeline-hooks.md` says the hook guards step 8 (Phase 1)
+- [x] Every orchestrator instruction that runs `--complete` after Step 8 says Step 8 already ran it (Phase 3 enumerating test, floor 6)
 
 ### Performance
 
-- [ ] No measurable change. Step 8 gains one `--complete` call and loses one `rm -f`
+- [x] No measurable change. Step 8 gains one `--complete` call and loses one `rm -f`
 
 ### Code Quality
 
-- [ ] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell`, `bundle:check` and `check:generated` pass
-- [ ] `npm run validate -- skills/<skill>/` passes for commit-changes and develop-{task,story,bug}
-- [ ] Each Phase 4 mutation is proven red under bash, with restore checked by `cmp`
+- [x] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell`, `bundle:check` and `check:generated` pass
+- [x] `npm run validate -- skills/<skill>/` passes for commit-changes and develop-{task,story,bug}
+- [x] Each Phase 4 mutation is proven red under bash, with restore checked by `cmp`
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry cites (task 161) and names the new lock lifetime
-- [ ] The step-8 doc no longer names the post-commit window as a known gap
+- [x] CHANGELOG `[Unreleased]` entry cites (task 161) and names the new lock lifetime
+- [x] The step-8 doc no longer names the post-commit window as a known gap
 
 ---
 
@@ -336,11 +351,41 @@ None identified.
 
 ---
 
+## Implementation Summary
+
+**Completed**: 2026-09-27
+
+**Approach.** One move, as planned. `advance-pipeline-lock.sh --skill commit-changes` removes nothing at any step. Step 8's Completion Checklist runs checks 2–5, then `--complete`, then check 1. Cleanup leaves the lock. Everything else follows from that. The review added two items:
+
+- The Stop hook's step-8 reason now names the checklist as the end of the step, not `/commit-changes` returning.
+- `develop-pipeline-hooks.md` now says the hook guards step 8, as the script always has.
+
+**Testing results.**
+
+- `ci:fast`, with `.agents/skills` moved aside: 4331 pass, 0 fail.
+- `lint:shell`, `bundle:check` and `check:generated` pass.
+- `validate` passes for commit-changes and develop-{task,story,bug}.
+- New executed cases, under bash and zsh:
+  - a passing checklist removes the lock through `--complete`;
+  - a failing checklist keeps it at 8;
+  - a HALT after the Step 8 commit snapshots `halt_step` 8, and `--restore` reads 8.
+- New prose guards: the detector clamp, and two enumerating population tests (generic Pipeline Progress updates; `--complete` mentions).
+- Five mutation proofs, all red under bash and restored by `cmp` (see the implementation report).
+
+**Deviations.** One test the plan did not name also pinned the old Cleanup. `halt-snippet-glob-safe.test.mjs` F1–F4 found the Cleanup block by its lock `rm`, and F1 asserted the lock was gone. They are updated (observation #203).
+
+**Deferred work.** task.160 CR6-1 and CR6-2, as listed under Out of Scope.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-27 | 1.0     | Initial draft | create-task |
+| 2026-09-27 | 1.1 | Review passed (8/10) — added the Stop hook's step-8 reason, the hooks reference, the "For Step 8 → completion" restatements and the three tests that pin the old lock lifetime to scope | review-task |
+| 2026-09-27 |  | Status → ready-for-development | review-task |
+| 2026-09-27 |  | Implemented — 16 source files plus 47 regenerated bundled copies; 4 test files changed; ci:fast 4331 pass / 0 fail | develop |
 <!-- change-log-end -->
 
 ---
@@ -348,24 +393,24 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: The lock survives the Step 8 commit
-- [ ] Population check recorded
-- [ ] `commit-changes` arm no-ops at step 8
-- [ ] Cleanup and checklist reordered; `--complete` after checks 2–5
-- [ ] Record paragraphs rewritten; commit-changes prose updated
+- [x] Population check recorded
+- [x] `commit-changes` arm no-ops at step 8
+- [x] Cleanup and checklist reordered; `--complete` after checks 2–5
+- [x] Record paragraphs rewritten; commit-changes prose updated
 
 ### Phase 2: A Step 8 HALT is resumable
-- [ ] HALT-at-8 snapshot test
-- [ ] Failing-checklist keeps-lock test
-- [ ] Restore test
+- [x] HALT-at-8 snapshot test
+- [x] Failing-checklist keeps-lock test
+- [x] Restore test
 
 ### Phase 3: Resume names step 8
-- [ ] Detector clamp
-- [ ] Resume contract asides removed
-- [ ] CR-2 order; CR-1 lines; enumerating test
+- [x] Detector clamp
+- [x] Resume contract asides removed
+- [x] CR-2 order; CR-1 lines; enumerating test
 
 ### Phase 4: Proof and gates
-- [ ] Mutation proofs
-- [ ] Gates and CHANGELOG
+- [x] Mutation proofs
+- [x] Gates and CHANGELOG
 
 ---
 
@@ -391,7 +436,7 @@ None identified.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.161.step-8-resume-record-survives-commit/task.161.step-8-resume-record-survives-commit.md`
