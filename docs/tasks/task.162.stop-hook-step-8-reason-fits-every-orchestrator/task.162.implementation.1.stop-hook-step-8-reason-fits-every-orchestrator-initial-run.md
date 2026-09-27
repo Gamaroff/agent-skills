@@ -3,7 +3,7 @@
 **Task**: `task.162.stop-hook-step-8-reason-fits-every-orchestrator.md`
 **Run Number**: 1
 **Started**: 2026-09-27 22:16
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -34,10 +34,10 @@ Make the Stop hook's step-8 reason skill- and step-aware (develop-bug Part B tai
 | 1. create-branch           | ✅ Done    | Branch `feature/task.162.*` exists in git                             | Branch created at `627cebcf` | —                    |
 | 2. review-task             | ✅ Done    | `task.162.review.{N}.{name}.md` exists (or skip logged)               | review.1 — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | inline (plan + surface map); 11/11; ci:fast green | `.summaries/step-3-loop-audit-1.json` |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.162.qa.{N}.*.md`; `task.162.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.162.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #503: https://github.com/Gamaroff/agent-skills/pull/503 | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.162.qa.{N}.*.md`; `task.162.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle, gate.1 PASS 100, PR review APPROVE | —                    |
+| 7. finalise                | ✅ Done    | `task.162.dod.{N}.*.md`; task `status: accepted`                      | dod.1 ACCEPTED; CI reading 2 SUCCESS @ a3bddfab; #502 closed | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | report committed + pushed; Completion Checklist | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -87,6 +87,40 @@ Make the Stop hook's step-8 reason skill- and step-aware (develop-bug Part B tai
 - Task status → Ready for Review; Change Log `develop` row written (inline path writes it instead of /develop)
 - Loop audit iter 1: `ready-for-review`, 11/11 → loop exit. Development completion comment posted to github issue 502
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS (13): the work-item dir, `CHANGELOG.md`, `shared/resources`, `shared/resources/tests`, and `references/` of develop-bug, develop-story, develop-task, qa-fix, qa-story, qa-task, review-pr, review-story, review-task. Pre-flight guard held 0 files
+- /commit-changes (scope mode) made two commits: `adf0cd11` fix(task.162) — hook, tests, resume contract, bundled copies, CHANGELOG; `454b0810` docs(task.162) — review report, task doc, this report (first commit of the report, per Step 4)
+- Leak check over both commits: OK
+- PR created: https://github.com/Gamaroff/agent-skills/pull/503 (base `develop`, `Closes #502`). PR body written from the diff directly rather than by the summariser subagent — the diff was already fully in context
+- Issue #502 in-review comment: posted. GitHub board: in-review → stage-disabled (the ladder does not fire this moment on this board)
+- Post-PR state check: PR #503 state = OPEN (read with `gh pr view` rather than the poller subagent). errors = 0
+- Lock `pr_url` set; lock at 5
+
+### Steps 5–6 — QA loop
+
+- Jira in-qa: n/a (TRACKER=github). GitHub board: QA-start re-assert → stage-disabled
+- Traceability mapper skipped: Success Criteria is a checklist, not a table (HAS_SUCCESS_CRITERIA_TABLE=false)
+- Step 5c `/review-pr --effort medium --comment`: ✅ APPROVE — report `task.162.pr-review.1.stop-hook-step-8-reason-fits-every-orchestrator.md`; 5 LOW findings (PC-1 resume contract not in the task's In Scope/Files Summary; CR-1 develop-bug tail omits Part B's Step 7 Completion Checklist; CR-2 step-8 "steps still ahead" clause; CR-3 no hook floor in the population test), none blocking. PR comment posted. GitHub board: ready-for-merge → stage-disabled
+- Cycle 1 `/qa-task code_review_blocking=true`: gate.1 PASS 100/100; code review 0 bugs / 2 cleanups; Step 4b 0 findings on the resume contract; mutation proofs re-run on the committed state (5 covered/absorbed, 1 `no-red-untested` recorded as QA-L1)
+
+### Step 7 — finalise
+
+- `/finalise` invoked (task mode). Four DoD agents in parallel: AC PARTIAL 7/9, security PASS (boundary: false), compliance NOT_APPLICABLE, docs PASS
+- **Decision — AC8/AC9 override.** The AC agent marked the CHANGELOG criterion and the hooks-doc-agrees criterion FAIL only because no per-PR test cites them; both artefacts exist and are accurate, the docs agent rated both PASS, and AC8 is guarded post-merge by `evals/shared/tests/changelog-entry-drift.test.mjs`. Overridden to PASS and recorded in the DoD file, as task.161 did for its AC14
+- DoD summary: docs/tasks/task.162.stop-hook-step-8-reason-fits-every-orchestrator/task.162.dod.1.stop-hook-step-8-reason-fits-every-orchestrator.md
+- CI reading 1: SUCCESS @ dbcc2e7a9e9b (5/5 checks; PR head at the decision — local HEAD db1f171e carried only the docs-only PR review report, pushed with the acceptance commit); CI reading 2: SUCCESS @ a3bddfabb58b over 5 checks after 150s (background poll)
+- Acceptance commit `a3bddfab` (document, DoD, sprint review, registry ticked) pushed; tracked-and-on-origin assertions passed; PR head matched
+- 6d CHANGELOG citation: `(task 162)` present under `[Unreleased]`
+- Canonical PR comment posted: https://github.com/Gamaroff/agent-skills/pull/503#issuecomment-5859649995
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/503#issuecomment-5859653476
+- Tracker #502: Document link already on `develop`; `done` comment posted (the orchestrator's own done call returned `already`); close performed
+- Post-close state check: issue #502 state = CLOSED (read with `gh issue view`, not the poller subagent). errors = 0
+- GitHub Issue #502 — close: CLOSED ✅
+- GitHub Issue #502 — board: done → already
+- Accept gap: tracker-actions journal empty — no handover artifacts; tracker debt none
+- Task completed
+
 ---
 
 ## Issues Log
@@ -99,14 +133,26 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-09-27
+**Gate Result**: PASS
+**Issues Found**: none blocking — 3 LOW advisories in `recommendations.future` (CR-1 develop-bug tail omits Part B's Step 7 Completion Checklist; CR-2 4b guard skips a missing tool silently; QA-L1 resume-contract tail wording unpinned)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Completion Summary**: Implemented the task as planned. At lock 8 the Stop hook now names develop-bug's Part B bug-close routine for a develop-bug run and keeps the DoD-body tail for story/task; the status position reads `Step 8/8 — COMMIT CHANGES ⏳ pending (Step 7 unverified: check its row first)` instead of "Step 7/8 ✅ complete"; the unreachable generic `--complete` clause is gone; the `--complete` population test now covers the hook script (comments reworded, no exemption); scenario 4b's no-jq PATH links only `rm` and `dirname`. One QA cycle (gate.1 PASS 100) and one PR conformance review (APPROVE). Notable decisions: the resume contract's step-8 paragraph was given the same skill-aware description (rule unchanged), found by the pre-develop surface map; AC8/AC9 were accepted as documentation criteria by recorded override. Five LOW advisories remain as follow-ups (CR-1 develop-bug tail omits Part B's Step 7 Completion Checklist; PC-1; CR-2; CR-3; QA-L1).
+
+
+**Finished**: 2026-09-27 22:42
+**Final Status**: Completed
 **Branch**: feature/task.162.stop-hook-step-8-reason-fits-every-orchestrator
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/503
+**QA Iterations**: 1 (gate.1 PASS 100/100; PR review APPROVE)
+**DoD Summary**: docs/tasks/task.162.stop-hook-step-8-reason-fits-every-orchestrator/task.162.dod.1.stop-hook-step-8-reason-fits-every-orchestrator.md
+**Tracker debt**: none
