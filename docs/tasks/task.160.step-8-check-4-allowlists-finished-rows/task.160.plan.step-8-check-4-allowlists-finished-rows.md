@@ -61,7 +61,7 @@ Run the file. Every new case except the finished-shapes case is red on today's c
 
 **File**: `shared/resources/develop-pipeline-step-8-commit.md`, in the `## Step 8 Completion Checklist` block, from `# 4. The Pipeline Progress TABLE has no unfinished row` through the `unfinished (⏳ Pending / ⏸️ Paused) row` line.
 
-Replace with the task's § 3 Target Architecture block. Keep the comment explaining the spaced awk braces from task.159. The prototype was run during authoring against every committed report whose `**Final Status**` reads Completed or Accepted, 123 reports, under bash and zsh:
+Replace with the task's § 3 Target Architecture block. Keep the comment explaining the spaced awk braces from task.159. Keep its `!col { next }` rule and the `|| { … exit 1; }` on the `UNFINISHED` assignment, and say why in the block's comment: without the rule, BSD awk aborts on `$col` when no header cell is `Status`, and without the `||` that abort reads as a pass (review.1). The prototype was run during authoring against every committed report whose `**Final Status**` reads Completed or Accepted, 123 reports, under bash and zsh:
 
 ```bash
 for f in $(git ls-files '*.implementation.*.md'); do
@@ -78,7 +78,7 @@ Then `npm run bundle` and `npm run bundle:check`.
 
 Same file, three edits:
 
-1. **§ Final Implementation Report Update**: the bullet "Ensure the Pipeline Progress table shows ✅ for all steps" becomes "…for all steps, **including Step 8's own row**. Nothing in the report is edited after `/commit-changes`: check 5 requires a clean tree, and check 4 requires every row finished."
+1. **§ Final Implementation Report Update**: the bullet "Ensure the Pipeline Progress table shows ✅ for all steps" becomes "…for all steps, **including Step 8's own row** (written `✅ Done`, the value the Step Transition Protocol's action 2 writes afterwards, so that edit is a no-op). Nothing in the report is edited after `/commit-changes`: check 5 requires a clean tree, and check 4 requires every row finished."
 2. **§ Invoke /commit-changes**: remove "Update the Pipeline Progress Notes for Step 8: `Committed in {hash}` …". Replace it with one sentence: the hash goes in the orchestrator's Phase 2 completion output, and `git log` is the record, because a commit cannot record its own hash without a further commit.
 3. **§ Final Push**: remove "Update Pipeline Progress: ✅ commit-changes."
 
@@ -97,6 +97,8 @@ Mutate `shared/resources/develop-pipeline-step-8-commit.md`, not a bundled copy,
 | drop `\|\| s ~ /^⏭[^\|[:alnum:]]*Skipped$/` | finished-shapes report passes (its `⏭️ Skipped` row) |
 | header lookup → `col = 2` | Bug-variant unfinished row fails |
 | drop the `else if (!n)` branch | header-only table fails |
+| drop `!col { next }` | no-Status-column table fails (message becomes `could not read`) |
+| drop `!col { next }` **and** the `\|\| { … exit 1; }` on the assignment | no-Status-column table fails (the check passes) |
 
 CHANGELOG `[Unreleased]` → **Fixed**: "Step 8 check 4 allowlists finished rows (a Status starting with ✅, or ⏭️ Skipped) found by the table header, and refuses everything else — ❌ Failed, ⚠️ Needs Attention, 🔄 …, an empty Status, a header-only table, a table with no Status column; Step 8 no longer edits the report after its own commit (task 160)."
 
