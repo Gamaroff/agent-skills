@@ -373,39 +373,117 @@ for (const s of ["develop-task", "develop-story", "develop-bug"]) {
   });
 }
 
-// The Step 8 row is written before the step's work, so it cannot prove Step 8 finished (task.160
-// QA cycle 2, CR2-1). The step document states that once; the resume contract cites it and verifies
-// a ✅ Step 8 against git instead of trusting the row.
+// Step 8's completion is decided by the resume record, never by its row or by git (task.160 QA
+// cycles 2–3, CR2-1 / CR3-1). The step document states the rule once; the resume contract cites it.
 const RESUME = "shared/resources/develop-pipeline-resume-contract.md";
-test("the step document says the Step 8 row is not the evidence, and a HALT sets it back", () => {
+const HOOK_PATH = path.join(
+  ROOT,
+  "shared",
+  "resources",
+  "develop-pipeline-on-precompact.sh",
+);
+const RESTORE = path.join(
+  ROOT,
+  "shared",
+  "resources",
+  "advance-pipeline-lock.sh",
+);
+const LOCK = ".claude/state/develop-pipeline.lock";
+const SNAPSHOT = ".claude/state/develop-pipeline.last-halt.json";
+test("the step document names the resume record, not the row or git, as Step 8's evidence", () => {
   const doc = readDoc(STEP8);
   const update = doc.slice(
     doc.indexOf("## Final Implementation Report Update"),
     doc.indexOf("## Lint the report before the terminal commit"),
   );
-  assert.match(update, /is not the evidence that Step 8 finished/);
-  assert.match(update, /set the Step 8 row to `❌ Failed`/);
-  assert.match(update, /Resume verifies a `✅` Step 8 against git/);
+  assert.match(
+    update,
+    /not the evidence that Step 8 finished — and neither is the git state/,
+  );
+  assert.match(update, /The evidence is the \*\*resume record\*\*/);
+  assert.doesNotMatch(update, /set the Step 8 row to `❌ Failed`/);
+  const resume = readDoc(RESUME);
+  assert.match(
+    resume,
+    /Step 8 is decided by the resume record, never by its row or by git/,
+  );
+  assert.match(
+    resume,
+    /When the record this resume was restored from is at step 8, re-run Step 8 from the start/,
+  );
+  assert.doesNotMatch(resume, /Steps 2 and 8 do not require/);
+  assert.doesNotMatch(resume, /verify-push-state/);
 });
 
-// The resume contract's Step 8 verification command, cut from the contract and bound — so the test
-// runs what a resuming orchestrator runs.
-function resumeStep8Command() {
-  const doc = readDoc(RESUME);
-  assert.doesNotMatch(doc, /Steps 2 and 8 do not require/);
-  const m = doc.match(
-    /`(bash \.agents\/skills\/\{develop-story\|develop-task\|develop-bug\}\/references\/verify-push-state\.sh --base [^`]*)`/,
+// A lock at step 8 for this work item, as the orchestrator holds it while Step 8 runs.
+function writeStep8Lock(fx) {
+  write(
+    fx.work,
+    LOCK,
+    JSON.stringify({
+      skill: "develop-task",
+      report_path: REPORT,
+      task_or_story_id: "9",
+      task_or_story_directory: WORK_ITEM,
+      branch: "feature/task.9.fx",
+      pr_url: "",
+      tracker: "github",
+      tracker_issue: "",
+      current_step: 8,
+    }) + "\n",
   );
-  assert.ok(
-    m,
-    "the resume contract no longer names the Step 8 verification command",
-  );
-  return bind(m[1], {
-    ".agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh":
-      VERIFY,
-    "{doc-directory}": WORK_ITEM,
-  });
 }
+
+// The real PreCompact hook, fired while Step 8 runs after its row went ✅. It commits and pushes the
+// report — so the branch looks exactly like a finished run — and what distinguishes the two is the
+// record it leaves: a snapshot at step 8, which --restore turns back into a lock at step 8.
+test("a PreCompact pause inside Step 8 looks finished to git but leaves a record at step 8", async () => {
+  const fx = await setup(finished("Task"));
+  try {
+    writeStep8Lock(fx);
+    const r = run("bash", `bash "${HOOK_PATH}"`, {
+      cwd: fx.work,
+      bin: fx.bin,
+      env: { PIPELINE_LOCK: LOCK },
+    });
+    assert.equal(r.status, 0, `hook: ${r.stdout}\n${r.stderr}`);
+    // Git cannot tell this from a finished Step 8: the report is committed and pushed.
+    assert.equal(
+      git(fx.work, "status", "--porcelain", "--", WORK_ITEM).trim(),
+      "",
+      "report left dirty",
+    );
+    assert.equal(
+      git(fx.work, "rev-parse", "HEAD").trim(),
+      git(fx.work, "rev-parse", "@{u}").trim(),
+      "hook did not push — the fixture no longer models the case",
+    );
+    assert.match(
+      fs.readFileSync(path.join(fx.work, REPORT), "utf8"),
+      /^## Pipeline Paused — /m,
+    );
+    // The record can: the lock is gone and a snapshot names step 8 for this work item.
+    assert.equal(
+      fs.existsSync(path.join(fx.work, LOCK)),
+      false,
+      "hook left the lock",
+    );
+    const snap = JSON.parse(
+      fs.readFileSync(path.join(fx.work, SNAPSHOT), "utf8"),
+    );
+    assert.equal(String(snap.halt_step), "8");
+    assert.equal(snap.task_or_story_directory, WORK_ITEM);
+    // And a resume restores it to a lock at step 8 — the value the resume contract reads.
+    const rr = run("bash", `bash "${RESTORE}" --restore "${WORK_ITEM}"`, {
+      cwd: fx.work,
+    });
+    assert.equal(rr.status, 0, `restore: ${rr.stdout}\n${rr.stderr}`);
+    const lock = JSON.parse(fs.readFileSync(path.join(fx.work, LOCK), "utf8"));
+    assert.equal(String(lock.current_step), "8");
+  } finally {
+    cleanup(fx.dir);
+  }
+});
 
 // The paused-and-resumed case can only pass for the right reason if the fixture carries the trap:
 // both unfinished-state tokens outside the table, neither inside it.
@@ -676,61 +754,43 @@ describe("executed against fixtures", { concurrency: true }, () => {
       }
     });
 
-    // ── Resume: a ✅ Step 8 row is verified against git (task.160 QA cycle 2, CR2-1) ──
-    // The gh stub answers the PR's base, its number and its head (the pushed branch tip).
-    const RESUME_GH =
-      'case "$*" in *baseRefName*) echo develop ;; *headRefOid*) git rev-parse @{u} ;; *number*) echo 1 ;; esac';
-    for (const [name, prepare, want] of [
-      ["Step 8 finished: committed and pushed", async () => {}, 0],
-      [
-        "a HALT after the commit, before the push",
-        async (fx) => {
-          fs.appendFileSync(
-            path.join(fx.work, REPORT),
-            "\n- halted before the push\n",
-          );
-          await gitAsync(fx.work, "commit", "-qam", "step 8, not pushed");
-        },
-        1,
-      ],
-      [
-        "a pause after the row was set, before the commit",
-        async (fx) => {
-          fs.appendFileSync(
-            path.join(fx.work, REPORT),
-            "\n- paused before the commit\n",
-          );
-        },
-        1,
-      ],
-    ]) {
-      test(`[${sh}] resume verification of a ✅ Step 8 row: ${name}`, async () => {
-        const fx = await setup(finished("Task"));
-        try {
-          // setup() installed the stub; replace its answers rather than install a second one.
-          fs.writeFileSync(path.join(fx.dir, "gh-body.sh"), `${RESUME_GH}\n`);
-          await prepare(fx);
-          const r = await runAsync(sh, resumeStep8Command(), {
-            cwd: fx.work,
-            bin: fx.bin,
-          });
-          if (want === 0)
-            assert.equal(
-              r.status,
-              0,
-              `stdout: ${r.stdout}\nstderr: ${r.stderr}`,
-            );
-          else
-            assert.notEqual(
-              r.status,
-              0,
-              `an unfinished Step 8 verified: ${r.stdout}`,
-            );
-        } finally {
-          cleanup(fx.dir);
-        }
-      });
-    }
+    // ── A finished Step 8 leaves no resume record (task.160 QA cycle 3, CR3-1) ──
+    // The Cleanup block, cut from the step document: it deletes this run's halt snapshot and then,
+    // last, the lock. That is what makes "a record at step 8" mean "Step 8 did not finish".
+    test(`[${sh}] Step 8's Cleanup leaves no resume record behind`, async () => {
+      const fx = await setup(finished("Task"));
+      try {
+        writeStep8Lock(fx);
+        write(
+          fx.work,
+          SNAPSHOT,
+          JSON.stringify({
+            task_or_story_directory: WORK_ITEM,
+            halt_step: "5",
+          }) + "\n",
+        );
+        const code = bind(
+          blockBy(readDoc(STEP8), "Remove the pipeline lock — must be last"),
+          {
+            "{work-item-dir}": WORK_ITEM,
+          },
+        );
+        const r = await runAsync(sh, code, { cwd: fx.work });
+        assert.equal(r.status, 0, `cleanup: ${r.stdout}\n${r.stderr}`);
+        assert.equal(
+          fs.existsSync(path.join(fx.work, LOCK)),
+          false,
+          "lock survived Cleanup",
+        );
+        assert.equal(
+          fs.existsSync(path.join(fx.work, SNAPSHOT)),
+          false,
+          "snapshot survived Cleanup",
+        );
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
 
     // ── check 5 — dirt is judged against the work item ─────────────────────────
 

@@ -5,7 +5,7 @@ type: task
 description: "Step 8 check 4 refuses only `⏳ Pending` and `⏸ Paused`, so `❌ Failed`, `⚠️ Needs Attention` and `🔄 In Progress` rows pass it, and a header-only table satisfies its no-table guard. Replace the deny-list with an allowlist (a Status cell starting with `✅`, or `⏭️ Skipped`) located by header, and make Step 8's own row update land before its commit so checks 4 and 5 can both hold."
 tags: [develop-pipeline, step-8, completion-checklist, follow-up]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-09-27
 updated: 2026-09-27
@@ -16,7 +16,7 @@ github_issue: 498
 
 # Technical Task: Step 8 check 4 allowlists finished rows instead of denying two unfinished ones
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.160.review.1.step-8-check-4-allowlists-finished-rows.md` implemented 2026-09-27
 
@@ -202,9 +202,9 @@ Two lines in it are load-bearing under BSD awk, and review found the task's firs
 
 7. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md`: the Step 8 summary names the Pipeline Progress update before the commit, and Step Transition Protocol action 2 is a no-op after Step 8
 
-### Files to Modify (Resume — QA cycle 2, CR2-1)
+### Files to Modify (Resume — QA cycles 2–3, CR2-1 / CR3-1)
 
-8. ✅ `shared/resources/develop-pipeline-resume-contract.md`: a ✅ Step 8 row is verified against git (`verify-push-state.sh`), not trusted; bundled into develop-{story,task,bug}, qa-{fix,story,task}, review-{pr,story,task}
+8. ✅ `shared/resources/develop-pipeline-resume-contract.md`: a resume whose record (lock, halt snapshot or orphaned claim) is at step 8 re-runs Step 8 — neither the row nor git can tell a paused Step 8 from a finished one; bundled into develop-{story,task,bug}, qa-{fix,story,task}, review-{pr,story,task}
 
 ### Files to Modify (Tests)
 
@@ -371,6 +371,7 @@ Check 4's allowlist is correct and measured. Phase 3's reordering (Step 8 sets i
 | 2026-09-27 |         | QA findings fixed — CR2-1 (a HALT inside Step 8 sets its row ❌ Failed; resume verifies a ✅ Step 8 against git), CR2-2 (action 2 uses check 4's predicate); 7 new tests; 2 iterations total | qa-fix |
 | 2026-09-27 |         | QA gate FAIL (70/100) — 2 findings (CR3-1 high, CR3-2 medium); QA loop escalated (convergence: HIGH 0, 0, 1) | qa-task |
 | 2026-09-27 |         | Status → in-progress | qa-task |
+| 2026-09-27 |         | QA findings fixed — CR3-1 (resume re-runs Step 8 whenever its record is at step 8; git check and ❌ Failed rule dropped), CR3-2 (resume tests rebuilt on the real PreCompact hook and the real Cleanup block); 3 iterations total | qa-fix |
 
 <!-- change-log-end -->
 

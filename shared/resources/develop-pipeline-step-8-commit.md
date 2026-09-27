@@ -23,10 +23,9 @@ Before invoking `/commit-changes`, update the implementation report one final ti
   - develop-story: what was **built**, QA iterations taken, notable decisions
   - develop-task: what was **implemented**, QA iterations taken, notable decisions
 
-**The Step 8 row is written before the step's work, so it is not the evidence that Step 8 finished.** This is the one statement of that rule; the resume contract cites it. Two consequences:
+**The Step 8 row is written before the step's work, so it is not the evidence that Step 8 finished — and neither is the git state.** A HALT inside Step 8 commits the report through the error-recovery HALT rule, and a PreCompact pause commits **and pushes** it, so after either one the row reads `✅` and the branch can look exactly like a finished run. The evidence is the **resume record**. Cleanup (below) removes this run's halt snapshot and then, last, the lock, so a finished Step 8 leaves none. A lock, halt snapshot or orphaned claim at step 8 for this work item therefore means Step 8 did not finish, and a resume re-runs Step 8 from the start, whatever the row reads (resume contract, Phase 0b). This is the one statement of the rule; the resume contract cites it.
 
-- **A HALT after this update sets the row back.** If the lint, `/commit-changes`, the push or the Completion Checklist fails, set the Step 8 row to `❌ Failed` (with the reason in Notes) before the error-recovery HALT rule commits the report. A HALT that commits the row at `✅` records success for work that did not happen, and a resume reads it as done.
-- **Resume verifies a `✅` Step 8 against git, not the row.** A PreCompact pause inside Step 8 cannot reset the row (the hook appends a pause section and edits no table row), so the row alone cannot tell a finished Step 8 from an interrupted one. The evidence is check 5's call — `verify-push-state.sh` with the PR's base and the work-item scope: tree clean within scope, local HEAD equal to the remote, PR head equal to HEAD. When it fails, Step 8 re-runs (resume contract, Phase 0b).
+Re-running is safe. The report update rewrites the same fields, `/commit-changes` commits only what changed, the push is a no-op when there is nothing new, and Cleanup and the Completion Checklist are idempotent.
 
 ---
 
