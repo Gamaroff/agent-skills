@@ -5,7 +5,7 @@ type: task
 description: "Step 8 check 4 refuses only `⏳ Pending` and `⏸ Paused`, so `❌ Failed`, `⚠️ Needs Attention` and `🔄 In Progress` rows pass it, and a header-only table satisfies its no-table guard. Replace the deny-list with an allowlist (a Status cell starting with `✅`, or `⏭️ Skipped`) located by header, and make Step 8's own row update land before its commit so checks 4 and 5 can both hold."
 tags: [develop-pipeline, step-8, completion-checklist, follow-up]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-09-27
 updated: 2026-09-27
@@ -16,7 +16,7 @@ github_issue: 498
 
 # Technical Task: Step 8 check 4 allowlists finished rows instead of denying two unfinished ones
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.160.review.1.step-8-check-4-allowlists-finished-rows.md` implemented 2026-09-27
 
@@ -334,24 +334,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-27
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.160.qa.2.step-8-check-4-allowlists-finished-rows.md](./task.160.qa.2.step-8-check-4-allowlists-finished-rows.md)
-- **Gate File**: [task.160.gate.2.step-8-check-4-allowlists-finished-rows.yml](./task.160.gate.2.step-8-check-4-allowlists-finished-rows.yml)
+- **Full Report**: [task.160.qa.3.step-8-check-4-allowlists-finished-rows.md](./task.160.qa.3.step-8-check-4-allowlists-finished-rows.md)
+- **Gate File**: [task.160.gate.3.step-8-check-4-allowlists-finished-rows.yml](./task.160.gate.3.step-8-check-4-allowlists-finished-rows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 71
+- **Tests Executed**: 78
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's CR-1 is fixed. There is one new medium finding (CR2-1): writing the Step 8 row ✅ before its commit means a HALT or pause inside Step 8 leaves a committed report that reads Step 8 as done, and the resume contract reads only that row. There is also one low finding (CR2-2): the action-2 confirmation is stricter than check 4.
+Check 4's allowlist is correct and measured. Phase 3's reordering (Step 8 sets its row before its commit) removed the only resume signal that Step 8 had not finished. Cycle 2's git-based replacement does not hold, because the PreCompact hook commits and pushes the report itself (CR3-1, high). The QA loop stopped on the Convergence check (HIGH 0, 0, 1) and escalated to a person.
 
 ---
 
@@ -369,6 +369,8 @@ Cycle 1's CR-1 is fixed. There is one new medium finding (CR2-1): writing the St
 | 2026-09-27 |         | QA findings fixed — CR-1 (4 Step 8 restatements + action 2 carve-out in 3 orchestrators; 7 new guard tests), 1 iteration | qa-fix |
 | 2026-09-27 |         | QA gate CONCERNS (90/100) — 2 findings (CR2-1 medium, CR2-2 low) | qa-task |
 | 2026-09-27 |         | QA findings fixed — CR2-1 (a HALT inside Step 8 sets its row ❌ Failed; resume verifies a ✅ Step 8 against git), CR2-2 (action 2 uses check 4's predicate); 7 new tests; 2 iterations total | qa-fix |
+| 2026-09-27 |         | QA gate FAIL (70/100) — 2 findings (CR3-1 high, CR3-2 medium); QA loop escalated (convergence: HIGH 0, 0, 1) | qa-task |
+| 2026-09-27 |         | Status → in-progress | qa-task |
 
 <!-- change-log-end -->
 

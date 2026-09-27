@@ -1,0 +1,74 @@
+schema: 1
+task: 'task.160.step-8-check-4-allowlists-finished-rows'
+task_title: 'Step 8 check 4 allowlists finished rows instead of denying two unfinished ones'
+gate: FAIL
+status_reason: 'Check 4 itself remains measured correct (probe engages 21/21; 78/78 tests; CI green on b30a5ef6). But the cycle-2 fix does not hold: the PreCompact hook commits and pushes the report, so a pause inside Step 8 leaves exactly the git state the new resume check reads as a finished Step 8, and resume skips the cleanup and checklist.'
+reviewer: 'QA Engineer'
+updated: '2026-09-27T11:36:56Z'
+
+top_issues:
+  - id: 'CR3-1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The resume contract verifies a ✅ Step 8 with verify-push-state (clean tree, HEAD == remote, PR head == HEAD). The PreCompact hook commits and pushes the report itself (develop-pipeline-on-precompact.sh "Best-effort commit + push": git add, git commit, git push origin HEAD). A pause anywhere after Step 8 sets its row ✅ therefore leaves a state that verifies, and resume skips a Step 8 whose cleanup (step4 records, test logs, halt snapshot, lock removal) and Completion Checklist never ran. The git state cannot tell a finished Step 8 from a paused one.'
+    suggested_action: 'Use the resume record as the evidence instead of git or the row. Step 8 removes the lock last, and a finished run leaves no halt snapshot for its document, so any lock, snapshot or orphaned claim at step 8 proves Step 8 did not finish. Such a resume re-runs Step 8 whatever the row reads or recommended_step says. Add a test that drives the hook''s own commit-and-push before the resume decision.'
+    suggested_owner: dev
+  - id: 'CR3-2'
+    severity: medium
+    file: 'shared/resources/tests/step-8-completion-checklist.test.mjs'
+    finding: 'The resume tests cannot fail for the reasons they name. The gh stub answers headRefOid with git rev-parse @{u}, which repeats the local-vs-remote check. The "pause before the commit" fixture leaves the report uncommitted, a state the hook never leaves. Dropping --pr or --scope from the contract command keeps all three cases green.'
+    suggested_action: 'Rebuild the resume tests around the resume-record rule (CR3-1), with a fixture produced by the hook''s commit-and-push block.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 78
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 21
+    notes: 'Probe re-run on b30a5ef6: 12 hostile refused, 9 legitimate admitted, engages, 0 reproduced. Record: task.160.qa.3.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'A pause inside Step 8 now resumes past an unfinished Step 8 (CR3-1): the lock and cleanup are left behind.'
+  maintainability:
+    status: PASS
+    notes: 'Restatements agree and are test-held.'
+
+recommendations:
+  immediate:
+    - action: 'CR3-1: decide Step 8 resume on the resume record (lock, snapshot or orphaned claim at step 8 → re-run Step 8), not on git or the row; drop the ❌ Failed rule that the record makes unnecessary.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'CR3-2: rebuild the resume tests on the hook''s own commit-and-push fixture.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+  future:
+    - action: 'CR-3 (medium/medium): a checklist failure is fix-and-recheck, but the ❌ Failed rule treats it as a HALT after the lock is already removed. Resolved if the ❌ rule is dropped per CR3-1.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'CR-4 (medium/medium): Phase 0b gives a ❌ Failed row no resume action. Resolved if the ❌ rule is dropped.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-5 (low): gh missing makes --base "" exit 2, which the contract reads as "re-run Step 8". Distinguish exit 2 as a HALT.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-6 (low, pre-existing binding): check 5 passes  but never binds PR_NUMBER, so it never checks the PR head. The step-8 doc claim "check 5 … PR head equal to HEAD" is false.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'CR-7 (cleanup): the Phase 0b working-tree probe establishes the clean tree before this call, so its --scope cannot change the outcome.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'Pre-existing: the resume detector recommends LOCK_STEP + 1 = 9 for a run stopped at Step 8.'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR3-1 fixed', 'CR3-2 fixed']

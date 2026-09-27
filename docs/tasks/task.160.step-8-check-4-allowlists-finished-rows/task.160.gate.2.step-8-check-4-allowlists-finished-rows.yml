@@ -4,7 +4,7 @@ task_title: 'Step 8 check 4 allowlists finished rows instead of denying two unfi
 gate: CONCERNS
 status_reason: 'Cycle 1 CR-1 fixed and guarded. The cycle-2 refute pass found that writing the Step 8 row ✅ before the commit removes the only signal a resume had that Step 8 did not finish: a HALT inside Step 8 now commits the report with Step 8 ✅, and the resume contract reads only the report for Step 8.'
 reviewer: 'QA Engineer'
-updated: '2026-09-27T14:00:00Z'
+updated: '2026-09-27T11:22:43Z'
 
 top_issues:
   - id: 'CR2-1'

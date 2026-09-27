@@ -4,7 +4,7 @@ task_title: 'Step 8 check 4 allowlists finished rows instead of denying two unfi
 gate: CONCERNS
 status_reason: 'Check 4 allowlist is correct and measured (probe engages, 21/21 cases; 64/64 tests; CI green). One medium finding: four other places still tell Step 8 to update Pipeline Progress after the push, contradicting the new ordering this task introduced.'
 reviewer: 'QA Engineer'
-updated: '2026-09-27T12:00:00Z'
+updated: '2026-09-27T11:10:12Z'
 
 top_issues:
   - id: 'CR-1'
