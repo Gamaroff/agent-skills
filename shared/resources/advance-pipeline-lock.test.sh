@@ -4,9 +4,11 @@
 # Usage: bash shared/resources/advance-pipeline-lock.test.sh
 #
 # Focus: the commit-changes self-advance guard. commit-changes is invoked at
-# three points in a single pipeline run (create-pr Step 4, qa-fix Steps 5–6,
-# terminal Step 8). Only the Step 8 invocation may remove the lock; the nested
-# invocations must preserve it so PreCompact/Stop hooks keep working.
+# several points in a single pipeline run (create-pr Step 4, qa-fix Steps 5–6,
+# the Step 8 commit, any HALT commit). It preserves the lock at every one of
+# them; only `--complete`, run by Step 8's Completion Checklist, removes it
+# (task 161). The lock must outlive every commit so the PreCompact/Stop hooks
+# keep working and a HALT can snapshot it.
 #
 # Covers:
 #   1–3. Nested commit-changes (current_step 4/5/6) preserves lock, step unchanged
@@ -125,12 +127,16 @@ done
 BASH_BIN=$(command -v bash)
 LOCK_FILE="$TMPDIR_TEST/nojq.lock"
 write_lock 8
-PATH="$NOJQ_BIN" PIPELINE_LOCK="$LOCK_FILE" "$BASH_BIN" "$SCRIPT" --skill commit-changes >/dev/null 2>&1
+ERR=$(PATH="$NOJQ_BIN" PIPELINE_LOCK="$LOCK_FILE" "$BASH_BIN" "$SCRIPT" --skill commit-changes 2>&1 >/dev/null)
 RC=$?
+# The jq gate also exits 0 and leaves the lock, so the lock alone cannot tell the pre-gate arm
+# from the gate. Its own line, and the gate's absence, can (task.161 QA cycle 2, CR-3).
 if [ "$RC" -ne 0 ] || [ ! -f "$LOCK_FILE" ]; then
   fail "without jq, commit-changes at step 8 leaves the lock" "rc=$RC, lock present=$([ -f "$LOCK_FILE" ] && echo yes || echo no)"
+elif ! echo "$ERR" | grep -q "lock preserved (--complete ends the run)" || echo "$ERR" | grep -q "jq not installed"; then
+  fail "without jq, commit-changes at step 8 leaves the lock" "answered by the jq gate, not the commit-changes arm: $ERR"
 else
-  pass "without jq, commit-changes at step 8 leaves the lock"
+  pass "without jq, commit-changes at step 8 leaves the lock (its own arm, not the jq gate)"
 fi
 PATH="$NOJQ_BIN" PIPELINE_LOCK="$LOCK_FILE" "$BASH_BIN" "$SCRIPT" --complete >/dev/null 2>&1
 RC=$?

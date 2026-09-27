@@ -113,20 +113,40 @@ for SK in develop-story develop-task develop-bug; do
   d="$TMPDIR_TEST/step8-$SK"
   mklock "$d" "{\"skill\":\"$SK\",\"current_step\":8,\"report_path\":\"report.md\"}"
   R=$(reason_of "$(run_hook "$d")")
-  if ! echo "$R" | grep -q "Completion Checklist has passed"; then
-    fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "Got: $(echo "$R" | grep -i 'only once' | head -1)"
+  if ! echo "$R" | grep -q "Step 8 ends only when its Completion Checklist passes"; then
+    fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "Got: $(echo "$R" | grep -i 'not finished' | head -1)"
   elif echo "$R" | grep -q "has actually completed: mark Step 8"; then
     fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "still carries the generic 'once /commit-changes has completed' line"
   elif echo "$R" | grep -q "is already ✅"; then
     # The lock reads 8 from the end of /finalise, before Step 8's report update, so an
     # unconditional "the row is already done" is false in that window (task.161 CR-2).
     fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "asserts Step 8's row is already done, unconditionally"
-  elif ! echo "$R" | grep -q "Final Implementation Report Update"; then
-    fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "does not name where Step 8 starts when its report update has not run"
+  elif ! echo "$R" | grep -q "at or below Step 7" || ! echo "$R" | grep -q "Step 7's tail"; then
+    # A lock at 8 can precede Step 7's tail: /finalise moves it there first. The reason must
+    # send an unfinished row at or below Step 7 back to that step, as the resume contract's
+    # step-8 rule does, never straight to Step 8's report update (task.161 QA cycle 2, CR-1).
+    fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "does not send an unfinished Step 7 back to Step 7's tail"
+  elif echo "$R" | grep -q "advance the lock yourself"; then
+    # At Step 8, advancing the lock is --complete, which only the checklist may run (CR-2).
+    fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "still tells the orchestrator to advance the lock itself"
+  elif echo "$R" | grep -q "invoke /commit-changes\."; then
+    fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "invokes /commit-changes alone rather than the whole step-8 doc"
   else
     pass "[$SK] lock=8 names the Completion Checklist as Step 8's completion"
   fi
 done
+
+# ── Scenario 5c: the step-aware text is Step 8 only ─────────────────────────
+# The step-8 wording must not leak into other steps: a step-3 stall still advances the lock
+# itself once the step has genuinely finished.
+d="$TMPDIR_TEST/step3-generic"
+mklock "$d" '{"skill":"develop-task","current_step":3,"report_path":"report.md"}'
+R=$(reason_of "$(run_hook "$d")")
+if echo "$R" | grep -q "advance the lock yourself" && echo "$R" | grep -q "invoke /develop\." && ! echo "$R" | grep -q "Completion Checklist"; then
+  pass "lock=3 keeps the generic advance text (step-8 wording is step-8 only)"
+else
+  fail "lock=3 keeps the generic advance text (step-8 wording is step-8 only)" "Got: $(echo "$R" | grep -i 'genuinely\|invoke' | head -2)"
+fi
 
 # ── Scenario 6: no lock → allow ──────────────────────────────────────────────
 d="$TMPDIR_TEST/nolock"; mkdir -p "$d"
