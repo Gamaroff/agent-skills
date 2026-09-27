@@ -117,6 +117,12 @@ for SK in develop-story develop-task develop-bug; do
     fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "Got: $(echo "$R" | grep -i 'only once' | head -1)"
   elif echo "$R" | grep -q "has actually completed: mark Step 8"; then
     fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "still carries the generic 'once /commit-changes has completed' line"
+  elif echo "$R" | grep -q "is already ✅"; then
+    # The lock reads 8 from the end of /finalise, before Step 8's report update, so an
+    # unconditional "the row is already done" is false in that window (task.161 CR-2).
+    fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "asserts Step 8's row is already done, unconditionally"
+  elif ! echo "$R" | grep -q "Final Implementation Report Update"; then
+    fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "does not name where Step 8 starts when its report update has not run"
   else
     pass "[$SK] lock=8 names the Completion Checklist as Step 8's completion"
   fi

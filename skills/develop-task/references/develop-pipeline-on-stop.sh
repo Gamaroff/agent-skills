@@ -232,10 +232,14 @@ fi
 # /commit-changes has completed … `--complete`" — would hand an orchestrator that
 # yielded during the push or the checklist the one instruction that skips the
 # checklist. Same for all three orchestrators: develop-bug follows the same step doc.
+#
+# The line is conditional because the lock reads 8 from the end of /finalise — before Step
+# 7's tail and before Step 8's own report update — so "the row is already done" is false for
+# a stop in that window (task.161 QA cycle 1, CR-2).
 if [ "$NEXT" = "5" ] && [ "$SKILL" != "develop-bug" ]; then
   COMPLETION_LINE="$THEN_WHAT"
 elif [ "$NEXT" = "8" ]; then
-  COMPLETION_LINE="Step 8 is NOT finished when /commit-changes returns. Run the rest of the Step 8 doc — push, Cleanup, then the Step 8 Completion Checklist. Only once the Completion Checklist has passed does it run \`advance-pipeline-lock.sh --complete\` itself, as its last action; never run \`--complete\` on your own because the commit landed. Step 8's row in \`${REPORT}\` is already ✅ — do not edit the report after the commit."
+  COMPLETION_LINE="Step 8 is NOT finished when /commit-changes returns. Pick up where it stopped. If Step 8's final report update and its commit have not run yet (the lock reads 8 from the end of /finalise, before Step 7's tail and before any Step 8 work), start at the step-8 doc's Final Implementation Report Update. If they have run, continue with the push, Cleanup and the Step 8 Completion Checklist, and do not edit \`${REPORT}\` again. Only once the Completion Checklist has passed does it run \`advance-pipeline-lock.sh --complete\` itself, as its last action; never run \`--complete\` on your own because the commit landed."
 else
   COMPLETION_LINE="Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to ${ADVANCE_TO} (or \`--complete\` if that was Step 8)."
 fi

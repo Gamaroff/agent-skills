@@ -10,7 +10,9 @@
 #
 # Covers:
 #   1–3. Nested commit-changes (current_step 4/5/6) preserves lock, step unchanged
-#   4.   Terminal commit-changes (current_step 8) removes lock
+#   4.   commit-changes at current_step 8 leaves the lock; --complete removes it (task 161)
+#   4b.  Without jq: commit-changes leaves the lock and --complete removes it; a corrupt
+#        lock does not make the no-op commit-changes call fail
 #   5.   Explicit --complete removes lock unconditionally (current_step 4)
 #   6.   No lock file → exit 0, noop
 #   7.   Every Steps 5–6 loop member (qa-story, qa-task, qa-fix, review-pr)
@@ -108,6 +110,42 @@ if [ -f "$LOCK_FILE" ]; then
   fail "--complete removes the lock commit-changes left at step 8" "lock file still exists"
 else
   pass "--complete removes the lock commit-changes left at step 8"
+fi
+
+# ── Scenario 4b: the terminal remover and the no-op arm work without jq ─────
+# --complete is the lock's one terminal remover (task 161). Gated behind the jq check it
+# exited 0 and left the lock, so a jq-less host could never finish Step 8 (task.161 QA
+# cycle 1, CR-1). `--skill commit-changes` removes nothing and must not need jq or a
+# parsable lock either (CR-3). PATH holds only what the script needs, and no jq.
+NOJQ_BIN="$TMPDIR_TEST/nojq-bin"
+mkdir -p "$NOJQ_BIN"
+for c in bash rm cat dirname date mktemp mv printf; do
+  ln -sf "$(command -v "$c")" "$NOJQ_BIN/$c"
+done
+BASH_BIN=$(command -v bash)
+LOCK_FILE="$TMPDIR_TEST/nojq.lock"
+write_lock 8
+PATH="$NOJQ_BIN" PIPELINE_LOCK="$LOCK_FILE" "$BASH_BIN" "$SCRIPT" --skill commit-changes >/dev/null 2>&1
+RC=$?
+if [ "$RC" -ne 0 ] || [ ! -f "$LOCK_FILE" ]; then
+  fail "without jq, commit-changes at step 8 leaves the lock" "rc=$RC, lock present=$([ -f "$LOCK_FILE" ] && echo yes || echo no)"
+else
+  pass "without jq, commit-changes at step 8 leaves the lock"
+fi
+PATH="$NOJQ_BIN" PIPELINE_LOCK="$LOCK_FILE" "$BASH_BIN" "$SCRIPT" --complete >/dev/null 2>&1
+RC=$?
+if [ "$RC" -ne 0 ] || [ -f "$LOCK_FILE" ]; then
+  fail "without jq, --complete removes the lock" "rc=$RC, lock present=$([ -f "$LOCK_FILE" ] && echo yes || echo no)"
+else
+  pass "without jq, --complete removes the lock"
+fi
+printf 'not json{' > "$LOCK_FILE"
+PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" --skill commit-changes >/dev/null 2>&1
+RC=$?
+if [ "$RC" -ne 0 ] || [ "$(cat "$LOCK_FILE")" != "not json{" ]; then
+  fail "commit-changes on a corrupt lock is a no-op (exit 0, untouched)" "rc=$RC"
+else
+  pass "commit-changes on a corrupt lock is a no-op (exit 0, untouched)"
 fi
 
 # ── Scenario 5: explicit --complete removes lock unconditionally ─────────────

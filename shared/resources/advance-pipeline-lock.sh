@@ -28,7 +28,9 @@
 #                      /review-task is one).
 #       --complete   → exit 0. It must stay able to clear a corrupt or absent lock.
 #       --restore    → rebuilds the lock (below).
-#   • jq missing    → exit 0, warn to stderr (degraded mode, same as on-stop.sh)
+#   • jq missing    → exit 0, warn to stderr (degraded mode, same as on-stop.sh). Exempt:
+#                     --complete and --skill commit-changes parse nothing and run first,
+#                     so the lock's one terminal remover works without jq (task 161)
 #   • lock that is not a JSON OBJECT (empty, whitespace-only, bare null/array/
 #                     scalar, or malformed) → exit 1, lock untouched, no success
 #                     line. Applies to every path that reads or writes the lock
@@ -129,6 +131,33 @@ if [ ! -f "$LOCK" ]; then
       ;;
   esac
 fi
+
+# The two modes that never parse the lock run BEFORE the jq gate. `--complete` is the lock's
+# one terminal remover (task 161): Step 8's Completion Checklist runs it and then asserts the
+# lock is gone, so on a host without jq a gated --complete would leave the lock forever, fail
+# check 1 on every run and collide with the next run's Step 1 (task.161 QA cycle 1, CR-1).
+# `--skill commit-changes` removes nothing at any step, so it needs neither jq nor a parsable
+# lock; running it through the parse made a no-op call exit 1 on a corrupt lock (CR-3).
+case "$1" in
+  --complete)
+    rm -f "$LOCK"
+    echo "advance-pipeline-lock: pipeline complete, lock removed"
+    exit 0
+    ;;
+  --skill)
+    if [ "${2:-}" = "commit-changes" ]; then
+      # commit-changes is the ONLY pipeline sub-skill invoked at more than one step: Step 4
+      # (create-pr commits code before opening the PR), Steps 5–6 (each qa-fix cycle), Step 8
+      # (the final commit) and any HALT commit. None of them ends the run, so none removes the
+      # lock. Step 8 still has a push, Cleanup and a blocking Completion Checklist after its
+      # commit; removing the lock here left all three with no resume record, a Step 8 HALT with
+      # no snapshot, and the Stop hook with nothing to guard (task 161; the removal came in
+      # a284dfdd). `--complete`, run by Step 8 once checks 2–5 pass, is the one terminal remover.
+      echo "advance-pipeline-lock: commit-changes — lock preserved (--complete ends the run)" >&2
+      exit 0
+    fi
+    ;;
+esac
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "advance-pipeline-lock: jq not installed; cannot advance lock" >&2
@@ -334,11 +363,7 @@ require_parsable_lock() {
 
 NEXT=""
 case "$1" in
-  --complete)
-    rm -f "$LOCK"
-    echo "advance-pipeline-lock: pipeline complete, lock removed"
-    exit 0
-    ;;
+  # --complete and `--skill commit-changes` are handled above the jq gate.
   --restore)
     shift
     WHICH=0
@@ -382,22 +407,6 @@ case "$1" in
       qa-story|qa-task|qa-fix|review-pr)
                                   exit 0 ;;  # iterative loop, orchestrator manages
       finalise)                   NEXT=8 ;;
-      commit-changes)
-        # commit-changes is the ONLY pipeline sub-skill invoked at more than one step:
-        #   - Step 4 (create-pr commits code before opening the PR)
-        #   - Steps 5–6 (each qa-fix cycle commits fixes)
-        #   - Step 8 (the final commit), and any HALT commit
-        # None of them ends the run, so none removes the lock. Step 8 still has a push,
-        # Cleanup and a blocking Completion Checklist after its commit; removing the lock
-        # here left all three with no resume record, a Step 8 HALT with no snapshot, and
-        # the Stop hook with nothing to guard (task 161; the removal came in a284dfdd).
-        # `--complete`, run by Step 8 once checks 2–5 pass, is the one terminal remover.
-        require_parsable_lock
-        CUR=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
-        case "$CUR" in ''|null) CUR=0 ;; esac
-        echo "advance-pipeline-lock: commit-changes at step $CUR — lock preserved (--complete ends the run)" >&2
-        exit 0
-        ;;
       *)
         # Unknown skill = not a pipeline sub-skill = silent noop
         exit 0

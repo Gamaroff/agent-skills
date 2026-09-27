@@ -351,6 +351,29 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-27
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.161.qa.1.step-8-resume-record-survives-commit.md](./task.161.qa.1.step-8-resume-record-survives-commit.md)
+- **Gate File**: [task.161.gate.1.step-8-resume-record-survives-commit.yml](./task.161.gate.1.step-8-resume-record-survives-commit.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 4332
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+CR-1 (medium): `advance-pipeline-lock.sh --complete` exits at its `jq` gate before its own arm, so on a host without `jq` the lock is never removed now that Cleanup's `rm` is gone. Advisory: CR-2 (the Stop hook's step-8 line asserts the row is already ✅) and CR-3 (the no-op `commit-changes` arm still parses the lock).
+
+---
+
 ## Implementation Summary
 
 **Completed**: 2026-09-27
@@ -386,6 +409,8 @@ None identified.
 | 2026-09-27 | 1.1 | Review passed (8/10) — added the Stop hook's step-8 reason, the hooks reference, the "For Step 8 → completion" restatements and the three tests that pin the old lock lifetime to scope | review-task |
 | 2026-09-27 |  | Status → ready-for-development | review-task |
 | 2026-09-27 |  | Implemented — 16 source files plus 47 regenerated bundled copies; 4 test files changed; ci:fast 4331 pass / 0 fail | develop |
+| 2026-09-27 |  | QA gate CONCERNS (80/100) — 1 finding (CR-1, medium) | qa-task |
+| 2026-09-27 |  | QA findings fixed — CR-1 (`--complete` and the no-op `commit-changes` arm run before the `jq` gate), CR-2 (the Stop hook's step-8 line is conditional), CR-3 (the no-op arm no longer parses the lock); 4 new tests; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
