@@ -204,7 +204,7 @@ Two lines in it are load-bearing under BSD awk, and review found the task's firs
 
 ### Files to Modify (Resume — QA cycles 2–3, CR2-1 / CR3-1)
 
-8. ✅ `shared/resources/develop-pipeline-resume-contract.md`: a resume whose record (lock, halt snapshot or orphaned claim) is at step 8 re-runs Step 8 — neither the row nor git can tell a paused Step 8 from a finished one; bundled into develop-{story,task,bug}, qa-{fix,story,task}, review-{pr,story,task}
+8. ✅ `shared/resources/develop-pipeline-resume-contract.md`: a resume whose record (lock, halt snapshot or orphaned claim) is at step 8 re-runs Step 8 — neither the row nor git can tell a paused Step 8 from a finished one; an unfinished row 1–7 still wins (QA cycle 5); `develop-pipeline-step-0-resolve-and-prepare.md` points at the rule; bundled into develop-{story,task,bug}, qa-{fix,story,task}, review-{pr,story,task}
 
 ### Files to Modify (Tests)
 
@@ -341,17 +341,17 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.160.qa.4.step-8-check-4-allowlists-finished-rows.md](./task.160.qa.4.step-8-check-4-allowlists-finished-rows.md)
-- **Gate File**: [task.160.gate.4.step-8-check-4-allowlists-finished-rows.yml](./task.160.gate.4.step-8-check-4-allowlists-finished-rows.yml)
+- **Full Report**: [task.160.qa.5.step-8-check-4-allowlists-finished-rows.md](./task.160.qa.5.step-8-check-4-allowlists-finished-rows.md)
+- **Gate File**: [task.160.gate.5.step-8-check-4-allowlists-finished-rows.yml](./task.160.gate.5.step-8-check-4-allowlists-finished-rows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 75
+- **Tests Executed**: 78
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The cycle-3 fix holds in its window: from the start of Step 8 until `/commit-changes`, a record at step 8 exists and a resume re-runs Step 8. Three medium findings remain. The step doc overstates the window (CR4-1). The Context Compression Recovery sections don't yet carry the rule (CR4-2). The Cleanup test models an unreal state (CR4-3). The post-commit window has no record, a gap that pre-dates this branch; it goes to a follow-up.
+Cycle 4's findings are fixed. There are two new medium findings. The step-8 resume rule can skip an unfinished Step 7, because /finalise moves the lock to 8 before Step 7's remaining work is done (CR5-1). The rule does not name a surviving lock (CR5-2). There are also two low wording findings (CR5-3, CR5-4). Check 4 remains measured correct.
 
 ---
 
@@ -374,6 +374,8 @@ The cycle-3 fix holds in its window: from the start of Step 8 until `/commit-cha
 | 2026-09-27 |         | QA findings fixed — CR3-1 (resume re-runs Step 8 whenever its record is at step 8; git check and ❌ Failed rule dropped), CR3-2 (resume tests rebuilt on the real PreCompact hook and the real Cleanup block); 3 iterations total | qa-fix |
 | 2026-09-27 |         | QA gate CONCERNS (90/100) — 3 findings (CR4-1..3, medium); post-commit window pre-existing → follow-up | qa-task |
 | 2026-09-27 |         | QA findings fixed — CR4-1 (Step 8 claim scoped: the record ends at the Step 8 commit; the older post-commit gap is named), CR4-2 (recovery exception in 3 orchestrators), CR4-3 (test runs the real lock helper and Cleanup); 4 iterations total | qa-fix |
+| 2026-09-27 |         | QA gate CONCERNS (90/100) — 4 findings (CR5-1, CR5-2 medium; CR5-3, CR5-4 low) | qa-task |
+| 2026-09-27 |         | QA findings fixed — CR5-1 (the step-8 rule overrides only the Step 8 row; an unfinished Step 7 still wins), CR5-2 (surviving lock named), CR5-3 (lint-failed HALT keeps its record), CR5-4 (step-0 points at the rule); 5 iterations total | qa-fix |
 
 <!-- change-log-end -->
 

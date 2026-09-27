@@ -19,6 +19,7 @@ import test, { describe } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { createRequire } from "node:module";
 import {
   ROOT,
@@ -409,7 +410,7 @@ test("the step document names the resume record, not the row or git, as Step 8's
   );
   assert.match(
     resume,
-    /When the record this resume was restored from is at step 8, re-run Step 8 from the start/,
+    /When the resume record is at step 8, the Step 8 row is not evidence/,
   );
   assert.doesNotMatch(resume, /Steps 2 and 8 do not require/);
   assert.doesNotMatch(resume, /verify-push-state/);
@@ -428,6 +429,46 @@ test("the step document names the resume record, not the row or git, as Step 8's
     resume,
     /A finished Step 8 leaves no record, so it can never be offered/,
   );
+  // Scoped to the Step 8 row: an unfinished Step 7 still wins, and a surviving lock counts
+  // (task.160 QA cycle 5, CR5-1 / CR5-2). A lint-failed HALT keeps its record (CR5-3).
+  assert.match(resume, /resume from the first row that is not finished/);
+  assert.match(resume, /an unfinished Step 7 row still wins/);
+  assert.match(resume, /whether it survived or was restored/);
+  assert.doesNotMatch(resume, /whatever the row reads and whatever/);
+  assert.match(update, /A HALT whose report fails lint skips that commit/);
+  const step0 = readDoc(
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+  );
+  assert.match(
+    step0,
+    /\*\*Except the Step 8 row:\*\*[^\n]*develop-pipeline-resume-contract\.md/,
+  );
+});
+
+// The premise CR5-1 rests on, executed: /finalise's lock cooperation moves the lock from 7 to 8 as
+// its last action — before the orchestrator runs Step 7's tail — so a record at step 8 can mean an
+// unfinished Step 7.
+test("finalise's lock cooperation moves the record to step 8 before Step 7's tail runs", () => {
+  const dir = fs.mkdtempSync(
+    path.join(fs.realpathSync(os.tmpdir()), "t160-finalise-"),
+  );
+  try {
+    fs.mkdirSync(path.join(dir, ".claude/state"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, LOCK),
+      JSON.stringify({ skill: "develop-task", current_step: 7 }) + "\n",
+    );
+    const r = run("bash", `bash "${RESTORE}" --skill finalise`, { cwd: dir });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(
+      String(
+        JSON.parse(fs.readFileSync(path.join(dir, LOCK), "utf8")).current_step,
+      ),
+      "8",
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // Context Compression Recovery continues from recommended_step, which is 9 for a record at step 8.
@@ -440,6 +481,8 @@ for (const s of ["develop-task", "develop-story", "develop-bug"]) {
     const item = doc.slice(at, doc.indexOf("\n\n", at));
     assert.match(item, /Exception — a record at step 8/);
     assert.match(item, /re-run Step 8 from the start/);
+    assert.match(item, /first unfinished row at or below Step 7/);
+    assert.match(item, /surviving or restored/);
     assert.match(item, /develop-pipeline-resume-contract\.md/);
   });
 }
@@ -835,7 +878,6 @@ describe("executed against fixtures", { concurrency: true }, () => {
           false,
           "this run's snapshot survived Cleanup",
         );
-        assert.equal(fs.existsSync(path.join(fx.work, LOCK)), false);
       } finally {
         cleanup(fx.dir);
       }
