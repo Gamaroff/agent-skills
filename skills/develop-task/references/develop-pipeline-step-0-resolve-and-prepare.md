@@ -249,7 +249,7 @@ find {task-directory} -maxdepth 1 -name "task.{id}.implementation.*.md" 2>/dev/n
 
 ### Shared Resume Logic
 
-If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. Skip upfront questions already recorded in the Decisions Log.
+If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. **Except the Step 8 row:** when the resume record (lock, halt snapshot or orphaned claim) is at step 8, that row is not evidence; follow the step-8 rule in `references/develop-pipeline-resume-contract.md` Phase 0b. Skip upfront questions already recorded in the Decisions Log.
 
 **Restore the lock before anything advances it (task.124 QA cycle 2, CR-2).** A resume skips Step 1, which is the lock's only ordinary writer, and every terminal HALT and PreCompact pause removed the lock and left a superset of it behind. When the resume detector's `source` is `halt_snapshot` or `orphaned_claim` and the operator chooses **Resume**, run — before Phase 0b verification, before any step banner — the command below (which snapshots restore here and which wait for the grant: who restores, and when: resume contract § Restore the lock (both resume paths); that section is the rule's one statement and this paragraph carries no copy of it — task.130):
 

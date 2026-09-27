@@ -19,6 +19,7 @@ import test, { describe } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { createRequire } from "node:module";
 import {
   ROOT,
@@ -193,8 +194,43 @@ function withoutProgressTable(text) {
   return [...lines.slice(0, at), ...lines.slice(next)].join("\n");
 }
 
+// Keep the header and separator rows under `## Pipeline Progress`; drop every step row.
+function headerOnly(text) {
+  const lines = text.split("\n");
+  const at = lines.findIndex((l) => /^## Pipeline Progress\s*$/.test(l));
+  const next = lines.findIndex((l, i) => i > at && l.startsWith("## "));
+  const pipes = lines.slice(at + 1, next).filter((l) => l.startsWith("|"));
+  assert.ok(pipes.length >= 3, "fixture: expected header + separator + rows");
+  const keep = new Set(pipes.slice(0, 2));
+  return lines
+    .filter(
+      (l, i) => !(i > at && i < next && l.startsWith("|") && !keep.has(l)),
+    )
+    .join("\n");
+}
+
+// Rename the table's `Status` header cell, so no column is named Status. Only the header row is
+// touched, and it must carry the cell exactly once.
+function withoutStatusColumn(text) {
+  const header = progressRows(text)[0];
+  const parts = header.split(" Status ");
+  assert.equal(parts.length, 2, "the header row does not name Status once");
+  return text.split(header).join(parts.join(" State  "));
+}
+
+// The one table row whose label is `label` — what check 4 prints when it refuses that row.
+function rowOf(text, label) {
+  const hits = progressRows(text).filter((l) => l.startsWith(`| ${label}`));
+  assert.equal(
+    hits.length,
+    1,
+    `expected one "${label}" row, found ${hits.length}`,
+  );
+  return hits[0];
+}
+
 const CHECK4_UNFINISHED =
-  /❌ Step 8 incomplete: Pipeline Progress still has an unfinished \(⏳ Pending \/ ⏸️ Paused\) row/;
+  /❌ Step 8 incomplete: Pipeline Progress has a row that is not finished \(✅ or ⏭️ Skipped\)/;
 const CHECK4_NO_TABLE =
   /❌ Step 8 incomplete: no Pipeline Progress table found/;
 
@@ -266,6 +302,259 @@ test("the step document names the general-bug registry as develop-bug's extra sc
     ),
     "develop-bug Step 8 no longer passes the registry as an extra scope",
   );
+});
+
+// Step 8 must not tell the orchestrator to edit the report after its own commit: check 5 needs a
+// clean tree, so any such edit either fails the step or is left out of the commit (task 160). 15 of
+// 123 committed completed reports carried a `⏳ Pending` row that way, 14 of them Step 8's own.
+test("Step 8 edits the report before /commit-changes and never after it", () => {
+  const doc = readDoc(STEP8);
+  const before = doc.slice(
+    doc.indexOf("## Final Implementation Report Update"),
+    doc.indexOf("## Lint the report before the terminal commit"),
+  );
+  assert.match(before, /including Step 8's own row/);
+  const after = doc.slice(
+    doc.indexOf("## Invoke /commit-changes"),
+    doc.indexOf("## Step 8 Completion Checklist"),
+  );
+  assert.ok(after.length > 0, "section anchors moved");
+  assert.doesNotMatch(after, /Update Pipeline Progress/);
+  assert.doesNotMatch(after, /Update the Pipeline Progress Notes/);
+  assert.doesNotMatch(after, /Pipeline Progress ✅/);
+  assert.doesNotMatch(after, /Committed in `/);
+});
+
+// Every restatement of Step 8 names the order the step document now states: the Pipeline Progress
+// rows are set BEFORE /commit-changes, never after the push. Four summaries restated the old order
+// after the step body changed (task.160 QA cycle 1, CR-1), and an orchestrator reads the summary.
+const STEP8_RESTATEMENTS = [
+  ["the step document's description", STEP8, /^description:.*$/m],
+  ...["develop-task", "develop-story", "develop-bug"].map((s) => [
+    `${s} SKILL.md's Step 8 summary`,
+    `skills/${s}/SKILL.md`,
+    /^.*develop-pipeline-step-8-commit\.md.*final push.*$/m,
+  ]),
+];
+for (const [name, file, pattern] of STEP8_RESTATEMENTS) {
+  test(`${name} sets Pipeline Progress before the commit, not after the push`, () => {
+    const line = readDoc(file).match(pattern)?.[0];
+    assert.ok(line, `${file}: no Step 8 summary line found`);
+    const progress = line.indexOf("Pipeline Progress");
+    const commit = line.indexOf("/commit-changes");
+    const push = line.indexOf("final push");
+    assert.ok(
+      progress >= 0 && commit >= 0 && push >= 0,
+      `${file}: summary shape changed: ${line}`,
+    );
+    assert.ok(
+      progress < commit,
+      `${file}: Pipeline Progress is named after /commit-changes: ${line}`,
+    );
+    assert.ok(
+      !line.slice(push).includes("Pipeline Progress"),
+      `${file}: Pipeline Progress follows the push: ${line}`,
+    );
+  });
+}
+
+// The Step Transition Protocol's action 2 runs after EVERY step, Step 8 included — after check 5 has
+// required a clean tree. Each orchestrator must say that after Step 8 it changes nothing.
+for (const s of ["develop-task", "develop-story", "develop-bug"]) {
+  test(`${s}'s Step Transition Protocol makes action 2 a no-op after Step 8`, () => {
+    const action2 = readDoc(`skills/${s}/SKILL.md`).match(
+      /^2\. \*\*Edit the implementation report\*\*.*$/m,
+    )?.[0];
+    assert.ok(action2, `skills/${s}/SKILL.md: action 2 not found`);
+    assert.match(action2, /After Step 8 this edit is a no-op/);
+    // The same predicate check 4 uses, and a mismatch is a HALT (task.160 QA cycle 2, CR2-2).
+    assert.match(action2, /check 4's own test/);
+    assert.match(action2, /HALT, not an edit/);
+    assert.doesNotMatch(action2, /reads `✅ Done` and change nothing/);
+  });
+}
+
+// Step 8's completion is decided by the resume record, never by its row or by git (task.160 QA
+// cycles 2–3, CR2-1 / CR3-1). The step document states the rule once; the resume contract cites it.
+const RESUME = "shared/resources/develop-pipeline-resume-contract.md";
+const HOOK_PATH = path.join(
+  ROOT,
+  "shared",
+  "resources",
+  "develop-pipeline-on-precompact.sh",
+);
+const RESTORE = path.join(
+  ROOT,
+  "shared",
+  "resources",
+  "advance-pipeline-lock.sh",
+);
+const LOCK = ".claude/state/develop-pipeline.lock";
+const SNAPSHOT = ".claude/state/develop-pipeline.last-halt.json";
+test("the step document names the resume record, not the row or git, as Step 8's evidence", () => {
+  const doc = readDoc(STEP8);
+  const update = doc.slice(
+    doc.indexOf("## Final Implementation Report Update"),
+    doc.indexOf("## Lint the report before the terminal commit"),
+  );
+  assert.match(
+    update,
+    /not the evidence that Step 8 finished — and neither is the git state/,
+  );
+  assert.match(update, /The evidence is the \*\*resume record\*\*/);
+  assert.doesNotMatch(update, /set the Step 8 row to `❌ Failed`/);
+  const resume = readDoc(RESUME);
+  assert.match(
+    resume,
+    /Step 8 is decided by the resume record, never by its row or by git/,
+  );
+  assert.match(
+    resume,
+    /When the resume record is at step 8, the Step 8 row is not evidence/,
+  );
+  assert.doesNotMatch(resume, /Steps 2 and 8 do not require/);
+  assert.doesNotMatch(resume, /verify-push-state/);
+  // Scoped to what the record covers (task.160 QA cycle 4, CR4-1): /commit-changes removes the lock,
+  // not Cleanup, so the record ends at the Step 8 commit and the post-commit gap is named.
+  assert.match(update, /`\/commit-changes`' lock cooperation/);
+  assert.match(
+    update,
+    /What it does not cover \(a known gap, older than this rule\)/,
+  );
+  assert.doesNotMatch(
+    update,
+    /removes this run's halt snapshot and then, last, the lock/,
+  );
+  assert.doesNotMatch(
+    resume,
+    /A finished Step 8 leaves no record, so it can never be offered/,
+  );
+  // Scoped to the Step 8 row: an unfinished Step 7 still wins, and a surviving lock counts
+  // (task.160 QA cycle 5, CR5-1 / CR5-2). A lint-failed HALT keeps its record (CR5-3).
+  assert.match(resume, /resume from the first row that is not finished/);
+  assert.match(resume, /an unfinished Step 7 row still wins/);
+  assert.match(resume, /whether it survived or was restored/);
+  assert.doesNotMatch(resume, /whatever the row reads and whatever/);
+  assert.match(update, /A HALT whose report fails lint skips that commit/);
+  const step0 = readDoc(
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+  );
+  assert.match(
+    step0,
+    /\*\*Except the Step 8 row:\*\*[^\n]*develop-pipeline-resume-contract\.md/,
+  );
+});
+
+// The premise CR5-1 rests on, executed: /finalise's lock cooperation moves the lock from 7 to 8 as
+// its last action — before the orchestrator runs Step 7's tail — so a record at step 8 can mean an
+// unfinished Step 7.
+test("finalise's lock cooperation moves the record to step 8 before Step 7's tail runs", () => {
+  const dir = fs.mkdtempSync(
+    path.join(fs.realpathSync(os.tmpdir()), "t160-finalise-"),
+  );
+  try {
+    fs.mkdirSync(path.join(dir, ".claude/state"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, LOCK),
+      JSON.stringify({ skill: "develop-task", current_step: 7 }) + "\n",
+    );
+    const r = run("bash", `bash "${RESTORE}" --skill finalise`, { cwd: dir });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(
+      String(
+        JSON.parse(fs.readFileSync(path.join(dir, LOCK), "utf8")).current_step,
+      ),
+      "8",
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Context Compression Recovery continues from recommended_step, which is 9 for a record at step 8.
+// Each orchestrator carries the step-8 exception and cites the resume contract (CR4-2).
+for (const s of ["develop-task", "develop-story", "develop-bug"]) {
+  test(`${s}'s Context Compression Recovery re-runs Step 8 for a record at step 8`, () => {
+    const doc = readDoc(`skills/${s}/SKILL.md`);
+    const at = doc.indexOf("4. Continue from `recommended_step`");
+    assert.ok(at >= 0, "recovery item 4 not found");
+    const item = doc.slice(at, doc.indexOf("\n\n", at));
+    assert.match(item, /Exception — a record at step 8/);
+    assert.match(item, /re-run Step 8 from the start/);
+    assert.match(item, /first unfinished row at or below Step 7/);
+    assert.match(item, /surviving or restored/);
+    assert.match(item, /develop-pipeline-resume-contract\.md/);
+  });
+}
+
+// A lock at step 8 for this work item, as the orchestrator holds it while Step 8 runs.
+function writeStep8Lock(fx) {
+  write(
+    fx.work,
+    LOCK,
+    JSON.stringify({
+      skill: "develop-task",
+      report_path: REPORT,
+      task_or_story_id: "9",
+      task_or_story_directory: WORK_ITEM,
+      branch: "feature/task.9.fx",
+      pr_url: "",
+      tracker: "github",
+      tracker_issue: "",
+      current_step: 8,
+    }) + "\n",
+  );
+}
+
+// The real PreCompact hook, fired while Step 8 runs after its row went ✅. It commits and pushes the
+// report — so the branch looks exactly like a finished run — and what distinguishes the two is the
+// record it leaves: a snapshot at step 8, which --restore turns back into a lock at step 8.
+test("a PreCompact pause inside Step 8 looks finished to git but leaves a record at step 8", async () => {
+  const fx = await setup(finished("Task"));
+  try {
+    writeStep8Lock(fx);
+    const r = run("bash", `bash "${HOOK_PATH}"`, {
+      cwd: fx.work,
+      bin: fx.bin,
+      env: { PIPELINE_LOCK: LOCK },
+    });
+    assert.equal(r.status, 0, `hook: ${r.stdout}\n${r.stderr}`);
+    // Git cannot tell this from a finished Step 8: the report is committed and pushed.
+    assert.equal(
+      git(fx.work, "status", "--porcelain", "--", WORK_ITEM).trim(),
+      "",
+      "report left dirty",
+    );
+    assert.equal(
+      git(fx.work, "rev-parse", "HEAD").trim(),
+      git(fx.work, "rev-parse", "@{u}").trim(),
+      "hook did not push — the fixture no longer models the case",
+    );
+    assert.match(
+      fs.readFileSync(path.join(fx.work, REPORT), "utf8"),
+      /^## Pipeline Paused — /m,
+    );
+    // The record can: the lock is gone and a snapshot names step 8 for this work item.
+    assert.equal(
+      fs.existsSync(path.join(fx.work, LOCK)),
+      false,
+      "hook left the lock",
+    );
+    const snap = JSON.parse(
+      fs.readFileSync(path.join(fx.work, SNAPSHOT), "utf8"),
+    );
+    assert.equal(String(snap.halt_step), "8");
+    assert.equal(snap.task_or_story_directory, WORK_ITEM);
+    // And a resume restores it to a lock at step 8 — the value the resume contract reads.
+    const rr = run("bash", `bash "${RESTORE}" --restore "${WORK_ITEM}"`, {
+      cwd: fx.work,
+    });
+    assert.equal(rr.status, 0, `restore: ${rr.stdout}\n${rr.stderr}`);
+    const lock = JSON.parse(fs.readFileSync(path.join(fx.work, LOCK), "utf8"));
+    assert.equal(String(lock.current_step), "8");
+  } finally {
+    cleanup(fx.dir);
+  }
 });
 
 // The paused-and-resumed case can only pass for the right reason if the fixture carries the trap:
@@ -411,6 +700,184 @@ describe("executed against fixtures", { concurrency: true }, () => {
         const r = await runChecklist(sh, fx);
         assert.equal(r.status, 1, `stdout: ${r.stdout}`);
         assert.match(r.stdout, CHECK4_NO_TABLE);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // ── check 4 is an allowlist (task 160) ────────────────────────────────────
+    // Finished = a Status cell that starts with ✅ (any detail after it), or reads ⏭️ Skipped. The
+    // shapes below are all in the committed corpus of finished reports; an exact `✅ Done` match
+    // would have refused most of them.
+    test(`[${sh}] a report whose Status cells use every finished shape passes check 4`, async () => {
+      let t = finished("Task");
+      for (const [label, shape] of [
+        ["1. create-branch", "✅"],
+        ["2. review-task", "✅ Complete"],
+        ["3. develop", "✅ Done (PASS 100/100)"],
+        ["4. create-pr", "✅ Skipped (gate PASS)"],
+        ["5–6. qa-task / qa-fix loop", "⏭️ Skipped"],
+      ]) {
+        t = setRow(t, label, shape);
+      }
+      const fx = await setup(t);
+      try {
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+        assert.match(r.stdout, /✅ Step 8 post-conditions verified/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // Every Status the deny-list did not name passed it. Each one here fails, and the message prints
+    // the refused row — and only that row, so a check that refused every row would also go red.
+    for (const state of [
+      "❌ Failed",
+      "⚠️ Needs Attention",
+      "🔄 Cycle 3",
+      "⏸️ Skipped",
+      "",
+    ]) {
+      test(`[${sh}] a table row at "${state}" fails check 4, naming that row`, async () => {
+        const t = setRow(finished("Task"), "8. commit-changes", state);
+        const fx = await setup(t);
+        try {
+          const r = await runChecklist(sh, fx);
+          assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+          assert.match(r.stdout, CHECK4_UNFINISHED);
+          assert.ok(
+            r.stdout.includes(rowOf(t, "8. commit-changes")),
+            `the refused row is not printed: ${r.stdout}`,
+          );
+          assert.ok(
+            !r.stdout.includes(rowOf(t, "7. finalise")),
+            `a finished row was printed as unfinished: ${r.stdout}`,
+          );
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+    }
+
+    // The Bug variant carries Status in the THIRD cell. Only a header lookup reads it there; a fixed
+    // column index would read the Skill cell and refuse every row.
+    test(`[${sh}] a bug-variant report with one unfinished row fails on that row only`, async () => {
+      const t = setRow(finished("Bug"), "8 | commit-changes", "❌ Failed");
+      const fx = await setup(t);
+      try {
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+        assert.match(r.stdout, CHECK4_UNFINISHED);
+        assert.ok(r.stdout.includes(rowOf(t, "8 | commit-changes")), r.stdout);
+        assert.ok(!r.stdout.includes(rowOf(t, "7 | finalise-close")), r.stdout);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // "Found nothing" and "had nothing to look at" must not produce the same pass.
+    test(`[${sh}] a table with a header and no step rows fails check 4`, async () => {
+      const fx = await setup(headerOnly(finished("Task")));
+      try {
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+        assert.match(r.stdout, CHECK4_UNFINISHED);
+        assert.match(r.stdout, /no step rows under the header/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // Without a Status column there is no cell to read. Under BSD awk an unguarded `$col` is a fatal
+    // error, which an unchecked command substitution turns into a pass (task.160 review.1).
+    test(`[${sh}] a table with no Status column fails check 4`, async () => {
+      const fx = await setup(withoutStatusColumn(finished("Task")));
+      try {
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+        assert.match(r.stdout, CHECK4_UNFINISHED);
+        assert.match(r.stdout, /no Status column in the header row/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // ── Step 8 ordering (task 160, Phase 3) ────────────────────────────────────
+    // The order the step document states: Step 8's own row is set ✅ Done, THEN the commit and push
+    // run, and nothing edits the report afterwards. Checks 4 and 5 then hold together.
+    test(`[${sh}] Step 8's row set ✅ before its own commit passes checks 4 and 5`, async () => {
+      const pending = setRow(
+        finished("Task"),
+        "8. commit-changes",
+        "⏳ Pending",
+      );
+      const fx = await setup(pending);
+      try {
+        write(fx.work, REPORT, finished("Task"));
+        await gitAsync(fx.work, "add", "-A");
+        await gitAsync(fx.work, "commit", "-q", "-m", "step 8");
+        await gitAsync(fx.work, "push", "-q");
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+        assert.match(r.stdout, /✅ Step 8 post-conditions verified/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // ── The record's real lifecycle (task.160 QA cycle 4, CR4-3) ──
+    // /commit-changes' lock cooperation is the remover: at step 8 it removes the lock (the record
+    // ends at the Step 8 commit); nested at step 5 it keeps it. Cleanup then removes this run's
+    // halt snapshot, cut from the step document and run under each shell.
+    test(`[${sh}] the Step 8 commit ends the record and Cleanup removes this run's snapshot`, async () => {
+      const fx = await setup(finished("Task"));
+      try {
+        const LOCK_HELPER = RESTORE;
+        writeStep8Lock(fx);
+        const nested = JSON.parse(
+          fs.readFileSync(path.join(fx.work, LOCK), "utf8"),
+        );
+        nested.current_step = 5;
+        write(fx.work, LOCK, JSON.stringify(nested) + "\n");
+        let r = run("bash", `bash "${LOCK_HELPER}" --skill commit-changes`, {
+          cwd: fx.work,
+        });
+        assert.equal(
+          fs.existsSync(path.join(fx.work, LOCK)),
+          true,
+          `nested commit removed the lock: ${r.stdout}${r.stderr}`,
+        );
+        writeStep8Lock(fx);
+        r = run("bash", `bash "${LOCK_HELPER}" --skill commit-changes`, {
+          cwd: fx.work,
+        });
+        assert.equal(
+          fs.existsSync(path.join(fx.work, LOCK)),
+          false,
+          `the Step 8 commit kept the lock: ${r.stdout}${r.stderr}`,
+        );
+        write(
+          fx.work,
+          SNAPSHOT,
+          JSON.stringify({
+            task_or_story_directory: WORK_ITEM,
+            halt_step: "5",
+          }) + "\n",
+        );
+        const code = bind(
+          blockBy(readDoc(STEP8), "Remove the pipeline lock — must be last"),
+          {
+            "{work-item-dir}": WORK_ITEM,
+          },
+        );
+        const c = await runAsync(sh, code, { cwd: fx.work });
+        assert.equal(c.status, 0, `cleanup: ${c.stdout}\n${c.stderr}`);
+        assert.equal(
+          fs.existsSync(path.join(fx.work, SNAPSHOT)),
+          false,
+          "this run's snapshot survived Cleanup",
+        );
       } finally {
         cleanup(fx.dir);
       }

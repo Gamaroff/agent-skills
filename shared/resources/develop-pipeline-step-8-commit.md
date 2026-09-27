@@ -1,6 +1,6 @@
 ---
 name: develop-pipeline-step-8-commit
-description: Step 8 (commit-changes + lock removal) shared by develop-story and develop-task. Covers final implementation report update (Finished timestamp, Final Status, QA Iterations, Completion Summary), /commit-changes invocation, final push, Pipeline Progress update, and pipeline lock file removal. Near-identical for both orchestrators — one variant noted for Completion Summary wording.
+description: Step 8 (commit-changes + lock removal) shared by develop-story and develop-task. Covers final implementation report update (Finished timestamp, Final Status, QA Iterations, Completion Summary, and every Pipeline Progress row including Step 8's own, all before the commit), /commit-changes invocation, final push, and pipeline lock file removal. Nothing edits the report after the commit. Near-identical for both orchestrators — one variant noted for Completion Summary wording.
 ---
 
 # Develop Pipeline — Step 8: Commit Changes
@@ -18,10 +18,17 @@ Before invoking `/commit-changes`, update the implementation report one final ti
 - Set **Finished** timestamp
 - Set **Final Status** to `Completed`
 - Fill in **QA Iterations** count
-- Ensure the Pipeline Progress table shows ✅ for all steps
+- Ensure the Pipeline Progress table shows ✅ for all steps, **including Step 8's own row**, written `✅ Done` — the value the orchestrator's Step Transition Protocol writes after the step returns, so that later edit changes nothing. Nothing in the report is edited after `/commit-changes`: check 5 of the Completion Checklist requires a clean tree, and check 4 requires every row finished. A late edit either fails check 5 or is left out of the commit, and 14 of the 123 committed completed reports carried Step 8's own row at `⏳ Pending` that way (task 160)
 - Write a **Completion Summary** paragraph:
   - develop-story: what was **built**, QA iterations taken, notable decisions
   - develop-task: what was **implemented**, QA iterations taken, notable decisions
+
+**The Step 8 row is written before the step's work, so it is not the evidence that Step 8 finished — and neither is the git state.** A PreCompact pause commits **and pushes** the report, so after one the row reads `✅` and the branch can look exactly like a finished run. The evidence is the **resume record**. This is the one statement of the rule; the resume contract cites it.
+
+- **What the record covers.** The lock stays at `current_step` 8 from the start of Step 8 until the Step 8 commit. At the end of that commit, `/commit-changes`' lock cooperation (`advance-pipeline-lock.sh --skill commit-changes`, at `current_step` ≥ 8) removes it. Cleanup removes this run's halt snapshot. The record reaches 8 slightly early: `/finalise` moves the lock to 8 as its last action, before the orchestrator finishes Step 7's tail. A lock (surviving or restored), halt snapshot or orphaned claim at step 8 for this work item therefore means Step 8 had not got past its commit, and possibly that Step 7's tail was unfinished. A resume from it goes back to the first unfinished row at or below Step 7, and otherwise re-runs Step 8 from the start, whatever the Step 8 row reads (resume contract, Phase 0b).
+- **What it does not cover (a known gap, older than this rule).** After the Step 8 commit there is no lock. A pause, crash or HALT during the push, Cleanup or a failing Completion Checklist leaves no record to resume from. A HALT whose commit runs `/commit-changes` leaves none either, because that commit removes the lock before the HALT rule's snapshot runs. A HALT whose report fails lint skips that commit, so its lock survives at 8, its snapshot records step 8, and it is resumable. Both follow from the step-8 lock removal in `a284dfdd` (2026-06-08), not from this rule, and are tracked as a follow-up task. On those paths the Completion Checklist's fix-and-recheck is the only guard.
+
+Re-running Step 8 is safe, but it is not a no-op. It writes a new **Finished** value, which costs one extra docs commit. It also leaves any `## Pipeline Paused` section the hook appended, which records the pause and is not rewritten. `/commit-changes` commits only what changed, the push is a no-op when nothing is new, and Cleanup and the Completion Checklist are idempotent.
 
 ---
 
@@ -91,7 +98,7 @@ Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`, plus one
 
 The implementation report and all other work-item artifacts must be staged and included in this commit.
 
-After `/commit-changes` completes, run `git log --oneline -1` to capture the final commit hash. Update the Pipeline Progress Notes for Step 8: `Committed in \`{hash}\`` (and note the PR reference if applicable, e.g. `Committed in \`{hash}\`, merged via PR #{N}`).
+After `/commit-changes` completes, run `git log --oneline -1` to capture the final commit hash, and report it in the Phase 2 completion output. **Do not write it into the report.** A commit cannot record its own hash without a further commit, and that edit is exactly the post-commit dirt check 5 refuses; `git log` is the record (task 160).
 
 ---
 
@@ -102,7 +109,7 @@ Push the final commit so the PR reflects the completed implementation report and
 git push origin HEAD
 ```
 
-Update Pipeline Progress: ✅ commit-changes.
+The Pipeline Progress row for Step 8 was already set before the commit (§ Final Implementation Report Update); there is nothing to update here.
 
 ---
 
@@ -193,18 +200,31 @@ REPORT="${IMPLEMENTATION_REPORT:?must be set from lock or context}"
 grep -qE "^\*\*Final Status(:\*\*|\*\*:) (Completed|Accepted)" "$REPORT" || { echo "❌ Step 8 incomplete: Final Status not set to Completed/Accepted in $REPORT"; exit 1; }
 grep -qE "^\*\*Finished(:\*\*|\*\*:) [0-9]" "$REPORT" || { echo "❌ Step 8 incomplete: Finished timestamp missing in $REPORT"; exit 1; }
 
-# 4. The Pipeline Progress TABLE has no unfinished row — its `|` rows only. The whole report is
-#    not read: the PreCompact hook's pause section names `⏳ Pending` in prose (obs #200).
-#    `⏸️ Paused` is unfinished too (resume contract). No table at all is a failure, not a pass:
-#    a check that could not look must not report that it found nothing.
-#    The match is the Status CELL (`| ⏸️ Paused |`), not the token anywhere in a row: a Notes
-#    cell naming a state is prose and must not trip it, and the emoji may arrive without its
-#    U+FE0F variation selector (`⏸ Paused`), which a literal `⏸️ Paused` never matched.
+# 4. Every step row in the Pipeline Progress TABLE is finished — its `|` rows only. The whole
+#    report is not read: the PreCompact hook's pause section names `⏳ Pending` in prose (obs #200).
+#    An ALLOWLIST, not a deny-list (task 160): a list of unfinished states passes every state it
+#    forgot (❌ Failed, ⚠️ Needs Attention, 🔄 …, an empty cell). Finished = a Status cell that starts
+#    with ✅ (any detail after it: `✅ Done (PASS 100/100)`, `✅ Skipped (…)`), or reads `⏭️ Skipped`,
+#    with or without the U+FE0F variation selector. Everything else fails, and the row is printed.
+#    The Status column is found by its HEADER, never by index: Task/Story carry it in the 2nd cell,
+#    Bug in the 3rd. Only the Status cell is read, so a Notes cell naming a state is prose.
+#    Three ways to have nothing to look at, and each fails rather than passing: no table, no Status
+#    column, no step rows under the header. `!col { next }` is load-bearing — with no Status column,
+#    `$col` is `$""`, which BSD awk rejects as a fatal error — and so is the `||` on the assignment:
+#    a command substitution drops awk's exit status, and an awk that died would read as a clean pass.
 #    The awk braces are spaced on purpose: an unspaced `{exit}` reads as a `{placeholder}`.
 PROGRESS_ROWS=$(awk '/^## Pipeline Progress[[:space:]]*$/ { f = 1; next } f && /^## / { exit } f && /^\|/' "$REPORT")
 [ -n "$PROGRESS_ROWS" ] || { echo "❌ Step 8 incomplete: no Pipeline Progress table found in $REPORT"; exit 1; }
-printf '%s\n' "$PROGRESS_ROWS" | grep -qE '\|[[:space:]]*(⏳[^|[:alnum:]]*Pending|⏸[^|[:alnum:]]*Paused)[[:space:]]*\|' \
-  && { echo "❌ Step 8 incomplete: Pipeline Progress still has an unfinished (⏳ Pending / ⏸️ Paused) row"; exit 1; } || true
+UNFINISHED=$(printf '%s\n' "$PROGRESS_ROWS" | awk -F'|' '
+  NR == 1 { for (i = 2; i < NF; i++) { c = $i; gsub(/^[[:space:]]+|[[:space:]]+$/, "", c); if (c == "Status") col = i } ; next }
+  /^\|[-:[:space:]|]+$/ { next }
+  !col { next }
+  { n++; s = $col; gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
+    if (s ~ /^✅/ || s ~ /^⏭[^|[:alnum:]]*Skipped$/) next
+    print }
+  END { if (!col) print "no Status column in the header row"; else if (!n) print "no step rows under the header" }') \
+  || { echo "❌ Step 8 incomplete: could not read the Pipeline Progress table in $REPORT (awk exited non-zero)"; exit 1; }
+[ -z "$UNFINISHED" ] || { echo "❌ Step 8 incomplete: Pipeline Progress has a row that is not finished (✅ or ⏭️ Skipped):"; printf '   %s\n' "$UNFINISHED"; exit 1; }
 
 # 5. The work actually exists on the remote — commits present, tree clean WITHIN THE WORK ITEM,
 #    local HEAD == remote HEAD, and (when a PR is open) PR head == local HEAD. --scope names dirt

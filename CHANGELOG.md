@@ -306,6 +306,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Step 8 check 4 allowlists finished rows instead of denying two unfinished ones (task 160).**
+  Check 4 refused a Status cell only when it read `⏳ Pending` or `⏸ Paused`, so every state the
+  list did not name passed: `❌ Failed`, `⚠️ Needs Attention`, `🔄 …`, an empty cell. It now finds the
+  Status column by its header (2nd cell for Task and Story, 3rd for Bug) and accepts only a cell
+  that starts with `✅` (any detail after it) or reads `⏭️ Skipped`. Four behaviours tighten on
+  purpose: (1) a row at `❌ Failed`, `⚠️ Needs Attention`, `🔄 …`, `⏸️ Skipped` or an empty Status
+  fails, and the message prints the row; (2) a table with a header and no step rows fails; (3) a
+  table with no `Status` header cell fails; (4) Step 8 no longer writes `Committed in {hash}` into
+  the report, or sets its own row after the push. It sets that row before `/commit-changes` and
+  edits nothing after it, because check 5 needs a clean tree: 14 of 123 committed completed reports
+  carried Step 8's own row at `⏳ Pending` from the old order. Measured over the same 123 reports,
+  the allowlist refuses none that the deny-list accepted. The check also fails closed when awk
+  itself errors: under BSD awk an unguarded `$col` with no Status column aborted, and the empty
+  command substitution read as a pass.
+
 - **Step 8 check 4 reads the Pipeline Progress table, not the whole report (task 159, obs #200).**
   The check grepped the whole implementation report for `⏳ Pending`. The PreCompact hook's
   `## Pipeline Paused` section names that token in prose, so every run that was paused and then
