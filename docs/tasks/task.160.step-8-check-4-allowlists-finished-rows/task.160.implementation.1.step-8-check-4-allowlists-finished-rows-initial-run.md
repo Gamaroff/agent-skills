@@ -101,6 +101,13 @@ Replace Step 8 check 4's Pending/Paused deny-list with a header-located allowlis
 
 - QA cycle 3 (qa-task): gate timestamps on gate.1/gate.2 had been hand-composed in the future (12:00Z, 14:00Z vs clock 11:31Z); corrected from file mtimes before the scoped diff (obs #182 recurrence appended). Independent reviewer (Explore, ~3.5 min): 7 findings; CR3-1 high verified by reading the PreCompact hook; CR3-2 verified by reading the stub. Probe engages 21/21; Step 4b clean; CI green on b30a5ef6. Gate FAIL 70/100. Convergence check (documented awk: HIGH 0,0,1) → TRIPS → escalation
 
+- QA loop re-entry: 2 extra cycles granted (user chose escalation option 1: resume re-runs Step 8 whenever the resume record is at step 8; drop the ❌ Failed rule; rebuild resume tests on the hook's own commit-and-push); 0 cycle(s) run outside the loop back-filled from disk. Lock restored from the halt snapshot by grant-qa-cycles.sh (QA_CYCLE=3, qa_max_cycles=5). Re-entering at 5b for gate.3's findings (cycle 3's fix was never run — the stall halted before 5b)
+
+- QA cycle 4 (qa-task): scoped diff since gate.3 11:36:56Z (checked against date -u); independent reviewer (~3 min): 5 findings. Provenance step on the high: the commit-changes lock-removal arm at step ≥ 8 is on origin/develop since a284dfdd (2026-06-08), so the post-commit no-record window is pre-existing → recommendations.future + follow-up task; the new defect is the doc's overstated claim (CR4-1). Probe engages 21/21; CI green on a5dc82c3. Gate CONCERNS 90. Convergence: HIGH 0 → no trip; route → continue; narrowing → false
+
+- QA cycle 5 (qa-task): scoped since gate.4 14:50:38Z; reviewer (~2.5 min) 5 findings, none high-confidence; QA verified CR5-1 (finalise NEXT=8 before Step 7 tail) and gated 4. Probe engages 21/21; CI green on 66d7802d. Gate CONCERNS 90. 5b cycle 5 fixed all 4 (c3a2bd6f). Budget spent → route 2c evaluated by engine: continue (medium-not-falling 1,3,2) → loop-limit escalation
+- Process errors this cycle, both caught before commit: (1) mutation-proof snapshots failed under zsh because `$FILES` was a scalar, which zsh does not word-split, so the mutations were left in place. All five were reversed by exact inverse edits (the lock helper via git, having no other change), confirmed by per-file diffs against HEAD, then re-run correctly under bash with an array. (2) A transient .git/index.lock failed the first commit attempt; the lock was already gone on the next check; the retry succeeded
+
 ---
 
 ## Issues Log
@@ -143,6 +150,7 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop not converging
+**Fixed (after granted re-entry)**: CR3-1 + CR3-2 in `a5dc82c3` — the resume record decides Step 8 (any lock/snapshot/claim at step 8 → re-run Step 8); git check and ❌ Failed rule dropped; tests run the real PreCompact hook and the real Cleanup block. 5 mutation proofs red. ci:fast 4319/0 fail; pushed once. qa-fix-3 comments posted
 
 ### QA Loop Not Converging — 2026-09-27
 
@@ -166,6 +174,53 @@ The pipeline stopped after 3 qa-task/qa-fix cycles because the HIGH finding coun
 2. Alternative: descope. Revert Phase 3 (the Step 8 ordering) and the cycle-1/2 resume changes, ship the check-4 allowlist alone (Phases 1, 2 and 4 are PASS on every gate), and file the Step 8 ordering plus resume signal as a follow-up task.
 3. Alternative: have the PreCompact hook write the Step 8 row as ⏸️ Paused when `CURRENT_STEP` is 8. This is narrower, but it adds a table edit to a hook that currently edits no row.
 
+### QA Cycle 4 — 2026-09-27
+**Gate Result**: CONCERNS
+**Issues Found**: 3 medium. CR4-1: the step doc overstates the resume-record window, because /commit-changes removes the lock at step 8, not Cleanup. CR4-2: Context Compression Recovery in 3 SKILL.md still continues from recommended_step. CR4-3: the Cleanup test seeds an unreal lock. The reviewer's high (no record after the Step 8 commit) is PRE-EXISTING (a284dfdd, 2026-06-08, same on develop) and routed to a follow-up task
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+**Fixed**: CR4-1..3 in `66d7802d` — move: scope the claim (record window = Step 8 start → its commit; older post-commit gap named); recovery exception in 3 orchestrators; lifecycle test on the real lock helper + Cleanup. 4 mutation proofs red. ci:fast 4322/0 fail; pushed once. qa-fix-4 comments posted. (/qa-fix procedure followed from the already-loaded skill; findings taken from gate.4 written this cycle)
+
+### QA Cycle 5 — 2026-09-27
+**Gate Result**: CONCERNS
+**Issues Found**: 2 medium. CR5-1: the step-8 rule could skip an unfinished Step 7, because /finalise moves the lock to 8 before Step 7's tail. CR5-2: a surviving lock at 8 is not named. 2 low: CR5-3 (a lint-failed HALT keeps the record) and CR5-4 (step-0 resume has no pointer). CR4-1..3 FIXED
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: Loop route: continue (medium-not-falling) — MEDIUM reads 1, 3, 2 over cycles 3–5 — route 2c needs it strictly falling, which is the evidence that one more gate would clear.
+**Action**: Escalating — loop limit reached
+**Fixed**: CR5-1..4 in `c3a2bd6f`. The move was to scope the claim: the step-8 rule now overrides only the Step 8 row, an unfinished row 1–7 still wins, a surviving lock counts, a lint-failed HALT is resumable, and step-0 points at the rule. The premise (finalise moves the lock 7 → 8) is executed in a test. 5 mutation proofs red. ci:fast 4323/0 fail after one fix (a `references/` citation in a shared source → `shared/resources/`). Pushed once; qa-fix-5 comments posted. **No gate has read this fix.**
+
+### QA Loop Limit Reached — 2026-09-27
+
+The pipeline completed its 5 qa-task/qa-fix cycles (3 original + 2 granted) without a clean PASS.
+
+**Final gate status**: CONCERNS (90/100) — gate.5, which reads `66d7802d`. Cycle 5's fix (`c3a2bd6f`) has not been gated.
+**HIGH findings per cycle**: 0, 0, 1, 0, 0. The one HIGH (cycle 3) was fixed and held.
+**MEDIUM findings per cycle**: 1, 1, 1, 3, 2
+**Remaining issues** (gate.5; all fixed in `c3a2bd6f`, ungated):
+- CR5-1 (medium): `shared/resources/develop-pipeline-resume-contract.md`. The step-8 rule could skip an unfinished Step 7
+- CR5-2 (medium): `shared/resources/develop-pipeline-resume-contract.md`. A surviving lock at 8 was not named
+- CR5-3 (low): `shared/resources/develop-pipeline-step-8-commit.md`. A lint-failed HALT keeps its record
+- CR5-4 (low): `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md`. No pointer to the rule
+
+**What was attempted per cycle**:
+- Cycle 1: Step 8 restatements corrected (`e299eae7`)
+- Cycle 2: the resume signal moved to git (`b30a5ef6`), which the hook's commit and push defeated
+- Cycle 3: escalated (HIGH 0, 0, 1). After the user chose option 1, the resume record decides (`a5dc82c3`)
+- Cycle 4: the record's window was scoped to Step 8's start through its commit; the older post-commit gap was named; recovery exceptions added (`66d7802d`)
+- Cycle 5: the rule was narrowed to the Step 8 row, a surviving lock was named, and step-0 was pointed at the rule (`c3a2bd6f`)
+
+**Likely root cause**: the check-4 deliverable (Phases 1, 2 and 4) has been PASS on every gate. Every finding since cycle 1 is about one question Phase 3 opened: how a resume knows Step 8 finished. That question touches the lock helper, the PreCompact hook, the HALT rule, /finalise's lock cooperation, the detector and three recovery sites, which is more surface than a one-task Phase 3 anticipated. The findings shrank from mechanism (cycles 2–3) to scope (4) to wording (5), and HIGH has been 0 since cycle 3. The loop was converging, but MEDIUM did not fall strictly (1, 3, 2), so the half-cycle rule declined.
+
+**Recommended next steps**:
+1. **Recommended: resume at 5a with 1 more cycle** to gate `c3a2bd6f`. The findings are down to wording; if that gate is clean, the run goes to 5c and Step 7.
+2. File a follow-up task for the pre-existing post-commit window (`a284dfdd`): no resume record after the Step 8 commit, the HALT snapshot skipped at step 8, and the detector's `LOCK_STEP + 1 = 9`.
+3. Alternatively, accept gate.5 and proceed manually with /finalise. `c3a2bd6f` would then ship with no gate reading it.
+
 ---
 
 ## Completion
@@ -174,6 +229,6 @@ The pipeline stopped after 3 qa-task/qa-fix cycles because the HIGH finding coun
 **Final Status**: Escalated
 **Branch**: `feature/task.160.step-8-check-4-allowlists-finished-rows`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/499
-**QA Iterations**: 3 (escalated — QA loop not converging)
+**QA Iterations**: 5 (escalated — loop limit; 2 of them granted)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
