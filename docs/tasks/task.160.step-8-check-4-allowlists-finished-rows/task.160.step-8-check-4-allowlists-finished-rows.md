@@ -5,10 +5,12 @@ type: task
 description: "Step 8 check 4 refuses only `⏳ Pending` and `⏸ Paused`, so `❌ Failed`, `⚠️ Needs Attention` and `🔄 In Progress` rows pass it, and a header-only table satisfies its no-table guard. Replace the deny-list with an allowlist (a Status cell starting with `✅`, or `⏭️ Skipped`) located by header, and make Step 8's own row update land before its commit so checks 4 and 5 can both hold."
 tags: [develop-pipeline, step-8, completion-checklist, follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-27
 updated: 2026-09-27
+completed_date: 2026-09-27
+pr_number: 499
 assignee:
 estimated_effort_hours: 16
 github_issue: 498
@@ -16,7 +18,7 @@ github_issue: 498
 
 # Technical Task: Step 8 check 4 allowlists finished rows instead of denying two unfinished ones
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.160.review.1.step-8-check-4-allowlists-finished-rows.md` implemented 2026-09-27
 
@@ -28,7 +30,7 @@ github_issue: 498
 
 Task 159 scoped Step 8 check 4 to the Pipeline Progress table's Status cells. Check 4 still names the unfinished states it refuses (`⏳ Pending`, `⏸ Paused`), so a Status the list does not name passes. This task inverts it: check 4 accepts only a finished Status, and refuses everything else. Finished means a cell starting with `✅` or reading `⏭️ Skipped`. It also makes a header-only table fail, and it fixes Step 8's own ordering so a correct run can satisfy check 4 and check 5 at the same time.
 
-**Scope**: check 4 in `shared/resources/develop-pipeline-step-8-commit.md` (and its three bundled copies), two post-commit report edits in the same document, new cases in `shared/resources/tests/step-8-completion-checklist.test.mjs`, and a CHANGELOG entry. Source: task.159 `gate.1` `recommendations.future` (CR-1, CR-2) and `pr-review.1`.
+**Scope**: check 4 in `shared/resources/develop-pipeline-step-8-commit.md` (and its three bundled copies), two post-commit report edits in the same document, new cases in `shared/resources/tests/step-8-completion-checklist.test.mjs`, and a CHANGELOG entry. QA cycles 1–5 widened Phase 3: the orchestrators' own Step 8 restatements (`skills/develop-{task,story,bug}/SKILL.md`), and the resume rule for a record at step 8 (`develop-pipeline-resume-contract.md` Phase 0b, the step-0 Shared Resume Logic pointer). § 7 lists the files. Source: task.159 `gate.1` `recommendations.future` (CR-1, CR-2) and `pr-review.1`.
 
 **Key deliverables**:
 
@@ -119,13 +121,15 @@ Two lines in it are load-bearing under BSD awk, and review found the task's firs
 ✅ The post-commit report edits in the same document: remove the `Committed in {hash}` Notes write after `/commit-changes`, and move `Update Pipeline Progress: ✅ commit-changes` to before it
 ✅ New executed cases in `shared/resources/tests/step-8-completion-checklist.test.mjs`
 ✅ A CHANGELOG `[Unreleased]` entry citing (task 160)
+✅ Added by QA cycles 1–5: the three orchestrators' Step 8 restatements and their Step Transition Protocol action 2 (a no-op after Step 8), and the resume rule that makes a record at step 8 re-run Step 8 without skipping an unfinished row 1–7 (resume contract Phase 0b, step-0, the three recovery exceptions)
 
 ### Out of Scope
 
 ❌ Rewriting the 15 committed reports that carry a leftover `⏳ Pending` row. They are history, and check 4 only runs at a live Step 8
 ❌ Normalising the 20+ finished Status shapes to one spelling. The allowlist accepts them as they are
 ❌ The two eval replay fixtures with no Pipeline Progress table. Their eval does not execute the checklist; making it do so is a separate change
-❌ develop-bug's own Step 8 prose outside the shared step document
+❌ develop-bug's own Step 8 behaviour beyond the shared step document (its SKILL.md summary line was corrected in QA cycle 1, CR-1, to match the shared step)
+❌ The pre-existing window after the Step 8 commit, where no resume record survives (`a284dfdd`), and the detector's `LOCK_STEP + 1` → follow-up task.161
 
 ---
 
@@ -354,13 +358,40 @@ None.
 Cycle 5's four findings are fixed. The step-8 resume rule now overrides only the Step 8 row: an unfinished Step 7 still wins, and a surviving lock counts. Two low advisory items (CR6-1, CR6-2) and the pre-existing post-commit resume gap (follow-up task.161) are in recommendations.future. Check 4 remains measured correct (probe 21/21).
 
 ---
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.160.qa.6.step-8-check-4-allowlists-finished-rows.md`
+**Gate File**: `task.160.gate.6.step-8-check-4-allowlists-finished-rows.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (6 QA cycles: 3, plus 2 and 1 granted)
+**PR conformance review (5c)**: ✅ APPROVE — `task.160.pr-review.1.step-8-check-4-allowlists-finished-rows.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 12/12 met, each with code and test evidence
+✅ **Tests:** executed checklist cases under bash and zsh in the per-PR `npm test` lane; mutation proofs M1–M8, plus two on the cycle-5 fix
+✅ **PR Review:** PR #499; CI green (test, validate, shellcheck, link-check, branch policy)
+✅ **Documentation:** the step-8 doc, the resume contract, the bundled copies, 3 orchestrator SKILL.md files, and the CHANGELOG `[Unreleased]` entry
+✅ **Security Review:** ✅ PASS. Measured: 21 probes against the shipped check 4, 0 reproduced
+✅ **Compliance Review:** NOT_APPLICABLE (internal tooling)
+
+**Follow-ups:** task.161, for the pre-existing Step 8 post-commit resume gap (`a284dfdd`), absorbing pr-review.1 CR-1 and CR-2. CR6-1 and CR6-2 are advisory (gate.6 `recommendations.future`).
+
+**Task marked as ACCEPTED on:** 2026-09-27
+
+**Detailed Verification Log:** See `task.160.dod.1.step-8-check-4-allowlists-finished-rows.md` for the complete verification evidence.
+
+---
 
 <!-- change-log-start -->
-
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-27 | 1.0     | Initial draft | create-task |
 | 2026-09-27 | 1.1     | Review passed (9/10): guard the row block on `col` and fail closed on awk's exit status, because the no-Status-column outcome was unreachable under BSD awk; Step 8 row written as `✅ Done` before the commit | review-task |
 | 2026-09-27 |         | Status → ready-for-development | review-task |
@@ -377,7 +408,7 @@ Cycle 5's four findings are fixed. The step-8 resume rule now overrides only the
 | 2026-09-27 |         | QA gate CONCERNS (90/100) — 4 findings (CR5-1, CR5-2 medium; CR5-3, CR5-4 low) | qa-task |
 | 2026-09-27 |         | QA findings fixed — CR5-1 (the step-8 rule overrides only the Step 8 row; an unfinished Step 7 still wins), CR5-2 (surviving lock named), CR5-3 (lint-failed HALT keeps its record), CR5-4 (step-0 points at the rule); 5 iterations total | qa-fix |
 | 2026-09-27 |         | QA gate PASS (100/100) — 0 open findings; 2 advisory (CR6-1 low, CR6-2 cleanup) | qa-task |
-
+| 2026-09-27 | 1.2 | DoD passed — accepted (PR #499); § 1/§ 4 scope brought in line with the QA-cycle additions (pr-review.1 PC-2) | finalise |
 <!-- change-log-end -->
 
 ---
