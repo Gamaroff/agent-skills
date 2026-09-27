@@ -198,10 +198,13 @@ grep -qE "^\*\*Finished(:\*\*|\*\*:) [0-9]" "$REPORT" || { echo "❌ Step 8 inco
 #    not read: the PreCompact hook's pause section names `⏳ Pending` in prose (obs #200).
 #    `⏸️ Paused` is unfinished too (resume contract). No table at all is a failure, not a pass:
 #    a check that could not look must not report that it found nothing.
+#    The match is the Status CELL (`| ⏸️ Paused |`), not the token anywhere in a row: a Notes
+#    cell naming a state is prose and must not trip it, and the emoji may arrive without its
+#    U+FE0F variation selector (`⏸ Paused`), which a literal `⏸️ Paused` never matched.
 #    The awk braces are spaced on purpose: an unspaced `{exit}` reads as a `{placeholder}`.
 PROGRESS_ROWS=$(awk '/^## Pipeline Progress[[:space:]]*$/ { f = 1; next } f && /^## / { exit } f && /^\|/' "$REPORT")
 [ -n "$PROGRESS_ROWS" ] || { echo "❌ Step 8 incomplete: no Pipeline Progress table found in $REPORT"; exit 1; }
-printf '%s\n' "$PROGRESS_ROWS" | grep -qE '⏳ Pending|⏸️ Paused' \
+printf '%s\n' "$PROGRESS_ROWS" | grep -qE '\|[[:space:]]*(⏳[^|[:alnum:]]*Pending|⏸[^|[:alnum:]]*Paused)[[:space:]]*\|' \
   && { echo "❌ Step 8 incomplete: Pipeline Progress still has an unfinished (⏳ Pending / ⏸️ Paused) row"; exit 1; } || true
 
 # 5. The work actually exists on the remote — commits present, tree clean WITHIN THE WORK ITEM,

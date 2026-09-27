@@ -162,6 +162,27 @@ function setRow(text, label, state) {
   return lines.join("\n");
 }
 
+// Write ONE row's Notes cell (the Task variant's fourth column). The cell must be empty first, so a
+// template that moves or fills the column turns the case red instead of silently testing another cell.
+function setNotes(text, label, notes) {
+  const lines = text.split("\n");
+  const hits = lines.flatMap((l, i) => (l.startsWith(`| ${label}`) ? [i] : []));
+  assert.equal(
+    hits.length,
+    1,
+    `expected one "${label}" row, found ${hits.length}`,
+  );
+  const cells = lines[hits[0]].split("|");
+  assert.equal(
+    cells[4].trim(),
+    "",
+    `the "${label}" row's Notes cell is not empty`,
+  );
+  cells[4] = ` ${notes} `;
+  lines[hits[0]] = cells.join("|");
+  return lines.join("\n");
+}
+
 // Remove `## Pipeline Progress` through the line before the next `## ` heading.
 function withoutProgressTable(text) {
   const lines = text.split("\n");
@@ -345,7 +366,9 @@ describe("executed against fixtures", { concurrency: true }, () => {
       }
     });
 
-    for (const state of ["⏳ Pending", "⏸️ Paused"]) {
+    // "⏸ Paused" is the paused state WITHOUT its U+FE0F variation selector — emoji output often
+    // drops it, and a literal `⏸️ Paused` pattern never matched it (finalise DoD probe, task.159).
+    for (const state of ["⏳ Pending", "⏸️ Paused", "⏸ Paused"]) {
       test(`[${sh}] a table row left at ${state} fails check 4`, async () => {
         const fx = await setup(
           setRow(finished("Task"), "8. commit-changes", state),
@@ -354,6 +377,26 @@ describe("executed against fixtures", { concurrency: true }, () => {
           const r = await runChecklist(sh, fx);
           assert.equal(r.status, 1, `stdout: ${r.stdout}`);
           assert.match(r.stdout, CHECK4_UNFINISHED);
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+    }
+
+    // A Notes cell is prose inside the table: naming a state there is the obs #200 trap moved one
+    // level in, and must not fail a finished row. Check 4 matches the Status CELL, not the token.
+    for (const notes of [
+      "resumed after ⏸️ Paused at compaction",
+      "was ⏳ Pending before the resume",
+    ]) {
+      test(`[${sh}] a ✅ Done row whose Notes read "${notes}" passes check 4`, async () => {
+        const fx = await setup(
+          setNotes(finished("Task"), "7. finalise", notes),
+        );
+        try {
+          const r = await runChecklist(sh, fx);
+          assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+          assert.match(r.stdout, /✅ Step 8 post-conditions verified/);
         } finally {
           cleanup(fx.dir);
         }
