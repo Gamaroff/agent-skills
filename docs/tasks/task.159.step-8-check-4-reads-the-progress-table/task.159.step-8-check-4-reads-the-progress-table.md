@@ -5,18 +5,20 @@ type: task
 description: "develop-pipeline Step 8 check 4 greps the whole implementation report for `⏳ Pending`, and the PreCompact hook's pause section names that token in prose, so every paused-and-resumed run fails a clean checklist. Scope the check to the table rows, count `⏸️ Paused` rows as unfinished too, and hold it with an executed bash + zsh test on a paused-and-resumed report."
 tags: [develop-pipeline, step-8, completion-checklist, precompact, follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-27
 updated: 2026-09-27
 assignee:
 estimated_effort_hours: 2
 github_issue: 496
+pr_number: 497
+completed_date: 2026-09-27
 ---
 
 # Technical Task: Step 8 check 4 reads the Pipeline Progress table, not the whole report
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.159.review.1.step-8-check-4-reads-the-progress-table.md` implemented 2026-09-27 (0 critical, 0 important; 3 optional carried to development)
 
@@ -345,16 +347,43 @@ No critical issues identified. The code review raised three advisory findings, r
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.159.qa.1.step-8-check-4-reads-the-progress-table.md`
+**Gate File**: `task.159.gate.1.step-8-check-4-reads-the-progress-table.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (Step 5c)**: ✅ APPROVE — `task.159.pr-review.1.step-8-check-4-reads-the-progress-table.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10/10 pre-merge criteria met. Observation #200 → `actioned` is a post-merge follow-up
+✅ **Tests:** 43/43 executed cases under bash and zsh; `ci:fast` gives 4286 pass, 0 fail; each check-4 branch mutation-proved
+✅ **PR Review:** PR #497; Step 5c `/review-pr` APPROVE
+✅ **Documentation:** CHANGELOG `[Unreleased]` Fixed entry; step document comment block; bundled copies regenerated
+✅ **Security Review:** ✅ PASS (measured). The probe engine ran 9 cases: pre-fix `present-but-inert`, fix head `engages`. The Status-cell fix (`3de659a0`) landed at finalise under the fix-and-recheck rule
+✅ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-27
+
+**Detailed Verification Log:** See `task.159.dod.1.step-8-check-4-reads-the-progress-table.md` for the complete verification evidence, both CI readings and the fix-and-recheck deviations.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-27 | 1.0     | Initial draft | create-task |
 | 2026-09-27 | 1.1     | Review passed (9/10) — no changes required; 3 optional test-tightening notes in review.1 | review-task |
 | 2026-09-27 |         | Status → ready-for-development | review-task |
 | 2026-09-27 |         | Implemented — 6 files, 9 tests (1 non-vacuity + 4 cases × bash/zsh); 3 mutation proofs | develop |
 | 2026-09-27 |         | QA gate PASS (100/100) — 0 gate findings; 3 advisory code-review findings to future | qa-task |
+| 2026-09-27 | 1.2 | DoD passed — accepted (PR #497); Status-cell fix landed at finalise (fix-and-recheck) | finalise |
 <!-- change-log-end -->
 
 ---
