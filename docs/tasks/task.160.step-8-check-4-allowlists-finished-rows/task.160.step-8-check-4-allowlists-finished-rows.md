@@ -5,7 +5,7 @@ type: task
 description: "Step 8 check 4 refuses only `⏳ Pending` and `⏸ Paused`, so `❌ Failed`, `⚠️ Needs Attention` and `🔄 In Progress` rows pass it, and a header-only table satisfies its no-table guard. Replace the deny-list with an allowlist (a Status cell starting with `✅`, or `⏭️ Skipped`) located by header, and make Step 8's own row update land before its commit so checks 4 and 5 can both hold."
 tags: [develop-pipeline, step-8, completion-checklist, follow-up]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-09-27
 updated: 2026-09-27
@@ -16,7 +16,9 @@ github_issue: 498
 
 # Technical Task: Step 8 check 4 allowlists finished rows instead of denying two unfinished ones
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.160.review.1.step-8-check-4-allowlists-finished-rows.md` implemented 2026-09-27
 
 **GitHub Issue**: [#498](https://github.com/Gamaroff/agent-skills/issues/498)
 
@@ -88,14 +90,18 @@ PROGRESS_ROWS=$(awk '/^## Pipeline Progress[[:space:]]*$/ { f = 1; next } f && /
 UNFINISHED=$(printf '%s\n' "$PROGRESS_ROWS" | awk -F'|' '
   NR == 1 { for (i = 2; i < NF; i++) { c = $i; gsub(/^[[:space:]]+|[[:space:]]+$/, "", c); if (c == "Status") col = i } ; next }
   /^\|[-:[:space:]|]+$/ { next }
+  !col { next }
   { n++; s = $col; gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
     if (s ~ /^✅/ || s ~ /^⏭[^|[:alnum:]]*Skipped$/) next
     print }
-  END { if (!col) print "no Status column in the header row"; else if (!n) print "no step rows under the header" }')
+  END { if (!col) print "no Status column in the header row"; else if (!n) print "no step rows under the header" }') \
+  || { echo "❌ Step 8 incomplete: could not read the Pipeline Progress table in $REPORT (awk exited non-zero)"; exit 1; }
 [ -z "$UNFINISHED" ] || { echo "❌ Step 8 incomplete: Pipeline Progress has a row that is not finished (✅ or ⏭️ Skipped):"; printf '   %s\n' "$UNFINISHED"; exit 1; }
 ```
 
 The final form is the developer's call, within the constraints in § 9. The awk program must keep its braces spaced (an unspaced `{exit}` reads as a `{placeholder}` to the harness's `bind()` and to an agent). It must stay free of apostrophes and GNU-only escapes, because it runs under zsh and BSD awk.
+
+Two lines in it are load-bearing under BSD awk, and review found the task's first draft without them. **`!col { next }`**: with no `Status` header cell, `col` is unset, and `$col` is then `$""`, which BSD awk rejects as a fatal `illegal field $()`. The `END` block never runs, and the check would print nothing. **The `|| { … exit 1; }` on the assignment**: a command substitution discards its exit status unless something reads it, so any awk runtime error would leave `UNFINISHED` empty and read as "no unfinished rows". The check fails closed instead. Both were reproduced under bash and zsh before the fix (review.1).
 
 ### Important Clarifications
 
@@ -142,12 +148,12 @@ The final form is the developer's call, within the constraints in § 9. The awk 
 
 **Risk**: Low · **Files**: `shared/resources/tests/step-8-completion-checklist.test.mjs`
 
-- [ ] `[sh]` a finished report whose Status cells use the corpus's finished shapes passes: bare `✅`, `✅ Complete`, `✅ Done (PASS 100/100)`, `✅ Skipped (gate PASS)` and `⏭️ Skipped`
-- [ ] `[sh]` a row at each of `❌ Failed`, `⚠️ Needs Attention`, `🔄 Cycle 3`, `⏸️ Skipped` and an empty Status fails check 4, and the message prints that row. Red on today's check 4
-- [ ] `[sh]` a Bug-variant report (Status in the 3rd cell) with one unfinished row fails, and a finished one passes. This proves the header lookup, not a fixed index. Red on today's check 4
-- [ ] `[sh]` a table with its header and separator but no step rows fails, naming `no step rows`. Red on today's check 4
-- [ ] `[sh]` a table whose header has no `Status` cell fails, naming `no Status column`. Red on today's check 4
-- [ ] The task.159 cases (paused-and-resumed passes; Pending, Paused and bare-`⏸` rows fail; Notes that mention a state pass; no table fails) stay green, updated only where the failure message changed
+- [x] `[sh]` a finished report whose Status cells use the corpus's finished shapes passes: bare `✅`, `✅ Complete`, `✅ Done (PASS 100/100)`, `✅ Skipped (gate PASS)` and `⏭️ Skipped`
+- [x] `[sh]` a row at each of `❌ Failed`, `⚠️ Needs Attention`, `🔄 Cycle 3`, `⏸️ Skipped` and an empty Status fails check 4, and the message prints that row. Red on today's check 4
+- [x] `[sh]` a Bug-variant report (Status in the 3rd cell) with one unfinished row fails, and a finished one passes. This proves the header lookup, not a fixed index. Red on today's check 4
+- [x] `[sh]` a table with its header and separator but no step rows fails, naming `no step rows`. Red on today's check 4
+- [x] `[sh]` a table whose header has no `Status` cell fails, naming `no Status column`. Red on today's check 4, and red on the § 3 draft without `!col { next }` (awk aborts and the check passes)
+- [x] The task.159 cases (paused-and-resumed passes; Pending, Paused and bare-`⏸` rows fail; Notes that mention a state pass; no table fails) stay green, updated only where the failure message changed
 
 **Dependencies**: none
 
@@ -155,8 +161,8 @@ The final form is the developer's call, within the constraints in § 9. The awk 
 
 **Risk**: Low · **Files**: `shared/resources/develop-pipeline-step-8-commit.md`, `skills/{develop-story,develop-task,develop-bug}/references/develop-pipeline-step-8-commit.md` (bundled)
 
-- [ ] Replace check 4 with the allowlist form (§ 3 Target Architecture), keeping the `❌ Step 8 incomplete:` message convention and printing each unfinished row
-- [ ] `npm run bundle`, then `npm run bundle:check` is clean
+- [x] Replace check 4 with the allowlist form (§ 3 Target Architecture), keeping the `❌ Step 8 incomplete:` message convention and printing each unfinished row
+- [x] `npm run bundle`, then `npm run bundle:check` is clean
 
 **Dependencies**: Phase 1
 
@@ -164,10 +170,10 @@ The final form is the developer's call, within the constraints in § 9. The awk 
 
 **Risk**: Low · **Files**: `shared/resources/develop-pipeline-step-8-commit.md` (+ bundled copies)
 
-- [ ] In § Final Implementation Report Update, add the Step 8 row itself to what is set ✅ before `/commit-changes`
-- [ ] Remove the post-commit `Committed in {hash}` Notes write from § Invoke /commit-changes. Point to the orchestrator's completion output and `git log`, with one sentence of why
-- [ ] Remove the post-push `Update Pipeline Progress: ✅ commit-changes` line from § Final Push
-- [ ] `[sh]` case: the checklist passes on a report whose Step 8 row was set ✅ before its commit, with a clean tree. This is the ordering the document now states
+- [x] In § Final Implementation Report Update, add the Step 8 row itself to what is set ✅ before `/commit-changes`. Write it as `✅ Done`, the value the orchestrators' Step Transition Protocol (action 2) writes after the step returns, so that later edit changes nothing
+- [x] Remove the post-commit `Committed in {hash}` Notes write from § Invoke /commit-changes. Point to the orchestrator's completion output and `git log`, with one sentence of why
+- [x] Remove the post-push `Update Pipeline Progress: ✅ commit-changes` line from § Final Push
+- [x] `[sh]` case: the checklist passes on a report whose Step 8 row was set ✅ before its commit, with a clean tree. This is the ordering the document now states
 
 **Dependencies**: Phase 2 (same file; land in one commit series)
 
@@ -175,9 +181,9 @@ The final form is the developer's call, within the constraints in § 9. The awk 
 
 **Risk**: Low · **Files**: `CHANGELOG.md`
 
-- [ ] Mutation-prove each branch (§ 9 Code Quality), recording each proof in the implementation report
-- [ ] CHANGELOG `[Unreleased]` → Fixed, citing (task 160) and naming the four tightenings in § 5
-- [ ] Gates green (§ 9)
+- [x] Mutation-prove each branch (§ 9 Code Quality), recording each proof in the implementation report
+- [x] CHANGELOG `[Unreleased]` → Fixed, citing (task 160) and naming the four tightenings in § 5
+- [x] Gates green (§ 9)
 
 **Dependencies**: Phases 1–3
 
@@ -241,32 +247,34 @@ The three orchestrators consume the bundled copy. `npm run bundle:check` asserts
 
 ### Functional
 
-- [ ] A report whose Status cells use each finished shape (`✅`, `✅ Complete`, `✅ Done (…)`, `✅ Skipped (…)`, `⏭️ Skipped`) passes the Step 8 checklist under bash and zsh. The Phase 2 allowlist branch `s ~ /^✅/ || s ~ /^⏭[^|[:alnum:]]*Skipped$/` returns `next`
-- [ ] A row at `❌ Failed`, `⚠️ Needs Attention`, `🔄 Cycle 3`, `⏸️ Skipped`, or with an empty Status fails check 4 under bash and zsh, and the output names that row. It falls to the Phase 2 `print` branch
-- [ ] A Bug-variant report with one unfinished row fails and a finished one passes. The Phase 2 header lookup sets `col` from the header cell named `Status`
-- [ ] A header-only table fails with `no step rows under the header`. Phase 2 `END` branch: `col` set, `n` is 0
-- [ ] A table with no `Status` header cell fails with `no Status column in the header row`. Phase 2 `END` branch: `col` unset
-- [ ] A report whose Step 8 row is set ✅ before its commit, with a clean tree, passes the checklist (Phase 3)
-- [ ] Every existing case in `step-8-completion-checklist.test.mjs` still passes
+- [x] A report whose Status cells use each finished shape (`✅`, `✅ Complete`, `✅ Done (…)`, `✅ Skipped (…)`, `⏭️ Skipped`) passes the Step 8 checklist under bash and zsh. The Phase 2 allowlist branch `s ~ /^✅/ || s ~ /^⏭[^|[:alnum:]]*Skipped$/` returns `next`
+- [x] A row at `❌ Failed`, `⚠️ Needs Attention`, `🔄 Cycle 3`, `⏸️ Skipped`, or with an empty Status fails check 4 under bash and zsh, and the output names that row. It falls to the Phase 2 `print` branch
+- [x] A Bug-variant report with one unfinished row fails and a finished one passes. The Phase 2 header lookup sets `col` from the header cell named `Status`
+- [x] A header-only table fails with `no step rows under the header`. Phase 2 `END` branch: `col` set, `n` is 0
+- [x] A table with no `Status` header cell fails with `no Status column in the header row`. Phase 2 `!col { next }` skips the rows, and the `END` branch fires with `col` unset
+- [x] A report whose Step 8 row is set ✅ before its commit, with a clean tree, passes the checklist (Phase 3)
+- [x] Every existing case in `step-8-completion-checklist.test.mjs` still passes
 
 ### Performance
 
-- [ ] No measurable change. The check is one awk pass over the table rows
+- [x] No measurable change. The check is one awk pass over the table rows
 
 ### Code Quality
 
-- [ ] Each branch is mutation-proved, with reverting it turning its named case red:
+- [x] Each branch is mutation-proved, with reverting it turning its named case red:
   - the allowlist tested by the old deny-list → the `❌ Failed` case goes red
   - the `✅` prefix narrowed to exact `✅ Done` → the finished-shapes case goes red
   - the `⏭` clause removed → the `⏭️ Skipped` case goes red
   - the header lookup replaced by a fixed `col = 2` → the Bug-variant case goes red
   - the `no step rows` branch removed → the header-only case goes red
-- [ ] `npm run ci:fast` (with the `.agents/skills` symlink moved aside), `npm run lint:shell`, `npm run bundle:check` and `npm run check:generated` all pass
-- [ ] `npm run validate -- skills/<skill>/` passes for `develop-story`, `develop-task` and `develop-bug`
+  - the `!col { next }` guard removed → the no-Status-column case goes red (the message changes to `could not read`)
+  - the `|| { … exit 1; }` on the `UNFINISHED` assignment removed, with the guard also removed → the no-Status-column case goes red (the check passes)
+- [x] `npm run ci:fast` (with the `.agents/skills` symlink moved aside), `npm run lint:shell`, `npm run bundle:check` and `npm run check:generated` all pass
+- [x] `npm run validate -- skills/<skill>/` passes for `develop-story`, `develop-task` and `develop-bug`
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry cites (task 160) and names the four tightenings in § 5
+- [x] CHANGELOG `[Unreleased]` entry cites (task 160) and names the four tightenings in § 5
 
 ---
 
@@ -323,6 +331,9 @@ None.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-27 | 1.0     | Initial draft | create-task |
+| 2026-09-27 | 1.1     | Review passed (9/10): guard the row block on `col` and fail closed on awk's exit status, because the no-Status-column outcome was unreachable under BSD awk; Step 8 row written as `✅ Done` before the commit | review-task |
+| 2026-09-27 |         | Status → ready-for-development | review-task |
+| 2026-09-27 |         | Implemented — 6 files, 21 new tests (10 executed cases × bash/zsh + 1 prose guard); 8 mutation proofs | develop |
 
 <!-- change-log-end -->
 
@@ -332,19 +343,19 @@ None.
 
 ### Phase 1: Tests first
 
-- [ ] Finished-shape, unfinished-shape, Bug-variant, header-only and no-Status-column cases, bash and zsh
+- [x] Finished-shape, unfinished-shape, Bug-variant, header-only and no-Status-column cases, bash and zsh
 
 ### Phase 2: Allowlist check 4
 
-- [ ] Allowlist check 4 in the shared source; re-bundled; bundle:check clean
+- [x] Allowlist check 4 in the shared source; re-bundled; bundle:check clean
 
 ### Phase 3: Step 8 ordering
 
-- [ ] No report edit after the Step 8 commit; the ordering case is green
+- [x] No report edit after the Step 8 commit; the ordering case is green
 
 ### Phase 4: Proof and gates
 
-- [ ] Five mutation proofs recorded; CHANGELOG entry; gates green
+- [x] Seven mutation proofs recorded; CHANGELOG entry; gates green
 
 ---
 

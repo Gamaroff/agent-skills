@@ -193,8 +193,43 @@ function withoutProgressTable(text) {
   return [...lines.slice(0, at), ...lines.slice(next)].join("\n");
 }
 
+// Keep the header and separator rows under `## Pipeline Progress`; drop every step row.
+function headerOnly(text) {
+  const lines = text.split("\n");
+  const at = lines.findIndex((l) => /^## Pipeline Progress\s*$/.test(l));
+  const next = lines.findIndex((l, i) => i > at && l.startsWith("## "));
+  const pipes = lines.slice(at + 1, next).filter((l) => l.startsWith("|"));
+  assert.ok(pipes.length >= 3, "fixture: expected header + separator + rows");
+  const keep = new Set(pipes.slice(0, 2));
+  return lines
+    .filter(
+      (l, i) => !(i > at && i < next && l.startsWith("|") && !keep.has(l)),
+    )
+    .join("\n");
+}
+
+// Rename the table's `Status` header cell, so no column is named Status. Only the header row is
+// touched, and it must carry the cell exactly once.
+function withoutStatusColumn(text) {
+  const header = progressRows(text)[0];
+  const parts = header.split(" Status ");
+  assert.equal(parts.length, 2, "the header row does not name Status once");
+  return text.split(header).join(parts.join(" State  "));
+}
+
+// The one table row whose label is `label` — what check 4 prints when it refuses that row.
+function rowOf(text, label) {
+  const hits = progressRows(text).filter((l) => l.startsWith(`| ${label}`));
+  assert.equal(
+    hits.length,
+    1,
+    `expected one "${label}" row, found ${hits.length}`,
+  );
+  return hits[0];
+}
+
 const CHECK4_UNFINISHED =
-  /❌ Step 8 incomplete: Pipeline Progress still has an unfinished \(⏳ Pending \/ ⏸️ Paused\) row/;
+  /❌ Step 8 incomplete: Pipeline Progress has a row that is not finished \(✅ or ⏭️ Skipped\)/;
 const CHECK4_NO_TABLE =
   /❌ Step 8 incomplete: no Pipeline Progress table found/;
 
@@ -266,6 +301,25 @@ test("the step document names the general-bug registry as develop-bug's extra sc
     ),
     "develop-bug Step 8 no longer passes the registry as an extra scope",
   );
+});
+
+// Step 8 must not tell the orchestrator to edit the report after its own commit: check 5 needs a
+// clean tree, so any such edit either fails the step or is left out of the commit (task 160). 15 of
+// 123 committed completed reports carried a `⏳ Pending` row that way, 14 of them Step 8's own.
+test("Step 8 edits the report before /commit-changes and never after it", () => {
+  const doc = readDoc(STEP8);
+  const before = doc.slice(
+    doc.indexOf("## Final Implementation Report Update"),
+    doc.indexOf("## Lint the report before the terminal commit"),
+  );
+  assert.match(before, /including Step 8's own row/);
+  const after = doc.slice(
+    doc.indexOf("## Invoke /commit-changes"),
+    doc.indexOf("## Step 8 Completion Checklist"),
+  );
+  assert.ok(after.length > 0, "section anchors moved");
+  assert.doesNotMatch(after, /Update Pipeline Progress/);
+  assert.doesNotMatch(after, /Update the Pipeline Progress Notes/);
 });
 
 // The paused-and-resumed case can only pass for the right reason if the fixture carries the trap:
@@ -411,6 +465,127 @@ describe("executed against fixtures", { concurrency: true }, () => {
         const r = await runChecklist(sh, fx);
         assert.equal(r.status, 1, `stdout: ${r.stdout}`);
         assert.match(r.stdout, CHECK4_NO_TABLE);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // ── check 4 is an allowlist (task 160) ────────────────────────────────────
+    // Finished = a Status cell that starts with ✅ (any detail after it), or reads ⏭️ Skipped. The
+    // shapes below are all in the committed corpus of finished reports; an exact `✅ Done` match
+    // would have refused most of them.
+    test(`[${sh}] a report whose Status cells use every finished shape passes check 4`, async () => {
+      let t = finished("Task");
+      for (const [label, shape] of [
+        ["1. create-branch", "✅"],
+        ["2. review-task", "✅ Complete"],
+        ["3. develop", "✅ Done (PASS 100/100)"],
+        ["4. create-pr", "✅ Skipped (gate PASS)"],
+        ["5–6. qa-task / qa-fix loop", "⏭️ Skipped"],
+      ]) {
+        t = setRow(t, label, shape);
+      }
+      const fx = await setup(t);
+      try {
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+        assert.match(r.stdout, /✅ Step 8 post-conditions verified/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // Every Status the deny-list did not name passed it. Each one here fails, and the message prints
+    // the refused row — and only that row, so a check that refused every row would also go red.
+    for (const state of [
+      "❌ Failed",
+      "⚠️ Needs Attention",
+      "🔄 Cycle 3",
+      "⏸️ Skipped",
+      "",
+    ]) {
+      test(`[${sh}] a table row at "${state}" fails check 4, naming that row`, async () => {
+        const t = setRow(finished("Task"), "8. commit-changes", state);
+        const fx = await setup(t);
+        try {
+          const r = await runChecklist(sh, fx);
+          assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+          assert.match(r.stdout, CHECK4_UNFINISHED);
+          assert.ok(
+            r.stdout.includes(rowOf(t, "8. commit-changes")),
+            `the refused row is not printed: ${r.stdout}`,
+          );
+          assert.ok(
+            !r.stdout.includes(rowOf(t, "7. finalise")),
+            `a finished row was printed as unfinished: ${r.stdout}`,
+          );
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+    }
+
+    // The Bug variant carries Status in the THIRD cell. Only a header lookup reads it there; a fixed
+    // column index would read the Skill cell and refuse every row.
+    test(`[${sh}] a bug-variant report with one unfinished row fails on that row only`, async () => {
+      const t = setRow(finished("Bug"), "8 | commit-changes", "❌ Failed");
+      const fx = await setup(t);
+      try {
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+        assert.match(r.stdout, CHECK4_UNFINISHED);
+        assert.ok(r.stdout.includes(rowOf(t, "8 | commit-changes")), r.stdout);
+        assert.ok(!r.stdout.includes(rowOf(t, "7 | finalise-close")), r.stdout);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // "Found nothing" and "had nothing to look at" must not produce the same pass.
+    test(`[${sh}] a table with a header and no step rows fails check 4`, async () => {
+      const fx = await setup(headerOnly(finished("Task")));
+      try {
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+        assert.match(r.stdout, CHECK4_UNFINISHED);
+        assert.match(r.stdout, /no step rows under the header/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // Without a Status column there is no cell to read. Under BSD awk an unguarded `$col` is a fatal
+    // error, which an unchecked command substitution turns into a pass (task.160 review.1).
+    test(`[${sh}] a table with no Status column fails check 4`, async () => {
+      const fx = await setup(withoutStatusColumn(finished("Task")));
+      try {
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+        assert.match(r.stdout, CHECK4_UNFINISHED);
+        assert.match(r.stdout, /no Status column in the header row/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // ── Step 8 ordering (task 160, Phase 3) ────────────────────────────────────
+    // The order the step document states: Step 8's own row is set ✅ Done, THEN the commit and push
+    // run, and nothing edits the report afterwards. Checks 4 and 5 then hold together.
+    test(`[${sh}] Step 8's row set ✅ before its own commit passes checks 4 and 5`, async () => {
+      const pending = setRow(
+        finished("Task"),
+        "8. commit-changes",
+        "⏳ Pending",
+      );
+      const fx = await setup(pending);
+      try {
+        write(fx.work, REPORT, finished("Task"));
+        await gitAsync(fx.work, "add", "-A");
+        await gitAsync(fx.work, "commit", "-q", "-m", "step 8");
+        await gitAsync(fx.work, "push", "-q");
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+        assert.match(r.stdout, /✅ Step 8 post-conditions verified/);
       } finally {
         cleanup(fx.dir);
       }
