@@ -23,6 +23,11 @@ Before invoking `/commit-changes`, update the implementation report one final ti
   - develop-story: what was **built**, QA iterations taken, notable decisions
   - develop-task: what was **implemented**, QA iterations taken, notable decisions
 
+**The Step 8 row is written before the step's work, so it is not the evidence that Step 8 finished.** This is the one statement of that rule; the resume contract cites it. Two consequences:
+
+- **A HALT after this update sets the row back.** If the lint, `/commit-changes`, the push or the Completion Checklist fails, set the Step 8 row to `❌ Failed` (with the reason in Notes) before the error-recovery HALT rule commits the report. A HALT that commits the row at `✅` records success for work that did not happen, and a resume reads it as done.
+- **Resume verifies a `✅` Step 8 against git, not the row.** A PreCompact pause inside Step 8 cannot reset the row (the hook appends a pause section and edits no table row), so the row alone cannot tell a finished Step 8 from an interrupted one. The evidence is check 5's call — `verify-push-state.sh` with the PR's base and the work-item scope: tree clean within scope, local HEAD equal to the remote, PR head equal to HEAD. When it fails, Step 8 re-runs (resume contract, Phase 0b).
+
 ---
 
 ## Lint the report before the terminal commit

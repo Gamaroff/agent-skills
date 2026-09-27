@@ -1,0 +1,18 @@
+{
+  "sink": "filename",
+  "entry": ".claude/state/t160-probe-wrapper.mjs#check4Admits",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 21,
+  "passed": 21,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-27T11:19:09.939Z"
+}

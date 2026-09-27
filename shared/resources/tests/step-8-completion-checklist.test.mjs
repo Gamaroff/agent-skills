@@ -366,6 +366,44 @@ for (const s of ["develop-task", "develop-story", "develop-bug"]) {
     )?.[0];
     assert.ok(action2, `skills/${s}/SKILL.md: action 2 not found`);
     assert.match(action2, /After Step 8 this edit is a no-op/);
+    // The same predicate check 4 uses, and a mismatch is a HALT (task.160 QA cycle 2, CR2-2).
+    assert.match(action2, /check 4's own test/);
+    assert.match(action2, /HALT, not an edit/);
+    assert.doesNotMatch(action2, /reads `✅ Done` and change nothing/);
+  });
+}
+
+// The Step 8 row is written before the step's work, so it cannot prove Step 8 finished (task.160
+// QA cycle 2, CR2-1). The step document states that once; the resume contract cites it and verifies
+// a ✅ Step 8 against git instead of trusting the row.
+const RESUME = "shared/resources/develop-pipeline-resume-contract.md";
+test("the step document says the Step 8 row is not the evidence, and a HALT sets it back", () => {
+  const doc = readDoc(STEP8);
+  const update = doc.slice(
+    doc.indexOf("## Final Implementation Report Update"),
+    doc.indexOf("## Lint the report before the terminal commit"),
+  );
+  assert.match(update, /is not the evidence that Step 8 finished/);
+  assert.match(update, /set the Step 8 row to `❌ Failed`/);
+  assert.match(update, /Resume verifies a `✅` Step 8 against git/);
+});
+
+// The resume contract's Step 8 verification command, cut from the contract and bound — so the test
+// runs what a resuming orchestrator runs.
+function resumeStep8Command() {
+  const doc = readDoc(RESUME);
+  assert.doesNotMatch(doc, /Steps 2 and 8 do not require/);
+  const m = doc.match(
+    /`(bash \.agents\/skills\/\{develop-story\|develop-task\|develop-bug\}\/references\/verify-push-state\.sh --base [^`]*)`/,
+  );
+  assert.ok(
+    m,
+    "the resume contract no longer names the Step 8 verification command",
+  );
+  return bind(m[1], {
+    ".agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh":
+      VERIFY,
+    "{doc-directory}": WORK_ITEM,
   });
 }
 
@@ -637,6 +675,62 @@ describe("executed against fixtures", { concurrency: true }, () => {
         cleanup(fx.dir);
       }
     });
+
+    // ── Resume: a ✅ Step 8 row is verified against git (task.160 QA cycle 2, CR2-1) ──
+    // The gh stub answers the PR's base, its number and its head (the pushed branch tip).
+    const RESUME_GH =
+      'case "$*" in *baseRefName*) echo develop ;; *headRefOid*) git rev-parse @{u} ;; *number*) echo 1 ;; esac';
+    for (const [name, prepare, want] of [
+      ["Step 8 finished: committed and pushed", async () => {}, 0],
+      [
+        "a HALT after the commit, before the push",
+        async (fx) => {
+          fs.appendFileSync(
+            path.join(fx.work, REPORT),
+            "\n- halted before the push\n",
+          );
+          await gitAsync(fx.work, "commit", "-qam", "step 8, not pushed");
+        },
+        1,
+      ],
+      [
+        "a pause after the row was set, before the commit",
+        async (fx) => {
+          fs.appendFileSync(
+            path.join(fx.work, REPORT),
+            "\n- paused before the commit\n",
+          );
+        },
+        1,
+      ],
+    ]) {
+      test(`[${sh}] resume verification of a ✅ Step 8 row: ${name}`, async () => {
+        const fx = await setup(finished("Task"));
+        try {
+          // setup() installed the stub; replace its answers rather than install a second one.
+          fs.writeFileSync(path.join(fx.dir, "gh-body.sh"), `${RESUME_GH}\n`);
+          await prepare(fx);
+          const r = await runAsync(sh, resumeStep8Command(), {
+            cwd: fx.work,
+            bin: fx.bin,
+          });
+          if (want === 0)
+            assert.equal(
+              r.status,
+              0,
+              `stdout: ${r.stdout}\nstderr: ${r.stderr}`,
+            );
+          else
+            assert.notEqual(
+              r.status,
+              0,
+              `an unfinished Step 8 verified: ${r.stdout}`,
+            );
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+    }
 
     // ── check 5 — dirt is judged against the work item ─────────────────────────
 

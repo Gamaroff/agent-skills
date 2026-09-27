@@ -344,7 +344,7 @@ For each step marked ✅ in the implementation report (within the Phase 0a scope
 
 A step marked `⏸️ Paused` (set by the PreCompact hook on graceful pause) is treated identically to `⏳ Pending`: re-run from the start of that step. Earlier `✅` steps still skip per their artifact verification. Log: "Resuming after graceful pause — re-running Step {N}."
 
-Steps 2 and 8 do not require artifact verification beyond reading the implementation report.
+Step 2 does not require artifact verification beyond reading the implementation report. **Step 8 does**: its row is written `✅` before the step's commit and push, so a `✅` Step 8 row is not evidence on its own (step-8 doc § Final Implementation Report Update states why and is the one statement of the rule). Verify it with check 5's call — `bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$(gh pr view --json baseRefName -q .baseRefName)" --pr "$(gh pr view --json number -q .number)" --scope {doc-directory}` (plus a `--scope` for each of the caller's `{extra-scope-paths}`). Exit 0 → Step 8 is verified. Any other exit → re-run Step 8 and log: "Resume verification failed for Step 8 — work not on the remote, re-running."
 
 ### Subagent Summary Replay
 

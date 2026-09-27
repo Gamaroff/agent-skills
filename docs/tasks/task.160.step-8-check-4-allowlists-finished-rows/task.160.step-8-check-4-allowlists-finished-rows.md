@@ -202,6 +202,10 @@ Two lines in it are load-bearing under BSD awk, and review found the task's firs
 
 7. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md`: the Step 8 summary names the Pipeline Progress update before the commit, and Step Transition Protocol action 2 is a no-op after Step 8
 
+### Files to Modify (Resume — QA cycle 2, CR2-1)
+
+8. ✅ `shared/resources/develop-pipeline-resume-contract.md`: a ✅ Step 8 row is verified against git (`verify-push-state.sh`), not trusted; bundled into develop-{story,task,bug}, qa-{fix,story,task}, review-{pr,story,task}
+
 ### Files to Modify (Tests)
 
 5. ✅ `shared/resources/tests/step-8-completion-checklist.test.mjs`: new executed cases (already in the `npm test` glob `shared/resources/tests/*.test.mjs`)
@@ -337,17 +341,17 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.160.qa.1.step-8-check-4-allowlists-finished-rows.md](./task.160.qa.1.step-8-check-4-allowlists-finished-rows.md)
-- **Gate File**: [task.160.gate.1.step-8-check-4-allowlists-finished-rows.yml](./task.160.gate.1.step-8-check-4-allowlists-finished-rows.yml)
+- **Full Report**: [task.160.qa.2.step-8-check-4-allowlists-finished-rows.md](./task.160.qa.2.step-8-check-4-allowlists-finished-rows.md)
+- **Gate File**: [task.160.gate.2.step-8-check-4-allowlists-finished-rows.yml](./task.160.gate.2.step-8-check-4-allowlists-finished-rows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 64
+- **Tests Executed**: 71
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One medium finding (CR-1): four restatements of Step 8 (the step document's description and the develop-task, develop-story and develop-bug `SKILL.md` summaries) still prescribe a Pipeline Progress update after the push. Check 4 itself is measured correct: the probe engages on 21/21 cases under bash and zsh.
+Cycle 1's CR-1 is fixed. There is one new medium finding (CR2-1): writing the Step 8 row ✅ before its commit means a HALT or pause inside Step 8 leaves a committed report that reads Step 8 as done, and the resume contract reads only that row. There is also one low finding (CR2-2): the action-2 confirmation is stricter than check 4.
 
 ---
 
@@ -363,6 +367,8 @@ One medium finding (CR-1): four restatements of Step 8 (the step document's desc
 | 2026-09-27 |         | Implemented — 6 files, 21 new tests (10 executed cases × bash/zsh + 1 prose guard); 8 mutation proofs | develop |
 | 2026-09-27 |         | QA gate CONCERNS (90/100) — 1 finding (CR-1, medium) | qa-task |
 | 2026-09-27 |         | QA findings fixed — CR-1 (4 Step 8 restatements + action 2 carve-out in 3 orchestrators; 7 new guard tests), 1 iteration | qa-fix |
+| 2026-09-27 |         | QA gate CONCERNS (90/100) — 2 findings (CR2-1 medium, CR2-2 low) | qa-task |
+| 2026-09-27 |         | QA findings fixed — CR2-1 (a HALT inside Step 8 sets its row ❌ Failed; resume verifies a ✅ Step 8 against git), CR2-2 (action 2 uses check 4's predicate); 7 new tests; 2 iterations total | qa-fix |
 
 <!-- change-log-end -->
 

@@ -1,0 +1,66 @@
+schema: 1
+task: 'task.160.step-8-check-4-allowlists-finished-rows'
+task_title: 'Step 8 check 4 allowlists finished rows instead of denying two unfinished ones'
+gate: CONCERNS
+status_reason: 'Cycle 1 CR-1 fixed and guarded. The cycle-2 refute pass found that writing the Step 8 row ✅ before the commit removes the only signal a resume had that Step 8 did not finish: a HALT inside Step 8 now commits the report with Step 8 ✅, and the resume contract reads only the report for Step 8.'
+reviewer: 'QA Engineer'
+updated: '2026-09-27T14:00:00Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-8-commit.md'
+    finding: 'Step 8 now sets its own row to ✅ Done before /commit-changes, the push and the Completion Checklist. If any of those fails, the HALT rule commits the report with Step 8 ✅, and a PreCompact pause inside Step 8 leaves the row ✅ (the hook only prints "now ⏸️ Paused", it never edits the row). The resume contract (develop-pipeline-resume-contract.md, "Steps 2 and 8 do not require artifact verification beyond reading the implementation report") and Context Compression Recovery ("find the last ✅ step") then read Step 8 as complete, so a resumed run can skip a commit, push and checklist that never succeeded. Under the old order the row stayed ⏳ Pending until after the push, which was that signal.'
+    suggested_action: 'In the step-8 doc, state that a HALT after the row is set (lint, commit, push or checklist failure) sets the Step 8 row to ❌ Failed before the HALT commit. In the resume contract, verify a ✅ Step 8 against git rather than the row alone (verify-push-state.sh scoped to the work item: tree clean, HEAD == remote, PR head == HEAD), re-running Step 8 when it fails. Add a guard test for each.'
+    suggested_owner: dev
+  - id: 'CR2-2'
+    severity: low
+    file: 'skills/develop-task/SKILL.md'
+    finding: 'The cycle-1 action-2 carve-out says "Confirm the row reads `✅ Done` and change nothing", but check 4 admits any cell starting with ✅ (or ⏭️ Skipped). A Step 8 row written `✅ Done (…)` passes check 4 and then fails this exact-match with no route out except action 2''s base rule, which is the post-commit edit task 160 removed. Same text in skills/develop-story/SKILL.md and skills/develop-bug/SKILL.md.'
+    suggested_action: 'Word the confirmation as check 4''s predicate (the cell starts with ✅, or reads ⏭️ Skipped) and state that a mismatch after Step 8 is a HALT, not an edit.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 71
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 21
+    notes: 'Probe re-run on e299eae7 through the shipped block under bash and zsh: 12 hostile refused, 9 legitimate admitted, verdict engages, 0 reproduced. Record: task.160.qa.2.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: one awk pass.'
+  reliability:
+    status: PASS
+    notes: 'Check 4 fails closed on every empty-evidence shape. The resume-signal regression is carried in top_issues (CR2-1).'
+  maintainability:
+    status: PASS
+    notes: 'All four Step 8 restatements now agree and are held by tests (mutation-proved, 4 reversions red).'
+
+recommendations:
+  immediate:
+    - action: 'CR2-1: make a HALT inside Step 8 leave the Step 8 row unfinished, and verify a ✅ Step 8 on resume against git.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md', 'shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR2-2: word the action-2 confirmation as check 4''s predicate; a mismatch is a HALT.'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md']
+  future:
+    - action: 'Pre-existing (not introduced here): the resume detector sets recommended_step = LOCK_STEP + 1 when no summary is expected, and the lock records the PENDING step, so a run halted at Step 8 is recommended step 9 — outside 1..8. Named follow-up; the fix for CR2-1 must not rely on the detector.'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md']
+    - action: 'Carried from gate.1 (advisory): CR-2 executed ordering test cannot fail on the order; CR-4 pin LC_ALL=C on the check-4 awk; CR-5 Phase 2 completion templates have no commit-hash field.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs', 'shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR2-1 fixed', 'CR2-2 fixed']
