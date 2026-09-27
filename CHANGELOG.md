@@ -306,6 +306,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Step 8 check 4 reads the Pipeline Progress table, not the whole report (task 159, obs #200).**
+  The check grepped the whole implementation report for `⏳ Pending`. The PreCompact hook's
+  `## Pipeline Paused` section names that token in prose, so every run that was paused and then
+  resumed failed Step 8's BLOCKING checklist, even with every table row at `✅ Done`. Check 4 now
+  reads only the `|` rows under `## Pipeline Progress`. Two cases tighten on purpose. A `⏸️ Paused`
+  row now fails, because the resume contract treats it as `⏳ Pending`. A report with no Pipeline
+  Progress table now fails too; before, it passed on nothing. Executed bash + zsh cases in
+  `step-8-completion-checklist.test.mjs` hold the change: a paused-and-resumed report built by
+  running the hook's own append block, a Pending row, a Paused row, and a missing table. Each branch
+  is mutation-proved.
 - **`qa-story`'s QA report template closed its fence early (task 152).** A stray four-backtick fence line
   after *Test Commands Executed* ended the four-backtick template there, so *Coverage Report* onward
   rendered as real headings of the skill and the template's own closing fence opened one that never
