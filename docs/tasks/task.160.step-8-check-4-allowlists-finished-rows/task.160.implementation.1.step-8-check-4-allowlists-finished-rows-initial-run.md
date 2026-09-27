@@ -3,7 +3,7 @@
 **Task**: `task.160.step-8-check-4-allowlists-finished-rows.md`
 **Run Number**: 1
 **Started**: 2026-09-27 12:51
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Replace Step 8 check 4's Pending/Paused deny-list with a header-located allowlis
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | review.1 — READY TO IMPLEMENT 9/10; 1 important + 1 optional fixed; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan named every hunk); 1 iteration; 64/64 checklist tests, ci:fast 4308/0 fail; 8 mutation proofs; gates green | —                    |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #499: https://github.com/Gamaroff/agent-skills/pull/499 | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | `.summaries/step-5-traceability-mapper.json` |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (3 + 2 + 1 granted); gate.6 PASS 100 on c3a2bd6f; 5c /review-pr APPROVE (pr-review.1, 4 low) | `.summaries/step-5-traceability-mapper.json` |
+| 7. finalise                | ✅ Done | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | dod.1 ACCEPTED; accept commit 1631334a; CI reading 2 SUCCESS; #498 closed; board Done | —                    |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report finalised before the commit; /commit-changes --scope work item; pushed; Cleanup + Completion Checklist | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -107,6 +107,17 @@ Replace Step 8 check 4's Pending/Paused deny-list with a header-located allowlis
 
 - QA cycle 5 (qa-task): scoped since gate.4 14:50:38Z; reviewer (~2.5 min) 5 findings, none high-confidence; QA verified CR5-1 (finalise NEXT=8 before Step 7 tail) and gated 4. Probe engages 21/21; CI green on 66d7802d. Gate CONCERNS 90. 5b cycle 5 fixed all 4 (c3a2bd6f). Budget spent → route 2c evaluated by engine: continue (medium-not-falling 1,3,2) → loop-limit escalation
 - Process errors this cycle, both caught before commit: (1) mutation-proof snapshots failed under zsh because `$FILES` was a scalar, which zsh does not word-split, so the mutations were left in place. All five were reversed by exact inverse edits (the lock helper via git, having no other change), confirmed by per-file diffs against HEAD, then re-run correctly under bash with an array. (2) A transient .git/index.lock failed the first commit attempt; the lock was already gone on the next check; the retry succeeded
+- QA loop re-entry: 1 extra cycle granted (user chose loop-limit option 1 — resume at 5a with 1 more cycle to gate `c3a2bd6f`); 0 cycle(s) run outside the loop back-filled from disk. Resume detector (source halt_snapshot, no blocking issues, PR #499 OPEN); lock restored from the halt snapshot by grant-qa-cycles.sh (QA_CYCLE=5, qa_max_cycles=6, qa_phase 5a)
+- QA cycle 6 (qa-task): scoped since gate.5 15:01:36Z (array-built; 28 files); reviewer (~2.5 min) 2 low advisory; CR5-1..4 FIXED, 2 mutations red; probe engages 21/21; Step 4b 0 findings over 6 files; ci:fast 4322/0 (.agents/skills aside); CI green on 36c42825. Gate PASS 100 → 5c. Committed gate+report as 9a4629f8, pushed once. 5c /review-pr (medium, --comment): APPROVE — 4 low (PC-1, PC-2, CR-1, CR-2). GitHub ready-for-merge: stage-disabled (expected). Transient .git/index.lock during qa-read-back staging; gone on re-check, re-run clean
+- Step 7 /finalise: 4 DoD agents (AC 12/12 PASS; security PASS, measured, 21 probes, 0 reproduced, record task.160.dod.security.run.json; the orchestrator ran the probe because Explore sessions cannot write; compliance NOT_APPLICABLE; docs PASS). Decision ACCEPTED. PC-2 fixed at acceptance: task § 1/§ 4 scope aligned with the QA-cycle additions. Registry: ticked
+- DoD summary: docs/tasks/task.160.step-8-check-4-allowlists-finished-rows/task.160.dod.1.step-8-check-4-allowlists-finished-rows.md
+- CI reading 1: SUCCESS @ 9a4629f897c782dbb1e1cc33b0e0e7e193b45307 (5 checks); CI reading 2: SUCCESS @ 1631334a53afe41dfe4d8993752f5114a249c9e4 (5 checks, 120s). Acceptance commit 1631334a pushed; tracked-and-pushed assertions OK; CHANGELOG cites task 160
+- Canonical PR summary posted: https://github.com/Gamaroff/agent-skills/pull/499#issuecomment-5857864280
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/499#issuecomment-5857868605
+- GitHub Issue #498 — close: CLOSED ✅ (done comment posted by /finalise; orchestrator re-run returned already). Document link already durable/absent
+- GitHub board: done → already (the close auto-moved the card)
+- Tracker journal (.claude/state/tracker-actions.jsonl) absent → Tracker debt: none
+- Task completed
 
 ---
 
@@ -221,14 +232,26 @@ The pipeline completed its 5 qa-task/qa-fix cycles (3 original + 2 granted) with
 2. File a follow-up task for the pre-existing post-commit window (`a284dfdd`): no resume record after the Step 8 commit, the HALT snapshot skipped at step 8, and the detector's `LOCK_STEP + 1 = 9`.
 3. Alternatively, accept gate.5 and proceed manually with /finalise. `c3a2bd6f` would then ship with no gate reading it.
 
+### QA Cycle 6 — 2026-09-27
+**Gate Result**: PASS
+**Issues Found**: none open. CR5-1..4 FIXED (2 mutations red: the Step 7 wording, and the helper's `finalise) NEXT=8`). Advisory: CR6-1 (low/medium: no template has a Commit field for Step 8's final hash), CR6-2 (cleanup: the before-commit test does not discriminate the order). Both are in recommendations.future with the pre-existing post-commit gap (→ task.161)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**PR Review report**: `task.160.pr-review.1.step-8-check-4-allowlists-finished-rows.md` — APPROVE, 4 low findings (PC-1 Completion block stale → Step 8 overwrites it; PC-2 task doc §1/§4 scope lag; CR-1 generic post-step Pipeline Progress line in 3 orchestrators; CR-2 step-8 recovery exception order → CR-1/CR-2 folded into task.161). Summary comment posted to PR #499; ready-for-merge: see Decisions Log
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated
+**Finished**: 2026-09-27 18:56
+**Final Status**: Completed
 **Branch**: `feature/task.160.step-8-check-4-allowlists-finished-rows`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/499
-**QA Iterations**: 5 (escalated — loop limit; 2 of them granted)
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 6 (3, then 2 and 1 granted after two escalations; gate.6 PASS 100; 5c APPROVE)
+**DoD Summary**: `task.160.dod.1.step-8-check-4-allowlists-finished-rows.md`
+**Tracker debt**: none
+
+**Completion Summary**: Check 4 of the Step 8 Completion Checklist now allowlists finished Status cells. A cell must start with `✅` or read `⏭️ Skipped`, and the Status column is located by header. It fails a header-only table and a table with no Status column, each with its own message, and it fails closed when awk dies. Step 8 now writes its own row and the report's final fields before its commit, so checks 4 and 5 can both hold. QA took 6 cycles: 3, then 2 and 1 granted after two escalations. Every finding after cycle 1 was about the question Phase 3 opened, namely how a resume knows Step 8 finished. It was settled as "the resume record decides": a record at step 8 makes the Step 8 row non-evidence, and the resume goes back to the first unfinished row 1–7 or re-runs Step 8. Gate.6 read PASS 100 on `c3a2bd6f`, 5c returned APPROVE, and `/finalise` accepted with CI green on both readings. The pre-existing post-commit window (`a284dfdd`) is out of scope → task.161, which also takes pr-review.1 CR-1 and CR-2.
