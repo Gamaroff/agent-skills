@@ -1,6 +1,6 @@
 ---
 name: develop-pipeline-step-8-commit
-description: Step 8 (commit-changes + lock removal) shared by develop-story and develop-task. Covers final implementation report update (Finished timestamp, Final Status, QA Iterations, Completion Summary), /commit-changes invocation, final push, Pipeline Progress update, and pipeline lock file removal. Near-identical for both orchestrators — one variant noted for Completion Summary wording.
+description: Step 8 (commit-changes + lock removal) shared by develop-story and develop-task. Covers final implementation report update (Finished timestamp, Final Status, QA Iterations, Completion Summary, and every Pipeline Progress row including Step 8's own, all before the commit), /commit-changes invocation, final push, and pipeline lock file removal. Nothing edits the report after the commit. Near-identical for both orchestrators — one variant noted for Completion Summary wording.
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/develop-pipeline-step-8-commit.md. Regenerate via `npm run bundle`. -->
 

@@ -198,6 +198,10 @@ Two lines in it are load-bearing under BSD awk, and review found the task's firs
 3. ✅ `skills/develop-task/references/develop-pipeline-step-8-commit.md`: bundled copy (generated)
 4. ✅ `skills/develop-bug/references/develop-pipeline-step-8-commit.md`: bundled copy (generated)
 
+### Files to Modify (Orchestrators — QA cycle 1, CR-1)
+
+7. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md`: the Step 8 summary names the Pipeline Progress update before the commit, and Step Transition Protocol action 2 is a no-op after Step 8
+
 ### Files to Modify (Tests)
 
 5. ✅ `shared/resources/tests/step-8-completion-checklist.test.mjs`: new executed cases (already in the `npm test` glob `shared/resources/tests/*.test.mjs`)
@@ -324,6 +328,29 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-27
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.160.qa.1.step-8-check-4-allowlists-finished-rows.md](./task.160.qa.1.step-8-check-4-allowlists-finished-rows.md)
+- **Gate File**: [task.160.gate.1.step-8-check-4-allowlists-finished-rows.yml](./task.160.gate.1.step-8-check-4-allowlists-finished-rows.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 64
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One medium finding (CR-1): four restatements of Step 8 (the step document's description and the develop-task, develop-story and develop-bug `SKILL.md` summaries) still prescribe a Pipeline Progress update after the push. Check 4 itself is measured correct: the probe engages on 21/21 cases under bash and zsh.
+
+---
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -334,6 +361,8 @@ None.
 | 2026-09-27 | 1.1     | Review passed (9/10): guard the row block on `col` and fail closed on awk's exit status, because the no-Status-column outcome was unreachable under BSD awk; Step 8 row written as `✅ Done` before the commit | review-task |
 | 2026-09-27 |         | Status → ready-for-development | review-task |
 | 2026-09-27 |         | Implemented — 6 files, 21 new tests (10 executed cases × bash/zsh + 1 prose guard); 8 mutation proofs | develop |
+| 2026-09-27 |         | QA gate CONCERNS (90/100) — 1 finding (CR-1, medium) | qa-task |
+| 2026-09-27 |         | QA findings fixed — CR-1 (4 Step 8 restatements + action 2 carve-out in 3 orchestrators; 7 new guard tests), 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

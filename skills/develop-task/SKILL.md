@@ -130,7 +130,7 @@ This prevents context accumulation across the 8-step pipeline.
 Every step ends with the same four actions, executed *in order, with no text output between them*:
 
 1. **Bash tool call** advancing the lock to the next step (use the helper: `bash .agents/skills/develop-task/references/advance-pipeline-lock.sh {N+1}`). **This must be the first call** — it is the binding side-effect that anchors the orchestrator into "still working" mode and signals to the `Stop` hook that the pipeline has advanced. If the just-completed step was Step 8, use `--complete` instead, which removes the lock. (This call is idempotent: a sub-skill normally self-advances the lock as its own last action, so this re-advance noops — but issuing it unconditionally is the deterministic, single-instruction behaviour.)
-2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`), then **read it back** — this is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
+2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`), then **read it back**. **After Step 8 this edit is a no-op:** Step 8 set its own row to `✅ Done` before its commit (step-8 doc § Final Implementation Report Update), and the Completion Checklist's check 5 has already required a clean tree, so any change here would be uncommitted dirt. Confirm the row reads `✅ Done` and change nothing (task 160). The read-back is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
 
    ```bash
    command node .agents/skills/develop-task/references/report-lint.js --file "{implementation-report-path}" --json; rc=$?
@@ -229,7 +229,7 @@ See `references/develop-pipeline-step-7-finalise.md` for the full Step 7 protoco
 
 ### Step 8: Commit Changes
 
-See `references/develop-pipeline-step-8-commit.md` for the full Step 8 protocol: final implementation report update (Finished timestamp, Final Status, QA Iterations, Completion Summary), `/commit-changes` invocation, final push, Pipeline Progress update, and pipeline lock file removal.
+See `references/develop-pipeline-step-8-commit.md` for the full Step 8 protocol: final implementation report update (Finished timestamp, Final Status, QA Iterations, Completion Summary, and every Pipeline Progress row ✅ **including Step 8's own**, all before the commit — nothing edits the report after it), `/commit-changes` invocation, final push, and pipeline lock file removal.
 
 ---
 

@@ -320,7 +320,54 @@ test("Step 8 edits the report before /commit-changes and never after it", () => 
   assert.ok(after.length > 0, "section anchors moved");
   assert.doesNotMatch(after, /Update Pipeline Progress/);
   assert.doesNotMatch(after, /Update the Pipeline Progress Notes/);
+  assert.doesNotMatch(after, /Pipeline Progress ✅/);
+  assert.doesNotMatch(after, /Committed in `/);
 });
+
+// Every restatement of Step 8 names the order the step document now states: the Pipeline Progress
+// rows are set BEFORE /commit-changes, never after the push. Four summaries restated the old order
+// after the step body changed (task.160 QA cycle 1, CR-1), and an orchestrator reads the summary.
+const STEP8_RESTATEMENTS = [
+  ["the step document's description", STEP8, /^description:.*$/m],
+  ...["develop-task", "develop-story", "develop-bug"].map((s) => [
+    `${s} SKILL.md's Step 8 summary`,
+    `skills/${s}/SKILL.md`,
+    /^.*develop-pipeline-step-8-commit\.md.*final push.*$/m,
+  ]),
+];
+for (const [name, file, pattern] of STEP8_RESTATEMENTS) {
+  test(`${name} sets Pipeline Progress before the commit, not after the push`, () => {
+    const line = readDoc(file).match(pattern)?.[0];
+    assert.ok(line, `${file}: no Step 8 summary line found`);
+    const progress = line.indexOf("Pipeline Progress");
+    const commit = line.indexOf("/commit-changes");
+    const push = line.indexOf("final push");
+    assert.ok(
+      progress >= 0 && commit >= 0 && push >= 0,
+      `${file}: summary shape changed: ${line}`,
+    );
+    assert.ok(
+      progress < commit,
+      `${file}: Pipeline Progress is named after /commit-changes: ${line}`,
+    );
+    assert.ok(
+      !line.slice(push).includes("Pipeline Progress"),
+      `${file}: Pipeline Progress follows the push: ${line}`,
+    );
+  });
+}
+
+// The Step Transition Protocol's action 2 runs after EVERY step, Step 8 included — after check 5 has
+// required a clean tree. Each orchestrator must say that after Step 8 it changes nothing.
+for (const s of ["develop-task", "develop-story", "develop-bug"]) {
+  test(`${s}'s Step Transition Protocol makes action 2 a no-op after Step 8`, () => {
+    const action2 = readDoc(`skills/${s}/SKILL.md`).match(
+      /^2\. \*\*Edit the implementation report\*\*.*$/m,
+    )?.[0];
+    assert.ok(action2, `skills/${s}/SKILL.md: action 2 not found`);
+    assert.match(action2, /After Step 8 this edit is a no-op/);
+  });
+}
 
 // The paused-and-resumed case can only pass for the right reason if the fixture carries the trap:
 // both unfinished-state tokens outside the table, neither inside it.

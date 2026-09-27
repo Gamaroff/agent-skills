@@ -129,7 +129,7 @@ When a step dispatches subagents, persist their summaries per [`references/subag
 Every step ends with the same four actions, executed _in order, with no text output between them_:
 
 1. **Bash tool call** advancing the lock to the next step: `bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh {N+1}`. **This must be the first call** — it anchors the orchestrator into "still working" mode and signals the `Stop` hook that the pipeline advanced. If the just-completed step was Step 8, use `--complete` instead (removes the lock). Idempotent — a sub-skill normally self-advances the lock, so this re-advance noops.
-2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`), then **read it back** — this is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
+2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`), then **read it back**. **After Step 8 this edit is a no-op:** Step 8 set its own row to `✅ Done` before its commit (step-8 doc § Final Implementation Report Update), and the Completion Checklist's check 5 has already required a clean tree, so any change here would be uncommitted dirt. Confirm the row reads `✅ Done` and change nothing (task 160). The read-back is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
 
    ```bash
    command node .agents/skills/develop-bug/references/report-lint.js --file "{implementation-report-path}" --json; rc=$?
@@ -241,7 +241,7 @@ See [`references/develop-bug-step-7-close-bug.md`](references/develop-bug-step-7
 
 ### Step 8: Commit Changes
 
-Follow [`references/develop-pipeline-step-8-commit.md`](references/develop-pipeline-step-8-commit.md) with **work-item dir = bug directory** and **`{extra-scope-paths}` = `docs/bugs/bug-registry.md` for a general bug** (Step 7 B3 edits that row, outside the bug directory; empty for a story or task bug): final implementation-report update (Finished, Final Status, QA/fix iterations, Completion Summary), `/commit-changes --scope {bug-directory}` (plus `--scope docs/bugs/bug-registry.md` for a general bug), final push, Pipeline Progress ✅, lock removal, and the Step 8 completion checklist.
+Follow [`references/develop-pipeline-step-8-commit.md`](references/develop-pipeline-step-8-commit.md) with **work-item dir = bug directory** and **`{extra-scope-paths}` = `docs/bugs/bug-registry.md` for a general bug** (Step 7 B3 edits that row, outside the bug directory; empty for a story or task bug): final implementation-report update (Finished, Final Status, QA/fix iterations, Completion Summary, and every Pipeline Progress row ✅ **including Step 8's own**, all before the commit — nothing edits the report after it), `/commit-changes --scope {bug-directory}` (plus `--scope docs/bugs/bug-registry.md` for a general bug), final push, lock removal, and the Step 8 completion checklist.
 
 ---
 
