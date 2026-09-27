@@ -3,7 +3,7 @@
 **Task**: `task.161.step-8-resume-record-survives-commit.md`
 **Run Number**: 1
 **Started**: 2026-09-27 19:11
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -34,10 +34,10 @@ Keep the pipeline lock alive through all of Step 8 (removed only by `--complete`
 | 1. create-branch           | ✅ Done    | Branch `feature/task.161.*` exists in git                             | Branch created at `85d19621`; stash cleanup hit a transient index.lock — report verified identical to stash, stash dropped | —                    |
 | 2. review-task             | ✅ Done    | `task.161.review.{N}.{name}.md` exists (or skip logged)               | `task.161.review.1.step-8-resume-record-survives-commit.md` — READY TO IMPLEMENT 8/10; 5 Important fixes applied; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; ci:fast 4331/0; 5/5 mutations red | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.161.qa.{N}.*.md`; `task.161.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.161.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #501: https://github.com/Gamaroff/agent-skills/pull/501 | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.161.qa.{N}.*.md`; `task.161.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: gate.1 CONCERNS 80 → gate.2 CONCERNS 80 → gate.3 CONCERNS 90 (empty queue, route 3); 5c review-pr CONCERNS | —                    |
+| 7. finalise                | ✅ Done    | `task.161.dod.{N}.*.md`; task `status: accepted`                      | accepted; DoD `task.161.dod.1…md`; CI reading 1 SUCCESS @ 8610c2f5, reading 2 SUCCESS @ 4f45560c; #500 closed | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | final report commit and push; the lock is removed only by the Completion Checklist's `--complete` (the task.161 lifecycle, dogfooded) | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -76,6 +76,28 @@ Keep the pipeline lock alive through all of Step 8 (removed only by `--complete`
 - Loop audit run inline, without an Explore dispatch, so no independent reader: status `ready-for-review`, 0 unchecked boxes, 4 of 4 phases. Exited the loop after iteration 1.
 - Change Log row written by the inline path, instead of `/develop`: "Implemented — 16 source files plus 47 regenerated bundled copies; 4 test files changed".
 - Development completion comment posted to github issue 500 (`posted`).
+- Step 4 staging scope: 22 paths (the work item, `CHANGELOG.md`, `shared/resources` and `shared/resources/tests`, commit-changes, develop-{task,story,bug}, and the `references/` of 15 skills with regenerated bundles). The pre-flight guard found no out-of-scope untracked files, so nothing was held.
+- Step 4 commits: `f9e190ed` (fix — sources, tests, bundles, CHANGELOG) and `0f2e0e0c` (docs — task, review, report). Leak check OK.
+- PR body written inline from the diff: the summariser subagent was not dispatched.
+- PR #501 opened against develop. The in-review comment on #500 was `posted`. The lock's `pr_url` is set.
+- GitHub board: in-review → stage-disabled (no `pipeline.in-review` moment configured for this board). Post-PR state check (inline `gh pr view`): PR #501 state = OPEN, 0 errors.
+- Step 5a, cycle 1: traceability mapper skipped, because Success Criteria is a checklist and not a table (HAS_SUCCESS_CRITERIA_TABLE=false). QA-start board re-assert: in-review → stage-disabled. `/qa-task` ran with `code_review_blocking=true` and an independent Explore code reviewer (returned in 2m13s). Gate 1 CONCERNS 80/100, then routed to 5b.
+- Step 5b, cycle 1: changes-requested → stage-disabled. The narrowing-residue offer was not evaluated: cycle 1 has no previous gate, so it is below the floor. `/qa-fix` ran with inline findings: the gate had 1 entry plus 2 advisory, so the ingester subagent was not dispatched and there was no independent reader. Fix-summary PR comment posted; tracker comment on #500 (`qa-fix-1`) `posted`.
+- Step 5a, cycle 2: refute pass over the full branch diff; the Explore reviewer returned in 3m02s; gate.2 CONCERNS 80. Step 5b, cycle 2: changes-requested → stage-disabled. Narrowing offer: `medium-files-differ`, so no offer; qa-fix Step 2.6 trigger (b) applied anyway, move: consolidate. Fix comments on the PR and on #500 (`qa-fix-2`) both `posted`.
+- Step 5a, cycle 3: scoped to changes since gate 2 (7 files, 796 lines); reviewer returned in 1m13s. Provenance measured for the reviewer's medium/high finding: rendered on origin/develop and on HEAD, the status line is identical, so it is pre-existing. Gate 3 CONCERNS 90 with an empty queue → §5c route 3.
+- Step 5c: trail-on-branch assertion OK (gate.3 and qa.3 on origin). `/review-pr --effort medium --comment` ran both lenses in parallel (code 2m22s, conformance 41s) and returned CONCERNS. No finding was high/high; the develop-bug Step 7-tail wording was raised a second time (QA gate 3 CR-2, review CR-1), still advisory. Report `task.161.pr-review.1…md`; PR comment posted. ready-for-merge → stage-disabled. Advanced 5 → 7.
+- Step 7: `/finalise` invoked (not inlined). The four DoD agents ran in parallel:
+  - AC: PARTIAL 14/15. AC14 (CHANGELOG) was FAIL only because no per-PR test guards it; overridden to PASS, since `changelog-entry-drift.test.mjs` guards it and the docs agent rated it PASS.
+  - Security: PASS (not a boundary; the fail-closed parse gate was re-executed).
+  - Compliance: not applicable.
+  - Docs: PASS.
+  - Gate.3 CONCERNS with an empty queue, judged non-blocking; its advisory items are carried forward.
+- DoD summary: docs/tasks/task.161.step-8-resume-record-survives-commit/task.161.dod.1.step-8-resume-record-survives-commit.md
+- CI reading 1: SUCCESS @ 8610c2f5 (5 checks); CI reading 2: SUCCESS @ 4f45560cce23 (5 checks, after 120s, background poll). Acceptance commit `4f45560c`: document, DoD, sprint review and registry (ticked), plus the staged pr-review.1 report. Checked tracked and on origin (6b). 6d: CHANGELOG cites (task 161).
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/501#issuecomment-5858594370. Canonical summary: https://github.com/Gamaroff/agent-skills/pull/501#issuecomment-5858589731
+- GitHub Issue #500 — close: CLOSED ✅ (finalise's close, then the orchestrator's idempotent close `performed`, confirmed CLOSED by `gh issue view`, run inline rather than through the poller subagent). Tracker comment `done`: posted, then `already`. The Document link was already on develop.
+- GitHub board: done → already.
+- Task completed: task.161 accepted 2026-09-27. Tracker debt: none (no `.claude/state/tracker-actions.jsonl`).
 
 ---
 
@@ -83,6 +105,7 @@ Keep the pipeline lock alive through all of Step 8 (removed only by `--complete`
 
 _Problems encountered and how they were resolved or escalated._
 
+- QA cycle 3: `qa-read-back.js` halted once (3 problems, output not captured because piped through `tail -1`), then passed on an immediate re-run with no change. It did not reproduce from a clean unstaged state. Possibly the transient `.git/index.lock` seen at Step 1; not proven.
 - Step 2: review-task's Phase 1.5 pre-pass agents (B architecture, C codebase) were not dispatched — both passes ran inline, so the review had no independent reader.
 
 - Step 1: `git stash push` saved the report but its cleanup failed on a transient `.git/index.lock` (gone on re-check). The untracked report stayed on disk; `cmp` against the stash copy was identical, so the stash was dropped rather than popped.
@@ -93,14 +116,62 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-09-27
+**Gate Result**: CONCERNS
+**Issues Found**: 1 open. CR-1 (medium, reliability): `--complete` exits at the `jq` gate before its own arm, so on a host without `jq` the lock is never removed now that Cleanup's `rm` is gone. Advisory: CR-2 (the Stop hook's step-8 line asserts the row is already ✅) and CR-3 (cleanup: the no-op arm still parses the lock)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixed**: CR-1: `--complete` runs before the `jq` gate. CR-3: the no-op `commit-changes` arm moves with it and parses nothing. CR-2: the Stop hook's step-8 line is conditional. 4 new test cases, and both fixes are mutation-proven. ci:fast 4331/0. Commit `a9b30f56` carries the fix plus gate.1 and qa.1; it was pushed once.
+
+### QA Cycle 2 — 2026-09-27
+**Gate Result**: CONCERNS
+**Issues Found**: 1 open. CR-1 (medium): at step 8 the cycle-1 Stop-hook line sent a Step 7-tail stall to Step 8's report update. Advisory: CR-2 (step-8 fixed text says invoke `/commit-changes` and advance the lock yourself), CR-3 and CR-4 (test hygiene)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixed**: the Stop hook now states the resume contract's step-8 rule (consolidate move, Step 2.6 trigger b). At step 8 the invoke target is the whole step-8 doc, and the "already finished" text is step-aware. The CR-3 assertion now discriminates; the CR-4 header is reworded; `develop-pipeline-hooks.md` is updated (probe population 1). 3 mutations red. ci:fast 4331/0. Commit `1774f3f6` carries the fix plus gate.2 and qa.2; it was pushed once.
+
+### QA Cycle 3 — 2026-09-27
+**Gate Result**: CONCERNS
+**Issues Found**: none open. Advisory: CR-2 (develop-bug Step 7-tail wording, medium confidence) and CR-3 (test PATH cleanup). Pre-existing: CR-1 (status block at lock 8 reads "Step 7/8 ✅ complete", identical on origin/develop), routed to recommendations.future
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS (`task.161.pr-review.1.step-8-resume-record-survives-commit.md`: CR-1 medium/medium develop-bug Step 7-tail wording; CR-2 cleanup; PC-1 and PC-2 low)
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Completion Summary**:
+- **What was implemented.** The pipeline lock now outlives the Step 8 commit:
+  - `/commit-changes`' lock cooperation removes nothing at any step.
+  - `--complete`, run as the Completion Checklist's last action after checks 2–5, is the one terminal remover, and it works without `jq`.
+  - A failed check, a crash or a HALT anywhere in Step 8 now leaves a resume record at step 8.
+  - The resume detector recommends 8, never 9.
+  - All three orchestrators state the step-8 recovery exception first.
+  - The Stop hook follows the resume contract's step-8 rule.
+  - Two population tests hold every restatement.
+- **QA.** 3 cycles:
+  - Cycle 1 found that `--complete` was gated on `jq`.
+  - Cycle 2's refute pass found cycle 1's own Stop-hook wording routing a Step 7-tail stall past the tail. It was fixed by consolidating onto the resume contract's rule.
+  - Cycle 3 left an empty gate queue.
+  - 5c `/review-pr` returned CONCERNS with no high/high finding.
+- **Carried forward.** Carried as a follow-up rather than fixed, because it was advisory by the pipeline's own routing: the develop-bug Step 7-tail wording (raised twice, medium confidence), plus a pre-existing status line and a test cleanup. All are in gate.3 `recommendations.future`.
+- **Process notes.**
+  - The first `ci:fast` found a test (`halt-snippet-glob-safe` F1–F4) that pinned the removed Cleanup `rm`, which review had not listed (observation #203).
+  - This run's own Step 8 exercises the new lifecycle: the lock survives this commit and is removed by the checklist's `--complete`.
+
+**Finished**: 2026-09-27 20:33
+**Final Status**: Completed
 **Branch**: feature/task.161.step-8-resume-record-survives-commit
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/501
+**QA Iterations**: 3 (gate.1 CONCERNS 80 → gate.2 CONCERNS 80 → gate.3 CONCERNS 90, empty queue); 5c review-pr CONCERNS
+**DoD Summary**: docs/tasks/task.161.step-8-resume-record-survives-commit/task.161.dod.1.step-8-resume-record-survives-commit.md
+**Tracker debt**: none
