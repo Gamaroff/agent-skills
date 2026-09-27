@@ -90,6 +90,7 @@ find {bug-directory} -maxdepth 1 \( -name "{bug-prefix}.implementation.*.md" -o 
 2. **Verify each ✅ step's artifact exists up to `recommended_step - 1`** (see [`references/develop-pipeline-resume-contract.md`](references/develop-pipeline-resume-contract.md) — Phase 0b). Steps at or after `recommended_step` are treated as ⏳ Pending.
 3. Output: "⚠️ Context recovery — last verified step: Step {recommended_step - 1}. Resuming from recommended step {recommended_step}."
 4. Continue from `recommended_step` — do NOT re-run verified steps, do NOT skip pending steps.
+   **Exception — a record at step 8.** When the restored lock's `current_step` (or the snapshot's `halt_step`) is 8, re-run Step 8 from the start instead, whatever `recommended_step` or the Step 8 row says (`references/develop-pipeline-resume-contract.md` Phase 0b states the rule once; the detector's `LOCK_STEP + 1` would name a step 9 that does not exist).
 
 **This recovery is mandatory even if the user did not explicitly re-invoke `/develop-bug`.** If you are in a conversation where `develop-bug` was previously running and context was then compressed, you are still the develop-bug orchestrator and must complete all remaining steps. A summary saying "next step: create-pr" means Step 4 is next, and Steps 5–8 still follow.
 

@@ -200,7 +200,7 @@ Two lines in it are load-bearing under BSD awk, and review found the task's firs
 
 ### Files to Modify (Orchestrators — QA cycle 1, CR-1)
 
-7. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md`: the Step 8 summary names the Pipeline Progress update before the commit, and Step Transition Protocol action 2 is a no-op after Step 8
+7. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md`: the Step 8 summary names the Pipeline Progress update before the commit, Step Transition Protocol action 2 is a no-op after Step 8, and Context Compression Recovery re-runs Step 8 for a resume record at step 8 (QA cycle 4)
 
 ### Files to Modify (Resume — QA cycles 2–3, CR2-1 / CR3-1)
 
@@ -334,24 +334,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-27
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.160.qa.3.step-8-check-4-allowlists-finished-rows.md](./task.160.qa.3.step-8-check-4-allowlists-finished-rows.md)
-- **Gate File**: [task.160.gate.3.step-8-check-4-allowlists-finished-rows.yml](./task.160.gate.3.step-8-check-4-allowlists-finished-rows.yml)
+- **Full Report**: [task.160.qa.4.step-8-check-4-allowlists-finished-rows.md](./task.160.qa.4.step-8-check-4-allowlists-finished-rows.md)
+- **Gate File**: [task.160.gate.4.step-8-check-4-allowlists-finished-rows.yml](./task.160.gate.4.step-8-check-4-allowlists-finished-rows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 78
+- **Tests Executed**: 75
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Check 4's allowlist is correct and measured. Phase 3's reordering (Step 8 sets its row before its commit) removed the only resume signal that Step 8 had not finished. Cycle 2's git-based replacement does not hold, because the PreCompact hook commits and pushes the report itself (CR3-1, high). The QA loop stopped on the Convergence check (HIGH 0, 0, 1) and escalated to a person.
+The cycle-3 fix holds in its window: from the start of Step 8 until `/commit-changes`, a record at step 8 exists and a resume re-runs Step 8. Three medium findings remain. The step doc overstates the window (CR4-1). The Context Compression Recovery sections don't yet carry the rule (CR4-2). The Cleanup test models an unreal state (CR4-3). The post-commit window has no record, a gap that pre-dates this branch; it goes to a follow-up.
 
 ---
 
@@ -372,6 +372,8 @@ Check 4's allowlist is correct and measured. Phase 3's reordering (Step 8 sets i
 | 2026-09-27 |         | QA gate FAIL (70/100) — 2 findings (CR3-1 high, CR3-2 medium); QA loop escalated (convergence: HIGH 0, 0, 1) | qa-task |
 | 2026-09-27 |         | Status → in-progress | qa-task |
 | 2026-09-27 |         | QA findings fixed — CR3-1 (resume re-runs Step 8 whenever its record is at step 8; git check and ❌ Failed rule dropped), CR3-2 (resume tests rebuilt on the real PreCompact hook and the real Cleanup block); 3 iterations total | qa-fix |
+| 2026-09-27 |         | QA gate CONCERNS (90/100) — 3 findings (CR4-1..3, medium); post-commit window pre-existing → follow-up | qa-task |
+| 2026-09-27 |         | QA findings fixed — CR4-1 (Step 8 claim scoped: the record ends at the Step 8 commit; the older post-commit gap is named), CR4-2 (recovery exception in 3 orchestrators), CR4-3 (test runs the real lock helper and Cleanup); 4 iterations total | qa-fix |
 
 <!-- change-log-end -->
 

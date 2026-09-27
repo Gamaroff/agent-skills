@@ -413,7 +413,36 @@ test("the step document names the resume record, not the row or git, as Step 8's
   );
   assert.doesNotMatch(resume, /Steps 2 and 8 do not require/);
   assert.doesNotMatch(resume, /verify-push-state/);
+  // Scoped to what the record covers (task.160 QA cycle 4, CR4-1): /commit-changes removes the lock,
+  // not Cleanup, so the record ends at the Step 8 commit and the post-commit gap is named.
+  assert.match(update, /`\/commit-changes`' lock cooperation/);
+  assert.match(
+    update,
+    /What it does not cover \(a known gap, older than this rule\)/,
+  );
+  assert.doesNotMatch(
+    update,
+    /removes this run's halt snapshot and then, last, the lock/,
+  );
+  assert.doesNotMatch(
+    resume,
+    /A finished Step 8 leaves no record, so it can never be offered/,
+  );
 });
+
+// Context Compression Recovery continues from recommended_step, which is 9 for a record at step 8.
+// Each orchestrator carries the step-8 exception and cites the resume contract (CR4-2).
+for (const s of ["develop-task", "develop-story", "develop-bug"]) {
+  test(`${s}'s Context Compression Recovery re-runs Step 8 for a record at step 8`, () => {
+    const doc = readDoc(`skills/${s}/SKILL.md`);
+    const at = doc.indexOf("4. Continue from `recommended_step`");
+    assert.ok(at >= 0, "recovery item 4 not found");
+    const item = doc.slice(at, doc.indexOf("\n\n", at));
+    assert.match(item, /Exception — a record at step 8/);
+    assert.match(item, /re-run Step 8 from the start/);
+    assert.match(item, /develop-pipeline-resume-contract\.md/);
+  });
+}
 
 // A lock at step 8 for this work item, as the orchestrator holds it while Step 8 runs.
 function writeStep8Lock(fx) {
@@ -754,13 +783,37 @@ describe("executed against fixtures", { concurrency: true }, () => {
       }
     });
 
-    // ── A finished Step 8 leaves no resume record (task.160 QA cycle 3, CR3-1) ──
-    // The Cleanup block, cut from the step document: it deletes this run's halt snapshot and then,
-    // last, the lock. That is what makes "a record at step 8" mean "Step 8 did not finish".
-    test(`[${sh}] Step 8's Cleanup leaves no resume record behind`, async () => {
+    // ── The record's real lifecycle (task.160 QA cycle 4, CR4-3) ──
+    // /commit-changes' lock cooperation is the remover: at step 8 it removes the lock (the record
+    // ends at the Step 8 commit); nested at step 5 it keeps it. Cleanup then removes this run's
+    // halt snapshot, cut from the step document and run under each shell.
+    test(`[${sh}] the Step 8 commit ends the record and Cleanup removes this run's snapshot`, async () => {
       const fx = await setup(finished("Task"));
       try {
+        const LOCK_HELPER = RESTORE;
         writeStep8Lock(fx);
+        const nested = JSON.parse(
+          fs.readFileSync(path.join(fx.work, LOCK), "utf8"),
+        );
+        nested.current_step = 5;
+        write(fx.work, LOCK, JSON.stringify(nested) + "\n");
+        let r = run("bash", `bash "${LOCK_HELPER}" --skill commit-changes`, {
+          cwd: fx.work,
+        });
+        assert.equal(
+          fs.existsSync(path.join(fx.work, LOCK)),
+          true,
+          `nested commit removed the lock: ${r.stdout}${r.stderr}`,
+        );
+        writeStep8Lock(fx);
+        r = run("bash", `bash "${LOCK_HELPER}" --skill commit-changes`, {
+          cwd: fx.work,
+        });
+        assert.equal(
+          fs.existsSync(path.join(fx.work, LOCK)),
+          false,
+          `the Step 8 commit kept the lock: ${r.stdout}${r.stderr}`,
+        );
         write(
           fx.work,
           SNAPSHOT,
@@ -775,18 +828,14 @@ describe("executed against fixtures", { concurrency: true }, () => {
             "{work-item-dir}": WORK_ITEM,
           },
         );
-        const r = await runAsync(sh, code, { cwd: fx.work });
-        assert.equal(r.status, 0, `cleanup: ${r.stdout}\n${r.stderr}`);
-        assert.equal(
-          fs.existsSync(path.join(fx.work, LOCK)),
-          false,
-          "lock survived Cleanup",
-        );
+        const c = await runAsync(sh, code, { cwd: fx.work });
+        assert.equal(c.status, 0, `cleanup: ${c.stdout}\n${c.stderr}`);
         assert.equal(
           fs.existsSync(path.join(fx.work, SNAPSHOT)),
           false,
-          "snapshot survived Cleanup",
+          "this run's snapshot survived Cleanup",
         );
+        assert.equal(fs.existsSync(path.join(fx.work, LOCK)), false);
       } finally {
         cleanup(fx.dir);
       }

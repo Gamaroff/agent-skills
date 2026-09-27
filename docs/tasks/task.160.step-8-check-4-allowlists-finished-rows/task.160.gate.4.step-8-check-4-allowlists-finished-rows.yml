@@ -1,0 +1,76 @@
+schema: 1
+task: 'task.160.step-8-check-4-allowlists-finished-rows'
+task_title: 'Step 8 check 4 allowlists finished rows instead of denying two unfinished ones'
+gate: CONCERNS
+status_reason: 'The cycle-3 fix holds for the window it covers: from the start of Step 8 until /commit-changes, a record at step 8 exists and a resume re-runs Step 8. But the step doc overstates it. /commit-changes removes the lock at step 8 (not Cleanup), so after the commit there is no record. That gap pre-dates this branch (a284dfdd, 2026-06-08) and routes to a follow-up, but the claim must be scoped and the other resume sites must carry the rule.'
+reviewer: 'QA Engineer'
+updated: '2026-09-27T14:50:38Z'
+
+top_issues:
+  - id: 'CR4-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-8-commit.md'
+    finding: 'The step doc says Cleanup removes the lock last, so a finished Step 8 leaves no record, and that a HALT inside Step 8 is caught by the record. Both overstate it. /commit-changes removes the lock at step 8 (advance-pipeline-lock.sh --skill commit-changes, the current_step >= 8 arm), so the record exists only from the start of Step 8 until that commit. A pause, crash or HALT during the push, Cleanup or a failing checklist leaves no record, exactly as on develop.'
+    suggested_action: 'Scope the claim: state the real remover and the window the rule covers (Step 8 start until /commit-changes), and name the post-commit window as a known, pre-existing gap with its follow-up.'
+    suggested_owner: dev
+  - id: 'CR4-2'
+    severity: medium
+    file: 'skills/develop-task/SKILL.md'
+    finding: 'The new Phase 0b rule (a record at step 8 re-runs Step 8 whatever recommended_step says) is stated only in the resume contract. Context Compression Recovery items 3–4 in skills/develop-{task,story,bug}/SKILL.md still say "continue from recommended_step", which is LOCK_STEP + 1 = 9 for a record at step 8, a step that does not exist.'
+    suggested_action: 'Have each Context Compression Recovery cite the resume-contract rule for a record at step 8, and add a guard test over the three SKILL.md files.'
+    suggested_owner: dev
+  - id: 'CR4-3'
+    severity: medium
+    file: 'shared/resources/tests/step-8-completion-checklist.test.mjs'
+    finding: 'The "Cleanup leaves no resume record" test seeds a lock at step 8 before running Cleanup. By the time Cleanup runs, /commit-changes has already removed that lock, so the test models a state the real sequence never has and holds nothing about the actual remover.'
+    suggested_action: 'Model the real sequence: a lock at step 8, then advance-pipeline-lock.sh --skill commit-changes, which asserts the lock is gone at the commit, then Cleanup, which asserts this run''s snapshot is gone.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 75
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 21
+    notes: 'Probe on a5dc82c3: 12 hostile refused, 9 legitimate admitted, engages. Record: task.160.qa.4.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'A pause or HALT before the Step 8 commit now resumes into Step 8, an improvement on develop, where the detector recommended step 9. The post-commit window is unchanged from develop (future).'
+  maintainability:
+    status: PASS
+    notes: 'The claim scoping and resume-site propagation are carried in top_issues.'
+
+recommendations:
+  immediate:
+    - action: 'CR4-1: scope the step-8 doc claim to the window the record covers; name the real remover.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'CR4-2: carry the step-8 rule into Context Compression Recovery in the three orchestrators.'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md']
+    - action: 'CR4-3: rebuild the Cleanup test on the real removal sequence.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+  future:
+    - action: 'PRE-EXISTING (a284dfdd, 2026-06-08): /commit-changes removes the lock at step 8, so a pause, crash or HALT after the Step 8 commit (push, Cleanup, a failing Completion Checklist) leaves no resume record, and the HALT rule''s snapshot guard finds no lock. Follow-up task: keep a step-8 record alive until the checklist passes (move lock removal to --complete after the checklist, or a Step 8 marker that only a passing checklist deletes) and snapshot before the HALT commit. Measured on develop: the same removal arm is present.'
+      refs: ['shared/resources/advance-pipeline-lock.sh', 'shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'PRE-EXISTING: the resume detector recommends LOCK_STEP + 1 = 9 for a record at step 8; the detector schema says 1–8. Fold into the follow-up above.'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md']
+    - action: 'CR-5 (cleanup): a Step 8 re-run writes a new Finished timestamp (one extra docs commit) and leaves the hook''s pause section in the report. State it.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR4-1, CR4-2, CR4-3 fixed']
