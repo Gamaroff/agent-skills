@@ -306,6 +306,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The Stop hook's step-8 reason fits every orchestrator (task 162).** At `current_step` 8 the
+  reason described Step 7's tail as "the DoD body to the PR, the tracker update, the Step 7
+  checklist" for all three orchestrators, so a develop-bug stall between `/finalise --bug` and
+  Part B was sent to work that does not close the bug. It now names Part B's bug-close routine
+  (Resolution Summary, status `closed`, parent or registry linkage, tracker-close check) for a
+  develop-bug lock, and the resume contract's step-8 paragraph says the same; the rule itself is
+  unchanged. The status-block position no longer asserts "Step 7/8 ✅ complete" at lock 8 (it reads
+  `Step 8/8 — COMMIT CHANGES ⏳ pending (Step 7 unverified: check its row first)`), a claim that
+  predates task 161. The generic line's unreachable "(or `--complete` if that was Step 8)" clause is
+  gone, and the `--complete` population test now scans the hook script, comments included. Scenario
+  4b's no-jq `PATH` links only `rm` and `dirname`, skipping any name `command -v` does not resolve
+  to an absolute path.
 - **Step 8 keeps its resume record until the Completion Checklist passes (task 161).** The pipeline
   lock now lives until Step 8's Completion Checklist passes. `advance-pipeline-lock.sh --skill
   commit-changes` used to remove it at `current_step` 8, which was the Step 8 commit (`a284dfdd`).

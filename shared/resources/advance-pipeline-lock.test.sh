@@ -118,11 +118,17 @@ fi
 # --complete is the lock's one terminal remover (task 161). Gated behind the jq check it
 # exited 0 and left the lock, so a jq-less host could never finish Step 8 (task.161 QA
 # cycle 1, CR-1). `--skill commit-changes` removes nothing and must not need jq or a
-# parsable lock either (CR-3). PATH holds only what the script needs, and no jq.
+# parsable lock either (CR-3). PATH holds only the external commands those two arms run
+# (`dirname` when the script loads, `rm` for --complete) and no jq. The script runs under an
+# absolute "$BASH_BIN", so bash need not be on PATH; `echo` is a builtin. A name `command -v`
+# does not resolve to an absolute path is a builtin, and linking its bare name would make a
+# self-referencing link, so it is skipped (task 162). An arm that starts needing another
+# command fails here, visibly, instead of finding it on an over-linked PATH.
 NOJQ_BIN="$TMPDIR_TEST/nojq-bin"
 mkdir -p "$NOJQ_BIN"
-for c in bash rm cat dirname date mktemp mv printf; do
-  ln -sf "$(command -v "$c")" "$NOJQ_BIN/$c"
+for c in rm dirname; do
+  p=$(command -v "$c")
+  case "$p" in /*) ln -sf "$p" "$NOJQ_BIN/$c" ;; esac
 done
 BASH_BIN=$(command -v bash)
 LOCK_FILE="$TMPDIR_TEST/nojq.lock"

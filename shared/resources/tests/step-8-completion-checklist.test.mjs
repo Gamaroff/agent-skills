@@ -591,10 +591,17 @@ test("every generic Pipeline Progress update says it is a no-op after Step 8", (
 // outside the step-8 document — which defines where it runs, and whose order the executed checklist
 // tests hold — must say that Step 8's Completion Checklist runs it. An orchestrator told to
 // `--complete` once /commit-changes returns would skip checks 2–5.
+//   files:  developPipelineDocs() (the Markdown above) plus the Stop hook script, whose reason is
+//           the other text an orchestrator is told to act on (task 162). The hook's `.md` siblings
+//           could not see its generic "(or `--complete` if that was Step 8)" clause.
+//   exempt: none in the hook — every line counts, `#` comments included. Its comments were
+//           reworded to name the Completion Checklist rather than skipped, so the rule holds for
+//           the whole file and a comment cannot carry the old instruction back in.
+const STOP_HOOK = "shared/resources/develop-pipeline-on-stop.sh";
 test("every orchestrator mention of --complete names the Step 8 Completion Checklist", () => {
   const perSkill = {};
   let seen = 0;
-  for (const file of developPipelineDocs()) {
+  for (const file of [...developPipelineDocs(), STOP_HOOK]) {
     if (file.endsWith("develop-pipeline-step-8-commit.md")) continue;
     for (const line of readDoc(file).split("\n")) {
       if (!line.includes("--complete")) continue;
