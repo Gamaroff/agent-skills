@@ -13,7 +13,7 @@
 #
 # Usage:
 #   advance-pipeline-lock.sh <next_step_number>     # advance to specific step (1..8)
-#   advance-pipeline-lock.sh --complete             # remove lock (Step 8 done)
+#   advance-pipeline-lock.sh --complete             # remove lock (Step 8's Completion Checklist passed)
 #   advance-pipeline-lock.sh --skill <skill-name>   # advance based on sub-skill that just returned
 #   advance-pipeline-lock.sh --restore <doc-dir>    # rebuild the lock from the halt snapshot or an
 #                                                   # orphaned PreCompact claim (task.124, Phase 4)
@@ -51,8 +51,8 @@
 #   qa-fix          → noop (loop)
 #   review-pr       → noop (loop — Step 5c, the loop's exit gate)
 #   finalise        → 8   (Step 7 done)
-#   commit-changes  → remove lock ONLY when current_step >= 8 (terminal commit);
-#                     nested invocations (create-pr Step 4, qa-fix Steps 5–6) preserve the lock
+#   commit-changes  → noop at every step, the Step 8 commit included (task 161);
+#                     --complete, after Step 8's Completion Checklist, is the one terminal remover
 #
 # --restore <doc-dir> (task.124, Phase 4). The ONE restore path — grant-qa-cycles.sh
 # used to carry its own (task.123) and now calls this. A terminal HALT and the
@@ -103,7 +103,7 @@ usage() {
   cat <<USAGE >&2
 Usage:
   $0 <next_step_number>     # 1..8
-  $0 --complete             # remove lock (pipeline finished)
+  $0 --complete             # remove lock (Step 8's Completion Checklist passed)
   $0 --skill <skill-name>   # advance based on returning sub-skill name
   $0 --restore [--which] [--accept-legacy] <doc-dir>
                             # rebuild the lock from the halt snapshot / orphaned claim
@@ -387,19 +387,16 @@ case "$1" in
         # commit-changes is the ONLY pipeline sub-skill invoked at more than one step:
         #   - Step 4 (create-pr commits code before opening the PR)
         #   - Steps 5–6 (each qa-fix cycle commits fixes)
-        #   - Step 8 (terminal commit)
-        # Only the Step 8 invocation means "pipeline complete". For the nested
-        # invocations the lock MUST be preserved so the PreCompact/Stop hooks keep
-        # working through the back half of the run.
+        #   - Step 8 (the final commit), and any HALT commit
+        # None of them ends the run, so none removes the lock. Step 8 still has a push,
+        # Cleanup and a blocking Completion Checklist after its commit; removing the lock
+        # here left all three with no resume record, a Step 8 HALT with no snapshot, and
+        # the Stop hook with nothing to guard (task 161; the removal came in a284dfdd).
+        # `--complete`, run by Step 8 once checks 2–5 pass, is the one terminal remover.
         require_parsable_lock
         CUR=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
         case "$CUR" in ''|null) CUR=0 ;; esac
-        if [ "$CUR" -ge 8 ] 2>/dev/null; then
-          rm -f "$LOCK"
-          echo "advance-pipeline-lock: pipeline complete (commit-changes at step $CUR), lock removed"
-        else
-          echo "advance-pipeline-lock: commit-changes nested at step $CUR — lock preserved" >&2
-        fi
+        echo "advance-pipeline-lock: commit-changes at step $CUR — lock preserved (--complete ends the run)" >&2
         exit 0
         ;;
       *)

@@ -88,14 +88,26 @@ for STEP in 4 5 6; do
   fi
 done
 
-# ── Scenario 4: terminal commit-changes (step 8) removes the lock ────────────
+# ── Scenario 4: commit-changes at step 8 leaves the lock; --complete removes it ──
+# The Step 8 commit is not the end of the run: its push, Cleanup and Completion
+# Checklist follow, and a pause, crash or HALT there needs the lock to resume
+# from. Only --complete, after the checklist, removes it (task 161).
 LOCK_FILE="$TMPDIR_TEST/terminal.lock"
 write_lock 8
 PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" --skill commit-changes >/dev/null 2>&1
-if [ -f "$LOCK_FILE" ]; then
-  fail "terminal commit-changes at step 8 removes lock" "lock file still exists"
+RC=$?
+if [ "$RC" -ne 0 ] || [ ! -f "$LOCK_FILE" ]; then
+  fail "commit-changes at step 8 leaves the lock" "rc=$RC, lock present=$([ -f "$LOCK_FILE" ] && echo yes || echo no)"
+elif [ "$(jq -r '.current_step' "$LOCK_FILE")" != "8" ]; then
+  fail "commit-changes at step 8 leaves the lock" "current_step changed: 8 → $(jq -r '.current_step' "$LOCK_FILE")"
 else
-  pass "terminal commit-changes at step 8 removes lock"
+  pass "commit-changes at step 8 leaves the lock (current_step 8)"
+fi
+PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" --complete >/dev/null 2>&1
+if [ -f "$LOCK_FILE" ]; then
+  fail "--complete removes the lock commit-changes left at step 8" "lock file still exists"
+else
+  pass "--complete removes the lock commit-changes left at step 8"
 fi
 
 # ── Scenario 5: explicit --complete removes lock unconditionally ─────────────

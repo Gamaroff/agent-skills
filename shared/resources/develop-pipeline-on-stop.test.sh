@@ -103,6 +103,25 @@ else
   fail "lock=8 still blocks" "did not name Step 8 / commit-changes. Got: $(echo "$R" | head -1)"
 fi
 
+# ── Scenario 5b: at Step 8 the completion condition is the Completion Checklist ──
+# The lock outlives the Step 8 commit (task 161): only the checklist's own
+# `--complete`, after checks 2–5 pass, removes it. The generic line ("once
+# /commit-changes has completed … or `--complete` if that was Step 8") would tell an
+# orchestrator that yielded during the push or the checklist to skip the checklist.
+# All three orchestrators follow the same step-8 doc, so each is asserted.
+for SK in develop-story develop-task develop-bug; do
+  d="$TMPDIR_TEST/step8-$SK"
+  mklock "$d" "{\"skill\":\"$SK\",\"current_step\":8,\"report_path\":\"report.md\"}"
+  R=$(reason_of "$(run_hook "$d")")
+  if ! echo "$R" | grep -q "Completion Checklist has passed"; then
+    fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "Got: $(echo "$R" | grep -i 'only once' | head -1)"
+  elif echo "$R" | grep -q "has actually completed: mark Step 8"; then
+    fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "still carries the generic 'once /commit-changes has completed' line"
+  else
+    pass "[$SK] lock=8 names the Completion Checklist as Step 8's completion"
+  fi
+done
+
 # ── Scenario 6: no lock → allow ──────────────────────────────────────────────
 d="$TMPDIR_TEST/nolock"; mkdir -p "$d"
 OUT=$(run_hook "$d")

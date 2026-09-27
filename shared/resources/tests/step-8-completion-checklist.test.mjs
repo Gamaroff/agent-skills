@@ -237,6 +237,12 @@ const CHECK4_NO_TABLE =
 // ── The block, from the step document ─────────────────────────────────────────
 
 const VERIFY = path.join(ROOT, "shared", "resources", "verify-push-state.sh");
+const LOCK_HELPER = path.join(
+  ROOT,
+  "shared",
+  "resources",
+  "advance-pipeline-lock.sh",
+);
 
 // {extra-scope-paths} is the caller's documented list of writes outside its work item (the table in
 // the step document): empty for develop-story and develop-task, and the bug registry for a
@@ -248,6 +254,8 @@ function checklist(extra = "") {
   return bind(code, {
     ".agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh":
       VERIFY,
+    ".agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh":
+      LOCK_HELPER,
     "{work-item-dir}": WORK_ITEM,
     "{extra-scope-paths}": extra,
   });
@@ -414,13 +422,12 @@ test("the step document names the resume record, not the row or git, as Step 8's
   );
   assert.doesNotMatch(resume, /Steps 2 and 8 do not require/);
   assert.doesNotMatch(resume, /verify-push-state/);
-  // Scoped to what the record covers (task.160 QA cycle 4, CR4-1): /commit-changes removes the lock,
-  // not Cleanup, so the record ends at the Step 8 commit and the post-commit gap is named.
+  // What the record covers (task 161, superseding task.160 QA cycle 4, CR4-1): /commit-changes'
+  // lock cooperation removes nothing, so the record spans all of Step 8 and no gap is left to name.
   assert.match(update, /`\/commit-changes`' lock cooperation/);
-  assert.match(
-    update,
-    /What it does not cover \(a known gap, older than this rule\)/,
-  );
+  assert.match(update, /What the record covers: all of Step 8/);
+  assert.match(update, /Every Step 8 HALT is resumable/);
+  assert.doesNotMatch(update, /What it does not cover/);
   assert.doesNotMatch(
     update,
     /removes this run's halt snapshot and then, last, the lock/,
@@ -435,7 +442,13 @@ test("the step document names the resume record, not the row or git, as Step 8's
   assert.match(resume, /an unfinished Step 7 row still wins/);
   assert.match(resume, /whether it survived or was restored/);
   assert.doesNotMatch(resume, /whatever the row reads and whatever/);
-  assert.match(update, /A HALT whose report fails lint skips that commit/);
+  // Every Step 8 HALT now keeps its record, so the lint-failed HALT is no longer the exception (task 161).
+  assert.doesNotMatch(
+    update,
+    /A HALT whose report fails lint skips that commit/,
+  );
+  assert.doesNotMatch(resume, /would name a step 9/);
+  assert.doesNotMatch(resume, /`\/commit-changes` removes the lock at step 8/);
   const step0 = readDoc(
     "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
   );
@@ -471,21 +484,137 @@ test("finalise's lock cooperation moves the record to step 8 before Step 7's tai
   }
 });
 
-// Context Compression Recovery continues from recommended_step, which is 9 for a record at step 8.
-// Each orchestrator carries the step-8 exception and cites the resume contract (CR4-2).
+// Context Compression Recovery re-runs Step 8 for a record at step 8. Each orchestrator carries the
+// step-8 exception and cites the resume contract (CR4-2), and states it BEFORE the items it overrides
+// (task.160 pr-review.1 CR-2, task 161): after items 2–3 it came too late, once recovery had already
+// verified Step 8 and printed "Resuming from recommended step 9".
 for (const s of ["develop-task", "develop-story", "develop-bug"]) {
   test(`${s}'s Context Compression Recovery re-runs Step 8 for a record at step 8`, () => {
     const doc = readDoc(`skills/${s}/SKILL.md`);
-    const at = doc.indexOf("4. Continue from `recommended_step`");
-    assert.ok(at >= 0, "recovery item 4 not found");
-    const item = doc.slice(at, doc.indexOf("\n\n", at));
+    const one = doc.indexOf(
+      "1. Read the implementation report. Find the last ✅ step",
+    );
+    const two = doc.indexOf("2. **Verify each ✅ step's artifact exists", one);
+    assert.ok(one >= 0 && two > one, "recovery items 1 and 2 not found");
+    const item = doc.slice(one, two);
     assert.match(item, /Exception — a record at step 8/);
+    assert.doesNotMatch(
+      doc.slice(two, doc.indexOf("\n\n", two)),
+      /Exception — a record at step 8/,
+      "the exception is restated after the items it overrides",
+    );
+    assert.doesNotMatch(item, /step 9/);
     assert.match(item, /re-run Step 8 from the start/);
     assert.match(item, /first unfinished row at or below Step 7/);
     assert.match(item, /surviving or restored/);
     assert.match(item, /develop-pipeline-resume-contract\.md/);
   });
 }
+
+// The detector never recommends a step 9 (task 161). Its schema says 1–8; a record at step 8 means
+// Step 8 has not passed its checklist, so it recommends 8. Every rule that adds 1 to LOCK_STEP must
+// carry the clamp, in the Step 3 rules and in the decision table alike.
+test("the resume detector recommends 8, never 9, for a record at step 8", () => {
+  const doc = readDoc("shared/resources/pipeline-resume-detector-prompt.md");
+  assert.match(doc, /`recommended_step` \| integer \| yes \|[^\n]*\(1–8\)/);
+  assert.match(doc, /`recommended_step = min\(LOCK_STEP \+ 1, 8\)`/);
+  const adders = doc
+    .split("\n")
+    .filter(
+      (l) => /LOCK_STEP \+ 1/.test(l) && !/min\(LOCK_STEP \+ 1, 8\)/.test(l),
+    );
+  // Non-vacuity: the decision table has two rows that add 1.
+  assert.ok(
+    adders.length >= 2,
+    `expected the table's +1 rows, found ${adders.length}`,
+  );
+  for (const l of adders) {
+    assert.match(l, /or 8 when LOCK_STEP is 8/, `unclamped: ${l}`);
+  }
+});
+
+// The population, not named lines (task.160 pr-review.1 CR-1; task 161). Every instruction that
+// updates the Pipeline Progress table after a step, anywhere the develop pipelines are specified,
+// either belongs to one numbered step, or says it is a no-op after Step 8 — whose own row was set
+// before its commit, when check 5's clean tree forbids any later edit.
+//   files:  skills/develop-*/SKILL.md and the develop-pipeline-*.md docs beside this test's parent
+//   hits:   PIPELINE_PROGRESS_EDIT below
+//   exempt: develop-pipeline-step-{1..7}-*.md — each instruction there updates its own step's row,
+//           and runs before Step 8; develop-pipeline-step-8-commit.md — Step 8's own edits, whose
+//           before-the-commit order the task.160 ordering tests execute; a line that says "before
+//           the commit" — an orchestrator's summary of that same Step 8 edit.
+const PIPELINE_PROGRESS_EDIT =
+  /update (the )?Pipeline Progress|Pipeline Progress (table|row)[^.]*(✅|update)/i;
+function developPipelineDocs() {
+  const skills = fs
+    .readdirSync(path.join(ROOT, "skills"))
+    .filter((d) => d.startsWith("develop-"))
+    .map((d) => `skills/${d}/SKILL.md`)
+    .filter((f) => fs.existsSync(path.join(ROOT, f)));
+  const shared = fs
+    .readdirSync(path.join(ROOT, "shared", "resources"))
+    .filter((f) => /^develop-pipeline-.*\.md$/.test(f))
+    .map((f) => `shared/resources/${f}`);
+  return [...skills, ...shared];
+}
+test("every generic Pipeline Progress update says it is a no-op after Step 8", () => {
+  const perSkill = {};
+  let required = 0;
+  for (const file of developPipelineDocs()) {
+    if (/develop-pipeline-step-[1-8]-/.test(file)) continue;
+    for (const line of readDoc(file).split("\n")) {
+      if (!PIPELINE_PROGRESS_EDIT.test(line)) continue;
+      if (/before the commit/.test(line)) continue;
+      required++;
+      perSkill[file] = (perSkill[file] || 0) + 1;
+      assert.match(
+        line,
+        /After Step 8 this (edit )?is a no-op/,
+        `${file}: a Pipeline Progress update with no Step 8 exception: ${line.slice(0, 160)}`,
+      );
+    }
+  }
+  // Floor: action 2 and the "After each step" line in each of the three orchestrators.
+  for (const s of ["develop-task", "develop-story", "develop-bug"]) {
+    assert.ok(
+      (perSkill[`skills/${s}/SKILL.md`] || 0) >= 2,
+      `${s}: expected action 2 and the "After each step" line, found ${perSkill[`skills/${s}/SKILL.md`] || 0}`,
+    );
+  }
+  assert.ok(
+    required >= 6,
+    `expected at least 6 generic updates, found ${required}`,
+  );
+});
+
+// Same population class for the lock's terminal remover (review I-5): every mention of `--complete`
+// outside the step-8 document — which defines where it runs, and whose order the executed checklist
+// tests hold — must say that Step 8's Completion Checklist runs it. An orchestrator told to
+// `--complete` once /commit-changes returns would skip checks 2–5.
+test("every orchestrator mention of --complete names the Step 8 Completion Checklist", () => {
+  const perSkill = {};
+  let seen = 0;
+  for (const file of developPipelineDocs()) {
+    if (file.endsWith("develop-pipeline-step-8-commit.md")) continue;
+    for (const line of readDoc(file).split("\n")) {
+      if (!line.includes("--complete")) continue;
+      seen++;
+      perSkill[file] = (perSkill[file] || 0) + 1;
+      assert.match(
+        line,
+        /Completion Checklist/,
+        `${file}: --complete without the checklist that runs it: ${line.slice(0, 160)}`,
+      );
+    }
+  }
+  for (const s of ["develop-task", "develop-story", "develop-bug"]) {
+    assert.ok(
+      (perSkill[`skills/${s}/SKILL.md`] || 0) >= 2,
+      `${s}: expected action 1 and the lock-update line, found ${perSkill[`skills/${s}/SKILL.md`] || 0}`,
+    );
+  }
+  assert.ok(seen >= 6, `expected at least 6 mentions, found ${seen}`);
+});
 
 // A lock at step 8 for this work item, as the orchestrator holds it while Step 8 runs.
 function writeStep8Lock(fx) {
@@ -826,14 +955,13 @@ describe("executed against fixtures", { concurrency: true }, () => {
       }
     });
 
-    // ── The record's real lifecycle (task.160 QA cycle 4, CR4-3) ──
-    // /commit-changes' lock cooperation is the remover: at step 8 it removes the lock (the record
-    // ends at the Step 8 commit); nested at step 5 it keeps it. Cleanup then removes this run's
-    // halt snapshot, cut from the step document and run under each shell.
-    test(`[${sh}] the Step 8 commit ends the record and Cleanup removes this run's snapshot`, async () => {
+    // ── The record's real lifecycle (task.160 QA cycle 4, CR4-3; inverted by task 161) ──
+    // /commit-changes' lock cooperation removes nothing, nested at step 5 or at the Step 8 commit.
+    // Cleanup, cut from the step document and run under each shell, removes this run's halt
+    // snapshot and leaves the lock: only the Completion Checklist's `--complete` ends the record.
+    test(`[${sh}] the Step 8 commit and Cleanup leave the record; Cleanup removes this run's snapshot`, async () => {
       const fx = await setup(finished("Task"));
       try {
-        const LOCK_HELPER = RESTORE;
         writeStep8Lock(fx);
         const nested = JSON.parse(
           fs.readFileSync(path.join(fx.work, LOCK), "utf8"),
@@ -852,10 +980,14 @@ describe("executed against fixtures", { concurrency: true }, () => {
         r = run("bash", `bash "${LOCK_HELPER}" --skill commit-changes`, {
           cwd: fx.work,
         });
+        assert.equal(r.status, 0, r.stdout + r.stderr);
         assert.equal(
-          fs.existsSync(path.join(fx.work, LOCK)),
-          false,
-          `the Step 8 commit kept the lock: ${r.stdout}${r.stderr}`,
+          String(
+            JSON.parse(fs.readFileSync(path.join(fx.work, LOCK), "utf8"))
+              .current_step,
+          ),
+          "8",
+          `the Step 8 commit did not leave the lock at 8: ${r.stdout}${r.stderr}`,
         );
         write(
           fx.work,
@@ -866,10 +998,14 @@ describe("executed against fixtures", { concurrency: true }, () => {
           }) + "\n",
         );
         const code = bind(
-          blockBy(readDoc(STEP8), "Remove the pipeline lock — must be last"),
+          blockBy(readDoc(STEP8), "halt snapshot for this run removed"),
           {
             "{work-item-dir}": WORK_ITEM,
           },
+        );
+        assert.doesNotMatch(
+          code,
+          /rm -f \.claude\/state\/develop-pipeline\.lock/,
         );
         const c = await runAsync(sh, code, { cwd: fx.work });
         assert.equal(c.status, 0, `cleanup: ${c.stdout}\n${c.stderr}`);
@@ -877,6 +1013,93 @@ describe("executed against fixtures", { concurrency: true }, () => {
           fs.existsSync(path.join(fx.work, SNAPSHOT)),
           false,
           "this run's snapshot survived Cleanup",
+        );
+        assert.equal(
+          fs.existsSync(path.join(fx.work, LOCK)),
+          true,
+          "Cleanup removed the lock — the record must outlive it",
+        );
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // ── Step 8 keeps its resume record until the checklist passes (task 161) ──
+    // The checklist runs checks 2–5, then `--complete`, then check 1. A passing run ends the record
+    // through `--complete`; a failing one exits first and the lock stays at 8.
+    test(`[${sh}] a passing checklist removes the lock at step 8 through --complete`, async () => {
+      const fx = await setup(finished("Task"));
+      try {
+        writeStep8Lock(fx);
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+        assert.match(r.stdout, /pipeline complete, lock removed/);
+        assert.match(r.stdout, /✅ Step 8 post-conditions verified/);
+        assert.equal(fs.existsSync(path.join(fx.work, LOCK)), false);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    test(`[${sh}] a failing checklist exits before --complete and the lock stays at 8`, async () => {
+      const fx = await setup(
+        setRow(finished("Task"), "8. commit-changes", "⏳ Pending"),
+      );
+      try {
+        writeStep8Lock(fx);
+        const r = await runChecklist(sh, fx);
+        assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+        assert.match(r.stdout, CHECK4_UNFINISHED);
+        assert.doesNotMatch(r.stdout, /lock removed/);
+        assert.equal(
+          String(
+            JSON.parse(fs.readFileSync(path.join(fx.work, LOCK), "utf8"))
+              .current_step,
+          ),
+          "8",
+          "a failed check removed the lock",
+        );
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // A HALT inside Step 8 commits the report through /commit-changes and then runs the HALT
+    // rule's snapshot block, cut verbatim from develop-task. The lock is still there at 8, so the
+    // snapshot records halt_step 8 — and --restore rebuilds a lock at 8 from it.
+    test(`[${sh}] a Step 8 HALT after /commit-changes snapshots halt_step 8, and --restore reads 8`, async () => {
+      const fx = await setup(finished("Task"));
+      try {
+        writeStep8Lock(fx);
+        let r = run("bash", `bash "${LOCK_HELPER}" --skill commit-changes`, {
+          cwd: fx.work,
+        });
+        assert.equal(r.status, 0, r.stdout + r.stderr);
+        const halt = bind(
+          blockBy(
+            readDoc("skills/develop-task/SKILL.md"),
+            'jq --arg reason "{halt_reason}"',
+          ),
+          { "{halt_reason}": "checklist refused", "{halt_step}": "8" },
+        );
+        const h = await runAsync(sh, halt, { cwd: fx.work });
+        assert.equal(h.status, 0, `halt: ${h.stdout}\n${h.stderr}`);
+        assert.equal(fs.existsSync(path.join(fx.work, LOCK)), false);
+        const snap = JSON.parse(
+          fs.readFileSync(path.join(fx.work, SNAPSHOT), "utf8"),
+        );
+        assert.equal(String(snap.halt_step), "8");
+        assert.equal(String(snap.current_step), "8");
+        r = run("bash", `bash "${LOCK_HELPER}" --restore "${WORK_ITEM}"`, {
+          cwd: fx.work,
+        });
+        assert.equal(r.status, 0, r.stdout + r.stderr);
+        assert.equal(
+          String(
+            JSON.parse(fs.readFileSync(path.join(fx.work, LOCK), "utf8"))
+              .current_step,
+          ),
+          "8",
         );
       } finally {
         cleanup(fx.dir);
