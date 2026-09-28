@@ -9,6 +9,8 @@ task-ref: task.163.stop-hook-step-8-follow-ups.md
 
 > Requirements and success criteria: [task.163.stop-hook-step-8-follow-ups.md](task.163.stop-hook-step-8-follow-ups.md)
 
+> **Superseded wording (QA cycles 1–2, PR review PC-1).** Two snippets below are the plan as written, not what shipped. The develop-bug `STEP7_TAIL` shipped as "Part B's bug-close routine — the Resolution Summary, status `closed`, the parent or registry linkage and the tracker-close check — then the Step 7 Completion Checklist". The lock-8 `STEPS_AHEAD` shipped as "then the steps still ahead: the first unfinished row at or below Step 7, if any, then Step 8". The task document and the code are authoritative.
+
 ## Overview
 
 Two text edits (the develop-bug tail, the step-8 status clause), one shared phrase kept identical in the hook and the resume contract, two test floors and one fixture fix. Start from `develop` at or after `e5c1f97d` (task.162 merged). Anchors are string identities, not line numbers.
