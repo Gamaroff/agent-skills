@@ -690,7 +690,7 @@ test("the Stop hook and the resume contract describe Step 7's tail in the same w
     "the Resolution Summary",
     "status `closed`",
     "the tracker-close check",
-    "Part B's Step 7 Completion Checklist",
+    "then the Step 7 Completion Checklist",
   ]) {
     assert.ok(
       bugHook[1].includes(phrase),
@@ -730,6 +730,32 @@ test("the Stop hook and the resume contract describe Step 7's tail in the same w
     taskHook[1],
     taskContract[1],
     "the hook and the contract describe the story/task Step 7 tail differently",
+  );
+});
+
+// The Remaining Work Status block's steps-ahead list is described in two places: the banner doc's
+// derivation rule and the Stop hook's step-8 reason. At lock 8 the hook lists Step 7's tail before
+// Step 8, because /finalise moves the lock there before that tail runs; a banner doc that derived
+// the list from current_step alone would list Step 8 only and contradict it (task 163, QA cycle 1
+// CR-1). This renders the hook and requires the banner doc to carry the same list.
+const BANNER = "shared/resources/develop-pipeline-remaining-work-banner.md";
+test("the banner doc and the Stop hook list the same steps ahead at lock 8", () => {
+  const reason = stopHookReasonAt8("develop-task");
+  const ahead = reason.match(/then the steps still ahead: ([^)]+)\)/);
+  assert.ok(
+    ahead,
+    `hook reason at lock 8 has no steps-ahead list: ${reason.slice(0, 200)}`,
+  );
+  assert.match(
+    ahead[1],
+    /Step 7's tail/,
+    `lock-8 list does not name Step 7's tail: ${ahead[1]}`,
+  );
+  // The banner doc wraps its lines; compare with whitespace collapsed.
+  const banner = readDoc(BANNER).replace(/\s+/g, " ");
+  assert.ok(
+    banner.includes(`\`${ahead[1]}\``),
+    `${BANNER} does not carry the hook's lock-8 list "${ahead[1]}"`,
   );
 });
 

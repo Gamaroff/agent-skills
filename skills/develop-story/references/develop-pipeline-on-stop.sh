@@ -242,8 +242,9 @@ fi
 #
 # Only the description of Step 7's tail differs by orchestrator. develop-bug's Step 7 is
 # /finalise --bug (Part A, whose lock cooperation advances the lock to 8) and then Part B, the
-# bug-close routine that actually closes the bug (develop-bug-step-7-close-bug.md), ending with
-# Part B's own Step 7 Completion Checklist, which decides whether Step 7 finished (task 163). A
+# bug-close routine that actually closes the bug (develop-bug-step-7-close-bug.md), then that
+# document's Step 7 Completion Checklist, which decides whether Step 7 finished. The checklist is a
+# section of its own, beside Parts A and B, and covers Part A's items too (task 163). A
 # story/task tail is the DoD body, the tracker update and the Step 7 checklist. The resume
 # contract's Phase 0b sentence names both tails in the same words; a parity test holds them
 # together (step-8-completion-checklist.test.mjs). The routing rule is the same
@@ -256,7 +257,7 @@ fi
 # A finer rule written here sent a Step 7-tail stall to Step 8's report update, which ticks
 # row 7 without the tail ever running (task.161 QA cycle 2, CR-1).
 if [ "$SKILL" = "develop-bug" ]; then
-  STEP7_TAIL="for Step 7: Part B's bug-close routine, meaning the Resolution Summary, status \`closed\`, the parent or registry linkage, the tracker-close check and Part B's Step 7 Completion Checklist (develop-bug-step-7-close-bug.md)"
+  STEP7_TAIL="for Step 7: Part B's bug-close routine, meaning the Resolution Summary, status \`closed\`, the parent or registry linkage and the tracker-close check, then the Step 7 Completion Checklist (develop-bug-step-7-close-bug.md)"
 else
   STEP7_TAIL="for Step 7: the DoD body to the PR, the tracker update, the Step 7 checklist"
 fi

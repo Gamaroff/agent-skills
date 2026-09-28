@@ -136,15 +136,15 @@ for SK in develop-story develop-task develop-bug; do
   fi
   # Step 7's tail is described per orchestrator (task 162). develop-bug's Step 7 ends with Part B,
   # the bug-close routine; the DoD body to the PR is the story/task tail and does not close a bug.
-  # Part B ends with its own Step 7 Completion Checklist, which decides whether Step 7 finished,
-  # so the tail must name it (task 163).
+  # The step doc's Step 7 Completion Checklist, which follows Part B and covers Parts A and B,
+  # decides whether Step 7 finished, so the tail must name it (task 163).
   if [ "$SK" = "develop-bug" ]; then
     if echo "$R" | grep -q "Resolution Summary" && echo "$R" | grep -q 'status `closed`' \
-      && echo "$R" | grep -q "Part B's Step 7 Completion Checklist" \
+      && echo "$R" | grep -q "then the Step 7 Completion Checklist" \
       && echo "$R" | grep -q "develop-bug-step-7-close-bug.md" && ! echo "$R" | grep -q "the DoD body to the PR"; then
-      pass "[$SK] lock=8 names Part B's bug-close routine, checklist included, as Step 7's tail"
+      pass "[$SK] lock=8 names Part B's bug-close routine, then the Step 7 Completion Checklist, as Step 7's tail"
     else
-      fail "[$SK] lock=8 names Part B's bug-close routine, checklist included, as Step 7's tail" "Got: $(echo "$R" | grep -o 'finish that step first ([^)]*)' | head -1)"
+      fail "[$SK] lock=8 names Part B's bug-close routine, then the Step 7 Completion Checklist, as Step 7's tail" "Got: $(echo "$R" | grep -o 'finish that step first ([^)]*)' | head -1)"
     fi
   else
     if echo "$R" | grep -q "the DoD body to the PR, the tracker update, the Step 7 checklist" && ! echo "$R" | grep -q "Resolution Summary"; then

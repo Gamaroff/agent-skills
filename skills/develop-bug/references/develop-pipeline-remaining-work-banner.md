@@ -80,6 +80,10 @@ Rules:
 - **Cheap to produce.** Derive the position and the steps-ahead list from the
   lock file's `current_step`; derive the unit counts from the work-item file you
   already have open in the loop. Never re-read files solely to render the block.
+  **One exception: a lock at 8.** `/finalise` moves the lock to 8 before Step 7's
+  tail runs, so at 8 the list reads `Step 7's tail first if its row is unfinished,
+  then Step 8` — the Stop hook's step-8 reason says the same, and a test holds the
+  two together (task 163).
 - **No prose around it.** No "here's where we are" preamble, no summary after.
 
 ## Per-pipeline variants
