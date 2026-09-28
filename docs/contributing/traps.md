@@ -32,6 +32,12 @@ An earlier handoff said "`npm` is fine". It is not; it was never checked.
 Not just one file — **the whole directory**. `.agents/skills/foo/…` and `skills/foo/…` are the same
 file on disk; editing either edits both. Only the `skills/` path is git-tracked.
 
+The symlink is gitignored, so **a test run in place passes on it where CI fails**: any test that
+reaches `.agents/skills/…` from the repository root resolves it here and nowhere else (obs #149 —
+71/71 locally, 19 red in CI). Build the test's cwd with `makeConsumerRoot()`
+(`evals/shared/lib/consumer-root.mjs`), and check a local green with `npm run test:clean-checkout`,
+which runs `npm test` in a clone of HEAD that has no ignored paths. `scripts/release.sh` gates on it.
+
 ### Never edit `skills/*/references/` — it is generated
 
 `shared/resources/` is the single source of truth. `.git/hooks/pre-commit` runs `npm run bundle`
