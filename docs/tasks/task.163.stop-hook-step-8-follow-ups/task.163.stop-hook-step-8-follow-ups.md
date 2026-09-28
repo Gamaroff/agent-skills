@@ -287,25 +287,25 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-28
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.163.qa.2.stop-hook-step-8-follow-ups.md](./task.163.qa.2.stop-hook-step-8-follow-ups.md)
-- **Gate File**: [task.163.gate.2.stop-hook-step-8-follow-ups.yml](./task.163.gate.2.stop-hook-step-8-follow-ups.yml)
-- **Previous**: [qa.1](./task.163.qa.1.stop-hook-step-8-follow-ups.md) / [gate.1](./task.163.gate.1.stop-hook-step-8-follow-ups.yml) — PASS (100/100), 2 LOW, fixed in cycle 1
+- **Full Report**: [task.163.qa.3.stop-hook-step-8-follow-ups.md](./task.163.qa.3.stop-hook-step-8-follow-ups.md)
+- **Gate File**: [task.163.gate.3.stop-hook-step-8-follow-ups.yml](./task.163.gate.3.stop-hook-step-8-follow-ups.yml)
+- **Previous**: [qa.2](./task.163.qa.2.stop-hook-step-8-follow-ups.md) / [gate.2](./task.163.gate.2.stop-hook-step-8-follow-ups.yml) — CONCERNS (90/100), fixed in cycle 2; [qa.1](./task.163.qa.1.stop-hook-step-8-follow-ups.md) / [gate.1](./task.163.gate.1.stop-hook-step-8-follow-ups.yml) — PASS (100/100), fixed in cycle 1
 
 ### Test Coverage Summary
-- **Tests Executed**: 185 (targeted suites) + 9 mutation proofs
+- **Tests Executed**: 185 (targeted suites) + 14 mutation proofs
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 (1 MEDIUM)
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-CR-1 (MEDIUM): cycle 1's banner-doc exception keys on "a lock at 8", so it also rewrites the ordinary Step 7 → 8 transition. It should be scoped to a Stop-hook re-prompt. There are three LOW findings on the same subject: CR-2, the checklist is still inside Part B's list; CR-3, the lock-8 list is narrower than the completion rule; CR-4, the banner test checks presence only.
+No HIGH or MEDIUM finding is new to this change. Two LOW wording findings on the banner-doc exception are open (CR-2, CR-3). A pre-existing HALT-rendering gap (a Step 7-tail HALT at lock 8) is recorded in the gate's recommendations.future.
 
 ---
 
@@ -319,6 +319,7 @@ CR-1 (MEDIUM): cycle 1's banner-doc exception keys on "a lock at 8", so it also 
 | 2026-09-28 |         | Implemented — 5 source files plus bundled copies; 1 new test, 5 new assertions; 7 mutations proved | develop |
 | 2026-09-28 |         | QA gate PASS (100/100) — 2 LOW findings | qa-task |
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — 1 MEDIUM, 3 LOW (cycle 2 refute pass) | qa-task |
+| 2026-09-28 |         | QA gate PASS (100/100) — 2 LOW findings; 1 pre-existing MEDIUM routed to future (cycle 3) | qa-task |
 | 2026-09-28 |         | QA findings fixed — banner doc defers to the Stop hook at a re-prompt only; checklist outside Part B's list; lock-8 list worded after the completion rule; 2 iterations | qa-fix |
 <!-- change-log-end -->
 
@@ -353,6 +354,15 @@ CR-1 (MEDIUM): cycle 1's banner-doc exception keys on "a lock at 8", so it also 
 ---
 
 ## Notes
+
+### Deferred Work
+
+The QA loop left through the cosmetic-residue exit (route 2b, cycle 3), carrying two LOW findings to `task.163.gate.3` `recommendations.future`:
+
+- **CR-2**: the banner doc's Stop-hook re-prompt exception restates the hook's lock-8 list without "if any, then Step 8". The fix is to stop restating it and keep only the deferral and its scope.
+- **CR-3**: the banner test compares literals rather than the hook's rendered strings. Fold it into CR-2.
+
+The same gate records one pre-existing gap, not introduced here: a HALT raised during Step 7's tail after `/finalise` moved the lock to 8 renders as a Step 8 HALT. Name the halting step instead of deriving it from the lock.
 
 ### Important Reminders
 
