@@ -102,9 +102,12 @@ function checkCardTitle(frontmatter, body = "") {
 }
 ```
 
-`describeCardScope(result, {title = false} = {})`: when `title` is true, the clean line reads
-`… — this checks the card sections and the title only, not template completeness.` The sync callers
-keep the default, so their wording does not change.
+`describeCardScope(result)`: when `result.titleChecked` is true, the clean line reads
+`… — this checks the card sections and the title only, not template completeness.` Key it on the
+result, not on an options argument: `formatCardCheck` calls `describeCardScope(result)` itself
+(`jira-sync.js:1936`), so an option passed from `card-preflight.js` would reach the JSON `scope` field
+and never the human-readable clean line (review 1, finding I1). The sync callers never set
+`titleChecked`, so their wording does not change.
 
 **`shared/resources/card-preflight.js`**. In `preflight()` at `:115`, change the destructure to
 `{ frontmatter, body }`, then:
@@ -116,10 +119,9 @@ const findings = [...sections.findings, ...titleFindings];
 return { file, kind, body, ...sections, findings, ok: findings.length === 0, titleChecked: true };
 ```
 
-Pass `{ title: true }` through to `describeCardScope`. `formatCardCheck` already renders `important`
-as ⚠️ and prints `Fix:`, so it needs no change there.
+`formatCardCheck` already renders `important` as ⚠️ and prints `Fix:`, so it needs no change.
 
-**`skills/create-task/SKILL.md` § 4**. Append to the frontmatter bullet at `:460`: *`title` is a name,
+**`skills/create-task/SKILL.md` § 4**. Append to the frontmatter bullet at `:463`: *`title` is a name,
 not a summary. If step 4.6 reports `title-too-long`, use the H1 as the title and move the extra text
 into `description`.* Do not put the number in the prose. It lives in `CARD_TITLE_MAX`.
 
@@ -138,7 +140,7 @@ output*: the preflight also reads the frontmatter `title`, and `title-too-long` 
 
 ### Phase 2: Evidence rules (obs #127, #124)
 
-**Section 3 prompt.** Add after the *Cite by identity* paragraph at `:692`:
+**Section 3 prompt.** Add after the *Cite by identity* paragraph at `:695`:
 
 ```markdown
 **Every current-state name carries its grep** (obs #127). A field, function, flag or file location
@@ -149,7 +151,7 @@ memory of a run, not a read of the code: task.123 named a `qa_cycles_completed` 
 nowhere.
 ```
 
-**§ 3.5 *Critical***. Add after the obs #102 bullet at `:432`:
+**§ 3.5 *Critical***. Add after the last *Critical* bullet (obs #170 at `:435` since task.151):
 
 ```markdown
 - **A current-state name nobody grepped** (obs #127): every field, function and file location the
@@ -177,8 +179,8 @@ nowhere.
   add. Name the regex change and a non-vacuity assertion instead.
 ```
 
-**review-task Step 3**. Add a new numbered check after the last one, matching the shape of checks
-6–8:
+**review-task Step 3**. Add a new numbered check after the last one (check 12 since task.151, so this
+is check 13), matching the shape of checks 6–8:
 
 ```markdown
 N. **Single-statement test discriminator** (obs #135):
@@ -193,7 +195,7 @@ N. **Single-statement test discriminator** (obs #135):
    - Flag as **Important** when the key is shared or no token-free restatement is addressed
 ```
 
-Add to *Common Hallucination Patterns* (`:852`):
+Add to *Common Hallucination Patterns* (`:919`):
 `- ❌ A test key that another rule's sites also match`.
 
 **`tests/create-task-authoring-evidence.test.js`**. Use CommonJS and `node:test`. Copy the
@@ -237,9 +239,9 @@ template's category, and effort from the rubric).
 The `shared/resources/` literals that make the bundler copy both files into create-task go in the
 prose that cites them. `observation-log.js` needs `yaml-subset.js`, which is already bundled.
 
-**The interactivity exceptions.** Add one sentence at each of `:108`, `:935` and `:958`: *In
+**The interactivity exceptions.** Add one sentence at each of `:108`, `:939` and `:962`: *In
 `--from-observation` mode (§ 1.1) the entries are the collaboration source; only the questions they
-leave open are asked.* At § 4.4 `:542`, add: *In `--from-observation` mode, write the rubric value
+leave open are asked.* At § 4.4 `:545`, add: *In `--from-observation` mode, write the rubric value
 and report it in the completion message.*
 
 **§ 5 step 2b.** After both files exist, run each `park[]` vector:
@@ -249,7 +251,8 @@ node .agents/skills/create-task/references/observation-log.js set-status --id 12
   --parked-until "task.150 merged to develop" --json
 ```
 
-Read `reason`. `ok` and `already` are success. Report any other value verbatim and continue: parking
+Read `reason`. `ok` is success. `set-status` has no `already` reason, and re-parking a parked entry
+also answers `ok`. Report any other value verbatim and continue: parking
 never blocks the document, and the entry stays `open`, which is visible and not lost.
 
 **`skills/create-task/scripts/lib.js`**:

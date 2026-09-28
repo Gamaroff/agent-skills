@@ -134,6 +134,29 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The card preflight reads the frontmatter title (task 150, obs #128).** `preflight()` kept only
+  the body, so no finding was ever raised about the title, and 42 of 146 task titles had grown past
+  100 characters (the longest 368), published verbatim as GitHub issue titles. `CARD_TITLE_MAX = 100`
+  and `checkCardTitle` now sit beside `checkCardSections` in `jira-sync.js`. A title over the bound is
+  one `important` finding, `title-too-long`, whose `Fix:` names the body H1 when that fits. It is
+  advisory at authoring (exit 0, 1 under `--strict`), and the clean line says the title was read. The
+  43 legacy long titles are frozen in `card-preflight-corpus.test.mjs`, a list that can only shrink.
+  The four `sync-jira-* --check-card` paths do not read the title yet (follow-up).
+- **create-task and review-task ask for the evidence behind a claim about the current code (task
+  150, obs #127, #124, #135).** create-task § 3.5 gains three Critical items. A current-state name
+  carries the `grep` hit that found it, or is marked `(unverified)`. A categorised population carries
+  one witness per member, not just a count. A proposed single-statement test shows its key belongs to
+  no other rule and names the restatement it would miss. The Section 3 prompt states the first of
+  these where Technical Background is written. review-task Step 3 gains check 13, *Single-statement
+  test discriminator*. `tests/create-task-authoring-evidence.test.js` holds each rule in its own
+  section, not merely somewhere in the file.
+- **`/create-task --from-observation <id>[,<id>…]` (task 150, obs #147).** It cuts a task from
+  observation-log entries. `seedFromObservations` in `scripts/lib.js` refuses an entry that is not
+  `open` and asks only the questions the entries leave open: the title when a single entry's is over
+  the bound or there are several, and tracker sync. After both files exist, it parks each entry
+  through `observation-log.js set-status`, so parking is no longer a step a session can forget. A
+  round-trip test runs the park vectors through the real engine.
+
 - **The review pre-pass measures a document against this repository's architecture (task 151, obs
   #130).** Agent B's domain list and pattern axes were hard-coded for a web stack ("backend /
   frontend / auth / payments / real-time", "API endpoints or payloads"), so on a shell/Node
