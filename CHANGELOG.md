@@ -306,6 +306,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/finalise` judges a documentation criterion by the document, not by a missing test (obs #204).**
+  The AC-traceability agent required a test citation for every success criterion, so a criterion
+  whose deliverable is what a document says — "the CHANGELOG cites the task", "the hooks doc agrees
+  with the hook" — failed on every run even when the agent had found the text and found it correct,
+  and the orchestrator overrode it by hand (task.161 AC14, task.162 AC8/AC9). The prompt now defines a
+  documentation criterion by what it requires ("file F says S"), cites the document line the agent
+  read, cites a pinning test when one exists (the changelog corpus guard, for a CHANGELOG entry) or
+  `NOT_APPLICABLE: documentation criterion`, and carries `test_runs_per_pr: null`. A behaviour
+  criterion cannot take the path: describing a behaviour in a document does not make it one.
 - **The Stop hook's step-8 reason fits every orchestrator (task 162).** At `current_step` 8 the
   reason described Step 7's tail as "the DoD body to the PR, the tracker update, the Step 7
   checklist" for all three orchestrators, so a develop-bug stall between `/finalise --bug` and
