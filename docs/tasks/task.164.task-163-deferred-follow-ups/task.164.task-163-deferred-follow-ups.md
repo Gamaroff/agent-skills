@@ -338,7 +338,7 @@ Cycle 2's five findings are fixed and proven. Four LOW remain: the mapping refus
 | 2026-09-28 |         | QA findings fixed — gate 1 CONCERNS: 4 of 4 (banner exceptions counted, HALT example per pipeline, whole-doc restatement check, spawn timeout reported), 1 iteration | qa-fix |
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — 5 findings (1 medium, 4 low) | qa-task |
 | 2026-09-28 |         | QA findings fixed — gate 2 CONCERNS: 5 of 5 (HALT rule cites the --skill mapping instead of listing it, halted step listed first, CHANGELOG example, 4b messages, seam NOTE line), 1 iteration | qa-fix |
-| 2026-09-28 |         | QA gate PASS (100/100) — 4 low findings open, 1 reviewer finding rejected | qa-task |
+| 2026-09-28 |         | QA gate PASS (100/100) — 4 low findings carried to recommendations.future (route 2b), 1 reviewer finding rejected | qa-task |
 <!-- change-log-end -->
 
 ---
