@@ -178,6 +178,7 @@ _Problems encountered and how they were resolved or escalated._
 
 - Step 7: /finalise identified 2 DoD gaps (AC6; security low). This is a terminal HALT, handed to the operator
 
+- Run-2 gap fix: `48d023a1` was committed and pushed with `ci:fast` RED (1 failure: a `shared/resources/` path in a test comment, caught by the comment-only-reference guard). The gate ran, but the same command chain committed without checking its exit code. Fixed in `ef3bf4ea` (gate green, 4399/0) within minutes. Lesson: never chain a commit after a gate without an exit-code check
 - QA Cycle 3: the convergence check tripped (HIGH 1, 1, 1). This is a terminal HALT, handed to the operator; see the escalation entry in QA Iteration History. Tracker `blocked` stage signalled
 - The code-review subagents (3) and the security probes ran independently. The findings ingester and pre-develop Explore were run inline (independence loss recorded in each step's Decisions Log)
 
@@ -274,3 +275,22 @@ they are handed over below.
 **QA Iterations**: 5 (4 qa-fix cycles; escalated at cycle 3, re-entered with 2 granted cycles)
 **DoD Summary**: `task.150.dod.1.create-task-authoring-evidence.md` (GAPS IDENTIFIED)
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+
+---
+
+## Pipeline Paused — 2026-09-28T20:38:34Z
+
+⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
+
+**State at pause**:
+
+- Skill: `/develop-task`
+- Branch: `feature/task.150.create-task-authoring-evidence`
+- Last step boundary: Step 7
+- PR: https://github.com/Gamaroff/agent-skills/pull/512
+- Tracker: github #480
+
+**Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 7.
+
+**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+
