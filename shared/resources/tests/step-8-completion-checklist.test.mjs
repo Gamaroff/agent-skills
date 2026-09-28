@@ -620,7 +620,117 @@ test("every orchestrator mention of --complete names the Step 8 Completion Check
       `${s}: expected action 1 and the lock-update line, found ${perSkill[`skills/${s}/SKILL.md`] || 0}`,
     );
   }
+  // The hook needs its own floor: the Markdown alone meets `seen >= 6`, so a hook that stopped
+  // mentioning --complete would pass its half of this check on nothing (task 163; task.162
+  // pr-review.1 CR-3).
+  assert.ok(
+    (perSkill[STOP_HOOK] || 0) >= 1,
+    `${STOP_HOOK}: expected at least one --complete line (the step-8 COMPLETION_LINE), found ${perSkill[STOP_HOOK] || 0}`,
+  );
   assert.ok(seen >= 6, `expected at least 6 mentions, found ${seen}`);
+});
+
+// The Stop hook's step-8 line and the resume contract's Phase 0b sentence each describe Step 7's
+// tail per orchestrator. Two copies of one description drift silently, so this renders the hook's
+// reason at lock 8 and requires each tail to read the same in both (task 163; task.162 gate.1
+// QA-L1: the contract's wording was unpinned). The named phrases are floors: an extraction that
+// found the wrong span, or none, fails here rather than comparing two empty strings.
+const STOP_HOOK_PATH = path.join(ROOT, STOP_HOOK);
+function stopHookReasonAt8(skill) {
+  const dir = fs.mkdtempSync(
+    path.join(fs.realpathSync(os.tmpdir()), "t163-stop-"),
+  );
+  try {
+    fs.mkdirSync(path.join(dir, ".claude/state"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, LOCK),
+      JSON.stringify({ skill, current_step: 8, report_path: "r.md" }) + "\n",
+    );
+    const r = run("bash", `printf '{}' | bash "${STOP_HOOK_PATH}"`, {
+      cwd: dir,
+    });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    return JSON.parse(r.stdout).reason;
+  } finally {
+    cleanup(dir);
+  }
+}
+test("the Stop hook and the resume contract describe Step 7's tail in the same words", () => {
+  const para = readDoc(RESUME)
+    .split("\n")
+    .find((l) => l.includes("Step 8 is decided by the resume record"));
+  assert.ok(
+    para,
+    `${RESUME}: no Phase 0b paragraph anchored at "Step 8 is decided by the resume record"`,
+  );
+
+  const bugReason = stopHookReasonAt8("develop-bug");
+  const taskReason = stopHookReasonAt8("develop-task");
+  assert.ok(
+    bugReason && taskReason,
+    "the hook rendered an empty reason at lock 8",
+  );
+
+  // develop-bug: the list after "meaning", up to the closing parenthesis of each copy.
+  const bugHook = bugReason.match(
+    /Part B's bug-close routine, meaning (.+?) \(develop-bug-step-7-close-bug\.md\)/,
+  );
+  const bugContract = para.match(
+    /for develop-bug: Part B's bug-close routine in `develop-bug-step-7-close-bug\.md`, meaning (.+?)\)\./,
+  );
+  assert.ok(
+    bugHook,
+    `hook reason at lock 8 (develop-bug) has no bug-close list: ${bugReason.slice(0, 200)}`,
+  );
+  assert.ok(
+    bugContract,
+    `${RESUME}: Phase 0b paragraph has no develop-bug bug-close list`,
+  );
+  for (const phrase of [
+    "the Resolution Summary",
+    "status `closed`",
+    "the tracker-close check",
+    "Part B's Step 7 Completion Checklist",
+  ]) {
+    assert.ok(
+      bugHook[1].includes(phrase),
+      `hook's develop-bug tail lacks "${phrase}": ${bugHook[1]}`,
+    );
+    assert.ok(
+      bugContract[1].includes(phrase),
+      `contract's develop-bug tail lacks "${phrase}": ${bugContract[1]}`,
+    );
+  }
+  assert.equal(
+    bugHook[1],
+    bugContract[1],
+    "the hook and the contract describe develop-bug's Step 7 tail differently",
+  );
+
+  // develop-story / develop-task: one shared tail.
+  const taskHook = taskReason.match(
+    /finish that step first \(for Step 7: ([^)]+)\)/,
+  );
+  const taskContract = para.match(
+    /for develop-story and develop-task: ([^;]+);/,
+  );
+  assert.ok(
+    taskHook,
+    `hook reason at lock 8 (develop-task) has no Step 7 tail: ${taskReason.slice(0, 200)}`,
+  );
+  assert.ok(
+    taskContract,
+    `${RESUME}: Phase 0b paragraph has no develop-story/develop-task tail`,
+  );
+  assert.ok(
+    taskHook[1].includes("the DoD body to the PR"),
+    `hook's task tail: ${taskHook[1]}`,
+  );
+  assert.equal(
+    taskHook[1],
+    taskContract[1],
+    "the hook and the contract describe the story/task Step 7 tail differently",
+  );
 });
 
 // A lock at step 8 for this work item, as the orchestrator holds it while Step 8 runs.

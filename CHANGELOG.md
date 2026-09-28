@@ -306,6 +306,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The Stop hook's step-8 reason names develop-bug's Step 7 checklist and every step still ahead
+  (task 163).** Five follow-ups from task 162's QA gate and PR review. At lock 8 the develop-bug
+  Step 7 tail now ends with Part B's Step 7 Completion Checklist, the check that decides whether
+  Step 7 finished, in the hook and the resume contract's Phase 0b sentence alike. At lock 8 the
+  status block no longer lists "the steps still ahead through Step 8", which there was empty or
+  repeated Step 8. It reads "Step 7's tail first if its row is unfinished, then Step 8", matching
+  the step-8 rule two lines below it. Lock 3 and every other step keep the generic clause. A new
+  test in `step-8-completion-checklist.test.mjs` renders the hook's reason at lock 8 and fails when
+  the hook and the contract describe either tail differently, so the contract's wording is now
+  pinned. The `--complete` population test gains a floor for the hook script. Scenario 4b fails at
+  setup, naming the command, when `command -v` returns empty. It no longer skips a missing command
+  silently, and it still skips a builtin.
 - **`/finalise` judges a documentation criterion by the document, not by a missing test (obs #204).**
   The AC-traceability agent required a test citation for every success criterion, so a criterion
   whose deliverable is what a document says — "the CHANGELOG cites the task", "the hooks doc agrees
