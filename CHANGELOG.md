@@ -134,6 +134,30 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The review pre-pass measures a document against this repository's architecture (task 151, obs
+  #130).** Agent B's domain list and pattern axes were hard-coded for a web stack ("backend /
+  frontend / auth / payments / real-time", "API endpoints or payloads"), so on a shell/Node
+  repository it answered `aligned` against axes the repository never defined. They are now slots,
+  `{arch_domains}` and `{arch_axes}`, filled by a new pure helper `prepass-axes.js` from the H2
+  headings of the consumer's `concepts/tech-stack.md` and `concepts/coding-standards.md`; a
+  repository with neither file — or with files that hold no non-empty `## ` heading — gets the former
+  lists as candidates (`source: fallback`); a file that exists but cannot be read exits 1. Agent B now
+  returns `axes_checked`, and an `aligned` with none is treated as a failed agent. review-story's
+  Subagent 3 dispatches from `review-story-prepass-prompts.md` instead of a one-line description.
+  `jira-sync.js` exports its `makeFenceTracker`, which the helper reuses.
+- **review-task, review-story and create-task run a claimed property instead of reading it (task
+  151, obs #161).** A new check — review-task Step 3 check 11, review-story Step 4 check 8, Detection
+  Rule "Invariant Verification", and a create-task 3.5 Critical bullet — tells the reviewer to execute
+  a claimed ordering, uniqueness, idempotence or round-trip of an existing function on the inputs
+  the document proposes. A falsified invariant is **Critical**. task.141's zero-padding sort claim
+  passed every existence check and fails a one-line run.
+- **Compatibility handling is diffed against the released shape (task 151, obs #170).** review-task
+  Step 3 check 12, review-story Step 4 check 9 and a create-task 3.5 Critical bullet derive the
+  legacy shape with `git show <tag>:<path>` from the last release tag; every uncovered field, and a
+  missing tag citation, is **Important**. task.143 covered the one field its QA finding named; the
+  released `v0.51.0` shape lacked three more. Held by `tests/review-property-checks.test.js`, which
+  reuses the item reader now shared in `tests/lib/markdown-section.js`.
+
 - **Breaking — `status-history.js` usage errors exit 2, not 1 (task 152).** An unknown flag, a
   missing `--file`, a value flag with no operand or an unreadable file now exits **2** (and prints
   `{"reason":"usage",…}` under `--json`), matching `doc-links.js` and `tracker-comment.js`. The two

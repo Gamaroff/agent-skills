@@ -299,7 +299,7 @@ options:
 
 Before formulating questions in any step, consult the pre-pass summaries from Phase 1.5:
 
-- **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` as a question in the technical accuracy phase (Step 3).
+- **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` as a question in the technical accuracy phase (Step 3). If `alignment` is `aligned`, record its `axes_checked` (and the `prepass-axes.js` `source`) in one line under the report's Technical Accuracy section, so an `aligned` measured against the wrong axes is visible in the report rather than silent.
 - **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings as a question during completeness review (Step 6) — ask whether the task should be scoped down or closed.
 
 If a pre-pass summary is absent (agent failed or returned `alignment: unknown` / `implementation_status: unknown`): treat that axis as unreviewed and rely on in-line discovery for that phase.
@@ -407,12 +407,20 @@ options:
 1. **Resolve variables** from Step 1 output:
    - `{task_path}` — the resolved task file path
    - `{arch_location}` — from `skills-config.yaml` → `architecture.architectureShardedLocation` (default: `docs/architecture`)
+   - `{arch_domains}` and `{arch_axes}` — from `references/prepass-axes.js`, which derives them from the H2 headings of this repository's own `concepts/tech-stack.md` and `concepts/coding-standards.md` (obs #130). Agent B's domains and axes are **slots**, not a list: a hard-coded web-stack list answered `aligned` on a shell/Node repository against axes it never defined.
+
+     ```bash
+     # From the repository root, like every engine call in this skill.
+     command node .agents/skills/review-task/references/prepass-axes.js --arch "docs/architecture" --json
+     ```
+
+     Substitute your `{arch_location}` for `docs/architecture`. `{arch_domains}` is `domains` joined with `, `; `{arch_axes}` is `axes` joined with `; `. Record the `source` field (`architecture` / `partial` / `fallback`) beside `PREPASS_B` — `fallback` means neither file yielded a non-empty `## ` heading and Agent B is running on the former web-stack lists as candidates — say so in the report beside any `aligned`. Exit 1 means a file exists but could not be read: treat Agent B as failed rather than dispatch it with empty slots.
 
 2. **Dispatch both agents in a single message** (parallel — one tool-call block, two Agent invocations):
    - **Agent B** (`subagent_type="Explore"`) — architecture alignment prompt from `review-task-prepass-prompts.md`
    - **Agent C** (`subagent_type="Explore"`) — codebase already-implemented prompt from `review-task-prepass-prompts.md`
 
-3. **Collect results**: each agent returns a YAML block. Validate the top-level key (`alignment` for B; `implementation_status` for C). If a key is missing or an agent fails: log `⚠️ Pre-pass Agent {B/C} failed — proceeding without {architecture/codebase} summary` and continue with the remaining summary.
+3. **Collect results**: each agent returns a YAML block. Validate the top-level key (`alignment` for B; `implementation_status` for C). **Agent B also needs `axes_checked`**: an `alignment: aligned` with `axes_checked` missing or empty is a failed agent — an `aligned` that names nothing it was measured against is not a result (obs #130). If a key is missing or an agent fails: log `⚠️ Pre-pass Agent {B/C} failed — proceeding without {architecture/codebase} summary` and continue with the remaining summary.
 
 4. **Store summaries** as `PREPASS_B`, `PREPASS_C` in active context for use by the Q&A phase.
 
@@ -870,6 +878,44 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       input")
     - Out of scope: a criterion that names no function, or no outcome of one ("the docs say X")
 
+11. **Invariant verification** (obs #161):
+    - When the document asserts a **property** of an **existing function** under **new inputs** —
+      an ordering, a uniqueness, an idempotence, a round-trip — do not reason about it: import the
+      function (or re-implement the two lines under test) and **run** it on the inputs the document
+      proposes. A property is the one claim that is cheap to execute and expensive to read; checks
+      1–9 ask whether a thing exists, and an existence check is no evidence for a behaviour
+    - Pure and local only: no network, no writes outside a temp directory. For a function with side
+      effects, re-implement the lines under test rather than import it
+    - Worked example: task.141 claimed zero-padding (`-02`, `-03`) keeps `listRunFiles`' basename
+      sort chronological past nine runs. Every existence check passed; one line falsified it,
+      because run 1 has no suffix and `.` sorts after `-`:
+      `command node -e 'console.log(["a-lan.md","a-lan-02.md"].sort())'` → `[ 'a-lan-02.md', 'a-lan.md' ]`
+    - Report a falsified invariant as **Critical** — the document is wrong, not under-specified, and
+      its plan is already written on top of it. Quote the command and its output as the evidence.
+      A property that cannot be run in the review environment (it needs a live service) →
+      **Optional**, recorded as "unverified — needs X"
+    - Adjacent to check 10: outcome reachability _reads_ one stated outcome through the deciding
+      function; this check _runs_ a property over a set of inputs. Where one claim is both, run it
+      and report it once, here
+
+12. **Released-shape diff for compatibility handling** (obs #170):
+    - Trigger: the document defines backward-compatibility, migration, "legacy" or old-format
+      handling for a file, record, state file, schema or config shape
+    - Derive the legacy shape from the last **released** version, not from the finding that
+      prompted the task: find the release tag with `git tag --list 'v*' --sort=-v:refname | head -1`
+      (or the project's own release-tag pattern), read the file that **defines or writes** the shape
+      at that tag with `git show <tag>:<path>`, and diff its fields against the target shape. If the
+      path was renamed since, find it at the tag with `git log --follow`
+    - Every field or key the released shape lacks, or reads differently, that the document does not
+      cover → **Important**. The document must **cite the tag** it compared against; no citation →
+      **Important**
+    - No release tag exists → **Optional** ("state the baseline"). The path did not exist at the
+      tag → say so: there is no released legacy, and the handling covers unreleased states only
+    - Worked example: task.143 specified legacy handling for `priorRuns` alone — the one field its
+      QA finding named. The released shape at `v0.51.0` lacks `targeted`, `priorRuns`, `bug` and
+      `filedBug` (`git show v0.51.0:skills/qa-next/SKILL.md | grep -c '\btargeted\b'` → `0`); a
+      missing `bug` would have made a repeat failure file a duplicate bug
+
 **Common Hallucination Patterns to Detect**:
 
 - ❌ Libraries not in package.json or tech stack
@@ -879,10 +925,12 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ Code patterns that violate project standards
 - ❌ Config keys, env vars or flags that no code reads
 - ❌ An outcome no current or planned branch of the named function returns for the stated input. Report it as **Important** under check 10, not as a Critical hallucination
+- ❌ A property of an existing function asserted for new inputs, and never run on them (check 11)
+- ❌ Legacy or compatibility handling scoped from the finding that prompted it, not diffed against the released shape (check 12)
 
 **Issues to Flag**:
 
-- **Critical**: Invented libraries/APIs, incorrect paths, wrong patterns
+- **Critical**: Invented libraries/APIs, incorrect paths, wrong patterns, a falsified invariant (check 11)
 - **Important**: Unverified technical claims, inconsistent approaches
 - **Optional**: Could be more specific or cite sources
 
@@ -1928,6 +1976,7 @@ This skill implements rigorous safeguards to DETECT hallucinations:
 4. **API Verification**: Endpoints MUST match documented APIs
 5. **Schema Verification**: Database fields MUST exist in Prisma schema
 6. **Config Key Verification**: Every config key, env var or flag MUST have a reader in the tree
+7. **Invariant Verification**: A property claimed of an existing function under new inputs MUST be executed on those inputs — an existence check and a behaviour check are different instruments, and passing the first is not evidence for the second (Step 3 check 11)
 
 ### Reporting Hallucinations
 

@@ -5,19 +5,23 @@ type: task
 description: "Three review-task checks confirm that a thing exists but never that a claimed property of it holds. (1) The Phase 1.5 pre-pass Agent B compares a document against a hard-coded web-stack domain list and web-stack axes. On a shell/Node repository it answers 'aligned' unless someone rewrites the prompt by hand (obs #130). Derive the domains and axes from the consumer's own architecture docs using a small pure helper, and require Agent B to report the axes it actually checked. (2) Every Step 3 check and Anti-Hallucination Detection Rule verifies existence. None runs the property a document claims for an existing function under new inputs (obs #161). Add an Invariant verification check: execute the claim and report a falsified one as Critical. (3) Legacy and compatibility handling is scoped from the finding that prompted it instead of from the released artefact (obs #170). Add a Released-shape diff check: `git show <tag>:<path>`, diff the result against the target shape, and report every uncovered field as Important. Sites: review-task, review-story and create-task Step 3.5, held by two tests."
 tags: [review-task, review-story, create-task, pre-pass, anti-hallucination, observation]
 category: documentation
-status: planned
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-28
 assignee:
 estimated_effort_hours: 8
 github_issue: 481
+completed_date: 2026-09-28
+pr_number: 511
 ---
 
 # Technical Task: review-task — stack-neutral pre-pass, executed invariants, released-shape diff
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.151.review.1.review-verifies-claimed-properties.md` implemented 2026-09-28
 
 **GitHub Issue**: [#481](https://github.com/Gamaroff/agent-skills/issues/481)
 
@@ -81,13 +85,14 @@ review.
    `review-story-prepass-prompts.md` ships only inside `skills/review-task/references/`, which the
    task prompt file's sibling note (line 10) reaches.
 3. **Every detection rule checks existence (obs #161).**
-   - The Anti-Hallucination Protocol in `skills/review-task/SKILL.md:1901` _(`### Detection Rules`)_
+   - The Anti-Hallucination Protocol in `skills/review-task/SKILL.md:1923` _(`### Detection Rules`)_
      has six rules: technology, path, pattern, API, schema and config key. Command:
      `sed -n '/^### Detection Rules/,/^### Reporting Hallucinations/p' skills/review-task/SKILL.md | grep -c '^[0-9]\. '`
      → `6`.
-   - Step 3's validation checks (`skills/review-task/SKILL.md:757`, nine numbered checks by
+   - Step 3's validation checks (`skills/review-task/SKILL.md:757`, ten numbered checks by
      `sed -n '/^### Step 3: Technical Accuracy/,/^\*\*Common Hallucination/p' … | grep -c '^[0-9]\+\. \*\*'`)
-     all ask whether a named thing exists or has a reader.
+     ask whether a named thing exists or has a reader. Check 10 (_Outcome reachability_, obs #168,
+     landed with task.145) reads one stated outcome through a function; none runs a property.
    - On task.141 (reviewed 2026-09-22) the document said zero-padding keeps `listRunFiles`'
      basename sort chronological past nine runs. Every existence check passed. The claim is false,
      because run 1 has no suffix and `.` sorts after `-`: `command node -e 'console.log(["a-lan.md","a-lan-02.md"].sort())'`
@@ -152,16 +157,16 @@ review.
 **Existence-only checks (obs #161, #170)**
 
 - `skills/review-task/SKILL.md:757` _(`### Step 3: Technical Accuracy and Anti-Hallucination Review`)_
-  has nine numbered checks. `Common Hallucination Patterns to Detect` is at line 852 and
-  `Issues to Flag` at line 861.
-- `skills/review-task/SKILL.md:1897` _(`## Anti-Hallucination Protocol`)_ has six Detection Rules.
+  has ten numbered checks; check 10 is _Outcome reachability_ (obs #168, task.145).
+  `Common Hallucination Patterns to Detect` is at line 873 and `Issues to Flag` at line 883.
+- `skills/review-task/SKILL.md:1919` _(`## Anti-Hallucination Protocol`)_ has six Detection Rules.
 - `skills/review-story/SKILL.md:872` _(`### Step 4: Technical Accuracy and Anti-Hallucination Review`)_
-  has six numbered checks, with `Common Hallucination Patterns to Detect` at line 946.
-  `## Anti-Hallucination Protocol` at line 2534 has five Detection Rules (same `sed | grep -c`
-  command → `5`).
+  has seven numbered checks; check 7 is _Outcome reachability_ (obs #168, line 946).
+  `Common Hallucination Patterns to Detect` is at line 965. `## Anti-Hallucination Protocol` at
+  line 2554 has five Detection Rules (same `sed | grep -c` command → `5`).
 - `skills/create-task/SKILL.md:418` _(`### 3.5 Adversarial Quality Review`)_ has a _🚨 Critical_
-  list that carries the authoring-time twins of review-task checks 6–8 (obs #103, #117, #102, at
-  lines 430–432). None of the three is a property or release check.
+  list that carries the authoring-time twins of review-task checks 6–8 and 10 (obs #103, #117, #102,
+  #168, at lines 430–433). None of the four is a property or release check.
 - Nothing in review-task, review-story or create-task mentions a release tag or `git show <tag>:`.
   Command: `grep -n "released\|git show v\|latest tag" skills/{review-task,review-story,create-task}/SKILL.md`
   → no matches.
@@ -173,7 +178,7 @@ shared/resources/prepass-axes.js      deriveAxes({ archDir }) → { reason, sour
                                       source: architecture | partial | fallback
                                       domains ← H2s of concepts/tech-stack.md      (minus "See also")
                                       axes    ← H2s of concepts/coding-standards.md (minus "See also")
-                                      fallback (neither file) ← today's web-stack list and four axes
+                                      fallback (neither half) ← today's web-stack domains and the former axis-2 list
                                       CLI: --arch <dir> [--json]; exit 0 ok, 2 usage; no writes, no network
 review-{task,story}-prepass-prompts   Agent B: "{arch_domains}", "for each of {arch_axes}"; returns axes_checked[]
 review-task Phase 1.5                 runs prepass-axes.js; B is valid only with alignment + axes_checked
@@ -189,7 +194,8 @@ create-task Step 3.5 Critical         + two authoring twins
 
 - **task.145**
   ([`task.145.review-outcome-reachability-check.md`](../task.145.review-outcome-reachability-check/task.145.review-outcome-reachability-check.md),
-  planned) adds _Outcome reachability_. When a success criterion states **one outcome** (a verdict,
+  **accepted** — landed as review-task Step 3 check 10, review-story Step 4 check 7 and a create-task
+  Step 3.5 bullet, all cited `obs #168`) added _Outcome reachability_. When a success criterion states **one outcome** (a verdict,
   exit code or status) that a named function returns for a stated input, the reviewer **reads** that
   input through the function's decision branches.
   - Invariant verification is a different claim: a **property over a set of inputs** (ordering,
@@ -197,8 +203,8 @@ create-task Step 3.5 Critical         + two authoring twins
     Technical Background and code comments in the plan, and it is checked by **executing** it.
   - Where one sentence fits both checks, running it answers the reading question as well. Report it
     once, under Invariant verification.
-  - task.145's examples (verdicts and exit codes) stay with task.145. This task adds nothing to its
-    four sites except the shared Step 3 list both append to.
+  - task.145's examples (verdicts and exit codes) stay with task.145. This task edits none of its
+    text; the two new checks append after it in the same lists.
 - **task.129**
   ([`task.129.review-call-site-population-check.md`](../task.129.review-call-site-population-check/task.129.review-call-site-population-check.md),
   planned) measures the **population of call sites** of a shared engine and diffs it against the
@@ -208,15 +214,20 @@ create-task Step 3.5 Critical         + two authoring twins
     `git show <tag>:<path>`, not `call-sites.js`.
   - task.129 also edits the pre-pass Agent C prompt. This task edits only Agent B, the dispatch table
     and the schema validation. The two edits are to different sections of the same two files.
-- **Numbering collision (all three tasks).** task.129 plans "check 9" and task.145 plans "check 10",
-  and Step 3 already has a check 9 (_Configuration Key Accuracy_, `skills/review-task/SKILL.md:847`).
-  This task therefore names its checks by **name and obs citation**, and its tests anchor on the obs
-  citation, not on a number. Whichever task lands later appends after the last check present at that
-  time.
+- **Numbering (task.145 has landed; task.129 has not).** review-task Step 3 now ends at check 10
+  (_Outcome reachability_, `skills/review-task/SKILL.md:852`), and review-story Step 4 at check 7
+  (`skills/review-story/SKILL.md:946`). This task's checks therefore append as review-task **11
+  (Invariant verification) and 12 (Released-shape diff)** and review-story **8 and 9**. task.129's
+  planned "check 9" already collides with the existing check 9 and will append after whatever is
+  last when it lands. This task still names its checks by **name and obs citation**, and its tests
+  anchor on the obs citation, not on a number.
 
 ### Same-class mechanism inventory (obs #103)
 
 - **Heading readers.** `prepass-axes.js` reads H2 headings and must skip fenced blocks.
+  `jira-sync.js` is already bundled into both `skills/review-task/references/` and
+  `skills/review-story/references/` (`ls skills/review-{task,story}/references/ | grep jira-sync`),
+  so requiring it from the helper adds no file to either skill's bundle closure (obs #83).
   `shared/resources/jira-sync.js` already has a CommonMark fence tracker, `makeFenceTracker()` at
   line 1204 (not exported). It also exports `matchCodeFence` (exported at line 5808). The helper
   **extends** that mechanism: export `makeFenceTracker` and require it. It must not add another fence
@@ -309,29 +320,30 @@ schemas)", so the value still fits a CLI repository.
 `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`,
 `shared/resources/tests/prepass-axes.test.mjs`
 
-- [ ] `prepass-axes.js`:
+- [x] `prepass-axes.js`:
   - `deriveAxes({ archDir })` reads `concepts/tech-stack.md` and `concepts/coding-standards.md`. It
     collects H2s with the fences skipped (reusing `makeFenceTracker`) and drops `See also`.
-  - It returns `source`: `architecture` when both files are present, `partial` when one is, and
-    `fallback` when neither is. A missing half takes today's list for that half.
+  - It returns `source`: `architecture` when both halves count, `partial` when one does, and
+    `fallback` when neither does. A half counts when its file is present and yields at least one
+    non-empty `## ` heading; a half that does not takes today's list for that half (QA cycles 1–2).
   - CLI: `--arch <dir> [--json]`, with `reason` equal to `source`. It exits 2 on a missing `--arch`
     or an unknown flag, with nothing on stdout. Guard: `require.main === module`.
-- [ ] Export `makeFenceTracker` from `jira-sync.js`. This is additive, and no behaviour changes.
-- [ ] Both prompt files, Agent B:
+- [x] Export `makeFenceTracker` from `jira-sync.js`. This is additive, and no behaviour changes.
+- [x] Both prompt files, Agent B:
   - Domain parenthetical → `{arch_domains}`.
   - Axis 2 → "for each of `{arch_axes}`".
   - Axis 3 → contract-neutral wording.
   - New output key `axes_checked: [<axis names compared>]`.
   - Variable table rows for `{arch_domains}` and `{arch_axes}`, sourced from `prepass-axes.js`.
   - Summary-schema validation requires `axes_checked` for B.
-- [ ] review-task Phase 1.5, step 1: run the helper from the repository root
+- [x] review-task Phase 1.5, step 1: run the helper from the repository root
       (`.agents/skills/review-task/references/prepass-axes.js`) and substitute its output. Step 3 of
       Phase 1.5 and the prompt file's § Summary schema validation state the `axes_checked` rule.
-- [ ] review-task § Pre-pass Summary Consumption: when `PREPASS_B` is `aligned`, the report's
+- [x] review-task § Pre-pass Summary Consumption: when `PREPASS_B` is `aligned`, the report's
       Technical Accuracy section records `axes_checked` in one line.
-- [ ] review-story Step 1 Subagent 3: cite `shared/resources/review-story-prepass-prompts.md`
+- [x] review-story Step 1 Subagent 3: cite `shared/resources/review-story-prepass-prompts.md`
       Agent B and run the same helper.
-- [ ] `prepass-axes.test.mjs` (see § 8).
+- [x] `prepass-axes.test.mjs` (see § 8).
 
 **Dependencies**: none.
 
@@ -340,7 +352,7 @@ schemas)", so the value still fits a CLI repository.
 **Files**: `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`,
 `skills/create-task/SKILL.md`
 
-- [ ] review-task Step 3: append **Invariant verification** (obs #161) after the last numbered
+- [x] review-task Step 3: append **Invariant verification** (obs #161) after the last numbered
       check.
   - Trigger: the document asserts a property of an **existing** function under **new** inputs
     (ordering, uniqueness, idempotence, round-trip).
@@ -349,14 +361,14 @@ schemas)", so the value still fits a CLI repository.
   - Worked example: task.141's `a-lan.md` / `a-lan-02.md` sort.
   - Severities: falsified → **Critical**; cannot be run in the review environment → **Optional**,
     recording what it needs.
-- [ ] review-task _Common Hallucination Patterns_: "❌ A property of an existing function asserted
+- [x] review-task _Common Hallucination Patterns_: "❌ A property of an existing function asserted
       for new inputs and not run on them".
-- [ ] review-task `### Detection Rules`: **7. Invariant Verification**. Existence and behaviour are
+- [x] review-task `### Detection Rules`: **7. Invariant Verification**. Existence and behaviour are
       different instruments.
-- [ ] review-task _Issues to Flag_ → Critical: add "falsified invariant".
-- [ ] review-story Step 4: the same check, worded for Dev Notes and acceptance criteria. Add
+- [x] review-task _Issues to Flag_ → Critical: add "falsified invariant".
+- [x] review-story Step 4: the same check, worded for Dev Notes and acceptance criteria. Add
       `### Detection Rules` **6. Invariant Verification**.
-- [ ] create-task Step 3.5 _🚨 Critical_: **A property claimed, not run** (obs #161).
+- [x] create-task Step 3.5 _🚨 Critical_: **A property claimed, not run** (obs #161).
 
 **Dependencies**: none. This phase is independent of Phase 1.
 
@@ -365,7 +377,7 @@ schemas)", so the value still fits a CLI repository.
 **Files**: `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`,
 `skills/create-task/SKILL.md`
 
-- [ ] review-task Step 3: append **Released-shape diff for compatibility handling** (obs #170).
+- [x] review-task Step 3: append **Released-shape diff for compatibility handling** (obs #170).
   - Trigger: the document defines backward-compatibility, migration, "legacy" or old-format
     handling for a file, record, state file, schema or config shape.
   - Action:
@@ -378,8 +390,8 @@ schemas)", so the value still fits a CLI repository.
   - No release tag exists → **Optional** ("state the baseline").
   - The path did not exist at the tag → no released legacy exists. Say so, and the handling covers
     unreleased states only.
-- [ ] review-story Step 4: the same check.
-- [ ] create-task Step 3.5 _🚨 Critical_: **Compatibility scoped from a finding, not from the
+- [x] review-story Step 4: the same check.
+- [x] create-task Step 3.5 _🚨 Critical_: **Compatibility scoped from a finding, not from the
       release** (obs #170). Derive the legacy shape from the tag and cite it.
 
 **Dependencies**: none. This phase is independent of Phases 1 and 2.
@@ -389,10 +401,10 @@ schemas)", so the value still fits a CLI repository.
 **Files**: `tests/review-property-checks.test.js`, `CHANGELOG.md`, `skills/*/references/`
 (generated)
 
-- [ ] `tests/review-property-checks.test.js` (see § 8).
-- [ ] `npm run bundle`. `bundle:check` must report no `UNREACHED`.
-- [ ] CHANGELOG `[Unreleased]` › Changed cites `(task 151)`.
-- [ ] Hand runs recorded in the implementation report (§ 8).
+- [x] `tests/review-property-checks.test.js` (see § 8).
+- [x] `npm run bundle`. `bundle:check` must report no `UNREACHED`.
+- [x] CHANGELOG `[Unreleased]` › Changed cites `(task 151)`.
+- [x] Hand runs recorded in the implementation report (§ 8).
 
 **Dependencies**: Phases 1–3.
 
@@ -417,6 +429,9 @@ schemas)", so the value still fits a CLI repository.
    pattern line, Issues to Flag), Detection Rule 7.
 8. ✅ `skills/review-story/SKILL.md`: Step 1 Subagent 3, Step 4 (two checks), Detection Rule 6.
 9. ✅ `skills/create-task/SKILL.md`: two Step 3.5 Critical bullets.
+9a. ✅ `tests/lib/markdown-section.js` and `tests/outcome-reachability-check.test.js`: the per-item
+    reader (`citingItemOf`, `asProse`) moves into the shared test lib so `review-property-checks`
+    reuses it rather than copying it (a plan deviation, recorded in the implementation report).
 
 ### Files to Modify (Documentation)
 
@@ -445,7 +460,8 @@ None.
   - The expected lists are read from the files by the test's own `^## ` scan, not restated. A later
     heading edit therefore does not break the test.
 - **Fallback and partial.** The fixtures are built in `mkdtempSync` directories, not committed.
-  - With no `concepts/` directory → `fallback`, with today's five domains and four axes.
+  - With no `concepts/` directory → `fallback`, with today's five domains and the former axis-2
+    list (naming, layering, file placement) — QA cycle 1, CR-5.
   - With only `coding-standards.md` → `partial`: the axes come from the file and the domains fall
     back.
 - **Fences.** A `## Heading` inside a fenced block is not an axis.
@@ -568,9 +584,10 @@ None.
 
 ### Medium Risk Areas
 
-1. **Step 3 numbering collides with tasks 129 and 145**
-   - Risk: all three tasks append to the same numbered list. task.129's planned "check 9" already
-     collides with the existing check 9. Merge order changes the numbers.
+1. **Step 3 numbering collides with task.129**
+   - Risk: both tasks append to the same numbered list (task.145 has already landed as check 10).
+     task.129's planned "check 9" already collides with the existing check 9. Merge order changes
+     the numbers.
    - Probability: High · Impact: Low
    - Mitigation: the checks are named and cited by obs number, and the tests anchor on the citation.
      The later task renumbers on rebase.
@@ -638,22 +655,97 @@ None.
 
 ---
 
+## Deferred Work
+
+Carried out of the QA loop, each with the reason it did not block acceptance:
+
+- **C3-CR-2** (low) — a heading containing U+2028/U+2029 is dropped by `atxH2`; carried by the
+  cosmetic-residue exit (route 2b, cycle 3). Fix: `[^]*?` content capture + a table case.
+- **C3-CR-1** (low) — a `## ` heading inside a multi-line HTML comment is read as an axis.
+- **C3-CR-3** (cleanup) — state the rule everywhere as "a non-empty H2 other than `See also`".
+- **C2-CR-3** (low) — a non-existent `--arch` root reads as `fallback`: that is the no-docs case by
+  design; `source` is recorded beside every `aligned`.
+- **C2-CR-4** (low) — `, ` / `; ` inside a heading make distinct heading sets render alike; no
+  known concepts file carries one.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.151.qa.3.review-verifies-claimed-properties.md`
+**Gate File**: `task.151.gate.3.review-verifies-claimed-properties.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100 (3 QA cycles; TASK-151-BUG-1 and -2 closed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 15/15 met (SC1–SC15)
+✅ **Tests:** 26 new tests in `prepass-axes.test.mjs` and `review-property-checks.test.js`; `ci:fast` 4363 pass / 0 fail; 22 mutation proofs recorded
+✅ **PR Review:** PR #511 — Step 5c `/review-pr` APPROVE
+✅ **Documentation:** CHANGELOG (three entries), review-task / review-story / create-task `SKILL.md`, both prompt files
+✅ **Security Review:** PASS — boundary probed (5 executed, 0 reproduced)
+✅ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-28
+
+**Detailed Verification Log:** See `task.151.dod.1.review-verifies-claimed-properties.md` for complete verification evidence.
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-28
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.151.qa.3.review-verifies-claimed-properties.md](./task.151.qa.3.review-verifies-claimed-properties.md)
+- **Gate File**: [task.151.gate.3.review-verifies-claimed-properties.yml](./task.151.gate.3.review-verifies-claimed-properties.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 26 new (30 in the targeted re-run); `ci:fast` 4363 pass / 0 fail
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Both bugs (TASK-151-BUG-1, -2) fixed and verified. One low edge case (C3-CR-2) carried to Deferred
+Work by the cosmetic-residue exit.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                            | Author      |
-| ---------- | ------- | -------------------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #130, #161, #170 (2026-09-24 observation review) | create-task |
+| 2026-09-28 | 1.1     | Review passed (9/10) — task.145 boundary and check numbering updated (checks 11–12 / 8–9); anchors re-measured | review-task |
+| 2026-09-28 |         | Status → ready-for-development | review-task |
+| 2026-09-28 |         | Implemented — 13 files (1 helper, 2 tests, 1 test-lib move, 3 SKILL.md, 2 prompt files, jira-sync export, CHANGELOG), 22 tests; 15 mutation proofs red | develop |
+| 2026-09-28 |         | QA gate CONCERNS (90/100) — 1 medium finding (CR-1), 4 low advisory | qa-task |
+| 2026-09-28 |         | QA findings fixed — gate 1 CR-1..CR-5, gate 2 C2-CR-1 (atxH2 reader), C2-CR-2, C2-CR-5; 2 iterations | qa-fix |
+| 2026-09-28 |         | QA gate CONCERNS (90/100) — cycle 2: gate-1 findings fixed; 1 medium (C2-CR-1), 4 advisory | qa-task |
+| 2026-09-28 |         | QA gate PASS (95/100) — cycle 3: no high or medium; 1 low carried (route 2b) | qa-task |
+| 2026-09-28 | 1.2 | DoD passed — accepted (PR #511) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Stack-neutral pre-pass (obs #130)
-- [ ] Phase 2: Invariant verification (obs #161)
-- [ ] Phase 3: Released-shape diff (obs #170)
-- [ ] Phase 4: Population test, bundle, docs
+- [x] Phase 1: Stack-neutral pre-pass (obs #130)
+- [x] Phase 2: Invariant verification (obs #161)
+- [x] Phase 3: Released-shape diff (obs #170)
+- [x] Phase 4: Population test, bundle, docs
 
 ---
 

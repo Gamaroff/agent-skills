@@ -382,7 +382,7 @@ questions:
 Before formulating questions in any step, consult the pre-pass summaries from Step 1's pre-pass execution:
 
 - **PREPASS_A** (epic alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` during the epic alignment review (Step 3) and carry them to the Unified Question Point.
-- **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` during the technical accuracy review (Step 4) and carry them to the Unified Question Point.
+- **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` during the technical accuracy review (Step 4) and carry them to the Unified Question Point. If `alignment` is `aligned`, record its `axes_checked` (and the `prepass-axes.js` `source`) in one line of the report's Technical Accuracy section.
 - **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings during the completeness review (Step 5) and carry them to the Unified Question Point — ask whether the story should be scoped down or closed.
 
 Severity `low` findings from any summary: add to the review report findings list but do not elevate to a user question unless they cluster with other issues.
@@ -508,7 +508,14 @@ Actions:
 4. Dispatch Parallel Subagents: Execute one single message to parallelize background analysis. Invoke four subagent operations concurrently:
    - Subagent 1 (Discovery): Scan directories and find the parent epic file path, the previous story path, the template file, and identify at most 2-3 matching domain-specific architecture files. Return only file paths and 1-line descriptions.
    - Subagent 2 (Epic Alignment): Evaluate the story's alignment against the parent epic requirements. Return a compact YAML summary (PREPASS_A).
-   - Subagent 3 (Architecture Alignment): Evaluate the story's technical details against core system architecture. Return a compact YAML summary (PREPASS_B).
+   - Subagent 3 (Architecture Alignment): dispatch **Agent B** from `references/review-story-prepass-prompts.md` — the prompt template, not a one-line description, so the story is measured on the same axes review-task measures a task on. Returns a compact YAML summary (PREPASS_B). Fill its `{arch_domains}` and `{arch_axes}` slots from `references/prepass-axes.js`, which derives them from the H2 headings of this repository's `concepts/tech-stack.md` and `concepts/coding-standards.md` (obs #130):
+
+     ```bash
+     # From the repository root, like every engine call in this skill.
+     command node .agents/skills/review-story/references/prepass-axes.js --arch "docs/architecture" --json
+     ```
+
+     Substitute your `${ARCH_ROOT}` for `docs/architecture`. `{arch_domains}` is `domains` joined with `, `; `{arch_axes}` is `axes` joined with `; `. Record `source` (`architecture` / `partial` / `fallback`) beside PREPASS_B; exit 1 means a file exists but could not be read — treat Agent B as failed rather than dispatch it with empty slots. **Validate `axes_checked`**: an `alignment: aligned` with `axes_checked` missing or empty is a failed agent (step 5 below) — an `aligned` that names nothing it was measured against is not a result.
    - Subagent 4 (Codebase Scan): Analyze current branch implementation status. Return a compact YAML summary (PREPASS_C).
 5. Handle Failures Gracefully: If any alignment/scan subagents fail or return an unknown status, log a specific warning (e.g., "⚠️ Pre-pass Agent A failed - proceeding via in-line discovery") and fall back to native validation checks in Steps 2-6. Subagent **unavailable** (no dispatch in this session), **failed**, or **slow** past its wall-clock budget: follow the three-row table in `references/develop-pipeline-autonomous-defaults.md` §Subagents — perform the pass inline, record the independence loss, write `killed at N minutes` never `stalled`, and remember that **output-file size is not a liveness signal**.
    Output: Up to 3 verified YAML summaries stored in active context; target file paths fully resolved for immediate step execution.
@@ -962,6 +969,41 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      **Optional** when the branch depends on an input the story does not pin down
    - Out of scope: a criterion that names no function, or no outcome of one
 
+8. **Invariant verification** (obs #161):
+   - When the Dev Notes, tasks or acceptance criteria assert a **property** of an **existing
+     function** under **new inputs** — an ordering, a uniqueness, an idempotence, a round-trip —
+     do not reason about it: import the function (or re-implement the two lines under test) and
+     **run** it on the inputs the story proposes. Checks 1–6 ask whether a thing exists, and an
+     existence check is no evidence for a behaviour
+   - Pure and local only: no network, no writes outside a temp directory. For a function with side
+     effects, re-implement the lines under test rather than import it
+   - Worked example (from a task): task.141 claimed zero-padding (`-02`, `-03`) keeps
+     `listRunFiles`' basename sort chronological past nine runs. One line falsified it, because
+     run 1 has no suffix and `.` sorts after `-`:
+     `command node -e 'console.log(["a-lan.md","a-lan-02.md"].sort())'` → `[ 'a-lan-02.md', 'a-lan.md' ]`
+   - Report a falsified invariant as **Critical**, quoting the command and its output. A property
+     that cannot be run in the review environment (it needs a live service) → **Optional**,
+     recorded as "unverified — needs X"
+   - Adjacent to check 7: outcome reachability _reads_ one stated outcome through the deciding
+     function; this check _runs_ a property over a set of inputs. Where one claim is both, run it
+     and report it once, here
+
+9. **Released-shape diff for compatibility handling** (obs #170):
+   - Trigger: the story defines backward-compatibility, migration, "legacy" or old-format handling
+     for a file, record, state file, schema or config shape
+   - Derive the legacy shape from the last **released** version, not from the finding that
+     prompted the story: find the release tag with `git tag --list 'v*' --sort=-v:refname | head -1`
+     (or the project's own release-tag pattern), read the file that **defines or writes** the shape
+     at that tag with `git show <tag>:<path>`, and diff its fields against the target shape
+   - Every field or key the released shape lacks, or reads differently, that the story does not
+     cover → **Important**. The story must **cite the tag** it compared against; no citation →
+     **Important**
+   - No release tag exists → **Optional** ("state the baseline"). The path did not exist at the
+     tag → say so: there is no released legacy, and the handling covers unreleased states only
+   - Worked example (from a task): task.143 scoped legacy handling to `priorRuns` alone, the field
+     its QA finding named; the released shape at `v0.51.0` also lacked `targeted`, `bug` and
+     `filedBug`
+
 **Common Hallucination Patterns to Detect**:
 
 - ❌ "Uses the standard React patterns" (vague, no source)
@@ -972,10 +1014,12 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ Endpoints not in API specification
 - ❌ Database fields not in schema definitions
 - ❌ An outcome no current or planned branch of the named function returns for the stated input. Report it as **Important** under check 7, not as a Critical hallucination
+- ❌ A property of an existing function asserted for new inputs, and never run on them (check 8)
+- ❌ Legacy or compatibility handling scoped from a finding, not diffed against the released shape (check 9)
 
 **Issues to Flag**:
 
-- **Critical**: Invented libraries/APIs, incorrect schema/endpoints
+- **Critical**: Invented libraries/APIs, incorrect schema/endpoints, a falsified invariant (check 8)
 - **Important**: Missing source references, unverified technical claims
 - **Optional**: Vague references, could be more specific
 
@@ -2562,6 +2606,7 @@ This skill implements rigorous safeguards to DETECT hallucinations:
 3. **Invention Detection**: Flag any technology/pattern not in architecture docs
 4. **Vague Source Detection**: Flag generic sources without specific references
 5. **Assumption Verification**: Check explicit assumptions against reality
+6. **Invariant Verification**: A property claimed of an existing function under new inputs MUST be executed on those inputs — an existence check and a behaviour check are different instruments, and passing the first is not evidence for the second (Step 4 check 8)
 
 ### Reporting Hallucinations
 
