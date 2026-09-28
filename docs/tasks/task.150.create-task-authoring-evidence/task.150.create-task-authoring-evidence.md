@@ -331,6 +331,9 @@ tests
    interactivity exceptions
 4. ✅ `skills/create-task/scripts/lib.js`: `parseObservationBody`, `seedFromObservations`
 5. ✅ `skills/review-task/SKILL.md`: the Step 3 check and the patterns line
+5a. ✅ `shared/resources/observation-log.js` and `observation-log-contract.md`: `set-status` refuses an
+    ambiguous `--id` and takes `--expect-status`. **Added after the QA loop escalated** (see
+    Implementation Summary), at the operator's direction
 
 ### Files to Add / Modify (Tests)
 
@@ -554,6 +557,12 @@ None.
   exceptions sit at the three interactivity lines and at § 4.4. `parseObservationBody` also accepts a
   whole entry file, because the frontmatter carries no `## ` line, so the skill passes the file text
   as `body`.
+- **Scope added after the QA escalation (operator-directed, 2026-09-28)**: QA cycles 1–3 each found
+  one HIGH in how `--from-observation` maps the selected entry to the entry `set-status` changes.
+  The last layer was in the engine: `findById` took the first same-prefix file in the whole log. The
+  fix is at that root. `set-status` refuses `ambiguous-id`, and takes `--expect-status`, which the
+  park vector passes as `open`. The seed's agreement check reads the raw id from the entry's file
+  text. See bugs 1–4.
 - **Deviation from the plan**: the legacy allowlist has **43** ids, not 42. M1 was re-run at
   `f88a997f`, and task.158 had been added since the plan was written.
 

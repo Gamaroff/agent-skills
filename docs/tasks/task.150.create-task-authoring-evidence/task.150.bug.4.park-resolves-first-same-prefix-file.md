@@ -4,7 +4,7 @@
 **Bug ID**: TASK-150-BUG-4
 **Severity**: HIGH
 **Priority**: P1
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer (QA cycle 3, safety re-probe code review CR-1 and CR-2)
 **Date Found**: 2026-09-28
 
@@ -48,3 +48,36 @@ fork), which is exactly the state the engine's `fork-detected` handling exists f
 Fix the root, which is shared by every `set-status` caller: `findById` should report `ambiguous-id`
 when more than one file matches, and `set-status` should refuse with a non-zero exit. Then key the
 § 1.1 selection and the § 5 re-check on the scan entry's `file`.
+
+## Developer Fix Cycle
+
+### Iteration 1 (operator-directed fix after the QA loop escalation)
+
+**Date**: 2026-09-28
+
+**Root Cause**: `findById` returned the first file whose numeric prefix matched, and `set-status`
+never read the current status. No seed-side check can see the whole log, so the fix belongs in the
+engine.
+
+**Fix Implementation**:
+
+- `shared/resources/observation-log.js`: `findAllById` returns every match. `set-status` refuses
+  `ambiguous-id` (exit 1, `files[]`) when there is more than one, and the new `--expect-status s`
+  refuses `status-changed` (exit 1) when the entry no longer reads `s`. An unknown `s` is a usage
+  error. The contract table documents both reasons.
+- `skills/create-task/scripts/lib.js`: every park vector carries `--expect-status open`. The
+  agreement check reads the raw frontmatter id from the entry's file text, closing cycle-3 CR-3
+  (`7abc` in `0007-*.md`).
+- `skills/create-task/SKILL.md`: § 1.1 selects by `file` and refuses an id that matches no file or
+  several. § 5 step 2b relies on the engine's check and drops the by-hand re-scan (cycle-3 CR3-2).
+
+**Testing**: engine: 2 new tests (the ambiguous two-file fixture, and `--expect-status`
+mismatch/match/unknown). Seed: an end-to-end test through the real engine (a same-prefix sibling
+answers `ambiguous-id`, and an entry changed after selection answers `status-changed`; neither file
+is touched), plus the raw-id test. Mutation-proved: the engine first-match, no expect check, and no
+expect validation each go red; the pre-fix seed, and a seed without the raw read, each go red.
+
+| Date | Status | Changed By | Notes |
+| ---------- | ------------ | ---------- | --------------------------------------------------- |
+| 2026-09-28 | New | QA | Cycle 3 unscoped review, reproduced |
+| 2026-09-28 | Ready for QA | dev (operator-directed) | Root fix in the engine plus `--expect-status` |

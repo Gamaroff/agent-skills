@@ -339,6 +339,87 @@ test("seed: status is read by the engine's statusOf, so an entry the log lists a
   }
 });
 
+test("seed: the agreement check reads the RAW frontmatter id from the file text, not scan's parseInt", () => {
+  // Scan reads `id: 7abc` as 7, which matches file 0007 — checking that value
+  // checks the parser against itself (cycle-3 CR-3). The file text is what the
+  // skill passes as `body`, and its header still says `7abc`.
+  const fm = {
+    file: "0007-x.md",
+    id: 7,
+    title: "create-task: t",
+    status: "open",
+  };
+  const text = (id) =>
+    `---\nid: ${id}\ntitle: "t"\nstatus: open\n---\n\n## Improvement\n\nDo it.\n`;
+  for (const raw of ["7abc", "5e2", "0x7", "8"]) {
+    assert.throws(
+      () =>
+        lib.seedFromObservations([{ frontmatter: fm, body: text(raw) }], {
+          taskId: 150,
+        }),
+      /does not match its file id 7/,
+      `raw id ${raw} must be refused`,
+    );
+  }
+  for (const raw of ["7", '"7"']) {
+    assert.doesNotThrow(() =>
+      lib.seedFromObservations([{ frontmatter: fm, body: text(raw) }], {
+        taskId: 150,
+      }),
+    );
+  }
+});
+
+test("park vectors carry --expect-status open, and the real engine refuses a same-prefix sibling and a changed entry (TASK-150-BUG-4)", () => {
+  const ws = fs.mkdtempSync(path.join(SCRATCH_ROOT, "from-observation-park-"));
+  try {
+    assert.equal(engine.run(["init", "--workspace", ws, "--json"]).exitCode, 0);
+    const logDir = path.join(ws, "skill-observations", "observation-log");
+    const put = (name, id, status) =>
+      fs.writeFileSync(
+        path.join(logDir, name),
+        `---\nid: ${id}\ntitle: "create-task: t"\nstatus: ${status}\nskill:\n  - create-task\n---\n\n## Improvement\n\nDo it.\n`,
+      );
+    const read = (name) => fs.readFileSync(path.join(logDir, name), "utf8");
+
+    // 1. A sibling on the same prefix: the cycle-3 reproduction. The vector used
+    //    to re-park the actioned sibling and report ok.
+    put("0005-a-actioned.md", 4, "actioned");
+    put("0005-b-target.md", 5, "open");
+    const scanned = engine.run(["scan", "--workspace", ws, "--json"]).entries;
+    const target = scanned.find((e) => e.file === "0005-b-target.md");
+    const seed = lib.seedFromObservations(
+      [{ frontmatter: target, body: read("0005-b-target.md") }],
+      { taskId: 150 },
+    );
+    assert.deepEqual(seed.park[0].slice(-3), [
+      "--expect-status",
+      "open",
+      "--json",
+    ]);
+    const r = engine.run([...seed.park[0], "--workspace", ws]);
+    assert.equal(r.reason, "ambiguous-id", JSON.stringify(r));
+    assert.match(read("0005-a-actioned.md"), /status: actioned/);
+    assert.match(read("0005-b-target.md"), /status: open/);
+
+    // 2. The entry changed between selection and parking.
+    put("0009-changed.md", 9, "open");
+    const nine = engine
+      .run(["scan", "--workspace", ws, "--json"])
+      .entries.find((e) => e.file === "0009-changed.md");
+    const seed9 = lib.seedFromObservations(
+      [{ frontmatter: nine, body: read("0009-changed.md") }],
+      { taskId: 150 },
+    );
+    put("0009-changed.md", 9, "actioned"); // another session gave it a home
+    const r9 = engine.run([...seed9.park[0], "--workspace", ws]);
+    assert.equal(r9.reason, "status-changed", JSON.stringify(r9));
+    assert.match(read("0009-changed.md"), /status: actioned/);
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
 test("round trip: the park vectors are accepted by the real engine and leave each entry parked on the task", () => {
   const ws = fs.mkdtempSync(path.join(SCRATCH_ROOT, "from-observation-"));
   try {

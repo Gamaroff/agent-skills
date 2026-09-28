@@ -194,9 +194,12 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
    `references/resolve-observation-workspace.sh`, both bundled beside this skill. Read
    `reason`: `scan-broken` is a broken reader, not an empty log. Stop and report it.
 
-2. **Select and refuse.** Take the entries whose `id` is in the list. **Refuse the run** when an id is
-   missing, or when its `status` is not `open`, and name the id and its status. A parked or actioned
-   entry already has a home, and a second task cut from it is the duplicate this entry prevents.
+2. **Select and refuse.** Take the entries whose **`file`** starts with the id's number (`0124-…` for
+   124). The file is the identity `set-status --id` resolves, while the scan's `id` is the frontmatter
+   as `parseInt` read it. **Refuse the run** when an id matches no file, or more than one, or when
+   the entry's `status` is not `open`, and name the id, the files and the status. A parked or
+   actioned entry already has a home, and a second task cut from it is the duplicate this entry
+   prevents.
 3. **Seed.** For each entry, read `${OBS_LOG_DIR}/<file>` (the `file` the scan returned; `OBS_LOG_DIR`
    is set by the resolver, so source it again in the same shell as this read, or every path loses its
    directory) and pass
@@ -706,10 +709,11 @@ Actions:
     # e.g. set-status --id 124 --status parked --parked-until "task.150 merged to develop" --json
     ```
 
-    **Re-check before parking.** `set-status` overwrites the status without reading it first, and
-    the entries were selected long before this step. Run `scan --json` again in the same shell and
-    run a vector only for an id whose entry still reads `open`. Report any other entry, with its
-    current status, and skip it: another session has given it a home since.
+    The engine checks each vector at the moment it writes. The vector carries
+    `--expect-status open`, so an entry another session parked or actioned since it was selected
+    answers `status-changed` and is left alone. An id that two files share answers `ambiguous-id`,
+    and neither file is touched. Do not re-check by hand first: a re-scan reads the log by
+    frontmatter id, and can clear one file while the vector resolves another.
 
     Read `reason`. `ok` is success. Report any other value verbatim and continue: parking never
     blocks the document, and an entry left `open` is visible, not lost. Name each parked id in the

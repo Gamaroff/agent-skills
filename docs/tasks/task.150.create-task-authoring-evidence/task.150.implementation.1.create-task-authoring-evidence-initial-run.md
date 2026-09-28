@@ -132,6 +132,14 @@ task.123's first committed draft is `e0881adb` (`git log --diff-filter=A`). It n
 - qa-fix cycle 2: findings ingested inline (same session wrote gate 2). The Change Log row is still deferred to loop exit
 - Post-fix PR state (inline `gh pr view`): OPEN at `701e5e4e`
 
+### Operator decision after the escalation — 2026-09-28
+
+- The operator chose option 1: "go ahead". Fix the root in `observation-log.js`, key create-task on `file`, and resume at 5a with 2 more cycles
+- The fix was made **outside the QA loop**, as an operator-directed fix (HALT option 1). It is not a QA cycle, writes no gate, and its evidence is in bug 4's Developer Fix Cycle. The next QA cycle (4) reviews it
+- Engine: `findAllById`; `set-status` refuses `ambiguous-id` and takes `--expect-status` (`status-changed`); contract table updated. Seed: `--expect-status open` on every vector; the agreement check reads the raw id from the file text. Prose: § 1.1 selects by `file`, and § 5 relies on the engine check
+- Tests: 2 engine and 2 seed, all mutation-proved (5 mutations). `ci:fast` 4393 pass / 0 fail; `bundle:check` 0 problems; `validate` passes on create-task and observe-work
+- Scope note: `shared/resources/observation-log.js` is outside the task's original file list. It is recorded in the task's Files Summary (5a) and Implementation Summary
+
 ---
 
 ## Issues Log

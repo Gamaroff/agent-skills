@@ -18,7 +18,10 @@ const { CARD_TITLE_MAX } = require("../references/jira-sync.js");
 // An entry's status is read by the engine's own reader, never re-derived here:
 // `statusOf` trims and reads an empty status as `open`, and a second reading
 // refused entries the log lists as open (task.150 QA cycle 1, TASK-150-BUG-2).
-const { statusOf } = require("../references/observation-log.js");
+const {
+  statusOf,
+  parseFrontmatter: parseObservationFrontmatter,
+} = require("../references/observation-log.js");
 
 const {
   parseFrontmatter,
@@ -241,7 +244,7 @@ function asArray(v) {
 }
 
 // An observation's IDENTITY is the one `set-status --id N` resolves, and the
-// engine resolves it by FILENAME: `findById` matches the numeric prefix of
+// engine resolves it by FILENAME: `findAllById` matches the numeric prefix of
 // `NNNN-slug.md`, never the frontmatter. So the park vector is built from the
 // scan entry's `file`, and the frontmatter id is only checked against it.
 //
@@ -321,9 +324,15 @@ function seedFromObservations(entries, { taskId } = {}) {
         `observation entry has no usable file id: ${JSON.stringify(frontmatter.file)} — pass the scan entry, whose \`file\` is what set-status resolves`,
       );
     }
-    if (frontmatterId(frontmatter.id) !== id) {
+    // The agreement check reads the RAW id when it can. Scan has already run
+    // parseInt on `frontmatter.id` (`7abc` arrives as 7), so checking that value
+    // would check the parser against itself. The skill passes the entry's file
+    // text as `body`; its own header carries the id as written.
+    const raw = (parseObservationFrontmatter(body) || {}).id;
+    const declared = raw !== undefined ? raw : frontmatter.id;
+    if (frontmatterId(declared) !== id) {
       throw new Error(
-        `observation ${frontmatter.file} has frontmatter id ${JSON.stringify(frontmatter.id)}, which does not match its file id ${id} — fix the entry before cutting a task from it`,
+        `observation ${frontmatter.file} has frontmatter id ${JSON.stringify(declared)}, which does not match its file id ${id} — fix the entry before cutting a task from it`,
       );
     }
     if (status !== "open") {
@@ -340,8 +349,9 @@ function seedFromObservations(entries, { taskId } = {}) {
   });
   rows.sort((a, b) => a.id - b.id);
   const ids = rows.map((r) => r.id);
-  // findById parks the FIRST file with a given prefix, so a repeated id would
-  // park one entry twice and leave the other open.
+  // Two selected entries on one id would park one of them twice. The engine now
+  // refuses an id two files share (`ambiguous-id`); this refuses it earlier,
+  // before any document is written, naming the id.
   const dup = ids.find((id, i) => ids.indexOf(id) !== i);
   if (dup !== undefined) {
     throw new Error(
@@ -391,6 +401,12 @@ function seedFromObservations(entries, { taskId } = {}) {
     "parked",
     "--parked-until",
     `task.${taskId} merged to develop`,
+    // Checked by the engine on the file it writes, at the moment it writes it:
+    // an entry parked or actioned since it was selected is refused
+    // (`status-changed`), and an id two files share is refused
+    // (`ambiguous-id`) — task.150 QA cycle 3, TASK-150-BUG-4.
+    "--expect-status",
+    "open",
     "--json",
   ]);
 

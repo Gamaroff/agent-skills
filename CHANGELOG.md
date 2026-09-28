@@ -155,7 +155,16 @@ All notable changes to this project will be documented in this file. Format foll
   `open` and asks only the questions the entries leave open: the title when a single entry's is over
   the bound or there are several, and tracker sync. After both files exist, it parks each entry
   through `observation-log.js set-status`, so parking is no longer a step a session can forget. A
-  round-trip test runs the park vectors through the real engine.
+  round-trip test runs the park vectors through the real engine. The seed keys each entry on its file's numeric prefix, the identity `set-status --id` resolves, and
+  refuses a frontmatter id that disagrees with it. Every park vector carries `--expect-status open`.
+- **`observation-log.js set-status` refuses an ambiguous id, and can refuse a changed entry (task
+  150).** `findById` returned the first file whose numeric prefix matched. When two files shared a
+  prefix (a hand-created file, or a consolidated fork), `set-status --id 5` rewrote whichever sorted
+  first, even an `actioned` entry, and reported `ok`. Every `--id` lookup now answers `ambiguous-id`
+  (exit 1, `files[]` named) and writes nothing. The new `--expect-status <s>` answers `status-changed`
+  (exit 1) when the entry no longer reads `s`, so a caller that selected an entry earlier cannot
+  overwrite a status another session has changed since. Both reasons are added to the contract;
+  existing reasons keep their meanings.
 
 - **The review pre-pass measures a document against this repository's architecture (task 151, obs
   #130).** Agent B's domain list and pattern axes were hard-coded for a web stack ("backend /
