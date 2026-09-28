@@ -286,11 +286,11 @@ repository's shared-resources directory; `observation-log.js` sits beside them t
 
 **They are named here rather than linked, deliberately.** A relative link resolves in situ and
 breaks the moment the bundler copies this file into a skill's `references/` directory — which it
-does, without bringing unrelated siblings along, because it keys on the literal
-`shared/resources/<name>` form and never sees a `./`-prefixed link. Writing them in that linkable
-form instead would drag three unrelated engines into every consumer of a skill that bundles this
-contract, to satisfy six cross-references. Nothing under `skills/` is link-checked in CI, so the
-broken form would have shipped green.
+does, without bringing unrelated siblings along, because it keys on the literal shared-resources
+path form (the directory name, a slash, a file name) and never sees a `./`-prefixed link.
+Writing them in that linkable form instead would drag three unrelated engines into every
+consumer of a skill that bundles this contract, to satisfy six cross-references. Nothing under
+`skills/` is link-checked in CI, so the broken form would have shipped green.
 
 ---
 
