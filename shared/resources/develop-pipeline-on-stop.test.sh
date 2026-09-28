@@ -136,12 +136,15 @@ for SK in develop-story develop-task develop-bug; do
   fi
   # Step 7's tail is described per orchestrator (task 162). develop-bug's Step 7 ends with Part B,
   # the bug-close routine; the DoD body to the PR is the story/task tail and does not close a bug.
+  # The step doc's Step 7 Completion Checklist, which follows Part B and covers Parts A and B,
+  # decides whether Step 7 finished, so the tail must name it (task 163).
   if [ "$SK" = "develop-bug" ]; then
     if echo "$R" | grep -q "Resolution Summary" && echo "$R" | grep -q 'status `closed`' \
+      && echo "$R" | grep -q "then the Step 7 Completion Checklist" \
       && echo "$R" | grep -q "develop-bug-step-7-close-bug.md" && ! echo "$R" | grep -q "the DoD body to the PR"; then
-      pass "[$SK] lock=8 names Part B's bug-close routine as Step 7's tail"
+      pass "[$SK] lock=8 names Part B's bug-close routine, then the Step 7 Completion Checklist, as Step 7's tail"
     else
-      fail "[$SK] lock=8 names Part B's bug-close routine as Step 7's tail" "Got: $(echo "$R" | grep -o 'finish that step first ([^)]*)' | head -1)"
+      fail "[$SK] lock=8 names Part B's bug-close routine, then the Step 7 Completion Checklist, as Step 7's tail" "Got: $(echo "$R" | grep -o 'finish that step first ([^)]*)' | head -1)"
     fi
   else
     if echo "$R" | grep -q "the DoD body to the PR, the tracker update, the Step 7 checklist" && ! echo "$R" | grep -q "Resolution Summary"; then
@@ -168,6 +171,11 @@ if echo "$R" | grep -q 'position `Step 2/8 ✅ complete`' && ! echo "$R" | grep 
 else
   fail "lock=3 keeps the generic status position (Step 2/8 ✅ complete)" "Got: $(echo "$R" | grep -o 'position `[^`]*`' | head -1)"
 fi
+if echo "$R" | grep -q "then the steps still ahead through Step 8" && ! echo "$R" | grep -q "first unfinished row at or below Step 7"; then
+  pass "lock=3 keeps the generic steps-ahead clause (through Step 8)"
+else
+  fail "lock=3 keeps the generic steps-ahead clause (through Step 8)" "Got: $(echo "$R" | grep -o 'then the steps still ahead[^)]*' | head -1)"
+fi
 
 # ── Scenario 5d: at Step 8 the status position does not assert Step 7 complete ──
 # /finalise moves the lock to 8 before Step 7's tail runs, so "Step 7/8 ✅ complete" is a claim a
@@ -183,6 +191,16 @@ for SK in develop-story develop-task develop-bug; do
     fail "[$SK] lock=8 position does not claim Step 7 complete" "position missing or reworded: $(echo "$R" | grep -o 'position `[^`]*`' | head -1)"
   else
     pass "[$SK] lock=8 position does not claim Step 7 complete"
+  fi
+  # The list after the position may not claim Step 8 is all that is left, and may not be narrower
+  # than the completion line's rule: the first unfinished row at or below Step 7 comes first (task
+  # 163; task.162 pr-review.1 CR-2; QA cycle 2 CR-3).
+  if echo "$R" | grep -q "then the steps still ahead through Step 8"; then
+    fail "[$SK] lock=8 steps-ahead clause follows the completion rule" "still carries the generic 'through Step 8' clause"
+  elif ! echo "$R" | grep -q "then the steps still ahead: the first unfinished row at or below Step 7, if any, then Step 8"; then
+    fail "[$SK] lock=8 steps-ahead clause follows the completion rule" "clause missing or reworded: $(echo "$R" | grep -o 'then the steps still ahead[^)]*' | head -1)"
+  else
+    pass "[$SK] lock=8 steps-ahead clause follows the completion rule"
   fi
 done
 

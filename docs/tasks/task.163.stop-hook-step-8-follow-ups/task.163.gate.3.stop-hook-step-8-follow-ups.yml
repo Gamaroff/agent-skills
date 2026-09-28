@@ -1,0 +1,74 @@
+schema: 1
+task: 'task.163.stop-hook-step-8-follow-ups'
+task_title: "Close task.162's step-8 follow-ups"
+gate: PASS
+status_reason: 'Cycle 2''s fixes hold: the banner-doc exception is scoped to a Stop-hook re-prompt, Part B''s list closes before the checklist, the lock-8 list follows the completion rule, and M10–M14 reproduced. Two LOW wording findings on the banner exception remain open. The MEDIUM finding the reviewer raised (a HALT in Step 7''s tail rendered at lock 8) is pre-existing on develop and is routed to recommendations.future.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T12:05:00Z'
+
+top_issues:
+  - id: CR-2
+    severity: low
+    file: 'shared/resources/develop-pipeline-remaining-work-banner.md'
+    finding: 'The exception says the lock-8 list "starts at the first unfinished row at or below Step 7". It omits the hook''s "if any, then Step 8", so the sentence does not cover a re-prompt where rows 1–7 are all finished.'
+    suggested_action: 'Stop restating the hook''s lock-8 wording in the banner doc. Keep the deferral (use the position and list the re-prompt''s reason gives, resolved into one "- Step N:" line per step) and the scope, and let the hook be the single statement.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: CR-3
+    severity: low
+    file: 'shared/resources/tests/step-8-completion-checklist.test.mjs'
+    finding: 'The banner test checks the hook''s output and the doc against separate hard-coded phrases and never compares the doc with the strings the hook renders, so wording the two copies do not share can drift. The doc''s "emit both as the reason gives them" also does not say to resolve the reason''s rule sentence into "- Step N:" lines.'
+    suggested_action: 'Fold into CR-2''s consolidation. Once the doc no longer restates the hook''s wording there is nothing to compare, and the test checks the scope, the carve-out and the resolve-into-lines instruction.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 185
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary in the change set (boundary: false). Unchanged from cycle 2.'
+  performance:
+    status: PASS
+    notes: 'Message text and test code only.'
+  reliability:
+    status: PASS
+    notes: 'The hook reason is well-formed at every lock step (47/47).'
+  maintainability:
+    status: PASS
+    notes: 'Parity tests hold the hook, contract and banner doc together, and 14 mutations prove them.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: CR-2
+      carried_from: top_issues (route 2b, cycle 3)
+      action: 'The banner doc''s exception says the lock-8 list "starts at the first unfinished row at or below Step 7" and omits the hook''s "if any, then Step 8". Fix: stop restating the hook''s lock-8 wording in the banner doc and keep only the deferral (use the reason''s position and list, resolved into one "- Step N:" line per step) and its scope.'
+      refs: ['shared/resources/develop-pipeline-remaining-work-banner.md']
+    - id: CR-3
+      carried_from: top_issues (route 2b, cycle 3)
+      action: 'The banner test compares against hard-coded phrases, not the hook''s rendered strings, and the doc does not say to resolve the reason''s rule into "- Step N:" lines. Fold into CR-2''s consolidation.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - action: 'Pre-existing, not introduced by this branch (provenance: origin/develop''s banner doc derives the position from current_step with no exception). A HALT raised during Step 7''s tail, after /finalise has moved the lock to 8, renders "Step 8/8 … ❌ halted" and lists Step 8 alone, though Step 7 is the step that halted. Name the halting step in a HALT block rather than deriving it from the lock.'
+      refs: ['shared/resources/develop-pipeline-remaining-work-banner.md', 'shared/resources/develop-pipeline-step-7-finalise.md']
+    - action: 'SC5 (the 4b empty and builtin arms) remains dev-only coverage (mutations M5/M6). A committed meta-test is optional.'
+      refs: ['shared/resources/advance-pipeline-lock.test.sh']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

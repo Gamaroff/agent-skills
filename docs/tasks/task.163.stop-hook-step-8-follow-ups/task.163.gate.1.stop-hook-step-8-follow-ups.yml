@@ -1,0 +1,62 @@
+schema: 1
+task: 'task.163.stop-hook-step-8-follow-ups'
+task_title: "Close task.162's step-8 follow-ups"
+gate: PASS
+status_reason: 'All five deliverables are implemented and each guard is mutation-proven with committed tests (7 of 7 mutations reproduced independently). Two LOW accuracy findings remain open: the lock-8 steps-ahead clause is not reflected in the banner doc rule, and "Part B''s" misattributes the Step 7 Completion Checklist, which is a top-level section.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T10:05:00Z'
+
+top_issues:
+  - id: CR-1
+    severity: low
+    file: 'shared/resources/develop-pipeline-remaining-work-banner.md'
+    finding: 'At lock 8 the Stop hook now lists "Step 7''s tail first if its row is unfinished, then Step 8", but the banner doc''s Rules still say to derive the steps-ahead list from the lock''s current_step, which at lock 8 yields only Step 8. The two instructions disagree in the one window the new clause exists for.'
+    suggested_action: 'Add a lock-8 exception to the banner doc''s "Cheap to produce" rule: at lock 8 Step 7''s tail may still be ahead (the lock moves to 8 before Step 7''s tail runs), so a Step 7 row that is not finished is listed before Step 8. Keep the hook as it is.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: low
+    file: 'shared/resources/develop-pipeline-on-stop.sh'
+    finding: 'The develop-bug Step 7 tail and the resume contract call it "Part B''s Step 7 Completion Checklist", but in develop-bug-step-7-close-bug.md the "## Step 7 Completion Checklist" is a top-level section beside Parts A and B, and it covers Part A items too (/finalise --bug invoked, DoD file present). The attribution is inaccurate in the text this task exists to make accurate.'
+    suggested_action: 'Say "the Step 7 Completion Checklist" in the hook''s develop-bug STEP7_TAIL, the resume contract''s Phase 0b clause, the 5b develop-bug grep and the parity test''s phrase floor, all in one edit. The parity test keeps the two copies in step.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 184
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary in the change set (boundary: false). The only branches added are a string selection (STEPS_AHEAD), a test-fixture setup case (4b) and a test helper. None accepts or rejects input in shipped code. The hook still emits its reason through jq --arg, so the new text is JSON-escaped.'
+  performance:
+    status: PASS
+    notes: 'Message text and test code only. The new parity test spawns the hook twice (about 170ms).'
+  reliability:
+    status: PASS
+    notes: 'The hook reason is well-formed at every step (47/47 hook assertions pass, and the step 0/9/missing/unparseable guards are unchanged). The 4b setup failure is counted rather than exiting, and the dependent assertions are gated.'
+  maintainability:
+    status: PASS
+    notes: 'The two copies of the Step 7 tail are now held together by a parity test. The STEPS_AHEAD binding follows the existing POSITION and ALREADY_DONE pattern, and each binding carries a comment citing its source finding.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'SC5 (4b empty and builtin arms) is proven only by development-time mutations M5 and M6 (dev-only). A committed meta-test that runs advance-pipeline-lock.test.sh with a missing command would make it covered. Optional, because the fixture''s failure mode is loud by construction.'
+      refs: ['shared/resources/advance-pipeline-lock.test.sh']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

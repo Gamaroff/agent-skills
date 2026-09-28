@@ -5,18 +5,22 @@ type: task
 description: "Close the five LOW advisories task.162 left: name develop-bug's Step 7 Completion Checklist in the Stop hook and resume contract, fix the step-8 'steps still ahead' clause, add a Stop-hook floor to the --complete population test, pin the resume contract's Step 7-tail wording, and make scenario 4b fail loudly on a missing command."
 tags: [develop-pipeline, stop-hook, step-8, develop-bug, follow-up]
 category: infrastructure
-status: planned
+status: accepted
 priority: Low
 created: 2026-09-28
 updated: 2026-09-28
 assignee:
 estimated_effort_hours: 4
 github_issue: 504
+completed_date: 2026-09-28
+pr_number: 506
 ---
 
 # Technical Task: Close task.162's step-8 follow-ups
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.163.review.1.stop-hook-step-8-follow-ups.md` implemented 2026-09-28
 
 **GitHub Issue**: [#504](https://github.com/Gamaroff/agent-skills/issues/504)
 
@@ -37,7 +41,7 @@ Two are accuracy gaps in what the hook and the resume contract tell an orchestra
 
 **Key deliverables**:
 
-1. At lock 8 a develop-bug orchestrator is told Part B ends with its own Step 7 Completion Checklist, in the hook and in the resume contract alike.
+1. At lock 8 a develop-bug orchestrator is told Step 7's tail is Part B's bug-close routine and then the Step 7 Completion Checklist, in the hook and in the resume contract alike. (The checklist is a section of its own beside Parts A and B, and this wording was refined in QA cycles 1–2.)
 2. At lock 8 the status-block instruction does not ask for a list of steps "still ahead through Step 8" when Step 8 is the only one.
 3. The `--complete` population test fails if the hook stops contributing lines to it.
 4. A test goes red when the resume contract's Step 7-tail wording is reverted.
@@ -76,8 +80,8 @@ Two are accuracy gaps in what the hook and the resume contract tell an orchestra
 
 ### Target Architecture
 
-- The develop-bug `STEP7_TAIL` and the contract's develop-bug clause both end with Part B's Step 7 Completion Checklist.
-- At `NEXT=8` the heredoc's list clause is bound like `POSITION`: a `STEPS_AHEAD` string that reads "then the steps still ahead through Step 8" below 8 and says Step 8 is the step in progress at 8. The exact wording is chosen in Phase 1 against `develop-pipeline-remaining-work-banner.md`.
+- The develop-bug `STEP7_TAIL` and the contract's develop-bug clause both read "Part B's bug-close routine — …, the tracker-close check — then the Step 7 Completion Checklist". The checklist sits outside Part B's list (QA cycle 2, CR-2).
+- At `NEXT=8` the heredoc's list clause is bound like `POSITION`: a `STEPS_AHEAD` string that reads "then the steps still ahead through Step 8" below 8, and "then the steps still ahead: the first unfinished row at or below Step 7, if any, then Step 8" at 8. The step-8 wording must not claim Step 8 is the only step ahead, and must not be narrower than the hook's own `COMPLETION_LINE`, which sends the first unfinished row at or below Step 7 back first (task.163 review.1; QA cycle 2, CR-3). The Remaining Work Status banner doc defers to this reason at a Stop-hook re-prompt, and only there (QA cycles 1–2).
 - The population test adds `(perSkill[STOP_HOOK] || 0) >= 1` beside its existing floors.
 - A new test in `step-8-completion-checklist.test.mjs` reads the resume contract's Phase 0b paragraph and the rendered hook reason at lock 8 for develop-bug and develop-task, and requires the same tail phrases in both. It is a parity test, so reverting either copy goes red.
 - Scenario 4b: an empty `command -v` result fails setup with the command's name; a bare name (a builtin) is skipped as now; an absolute path is linked.
@@ -94,7 +98,7 @@ Two are accuracy gaps in what the hook and the resume contract tell an orchestra
 
 ### In Scope
 
-✅ `shared/resources/develop-pipeline-on-stop.sh`: develop-bug `STEP7_TAIL` names Part B's Step 7 Completion Checklist; a step-aware `STEPS_AHEAD` clause at `NEXT=8`
+✅ `shared/resources/develop-pipeline-on-stop.sh`: develop-bug `STEP7_TAIL` names the Step 7 Completion Checklist after Part B's bug-close routine; a step-aware `STEPS_AHEAD` clause at `NEXT=8`
 ✅ `shared/resources/develop-pipeline-resume-contract.md`: the Phase 0b develop-bug clause names the same checklist
 ✅ `shared/resources/develop-pipeline-on-stop.test.sh`: 5b's develop-bug case requires the checklist; 5d requires the step-8 clause and forbids the generic one; 5c keeps the generic clause at lock 3
 ✅ `shared/resources/tests/step-8-completion-checklist.test.mjs`: the `STOP_HOOK` floor; a hook↔contract Step 7-tail parity test
@@ -125,10 +129,10 @@ None to any interface. The Stop hook's reason text changes at lock 8 (the develo
 
 **Files**: `shared/resources/develop-pipeline-on-stop.sh`, `shared/resources/develop-pipeline-resume-contract.md`, `shared/resources/develop-pipeline-on-stop.test.sh`
 
-- [ ] Append Part B's Step 7 Completion Checklist to the develop-bug `STEP7_TAIL`, and to the develop-bug clause of the resume contract's Phase 0b sentence, in the same words.
-- [ ] Bind `STEPS_AHEAD` before the heredoc: the generic clause below 8, a Step 8-only clause at 8. Interpolate it where the literal clause is now.
-- [ ] 5b develop-bug: also require the checklist phrase.
-- [ ] 5d: at lock 8 require the step-8 clause and forbid "then the steps still ahead through Step 8". 5c: at lock 3 still require the generic clause.
+- [x] Append the Step 7 Completion Checklist, after Part B's bug-close routine, to the develop-bug `STEP7_TAIL` and to the develop-bug clause of the resume contract's Phase 0b sentence, in the same words.
+- [x] Bind `STEPS_AHEAD` before the heredoc: the generic clause below 8; at 8, "then the steps still ahead: the first unfinished row at or below Step 7, if any, then Step 8". Interpolate it where the literal clause is now.
+- [x] 5b develop-bug: also require the checklist phrase.
+- [x] 5d: at lock 8 require the step-8 clause and forbid "then the steps still ahead through Step 8". 5c: at lock 3 still require the generic clause.
 
 ### Phase 2: The guards have floors and fail in the right place
 
@@ -136,22 +140,22 @@ None to any interface. The Stop hook's reason text changes at lock 8 (the develo
 
 **Files**: `shared/resources/tests/step-8-completion-checklist.test.mjs`, `shared/resources/advance-pipeline-lock.test.sh`
 
-- [ ] Add `(perSkill[STOP_HOOK] || 0) >= 1` to the `--complete` population test, with a message naming the hook.
-- [ ] Add a parity test: render the hook reason at lock 8 for develop-bug and develop-task (spawn the hook with a fixture lock, as `develop-pipeline-on-stop.test.sh` does), read the resume contract's Phase 0b paragraph, and require each tail's phrases in both. Name a floor so a paragraph that cannot be found fails rather than passes.
-- [ ] Scenario 4b: replace the two-way `case` with three arms. Empty → fail setup naming the command. Absolute path → link. Bare name → skip (builtin). Update the comment.
+- [x] Add `(perSkill[STOP_HOOK] || 0) >= 1` to the `--complete` population test, with a message naming the hook.
+- [x] Add a parity test: render the hook reason at lock 8 for develop-bug and develop-task (spawn the hook with a fixture lock, as `develop-pipeline-on-stop.test.sh` does), read the resume contract's Phase 0b paragraph, and require each tail's phrases in both. Name a floor so a paragraph that cannot be found fails rather than passes.
+- [x] Scenario 4b: replace the two-way `case` with three arms. Empty → fail setup naming the command. Absolute path → link. Bare name → skip (builtin). Update the comment.
 
 ### Phase 3: Proof and gates
 
 **Risk**: Low.
 
-- [ ] Mutation-prove under bash, with `cp` snapshots of a real `FILES` array and restore checked by `cmp`:
+- [x] Mutation-prove under bash, with `cp` snapshots of a real `FILES` array and restore checked by `cmp`:
   - drop the checklist from the develop-bug `STEP7_TAIL` → 5b develop-bug red and the parity test red;
   - drop it from the contract only → the parity test red;
   - restore the literal "steps still ahead through Step 8" at 8 → 5d red;
   - rename `--complete` out of every hook line → the new `STOP_HOOK` floor red;
   - make `command -v rm` return empty (e.g. a name that does not exist in the loop) → 4b setup fails naming it;
   - re-add `printf` to the 4b loop → 4b stays green (absorbed, as in task.162).
-- [ ] `npm run bundle`, then `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell` and `npm run bundle:check`. CHANGELOG `[Unreleased]` entry citing (task 163).
+- [x] `npm run bundle`, then `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell` and `npm run bundle:check`. CHANGELOG `[Unreleased]` entry citing (task 163).
 
 ---
 
@@ -176,6 +180,7 @@ None.
 
 6. ✅ `CHANGELOG.md`: `[Unreleased]` entry
 7. ✅ Bundled `references/` copies, regenerated by `npm run bundle` (never edited by hand)
+8. ✅ `shared/resources/develop-pipeline-remaining-work-banner.md`: the steps-ahead derivation rule states the lock-8 exception (QA cycle 1, CR-1)
 
 ### Files to Delete
 
@@ -215,24 +220,24 @@ Not applicable. The change is message text and test code.
 
 ### Functional
 
-- [ ] At lock 8 with `skill: develop-bug`, the reason names Part B's Step 7 Completion Checklist (Phase 1)
-- [ ] The resume contract's Phase 0b develop-bug clause names the same checklist, and a parity test goes red if either copy drops it (Phases 1–2)
-- [ ] At lock 8 no reason contains "then the steps still ahead through Step 8"; at lock 3 the reason still does (Phase 1)
-- [ ] The `--complete` population test fails when the hook contributes no line to it (Phase 2)
-- [ ] Scenario 4b fails at setup, naming the command, when `command -v` returns empty; a builtin is still skipped (Phase 2)
+- [x] At lock 8 with `skill: develop-bug`, the reason names the Step 7 Completion Checklist after Part B's bug-close routine (Phase 1)
+- [x] The resume contract's Phase 0b develop-bug clause names the same checklist, and a parity test goes red if either copy drops it (Phases 1–2)
+- [x] At lock 8 no reason contains "then the steps still ahead through Step 8"; at lock 3 the reason still does (Phase 1)
+- [x] The `--complete` population test fails when the hook contributes no line to it (Phase 2)
+- [x] Scenario 4b fails at setup, naming the command, when `command -v` returns empty; a builtin is still skipped (Phase 2)
 
 ### Performance
 
-- [ ] No measurable change
+- [x] No measurable change
 
 ### Code Quality
 
-- [ ] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell` and `bundle:check` pass
-- [ ] Each Phase 3 mutation behaves as stated under bash, with restore checked by `cmp`
+- [x] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell` and `bundle:check` pass
+- [x] Each Phase 3 mutation behaves as stated under bash, with restore checked by `cmp`
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry cites (task 163)
+- [x] CHANGELOG `[Unreleased]` entry cites (task 163)
 
 ---
 
@@ -282,30 +287,90 @@ None identified.
 
 ---
 
-## Change Log
+## QA Testing Results
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
-| 2026-09-28 | 1.0     | Initial draft | create-task |
-<!-- change-log-end -->
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-28
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.163.qa.3.stop-hook-step-8-follow-ups.md](./task.163.qa.3.stop-hook-step-8-follow-ups.md)
+- **Gate File**: [task.163.gate.3.stop-hook-step-8-follow-ups.yml](./task.163.gate.3.stop-hook-step-8-follow-ups.yml)
+- **Previous**: [qa.2](./task.163.qa.2.stop-hook-step-8-follow-ups.md) / [gate.2](./task.163.gate.2.stop-hook-step-8-follow-ups.yml) — CONCERNS (90/100), fixed in cycle 2; [qa.1](./task.163.qa.1.stop-hook-step-8-follow-ups.md) / [gate.1](./task.163.gate.1.stop-hook-step-8-follow-ups.yml) — PASS (100/100), fixed in cycle 1
+
+### Test Coverage Summary
+- **Tests Executed**: 185 (targeted suites) + 14 mutation proofs
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No HIGH or MEDIUM finding is new to this change. Two LOW wording findings on the banner-doc exception are open (CR-2, CR-3). A pre-existing HALT-rendering gap (a Step 7-tail HALT at lock 8) is recorded in the gate's recommendations.future.
 
 ---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.163.qa.3.stop-hook-step-8-follow-ups.md`
+**Gate File**: `task.163.gate.3.stop-hook-step-8-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100. Three QA cycles; the loop left via the cosmetic-residue exit.
+**PR Review**: `task.163.pr-review.1.stop-hook-step-8-follow-ups.md` returned ⚠️ CONCERNS. PC-1 was addressed and CR-1 (LOW) is deferred.
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 9 met, each traced to code and to a test that runs per PR
+✅ **Tests:** hook 47/0, lock 95/0, step-8 checklist 90/0, PreCompact 18/0; ci:fast 4,334/0; 14 mutations proved
+✅ **CI:** SUCCESS on PR #506 head `3f936a33` (link-check, shellcheck, test, validate)
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed cites (task 163); resume contract and banner doc updated; bundled copies in sync
+✅ **Security Review:** PASS (`boundary: false`; the Stop-hook verdict logic is untouched)
+✅ **Compliance Review:** NOT_APPLICABLE (internal pipeline tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-28
+
+**Detailed Verification Log:** See `task.163.dod.1.stop-hook-step-8-follow-ups.md` for the complete verification evidence and timestamps.
+
+---
+<!-- change-log-start -->
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2026-09-28 | 1.0     | Initial draft | create-task |
+| 2026-09-28 | 1.1     | Review passed (9/10) — step-8 `STEPS_AHEAD` wording fixed to allow an unfinished Step 7 tail | review-task |
+| 2026-09-28 |         | Status → ready-for-development | review-task |
+| 2026-09-28 |         | Implemented — 5 source files plus bundled copies; 1 new test, 5 new assertions; 7 mutations proved | develop |
+| 2026-09-28 |         | QA gate PASS (100/100) — 2 LOW findings | qa-task |
+| 2026-09-28 |         | QA gate CONCERNS (90/100) — 1 MEDIUM, 3 LOW (cycle 2 refute pass) | qa-task |
+| 2026-09-28 |         | QA gate PASS (100/100) — 2 LOW findings; 1 pre-existing MEDIUM routed to future (cycle 3) | qa-task |
+| 2026-09-28 |         | Spec wording aligned with the QA-refined implementation (checklist after Part B; lock-8 list per the completion rule) — PR review PC-1 | develop-task |
+| 2026-09-28 |         | QA findings fixed — banner doc defers to the Stop hook at a re-prompt only; checklist outside Part B's list; lock-8 list worded after the completion rule; 2 iterations | qa-fix |
+| 2026-09-28 | 1.2 | DoD passed — accepted (PR #506) | finalise |
+
+---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
 ### Phase 1: The step-8 text is complete and consistent
-- [ ] develop-bug tail names the checklist (hook and contract)
-- [ ] Step-aware `STEPS_AHEAD`
-- [ ] 5b, 5c, 5d updated
+- [x] develop-bug tail names the checklist (hook and contract)
+- [x] Step-aware `STEPS_AHEAD`
+- [x] 5b, 5c, 5d updated
 
 ### Phase 2: The guards have floors and fail in the right place
-- [ ] `STOP_HOOK` floor
-- [ ] Hook↔contract parity test
-- [ ] 4b three-way case
+- [x] `STOP_HOOK` floor
+- [x] Hook↔contract parity test
+- [x] 4b three-way case
 
 ### Phase 3: Proof and gates
-- [ ] Mutation proofs
-- [ ] Gates and CHANGELOG
+- [x] Mutation proofs
+- [x] Gates and CHANGELOG
 
 ---
 
@@ -321,6 +386,17 @@ None identified.
 
 ## Notes
 
+### Deferred Work
+
+The QA loop left through the cosmetic-residue exit (route 2b, cycle 3), carrying two LOW findings to `task.163.gate.3` `recommendations.future`:
+
+- **CR-2**: the banner doc's Stop-hook re-prompt exception restates the hook's lock-8 list without "if any, then Step 8". The fix is to stop restating it and keep only the deferral and its scope.
+- **CR-3**: the banner test compares literals rather than the hook's rendered strings. Fold it into CR-2.
+
+The same gate records one pre-existing gap, not introduced here: a HALT raised during Step 7's tail after `/finalise` moved the lock to 8 renders as a Step 8 HALT. Name the halting step instead of deriving it from the lock.
+
+PR review 1 (`task.163.pr-review.1`) left one LOW code finding as a follow-up. **CR-1**: the `--complete` population test's hook floor passes on comment lines alone. It should count only non-comment hook lines (at least 2), or its message should be narrowed to what it checks.
+
 ### Important Reminders
 
 - Edit `shared/resources/` sources, then run `npm run bundle`. Never edit the `skills/*/references/` copies.
@@ -329,7 +405,7 @@ None identified.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.163.stop-hook-step-8-follow-ups/task.163.stop-hook-step-8-follow-ups.md`

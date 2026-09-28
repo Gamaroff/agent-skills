@@ -120,36 +120,46 @@ fi
 # cycle 1, CR-1). `--skill commit-changes` removes nothing and must not need jq or a
 # parsable lock either (CR-3). PATH holds only the external commands those two arms run
 # (`dirname` when the script loads, `rm` for --complete) and no jq. The script runs under an
-# absolute "$BASH_BIN", so bash need not be on PATH; `echo` is a builtin. A name `command -v`
-# does not resolve to an absolute path is a builtin, and linking its bare name would make a
-# self-referencing link, so it is skipped (task 162). An arm that starts needing another
-# command fails here, visibly, instead of finding it on an over-linked PATH.
+# absolute "$BASH_BIN", so bash need not be on PATH; `echo` is a builtin. `command -v` answers
+# one of three ways, and each has its own arm. An absolute path is linked. A bare name is a
+# builtin, and linking it would make a self-referencing link, so it is skipped (task 162). An empty
+# answer is a missing command: setup fails there, naming it, and the two no-jq assertions below do
+# not run, rather than failing later for the setup's reason under their own names (task 163;
+# task.162 gate.1 CR-2). An arm that starts needing another command fails here, visibly, instead of
+# finding it on an over-linked PATH.
 NOJQ_BIN="$TMPDIR_TEST/nojq-bin"
 mkdir -p "$NOJQ_BIN"
+NOJQ_SETUP_OK=1
 for c in rm dirname; do
   p=$(command -v "$c")
-  case "$p" in /*) ln -sf "$p" "$NOJQ_BIN/$c" ;; esac
+  case "$p" in
+    "") fail "4b setup: '$c' not found on PATH" "the no-jq fixture cannot link a command that does not resolve"; NOJQ_SETUP_OK=0 ;;
+    /*) ln -sf "$p" "$NOJQ_BIN/$c" ;;
+    *) ;; # a builtin resolves to its bare name: skip it (linking it would self-reference)
+  esac
 done
 BASH_BIN=$(command -v bash)
 LOCK_FILE="$TMPDIR_TEST/nojq.lock"
-write_lock 8
-ERR=$(PATH="$NOJQ_BIN" PIPELINE_LOCK="$LOCK_FILE" "$BASH_BIN" "$SCRIPT" --skill commit-changes 2>&1 >/dev/null)
-RC=$?
-# The jq gate also exits 0 and leaves the lock, so the lock alone cannot tell the pre-gate arm
-# from the gate. Its own line, and the gate's absence, can (task.161 QA cycle 2, CR-3).
-if [ "$RC" -ne 0 ] || [ ! -f "$LOCK_FILE" ]; then
-  fail "without jq, commit-changes at step 8 leaves the lock" "rc=$RC, lock present=$([ -f "$LOCK_FILE" ] && echo yes || echo no)"
-elif ! echo "$ERR" | grep -q "lock preserved (--complete ends the run)" || echo "$ERR" | grep -q "jq not installed"; then
-  fail "without jq, commit-changes at step 8 leaves the lock" "answered by the jq gate, not the commit-changes arm: $ERR"
-else
-  pass "without jq, commit-changes at step 8 leaves the lock (its own arm, not the jq gate)"
-fi
-PATH="$NOJQ_BIN" PIPELINE_LOCK="$LOCK_FILE" "$BASH_BIN" "$SCRIPT" --complete >/dev/null 2>&1
-RC=$?
-if [ "$RC" -ne 0 ] || [ -f "$LOCK_FILE" ]; then
-  fail "without jq, --complete removes the lock" "rc=$RC, lock present=$([ -f "$LOCK_FILE" ] && echo yes || echo no)"
-else
-  pass "without jq, --complete removes the lock"
+if [ "$NOJQ_SETUP_OK" -eq 1 ]; then
+  write_lock 8
+  ERR=$(PATH="$NOJQ_BIN" PIPELINE_LOCK="$LOCK_FILE" "$BASH_BIN" "$SCRIPT" --skill commit-changes 2>&1 >/dev/null)
+  RC=$?
+  # The jq gate also exits 0 and leaves the lock, so the lock alone cannot tell the pre-gate arm
+  # from the gate. Its own line, and the gate's absence, can (task.161 QA cycle 2, CR-3).
+  if [ "$RC" -ne 0 ] || [ ! -f "$LOCK_FILE" ]; then
+    fail "without jq, commit-changes at step 8 leaves the lock" "rc=$RC, lock present=$([ -f "$LOCK_FILE" ] && echo yes || echo no)"
+  elif ! echo "$ERR" | grep -q "lock preserved (--complete ends the run)" || echo "$ERR" | grep -q "jq not installed"; then
+    fail "without jq, commit-changes at step 8 leaves the lock" "answered by the jq gate, not the commit-changes arm: $ERR"
+  else
+    pass "without jq, commit-changes at step 8 leaves the lock (its own arm, not the jq gate)"
+  fi
+  PATH="$NOJQ_BIN" PIPELINE_LOCK="$LOCK_FILE" "$BASH_BIN" "$SCRIPT" --complete >/dev/null 2>&1
+  RC=$?
+  if [ "$RC" -ne 0 ] || [ -f "$LOCK_FILE" ]; then
+    fail "without jq, --complete removes the lock" "rc=$RC, lock present=$([ -f "$LOCK_FILE" ] && echo yes || echo no)"
+  else
+    pass "without jq, --complete removes the lock"
+  fi
 fi
 printf 'not json{' > "$LOCK_FILE"
 PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" --skill commit-changes >/dev/null 2>&1
