@@ -609,6 +609,40 @@ None.
 
 ---
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.154.qa.5.bundler-and-snippet-test-hygiene.md`
+**Gate File**: `task.154.gate.5.bundler-and-snippet-test-hygiene.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Security Review:**
+   - [ ] The base-location refusal in `scripts/test-clean-checkout.sh:53-87` is an inline `node -e` predicate reading an environment variable. No `security-probe.mjs` entry form reaches it, so probe mode executed 0 candidates (medium). Move the decision into an importable module and probe it through `path#export`.
+
+2. **Acceptance Criteria:**
+   - [ ] AC5: no test pins `scripts/release.sh` running `npm run test:clean-checkout` as its test gate.
+   - [ ] AC6: the under-10 s limit per new test file was measured once (5.3 s, 0.23 s, 1.3 s) but is not asserted. Either assert it or restate the criterion as a recorded measurement.
+
+AC13 (observations #149 and #151 set to `actioned`) is post-merge by definition and is not counted as a gap.
+
+### Next Steps:
+
+- Close the three items above, then re-run `/finalise`.
+- Advisory: `docs/runbooks/release-and-install.md:13` still lists plain `npm test` in the manual pre-flight.
+
+**Estimated Effort:** Small to Medium (1-2 hours)
+
+**Gap Report Generated:** 2026-09-29
+**Detailed Verification Log:** See [`task.154.dod.1.bundler-and-snippet-test-hygiene.md`](./task.154.dod.1.bundler-and-snippet-test-hygiene.md).
+
+---
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -625,6 +659,7 @@ None.
 | 2026-09-29 |         | QA gate CONCERNS (80/100) — 4 findings (2 MEDIUM, 2 LOW) | qa-task |
 | 2026-09-29 |         | QA gate PASS (100/100) — 0 findings, 4 advisory cleanups | qa-task |
 | 2026-09-29 |         | QA findings fixed — gate PASS (100/100), 4 iterations, 8 bugs closed | qa-fix |
+| 2026-09-29 |         | DoD incomplete — 3 gaps identified (task.154.dod.1) | finalise |
 
 <!-- change-log-end -->
 

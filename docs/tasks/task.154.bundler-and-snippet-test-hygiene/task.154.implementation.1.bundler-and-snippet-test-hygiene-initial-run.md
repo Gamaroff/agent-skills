@@ -36,7 +36,7 @@ First pipeline run for task 154: remove the placeholder literal behind the bundl
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; audit 28/28 Ready for Review @ `63d039b6`; 6 mutation proofs | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #513: https://github.com/Gamaroff/agent-skills/pull/513 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.154.qa.{N}.*.md`; `task.154.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles (FAIL → CONCERNS ×3 → PASS 100); 8 bugs closed; runner redesigned at cycle 3; 5c APPROVE | —                    |
-| 7. finalise                | ⏳ Pending | `task.154.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
+| 7. finalise                | ❌ Gaps    | `task.154.dod.{N}.*.md`; task `status: accepted`                      | DoD 1: 3 gaps (Security probe unreachable, medium; AC5; AC6); CI reading 1 SUCCESS @ `060e9377`; gaps PR comment posted; HALTED | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -116,6 +116,12 @@ _Problems encountered and how they were resolved or escalated._
 
 - **QA cycle 4 (5a)**: bug reports for the two MEDIUM findings were not written at 5a (qa-task Step 9); filed at 5b as bugs 7–8 together with their fix, and linked from QA report 4.
 - **Reviewer independence**: gates 1–4 were written by the orchestrator, so qa-fix's findings ingester (Step 1a) was not dispatched — the findings were already in context. Each cycle's diff review was an independent Explore subagent; the fixes were not.
+- **Finalise DoD gaps (dod.1)** — pipeline HALTED at Step 7:
+  - Security FAIL (medium): the base-location refusal in `scripts/test-clean-checkout.sh:53-87` is an inline `node -e` predicate reading `CLEAN_CHECKOUT_DIR`. No `security-probe.mjs` entry form reaches it, so probe mode executed 0 candidates. Fix route: move the decision into an importable module and probe it through `path#export`.
+  - AC5: no test pins `scripts/release.sh` running `npm run test:clean-checkout`.
+  - AC6: the under-10 s limit was measured once, not asserted.
+  - AC13 (observations to `actioned`) is post-merge and not counted as a gap.
+  - Fix-and-recheck was not reachable: two sections fail, and one finding is medium. QA gate PASS 100; CI green.
 - **Spec change**: the clean-checkout runner's design changed in QA cycle 3 (per-run `mktemp -d` directory inside a base) after three cycles of findings on the named-location design; task §3 was brought into line in cycle 4.
 
 ---
