@@ -1,0 +1,68 @@
+schema: 1
+task: 'task.154.bundler-and-snippet-test-hygiene'
+task_title: 'Bundler and snippet-test hygiene: attributed warning, symlink-free test run'
+gate: FAIL
+status_reason: 'The clean-checkout runner deletes whatever CLEAN_CHECKOUT_DIR names, including the repository and its ancestors (reproduced by hand in a scratch fixture); and bundle-missing-source §2 contradicts its own comment on a stale copy.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T22:03:46Z'
+
+top_issues:
+  - id: 'T154-QA1-1'
+    severity: high
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'rm -rf "$DIR" runs unconditionally (and from the EXIT trap) on a path CLEAN_CHECKOUT_DIR can set; probed: DIR = the repo deletes the repo with .git, DIR = its parent deletes the parent, DIR = an unrelated non-empty dir deletes it at rc 0, DIR = a relative path leaks the clone. Bug: task.154.bug.1.clean-checkout-dir-deletes-repo.md'
+    suggested_action: 'Resolve DIR to an absolute path; refuse DIR == REPO, REPO under DIR, and an existing DIR without a runner-written marker; write the marker after cloning; test each refusal including the relative case.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA1-2'
+    severity: medium
+    file: 'tests/bundle-missing-source.test.js'
+    finding: '§2 says it tolerates a stale copy via spawnSync but then requires the zero-problem summary line (bundle_skill.py:1267); any freshness problem fails it as "no summary line" (code review CR-1). Bug: task.154.bug.2.missing-source-test-summary-line.md'
+    suggested_action: 'Take the skill count from a freshness-independent source or accept both summary forms; add a stale-copy fixture case.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 13
+  phases_verified: 6/6
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [3, 5]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 6
+    notes: 'By-hand probe (probe-boundary-rule §5.1): the CLEAN_CHECKOUT_DIR env-var arm is a declined sink no engine entry form reaches. 6 candidates run under env -i with a throwaway HOME in a scratch fixture; 3 deleted data outside the clone. Local developer tool, input is the operator''s own environment — data-loss, not privilege. bundle_skill.py _within containment unchanged.'
+  performance:
+    status: PASS
+    notes: 'clean-checkout suite 279s vs in-place ci:fast 250s; new test files 5.3s / 0.23s / 1.3s.'
+  reliability:
+    status: FAIL
+    notes: 'Destructive rm -rf on an operator-settable path (T154-QA1-1).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Temp-dir refusal is a second copy of EPHEMERAL_PATTERNS missing .claude/worktrees/ (CR-2); shared_refs_with_lines duplicates the collector regex (CR-4, guarded by §1d); unreachable None-origin branch (CR-5); one exit listener per consumer root (CR-6).'
+
+recommendations:
+  immediate:
+    - action: 'Make the runner refuse to delete anything it did not create (T154-QA1-1).'
+      refs: ['scripts/test-clean-checkout.sh', 'tests/test-clean-checkout.test.js']
+    - action: 'Make §2 fail only on a missing-source warning or a sub-floor count (T154-QA1-2).'
+      refs: ['tests/bundle-missing-source.test.js']
+  future:
+    - action: 'Ask observation-log.js ephemeralReason() on the resolved DIR instead of a hand copy of its patterns (CR-2) — natural to fold into the T154-QA1-1 fix.'
+      refs: ['scripts/test-clean-checkout.sh']
+    - action: 'Cleanups CR-4/5/6 (single regex, drop None branch, one exit hook).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py', 'evals/shared/lib/consumer-root.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

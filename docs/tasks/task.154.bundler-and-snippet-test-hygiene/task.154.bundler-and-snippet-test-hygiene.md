@@ -8,7 +8,7 @@ category: testing
 status: ready-for-review
 priority: Medium
 created: 2026-09-24
-updated: 2026-09-28
+updated: 2026-09-29
 assignee:
 estimated_effort_hours: 16
 github_issue: 484
@@ -576,6 +576,33 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-29
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.154.qa.1.bundler-and-snippet-test-hygiene.md](./task.154.qa.1.bundler-and-snippet-test-hygiene.md)
+- **Gate File**: [task.154.gate.1.bundler-and-snippet-test-hygiene.yml](./task.154.gate.1.bundler-and-snippet-test-hygiene.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 4415 (full suite, in place and in a clean clone); 13 new
+- **Phases Verified**: 6/6
+- **Critical Issues**: 1
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+
+### Key Findings
+
+- **HIGH**: the clean-checkout runner deletes whatever `CLEAN_CHECKOUT_DIR` names, including the repository ([bug 1](./task.154.bug.1.clean-checkout-dir-deletes-repo.md)).
+- **MEDIUM**: bundle-missing-source §2 needs the zero-problem summary line, which contradicts its own comment ([bug 2](./task.154.bug.2.missing-source-test-summary-line.md)).
+
+---
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -586,6 +613,7 @@ None.
 | 2026-09-28 | 1.1     | Review passed (9/10) — per-origin dedupe promise restated to match `seen`; §2 key narrowed; runner refuses a missing `node_modules` | review-task |
 | 2026-09-28 |         | Status → ready-for-development | review-task |
 | 2026-09-28 |         | Implemented — 17 files, 3 new test files (13 tests), 6 mutation proofs | develop-task (inline) |
+| 2026-09-29 |         | QA gate FAIL (70/100) — 2 findings (1 HIGH, 1 MEDIUM) | qa-task |
 
 <!-- change-log-end -->
 

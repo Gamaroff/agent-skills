@@ -56,7 +56,11 @@ function git(cwd, ...args) {
  */
 function makeFixture() {
   fs.mkdirSync(BASE, { recursive: true });
-  const repo = fs.mkdtempSync(path.join(BASE, "repo-"));
+  // The repo sits one level inside its own wrapper, so a refusal case can name
+  // the repo's PARENT without that parent being the shared BASE.
+  const wrapper = fs.mkdtempSync(path.join(BASE, "wrap-"));
+  const repo = path.join(wrapper, "repo");
+  fs.mkdirSync(repo);
   const w = (rel, content) => {
     fs.mkdirSync(path.dirname(path.join(repo, rel)), { recursive: true });
     fs.writeFileSync(path.join(repo, rel), content);
@@ -76,11 +80,9 @@ function makeFixture() {
   fs.mkdirSync(path.join(repo, "node_modules"));
   return {
     repo,
-    cloneDir: path.join(repo + "-clone"),
-    cleanup: () => {
-      fs.rmSync(repo, { recursive: true, force: true });
-      fs.rmSync(repo + "-clone", { recursive: true, force: true });
-    },
+    wrapper,
+    cloneDir: path.join(wrapper, "clone"),
+    cleanup: () => fs.rmSync(wrapper, { recursive: true, force: true }),
   };
 }
 
@@ -175,6 +177,98 @@ test("the runner refuses when node_modules is missing", () => {
     const r = runRunner(fx, "true");
     assert.equal(r.status, 2);
     assert.match(r.stderr, /node_modules is missing/);
+  } finally {
+    fx.cleanup();
+  }
+});
+
+// Task 154 QA cycle 1 (TASK-154-BUG-1): the runner deletes its clone directory,
+// and the first version deleted whatever CLEAN_CHECKOUT_DIR named. Each case
+// below names a location the runner must NOT delete, and asserts both the
+// refusal and that the location survived — a refusal that still deleted would
+// pass an exit-code check alone.
+test("the runner refuses to delete the repository, an ancestor, root, or a directory it did not create", () => {
+  const fx = makeFixture();
+  try {
+    const foreign = path.join(fx.wrapper, "foreign");
+    fs.mkdirSync(foreign);
+    fs.writeFileSync(path.join(foreign, "precious"), "keep\n");
+    const cases = [
+      { dir: fx.repo, why: /is the repository or contains it/ },
+      { dir: ".", why: /is the repository or contains it/ },
+      { dir: fx.wrapper, why: /is the repository or contains it/ },
+      { dir: "/", why: /contains the repository/ },
+      { dir: foreign, why: /was not created by this script/ },
+    ];
+    for (const { dir, why } of cases) {
+      const r = runRunner(fx, "true", { CLEAN_CHECKOUT_DIR: dir });
+      assert.equal(
+        r.status,
+        2,
+        `expected exit 2 for ${dir}, got ${r.status}:\n${r.stderr}`,
+      );
+      assert.match(r.stderr, why, `wrong refusal for ${dir}`);
+    }
+    assert.ok(
+      fs.existsSync(path.join(fx.repo, ".git")),
+      "the repository was deleted",
+    );
+    assert.ok(
+      fs.existsSync(path.join(foreign, "precious")),
+      "the foreign directory was emptied",
+    );
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("the runner refuses a path that resolves into a temporary directory through a symlink", () => {
+  const fx = makeFixture();
+  try {
+    const link = path.join(fx.wrapper, "to-tmp");
+    fs.symlinkSync("/tmp", link);
+    const r = runRunner(fx, "true", {
+      CLEAN_CHECKOUT_DIR: path.join(link, "x"),
+    });
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /temporary directory/);
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("the runner re-uses its own marked clone, an empty directory, and a relative path — and leaves none behind", () => {
+  const fx = makeFixture();
+  try {
+    // A leftover from an interrupted run: the runner's own marker in .git/.
+    fs.mkdirSync(path.join(fx.cloneDir, ".git"), { recursive: true });
+    fs.writeFileSync(
+      path.join(fx.cloneDir, ".git", "test-clean-checkout.marker"),
+      "",
+    );
+    fs.writeFileSync(path.join(fx.cloneDir, "stale"), "x\n");
+    let r = runRunner(fx, "test -f skills/x/marker && test ! -e stale");
+    assert.equal(
+      r.status,
+      0,
+      `leftover marked clone was not replaced:\n${r.stderr}`,
+    );
+    assert.ok(!fs.existsSync(fx.cloneDir), "clone left behind");
+
+    const empty = path.join(fx.wrapper, "empty");
+    fs.mkdirSync(empty);
+    r = runRunner(fx, "true", { CLEAN_CHECKOUT_DIR: empty });
+    assert.equal(r.status, 0, `empty directory refused:\n${r.stderr}`);
+
+    // Relative to the invoking directory (the fixture repo). The first version
+    // ran its EXIT-trap `rm -rf` on the relative path after `cd` into the
+    // clone, so the clone was never removed.
+    r = runRunner(fx, "true", { CLEAN_CHECKOUT_DIR: "rel-clone" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(
+      !fs.existsSync(path.join(fx.repo, "rel-clone")),
+      "relative clone left behind",
+    );
   } finally {
     fx.cleanup();
   }

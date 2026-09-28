@@ -141,8 +141,10 @@ All notable changes to this project will be documented in this file. Format foll
   (obs #149). New `npm run test:clean-checkout` (`scripts/test-clean-checkout.sh`) makes a
   `git clone --local --shared` of HEAD — full history and tags, tracked files only, no ignored paths
   — in a repo-local `.clean-checkout/` (never a temporary directory, which the observation-log
-  tests refuse), links `node_modules`, runs `npm test` there and removes the clone. It warns that
-  uncommitted changes are not tested. `release.sh` now gates on it. The consumer-shaped test root is
+  tests refuse), links `node_modules`, runs `npm test` there and removes the clone. It deletes only
+  what it created: a `CLEAN_CHECKOUT_DIR` that is the repository, contains it, resolves into an
+  ephemeral location, or already exists without the runner's `.git/` marker is refused, never
+  removed. It warns that uncommitted changes are not tested. `release.sh` now gates on it. The consumer-shaped test root is
   defined once, `makeConsumerRoot()` in `evals/shared/lib/consumer-root.mjs`, replacing two
   hand-rolled copies; `consumer-root.test.mjs` proves the snippet it guards fails from a bare
   directory. create-skill and `docs/contributing/traps.md` carry the rule.

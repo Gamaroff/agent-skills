@@ -1,4 +1,3 @@
-"use strict";
 /**
  * Consumer-root helper — the one way a test builds a consumer-shaped root.
  *
@@ -22,6 +21,11 @@ import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+// Every root this process built, removed by ONE exit hook. A listener per root
+// trips Node's MaxListenersExceededWarning past ten roots in one test file.
+const ROOTS = [];
+let hooked = false;
+
 /**
  * @param {string} repoRoot  this repository's root; its `skills/` is linked in
  * @param {string} [prefix]  mkdtemp prefix, so a leftover root names its test
@@ -34,6 +38,12 @@ export function makeConsumerRoot(repoRoot, prefix = "consumer-") {
     path.join(repoRoot, "skills"),
     path.join(root, ".agents", "skills"),
   );
-  process.on("exit", () => rmSync(root, { recursive: true, force: true }));
+  ROOTS.push(root);
+  if (!hooked) {
+    hooked = true;
+    process.on("exit", () => {
+      for (const r of ROOTS) rmSync(r, { recursive: true, force: true });
+    });
+  }
   return root;
 }

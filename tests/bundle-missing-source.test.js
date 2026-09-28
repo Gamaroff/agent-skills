@@ -50,6 +50,30 @@ const MISSING_RE = /^⚠️ {2}shared\/resources\/.* not found/;
 /** Non-vacuity floor for §2 — 129 skills at authoring time (2026-09-28). */
 const MIN_SKILLS = 100;
 
+/**
+ * What §2 reads from `--check` output, and nothing else. `check_all` prints a
+ * different summary line on the clean path (`✅ bundle freshness: N skill(s)
+ * checked`) and on the problem path (`❌ bundle freshness: P problem(s) across M
+ * skill(s)`), so the reader requires *a* summary line — proof the run finished —
+ * without depending on which one. Freshness is bundle-check-mode.test.js's and
+ * CI's bundle:check's to judge; a stale copy must not turn this test red
+ * (task 154 QA cycle 1, TASK-154-BUG-2).
+ */
+function readCheckOutput(stdout) {
+  return {
+    missing: stdout.split("\n").filter((l) => MISSING_RE.test(l)),
+    completed: /^(✅|❌) bundle freshness: /m.test(stdout),
+  };
+}
+
+/** The skills `--check` with no target walks: every skills/<d>/SKILL.md (bundle_skill.py main()). */
+function liveSkillCount() {
+  const skills = path.join(REPO_ROOT, "skills");
+  return fs
+    .readdirSync(skills)
+    .filter((d) => fs.existsSync(path.join(skills, d, "SKILL.md"))).length;
+}
+
 /** A skill that cites `shared/resources/a.md`, which in turn cites line 3's target. */
 function skillMd(name) {
   return `---\nname: ${name}\ndescription: fixture\n---\n\n# Fixture\n\nSee shared/resources/a.md.\n`;
@@ -79,6 +103,7 @@ function bundleFixture({ aMd, skillNames = ["fx"] }) {
     missing: stdout.split("\n").filter((l) => MISSING_RE.test(l)),
     bundled: (skill, rel) =>
       fs.existsSync(path.join(root, "skills", skill, "references", rel)),
+    skillDir: (skill) => path.join(root, "skills", skill),
     cleanup: () => fs.rmSync(root, { recursive: true, force: true }),
   };
 }
@@ -178,6 +203,36 @@ test("§1d the line-aware collector names what collect_shared_refs names", () =>
   ]);
 });
 
+test("§1e the §2 reader tolerates a stale copy — it reads the warning, not freshness", () => {
+  const fx = bundleFixture({ aMd: A_MD_IN_WORDS });
+  try {
+    // Make the bundled copy stale, then --check that one skill.
+    fs.appendFileSync(
+      path.join(fx.skillDir("fx"), "references", "a.md"),
+      "drift\n",
+    );
+    const r = spawnSync("python3", [BUNDLER, "--check", fx.skillDir("fx")], {
+      encoding: "utf-8",
+    });
+    assert.notEqual(
+      r.status,
+      0,
+      `premise: --check should fail on a stale copy:\n${r.stdout}`,
+    );
+    assert.match(
+      r.stdout,
+      /STALE/,
+      "premise: the failure should be the stale copy",
+    );
+    assert.deepEqual(readCheckOutput(r.stdout), {
+      missing: [],
+      completed: true,
+    });
+  } finally {
+    fx.cleanup();
+  }
+});
+
 test("§2 the live tree carries no citation of a missing shared source", () => {
   // spawnSync, not execFileSync: `--check` also exits non-zero on a STALE copy,
   // and a throw there would turn this test red for a reason that is not its own
@@ -187,7 +242,7 @@ test("§2 the live tree carries no citation of a missing shared source", () => {
     cwd: REPO_ROOT,
     encoding: "utf-8",
   });
-  const missing = stdout.split("\n").filter((l) => MISSING_RE.test(l));
+  const { missing, completed } = readCheckOutput(stdout);
   assert.deepEqual(
     missing,
     [],
@@ -195,10 +250,10 @@ test("§2 the live tree carries no citation of a missing shared source", () => {
       "Inside shared/resources/ such a literal is a bundling instruction (create-skill § " +
       '"Inside shared/resources/, a shared/resources/ literal is a bundling instruction").',
   );
-  const m = stdout.match(/bundle freshness: (\d+) skill\(s\) checked/);
-  assert.ok(m, `no summary line in --check output:\n${stdout}`);
+  assert.ok(completed, `--check did not finish (no summary line):\n${stdout}`);
+  const n = liveSkillCount();
   assert.ok(
-    Number(m[1]) >= MIN_SKILLS,
-    `only ${m[1]} skill(s) checked — expected at least ${MIN_SKILLS}; the scan is vacuous`,
+    n >= MIN_SKILLS,
+    `only ${n} skill(s) for --check to walk — expected at least ${MIN_SKILLS}; the scan is vacuous`,
   );
 });
