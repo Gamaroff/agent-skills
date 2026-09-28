@@ -130,10 +130,14 @@ fi
 # it: a linked builtin is a dangling self-link no no-jq command uses, so the file passed either way.
 # ADVANCE_LOCK_TEST_4B_CMDS is a test-only seam: advance-pipeline-lock-4b-setup.test.mjs sets it to
 # reach the empty and builtin arms, which the literal list never does. Unset, it is `rm dirname`
-# (task 164; task.163 SC5).
+# (task 164; task.163 SC5). When it is set the file says so, so a value exported in a developer's
+# shell shows in the direct `npm test` run instead of silently changing 4b (task 164, QA-164-9).
 NOJQ_BIN="$TMPDIR_TEST/nojq-bin"
 mkdir -p "$NOJQ_BIN"
 NOJQ_SETUP_OK=1
+if [ -n "${ADVANCE_LOCK_TEST_4B_CMDS:-}" ]; then
+  echo "  NOTE  4b: ADVANCE_LOCK_TEST_4B_CMDS is set — the command list is '${ADVANCE_LOCK_TEST_4B_CMDS}' (test-only seam)"
+fi
 read -r -a NOJQ_CMDS <<< "${ADVANCE_LOCK_TEST_4B_CMDS:-rm dirname}"
 for c in "${NOJQ_CMDS[@]}"; do
   p=$(command -v "$c")

@@ -852,7 +852,11 @@ test("the banner doc defers to the Stop hook at a re-prompt without restating it
 // current_step rule named Step 8 — the step that had not run (task 164; task.163 gate.3
 // recommendations.future). The rule is scoped to the printed block; halt_step is not its subject.
 // The Step 7 names are read off the hook, which is their one statement, so the example cannot name
-// one pipeline's step for all three (QA-164-2: develop-bug's Step 7 is "FINALISE & CLOSE").
+// one pipeline's step for all three (QA-164-2: develop-bug's Step 7 is "FINALISE & CLOSE"). Which
+// sub-skills advance the lock before their step's tail is advance-pipeline-lock.sh's --skill mapping:
+// the rule cites it and names only /finalise, as the example. Explaining the difference at lock 8
+// alone left develop (→ 4) and create-pr (→ 5) out (QA-164-5), so the rule may not list the mapping
+// either — every skill in it but the example is read off the script and refused here.
 test("a HALT status block names the step that halted, not current_step", () => {
   const banner = readDoc(BANNER).replace(/\s+/g, " ");
   const rule = banner.match(
@@ -864,6 +868,9 @@ test("a HALT status block names the step that halted, not current_step", () => {
   );
   for (const phrase of [
     "not at `current_step`",
+    "the first line of the steps-ahead list",
+    "a HALT in Step N lists `- Step N:` first",
+    "`--skill` mapping of `advance-pipeline-lock.sh`",
     "Step 7/8 — {STEP-NAME} ❌ halted",
     "`halt_step`",
   ]) {
@@ -887,6 +894,27 @@ test("a HALT status block names the step that halted, not current_step", () => {
     assert.ok(
       rule[1].includes(`\`${name}\``),
       `${BANNER}: the HALT rule does not name the hook's Step 7 name "${name}": ${rule[1]}`,
+    );
+  }
+  const mapping = readDoc("shared/resources/advance-pipeline-lock.sh").match(
+    /\n {2}--skill\)\n([\s\S]*?)\n {4}esac/,
+  );
+  assert.ok(mapping, "advance-pipeline-lock.sh: no --skill case");
+  const advancing = [
+    ...mapping[1].matchAll(/^\s*([a-z|-]+)\)\s+NEXT=(\d+)/gm),
+  ].flatMap((m) =>
+    m[1].split("|").map((name) => ({ name, next: Number(m[2]) })),
+  );
+  assert.ok(
+    advancing.length >= 5 &&
+      advancing.some((a) => a.name === "finalise" && a.next === 8),
+    `advance-pipeline-lock.sh: expected the --skill mapping to include finalise → 8, found ${JSON.stringify(advancing)}`,
+  );
+  for (const { name } of advancing) {
+    if (name === "finalise") continue;
+    assert.ok(
+      !rule[1].includes(`\`${name}\``) && !rule[1].includes(`\`/${name}\``),
+      `${BANNER}: the HALT rule lists "${name}" from the --skill mapping; cite the mapping instead`,
     );
   }
   const row = readDoc(BANNER)

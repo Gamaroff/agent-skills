@@ -40,30 +40,35 @@ function runLockTests(cmds) {
 test("4b: a command missing from PATH fails setup by name and skips the no-jq assertions", () => {
   const { status, out, why } = runLockTests("rm dirname no-such-cmd-t164");
   assert.equal(status, 1, `${why}\n${out.slice(-600)}`);
-  assert.match(out, /4b setup: 'no-such-cmd-t164' not found on PATH/);
+  assert.match(out, /4b setup: 'no-such-cmd-t164' not found on PATH/, why);
   assert.doesNotMatch(
     out,
     /without jq/,
-    "the no-jq assertions ran after setup failed",
+    `the no-jq assertions ran after setup failed (${why})`,
   );
+  assert.match(out, /NOTE {2}4b: ADVANCE_LOCK_TEST_4B_CMDS is set/, why);
 });
 
 test("4b: a builtin is skipped, visibly, and setup does not fail", () => {
   const { status, out, why } = runLockTests("rm dirname printf");
   assert.equal(status, 0, `${why}\n${out.slice(-600)}`);
-  assert.match(out, /SKIP {2}4b: 'printf' is a builtin, not linked/);
-  assert.doesNotMatch(out, /4b setup:/);
+  assert.match(out, /SKIP {2}4b: 'printf' is a builtin, not linked/, why);
+  assert.doesNotMatch(out, /4b setup:/, why);
+  assert.match(out, /NOTE {2}4b: ADVANCE_LOCK_TEST_4B_CMDS is set/, why);
 });
 
 // Risk 3: the seam must not leak. The variable is deleted from the child's environment, so a value
-// exported in the developer's shell cannot reach this case, and an unset seam must give `rm dirname`.
+// exported in the developer's shell cannot reach this case, and an unset seam must give `rm dirname`
+// with no NOTE line. The two cases above set it and require the NOTE, which is what makes a leaked
+// value visible in the direct `npm test` run of the lock test file (QA-164-9).
 test("4b: with the seam unset, the default list runs both no-jq assertions", () => {
   const { status, out, why } = runLockTests(undefined);
   assert.equal(status, 0, `${why}\n${out.slice(-600)}`);
   assert.match(
     out,
     /PASS {2}without jq, commit-changes at step 8 leaves the lock/,
+    why,
   );
-  assert.match(out, /PASS {2}without jq, --complete removes the lock/);
-  assert.doesNotMatch(out, /4b setup:|SKIP {2}4b:/);
+  assert.match(out, /PASS {2}without jq, --complete removes the lock/, why);
+  assert.doesNotMatch(out, /4b setup:|SKIP {2}4b:|NOTE {2}4b:/, why);
 });

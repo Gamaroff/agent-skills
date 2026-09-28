@@ -88,13 +88,18 @@ Rules:
   the reason's steps-ahead instruction into one `- Step N:` line per remaining
   step, in the Format above.
   **Exception 2: a HALT names the step that halted.** The position of a HALT
-  block is the step being executed when it halted, and the list starts at that
-  step, not at `current_step`. At lock 8 the two differ: `/finalise` moves the
-  lock to 8 before Step 7's tail runs, so a HALT in Step 7's tail reads
-  `Step 7/8 — {STEP-NAME} ❌ halted`, where `{STEP-NAME}` is `FINALISE` on
-  develop-story and develop-task and `FINALISE & CLOSE` on develop-bug. This
-  governs the printed block only; the `halt_step` a HALT snapshot records is
-  unchanged (task 164).
+  block is the step being executed when it halted, not at `current_step`. That
+  step did not finish, so it is also the first line of the steps-ahead list: a
+  HALT in Step N lists `- Step N:` first, where every other block starts at
+  `Step {N+1}`. The halting step and `current_step` differ whenever a
+  sub-skill has advanced the lock as its last action and its step's tail then
+  halts. Which sub-skills advance it, and to where, is stated once, in the
+  `--skill` mapping of `advance-pipeline-lock.sh`; this file does not list
+  them. `/finalise` is one: it moves the lock to 8 before Step 7's tail runs, so
+  a HALT in Step 7's tail reads `Step 7/8 — {STEP-NAME} ❌ halted`, where
+  `{STEP-NAME}` is `FINALISE` on develop-story and develop-task and
+  `FINALISE & CLOSE` on develop-bug. This governs the printed block only; the
+  `halt_step` a HALT snapshot records is unchanged (task 164).
 - **No prose around it.** No "here's where we are" preamble, no summary after.
 
 ## Per-pipeline variants

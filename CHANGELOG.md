@@ -312,8 +312,10 @@ All notable changes to this project will be documented in this file. Format foll
   drifted from the hook (it dropped "if any, then Step 8"). It points at the hook's `POSITION` and
   `STEPS_AHEAD` and says to resolve the reason's list into one `- Step N:` line per step. Its test
   now cuts the forbidden fragments from the rendered hook reason instead of typing them. A HALT
-  status block names the step being executed, not `current_step`, so a HALT in Step 7's tail at
-  lock 8 reads `Step 7/8 — FINALISE ❌ halted`; the snapshot's `halt_step` is unchanged. The
+  status block names the step being executed, not `current_step`, and lists that step first. So
+  a HALT in Step 7's tail at lock 8 reads `Step 7/8 — {STEP-NAME} ❌ halted` (`FINALISE`, or
+  `FINALISE & CLOSE` on develop-bug); which sub-skills advance the lock early is left to
+  `advance-pipeline-lock.sh`'s `--skill` mapping. The snapshot's `halt_step` is unchanged. The
   hook's `--complete` floor counts code lines only (at least 2: `COMPLETION_LINE`,
   `ALREADY_DONE`); three of its five `--complete` lines are comments. Scenario 4b's builtin arm
   prints a `SKIP` line, and a new `advance-pipeline-lock-4b-setup.test.mjs` drives its missing,
