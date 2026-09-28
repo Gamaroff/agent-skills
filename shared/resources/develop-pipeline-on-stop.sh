@@ -256,7 +256,7 @@ fi
 # A finer rule written here sent a Step 7-tail stall to Step 8's report update, which ticks
 # row 7 without the tail ever running (task.161 QA cycle 2, CR-1).
 if [ "$SKILL" = "develop-bug" ]; then
-  STEP7_TAIL="for Step 7: Part B's bug-close routine, meaning the Resolution Summary, status \`closed\`, the parent or registry linkage and the tracker-close check, then the Step 7 Completion Checklist (develop-bug-step-7-close-bug.md)"
+  STEP7_TAIL="for Step 7: Part B's bug-close routine — the Resolution Summary, status \`closed\`, the parent or registry linkage and the tracker-close check — then the Step 7 Completion Checklist (develop-bug-step-7-close-bug.md)"
 else
   STEP7_TAIL="for Step 7: the DoD body to the PR, the tracker update, the Step 7 checklist"
 fi
@@ -288,11 +288,12 @@ else
 fi
 
 # The steps the status block lists after the position. Below 8 they run to Step 8. At 8 the list
-# may not claim Step 8 is the only step left: the completion line below sends an unfinished row at
-# or below Step 7 back to that step first, so Step 7's tail can still be ahead (task 163;
-# task.162 pr-review.1 CR-2).
+# is worded after the completion line's rule, not narrower: that line sends the first unfinished
+# row at or below Step 7 back first, which is usually Step 7's tail but can be an earlier row after
+# a --restore (task 163; task.162 pr-review.1 CR-2; QA cycle 2 CR-3). The banner doc defers to
+# this reason at a Stop-hook re-prompt rather than restating it.
 if [ "$NEXT" = "8" ]; then
-  STEPS_AHEAD="then the steps still ahead: Step 7's tail first if its row is unfinished, then Step 8"
+  STEPS_AHEAD="then the steps still ahead: the first unfinished row at or below Step 7, if any, then Step 8"
 else
   STEPS_AHEAD="then the steps still ahead through Step 8"
 fi

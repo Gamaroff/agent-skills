@@ -287,24 +287,25 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-28
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.163.qa.1.stop-hook-step-8-follow-ups.md](./task.163.qa.1.stop-hook-step-8-follow-ups.md)
-- **Gate File**: [task.163.gate.1.stop-hook-step-8-follow-ups.yml](./task.163.gate.1.stop-hook-step-8-follow-ups.yml)
+- **Full Report**: [task.163.qa.2.stop-hook-step-8-follow-ups.md](./task.163.qa.2.stop-hook-step-8-follow-ups.md)
+- **Gate File**: [task.163.gate.2.stop-hook-step-8-follow-ups.yml](./task.163.gate.2.stop-hook-step-8-follow-ups.yml)
+- **Previous**: [qa.1](./task.163.qa.1.stop-hook-step-8-follow-ups.md) / [gate.1](./task.163.gate.1.stop-hook-step-8-follow-ups.yml) — PASS (100/100), 2 LOW, fixed in cycle 1
 
 ### Test Coverage Summary
-- **Tests Executed**: 184 (targeted suites) + 7 mutation proofs
+- **Tests Executed**: 185 (targeted suites) + 9 mutation proofs
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0
+- **Critical Issues**: 0 (1 MEDIUM)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No critical issues identified. Two LOW accuracy findings are open. CR-1: the banner doc's "derive the steps-ahead list from current_step" rule needs a lock-8 exception. CR-2: "Part B's Step 7 Completion Checklist" misattributes a top-level checklist.
+CR-1 (MEDIUM): cycle 1's banner-doc exception keys on "a lock at 8", so it also rewrites the ordinary Step 7 → 8 transition. It should be scoped to a Stop-hook re-prompt. There are three LOW findings on the same subject: CR-2, the checklist is still inside Part B's list; CR-3, the lock-8 list is narrower than the completion rule; CR-4, the banner test checks presence only.
 
 ---
 
@@ -317,7 +318,8 @@ No critical issues identified. Two LOW accuracy findings are open. CR-1: the ban
 | 2026-09-28 |         | Status → ready-for-development | review-task |
 | 2026-09-28 |         | Implemented — 5 source files plus bundled copies; 1 new test, 5 new assertions; 7 mutations proved | develop |
 | 2026-09-28 |         | QA gate PASS (100/100) — 2 LOW findings | qa-task |
-| 2026-09-28 |         | QA findings fixed — 2 LOW (banner-doc lock-8 exception; checklist no longer attributed to Part B), 1 iteration | qa-fix |
+| 2026-09-28 |         | QA gate CONCERNS (90/100) — 1 MEDIUM, 3 LOW (cycle 2 refute pass) | qa-task |
+| 2026-09-28 |         | QA findings fixed — banner doc defers to the Stop hook at a re-prompt only; checklist outside Part B's list; lock-8 list worded after the completion rule; 2 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---

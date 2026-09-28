@@ -671,12 +671,13 @@ test("the Stop hook and the resume contract describe Step 7's tail in the same w
     "the hook rendered an empty reason at lock 8",
   );
 
-  // develop-bug: the list after "meaning", up to the closing parenthesis of each copy.
+  // develop-bug: Part B's list, between the dashes, and then the checklist — which is a section of
+  // its own beside Parts A and B, so it must sit outside Part B's list (QA cycle 2, CR-2).
   const bugHook = bugReason.match(
-    /Part B's bug-close routine, meaning (.+?) \(develop-bug-step-7-close-bug\.md\)/,
+    /Part B's bug-close routine — (.+?) — then the Step 7 Completion Checklist \(develop-bug-step-7-close-bug\.md\)/,
   );
   const bugContract = para.match(
-    /for develop-bug: Part B's bug-close routine in `develop-bug-step-7-close-bug\.md`, meaning (.+?)\)\./,
+    /for develop-bug: Part B's bug-close routine in `develop-bug-step-7-close-bug\.md` — (.+?) — then the Step 7 Completion Checklist\)\./,
   );
   assert.ok(
     bugHook,
@@ -690,7 +691,6 @@ test("the Stop hook and the resume contract describe Step 7's tail in the same w
     "the Resolution Summary",
     "status `closed`",
     "the tracker-close check",
-    "then the Step 7 Completion Checklist",
   ]) {
     assert.ok(
       bugHook[1].includes(phrase),
@@ -699,6 +699,16 @@ test("the Stop hook and the resume contract describe Step 7's tail in the same w
     assert.ok(
       bugContract[1].includes(phrase),
       `contract's develop-bug tail lacks "${phrase}": ${bugContract[1]}`,
+    );
+  }
+  for (const [where, list] of [
+    ["hook", bugHook[1]],
+    ["contract", bugContract[1]],
+  ]) {
+    assert.doesNotMatch(
+      list,
+      /Checklist/,
+      `the ${where} lists the Step 7 Completion Checklist inside Part B's routine: ${list}`,
     );
   }
   assert.equal(
@@ -733,30 +743,57 @@ test("the Stop hook and the resume contract describe Step 7's tail in the same w
   );
 });
 
-// The Remaining Work Status block's steps-ahead list is described in two places: the banner doc's
-// derivation rule and the Stop hook's step-8 reason. At lock 8 the hook lists Step 7's tail before
-// Step 8, because /finalise moves the lock there before that tail runs; a banner doc that derived
-// the list from current_step alone would list Step 8 only and contradict it (task 163, QA cycle 1
-// CR-1). This renders the hook and requires the banner doc to carry the same list.
+// The Remaining Work Status block's position and steps-ahead list come from current_step at every
+// firing point but one: when the Stop hook re-prompts, its reason names both, and at lock 8 they
+// differ from the derivation (/finalise moves the lock there before Step 7's tail runs). The banner
+// doc defers to the reason there and nowhere else — scoping the exception by the lock's value made it
+// fire on the ordinary Step 7 → 8 transition too, which advances the lock before printing the block
+// (task 163, QA cycle 2 CR-1, CR-4). This checks the exception's scope and both halves it covers.
 const BANNER = "shared/resources/develop-pipeline-remaining-work-banner.md";
-test("the banner doc and the Stop hook list the same steps ahead at lock 8", () => {
+test("the banner doc defers to the Stop hook's lock-8 position and list, at a re-prompt only", () => {
   const reason = stopHookReasonAt8("develop-task");
+  const position = reason.match(/position `([^`]+)`/);
   const ahead = reason.match(/then the steps still ahead: ([^)]+)\)/);
   assert.ok(
-    ahead,
-    `hook reason at lock 8 has no steps-ahead list: ${reason.slice(0, 200)}`,
+    position && ahead,
+    `hook reason at lock 8 lacks a position or list: ${reason.slice(0, 200)}`,
+  );
+  assert.match(
+    position[1],
+    /Step 7 unverified/,
+    `lock-8 position: ${position[1]}`,
   );
   assert.match(
     ahead[1],
-    /Step 7's tail/,
-    `lock-8 list does not name Step 7's tail: ${ahead[1]}`,
+    /first unfinished row at or below Step 7/,
+    `lock-8 list: ${ahead[1]}`,
   );
-  // The banner doc wraps its lines; compare with whitespace collapsed.
+
+  // The banner doc wraps its lines; read it with whitespace collapsed.
   const banner = readDoc(BANNER).replace(/\s+/g, " ");
-  assert.ok(
-    banner.includes(`\`${ahead[1]}\``),
-    `${BANNER} does not carry the hook's lock-8 list "${ahead[1]}"`,
+  const exception = banner.match(
+    /\*\*One exception: ([^*]+)\*\*(.+?)\(task 163\)\./,
   );
+  assert.ok(
+    exception,
+    `${BANNER}: no "One exception" clause in the derivation rule`,
+  );
+  assert.equal(
+    exception[1],
+    "a Stop-hook re-prompt.",
+    `the exception is scoped to "${exception[1]}", not a Stop-hook re-prompt`,
+  );
+  for (const phrase of [
+    "emit both as the reason gives them",
+    "Step 7 unverified",
+    "the first unfinished row at or below Step 7",
+    "the ordinary Step 7 → 8 transition and a Step 8 HALT, follows this rule",
+  ]) {
+    assert.ok(
+      exception[2].includes(phrase),
+      `${BANNER}: the exception lacks "${phrase}": ${exception[2]}`,
+    );
+  }
 });
 
 // A lock at step 8 for this work item, as the orchestrator holds it while Step 8 runs.
