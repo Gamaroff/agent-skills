@@ -134,6 +134,43 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The card preflight reads the frontmatter title (task 150, obs #128).** `preflight()` kept only
+  the body, so no finding was ever raised about the title, and 42 of 146 task titles had grown past
+  100 characters (the longest 368), published verbatim as GitHub issue titles. `CARD_TITLE_MAX = 100`
+  and `checkCardTitle` now sit beside `checkCardSections` in `jira-sync.js`. A title over the bound is
+  one `important` finding, `title-too-long`, whose `Fix:` names the body H1 when that fits. It is
+  advisory at authoring (exit 0, 1 under `--strict`), and the clean line says the title was read. The
+  43 legacy long titles are frozen in `card-preflight-corpus.test.mjs`, a list that can only shrink.
+  The title is read from the raw header, not the line-based parser. Any title that is not one
+  column-0 single-line `title:` line (block scalar, tag, anchor, multi-line or next-line value,
+  unclosed quote, duplicate or indented `title:`) gets `title-not-inline`, and a BOM before the
+  frontmatter gets `title-unreadable-bom`, because the parser would otherwise measure the wrong
+  text or read no title at all.
+  The four `sync-jira-* --check-card` paths do not read the title yet (follow-up).
+- **create-task and review-task ask for the evidence behind a claim about the current code (task
+  150, obs #127, #124, #135).** create-task § 3.5 gains three Critical items. A current-state name
+  carries the `grep` hit that found it, or is marked `(unverified)`. A categorised population carries
+  one witness per member, not just a count. A proposed single-statement test shows its key belongs to
+  no other rule and names the restatement it would miss. The Section 3 prompt states the first of
+  these where Technical Background is written. review-task Step 3 gains check 13, *Single-statement
+  test discriminator*. `tests/create-task-authoring-evidence.test.js` holds each rule in its own
+  section, not merely somewhere in the file.
+- **`/create-task --from-observation <id>[,<id>…]` (task 150, obs #147).** It cuts a task from
+  observation-log entries. `seedFromObservations` in `scripts/lib.js` refuses an entry that is not
+  `open` and asks only the questions the entries leave open: the title when a single entry's is over
+  the bound or there are several, and tracker sync. After both files exist, it parks each entry
+  through `observation-log.js set-status`, so parking is no longer a step a session can forget. A
+  round-trip test runs the park vectors through the real engine. The seed keys each entry on its file's numeric prefix, the identity `set-status --id` resolves, and
+  refuses a frontmatter id that disagrees with it. Every park vector carries `--expect-status open`.
+- **`observation-log.js set-status` refuses an ambiguous id, and can refuse a changed entry (task
+  150).** `findById` returned the first file whose numeric prefix matched. When two files shared a
+  prefix (a hand-created file, or a consolidated fork), `set-status --id 5` rewrote whichever sorted
+  first, even an `actioned` entry, and reported `ok`. Every `--id` lookup now answers `ambiguous-id`
+  (exit 1, `files[]` named) and writes nothing. The new `--expect-status <s>` answers `status-changed`
+  (exit 1) when the entry no longer reads `s`, so a caller that selected an entry earlier cannot
+  overwrite a status another session has changed since. Both reasons are added to the contract;
+  existing reasons keep their meanings.
+
 - **The review pre-pass measures a document against this repository's architecture (task 151, obs
   #130).** Agent B's domain list and pattern axes were hard-coded for a web stack ("backend /
   frontend / auth / payments / real-time", "API endpoints or payloads"), so on a shell/Node

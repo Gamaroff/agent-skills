@@ -1,0 +1,72 @@
+schema: 1
+task: 'task.150.create-task-authoring-evidence'
+task_title: 'create-task: anchored claims, a bounded title, and a --from-observation entry'
+gate: FAIL
+status_reason: 'Cycle 2 fixes hold (real-scan re-probe engages 12/12), but the unscoped review found the park vector still resolves by first-match across the whole log: a same-prefix sibling is parked instead of the target (HIGH, reproduced), and the § 5 re-check keys on the wrong identity (MEDIUM).'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T19:32:14Z'
+
+top_issues:
+  - id: 'TASK-150-BUG-4'
+    severity: high
+    file: 'skills/create-task/scripts/lib.js'
+    finding: 'Duplicate refusal covers only the selected entries; findById returns the first same-prefix file in the whole log, so 0005-a-actioned.md (actioned) is overwritten to parked while 0005-b-target.md stays open; set-status reports ok.'
+    suggested_action: 'Make findById/set-status refuse an id that more than one file matches (the shared root), and key § 1.1 selection and the § 5 re-check on the scan entry file.'
+    suggested_owner: dev
+    bug_ref: 'task.150.bug.4.park-resolves-first-same-prefix-file.md'
+    status: open
+  - id: 'TASK-150-CR3-2'
+    severity: medium
+    file: 'skills/create-task/SKILL.md'
+    finding: 'Selection (§ 1.1 step 2) and the § 5 step 2b still-open re-check match on the scan id (frontmatter parseInt), while the vector resolves by file prefix, so the re-check can read one file and clear a vector that parks another.'
+    suggested_action: 'Key selection and the re-check on the scan entry file, and refuse when it is not the file findById would pick.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 44
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 24
+    notes: 'task.150.qa.3.security.run.json: seed on real scan output engages 12/12; status 7/7; title 5/5. The whole-log ambiguity (BUG-4) is outside what the per-entry probe can see; found by the reviewer tracing findById and reproduced by hand.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-4 silently overwrites a resolved entry lifecycle and reports ok.'
+  maintainability:
+    status: PASS
+    notes: 'CR-3 (advisory, low/medium): the frontmatter/file agreement check reads the scan parseInt value, so the strict string branch never runs on the real path; harmless to identity, but the claim of a strict read is overstated.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-150-BUG-4 at the root (findById ambiguity refused by set-status) and key selection / re-check on file.'
+      refs: ['shared/resources/observation-log.js', 'skills/create-task/scripts/lib.js', 'skills/create-task/SKILL.md']
+  future:
+    - action: 'CR-3 (advisory): read the raw frontmatter id from the file text for the agreement check, or drop the strict-read claim.'
+      refs: ['skills/create-task/scripts/lib.js']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 1
+  fix_date: '2026-09-28'
+  total_iterations: 2
+  verification_method: 'BUG-3 re-probed on real scan output (12/12 engages); BUG-1/2 closed in cycle 2.'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['TASK-150-BUG-4 fixed', 'QA loop re-entered by the operator (convergence stall at cycle 3)']

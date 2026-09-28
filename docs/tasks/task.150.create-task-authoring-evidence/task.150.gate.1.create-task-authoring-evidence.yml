@@ -1,0 +1,74 @@
+schema: 1
+task: 'task.150.create-task-authoring-evidence'
+task_title: 'create-task: anchored claims, a bounded title, and a --from-observation entry'
+gate: FAIL
+status_reason: 'The security probe found the seed id guard present-but-inert: 6 malformed ids are accepted and converted, so a park vector names a different observation (HIGH). The seed also reads status differently from the engine (MEDIUM). All other phases and criteria verified; ci:fast green.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T19:08:26Z'
+
+top_issues:
+  - id: 'TASK-150-BUG-1'
+    severity: high
+    file: 'skills/create-task/scripts/lib.js'
+    finding: 'seedFromObservations accepts ids Number() coerces (0x10 → 16, 1e2 → 100, "" → 0, -3, 0, " 12 "), so a park vector parks a different observation; probe verdict present-but-inert (6/9 hostile accepted).'
+    suggested_action: 'Accept only a positive integer number or a /^[1-9][0-9]*$/ string; throw otherwise; add the six probe inputs as refusal tests.'
+    suggested_owner: dev
+    bug_ref: 'task.150.bug.1.seed-id-guard-inert.md'
+    status: open
+  - id: 'TASK-150-BUG-2'
+    severity: medium
+    file: 'skills/create-task/scripts/lib.js'
+    finding: 'seedFromObservations reads status as String(status || "open") while the engine statusOf trims; " open " is open to the engine and refused by the seed (probe over-block st.open-ws).'
+    suggested_action: 'Use statusOf from ../references/observation-log.js; add " open " and "" as accepted cases.'
+    suggested_owner: dev
+    bug_ref: 'task.150.bug.2.seed-status-diverges-from-engine.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 22
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 22
+    notes: 'Three controls probed from task.150.qa.1.security.run.json: checkCardTitle engages (5/5); seed status guard engages with one over-block; seed id guard present-but-inert (TASK-150-BUG-1). Local, operator-authored data only; no network or credential surface.'
+  performance:
+    status: PASS
+    notes: 'One frontmatter parse per document in the corpus walk; the preflight adds one regex over the body.'
+  reliability:
+    status: PASS
+    notes: 'Parking runs only after both files exist and never blocks the document; the round trip is tested against the real engine in a repo-local workspace (TMPDIR=/tmp run green).'
+  maintainability:
+    status: PASS
+    notes: 'CARD_TITLE_MAX defined once; section-scoped presence tests; 15 dev-run mutation proofs. Advisory cleanups CR-5 (tautological parity assertion) and CR-6 (lib.js loads all of jira-sync.js for one constant).'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-150-BUG-1: strict positive-integer id guard with refusal tests.'
+      refs: ['skills/create-task/scripts/lib.js', 'skills/create-task/tests/from-observation.test.js']
+    - action: 'Fix TASK-150-BUG-2: reuse the engine statusOf.'
+      refs: ['skills/create-task/scripts/lib.js']
+  future:
+    - action: 'CR-1 (advisory, medium/medium): define whether the bound measures the frontmatter title or the published "[Task N] "-prefixed summary, and pin it with a test for an unprefixed title.'
+      refs: ['shared/resources/jira-sync.js', 'skills/create-task/scripts/lib.js']
+    - action: 'CR-2 (advisory, low): strip the template "Technical Task: " prefix before offering the H1 as the title.'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'CR-3/CR-4 (advisory, low): the § 5 step 2b park block hard-codes --id 124 and task.150; § 1.1 step 3 reads OBS_LOG_DIR in a later shell. Use placeholders and state the shell binding.'
+      refs: ['skills/create-task/SKILL.md']
+    - action: 'Pre-existing: review-task SKILL.md Step 4b reports zero-blocks-executed (identical on origin/develop); out of scope.'
+      refs: ['skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['TASK-150-BUG-1 fixed and re-probed']

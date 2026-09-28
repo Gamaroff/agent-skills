@@ -112,11 +112,35 @@ function preflight(file, kind) {
   // with a blank line and on CRLF documents. No real document disagreed yet,
   // which is exactly how a latent parse divergence stays invisible until it
   // is not.
-  const { body } = lib.parseFrontmatter(fs.readFileSync(file, "utf8"));
+  const text = fs.readFileSync(file, "utf8");
+  const { frontmatter, body } = lib.parseFrontmatter(text);
+  // The TITLE is read from the raw header (`readCardTitle`, BOM stripped), so
+  // no YAML shape and no BOM can hide it from the bound (task.150 DoD). The BODY
+  // is left exactly as the sync path reads it — parity with the sync is the
+  // contract.
+  const bom = text.charCodeAt(0) === 0xfeff;
   // `body` is returned so the parity test can assert the authoring path and the
   // sync path resolved the SAME text, not merely the same verdict — the original
   // divergence matched on every verdict it was tested against.
-  return { file, kind, body, ...lib.checkCardSections(body, specs) };
+  //
+  // The title is the one part of the card the section check cannot see, because
+  // it lives in the frontmatter (task.150, obs #128). Its finding is appended to
+  // the section findings and `ok` covers both, so `--strict` treats a long title
+  // like any other finding. `titleChecked` is what makes the clean line say so.
+  const sections = lib.checkCardSections(body, specs);
+  const findings = [
+    ...sections.findings,
+    ...lib.checkCardTitle(frontmatter, body, { bom, raw: text }),
+  ];
+  return {
+    file,
+    kind,
+    body,
+    ...sections,
+    findings,
+    ok: findings.length === 0,
+    titleChecked: true,
+  };
 }
 
 function main(argv) {

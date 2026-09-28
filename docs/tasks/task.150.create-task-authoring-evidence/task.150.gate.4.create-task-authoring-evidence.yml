@@ -1,0 +1,64 @@
+schema: 1
+task: 'task.150.create-task-authoring-evidence'
+task_title: 'create-task: anchored claims, a bounded title, and a --from-observation entry'
+gate: CONCERNS
+status_reason: 'The operator-directed root fix holds: set-status refuses ambiguous ids and honours --expect-status, and the end-to-end park probe engages 10/10 (34 probes, 0 reproduced). One medium: the engine''s other caller, observe-work review Step 6, still re-scans by hand and writes without --expect-status.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T19:48:40Z'
+
+top_issues:
+  - id: 'TASK-150-CR4-1'
+    severity: medium
+    file: 'skills/observe-work/references/review-cycle.md'
+    finding: 'observe-work review Step 6 (and the SKILL.md quick-reference row) re-scans by hand then runs set-status --id N --status actioned without --expect-status, so an entry another session resolved during the review is still overwritten — the exact case --expect-status was added for.'
+    suggested_action: 'Add --expect-status <status seen at selection> to the Step 6 vector and the quick-reference row, and name status-changed and ambiguous-id as outcomes to report, not retry.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 70
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 34
+    notes: 'task.150.qa.4.security.run.json: parkWrites (whole park path through the real engine, collision and changed-status scenarios) engages 10/10; seedFromRealScan 12/12; status 7/7; title 5/5. 0 reproduced.'
+  performance:
+    status: PASS
+    notes: 'findAllById reads the same directory listing findById did.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR4-1: the other set-status caller still lacks the write-time status check.'
+  maintainability:
+    status: PASS
+    notes: 'CR4-2 (advisory, low/medium): --expect-status is accepted and ignored by subcommands other than set-status.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR4-1: observe-work Step 6 and quick reference pass --expect-status.'
+      refs: ['skills/observe-work/references/review-cycle.md', 'skills/observe-work/SKILL.md']
+  future:
+    - action: 'CR4-2 (advisory): reject --expect-status outside set-status, as write rejects --id.'
+      refs: ['shared/resources/observation-log.js']
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-09-28'
+  total_iterations: 3
+  verification_method: 'BUG-4 verified by the end-to-end park probe (ambiguous and changed-status scenarios refused, clean ones parked) and the committed engine and seed tests.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR4-1 fixed']

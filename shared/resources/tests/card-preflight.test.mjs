@@ -331,9 +331,14 @@ test("B: the authoring path and the sync path read the SAME body", () => {
     "body opens with a horizontal rule":
       "---\nid: t\n---\n\n---\n\n## 1. Overview\n\nx y z.\n\n## Success Criteria\n\n1. [ ] a\n",
     "no frontmatter at all": "## 1. Overview\n\nx y z.\n",
+    // The authoring path reads the title and the sync path does not
+    // (task.150). The section findings must still match exactly; the title
+    // finding is the only difference, asserted below.
+    "title over the bound": `---\nid: t\ntitle: "${"t".repeat(101)}"\n---\n\n## 1. Overview\n\nx y z.\n\n## Success Criteria\n\n1. [ ] a\n`,
   };
 
   let compared = 0;
+  let titleOnlyDifference = 0;
   for (const [name, text] of Object.entries(shapes)) {
     withTempDoc("task.998.parity.md", text, (file) => {
       // What the authoring path produces...
@@ -355,9 +360,46 @@ test("B: the authoring path and the sync path read the SAME body", () => {
         syncBody,
         `${name}: the two paths resolved DIFFERENT bodies — a verdict that happens to match is not parity`,
       );
-      assert.equal(authoring.ok, sync.ok, `${name}: ok differs`);
+      // The title findings are the one thing the authoring path adds; they all
+      // carry section "(title)". Filter on that, then prove the filter removed
+      // only title findings: each one it kept out names a title code, and none
+      // of the section findings it kept is a title code. (The earlier form
+      // compared two complementary filters over one array, which cannot fail.)
+      const TITLE_CODES = [
+        "title-too-long",
+        "title-not-inline",
+        "title-unreadable-bom",
+      ];
+      const titleOnly = authoring.findings.filter(
+        (f) => f.section === "(title)",
+      );
+      const sectionFindings = authoring.findings.filter(
+        (f) => f.section !== "(title)",
+      );
+      assert.ok(
+        titleOnly.every((f) => TITLE_CODES.includes(f.code)),
+        `${name}: a (title) finding carries a non-title code`,
+      );
+      assert.ok(
+        sectionFindings.every((f) => !TITLE_CODES.includes(f.code)),
+        `${name}: a title code escaped the (title) section`,
+      );
+      if (titleOnly.length) {
+        assert.equal(
+          name,
+          "title over the bound",
+          `${name}: unexpected title finding`,
+        );
+        assert.equal(titleOnly.length, 1);
+        titleOnlyDifference++;
+      }
+      assert.equal(
+        sectionFindings.length === 0,
+        sync.ok,
+        `${name}: ok differs`,
+      );
       assert.deepEqual(
-        authoring.findings.map((f) => `${f.section}:${f.severity}`),
+        sectionFindings.map((f) => `${f.section}:${f.severity}`),
         sync.findings.map((f) => `${f.section}:${f.severity}`),
         `${name}: findings differ`,
       );
@@ -369,7 +411,12 @@ test("B: the authoring path and the sync path read the SAME body", () => {
       compared++;
     });
   }
-  assert.equal(compared, 4, "non-vacuity: every shape must have been compared");
+  assert.equal(compared, 5, "non-vacuity: every shape must have been compared");
+  assert.equal(
+    titleOnlyDifference,
+    1,
+    "non-vacuity: the long-title shape must have produced its one title finding",
+  );
 });
 
 test("B: --json does not emit the document body", () => {
@@ -484,7 +531,9 @@ test("B: --json and the display both carry the scope statement", () => {
   assert.equal(payload.ok, true);
   assert.match(
     payload.scope,
-    /^\d+ card blocks? resolves? — this checks the card sections only, not template completeness\.$/,
+    // The authoring preflight also reads the title (task.150), and its scope
+    // line says so; the sync paths' wording is pinned by the four-script test.
+    /^\d+ card blocks? resolves? — this checks the card sections and the title only, not template completeness\.$/,
   );
   const shown = runCli(["--file", real]).stdout;
   assert.match(shown, /No problems found\. \d+ card block/);
@@ -599,5 +648,298 @@ test("D: create-task, create-story and create-epic each invoke the preflight", (
     called,
     3,
     "non-vacuity: all three authoring skills must have been checked",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Title bound (task.150, obs #128)
+// ---------------------------------------------------------------------------
+
+// A complete, clean task document whose only variable is its title, so every
+// finding below is the title's.
+const withTitle = (title, h1 = "Technical Task: a short name") => `---
+id: task.997
+type: task
+${title == null ? "" : `title: "${title}"\n`}---
+
+# ${h1}
+
+## 1. Overview
+
+A summary sentence the card can publish.
+
+## 9. Success Criteria
+
+- [ ] One criterion the card can publish.
+`;
+
+test("A: a 101-character title gets exactly one title-too-long finding naming the H1", () => {
+  withTempDoc("task.997.title.md", withTitle("t".repeat(101)), (file) => {
+    const r = pf.preflight(file, "task");
+    const t = r.findings.filter((f) => f.code === "title-too-long");
+    assert.equal(t.length, 1, "exactly one title finding");
+    assert.equal(r.findings.length, 1, "the fixture has no other finding");
+    assert.equal(t[0].severity, "important");
+    assert.equal(t[0].section, "(title)");
+    assert.match(
+      t[0].fix,
+      /Technical Task: a short name/,
+      "the fix names the H1",
+    );
+    assert.equal(r.ok, false, "ok covers the title as well as the sections");
+  });
+});
+
+test("A: a title of exactly CARD_TITLE_MAX characters gets no finding (the bound is >, not >=)", () => {
+  assert.equal(lib.CARD_TITLE_MAX, 100);
+  withTempDoc(
+    "task.997.title.md",
+    withTitle("t".repeat(lib.CARD_TITLE_MAX)),
+    (file) => {
+      const r = pf.preflight(file, "task");
+      assert.deepEqual(r.findings, []);
+      assert.equal(r.ok, true);
+    },
+  );
+});
+
+test("A: no title gets no finding", () => {
+  withTempDoc("task.997.title.md", withTitle(null), (file) => {
+    assert.deepEqual(pf.preflight(file, "task").findings, []);
+  });
+});
+
+test("A: an H1 over the bound is not offered as the fix", () => {
+  const f = lib.checkCardTitle(
+    { title: "t".repeat(150) },
+    `# ${"h".repeat(120)}\n`,
+  );
+  assert.equal(f.length, 1);
+  assert.match(f[0].fix, /Shorten the title/);
+});
+
+test("A: the title finding appears for story and epic documents too", () => {
+  const long = "t".repeat(101);
+  for (const kind of ["story", "epic"]) {
+    const doc = `---\ntitle: "${long}"\n---\n\n# Short\n`;
+    withTempDoc(`${kind}.1.x.md`, doc, (file) => {
+      const r = pf.preflight(file, kind);
+      assert.equal(
+        r.findings.filter((f) => f.code === "title-too-long").length,
+        1,
+        `${kind}: one title finding`,
+      );
+    });
+  }
+});
+
+test("A: a long title exits 0 by default and 1 under --strict", () => {
+  withTempDoc("task.997.title.md", withTitle("t".repeat(101)), (file) => {
+    const plain = runCli(["--file", file]);
+    assert.equal(plain.code, 0);
+    assert.match(plain.stdout, /title-too-long|\(title\)/);
+    assert.equal(runCli(["--file", file, "--strict", "--json"]).code, 1);
+  });
+});
+
+test("A: a clean result says it read the title; the sync scope line does not", () => {
+  withTempDoc("task.997.title.md", withTitle("a short title"), (file) => {
+    const out = runCli(["--file", file]).stdout;
+    assert.match(out, /checks the card sections and the title only/);
+    const json = JSON.parse(runCli(["--file", file, "--json"]).stdout);
+    assert.match(json.scope, /and the title only/);
+  });
+  // The sync path never sets titleChecked, so its wording is unchanged.
+  const sync = lib.checkCardSections(
+    "## 1. Overview\n\nx.\n\n## Success Criteria\n\n- [ ] a\n",
+    lib.CARD_SECTIONS_BY_KIND.task,
+  );
+  assert.match(lib.describeCardScope(sync), /checks the card sections only/);
+});
+
+// The three shapes the finalise security probe reproduced (task.150 DoD): each
+// hid an over-bound title from the line-based parser, so the bound passed it.
+test("A: a folded block-scalar title is flagged, not measured by its indicator", () => {
+  const doc = `---\ntitle: >-\n  ${"word ".repeat(40).trim()}\n---\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n`;
+  withTempDoc("task.996.folded.md", doc, (file) => {
+    const codes = pf.preflight(file, "task").findings.map((f) => f.code);
+    assert.deepEqual(codes, ["title-not-inline"]);
+  });
+});
+
+test("A: a literal block-scalar title is flagged, not measured by its indicator", () => {
+  const doc = `---\ntitle: |\n  ${"x".repeat(150)}\n---\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n`;
+  withTempDoc("task.996.literal.md", doc, (file) => {
+    const codes = pf.preflight(file, "task").findings.map((f) => f.code);
+    assert.deepEqual(codes, ["title-not-inline"]);
+  });
+});
+
+test("A: a BOM before the frontmatter is flagged, and the title behind it is still measured", () => {
+  const doc = `\uFEFF---\ntitle: "${"x".repeat(368)}"\n---\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n`;
+  withTempDoc("task.996.bom.md", doc, (file) => {
+    const r = pf.preflight(file, "task");
+    const title = r.findings
+      .filter((f) => f.section === "(title)")
+      .map((f) => f.code);
+    assert.deepEqual(title, ["title-unreadable-bom", "title-too-long"]);
+    assert.equal(r.ok, false);
+  });
+  // A BOM with a short title still gets the BOM finding: the sync cannot read it.
+  withTempDoc(
+    "task.996.bom-short.md",
+    `\uFEFF---\ntitle: "a name"\n---\n\n# Short\n`,
+    (file) => {
+      const codes = pf
+        .preflight(file, "task")
+        .findings.filter((f) => f.section === "(title)")
+        .map((f) => f.code);
+      assert.deepEqual(codes, ["title-unreadable-bom"]);
+    },
+  );
+});
+
+// The seven shapes DoD run 2 reproduced (task.150.dod.2.security.run.json): each
+// made the line-based parser measure something other than the YAML title. The
+// title is now read from the raw header, and every non-inline form is refused.
+test("A: every title that is not one single-line column-0 value is title-not-inline", () => {
+  const L = "Long title word ".repeat(10).trim();
+  const shapes = {
+    "block scalar with a comment": `title: >- # name\n  ${L}`,
+    "tagged block scalar": `title: !!str >-\n  ${L}`,
+    "anchored block scalar": `title: &t >-\n  ${L}`,
+    "multi-line plain scalar": `title: Short start\n  ${L}`,
+    "value on the next line": `title:\n  ${L}`,
+    "multi-line double-quoted scalar": `title: "Short start\n  ${L}"`,
+    "indented title overwriting the real one": `title: ${L}\nnotes: |\n  title: short`,
+  };
+  let checked = 0;
+  for (const [name, header] of Object.entries(shapes)) {
+    const doc = `---\n${header}\ntype: task\n---\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n`;
+    withTempDoc("task.995.shape.md", doc, (file) => {
+      const codes = pf
+        .preflight(file, "task")
+        .findings.filter((f) => f.section === "(title)")
+        .map((f) => f.code);
+      assert.deepEqual(
+        codes,
+        ["title-not-inline"],
+        `${name}: ${JSON.stringify(codes)}`,
+      );
+    });
+    checked++;
+  }
+  assert.equal(checked, 7, "non-vacuity: every shape was checked");
+  // And the inline forms real documents use are NOT refused.
+  for (const header of [
+    `title: "[Task 1] a name"`,
+    `title: 'a name'`,
+    `title: a name: with a colon`,
+  ]) {
+    assert.deepEqual(
+      lib.readCardTitle(`---\n${header}\n---\n`).problem,
+      null,
+      header,
+    );
+  }
+});
+
+// DoD run 3 (task.150): the reader decided the header's edges and the title key
+// differently from the sync, so a long title reached the card with no finding.
+// Each shape is a WHOLE document, because the fence is part of what is checked.
+test("A: a header the sync and YAML could read differently never passes a long title", () => {
+  const L = "Long title word ".repeat(10).trim();
+  const tail =
+    "\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n";
+  const shapes = {
+    // The header runs to the column-0 fence, as it does for the sync: the title
+    // after an indented `---` is found, and measured.
+    "indented --- inside a block scalar": [
+      `---\ndescription: |\n  a\n  ---\n  b\ntitle: "${L}"\n---`,
+      "title-too-long",
+    ],
+    "indented --- as a plain continuation": [
+      `---\nid: task.995\n  ---\ntitle: "${L}"\n---`,
+      "title-too-long",
+    ],
+    "opening fence with a comment": [
+      `--- # yaml document\ntitle: "${L}"\n---`,
+      "title-not-inline",
+    ],
+    "opening fence of four dashes": [
+      `----\ntitle: "${L}"\n---`,
+      "title-not-inline",
+    ],
+    "a ... end marker inside the header": [
+      `---\ntype: task\n...\ntitle: "${L}"\n---`,
+      "title-not-inline",
+    ],
+    "merge key with a flow map": [
+      `---\nid: task.995\n<<: {title: "${L}"}\n---`,
+      "title-not-inline",
+    ],
+    "explicit key": [`---\n? title\n: "${L}"\n---`, "title-not-inline"],
+    "quoted key": [`---\n"title": "${L}"\n---`, "title-not-inline"],
+    "single-quoted key": [`---\n'title': "${L}"\n---`, "title-not-inline"],
+    "title in a flow map": [
+      `---\nmeta: {id: 1, title: "${L}"}\n---`,
+      "title-not-inline",
+    ],
+  };
+  let checked = 0;
+  for (const [name, [header, code]] of Object.entries(shapes)) {
+    withTempDoc("task.995.shape.md", header + tail, (file) => {
+      const codes = pf
+        .preflight(file, "task")
+        .findings.filter((f) => f.section === "(title)")
+        .map((f) => f.code);
+      assert.deepEqual(codes, [code], `${name}: ${JSON.stringify(codes)}`);
+    });
+    checked++;
+  }
+  assert.equal(checked, 10, "non-vacuity: every shape was checked");
+  // Headers real documents have are not refused: a short title after an
+  // indented `---`, and prose that mentions a title in a value.
+  for (const doc of [
+    `---\ndescription: |\n  a\n  ---\ntitle: "A name"\n---\n`,
+    `---\ntitle: "A name"\ndescription: the title: is short\n---\n`,
+    `---\ntitle: "A name"\n---\n\n---\n\nA rule in the body.\n`,
+  ]) {
+    assert.deepEqual(
+      lib.readCardTitle(doc),
+      { title: "A name", problem: null },
+      doc,
+    );
+  }
+});
+
+// Success Criterion: CARD_TITLE_MAX is defined once, in the source jira-sync.js,
+// and anywhere else only as a generated references/ copy of that file. This is a
+// source-structure property, so a scan of the TRACKED tree is the instrument. The
+// pattern is assembled at runtime so this file does not match itself.
+test("B: CARD_TITLE_MAX is defined in exactly one source file", () => {
+  const name = ["CARD", "TITLE", "MAX"].join("_");
+  const out = execFileSync(
+    "git",
+    ["grep", "-l", "-E", `${name}[[:space:]]*=`, "--", "shared", "skills"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+  const files = out.split("\n").filter(Boolean);
+  assert.ok(
+    files.includes("shared/resources/jira-sync.js"),
+    "non-vacuity: the source definition is found",
+  );
+  const others = files.filter(
+    (f) =>
+      f !== "shared/resources/jira-sync.js" &&
+      !/^skills\/[^/]+\/references\/jira-sync\.js$/.test(f),
+  );
+  assert.deepEqual(
+    others,
+    [],
+    `a second definition of ${name}: ${others.join(", ")}`,
   );
 });

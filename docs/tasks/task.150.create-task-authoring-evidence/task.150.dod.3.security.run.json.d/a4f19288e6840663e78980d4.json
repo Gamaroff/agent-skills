@@ -1,0 +1,18 @@
+{
+  "sink": "template-render",
+  "entry": ".observation-log-test-tmp/dod3-recheck/adapter.mjs#corpusRatchetTitle",
+  "name": "corpusRatchetTitle",
+  "call_site": "shared/resources/tests/card-preflight-corpus.test.mjs:146",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 32,
+  "passed": 32,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-28T20:58:29.976Z"
+}

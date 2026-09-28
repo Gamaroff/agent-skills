@@ -106,7 +106,7 @@ Full categorised index below.
 | `create-issue` | Create issues and corresponding local work item documents. This skill should be used when identifying bugs, improvements, or work items during PR reviews or development.… |
 | `create-parallel-stories` | Generate stories organized for parallel development using Git worktrees. Implements hybrid numbering (1-1, 1-2 for parallel, 2, 3 for sequential) with dependency mapping, conflict prevention,… |
 | `create-story` | Primary workflow for creating the next logical story in a development sequence. Implements a rigorous 10-step process to identify, extract, and document story requirements with… |
-| `create-task` | Create comprehensive technical task documentation for refactoring, infrastructure changes, and technical improvements. Interactive workflow with decision guidance for non-user-facing work. |
+| `create-task` | Create comprehensive technical task documentation for refactoring, infrastructure changes, and technical improvements. Interactive workflow with decision guidance for non-user-facing work. `--from-observation` with a list of… |
 | `edit-epic` | Edit epic documents with validation, cascade analysis for child stories, and diff preview. Use when modifying epic files. Rejects story files with appropriate message. |
 | `edit-story` | Edit story documents with comprehensive validation and diff preview. Use when modifying story files. Rejects epic files with appropriate message. |
 | `ensure-epic-github-issue` | Internal sub-routine called from create-story and review-story. Given an epic markdown file path, ensures the epic has a corresponding GitHub issue. Creates the issue if… |

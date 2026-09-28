@@ -13,18 +13,22 @@ tags:
     observation,
   ]
 category: other
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-28
 assignee:
 estimated_effort_hours: 16
 github_issue: 480
+completed_date: 2026-09-28
+pr_number: 512
 ---
 
 # Technical Task: create-task — anchored claims, a bounded title, and a --from-observation entry
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.150.review.1.create-task-authoring-evidence.md` implemented 2026-09-28
 
 **GitHub Issue**: [#480](https://github.com/Gamaroff/agent-skills/issues/480)
 
@@ -71,7 +75,7 @@ parked by the skill, not by whichever session remembers to do it.
    `qa_cycles_completed`, that exists nowhere in the code. `git grep -n qa_cycles_completed -- ':!docs/tasks'`
    returns 0 hits on develop at `e04de749`. task.123 also put the snapshot writer in the wrong file.
    review-task found both only because its reviewer grepped each name. The create-task Section 3
-   prompt (`skills/create-task/SKILL.md:692`, *"Cite by identity, not by coordinate"*, obs #22) says
+   prompt (`skills/create-task/SKILL.md:695`, *"Cite by identity, not by coordinate"*, obs #22) says
    how to cite a claim once it is found. It does not require anyone to look.
 2. **A categorisation with no witnesses (obs #124).** task.122's count was right: 15 copies across 12
    skills. Its categorisation was wrong for 7 of the 15, and Phase 2's regex, its "eight" criterion
@@ -82,10 +86,11 @@ parked by the skill, not by whichever session remembers to do it.
    `loop-limit|not-converging`, a token another rule also uses. The test would have been red at the
    wrong site and would have missed the token-free restatement that caused task.124 bug 13. The same
    document asked for a site to be added to a population that is derived from directories. Neither
-   create-task § 3.5 nor review-task Step 3 (`skills/review-task/SKILL.md:757`, checks 1–9) asks
+   create-task § 3.5 nor review-task Step 3 (`skills/review-task/SKILL.md:765`, checks 1–12) asks
    either question.
 4. **No bound on the title (obs #128).** 42 of the 146 task card documents have a frontmatter `title`
-   over 100 characters. The longest is 368, and 9 are over 255. (Command: Plan § *Measurements* M1;
+   over 100 characters (at `e04de749`; re-run at `f88a997f` on 2026-09-28 by review 1: 43 of 166, the
+   new one task.158). The longest is 368, and 9 are over 255. (Command: Plan § *Measurements* M1;
    the definition is `card-preflight-corpus.test.mjs` `taskCardDocuments()`.) These titles are
    published as they are: issue #464 (task.140) has a 368-character title and #450 (task.138) has a
    357-character title (M2). `card-preflight.js` keeps only the body. `preflight()` at
@@ -120,18 +125,18 @@ Every claim below was grepped on develop at `e04de749` (2026-09-24).
 
 - **create-task § 1** (`skills/create-task/SKILL.md:161`, *Initial Information Gathering*) prompts for
   title, category, priority, assignee and effort. `SKILL.md:108`, *USER COLLABORATION IS MANDATORY*,
-  Key Principle 1 at `:935` and skill success criterion 2 at `:958` (*User-Validated Content*) make
+  Key Principle 1 at `:939` and skill success criterion 2 at `:962` (*User-Validated Content*) make
   every prompt mandatory. There is no source-driven entry: `git grep -n from-observation` returns
   nothing.
 - **create-task § 3.5** (`SKILL.md:418`, *Adversarial Quality Review*) lists these *Critical* items:
-  obs #103 (`:430`), obs #117 (`:431`) and obs #102 (`:432`). None of them mentions obs #124, #127 or
-  #135. `git grep -n -E 'obs #(124|127|135)\b' -- skills shared` returns nothing.
-- **create-task Section 3 prompt** (`SKILL.md:692`, *Cite by identity, not by coordinate*): covers
+  obs #103 (`:430`), obs #117 (`:431`), obs #102 (`:432`), and — since task.151 — obs #168, #161 and
+  #170 (`:433`–`:435`). None of them mentions obs #124, #127 or #135. `git grep -n -E 'obs #(124|127|135)\b' -- skills shared` returns nothing.
+- **create-task Section 3 prompt** (`SKILL.md:695`, *Cite by identity, not by coordinate*): covers
   how to cite, not whether the citation was verified.
-- **create-task § 4** (`SKILL.md:460`, *Emit a YAML frontmatter block*) lists the `title` field and
+- **create-task § 4** (`SKILL.md:463`, *Emit a YAML frontmatter block*) lists the `title` field and
   says nothing about its length. `populateTaskTemplate` (`skills/create-task/scripts/lib.js:131`)
   substitutes `[TASK_TITLE]` into the frontmatter and the H1 (`:156`) without a bound.
-- **create-task § 4.4** (`SKILL.md:542`, *Do **not** silently write a value without prompting*): the
+- **create-task § 4.4** (`SKILL.md:545`, *Do **not** silently write a value without prompting*): the
   effort estimate always prompts.
 - **create-task § 4.6** runs `references/card-preflight.js --file …`. Its callers are create-task,
   create-story and create-epic (`git grep -l 'card-preflight.js' -- 'skills/*/SKILL.md'`).
@@ -148,10 +153,12 @@ Every claim below was grepped on develop at `e04de749` (2026-09-24).
   the same `ok` and the same findings. None of its fixture shapes has a `title`.
 - **Corpus guard**: `card-preflight-corpus.test.mjs` calls `checkCardSections` directly (`:79`), not
   `preflight()`, over `taskCardDocuments()`, and applies a `CORPUS_FLOOR` of 100 (`:67`).
-- **review-task Step 3** (`skills/review-task/SKILL.md:757`): checks 1–9. Check 7 is *Figures that a
-  test will re-measure* (obs #117, `:833`) and check 9 is *Configuration Key Accuracy* (`:847`),
-  followed by *Common Hallucination Patterns to Detect* (`:852`). None of them looks at a proposed
-  test's discriminator.
+- **review-task Step 3** (`skills/review-task/SKILL.md:765`): checks 1–12. Check 7 is *Figures that a
+  test will re-measure* (obs #117, `:841`), check 9 is *Configuration Key Accuracy* (`:855`), and
+  task.151 added checks 10–12 (*Outcome reachability*, obs #168, `:860`; *Invariant verification*,
+  obs #161, `:881`; *Released-shape diff*, obs #170, `:901`). *Common Hallucination Patterns to
+  Detect* follows at `:919`. None of them looks at a proposed test's discriminator. (Re-grepped on
+  develop at `f88a997f`, 2026-09-28, by review 1.)
 - **Observation log engine**: `shared/resources/observation-log.js`. `scan --json` returns `file`,
   `id`, `title`, `status`, `skill[]` and the other fields per entry (`cmdScan`, `:666`).
   `set-status --id N --status parked` requires `--parked-until` (`:1028`,
@@ -170,7 +177,10 @@ Every claim below was grepped on develop at `e04de749` (2026-09-24).
 - **`card-preflight.js`**: `preflight()` also reads `frontmatter` and appends
   `checkCardTitle(frontmatter, body)` to the section findings, then recomputes `ok`. `--strict` makes
   a title finding exit 1, as it does for any other finding. The clean-result scope line says that the
-  preflight read the title as well as the card sections.
+  preflight read the title as well as the card sections: `preflight()` returns `titleChecked: true`,
+  and `describeCardScope(result)` reads that field. It is not an options argument, because
+  `formatCardCheck` calls `describeCardScope(result)` internally (`jira-sync.js:1936`) and an option
+  passed by `card-preflight.js` would never reach that call.
 - **create-task § 4**: the `title` bullet says a title is a name, not a summary. When the § 4.6
   preflight reports `title-too-long`, the author uses the H1 as the title and moves the extra text
   into `description`. The number is not repeated in the prose.
@@ -190,7 +200,7 @@ Every claim below was grepped on develop at `e04de749` (2026-09-24).
   4. Ask only the questions that are still open.
   5. After both files are written, park each id.
 
-  Lines `:108`, `:935` and `:958` and the § 4.4 rule at `:542` each get a one-sentence exception for
+  Lines `:108`, `:939` and `:962` and the § 4.4 rule at `:545` each get a one-sentence exception for
   this entry.
 - **`lib.js`**: `parseObservationBody(text)` splits the body into `{issue, improvement, principle}`.
   `seedFromObservations(entries, {taskId})` returns:
@@ -218,7 +228,7 @@ Every claim below was grepped on develop at `e04de749` (2026-09-24).
 ### In Scope
 
 - ✅ create-task: § 1.1 (new), § 3.5 (three bullets), Section 3 prompt, § 4 title bullet, § 4.4
-  exception, and the `:108` / `:935` / `:958` exceptions
+  exception, and the `:108` / `:939` / `:962` exceptions
 - ✅ review-task Step 3: the discriminator check and a *Common Hallucination Patterns* line
 - ✅ `shared/resources/jira-sync.js` (`CARD_TITLE_MAX`, `checkCardTitle`) and
   `shared/resources/card-preflight.js`
@@ -268,48 +278,48 @@ None to any API. There are two changes a caller can see:
 `skills/create-task/SKILL.md`, `shared/resources/authoring-card-preflight.md`, the two preflight
 tests
 
-- [ ] Add `CARD_TITLE_MAX` and `checkCardTitle(frontmatter, body)` beside `checkCardSections`, and export both
-- [ ] In `preflight()`, read the frontmatter and append the title finding. `ok` covers both
-- [ ] Update the scope line so a clean result says it read the title
-- [ ] create-task § 4 title bullet, which points to the § 4.6 finding and does not repeat the number
-- [ ] Add a unit test, a parity shape and a corpus ratchet with a 42-id legacy allowlist
+- [x] Add `CARD_TITLE_MAX` and `checkCardTitle(frontmatter, body)` beside `checkCardSections`, and export both
+- [x] In `preflight()`, read the frontmatter and append the title finding. `ok` covers both
+- [x] Update the scope line so a clean result says it read the title. `describeCardScope` keys on `result.titleChecked`, so the sync callers, which never set it, keep their wording
+- [x] create-task § 4 title bullet, which points to the § 4.6 finding and does not repeat the number
+- [x] Add a unit test, a parity shape and a corpus ratchet with a legacy allowlist taken from M1 re-run at implementation time
 
 ### Phase 2: Evidence rules (obs #127, #124) (Risk: Low)
 
 **Files**: `skills/create-task/SKILL.md`
 
-- [ ] Section 3 prompt: add the *Every current-state name carries its grep* paragraph (obs #127)
-- [ ] § 3.5 *Critical*: add *A current-state name nobody grepped* (obs #127)
-- [ ] § 3.5 *Critical*: add *A categorised population without a witness per member* (obs #124)
+- [x] Section 3 prompt: add the *Every current-state name carries its grep* paragraph (obs #127)
+- [x] § 3.5 *Critical*: add *A current-state name nobody grepped* (obs #127)
+- [x] § 3.5 *Critical*: add *A categorised population without a witness per member* (obs #124)
 
 ### Phase 3: Discriminator rule (obs #135) (Risk: Low)
 
 **Files**: `skills/create-task/SKILL.md`, `skills/review-task/SKILL.md`
 
-- [ ] § 3.5 *Critical*: add *A single-statement test keyed on a shared token* (obs #135)
-- [ ] review-task Step 3: add the **Single-statement test discriminator** check after the last numbered check
-- [ ] review-task *Common Hallucination Patterns*: add one line
-- [ ] Add `tests/create-task-authoring-evidence.test.js`, covering Phases 2 and 3
+- [x] § 3.5 *Critical*: add *A single-statement test keyed on a shared token* (obs #135)
+- [x] review-task Step 3: add the **Single-statement test discriminator** check after the last numbered check
+- [x] review-task *Common Hallucination Patterns*: add one line
+- [x] Add `tests/create-task-authoring-evidence.test.js`, covering Phases 2 and 3
 
 ### Phase 4: `--from-observation` entry (obs #147) (Risk: Medium)
 
 **Files**: `skills/create-task/SKILL.md`, `skills/create-task/scripts/lib.js`,
 `skills/create-task/tests/from-observation.test.js`
 
-- [ ] Add § 1.1 *Entry from the observation log*: resolve, select, refuse non-open entries, seed, ask what is still open, park
-- [ ] Add one-sentence exceptions at `:108`, `:935`, `:958` and § 4.4 `:542`
-- [ ] Add `parseObservationBody` and `seedFromObservations` to `lib.js`, using `CARD_TITLE_MAX` from `jira-sync.js`
-- [ ] Add § 5 *Post-Generation* step 2b: park each id after both files exist, read `reason`, and report a failure without blocking
-- [ ] Cite `shared/resources/observation-log.js` and `resolve-observation-workspace.sh`, then run `npm run bundle:skill skills/create-task`
-- [ ] Update the frontmatter `description` to mention the entry, then run `npm run generate-catalog`
+- [x] Add § 1.1 *Entry from the observation log*: resolve, select, refuse non-open entries, seed, ask what is still open, park
+- [x] Add one-sentence exceptions at `:108`, `:939`, `:962` and § 4.4 `:545`
+- [x] Add `parseObservationBody` and `seedFromObservations` to `lib.js`, using `CARD_TITLE_MAX` from `jira-sync.js`
+- [x] Add § 5 *Post-Generation* step 2b: park each id after both files exist, read `reason`, and report a failure without blocking
+- [x] Cite `shared/resources/observation-log.js` and `resolve-observation-workspace.sh`, then run `npm run bundle:skill skills/create-task`
+- [x] Update the frontmatter `description` to mention the entry, then run `npm run generate-catalog`
 
 ### Phase 5: Documentation and validation (Risk: Low)
 
 **Files**: `CHANGELOG.md`
 
-- [ ] Add a CHANGELOG `[Unreleased]` › Changed entry citing `(task 150)` and obs #124, #127, #128, #135 and #147
-- [ ] Run `npm run ci:fast`, `npm run bundle:check`, and `npm run validate` on create-task and review-task
-- [ ] Mutation-prove every new assertion (see § 8)
+- [x] Add a CHANGELOG `[Unreleased]` › Changed entry citing `(task 150)` and obs #124, #127, #128, #135 and #147
+- [x] Run `npm run ci:fast`, `npm run bundle:check`, and `npm run validate` on create-task and review-task
+- [x] Mutation-prove every new assertion (see § 8)
 
 ---
 
@@ -323,6 +333,9 @@ tests
    interactivity exceptions
 4. ✅ `skills/create-task/scripts/lib.js`: `parseObservationBody`, `seedFromObservations`
 5. ✅ `skills/review-task/SKILL.md`: the Step 3 check and the patterns line
+5a. ✅ `shared/resources/observation-log.js` and `observation-log-contract.md`: `set-status` refuses an
+    ambiguous `--id` and takes `--expect-status`. **Added after the QA loop escalated** (see
+    Implementation Summary), at the operator's direction
 
 ### Files to Add / Modify (Tests)
 
@@ -360,7 +373,8 @@ None.
   - Parity gets one new shape, a long title: the section findings still match the sync path
     exactly, and the title finding is the only extra.
 - **`shared/resources/tests/card-preflight-corpus.test.mjs`**: every task card document outside a
-  frozen `LEGACY_LONG_TITLES` list (the 42 ids from M1) has `title.length <= CARD_TITLE_MAX`. Every
+  frozen `LEGACY_LONG_TITLES` list (the ids M1 prints when re-run at implementation time; 43 at
+  `f88a997f`) has `title.length <= CARD_TITLE_MAX`. Every
   listed id is still over the bound, so a shortened title fails until its id is removed and the list
   only shrinks. The existing `CORPUS_FLOOR` applies.
 - **`tests/create-task-authoring-evidence.test.js`**: the test extracts each site section by
@@ -419,38 +433,38 @@ does not hold this run.
 
 ### Functional
 
-- [ ] `card-preflight.js --file` on a document whose title is over `CARD_TITLE_MAX` prints one
+- [x] `card-preflight.js --file` on a document whose title is over `CARD_TITLE_MAX` prints one
       `title-too-long` finding naming the H1. It exits 0, and exits 1 under `--strict`. Held by
       `shared/resources/tests/card-preflight.test.mjs`
-- [ ] No task card document outside `LEGACY_LONG_TITLES` has a title over the bound, and every listed
+- [x] No task card document outside `LEGACY_LONG_TITLES` has a title over the bound, and every listed
       id is still over it. Held by `shared/resources/tests/card-preflight-corpus.test.mjs`
-- [ ] create-task § 3.5 carries the obs #127, #124 and #135 rules, the Section 3 prompt carries the
+- [x] create-task § 3.5 carries the obs #127, #124 and #135 rules, the Section 3 prompt carries the
       obs #127 paragraph, and review-task Step 3 carries the obs #135 check. Each is section-scoped.
       Held by `tests/create-task-authoring-evidence.test.js`
-- [ ] `seedFromObservations` refuses a non-`open` entry, returns `title: null` for an over-bound
+- [x] `seedFromObservations` refuses a non-`open` entry, returns `title: null` for an over-bound
       source title, and produces park vectors that the real engine accepts. Held by
       `skills/create-task/tests/from-observation.test.js`
 
 ### Performance
 
-- [ ] All four test files run offline, with no network or `gh` calls
-- [ ] The corpus ratchet adds one frontmatter parse per document to a walk that already reads each
+- [x] All four test files run offline, with no network or `gh` calls
+- [x] The corpus ratchet adds one frontmatter parse per document to a walk that already reads each
       file
 
 ### Code Quality
 
-- [ ] Every row of the § 8 mutation table was run and recorded red, then green on restore, in the
+- [x] Every row of the § 8 mutation table was run and recorded red, then green on restore, in the
       implementation report
-- [ ] `CARD_TITLE_MAX` is defined once. `git grep -n 'CARD_TITLE_MAX *=' -- shared skills` returns only
+- [x] `CARD_TITLE_MAX` is defined once. `git grep -n 'CARD_TITLE_MAX *=' -- shared skills` returns only
       `shared/resources/jira-sync.js` and its generated `references/` copies
-- [ ] `npm run ci:fast`, `npm run bundle:check` (no `UNREACHED` copies) and `npm run validate` on
+- [x] `npm run ci:fast`, `npm run bundle:check` (no `UNREACHED` copies) and `npm run validate` on
       create-task and review-task are clean
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 150)` and the five observation ids
-- [ ] `shared/resources/authoring-card-preflight.md` documents the title finding and its fix
-- [ ] The implementation report records the task.123 hand run from § 8
+- [x] CHANGELOG `[Unreleased]` cites `(task 150)` and the five observation ids
+- [x] `shared/resources/authoring-card-preflight.md` documents the title finding and its fix
+- [x] The implementation report records the task.123 hand run from § 8
 
 ---
 
@@ -524,25 +538,141 @@ None.
 
 ---
 
-<!-- change-log-start -->
+## Implementation Summary
 
+**Completed**: 2026-09-28 (develop-task Step 3, inline; implementation report
+`task.150.implementation.1.create-task-authoring-evidence-initial-run.md`)
+
+### Approach
+
+- **Phase 1**: `CARD_TITLE_MAX` and `checkCardTitle` were added beside `checkCardSections` in
+  `shared/resources/jira-sync.js`. `preflight()` now reads the frontmatter, appends the title
+  finding and recomputes `ok`. It returns `titleChecked: true`, and `describeCardScope` keys its
+  wording on that, not on an options argument (review 1, I1). The create-task § 4 title bullet and
+  the `authoring-card-preflight.md` paragraph point to the finding and do not restate the number.
+- **Phases 2–3**: the three § 3.5 *Critical* bullets go after the last one (obs #170), and the
+  Section 3 paragraph goes after *Cite by identity*. review-task Step 3 gains **check 13**, not 10:
+  task.151 had added 10–12. The *Common Hallucination Patterns* line names check 13.
+- **Phase 4**: `parseObservationBody` and `seedFromObservations` are in `scripts/lib.js`, and
+  `CARD_TITLE_MAX` is imported from `../references/jira-sync.js`. The new § 1.1 cites the engine
+  and the resolver, which bundles both into create-task. § 5 step 2b parks, and one-sentence
+  exceptions sit at the three interactivity lines and at § 4.4. `parseObservationBody` also accepts a
+  whole entry file, because the frontmatter carries no `## ` line, so the skill passes the file text
+  as `body`.
+- **Scope added after the QA escalation (operator-directed, 2026-09-28)**: QA cycles 1–3 each found
+  one HIGH in how `--from-observation` maps the selected entry to the entry `set-status` changes.
+  The last layer was in the engine: `findById` took the first same-prefix file in the whole log. The
+  fix is at that root. `set-status` refuses `ambiguous-id`, and takes `--expect-status`, which the
+  park vector passes as `open`. The seed's agreement check reads the raw id from the entry's file
+  text. See bugs 1–4.
+- **Deviation from the plan**: the legacy allowlist has **43** ids, not 42. M1 was re-run at
+  `f88a997f`, and task.158 had been added since the plan was written.
+
+### Testing Results
+
+- 22 new tests: 7 title tests plus 1 parity shape in `card-preflight.test.mjs`, 1 ratchet in
+  `card-preflight-corpus.test.mjs`, 7 in `tests/create-task-authoring-evidence.test.js` and 7 in
+  `skills/create-task/tests/from-observation.test.js`.
+- `npm run ci:fast`: 4386 tests, 4385 pass, 0 fail. `npm run bundle:check`: 0 problems.
+  `quick_validate.py` passes on create-task and review-task.
+- The 13 mutation proofs from § 8, plus I1 and the ratchet's stale half, are recorded in the
+  implementation report. Each was red when mutated and green on restore.
+- Behavioural evidence (hand run, not held by CI): task.123's first committed draft (`e0881adb`)
+  names `qa_cycles_completed` three times. `git grep -n qa_cycles_completed e0881adb -- ':!docs/tasks'`
+  returns 0 hits, so the obs #127 bullet flags it. At HEAD the only hit outside `docs/tasks` is the
+  new rule's own worked example.
+
+### Deferred Work
+
+- The title check in the four `sync-jira-* --check-card` paths (Open Question 2). It is a follow-up
+  task.
+- Renaming the 43 legacy long titles and their published issues. That is the owner's decision.
+- Setting obs #124, #127, #128, #135 and #147 to `actioned` when this merges (§ Notes).
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-28
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 5 of 5; cycles 4–5 were granted by the operator after a cycle-3 escalation)
+
+### QA Report
+
+- **Full Report**: [task.150.qa.5.create-task-authoring-evidence.md](./task.150.qa.5.create-task-authoring-evidence.md)
+- **Gate File**: [task.150.gate.5.create-task-authoring-evidence.yml](./task.150.gate.5.create-task-authoring-evidence.yml)
+- **History**: [qa.4](./task.150.qa.4.create-task-authoring-evidence.md) CONCERNS 90 · [qa.3](./task.150.qa.3.create-task-authoring-evidence.md) · [qa.2](./task.150.qa.2.create-task-authoring-evidence.md) · [qa.1](./task.150.qa.1.create-task-authoring-evidence.md) FAIL 70
+
+### Test Coverage Summary
+
+- **Tests Executed**: 101 targeted; `ci:fast` 4393 pass / 0 fail; 22 security probes this cycle (136 across the loop)
+- **Phases Verified**: 5/5
+- **Critical Issues**: none. Bugs 1–4 are closed
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues remain. Two low advisory findings are carried as follow-ups: the observe-work
+Step 6 template's literal `open`, and § 1.1's padded prefix match.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.150.qa.5.create-task-authoring-evidence.md`
+**Gate File**: `task.150.gate.5.create-task-authoring-evidence.yml`
+**Gate Status**: ✅ PASS (100/100). Step 5c `/review-pr`: ⚠️ CONCERNS, advisory (no finding both high severity and high confidence)
+
+All Definition of Done criteria were verified in run 3:
+
+✅ **Acceptance Criteria:** 12/12, with code and per-PR test evidence
+✅ **Tests & CI:** `ci:fast` 4401 pass / 0 fail. CI is green on `ab057653` (5 checks)
+✅ **Documentation:** four CHANGELOG entries; the create-task § 1.1, preflight and observation-log contracts; the regenerated catalog
+✅ **Security Review:** PASS after a Step 8a fix-and-recheck. Run 3's probe reproduced 20 low-severity title shapes. `ab057653` fixed them, and the recheck ran 112 probes with 0 reproduced
+⚠️ **Compliance Review:** not applicable (internal tooling)
+
+**History:** DoD run 1 (`task.150.dod.1`) and run 2 (`task.150.dod.2`) each found 2 gaps. They were closed in `4f48ebe3` and in `48d023a1` + `ef3bf4ea`.
+
+**Task marked as ACCEPTED on:** 2026-09-28
+
+**Detailed Verification Log:** See `task.150.dod.3.create-task-authoring-evidence.md` for the full verification evidence.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                                          | Author      |
-| ---------- | ------- | ---------------------------------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #124, #127, #128, #135, #147 (2026-09-24 observation review) | create-task |
-
+| 2026-09-28 | 1.1     | Review passed (9/10): 0 critical, 2 important (the scope line keys on `result.titleChecked`; the task.151 list growth), 3 optional (9 drifted anchors, no `already` reason, M1 re-measured at 43 of 166), all applied | review-task |
+| 2026-09-28 |         | Status → ready-for-development | review-task |
+| 2026-09-28 |         | Implemented — 11 authored files (plus bundled copies), 22 new tests | develop |
+| 2026-09-28 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task |
+| 2026-09-28 |         | QA gate FAIL (70/100) — cycle 2: 1 high (seed identity on the scan path) | qa-task |
+| 2026-09-28 |         | QA gate FAIL (70/100) — cycle 3: 1 high (whole-log same-prefix park), 1 medium | qa-task |
+| 2026-09-28 |         | QA gate CONCERNS (90/100) — cycle 4: 0 high, 1 medium (observe-work Step 6 lacks --expect-status) | qa-task |
+| 2026-09-28 |         | QA findings fixed — bugs 1–4 and CR4-1; engine set-status gains ambiguous-id and --expect-status; 4 iterations | qa-fix |
+| 2026-09-28 |         | QA gate PASS (100/100) — cycle 5: no high or medium; 2 low advisory carried | qa-task |
+| 2026-09-28 |  | DoD incomplete — 2 gaps identified | finalise |
+| 2026-09-28 |  | DoD incomplete (run 2) — 2 gaps identified | finalise |
+| 2026-09-28 | 1.2 | DoD passed — accepted (PR #512) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Title bound in the card preflight
-- [ ] Phase 2: Evidence rules
-- [ ] Phase 3: Discriminator rule
-- [ ] Phase 4: `--from-observation` entry
-- [ ] Phase 5: Documentation and validation
+- [x] Phase 1: Title bound in the card preflight
+- [x] Phase 2: Evidence rules
+- [x] Phase 3: Discriminator rule
+- [x] Phase 4: `--from-observation` entry
+- [x] Phase 5: Documentation and validation
 
 ---
 

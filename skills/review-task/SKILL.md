@@ -916,6 +916,20 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       `filedBug` (`git show v0.51.0:skills/qa-next/SKILL.md | grep -c '\btargeted\b'` → `0`); a
       missing `bug` would have made a repeat failure file a duplicate bug
 
+13. **Single-statement test discriminator** (obs #135):
+    - For each test the plan proposes that holds one statement, a population or an allowlist, grep
+      the key it matches on and list every hit
+    - A hit that belongs to a different rule means the key is shared: the test is red at the wrong
+      site. Ask for a positive marker or a compound pattern
+    - Ask which restatement of the rule would **not** match the key, and how the test sees it. A
+      token-free restatement makes the test pass over the thing it was built to catch
+    - A population derived from directories never needs a site added by hand. A plan that names one
+      has misread the test
+    - Worked example: task.130 proposed a test keyed on `loop-limit|not-converging`, a token another
+      rule also uses. It would have been red at the wrong site, and it would have missed the
+      token-free restatement that caused task.124 bug 13
+    - Flag as **Important** when the key is shared or no token-free restatement is addressed
+
 **Common Hallucination Patterns to Detect**:
 
 - ❌ Libraries not in package.json or tech stack
@@ -927,6 +941,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ An outcome no current or planned branch of the named function returns for the stated input. Report it as **Important** under check 10, not as a Critical hallucination
 - ❌ A property of an existing function asserted for new inputs, and never run on them (check 11)
 - ❌ Legacy or compatibility handling scoped from the finding that prompted it, not diffed against the released shape (check 12)
+- ❌ A test key that another rule's sites also match (check 13)
 
 **Issues to Flag**:
 

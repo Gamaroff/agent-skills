@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": ".claude/state/t150-probe/wrapper.mjs#titleWithinBound",
+      "name": "titleWithinBound",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 5,
+      "passed": 5,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-28T19:29:57.135Z"
+    },
+    {
+      "sink": "filename",
+      "entry": ".claude/state/t150-probe/wrapper.mjs#seedAcceptsStatus",
+      "name": "seedAcceptsStatus",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 7,
+      "passed": 7,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-28T19:29:56.401Z"
+    },
+    {
+      "sink": "filename",
+      "entry": ".claude/state/t150-probe/wrapper.mjs#seedFromRealScan",
+      "name": "seedFromRealScan",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 12,
+      "passed": 12,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-28T19:29:46.461Z"
+    }
+  ],
+  "totals": {
+    "executed": 24,
+    "reproduced": 0
+  },
+  "updated_at": "2026-09-28T19:29:57.135Z"
+}
