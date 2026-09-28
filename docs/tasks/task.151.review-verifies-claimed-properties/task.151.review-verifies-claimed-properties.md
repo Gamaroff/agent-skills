@@ -5,7 +5,7 @@ type: task
 description: "Three review-task checks confirm that a thing exists but never that a claimed property of it holds. (1) The Phase 1.5 pre-pass Agent B compares a document against a hard-coded web-stack domain list and web-stack axes. On a shell/Node repository it answers 'aligned' unless someone rewrites the prompt by hand (obs #130). Derive the domains and axes from the consumer's own architecture docs using a small pure helper, and require Agent B to report the axes it actually checked. (2) Every Step 3 check and Anti-Hallucination Detection Rule verifies existence. None runs the property a document claims for an existing function under new inputs (obs #161). Add an Invariant verification check: execute the claim and report a falsified one as Critical. (3) Legacy and compatibility handling is scoped from the finding that prompted it instead of from the released artefact (obs #170). Add a Released-shape diff check: `git show <tag>:<path>`, diff the result against the target shape, and report every uncovered field as Important. Sites: review-task, review-story and create-task Step 3.5, held by two tests."
 tags: [review-task, review-story, create-task, pre-pass, anti-hallucination, observation]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-24
@@ -13,11 +13,13 @@ updated: 2026-09-28
 assignee:
 estimated_effort_hours: 8
 github_issue: 481
+completed_date: 2026-09-28
+pr_number: 511
 ---
 
 # Technical Task: review-task — stack-neutral pre-pass, executed invariants, released-shape diff
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.151.review.1.review-verifies-claimed-properties.md` implemented 2026-09-28
 
@@ -668,6 +670,32 @@ Carried out of the QA loop, each with the reason it did not block acceptance:
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.151.qa.3.review-verifies-claimed-properties.md`
+**Gate File**: `task.151.gate.3.review-verifies-claimed-properties.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100 (3 QA cycles; TASK-151-BUG-1 and -2 closed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 15/15 met (SC1–SC15)
+✅ **Tests:** 26 new tests in `prepass-axes.test.mjs` and `review-property-checks.test.js`; `ci:fast` 4363 pass / 0 fail; 22 mutation proofs recorded
+✅ **PR Review:** PR #511 — Step 5c `/review-pr` APPROVE
+✅ **Documentation:** CHANGELOG (three entries), review-task / review-story / create-task `SKILL.md`, both prompt files
+✅ **Security Review:** PASS — boundary probed (5 executed, 0 reproduced)
+✅ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-28
+
+**Detailed Verification Log:** See `task.151.dod.1.review-verifies-claimed-properties.md` for complete verification evidence.
+
+---
+
 ## QA Testing Results
 
 **QA Status**: PASS
@@ -694,12 +722,11 @@ Both bugs (TASK-151-BUG-1, -2) fixed and verified. One low edge case (C3-CR-2) c
 Work by the cosmetic-residue exit.
 
 ---
-
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                            | Author      |
-| ---------- | ------- | -------------------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #130, #161, #170 (2026-09-24 observation review) | create-task |
 | 2026-09-28 | 1.1     | Review passed (9/10) — task.145 boundary and check numbering updated (checks 11–12 / 8–9); anchors re-measured | review-task |
 | 2026-09-28 |         | Status → ready-for-development | review-task |
@@ -708,6 +735,7 @@ Work by the cosmetic-residue exit.
 | 2026-09-28 |         | QA findings fixed — gate 1 CR-1..CR-5, gate 2 C2-CR-1 (atxH2 reader), C2-CR-2, C2-CR-5; 2 iterations | qa-fix |
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — cycle 2: gate-1 findings fixed; 1 medium (C2-CR-1), 4 advisory | qa-task |
 | 2026-09-28 |         | QA gate PASS (95/100) — cycle 3: no high or medium; 1 low carried (route 2b) | qa-task |
+| 2026-09-28 | 1.2 | DoD passed — accepted (PR #511) | finalise |
 <!-- change-log-end -->
 
 ---
