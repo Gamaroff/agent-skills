@@ -649,31 +649,45 @@ None.
 
 ---
 
+## Deferred Work
+
+Carried out of the QA loop, each with the reason it did not block acceptance:
+
+- **C3-CR-2** (low) — a heading containing U+2028/U+2029 is dropped by `atxH2`; carried by the
+  cosmetic-residue exit (route 2b, cycle 3). Fix: `[^]*?` content capture + a table case.
+- **C3-CR-1** (low) — a `## ` heading inside a multi-line HTML comment is read as an axis.
+- **C3-CR-3** (cleanup) — state the rule everywhere as "a non-empty H2 other than `See also`".
+- **C2-CR-3** (low) — a non-existent `--arch` root reads as `fallback`: that is the no-docs case by
+  design; `source` is recorded beside every `aligned`.
+- **C2-CR-4** (low) — `, ` / `; ` inside a heading make distinct heading sets render alike; no
+  known concepts file carries one.
+
+---
+
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-28
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.151.qa.2.review-verifies-claimed-properties.md](./task.151.qa.2.review-verifies-claimed-properties.md)
-- **Gate File**: [task.151.gate.2.review-verifies-claimed-properties.yml](./task.151.gate.2.review-verifies-claimed-properties.yml)
+- **Full Report**: [task.151.qa.3.review-verifies-claimed-properties.md](./task.151.qa.3.review-verifies-claimed-properties.md)
+- **Gate File**: [task.151.gate.3.review-verifies-claimed-properties.yml](./task.151.gate.3.review-verifies-claimed-properties.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 25 new (64 in the targeted re-run); `ci:fast` 4362 pass / 0 fail
+- **Tests Executed**: 26 new (30 in the targeted re-run); `ci:fast` 4363 pass / 0 fail
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (1 medium: C2-CR-1)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Gate 1's five findings are fixed and mutation-proven. C2-CR-1 (medium): an H2 with no text still
-counts as an axis — [task.151.bug.2.blank-h2-counts-as-an-axis.md](./task.151.bug.2.blank-h2-counts-as-an-axis.md).
-Four advisory findings (C2-CR-2 – C2-CR-5) in the QA report.
+Both bugs (TASK-151-BUG-1, -2) fixed and verified. One low edge case (C3-CR-2) carried to Deferred
+Work by the cosmetic-residue exit.
 
 ---
 
@@ -688,6 +702,7 @@ Four advisory findings (C2-CR-2 – C2-CR-5) in the QA report.
 | 2026-09-28 |         | Implemented — 13 files (1 helper, 2 tests, 1 test-lib move, 3 SKILL.md, 2 prompt files, jira-sync export, CHANGELOG), 22 tests; 15 mutation proofs red | develop |
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — 1 medium finding (CR-1), 4 low advisory | qa-task |
 | 2026-09-28 |         | QA findings fixed — gate 1 CR-1..CR-5, gate 2 C2-CR-1 (atxH2 reader), C2-CR-2, C2-CR-5; 2 iterations | qa-fix |
+| 2026-09-28 |         | QA gate PASS (95/100) — cycle 3: no high or medium; 1 low carried (route 2b) | qa-task |
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — cycle 2: gate-1 findings fixed; 1 medium (C2-CR-1), 4 advisory | qa-task |
 <!-- change-log-end -->
 

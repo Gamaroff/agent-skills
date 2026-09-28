@@ -4,7 +4,7 @@
 **Bug ID**: TASK-151-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 1 diff code review, CR-1)
 **Date Found**: 2026-09-28
 
@@ -88,3 +88,4 @@ produced an empty list under `source: architecture`.
 | 2026-09-28 | New          | qa-task    | QA cycle 1, CR-1               |
 | 2026-09-28 | In Progress  | qa-fix     | Investigation                  |
 | 2026-09-28 | Ready for QA | qa-fix     | Fix + test, mutation-proven    |
+| 2026-09-28 | Closed       | qa-task    | Verified in QA cycle 3 (gate 3 PASS)    |

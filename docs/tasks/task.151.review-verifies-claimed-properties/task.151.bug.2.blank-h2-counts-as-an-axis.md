@@ -4,7 +4,7 @@
 **Bug ID**: TASK-151-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 2 refute pass, CR-1)
 **Date Found**: 2026-09-28
 
@@ -75,3 +75,4 @@ for a non-heading; `h2s` keeps only non-empty text.
 | 2026-09-28 | New          | qa-task    | QA cycle 2 refute pass, C2-CR-1         |
 | 2026-09-28 | In Progress  | qa-fix     | Narrowing offer — consolidate           |
 | 2026-09-28 | Ready for QA | qa-fix     | atxH2 + CommonMark table, 3 proofs red  |
+| 2026-09-28 | Closed       | qa-task    | Verified in QA cycle 3 (gate 3 PASS)    |
