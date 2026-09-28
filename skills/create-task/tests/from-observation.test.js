@@ -182,6 +182,59 @@ test("seed: an entry that is not `open` is refused, naming its status", () => {
   }
 });
 
+test("seed: an id that does not name exactly one entry is refused (TASK-150-BUG-1)", () => {
+  // Each of these was ACCEPTED by `Number()` + `Number.isInteger` and converted:
+  // "0x10" parked #16, "1e2" parked #100, "" parked #0. The engine parses
+  // `id: 0x10` as the STRING "0x10", so a hand-edited entry reaches the seed so.
+  const refused = [
+    "",
+    "0x10",
+    "1e2",
+    "-3",
+    "0",
+    " 12 ",
+    "1.5",
+    0,
+    -1,
+    1.5,
+    null,
+    undefined,
+  ];
+  for (const id of refused) {
+    assert.throws(
+      () => lib.seedFromObservations([entry(id)], { taskId: 150 }),
+      /has no numeric id/,
+      `id ${JSON.stringify(id)} must be refused`,
+    );
+  }
+  for (const id of [124, "124", 1]) {
+    const seed = lib.seedFromObservations([entry(id)], { taskId: 150 });
+    assert.equal(
+      seed.park[0][2],
+      String(Number(id)),
+      `id ${JSON.stringify(id)} is accepted as itself`,
+    );
+  }
+});
+
+test("seed: status is read by the engine's statusOf, so an entry the log lists as open is open (TASK-150-BUG-2)", () => {
+  for (const status of [" open ", "", null]) {
+    const fm = { ...entry(5).frontmatter, status };
+    assert.equal(
+      engine.statusOf(fm),
+      "open",
+      "precondition: the engine reads this status as open",
+    );
+    assert.doesNotThrow(
+      () =>
+        lib.seedFromObservations([{ frontmatter: fm, body: "" }], {
+          taskId: 150,
+        }),
+      `status ${JSON.stringify(status)} must be accepted`,
+    );
+  }
+});
+
 test("round trip: the park vectors are accepted by the real engine and leave each entry parked on the task", () => {
   const ws = fs.mkdtempSync(path.join(SCRATCH_ROOT, "from-observation-"));
   try {

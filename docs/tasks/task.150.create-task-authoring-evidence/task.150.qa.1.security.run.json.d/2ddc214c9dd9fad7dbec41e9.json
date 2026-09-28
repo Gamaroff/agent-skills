@@ -1,0 +1,18 @@
+{
+  "sink": "filename",
+  "entry": ".claude/state/t150-probe/wrapper.mjs#seedAcceptsStatus",
+  "name": "seedAcceptsStatus",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 8,
+  "passed": 7,
+  "reproduced": 0,
+  "overblocked": 1,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-28T19:07:07.656Z"
+}

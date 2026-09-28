@@ -197,7 +197,9 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
 2. **Select and refuse.** Take the entries whose `id` is in the list. **Refuse the run** when an id is
    missing, or when its `status` is not `open`, and name the id and its status. A parked or actioned
    entry already has a home, and a second task cut from it is the duplicate this entry prevents.
-3. **Seed.** For each entry, read `${OBS_LOG_DIR}/<file>` (the `file` the scan returned) and pass
+3. **Seed.** For each entry, read `${OBS_LOG_DIR}/<file>` (the `file` the scan returned; `OBS_LOG_DIR`
+   is set by the resolver, so source it again in the same shell as this read, or every path loses its
+   directory) and pass
    `{ frontmatter: <the scan entry>, body: <the file's text> }` to `seedFromObservations` in
    `scripts/lib.js`. It returns `ids`, `title` (or `null` with `titleReason`), `description`, `tags`,
    `references`, `changeLogDescription` and the `park` vectors, and it throws on a non-`open` entry.
@@ -691,13 +693,15 @@ Actions:
 1. Task document created at `docs/tasks/task.[ID].[name]/task.[ID].[name].md`
 2. Plan file created at `docs/tasks/task.[ID].[name]/task.[ID].plan.[name].md`
 2a. Card preflight run (step 4.6) — report any findings verbatim, as advisory
-2b. **`--from-observation` only: park the entries.** Run each `park` vector from the § 1.1 seed,
-    in the same shell as the resolver, one call per id:
+2b. **`--from-observation` only: park the entries.** Run each `park` vector from the § 1.1 seed
+    **verbatim**, in the same shell as the resolver, one call per id. The seed has already built the
+    arguments, so never retype an id or a task number. `{park-vector}` below is one vector's
+    elements, each quoted:
 
     ```bash
     source .agents/skills/create-task/references/resolve-observation-workspace.sh || exit 1
-    command node .agents/skills/create-task/references/observation-log.js \
-      set-status --id 124 --status parked --parked-until "task.150 merged to develop" --json
+    command node .agents/skills/create-task/references/observation-log.js {park-vector}
+    # e.g. set-status --id 124 --status parked --parked-until "task.150 merged to develop" --json
     ```
 
     Read `reason`. `ok` is success. Report any other value verbatim and continue: parking never

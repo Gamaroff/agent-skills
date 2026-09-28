@@ -580,6 +580,34 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-28
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.150.qa.1.create-task-authoring-evidence.md](./task.150.qa.1.create-task-authoring-evidence.md)
+- **Gate File**: [task.150.gate.1.create-task-authoring-evidence.yml](./task.150.gate.1.create-task-authoring-evidence.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 40 (4 files) + `ci:fast` 4385 pass / 0 fail; 22 security probes
+- **Phases Verified**: 5/5 (Phase 4 with issues)
+- **Critical Issues**: 1 HIGH ([TASK-150-BUG-1](./task.150.bug.1.seed-id-guard-inert.md)), 1 MEDIUM ([TASK-150-BUG-2](./task.150.bug.2.seed-status-diverges-from-engine.md))
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+`seedFromObservations`' id guard is present but inert. `Number()` accepts `0x10`, `1e2`, `""`,
+`-3`, `0` and `" 12 "`, so a park vector can name a different observation. The seed also reads
+status differently from the engine. Both are in `skills/create-task/scripts/lib.js`.
+
+---
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -590,6 +618,7 @@ None.
 | 2026-09-28 | 1.1     | Review passed (9/10): 0 critical, 2 important (the scope line keys on `result.titleChecked`; the task.151 list growth), 3 optional (9 drifted anchors, no `already` reason, M1 re-measured at 43 of 166), all applied | review-task |
 | 2026-09-28 |         | Status → ready-for-development | review-task |
 | 2026-09-28 |         | Implemented — 11 authored files (plus bundled copies), 22 new tests | develop |
+| 2026-09-28 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task |
 
 <!-- change-log-end -->
 

@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": ".claude/state/t150-probe/wrapper.mjs#titleWithinBound",
+      "name": "titleWithinBound",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 5,
+      "passed": 5,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-28T19:07:09.566Z"
+    },
+    {
+      "sink": "filename",
+      "entry": ".claude/state/t150-probe/wrapper.mjs#seedAcceptsStatus",
+      "name": "seedAcceptsStatus",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 8,
+      "passed": 7,
+      "reproduced": 0,
+      "overblocked": 1,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-28T19:07:07.656Z"
+    },
+    {
+      "sink": "filename",
+      "entry": ".claude/state/t150-probe/wrapper.mjs#seedAcceptsId",
+      "name": "seedAcceptsId",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 9,
+      "passed": 3,
+      "reproduced": 6,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-28T19:07:08.837Z"
+    }
+  ],
+  "totals": {
+    "executed": 22,
+    "reproduced": 6
+  },
+  "updated_at": "2026-09-28T19:07:09.566Z"
+}

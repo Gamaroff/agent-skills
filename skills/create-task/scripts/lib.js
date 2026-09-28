@@ -15,6 +15,10 @@ const shared = require("../references/create-skills-lib.js");
 // The card title bound is defined once, beside the card spec, and read from
 // there (task.150). A copy of the number here would be a second definition.
 const { CARD_TITLE_MAX } = require("../references/jira-sync.js");
+// An entry's status is read by the engine's own reader, never re-derived here:
+// `statusOf` trims and reads an empty status as `open`, and a second reading
+// refused entries the log lists as open (task.150 QA cycle 1, TASK-150-BUG-2).
+const { statusOf } = require("../references/observation-log.js");
 
 const {
   parseFrontmatter,
@@ -236,6 +240,19 @@ function asArray(v) {
   return (Array.isArray(v) ? v : [v]).map(String).filter(Boolean);
 }
 
+// An observation id becomes a `set-status --id` argument, so it must name
+// exactly one entry. `Number()` is not that check: it reads "0x10" as 16, "1e2"
+// as 100, "" as 0 and " 12 " as 12, and a malformed id then parks a DIFFERENT
+// observation (task.150 QA cycle 1, TASK-150-BUG-1). A positive integer number,
+// or a string of base-10 digits with no leading zero — nothing else.
+function observationId(raw) {
+  if (typeof raw === "number") {
+    return Number.isInteger(raw) && raw >= 1 ? raw : null;
+  }
+  if (typeof raw === "string" && /^[1-9][0-9]*$/.test(raw)) return Number(raw);
+  return null;
+}
+
 function firstSentence(text) {
   const flat = String(text || "")
     .replace(/\s+/g, " ")
@@ -271,9 +288,9 @@ function seedFromObservations(entries, { taskId } = {}) {
     );
   }
   const rows = entries.map(({ frontmatter = {}, body = "" }) => {
-    const id = Number(frontmatter.id);
-    const status = String(frontmatter.status || "open");
-    if (!Number.isInteger(id)) {
+    const id = observationId(frontmatter.id);
+    const status = statusOf(frontmatter);
+    if (id === null) {
       throw new Error(
         `observation entry has no numeric id: ${JSON.stringify(frontmatter.id)}`,
       );
