@@ -86,4 +86,66 @@ function sectionOf(text, heading) {
   return out;
 }
 
-module.exports = { FENCE_OPEN, fenceStep, sectionOf };
+// The per-item reader and prose normaliser, moved here from
+// tests/outcome-reachability-check.test.js (task.145) when
+// tests/review-property-checks.test.js (task 151) needed the same item scope.
+const LIST_ITEM = /^(\s*)(?:\d+\.|[-*])\s/;
+
+/**
+ * The list item whose first line matches `citation` (a RegExp), through to the next
+ * line at the item's own indentation or shallower (a sibling item, or the prose
+ * after the list). Blank lines inside the item do not end it; fenced lines are
+ * dropped, since a command in a fence is an example, not the check's wording.
+ */
+function citingItemOf(sectionLines, citation) {
+  let open = null;
+  let start = -1;
+  let indent = 0;
+  for (let i = 0; i < sectionLines.length; i++) {
+    const line = sectionLines[i];
+    const step = fenceStep(open, line);
+    const fenced = open !== null || step.isFence;
+    open = step.open;
+    if (fenced) continue;
+    const m = line.match(LIST_ITEM);
+    if (m && citation.test(line)) {
+      start = i;
+      indent = m[1].length;
+      break;
+    }
+  }
+  if (start === -1) return null;
+
+  const item = [sectionLines[start]];
+  open = null;
+  for (let i = start + 1; i < sectionLines.length; i++) {
+    const line = sectionLines[i];
+    const step = fenceStep(open, line);
+    // A fence that OPENS at the item's indentation or shallower is not inside
+    // the item — it ends it, like any other line at that depth. Toggling on it
+    // first glued the lines after it onto the item (task.145 QA cycle 1, CR-4).
+    // Opening or CLOSING: a fence line at the item's depth or shallower is at
+    // the item's own level, so the item ended before it (CR2-4 — the closing
+    // side was still reachable after cycle 1's opening-only fix).
+    if (step.isFence && line.match(/^\s*/)[0].length <= indent) break;
+    const fenced = open !== null || step.isFence;
+    open = step.open;
+    if (fenced) continue;
+    if (line.trim() === "") continue;
+    const lead = line.match(/^\s*/)[0].length;
+    if (lead <= indent) break;
+    item.push(line);
+  }
+  return item.join("\n");
+}
+
+/**
+ * Prose as a reader sees it: a phrase wrapped across lines or split by emphasis
+ * ("**named\n  function**") is still the phrase. Matching the raw text would
+ * make an element's presence depend on where prettier chose to wrap.
+ */
+function asProse(item) {
+  return item.replace(/\*\*|`/g, "").replace(/\s+/g, " ");
+}
+
+module.exports = { FENCE_OPEN, fenceStep, sectionOf, citingItemOf, asProse };
