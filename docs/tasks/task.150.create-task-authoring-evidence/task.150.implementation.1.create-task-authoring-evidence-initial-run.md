@@ -3,7 +3,7 @@
 **Task**: `task.150.create-task-authoring-evidence.md`
 **Run Number**: 1
 **Started**: 2026-09-28 18:46
-**Status**: Escalated
+**Status**: Paused (DoD gaps)
 
 ---
 
@@ -35,8 +35,8 @@ Close five create-task authoring gaps (obs #124, #127, #128, #135, #147): grep-a
 | 2. review-task             | ✅ Done    | `task.150.review.{N}.{name}.md` exists (or skip logged)                | `task.150.review.1.create-task-authoring-evidence.md`: READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 5/5 phases; ci:fast 4385/0; 15 mutation proofs | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #512: https://github.com/Gamaroff/agent-skills/pull/512 | —                    |
-| 5–6. qa-task / qa-fix loop | ❌ Failed  | `task.150.qa.{N}.*.md`; `task.150.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated: loop not converging at cycle 3 (HIGH 1, 1, 1); gates 1–3 FAIL 70 | `task.150.qa.3.security.run.json` |
-| 7. finalise                | ⏳ Pending | `task.150.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.150.qa.{N}.*.md`; `task.150.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at cycle 3 (HIGH 1, 1, 1); operator root fix and 2 granted cycles; gate 5 PASS 100; 5c CONCERNS | `task.150.qa.5.security.run.json` |
+| 7. finalise                | ❌ Failed  | `task.150.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: 2 (AC6 performance wording; security low: title bound fails open on block-scalar/BOM frontmatter). `task.150.dod.1` | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -139,12 +139,31 @@ task.123's first committed draft is `e0881adb` (`git log --diff-filter=A`). It n
 - Engine: `findAllById`; `set-status` refuses `ambiguous-id` and takes `--expect-status` (`status-changed`); contract table updated. Seed: `--expect-status open` on every vector; the agreement check reads the raw id from the file text. Prose: § 1.1 selects by `file`, and § 5 relies on the engine check
 - Tests: 2 engine and 2 seed, all mutation-proved (5 mutations). `ci:fast` 4393 pass / 0 fail; `bundle:check` 0 problems; `validate` passes on create-task and observe-work
 - Scope note: `shared/resources/observation-log.js` is outside the task's original file list. It is recorded in the task's Files Summary (5a) and Implementation Summary
+- QA loop re-entry: 2 extra cycles granted; 0 cycles run outside the loop back-filled from disk (gates 1–3 all carry `### QA Cycle` entries). Lock restored from the halt snapshot by `grant-qa-cycles.sh`; `qa_max_cycles` = 5
+- Status line: Escalated → In Progress (resumed)
+
+### Step 5c — review-pr (cycle 5)
+
+- `/review-pr --effort medium --comment`: **CONCERNS** (no high+high finding; medium findings present). Report `task.150.pr-review.1.create-task-authoring-evidence.md`; the PR comment was posted with the `<!-- agent-skills-pr-review -->` marker
+- Findings: PC-1 (trail, medium: the report's cycle 4–5 state is deferred to Step 8 and the Completion block still read Escalated, corrected at Step 8), PC-2/PC-3 (low), CR-1 (medium/medium: the observe-work Step 6 template's literal `--expect-status open`, the same defect as gate 5's CR5-1), CR-2 (low/low)
+- CONCERNS does not block: findings recorded, loop exited. CR-1 is carried as the first follow-up
+- `ready-for-merge`: stage-disabled
+
+### Step 7 — finalise
+
+- `/finalise` invoked (task mode). Four DoD agents dispatched in parallel: AC PARTIAL (AC6 FAIL; AC8 PASS by judgement, since its grep holds), security FAIL (low; 48 probes, 3 reproduced; run record `task.150.dod.security.run.json`), compliance NOT_APPLICABLE, docs PASS
+- CI reading 1: SUCCESS @ `62371a0e4ace` over 5 checks (background poll, 60s). No acceptance commit was made, so there is no reading 2
+- Decision: IN PROGRESS, gaps identified. Step 8a (fix-and-recheck) is not applicable: two sections are not PASS, and the AC finding has no agent severity
+- Gaps: (1) AC6: the corpus ratchet is a second walk and re-reads each document; (2) security (low): `checkCardTitle` fails open on folded or literal block-scalar titles and on BOM-prefixed frontmatter, inherited from the line-based `parseFrontmatter`
+- Change Log gaps row written via `change-log.js` (no version bump); gap report section added to the task; gaps PR comment posted. Task status unchanged (`ready-for-review`)
 
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+- Step 7: /finalise identified 2 DoD gaps (AC6; security low). This is a terminal HALT, handed to the operator
 
 - QA Cycle 3: the convergence check tripped (HIGH 1, 1, 1). This is a terminal HALT, handed to the operator; see the escalation entry in QA Iteration History. Tracker `blocked` stage signalled
 - The code-review subagents (3) and the security probes ran independently. The findings ingester and pre-develop Explore were run inline (independence loss recorded in each step's Decisions Log)
@@ -211,14 +230,34 @@ they are handed over below.
 2. In create-task § 1.1 and § 5 step 2b, key the selection and the re-check on the scan entry's `file`. Then resume with `/develop-task` → "Resume at 5a with 2 more cycles"
 3. Alternatively, split Phase 4 (`--from-observation`) into its own task, as the task's Open Question 3 already allows, and land Phases 1–3 and 5, which QA has found clean for 3 cycles
 
+### QA Cycle 4 — 2026-09-28
+**Gate Result**: CONCERNS
+**Issues Found**: 1. CR4-1 (MEDIUM): observe-work review Step 6 and its quick-reference row write `set-status` without `--expect-status`. BUG-4, CR3-2 and cycle-3 CR-3 are fixed; the end-to-end park probe engages 10/10. Advisory: CR4-2 (`--expect-status` accepted outside `set-status`)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+**Fixes Applied**: CR4-1: observe-work review Step 6 and its quick-reference row pass `--expect-status`. CR4-2: the flag is rejected outside `set-status` (mutation-proved). The create-task example vector was updated. Probe population 5: 3 updated, 2 unaffected. Fast gate: `ci:fast` 4393 pass / 0 fail on attempt 1
+**Commit**: `ead30d17`
+
+### QA Cycle 5 — 2026-09-28
+**Gate Result**: PASS
+**Issues Found**: none in `top_issues`. Advisory: CR5-1 (the observe-work Step 6 template's literal `--expect-status open`) and CR5-2 (§ 1.1 matches a padded prefix), carried to `recommendations.future`
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
 **Finished**: 2026-09-28 (halted at Steps 5–6)
-**Final Status**: Escalated (QA loop not converging, cycle 3)
+**Final Status**: Failed (DoD gaps at Step 7)
 **Branch**: `feature/task.150.create-task-authoring-evidence`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/512
-**QA Iterations**: 3 (2 qa-fix cycles)
-**DoD Summary**: {populated after Step 7}
+**QA Iterations**: 5 (4 qa-fix cycles; escalated at cycle 3, re-entered with 2 granted cycles)
+**DoD Summary**: `task.150.dod.1.create-task-authoring-evidence.md` (GAPS IDENTIFIED)
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}

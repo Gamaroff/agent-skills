@@ -615,14 +615,46 @@ None.
 No critical issues remain. Two low advisory findings are carried as follow-ups: the observe-work
 Step 6 template's literal `open`, and § 1.1's padded prefix match.
 
+
 ---
 
-<!-- change-log-start -->
+## Definition of Done - Gaps Identified
 
+**Status:** IN PROGRESS (the document stays at `ready-for-review`; not accepted)
+
+### QA Gate Status
+
+**QA Report**: `task.150.qa.5.create-task-authoring-evidence.md`
+**Gate File**: `task.150.gate.5.create-task-authoring-evidence.yml`
+**Gate Status**: ✅ PASS (100/100). Step 5c `/review-pr`: ⚠️ CONCERNS
+
+### Missing Criteria:
+
+1. **Performance criterion (Success Criteria, Performance 2):**
+   - [ ] The corpus ratchet should add one frontmatter parse per document to the existing walk. As built, it is a second walk that reads each document again (`shared/resources/tests/card-preflight-corpus.test.mjs:113`, `:124`)
+
+2. **Security Review (low, reproduced by execution):**
+   - [ ] `checkCardTitle` fails open on a folded (`>-`) or literal (`|`) block-scalar `title:` and on BOM-prefixed frontmatter. The line-based `parseFrontmatter` reads the indicator, or finds no frontmatter. Run record: `task.150.dod.security.run.json` (48 probes, 3 reproduced)
+
+### Next Steps:
+
+- [ ] Share one walk (a single read and parse per document) between the two corpus tests
+- [ ] Strip a leading BOM and refuse or flag a block-scalar `title:` in the title check, with the three probe inputs as tests
+- [ ] Re-run `/finalise`
+
+**Not gaps (follow-ups):** a single-definition test for `CARD_TITLE_MAX` (the criterion's grep holds today); the observe-work review Step 6 template's literal `--expect-status open` (5c CR-1, CR5-1); § 1.1's padded-prefix match (CR5-2).
+
+**Estimated Effort:** Small (1–2 hours)
+
+**Gap Report Generated:** 2026-09-28
+**Detailed Verification Log:** See `task.150.dod.1.create-task-authoring-evidence.md` for the full verification evidence.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                                          | Author      |
-| ---------- | ------- | ---------------------------------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #124, #127, #128, #135, #147 (2026-09-24 observation review) | create-task |
 | 2026-09-28 | 1.1     | Review passed (9/10): 0 critical, 2 important (the scope line keys on `result.titleChecked`; the task.151 list growth), 3 optional (9 drifted anchors, no `already` reason, M1 re-measured at 43 of 166), all applied | review-task |
 | 2026-09-28 |         | Status → ready-for-development | review-task |
@@ -633,7 +665,7 @@ Step 6 template's literal `open`, and § 1.1's padded prefix match.
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — cycle 4: 0 high, 1 medium (observe-work Step 6 lacks --expect-status) | qa-task |
 | 2026-09-28 |         | QA findings fixed — bugs 1–4 and CR4-1; engine set-status gains ambiguous-id and --expect-status; 4 iterations | qa-fix |
 | 2026-09-28 |         | QA gate PASS (100/100) — cycle 5: no high or medium; 2 low advisory carried | qa-task |
-
+| 2026-09-28 |  | DoD incomplete — 2 gaps identified | finalise |
 <!-- change-log-end -->
 
 ---

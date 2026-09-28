@@ -1,0 +1,18 @@
+{
+  "sink": "filename",
+  "entry": ".observation-log-test-tmp/dod-probe/wrapper.mjs#setStatusGuard",
+  "name": "setStatusGuard",
+  "call_site": "shared/resources/observation-log.js:1049",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 16,
+  "passed": 16,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-28T20:05:57.468Z"
+}
