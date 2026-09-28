@@ -4,7 +4,7 @@
 **Bug ID**: TASK-150-BUG-3
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 2: refute pass CR-1 and CR-2, plus the safety re-probe)
 **Date Found**: 2026-09-28
 
@@ -82,3 +82,4 @@ no safe-integer check each turn a named test red.
 | ---------- | ------------ | ---------- | ---------------------------------------- |
 | 2026-09-28 | New | QA | Refute CR-1/CR-2 plus the re-probe, cycle 2 |
 | 2026-09-28 | Ready for QA | qa-fix | Identity keyed on the file prefix |
+| 2026-09-28 | Closed | QA | Cycle 3 real-scan re-probe engages 12/12 |

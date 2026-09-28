@@ -13,7 +13,7 @@ tags:
     observation,
   ]
 category: other
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-28
@@ -24,7 +24,7 @@ github_issue: 480
 
 # Technical Task: create-task — anchored claims, a bounded title, and a --from-observation entry
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.150.review.1.create-task-authoring-evidence.md` implemented 2026-09-28
 
@@ -586,26 +586,26 @@ None.
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-28
 **Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Gate Decision**: FAIL (cycle 3; the QA loop escalated as not converging)
 
 ### QA Report
 
-- **Full Report**: [task.150.qa.2.create-task-authoring-evidence.md](./task.150.qa.2.create-task-authoring-evidence.md)
-- **Gate File**: [task.150.gate.2.create-task-authoring-evidence.yml](./task.150.gate.2.create-task-authoring-evidence.yml)
-- **Previous**: [task.150.qa.1.create-task-authoring-evidence.md](./task.150.qa.1.create-task-authoring-evidence.md) (FAIL 70)
+- **Full Report**: [task.150.qa.3.create-task-authoring-evidence.md](./task.150.qa.3.create-task-authoring-evidence.md)
+- **Gate File**: [task.150.gate.3.create-task-authoring-evidence.yml](./task.150.gate.3.create-task-authoring-evidence.yml)
+- **Previous**: [qa.2](./task.150.qa.2.create-task-authoring-evidence.md) (FAIL 70), [qa.1](./task.150.qa.1.create-task-authoring-evidence.md) (FAIL 70)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 42 targeted; 30 security probes
+- **Tests Executed**: 44 targeted; 24 security probes (cycle 3)
 - **Phases Verified**: 5/5 (Phase 4 with issues)
-- **Critical Issues**: 1 HIGH ([TASK-150-BUG-3](./task.150.bug.3.seed-identity-not-the-engines.md)); BUG-1 and BUG-2 fixed for their stated inputs
+- **Critical Issues**: 1 HIGH ([TASK-150-BUG-4](./task.150.bug.4.park-resolves-first-same-prefix-file.md)), 1 MEDIUM; BUG-1, -2 and -3 fixed
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-On the prescribed path, the seed's id is not the id `set-status` parks. Scan output is already
-`parseInt`-ed, and `set-status` resolves by filename prefix, so a malformed entry can park a
-different observation.
+`set-status` parks the first file in the whole log whose prefix matches, so a same-prefix sibling
+is overwritten instead of the selected entry. The HIGH count per cycle is 1, 1, 1 in the same
+`--from-observation` identity mechanism, so the loop escalated for a person to decide.
 
 ---
 
@@ -621,6 +621,7 @@ different observation.
 | 2026-09-28 |         | Implemented — 11 authored files (plus bundled copies), 22 new tests | develop |
 | 2026-09-28 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task |
 | 2026-09-28 |         | QA gate FAIL (70/100) — cycle 2: 1 high (seed identity on the scan path) | qa-task |
+| 2026-09-28 |         | QA gate FAIL (70/100) — cycle 3: 1 high (whole-log same-prefix park), 1 medium | qa-task |
 
 <!-- change-log-end -->
 

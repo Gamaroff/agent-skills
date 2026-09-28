@@ -3,7 +3,7 @@
 **Task**: `task.150.create-task-authoring-evidence.md`
 **Run Number**: 1
 **Started**: 2026-09-28 18:46
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -34,8 +34,8 @@ Close five create-task authoring gaps (obs #124, #127, #128, #135, #147): grep-a
 | 1. create-branch           | ✅ Done    | Branch `feature/task.150.*` exists in git                              | Branch created at `f88a997f` | —                    |
 | 2. review-task             | ✅ Done    | `task.150.review.{N}.{name}.md` exists (or skip logged)                | `task.150.review.1.create-task-authoring-evidence.md`: READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 5/5 phases; ci:fast 4385/0; 15 mutation proofs | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.150.qa.{N}.*.md`; `task.150.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #512: https://github.com/Gamaroff/agent-skills/pull/512 | —                    |
+| 5–6. qa-task / qa-fix loop | ❌ Failed  | `task.150.qa.{N}.*.md`; `task.150.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated: loop not converging at cycle 3 (HIGH 1, 1, 1); gates 1–3 FAIL 70 | `task.150.qa.3.security.run.json` |
 | 7. finalise                | ⏳ Pending | `task.150.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -111,6 +111,26 @@ task.123's first committed draft is `e0881adb` (`git log --diff-filter=A`). It n
 
 - SCOPE_PATHS (33): the work-item dir, CHANGELOG.md, docs/reference, shared/resources (+ tests), skills/create-task (+ scripts, references), skills/review-task, and the 23 skills' `references/` dirs that carry a bundled `jira-sync.js` / `card-preflight.js` / `authoring-card-preflight.md`. The two new test files sit in directories with no tracked change, so they were named explicitly as extra `--scope` paths, per the Step 4 doc
 - Pre-flight guard: 0 out-of-scope untracked files held
+- /commit-changes (via /create-pr, scope mode): 3 commits. `39d4a3d8` feat(card-preflight), `5e682223` feat(create-task), `3284b7a6` docs(task.150). The pre-commit bundle reported the known `shared/resources/<name>` warning, which was already there before this change
+- PR created: https://github.com/Gamaroff/agent-skills/pull/512 (base `develop`, `Closes #480`)
+- Leak check over the 3 commits: OK (no path outside SCOPE_PATHS)
+- Issue #480 PR-opened comment: posted. GitHub board: in-review → stage-disabled (the `in-review` moment is not configured in this repo's ladder)
+- Post-PR state check (inline `gh pr view`): PR #512 state = OPEN, errors = 0
+- Lock `pr_url` set
+
+### Steps 5–6 — QA loop
+
+- Traceability mapper not dispatched: `HAS_SUCCESS_CRITERIA_TABLE = false` (Success Criteria is a checklist)
+- QA-start board re-assert: `in-review` → stage-disabled
+- QA Cycle 1 — changes-requested: stage-disabled
+- Cycle 1 third-strike and narrowing checks: n/a at cycle 1 (below-cycle-floor)
+- qa-fix cycle 1: findings ingested inline, not by the ingester subagent. The same session wrote gate 1, so the ingester would have re-read what was already in context (independence loss recorded). The Change Log row is deferred to loop exit (one row per loop, the task.151 precedent)
+- The commit followed `/commit-changes`' scope-mode procedure inline (explicit paths, implementation report unstaged) instead of re-invoking the skill
+- Post-fix PR state (inline `gh pr view`): OPEN at `f471f3fd`
+- QA Cycle 2 — changes-requested: stage-disabled. Third strike: `lib.js` HIGH in gates 1 and 2 (2 strikes, not 3). Chose to replace, not patch, to avoid a third. Narrowing offer: false (HIGH not 0)
+- QA cycle 2 ran as a refute pass (REFUTE_PASS) plus a safety re-probe (SAFETY_REPROBE by judgement, clause 2: the prior gate failed on a boundary). Run record `task.150.qa.2.security.run.json` (30 probes)
+- qa-fix cycle 2: findings ingested inline (same session wrote gate 2). The Change Log row is still deferred to loop exit
+- Post-fix PR state (inline `gh pr view`): OPEN at `701e5e4e`
 
 ---
 
@@ -118,20 +138,79 @@ task.123's first committed draft is `e0881adb` (`git log --diff-filter=A`). It n
 
 _Problems encountered and how they were resolved or escalated._
 
+- QA Cycle 3: the convergence check tripped (HIGH 1, 1, 1). This is a terminal HALT, handed to the operator; see the escalation entry in QA Iteration History. Tracker `blocked` stage signalled
+- The code-review subagents (3) and the security probes ran independently. The findings ingester and pre-develop Explore were run inline (independence loss recorded in each step's Decisions Log)
+
 ---
 
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-09-28
+**Gate Result**: FAIL
+**Issues Found**: 2. TASK-150-BUG-1 (HIGH): the seed id guard is present but inert, and 6 malformed ids are accepted and converted. TASK-150-BUG-2 (MEDIUM): the seed's status read diverges from the engine's `statusOf`. Also 4 advisory code-review bugs and 2 cleanups
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: BUG-1: the strict `observationId()` guard (12 refused and 3 accepted ids tested). BUG-2: the engine's `statusOf` is reused. CR-3: the § 5 park block runs the seed's vector verbatim. CR-4: § 1.1 step 3 re-sources the resolver. Both new tests were mutation-proved red on the pre-fix `lib.js`. Fast gate: `ci:fast` 4387 pass / 0 fail on attempt 1
+**Commit**: `f471f3fd`
+
+### QA Cycle 2 — 2026-09-28
+**Gate Result**: FAIL
+**Issues Found**: 1. TASK-150-BUG-3 (HIGH): on the scan path the seed's id is not the id `set-status` parks. Scan `parseInt`s the id and `findById` keys on the filename prefix; reproduced with real scan output. BUG-1 and BUG-2 are closed for their stated inputs. Advisory: CR-3 (park overwrites an entry that changed since selection), CR-4, CR-5, CR-6
+**HIGH findings**: 1
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: BUG-3, a **replace move** (the frontmatter-id mechanism had HIGH in gates 1 and 2): identity is the scan entry's `file` prefix, the frontmatter id must agree, and duplicates and unsafe integers are refused. A test driven by real scan output was added. Mutation-proved 4 ways. Also refute CR-3 (re-scan before parking), CR-4, and CR-6 (the ratchet uses `checkCardTitle`). Fast gate: `ci:fast` 4389 pass / 0 fail on attempt 1
+**Commit**: `701e5e4e`
+
+### QA Cycle 3 — 2026-09-28
+**Gate Result**: FAIL
+**Issues Found**: 2. TASK-150-BUG-4 (HIGH): `set-status` parks the first same-prefix file in the whole log, so an actioned sibling is overwritten while the target stays open (reproduced). CR3-2 (MEDIUM): the § 1.1 selection and the § 5 re-check key on the scan `id`, not the `file`. BUG-3 is closed (the real-scan re-probe engages 12/12)
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop not converging
+
+### QA Loop Not Converging — 2026-09-28
+
+The pipeline stopped after 3 qa-task/qa-fix cycles: the HIGH finding
+count failed to strictly decrease across two consecutive cycles, so the
+loop was no longer converging. The remaining findings are NOT accepted —
+they are handed over below.
+
+**Final gate status**: FAIL (70/100)
+**HIGH findings per cycle**: 1, 1, 1 — flat from cycle 1 onward
+**Remaining issues** (from final gate file):
+- TASK-150-BUG-4 (high, `skills/create-task/scripts/lib.js`): the duplicate refusal covers only the selected entries. `findById` returns the first file in the whole log whose prefix matches, so `0005-a-actioned.md` is overwritten to `parked` while `0005-b-target.md` stays open, and `set-status` reports `ok`
+- TASK-150-CR3-2 (medium, `skills/create-task/SKILL.md`): the § 1.1 selection and the § 5 step 2b re-check match on the scan `id` (the frontmatter, `parseInt`-ed), while the vector resolves by file prefix
+
+**What was attempted per cycle**:
+- Cycle 1: the seed's id guard was tightened from `Number()` to a strict positive-integer string check (BUG-1); status is read through the engine's `statusOf` (BUG-2); the park block uses the seed's vector, and the resolver is re-sourced (CR-3, CR-4)
+- Cycle 2: a replace move. Identity is keyed on the scan entry's file prefix (what `findById` resolves), the frontmatter id must agree, and duplicates among the selected entries and unsafe integers are refused (BUG-3). A re-scan was added before parking (refute CR-3). The ratchet uses `checkCardTitle` (CR-6)
+- Cycle 3: no fix. The convergence check tripped
+
+**Likely root cause**: every HIGH was in one mechanism, `--from-observation`'s mapping from "the entry I selected" to "the entry `set-status --id N` changes". Each cycle closed the mapping one layer further out: the raw value, then scan's coercion, then whole-log ambiguity. The layer still open is in the **engine**, not the seed. `findById` silently picks the first of several matching files, and `set-status` never reads the current status. A seed-side check can only approximate that, because the seed sees the selected entries, not the log. Patching `lib.js` a fourth time would add another approximation.
+
+**Recommended next steps**:
+1. Fix the root in `shared/resources/observation-log.js`. `findById` reports every match, and `set-status` (and every `--id` command) refuses with `reason: ambiguous-id`, exit 1, when more than one file matches. Add the two-file fixture to `observation-log.test.mjs`. This protects observe-work's own `set-status` callers too, and they have the same exposure on develop today
+2. In create-task § 1.1 and § 5 step 2b, key the selection and the re-check on the scan entry's `file`. Then resume with `/develop-task` → "Resume at 5a with 2 more cycles"
+3. Alternatively, split Phase 4 (`--from-observation`) into its own task, as the task's Open Question 3 already allows, and land Phases 1–3 and 5, which QA has found clean for 3 cycles
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-28 (halted at Steps 5–6)
+**Final Status**: Escalated (QA loop not converging, cycle 3)
 **Branch**: `feature/task.150.create-task-authoring-evidence`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/512
+**QA Iterations**: 3 (2 qa-fix cycles)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
