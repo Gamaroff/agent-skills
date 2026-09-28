@@ -4,7 +4,7 @@
 **Bug ID**: TASK-154-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 2, refute pass CR-2; confirmed by reading `scripts/test-clean-checkout.sh`)
 **Date Found**: 2026-09-29
 
@@ -58,3 +58,4 @@ pid and refuses. It exits 2 and deletes nothing.
 | ---------- | ------------ | ---------- | ------------------------- |
 | 2026-09-29 | New          | qa-task    | Found in QA cycle 2       |
 | 2026-09-29 | Ready for QA | qa-fix     | Fix implemented (cycle 2) |
+| 2026-09-29 | Closed       | qa-task    | Closed for the live-owner case; the takeover race is bug 5 |

@@ -586,22 +586,21 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.154.qa.2.bundler-and-snippet-test-hygiene.md](./task.154.qa.2.bundler-and-snippet-test-hygiene.md)
-- **Gate File**: [task.154.gate.2.bundler-and-snippet-test-hygiene.yml](./task.154.gate.2.bundler-and-snippet-test-hygiene.yml)
+- **Full Report**: [task.154.qa.3.bundler-and-snippet-test-hygiene.md](./task.154.qa.3.bundler-and-snippet-test-hygiene.md)
+- **Gate File**: [task.154.gate.3.bundler-and-snippet-test-hygiene.yml](./task.154.gate.3.bundler-and-snippet-test-hygiene.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 4419 (fast gate); 15 in the new test files; 18 by-hand safety probes
+- **Tests Executed**: 20 in the scoped test files (also under `TMPDIR=/tmp`); 21 by-hand safety probes
 - **Phases Verified**: 6/6
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
 
-- Cycle 1's HIGH and MEDIUM are fixed and verified. Bugs [1](./task.154.bug.1.clean-checkout-dir-deletes-repo.md) and [2](./task.154.bug.2.missing-source-test-summary-line.md) are closed.
-- **MEDIUM**: §2 can pass on a scan of zero resolved skills ([bug 3](./task.154.bug.3.missing-source-scan-can-be-vacuous.md)).
-- **MEDIUM**: two concurrent runner invocations delete each other's clone ([bug 4](./task.154.bug.4.clean-checkout-concurrent-runs.md)).
-- 7 LOW edge cases in the runner and its test (gate 2, QA2-3 to QA2-9).
+- Cycle 2 findings are fixed. Bugs [3](./task.154.bug.3.missing-source-scan-can-be-vacuous.md) and [4](./task.154.bug.4.clean-checkout-concurrent-runs.md) are closed.
+- **MEDIUM**: stale-lock takeover races ([bug 5](./task.154.bug.5.clean-checkout-lock-takeover-race.md)); ownership is decided before the lock ([bug 6](./task.154.bug.6.clean-checkout-ownership-before-lock.md)).
+- The runner's shared-location protection has drawn findings for 3 cycles running. QA report 3 records the structural alternative: a per-run directory.
 
 ---
 
@@ -617,6 +616,7 @@ None.
 | 2026-09-28 |         | Implemented — 17 files, 3 new test files (13 tests), 6 mutation proofs | develop-task (inline) |
 | 2026-09-29 |         | QA gate FAIL (70/100) — 2 findings (1 HIGH, 1 MEDIUM) | qa-task |
 | 2026-09-29 |         | QA gate CONCERNS (80/100) — 9 findings (2 MEDIUM, 7 LOW) | qa-task |
+| 2026-09-29 |         | QA gate CONCERNS (80/100) — 6 findings (2 MEDIUM, 4 LOW) | qa-task |
 
 <!-- change-log-end -->
 

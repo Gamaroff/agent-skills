@@ -1,0 +1,99 @@
+schema: 1
+task: 'task.154.bundler-and-snippet-test-hygiene'
+task_title: 'Bundler and snippet-test hygiene: attributed warning, symlink-free test run'
+gate: CONCERNS
+status_reason: 'Cycle 2 findings fixed (21-candidate by-hand re-probe safe; scan-size floor verified). The scoped review found the cycle-2 lock itself defective: stale-lock takeover is not atomic, and ownership is decided before the lock is consulted — the same shared-location subject for the third cycle running.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T22:35:18Z'
+
+top_issues:
+  - id: 'T154-QA3-1'
+    severity: medium
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'Stale-lock takeover (rm -rf LOCK; take_lock) is not atomic: two runs finding one dead PID can both end up holding the location and delete each other''s clone (CR-1). Bug: task.154.bug.5.clean-checkout-lock-takeover-race.md'
+    suggested_action: 'Remove the shared location: see QA report 3 structural note.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA3-2'
+    severity: medium
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'Ownership (marker/emptiness) is decided before the lock is consulted, so a live run''s mid-clone directory is reported "not created by this script — remove it by hand" (CR-2). Bug: task.154.bug.6.clean-checkout-ownership-before-lock.md'
+    suggested_action: 'Remove the shared location: see QA report 3 structural note.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA3-3'
+    severity: low
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'A pid-less lock is both "a foreign directory" and "this script between mkdir and the pid write", reported as one (CR-3).'
+    suggested_action: 'Publish the lock with its pid atomically, or remove the lock.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA3-4'
+    severity: low
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'git clone checks out the tree before the marker is written, so "marked before checkout" does not hold; a kill mid-clone still leaves an unmarked directory (CR-4).'
+    suggested_action: 'clone --no-checkout, mark, then checkout — or remove the need for the marker.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA3-5'
+    severity: low
+    file: 'scripts/test-clean-checkout.sh'
+    finding: '<dir>.lock never passes the location decision yet is rm -rf''d on a dead numeric pid (CR-5).'
+    suggested_action: 'Check the lock path like DIR, or remove the lock.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA3-6'
+    severity: low
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'fs.existsSync follows symlinks, so a dangling-symlink CLEAN_CHECKOUT_DIR reads as absent and is then rm -rf''d (CR-6).'
+    suggested_action: 'Use lstat for existence; refuse a symlink at the final component.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 20
+  phases_verified: 6/6
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [5]
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-29'
+  total_iterations: 2
+  verification_method: 'By-hand re-probe (21 candidates incl. live lock, lock-path-is-file, failing command) + committed tests (20/20, also under TMPDIR=/tmp)'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 21
+    notes: 'By-hand re-probe of the rewritten runner (§5.1): 21 candidates under env -i + throwaway HOME in a scratch fixture; every destructive candidate refused, nothing outside the clone deleted, command status propagated, live lock and a file at the lock path kept. Concurrency (CR-1/2) is a reliability defect between two runs of this tool, reached only by concurrent invocation.'
+  performance:
+    status: PASS
+    notes: 'ci:fast 4424 tests in 244s.'
+  reliability:
+    status: CONCERNS
+    notes: 'Lock takeover race and ownership-before-lock (T154-QA3-1/2).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Third consecutive cycle of findings on the runner''s shared-location protection (marker → lock → lock takeover): a repeat subject.'
+
+recommendations:
+  immediate:
+    - action: 'Replace the shared-location mechanism rather than patch the lock again (qa-fix Step 2.6, repeat subject).'
+      refs: ['scripts/test-clean-checkout.sh', 'tests/test-clean-checkout.test.js']
+  future:
+    - action: 'observation-log.js EPHEMERAL_PATTERNS lacks /private/var/tmp — pre-existing; follow-up.'
+      refs: ['shared/resources/observation-log.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T154-QA3-1 and T154-QA3-2 resolved']

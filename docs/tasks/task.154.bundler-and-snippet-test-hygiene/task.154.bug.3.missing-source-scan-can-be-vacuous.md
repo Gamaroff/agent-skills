@@ -4,7 +4,7 @@
 **Bug ID**: TASK-154-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 2, refute pass CR-1)
 **Date Found**: 2026-09-29
 
@@ -50,3 +50,4 @@ returns `{checked: 0, unresolved: 1}`.
 | ---------- | ------------ | ---------- | ------------------------- |
 | 2026-09-29 | New          | qa-task    | Found in QA cycle 2       |
 | 2026-09-29 | Ready for QA | qa-fix     | Fix implemented (cycle 2) |
+| 2026-09-29 | Closed       | qa-task    | Verified in QA cycle 3 |

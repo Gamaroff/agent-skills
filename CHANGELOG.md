@@ -140,13 +140,11 @@ All notable changes to this project will be documented in this file. Format foll
   `finalise-bug-mode.test.mjs` once passed 71/71 locally while 19 rows failed on every push
   (obs #149). New `npm run test:clean-checkout` (`scripts/test-clean-checkout.sh`) makes a
   `git clone --local --shared` of HEAD — full history and tags, tracked files only, no ignored paths
-  — in a repo-local `.clean-checkout/` (never a temporary directory, which the observation-log
-  tests refuse), links `node_modules`, runs `npm test` there and removes the clone. It deletes only
-  what it created: a `CLEAN_CHECKOUT_DIR` that is the repository, contains it, resolves into an
-  ephemeral location, has no parent, cannot be listed, or already exists without the runner's
-  `.git/` marker is refused, never removed; and a `<dir>.lock` holding the owner's PID keeps two
-  runs off one location (a dead owner's lock is taken over). It warns that uncommitted changes are
-  not tested. `release.sh` now gates on it. The consumer-shaped test root is
+  — in a directory of its own (`mktemp -d`) inside a repo-local base, `.clean-checkout/` by default
+  (never a temporary directory, which the observation-log tests refuse), links `node_modules`, runs
+  `npm test` there and removes that directory and nothing else: ownership by construction, so the
+  base is never deleted and two concurrent runs never touch each other's clone. It warns that
+  uncommitted changes are not tested. `release.sh` now gates on it. The consumer-shaped test root is
   defined once, `makeConsumerRoot()` in `evals/shared/lib/consumer-root.mjs`, replacing two
   hand-rolled copies; `consumer-root.test.mjs` proves the snippet it guards fails from a bare
   directory. create-skill and `docs/contributing/traps.md` carry the rule.
