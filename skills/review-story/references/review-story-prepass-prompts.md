@@ -59,11 +59,11 @@ findings:
 ```
 Read the story file at {story_path}. Extract: the tech stack references, service/module names, library names, and API patterns mentioned in Dev Notes and Tasks.
 
-Search for architecture documents under {arch_location} that cover the story's domain — this repository's domains are: {arch_domains}. Pick the most relevant. Read at most 2 architecture files.
+Search for architecture documents under {arch_location} that cover the story's domain. Candidate domains: {arch_domains}. Pick the most relevant. Read at most 2 architecture files.
 
 Compare the story's technical claims against the architecture documents on these axes:
 1. Libraries: does the story reference libraries not in the architecture docs or tech-stack.md?
-2. Patterns: for each of these documented standards that the story touches — {arch_axes} — does the story deviate from it?
+2. Patterns: for each of these standards that the story touches — {arch_axes} — does the story deviate from what the architecture docs say about it?
 3. Contracts: are interfaces the architecture docs define (endpoints, CLI flags, exit codes, output schemas — whichever they define) used consistently with those docs?
 4. Security: does the story handle auth, crypto, or sensitive data in a way that contradicts architecture guidance?
 
@@ -150,13 +150,13 @@ Do NOT send them sequentially — all three must be in the same tool-call block 
 
 `prepass-axes.js` reads the H2 headings of `concepts/tech-stack.md` (domains) and
 `concepts/coding-standards.md` (axes) under `{arch_location}`. A half counts only when its file
-exists **and** has a `## ` heading — an empty half falls back like a missing file. Its `source` is
-`architecture` when both halves count, `partial` when one does, and `fallback` when neither does —
-the fallback reproduces the former web-stack lists, so a repository without those docs is reviewed
-exactly as before. A file that exists but cannot be read exits 1 with nothing on stdout: treat that
-as a failed pre-pass, never substitute an empty slot. Record
-`source` beside the summary: an `aligned` measured against fallback axes is a weaker result than one
-measured against the repository's own standards (obs #130).
+exists **and** has a non-empty `## ` heading — an empty half falls back like a missing file. Its
+`source` is `architecture` when both halves count, `partial` when one does, and `fallback` when
+neither does. The fallback supplies the former web-stack lists as **candidates**, which is why the
+template calls the slots candidates rather than this repository's own. A file that exists but cannot
+be read exits 1 with nothing on stdout: treat that as a failed pre-pass, never substitute an empty
+slot. Record `source` beside the summary and in the review report: an `aligned` measured against
+fallback axes is a weaker result than one measured against the repository's own standards (obs #130).
 
 ### Handling agent failures
 

@@ -66,15 +66,35 @@ const SKIP = new Set(["see also"]);
 
 const USAGE = "usage: prepass-axes.js --arch <dir> [--json]";
 
+// The text of a CommonMark ATX level-2 heading, or null when the line is not
+// one. ONE reader for "what is an axis heading", written to the spec rather
+// than grown from the inputs each QA cycle happened to name (task 151 QA
+// cycles 1–2: a regex that gained one edge case per cycle):
+//   - up to 3 leading spaces (the fence tracker's own rule); 4+ is code
+//   - exactly `##`, then a space or tab, or the end of the line — `##x` and
+//     `###` are not H2s
+//   - an optional closing sequence: a run of `#` preceded by a space or tab,
+//     or making up the whole content (`## #`, `## ##` are EMPTY headings)
+//   - surrounding whitespace is not content
+// An empty heading returns "" — a heading, but never an axis.
+function atxH2(line) {
+  const m = /^ {0,3}##(?:[ \t]+(.*?))?[ \t]*$/.exec(line);
+  if (!m) return null;
+  let t = m[1] || "";
+  if (/^#+$/.test(t)) return "";
+  t = t.replace(/[ \t]+#+$/, "");
+  return t.trim();
+}
+
 function h2s(text) {
   const isFence = makeFenceTracker();
   const out = [];
   for (const line of String(text).replace(/\r\n?/g, "\n").split("\n")) {
     if (isFence(line)) continue;
-    // CommonMark ATX H2: up to 3 leading spaces (the fence tracker's own rule),
-    // then `##`, then a space or tab (CR-3). An optional closing run of `#`.
-    const m = /^ {0,3}##[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/.exec(line);
-    if (m && !SKIP.has(m[1].toLowerCase())) out.push(m[1]);
+    const t = atxH2(line);
+    // An empty heading is not an axis (C2-CR-1): it would reach Agent B as a
+    // blank slot under a `source` that says the repository defined it.
+    if (t && !SKIP.has(t.toLowerCase())) out.push(t);
   }
   return out;
 }
@@ -164,7 +184,7 @@ function main(argv) {
   return 0;
 }
 
-module.exports = { deriveAxes, h2s, FALLBACK_DOMAINS, FALLBACK_AXES };
+module.exports = { deriveAxes, h2s, atxH2, FALLBACK_DOMAINS, FALLBACK_AXES };
 
 // process.exitCode, never a hard exit: exiting after a stdout write truncates
 // the output on a pipe (the select-next.mjs 64 KB trap).

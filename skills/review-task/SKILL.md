@@ -414,7 +414,7 @@ options:
      command node .agents/skills/review-task/references/prepass-axes.js --arch "docs/architecture" --json
      ```
 
-     Substitute your `{arch_location}` for `docs/architecture`. `{arch_domains}` is `domains` joined with `, `; `{arch_axes}` is `axes` joined with `; `. Record the `source` field (`architecture` / `partial` / `fallback`) beside `PREPASS_B` — `fallback` means neither file yielded a `## ` heading and Agent B is running on the former web-stack lists. Exit 1 means a file exists but could not be read: treat Agent B as failed rather than dispatch it with empty slots.
+     Substitute your `{arch_location}` for `docs/architecture`. `{arch_domains}` is `domains` joined with `, `; `{arch_axes}` is `axes` joined with `; `. Record the `source` field (`architecture` / `partial` / `fallback`) beside `PREPASS_B` — `fallback` means neither file yielded a non-empty `## ` heading and Agent B is running on the former web-stack lists as candidates — say so in the report beside any `aligned`. Exit 1 means a file exists but could not be read: treat Agent B as failed rather than dispatch it with empty slots.
 
 2. **Dispatch both agents in a single message** (parallel — one tool-call block, two Agent invocations):
    - **Agent B** (`subagent_type="Explore"`) — architecture alignment prompt from `review-task-prepass-prompts.md`

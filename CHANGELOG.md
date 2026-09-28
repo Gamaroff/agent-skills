@@ -140,8 +140,8 @@ All notable changes to this project will be documented in this file. Format foll
   repository it answered `aligned` against axes the repository never defined. They are now slots,
   `{arch_domains}` and `{arch_axes}`, filled by a new pure helper `prepass-axes.js` from the H2
   headings of the consumer's `concepts/tech-stack.md` and `concepts/coding-standards.md`; a
-  repository with neither file — or with files that hold no `## ` heading — gets the former lists
-  unchanged (`source: fallback`); a file that exists but cannot be read exits 1. Agent B now
+  repository with neither file — or with files that hold no non-empty `## ` heading — gets the former
+  lists as candidates (`source: fallback`); a file that exists but cannot be read exits 1. Agent B now
   returns `axes_checked`, and an `aligned` with none is treated as a failed agent. review-story's
   Subagent 3 dispatches from `review-story-prepass-prompts.md` instead of a one-line description.
   `jira-sync.js` exports its `makeFenceTracker`, which the helper reuses.

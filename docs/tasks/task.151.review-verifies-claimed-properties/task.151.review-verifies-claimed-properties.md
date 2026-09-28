@@ -321,8 +321,9 @@ schemas)", so the value still fits a CLI repository.
 - [x] `prepass-axes.js`:
   - `deriveAxes({ archDir })` reads `concepts/tech-stack.md` and `concepts/coding-standards.md`. It
     collects H2s with the fences skipped (reusing `makeFenceTracker`) and drops `See also`.
-  - It returns `source`: `architecture` when both files are present, `partial` when one is, and
-    `fallback` when neither is. A missing half takes today's list for that half.
+  - It returns `source`: `architecture` when both halves count, `partial` when one does, and
+    `fallback` when neither does. A half counts when its file is present and yields at least one
+    non-empty `## ` heading; a half that does not takes today's list for that half (QA cycles 1–2).
   - CLI: `--arch <dir> [--json]`, with `reason` equal to `source`. It exits 2 on a missing `--arch`
     or an unknown flag, with nothing on stdout. Guard: `require.main === module`.
 - [x] Export `makeFenceTracker` from `jira-sync.js`. This is additive, and no behaviour changes.
@@ -658,21 +659,21 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.151.qa.1.review-verifies-claimed-properties.md](./task.151.qa.1.review-verifies-claimed-properties.md)
-- **Gate File**: [task.151.gate.1.review-verifies-claimed-properties.yml](./task.151.gate.1.review-verifies-claimed-properties.yml)
+- **Full Report**: [task.151.qa.2.review-verifies-claimed-properties.md](./task.151.qa.2.review-verifies-claimed-properties.md)
+- **Gate File**: [task.151.gate.2.review-verifies-claimed-properties.yml](./task.151.gate.2.review-verifies-claimed-properties.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 22 new (69 in the targeted re-run); `ci:fast` 4359 pass / 0 fail
+- **Tests Executed**: 25 new (64 in the targeted re-run); `ci:fast` 4362 pass / 0 fail
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (1 medium: CR-1)
+- **Critical Issues**: 0 (1 medium: C2-CR-1)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-CR-1 (medium): a concepts file with no `## ` headings reads as `source: architecture` with empty
-lists — [task.151.bug.1.empty-concepts-file-reads-as-architecture.md](./task.151.bug.1.empty-concepts-file-reads-as-architecture.md).
-Four low advisory findings (CR-2 – CR-5) in the QA report.
+Gate 1's five findings are fixed and mutation-proven. C2-CR-1 (medium): an H2 with no text still
+counts as an axis — [task.151.bug.2.blank-h2-counts-as-an-axis.md](./task.151.bug.2.blank-h2-counts-as-an-axis.md).
+Four advisory findings (C2-CR-2 – C2-CR-5) in the QA report.
 
 ---
 
@@ -686,7 +687,8 @@ Four low advisory findings (CR-2 – CR-5) in the QA report.
 | 2026-09-28 |         | Status → ready-for-development | review-task |
 | 2026-09-28 |         | Implemented — 13 files (1 helper, 2 tests, 1 test-lib move, 3 SKILL.md, 2 prompt files, jira-sync export, CHANGELOG), 22 tests; 15 mutation proofs red | develop |
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — 1 medium finding (CR-1), 4 low advisory | qa-task |
-| 2026-09-28 |         | QA findings fixed — CR-1 (medium) plus CR-2, CR-3, CR-4, CR-5; 1 iteration | qa-fix |
+| 2026-09-28 |         | QA findings fixed — gate 1 CR-1..CR-5, gate 2 C2-CR-1 (atxH2 reader), C2-CR-2, C2-CR-5; 2 iterations | qa-fix |
+| 2026-09-28 |         | QA gate CONCERNS (90/100) — cycle 2: gate-1 findings fixed; 1 medium (C2-CR-1), 4 advisory | qa-task |
 <!-- change-log-end -->
 
 ---

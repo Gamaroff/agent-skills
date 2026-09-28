@@ -1,0 +1,64 @@
+schema: 1
+task: 'task.151.review-verifies-claimed-properties'
+task_title: 'review-task: stack-neutral pre-pass, executed invariants, released-shape diff'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes verified (CR-1..CR-5 of gate 1 closed); the cycle-2 refute pass found that an H2 with no text still counts as an axis (medium, high confidence) — the same blank-slot outcome through a new input.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T15:59:50Z'
+
+top_issues:
+  - id: 'C2-CR-1'
+    severity: medium
+    file: 'shared/resources/prepass-axes.js'
+    finding: 'h2s() keeps a heading with no text ("##  ", "##\t", "## #", "## ##"), so a file of empty headings yields source architecture with blank entries.'
+    suggested_action: 'Trim the capture, strip a closing # run that is the whole content, drop empties; add these inputs to the CR-1 test.'
+    suggested_owner: dev
+    bug_ref: 'task.151.bug.2.blank-h2-counts-as-an-axis.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 25
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 5
+    notes: 'argv probe re-run on the fixed helper: verdict engages, 5 executed; the two errored cases are inputs the filename sink cannot materialise as fixture names ("" and "--arch=/etc"), both exit 2 when run directly.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: at most 2 file reads; prepass-axes.test.mjs ~0.9 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'C2-CR-1 (blank heading counts as an axis); C2-CR-3 (a missing --arch reads as a valid fallback) advisory.'
+  maintainability:
+    status: PASS
+    notes: 'C2-CR-5: the plan item defining source is stale after cycle 1 — advisory.'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fixed: ['TASK-151-BUG-1 (verified: no-H2 file → fallback; test + mutation proof)']
+  gate_1_findings_closed: ['CR-1', 'CR-2', 'CR-3', 'CR-4', 'CR-5']
+
+recommendations:
+  immediate:
+    - action: 'Fix C2-CR-1 in h2s and extend the CR-1 test.'
+      refs: ['shared/resources/prepass-axes.js', 'shared/resources/tests/prepass-axes.test.mjs']
+  future:
+    - action: 'C2-CR-2 (medium, advisory): in fallback/partial the prompt states web-stack domains as "this repository''s"; reword the slot sentence neutrally and fix the "exactly as before" claim. C2-CR-3: report a missing --arch root distinctly. C2-CR-4: joiner characters inside headings. C2-CR-5: task plan item wording.'
+      refs: ['shared/resources/review-task-prepass-prompts.md', 'shared/resources/review-story-prepass-prompts.md', 'shared/resources/prepass-axes.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['C2-CR-1 fixed']

@@ -24,7 +24,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
@@ -32,7 +32,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const RES = join(HERE, "..");
 const ROOT = join(RES, "..", "..");
 const HELPER = join(RES, "prepass-axes.js");
-const { deriveAxes, FALLBACK_DOMAINS, FALLBACK_AXES } = require(HELPER);
+const { deriveAxes, atxH2, FALLBACK_DOMAINS, FALLBACK_AXES } = require(HELPER);
 
 const ARCH = join(ROOT, "docs", "architecture");
 const WEB_STACK = /payments|real-time|frontend/i;
@@ -205,6 +205,38 @@ test("a read error that is not absence throws; the CLI exits 1 with empty stdout
   }
 });
 
+test("atxH2 follows the CommonMark ATX rules, one case per rule (C2-CR-1)", () => {
+  // [line, expected]: null = not an H2; "" = an empty H2 (a heading, never an axis).
+  const cases = [
+    ["## foo", "foo"],
+    ["   ## foo", "foo"], // up to 3 leading spaces
+    ["    ## foo", null], // 4 is an indented code block
+    ["##\tfoo", "foo"], // a tab separates
+    ["##foo", null], // no separator: not a heading
+    ["### foo", null], // level 3
+    ["# foo", null], // level 1
+    ["##", ""], // bare marker: an empty heading
+    ["##  ", ""],
+    ["##\t\t", ""],
+    ["## #", ""], // a closing sequence that is the whole content
+    ["## ##", ""],
+    ["## foo ##", "foo"], // closing sequence stripped
+    ["## foo ##   ", "foo"],
+    ["## foo#", "foo#"], // no space before the run: content, not a closing sequence
+    ["##   foo   ", "foo"], // surrounding whitespace is not content
+  ];
+  for (const [line, want] of cases) {
+    assert.equal(atxH2(line), want, `atxH2(${JSON.stringify(line)})`);
+  }
+  // Every empty form is dropped: a file of empty headings is absent → fallback.
+  const r = deriveAxes({
+    archDir: "x",
+    readFile: () => "##  \n##\t\t\n## #\n## ##\n##\n",
+  });
+  assert.equal(r.source, "fallback");
+  assert.deepEqual(r.domains, [...FALLBACK_DOMAINS]);
+});
+
 test("CommonMark H2 forms: up to 3 leading spaces and a tab are headings (CR-3)", () => {
   const r = deriveAxes({
     archDir: "x",
@@ -229,13 +261,25 @@ test("CLI: --json prints the result shape and exits 0", () => {
   assert.ok(out.read.length <= 2);
 });
 
-test("CLI: a usage error exits 2 with nothing on stdout", () => {
-  for (const args of [["--bogus"], [], ["--arch"], ["--arch", "--json"]]) {
-    const r = run([HELPER, ...args]);
-    assert.equal(r.status, 2, `args ${JSON.stringify(args)}: ${r.stdout}`);
-    assert.equal(r.stdout, "", `args ${JSON.stringify(args)} wrote stdout`);
+// Spawned concurrently: four serial node start-ups were most of this file's
+// one-second budget (SC8).
+function runAsync(args) {
+  return new Promise((resolve) => {
+    execFile(process.execPath, args, (err, stdout, stderr) =>
+      resolve({ status: err ? err.code : 0, stdout, stderr }),
+    );
+  });
+}
+
+test("CLI: a usage error exits 2 with nothing on stdout", async () => {
+  const cases = [["--bogus"], [], ["--arch"], ["--arch", "--json"]];
+  const results = await Promise.all(cases.map((a) => runAsync([HELPER, ...a])));
+  results.forEach((r, i) => {
+    const args = JSON.stringify(cases[i]);
+    assert.equal(r.status, 2, `args ${args}: ${r.stdout}`);
+    assert.equal(r.stdout, "", `args ${args} wrote stdout`);
     assert.match(r.stderr, /usage: prepass-axes\.js --arch <dir>/);
-  }
+  });
 });
 
 test("CLI: runs through a symlinked directory (obs #126 guard class)", () => {
