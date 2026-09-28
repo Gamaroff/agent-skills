@@ -5,7 +5,7 @@ type: task
 description: "Two local-only blind spots in the repository's own tooling. (1) bundle_skill.py prints an unattributed `shared/resources/<name> not found` warning on every bundle and every pre-commit run, caused by a placeholder literal in observation-log-contract.md; remove the literal, make the warning name the citing file and line, and give it a CI reader. (2) Snippet tests that reach `.agents/skills/…` pass locally only through the developer's gitignored symlink; the two known instances are fixed, but nothing stops the next one — add a shared consumer-root helper, a clean-checkout test runner for the local release gate, and the create-skill rule."
 tags: [create-skill, bundle, testing, ci, observe-work, observation]
 category: testing
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-28
@@ -16,7 +16,7 @@ github_issue: 484
 
 # Technical Task: Bundler and snippet-test hygiene — an attributed warning and a symlink-free test run
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.154.review.1.bundler-and-snippet-test-hygiene.md` implemented 2026-09-28
 
@@ -326,7 +326,7 @@ can land in either order, or as two PRs.
       at the call site
 - [x] The helper test: sourcing `newest-numbered.sh` through `.agents/skills/finalise/references/`
       succeeds from the helper root and fails from a bare `mkdtemp` directory (the premise)
-- [ ] Both migrated files keep their pass counts (71 and 84) in the clean-checkout run
+- [x] Both migrated files keep their pass counts (71 and 84) in the clean-checkout run
 
 ### Phase 5: Clean-checkout runner and release gate (Risk: Medium)
 
@@ -456,37 +456,37 @@ None.
 
 ### Functional
 
-- [ ] `npm run -s bundle 2>&1 | grep -c 'not found'` prints `0` on the task branch
+- [x] `npm run -s bundle 2>&1 | grep -c 'not found'` prints `0` on the task branch
       (test: `tests/bundle-missing-source.test.js` §2)
-- [ ] An unresolvable `shared/resources/` citation in a shared source produces exactly one line
+- [x] An unresolvable `shared/resources/` citation in a shared source produces exactly one line
       naming the citing file and line (test: `tests/bundle-missing-source.test.js` §1)
-- [ ] `evals/shared/lib/consumer-root.mjs` is the only consumer-root builder: neither migrated file
+- [x] `evals/shared/lib/consumer-root.mjs` is the only consumer-root builder: neither migrated file
       calls `symlinkSync` for `.agents/skills` itself (test:
       `evals/shared/tests/consumer-root.test.mjs` asserts the helper root succeeds and a bare root
       fails)
-- [ ] `npm run test:clean-checkout` fails on a fixture whose test passes only through a gitignored
+- [x] `npm run test:clean-checkout` fails on a fixture whose test passes only through a gitignored
       symlink (test: `tests/test-clean-checkout.test.js`)
-- [ ] `scripts/release.sh` runs `npm run test:clean-checkout` as its test gate
+- [x] `scripts/release.sh` runs `npm run test:clean-checkout` as its test gate
 
 ### Performance
 
-- [ ] Each new test file runs in under 10 seconds on the dev Mac (`command node --test <file>`
+- [x] Each new test file runs in under 10 seconds on the dev Mac (`command node --test <file>`
       wall time, recorded)
-- [ ] The clean-checkout run's wall time is recorded next to the in-place run's in the implementation
+- [x] The clean-checkout run's wall time is recorded next to the in-place run's in the implementation
       report
 
 ### Code Quality
 
-- [ ] Every row of § 8's mutation table was reverted, observed red, and restored, with the red
+- [x] Every row of § 8's mutation table was reverted, observed red, and restored, with the red
       output quoted in the implementation report
-- [ ] `npm run ci:fast`, `npm run bundle:check` (0 problems), `npm run lint:shell` and
+- [x] `npm run ci:fast`, `npm run bundle:check` (0 problems), `npm run lint:shell` and
       `npm run validate:all` are clean
-- [ ] `npm run test:clean-checkout` is green on the committed task branch
+- [x] `npm run test:clean-checkout` is green on the committed task branch
 
 ### Migration
 
-- [ ] create-skill carries the testing paragraph citing obs #149, and traps.md carries the trap
-- [ ] CHANGELOG `[Unreleased]` cites `(task 154)`
+- [x] create-skill carries the testing paragraph citing obs #149, and traps.md carries the trap
+- [x] CHANGELOG `[Unreleased]` cites `(task 154)`
 - [ ] Observations #149 and #151 are set to `actioned` when this task's PR merges
 
 ---
@@ -585,6 +585,7 @@ None.
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #149, #151 (2026-09-24 observation review) | create-task |
 | 2026-09-28 | 1.1     | Review passed (9/10) — per-origin dedupe promise restated to match `seen`; §2 key narrowed; runner refuses a missing `node_modules` | review-task |
 | 2026-09-28 |         | Status → ready-for-development | review-task |
+| 2026-09-28 |         | Implemented — 17 files, 3 new test files (13 tests), 6 mutation proofs | develop-task (inline) |
 
 <!-- change-log-end -->
 

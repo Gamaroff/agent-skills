@@ -33,7 +33,7 @@ First pipeline run for task 154: remove the placeholder literal behind the bundl
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- |
 | 1. create-branch           | ✅ Done    | Branch `feature/task.154.*` exists in git                             | Branch created at `12b8fb78` (develop tip); pushed with upstream | —                    |
 | 2. review-task             | ✅ Done    | `task.154.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 9/10; Planned → Ready for Development; 1 Important + 2 Optional fixed | —                    |
-| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; audit 28/28 Ready for Review @ `63d039b6`; 6 mutation proofs | —                    |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.154.qa.{N}.*.md`; `task.154.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.154.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
@@ -88,9 +88,17 @@ First pipeline run for task 154: remove the placeholder literal behind the bundl
 | Drop the dedupe set | bundle-missing-source §1b | ✖ §1b — `actual: 2` (two identical lines for two skills) |
 | Remove `symlinkSync` from makeConsumerRoot | consumer-root.test.mjs | ✖ helper-root case — `newest-numbered.sh is not reachable from the consumer root` |
 | Runner copies the working tree (`cp -R`) instead of cloning | test-clean-checkout.test.js | ✖ 3 cases — the check passes in the copy; positive control and dirty-tree case red |
-| Point finalise-bug-mode back at REPO_ROOT as cwd | npm run test:clean-checkout | pending — needs a committed HEAD (recorded below) |
+| Point finalise-bug-mode back at REPO_ROOT as cwd | npm run test:clean-checkout | ✖ in the clean clone: 88 tests, 42 pass, **46 fail**; in place the same commit reads 88/88 pass — the point of the runner. Proven on a temporary commit, then `git reset --soft` to `63d039b6` and the file restored; tree clean |
 
 All restored; each file re-run green after restore.
+
+#### Verification on the committed branch (`63d039b6`)
+
+- `npm run test:clean-checkout`: rc=0 — 4415 tests, 4414 pass, 0 fail, 1 skipped; **279s** wall. In place, `npm run ci:fast` (prettier + the same `npm test`) was 4415 / 0 fail / 1 skipped in **250s**, so the clone costs no more than the format check it skips plus ~30s. Same pass count both ways.
+- New test files: bundle-missing-source 5.3s (5 tests), consumer-root 0.23s (2), test-clean-checkout 1.3s (6) — all under 10s.
+- `npm run -s bundle` prints 0 `not found` lines; `bundle:check` 129 skills, 0 problems; `lint:shell` clean (76 scripts); `quick_validate` create-skill ✓, observe-work ✓.
+- The pre-commit hook's bundle run on each of the five commits printed no `not found` line.
+- Loop audit iter 1 (Explore): `{"status":"ready-for-review","completed":28,"total":28,"last_commit_hash":"63d039b6…"}` → exit loop. Change Log row written by the inline path (one row). Development completion comment posted to github issue 484 (develop-complete → posted).
 
 ---
 
