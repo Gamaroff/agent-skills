@@ -298,6 +298,32 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-28
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.164.qa.1.task-163-deferred-follow-ups.md](./task.164.qa.1.task-163-deferred-follow-ups.md)
+- **Gate File**: [task.164.gate.1.task-163-deferred-follow-ups.yml](./task.164.gate.1.task-163-deferred-follow-ups.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 97 (step-8 checklist 91, new 4b meta-test 3, 6 mutations re-run)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+One MEDIUM: the banner doc's derivation rule says the re-prompt clause is the one exception and every other firing point follows `current_step`, while the new HALT rule after it is a second exception (QA-164-1). Three LOW: story/task-only HALT example (QA-164-2), exception-span-only restatement check (QA-164-3), a spawnSync timeout reported as a bare `null` (QA-164-4).
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -307,6 +333,8 @@ None identified.
 | 2026-09-28 |         | Status → ready-for-development | review-task |
 | 2026-09-28 |         | Implemented — 5 files (1 new test file), 5 tests added or rewritten; 6 mutations proven | develop-task |
 | 2026-09-28 |         | Status → ready-for-review | develop-task |
+| 2026-09-28 |         | QA gate CONCERNS (90/100) — 4 findings (1 medium, 3 low) | qa-task |
+| 2026-09-28 |         | QA findings fixed — gate 1 CONCERNS: 4 of 4 (banner exceptions counted, HALT example per pipeline, whole-doc restatement check, spawn timeout reported), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

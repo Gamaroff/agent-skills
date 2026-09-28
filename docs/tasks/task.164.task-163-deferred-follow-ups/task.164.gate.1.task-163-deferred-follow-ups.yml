@@ -1,0 +1,74 @@
+schema: 1
+task: 'task.164.task-163-deferred-follow-ups'
+task_title: "[Task 164] Close task.163's deferred follow-ups"
+gate: CONCERNS
+status_reason: 'All five follow-ups are implemented and every guard is mutation-proven (6/6 red), but the banner doc now contradicts itself about HALTs: the re-prompt clause still says it is the one exception and that every other firing point follows the current_step rule, while the new HALT rule directly after it overrides that rule at lock 8.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T09:25:35Z'
+
+top_issues:
+  - id: 'QA-164-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-remaining-work-banner.md'
+    finding: 'The derivation rule contradicts itself. The re-prompt clause is introduced as "One exception" and ends "Every other firing point, including the ordinary Step 7 → 8 transition, follows this rule", but the HALT rule after it makes HALT blocks a second exception: at lock 8 a Step 7-tail HALT prints Step 7, not current_step. The old clause said "and a Step 8 HALT"; dropping that phrase left the two statements in conflict (code review CR-1).'
+    suggested_action: 'Make the carve-out exclude HALT blocks explicitly, or state both deviations as one list of exceptions. Pin the new wording in the banner test in place of the "the ordinary Step 7 → 8 transition, follows this rule" phrase.'
+    suggested_owner: dev
+  - id: 'QA-164-2'
+    severity: low
+    file: 'shared/resources/develop-pipeline-remaining-work-banner.md'
+    finding: 'The HALT rule is shared by all three pipelines but gives one literal rendering, `Step 7/8 — FINALISE ❌ halted`. develop-bug names Step 7 "FINALISE & CLOSE" (develop-pipeline-on-stop.sh:183), so the example is wrong for develop-bug, and the HALT pin hard-codes it (CR-2).'
+    suggested_action: 'Mark the example as the develop-story/develop-task rendering or write it as `Step 7/8 — {STEP-NAME} ❌ halted`, and align the pin test phrase.'
+    suggested_owner: dev
+  - id: 'QA-164-3'
+    severity: low
+    file: 'shared/resources/tests/step-8-completion-checklist.test.mjs'
+    finding: 'The no-restatement check reads only the captured exception span. A restatement of the hook fragments placed in the HALT sentence, or anywhere else in the doc, would pass, and those are the second copies that drift (CR-3).'
+    suggested_action: 'Run the derived-fragment check over the whole whitespace-collapsed banner doc.'
+    suggested_owner: dev
+  - id: 'QA-164-4'
+    severity: low
+    file: 'shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs'
+    finding: 'spawnSync blocks the event loop, so node:test''s per-case timeout cannot fire; the spawnSync timeout is the real limit, and when it kills the child runLockTests returns status null and drops r.signal / r.error, so a timeout reads as a bare "null !== 0" (CR-4).'
+    suggested_action: 'Return r.signal and r.error from runLockTests and put them in the assertion messages; drop the node:test timeout option or state that the spawnSync timeout is the one that applies.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 97
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false. The change set adds no accept/reject function over untrusted input. The only classifier is scenario 4b''s `case "$p"` over `command -v` output, which is test-fixture setup; its "refusal" is a test failure, not a gate on an action. The seam variable is read only by the test file.'
+  performance:
+    status: PASS
+    notes: 'The new meta-test adds three runs of the lock test file (13–16s each measured) to npm test. No production path changes.'
+  reliability:
+    status: PASS
+    notes: 'The hook is unchanged. The banner rule changes printed output only; halt_step is untouched.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The banner doc states two conflicting rules for HALT blocks (QA-164-1).'
+
+recommendations:
+  immediate:
+    - action: 'Resolve the HALT carve-out contradiction in the banner doc and pin it (QA-164-1).'
+      refs: ['shared/resources/develop-pipeline-remaining-work-banner.md', 'shared/resources/tests/step-8-completion-checklist.test.mjs']
+  future:
+    - action: 'The 4b meta-test re-runs the whole lock test file (with its zsh passes) three times to reach a ten-line setup loop, adding about 45s to npm test. Consider an early-exit seam after 4b or moving 4b into its own sourced script (code review CR-5).'
+      refs: ['shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs', 'shared/resources/advance-pipeline-lock.test.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-164-1 resolved']

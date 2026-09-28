@@ -779,12 +779,37 @@ test("the banner doc defers to the Stop hook at a re-prompt without restating it
 
   // The banner doc wraps its lines; read it with whitespace collapsed.
   const banner = readDoc(BANNER).replace(/\s+/g, " ");
+  // The rule names how many exceptions it has, and the carve-out sits before them, so no exception
+  // can be introduced as "the one" while another follows it. That is the contradiction task.164 QA
+  // cycle 1 found (QA-164-1): "One exception" and "every other firing point follows this rule",
+  // then a HALT rule overriding it.
+  const intro = banner.match(
+    /Never re-read files solely to render the block\. (.+?)\*\*Exception 1:/,
+  );
+  assert.ok(intro, `${BANNER}: no carve-out sentence before the exceptions`);
+  assert.ok(
+    intro[1].includes("Two firing points are exceptions") &&
+      intro[1].includes(
+        "the ordinary Step 7 → 8 transition, follows this rule",
+      ),
+    `${BANNER}: the carve-out does not name both exceptions and the Step 7 → 8 transition: ${intro[1]}`,
+  );
+  const markers = banner.match(/\*\*Exception \d+:/g) || [];
+  assert.equal(
+    markers.length,
+    2,
+    `${BANNER}: the carve-out says two exceptions, the doc marks ${markers.length}`,
+  );
+  assert.ok(
+    !/\bOne exception\b/.test(banner),
+    `${BANNER}: an exception is still introduced as the only one`,
+  );
   const exception = banner.match(
-    /\*\*One exception: ([^*]+)\*\*(.+?)\(task 163, task 164\)\./,
+    /\*\*Exception 1: ([^*]+)\*\*(.+?)\*\*Exception 2:/,
   );
   assert.ok(
     exception,
-    `${BANNER}: no "One exception" clause in the derivation rule`,
+    `${BANNER}: no "Exception 1" clause in the derivation rule`,
   );
   assert.equal(
     exception[1],
@@ -792,8 +817,9 @@ test("the banner doc defers to the Stop hook at a re-prompt without restating it
     `the exception is scoped to "${exception[1]}", not a Stop-hook re-prompt`,
   );
   // The hook's distinctive fragments: the position's parenthetical before its colon, and the list's
-  // first five words. Each is floored non-empty, so an extraction that found nothing cannot pass the
-  // "does not carry" check vacuously.
+  // first five words. Each is floored, so an extraction that found nothing cannot pass the "does not
+  // carry" check vacuously. They are checked against the WHOLE doc, not only the exception: a
+  // restatement placed in the HALT rule or anywhere else is the same second copy (QA-164-3).
   const fragments = [
     (position[1].match(/\(([^:]+):/) || [])[1] || "",
     ahead[1].split(" ").slice(0, 5).join(" "),
@@ -804,8 +830,8 @@ test("the banner doc defers to the Stop hook at a re-prompt without restating it
       `hook fragment too short to be distinctive: "${fragment}"`,
     );
     assert.ok(
-      !exception[2].includes(fragment),
-      `${BANNER}: the exception restates the hook ("${fragment}"): ${exception[2]}`,
+      !banner.includes(fragment),
+      `${BANNER}: the doc restates the hook ("${fragment}")`,
     );
   }
   for (const phrase of [
@@ -813,7 +839,6 @@ test("the banner doc defers to the Stop hook at a re-prompt without restating it
     "`STEPS_AHEAD`",
     "Emit the position as the reason gives it",
     "one `- Step N:` line per remaining step",
-    "the ordinary Step 7 → 8 transition, follows this rule",
   ]) {
     assert.ok(
       exception[2].includes(phrase),
@@ -826,20 +851,42 @@ test("the banner doc defers to the Stop hook at a re-prompt without restating it
 // /finalise has moved the lock before Step 7's tail runs, so a Step 7-tail HALT rendered by the
 // current_step rule named Step 8 — the step that had not run (task 164; task.163 gate.3
 // recommendations.future). The rule is scoped to the printed block; halt_step is not its subject.
+// The Step 7 names are read off the hook, which is their one statement, so the example cannot name
+// one pipeline's step for all three (QA-164-2: develop-bug's Step 7 is "FINALISE & CLOSE").
 test("a HALT status block names the step that halted, not current_step", () => {
   const banner = readDoc(BANNER).replace(/\s+/g, " ");
   const rule = banner.match(
-    /\*\*A HALT names the step that halted\.\*\*(.+?)\(task 164\)\./,
+    /\*\*Exception 2: a HALT names the step that halted\.\*\*(.+?)\(task 164\)\./,
   );
-  assert.ok(rule, `${BANNER}: no "A HALT names the step that halted" rule`);
+  assert.ok(
+    rule,
+    `${BANNER}: no "Exception 2: a HALT names the step that halted" rule`,
+  );
   for (const phrase of [
     "not at `current_step`",
-    "Step 7/8 — FINALISE ❌ halted",
+    "Step 7/8 — {STEP-NAME} ❌ halted",
     "`halt_step`",
   ]) {
     assert.ok(
       rule[1].includes(phrase),
       `${BANNER}: the HALT rule lacks "${phrase}": ${rule[1]}`,
+    );
+  }
+  const step7Names = [
+    ...new Set(
+      [...readDoc(STOP_HOOK).matchAll(/^\s*7\) NEXT_NAME="([^"]+)"/gm)].map(
+        (m) => m[1],
+      ),
+    ),
+  ];
+  assert.ok(
+    step7Names.length >= 2,
+    `${STOP_HOOK}: expected a Step 7 name for develop-bug and one for develop-story/task, found ${JSON.stringify(step7Names)}`,
+  );
+  for (const name of step7Names) {
+    assert.ok(
+      rule[1].includes(`\`${name}\``),
+      `${BANNER}: the HALT rule does not name the hook's Step 7 name "${name}": ${rule[1]}`,
     );
   }
   const row = readDoc(BANNER)
