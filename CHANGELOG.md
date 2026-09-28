@@ -143,8 +143,10 @@ All notable changes to this project will be documented in this file. Format foll
   — in a repo-local `.clean-checkout/` (never a temporary directory, which the observation-log
   tests refuse), links `node_modules`, runs `npm test` there and removes the clone. It deletes only
   what it created: a `CLEAN_CHECKOUT_DIR` that is the repository, contains it, resolves into an
-  ephemeral location, or already exists without the runner's `.git/` marker is refused, never
-  removed. It warns that uncommitted changes are not tested. `release.sh` now gates on it. The consumer-shaped test root is
+  ephemeral location, has no parent, cannot be listed, or already exists without the runner's
+  `.git/` marker is refused, never removed; and a `<dir>.lock` holding the owner's PID keeps two
+  runs off one location (a dead owner's lock is taken over). It warns that uncommitted changes are
+  not tested. `release.sh` now gates on it. The consumer-shaped test root is
   defined once, `makeConsumerRoot()` in `evals/shared/lib/consumer-root.mjs`, replacing two
   hand-rolled copies; `consumer-root.test.mjs` proves the snippet it guards fails from a bare
   directory. create-skill and `docs/contributing/traps.md` carry the rule.
@@ -388,9 +390,11 @@ All notable changes to this project will be documented in this file. Format foll
   it as "pre-existing" (obs #151). The literal is gone (the contract now describes the path form in
   words; a brace placeholder would have matched too). Discovery now carries each citation's origin,
   and the warning reads `⚠️  shared/resources/<name> not found — cited at <file>:<line>`, once per
-  `(name, origin)` per run, mirroring the comment-only-reference warning. New
-  `tests/bundle-missing-source.test.js` proves the attribution and dedupe on a fixture and requires
-  the live `--check` output to carry none.
+  `(name, origin)` per run, mirroring the comment-only-reference warning. `--check`'s problem-path
+  summary now also prints `N skill(s) checked, U unresolved`, so a scan of nothing is no longer
+  indistinguishable from a scan with nothing wrong. New `tests/bundle-missing-source.test.js`
+  proves the attribution and dedupe on a fixture and requires the live `--check` output to carry
+  none, over a scan count read from `--check` itself.
 
 - **The banner doc defers to the Stop hook instead of restating it, and a HALT names the step that
   halted (task 164).** Five follow-ups deferred by task 163. The Remaining Work Status doc's

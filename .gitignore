@@ -71,4 +71,5 @@ secrets.yml
 # scratch base. Repo-local, never a temporary directory, for the same reason as
 # the observation-log scratch above.
 .clean-checkout/
+.clean-checkout.lock/
 .clean-checkout-test-tmp/

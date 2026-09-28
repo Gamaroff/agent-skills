@@ -578,28 +578,30 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-29
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.154.qa.1.bundler-and-snippet-test-hygiene.md](./task.154.qa.1.bundler-and-snippet-test-hygiene.md)
-- **Gate File**: [task.154.gate.1.bundler-and-snippet-test-hygiene.yml](./task.154.gate.1.bundler-and-snippet-test-hygiene.yml)
+- **Full Report**: [task.154.qa.2.bundler-and-snippet-test-hygiene.md](./task.154.qa.2.bundler-and-snippet-test-hygiene.md)
+- **Gate File**: [task.154.gate.2.bundler-and-snippet-test-hygiene.yml](./task.154.gate.2.bundler-and-snippet-test-hygiene.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 4415 (full suite, in place and in a clean clone); 13 new
+- **Tests Executed**: 4419 (fast gate); 15 in the new test files; 18 by-hand safety probes
 - **Phases Verified**: 6/6
-- **Critical Issues**: 1
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
 
-- **HIGH**: the clean-checkout runner deletes whatever `CLEAN_CHECKOUT_DIR` names, including the repository ([bug 1](./task.154.bug.1.clean-checkout-dir-deletes-repo.md)).
-- **MEDIUM**: bundle-missing-source §2 needs the zero-problem summary line, which contradicts its own comment ([bug 2](./task.154.bug.2.missing-source-test-summary-line.md)).
+- Cycle 1's HIGH and MEDIUM are fixed and verified. Bugs [1](./task.154.bug.1.clean-checkout-dir-deletes-repo.md) and [2](./task.154.bug.2.missing-source-test-summary-line.md) are closed.
+- **MEDIUM**: §2 can pass on a scan of zero resolved skills ([bug 3](./task.154.bug.3.missing-source-scan-can-be-vacuous.md)).
+- **MEDIUM**: two concurrent runner invocations delete each other's clone ([bug 4](./task.154.bug.4.clean-checkout-concurrent-runs.md)).
+- 7 LOW edge cases in the runner and its test (gate 2, QA2-3 to QA2-9).
 
 ---
 
@@ -614,6 +616,7 @@ None.
 | 2026-09-28 |         | Status → ready-for-development | review-task |
 | 2026-09-28 |         | Implemented — 17 files, 3 new test files (13 tests), 6 mutation proofs | develop-task (inline) |
 | 2026-09-29 |         | QA gate FAIL (70/100) — 2 findings (1 HIGH, 1 MEDIUM) | qa-task |
+| 2026-09-29 |         | QA gate CONCERNS (80/100) — 9 findings (2 MEDIUM, 7 LOW) | qa-task |
 
 <!-- change-log-end -->
 

@@ -51,27 +51,31 @@ const MISSING_RE = /^⚠️ {2}shared\/resources\/.* not found/;
 const MIN_SKILLS = 100;
 
 /**
- * What §2 reads from `--check` output, and nothing else. `check_all` prints a
- * different summary line on the clean path (`✅ bundle freshness: N skill(s)
- * checked`) and on the problem path (`❌ bundle freshness: P problem(s) across M
- * skill(s)`), so the reader requires *a* summary line — proof the run finished —
- * without depending on which one. Freshness is bundle-check-mode.test.js's and
- * CI's bundle:check's to judge; a stale copy must not turn this test red
- * (task 154 QA cycle 1, TASK-154-BUG-2).
+ * What §2 reads from `--check` output, and nothing else. `check_all` prints its
+ * scan size on both paths — `✅ bundle freshness: N skill(s) checked, 0 problems`
+ * when clean, and `N skill(s) checked, U unresolved` under the `❌` summary when
+ * not — so the reader takes the count the SCAN reports, never a count of skills
+ * on disk: a run whose targets all went unresolved scans nothing and must not
+ * pass (task 154 QA cycle 2, TASK-154-BUG-3). Freshness itself is
+ * bundle-check-mode.test.js's and CI's bundle:check's to judge; a stale copy
+ * must not turn §2 red (QA cycle 1, TASK-154-BUG-2).
  */
 function readCheckOutput(stdout) {
+  const clean = stdout.match(
+    /^✅ bundle freshness: (\d+) skill\(s\) checked, 0 problems$/m,
+  );
+  const counted = stdout.match(
+    /^ {3}(\d+) skill\(s\) checked, (\d+) unresolved$/m,
+  );
+  const scan = clean
+    ? { checked: Number(clean[1]), unresolved: 0 }
+    : counted
+      ? { checked: Number(counted[1]), unresolved: Number(counted[2]) }
+      : { checked: null, unresolved: null };
   return {
     missing: stdout.split("\n").filter((l) => MISSING_RE.test(l)),
-    completed: /^(✅|❌) bundle freshness: /m.test(stdout),
+    ...scan,
   };
-}
-
-/** The skills `--check` with no target walks: every skills/<d>/SKILL.md (bundle_skill.py main()). */
-function liveSkillCount() {
-  const skills = path.join(REPO_ROOT, "skills");
-  return fs
-    .readdirSync(skills)
-    .filter((d) => fs.existsSync(path.join(skills, d, "SKILL.md"))).length;
 }
 
 /** A skill that cites `shared/resources/a.md`, which in turn cites line 3's target. */
@@ -226,7 +230,28 @@ test("§1e the §2 reader tolerates a stale copy — it reads the warning, not f
     );
     assert.deepEqual(readCheckOutput(r.stdout), {
       missing: [],
-      completed: true,
+      checked: 1,
+      unresolved: 0,
+    });
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("§1f a scan that resolved nothing reports it — the reader cannot mistake it for a clean scan", () => {
+  const fx = bundleFixture({ aMd: A_MD_IN_WORDS });
+  try {
+    // A target with no SKILL.md is unresolvable; check_skill returns before
+    // discovery, so no warning of any kind can print for it.
+    const bogus = path.join(path.dirname(fx.skillDir("fx")), "not-a-skill");
+    fs.mkdirSync(bogus);
+    const r = spawnSync("python3", [BUNDLER, "--check", bogus], {
+      encoding: "utf-8",
+    });
+    assert.deepEqual(readCheckOutput(r.stdout), {
+      missing: [],
+      checked: 0,
+      unresolved: 1,
     });
   } finally {
     fx.cleanup();
@@ -242,7 +267,7 @@ test("§2 the live tree carries no citation of a missing shared source", () => {
     cwd: REPO_ROOT,
     encoding: "utf-8",
   });
-  const { missing, completed } = readCheckOutput(stdout);
+  const { missing, checked, unresolved } = readCheckOutput(stdout);
   assert.deepEqual(
     missing,
     [],
@@ -250,10 +275,17 @@ test("§2 the live tree carries no citation of a missing shared source", () => {
       "Inside shared/resources/ such a literal is a bundling instruction (create-skill § " +
       '"Inside shared/resources/, a shared/resources/ literal is a bundling instruction").',
   );
-  assert.ok(completed, `--check did not finish (no summary line):\n${stdout}`);
-  const n = liveSkillCount();
   assert.ok(
-    n >= MIN_SKILLS,
-    `only ${n} skill(s) for --check to walk — expected at least ${MIN_SKILLS}; the scan is vacuous`,
+    checked !== null,
+    `--check printed no scan count — it did not finish:\n${stdout}`,
+  );
+  assert.equal(
+    unresolved,
+    0,
+    `${unresolved} skill(s) went unresolved — the scan skipped them:\n${stdout}`,
+  );
+  assert.ok(
+    checked >= MIN_SKILLS,
+    `the scan checked only ${checked} skill(s) — expected at least ${MIN_SKILLS}; it is vacuous`,
   );
 });

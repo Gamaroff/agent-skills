@@ -4,7 +4,7 @@
 **Bug ID**: TASK-154-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 1, by-hand probe)
 **Date Found**: 2026-09-29
 
@@ -100,3 +100,4 @@ row should now be refused (exit 2) or leave nothing behind.
 | 2026-09-29 | New          | qa-task    | Found in QA cycle 1      |
 | 2026-09-29 | In Progress  | qa-fix     | Investigation started    |
 | 2026-09-29 | Ready for QA | qa-fix     | Fix implemented (cycle 1) |
+| 2026-09-29 | Closed       | qa-task    | Verified in QA cycle 2    |

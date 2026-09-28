@@ -1277,6 +1277,11 @@ def check_all(targets):
         f"❌ bundle freshness: {len(all_problems)} problem(s) "
         f"across {skills_affected} skill(s)"
     )
+    # The scan's own size, on the problem path too. The clean line above carries
+    # it; without this one a run whose every target went unresolved printed
+    # `0 problem(s) across 0 skill(s)` and a reader could not tell a scan of
+    # nothing from a scan with nothing wrong (task 154 QA cycle 2).
+    print(f"   {len(targets) - unresolved} skill(s) checked, {unresolved} unresolved")
 
     # Only classes that actually occurred are named. A summary that lists the
     # whole taxonomy every run puts every class name in stdout, which makes

@@ -33,6 +33,23 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const RUNNER = path.join(REPO_ROOT, "scripts", "test-clean-checkout.sh");
 const BASE = path.join(REPO_ROOT, ".clean-checkout-test-tmp");
 
+// The runner refuses an ephemeral clone location, and every fixture's clone sits
+// under BASE — so in a checkout that is itself ephemeral (under /tmp, or a
+// .claude/worktrees/ worktree) every positive case would fail with exit 2 and no
+// message naming the cause. Say it once, up front (task 154 QA cycle 2; the
+// same guard observation-log.test.mjs applies to its scratch base).
+{
+  const { ephemeralReason } = require("../shared/resources/observation-log.js");
+  fs.mkdirSync(BASE, { recursive: true });
+  const why = ephemeralReason(fs.realpathSync(BASE));
+  if (why) {
+    throw new Error(
+      `scratch base ${BASE} is ${why}: this checkout's location makes every ` +
+        "clean-checkout fixture ephemeral. Run this test from a checkout outside it.",
+    );
+  }
+}
+
 const GIT_ID = [
   "-c",
   "user.name=fixture",
@@ -197,7 +214,7 @@ test("the runner refuses to delete the repository, an ancestor, root, or a direc
       { dir: fx.repo, why: /is the repository or contains it/ },
       { dir: ".", why: /is the repository or contains it/ },
       { dir: fx.wrapper, why: /is the repository or contains it/ },
-      { dir: "/", why: /contains the repository/ },
+      { dir: "/", why: /is the repository or contains it/ },
       { dir: foreign, why: /was not created by this script/ },
     ];
     for (const { dir, why } of cases) {
@@ -268,6 +285,150 @@ test("the runner re-uses its own marked clone, an empty directory, and a relativ
     assert.ok(
       !fs.existsSync(path.join(fx.repo, "rel-clone")),
       "relative clone left behind",
+    );
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("the runner refuses a control character, a missing parent, an unreadable directory and /private/var/tmp", () => {
+  const fx = makeFixture();
+  try {
+    const cases = [
+      { dir: path.join(fx.wrapper, "a\tb"), why: /control character/ },
+      {
+        dir: path.join(fx.wrapper, "missing", "clone"),
+        why: /parent directory does not exist/,
+      },
+      // macOS resolves /var/tmp to /private/var/tmp, which the engine does not list.
+      { dir: "/private/var/tmp/clean-checkout-x", why: /temporary directory/ },
+    ];
+    for (const { dir, why } of cases) {
+      const r = runRunner(fx, "true", { CLEAN_CHECKOUT_DIR: dir });
+      assert.equal(
+        r.status,
+        2,
+        `expected exit 2 for ${JSON.stringify(dir)}, got ${r.status}:\n${r.stderr}`,
+      );
+      assert.match(r.stderr, why, `wrong refusal for ${JSON.stringify(dir)}`);
+    }
+    assert.ok(
+      !fs.existsSync(path.join(fx.wrapper, "missing")),
+      "a missing parent was created",
+    );
+    // "Could not list" is not "empty". Root reads any directory, so the case
+    // only means something for an unprivileged user.
+    if (typeof process.getuid !== "function" || process.getuid() !== 0) {
+      const sealed = path.join(fx.wrapper, "sealed");
+      fs.mkdirSync(sealed);
+      fs.writeFileSync(path.join(sealed, "keep"), "x\n");
+      fs.chmodSync(sealed, 0o000);
+      try {
+        const r = runRunner(fx, "true", { CLEAN_CHECKOUT_DIR: sealed });
+        assert.equal(r.status, 2, r.stderr);
+        assert.match(r.stderr, /cannot be listed/);
+      } finally {
+        fs.chmodSync(sealed, 0o755);
+      }
+      assert.ok(
+        fs.existsSync(path.join(sealed, "keep")),
+        "the unreadable directory was deleted",
+      );
+    }
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("a case variant of the repository is still the repository where the filesystem ignores case", (t) => {
+  const fx = makeFixture();
+  try {
+    const variant = path.join(fx.wrapper, "REPO");
+    if (!fs.existsSync(variant)) {
+      t.skip("case-sensitive filesystem — a case variant is a different path");
+      return;
+    }
+    const r = runRunner(fx, "true", { CLEAN_CHECKOUT_DIR: variant });
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /is the repository or contains it/);
+    assert.ok(
+      fs.existsSync(path.join(fx.repo, ".git")),
+      "the repository was deleted",
+    );
+  } finally {
+    fx.cleanup();
+  }
+});
+
+// Task 154 QA cycle 2 (TASK-154-BUG-4): the marker proves a run created the
+// clone, not that it finished — the lock is what keeps two runs apart.
+test("the runner refuses a location another live run holds, and leaves that run's clone alone", () => {
+  const fx = makeFixture();
+  try {
+    fs.mkdirSync(path.join(fx.cloneDir, ".git"), { recursive: true });
+    fs.writeFileSync(
+      path.join(fx.cloneDir, ".git", "test-clean-checkout.marker"),
+      "",
+    );
+    fs.writeFileSync(path.join(fx.cloneDir, "in-use"), "x\n");
+    fs.mkdirSync(fx.cloneDir + ".lock");
+    fs.writeFileSync(
+      path.join(fx.cloneDir + ".lock", "pid"),
+      `${process.pid}\n`,
+    ); // alive: this process
+    const r = runRunner(fx, "true");
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(
+      r.stderr,
+      new RegExp(`another run \\(PID ${process.pid}\\) is using it`),
+    );
+    assert.ok(
+      fs.existsSync(path.join(fx.cloneDir, "in-use")),
+      "the live run's clone was deleted",
+    );
+    assert.ok(
+      fs.existsSync(fx.cloneDir + ".lock"),
+      "the live run's lock was removed",
+    );
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("the runner takes over a dead run's lock, refuses a lock it did not write, and releases its own", () => {
+  const fx = makeFixture();
+  try {
+    const lock = fx.cloneDir + ".lock";
+    // A pid no live process holds: spawn one and wait for it to exit.
+    const dead = spawnSync(
+      process.execPath,
+      ["-e", "process.stdout.write(String(process.pid))"],
+      {
+        encoding: "utf-8",
+      },
+    ).stdout;
+    fs.mkdirSync(lock);
+    fs.writeFileSync(path.join(lock, "pid"), `${dead}\n`);
+    let r = runRunner(fx, "test -f skills/x/marker");
+    assert.equal(
+      r.status,
+      0,
+      `a dead run's lock was not taken over:\n${r.stderr}`,
+    );
+    assert.ok(!fs.existsSync(lock), "the runner did not release its lock");
+    assert.ok(
+      !fs.existsSync(fx.cloneDir),
+      "the runner did not remove its clone",
+    );
+
+    fs.mkdirSync(lock);
+    fs.writeFileSync(path.join(lock, "notes"), "someone else's\n");
+    r = runRunner(fx, "true");
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /is not this script's lock/);
+    assert.ok(
+      fs.existsSync(path.join(lock, "notes")),
+      "a foreign lock directory was removed",
     );
   } finally {
     fx.cleanup();

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-154-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 1, code review CR-1)
 **Date Found**: 2026-09-29
 
@@ -64,3 +64,4 @@ red.
 | 2026-09-29 | New          | qa-task    | Found in QA cycle 1      |
 | 2026-09-29 | In Progress  | qa-fix     | Investigation started    |
 | 2026-09-29 | Ready for QA | qa-fix     | Fix implemented (cycle 1) |
+| 2026-09-29 | Closed       | qa-task    | Verified in QA cycle 2    |
