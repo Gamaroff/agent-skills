@@ -28,7 +28,7 @@ This task makes one prose change in the banner doc: the doc defers to the hook i
    > above. Every other firing point, including the ordinary Step 7 → 8 transition, follows this
    > rule (task 163, task 164).
 
-   Keep the closing `(task 163…)` token shape: the banner test's regex anchors the clause's end on it (`/\*\*One exception: ([^*]+)\*\*(.+?)\(task 163\)\./`). If the anchor changes, change the test's regex in the same edit.
+   The banner test's regex anchors the clause's end on its closing token (today `/\*\*One exception: ([^*]+)\*\*(.+?)\(task 163\)\./`). The new clause ends `(task 163, task 164).`, which that regex does not match, so change it in the same edit to `/\*\*One exception: ([^*]+)\*\*(.+?)\(task 163, task 164\)\./`. The HALT sentence that follows ends `(task 164).`, so the lazy match stops before it.
 
 2. **HALT rule.** Add one sentence after the exception, and align the HALT row of the position table:
 
@@ -77,16 +77,24 @@ This task makes one prose change in the banner doc: the doc defers to the hook i
 # builtin arms. Unset in every normal run, which gives `rm dirname`.
 read -r -a NOJQ_CMDS <<< "${ADVANCE_LOCK_TEST_4B_CMDS:-rm dirname}"
 for c in "${NOJQ_CMDS[@]}"; do
+  p=$(command -v "$c")
+  case "$p" in
+    "") ... ;;                                              # unchanged
+    /*) ... ;;                                              # unchanged
+    *) echo "  SKIP  4b: '$c' is a builtin, not linked" ;;  # was a silent `;;`
+  esac
+done
 ```
 
-Everything below the loop header is unchanged. Update the comment above the loop to name the seam.
+The builtin arm must print. Silent, it cannot be observed from outside the file: linking a builtin makes a dangling self-link that none of the no-jq commands uses, so the file passes 95/0 whether the arm skips or links (probed at review). The `SKIP` prefix matches the file's existing `SKIP  zsh interpreter pass …` line and is not counted as a pass or a fail. Update the comment above the loop to name the seam and the skip line.
 
 **`shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs`** (new). Use `spawnSync("bash", [SCRIPT], { env: { ...process.env, ADVANCE_LOCK_TEST_4B_CMDS: … } })`, or the `run` helper from `./lib/executed-prose.mjs` if it fits:
 
 - `ADVANCE_LOCK_TEST_4B_CMDS="rm dirname no-such-cmd-t164"` → `status === 1`; stdout matches `/4b setup: 'no-such-cmd-t164' not found on PATH/`; stdout has no `without jq`.
-- `ADVANCE_LOCK_TEST_4B_CMDS="rm dirname printf"` → `status === 0`; stdout has no `4b setup:`.
+- `ADVANCE_LOCK_TEST_4B_CMDS="rm dirname printf"` → `status === 0`; stdout matches `/SKIP  4b: 'printf' is a builtin, not linked/`; stdout has no `4b setup:`.
+- The override **deleted** from the child's env (`const env = { ...process.env }; delete env.ADVANCE_LOCK_TEST_4B_CMDS;`) → `status === 0`; stdout carries both `PASS  without jq, …` lines. This is Risk 3's "an unset override gives `rm dirname`" check, and deleting the key is what stops a value in the developer's shell leaking into it.
 
-Name the timeout: the file runs about 7s per invocation (zsh cases included), so set the `node:test` timeout generously (60s). The suite glob `shared/resources/tests/*.test.mjs` already picks the file up in `npm test`, so no `package.json` change is needed (confirm with `grep` before assuming).
+Name the timeout: the file runs about 7s per invocation (zsh cases included), and the test runs it three times, so set the `node:test` timeout generously (60s per case). The suite glob `shared/resources/tests/*.test.mjs` already picks the file up in `npm test`, so no `package.json` change is needed (confirm with `grep` before assuming).
 
 ### Phase 4: Proof and gates
 
