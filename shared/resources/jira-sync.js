@@ -1938,6 +1938,43 @@ function formatCardCheck(result, opts = {}) {
   return lines.join("\n");
 }
 
+// A card's summary line is the document's frontmatter `title`. A title is a
+// name, not a summary: the summary belongs in `description`. Nothing bounded
+// it, and the preflight could not see it: `preflight()` kept only the body. On
+// 2026-09-24, 42 of 146 task titles exceeded 100 characters, the longest 368,
+// and GitHub published them verbatim as issue titles (task.150, obs #128).
+//
+// Defined here, once, beside the section spec the same checks read. The
+// authoring preflight, the corpus ratchet and create-task's
+// `--from-observation` seed all import it rather than restating the number.
+const CARD_TITLE_MAX = 100;
+
+/**
+ * One `important` finding when the frontmatter `title` is longer than
+ * `CARD_TITLE_MAX`, else none. A missing title is not this check's business.
+ *
+ * `body` is read only to suggest the fix: when the body's H1 is within the
+ * bound, it is usually the name the long title was trying to be.
+ */
+function checkCardTitle(frontmatter, body = "") {
+  const title =
+    frontmatter && frontmatter.title != null ? String(frontmatter.title) : "";
+  if (!title || title.length <= CARD_TITLE_MAX) return [];
+  const h1 = (/^# (.+)$/m.exec(body) || [])[1] || "";
+  const useH1 = h1 && h1.length <= CARD_TITLE_MAX;
+  return [
+    {
+      severity: "important",
+      section: "(title)",
+      code: "title-too-long",
+      message: `The frontmatter title is ${title.length} characters — the card's summary line would be a paragraph (limit ${CARD_TITLE_MAX}).`,
+      fix: useH1
+        ? `Use the H1 as the title ("${h1}", ${h1.length} chars) and move the rest into \`description\`.`
+        : `Shorten the title to a name of at most ${CARD_TITLE_MAX} characters and move the rest into \`description\`.`,
+    },
+  ];
+}
+
 // What a clean result is a claim about — and what it is not.
 //
 // `ok: true` with zero findings reads as a structural all-clear, and it was
@@ -1948,10 +1985,19 @@ function formatCardCheck(result, opts = {}) {
 // scope statement the authoring contract asks for; it is deliberately not a
 // mandatory-section count, which is a per-kind template property this
 // tracker-neutral module has no definition of and must not grow a second one.
+//
+// The title clause keys on the RESULT, not on an options argument: `formatCardCheck`
+// calls this itself, with no options, so an option passed by a caller would reach
+// the JSON `scope` field and never the human-readable line (task.150 review, I1).
+// Only the authoring preflight sets `titleChecked`; the sync callers keep their
+// wording.
 function describeCardScope(result) {
   const resolved = result.blocks.filter((b) => b.status === "ok").length;
   const noun = resolved === 1 ? "card block resolves" : "card blocks resolve";
-  return `${resolved} ${noun} — this checks the card sections only, not template completeness.`;
+  const what = result.titleChecked
+    ? "the card sections and the title only"
+    : "the card sections only";
+  return `${resolved} ${noun} — this checks ${what}, not template completeness.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -5770,6 +5816,8 @@ module.exports = {
   summaryBlockNodes,
   buildCardSections,
   checkCardSections,
+  CARD_TITLE_MAX,
+  checkCardTitle,
   formatCardCheck,
   describeCardScope,
   isLabelOnly,

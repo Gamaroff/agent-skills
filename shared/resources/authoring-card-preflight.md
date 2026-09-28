@@ -30,6 +30,15 @@ Branch on the printed result, not on the exit status:
 | `No problems found. N card blocks resolve — …` | Say nothing about it. A clean preflight is not news. **It is also not an all-clear**: the line names its own scope because it checks the handful of headings the card is built from and nothing else — `task.103` passed it and reached review with ten of eleven mandatory sections. Template completeness is the reviewer's, not this check's. |
 | One or more findings | Print the tool's output verbatim, unedited, and tell the user the check is advisory. Each finding already carries its own `Fix:` line naming the exact heading to add or rename. |
 
+**The preflight also reads the frontmatter `title`** (task.150, obs #128). A title longer than
+`CARD_TITLE_MAX` (defined once, in `jira-sync.js`) is one `important` finding, `title-too-long`,
+because the card's summary line is the title and a paragraph there is unreadable on a board. Its
+`Fix:` names the body H1 when that fits, since the H1 is usually the name the long title was trying
+to be. Use it as the title, and move the rest into `description`. The sync paths'
+`--check-card` does not read the title yet, so this finding is advisory at authoring and not yet
+gated at review. A clean line says it read the title: `… checks the card sections and the title
+only …`.
+
 Do **not** paraphrase a finding, and do **not** re-derive the fix. The `Fix:` line is generated from
 the same spec the sync will use; a paraphrase is a second statement of the rule that can disagree
 with the first.

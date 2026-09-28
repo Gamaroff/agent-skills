@@ -91,6 +91,67 @@ test("corpus: no task document publishes a label-only card block", () => {
   );
 });
 
+// The legacy long titles (task.150, obs #128). Every task card document whose
+// frontmatter `title` was over CARD_TITLE_MAX when the bound landed, measured
+// with M1 in task.150's plan at `f88a997f` on 2026-09-28: 43 of 166. Renaming
+// them, and the issues already published under them, is the owner's decision
+// and out of that task's scope, so they are frozen here instead.
+//
+// The list can only SHRINK. A new long title fails (it is not listed), and a
+// listed title that has been shortened also fails until its id is removed.
+// Without that second half, a fixed id would sit in the list forever and quietly
+// re-admit a long title later.
+const LEGACY_LONG_TITLES = Object.freeze(
+  new Set([
+    49, 54, 55, 56, 57, 62, 64, 65, 99, 101, 105, 108, 113, 114, 115, 116, 117,
+    118, 119, 120, 121, 122, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133,
+    134, 135, 136, 137, 138, 139, 140, 143, 144, 146, 158,
+  ]),
+);
+
+test("corpus: no task title outside the legacy list exceeds CARD_TITLE_MAX, and every listed title still does", () => {
+  const docs = taskCardDocuments();
+  assert.ok(
+    docs.length >= CORPUS_FLOOR,
+    `expected at least ${CORPUS_FLOOR} task documents, found ${docs.length} — the walk is broken, not the corpus`,
+  );
+
+  const over = [];
+  const stale = [];
+  const seen = new Set();
+  for (const file of docs) {
+    const id = Number(file.split("/").pop().split(".")[1]);
+    const { frontmatter } = parseFrontmatter(readFileSync(file, "utf8"));
+    const len = String((frontmatter && frontmatter.title) || "").length;
+    const long = len > lib.CARD_TITLE_MAX;
+    if (LEGACY_LONG_TITLES.has(id)) {
+      seen.add(id);
+      if (!long) stale.push(`task.${id} (${len} chars)`);
+    } else if (long) {
+      over.push(`task.${id} (${len} chars)`);
+    }
+  }
+
+  assert.deepEqual(
+    over,
+    [],
+    `${over.length} task title(s) exceed ${lib.CARD_TITLE_MAX} characters — use the H1 as the title and move the rest into \`description\`:\n  ${over.join("\n  ")}`,
+  );
+  assert.deepEqual(
+    stale,
+    [],
+    `${stale.length} listed title(s) are now within the bound — remove their ids from LEGACY_LONG_TITLES so the list only shrinks:\n  ${stale.join("\n  ")}`,
+  );
+  // Every listed id must still name a document, or the list is carrying dead
+  // entries that make it look larger than the debt it records.
+  const missing = [...LEGACY_LONG_TITLES].filter((id) => !seen.has(id));
+  assert.deepEqual(
+    missing,
+    [],
+    `listed ids with no task document: ${missing.join(", ")}`,
+  );
+});
+
 // The property that defines `heading-only`, stated once as a fixture beside the
 // corpus walk so a reader can see what the population test is counting.
 test("corpus: the finding fires on a bold label alone and clears when the list under it is rendered", () => {
