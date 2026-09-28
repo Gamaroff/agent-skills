@@ -13,18 +13,20 @@ tags:
     observation,
   ]
 category: other
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-28
 assignee:
 estimated_effort_hours: 16
 github_issue: 480
+completed_date: 2026-09-28
+pr_number: 512
 ---
 
 # Technical Task: create-task — anchored claims, a bounded title, and a --from-observation entry
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.150.review.1.create-task-authoring-evidence.md` implemented 2026-09-28
 
@@ -617,30 +619,29 @@ Step 6 template's literal `open`, and § 1.1's padded prefix match.
 
 ---
 
-## Definition of Done - Gaps Identified
+## Definition of Done - PASSED ✅
 
-**Status:** IN PROGRESS (run 2; the document stays at `ready-for-review`). Run 1's two gaps were closed in `4f48ebe3`. Run 2 found the two below. History: `task.150.dod.1` and `task.150.dod.2`.
+**Status:** ACCEPTED
 
-### QA Gate Status
+### QA Report Summary
 
-**Gate**: `task.150.gate.5.create-task-authoring-evidence.yml` ✅ PASS (100/100). Step 5c: ⚠️ CONCERNS
+**QA Report**: `task.150.qa.5.create-task-authoring-evidence.md`
+**Gate File**: `task.150.gate.5.create-task-authoring-evidence.yml`
+**Gate Status**: ✅ PASS (100/100). Step 5c `/review-pr`: ⚠️ CONCERNS, advisory (no finding both high severity and high confidence)
 
-### Missing Criteria:
+All Definition of Done criteria were verified in run 3:
 
-1. **Code Quality (`CARD_TITLE_MAX` defined once):**
-   - [ ] No test pins the single definition. The grep holds today, but nothing turns red on a second definition
+✅ **Acceptance Criteria:** 12/12, with code and per-PR test evidence
+✅ **Tests & CI:** `ci:fast` 4401 pass / 0 fail. CI is green on `ab057653` (5 checks)
+✅ **Documentation:** four CHANGELOG entries; the create-task § 1.1, preflight and observation-log contracts; the regenerated catalog
+✅ **Security Review:** PASS after a Step 8a fix-and-recheck. Run 3's probe reproduced 20 low-severity title shapes. `ab057653` fixed them, and the recheck ran 112 probes with 0 reproduced
+⚠️ **Compliance Review:** not applicable (internal tooling)
 
-2. **Security Review (low, reproduced by execution):**
-   - [ ] The title check fails open on 7 YAML shapes the line-based parser misreads: a block scalar with a comment, tag or anchor; a multi-line plain or quoted scalar; a title on the next line; an indented `title:` inside another block. Run record: `task.150.dod.2.security.run.json` (84 probes, 7 reproduced)
+**History:** DoD run 1 (`task.150.dod.1`) and run 2 (`task.150.dod.2`) each found 2 gaps. They were closed in `4f48ebe3` and in `48d023a1` + `ef3bf4ea`.
 
-### Next Steps:
+**Task marked as ACCEPTED on:** 2026-09-28
 
-- [ ] Add a single-definition test for `CARD_TITLE_MAX`
-- [ ] Read the raw column-0 `title:` line and flag any title that is not a single-line inline scalar, with the seven inputs as tests
-- [ ] Re-run `/finalise`
-
-**Estimated Effort:** Small (about 1 hour)
-**Detailed Verification Log:** `task.150.dod.2.create-task-authoring-evidence.md`
+**Detailed Verification Log:** See `task.150.dod.3.create-task-authoring-evidence.md` for the full verification evidence.
 
 ---
 <!-- change-log-start -->
@@ -660,6 +661,7 @@ Step 6 template's literal `open`, and § 1.1's padded prefix match.
 | 2026-09-28 |         | QA gate PASS (100/100) — cycle 5: no high or medium; 2 low advisory carried | qa-task |
 | 2026-09-28 |  | DoD incomplete — 2 gaps identified | finalise |
 | 2026-09-28 |  | DoD incomplete (run 2) — 2 gaps identified | finalise |
+| 2026-09-28 | 1.2 | DoD passed — accepted (PR #512) | finalise |
 <!-- change-log-end -->
 
 ---
