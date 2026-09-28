@@ -34,8 +34,8 @@ First pipeline run for task 154: remove the placeholder literal behind the bundl
 | 1. create-branch           | ✅ Done    | Branch `feature/task.154.*` exists in git                             | Branch created at `12b8fb78` (develop tip); pushed with upstream | —                    |
 | 2. review-task             | ✅ Done    | `task.154.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 9/10; Planned → Ready for Development; 1 Important + 2 Optional fixed | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; audit 28/28 Ready for Review @ `63d039b6`; 6 mutation proofs | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.154.qa.{N}.*.md`; `task.154.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #513: https://github.com/Gamaroff/agent-skills/pull/513 | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.154.qa.{N}.*.md`; `task.154.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles (FAIL → CONCERNS ×3 → PASS 100); 8 bugs closed; runner redesigned at cycle 3; 5c APPROVE | —                    |
 | 7. finalise                | ⏳ Pending | `task.154.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -100,17 +100,82 @@ All restored; each file re-run green after restore.
 - The pre-commit hook's bundle run on each of the five commits printed no `not found` line.
 - Loop audit iter 1 (Explore): `{"status":"ready-for-review","completed":28,"total":28,"last_commit_hash":"63d039b6…"}` → exit loop. Change Log row written by the inline path (one row). Development completion comment posted to github issue 484 (develop-complete → posted).
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS: docs/tasks/task.154…, .gitignore, CHANGELOG.md, docs/contributing, evals/shared/lib, evals/shared/tests, package.json, scripts, shared/resources, skills/create-skill/scripts, skills/create-skill, skills/observe-work/references, tests. Pre-flight guard: no untracked files, nothing held.
+- /create-pr --base develop (pre-supplied) --issue 484. Auto-commit `adfa7992` (task doc + report only); leak check OK. Branch pushed; remote tip verified equal to local HEAD.
+- PR body written by the orchestrator from the recorded verification rather than by the diff-summariser subagent — every figure in it is measured above; noted as a deviation from create-pr Step 5.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/513 (state OPEN). Lock `pr_url` set.
+- Tracker: in-review comment → posted; GitHub board: in-review → stage-disabled (the ladder has no `in-review` target — correct no-op).
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
 
+- **QA cycle 4 (5a)**: bug reports for the two MEDIUM findings were not written at 5a (qa-task Step 9); filed at 5b as bugs 7–8 together with their fix, and linked from QA report 4.
+- **Reviewer independence**: gates 1–4 were written by the orchestrator, so qa-fix's findings ingester (Step 1a) was not dispatched — the findings were already in context. Each cycle's diff review was an independent Explore subagent; the fixes were not.
+- **Spec change**: the clean-checkout runner's design changed in QA cycle 3 (per-run `mktemp -d` directory inside a base) after three cycles of findings on the named-location design; task §3 was brought into line in cycle 4.
+
 ---
 
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1 — 2026-09-29
+**Gate Result**: FAIL
+**Issues Found**: 2 — T154-QA1-1 (HIGH, `scripts/test-clean-checkout.sh`: `rm -rf "$DIR"` deletes whatever CLEAN_CHECKOUT_DIR names — repo, ancestor, unrelated dir; reproduced by hand), T154-QA1-2 (MEDIUM, `tests/bundle-missing-source.test.js` §2 needs the zero-problem summary line)
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: T154-QA1-1 — runner resolves CLEAN_CHECKOUT_DIR and refuses the repo, `/`, an ancestor, an ephemeral path (engine `ephemeralReason()`, as-given and resolved — macOS `/var/tmp` → `/private/var/tmp` is missing from the engine's list, pre-existing) and an unmarked existing dir; `.git/` marker; absolute trap. T154-QA1-2 — §2 `readCheckOutput()` + filesystem skill count; §1e stale fixture. CR-2 and CR-6 folded in. Mutation proofs F1–F5 each red → restored green (`.claude/state/t154-mutations.log`). Findings ingested inline (the orchestrator wrote gate 1; no ingester dispatched — independence loss recorded). Fast gate: `ci:fast` 4419 tests, 0 fail, 1 skipped, 248s. PR state after push: OPEN (polled inline with `gh pr view`, not the poller subagent). Change Log `qa-fix` row deferred to loop exit (one row per loop, precedent task.150).
+**Commit**: `77250a8a`
+
+### QA Cycle 2 — 2026-09-29
+**Gate Result**: CONCERNS
+**Issues Found**: 9 — T154-QA2-1 (MEDIUM, §2 passes a scan of zero resolved skills), T154-QA2-2 (MEDIUM, concurrent runner invocations delete each other's clone), QA2-3..9 (LOW: APFS case variant, /private/var/tmp spelling, marker written after checkout, unreadable dir reads empty, test base under /tmp, tab garbles message, nested parent left behind). Cycle 1's HIGH/MEDIUM verified fixed (18-candidate by-hand re-probe; QA mutation spot check F2, F5); bugs 1–2 closed.
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: QA2-1 — `check_all` prints `N skill(s) checked, U unresolved` on the problem path; §2 reads the scan count from `--check`, fails on any unresolved; §1f. QA2-2 — `<dir>.lock` (mkdir + owner PID; live owner refused, dead owner taken over, pid-less lock refused). QA2-3..9 — one node location decision (realpathSync.native both sides, control chars, /private/var normalised, missing parent, unlistable dir), marker before checkout, test scratch-base precondition. Mutation proofs G1, G3–G9 red → restored green; G10 (marker-before-checkout) no-red-untested. Findings ingested inline (orchestrator wrote gate 2; independence loss recorded). Fast gate: `ci:fast` 4424 tests, 0 fail, 1 skipped, 244s. PR state after push: OPEN, head `5b1e3d91` (ls-remote; `gh pr view` lagged one read).
+**Commit**: `5b1e3d91`
+
+### QA Cycle 3 — 2026-09-29
+**Gate Result**: CONCERNS
+**Issues Found**: 6 — T154-QA3-1 (MEDIUM, stale-lock takeover not atomic), T154-QA3-2 (MEDIUM, ownership decided before the lock is read), QA3-3..6 (LOW: pid-less lock ambiguity, marker written after checkout, lock path unchecked, dangling symlink reads absent). All in `scripts/test-clean-checkout.sh`'s shared-location protection — third consecutive cycle on that subject. Cycle 2 fixes verified (21-candidate by-hand re-probe; 20/20 incl. TMPDIR=/tmp); bugs 3–4 closed.
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+**Fixes Applied**: Structural move (qa-fix Step 2.6, repeat subject — the runner's shared-location protection drew findings in cycles 1, 2 and 3). `CLEAN_CHECKOUT_DIR` is now a base; each run clones into its own `mktemp -d` directory and deletes only that, so the lock, marker, takeover and ownership checks were removed rather than patched (T154-QA3-1..6). Tests rewritten: concurrency (two runs at once), never-deletes-base / foreign `run.*`, unusable-base refusals. Mutation proofs H1–H4 red → restored byte-identical green. Spec deviation recorded for /finalise: task §3 Target Architecture still describes a named clone location removed at start/exit. Fast gate: `ci:fast` 4422 tests, 0 fail, 1 skipped, 250s. PR OPEN, remote head `480782e4`.
+**Commit**: `480782e4`
+
+### QA Cycle 4 — 2026-09-29
+**Gate Result**: CONCERNS
+**Issues Found**: 4 — T154-QA4-1 (MEDIUM, test: base-is-empty checks pass on a deleted base), T154-QA4-2 (MEDIUM, test: relative-base case cannot discriminate), QA4-3 (LOW, spec text lags the per-run redesign), QA4-4 (LOW, test guard checks one spelling). No runner defect; 16-candidate by-hand re-probe left the filesystem unchanged; bugs 5–6 closed.
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+**Fixes Applied**: QA4-1 (`entries()` throws on a missing base; created-base case), QA4-2 (relative base from a subdirectory), QA4-3 (task §3 / Phase 5 / risk note 2 rewritten for the per-run design), QA4-4 (guard checks both spellings); cleanups CR-5, CR-6. Mutation proofs J1 (4 tests red) and J2 (1 red) — each a mutation the old assertions passed. qa-fix run inline by the orchestrator (fix was four small edits; independence loss recorded). Bugs 7–8 filed late (QA Step 9 missed at 5a; filed with the fix) — noted in the Issues Log. Fast gate: `ci:fast` 4422 tests, 0 fail, 1 skipped, 249s. PR OPEN, remote head `1b245db7`.
+**Commit**: `1b245db7`
+
+### QA Cycle 5 — 2026-09-29
+**Gate Result**: PASS
+**Issues Found**: none — 4 advisory cleanups (CR-1..4) in gate 5 `recommendations.future`; bugs 7–8 verified and closed
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — `task.154.pr-review.1.bundler-and-snippet-test-hygiene.md` (0 conformance findings; 3 low code findings: CR-1 clone origin refs, CR-2 inherited CLEAN_CHECKOUT_CMD in release.sh, CR-3 duplicated regex); ready-for-merge → stage-disabled
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 
@@ -119,7 +184,26 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.154.bundler-and-snippet-test-hygiene`
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/513
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
+
+---
+
+## Pipeline Paused — 2026-09-28T23:01:48Z
+
+⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
+
+**State at pause**:
+
+- Skill: `/develop-task`
+- Branch: `feature/task.154.bundler-and-snippet-test-hygiene`
+- Last step boundary: Step 7
+- PR: https://github.com/Gamaroff/agent-skills/pull/513
+- Tracker: github #484
+
+**Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 7.
+
+**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+
