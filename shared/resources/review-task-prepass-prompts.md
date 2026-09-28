@@ -16,22 +16,23 @@ Used by `skills/review-task/SKILL.md` Phase 1.5. Both agents are dispatched in a
 
 **Subagent type**: Explore (read-only)
 
-**Prompt template** (substitute `{task_path}` and `{arch_location}` before dispatching):
+**Prompt template** (substitute `{task_path}`, `{arch_location}`, `{arch_domains}` and `{arch_axes}` before dispatching — the last two come from `prepass-axes.js`, see Variable substitution):
 
 ```
 Read the task file at {task_path}. Extract: the tech stack references, service/module names, library names, and API patterns mentioned in the Implementation Plan and Technical Background sections.
 
-Search for architecture documents under {arch_location} that cover the task's domain (backend / frontend / auth / payments / real-time — pick the most relevant). Read at most 2 architecture files.
+Search for architecture documents under {arch_location} that cover the task's domain — this repository's domains are: {arch_domains}. Pick the most relevant. Read at most 2 architecture files.
 
 Compare the task's technical claims against the architecture documents on these axes:
 1. Libraries: does the task reference libraries not in the architecture docs or tech-stack.md?
-2. Patterns: does the task deviate from documented patterns (naming, layering, file placement)?
-3. API contracts: are API endpoints or payloads consistent with specs in architecture docs?
+2. Patterns: for each of these documented standards that the task touches — {arch_axes} — does the task deviate from it?
+3. Contracts: are interfaces the architecture docs define (endpoints, CLI flags, exit codes, output schemas — whichever they define) used consistently with those docs?
 4. Security: does the task handle auth, crypto, or sensitive data in a way that contradicts architecture guidance?
 
 Return ONLY this YAML block (no other text):
 
 alignment: aligned | drift | conflict
+axes_checked: [<each axis name from step 2 you actually compared against>]
 findings:
   - area: <one of: library | pattern | api-contract | security>
     severity: low | medium | high
@@ -42,6 +43,7 @@ findings:
 **Fallback**: if no architecture documents can be found under `{arch_location}`, return:
 ```yaml
 alignment: unknown
+axes_checked: []
 findings:
   - area: arch-not-found
     severity: low
@@ -103,6 +105,15 @@ Do NOT send them sequentially — both must be in the same tool-call block to ru
 |----------|--------|
 | `{task_path}` | Resolved in Input Resolution / Step 1 |
 | `{arch_location}` | `skills-config.yaml` → `architecture.architectureShardedLocation`, default: `docs/architecture` |
+| `{arch_domains}` | `prepass-axes.js --arch {arch_location} --json` → `domains`, joined with `, ` |
+| `{arch_axes}` | the same call → `axes`, joined with `; ` |
+
+`prepass-axes.js` reads the H2 headings of `concepts/tech-stack.md` (domains) and
+`concepts/coding-standards.md` (axes) under `{arch_location}`. Its `source` is `architecture` when
+both exist, `partial` when one does, and `fallback` when neither does — the fallback reproduces the
+former web-stack lists, so a repository without those docs is reviewed exactly as before. Record
+`source` beside the summary: an `aligned` measured against fallback axes is a weaker result than one
+measured against the repository's own standards (obs #130).
 
 ### Handling agent failures
 
@@ -114,3 +125,9 @@ If one agent times out or returns malformed output:
 ### Summary schema validation
 
 Before passing summaries to the Q&A phase, validate each returned block has the expected top-level key (`alignment` for B; `implementation_status` for C). If the key is missing, treat the agent as failed and apply the failure rule above.
+
+**Agent B also needs `axes_checked`.** An `alignment: aligned` whose `axes_checked` is missing or empty is
+a **failed** agent — apply the failure rule above and perform the pass inline. An `aligned` that names
+nothing it was aligned against is not a result: it is the answer a web-stack prompt gave a shell/Node
+repository (obs #130). `drift` and `conflict` without it are accepted, because their findings
+already name the areas; `unknown` carries `axes_checked: []`.

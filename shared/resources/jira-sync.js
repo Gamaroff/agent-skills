@@ -5806,6 +5806,10 @@ module.exports = {
   adfContainsText,
   adfContainsExactText,
   matchCodeFence,
+  // The CommonMark fence tracker behind extractSection. Exported so a heading
+  // reader elsewhere (prepass-axes.js) reuses it rather than adding a third
+  // fence parser beside this one and doc-links.js (task 151).
+  makeFenceTracker,
   firstLineOf,
   COMMENT_MARKER_PREFIX,
   // jira api
