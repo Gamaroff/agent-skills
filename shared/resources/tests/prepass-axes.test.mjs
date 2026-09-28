@@ -92,8 +92,9 @@ test("no concepts/ docs → fallback, reproducing the former web-stack lists", (
       "payments",
       "real-time",
     ]);
-    assert.deepEqual(r.axes, [...FALLBACK_AXES]);
-    assert.equal(FALLBACK_AXES.length, 3);
+    // The former axis-2 parenthetical, and nothing from axes 3–4 (CR-5).
+    assert.deepEqual(r.axes, ["naming", "layering", "file placement"]);
+    assert.deepEqual([...FALLBACK_AXES], r.axes);
     assert.deepEqual(r.read, []);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -142,6 +143,76 @@ test("a heading inside a fenced block is not an axis", () => {
 function run(args, opts = {}) {
   return spawnSync(process.execPath, args, { encoding: "utf8", ...opts });
 }
+
+test("a concepts file with no H2 heading is absent, not an empty measurement (CR-1)", () => {
+  // Both files present, neither has a `## ` heading → fallback, never
+  // `architecture` with empty lists.
+  const none = deriveAxes({
+    archDir: "x",
+    readFile: () => "# Title\n\n### only h3\n\nprose\n",
+  });
+  assert.equal(none.source, "fallback");
+  assert.deepEqual(none.domains, [...FALLBACK_DOMAINS]);
+  assert.deepEqual(none.axes, [...FALLBACK_AXES]);
+  assert.equal(none.read.length, 2, "both files were read, so both are named");
+
+  // One usable half → partial; the empty half falls back.
+  const half = deriveAxes({
+    archDir: "x",
+    readFile: (p) => (p.endsWith("coding-standards.md") ? "## Naming\n" : ""),
+  });
+  assert.equal(half.source, "partial");
+  assert.deepEqual(half.axes, ["Naming"]);
+  assert.deepEqual(half.domains, [...FALLBACK_DOMAINS]);
+});
+
+test("a read error that is not absence throws; the CLI exits 1 with empty stdout (CR-2)", () => {
+  const err = (code) => () => {
+    const e = new Error(code);
+    e.code = code;
+    throw e;
+  };
+  assert.throws(
+    () => deriveAxes({ archDir: "x", readFile: err("EACCES") }),
+    /EACCES/,
+  );
+  // Absence in either spelling is not an error.
+  assert.equal(
+    deriveAxes({ archDir: "x", readFile: err("ENOENT") }).source,
+    "fallback",
+  );
+  assert.equal(
+    deriveAxes({ archDir: "x", readFile: err("ENOTDIR") }).source,
+    "fallback",
+  );
+
+  const dir = tmp();
+  try {
+    // tech-stack.md is a DIRECTORY → EISDIR, which is not absence.
+    mkdirSync(join(dir, "concepts", "tech-stack.md"), { recursive: true });
+    const r = run([HELPER, "--arch", dir, "--json"]);
+    assert.equal(r.status, 1, r.stderr);
+    assert.equal(r.stdout, "");
+    assert.match(r.stderr, /cannot read the architecture docs/);
+    // --arch naming a regular file → ENOTDIR under it → absence, exit 0.
+    const file = join(dir, "not-a-dir");
+    writeFileSync(file, "x");
+    const f = run([HELPER, "--arch", file, "--json"]);
+    assert.equal(f.status, 0, f.stderr);
+    assert.equal(JSON.parse(f.stdout).source, "fallback");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("CommonMark H2 forms: up to 3 leading spaces and a tab are headings (CR-3)", () => {
+  const r = deriveAxes({
+    archDir: "x",
+    readFile: () =>
+      "   ## Indented three\n##\tTabbed\n## Closed ##\n    ## four spaces is code\n##NoSpace\n###  H3\n",
+  });
+  assert.deepEqual(r.axes, ["Indented three", "Tabbed", "Closed"]);
+});
 
 test("CLI: --json prints the result shape and exits 0", () => {
   const r = run([HELPER, "--arch", ARCH, "--json"]);

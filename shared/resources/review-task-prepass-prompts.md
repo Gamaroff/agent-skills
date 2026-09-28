@@ -109,9 +109,12 @@ Do NOT send them sequentially — both must be in the same tool-call block to ru
 | `{arch_axes}` | the same call → `axes`, joined with `; ` |
 
 `prepass-axes.js` reads the H2 headings of `concepts/tech-stack.md` (domains) and
-`concepts/coding-standards.md` (axes) under `{arch_location}`. Its `source` is `architecture` when
-both exist, `partial` when one does, and `fallback` when neither does — the fallback reproduces the
-former web-stack lists, so a repository without those docs is reviewed exactly as before. Record
+`concepts/coding-standards.md` (axes) under `{arch_location}`. A half counts only when its file
+exists **and** has a `## ` heading — an empty half falls back like a missing file. Its `source` is
+`architecture` when both halves count, `partial` when one does, and `fallback` when neither does —
+the fallback reproduces the former web-stack lists, so a repository without those docs is reviewed
+exactly as before. A file that exists but cannot be read exits 1 with nothing on stdout: treat that
+as a failed pre-pass, never substitute an empty slot. Record
 `source` beside the summary: an `aligned` measured against fallback axes is a weaker result than one
 measured against the repository's own standards (obs #130).
 

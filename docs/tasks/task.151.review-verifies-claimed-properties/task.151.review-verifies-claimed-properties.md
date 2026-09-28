@@ -648,6 +648,34 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-28
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.151.qa.1.review-verifies-claimed-properties.md](./task.151.qa.1.review-verifies-claimed-properties.md)
+- **Gate File**: [task.151.gate.1.review-verifies-claimed-properties.yml](./task.151.gate.1.review-verifies-claimed-properties.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 22 new (69 in the targeted re-run); `ci:fast` 4359 pass / 0 fail
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 (1 medium: CR-1)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+CR-1 (medium): a concepts file with no `## ` headings reads as `source: architecture` with empty
+lists — [task.151.bug.1.empty-concepts-file-reads-as-architecture.md](./task.151.bug.1.empty-concepts-file-reads-as-architecture.md).
+Four low advisory findings (CR-2 – CR-5) in the QA report.
+
+---
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -657,6 +685,8 @@ None.
 | 2026-09-28 | 1.1     | Review passed (9/10) — task.145 boundary and check numbering updated (checks 11–12 / 8–9); anchors re-measured | review-task |
 | 2026-09-28 |         | Status → ready-for-development | review-task |
 | 2026-09-28 |         | Implemented — 13 files (1 helper, 2 tests, 1 test-lib move, 3 SKILL.md, 2 prompt files, jira-sync export, CHANGELOG), 22 tests; 15 mutation proofs red | develop |
+| 2026-09-28 |         | QA gate CONCERNS (90/100) — 1 medium finding (CR-1), 4 low advisory | qa-task |
+| 2026-09-28 |         | QA findings fixed — CR-1 (medium) plus CR-2, CR-3, CR-4, CR-5; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -18,16 +18,27 @@
  * structure — the fence tracker is jira-sync.js's, reused rather than restated.
  *
  * `source` says where the lists came from:
- *   architecture — both files were read
- *   partial      — one was; the missing half takes the web-stack fallback
- *   fallback     — neither was; today's hard-coded lists, unchanged
+ *   architecture — both files were read and each yielded at least one heading
+ *   partial      — one half did; the other takes the web-stack fallback
+ *   fallback     — neither did; the former hard-coded lists, unchanged
+ *
+ * A half "yields" only when its file exists AND has an H2. A file with no `## `
+ * heading is treated exactly like a missing one: an empty list is nothing to
+ * measure against, and labelling it `architecture` would dispatch Agent B with
+ * blank slots under the strongest source label (task 151 QA cycle 1, CR-1).
+ *
+ * A missing file (ENOENT, or ENOTDIR when --arch names a file) is absence. Any
+ * other read error — EACCES, EISDIR — is NOT absence: `deriveAxes` throws, and
+ * the CLI exits 1 with nothing on stdout, so "no docs" and "could not read the
+ * docs" stay distinguishable (CR-2).
  *
  * Pure and offline: reads at most two files, writes nothing, no network.
  *
  * Usage:
  *   node prepass-axes.js --arch <dir> [--json]
  *
- * Exit 0 on success (every `source` is a success). Exit 2 on a usage error —
+ * Exit 0 on success (every `source` is a success). Exit 1 when a concepts file
+ * exists but cannot be read (not absence — see above). Exit 2 on a usage error —
  * missing `--arch`, or an unknown flag — with the usage on stderr and nothing
  * on stdout, so a caller substituting stdout into a prompt never substitutes an
  * error message.
@@ -37,10 +48,11 @@ const fs = require("fs");
 const path = require("path");
 const { makeFenceTracker } = require("./jira-sync.js");
 
-// Today's hard-coded lists, kept ONLY as the fallback for a repository with no
-// concepts/ docs. They reproduce the prompt's former wording: the domain
-// parenthetical, and axes 2–4 (axis 1, libraries, is stack-neutral already and
-// stays in the template).
+// The former hard-coded lists, kept ONLY as the fallback for a repository with
+// no usable concepts/ docs. They reproduce the prompt's former wording: the
+// domain parenthetical, and axis 2's parenthetical (naming, layering, file
+// placement). Axes 1, 3 and 4 are stack-neutral and stay in the template, so the
+// fallback must not restate them inside axis 2 (CR-5).
 const FALLBACK_DOMAINS = Object.freeze([
   "backend",
   "frontend",
@@ -48,11 +60,7 @@ const FALLBACK_DOMAINS = Object.freeze([
   "payments",
   "real-time",
 ]);
-const FALLBACK_AXES = Object.freeze([
-  "naming, layering, file placement",
-  "API endpoints and payloads",
-  "auth, crypto and sensitive data",
-]);
+const FALLBACK_AXES = Object.freeze(["naming", "layering", "file placement"]);
 const SKIP = new Set(["see also"]);
 
 const USAGE = "usage: prepass-axes.js --arch <dir> [--json]";
@@ -62,7 +70,9 @@ function h2s(text) {
   const out = [];
   for (const line of String(text).replace(/\r\n?/g, "\n").split("\n")) {
     if (isFence(line)) continue;
-    const m = /^## +(.+?)(?:\s+#+)?\s*$/.exec(line);
+    // CommonMark ATX H2: up to 3 leading spaces (the fence tracker's own rule),
+    // then `##`, then a space or tab (CR-3). An optional closing run of `#`.
+    const m = /^ {0,3}##[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/.exec(line);
     if (m && !SKIP.has(m[1].toLowerCase())) out.push(m[1]);
   }
   return out;
@@ -77,23 +87,29 @@ function deriveAxes({
     axes: path.join(String(archDir), "concepts", "coding-standards.md"),
   };
   const read = [];
+  // Absent → null. Present → its H2s, which may be empty; an empty list is
+  // treated as absent below. Any error other than absence propagates.
   const take = (p) => {
+    let t;
     try {
-      const t = readFile(p);
-      read.push(p);
-      return t;
-    } catch {
-      return null;
+      t = readFile(p);
+    } catch (e) {
+      if (e && (e.code === "ENOENT" || e.code === "ENOTDIR")) return null;
+      throw e;
     }
+    read.push(p);
+    return h2s(t);
   };
   const ts = take(files.domains);
   const cs = take(files.axes);
-  const domains = ts === null ? [...FALLBACK_DOMAINS] : h2s(ts);
-  const axes = cs === null ? [...FALLBACK_AXES] : h2s(cs);
+  const hasDomains = ts !== null && ts.length > 0;
+  const hasAxes = cs !== null && cs.length > 0;
+  const domains = hasDomains ? ts : [...FALLBACK_DOMAINS];
+  const axes = hasAxes ? cs : [...FALLBACK_AXES];
   const source =
-    ts !== null && cs !== null
+    hasDomains && hasAxes
       ? "architecture"
-      : ts === null && cs === null
+      : !hasDomains && !hasAxes
         ? "fallback"
         : "partial";
   return { reason: source, source, domains, axes, read };
@@ -126,7 +142,17 @@ function main(argv) {
     process.stderr.write(`prepass-axes: ${args.error}\n${USAGE}\n`);
     return 2;
   }
-  const r = deriveAxes({ archDir: args.arch });
+  let r;
+  try {
+    r = deriveAxes({ archDir: args.arch });
+  } catch (e) {
+    // A read error that is not absence (EACCES, EISDIR): say so and substitute
+    // nothing — an empty stdout is what a caller filling prompt slots must see.
+    process.stderr.write(
+      `prepass-axes: cannot read the architecture docs under ${args.arch}: ${e && e.message}\n`,
+    );
+    return 1;
+  }
   if (args.json) {
     process.stdout.write(JSON.stringify(r) + "\n");
   } else {
