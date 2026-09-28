@@ -615,39 +615,32 @@ None.
 No critical issues remain. Two low advisory findings are carried as follow-ups: the observe-work
 Step 6 template's literal `open`, and § 1.1's padded prefix match.
 
-
 ---
 
 ## Definition of Done - Gaps Identified
 
-**Status:** IN PROGRESS (the document stays at `ready-for-review`; not accepted)
+**Status:** IN PROGRESS (run 2; the document stays at `ready-for-review`). Run 1's two gaps were closed in `4f48ebe3`. Run 2 found the two below. History: `task.150.dod.1` and `task.150.dod.2`.
 
 ### QA Gate Status
 
-**QA Report**: `task.150.qa.5.create-task-authoring-evidence.md`
-**Gate File**: `task.150.gate.5.create-task-authoring-evidence.yml`
-**Gate Status**: ✅ PASS (100/100). Step 5c `/review-pr`: ⚠️ CONCERNS
+**Gate**: `task.150.gate.5.create-task-authoring-evidence.yml` ✅ PASS (100/100). Step 5c: ⚠️ CONCERNS
 
 ### Missing Criteria:
 
-1. **Performance criterion (Success Criteria, Performance 2):**
-   - [ ] The corpus ratchet should add one frontmatter parse per document to the existing walk. As built, it is a second walk that reads each document again (`shared/resources/tests/card-preflight-corpus.test.mjs:113`, `:124`)
+1. **Code Quality (`CARD_TITLE_MAX` defined once):**
+   - [ ] No test pins the single definition. The grep holds today, but nothing turns red on a second definition
 
 2. **Security Review (low, reproduced by execution):**
-   - [ ] `checkCardTitle` fails open on a folded (`>-`) or literal (`|`) block-scalar `title:` and on BOM-prefixed frontmatter. The line-based `parseFrontmatter` reads the indicator, or finds no frontmatter. Run record: `task.150.dod.security.run.json` (48 probes, 3 reproduced)
+   - [ ] The title check fails open on 7 YAML shapes the line-based parser misreads: a block scalar with a comment, tag or anchor; a multi-line plain or quoted scalar; a title on the next line; an indented `title:` inside another block. Run record: `task.150.dod.2.security.run.json` (84 probes, 7 reproduced)
 
 ### Next Steps:
 
-- [ ] Share one walk (a single read and parse per document) between the two corpus tests
-- [ ] Strip a leading BOM and refuse or flag a block-scalar `title:` in the title check, with the three probe inputs as tests
+- [ ] Add a single-definition test for `CARD_TITLE_MAX`
+- [ ] Read the raw column-0 `title:` line and flag any title that is not a single-line inline scalar, with the seven inputs as tests
 - [ ] Re-run `/finalise`
 
-**Not gaps (follow-ups):** a single-definition test for `CARD_TITLE_MAX` (the criterion's grep holds today); the observe-work review Step 6 template's literal `--expect-status open` (5c CR-1, CR5-1); § 1.1's padded-prefix match (CR5-2).
-
-**Estimated Effort:** Small (1–2 hours)
-
-**Gap Report Generated:** 2026-09-28
-**Detailed Verification Log:** See `task.150.dod.1.create-task-authoring-evidence.md` for the full verification evidence.
+**Estimated Effort:** Small (about 1 hour)
+**Detailed Verification Log:** `task.150.dod.2.create-task-authoring-evidence.md`
 
 ---
 <!-- change-log-start -->
@@ -666,6 +659,7 @@ Step 6 template's literal `open`, and § 1.1's padded prefix match.
 | 2026-09-28 |         | QA findings fixed — bugs 1–4 and CR4-1; engine set-status gains ambiguous-id and --expect-status; 4 iterations | qa-fix |
 | 2026-09-28 |         | QA gate PASS (100/100) — cycle 5: no high or medium; 2 low advisory carried | qa-task |
 | 2026-09-28 |  | DoD incomplete — 2 gaps identified | finalise |
+| 2026-09-28 |  | DoD incomplete (run 2) — 2 gaps identified | finalise |
 <!-- change-log-end -->
 
 ---
