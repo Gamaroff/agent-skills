@@ -1,6 +1,6 @@
 ---
 name: create-task
-description: Create comprehensive technical task documentation for refactoring, infrastructure changes, and technical improvements. Interactive workflow with decision guidance for non-user-facing work.
+description: Create comprehensive technical task documentation for refactoring, infrastructure changes, and technical improvements. Interactive workflow with decision guidance for non-user-facing work. `--from-observation` with a list of observation ids seeds the task from observation-log entries, asks only what they leave open, and parks the entries on the new task.
 invokes: [ensure-task-github-issue, ensure-task-jira-issue, mermaid-architect]
 ---
 
@@ -105,7 +105,7 @@ This skill produces **task documentation and the co-located plan file**, and the
 
 When this skill is activated:
 
-1. **USER COLLABORATION IS MANDATORY** - Full interactive workflow required
+1. **USER COLLABORATION IS MANDATORY** - Full interactive workflow required. In `--from-observation` mode (§ 1.1) the entries are the collaboration source; only the questions they leave open are asked.
 2. **STEP-BY-STEP SECTION BUILDING** - Process each of 11 sections sequentially
 3. **VALIDATION REQUIRED** - Verify completeness before generating final document
 4. **FILE CREATION** - Create proper directory structure with correct naming
@@ -174,6 +174,46 @@ From this, auto-generate:
 - **Directory Path**: `docs/tasks/task.[ID].[kebab-case-name]/`
 - **File Path**: `task.[ID].[kebab-case-name].md`
 - **Registry update** (after the task doc + plan are written, in Step 5): add a new row to `task-registry.md` and increment **Next Available Task Number**. Commit the registry update in the same commit as the new task files.
+
+### 1.1 Entry from the Observation Log (`--from-observation`)
+
+`/create-task --from-observation 124,127` cuts a task from observation-log entries (obs #147). The
+entries already answer most of § 1's prompts, so this entry asks only what they leave open. It cites
+the ids, and it **parks the entries itself** once the task exists. Parking was the step a session
+could forget: 9 entries had been parked by hand, each by whichever session remembered.
+
+1. **Resolve the workspace and scan.** From the repository root, in one shell. The resolver refuses
+   an ephemeral anchor, and a bare `source` would carry on with the variables unset:
+
+   ```bash
+   source .agents/skills/create-task/references/resolve-observation-workspace.sh || exit 1
+   command node .agents/skills/create-task/references/observation-log.js scan --json
+   ```
+
+   The engine is `references/observation-log.js` and the resolver is
+   `references/resolve-observation-workspace.sh`, both bundled beside this skill. Read
+   `reason`: `scan-broken` is a broken reader, not an empty log. Stop and report it.
+
+2. **Select and refuse.** Take the entries whose `id` is in the list. **Refuse the run** when an id is
+   missing, or when its `status` is not `open`, and name the id and its status. A parked or actioned
+   entry already has a home, and a second task cut from it is the duplicate this entry prevents.
+3. **Seed.** For each entry, read `${OBS_LOG_DIR}/<file>` (the `file` the scan returned) and pass
+   `{ frontmatter: <the scan entry>, body: <the file's text> }` to `seedFromObservations` in
+   `scripts/lib.js`. It returns `ids`, `title` (or `null` with `titleReason`), `description`, `tags`,
+   `references`, `changeLogDescription` and the `park` vectors, and it throws on a non-`open` entry.
+   The Improvement sections seed Target Architecture and the Implementation Plan. The Issue sections
+   seed Motivation, **and every current-state name they carry is grepped before it is written**
+   (§ 3.5, obs #127). An observation is a memory of a run, not a read of the code.
+4. **Ask only what is still open.** Ask for the title only when `title` is `null`: `over-bound`
+   (observation titles run long, and a title is a name, obs #128) or `multiple-entries`. Also ask the
+   tracker-sync question at 4.5, which stays opt-in. Take the rest as defaults and **report** each one
+   in the completion message: priority `Medium`, the template's category, and effort from the rubric
+   (§ 4.4). § 3.5 still runs in full. Its Critical items are about the document, not the author, and a
+   seeded document needs them more.
+5. **Cite.** Put `references` under References, and use `changeLogDescription` as the
+   Change Log's first row.
+6. **Park** is § 5 step 2b. It runs after both files exist, never before, so a run that stops early
+   leaves the entries `open`, which is visible and not lost.
 
 ### 1.2 One Task or Several?
 
@@ -433,6 +473,9 @@ After the Implementation Plan and Technical Background are populated, decide whe
 - **An outcome the named function cannot return** (obs #168): when a success criterion or test case states what a named function returns for a stated input (a verdict, an exit code, a status), walk that input through the function's decision branches as the plan leaves them. That means the branches it has today plus any a planned phase adds or changes. Confirm the stated outcome is the branch that fires on that walk. An outcome a planned phase produces is reachable even though today's code cannot return it. A planned branch counts only when a named phase states it: the condition and the outcome it returns. Name that phase in the criterion as a cross-reference: the phase states the branch, and the criterion only points at it. A phase that only names the function, or a criterion that promises a later phase will add the branch, does not count. An unreachable outcome is one no current or planned branch returns. It is a criterion the developer would have to silently rewrite or silently fail. **Put it to the author, and never auto-fix it** by rewriting the criterion to what today's code returns: that rewrite turns the behaviour the task exists to deliver into the behaviour it exists to change. (task.144 promised `present-but-inert` for an accept-all fixture; `computeVerdict`, which that plan did not change, scores it `absent`.)
 - **A property claimed, not run** (obs #161): when the document asserts that an existing function keeps an ordering, a uniqueness, an idempotence or a round-trip under the inputs this task adds, run it on those inputs before writing the claim down — a one-line `command node -e` is enough, and an existence check is no evidence for a behaviour. task.141 claimed zero-padding keeps `listRunFiles`' basename sort chronological; it does not (`["a-lan.md","a-lan-02.md"].sort()` puts `-02` first), and its plan's own test asserted the false claim. A falsified property is Critical: fix the claim before the plan is written on top of it.
 - **Compatibility scoped from a finding, not from the release** (obs #170): when the task defines legacy, migration or old-format handling for a shape, derive the legacy shape from the last release tag — `git show <tag>:<path>` on the file that defines or writes it, diffed against the target shape — cover every field the diff shows, and cite the tag in Technical Background. task.143 covered the one field its QA finding named; the released shape at `v0.51.0` lacked three more.
+- **A current-state name nobody grepped** (obs #127): every field, function and file location the Technical Background asserts about the current code has a `grep` hit cited as `path:line`, or is marked `(unverified)`. Grep each one now. The author who names a field is the one who greps for it.
+- **A categorised population without a witness per member** (obs #124): when the document sorts a measured population into classes (used / dead / prose, real dependency / not), each **member** carries its witness, meaning the `file:line` of its invocation or the grep that returned nothing. A count carries its command (obs #117). A category needs its witness, one per member. Where the classification drives a design (a regex keyed on an invocation spelling), quote at least one real instance of that spelling from the tree. task.122 counted 15 correctly and categorised 7 of them wrongly.
+- **A single-statement test keyed on a shared token** (obs #135): for each proposed single-statement, population or allowlist test, (a) grep the key it proposes and list every hit. If any hit belongs to a different rule, the key is shared, and the test needs a positive marker or a compound (verb + discriminator) pattern. (b) Name a restatement that would **not** match the key and say how the test sees it. (c) If the test's population is derived from directories, do not name a site to add. Name the regex change and a non-vacuity assertion instead. task.130 keyed a test on `loop-limit|not-converging`, a token another rule also uses: it would have been red at the wrong site and blind to the token-free restatement behind task.124 bug 13.
 
 #### ⚡ Should Add (present to user for confirmation)
 
@@ -460,7 +503,7 @@ Once validated:
 2. **Generate Markdown File**
    - Populate with all user-provided content
    - Format with proper markdown structure
-   - Emit a YAML frontmatter block (per `resources/task-template.md`) with: `id`, `title`, `type: task`, `description` (a one-sentence summary — recommended), optional `tags`, `category`, `status`, `priority`, `created`, `updated`, `assignee`. `type` is OKF's one hard requirement; `description` is OKF-recommended. See [OKF conformance](references/open-knowledge-format.md).
+   - Emit a YAML frontmatter block (per `resources/task-template.md`) with: `id`, `title`, `type: task`, `description` (a one-sentence summary — recommended), optional `tags`, `category`, `status`, `priority`, `created`, `updated`, `assignee`. `type` is OKF's one hard requirement; `description` is OKF-recommended. See [OKF conformance](references/open-knowledge-format.md). **`title` is a name, not a summary**: if step 4.6 reports `title-too-long`, use the H1 as the title and move the extra text into `description`. The bound lives in the preflight, so it is not restated here (obs #128).
    - Set frontmatter `status: planned` (body `**Status:** Planned`) and both `created`/`updated` to today
    - Initialize empty progress tracking checkboxes
    - Seed the unnumbered `## Change Log` section (between `## Stakeholder Sign-off` and
@@ -542,7 +585,7 @@ Before the optional tracker-sync step (4.5), propose a default effort estimate a
 
 **Step 3 — write back.** If the user accepts the recommendation or picks any numeric option, write `estimated_effort_hours: {N}` into the frontmatter before the optional Step 4.5 sync (so the estimate is ready whether the user syncs now or later). If the user picks Skip, omit the field — review-task will flag it as a LOW gap later.
 
-Do **not** silently write a value without prompting. The recommendation is a default for the user's prompt, not an auto-applied estimate.
+Do **not** silently write a value without prompting. The recommendation is a default for the user's prompt, not an auto-applied estimate. In `--from-observation` mode (§ 1.1), write the rubric value and report it in the completion message: the entries are the collaboration source, and effort is derivable from the document.
 
 ### 4.5 Offer Tracker Sync (opt-in)
 
@@ -648,6 +691,18 @@ Actions:
 1. Task document created at `docs/tasks/task.[ID].[name]/task.[ID].[name].md`
 2. Plan file created at `docs/tasks/task.[ID].[name]/task.[ID].plan.[name].md`
 2a. Card preflight run (step 4.6) — report any findings verbatim, as advisory
+2b. **`--from-observation` only: park the entries.** Run each `park` vector from the § 1.1 seed,
+    in the same shell as the resolver, one call per id:
+
+    ```bash
+    source .agents/skills/create-task/references/resolve-observation-workspace.sh || exit 1
+    command node .agents/skills/create-task/references/observation-log.js \
+      set-status --id 124 --status parked --parked-until "task.150 merged to develop" --json
+    ```
+
+    Read `reason`. `ok` is success. Report any other value verbatim and continue: parking never
+    blocks the document, and an entry left `open` is visible, not lost. Name each parked id in the
+    completion message.
 3. If `${PRD_ROOT}/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this task's ID/key
@@ -698,6 +753,13 @@ anchor (a heading, a symbol name, a unique string) over a line number; where a l
 helps, pair it with the identifier so the citation survives the next edit:
 `qa-task/SKILL.md:580` *(`- **Security**: Review for security issues`)*. A reader who finds the
 coordinate stale can still find the thing. (obs #22)
+
+**Every current-state name carries its grep** (obs #127). A field, function, flag or file location
+the document says exists *today* is cited with the `grep -rn` (or `git grep -n`) hit that found it,
+as `path:line` paired with the identifier. A name the grep does not find is marked `(unverified)` or
+removed. A task cut from an observation inherits the observation's wording, and an observation is a
+memory of a run, not a read of the code: task.123 named a `qa_cycles_completed` field that exists
+nowhere.
 
 ```
 Current Architecture:
@@ -936,7 +998,7 @@ Phases: 5 phases (configs → services → integration → testing)
 
 ## Key Principles
 
-1. **User Collaboration is Mandatory** - Every section requires user input and validation
+1. **User Collaboration is Mandatory** - Every section requires user input and validation. In `--from-observation` mode (§ 1.1) the entries are the collaboration source; only the questions they leave open are asked.
 2. **Transparency in Structure** - Clear 11-section format ensures completeness
 3. **Breaking Changes Emphasis** - Migration paths required, not optional
 4. **Risk-Aware Documentation** - Risk assessment integrated, not afterthought
@@ -959,7 +1021,7 @@ See `resources/` directory for:
 A successful create-task execution produces:
 
 1. ✅ **Complete Task Document** - All 11 sections populated
-2. ✅ **User-Validated Content** - Every section reviewed with user
+2. ✅ **User-Validated Content** - Every section reviewed with user. In `--from-observation` mode (§ 1.1) the entries are the collaboration source; only the questions they leave open are asked.
 3. ✅ **Proper Naming** - Follows convention (dots/hyphens pattern)
 4. ✅ **Correct Directory Structure** - `docs/tasks/task.[ID].[name]/`
 5. ✅ **Markdown Formatting** - Proper headers, code blocks, lists

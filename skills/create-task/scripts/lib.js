@@ -12,6 +12,9 @@
 const fs = require("fs");
 const path = require("path");
 const shared = require("../references/create-skills-lib.js");
+// The card title bound is defined once, beside the card spec, and read from
+// there (task.150). A copy of the number here would be a second definition.
+const { CARD_TITLE_MAX } = require("../references/jira-sync.js");
 
 const {
   parseFrontmatter,
@@ -183,6 +186,170 @@ function mergeSprintStatus(yaml, entry) {
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// --from-observation seed (task.150, obs #147)
+//
+// A task cut from observation-log entries used to be improvised through every
+// mandatory prompt, and the entries were then parked by hand — 9 of them, by
+// whichever session remembered. These two pure functions turn the entries into
+// the answers create-task would otherwise have asked for, and into the exact
+// `observation-log.js set-status` vectors that park them. The skill runs the
+// vectors itself, after both files exist (§ 5 step 2b).
+//
+// The engine has no body reader — `renderObservation` treats the body as
+// opaque — so the parser lives here, with its only consumer. If a second
+// consumer appears, it belongs in the engine.
+// ---------------------------------------------------------------------------
+
+const OBS_SECTIONS = {
+  Issue: "issue",
+  Improvement: "improvement",
+  Principle: "principle",
+};
+
+/**
+ * Split an observation body into its three canonical sections. A missing
+ * section is "", never undefined, so a caller can read any field unconditionally.
+ */
+function parseObservationBody(text) {
+  const out = { issue: "", improvement: "", principle: "" };
+  let current = null;
+  const buf = { issue: [], improvement: [], principle: [] };
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const h = /^## (Issue|Improvement|Principle)\s*$/.exec(line);
+    if (h) {
+      current = OBS_SECTIONS[h[1]];
+      continue;
+    }
+    if (/^## /.test(line)) {
+      current = null;
+      continue;
+    }
+    if (current) buf[current].push(line);
+  }
+  for (const k of Object.keys(out)) out[k] = buf[k].join("\n").trim();
+  return out;
+}
+
+function asArray(v) {
+  if (v == null || v === "") return [];
+  return (Array.isArray(v) ? v : [v]).map(String).filter(Boolean);
+}
+
+function firstSentence(text) {
+  const flat = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const m = /^(.+?[.!?])(?=\s|$)/.exec(flat);
+  return m ? m[1] : flat;
+}
+
+/**
+ * Seed a task document from observation-log entries.
+ *
+ * @param {{frontmatter: object, body: string}[]} entries  any order
+ * @param {{taskId: number|string}} opts
+ * @returns {{
+ *   ids: number[], title: string|null, titleReason: string|null,
+ *   description: string, tags: string[], references: string[],
+ *   changeLogDescription: string, park: string[][]
+ * }}
+ *
+ * Throws on an entry that is not `open`: a parked or actioned entry already has
+ * a home, and cutting a second task from it is the duplicate this entry exists
+ * to prevent.
+ */
+function seedFromObservations(entries, { taskId } = {}) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new Error(
+      "seedFromObservations: at least one observation entry is required",
+    );
+  }
+  if (taskId == null || taskId === "") {
+    throw new Error(
+      "seedFromObservations: taskId is required (it names the park condition)",
+    );
+  }
+  const rows = entries.map(({ frontmatter = {}, body = "" }) => {
+    const id = Number(frontmatter.id);
+    const status = String(frontmatter.status || "open");
+    if (!Number.isInteger(id)) {
+      throw new Error(
+        `observation entry has no numeric id: ${JSON.stringify(frontmatter.id)}`,
+      );
+    }
+    if (status !== "open") {
+      throw new Error(
+        `observation #${id} is ${status} — it already has a home`,
+      );
+    }
+    return {
+      id,
+      title: String(frontmatter.title || ""),
+      skills: asArray(frontmatter.skill),
+      sections: parseObservationBody(body),
+    };
+  });
+  rows.sort((a, b) => a.id - b.id);
+  const ids = rows.map((r) => r.id);
+
+  const tags = [];
+  for (const r of rows)
+    for (const sk of r.skills) if (!tags.includes(sk)) tags.push(sk);
+  tags.push("observation");
+
+  // The title is a NAME (obs #128). One entry gives a candidate: its title with
+  // a leading "<skill>: " prefix removed. Observation titles run long (median
+  // 127 on 2026-09-24), so a candidate over the bound is refused rather than
+  // truncated, and several entries never name the task by themselves. Either
+  // way the one remaining question is the title.
+  let title = null;
+  let titleReason = null;
+  if (rows.length > 1) {
+    titleReason = "multiple-entries";
+  } else {
+    let bare = rows[0].title;
+    for (const sk of rows[0].skills) {
+      if (bare.startsWith(`${sk}: `)) {
+        bare = bare.slice(sk.length + 2);
+        break;
+      }
+    }
+    const candidate = `[Task ${taskId}] ${bare}`;
+    if (candidate.length <= CARD_TITLE_MAX) title = candidate;
+    else titleReason = "over-bound";
+  }
+
+  const description = rows
+    .map((r) => firstSentence(r.sections.improvement))
+    .filter(Boolean)
+    .join(" ");
+  const references = rows.map((r) => `Observation #${r.id} — ${r.title}`);
+  const list = ids.map((i) => `#${i}`).join(", ");
+  const changeLogDescription = `Initial draft — cut from observation${ids.length > 1 ? "s" : ""} ${list}`;
+  const park = ids.map((id) => [
+    "set-status",
+    "--id",
+    String(id),
+    "--status",
+    "parked",
+    "--parked-until",
+    `task.${taskId} merged to develop`,
+    "--json",
+  ]);
+
+  return {
+    ids,
+    title,
+    titleReason,
+    description,
+    tags,
+    references,
+    changeLogDescription,
+    park,
+  };
+}
+
 module.exports = {
   TASK_FILENAME_RE,
   MANDATORY_SECTION_HEADINGS,
@@ -196,4 +363,6 @@ module.exports = {
   countMandatorySections,
   populateTaskTemplate,
   mergeSprintStatus,
+  parseObservationBody,
+  seedFromObservations,
 };
