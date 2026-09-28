@@ -176,7 +176,7 @@ shared/resources/prepass-axes.js      deriveAxes({ archDir }) → { reason, sour
                                       source: architecture | partial | fallback
                                       domains ← H2s of concepts/tech-stack.md      (minus "See also")
                                       axes    ← H2s of concepts/coding-standards.md (minus "See also")
-                                      fallback (neither file) ← today's web-stack list and four axes
+                                      fallback (neither half) ← today's web-stack domains and the former axis-2 list
                                       CLI: --arch <dir> [--json]; exit 0 ok, 2 usage; no writes, no network
 review-{task,story}-prepass-prompts   Agent B: "{arch_domains}", "for each of {arch_axes}"; returns axes_checked[]
 review-task Phase 1.5                 runs prepass-axes.js; B is valid only with alignment + axes_checked
@@ -427,6 +427,9 @@ schemas)", so the value still fits a CLI repository.
    pattern line, Issues to Flag), Detection Rule 7.
 8. ✅ `skills/review-story/SKILL.md`: Step 1 Subagent 3, Step 4 (two checks), Detection Rule 6.
 9. ✅ `skills/create-task/SKILL.md`: two Step 3.5 Critical bullets.
+9a. ✅ `tests/lib/markdown-section.js` and `tests/outcome-reachability-check.test.js`: the per-item
+    reader (`citingItemOf`, `asProse`) moves into the shared test lib so `review-property-checks`
+    reuses it rather than copying it (a plan deviation, recorded in the implementation report).
 
 ### Files to Modify (Documentation)
 
@@ -455,7 +458,8 @@ None.
   - The expected lists are read from the files by the test's own `^## ` scan, not restated. A later
     heading edit therefore does not break the test.
 - **Fallback and partial.** The fixtures are built in `mkdtempSync` directories, not committed.
-  - With no `concepts/` directory → `fallback`, with today's five domains and four axes.
+  - With no `concepts/` directory → `fallback`, with today's five domains and the former axis-2
+    list (naming, layering, file placement) — QA cycle 1, CR-5.
   - With only `coding-standards.md` → `partial`: the axes come from the file and the domains fall
     back.
 - **Fences.** A `## Heading` inside a fenced block is not an axis.
@@ -702,8 +706,8 @@ Work by the cosmetic-residue exit.
 | 2026-09-28 |         | Implemented — 13 files (1 helper, 2 tests, 1 test-lib move, 3 SKILL.md, 2 prompt files, jira-sync export, CHANGELOG), 22 tests; 15 mutation proofs red | develop |
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — 1 medium finding (CR-1), 4 low advisory | qa-task |
 | 2026-09-28 |         | QA findings fixed — gate 1 CR-1..CR-5, gate 2 C2-CR-1 (atxH2 reader), C2-CR-2, C2-CR-5; 2 iterations | qa-fix |
-| 2026-09-28 |         | QA gate PASS (95/100) — cycle 3: no high or medium; 1 low carried (route 2b) | qa-task |
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — cycle 2: gate-1 findings fixed; 1 medium (C2-CR-1), 4 advisory | qa-task |
+| 2026-09-28 |         | QA gate PASS (95/100) — cycle 3: no high or medium; 1 low carried (route 2b) | qa-task |
 <!-- change-log-end -->
 
 ---
