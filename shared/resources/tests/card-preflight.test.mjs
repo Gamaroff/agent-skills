@@ -360,18 +360,29 @@ test("B: the authoring path and the sync path read the SAME body", () => {
         syncBody,
         `${name}: the two paths resolved DIFFERENT bodies — a verdict that happens to match is not parity`,
       );
-      // The title finding is the one thing the authoring path adds. Filter it
-      // out, then prove it was the ONLY thing filtered: a filter that removed a
-      // section finding too would make parity pass vacuously.
+      // The title findings are the one thing the authoring path adds; they all
+      // carry section "(title)". Filter on that, then prove the filter removed
+      // only title findings: each one it kept out names a title code, and none
+      // of the section findings it kept is a title code. (The earlier form
+      // compared two complementary filters over one array, which cannot fail.)
+      const TITLE_CODES = [
+        "title-too-long",
+        "title-block-scalar",
+        "title-unreadable-bom",
+      ];
       const titleOnly = authoring.findings.filter(
-        (f) => f.code === "title-too-long",
+        (f) => f.section === "(title)",
       );
       const sectionFindings = authoring.findings.filter(
-        (f) => f.code !== "title-too-long",
+        (f) => f.section !== "(title)",
       );
-      assert.equal(
-        authoring.findings.length - sectionFindings.length,
-        titleOnly.length,
+      assert.ok(
+        titleOnly.every((f) => TITLE_CODES.includes(f.code)),
+        `${name}: a (title) finding carries a non-title code`,
+      );
+      assert.ok(
+        sectionFindings.every((f) => !TITLE_CODES.includes(f.code)),
+        `${name}: a title code escaped the (title) section`,
       );
       if (titleOnly.length) {
         assert.equal(
@@ -744,4 +755,46 @@ test("A: a clean result says it read the title; the sync scope line does not", (
     lib.CARD_SECTIONS_BY_KIND.task,
   );
   assert.match(lib.describeCardScope(sync), /checks the card sections only/);
+});
+
+// The three shapes the finalise security probe reproduced (task.150 DoD): each
+// hid an over-bound title from the line-based parser, so the bound passed it.
+test("A: a folded block-scalar title is flagged, not measured by its indicator", () => {
+  const doc = `---\ntitle: >-\n  ${"word ".repeat(40).trim()}\n---\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n`;
+  withTempDoc("task.996.folded.md", doc, (file) => {
+    const codes = pf.preflight(file, "task").findings.map((f) => f.code);
+    assert.deepEqual(codes, ["title-block-scalar"]);
+  });
+});
+
+test("A: a literal block-scalar title is flagged, not measured by its indicator", () => {
+  const doc = `---\ntitle: |\n  ${"x".repeat(150)}\n---\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n`;
+  withTempDoc("task.996.literal.md", doc, (file) => {
+    const codes = pf.preflight(file, "task").findings.map((f) => f.code);
+    assert.deepEqual(codes, ["title-block-scalar"]);
+  });
+});
+
+test("A: a BOM before the frontmatter is flagged, and the title behind it is still measured", () => {
+  const doc = `\uFEFF---\ntitle: "${"x".repeat(368)}"\n---\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n`;
+  withTempDoc("task.996.bom.md", doc, (file) => {
+    const r = pf.preflight(file, "task");
+    const title = r.findings
+      .filter((f) => f.section === "(title)")
+      .map((f) => f.code);
+    assert.deepEqual(title, ["title-unreadable-bom", "title-too-long"]);
+    assert.equal(r.ok, false);
+  });
+  // A BOM with a short title still gets the BOM finding: the sync cannot read it.
+  withTempDoc(
+    "task.996.bom-short.md",
+    `\uFEFF---\ntitle: "a name"\n---\n\n# Short\n`,
+    (file) => {
+      const codes = pf
+        .preflight(file, "task")
+        .findings.filter((f) => f.section === "(title)")
+        .map((f) => f.code);
+      assert.deepEqual(codes, ["title-unreadable-bom"]);
+    },
+  );
 });

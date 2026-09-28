@@ -1956,13 +1956,48 @@ const CARD_TITLE_MAX = 100;
  * `body` is read only to suggest the fix: when the body's H1 is within the
  * bound, it is usually the name the long title was trying to be.
  */
-function checkCardTitle(frontmatter, body = "") {
+//
+// Two shapes hide a title from `parseFrontmatter`, which reads the header line by
+// line (task.150 DoD, security probe): a YAML block scalar (`title: >-` then the
+// text on following lines) reads as its indicator, `>-`; and a byte-order mark
+// before the opening `---` means no frontmatter is recognised at all. Both would
+// have passed the bound with a title of any length, so each is its own finding.
+// `opts.bom` is set by a caller that saw a BOM and stripped it to read the
+// title; the length check then measures the real title.
+const BLOCK_SCALAR_INDICATOR = /^[>|][+-]?[0-9]?[+-]?$/;
+
+function checkCardTitle(frontmatter, body = "", opts = {}) {
   const title =
     frontmatter && frontmatter.title != null ? String(frontmatter.title) : "";
-  if (!title || title.length <= CARD_TITLE_MAX) return [];
+  const findings = [];
+  if (opts.bom) {
+    findings.push({
+      severity: "important",
+      section: "(title)",
+      code: "title-unreadable-bom",
+      message:
+        "The document starts with a byte-order mark, so the tracker sync cannot read its frontmatter — the card would publish no title.",
+      fix: "Save the file as UTF-8 without a BOM.",
+    });
+  }
+  if (BLOCK_SCALAR_INDICATOR.test(title.trim())) {
+    findings.push({
+      severity: "important",
+      section: "(title)",
+      code: "title-block-scalar",
+      message: `The frontmatter title is a YAML block scalar (\`${title.trim()}\`) — the card's summary line would be the indicator, not the title.`,
+      fix:
+        "Write the title on the `title:` line itself, quoted, as a name of at most " +
+        CARD_TITLE_MAX +
+        " characters.",
+    });
+    return findings;
+  }
+  if (!title || title.length <= CARD_TITLE_MAX) return findings;
   const h1 = (/^# (.+)$/m.exec(body) || [])[1] || "";
   const useH1 = h1 && h1.length <= CARD_TITLE_MAX;
   return [
+    ...findings,
     {
       severity: "important",
       section: "(title)",

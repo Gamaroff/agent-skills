@@ -39,6 +39,13 @@ to be. Use it as the title, and move the rest into `description`. The sync paths
 gated at review. A clean line says it read the title: `… checks the card sections and the title
 only …`.
 
+Two shapes would hide a title from the line-based frontmatter parser, and each has its own
+`important` finding. **`title-block-scalar`**: `title: >-` or `title: |` with the text on the
+following lines reads as the indicator, so the card would publish `>-`. Write the title on its own
+line, quoted. **`title-unreadable-bom`**: a byte-order mark before the opening `---` means no
+frontmatter is recognised, so the sync would publish no title. Save the file without the BOM. The
+preflight still reads the title behind the BOM, so an over-bound title there is reported too.
+
 Do **not** paraphrase a finding, and do **not** re-derive the fix. The `Fix:` line is generated from
 the same spec the sync will use; a paraphrase is a second statement of the rule that can disagree
 with the first.

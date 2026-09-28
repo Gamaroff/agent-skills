@@ -46,7 +46,9 @@ const { checkCardSections, CARD_SECTIONS_BY_KIND, parseFrontmatter } = lib;
 // equals its directory. Everything else in the folder (plans, reviews, QA
 // write-ups, gates, implementation reports) is a sibling artifact no card is
 // built from, and a suffix blocklist misses the ones nobody thought of.
+let WALKS = 0;
 function taskCardDocuments() {
+  WALKS++;
   const root = join(repoRoot, "docs", "tasks");
   const out = [];
   for (const entry of readdirSync(root)) {
@@ -62,20 +64,37 @@ function taskCardDocuments() {
   return out;
 }
 
+// ONE walk for the whole file: every task card document is read once and its
+// frontmatter parsed once, and every corpus test below reads the same records
+// (task.150 DoD gap, AC6). The title ratchet used to run its own walk and a
+// second readFileSync per document, which is not what the task promised. The
+// read counter makes the promise checkable: the last test asserts one read per
+// document, so a test that walks or reads again turns it red.
+let READS = 0;
+let CORPUS = null;
+function corpus() {
+  if (CORPUS) return CORPUS;
+  CORPUS = taskCardDocuments().map((file) => {
+    READS++;
+    const { frontmatter, body } = parseFrontmatter(readFileSync(file, "utf8"));
+    return { file, frontmatter, body };
+  });
+  return CORPUS;
+}
+
 // The corpus floor. 120 documents on 2026-09-17; a number well under that
 // still proves the walk found the corpus, and a number over it never fails.
 const CORPUS_FLOOR = 100;
 
 test("corpus: no task document publishes a label-only card block", () => {
-  const docs = taskCardDocuments();
+  const docs = corpus();
   assert.ok(
     docs.length >= CORPUS_FLOOR,
     `expected at least ${CORPUS_FLOOR} task documents, found ${docs.length} — the walk is broken, not the corpus`,
   );
 
   const headingOnly = [];
-  for (const file of docs) {
-    const { body } = parseFrontmatter(readFileSync(file, "utf8"));
+  for (const { file, body } of docs) {
     const r = checkCardSections(body, CARD_SECTIONS_BY_KIND.task);
     for (const f of r.findings) {
       if (f.code === "heading-only") {
@@ -110,7 +129,7 @@ const LEGACY_LONG_TITLES = Object.freeze(
 );
 
 test("corpus: no task title outside the legacy list exceeds CARD_TITLE_MAX, and every listed title still does", () => {
-  const docs = taskCardDocuments();
+  const docs = corpus();
   assert.ok(
     docs.length >= CORPUS_FLOOR,
     `expected at least ${CORPUS_FLOOR} task documents, found ${docs.length} — the walk is broken, not the corpus`,
@@ -119,9 +138,8 @@ test("corpus: no task title outside the legacy list exceeds CARD_TITLE_MAX, and 
   const over = [];
   const stale = [];
   const seen = new Set();
-  for (const file of docs) {
+  for (const { file, frontmatter } of docs) {
     const id = Number(file.split("/").pop().split(".")[1]);
-    const { frontmatter } = parseFrontmatter(readFileSync(file, "utf8"));
     const len = String((frontmatter && frontmatter.title) || "").length;
     // The preflight's own rule decides "long" — never a restatement of it here.
     const long = lib
@@ -181,5 +199,26 @@ test("corpus: the finding fires on a bold label alone and clears when the list u
   assert.deepEqual(
     alone.findings.map((f) => [f.section, f.code]),
     [["Success Criteria", "heading-only"]],
+  );
+});
+
+// Runs after the two corpus tests (node:test runs a file's tests in order). One
+// read per document across the whole file: the title ratchet adds a parse's worth
+// of work to the walk the label check already does, not a second walk.
+test("corpus: the whole file reads each task card document exactly once", () => {
+  const docs = corpus();
+  assert.ok(
+    docs.length >= CORPUS_FLOOR,
+    "non-vacuity: the walk found the corpus",
+  );
+  assert.equal(
+    WALKS,
+    1,
+    `${WALKS} walks of docs/tasks — a corpus test is running its own walk`,
+  );
+  assert.equal(
+    READS,
+    docs.length,
+    `${READS} reads for ${docs.length} documents — a corpus test is walking or reading again instead of using corpus()`,
   );
 });

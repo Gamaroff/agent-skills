@@ -3,7 +3,7 @@
 **Task**: `task.150.create-task-authoring-evidence.md`
 **Run Number**: 1
 **Started**: 2026-09-28 18:46
-**Status**: Paused (DoD gaps)
+**Status**: In Progress
 
 ---
 
@@ -156,6 +156,14 @@ task.123's first committed draft is `e0881adb` (`git log --diff-filter=A`). It n
 - Decision: IN PROGRESS, gaps identified. Step 8a (fix-and-recheck) is not applicable: two sections are not PASS, and the AC finding has no agent severity
 - Gaps: (1) AC6: the corpus ratchet is a second walk and re-reads each document; (2) security (low): `checkCardTitle` fails open on folded or literal block-scalar titles and on BOM-prefixed frontmatter, inherited from the line-based `parseFrontmatter`
 - Change Log gaps row written via `change-log.js` (no version bump); gap report section added to the task; gaps PR comment posted. Task status unchanged (`ready-for-review`)
+
+### Operator decision after the DoD gaps — 2026-09-28
+
+- The operator chose the recommended option: close both gaps in one commit, then re-run `/finalise`. The fix was made outside the pipeline, as the HALT message directs
+- Gap 1 (AC6): the corpus tests share one memoised walk (`corpus()`), so each task document is read and parsed once. A final test asserts one walk and one read per document. Mutation-proved: restoring the ratchet's own walk turns it red
+- Gap 2 (security low): `checkCardTitle` flags a block-scalar title (`title-block-scalar`) and a BOM-prefixed document (`title-unreadable-bom`). `preflight()` measures the title behind a BOM, while the body parse is unchanged, which keeps sync parity. The three probe inputs are tests. Mutation-proved 3 ways
+- Also fixed, because it sat in the same parity test: cycle-1 CR-5 (a tautological parity assertion), which now checks codes by section. Docs: `authoring-card-preflight.md` and the CHANGELOG
+- `ci:fast` 4397 pass / 0 fail; `bundle:check` 0 problems
 
 ---
 

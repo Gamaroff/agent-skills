@@ -141,6 +141,9 @@ All notable changes to this project will be documented in this file. Format foll
   one `important` finding, `title-too-long`, whose `Fix:` names the body H1 when that fits. It is
   advisory at authoring (exit 0, 1 under `--strict`), and the clean line says the title was read. The
   43 legacy long titles are frozen in `card-preflight-corpus.test.mjs`, a list that can only shrink.
+  A block-scalar title (`title: >-`) and a BOM before the frontmatter each get their own finding
+  (`title-block-scalar`, `title-unreadable-bom`), because the line-based parser would otherwise
+  measure the indicator or read no title at all.
   The four `sync-jira-* --check-card` paths do not read the title yet (follow-up).
 - **create-task and review-task ask for the evidence behind a claim about the current code (task
   150, obs #127, #124, #135).** create-task § 3.5 gains three Critical items. A current-state name
