@@ -115,13 +115,11 @@ function preflight(file, kind) {
   // is not.
   const text = fs.readFileSync(file, "utf8");
   const { frontmatter, body } = lib.parseFrontmatter(text);
-  // The TITLE is read from the text with any leading BOM stripped, so a BOM
-  // cannot hide a long title from the bound (task.150 DoD). The BODY is left
-  // exactly as the sync path reads it — parity with the sync is the contract.
+  // The TITLE is read from the raw header (`readCardTitle`, BOM stripped), so
+  // no YAML shape and no BOM can hide it from the bound (task.150 DoD). The BODY
+  // is left exactly as the sync path reads it — parity with the sync is the
+  // contract.
   const bom = text.charCodeAt(0) === 0xfeff;
-  const titleFrontmatter = bom
-    ? lib.parseFrontmatter(text.slice(1)).frontmatter
-    : frontmatter;
   // `body` is returned so the parity test can assert the authoring path and the
   // sync path resolved the SAME text, not merely the same verdict — the original
   // divergence matched on every verdict it was tested against.
@@ -133,7 +131,7 @@ function preflight(file, kind) {
   const sections = lib.checkCardSections(body, specs);
   const findings = [
     ...sections.findings,
-    ...lib.checkCardTitle(titleFrontmatter, body, { bom }),
+    ...lib.checkCardTitle(frontmatter, body, { bom, raw: text }),
   ];
   return {
     file,

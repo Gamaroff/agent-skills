@@ -367,7 +367,7 @@ test("B: the authoring path and the sync path read the SAME body", () => {
       // compared two complementary filters over one array, which cannot fail.)
       const TITLE_CODES = [
         "title-too-long",
-        "title-block-scalar",
+        "title-not-inline",
         "title-unreadable-bom",
       ];
       const titleOnly = authoring.findings.filter(
@@ -763,7 +763,7 @@ test("A: a folded block-scalar title is flagged, not measured by its indicator",
   const doc = `---\ntitle: >-\n  ${"word ".repeat(40).trim()}\n---\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n`;
   withTempDoc("task.996.folded.md", doc, (file) => {
     const codes = pf.preflight(file, "task").findings.map((f) => f.code);
-    assert.deepEqual(codes, ["title-block-scalar"]);
+    assert.deepEqual(codes, ["title-not-inline"]);
   });
 });
 
@@ -771,7 +771,7 @@ test("A: a literal block-scalar title is flagged, not measured by its indicator"
   const doc = `---\ntitle: |\n  ${"x".repeat(150)}\n---\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n`;
   withTempDoc("task.996.literal.md", doc, (file) => {
     const codes = pf.preflight(file, "task").findings.map((f) => f.code);
-    assert.deepEqual(codes, ["title-block-scalar"]);
+    assert.deepEqual(codes, ["title-not-inline"]);
   });
 });
 
@@ -796,5 +796,81 @@ test("A: a BOM before the frontmatter is flagged, and the title behind it is sti
         .map((f) => f.code);
       assert.deepEqual(codes, ["title-unreadable-bom"]);
     },
+  );
+});
+
+// The seven shapes DoD run 2 reproduced (task.150.dod.2.security.run.json): each
+// made the line-based parser measure something other than the YAML title. The
+// title is now read from the raw header, and every non-inline form is refused.
+test("A: every title that is not one single-line column-0 value is title-not-inline", () => {
+  const L = "Long title word ".repeat(10).trim();
+  const shapes = {
+    "block scalar with a comment": `title: >- # name\n  ${L}`,
+    "tagged block scalar": `title: !!str >-\n  ${L}`,
+    "anchored block scalar": `title: &t >-\n  ${L}`,
+    "multi-line plain scalar": `title: Short start\n  ${L}`,
+    "value on the next line": `title:\n  ${L}`,
+    "multi-line double-quoted scalar": `title: "Short start\n  ${L}"`,
+    "indented title overwriting the real one": `title: ${L}\nnotes: |\n  title: short`,
+  };
+  let checked = 0;
+  for (const [name, header] of Object.entries(shapes)) {
+    const doc = `---\n${header}\ntype: task\n---\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n`;
+    withTempDoc("task.995.shape.md", doc, (file) => {
+      const codes = pf
+        .preflight(file, "task")
+        .findings.filter((f) => f.section === "(title)")
+        .map((f) => f.code);
+      assert.deepEqual(
+        codes,
+        ["title-not-inline"],
+        `${name}: ${JSON.stringify(codes)}`,
+      );
+    });
+    checked++;
+  }
+  assert.equal(checked, 7, "non-vacuity: every shape was checked");
+  // And the inline forms real documents use are NOT refused.
+  for (const header of [
+    `title: "[Task 1] a name"`,
+    `title: 'a name'`,
+    `title: a name: with a colon`,
+  ]) {
+    assert.deepEqual(
+      lib.readCardTitle(`---\n${header}\n---\n`).problem,
+      null,
+      header,
+    );
+  }
+});
+
+// Success Criterion: CARD_TITLE_MAX is defined once, in shared/resources/jira-sync.js,
+// and anywhere else only as a generated references/ copy of that file. This is a
+// source-structure property, so a scan of the TRACKED tree is the instrument. The
+// pattern is assembled at runtime so this file does not match itself.
+test("B: CARD_TITLE_MAX is defined in exactly one source file", () => {
+  const name = ["CARD", "TITLE", "MAX"].join("_");
+  const out = execFileSync(
+    "git",
+    ["grep", "-l", "-E", `${name}[[:space:]]*=`, "--", "shared", "skills"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+  const files = out.split("\n").filter(Boolean);
+  assert.ok(
+    files.includes("shared/resources/jira-sync.js"),
+    "non-vacuity: the source definition is found",
+  );
+  const others = files.filter(
+    (f) =>
+      f !== "shared/resources/jira-sync.js" &&
+      !/^skills\/[^/]+\/references\/jira-sync\.js$/.test(f),
+  );
+  assert.deepEqual(
+    others,
+    [],
+    `a second definition of ${name}: ${others.join(", ")}`,
   );
 });

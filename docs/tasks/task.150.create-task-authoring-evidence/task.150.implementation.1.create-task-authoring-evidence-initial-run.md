@@ -165,6 +165,11 @@ task.123's first committed draft is `e0881adb` (`git log --diff-filter=A`). It n
 - Also fixed, because it sat in the same parity test: cycle-1 CR-5 (a tautological parity assertion), which now checks codes by section. Docs: `authoring-card-preflight.md` and the CHANGELOG
 - `ci:fast` 4397 pass / 0 fail; `bundle:check` 0 problems
 
+### Finalise run 2 and its gaps — 2026-09-28
+
+- `/finalise` run 2 (`task.150.dod.2`): run 1's gaps verified closed. New gaps: AC8, where no test pins the single `CARD_TITLE_MAX` definition (the agent refused run 1's "pass by judgement" under the citation rule), and security (low), where the title check failed open on 7 more YAML shapes (84 probes, 7 reproduced). CI reading 1: SUCCESS @ `4f48ebe3`. Step 8a is not applicable (two sections)
+- Closed under the operator's standing instruction ("go with recommended next steps"), with the same move as before, **replace, not patch**. The title is read from the raw header by `readCardTitle`. Anything that is not one column-0 single-line `title:` value gets `title-not-inline`, which replaces `title-block-scalar`. A tracked-tree test pins the single `CARD_TITLE_MAX` definition. Corpus scan: 481 real documents, 0 false positives. Mutation-proved 3 ways. `ci:fast` green
+
 ---
 
 ## Issues Log

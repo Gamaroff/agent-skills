@@ -1957,18 +1957,70 @@ const CARD_TITLE_MAX = 100;
  * bound, it is usually the name the long title was trying to be.
  */
 //
-// Two shapes hide a title from `parseFrontmatter`, which reads the header line by
-// line (task.150 DoD, security probe): a YAML block scalar (`title: >-` then the
-// text on following lines) reads as its indicator, `>-`; and a byte-order mark
-// before the opening `---` means no frontmatter is recognised at all. Both would
-// have passed the bound with a title of any length, so each is its own finding.
-// `opts.bom` is set by a caller that saw a BOM and stripped it to read the
-// title; the length check then measures the real title.
+// The title is read from the RAW header, not from `parseFrontmatter`. That
+// parser reads line by line, and the security probe showed it measuring
+// something other than the YAML title in ten shapes across two DoD runs
+// (task.150): a block scalar (`>-`, `|`), with or without a comment, tag or
+// anchor; a multi-line plain or quoted scalar; a value on the line after
+// `title:`; an indented `title:` inside another block that overwrites the real
+// one; and a byte-order mark before the fence, which hides the whole header.
+// Patching the parser per shape lost every time, so the claim is scoped
+// instead: a card title is ONE column-0 `title:` line with a single-line value,
+// and anything else is `title-not-inline` — refused, never measured.
 const BLOCK_SCALAR_INDICATOR = /^[>|][+-]?[0-9]?[+-]?$/;
 
+/**
+ * Read the card title from a document's raw text. Returns
+ * `{ title, problem }`: `problem` is null for a single-line inline title (or no
+ * title at all), else a short reason the title is not inline.
+ */
+function readCardTitle(text) {
+  const src = String(text || "").replace(/^\uFEFF/, "");
+  const lines = src.split(/\r?\n/);
+  if ((lines[0] || "").trim() !== "---") return { title: "", problem: null };
+  const end = lines.findIndex((l, k) => k > 0 && l.trim() === "---");
+  const header = lines.slice(1, end > 0 ? end : lines.length);
+  const titleLines = header
+    .map((l, k) => ({ l, k }))
+    .filter(({ l }) => /^\s*title\s*:/.test(l));
+  if (titleLines.length === 0) return { title: "", problem: null };
+  if (titleLines.length > 1) {
+    return {
+      title: "",
+      problem: `the header has ${titleLines.length} \`title:\` lines`,
+    };
+  }
+  const { l, k } = titleLines[0];
+  if (/^\s/.test(l))
+    return {
+      title: "",
+      problem: "the only `title:` line is indented inside another key",
+    };
+  const value = l.replace(/^title\s*:/, "").trim();
+  if (value === "")
+    return { title: "", problem: "the value is not on the `title:` line" };
+  if (/^[>|!&*]/.test(value)) {
+    return {
+      title: "",
+      problem: `the value is a YAML ${value[0] === ">" || value[0] === "|" ? "block scalar" : value[0] === "!" ? "tag" : value[0] === "&" ? "anchor" : "alias"} (\`${value}\`)`,
+    };
+  }
+  const next = header[k + 1];
+  if (next !== undefined && /^\s+\S/.test(next)) {
+    return { title: "", problem: "the value continues on an indented line" };
+  }
+  const q = value[0];
+  if ((q === '"' || q === "'") && !(value.length > 1 && value.endsWith(q))) {
+    return {
+      title: "",
+      problem: "the quoted value is not closed on the `title:` line",
+    };
+  }
+  const title = q === '"' || q === "'" ? value.slice(1, -1) : value;
+  return { title, problem: null };
+}
+
 function checkCardTitle(frontmatter, body = "", opts = {}) {
-  const title =
-    frontmatter && frontmatter.title != null ? String(frontmatter.title) : "";
   const findings = [];
   if (opts.bom) {
     findings.push({
@@ -1980,12 +2032,24 @@ function checkCardTitle(frontmatter, body = "", opts = {}) {
       fix: "Save the file as UTF-8 without a BOM.",
     });
   }
-  if (BLOCK_SCALAR_INDICATOR.test(title.trim())) {
+  let title;
+  let problem = null;
+  if (opts.raw != null) {
+    ({ title, problem } = readCardTitle(opts.raw));
+  } else {
+    // No raw text (the corpus ratchet, a sync caller): the parsed value is all
+    // there is, and a block-scalar indicator is still refused.
+    title =
+      frontmatter && frontmatter.title != null ? String(frontmatter.title) : "";
+    if (BLOCK_SCALAR_INDICATOR.test(title.trim()))
+      problem = `the value is a YAML block scalar (\`${title.trim()}\`)`;
+  }
+  if (problem) {
     findings.push({
       severity: "important",
       section: "(title)",
-      code: "title-block-scalar",
-      message: `The frontmatter title is a YAML block scalar (\`${title.trim()}\`) — the card's summary line would be the indicator, not the title.`,
+      code: "title-not-inline",
+      message: `The frontmatter title is not a single-line value — ${problem} — so the card's summary line would not be the title.`,
       fix:
         "Write the title on the `title:` line itself, quoted, as a name of at most " +
         CARD_TITLE_MAX +
@@ -5853,6 +5917,7 @@ module.exports = {
   checkCardSections,
   CARD_TITLE_MAX,
   checkCardTitle,
+  readCardTitle,
   formatCardCheck,
   describeCardScope,
   isLabelOnly,
