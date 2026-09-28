@@ -62,6 +62,9 @@ DECISION=$(command node -e '
   const tail = [];
   while (!fs.existsSync(p) && path.dirname(p) !== p) { tail.unshift(path.basename(p)); p = path.dirname(p); }
   const abs = path.join(fs.realpathSync.native(p), ...tail);
+  // Again on the resolved path: a symlink component can carry a control
+  // character the given path did not.
+  if (/[\u0000-\u001f\u007f]/.test(abs)) say("REFUSE", JSON.stringify(abs) + " — it resolves to a path with a control character");
   const spellings = [abs, given];
   for (const s of [abs, given]) if (s.startsWith("/private/var/")) spellings.push(s.slice("/private".length));
   for (const s of spellings) {

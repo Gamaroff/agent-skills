@@ -1,0 +1,87 @@
+schema: 1
+task: 'task.154.bundler-and-snippet-test-hygiene'
+task_title: 'Bundler and snippet-test hygiene: attributed warning, symlink-free test run'
+gate: CONCERNS
+status_reason: 'The per-run redesign closed every cycle-3 finding and drew no runner defect (16-candidate by-hand re-probe: tree unchanged in every case). Residue is in the test file — two assertions that pass vacuously — plus spec text still describing the replaced design.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T22:47:20Z'
+
+top_issues:
+  - id: 'T154-QA4-1'
+    severity: medium
+    file: 'tests/test-clean-checkout.test.js'
+    finding: 'entries() returns [] for a missing directory as well as an empty one, so the base-is-empty checks (and the created-base case) pass if the runner deleted the base; "never deletes the base" is untested for a base the runner created (CR-1).'
+    suggested_action: 'Assert the base exists and is a directory before each empty check (or make entries() throw on a missing dir); add a created-base case to the never-deletes test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA4-2'
+    severity: medium
+    file: 'tests/test-clean-checkout.test.js'
+    finding: 'The relative-base case runs from the repo top level, where "invoking directory" and "repo" coincide, and a missing rel-base also reads as empty, so a runner resolving it elsewhere would pass (CR-2).'
+    suggested_action: 'Invoke from a subdirectory; assert <subdir>/rel-base exists and is empty and <repo>/rel-base does not.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA4-3'
+    severity: low
+    file: 'docs/tasks/task.154.bundler-and-snippet-test-hygiene/task.154.bundler-and-snippet-test-hygiene.md'
+    finding: 'Target Architecture (§3), the Phase 5 criterion and risk note 2 still say the runner removes the clone at start and on exit; the per-run design deletes nothing at start, and a killed run leaves a run.* directory (CR-3).'
+    suggested_action: 'Rewrite those three places to the per-run design and state the interrupted-run residue and how to clear it.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA4-4'
+    severity: low
+    file: 'tests/test-clean-checkout.test.js'
+    finding: 'platform-variance: the scratch-base guard checks only the resolved spelling, while the runner also refuses the /private/var → /var spelling, so a macOS checkout under /var/tmp passes the guard and fails every positive case (CR-4).'
+    suggested_action: 'Apply the same spelling set as the runner in the guard.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 11
+  phases_verified: 6/6
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [5]
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-29'
+  total_iterations: 3
+  verification_method: 'By-hand re-probe (16 candidates, filesystem snapshot before/after each) + 11/11 tests incl. TMPDIR=/tmp'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 16
+    notes: 'By-hand re-probe of the per-run runner (§5.1): repo, ., parent, /, foreign base holding run.keep, HOME, symlink-to-repo, dangling symlink, repo/.git, a file, tab, missing parent, /tmp via .., default, failing command, new base. Filesystem tree hashed before/after each: unchanged in every case except the two that create an empty base by design.'
+  performance:
+    status: PASS
+    notes: 'ci:fast 4422 tests in 250s.'
+  reliability:
+    status: PASS
+    notes: 'Per-run ownership removes the shared-location class; no runner finding this cycle.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two vacuous test assertions (QA4-1/2); spec text lags the redesign (QA4-3).'
+
+recommendations:
+  immediate:
+    - action: 'Make the base-kept and relative-base assertions non-vacuous (QA4-1/2).'
+      refs: ['tests/test-clean-checkout.test.js']
+  future:
+    - action: 'CR-5 (control-char check on the resolved path) and CR-6 (assert the concurrent runs used distinct run dirs) — cleanups.'
+      refs: ['scripts/test-clean-checkout.sh', 'tests/test-clean-checkout.test.js']
+    - action: 'observation-log.js EPHEMERAL_PATTERNS lacks /private/var/tmp — pre-existing; follow-up.'
+      refs: ['shared/resources/observation-log.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T154-QA4-1 and T154-QA4-2 fixed']

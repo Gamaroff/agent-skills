@@ -48,7 +48,13 @@ const BASE = path.join(REPO_ROOT, ".clean-checkout-test-tmp");
 {
   const { ephemeralReason } = require("../shared/resources/observation-log.js");
   fs.mkdirSync(BASE, { recursive: true });
-  const why = ephemeralReason(fs.realpathSync(BASE));
+  // Both spellings, as the runner checks them: macOS resolves /var/tmp to
+  // /private/var/tmp, which the engine does not list (task 154 QA cycle 4).
+  const real = fs.realpathSync(BASE);
+  const why =
+    ephemeralReason(real) ||
+    (real.startsWith("/private/var/") &&
+      ephemeralReason(real.slice("/private".length)));
   if (why) {
     throw new Error(
       `scratch base ${BASE} is ${why}: this checkout's location makes every ` +
@@ -111,14 +117,20 @@ function makeFixture() {
   };
 }
 
-/** Entries in a base — the runner's own directories are `run.XXXXXX`. */
+/**
+ * Entries in a base — the runner's own directories are `run.XXXXXX`. A missing
+ * base THROWS rather than reading as empty: an empty listing and a deleted base
+ * must not look the same, or every "left nothing behind" check passes on a
+ * runner that deleted the base (task 154 QA cycle 4).
+ */
 function entries(dir) {
-  return fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [];
+  assert.ok(fs.statSync(dir).isDirectory(), `${dir} is not a directory`);
+  return fs.readdirSync(dir).sort();
 }
 
-function runRunner(fx, cmd, extraEnv = {}) {
+function runRunner(fx, cmd, extraEnv = {}, cwd = fx.repo) {
   return spawnSync("bash", [RUNNER], {
-    cwd: fx.repo,
+    cwd,
     encoding: "utf-8",
     env: {
       ...process.env,
@@ -254,6 +266,18 @@ test("the runner never deletes its base, or anything in it that it did not creat
       fs.existsSync(path.join(foreign, "run.keep", "k")),
       "a foreign run.* directory was deleted",
     );
+    // A base the runner CREATED is kept too, not only one that already existed.
+    assert.ok(
+      !fs.existsSync(fx.baseDir),
+      "premise: the fixture base starts absent",
+    );
+    const r = runRunner(fx, "true");
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(
+      entries(fx.baseDir),
+      [],
+      "a created base must survive, empty",
+    );
   } finally {
     fx.cleanup();
   }
@@ -265,7 +289,10 @@ test("two concurrent runs on one base each keep their own clone, and leave nothi
     // Each run holds its clone for a second and checks it is still there. With a
     // shared location, the second run's start-up deletion removed the first's
     // clone mid-command (TASK-154-BUG-4, BUG-5).
-    const cmd = "test -f skills/x/marker && sleep 1 && test -f skills/x/marker";
+    // Each prints the directory it ran in, so the test can assert the two runs
+    // used different ones rather than infer it from timing.
+    const cmd =
+      'test -f skills/x/marker && sleep 1 && test -f skills/x/marker && echo "RAN-IN $PWD"';
     const once = () =>
       new Promise((resolve) => {
         const c = spawn("bash", [RUNNER], {
@@ -277,12 +304,29 @@ test("two concurrent runs on one base each keep their own clone, and leave nothi
           },
         });
         let err = "";
+        let out = "";
         c.stderr.on("data", (d) => (err += d));
-        c.on("close", (code) => resolve({ code, err }));
+        c.stdout.on("data", (d) => (out += d));
+        c.on("close", (code) => resolve({ code, err, out }));
       });
     const [a, b] = await Promise.all([once(), once()]);
     assert.equal(a.code, 0, a.err);
     assert.equal(b.code, 0, b.err);
+    const ranIn = (o) => (o.match(/^RAN-IN (.+)$/m) || [])[1];
+    const [dirA, dirB] = [ranIn(a.out), ranIn(b.out)];
+    const base = fs.realpathSync(fx.baseDir);
+    assert.ok(
+      dirA && dirB,
+      `a run did not report its directory:\n${a.out}\n${b.out}`,
+    );
+    assert.notEqual(dirA, dirB, "the two runs shared one directory");
+    for (const d of [dirA, dirB]) {
+      assert.equal(
+        path.dirname(d),
+        base,
+        `${d} is not a run directory of the base`,
+      );
+    }
     assert.deepEqual(
       entries(fx.baseDir),
       [],
@@ -319,12 +363,20 @@ test("the runner creates a missing base one level deep, and resolves a relative 
       "the created base should be left empty",
     );
 
-    r = runRunner(fx, "true", { CLEAN_CHECKOUT_DIR: "rel-base" });
+    // From a SUBDIRECTORY, so "the invoking directory" and "the repository" are
+    // different places and the case can tell which one the runner used.
+    const sub = path.join(fx.repo, "sub");
+    fs.mkdirSync(sub);
+    r = runRunner(fx, "true", { CLEAN_CHECKOUT_DIR: "rel-base" }, sub);
     assert.equal(r.status, 0, r.stderr);
     assert.deepEqual(
-      entries(path.join(fx.repo, "rel-base")),
+      entries(path.join(sub, "rel-base")),
       [],
-      "relative base not resolved from the invoking directory",
+      "relative base not created in the invoking directory",
+    );
+    assert.ok(
+      !fs.existsSync(path.join(fx.repo, "rel-base")),
+      "relative base was resolved against the repository",
     );
   } finally {
     fx.cleanup();

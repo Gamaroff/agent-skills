@@ -213,10 +213,14 @@ that the live tree is clean.
   fails from a bare temporary directory.
 - **Clean-checkout runner.** `scripts/test-clean-checkout.sh` makes a `git clone --local --shared`
   of `HEAD`. That clone has full history and tags, keeps tracked files even when they match
-  `.gitignore`, and has no ignored files, like CI's `fetch-depth: 0` checkout. It goes into
-  `${CLEAN_CHECKOUT_DIR:-<repo>/.clean-checkout}`. That location is repo-local and gitignored, and
-  it is never a temporary directory, for the `EPHEMERAL_PATTERNS` reason above. The script links
-  `node_modules`, runs `npm test` there, and removes the clone at start and on exit. It warns when
+  `.gitignore`, and has no ignored files, like CI's `fetch-depth: 0` checkout. Each run clones into
+  a directory of its own, made with `mktemp -d` inside the base
+  `${CLEAN_CHECKOUT_DIR:-<repo>/.clean-checkout}`, and deletes that directory and nothing else. The
+  base is repo-local and gitignored, it is never a temporary directory (for the `EPHEMERAL_PATTERNS`
+  reason above), and it is never deleted. Ownership comes from construction: no other run or tool can
+  name a directory `mktemp` has just created, so concurrent runs cannot collide. (QA cycles 1–3
+  replaced a first design that cloned into the named location itself; see the implementation report.)
+  The script links `node_modules` and runs `npm test` in its run directory. It warns when
   the working tree has uncommitted changes, because those are not what it tests.
   `npm run test:clean-checkout` calls it, and `scripts/release.sh` runs it in place of the
   in-place `npm test`.
@@ -333,10 +337,10 @@ can land in either order, or as two PRs.
 **Files**: `scripts/test-clean-checkout.sh`, `package.json`, `scripts/release.sh`,
 `tests/test-clean-checkout.test.js`
 
-- [x] The runner clones `HEAD` with `git clone --local --shared --quiet` into
-      `${CLEAN_CHECKOUT_DIR:-<repo>/.clean-checkout}`, links `node_modules`, runs `npm test` (or the
-      command in `$CLEAN_CHECKOUT_CMD`) in the clone, propagates the exit code, and removes the
-      clone at start and on exit
+- [x] The runner clones `HEAD` with `git clone --local --shared --quiet` into its own `mktemp -d`
+      directory inside the base `${CLEAN_CHECKOUT_DIR:-<repo>/.clean-checkout}`, links
+      `node_modules`, runs `npm test` (or the command in `$CLEAN_CHECKOUT_CMD`) in the clone,
+      propagates the exit code, and removes its run directory on exit. It never deletes the base
 - [x] It refuses a clone location that matches a temporary-directory pattern (`/tmp`,
       `/private/tmp`, `/var/tmp`), naming the reason
 - [x] It prints a warning when `git status --porcelain` is non-empty
@@ -521,9 +525,11 @@ None.
 1. **A future placeholder reintroduced in a skill file.** Pass 3 rewrites a skill file's
    `shared/resources/<x>` to `references/<x>` without a warning, so the §2 live scan cannot see it.
    See Notes, and the out-of-scope item on pass-3 rewrites.
-2. **A clone nested in the repository.** An interrupted run can leave `.clean-checkout/` behind.
-   It is gitignored, so anything that scans through `git ls-files` never sees it, and the runner
-   deletes it at start. An in-place test that walks the filesystem from the repository root would
+2. **A clone nested in the repository.** A killed run (SIGKILL, OOM) leaves its `run.XXXXXX`
+   directory under `.clean-checkout/`. The runner never reclaims it, because it deletes only its own
+   run directory. Remove a leftover by hand: `rm -rf .clean-checkout/run.*` when no run is active.
+   It is gitignored, so anything that scans through `git ls-files` never sees it. An in-place test
+   that walks the filesystem from the repository root would
    see a second `skills/` tree. Check the walkers (`bundled-links.test.js`,
    `bundle-comment-origin.test.js`) with a leftover clone present, or set `CLEAN_CHECKOUT_DIR`
    outside the repository and outside every temporary directory.
@@ -586,21 +592,21 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.154.qa.3.bundler-and-snippet-test-hygiene.md](./task.154.qa.3.bundler-and-snippet-test-hygiene.md)
-- **Gate File**: [task.154.gate.3.bundler-and-snippet-test-hygiene.yml](./task.154.gate.3.bundler-and-snippet-test-hygiene.yml)
+- **Full Report**: [task.154.qa.4.bundler-and-snippet-test-hygiene.md](./task.154.qa.4.bundler-and-snippet-test-hygiene.md)
+- **Gate File**: [task.154.gate.4.bundler-and-snippet-test-hygiene.yml](./task.154.gate.4.bundler-and-snippet-test-hygiene.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 20 in the scoped test files (also under `TMPDIR=/tmp`); 21 by-hand safety probes
+- **Tests Executed**: 11 runner tests (also under `TMPDIR=/tmp`); 16 by-hand safety probes
 - **Phases Verified**: 6/6
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
 
-- Cycle 2 findings are fixed. Bugs [3](./task.154.bug.3.missing-source-scan-can-be-vacuous.md) and [4](./task.154.bug.4.clean-checkout-concurrent-runs.md) are closed.
-- **MEDIUM**: stale-lock takeover races ([bug 5](./task.154.bug.5.clean-checkout-lock-takeover-race.md)); ownership is decided before the lock ([bug 6](./task.154.bug.6.clean-checkout-ownership-before-lock.md)).
-- The runner's shared-location protection has drawn findings for 3 cycles running. QA report 3 records the structural alternative: a per-run directory.
+- The per-run redesign closed cycle 3's findings. Bugs [5](./task.154.bug.5.clean-checkout-lock-takeover-race.md) and [6](./task.154.bug.6.clean-checkout-ownership-before-lock.md) are closed.
+- **MEDIUM** (test machinery): two runner-test assertions pass vacuously (QA4-1, QA4-2).
+- **LOW**: the spec text still describes the replaced design (QA4-3); the scratch-base guard checks one spelling of the path (QA4-4).
 
 ---
 
@@ -617,6 +623,7 @@ None.
 | 2026-09-29 |         | QA gate FAIL (70/100) — 2 findings (1 HIGH, 1 MEDIUM) | qa-task |
 | 2026-09-29 |         | QA gate CONCERNS (80/100) — 9 findings (2 MEDIUM, 7 LOW) | qa-task |
 | 2026-09-29 |         | QA gate CONCERNS (80/100) — 6 findings (2 MEDIUM, 4 LOW) | qa-task |
+| 2026-09-29 |         | QA gate CONCERNS (80/100) — 4 findings (2 MEDIUM, 2 LOW) | qa-task |
 
 <!-- change-log-end -->
 
