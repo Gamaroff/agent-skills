@@ -5,7 +5,7 @@ type: task
 description: "Close the five LOW advisories task.162 left: name develop-bug's Step 7 Completion Checklist in the Stop hook and resume contract, fix the step-8 'steps still ahead' clause, add a Stop-hook floor to the --complete population test, pin the resume contract's Step 7-tail wording, and make scenario 4b fail loudly on a missing command."
 tags: [develop-pipeline, stop-hook, step-8, develop-bug, follow-up]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-09-28
 updated: 2026-09-28
@@ -16,7 +16,9 @@ github_issue: 504
 
 # Technical Task: Close task.162's step-8 follow-ups
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.163.review.1.stop-hook-step-8-follow-ups.md` implemented 2026-09-28
 
 **GitHub Issue**: [#504](https://github.com/Gamaroff/agent-skills/issues/504)
 
@@ -77,7 +79,7 @@ Two are accuracy gaps in what the hook and the resume contract tell an orchestra
 ### Target Architecture
 
 - The develop-bug `STEP7_TAIL` and the contract's develop-bug clause both end with Part B's Step 7 Completion Checklist.
-- At `NEXT=8` the heredoc's list clause is bound like `POSITION`: a `STEPS_AHEAD` string that reads "then the steps still ahead through Step 8" below 8 and says Step 8 is the step in progress at 8. The exact wording is chosen in Phase 1 against `develop-pipeline-remaining-work-banner.md`.
+- At `NEXT=8` the heredoc's list clause is bound like `POSITION`: a `STEPS_AHEAD` string that reads "then the steps still ahead through Step 8" below 8, and "then the steps still ahead: Step 7's tail first if its row is unfinished, then Step 8" at 8. The step-8 wording must not claim Step 8 is the only step ahead: at lock 8 the hook's own `COMPLETION_LINE` sends an unfinished Step 7 row back to Step 7 first, and the banner doc lists every remaining step (task.163 review.1).
 - The population test adds `(perSkill[STOP_HOOK] || 0) >= 1` beside its existing floors.
 - A new test in `step-8-completion-checklist.test.mjs` reads the resume contract's Phase 0b paragraph and the rendered hook reason at lock 8 for develop-bug and develop-task, and requires the same tail phrases in both. It is a parity test, so reverting either copy goes red.
 - Scenario 4b: an empty `command -v` result fails setup with the command's name; a bare name (a builtin) is skipped as now; an absolute path is linked.
@@ -125,10 +127,10 @@ None to any interface. The Stop hook's reason text changes at lock 8 (the develo
 
 **Files**: `shared/resources/develop-pipeline-on-stop.sh`, `shared/resources/develop-pipeline-resume-contract.md`, `shared/resources/develop-pipeline-on-stop.test.sh`
 
-- [ ] Append Part B's Step 7 Completion Checklist to the develop-bug `STEP7_TAIL`, and to the develop-bug clause of the resume contract's Phase 0b sentence, in the same words.
-- [ ] Bind `STEPS_AHEAD` before the heredoc: the generic clause below 8, a Step 8-only clause at 8. Interpolate it where the literal clause is now.
-- [ ] 5b develop-bug: also require the checklist phrase.
-- [ ] 5d: at lock 8 require the step-8 clause and forbid "then the steps still ahead through Step 8". 5c: at lock 3 still require the generic clause.
+- [x] Append Part B's Step 7 Completion Checklist to the develop-bug `STEP7_TAIL`, and to the develop-bug clause of the resume contract's Phase 0b sentence, in the same words.
+- [x] Bind `STEPS_AHEAD` before the heredoc: the generic clause below 8; at 8, "then the steps still ahead: Step 7's tail first if its row is unfinished, then Step 8". Interpolate it where the literal clause is now.
+- [x] 5b develop-bug: also require the checklist phrase.
+- [x] 5d: at lock 8 require the step-8 clause and forbid "then the steps still ahead through Step 8". 5c: at lock 3 still require the generic clause.
 
 ### Phase 2: The guards have floors and fail in the right place
 
@@ -136,22 +138,22 @@ None to any interface. The Stop hook's reason text changes at lock 8 (the develo
 
 **Files**: `shared/resources/tests/step-8-completion-checklist.test.mjs`, `shared/resources/advance-pipeline-lock.test.sh`
 
-- [ ] Add `(perSkill[STOP_HOOK] || 0) >= 1` to the `--complete` population test, with a message naming the hook.
-- [ ] Add a parity test: render the hook reason at lock 8 for develop-bug and develop-task (spawn the hook with a fixture lock, as `develop-pipeline-on-stop.test.sh` does), read the resume contract's Phase 0b paragraph, and require each tail's phrases in both. Name a floor so a paragraph that cannot be found fails rather than passes.
-- [ ] Scenario 4b: replace the two-way `case` with three arms. Empty → fail setup naming the command. Absolute path → link. Bare name → skip (builtin). Update the comment.
+- [x] Add `(perSkill[STOP_HOOK] || 0) >= 1` to the `--complete` population test, with a message naming the hook.
+- [x] Add a parity test: render the hook reason at lock 8 for develop-bug and develop-task (spawn the hook with a fixture lock, as `develop-pipeline-on-stop.test.sh` does), read the resume contract's Phase 0b paragraph, and require each tail's phrases in both. Name a floor so a paragraph that cannot be found fails rather than passes.
+- [x] Scenario 4b: replace the two-way `case` with three arms. Empty → fail setup naming the command. Absolute path → link. Bare name → skip (builtin). Update the comment.
 
 ### Phase 3: Proof and gates
 
 **Risk**: Low.
 
-- [ ] Mutation-prove under bash, with `cp` snapshots of a real `FILES` array and restore checked by `cmp`:
+- [x] Mutation-prove under bash, with `cp` snapshots of a real `FILES` array and restore checked by `cmp`:
   - drop the checklist from the develop-bug `STEP7_TAIL` → 5b develop-bug red and the parity test red;
   - drop it from the contract only → the parity test red;
   - restore the literal "steps still ahead through Step 8" at 8 → 5d red;
   - rename `--complete` out of every hook line → the new `STOP_HOOK` floor red;
   - make `command -v rm` return empty (e.g. a name that does not exist in the loop) → 4b setup fails naming it;
   - re-add `printf` to the 4b loop → 4b stays green (absorbed, as in task.162).
-- [ ] `npm run bundle`, then `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell` and `npm run bundle:check`. CHANGELOG `[Unreleased]` entry citing (task 163).
+- [x] `npm run bundle`, then `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell` and `npm run bundle:check`. CHANGELOG `[Unreleased]` entry citing (task 163).
 
 ---
 
@@ -215,24 +217,24 @@ Not applicable. The change is message text and test code.
 
 ### Functional
 
-- [ ] At lock 8 with `skill: develop-bug`, the reason names Part B's Step 7 Completion Checklist (Phase 1)
-- [ ] The resume contract's Phase 0b develop-bug clause names the same checklist, and a parity test goes red if either copy drops it (Phases 1–2)
-- [ ] At lock 8 no reason contains "then the steps still ahead through Step 8"; at lock 3 the reason still does (Phase 1)
-- [ ] The `--complete` population test fails when the hook contributes no line to it (Phase 2)
-- [ ] Scenario 4b fails at setup, naming the command, when `command -v` returns empty; a builtin is still skipped (Phase 2)
+- [x] At lock 8 with `skill: develop-bug`, the reason names Part B's Step 7 Completion Checklist (Phase 1)
+- [x] The resume contract's Phase 0b develop-bug clause names the same checklist, and a parity test goes red if either copy drops it (Phases 1–2)
+- [x] At lock 8 no reason contains "then the steps still ahead through Step 8"; at lock 3 the reason still does (Phase 1)
+- [x] The `--complete` population test fails when the hook contributes no line to it (Phase 2)
+- [x] Scenario 4b fails at setup, naming the command, when `command -v` returns empty; a builtin is still skipped (Phase 2)
 
 ### Performance
 
-- [ ] No measurable change
+- [x] No measurable change
 
 ### Code Quality
 
-- [ ] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell` and `bundle:check` pass
-- [ ] Each Phase 3 mutation behaves as stated under bash, with restore checked by `cmp`
+- [x] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell` and `bundle:check` pass
+- [x] Each Phase 3 mutation behaves as stated under bash, with restore checked by `cmp`
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry cites (task 163)
+- [x] CHANGELOG `[Unreleased]` entry cites (task 163)
 
 ---
 
@@ -287,6 +289,9 @@ None identified.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-28 | 1.0     | Initial draft | create-task |
+| 2026-09-28 | 1.1     | Review passed (9/10) — step-8 `STEPS_AHEAD` wording fixed to allow an unfinished Step 7 tail | review-task |
+| 2026-09-28 |         | Status → ready-for-development | review-task |
+| 2026-09-28 |         | Implemented — 5 source files plus bundled copies; 1 new test, 5 new assertions; 7 mutations proved | develop |
 <!-- change-log-end -->
 
 ---
@@ -294,18 +299,18 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: The step-8 text is complete and consistent
-- [ ] develop-bug tail names the checklist (hook and contract)
-- [ ] Step-aware `STEPS_AHEAD`
-- [ ] 5b, 5c, 5d updated
+- [x] develop-bug tail names the checklist (hook and contract)
+- [x] Step-aware `STEPS_AHEAD`
+- [x] 5b, 5c, 5d updated
 
 ### Phase 2: The guards have floors and fail in the right place
-- [ ] `STOP_HOOK` floor
-- [ ] Hook↔contract parity test
-- [ ] 4b three-way case
+- [x] `STOP_HOOK` floor
+- [x] Hook↔contract parity test
+- [x] 4b three-way case
 
 ### Phase 3: Proof and gates
-- [ ] Mutation proofs
-- [ ] Gates and CHANGELOG
+- [x] Mutation proofs
+- [x] Gates and CHANGELOG
 
 ---
 
@@ -329,7 +334,7 @@ None identified.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.163.stop-hook-step-8-follow-ups/task.163.stop-hook-step-8-follow-ups.md`

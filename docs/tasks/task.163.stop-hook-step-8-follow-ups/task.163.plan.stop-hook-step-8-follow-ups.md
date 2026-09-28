@@ -31,20 +31,20 @@ Two text edits (the develop-bug tail, the step-8 status clause), one shared phra
 
    ```bash
    if [ "$NEXT" = "8" ]; then
-     STEPS_AHEAD="then Step 8 as the only step still ahead"
+     STEPS_AHEAD="then the steps still ahead: Step 7's tail first if its row is unfinished, then Step 8"
    else
      STEPS_AHEAD="then the steps still ahead through Step 8"
    fi
    ```
 
-   and write `(position \`${POSITION}\`, ${STEPS_AHEAD})`. Check the step-8 wording against the `Pipeline steps still ahead:` examples in `develop-pipeline-remaining-work-banner.md` before settling it.
+   and write `(position \`${POSITION}\`, ${STEPS_AHEAD})`. The step-8 wording must not say Step 8 is the only step ahead: the `COMPLETION_LINE` two lines below sends an unfinished Step 7 row back to Step 7 first, and the banner doc lists every remaining step (task.163 review.1).
 
 **`shared/resources/develop-pipeline-resume-contract.md`**, Phase 0b paragraph (anchor: "Step 8 is decided by the resume record"): the develop-bug clause "for develop-bug: Part B's bug-close routine in `develop-bug-step-7-close-bug.md`, meaning …the tracker-close check" gains "and Part B's Step 7 Completion Checklist".
 
 **`shared/resources/develop-pipeline-on-stop.test.sh`**
 
 - 5b, develop-bug arm: add `grep -q "Step 7 Completion Checklist"` to the conditions.
-- 5d: add, per skill, a required `then Step 8 as the only step still ahead` and a forbidden `then the steps still ahead through Step 8`.
+- 5d: add, per skill, a required `then the steps still ahead: Step 7's tail first if its row is unfinished, then Step 8` and a forbidden `then the steps still ahead through Step 8`.
 - 5c (lock 3): require `then the steps still ahead through Step 8`.
 
 ### Phase 2: The guards have floors and fail in the right place
