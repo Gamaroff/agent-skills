@@ -844,7 +844,7 @@ test("A: every title that is not one single-line column-0 value is title-not-inl
   }
 });
 
-// Success Criterion: CARD_TITLE_MAX is defined once, in shared/resources/jira-sync.js,
+// Success Criterion: CARD_TITLE_MAX is defined once, in the source jira-sync.js,
 // and anywhere else only as a generated references/ copy of that file. This is a
 // source-structure property, so a scan of the TRACKED tree is the instrument. The
 // pattern is assembled at runtime so this file does not match itself.
