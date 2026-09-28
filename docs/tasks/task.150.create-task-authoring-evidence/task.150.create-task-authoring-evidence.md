@@ -591,29 +591,29 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-28
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS (cycle 4, after the operator-granted re-entry)
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 5 of 5; cycles 4–5 were granted by the operator after a cycle-3 escalation)
 
 ### QA Report
 
-- **Full Report**: [task.150.qa.4.create-task-authoring-evidence.md](./task.150.qa.4.create-task-authoring-evidence.md)
-- **Gate File**: [task.150.gate.4.create-task-authoring-evidence.yml](./task.150.gate.4.create-task-authoring-evidence.yml)
-- **Previous**: [qa.3](./task.150.qa.3.create-task-authoring-evidence.md), [qa.2](./task.150.qa.2.create-task-authoring-evidence.md), [qa.1](./task.150.qa.1.create-task-authoring-evidence.md) (each FAIL 70)
+- **Full Report**: [task.150.qa.5.create-task-authoring-evidence.md](./task.150.qa.5.create-task-authoring-evidence.md)
+- **Gate File**: [task.150.gate.5.create-task-authoring-evidence.yml](./task.150.gate.5.create-task-authoring-evidence.yml)
+- **History**: [qa.4](./task.150.qa.4.create-task-authoring-evidence.md) CONCERNS 90 · [qa.3](./task.150.qa.3.create-task-authoring-evidence.md) · [qa.2](./task.150.qa.2.create-task-authoring-evidence.md) · [qa.1](./task.150.qa.1.create-task-authoring-evidence.md) FAIL 70
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 70 targeted; 34 security probes
+- **Tests Executed**: 101 targeted; `ci:fast` 4393 pass / 0 fail; 22 security probes this cycle (136 across the loop)
 - **Phases Verified**: 5/5
-- **Critical Issues**: none. BUG-1 through BUG-4 are fixed. 1 MEDIUM open (CR4-1: observe-work review Step 6)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: none. Bugs 1–4 are closed
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-The root fix holds: the end-to-end park probe engages 10/10. One medium remains: observe-work's own
-`set-status` call in review Step 6 does not pass `--expect-status`.
+No critical issues remain. Two low advisory findings are carried as follow-ups: the observe-work
+Step 6 template's literal `open`, and § 1.1's padded prefix match.
 
 ---
 
@@ -631,6 +631,8 @@ The root fix holds: the end-to-end park probe engages 10/10. One medium remains:
 | 2026-09-28 |         | QA gate FAIL (70/100) — cycle 2: 1 high (seed identity on the scan path) | qa-task |
 | 2026-09-28 |         | QA gate FAIL (70/100) — cycle 3: 1 high (whole-log same-prefix park), 1 medium | qa-task |
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — cycle 4: 0 high, 1 medium (observe-work Step 6 lacks --expect-status) | qa-task |
+| 2026-09-28 |         | QA findings fixed — bugs 1–4 and CR4-1; engine set-status gains ambiguous-id and --expect-status; 4 iterations | qa-fix |
+| 2026-09-28 |         | QA gate PASS (100/100) — cycle 5: no high or medium; 2 low advisory carried | qa-task |
 
 <!-- change-log-end -->
 
