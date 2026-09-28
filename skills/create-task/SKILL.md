@@ -202,7 +202,9 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
    directory) and pass
    `{ frontmatter: <the scan entry>, body: <the file's text> }` to `seedFromObservations` in
    `scripts/lib.js`. It returns `ids`, `title` (or `null` with `titleReason`), `description`, `tags`,
-   `references`, `changeLogDescription` and the `park` vectors, and it throws on a non-`open` entry.
+   `references`, `changeLogDescription` and the `park` vectors. It throws on a non-`open` entry, and on
+   an entry whose identity is uncertain. Identity is the scan entry's `file` prefix, which is what
+   `set-status --id` resolves, and the frontmatter id must agree with it.
    The Improvement sections seed Target Architecture and the Implementation Plan. The Issue sections
    seed Motivation, **and every current-state name they carry is grepped before it is written**
    (§ 3.5, obs #127). An observation is a memory of a run, not a read of the code.
@@ -703,6 +705,11 @@ Actions:
     command node .agents/skills/create-task/references/observation-log.js {park-vector}
     # e.g. set-status --id 124 --status parked --parked-until "task.150 merged to develop" --json
     ```
+
+    **Re-check before parking.** `set-status` overwrites the status without reading it first, and
+    the entries were selected long before this step. Run `scan --json` again in the same shell and
+    run a vector only for an id whose entry still reads `open`. Report any other entry, with its
+    current status, and skip it: another session has given it a home since.
 
     Read `reason`. `ok` is success. Report any other value verbatim and continue: parking never
     blocks the document, and an entry left `open` is visible, not lost. Name each parked id in the

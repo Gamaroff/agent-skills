@@ -4,7 +4,7 @@
 **Bug ID**: TASK-150-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, security probe)
 **Date Found**: 2026-09-28
 
@@ -68,3 +68,4 @@ already bundled into create-task, and uses it. There is now one reader of an ent
 | ---------- | ------------ | ---------- | ---------------------------- |
 | 2026-09-28 | New | QA | Probe over-block `st.open-ws` |
 | 2026-09-28 | Ready for QA | qa-fix | Reuse the engine's `statusOf` |
+| 2026-09-28 | Closed | QA | Cycle 2 re-probe: status control engages 7/7 |

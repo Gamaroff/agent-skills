@@ -4,7 +4,7 @@
 **Bug ID**: TASK-150-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, security probe)
 **Date Found**: 2026-09-28
 
@@ -87,3 +87,4 @@ fix. `from-observation.test.js` passes 9/9.
 | ---------- | ------------ | ---------- | ------------------------------- |
 | 2026-09-28 | New | QA | Found by the QA cycle 1 probe |
 | 2026-09-28 | Ready for QA | qa-fix | Strict positive-integer id guard |
+| 2026-09-28 | Closed | QA | Raw-input guard verified by the cycle 2 re-probe; the scan-path bypass is TASK-150-BUG-3 |

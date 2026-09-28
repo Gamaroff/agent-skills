@@ -590,21 +590,22 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.150.qa.1.create-task-authoring-evidence.md](./task.150.qa.1.create-task-authoring-evidence.md)
-- **Gate File**: [task.150.gate.1.create-task-authoring-evidence.yml](./task.150.gate.1.create-task-authoring-evidence.yml)
+- **Full Report**: [task.150.qa.2.create-task-authoring-evidence.md](./task.150.qa.2.create-task-authoring-evidence.md)
+- **Gate File**: [task.150.gate.2.create-task-authoring-evidence.yml](./task.150.gate.2.create-task-authoring-evidence.yml)
+- **Previous**: [task.150.qa.1.create-task-authoring-evidence.md](./task.150.qa.1.create-task-authoring-evidence.md) (FAIL 70)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 40 (4 files) + `ci:fast` 4385 pass / 0 fail; 22 security probes
+- **Tests Executed**: 42 targeted; 30 security probes
 - **Phases Verified**: 5/5 (Phase 4 with issues)
-- **Critical Issues**: 1 HIGH ([TASK-150-BUG-1](./task.150.bug.1.seed-id-guard-inert.md)), 1 MEDIUM ([TASK-150-BUG-2](./task.150.bug.2.seed-status-diverges-from-engine.md))
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 1 HIGH ([TASK-150-BUG-3](./task.150.bug.3.seed-identity-not-the-engines.md)); BUG-1 and BUG-2 fixed for their stated inputs
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-`seedFromObservations`' id guard is present but inert. `Number()` accepts `0x10`, `1e2`, `""`,
-`-3`, `0` and `" 12 "`, so a park vector can name a different observation. The seed also reads
-status differently from the engine. Both are in `skills/create-task/scripts/lib.js`.
+On the prescribed path, the seed's id is not the id `set-status` parks. Scan output is already
+`parseInt`-ed, and `set-status` resolves by filename prefix, so a malformed entry can park a
+different observation.
 
 ---
 
@@ -619,6 +620,7 @@ status differently from the engine. Both are in `skills/create-task/scripts/lib.
 | 2026-09-28 |         | Status → ready-for-development | review-task |
 | 2026-09-28 |         | Implemented — 11 authored files (plus bundled copies), 22 new tests | develop |
 | 2026-09-28 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task |
+| 2026-09-28 |         | QA gate FAIL (70/100) — cycle 2: 1 high (seed identity on the scan path) | qa-task |
 
 <!-- change-log-end -->
 

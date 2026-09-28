@@ -240,16 +240,37 @@ function asArray(v) {
   return (Array.isArray(v) ? v : [v]).map(String).filter(Boolean);
 }
 
-// An observation id becomes a `set-status --id` argument, so it must name
-// exactly one entry. `Number()` is not that check: it reads "0x10" as 16, "1e2"
-// as 100, "" as 0 and " 12 " as 12, and a malformed id then parks a DIFFERENT
-// observation (task.150 QA cycle 1, TASK-150-BUG-1). A positive integer number,
-// or a string of base-10 digits with no leading zero — nothing else.
-function observationId(raw) {
+// An observation's IDENTITY is the one `set-status --id N` resolves, and the
+// engine resolves it by FILENAME: `findById` matches the numeric prefix of
+// `NNNN-slug.md`, never the frontmatter. So the park vector is built from the
+// scan entry's `file`, and the frontmatter id is only checked against it.
+//
+// Keying on the frontmatter id was wrong twice. `Number()` coerced "0x10" to 16
+// (task.150 QA cycle 1, TASK-150-BUG-1); the stricter string check that fixed it
+// never saw the raw text on the real path, because `scan` has already run
+// `parseInt` on it — `id: 1e2` in `0005-x.md` arrived as 1 and parked 0001-*
+// (QA cycle 2, TASK-150-BUG-3).
+function fileId(file) {
+  const m = /^(\d+)-/.exec(
+    String(file || "")
+      .split("/")
+      .pop(),
+  );
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isSafeInteger(n) && n >= 1 ? n : null;
+}
+
+// The frontmatter id, read strictly: a safe positive integer number, or a
+// string of base-10 digits with no leading zero. Anything else is not an id.
+function frontmatterId(raw) {
   if (typeof raw === "number") {
-    return Number.isInteger(raw) && raw >= 1 ? raw : null;
+    return Number.isSafeInteger(raw) && raw >= 1 ? raw : null;
   }
-  if (typeof raw === "string" && /^[1-9][0-9]*$/.test(raw)) return Number(raw);
+  if (typeof raw === "string" && /^[1-9][0-9]*$/.test(raw)) {
+    const n = Number(raw);
+    return Number.isSafeInteger(n) ? n : null;
+  }
   return null;
 }
 
@@ -264,7 +285,9 @@ function firstSentence(text) {
 /**
  * Seed a task document from observation-log entries.
  *
- * @param {{frontmatter: object, body: string}[]} entries  any order
+ * @param {{frontmatter: object, body: string}[]} entries  any order. `frontmatter`
+ *   is the `scan --json` entry, which carries `file`: the id is the file's numeric
+ *   prefix, because that is what `set-status --id` resolves.
  * @param {{taskId: number|string}} opts
  * @returns {{
  *   ids: number[], title: string|null, titleReason: string|null,
@@ -274,7 +297,10 @@ function firstSentence(text) {
  *
  * Throws on an entry that is not `open`: a parked or actioned entry already has
  * a home, and cutting a second task from it is the duplicate this entry exists
- * to prevent.
+ * to prevent. Throws, too, on an entry whose identity is not certain: no `file`,
+ * a file with no safe numeric prefix, a frontmatter id that disagrees with it,
+ * or two entries naming the same id. Each would park a different entry, or the
+ * same one twice.
  */
 function seedFromObservations(entries, { taskId } = {}) {
   if (!Array.isArray(entries) || entries.length === 0) {
@@ -288,11 +314,16 @@ function seedFromObservations(entries, { taskId } = {}) {
     );
   }
   const rows = entries.map(({ frontmatter = {}, body = "" }) => {
-    const id = observationId(frontmatter.id);
+    const id = fileId(frontmatter.file);
     const status = statusOf(frontmatter);
     if (id === null) {
       throw new Error(
-        `observation entry has no numeric id: ${JSON.stringify(frontmatter.id)}`,
+        `observation entry has no usable file id: ${JSON.stringify(frontmatter.file)} — pass the scan entry, whose \`file\` is what set-status resolves`,
+      );
+    }
+    if (frontmatterId(frontmatter.id) !== id) {
+      throw new Error(
+        `observation ${frontmatter.file} has frontmatter id ${JSON.stringify(frontmatter.id)}, which does not match its file id ${id} — fix the entry before cutting a task from it`,
       );
     }
     if (status !== "open") {
@@ -309,6 +340,14 @@ function seedFromObservations(entries, { taskId } = {}) {
   });
   rows.sort((a, b) => a.id - b.id);
   const ids = rows.map((r) => r.id);
+  // findById parks the FIRST file with a given prefix, so a repeated id would
+  // park one entry twice and leave the other open.
+  const dup = ids.find((id, i) => ids.indexOf(id) !== i);
+  if (dup !== undefined) {
+    throw new Error(
+      `observation #${dup} is named by more than one entry — refusing to park it twice`,
+    );
+  }
 
   const tags = [];
   for (const r of rows)

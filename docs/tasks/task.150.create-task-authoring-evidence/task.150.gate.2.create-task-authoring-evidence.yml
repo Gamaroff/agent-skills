@@ -1,0 +1,71 @@
+schema: 1
+task: 'task.150.create-task-authoring-evidence'
+task_title: 'create-task: anchored claims, a bounded title, and a --from-observation entry'
+gate: FAIL
+status_reason: 'The refute pass shows the cycle-1 id guard never sees the raw id on the prescribed path: scan output is already parseInt-ed and set-status keys on the filename prefix, so a park vector can still name a different entry (HIGH, reproduced with real scan output). The re-probe adds unsafe-integer ids to the same mechanism.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T19:20:55Z'
+
+top_issues:
+  - id: 'TASK-150-BUG-3'
+    severity: high
+    file: 'skills/create-task/scripts/lib.js'
+    finding: 'seedFromObservations keys the park vector on the frontmatter id, which scan has already parseInt-ed (id: 1e2 → 1), while set-status resolves by filename prefix (findById); file 0005-x.md with id: 1e2 yields --id 1 and parks 0001-*; unsafe integers (9007199254740993, 1e21) also convert.'
+    suggested_action: 'Derive the id from the scan entry file prefix (safe integer), refuse when it disagrees with the frontmatter id, when file is absent/malformed, or when ids repeat; test with real scan output.'
+    suggested_owner: dev
+    bug_ref: 'task.150.bug.3.seed-identity-not-the-engines.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 42
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 30
+    notes: 'Fresh enumeration (task.150.qa.2.security.run.json): title engages 5/5, status engages 7/7, id present-but-inert on unsafe integers (3/15 hostile accepted). The refute pass found the prescribed-path identity defect (BUG-3). Local operator data only.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-3 (advisory, medium/medium): the seed checks open at § 1.1 but parks at § 5 after a long session; set-status overwrites without checking current status, so an entry parked or actioned in between is silently rewritten.'
+  maintainability:
+    status: PASS
+    notes: 'CR-6 cleanup: the corpus ratchet restates the length rule instead of calling checkCardTitle.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-150-BUG-3 (file-prefix identity, agreement check, duplicate refusal, safe integers) with a real-scan-output test.'
+      refs: ['skills/create-task/scripts/lib.js', 'skills/create-task/tests/from-observation.test.js']
+  future:
+    - action: 'CR-3 (advisory): re-scan immediately before § 5 step 2b and skip, and report, any entry no longer open.'
+      refs: ['skills/create-task/SKILL.md']
+    - action: 'CR-4 (advisory, low): refuse duplicate ids (folded into BUG-3).'
+      refs: ['skills/create-task/scripts/lib.js']
+    - action: 'CR-5 (advisory, low/low): firstSentence stops at abbreviations such as e.g.'
+      refs: ['skills/create-task/scripts/lib.js']
+    - action: 'CR-6 (cleanup): the corpus ratchet should call checkCardTitle.'
+      refs: ['shared/resources/tests/card-preflight-corpus.test.mjs']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-09-28'
+  total_iterations: 1
+  verification_method: 'Cycle-1 BUG-1 and BUG-2 re-verified by the re-probe on raw inputs (status engages; raw-string ids refused); BUG-1 re-scoped by BUG-3 on the scan path.'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['TASK-150-BUG-3 fixed and re-probed on real scan output']

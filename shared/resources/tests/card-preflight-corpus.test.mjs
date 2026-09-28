@@ -123,7 +123,10 @@ test("corpus: no task title outside the legacy list exceeds CARD_TITLE_MAX, and 
     const id = Number(file.split("/").pop().split(".")[1]);
     const { frontmatter } = parseFrontmatter(readFileSync(file, "utf8"));
     const len = String((frontmatter && frontmatter.title) || "").length;
-    const long = len > lib.CARD_TITLE_MAX;
+    // The preflight's own rule decides "long" — never a restatement of it here.
+    const long = lib
+      .checkCardTitle(frontmatter || {}, "")
+      .some((f) => f.code === "title-too-long");
     if (LEGACY_LONG_TITLES.has(id)) {
       seen.add(id);
       if (!long) stale.push(`task.${id} (${len} chars)`);
