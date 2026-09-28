@@ -98,9 +98,14 @@ Two classifications carry the document, and both are **changelog-based, not date
 - **`addedMidSprint`** — a Sprint changelog event joined this issue to this sprint _after_
   `startDate`. This is when the issue joined the sprint, not when it was created. An issue filed
   months ago and pulled in on day six is discovery, and dating it by creation would miss that.
-- **`carriedOver`** — joined at or before `startDate` having come from another sprint (the same event
-  names a prior sprint in `from`). An issue on its first ever sprint has an empty `from` and is not
-  carry-over.
+- **`carriedOver`** — the issue's latest join at or before `startDate` came from another sprint (that
+  event names a prior sprint in `from`). An issue on its first ever sprint has an empty `from` and is
+  not carry-over.
+
+A **join** is an event that puts the sprint into the list — present in `to`, absent from `from`.
+Every later edit of the Sprint field re-lists a sprint the issue is already in: closing the sprint
+rolls unfinished issues on (`5731` → `5731, 5876`), and moving one to the backlog afterwards drops the
+next sprint (`5731, 5876` → `5731`). Neither is a join.
 
 ### 3. Collect commit figures
 

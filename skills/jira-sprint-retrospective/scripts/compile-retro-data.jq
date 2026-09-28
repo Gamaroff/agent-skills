@@ -63,7 +63,18 @@ def sprint_events:
         from: ((.from // "") | tostring | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))),
         added: ((.to // "") | tostring | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))) } ];
 
-def joined_events: [ sprint_events[] | select(.added | index($sid)) | select(.at != null) ];
+# A join is an event that puts this sprint into the list: present in .to, ABSENT
+# from .from. Testing .to alone is wrong, because every later edit of the Sprint
+# field re-lists a sprint the issue is already in — closing a sprint rolls its
+# unfinished issues on ("5731" -> "5731, 5876"), and moving one to the backlog
+# afterwards drops the next sprint ("5731, 5876" -> "5731"). Both carry this
+# sprint in .to, both happen after the start, and both used to read as
+# mid-sprint discovery: a live sprint reported 65 added against 46 real joins.
+def joined_events:
+  [ sprint_events[]
+    | select(.added | index($sid))
+    | select((.from | index($sid)) | not)
+    | select(.at != null) ];
 
 # Discovery: joined after the sprint had started.
 def added_mid_sprint:
@@ -76,15 +87,16 @@ def added_date:
   else [ joined_events[] | select(.at > $startEpoch) ] | sort_by(.at) | last | (.raw // null)
   end;
 
-# Carry-over: joined at or before the start, having come from somewhere — the
-# same event names a previous sprint in .from. An issue placed on its first ever
-# sprint has an empty .from and is not a carry-over.
+# Carry-over: the issue's LATEST join at or before the start came from somewhere —
+# that event names a previous sprint in .from. An issue placed on its first ever
+# sprint has an empty .from and is not a carry-over. The latest join decides it,
+# not any: an issue moved out to a previous sprint and back from the backlog
+# before the start arrived from the backlog.
 def carried_over:
   if $startEpoch == null then false
   else
-    [ joined_events[]
-      | select(.at <= $startEpoch)
-      | select((.from | length) > 0) ] | length > 0
+    [ joined_events[] | select(.at <= $startEpoch) ] | sort_by(.at) | last
+    | if . == null then false else (.from | length) > 0 end
   end;
 
 def issue_rows:

@@ -439,6 +439,16 @@ All notable changes to this project will be documented in this file. Format foll
   `ALREADY_DONE`); three of its five `--complete` lines are comments. Scenario 4b's builtin arm
   prints a `SKIP` line, and a new `advance-pipeline-lock-4b-setup.test.mjs` drives its missing,
   builtin and default arms through a test-only `ADVANCE_LOCK_TEST_4B_CMDS` seam.
+
+- **`jira-sprint-retrospective` no longer reads a sprint's roll-over as mid-sprint discovery.**
+  `compile-retro-data.jq` counted any Sprint changelog event whose `to` listed the sprint as a join.
+  Closing a sprint re-lists it for every unfinished issue (`5731` → `5731, 5876`), and a later backlog
+  move does too (`5731, 5876` → `5731`); both land after the start, so each read as work added
+  mid-sprint. On a live 69-issue sprint the retrospective reported 65 added where 49 had joined. A
+  join now requires the sprint absent from `from`, and `carriedOver` is decided by the latest join at
+  or before the start. Four fixture cases in `fixture.test.sh` pin it; four of them fail on the old
+  classifier.
+
 - **The Stop hook's step-8 reason names develop-bug's Step 7 checklist and every step still ahead
   (task 163).** Five follow-ups from task 162's QA gate and PR review. At lock 8 the develop-bug
   Step 7 tail now reads Part B's bug-close routine, then the Step 7 Completion Checklist, the check

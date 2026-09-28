@@ -99,5 +99,149 @@
         }
       ]
     }
+  },
+  {
+    "key": "PROJ-204",
+    "fields": {
+      "summary": "Committed, then rolled into the next sprint at closure",
+      "description": null,
+      "issuetype": { "name": "Story" },
+      "parent": null,
+      "status": {
+        "name": "Selected for Development",
+        "statusCategory": { "key": "new" }
+      },
+      "resolution": null,
+      "resolutiondate": null,
+      "created": "2026-06-11T19:04:00.000+0200",
+      "assignee": {
+        "displayName": "Ada Lovelace",
+        "accountId": "acc-ada",
+        "emailAddress": "ada@example.com"
+      }
+    },
+    "changelog": {
+      "histories": [
+        {
+          "created": "2026-08-05T12:00:00.000Z",
+          "items": [{ "field": "Sprint", "from": "", "to": "5434" }]
+        },
+        {
+          "created": "2026-08-12T17:00:00.000+0200",
+          "items": [{ "field": "Sprint", "from": "5434", "to": "5434, 5500" }]
+        }
+      ]
+    }
+  },
+  {
+    "key": "PROJ-205",
+    "fields": {
+      "summary": "Committed, rolled over, then moved to the backlog",
+      "description": null,
+      "issuetype": { "name": "Story" },
+      "parent": null,
+      "status": {
+        "name": "Selected for Development",
+        "statusCategory": { "key": "new" }
+      },
+      "resolution": null,
+      "resolutiondate": null,
+      "created": "2026-06-11T19:04:00.000+0200",
+      "assignee": {
+        "displayName": "Ada Lovelace",
+        "accountId": "acc-ada",
+        "emailAddress": "ada@example.com"
+      }
+    },
+    "changelog": {
+      "histories": [
+        {
+          "created": "2026-08-05T12:00:00.000Z",
+          "items": [{ "field": "Sprint", "from": "", "to": "5434" }]
+        },
+        {
+          "created": "2026-08-12T17:00:00.000+0200",
+          "items": [{ "field": "Sprint", "from": "5434", "to": "5434, 5500" }]
+        },
+        {
+          "created": "2026-08-15T09:00:00.000+0200",
+          "items": [{ "field": "Sprint", "from": "5434, 5500", "to": "5434" }]
+        }
+      ]
+    }
+  },
+  {
+    "key": "PROJ-206",
+    "fields": {
+      "summary": "Moved to the previous sprint, then rolled back in before the start",
+      "description": null,
+      "issuetype": { "name": "Story" },
+      "parent": null,
+      "status": {
+        "name": "Selected for Development",
+        "statusCategory": { "key": "new" }
+      },
+      "resolution": null,
+      "resolutiondate": null,
+      "created": "2026-06-11T19:04:00.000+0200",
+      "assignee": {
+        "displayName": "Ada Lovelace",
+        "accountId": "acc-ada",
+        "emailAddress": "ada@example.com"
+      }
+    },
+    "changelog": {
+      "histories": [
+        {
+          "created": "2026-08-04T09:00:00.000Z",
+          "items": [{ "field": "Sprint", "from": "", "to": "5434" }]
+        },
+        {
+          "created": "2026-08-04T09:10:00.000Z",
+          "items": [{ "field": "Sprint", "from": "5434", "to": "5232" }]
+        },
+        {
+          "created": "2026-08-05T10:00:00.000Z",
+          "items": [{ "field": "Sprint", "from": "5232", "to": "5232, 5434" }]
+        }
+      ]
+    }
+  },
+  {
+    "key": "PROJ-207",
+    "fields": {
+      "summary": "Came from the previous sprint, then re-added from the backlog before the start",
+      "description": null,
+      "issuetype": { "name": "Story" },
+      "parent": null,
+      "status": {
+        "name": "Selected for Development",
+        "statusCategory": { "key": "new" }
+      },
+      "resolution": null,
+      "resolutiondate": null,
+      "created": "2026-06-11T19:04:00.000+0200",
+      "assignee": {
+        "displayName": "Ada Lovelace",
+        "accountId": "acc-ada",
+        "emailAddress": "ada@example.com"
+      }
+    },
+    "changelog": {
+      "histories": [
+        {
+          "created": "2026-08-04T09:00:00.000Z",
+          "items": [{ "field": "Sprint", "from": "5232", "to": "5232, 5434" }]
+        },
+        {
+          "created": "2026-08-04T09:10:00.000Z",
+          "items": [{ "field": "Sprint", "from": "5232, 5434", "to": "5232" }]
+        },
+        {
+          "created": "2026-08-04T09:20:00.000Z",
+          "items": [{ "field": "Sprint", "from": "", "to": "5434" }]
+        }
+      ]
+    }
   }
 ]
