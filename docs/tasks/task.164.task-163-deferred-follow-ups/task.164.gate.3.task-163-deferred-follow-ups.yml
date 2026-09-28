@@ -1,0 +1,108 @@
+schema: 1
+task: 'task.164.task-163-deferred-follow-ups'
+task_title: "[Task 164] Close task.163's deferred follow-ups"
+gate: PASS
+status_reason: 'All five cycle-2 findings are fixed and mutation-proven (G1–G3 red, re-run independently). The scoped review raised one MEDIUM whose premise does not hold (rejected with evidence below) and four LOW accuracy and test-strength gaps. No HIGH or MEDIUM remains, and all NFRs PASS.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T11:05:00Z'
+
+top_issues:
+  - id: 'QA-164-10'
+    severity: low
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+    file: 'shared/resources/tests/step-8-completion-checklist.test.mjs'
+    finding: 'The mapping-refusal check refuses only backtick-wrapped names (`develop`, `/develop`). A HALT rule that relisted the mapping in plain prose, such as "/develop (→ 4) and /create-pr (→ 5)", would pass (CR-2; reviewer medium/medium, graded LOW like QA-164-3 because the doc is correct today and the gap is in the guard''s reach).'
+    suggested_action: 'Refuse unformatted mentions with a boundary-aware match (excluding develop-story/task/bug for `develop`), and prove it with a plain-prose mutation.'
+    suggested_owner: dev
+  - id: 'QA-164-11'
+    severity: low
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+    file: 'shared/resources/develop-pipeline-remaining-work-banner.md'
+    finding: 'Exception 2 says the --skill mapping states "which sub-skills advance it". The mapping states where each skill would advance the lock: review-task → 3 is mapped but skills/review-task/SKILL.md never calls it, and create-branch → 2 cannot fire because the lock is written after Step 1 (CR-3).'
+    suggested_action: 'Word the citation as "where a sub-skill that advances the lock moves it", not as proof that each mapped skill self-advances.'
+    suggested_owner: dev
+  - id: 'QA-164-12'
+    severity: low
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+    file: 'shared/resources/tests/step-8-completion-checklist.test.mjs'
+    finding: 'The mapping regex `\n {2}--skill\)\n([\s\S]*?)\n {4}esac` matches the FIRST `  --skill)` arm (the commit-changes early exit, advance-pipeline-lock.sh:147) and lazily spans to the mapping''s `esac`, so it captures about 266 unrelated lines. The ≥5 / finalise floor catches a zero parse, but its message would misname the cause (CR-4).'
+    suggested_action: 'Anchor the capture on the mapping''s own `SKILL_NAME="$2"` / `case "$SKILL_NAME" in`.'
+    suggested_owner: dev
+  - id: 'QA-164-13'
+    severity: low
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+    file: 'shared/resources/develop-pipeline-remaining-work-banner.md'
+    finding: '"the step being executed when it halted, not at `current_step`" is ungrammatical (introduced by cycle 2''s fix; the HALT pin pins the phrase). Exception 2''s `Step N` / `Step {N+1}` wording has no stated meaning for a HALT inside the Steps 5–6 loop, whose position line is `Steps 5–6/8` (CR-5).'
+    suggested_action: 'Say "not `current_step`" (and update the pin), and state that a HALT in the QA loop lists `- Steps 5–6:` first.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 97
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false, unchanged. The seam NOTE line is output only; no accept/reject function over untrusted input.'
+  performance:
+    status: PASS
+    notes: 'No production change.'
+  reliability:
+    status: PASS
+    notes: 'The hook is unchanged; halt_step is untouched.'
+  maintainability:
+    status: PASS
+    notes: 'Exception 2 now cites the mapping instead of restating it. The residue is wording and guard-reach only.'
+
+bug_resolution:
+  previous_gate: 'task.164.gate.2.task-163-deferred-follow-ups.yml'
+  fixed_in: '47afcfa4'
+  resolved: ['QA-164-5', 'QA-164-6', 'QA-164-7', 'QA-164-8', 'QA-164-9']
+  verification: 'G1–G3 mutations each red, cmp restores, re-run independently at this review; QA-164-6 is CHANGELOG prose.'
+  rejected_findings:
+    - id: 'CR-1 (cycle 3 code review)'
+      claim: 'The Step 3 develop-loop-continues block, fired at lock 4 after /develop self-advances, would start its list at Step 5 and drop create-pr.'
+      why_rejected: 'The ordinary rule starts the list AT current_step, not after it. After Step N completes the lock reads N+1, and the list starts at Step N+1 (the Format''s `- Step {N+1}:`). So at lock 4 the loop-continue block lists Step 4 (create-pr) first, which is correct for a block positioned in Step 3.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'QA-164-10'
+      carried_from: 'top_issues (route 2b, cycle 3)'
+      action: 'Refuse unformatted mentions of --skill mapping names in the HALT rule (boundary-aware; exclude develop-story/task/bug for develop), proven by a plain-prose mutation.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - id: 'QA-164-11'
+      carried_from: 'top_issues (route 2b, cycle 3)'
+      action: 'Word the mapping citation as "where a sub-skill that advances the lock moves it", not as proof that each mapped skill self-advances.'
+      refs: ['shared/resources/develop-pipeline-remaining-work-banner.md']
+    - id: 'QA-164-12'
+      carried_from: 'top_issues (route 2b, cycle 3)'
+      action: 'Anchor the test''s mapping regex on SKILL_NAME="$2" / case "$SKILL_NAME" in, not the first --skill) arm.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - id: 'QA-164-13'
+      carried_from: 'top_issues (route 2b, cycle 3)'
+      action: 'Say "not `current_step`" (and update the pin), and state that a HALT in the QA loop lists `- Steps 5–6:` first.'
+      refs: ['shared/resources/develop-pipeline-remaining-work-banner.md', 'shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - action: 'The 4b meta-test re-runs the whole lock test file three times, adding about 45s to npm test. Consider an early-exit seam after 4b (gate 1 CR-5, carried).'
+      refs: ['shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs']
+    - action: 'advance-pipeline-lock.sh maps review-task → 3 but review-task never self-advances. Either add the cooperation block or drop the mapping entry (pre-existing, outside this task).'
+      refs: ['shared/resources/advance-pipeline-lock.sh', 'skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

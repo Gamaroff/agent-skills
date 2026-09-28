@@ -300,28 +300,28 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-28
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.164.qa.2.task-163-deferred-follow-ups.md](./task.164.qa.2.task-163-deferred-follow-ups.md)
-- **Gate File**: [task.164.gate.2.task-163-deferred-follow-ups.yml](./task.164.gate.2.task-163-deferred-follow-ups.yml)
-- **Previous cycle**: [task.164.qa.1.task-163-deferred-follow-ups.md](./task.164.qa.1.task-163-deferred-follow-ups.md), [task.164.gate.1.task-163-deferred-follow-ups.yml](./task.164.gate.1.task-163-deferred-follow-ups.yml)
+- **Full Report**: [task.164.qa.3.task-163-deferred-follow-ups.md](./task.164.qa.3.task-163-deferred-follow-ups.md)
+- **Gate File**: [task.164.gate.3.task-163-deferred-follow-ups.yml](./task.164.gate.3.task-163-deferred-follow-ups.yml)
+- **Earlier cycles**: [qa.1](./task.164.qa.1.task-163-deferred-follow-ups.md) / [gate.1](./task.164.gate.1.task-163-deferred-follow-ups.yml), [qa.2](./task.164.qa.2.task-163-deferred-follow-ups.md) / [gate.2](./task.164.gate.2.task-163-deferred-follow-ups.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 97 (step-8 checklist 91, 4b meta-test 3, cycle-1 fix mutations F1–F4 re-run)
+- **Tests Executed**: 97 (step-8 checklist 91, 4b meta-test 3, cycle-2 fix mutations G1–G3 re-run)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Cycle 1's four findings are fixed and proven. The refute pass found one MEDIUM: Exception 2 explains the HALT/`current_step` difference only at lock 8, while `develop` and `create-pr` also self-advance before their step's tail (QA-164-5). Four LOW: the CHANGELOG example (QA-164-6), the halted step being listed first is unstated (QA-164-7), the 4b `why` comment overclaims (QA-164-8), and a leaked seam is silent in the direct run (QA-164-9).
+Cycle 2's five findings are fixed and proven. Four LOW remain: the mapping refusal is backtick-only (QA-164-10), the mapping citation overstates (QA-164-11), the mapping regex's anchor (QA-164-12), and grammar plus a Steps 5–6 HALT (QA-164-13). One reviewer MEDIUM was rejected with evidence: the ordinary list starts at `current_step`, so the Step 3 loop-continue block at lock 4 lists create-pr correctly.
 
 ---
 
@@ -338,6 +338,7 @@ Cycle 1's four findings are fixed and proven. The refute pass found one MEDIUM: 
 | 2026-09-28 |         | QA findings fixed — gate 1 CONCERNS: 4 of 4 (banner exceptions counted, HALT example per pipeline, whole-doc restatement check, spawn timeout reported), 1 iteration | qa-fix |
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — 5 findings (1 medium, 4 low) | qa-task |
 | 2026-09-28 |         | QA findings fixed — gate 2 CONCERNS: 5 of 5 (HALT rule cites the --skill mapping instead of listing it, halted step listed first, CHANGELOG example, 4b messages, seam NOTE line), 1 iteration | qa-fix |
+| 2026-09-28 |         | QA gate PASS (100/100) — 4 low findings open, 1 reviewer finding rejected | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -374,6 +375,17 @@ Cycle 1's four findings are fixed and proven. The refute pass found one MEDIUM: 
 ---
 
 ## Notes
+
+### Deferred Work
+
+The QA loop left through the cosmetic-residue exit (route 2b, cycle 3). Four LOW findings are carried to `task.164.gate.3` `recommendations.future`:
+
+- **QA-164-10**: the HALT pin refuses `--skill` mapping names only when backtick-wrapped; refuse plain-prose mentions too.
+- **QA-164-11**: the banner doc says the mapping states "which sub-skills advance" the lock; it states where each would move it (`review-task` is mapped but never self-advances).
+- **QA-164-12**: the test's mapping regex anchors on the first `--skill)` arm; anchor it on the mapping's own `case`.
+- **QA-164-13**: "not at `current_step`" is ungrammatical, and a HALT inside the Steps 5–6 loop has no stated `N`.
+
+Two more follow-ups, not from this task's change: the 4b meta-test re-runs the whole lock test file three times (about 45s in `npm test`); and `advance-pipeline-lock.sh` maps `review-task` → 3 though `review-task` never self-advances.
 
 ### Important Reminders
 
