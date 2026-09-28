@@ -126,16 +126,21 @@ fi
 # answer is a missing command: setup fails there, naming it, and the two no-jq assertions below do
 # not run, rather than failing later for the setup's reason under their own names (task 163;
 # task.162 gate.1 CR-2). An arm that starts needing another command fails here, visibly, instead of
-# finding it on an over-linked PATH.
+# finding it on an over-linked PATH. The builtin arm prints a SKIP line, because nothing else can see
+# it: a linked builtin is a dangling self-link no no-jq command uses, so the file passed either way.
+# ADVANCE_LOCK_TEST_4B_CMDS is a test-only seam: advance-pipeline-lock-4b-setup.test.mjs sets it to
+# reach the empty and builtin arms, which the literal list never does. Unset, it is `rm dirname`
+# (task 164; task.163 SC5).
 NOJQ_BIN="$TMPDIR_TEST/nojq-bin"
 mkdir -p "$NOJQ_BIN"
 NOJQ_SETUP_OK=1
-for c in rm dirname; do
+read -r -a NOJQ_CMDS <<< "${ADVANCE_LOCK_TEST_4B_CMDS:-rm dirname}"
+for c in "${NOJQ_CMDS[@]}"; do
   p=$(command -v "$c")
   case "$p" in
     "") fail "4b setup: '$c' not found on PATH" "the no-jq fixture cannot link a command that does not resolve"; NOJQ_SETUP_OK=0 ;;
     /*) ln -sf "$p" "$NOJQ_BIN/$c" ;;
-    *) ;; # a builtin resolves to its bare name: skip it (linking it would self-reference)
+    *) echo "  SKIP  4b: '$c' is a builtin, not linked" ;; # linking it would self-reference
   esac
 done
 BASH_BIN=$(command -v bash)
