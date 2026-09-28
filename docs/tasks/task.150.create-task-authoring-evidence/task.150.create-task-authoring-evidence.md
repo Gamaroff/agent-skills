@@ -13,7 +13,7 @@ tags:
     observation,
   ]
 category: other
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-28
@@ -24,7 +24,7 @@ github_issue: 480
 
 # Technical Task: create-task — anchored claims, a bounded title, and a --from-observation entry
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.150.review.1.create-task-authoring-evidence.md` implemented 2026-09-28
 
@@ -591,30 +591,29 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-28
-**Quality Score**: 70/100
-**Gate Decision**: FAIL (cycle 3; the QA loop escalated as not converging)
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS (cycle 4, after the operator-granted re-entry)
 
 ### QA Report
 
-- **Full Report**: [task.150.qa.3.create-task-authoring-evidence.md](./task.150.qa.3.create-task-authoring-evidence.md)
-- **Gate File**: [task.150.gate.3.create-task-authoring-evidence.yml](./task.150.gate.3.create-task-authoring-evidence.yml)
-- **Previous**: [qa.2](./task.150.qa.2.create-task-authoring-evidence.md) (FAIL 70), [qa.1](./task.150.qa.1.create-task-authoring-evidence.md) (FAIL 70)
+- **Full Report**: [task.150.qa.4.create-task-authoring-evidence.md](./task.150.qa.4.create-task-authoring-evidence.md)
+- **Gate File**: [task.150.gate.4.create-task-authoring-evidence.yml](./task.150.gate.4.create-task-authoring-evidence.yml)
+- **Previous**: [qa.3](./task.150.qa.3.create-task-authoring-evidence.md), [qa.2](./task.150.qa.2.create-task-authoring-evidence.md), [qa.1](./task.150.qa.1.create-task-authoring-evidence.md) (each FAIL 70)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 44 targeted; 24 security probes (cycle 3)
-- **Phases Verified**: 5/5 (Phase 4 with issues)
-- **Critical Issues**: 1 HIGH ([TASK-150-BUG-4](./task.150.bug.4.park-resolves-first-same-prefix-file.md)), 1 MEDIUM; BUG-1, -2 and -3 fixed
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Tests Executed**: 70 targeted; 34 security probes
+- **Phases Verified**: 5/5
+- **Critical Issues**: none. BUG-1 through BUG-4 are fixed. 1 MEDIUM open (CR4-1: observe-work review Step 6)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-`set-status` parks the first file in the whole log whose prefix matches, so a same-prefix sibling
-is overwritten instead of the selected entry. The HIGH count per cycle is 1, 1, 1 in the same
-`--from-observation` identity mechanism, so the loop escalated for a person to decide.
+The root fix holds: the end-to-end park probe engages 10/10. One medium remains: observe-work's own
+`set-status` call in review Step 6 does not pass `--expect-status`.
 
 ---
 
@@ -631,6 +630,7 @@ is overwritten instead of the selected entry. The HIGH count per cycle is 1, 1, 
 | 2026-09-28 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task |
 | 2026-09-28 |         | QA gate FAIL (70/100) — cycle 2: 1 high (seed identity on the scan path) | qa-task |
 | 2026-09-28 |         | QA gate FAIL (70/100) — cycle 3: 1 high (whole-log same-prefix park), 1 medium | qa-task |
+| 2026-09-28 |         | QA gate CONCERNS (90/100) — cycle 4: 0 high, 1 medium (observe-work Step 6 lacks --expect-status) | qa-task |
 
 <!-- change-log-end -->
 

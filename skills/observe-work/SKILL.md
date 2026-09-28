@@ -327,7 +327,7 @@ command node references/observation-log.js <command> --json
 | Write an observation | `command node references/observation-log.js write --title … --skill … --siblings-checked … --body-file … --json` |
 | Write past a `possible-duplicate` you have judged distinct | `… write … --not-duplicate-of 12,34 --json` |
 | Checkpoint with nothing to log | `command node references/observation-log.js checkpoint --note "no observations" --json` |
-| Resolve one | `command node references/observation-log.js set-status --id N --status actioned --resolution … --json` |
+| Resolve one | `command node references/observation-log.js set-status --id N --status actioned --resolution … --expect-status open --json` (the status you read; `status-changed` / `ambiguous-id` → report, do not retry) |
 | Sweep resolved entries | `command node references/observation-log.js archive --json` |
 | Audit a skill family | `command node references/observation-log.js families --audit --json` |
 

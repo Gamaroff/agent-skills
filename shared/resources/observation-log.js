@@ -1615,6 +1615,14 @@ function parseArgs(argv) {
   // ignores is worse than one it rejects: the caller sees exit 0 and believes
   // the id took effect. Rejecting it here is what makes "there is no --id flag"
   // true from the caller's side rather than only from the implementation's.
+  // Same rule for --expect-status: every other subcommand would accept it and
+  // then ignore it, and a guard the caller believes in but nothing checks is
+  // worse than a rejected flag (task.150 QA cycle 4, CR4-2).
+  if (args.subcommand !== "set-status" && args.expectStatus != null) {
+    throw new UsageError(
+      `${args.subcommand} does not accept --expect-status: only set-status checks the current status before writing.`,
+    );
+  }
   if (args.subcommand === "write" && args.id != null) {
     throw new UsageError(
       "write does not accept --id: ids are always derived. A batch that " +

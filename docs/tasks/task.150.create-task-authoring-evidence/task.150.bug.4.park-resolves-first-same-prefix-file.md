@@ -4,7 +4,7 @@
 **Bug ID**: TASK-150-BUG-4
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 3, safety re-probe code review CR-1 and CR-2)
 **Date Found**: 2026-09-28
 
@@ -81,3 +81,4 @@ expect validation each go red; the pre-fix seed, and a seed without the raw read
 | ---------- | ------------ | ---------- | --------------------------------------------------- |
 | 2026-09-28 | New | QA | Cycle 3 unscoped review, reproduced |
 | 2026-09-28 | Ready for QA | dev (operator-directed) | Root fix in the engine plus `--expect-status` |
+| 2026-09-28 | Closed | QA | Cycle 4: the end-to-end park probe engages 10/10 |

@@ -752,6 +752,18 @@ test("set-status --expect-status refuses when the entry changed since it was rea
     const bad = cli(args("opn"));
     assert.equal(bad.json.reason, "usage");
     assert.equal(bad.code, 2);
+    // Every other subcommand rejects the flag rather than ignoring it (CR4-2).
+    const scan = cli([
+      "scan",
+      "--workspace",
+      dir,
+      "--expect-status",
+      "open",
+      "--json",
+    ]);
+    assert.equal(scan.json.reason, "usage");
+    assert.equal(scan.code, 2);
+    assert.match(scan.json.error, /does not accept --expect-status/);
   } finally {
     cleanup(dir);
   }

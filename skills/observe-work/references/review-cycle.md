@@ -173,12 +173,19 @@ written to it while this review ran. Re-scan, and:
 - an entry that arrived during the run is **not** actioned by this review — it was never evaluated;
 - an entry whose status changed under you was resolved elsewhere; do not overwrite that resolution.
 
-Then mark the entries this review actually decided:
+Then mark the entries this review actually decided. Pass the status you read when you decided,
+as `--expect-status`, because the re-scan above cannot protect this write. It reads the log at one
+moment, and the write lands at another, on whichever file `--id` resolves:
 
 ```bash
 command node references/observation-log.js set-status \
-  --id N --status actioned --resolution "…" --json
+  --id N --status actioned --resolution "…" --expect-status open --json
 ```
+
+The engine checks it on the file it writes, at the moment it writes. `status-changed` means another
+session resolved the entry since you read it. `ambiguous-id` means two files share the id. Both
+write nothing: report them, and do not retry them. Use the status you actually read (`parked`
+for a parked entry you are now actioning), not a fixed `open`.
 
 `--status` is one of `actioned`, `declined`, `superseded`, `parked`. A `parked` write without
 `--parked-until` trips `parked-without-condition` and exits 1.

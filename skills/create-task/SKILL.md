@@ -706,7 +706,7 @@ Actions:
     ```bash
     source .agents/skills/create-task/references/resolve-observation-workspace.sh || exit 1
     command node .agents/skills/create-task/references/observation-log.js {park-vector}
-    # e.g. set-status --id 124 --status parked --parked-until "task.150 merged to develop" --json
+    # e.g. set-status --id 124 --status parked --parked-until "task.150 merged to develop" --expect-status open --json
     ```
 
     The engine checks each vector at the moment it writes. The vector carries
