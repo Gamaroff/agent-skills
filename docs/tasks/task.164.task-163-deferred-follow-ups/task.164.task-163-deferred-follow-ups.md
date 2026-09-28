@@ -5,7 +5,9 @@ type: task
 description: "Close the five items task.163 deferred: stop the banner doc restating the Stop hook's lock-8 wording, make the banner test compare what the hook renders, give the --complete hook floor a non-comment count, name the halting step in a HALT status block, and commit a meta-test for scenario 4b's empty command -v arm."
 tags: [develop-pipeline, stop-hook, remaining-work-banner, step-8, follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
+completed_date: 2026-09-28
+pr_number: 508
 priority: Low
 created: 2026-09-28
 updated: 2026-09-28
@@ -16,7 +18,7 @@ github_issue: 507
 
 # Technical Task: Close task.163's deferred follow-ups
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.164.review.1.task-163-deferred-follow-ups.md` implemented 2026-09-28
 
@@ -325,10 +327,37 @@ Cycle 2's five findings are fixed and proven. Four LOW remain: the mapping refus
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.164.qa.3.task-163-deferred-follow-ups.md`
+**Gate File**: `task.164.gate.3.task-163-deferred-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100. Three QA cycles; the loop left via the cosmetic-residue exit (four LOW carried).
+**PR Review**: `task.164.pr-review.1.task-163-deferred-follow-ups.md` returned ✅ APPROVE (4 LOW; PC-2 fixed).
+
+All Definition of Done criteria have been verified, with one recorded deviation:
+
+✅ **Success Criteria:** 9 of 10 traced to code and to a test that runs per PR. ⚠️ AC7 (performance) is backed by a measurement (13–16s per 4b run; no production code changed) rather than a test, and is accepted as a deviation by the user's decision.
+✅ **Tests:** step-8 checklist 91/0, 4b meta-test 3/0, lock test 95/0; ci:fast 4,337/0/1 skipped; mutations M1–M6, F1–F4 and G1–G3 each proven red
+✅ **CI:** SUCCESS on PR #508 head `bd401f36` (link-check, shellcheck, test, validate, branch rule)
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed cites (task 164); banner doc and its bundled copies updated
+✅ **Security Review:** PASS (`boundary: false`; no secrets, no unsafe execution)
+✅ **Compliance Review:** NOT_APPLICABLE (internal pipeline tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-28
+
+**Detailed Verification Log:** See `task.164.dod.1.task-163-deferred-follow-ups.md` for the complete verification evidence and timestamps.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-28 | 1.0     | Initial draft | create-task |
 | 2026-09-28 | 1.1     | Review passed (8/10) — 4b builtin arm made observable (SKIP line), unset-override test added, banner regex anchor named | review-task |
 | 2026-09-28 |         | Status → ready-for-development | review-task |
@@ -339,9 +368,10 @@ Cycle 2's five findings are fixed and proven. Four LOW remain: the mapping refus
 | 2026-09-28 |         | QA gate CONCERNS (90/100) — 5 findings (1 medium, 4 low) | qa-task |
 | 2026-09-28 |         | QA findings fixed — gate 2 CONCERNS: 5 of 5 (HALT rule cites the --skill mapping instead of listing it, halted step listed first, CHANGELOG example, 4b messages, seam NOTE line), 1 iteration | qa-fix |
 | 2026-09-28 |         | QA gate PASS (100/100) — 4 low findings carried to recommendations.future (route 2b), 1 reviewer finding rejected | qa-task |
-<!-- change-log-end -->
+| 2026-09-28 | 1.2 | DoD verified — accepted (PR #508); AC7 accepted on measurement as a recorded deviation | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
@@ -395,7 +425,7 @@ Two more follow-ups, not from this task's change: the 4b meta-test re-runs the w
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.164.task-163-deferred-follow-ups/task.164.task-163-deferred-follow-ups.md`
