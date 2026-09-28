@@ -3,7 +3,7 @@
 **Task**: `task.150.create-task-authoring-evidence.md`
 **Run Number**: 1
 **Started**: 2026-09-28 18:46
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Close five create-task authoring gaps (obs #124, #127, #128, #135, #147): grep-a
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 5/5 phases; ci:fast 4385/0; 15 mutation proofs | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #512: https://github.com/Gamaroff/agent-skills/pull/512 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.150.qa.{N}.*.md`; `task.150.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at cycle 3 (HIGH 1, 1, 1); operator root fix and 2 granted cycles; gate 5 PASS 100; 5c CONCERNS | `task.150.qa.5.security.run.json` |
-| 7. finalise                | ❌ Failed  | `task.150.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: 2 (AC6 performance wording; security low: title bound fails open on block-scalar/BOM frontmatter). `task.150.dod.1` | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.150.dod.{N}.*.md`; task `status: accepted`                       | Run 3 accepted (`task.150.dod.3`) after the Step 8a fix-and-recheck `ab057653`. Runs 1 and 2 found 2 gaps each, closed by operator direction | `task.150.dod.3.security.run.json` |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final report commit | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -170,6 +170,20 @@ task.123's first committed draft is `e0881adb` (`git log --diff-filter=A`). It n
 - `/finalise` run 2 (`task.150.dod.2`): run 1's gaps verified closed. New gaps: AC8, where no test pins the single `CARD_TITLE_MAX` definition (the agent refused run 1's "pass by judgement" under the citation rule), and security (low), where the title check failed open on 7 more YAML shapes (84 probes, 7 reproduced). CI reading 1: SUCCESS @ `4f48ebe3`. Step 8a is not applicable (two sections)
 - Closed under the operator's standing instruction ("go with recommended next steps"), with the same move as before, **replace, not patch**. The title is read from the raw header by `readCardTitle`. Anything that is not one column-0 single-line `title:` value gets `title-not-inline`, which replaces `title-block-scalar`. A tracked-tree test pins the single `CARD_TITLE_MAX` definition. Corpus scan: 481 real documents, 0 false positives. Mutation-proved 3 ways. `ci:fast` green
 
+### Finalise run 3 — accepted — 2026-09-28
+
+- `/finalise` run 3 (`task.150.dod.3`). AC 12/12: both run-2 gaps are verified closed. Docs PASS; compliance NOT_APPLICABLE. The security agent (141 probes) reproduced 20 low-severity title shapes: an indented `---` ended the reader's header before the sync's; `--- # c` and `----` opening fences; quoted, explicit and merge `title` keys; and a corpus ratchet that read the parsed value only and counted only `title-too-long`
+- **Step 8a fix-and-recheck**, decided by the evaluator, not by judgement: exactly one FAIL section, severity low, and no other open finding. The evaluator ran three times: a halt on `mutation-proved` only, then proceed, then proceed with `--git-base c454d8a8`. The fix is `ab057653`:
+  - the header edges are now the sync's;
+  - fence mismatches, quoted, explicit or flow `title` keys, and `<<:` merges give `title-not-inline`;
+  - the ratchet's `classifyTitles` reads raw text and fails any title finding;
+  - the BOM is read from raw text.
+
+  Verification: `ci:fast` 4401/0, both halves mutation-proved (`.claude/state/finalise-mutation-proof.log`), and 0 corpus false positives. Recheck: the two title controls were re-run over 32 cases each, with 0 reproduced and 0 over-blocked; the record shows 112 executed and 0 reproduced. The original adapter was lost with the agent's scratch space, so the recheck used a rebuilt adapter, recorded as a deviation in `dod.3`
+- CI reading 1: SUCCESS @ `c454d8a8` (5 checks). CI reading 1 on the fix head: SUCCESS @ `ab057653` (5 checks). **CI reading 2: SUCCESS @ `1e13e178` (the acceptance head, 5 checks, 120s)**
+- The first CI poll on the fix head reported SUCCESS over 0 checks at 0s: it sampled before the new head's rollup existed (obs #108). It was discarded and replaced by a poll that requires the right head, at least 5 checks, a count stable across two samples, and a wait greater than 0
+- Publish boundary crossed in order: acceptance commit `1e13e178`, pushed and asserted tracked on origin, PR head = acceptance head, then the side-effects. The PR canonical comment was posted. Issue #480 got the `done` comment (`posted`) and was closed (`CLOSED` verified). Board `done`: `already`. The document link was already on `develop`. The registry was `ticked`. CHANGELOG cites task 150
+
 ---
 
 ## Issues Log
@@ -268,13 +282,13 @@ they are handed over below.
 
 ## Completion
 
-**Finished**: 2026-09-28 (halted at Steps 5–6)
-**Final Status**: Failed (DoD gaps at Step 7)
+**Finished**: 2026-09-28
+**Final Status**: Completed — accepted (DoD run 3)
 **Branch**: `feature/task.150.create-task-authoring-evidence`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/512
 **QA Iterations**: 5 (4 qa-fix cycles; escalated at cycle 3, re-entered with 2 granted cycles)
-**DoD Summary**: `task.150.dod.1.create-task-authoring-evidence.md` (GAPS IDENTIFIED)
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**DoD Summary**: `task.150.dod.3.create-task-authoring-evidence.md` (ACCEPTED; runs 1 and 2 had gaps)
+**Tracker debt**: none
 
 ---
 
@@ -292,5 +306,7 @@ they are handed over below.
 
 **Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 7.
 
-**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+_Resumed after compaction; Step 7 re-ran and accepted (see Decisions Log, Finalise run 3)._
+
+**Pipeline Progress** for this step was `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
 
