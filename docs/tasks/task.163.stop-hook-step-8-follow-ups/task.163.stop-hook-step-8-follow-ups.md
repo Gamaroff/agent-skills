@@ -5,18 +5,20 @@ type: task
 description: "Close the five LOW advisories task.162 left: name develop-bug's Step 7 Completion Checklist in the Stop hook and resume contract, fix the step-8 'steps still ahead' clause, add a Stop-hook floor to the --complete population test, pin the resume contract's Step 7-tail wording, and make scenario 4b fail loudly on a missing command."
 tags: [develop-pipeline, stop-hook, step-8, develop-bug, follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-09-28
 updated: 2026-09-28
 assignee:
 estimated_effort_hours: 4
 github_issue: 504
+completed_date: 2026-09-28
+pr_number: 506
 ---
 
 # Technical Task: Close task.162's step-8 follow-ups
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.163.review.1.stop-hook-step-8-follow-ups.md` implemented 2026-09-28
 
@@ -309,10 +311,37 @@ No HIGH or MEDIUM finding is new to this change. Two LOW wording findings on the
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.163.qa.3.stop-hook-step-8-follow-ups.md`
+**Gate File**: `task.163.gate.3.stop-hook-step-8-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100. Three QA cycles; the loop left via the cosmetic-residue exit.
+**PR Review**: `task.163.pr-review.1.stop-hook-step-8-follow-ups.md` returned ⚠️ CONCERNS. PC-1 was addressed and CR-1 (LOW) is deferred.
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 9 met, each traced to code and to a test that runs per PR
+✅ **Tests:** hook 47/0, lock 95/0, step-8 checklist 90/0, PreCompact 18/0; ci:fast 4,334/0; 14 mutations proved
+✅ **CI:** SUCCESS on PR #506 head `3f936a33` (link-check, shellcheck, test, validate)
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed cites (task 163); resume contract and banner doc updated; bundled copies in sync
+✅ **Security Review:** PASS (`boundary: false`; the Stop-hook verdict logic is untouched)
+✅ **Compliance Review:** NOT_APPLICABLE (internal pipeline tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-28
+
+**Detailed Verification Log:** See `task.163.dod.1.stop-hook-step-8-follow-ups.md` for the complete verification evidence and timestamps.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-28 | 1.0     | Initial draft | create-task |
 | 2026-09-28 | 1.1     | Review passed (9/10) — step-8 `STEPS_AHEAD` wording fixed to allow an unfinished Step 7 tail | review-task |
 | 2026-09-28 |         | Status → ready-for-development | review-task |
@@ -322,9 +351,10 @@ No HIGH or MEDIUM finding is new to this change. Two LOW wording findings on the
 | 2026-09-28 |         | QA gate PASS (100/100) — 2 LOW findings; 1 pre-existing MEDIUM routed to future (cycle 3) | qa-task |
 | 2026-09-28 |         | Spec wording aligned with the QA-refined implementation (checklist after Part B; lock-8 list per the completion rule) — PR review PC-1 | develop-task |
 | 2026-09-28 |         | QA findings fixed — banner doc defers to the Stop hook at a re-prompt only; checklist outside Part B's list; lock-8 list worded after the completion rule; 2 iterations | qa-fix |
-<!-- change-log-end -->
+| 2026-09-28 | 1.2 | DoD passed — accepted (PR #506) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
@@ -375,7 +405,7 @@ PR review 1 (`task.163.pr-review.1`) left one LOW code finding as a follow-up. *
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.163.stop-hook-step-8-follow-ups/task.163.stop-hook-step-8-follow-ups.md`
