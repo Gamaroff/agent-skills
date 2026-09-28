@@ -1,0 +1,86 @@
+schema: 1
+task: 'task.164.task-163-deferred-follow-ups'
+task_title: "[Task 164] Close task.163's deferred follow-ups"
+gate: CONCERNS
+status_reason: 'All four cycle-1 findings are fixed and mutation-proven (F1–F4 red). The refute pass found that Exception 2 explains the HALT/current_step difference only at lock 8, while develop (→4) and create-pr (→5) also self-advance the lock before their step''s tail runs; plus four LOW accuracy gaps.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T10:05:00Z'
+
+top_issues:
+  - id: 'QA-164-5'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-remaining-work-banner.md'
+    finding: 'Exception 2 says "At lock 8 the two differ" and explains only /finalise. advance-pipeline-lock.sh''s --skill mapping (develop → 4, create-pr → 5, finalise → 8), with the self-advance blocks in skills/develop, skills/create-pr and skills/finalise, means a HALT in the tail of Step 3 or Step 4 also sits at a lock one ahead of the halting step. The operative rule is general and correct, but its explanation names one case of several, which is the narrow restatement this task removes (refute pass CR-1).'
+    suggested_action: 'State the difference generally: any HALT in a step''s tail after its sub-skill has advanced the lock. Keep /finalise at lock 8 as the named example, and pin the general wording.'
+    suggested_owner: dev
+  - id: 'QA-164-6'
+    severity: low
+    file: 'CHANGELOG.md'
+    finding: 'The task 164 entry still says a Step 7-tail HALT reads `Step 7/8 — FINALISE ❌ halted` for every pipeline, the story/task-only example QA-164-2 corrected in the doc (CR-2).'
+    suggested_action: 'Name the step generically, or give both names as the doc does.'
+    suggested_owner: dev
+  - id: 'QA-164-7'
+    severity: low
+    file: 'shared/resources/develop-pipeline-remaining-work-banner.md'
+    finding: 'Exception 2 says the HALT list "starts at that step", while the Format template starts the list at Step {N+1}. It does not say plainly that every HALT block lists the halted step as the first step still ahead, and no test pins it (CR-3).'
+    suggested_action: 'Say explicitly that a HALT block lists the halted step itself first, because it did not finish, and pin that phrase.'
+    suggested_owner: dev
+  - id: 'QA-164-8'
+    severity: low
+    file: 'shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs'
+    finding: 'The header says status, signal and error are carried into every assertion message, but only the assert.equal status checks carry `why` (CR-4).'
+    suggested_action: 'Append `why` to the match / doesNotMatch messages, or narrow the comment.'
+    suggested_owner: dev
+  - id: 'QA-164-9'
+    severity: low
+    file: 'shared/resources/advance-pipeline-lock.test.sh'
+    finding: 'npm test also runs advance-pipeline-lock.test.sh directly. There, an ADVANCE_LOCK_TEST_4B_CMDS exported in the developer''s shell silently replaces `rm dirname`; only the .mjs children delete it (CR-5).'
+    suggested_action: 'Print a visible notice when the seam is set, so a leaked value shows in the main suite''s output.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 97
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false, unchanged from gate 1. No accept/reject function over untrusted input. The 4b case over `command -v` output is test-fixture setup, and the seam is read by the test file only.'
+  performance:
+    status: PASS
+    notes: 'No production path changes. The 4b meta-test''s cost is unchanged since gate 1 (three runs of the lock test file).'
+  reliability:
+    status: PASS
+    notes: 'The hook is unchanged. The rule changes printed output only; halt_step is untouched.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Exception 2''s explanation names one of several lock-ahead cases (QA-164-5).'
+
+bug_resolution:
+  previous_gate: 'task.164.gate.1.task-163-deferred-follow-ups.yml'
+  fixed_in: 'b49b7761'
+  resolved: ['QA-164-1', 'QA-164-2', 'QA-164-3', 'QA-164-4']
+  verification: 'F1–F4 mutations each red, cmp-checked restores, re-run independently at this review; QA-164-4 is diagnostic text (dev-only).'
+
+recommendations:
+  immediate:
+    - action: 'Generalise Exception 2''s explanation beyond lock 8, and pin it (QA-164-5).'
+      refs: ['shared/resources/develop-pipeline-remaining-work-banner.md', 'shared/resources/tests/step-8-completion-checklist.test.mjs']
+  future:
+    - action: 'The 4b meta-test re-runs the whole lock test file three times, adding about 45s to npm test. Consider an early-exit seam after 4b (gate 1 CR-5, carried).'
+      refs: ['shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-164-5 resolved']

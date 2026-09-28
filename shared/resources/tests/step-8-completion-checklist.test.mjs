@@ -622,10 +622,15 @@ test("every orchestrator mention of --complete names the Step 8 Completion Check
   }
   // The hook needs its own floor: the Markdown alone meets `seen >= 6`, so a hook that stopped
   // mentioning --complete would pass its half of this check on nothing (task 163; task.162
-  // pr-review.1 CR-3).
+  // pr-review.1 CR-3). It counts code lines only: three of the hook's --complete lines are `#`
+  // comments, so a floor over every line stayed green with neither instruction left in it (task 164;
+  // task.163 pr-review.1 CR-1). The two it measures are COMPLETION_LINE and ALREADY_DONE.
+  const hookCode = readDoc(STOP_HOOK)
+    .split("\n")
+    .filter((l) => l.includes("--complete") && !/^\s*#/.test(l)).length;
   assert.ok(
-    (perSkill[STOP_HOOK] || 0) >= 1,
-    `${STOP_HOOK}: expected at least one --complete line (the step-8 COMPLETION_LINE), found ${perSkill[STOP_HOOK] || 0}`,
+    hookCode >= 2,
+    `${STOP_HOOK}: expected --complete in COMPLETION_LINE and ALREADY_DONE (2 non-comment lines), found ${hookCode}`,
   );
   assert.ok(seen >= 6, `expected at least 6 mentions, found ${seen}`);
 });
@@ -748,9 +753,12 @@ test("the Stop hook and the resume contract describe Step 7's tail in the same w
 // differ from the derivation (/finalise moves the lock there before Step 7's tail runs). The banner
 // doc defers to the reason there and nowhere else — scoping the exception by the lock's value made it
 // fire on the ordinary Step 7 → 8 transition too, which advances the lock before printing the block
-// (task 163, QA cycle 2 CR-1, CR-4). This checks the exception's scope and both halves it covers.
+// (task 163, QA cycle 2 CR-1, CR-4). The doc defers without restating: its restatement had already
+// drifted from the hook (task.163 gate.3 CR-2), and literals typed into this test could not see that
+// (CR-3). So the forbidden fragments are cut from the rendered reason, not typed here — and they are
+// fragments, not whole strings, because a restatement paraphrases rather than copies (task 164).
 const BANNER = "shared/resources/develop-pipeline-remaining-work-banner.md";
-test("the banner doc defers to the Stop hook's lock-8 position and list, at a re-prompt only", () => {
+test("the banner doc defers to the Stop hook at a re-prompt without restating it", () => {
   const reason = stopHookReasonAt8("develop-task");
   const position = reason.match(/position `([^`]+)`/);
   const ahead = reason.match(/then the steps still ahead: ([^)]+)\)/);
@@ -771,29 +779,151 @@ test("the banner doc defers to the Stop hook's lock-8 position and list, at a re
 
   // The banner doc wraps its lines; read it with whitespace collapsed.
   const banner = readDoc(BANNER).replace(/\s+/g, " ");
+  // The rule names how many exceptions it has, and the carve-out sits before them, so no exception
+  // can be introduced as "the one" while another follows it. That is the contradiction task.164 QA
+  // cycle 1 found (QA-164-1): "One exception" and "every other firing point follows this rule",
+  // then a HALT rule overriding it.
+  const intro = banner.match(
+    /Never re-read files solely to render the block\. (.+?)\*\*Exception 1:/,
+  );
+  assert.ok(intro, `${BANNER}: no carve-out sentence before the exceptions`);
+  assert.ok(
+    intro[1].includes("Two firing points are exceptions") &&
+      intro[1].includes(
+        "the ordinary Step 7 → 8 transition, follows this rule",
+      ),
+    `${BANNER}: the carve-out does not name both exceptions and the Step 7 → 8 transition: ${intro[1]}`,
+  );
+  const markers = banner.match(/\*\*Exception \d+:/g) || [];
+  assert.equal(
+    markers.length,
+    2,
+    `${BANNER}: the carve-out says two exceptions, the doc marks ${markers.length}`,
+  );
+  assert.ok(
+    !/\bOne exception\b/.test(banner),
+    `${BANNER}: an exception is still introduced as the only one`,
+  );
   const exception = banner.match(
-    /\*\*One exception: ([^*]+)\*\*(.+?)\(task 163\)\./,
+    /\*\*Exception 1: ([^*]+)\*\*(.+?)\*\*Exception 2:/,
   );
   assert.ok(
     exception,
-    `${BANNER}: no "One exception" clause in the derivation rule`,
+    `${BANNER}: no "Exception 1" clause in the derivation rule`,
   );
   assert.equal(
     exception[1],
     "a Stop-hook re-prompt.",
     `the exception is scoped to "${exception[1]}", not a Stop-hook re-prompt`,
   );
+  // The hook's distinctive fragments: the position's parenthetical before its colon, and the list's
+  // first five words. Each is floored, so an extraction that found nothing cannot pass the "does not
+  // carry" check vacuously. They are checked against the WHOLE doc, not only the exception: a
+  // restatement placed in the HALT rule or anywhere else is the same second copy (QA-164-3).
+  const fragments = [
+    (position[1].match(/\(([^:]+):/) || [])[1] || "",
+    ahead[1].split(" ").slice(0, 5).join(" "),
+  ];
+  for (const fragment of fragments) {
+    assert.ok(
+      fragment.split(" ").length >= 3,
+      `hook fragment too short to be distinctive: "${fragment}"`,
+    );
+    assert.ok(
+      !banner.includes(fragment),
+      `${BANNER}: the doc restates the hook ("${fragment}")`,
+    );
+  }
   for (const phrase of [
-    "emit both as the reason gives them",
-    "Step 7 unverified",
-    "the first unfinished row at or below Step 7",
-    "the ordinary Step 7 → 8 transition and a Step 8 HALT, follows this rule",
+    "`POSITION`",
+    "`STEPS_AHEAD`",
+    "Emit the position as the reason gives it",
+    "one `- Step N:` line per remaining step",
   ]) {
     assert.ok(
       exception[2].includes(phrase),
       `${BANNER}: the exception lacks "${phrase}": ${exception[2]}`,
     );
   }
+});
+
+// A HALT block's position is the step that halted, not current_step. They differ at lock 8, where
+// /finalise has moved the lock before Step 7's tail runs, so a Step 7-tail HALT rendered by the
+// current_step rule named Step 8 — the step that had not run (task 164; task.163 gate.3
+// recommendations.future). The rule is scoped to the printed block; halt_step is not its subject.
+// The Step 7 names are read off the hook, which is their one statement, so the example cannot name
+// one pipeline's step for all three (QA-164-2: develop-bug's Step 7 is "FINALISE & CLOSE"). Which
+// sub-skills advance the lock before their step's tail is advance-pipeline-lock.sh's --skill mapping:
+// the rule cites it and names only /finalise, as the example. Explaining the difference at lock 8
+// alone left develop (→ 4) and create-pr (→ 5) out (QA-164-5), so the rule may not list the mapping
+// either — every skill in it but the example is read off the script and refused here.
+test("a HALT status block names the step that halted, not current_step", () => {
+  const banner = readDoc(BANNER).replace(/\s+/g, " ");
+  const rule = banner.match(
+    /\*\*Exception 2: a HALT names the step that halted\.\*\*(.+?)\(task 164\)\./,
+  );
+  assert.ok(
+    rule,
+    `${BANNER}: no "Exception 2: a HALT names the step that halted" rule`,
+  );
+  for (const phrase of [
+    "not at `current_step`",
+    "the first line of the steps-ahead list",
+    "a HALT in Step N lists `- Step N:` first",
+    "`--skill` mapping of `advance-pipeline-lock.sh`",
+    "Step 7/8 — {STEP-NAME} ❌ halted",
+    "`halt_step`",
+  ]) {
+    assert.ok(
+      rule[1].includes(phrase),
+      `${BANNER}: the HALT rule lacks "${phrase}": ${rule[1]}`,
+    );
+  }
+  const step7Names = [
+    ...new Set(
+      [...readDoc(STOP_HOOK).matchAll(/^\s*7\) NEXT_NAME="([^"]+)"/gm)].map(
+        (m) => m[1],
+      ),
+    ),
+  ];
+  assert.ok(
+    step7Names.length >= 2,
+    `${STOP_HOOK}: expected a Step 7 name for develop-bug and one for develop-story/task, found ${JSON.stringify(step7Names)}`,
+  );
+  for (const name of step7Names) {
+    assert.ok(
+      rule[1].includes(`\`${name}\``),
+      `${BANNER}: the HALT rule does not name the hook's Step 7 name "${name}": ${rule[1]}`,
+    );
+  }
+  const mapping = readDoc("shared/resources/advance-pipeline-lock.sh").match(
+    /\n {2}--skill\)\n([\s\S]*?)\n {4}esac/,
+  );
+  assert.ok(mapping, "advance-pipeline-lock.sh: no --skill case");
+  const advancing = [
+    ...mapping[1].matchAll(/^\s*([a-z|-]+)\)\s+NEXT=(\d+)/gm),
+  ].flatMap((m) =>
+    m[1].split("|").map((name) => ({ name, next: Number(m[2]) })),
+  );
+  assert.ok(
+    advancing.length >= 5 &&
+      advancing.some((a) => a.name === "finalise" && a.next === 8),
+    `advance-pipeline-lock.sh: expected the --skill mapping to include finalise → 8, found ${JSON.stringify(advancing)}`,
+  );
+  for (const { name } of advancing) {
+    if (name === "finalise") continue;
+    assert.ok(
+      !rule[1].includes(`\`${name}\``) && !rule[1].includes(`\`/${name}\``),
+      `${BANNER}: the HALT rule lists "${name}" from the --skill mapping; cite the mapping instead`,
+    );
+  }
+  const row = readDoc(BANNER)
+    .split("\n")
+    .find((l) => l.startsWith("| Every HALT"));
+  assert.ok(
+    row && row.includes("not `current_step`"),
+    `${BANNER}: the HALT row of the position table does not name the halting step: ${row}`,
+  );
 });
 
 // A lock at step 8 for this work item, as the orchestrator holds it while Step 8 runs.

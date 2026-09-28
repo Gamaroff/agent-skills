@@ -306,6 +306,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The banner doc defers to the Stop hook instead of restating it, and a HALT names the step that
+  halted (task 164).** Five follow-ups deferred by task 163. The Remaining Work Status doc's
+  re-prompt exception no longer restates the hook's lock-8 position and list, which had already
+  drifted from the hook (it dropped "if any, then Step 8"). It points at the hook's `POSITION` and
+  `STEPS_AHEAD` and says to resolve the reason's list into one `- Step N:` line per step. Its test
+  now cuts the forbidden fragments from the rendered hook reason instead of typing them. A HALT
+  status block names the step being executed, not `current_step`, and lists that step first. So
+  a HALT in Step 7's tail at lock 8 reads `Step 7/8 — {STEP-NAME} ❌ halted` (`FINALISE`, or
+  `FINALISE & CLOSE` on develop-bug); which sub-skills advance the lock early is left to
+  `advance-pipeline-lock.sh`'s `--skill` mapping. The snapshot's `halt_step` is unchanged. The
+  hook's `--complete` floor counts code lines only (at least 2: `COMPLETION_LINE`,
+  `ALREADY_DONE`); three of its five `--complete` lines are comments. Scenario 4b's builtin arm
+  prints a `SKIP` line, and a new `advance-pipeline-lock-4b-setup.test.mjs` drives its missing,
+  builtin and default arms through a test-only `ADVANCE_LOCK_TEST_4B_CMDS` seam.
 - **The Stop hook's step-8 reason names develop-bug's Step 7 checklist and every step still ahead
   (task 163).** Five follow-ups from task 162's QA gate and PR review. At lock 8 the develop-bug
   Step 7 tail now reads Part B's bug-close routine, then the Step 7 Completion Checklist, the check

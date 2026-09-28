@@ -26,7 +26,7 @@ in the same way a missing step banner is.
 | Each QA/verify cycle that continues (Steps 5–6, before re-invoking the QA skill) | `Steps 5–6/8 — QA LOOP ⏳ in progress, cycle {CYCLE}/5`            |
 | Step 5c, before invoking `/review-pr` on a gate that exited 5a clean † | `Steps 5–6/8 — QA LOOP ⏳ PR conformance review, cycle {CYCLE}/5` |
 | Step 5c returning REQUEST CHANGES (before re-entering 5b) †            | `Steps 5–6/8 — QA LOOP ⏳ review requested changes, cycle {CYCLE}/5` |
-| Every HALT — emitted immediately **before** the halt banner, so the user sees what did not run | `Step {N}/8 — {STEP-NAME} ❌ halted`                              |
+| Every HALT — emitted immediately **before** the halt banner, so the user sees what did not run. `{N}` is the step that halted, not `current_step` (see "Exception 2" below) | `Step {N}/8 — {STEP-NAME} ❌ halted`                              |
 | Pipeline completion (after Step 8)                                      | `Step 8/8 — COMMIT CHANGES ✅ complete`                            |
 
 † **The two Step 5c rows are `develop-story` / `develop-task` only.** `develop-bug`'s
@@ -80,13 +80,27 @@ Rules:
 - **Cheap to produce.** Derive the position and the steps-ahead list from the
   lock file's `current_step`; derive the unit counts from the work-item file you
   already have open in the loop. Never re-read files solely to render the block.
-  **One exception: a Stop-hook re-prompt.** When the `Stop` hook re-prompts a
-  stalled run, its reason names the position and the steps ahead; emit both as
-  the reason gives them. At lock 8 they differ from this rule, because `/finalise`
-  moves the lock to 8 before Step 7's tail runs: the position is Step 8 pending
-  with Step 7 unverified, and the list starts at the first unfinished row at or
-  below Step 7. Every other firing point, including the ordinary Step 7 → 8
-  transition and a Step 8 HALT, follows this rule (task 163).
+  Two firing points are exceptions, and every other one, including the ordinary
+  Step 7 → 8 transition, follows this rule (task 163, task 164).
+  **Exception 1: a Stop-hook re-prompt.** When the `Stop` hook re-prompts a
+  stalled run, its reason names the position and the steps still ahead; the
+  hook's `POSITION` and `STEPS_AHEAD` bindings are their one statement, and this
+  file does not restate them. Emit the position as the reason gives it. Resolve
+  the reason's steps-ahead instruction into one `- Step N:` line per remaining
+  step, in the Format above.
+  **Exception 2: a HALT names the step that halted.** The position of a HALT
+  block is the step being executed when it halted, not at `current_step`. That
+  step did not finish, so it is also the first line of the steps-ahead list: a
+  HALT in Step N lists `- Step N:` first, where every other block starts at
+  `Step {N+1}`. The halting step and `current_step` differ whenever a
+  sub-skill has advanced the lock as its last action and its step's tail then
+  halts. Which sub-skills advance it, and to where, is stated once, in the
+  `--skill` mapping of `advance-pipeline-lock.sh`; this file does not list
+  them. `/finalise` is one: it moves the lock to 8 before Step 7's tail runs, so
+  a HALT in Step 7's tail reads `Step 7/8 — {STEP-NAME} ❌ halted`, where
+  `{STEP-NAME}` is `FINALISE` on develop-story and develop-task and
+  `FINALISE & CLOSE` on develop-bug. This governs the printed block only; the
+  `halt_step` a HALT snapshot records is unchanged (task 164).
 - **No prose around it.** No "here's where we are" preamble, no summary after.
 
 ## Per-pipeline variants

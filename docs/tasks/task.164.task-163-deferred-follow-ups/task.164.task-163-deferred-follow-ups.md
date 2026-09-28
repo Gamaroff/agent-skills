@@ -5,7 +5,9 @@ type: task
 description: "Close the five items task.163 deferred: stop the banner doc restating the Stop hook's lock-8 wording, make the banner test compare what the hook renders, give the --complete hook floor a non-comment count, name the halting step in a HALT status block, and commit a meta-test for scenario 4b's empty command -v arm."
 tags: [develop-pipeline, stop-hook, remaining-work-banner, step-8, follow-up]
 category: infrastructure
-status: planned
+status: accepted
+completed_date: 2026-09-28
+pr_number: 508
 priority: Low
 created: 2026-09-28
 updated: 2026-09-28
@@ -16,7 +18,9 @@ github_issue: 507
 
 # Technical Task: Close task.163's deferred follow-ups
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.164.review.1.task-163-deferred-follow-ups.md` implemented 2026-09-28
 
 **GitHub Issue**: [#507](https://github.com/Gamaroff/agent-skills/issues/507)
 
@@ -79,9 +83,10 @@ Two of them are wording and test weaknesses in the banner-doc exception that tas
 - The banner test renders the hook at lock 8 and asserts four things. The doc's exception is scoped to a Stop-hook re-prompt, keeps the ordinary-transition carve-out, and says to resolve the list into `- Step N:` lines. The doc carries none of the distinctive fragments of the hook's rendered position or list (for example `Step 7 unverified`, `first unfinished row`), derived from the rendered reason rather than typed as literals, so there is no second copy to drift. A whole-string check would pass on task.163's paraphrase. The hook's lock-8 reason still carries both. The test's name says what it checks.
 - The population test's floor counts only hook lines that mention `--complete` and are not `#` comments, and requires at least 2 (`COMPLETION_LINE`, `ALREADY_DONE`). The message names both.
 - The banner doc's HALT row and derivation rule say that a HALT names **the step being executed when it halted**, not `current_step`, and the steps-ahead list then starts at that step. The rule states the Step 7-tail case explicitly: lock 8, halting step 7. A pinning test holds it.
-- Scenario 4b's command list comes from an array seeded by an override variable when set (a test-only seam), else `rm dirname`. A new `shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs` runs the lock test file twice through that seam:
+- Scenario 4b's command list comes from an array seeded by an override variable when set (a test-only seam), else `rm dirname`. The builtin arm prints a visible `SKIP  4b: '<name>' is a builtin, not linked` line, so skipping is observable from outside the file. Without that line nothing outside the file can see the arm: linking a builtin creates a dangling self-link that no no-jq command uses, so the file stays green either way (probed at review: 95 passed, 0 failed with the arm mutated to link). A new `shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs` runs the lock test file three times:
   - With a missing command, it expects exit 1, the `4b setup: '<name>' not found on PATH` line, and no "without jq" assertion line.
-  - With `printf` added, it expects exit 0 and no setup failure.
+  - With `printf` added, it expects exit 0, the `SKIP  4b: 'printf' is a builtin, not linked` line, and no `4b setup:` line.
+  - With the override removed from the environment, it expects exit 0 and both "without jq" `PASS` lines. This proves an unset override gives `rm dirname` (Risk 3).
 
 ### Important Clarifications
 
@@ -125,8 +130,8 @@ None to any interface. The banner doc's HALT rule changes the position line an o
 
 **Files**: `shared/resources/develop-pipeline-remaining-work-banner.md`
 
-- [ ] Rewrite the "One exception: a Stop-hook re-prompt" clause. Keep the scope and the ordinary-transition carve-out. Emit the position the reason gives, and resolve the reason's steps-ahead instruction into one `- Step N:` line per remaining step. State no lock-8 wording of its own; name the hook's `POSITION` / `STEPS_AHEAD` bindings as its source.
-- [ ] State in the derivation rule and the HALT row that a HALT names the step being executed when it halted, and lists steps ahead from that step. Name the Step 7-tail case (lock 8, halting step 7).
+- [x] Rewrite the "One exception: a Stop-hook re-prompt" clause. Keep the scope and the ordinary-transition carve-out. Emit the position the reason gives, and resolve the reason's steps-ahead instruction into one `- Step N:` line per remaining step. State no lock-8 wording of its own; name the hook's `POSITION` / `STEPS_AHEAD` bindings as its source.
+- [x] State in the derivation rule and the HALT row that a HALT names the step being executed when it halted, and lists steps ahead from that step. Name the Step 7-tail case (lock 8, halting step 7).
 
 ### Phase 2: The tests compare what they claim to compare
 
@@ -134,9 +139,9 @@ None to any interface. The banner doc's HALT rule changes the position line an o
 
 **Files**: `shared/resources/tests/step-8-completion-checklist.test.mjs`
 
-- [ ] Banner test: keep the scope, carve-out and `- Step N:` checks. Replace the lock-8 phrase checks with an assertion that the doc carries none of the distinctive fragments of the hook's rendered position or list, derived from the rendered reason. Keep the assertion that the hook's lock-8 reason carries both. Rename the test to what it checks.
-- [ ] Population test: count hook `--complete` lines that are not `#` comments, and require at least 2, with a message naming `COMPLETION_LINE` and `ALREADY_DONE`.
-- [ ] New pin: the banner doc's HALT rule names the halting step, and states the Step 7-tail at lock 8 case.
+- [x] Banner test: keep the scope, carve-out and `- Step N:` checks. Replace the lock-8 phrase checks with an assertion that the doc carries none of the distinctive fragments of the hook's rendered position or list, derived from the rendered reason. Keep the assertion that the hook's lock-8 reason carries both. Rename the test to what it checks.
+- [x] Population test: count hook `--complete` lines that are not `#` comments, and require at least 2, with a message naming `COMPLETION_LINE` and `ALREADY_DONE`.
+- [x] New pin: the banner doc's HALT rule names the halting step, and states the Step 7-tail at lock 8 case.
 
 ### Phase 3: Scenario 4b's arms are reachable from a committed test
 
@@ -144,22 +149,23 @@ None to any interface. The banner doc's HALT rule changes the position line an o
 
 **Files**: `shared/resources/advance-pipeline-lock.test.sh`, `shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs` (new)
 
-- [ ] Seed 4b's command list from a test-only override variable when set, else `rm dirname`, as an array. Keep the loop's three arms unchanged. Update the comment.
-- [ ] New test, missing command: override with a nonexistent name. Expect exit 1, the `4b setup: '<name>' not found on PATH` line, and no `without jq` assertion line.
-- [ ] New test, builtin: override with `rm dirname printf`. Expect exit 0 and no `4b setup:` line.
+- [x] Seed 4b's command list from a test-only override variable when set, else `rm dirname`, as an array. Keep the empty and absolute arms unchanged. Make the builtin arm print `SKIP  4b: '<name>' is a builtin, not linked`. Update the comment.
+- [x] New test, missing command: override with a nonexistent name. Expect exit 1, the `4b setup: '<name>' not found on PATH` line, and no `without jq` assertion line.
+- [x] New test, builtin: override with `rm dirname printf`. Expect exit 0, the `SKIP  4b: 'printf' is a builtin, not linked` line, and no `4b setup:` line.
+- [x] New test, unset override: remove the variable from the child's environment. Expect exit 0 and both `without jq` `PASS` lines.
 
 ### Phase 4: Proof and gates
 
 **Risk**: Low.
 
-- [ ] Mutation-prove under bash, with `cp` snapshots and `cmp`-checked restore:
+- [x] Mutation-prove under bash, with `cp` snapshots and `cmp`-checked restore:
   - restore the lock-8 restatement in the banner exception → banner test red;
   - drop the `- Step N:` instruction → banner test red;
   - make one of `COMPLETION_LINE` / `ALREADY_DONE` stop naming `--complete` → population floor red (the old ≥ 1 floor stays green: record that too);
   - revert the HALT rule to `current_step` → HALT pin red;
   - make 4b's empty arm stop failing (e.g. treat `""` as skip) → new missing-command test red;
   - make 4b link a bare name → new builtin test red.
-- [ ] `npm run bundle`, then `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell`, `npm run bundle:check`. CHANGELOG `[Unreleased]` entry citing (task 164).
+- [x] `npm run bundle`, then `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell`, `npm run bundle:check`. CHANGELOG `[Unreleased]` entry citing (task 164).
 
 ---
 
@@ -202,7 +208,7 @@ None.
 
 - **Scope**: scenario 4b end to end, through the lock test file itself
 - **Command**: `node --test shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs`
-- **Target**: missing command → exit 1 with the named setup line; builtin → exit 0 with no setup line
+- **Target**: missing command → exit 1 with the named setup line; builtin → exit 0 with the skip line and no setup line; unset override → exit 0 with both no-jq `PASS` lines
 
 ### Contract Tests
 
@@ -210,7 +216,7 @@ None.
 
 ### Performance Tests
 
-Not applicable. The new 4b test runs the lock test file twice (about 7s each).
+Not applicable. The new 4b test runs the lock test file three times (13–16s each, measured with `time node --test` on the new file; the plan's 7s estimate was low).
 
 ### Consumer Tests
 
@@ -223,24 +229,25 @@ Not applicable. The new 4b test runs the lock test file twice (about 7s each).
 
 ### Functional
 
-- [ ] The banner doc's re-prompt exception carries neither the hook's rendered lock-8 position nor its list text, and a test goes red if either returns (Phases 1–2)
-- [ ] The exception tells the orchestrator to resolve the reason's list into `- Step N:` lines, pinned by a test (Phases 1–2)
-- [ ] The `--complete` population test fails when the hook has fewer than 2 non-comment `--complete` lines (Phase 2)
-- [ ] The banner doc's HALT rule names the halting step, with the Step 7-tail at lock 8 case stated, pinned by a test (Phases 1–2)
-- [ ] With a missing command in 4b's list, `advance-pipeline-lock.test.sh` exits 1 and prints `4b setup: '<name>' not found on PATH`, and a committed test asserts it (Phase 3)
+- [x] The banner doc's re-prompt exception carries neither the hook's rendered lock-8 position nor its list text, and a test goes red if either returns (Phases 1–2)
+- [x] The exception tells the orchestrator to resolve the reason's list into `- Step N:` lines, pinned by a test (Phases 1–2)
+- [x] The `--complete` population test fails when the hook has fewer than 2 non-comment `--complete` lines (Phase 2)
+- [x] The banner doc's HALT rule names the halting step, with the Step 7-tail at lock 8 case stated, pinned by a test (Phases 1–2)
+- [x] With a missing command in 4b's list, `advance-pipeline-lock.test.sh` exits 1 and prints `4b setup: '<name>' not found on PATH`, and a committed test asserts it (Phase 3)
+- [x] With a builtin in 4b's list, the file exits 0 and prints `SKIP  4b: '<name>' is a builtin, not linked`, and a committed test asserts it; the test goes red when the arm links the builtin instead (Phases 3–4)
 
 ### Performance
 
-- [ ] No measurable change beyond the new 4b test's two runs of the lock test file
+- [x] No measurable change beyond the new 4b test's three runs of the lock test file
 
 ### Code Quality
 
-- [ ] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell` and `bundle:check` pass
-- [ ] Each Phase 4 mutation behaves as stated under bash, with restore checked by `cmp`
+- [x] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell` and `bundle:check` pass
+- [x] Each Phase 4 mutation behaves as stated under bash, with restore checked by `cmp`
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry cites (task 164)
+- [x] CHANGELOG `[Unreleased]` entry cites (task 164)
 
 ---
 
@@ -264,7 +271,7 @@ None identified.
    - **Mitigation**: the rule is scoped to the printed block and says so; `halt_step` is named Out of Scope.
 3. **The 4b test seam leaks into normal runs.**
    - **Risk**: an override set in a developer's environment silently changes 4b.
-   - **Mitigation**: give the variable a test-specific name, read it only in `advance-pipeline-lock.test.sh`, and assert that an unset override gives `rm dirname`.
+   - **Mitigation**: give the variable a test-specific name, read it only in `advance-pipeline-lock.test.sh`, and assert that an unset override gives `rm dirname` (the new test's third case removes the variable from the child's environment, so a value in the developer's shell cannot leak into it).
 
 ---
 
@@ -293,33 +300,97 @@ None identified.
 
 ---
 
-## Change Log
+## QA Testing Results
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
-| 2026-09-28 | 1.0     | Initial draft | create-task |
-<!-- change-log-end -->
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-28
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.164.qa.3.task-163-deferred-follow-ups.md](./task.164.qa.3.task-163-deferred-follow-ups.md)
+- **Gate File**: [task.164.gate.3.task-163-deferred-follow-ups.yml](./task.164.gate.3.task-163-deferred-follow-ups.yml)
+- **Earlier cycles**: [qa.1](./task.164.qa.1.task-163-deferred-follow-ups.md) / [gate.1](./task.164.gate.1.task-163-deferred-follow-ups.yml), [qa.2](./task.164.qa.2.task-163-deferred-follow-ups.md) / [gate.2](./task.164.gate.2.task-163-deferred-follow-ups.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 97 (step-8 checklist 91, 4b meta-test 3, cycle-2 fix mutations G1–G3 re-run)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Cycle 2's five findings are fixed and proven. Four LOW remain: the mapping refusal is backtick-only (QA-164-10), the mapping citation overstates (QA-164-11), the mapping regex's anchor (QA-164-12), and grammar plus a Steps 5–6 HALT (QA-164-13). One reviewer MEDIUM was rejected with evidence: the ordinary list starts at `current_step`, so the Step 3 loop-continue block at lock 4 lists create-pr correctly.
 
 ---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.164.qa.3.task-163-deferred-follow-ups.md`
+**Gate File**: `task.164.gate.3.task-163-deferred-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100. Three QA cycles; the loop left via the cosmetic-residue exit (four LOW carried).
+**PR Review**: `task.164.pr-review.1.task-163-deferred-follow-ups.md` returned ✅ APPROVE (4 LOW; PC-2 fixed).
+
+All Definition of Done criteria have been verified, with one recorded deviation:
+
+✅ **Success Criteria:** 9 of 10 traced to code and to a test that runs per PR. ⚠️ AC7 (performance) is backed by a measurement (13–16s per 4b run; no production code changed) rather than a test, and is accepted as a deviation by the user's decision.
+✅ **Tests:** step-8 checklist 91/0, 4b meta-test 3/0, lock test 95/0; ci:fast 4,337/0/1 skipped; mutations M1–M6, F1–F4 and G1–G3 each proven red
+✅ **CI:** SUCCESS on PR #508 head `bd401f36` (link-check, shellcheck, test, validate, branch rule)
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed cites (task 164); banner doc and its bundled copies updated
+✅ **Security Review:** PASS (`boundary: false`; no secrets, no unsafe execution)
+✅ **Compliance Review:** NOT_APPLICABLE (internal pipeline tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-28
+
+**Detailed Verification Log:** See `task.164.dod.1.task-163-deferred-follow-ups.md` for the complete verification evidence and timestamps.
+
+---
+<!-- change-log-start -->
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2026-09-28 | 1.0     | Initial draft | create-task |
+| 2026-09-28 | 1.1     | Review passed (8/10) — 4b builtin arm made observable (SKIP line), unset-override test added, banner regex anchor named | review-task |
+| 2026-09-28 |         | Status → ready-for-development | review-task |
+| 2026-09-28 |         | Implemented — 5 files (1 new test file), 5 tests added or rewritten; 6 mutations proven | develop-task |
+| 2026-09-28 |         | Status → ready-for-review | develop-task |
+| 2026-09-28 |         | QA gate CONCERNS (90/100) — 4 findings (1 medium, 3 low) | qa-task |
+| 2026-09-28 |         | QA findings fixed — gate 1 CONCERNS: 4 of 4 (banner exceptions counted, HALT example per pipeline, whole-doc restatement check, spawn timeout reported), 1 iteration | qa-fix |
+| 2026-09-28 |         | QA gate CONCERNS (90/100) — 5 findings (1 medium, 4 low) | qa-task |
+| 2026-09-28 |         | QA findings fixed — gate 2 CONCERNS: 5 of 5 (HALT rule cites the --skill mapping instead of listing it, halted step listed first, CHANGELOG example, 4b messages, seam NOTE line), 1 iteration | qa-fix |
+| 2026-09-28 |         | QA gate PASS (100/100) — 4 low findings carried to recommendations.future (route 2b), 1 reviewer finding rejected | qa-task |
+| 2026-09-28 | 1.2 | DoD verified — accepted (PR #508); AC7 accepted on measurement as a recorded deviation | finalise |
+
+---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
 ### Phase 1: The banner doc defers and names the halting step
-- [ ] Re-prompt exception defers without restating
-- [ ] HALT rule names the halting step
+- [x] Re-prompt exception defers without restating
+- [x] HALT rule names the halting step
 
 ### Phase 2: The tests compare what they claim to compare
-- [ ] Banner test against the rendered hook
-- [ ] Non-comment hook floor ≥ 2
-- [ ] HALT-step pin
+- [x] Banner test against the rendered hook
+- [x] Non-comment hook floor ≥ 2
+- [x] HALT-step pin
 
 ### Phase 3: Scenario 4b's arms are reachable from a committed test
-- [ ] Test-only override seam
-- [ ] Missing-command and builtin tests
+- [x] Test-only override seam
+- [x] Missing-command and builtin tests
 
 ### Phase 4: Proof and gates
-- [ ] Mutation proofs
-- [ ] Gates and CHANGELOG
+- [x] Mutation proofs
+- [x] Gates and CHANGELOG
 
 ---
 
@@ -335,6 +406,17 @@ None identified.
 
 ## Notes
 
+### Deferred Work
+
+The QA loop left through the cosmetic-residue exit (route 2b, cycle 3). Four LOW findings are carried to `task.164.gate.3` `recommendations.future`:
+
+- **QA-164-10**: the HALT pin refuses `--skill` mapping names only when backtick-wrapped; refuse plain-prose mentions too.
+- **QA-164-11**: the banner doc says the mapping states "which sub-skills advance" the lock; it states where each would move it (`review-task` is mapped but never self-advances).
+- **QA-164-12**: the test's mapping regex anchors on the first `--skill)` arm; anchor it on the mapping's own `case`.
+- **QA-164-13**: "not at `current_step`" is ungrammatical, and a HALT inside the Steps 5–6 loop has no stated `N`.
+
+Two more follow-ups, not from this task's change: the 4b meta-test re-runs the whole lock test file three times (about 45s in `npm test`); and `advance-pipeline-lock.sh` maps `review-task` → 3 though `review-task` never self-advances.
+
 ### Important Reminders
 
 - Edit `shared/resources/` sources, then run `npm run bundle`. Never edit the `skills/*/references/` copies.
@@ -343,7 +425,7 @@ None identified.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.164.task-163-deferred-follow-ups/task.164.task-163-deferred-follow-ups.md`
