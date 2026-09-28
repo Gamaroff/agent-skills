@@ -4,7 +4,7 @@
 **Bug ID**: TASK-154-BUG-8
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 4, code review CR-2)
 **Date Found**: 2026-09-29
 
@@ -32,3 +32,4 @@ The case now invokes from `<repo>/sub`. It asserts that `<repo>/sub/rel-base` ex
 | ---------- | ------------ | ---------- | ---------------------------------------------------------------------- |
 | 2026-09-29 | New          | qa-task    | Found in QA cycle 4 (filed late: the gate listed it, the file followed) |
 | 2026-09-29 | Ready for QA | qa-fix     | Fix implemented (cycle 4)                                              |
+| 2026-09-29 | Closed       | qa-task    | Verified in QA cycle 5                                                 |

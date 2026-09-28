@@ -1,0 +1,63 @@
+schema: 1
+task: 'task.154.bundler-and-snippet-test-hygiene'
+task_title: 'Bundler and snippet-test hygiene: attributed warning, symlink-free test run'
+gate: PASS
+status_reason: 'Cycle 4 findings fixed and verified (J1/J2 mutations red); the scoped review found no correctness defect — four low-severity cleanups, recorded as future recommendations.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T22:57:12Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 11
+  phases_verified: 6/6
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 8
+  bugs_remaining: 0
+  fix_date: '2026-09-29'
+  total_iterations: 4
+  verification_method: 'Committed tests (11/11, also TMPDIR=/tmp) + mutation proofs per cycle + by-hand safety re-probes (cycles 1–4)'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 16
+    notes: 'The runner''s deletion surface was re-probed by hand at cycle 4 (16 candidates, filesystem hashed before/after); cycle 5 changed only a control-character check and tests.'
+  performance:
+    status: PASS
+    notes: 'ci:fast 4422 tests in 249s.'
+  reliability:
+    status: PASS
+    notes: 'Per-run ownership; concurrency case asserts distinct run directories.'
+  maintainability:
+    status: PASS
+    notes: 'Four advisory cleanups (see recommendations.future).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Add a test that reaches the resolved-path control-character refusal (a symlinked base whose target name has a tab) — CR-1.'
+      refs: ['scripts/test-clean-checkout.sh', 'tests/test-clean-checkout.test.js']
+    - action: 'Resolve the concurrency case''s expected base with fs.realpathSync.native, as the runner does — CR-2.'
+      refs: ['tests/test-clean-checkout.test.js']
+    - action: 'Task §3: say the DEFAULT base is repo-local; Phase 5 refusal criterion: list the refusals the script makes, applied to the base — CR-3.'
+      refs: ['docs/tasks/task.154.bundler-and-snippet-test-hygiene/task.154.bundler-and-snippet-test-hygiene.md']
+    - action: 'Drop the duplicated created-base block from one of the two cases — CR-4.'
+      refs: ['tests/test-clean-checkout.test.js']
+    - action: 'observation-log.js EPHEMERAL_PATTERNS lacks /private/var/tmp — pre-existing; follow-up.'
+      refs: ['shared/resources/observation-log.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

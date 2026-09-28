@@ -584,29 +584,28 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-29
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.154.qa.4.bundler-and-snippet-test-hygiene.md](./task.154.qa.4.bundler-and-snippet-test-hygiene.md)
-- **Gate File**: [task.154.gate.4.bundler-and-snippet-test-hygiene.yml](./task.154.gate.4.bundler-and-snippet-test-hygiene.yml)
+- **Full Report**: [task.154.qa.5.bundler-and-snippet-test-hygiene.md](./task.154.qa.5.bundler-and-snippet-test-hygiene.md)
+- **Gate File**: [task.154.gate.5.bundler-and-snippet-test-hygiene.yml](./task.154.gate.5.bundler-and-snippet-test-hygiene.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 11 runner tests (also under `TMPDIR=/tmp`); 16 by-hand safety probes
+- **Tests Executed**: 4422 (fast gate); 11 runner tests (also under `TMPDIR=/tmp`)
 - **Phases Verified**: 6/6
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- The per-run redesign closed cycle 3's findings. Bugs [5](./task.154.bug.5.clean-checkout-lock-takeover-race.md) and [6](./task.154.bug.6.clean-checkout-ownership-before-lock.md) are closed.
-- **MEDIUM** (test machinery): two runner-test assertions pass vacuously (QA4-1, QA4-2).
-- **LOW**: the spec text still describes the replaced design (QA4-3); the scratch-base guard checks one spelling of the path (QA4-4).
+- 5 QA cycles; 8 bugs found and closed. A structural redesign of the clean-checkout runner in cycle 3 made each run own its own `mktemp -d` directory.
+- No open findings. Four advisory cleanups are recorded in gate 5 `recommendations.future`.
 
 ---
 
@@ -624,6 +623,8 @@ None.
 | 2026-09-29 |         | QA gate CONCERNS (80/100) — 9 findings (2 MEDIUM, 7 LOW) | qa-task |
 | 2026-09-29 |         | QA gate CONCERNS (80/100) — 6 findings (2 MEDIUM, 4 LOW) | qa-task |
 | 2026-09-29 |         | QA gate CONCERNS (80/100) — 4 findings (2 MEDIUM, 2 LOW) | qa-task |
+| 2026-09-29 |         | QA gate PASS (100/100) — 0 findings, 4 advisory cleanups | qa-task |
+| 2026-09-29 |         | QA findings fixed — gate PASS (100/100), 4 iterations, 8 bugs closed | qa-fix |
 
 <!-- change-log-end -->
 
