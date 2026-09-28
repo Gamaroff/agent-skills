@@ -844,6 +844,75 @@ test("A: every title that is not one single-line column-0 value is title-not-inl
   }
 });
 
+// DoD run 3 (task.150): the reader decided the header's edges and the title key
+// differently from the sync, so a long title reached the card with no finding.
+// Each shape is a WHOLE document, because the fence is part of what is checked.
+test("A: a header the sync and YAML could read differently never passes a long title", () => {
+  const L = "Long title word ".repeat(10).trim();
+  const tail =
+    "\n\n# Short\n\n## 1. Overview\n\nA sentence.\n\n## 9. Success Criteria\n\n- [ ] one\n";
+  const shapes = {
+    // The header runs to the column-0 fence, as it does for the sync: the title
+    // after an indented `---` is found, and measured.
+    "indented --- inside a block scalar": [
+      `---\ndescription: |\n  a\n  ---\n  b\ntitle: "${L}"\n---`,
+      "title-too-long",
+    ],
+    "indented --- as a plain continuation": [
+      `---\nid: task.995\n  ---\ntitle: "${L}"\n---`,
+      "title-too-long",
+    ],
+    "opening fence with a comment": [
+      `--- # yaml document\ntitle: "${L}"\n---`,
+      "title-not-inline",
+    ],
+    "opening fence of four dashes": [
+      `----\ntitle: "${L}"\n---`,
+      "title-not-inline",
+    ],
+    "a ... end marker inside the header": [
+      `---\ntype: task\n...\ntitle: "${L}"\n---`,
+      "title-not-inline",
+    ],
+    "merge key with a flow map": [
+      `---\nid: task.995\n<<: {title: "${L}"}\n---`,
+      "title-not-inline",
+    ],
+    "explicit key": [`---\n? title\n: "${L}"\n---`, "title-not-inline"],
+    "quoted key": [`---\n"title": "${L}"\n---`, "title-not-inline"],
+    "single-quoted key": [`---\n'title': "${L}"\n---`, "title-not-inline"],
+    "title in a flow map": [
+      `---\nmeta: {id: 1, title: "${L}"}\n---`,
+      "title-not-inline",
+    ],
+  };
+  let checked = 0;
+  for (const [name, [header, code]] of Object.entries(shapes)) {
+    withTempDoc("task.995.shape.md", header + tail, (file) => {
+      const codes = pf
+        .preflight(file, "task")
+        .findings.filter((f) => f.section === "(title)")
+        .map((f) => f.code);
+      assert.deepEqual(codes, [code], `${name}: ${JSON.stringify(codes)}`);
+    });
+    checked++;
+  }
+  assert.equal(checked, 10, "non-vacuity: every shape was checked");
+  // Headers real documents have are not refused: a short title after an
+  // indented `---`, and prose that mentions a title in a value.
+  for (const doc of [
+    `---\ndescription: |\n  a\n  ---\ntitle: "A name"\n---\n`,
+    `---\ntitle: "A name"\ndescription: the title: is short\n---\n`,
+    `---\ntitle: "A name"\n---\n\n---\n\nA rule in the body.\n`,
+  ]) {
+    assert.deepEqual(
+      lib.readCardTitle(doc),
+      { title: "A name", problem: null },
+      doc,
+    );
+  }
+});
+
 // Success Criterion: CARD_TITLE_MAX is defined once, in the source jira-sync.js,
 // and anywhere else only as a generated references/ copy of that file. This is a
 // source-structure property, so a scan of the TRACKED tree is the instrument. The

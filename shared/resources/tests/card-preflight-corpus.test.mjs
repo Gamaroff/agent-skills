@@ -76,8 +76,9 @@ function corpus() {
   if (CORPUS) return CORPUS;
   CORPUS = taskCardDocuments().map((file) => {
     READS++;
-    const { frontmatter, body } = parseFrontmatter(readFileSync(file, "utf8"));
-    return { file, frontmatter, body };
+    const text = readFileSync(file, "utf8");
+    const { frontmatter, body } = parseFrontmatter(text);
+    return { file, text, frontmatter, body };
   });
   return CORPUS;
 }
@@ -128,23 +129,26 @@ const LEGACY_LONG_TITLES = Object.freeze(
   ]),
 );
 
-test("corpus: no task title outside the legacy list exceeds CARD_TITLE_MAX, and every listed title still does", () => {
-  const docs = corpus();
-  assert.ok(
-    docs.length >= CORPUS_FLOOR,
-    `expected at least ${CORPUS_FLOOR} task documents, found ${docs.length} — the walk is broken, not the corpus`,
-  );
-
+// The ratchet's classification, apart from the walk so a fixture can drive it.
+// The preflight's own rule decides — never a restatement of it here — and it is
+// given the RAW text, as the preflight is: the parsed value alone measured a
+// block-scalar indicator, not the title, and let a long title through the one
+// blocking title gate (task.150 DoD run 3). The legacy list excuses a long
+// title and nothing else: every other title finding fails for every document.
+function classifyTitles(docs) {
   const over = [];
   const stale = [];
+  const unreadable = [];
   const seen = new Set();
-  for (const { file, frontmatter } of docs) {
+  for (const { file, text, frontmatter } of docs) {
     const id = Number(file.split("/").pop().split(".")[1]);
     const len = String((frontmatter && frontmatter.title) || "").length;
-    // The preflight's own rule decides "long" — never a restatement of it here.
-    const long = lib
-      .checkCardTitle(frontmatter || {}, "")
-      .some((f) => f.code === "title-too-long");
+    const findings = lib.checkCardTitle(frontmatter || {}, "", { raw: text });
+    const long = findings.some((f) => f.code === "title-too-long");
+    for (const f of findings) {
+      if (f.code !== "title-too-long")
+        unreadable.push(`task.${id} → ${f.code}`);
+    }
     if (LEGACY_LONG_TITLES.has(id)) {
       seen.add(id);
       if (!long) stale.push(`task.${id} (${len} chars)`);
@@ -152,6 +156,49 @@ test("corpus: no task title outside the legacy list exceeds CARD_TITLE_MAX, and 
       over.push(`task.${id} (${len} chars)`);
     }
   }
+  return { over, stale, unreadable, seen };
+}
+
+test("corpus ratchet: a long title in any non-inline shape fails, not only an inline one", () => {
+  const long =
+    "[Task 999] A long card title that keeps on going past the bound A long card title that keeps on going past the bound";
+  const doc = (header) => ({
+    file: "docs/tasks/task.999.x/task.999.x.md",
+    text: `---\n${header}\n---\n\n# Short\n`,
+    frontmatter: parseFrontmatter(`---\n${header}\n---\n`).frontmatter,
+  });
+  const shapes = [
+    `title: >-\n  ${long}`,
+    `title:\n  ${long}`,
+    `base: &t "${long}"\ntitle: *t`,
+    `"title": "${long}"`,
+    `description: |\n  a\n  ---\n  b\ntitle: "${long}"`,
+  ];
+  for (const h of shapes) {
+    const r = classifyTitles([doc(h)]);
+    assert.ok(
+      r.over.length + r.unreadable.length > 0,
+      `a long title passed the ratchet: ${JSON.stringify(h)}`,
+    );
+  }
+  // A short inline title is clean, so the fixture is not vacuous.
+  const clean = classifyTitles([doc('title: "A short name"')]);
+  assert.deepEqual([clean.over, clean.unreadable], [[], []]);
+});
+
+test("corpus: no task title outside the legacy list exceeds CARD_TITLE_MAX, and every listed title still does", () => {
+  const docs = corpus();
+  assert.ok(
+    docs.length >= CORPUS_FLOOR,
+    `expected at least ${CORPUS_FLOOR} task documents, found ${docs.length} — the walk is broken, not the corpus`,
+  );
+
+  const { over, stale, unreadable, seen } = classifyTitles(docs);
+  assert.deepEqual(
+    unreadable,
+    [],
+    `${unreadable.length} task title(s) are not one single-line \`title:\` value, so their length cannot be measured — write the title on its own line, quoted:\n  ${unreadable.join("\n  ")}`,
+  );
 
   assert.deepEqual(
     over,

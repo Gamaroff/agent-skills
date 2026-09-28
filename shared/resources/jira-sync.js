@@ -1967,7 +1967,23 @@ const CARD_TITLE_MAX = 100;
 // Patching the parser per shape lost every time, so the claim is scoped
 // instead: a card title is ONE column-0 `title:` line with a single-line value,
 // and anything else is `title-not-inline` — refused, never measured.
+//
+// DoD run 3 then found the reader itself deciding two things differently from
+// the sync: where the header ENDS (an indented `---` ended it here, not
+// there), and which lines are the `title` key (a quoted key, an explicit
+// `? title`, a flow map or a `<<:` merge). So the header's edges are now the
+// sync parser's own edges, and any header whose edges YAML could read
+// differently — a fence that is not a bare `---`, a `...` end marker — or
+// that names `title` in any key form but the canonical one, or carries a
+// merge key that could supply it, is refused too. The rule stays one sentence:
+// what is not the canonical shape is not measured.
 const BLOCK_SCALAR_INDICATOR = /^[>|][+-]?[0-9]?[+-]?$/;
+// Every way a header line can name the `title` key: plain, quoted, explicit
+// (`? title`), a list item, or inside a flow map. Only the first form, at
+// column 0 and unquoted, is canonical.
+const TITLE_KEY = /^\s*(?:\?\s*|-\s+)?(["']?)title\1\s*(?::|$)/;
+const FLOW_TITLE_KEY = /[{,]\s*(["']?)title\1\s*:/;
+const MERGE_KEY = /^\s*<<\s*:/;
 
 /**
  * Read the card title from a document's raw text. Returns
@@ -1977,24 +1993,50 @@ const BLOCK_SCALAR_INDICATOR = /^[>|][+-]?[0-9]?[+-]?$/;
 function readCardTitle(text) {
   const src = String(text || "").replace(/^\uFEFF/, "");
   const lines = src.split(/\r?\n/);
-  if ((lines[0] || "").trim() !== "---") return { title: "", problem: null };
-  const end = lines.findIndex((l, k) => k > 0 && l.trim() === "---");
-  const header = lines.slice(1, end > 0 ? end : lines.length);
-  const titleLines = header
+  // The header's edges exactly as `parseFrontmatter` finds them: it opens when
+  // the text starts with `---` and closes at the next line that starts with
+  // `---` at column 0. An indented `---` is content, to the sync and to YAML.
+  if (!lines[0].startsWith("---")) return { title: "", problem: null };
+  const end = lines.findIndex((l, k) => k > 0 && l.startsWith("---"));
+  if (end < 0) return { title: "", problem: null };
+  const header = lines.slice(1, end);
+  const keyLines = header
     .map((l, k) => ({ l, k }))
-    .filter(({ l }) => /^\s*title\s*:/.test(l));
-  if (titleLines.length === 0) return { title: "", problem: null };
-  if (titleLines.length > 1) {
+    .filter(
+      ({ l }) =>
+        TITLE_KEY.test(l) || FLOW_TITLE_KEY.test(l) || MERGE_KEY.test(l),
+    );
+  if (keyLines.length === 0) return { title: "", problem: null };
+  const bareFence = (l) => l.trimEnd() === "---";
+  if (
+    !bareFence(lines[0]) ||
+    !bareFence(lines[end]) ||
+    header.some((l) => /^\.\.\.(\s|$)/.test(l))
+  ) {
     return {
       title: "",
-      problem: `the header has ${titleLines.length} \`title:\` lines`,
+      problem:
+        "the frontmatter fences are not bare `---` lines, so YAML and the sync can disagree about where the header ends",
     };
   }
-  const { l, k } = titleLines[0];
-  if (/^\s/.test(l))
+  if (keyLines.some(({ l }) => MERGE_KEY.test(l))) {
     return {
       title: "",
-      problem: "the only `title:` line is indented inside another key",
+      problem: "the header has a `<<:` merge key, which can supply the title",
+    };
+  }
+  if (keyLines.length > 1) {
+    return {
+      title: "",
+      problem: `the header names \`title\` ${keyLines.length} times`,
+    };
+  }
+  const { l, k } = keyLines[0];
+  if (!/^title\s*:/.test(l))
+    return {
+      title: "",
+      problem:
+        "the `title` key is not a plain column-0 `title:` line (indented, quoted, explicit or in a flow map)",
     };
   const value = l.replace(/^title\s*:/, "").trim();
   if (value === "")
@@ -2022,7 +2064,10 @@ function readCardTitle(text) {
 
 function checkCardTitle(frontmatter, body = "", opts = {}) {
   const findings = [];
-  if (opts.bom) {
+  // With raw text the BOM is read from it, so a caller cannot forget to pass it.
+  const bom =
+    opts.bom ?? (opts.raw != null && String(opts.raw).charCodeAt(0) === 0xfeff);
+  if (bom) {
     findings.push({
       severity: "important",
       section: "(title)",
