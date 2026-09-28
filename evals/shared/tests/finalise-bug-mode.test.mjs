@@ -30,8 +30,6 @@ import {
   readdirSync,
   existsSync,
   mkdtempSync,
-  mkdirSync,
-  symlinkSync,
   writeFileSync,
   rmSync,
   chmodSync,
@@ -40,6 +38,7 @@ import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { makeConsumerRoot } from "../lib/consumer-root.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -50,16 +49,9 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 // the developer's gitignored `.agents/skills -> ../skills` symlink, which is
 // how this file passed 71/71 locally while CI (no `.agents/` at all) failed 19
 // — the suite was certifying a symlink, not the code. Reproduce that failure
-// by running with the symlink moved aside; this fixture must pass without it.
-const CONSUMER_ROOT = mkdtempSync(path.join(tmpdir(), "finalise-consumer-"));
-mkdirSync(path.join(CONSUMER_ROOT, ".agents"));
-symlinkSync(
-  path.join(REPO_ROOT, "skills"),
-  path.join(CONSUMER_ROOT, ".agents", "skills"),
-);
-process.on("exit", () =>
-  rmSync(CONSUMER_ROOT, { recursive: true, force: true }),
-);
+// by running with the symlink moved aside (`npm run test:clean-checkout`); this
+// fixture must pass without it.
+const CONSUMER_ROOT = makeConsumerRoot(REPO_ROOT, "finalise-consumer-");
 const SKILL = path.join(REPO_ROOT, "skills", "finalise", "SKILL.md");
 const TEMPLATE = path.join(
   REPO_ROOT,
