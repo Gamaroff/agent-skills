@@ -5,10 +5,10 @@ type: task
 description: "Two local-only blind spots in the repository's own tooling. (1) bundle_skill.py prints an unattributed `shared/resources/<name> not found` warning on every bundle and every pre-commit run, caused by a placeholder literal in observation-log-contract.md; remove the literal, make the warning name the citing file and line, and give it a CI reader. (2) Snippet tests that reach `.agents/skills/…` pass locally only through the developer's gitignored symlink; the two known instances are fixed, but nothing stops the next one — add a shared consumer-root helper, a clean-checkout test runner for the local release gate, and the create-skill rule."
 tags: [create-skill, bundle, testing, ci, observe-work, observation]
 category: testing
-status: planned
+status: in-progress
 priority: Medium
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-28
 assignee:
 estimated_effort_hours: 16
 github_issue: 484
@@ -16,7 +16,9 @@ github_issue: 484
 
 # Technical Task: Bundler and snippet-test hygiene — an attributed warning and a symlink-free test run
 
-**Status:** Planned
+**Status:** In Progress
+
+**Review**: ✅ All review recommendations from `task.154.review.1.bundler-and-snippet-test-hygiene.md` implemented 2026-09-28
 
 **GitHub Issue**: [#484](https://github.com/Gamaroff/agent-skills/issues/484)
 
@@ -195,8 +197,10 @@ that the live tree is clean.
   the form in words ("the literal shared-resources path form") and contains no
   `shared/resources/<…>` literal. The bundled copy is regenerated.
 - **Attributed warning.** Discovery keeps each candidate's origin, `(file, line)`, beside its name.
-  The warning becomes `⚠️  shared/resources/<name> not found — cited at <rel-file>:<line>` and prints
-  once per `(origin, name)` per run. Line-aware collection is a new pure helper next to
+  The warning becomes `⚠️  shared/resources/<name> not found — cited at <rel-file>:<line>`. Within one
+  skill it names the citation discovery reaches first, because `seen` stays keyed on the name (Risk 2),
+  so a second file in the same closure citing the same missing name is not reported separately.
+  Across skills it prints once per `(name, origin)` per run. Line-aware collection is a new pure helper next to
   `comment_only_refs`. `collect_shared_refs` in `quick_validate.py` keeps its signature, because
   `package_skill.py` and `quick_validate.py` still call it.
 - **CI reader.** `tests/bundle-missing-source.test.js` §1 builds a fixture repo whose shared source
@@ -276,36 +280,38 @@ can land in either order, or as two PRs.
 **Files**: `shared/resources/observation-log-contract.md`,
 `skills/observe-work/references/observation-log-contract.md` (generated)
 
-- [ ] Rephrase line 290 so it names the form in words, with no `shared/resources/` followed by a
+- [x] Rephrase line 290 so it names the form in words, with no `shared/resources/` followed by a
       name, placeholder or brace
-- [ ] `npm run bundle`. The warning line disappears, and the bundled copy's line 290 reads
+- [x] `npm run bundle`. The warning line disappears, and the bundled copy's line 290 reads
       correctly
-- [ ] `bundle:check` still reports 0 problems
+- [x] `bundle:check` still reports 0 problems
 
 ### Phase 2: Attribute the warning (Risk: Low)
 
 **Files**: `skills/create-skill/scripts/bundle_skill.py`
 
-- [ ] Add `shared_refs_with_lines(text)`, a pure function returning `[(line_no, name)]` next to
+- [x] Add `shared_refs_with_lines(text)`, a pure function returning `[(line_no, name)]` next to
       `comment_only_refs`, using the same regex and punctuation strip as `collect_shared_refs`
-- [ ] `pending` carries `(name, origin)` entries, with origin = `(rel_path, line_no)` for
+- [x] `pending` carries `(name, origin)` entries, with origin = `(rel_path, line_no)` for
       `shared/resources/` citations and JS/shell sibling edges
-- [ ] The not-found branch prints `⚠️  shared/resources/<name> not found — cited at <rel>:<line>`,
+- [x] The not-found branch prints `⚠️  shared/resources/<name> not found — cited at <rel>:<line>`,
       deduplicated per run through a `_WARNED_MISSING` set that mirrors `_WARNED_COMMENT_ORIGINS`
-- [ ] `seen`-set semantics stay the same: a name is still resolved once per skill
+- [x] `seen`-set semantics stay the same: a name is still resolved once per skill, so within one skill
+      the warning names the first citation discovery reaches, not every citation of that name
 
 ### Phase 3: CI reader for the warning (Risk: Low)
 
 **Files**: `tests/bundle-missing-source.test.js`
 
-- [ ] §1 fixture: a temporary repo with `shared/resources/a.md` citing
+- [x] §1 fixture: a temporary repo with `shared/resources/a.md` citing
       `shared/resources/missing.md` on line 3, and a skill citing `a.md`. The bundler's stdout
       contains `missing.md not found — cited at shared/resources/a.md:3`, exactly once
-- [ ] §1 negative: the same fixture with the citation rephrased in words produces no `not found`
+- [x] §1 negative: the same fixture with the citation rephrased in words produces no `not found`
       line
-- [ ] §2 live tree: `bundle_skill.py --check` stdout has zero `not found` lines, and its summary line
+- [x] §2 live tree: `bundle_skill.py --check` stdout has zero lines matching `shared/resources/.* not found`
+      (not a bare `not found`, which also matches the unrelated `SKILL.md not found` at `:775`), and its summary line
       reports at least 100 skills checked, which is the non-vacuity floor
-- [ ] Mutation-prove both halves (see § 8)
+- [x] Mutation-prove both halves (see § 8)
 
 ### Phase 4: Shared consumer-root helper (Risk: Low)
 
@@ -314,11 +320,11 @@ can land in either order, or as two PRs.
 `evals/shared/tests/optional-file-lookups.test.mjs`,
 `evals/shared/tests/consumer-root.test.mjs`
 
-- [ ] `makeConsumerRoot(repoRoot, prefix)`: a temporary directory with
+- [x] `makeConsumerRoot(repoRoot, prefix)`: a temporary directory with
       `.agents/skills -> <repoRoot>/skills`, cleaned up on process exit
-- [ ] Replace the two hand-rolled blocks with the import, keeping each file's explanatory comment
+- [x] Replace the two hand-rolled blocks with the import, keeping each file's explanatory comment
       at the call site
-- [ ] The helper test: sourcing `newest-numbered.sh` through `.agents/skills/finalise/references/`
+- [x] The helper test: sourcing `newest-numbered.sh` through `.agents/skills/finalise/references/`
       succeeds from the helper root and fails from a bare `mkdtemp` directory (the premise)
 - [ ] Both migrated files keep their pass counts (71 and 84) in the clean-checkout run
 
@@ -327,33 +333,35 @@ can land in either order, or as two PRs.
 **Files**: `scripts/test-clean-checkout.sh`, `package.json`, `scripts/release.sh`,
 `tests/test-clean-checkout.test.js`
 
-- [ ] The runner clones `HEAD` with `git clone --local --shared --quiet` into
+- [x] The runner clones `HEAD` with `git clone --local --shared --quiet` into
       `${CLEAN_CHECKOUT_DIR:-<repo>/.clean-checkout}`, links `node_modules`, runs `npm test` (or the
       command in `$CLEAN_CHECKOUT_CMD`) in the clone, propagates the exit code, and removes the
       clone at start and on exit
-- [ ] It refuses a clone location that matches a temporary-directory pattern (`/tmp`,
+- [x] It refuses a clone location that matches a temporary-directory pattern (`/tmp`,
       `/private/tmp`, `/var/tmp`), naming the reason
-- [ ] It prints a warning when `git status --porcelain` is non-empty
-- [ ] Add `.clean-checkout/` and `.clean-checkout-test-tmp/` to `.gitignore`
-- [ ] Add `"test:clean-checkout": "bash scripts/test-clean-checkout.sh"` to `package.json`
-- [ ] `scripts/release.sh` pre-release step runs `npm run test:clean-checkout` in place of
+- [x] It prints a warning when `git status --porcelain` is non-empty
+- [x] It refuses, naming the reason, when `$REPO/node_modules` does not exist (a dangling link would make
+      `npm test` fail with an unrelated module-resolution error)
+- [x] Add `.clean-checkout/` and `.clean-checkout-test-tmp/` to `.gitignore`
+- [x] Add `"test:clean-checkout": "bash scripts/test-clean-checkout.sh"` to `package.json`
+- [x] `scripts/release.sh` pre-release step runs `npm run test:clean-checkout` in place of
       `npm test`, and the dry-run message is updated to match
-- [ ] Fixture test: a temporary git repo whose committed test passes only through a gitignored
+- [x] Fixture test: a temporary git repo whose committed test passes only through a gitignored
       symlink. It passes when run in place and fails under the runner (with `CLEAN_CHECKOUT_CMD`
       pointed at the fixture's test), which proves the runner excludes ignored paths
-- [ ] `bash -n` and `npm run lint:shell` pass on the new script
+- [x] `bash -n` and `npm run lint:shell` pass on the new script
 
 ### Phase 6: Rule, trap, docs (Risk: Low)
 
 **Files**: `skills/create-skill/SKILL.md`, `docs/contributing/traps.md`, `CHANGELOG.md`
 
-- [ ] create-skill § *A helper a fenced block executes is addressed from the repository root*:
+- [x] create-skill § *A helper a fenced block executes is addressed from the repository root*:
       add a paragraph saying that a test executing such a block must run it from
       `makeConsumerRoot()`, never from the repository root or the inherited cwd, and that
       `npm run test:clean-checkout` is how to confirm a local green (obs #149)
-- [ ] traps.md § *`.agents/skills` is a symlink*: one paragraph with the failure and the runner
-- [ ] CHANGELOG `[Unreleased]` › Changed / Fixed, citing `(task 154)`
-- [ ] `npm run ci:fast`, `npm run bundle:check`, `npm run lint:shell`, and
+- [x] traps.md § *`.agents/skills` is a symlink*: one paragraph with the failure and the runner
+- [x] CHANGELOG `[Unreleased]` › Changed / Fixed, citing `(task 154)`
+- [x] `npm run ci:fast`, `npm run bundle:check`, `npm run lint:shell`, and
       `npm run validate:all` for create-skill and observe-work
 
 ---
@@ -575,6 +583,8 @@ None.
 | Date       | Version | Description                                                                   | Author      |
 | ---------- | ------- | ----------------------------------------------------------------------------- | ----------- |
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #149, #151 (2026-09-24 observation review) | create-task |
+| 2026-09-28 | 1.1     | Review passed (9/10) — per-origin dedupe promise restated to match `seen`; §2 key narrowed; runner refuses a missing `node_modules` | review-task |
+| 2026-09-28 |         | Status → ready-for-development | review-task |
 
 <!-- change-log-end -->
 
@@ -582,12 +592,12 @@ None.
 
 ## Progress Tracking
 
-- [ ] Phase 1: Remove the placeholder literal
-- [ ] Phase 2: Attribute the warning
-- [ ] Phase 3: CI reader for the warning
-- [ ] Phase 4: Shared consumer-root helper
-- [ ] Phase 5: Clean-checkout runner and release gate
-- [ ] Phase 6: Rule, trap, docs
+- [x] Phase 1: Remove the placeholder literal
+- [x] Phase 2: Attribute the warning
+- [x] Phase 3: CI reader for the warning
+- [x] Phase 4: Shared consumer-root helper
+- [x] Phase 5: Clean-checkout runner and release gate
+- [x] Phase 6: Rule, trap, docs
 
 ---
 
