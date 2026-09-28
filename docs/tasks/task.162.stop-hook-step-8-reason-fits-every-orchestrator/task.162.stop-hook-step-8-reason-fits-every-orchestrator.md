@@ -5,18 +5,22 @@ type: task
 description: "At current_step 8 the Stop hook describes Step 7's tail in develop-story/develop-task terms and asserts 'Step 7/8 ✅ complete' before its own routing; make both skill- and step-aware, drop an unreachable --complete clause, and tighten task.161's no-jq test PATH."
 tags: [develop-pipeline, stop-hook, step-8, develop-bug, follow-up]
 category: infrastructure
-status: planned
+status: accepted
 priority: Low
 created: 2026-09-27
 updated: 2026-09-27
 assignee:
 estimated_effort_hours: 4
 github_issue: 502
+pr_number: 503
+completed_date: 2026-09-27
 ---
 
 # Technical Task: The Stop hook's step-8 reason fits every orchestrator
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.162.review.1.stop-hook-step-8-reason-fits-every-orchestrator.md` implemented 2026-09-27
 
 **GitHub Issue**: [#502](https://github.com/Gamaroff/agent-skills/issues/502)
 
@@ -130,11 +134,11 @@ None to any interface. At `current_step` 8 the Stop hook's reason text changes: 
 
 **Files**: `shared/resources/develop-pipeline-on-stop.sh`, `shared/resources/develop-pipeline-on-stop.test.sh`
 
-- [ ] At `NEXT=8`, choose the Step 7-tail parenthetical by `SKILL`. develop-bug names Part B (Resolution Summary, status `closed`, parent/registry linkage, tracker-close verification) and cites `develop-bug-step-7-close-bug.md`. develop-story/develop-task keep the DoD body, tracker update and Step 7 checklist.
-- [ ] At `NEXT=8`, make the status-block position step-aware: it names Step 8 as pending and Step 7 as unverified, and never "Step 7/8 ✅ complete". Other steps keep `Step $((NEXT - 1))/8 ✅ complete`.
-- [ ] Delete "(or `--complete` if that was Step 8)" from the generic `COMPLETION_LINE`.
-- [ ] Test 5b: split the assertions by skill. develop-bug requires the Part B wording and forbids the DoD-body wording. develop-story and develop-task require the DoD-body wording.
-- [ ] New case: at lock 8 the reason does not contain "Step 7/8 ✅ complete" for any orchestrator. The existing step-3 case (5c) still sees the generic position.
+- [x] At `NEXT=8`, choose the Step 7-tail parenthetical by `SKILL`. develop-bug names Part B (Resolution Summary, status `closed`, parent/registry linkage, tracker-close verification) and cites `develop-bug-step-7-close-bug.md`. develop-story/develop-task keep the DoD body, tracker update and Step 7 checklist.
+- [x] At `NEXT=8`, make the status-block position step-aware: it names Step 8 as pending and Step 7 as unverified, and never "Step 7/8 ✅ complete". Other steps keep `Step $((NEXT - 1))/8 ✅ complete`.
+- [x] Delete "(or `--complete` if that was Step 8)" from the generic `COMPLETION_LINE`.
+- [x] Test 5b: split the assertions by skill. develop-bug requires the Part B wording and forbids the DoD-body wording. develop-story and develop-task require the DoD-body wording.
+- [x] New case: at lock 8 the reason does not contain "Step 7/8 ✅ complete" for any orchestrator. The existing step-3 case (5c) gains an assertion that the position reads "Step 2/8 ✅ complete".
 
 ### Phase 2: Guards and fixture
 
@@ -142,20 +146,21 @@ None to any interface. At `current_step` 8 the Stop hook's reason text changes: 
 
 **Files**: `shared/resources/tests/step-8-completion-checklist.test.mjs`, `shared/resources/advance-pipeline-lock.test.sh`
 
-- [ ] Widen the "every orchestrator mention of `--complete` names the Step 8 Completion Checklist" test to also scan `shared/resources/develop-pipeline-on-stop.sh`. Record the widened population in the test comment. It must be red on the pre-Phase-1 hook (the generic clause) and green after.
-- [ ] Scenario 4b: link only `rm` and `dirname`; skip any name whose `command -v` is not an absolute path. The two assertions and the corrupt-lock case stay as they are.
+- [x] Widen the "every orchestrator mention of `--complete` names the Step 8 Completion Checklist" test to also scan `shared/resources/develop-pipeline-on-stop.sh`. Record the widened population in the test comment. It must be red on the pre-Phase-1 hook (the generic clause) and green after.
+- [x] Reword the hook's shell comments that name `--complete` without "Completion Checklist" on the same line, so the scan needs no comment exemption. On `develop` these are lines 82, 237, 239 (a quotation of the deleted generic clause) and 257 (the phrase wraps to 258). Without this the widened test stays red after Phase 1 (review.1, check 10).
+- [x] Scenario 4b: link only `rm` and `dirname`; skip any name whose `command -v` is not an absolute path. The two assertions and the corrupt-lock case stay as they are.
 
 ### Phase 3: Proof and gates
 
 **Risk**: Low.
 
-- [ ] Probe (qa-fix Step 3.5): find every executed document that restates the Stop hook's step-8 reason or its status-block position; update `develop-pipeline-hooks.md` only if it is now inaccurate.
-- [ ] Mutation-prove under bash, with `cp` snapshots of a real `FILES` array and restore checked by `cmp`. Four mutations:
+- [x] Probe (qa-fix Step 3.5): find every executed document that restates the Stop hook's step-8 reason or its status-block position; update `develop-pipeline-hooks.md` only if it is now inaccurate.
+- [x] Mutation-prove under bash, with `cp` snapshots of a real `FILES` array and restore checked by `cmp`. Four mutations:
   - restore the shared (skill-blind) Step 7-tail text → 5b's develop-bug case red;
   - restore `Step $((NEXT - 1))/8 ✅ complete` at 8 → the new position case red;
   - restore the generic `--complete` clause → the widened population test red;
   - re-add `printf` to the 4b link list → the absolute-path skip must keep 4b green (a mutation the fixture absorbs by design, recorded as such).
-- [ ] `npm run bundle`, then `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell` and `npm run bundle:check`. CHANGELOG `[Unreleased]` entry citing (task 162).
+- [x] `npm run bundle`, then `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell` and `npm run bundle:check`. CHANGELOG `[Unreleased]` entry citing (task 162).
 
 ---
 
@@ -219,24 +224,24 @@ Not applicable. The change is message text and test fixtures.
 
 ### Functional
 
-- [ ] At `current_step` 8 with `skill: develop-bug`, the Stop hook's reason names the bug-close routine (Resolution Summary, status `closed`, parent/registry linkage) and does not name "the DoD body to the PR" (Phase 1)
-- [ ] At `current_step` 8 with `skill: develop-story` or `develop-task`, the reason names the DoD body, the tracker update and the Step 7 checklist (Phase 1)
-- [ ] At `current_step` 8, no orchestrator's reason contains "Step 7/8 ✅ complete"; at step 3 the position still reads "Step 2/8 ✅ complete" (Phase 1)
-- [ ] No line of `develop-pipeline-on-stop.sh` mentions `--complete` without naming the Completion Checklist (Phase 2 population test)
+- [x] At `current_step` 8 with `skill: develop-bug`, the Stop hook's reason names the bug-close routine (Resolution Summary, status `closed`, parent/registry linkage) and does not name "the DoD body to the PR" (Phase 1)
+- [x] At `current_step` 8 with `skill: develop-story` or `develop-task`, the reason names the DoD body, the tracker update and the Step 7 checklist (Phase 1)
+- [x] At `current_step` 8, no orchestrator's reason contains "Step 7/8 ✅ complete"; at step 3 the position still reads "Step 2/8 ✅ complete" (Phase 1)
+- [x] No line of `develop-pipeline-on-stop.sh` mentions `--complete` without naming the Completion Checklist (Phase 2 population test)
 
 ### Performance
 
-- [ ] No measurable change: the change is text selection inside an existing `case`
+- [x] No measurable change: the change is text selection inside an existing `case`
 
 ### Code Quality
 
-- [ ] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell` and `bundle:check` pass
-- [ ] Each Phase 3 mutation behaves as stated under bash, with restore checked by `cmp`
+- [x] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell` and `bundle:check` pass
+- [x] Each Phase 3 mutation behaves as stated under bash, with restore checked by `cmp`
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry cites (task 162)
-- [ ] `develop-pipeline-hooks.md` agrees with the hook's step-8 reason (Phase 3 probe recorded)
+- [x] CHANGELOG `[Unreleased]` entry cites (task 162)
+- [x] `develop-pipeline-hooks.md` agrees with the hook's step-8 reason (Phase 3 probe recorded)
 
 ---
 
@@ -286,11 +291,66 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-27
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.162.qa.1.stop-hook-step-8-reason-fits-every-orchestrator.md](./task.162.qa.1.stop-hook-step-8-reason-fits-every-orchestrator.md)
+- **Gate File**: [task.162.gate.1.stop-hook-step-8-reason-fits-every-orchestrator.yml](./task.162.gate.1.stop-hook-step-8-reason-fits-every-orchestrator.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 226 (43 hook scenarios, 95 lock scenarios, 88 checklist tests)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. Three LOW advisories (CR-1, CR-2, QA-L1) recorded as future recommendations in the gate.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.162.qa.1.stop-hook-step-8-reason-fits-every-orchestrator.md`
+**Gate File**: `task.162.gate.1.stop-hook-step-8-reason-fits-every-orchestrator.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: `task.162.pr-review.1.stop-hook-step-8-reason-fits-every-orchestrator.md` — ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 9/9 — 7 held by per-PR tests; the CHANGELOG and hooks-doc criteria are documentation criteria, verified present and accurate
+✅ **Tests:** 43 hook scenarios, 95 lock scenarios, 88 checklist tests; ci:fast 4331/0; 5 mutation proofs covered/absorbed
+✅ **PR Review:** PR #503 — conformance review APPROVE; CI 5/5 SUCCESS
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed; resume contract; bundled copies regenerated
+✅ **Security Review:** PASS — no boundary, no secrets, reason still JSON-escaped through `jq --arg`
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling
+
+**Task marked as ACCEPTED on:** 2026-09-27
+
+**Detailed Verification Log:** See `task.162.dod.1.stop-hook-step-8-reason-fits-every-orchestrator.md` for complete verification evidence and timestamps.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-27 | 1.0     | Initial draft | create-task |
+| 2026-09-27 | 1.1     | Review passed (9/10) — Phase 2 names the hook's four `--complete` comment lines to reword; 5c gains the Step 2/8 position assertion | review-task |
+| 2026-09-27 |         | Status → ready-for-development | review-task |
+| 2026-09-27 |         | Implemented — 8 source files (hook, 3 tests, resume contract, CHANGELOG), 6 new test assertions; bundled copies regenerated | develop |
+| 2026-09-27 |         | QA gate PASS (100/100) — 0 blocking findings, 3 LOW advisories | qa-task |
+| 2026-09-27 | 1.2     | DoD passed — accepted (PR #503) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -298,19 +358,19 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: The step-8 reason fits every orchestrator
-- [ ] Skill-aware Step 7 tail at 8
-- [ ] Step-aware status position at 8
-- [ ] Generic `--complete` clause deleted
-- [ ] 5b split by skill; position case
+- [x] Skill-aware Step 7 tail at 8
+- [x] Step-aware status position at 8
+- [x] Generic `--complete` clause deleted
+- [x] 5b split by skill; position case
 
 ### Phase 2: Guards and fixture
-- [ ] `--complete` population scan covers the hook script
-- [ ] 4b `PATH` fixture tightened
+- [x] `--complete` population scan covers the hook script
+- [x] 4b `PATH` fixture tightened
 
 ### Phase 3: Proof and gates
-- [ ] Probe recorded; hooks doc updated if needed
-- [ ] Mutation proofs
-- [ ] Gates and CHANGELOG
+- [x] Probe recorded; hooks doc updated if needed
+- [x] Mutation proofs
+- [x] Gates and CHANGELOG
 
 ---
 
@@ -338,8 +398,8 @@ None identified.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
-1. `/develop-task docs/tasks/task.162.stop-hook-step-8-reason-fits-every-orchestrator/task.162.stop-hook-step-8-reason-fits-every-orchestrator.md`
+1. (done) `/develop-task docs/tasks/task.162.stop-hook-step-8-reason-fits-every-orchestrator/task.162.stop-hook-step-8-reason-fits-every-orchestrator.md`
 2. QA artifacts will be co-located: `task.162.qa.{N}.*.md`, `task.162.gate.{N}.*.yml`, `task.162.bug.{N}.*.md`

@@ -134,6 +134,22 @@ for SK in develop-story develop-task develop-bug; do
   else
     pass "[$SK] lock=8 names the Completion Checklist as Step 8's completion"
   fi
+  # Step 7's tail is described per orchestrator (task 162). develop-bug's Step 7 ends with Part B,
+  # the bug-close routine; the DoD body to the PR is the story/task tail and does not close a bug.
+  if [ "$SK" = "develop-bug" ]; then
+    if echo "$R" | grep -q "Resolution Summary" && echo "$R" | grep -q 'status `closed`' \
+      && echo "$R" | grep -q "develop-bug-step-7-close-bug.md" && ! echo "$R" | grep -q "the DoD body to the PR"; then
+      pass "[$SK] lock=8 names Part B's bug-close routine as Step 7's tail"
+    else
+      fail "[$SK] lock=8 names Part B's bug-close routine as Step 7's tail" "Got: $(echo "$R" | grep -o 'finish that step first ([^)]*)' | head -1)"
+    fi
+  else
+    if echo "$R" | grep -q "the DoD body to the PR, the tracker update, the Step 7 checklist" && ! echo "$R" | grep -q "Resolution Summary"; then
+      pass "[$SK] lock=8 names the DoD body, tracker update and Step 7 checklist as Step 7's tail"
+    else
+      fail "[$SK] lock=8 names the DoD body, tracker update and Step 7 checklist as Step 7's tail" "Got: $(echo "$R" | grep -o 'finish that step first ([^)]*)' | head -1)"
+    fi
+  fi
 done
 
 # ── Scenario 5c: the step-aware text is Step 8 only ─────────────────────────
@@ -147,6 +163,28 @@ if echo "$R" | grep -q "advance the lock yourself" && echo "$R" | grep -q "invok
 else
   fail "lock=3 keeps the generic advance text (step-8 wording is step-8 only)" "Got: $(echo "$R" | grep -i 'genuinely\|invoke' | head -2)"
 fi
+if echo "$R" | grep -q 'position `Step 2/8 ✅ complete`' && ! echo "$R" | grep -q "Step 7 unverified"; then
+  pass "lock=3 keeps the generic status position (Step 2/8 ✅ complete)"
+else
+  fail "lock=3 keeps the generic status position (Step 2/8 ✅ complete)" "Got: $(echo "$R" | grep -o 'position `[^`]*`' | head -1)"
+fi
+
+# ── Scenario 5d: at Step 8 the status position does not assert Step 7 complete ──
+# /finalise moves the lock to 8 before Step 7's tail runs, so "Step 7/8 ✅ complete" is a claim a
+# lock at 8 does not support, made two lines above the rule that denies it (task 162; pre-existing,
+# task.161 gate.3 CR-1). The position names Step 8 pending and Step 7 unverified instead.
+for SK in develop-story develop-task develop-bug; do
+  d="$TMPDIR_TEST/step8-position-$SK"
+  mklock "$d" "{\"skill\":\"$SK\",\"current_step\":8,\"report_path\":\"report.md\"}"
+  R=$(reason_of "$(run_hook "$d")")
+  if echo "$R" | grep -q "Step 7/8 ✅ complete"; then
+    fail "[$SK] lock=8 position does not claim Step 7 complete" "Got: $(echo "$R" | grep -o 'position `[^`]*`' | head -1)"
+  elif ! echo "$R" | grep -q 'position `Step 8/8 — COMMIT CHANGES ⏳ pending (Step 7 unverified: check its row first)`'; then
+    fail "[$SK] lock=8 position does not claim Step 7 complete" "position missing or reworded: $(echo "$R" | grep -o 'position `[^`]*`' | head -1)"
+  else
+    pass "[$SK] lock=8 position does not claim Step 7 complete"
+  fi
+done
 
 # ── Scenario 6: no lock → allow ──────────────────────────────────────────────
 d="$TMPDIR_TEST/nolock"; mkdir -p "$d"
