@@ -133,7 +133,9 @@ Gate `release.sh` on CI's recorded verdict for HEAD, mark every load-sensitive a
 - Fix `940390b8`: CR-6 fixture sized to its schedule (`cr6Schedule`/`cr6Lifetimes`). The fast gate then went red twice on `tests/test-clean-checkout.test.js`, reported `LOAD-SENSITIVE — … this file took 10037 ms` (then 10192 ms) against a 10 s budget, and the file passed alone in 8.1 s. The marker worked as designed. The cause was task 153's own step 1b, which spawned `node` three times per `release.sh` run (about 108 ms each). The fix is `--tsv` plus one `read`.
 - QA cycle 4 (gate 4 CONCERNS): the new parse failed open on a bare `green` with no TAB (CR4-1, MEDIUM). Fix `dcda808f` requires a single line containing a TAB and a known reason, and accepts `green` only on exit 0. Each guard is mutation-proven.
 - QA cycle 5 (gate 5 PASS 100, refute pass): no open finding; 3 LOW advisory items.
-- The accepted DoD (`task.153.dod.1`) is not edited. It verified `0c23a046`. The two fix commits are verified by gates 4–5 and by develop-next Step 3's own head re-check, CI rollup and `npm run ci`.
+- The accepted DoD (`task.153.dod.1`) is not edited. It verified `0c23a046`.
+- 5c re-run (`task.153.pr-review.2`, conformance lens only, `--no-code`: cycles 4–5 were the code review of the fix diff) → CONCERNS. PC-1: no DoD had checked the fix commits. PC-2 and PC-3 were doc drifts, fixed in `9dc369d7`.
+- `/finalise` re-run → `task.153.dod.2`: four DoD agents (AC 14/14, security PASS 26/0 with the `--tsv` parse checked to fail closed, docs PASS, compliance N/A). CI reading 1: SUCCESS @ 9dc369d72bad (5 checks, 150 s); CI reading 2: SUCCESS @ 692b9ff23218 over 5 checks after 180 s. The acceptance commit is `692b9ff2`. The run-1 DoD section is marked historical; Change Log 1.3. Canonical PR summary updated in place: https://github.com/Gamaroff/agent-skills/pull/515#issuecomment-5886009096. DoD body (run 2) posted: https://github.com/Gamaroff/agent-skills/pull/515#issuecomment-5888519434. Issue #483 was already CLOSED; board already Done.
 
 ---
 
@@ -217,5 +219,5 @@ _Track each QA review/fix cycle._
 **Branch**: `feature/task.153.release-ci-gate-load-sensitive-tests`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/515
 **QA Iterations**: 5 QA cycles — 3 before acceptance (2 qa-fix cycles, diminishing-returns exit, 5c APPROVE) and 2 after it (QA3-1 and CR4-1 fixed; gate 5 PASS 100; 5c re-run CONCERNS on the stale DoD, answered by `/finalise` dod.2)
-**DoD Summary**: docs/tasks/task.153.release-ci-gate-load-sensitive-tests/task.153.dod.1.release-ci-gate-load-sensitive-tests.md
+**DoD Summary**: docs/tasks/task.153.release-ci-gate-load-sensitive-tests/task.153.dod.2.release-ci-gate-load-sensitive-tests.md (run 2; run 1 superseded)
 **Tracker debt**: none
