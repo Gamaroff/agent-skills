@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-09-28
-**Next Available Task Number:** **167**
+**Last Updated:** 2026-09-29
+**Next Available Task Number:** **168**
 
 ## How to use
 
@@ -207,6 +207,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 164 | [Close task.163's deferred follow-ups](task.164.task-163-deferred-follow-ups/task.164.task-163-deferred-follow-ups.md) | accepted | infrastructure | Low | 2026-09-28 | [#507](https://github.com/Gamaroff/agent-skills/issues/507) | Follow-up to task.163 (gate.3 CR-2/CR-3 + future, pr-review.1 CR-1): banner doc defers to the Stop hook without restating its lock-8 wording, banner test checks fragments of the rendered hook, non-comment `--complete` hook floor ≥ 2, HALT status block names the halting step, committed meta-test for scenario 4b's empty/builtin arms. Depends on task.163 (merged `f73f3cc5`) |
 | 165 | [Close task.164's deferred follow-ups](task.165.task-164-deferred-follow-ups/task.165.task-164-deferred-follow-ups.md) | planned | infrastructure | Low | 2026-09-28 | [#509](https://github.com/Gamaroff/agent-skills/issues/509) | task.164 · Follow-up to task.164 (gate.3 QA-164-10..13, pr-review.1 CR-1/CR-2, Deferred Work): Exception 2 wording (mapping citation, current_step contrast, grammar, Steps 5–6 HALT), HALT pin plain-prose refusal + anchored mapping parse, hook floor by binding name, 4b meta-test early exit, outcome-gated lock cooperation in review-task (new) and review-story |
 | 166 | [Give measured non-functional criteria a defined path through review and finalise](task.166.measured-non-functional-criteria/task.166.measured-non-functional-criteria.md) | planned | infrastructure | Medium | 2026-09-28 | [#510](https://github.com/Gamaroff/agent-skills/issues/510) | — Observation #206: third test-free kind (measured criterion) in finalise-dod-ac-prompt.md; review-task Step 6 flags unbounded non-functional criteria; pins for both (and for the untested obs #204 documentation kind) |
+| 167 | [Fast-gate precondition: no false HALT under npm loglevel=silent](task.167.fast-gate-precondition-npm-loglevel/task.167.fast-gate-precondition-npm-loglevel.md) | planned | testing | Medium | 2026-09-29 | [#514](https://github.com/Gamaroff/agent-skills/issues/514) | Cut from obs #213: one flag (`--loglevel=notice`) on the precondition's `npm run` listing, plus silent-env and silent-`.npmrc` test cases |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
