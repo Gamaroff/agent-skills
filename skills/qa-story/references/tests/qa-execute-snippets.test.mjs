@@ -28,7 +28,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { neverRan, spawnBudget } from "../spawn-budget.mjs";
+import { loadSensitive, neverRan, spawnBudget } from "../spawn-budget.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -795,7 +795,7 @@ test("a hanging block is terminated by the timeout rather than hanging the run",
   );
   assert.ok(
     elapsed < 10_000,
-    `the 30s sleep must be truncated, took ${elapsed}ms`,
+    loadSensitive(`the 30s sleep must be truncated, took ${elapsed}ms`),
   );
 });
 

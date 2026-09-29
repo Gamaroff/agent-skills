@@ -23,7 +23,7 @@
 import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { spawnBudget } from "../spawn-budget.mjs";
+import { loadSensitive, spawnBudget } from "../spawn-budget.mjs";
 import {
   mkdtempSync,
   mkdirSync,
@@ -611,7 +611,7 @@ describe("the fast-path is a hint, not an authorisation decision (T61-H2)", () =
         assert.equal(dm.resolveAccessTracker({}, { cwd: dir }), "full");
         assert.ok(
           Date.now() - t0 < 200,
-          "an unrestricted repo must not pay for a subprocess",
+          loadSensitive("an unrestricted repo must not pay for a subprocess"),
         );
       },
     );
