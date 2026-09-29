@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **The QA read-back requires this cycle's links; the current gate and path containment each have
+  one definition (task 158).** Three residues from task.149. `qa-read-back.js` now halts when the
+  document does not link the gate and QA report `qa-cycle.sh --path` names for the current cycle;
+  before, a cycle-2 document still linking `gate.1`/`qa.1` read clean because every link
+  resolved. `doc-links.js` `checkDocument` returns the additive `resolved[]` it already computed.
+  Every current-cycle gate lookup — `qa-task`/`qa-story` Phase 0 and Step 13b, the QA loop's
+  latest gate, the resume contract's cycle reconstruction, Step 7's completion comment — now asks
+  `qa-cycle.sh`, so a zero-padded `gate.02` is found (Step 13b read `BLOCKING_COUNT` 0 on a gate
+  with a HIGH entry) and two files claiming one cycle stop the block instead of the first being
+  taken. The helper is now bundled into `develop-story`, `develop-task` and `develop-bug`, and
+  `tests/qa-cycle.test.js` fails on a `find`/`ls` gate selection left in the QA skills or the
+  step docs. `security-probe.mjs` `--entry` and `--fake-gh` use the shared `isWithin`, so a
+  `..name` directory inside the repository is no longer refused (the root itself still is);
+  `doc-links.js` exports the one CommonJS `isWithin`, and a parity test holds it to the ESM one in
+  `qa-execute-snippets.mjs`.
+
 ## [v0.52.0] - 2026-09-29
 
 ### Added
