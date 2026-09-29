@@ -34,8 +34,8 @@ test holds in sync with the code. The one live instance that keeps tripping — 
 is fixed so that it tolerates load instead of only naming it.
 
 **Scope**: `scripts/release.sh` plus one new decision module; one new export in
-`shared/resources/spawn-budget.mjs`; the CR-6 test; four wall-clock assertions; two contributing docs;
-three new test files.
+`shared/resources/spawn-budget.mjs`; the CR-6 test; four wall-clock assertions (seven after QA cycle 2 —
+see § 7); two contributing docs; three new test files.
 
 **Key deliverables**:
 
@@ -352,6 +352,13 @@ All three test files are inside the existing `'tests/*.test.js'` glob in `packag
 13. ✅ `docs/contributing/traps.md` — § Load-sensitive tests
 14. ✅ `docs/contributing/releases.md` — class note, new script step, `--skip-ci-check`
 15. ✅ `CHANGELOG.md`
+16. ✅ `tests/test-clean-checkout.test.js` — green `gh` stub (it drives `release.sh`); its `FILE_BUDGET_MS` after-hook marked (QA cycle 2, CR2-1)
+17. ✅ `tests/bundle-missing-source.test.js` — `FILE_BUDGET_MS` after-hook marked (QA cycle 2, CR2-1)
+18. ✅ `evals/shared/tests/consumer-root.test.mjs` — `FILE_BUDGET_MS` after-hook marked (QA cycle 2, CR2-1)
+
+> The three whole-file budgets (`ms < FILE_BUDGET_MS` over `process.hrtime`) were added by task.154
+> after this document's 2026-09-24 enumeration; QA cycle 2 found them and the guard now also
+> enumerates by high-resolution clock source (direction C), so `traps.md` lists seven files.
 
 ### Files to Delete
 
