@@ -24,6 +24,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeConsumerRoot } from "../lib/consumer-root.mjs";
+import { loadSensitive } from "../../../shared/resources/spawn-budget.mjs";
 
 // Task 154 AC6: this file runs in under 10 s. Timed from module load, so every
 // test and fixture counts; a failing root after-hook fails the run.
@@ -33,7 +34,9 @@ after(() => {
   const ms = Number(process.hrtime.bigint() - FILE_STARTED) / 1e6;
   assert.ok(
     ms < FILE_BUDGET_MS,
-    `this file took ${Math.round(ms)} ms, over its ${FILE_BUDGET_MS} ms budget (task 154 AC6)`,
+    loadSensitive(
+      `this file took ${Math.round(ms)} ms, over its ${FILE_BUDGET_MS} ms budget (task 154 AC6)`,
+    ),
   );
 });
 

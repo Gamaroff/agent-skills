@@ -550,7 +550,8 @@ None.
 | 2026-09-29 |         | Implemented — 4 files added (1 script, 3 test files), 11 modified, 6 bundled copies regenerated; 46 new tests; mutations M1–M10 red (M10 after a CR-6 fixture fix) | develop |
 | 2026-09-29 |         | Status → ready-for-review | develop |
 | 2026-09-29 |         | QA gate PASS (95/100) — 1 LOW finding gated (CR-1), 4 advisory | qa-task |
-| 2026-09-29 |         | QA findings fixed — CR-1 gated + CR-2..CR-5 advisory, 1 iteration; fast gate green | qa-fix |
+| 2026-09-29 |         | QA gate CONCERNS (90/100) — 3 findings gated (1 MEDIUM), 3 advisory | qa-task |
+| 2026-09-29 |         | QA findings fixed — gate 1 CR-1..CR-5, gate 2 CR2-1..CR2-5 + PRB2-1 (3 more load-sensitive files marked and listed), 2 iterations; fast gate green | qa-fix |
 
 <!-- change-log-end -->
 
@@ -568,25 +569,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-29
-**Quality Score**: 95/100
-**Gate Decision**: PASS
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.153.qa.1.release-ci-gate-load-sensitive-tests.md](./task.153.qa.1.release-ci-gate-load-sensitive-tests.md)
-- **Gate File**: [task.153.gate.1.release-ci-gate-load-sensitive-tests.yml](./task.153.gate.1.release-ci-gate-load-sensitive-tests.yml)
+- **Full Report**: [task.153.qa.2.release-ci-gate-load-sensitive-tests.md](./task.153.qa.2.release-ci-gate-load-sensitive-tests.md)
+- **Gate File**: [task.153.gate.2.release-ci-gate-load-sensitive-tests.yml](./task.153.gate.2.release-ci-gate-load-sensitive-tests.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 46 new; `npm run ci` green
+- **Tests Executed**: 51 new; `npm run ci:fast` green
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-No critical issues. One LOW code-review bug gated for qa-fix (CR-1: the marker guard's
-`enclosingAssert` does not check the call spans the hit line); four advisory items (CR-2..CR-5).
+One MEDIUM: the load-sensitive guard misses three `FILE_BUDGET_MS` whole-file budgets (process.hrtime),
+so its list is incomplete. Two LOW gated: the refusal names the wrong run URL; `--repo` admits `..`.
 
 ---
 

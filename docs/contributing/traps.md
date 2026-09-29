@@ -120,13 +120,17 @@ re-run the gate, not investigate. A failure **without** the marker is real — d
 The marker is built by `loadSensitive()` in the shared `spawn-budget.mjs` (task 153), and
 `scripts/release.sh` prints this rule when its local test aborts. Every file that carries it:
 
+- `evals/shared/tests/consumer-root.test.mjs`
 - `shared/resources/tests/access-config-parity.test.mjs`
 - `shared/resources/tests/qa-diminishing-returns.test.mjs`
 - `shared/resources/tests/qa-execute-snippets.test.mjs`
 - `skills/session-handoff/tests/handoff-verify.test.js`
+- `tests/bundle-missing-source.test.js`
+- `tests/test-clean-checkout.test.js`
 
 `tests/load-sensitive-marker.test.js` fails when this list and the code disagree, and when a
-wall-clock assertion (`Date.now() - t0 < N`, `elapsed < N`) is added without the marker.
+wall-clock assertion (`Date.now() - t0 < N`, `elapsed < N`, `ms < …BUDGET_MS`) is added without the marker, or when a
+test file reads a high-resolution clock (`process.hrtime`, `performance.now`) without carrying it.
 
 The **stdout-drain premise test is not load-sensitive any more** (fixed 2026-09-04; the payload is
 now sized from the pipe buffer). A failure there is real. Do not re-run it away.

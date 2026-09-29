@@ -167,6 +167,45 @@ test("verdict: a non-array input is unverifiable", () => {
   assert.equal(mod.ciVerdict({}).reason, "unverifiable");
 });
 
+test("verdict: the refusal names the run that produced the verdict, not the first run (CR2-2)", () => {
+  const red = mod.ciVerdict([
+    run("Test", "success", "completed", 11),
+    run("Test", "failure", "completed", 12),
+    run("ShellCheck", "success", "completed", 13),
+  ]);
+  assert.match(
+    red.detail,
+    /Test: red \(https:\/\/github\.com\/o\/r\/actions\/runs\/12\)/,
+  );
+  const pending = mod.ciVerdict([
+    run("Test", "success", "completed", 21),
+    { ...run("Test", "", "in_progress", 22) },
+    run("ShellCheck", "success", "completed", 23),
+  ]);
+  assert.match(
+    pending.detail,
+    /Test: pending \(https:\/\/github\.com\/o\/r\/actions\/runs\/22\)/,
+  );
+});
+
+test("isRepoSlug: GitHub's owner/name shape — no traversal segment, no leading or trailing hyphen (PRB2-1)", () => {
+  for (const ok of ["Gamaroff/agent-skills", "o/r", "a-b/c.d_e", "a/.github"])
+    assert.equal(mod.isRepoSlug(ok), true, ok);
+  for (const bad of [
+    "../x",
+    "o/..",
+    "o/.",
+    "-o/r",
+    "o-/r",
+    "o--p/r",
+    "o",
+    "o/r/x",
+    "",
+    "o/r\n",
+  ])
+    assert.equal(mod.isRepoSlug(bad), false, JSON.stringify(bad));
+});
+
 // ── fetchRuns: every way of not reading CI is an error, never runs ────────
 
 test("fetchRuns: gh not installed (ENOENT) → error", () => {
@@ -283,7 +322,7 @@ test("cli: --repo reaches gh as -R; a malformed --repo is a usage error and gh i
       json(GREEN_REQUIRED),
   );
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-  for (const bad of ["o", "o/r/x", "o r/x", "--json"]) {
+  for (const bad of ["o", "o/r/x", "o r/x", "--json", "../x", "o/..", "-o/r"]) {
     const r = cli(["--sha", SHA, "--repo", bad], "echo called >&2; exit 0");
     assert.equal(r.status, 2, bad);
     assert.doesNotMatch(r.stderr, /called/);

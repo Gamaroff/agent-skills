@@ -55,6 +55,23 @@ const RED_CONCLUSIONS = new Set([
   "action_required",
 ]);
 const RANK = { green: 0, unverifiable: 1, pending: 2, red: 3 };
+const CAUSES = {
+  red: (r) => RED_CONCLUSIONS.has(r.conclusion),
+  pending: (r) => r.status !== "completed",
+  unverifiable: () => true,
+};
+
+/**
+ * GitHub's own shape for owner/name: an owner is letters, digits and single hyphens, neither first
+ * nor last; a repository is letters, digits, `-`, `_` and `.`, but never `.` or `..`. The
+ * looser `[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+` admitted `../x` (QA cycle 2, probe PRB2-1).
+ */
+export function isRepoSlug(value) {
+  const m = /^([A-Za-z0-9](?:-?[A-Za-z0-9])*)\/([A-Za-z0-9_.-]+)$/.exec(
+    String(value),
+  );
+  return m !== null && m[2] !== "." && m[2] !== "..";
+}
 
 /** One workflow's verdict from its runs, or null when the runs give no answer. */
 function workflowVerdict(runs) {
@@ -110,7 +127,12 @@ export function ciVerdict(runs, workflows = WORKFLOWS, sha = "") {
       ? `${out.map((w) => w.name).join(", ")} green`
       : notGreen
           .map((w) => {
-            const url = w.runs.find((r) => r.url)?.url;
+            // The run that PRODUCED the verdict, not merely the first with a URL: one SHA carries
+            // a main run and a develop run, and "Test: red (url)" must not link the green one
+            // (QA cycle 2, CR2-2). No causing run with a URL → no URL, never a wrong one.
+            const url = w.runs.find(
+              (r) => CAUSES[w.verdict]?.(r) && r.url,
+            )?.url;
             const why =
               w.runs.length === 0 ? "no run for this commit" : w.verdict;
             return `${w.name}: ${why}${url ? ` (${url})` : ""}`;
@@ -194,7 +216,7 @@ export function main(
     stderr.write(`--sha must be a full 40-character commit SHA\n${USAGE}\n`);
     return 2;
   }
-  if (repo !== "" && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) {
+  if (repo !== "" && !isRepoSlug(repo)) {
     stderr.write(`--repo must be owner/name\n${USAGE}\n`);
     return 2;
   }

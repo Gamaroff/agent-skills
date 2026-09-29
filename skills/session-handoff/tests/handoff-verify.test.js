@@ -1472,7 +1472,12 @@ test("cli: a `command ` prefix is stripped, the argv runs without a shell, and a
   // waited for the whole tree to end on its own, and the grandchild then read as
   // killed — mutation M10 (kill the leader alone) passed. Now, under M10, the
   // grandchild is still alive when the verifier returns at ~20 s.
-  const schedule = [3, 6, 12].slice(0, 1 + spawnBudget("HANDOFF").retries);
+  // Doubling from 3 s, one entry per attempt — HANDOFF_SPAWN_RETRIES=5 gives six attempts, not a
+  // silent cap at three (QA cycle 2, CR2-5).
+  const schedule = Array.from(
+    { length: 1 + spawnBudget("HANDOFF").retries },
+    (_, k) => 3 * 2 ** k,
+  );
   const r = retryUntilForked(schedule, (t) => {
     const dir = tempDir();
     const pidFile = path.join(dir, "child.pid");
@@ -1491,7 +1496,13 @@ test("cli: a `command ` prefix is stripped, the argv runs without a shell, and a
     );
     const res = runCli(["handoff.md", "--json", "--timeout", String(t)], dir);
     const obj = JSON.parse(res.stdout);
-    return { obj, forked: fs.existsSync(pidFile), pidFile, t };
+    // Forked means the pid file holds a positive integer, not merely that it exists: a kill that
+    // lands between the file's creation and its write leaves it empty, and that is the same
+    // precondition miss the retry exists for (QA cycle 2, CR2-4).
+    const pid = fs.existsSync(pidFile)
+      ? Number(fs.readFileSync(pidFile, "utf8"))
+      : NaN;
+    return { obj, forked: Number.isInteger(pid) && pid > 0, pidFile, t };
   });
   assert.equal(r.obj.lines[0].verdict, "unverifiable");
   assert.match(r.obj.lines[0].detail, new RegExp(`timeout \\(${r.t}s\\)`));
