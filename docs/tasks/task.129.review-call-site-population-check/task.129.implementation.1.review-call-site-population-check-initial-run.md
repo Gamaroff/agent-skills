@@ -3,7 +3,7 @@
 **Task**: `task.129.review-call-site-population-check.md`
 **Run Number**: 1
 **Started**: 2026-09-29 21:00
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -37,8 +37,8 @@ Lift `collectCallSites()` into a shared `call-sites.js` collector and add a call
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan + surface map); 2 fast-gate iterations; 7/7 phase items; ci:fast green | `.summaries/step-3-iteration-audit-1.json` |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #525: https://github.com/Gamaroff/agent-skills/pull/525 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.129.qa.{N}.*.md`; `task.129.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles; gate 4 PASS 100; 5c CONCERNS (pr-review.1) | — |
-| 7. finalise                | ❌ Failed | `task.129.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: AC2, AC4, AC5, AC7 — dod.1; HALT | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done | `task.129.dod.{N}.*.md`; task `status: accepted`                       | run 1 (dod.1) HALT on 4 gaps → fixed `cf642685` → run 2 (dod.2) ACCEPTED; acceptance `2b597066`; CI reading 2 SUCCESS | —                    |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | final report commit + push; lock completed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -105,13 +105,27 @@ Lift `collectCallSites()` into a shared `call-sites.js` collector and add a call
 - CI reading 1: SUCCESS @ `a374a5cb5d45` over 5 checks.
 - Decision: NOT ACCEPTED — 4 gaps (AC2, AC4, AC5, AC7). Fix-and-recheck (8a) not applicable: four gaps, not one low finding. Status stays ready-for-review; gaps row written; gap report added to the task body; gaps PR comment posted.
 
+### Resume after the Step 7 HALT — 2026-09-29
+
+- Operator instruction: "fix the four gaps". Lock restored from the halt snapshot at step 7 (`advance-pipeline-lock.sh --restore`).
+- Gap fixes in `cf642685`: AC2 committed `c69f5115^` fixture test (CI `fetch-depth: 0`; shallow clone skips with a reason); AC4 CLI < 2 s test, marked `loadSensitive()` and listed in `docs/contributing/traps.md` (the load-sensitive guard caught the first version); AC5 no-restated-shape test, keyed on the `node\s+` invocation anchor — a filename key was red at the wrong site (the guard's close-ordering regex). All four mutations red on the named test. AC7: obs #120 set `actioned` naming PR #525.
+- Fast gate: one unrelated load-sensitive trip (`tests/test-clean-checkout.test.js` 10,580 ms > 10,000 ms budget) — green alone, green on the re-run of the gate.
+- DoD summary: `task.129.dod.2.review-call-site-population-check.md` — AC 7/7 PASS, Security PASS (not a boundary), Compliance N/A, Docs PASS.
+- CI reading 1: SUCCESS @ `cf6426853772` (5 checks; sampled PENDING first, resolved by a background poll). CI reading 2: SUCCESS @ `2b597066248a` over 5 checks — the reading-2 poll's own stop condition never fired (an unquoted `set -- $R` does not word-split under zsh), so it ran to its bound; the reading was then taken directly and every check was COMPLETED SUCCESS.
+- Acceptance commit `2b597066` (task `status: accepted`, Change Log 1.2, registry ticked, sprint review); pushed; artefacts asserted on origin.
+- PR canonical comment posted: https://github.com/Gamaroff/agent-skills/pull/525#issuecomment-5898996163
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/525#issuecomment-5899006531
+- Issue #432: document link re-pointed to `develop` (performed); `done` comment posted; issue close performed — state CLOSED. Board transition: `done` → already (Done).
+- Tracker journal empty — tracker debt: none.
+- Task completed.
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
 
-- **Step 7 HALT — DoD gaps (4):** AC2 the task.121 `c69f5115^` fixture has no committed test (the stated shallow-clone reason is wrong: `test.yml` uses `fetch-depth: 0`); AC4 no test asserts the CLI ≤ 2 s; AC5 no test fails if the guard restates an engine shape; AC7 observation #120 not closed naming PR #525. Estimated ≈1 hour. See `task.129.dod.1.review-call-site-population-check.md`.
+- **Step 7 HALT — DoD gaps (4) — RESOLVED in run 2:** AC2 the task.121 `c69f5115^` fixture has no committed test (the stated shallow-clone reason is wrong: `test.yml` uses `fetch-depth: 0`); AC4 no test asserts the CLI ≤ 2 s; AC5 no test fails if the guard restates an engine shape; AC7 observation #120 not closed naming PR #525. Estimated ≈1 hour. See `task.129.dod.1.review-call-site-population-check.md`.
 - Open follow-up (not a DoD gap): PR-review CR-1 — exit 1 also occurs on MODULE_NOT_FOUND, so prose branching on exit 1 should branch on the JSON `reason`.
 
 - Step 3 iteration 1: fast gate failed on `transition-protocol-parity.test.mjs` (a skill naming `tracker-comment.js` must bundle it). Cause: literal engine filenames in create-task 3.5. Fixed by naming engines by `--engine` value. Triage: `.summaries/step-3-test-triage-1.json`.
@@ -170,12 +184,16 @@ _Track each QA review/fix cycle._
 
 ---
 
+## Completion Summary
+
+Implemented `shared/resources/call-sites.js` — one collector of engine invocations in shipped source (five engines, a CLI with `--engine`, `--root`, `--json`, and every outcome one row of a `REASONS` table) — and made `comment-slot-coverage.test.mjs` consume it with its populations unchanged (24 / 12). Added the call-site population check to review-task (Step 3 check 14) and review-story (Step 4 check 10), both Agent C pre-pass prompts, and the create-task 3.5 authoring twin, held by a presence test. QA took 4 cycles (gates CONCERNS 80 ×3 → PASS 100, HIGH 0 throughout); cycles 1–3 each found a new edge in the CLI's exit contract, and cycle 2 took the narrowing-residue offer to consolidate it into the `REASONS` table. The 5c PR review returned CONCERNS; its document findings were corrected. `/finalise` run 1 halted on four gaps (three success criteria with hand-run evidence only, and obs #120 not closed); at the operator's instruction they were fixed with three committed, mutation-proved tests and the observation closed, and run 2 accepted the task. Follow-ups: PR-review CR-1 (branch on the JSON `reason`, not exit 1) and gate 4's three advisory items.
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated — HALT at Step 7 (DoD gaps)
+**Finished**: 2026-09-29 23:13
+**Final Status**: Completed
 **Branch**: feature/task.129.review-call-site-population-check
 **PR**: https://github.com/Gamaroff/agent-skills/pull/525
 **QA Iterations**: 4 (gate 4 PASS 100; 5c CONCERNS)
-**DoD Summary**: task.129.dod.1.review-call-site-population-check.md — GAPS IDENTIFIED
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**DoD Summary**: task.129.dod.2.review-call-site-population-check.md — ACCEPTED (run 1 dod.1: gaps, superseded)
+**Tracker debt**: none
