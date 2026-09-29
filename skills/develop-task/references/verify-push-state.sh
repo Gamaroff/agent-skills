@@ -28,7 +28,11 @@
 # Every check here captures the command's own status directly.
 #
 # Usage:
-#   verify-push-state.sh --base <branch> [--pr <number>] [--remote <name>]
+#   verify-push-state.sh --base <branch> [--pr <number>] [--remote <name>] [--scope <path>]...
+#
+#   --scope (repeatable) narrows check 3 to the named paths: a dirty path inside a scope fails,
+#   a dirty path outside every scope is printed as a named warning and does not. Without
+#   --scope, any dirty path fails. For a checkout another session is also editing (obs #142).
 #
 # Exit codes:
 #   0  every check passed — the reported state is real
@@ -40,14 +44,20 @@ set -uo pipefail
 BASE=""
 PR=""
 REMOTE="origin"
+SCOPES=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --base)   BASE="${2:-}"; shift 2 ;;
     --pr)     PR="${2:-}"; shift 2 ;;
     --remote) REMOTE="${2:-}"; shift 2 ;;
+    --scope)
+      [ -n "${2:-}" ] || { echo "verify-push-state: --scope needs a path" >&2; exit 2; }
+      SCOPES+=("$2"); shift 2 ;;
     -h|--help)
-      sed -n '28,36p' "$0"; exit 0 ;;
+      # By markers, not line numbers: the bundler prepends a header to every copy under
+      # skills/*/references/, and a fixed range there dropped the last line (task.147 QA-5, CR-6).
+      sed -n '/^# Usage:/,/^#   2 /p' "$0"; exit 0 ;;
     *) echo "verify-push-state: unknown argument '$1'" >&2; exit 2 ;;
   esac
 done
@@ -56,6 +66,88 @@ done
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
   || { echo "verify-push-state: not a git repository" >&2; exit 2; }
+
+# ONE predicate decides "is path P inside scope S", for both the scope gate below and check 3. They
+# used to disagree: the gate used filesystem and pathspec semantics, check 3 compared strings. Every
+# spelling they disagreed on (a glob, a case-folded path, :/ magic, a symlinked component) was a
+# scope that existed but matched nothing, so check 3 passed vacuously (task.147 QA-5, CR-3).
+path_under() {
+  [ "$1" = "$2" ] && return 0
+  case "$1" in "$2"/*) return 0 ;; esac
+  return 1
+}
+
+# Normalise each --scope to the repo-root-relative form porcelain prints, then refuse one that names
+# nothing. A `./`-prefixed, absolute or mistyped scope used to match no path, which classed every
+# dirty path as outside and passed check 3 with nothing checked (task.147 QA-1, CR-8).
+if [ ${#SCOPES[@]} -gt 0 ]; then
+  TOP=$(git rev-parse --show-toplevel)
+  PREFIX=$(git rev-parse --show-prefix)
+  NORMALISED=()
+  for s in "${SCOPES[@]}"; do
+    raw="$s"
+    # An absolute scope is compared against the PHYSICAL toplevel, so canonicalise it the same way
+    # first: a logical path through a symlink (macOS /tmp → /private/tmp) is inside the repo
+    # (task.147 QA-2, CR-9).
+    case "$s" in
+      /*)
+        if [ -d "$s" ]; then s=$(cd "$s" 2>/dev/null && pwd -P) || s="$raw"
+        elif [ -d "$(dirname "$s")" ]; then s="$(cd "$(dirname "$s")" 2>/dev/null && pwd -P)/$(basename "$s")"
+        fi ;;
+    esac
+    case "$s" in
+      "$TOP")   s="" ;;
+      "$TOP"/*) s="${s#"$TOP"/}" ;;
+      /*)       echo "verify-push-state: --scope '$raw' is outside this repository, or does not resolve to a path inside it" >&2; exit 2 ;;
+      *)        s="${PREFIX}${s#./}" ;;
+    esac
+    # A '..' segment would pass the existence check and then match no porcelain path, which is a
+    # vacuous pass. Refuse it rather than guess what it meant.
+    case "/$s/" in */../*) echo "verify-push-state: --scope '$raw' contains '..' — pass a path inside the repository" >&2; exit 2 ;; esac
+    # Collapse what porcelain never prints: repeated slashes and '.' segments. Without this,
+    # `docs/./tasks` or `docs//tasks` passed the existence check and matched nothing, which is a
+    # vacuous pass, the sibling of the '..' case (task.147 QA-3, CR-4).
+    while [ "${s#*//}" != "$s" ]; do s="${s%%//*}/${s#*//}"; done
+    while [ "${s#*/./}" != "$s" ]; do s="${s%%/./*}/${s#*/./}"; done
+    while [ "${s#./}" != "$s" ]; do s="${s#./}"; done
+    [ "$s" = "." ] && s=""
+    s="${s%/.}"
+    # Relative by now (the toplevel was stripped above). A leading '/' can only be left over from a
+    # `.//x` spelling whose `./` was stripped before the collapse; kept, it matched no porcelain path
+    # and check 3 passed vacuously (task.147 QA-4, CR-1).
+    while [ "${s#/}" != "$s" ]; do s="${s#/}"; done
+    while [ "${s%/}" != "$s" ]; do s="${s%/}"; done
+    [ -n "$s" ] || { echo "verify-push-state: --scope '$raw' names the whole repository — omit --scope instead" >&2; exit 2; }
+    NORMALISED+=("$s")
+  done
+  SCOPES=("${NORMALISED[@]}")
+
+  # The gate is check 3's own predicate over git's own path list: case-exact, no globbing, no
+  # symlink following. The list is the index and the untracked-not-ignored files (so an uncommitted
+  # deletion counts) plus HEAD's tree (so a scope whose files were all renamed away still counts).
+  # A scope that no such path falls under can only ever match nothing: refuse it (exit 2).
+  PATHS_FILE=$(mktemp) || { echo "verify-push-state: mktemp failed — cannot validate --scope" >&2; exit 2; }
+  if git -C "$TOP" ls-files -z --cached --others --exclude-standard > "$PATHS_FILE" 2>/dev/null; then
+    git -C "$TOP" ls-tree -r -z --name-only HEAD >> "$PATHS_FILE" 2>/dev/null
+    LISTED=true
+  else
+    # An unreadable index is check 3's to report: it reads the same index and fails on it. Skipping
+    # validation here cannot produce a vacuous pass, and exiting 2 would misreport it as a usage error.
+    LISTED=false
+  fi
+  for s in "${SCOPES[@]}"; do
+    [ "$LISTED" = true ] || break
+    FOUND=false
+    while IFS= read -r -d '' p; do
+      if path_under "$p" "$s"; then FOUND=true; break; fi
+    done < "$PATHS_FILE"
+    if [ "$FOUND" != true ]; then
+      rm -f "$PATHS_FILE"
+      echo "verify-push-state: --scope '$s' names no path git knows (tracked or untracked, case-exact, no globbing)" >&2; exit 2
+    fi
+  done
+  rm -f "$PATHS_FILE"
+fi
 
 FAILURES=0
 note() { printf '  %s\n' "$1"; }
@@ -101,12 +193,65 @@ fi
 # ── 3. Working tree is clean ──────────────────────────────────────────────────
 # Uncommitted work is work that will not reach the PR, however green the suite was
 # when it ran against the working tree.
-DIRTY=$(git status --porcelain 2>/dev/null)
-if [ -n "$DIRTY" ]; then
-  fail "working tree is DIRTY — $(printf '%s\n' "$DIRTY" | grep -c .) uncommitted path(s):"
-  printf '%s\n' "$DIRTY" | head -20 | sed 's/^/      /'
+if [ ${#SCOPES[@]} -eq 0 ]; then
+  DIRTY=$(git status --porcelain 2>/dev/null)
+  if [ -n "$DIRTY" ]; then
+    fail "working tree is DIRTY — $(printf '%s\n' "$DIRTY" | grep -c .) uncommitted path(s):"
+    printf '%s\n' "$DIRTY" | head -20 | sed 's/^/      /'
+  else
+    ok "working tree clean"
+  fi
 else
-  ok "working tree clean"
+  # Scoped: only dirt inside a scope is this run's unfinished work. Dirt outside every scope
+  # belongs to someone else in a shared checkout — name it, never fail on it (obs #142).
+  # -z and --untracked-files=all: file-level entries with no quoting, so a new directory is
+  # judged by its files rather than by a directory entry that may straddle a scope.
+  INSIDE=()
+  OUTSIDE=()
+  in_scope() {
+    local s
+    for s in "${SCOPES[@]}"; do path_under "$1" "$s" && return 0; done
+    return 1
+  }
+  # Each command's own status is captured: an unreadable status must fail check 3, never read as an
+  # empty list, which would report "clean within scope" (task.147 QA-1, CR-7).
+  STATUS_READ=false
+  if STATUS_FILE=$(mktemp); then
+    git status --porcelain -z --untracked-files=all > "$STATUS_FILE" 2>/dev/null
+    GS_STATUS=$?
+    if [ "$GS_STATUS" -eq 0 ]; then STATUS_READ=true; fi
+  fi
+  if [ "$STATUS_READ" = true ]; then
+    # With -z, a rename or copy is "XY <dest>" followed by a separate "<source>" entry. BOTH paths
+    # are judged: a move from inside the scope to outside it is a pending removal from the work
+    # item, and judging only the destination passed it as a warning (task.147 QA-1).
+    RENAME_SRC=false
+    while IFS= read -r -d '' entry; do
+      if [ "$RENAME_SRC" = true ]; then
+        RENAME_SRC=false
+        in_scope "$entry" && INSIDE+=("$entry (moved or copied away)")
+        continue
+      fi
+      XY="${entry:0:2}"
+      P="${entry:3}"
+      # Either column: a worktree-side rename (" R", as for an intent-to-add path) also carries a
+      # separate source record (task.147 QA-2, CR-8).
+      case "$XY" in R?|C?|?R|?C) RENAME_SRC=true ;; esac
+      if in_scope "$P"; then INSIDE+=("$P"); else OUTSIDE+=("$P"); fi
+    done < "$STATUS_FILE"
+  fi
+  [ -n "${STATUS_FILE:-}" ] && rm -f "$STATUS_FILE"
+  for P in ${OUTSIDE[@]+"${OUTSIDE[@]}"}; do
+    note "! outside scope (warning): $P"
+  done
+  if [ "$STATUS_READ" != true ]; then
+    fail "could not read the working-tree status — cannot establish that the scope is clean"
+  elif [ ${#INSIDE[@]} -gt 0 ]; then
+    fail "working tree is DIRTY within scope — ${#INSIDE[@]} uncommitted path(s):"
+    printf '      %s\n' "${INSIDE[@]}" | head -20
+  else
+    ok "working tree clean within scope (${#OUTSIDE[@]} path(s) outside scope, listed above)"
+  fi
 fi
 
 # ── 4. Local HEAD is on the remote ────────────────────────────────────────────

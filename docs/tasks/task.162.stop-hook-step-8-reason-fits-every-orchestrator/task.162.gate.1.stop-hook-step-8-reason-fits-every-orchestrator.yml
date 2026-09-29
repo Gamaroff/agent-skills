@@ -1,0 +1,52 @@
+schema: 1
+task: 'task.162.stop-hook-step-8-reason-fits-every-orchestrator'
+task_title: "The Stop hook's step-8 reason fits every orchestrator"
+gate: PASS
+status_reason: 'All 4 functional success criteria verified by executed tests and 5 mutation proofs; ci:fast, lint:shell and bundle:check green. The diff review raised two low cleanups and no bug, so nothing enters the queue.'
+reviewer: 'QA Engineer'
+updated: '2026-09-27T20:31:33Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 226
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false. The diff adds no accept/reject predicate: STEP7_TAIL and POSITION select message text, and the 4b case guard filters test-fixture links. Nothing shipped refuses an input.'
+  performance:
+    status: PASS
+    notes: 'Two string selections inside an existing hook run; no measurable change.'
+  reliability:
+    status: PASS
+    notes: 'Reason renders as valid JSON at locks 3 and 8 for all three skills; 43/43 hook scenarios pass. Rollback is a revert plus bundle.'
+  maintainability:
+    status: PASS
+    notes: 'Comments reworded rather than exempted, so the widened population test holds for every line of the hook.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1: add "the Step 7 Completion Checklist" to the develop-bug Step 7 tail in the hook and the resume contract, so both tails name their checklist (develop-bug-step-7-close-bug.md has its own).'
+      refs: ['shared/resources/develop-pipeline-on-stop.sh', 'shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-2: the 4b absolute-path guard can only fire on a builtin; for a genuinely missing rm or dirname it skips silently and the failure surfaces later as a no-jq assertion. Consider failing setup loudly instead.'
+      refs: ['shared/resources/advance-pipeline-lock.test.sh']
+    - action: 'QA-L1: the resume contract Phase 0b skill-aware Step 7-tail wording is not pinned by any test (reverting it reds nothing).'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

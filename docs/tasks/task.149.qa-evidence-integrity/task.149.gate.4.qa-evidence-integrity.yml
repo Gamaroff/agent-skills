@@ -1,0 +1,74 @@
+schema: 1
+task: 'task.149.qa-evidence-integrity'
+task_title: 'QA evidence integrity: qa-task/qa-story claims that no check reads back'
+gate: CONCERNS
+status_reason: 'BUG-5 closed; both boundaries engage (37 probes, 0 reproduced). The read-back blocks'' input has no writer in the block, and pass 1 stages untracked link targets outside the work item (MEDIUM each); a root SRC ("/") slips the CR3-5 containment test (low).'
+reviewer: 'QA Engineer'
+updated: '2026-09-26T05:55:00Z'
+
+top_issues:
+  - id: TASK-149-BUG-6
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Step 12b reads ${TASK_DIR:?} and item 3e ${STORY_FILE:?} with no writer or {placeholder} in the block, so the block as delivered halts on its own guard; the block test injects the input through env and cannot see it (review CR-1, CR-2).'
+    suggested_action: 'Bind the input with a {placeholder} line and halt when it is unsubstituted; make the test substitute the placeholder in the block text rather than inject env.'
+    suggested_owner: dev
+    bug_ref: 'task.149.bug.6.read-back-input-unbound.md'
+  - id: TASK-149-BUG-7
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Pass 1 git-adds every untracked link target in the repository, including directories and files outside the work-item directory, so unrelated uncommitted work can ride into the QA commit (review CR-3).'
+    suggested_action: 'Auto-stage only regular files under the work-item directory; any other untracked target blocks with a message to stage it deliberately; test both.'
+    suggested_owner: dev
+    bug_ref: 'task.149.bug.7.read-back-stages-outside-work-item.md'
+  - id: CR4-4
+    severity: low
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'The SRC-contains-sandbox test builds its prefix as srcReal + sep, which is "//" for SRC "/", so --copy-as /:x passes and cpSync would copy the filesystem root into the sandbox.'
+    suggested_action: 'Test containment with path.relative (contained when empty, or not starting with ".." and not absolute), in a pure exported helper the test can call with "/" safely.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 4239
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 37
+    notes: '--copy-as DEST containment engages 23/23; change-log --check-updated engages 14/14; TMPDIR=/tmp suites 209 pass. CR4-4 (root SRC) is a copy-scope defect, low.'
+  performance:
+    status: PASS
+    notes: 'Block test 52 cases ~4 s concurrent.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-149-BUG-6, TASK-149-BUG-7.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory: the [ -n "$THIS_GATE" ] halt is unreachable once qa-cycle.sh yields a cycle (no-red-dead by construction); CR-5 unprefixed globs and a task-shaped qa-story fixture.'
+
+bug_resolution:
+  bugs_closed: ['TASK-149-BUG-5']
+  bugs_new: 2
+
+recommendations:
+  immediate:
+    - action: 'Bind the read-back input by placeholder (TASK-149-BUG-6); scope pass-1 staging to the work item (TASK-149-BUG-7).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future:
+    - action: 'CR-5: prefix the read-back globs like their sibling blocks and give the qa-story block test a story-shaped fixture.'
+      refs: ['skills/qa-story/SKILL.md', 'tests/qa-read-back-block.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-149-BUG-6 and TASK-149-BUG-7 fixed']

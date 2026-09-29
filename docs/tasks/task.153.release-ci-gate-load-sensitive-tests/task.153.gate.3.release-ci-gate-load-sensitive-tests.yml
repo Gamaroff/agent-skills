@@ -1,0 +1,65 @@
+schema: 1
+task: 'task.153.release-ci-gate-load-sensitive-tests'
+task_title: "[Task 153] Release gate reads CI's verdict; load-sensitive tests name themselves"
+gate: PASS
+status_reason: 'All gate-2 findings fixed and re-proven (6/6 mutations red); both boundary controls engage (26 probes, 0 reproduced). One LOW from criterion verification: with HANDOFF_SPAWN_RETRIES>=3 the doubled schedule outlives the fixture, so a late miss fails without the marker.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T07:37:17Z'
+
+top_issues:
+  - id: 'QA3-1'
+    severity: low
+    file: 'skills/session-handoff/tests/handoff-verify.test.js'
+    finding: 'The doubling schedule (cycle-2 CR2-5 fix) reaches 24 s at HANDOFF_SPAWN_RETRIES=3, past slow.js own 20 s lifetime: that attempt sees no timeout, reads as forked, and fails the timeout-(Ns) assertion WITHOUT the LOAD-SENSITIVE marker — the criterion "exhausted retries fail with the marker" breaks under a documented knob. Default (2 retries: 3/6/12 s) is unaffected.'
+    suggested_action: 'Tie slow.js lifetime to the largest scheduled timeout plus a margin (or cap each attempt below it); unit-check the schedule stays inside the fixture lifetime for retries >= 3.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 59
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 26
+    notes: 'release-ci-verdict-sha engages 13/13; release-ci-verdict-repo engages 13/13 (../x and o/.. now refused). Record task.153.qa.3.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'No threshold raised; three whole-file budgets only gained a message.'
+  reliability:
+    status: PASS
+    notes: 'Fails closed; causing run named in refusals.'
+  maintainability:
+    status: PASS
+    notes: 'Guard now enumerates by spelling (A), by list (B) and by high-resolution clock source (C).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'QA3-1: keep every scheduled CR-6 attempt inside the fixture lifetime.'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+    - action: 'CR3-2 (advisory, low/medium): git grep --column reports only the first match per line; a second unmarked comparison on the same line is unchecked — use -o or rescan in JS.'
+      refs: ['tests/load-sensitive-marker.test.js']
+    - action: 'CR3-3 (advisory, low/low): --column is a byte offset; convert before comparing with UTF-16 indices.'
+      refs: ['tests/load-sensitive-marker.test.js']
+    - action: 'CR3-4 (advisory, low/low): direction C proves the FILE carries a marker, not each clock read; say so in the header or check per assertion.'
+      refs: ['tests/load-sensitive-marker.test.js']
+    - action: 'CR3-5 (cleanup): the dynamic-import after-hook is duplicated in two CJS test files — one shared helper.'
+      refs: ['tests/bundle-missing-source.test.js', 'tests/test-clean-checkout.test.js']
+    - action: 'CR3-6 (cleanup): readWorkflow is called twice per file in the parity test.'
+      refs: ['tests/release-ci-verdict.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

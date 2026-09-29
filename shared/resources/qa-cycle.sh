@@ -26,9 +26,29 @@
 #
 # Run under bash by that `bash …` invocation whatever the caller's shell — so the
 # unmatched-glob behaviour of zsh (abort before `ls`) never reaches the derivation.
+#
+# qa-cycle.sh <dir> --path gate|qa — print the ONE file of the current cycle: the
+# gate (`*.gate.{N}.*.yml`) or the QA report (`*.qa.{N}.*.md`) whose number is the
+# cycle above. It is the definition qa-read-back.js uses (task.149 BUG-11), in
+# place of a second grammar that drifted three times (BUG-9, CR6-2, BUG-11 — leading
+# zeros, the greedy segment, dotfiles). The same glob and the same sed decide both the
+# cycle and the file, so they cannot disagree. It is NOT yet the only definition: the
+# QA skills' Phase 0 and Step 13b blocks still find the gate with
+# `find -name "*.gate.${N}.*.yml"`, which misses a zero-padded gate this mode names;
+# moving them onto --path is a recorded follow-up (task.149 gate 8). Candidates are regular files only — not a directory named like a gate,
+# not a symlink. Exit 1, nothing on stdout, one ⚠️ line on stderr when no file
+# matches or when more than one does: an ambiguous cycle is refused, never picked.
 set -u
 
 DIR=${1:-}
+MODE=${2:-}
+KIND=${3:-}
+if [ -n "$MODE" ]; then
+  if [ "$MODE" != "--path" ] || { [ "$KIND" != "gate" ] && [ "$KIND" != "qa" ]; }; then
+    echo "⚠️  qa-cycle: usage: qa-cycle.sh <dir> [--path gate|qa]" >&2
+    exit 2
+  fi
+fi
 if [ -z "$DIR" ] || [ ! -d "$DIR" ]; then
   echo "⚠️  qa-cycle: no such directory: '${DIR}' — cannot derive the QA cycle" >&2
   exit 1
@@ -81,4 +101,25 @@ if [ -z "$best" ]; then
   exit 1
 fi
 
-printf '%s\n' "$best"
+if [ -z "$MODE" ]; then
+  printf '%s\n' "$best"
+  exit 0
+fi
+
+if [ "$KIND" = "gate" ]; then EXT=yml; else EXT=md; fi
+hits=()
+for f in "$DIR"/*."$KIND".*."$EXT"; do
+  [ -f "$f" ] && [ ! -L "$f" ] || continue
+  n=$(printf '%s' "${f##*/}" | sed -nE "s/^.*\\.${KIND}\\.([0-9]{1,9})\\..*$/\\1/p")
+  case "$n" in ''|*[!0-9]*) continue ;; esac
+  [ "$((10#$n))" -eq "$best" ] && hits+=("$f")
+done
+if [ "${#hits[@]}" -eq 0 ]; then
+  echo "⚠️  qa-cycle: no regular ${KIND} file for cycle ${best} in ${DIR} (expected *.${KIND}.${best}.{name}.${EXT})" >&2
+  exit 1
+fi
+if [ "${#hits[@]}" -gt 1 ]; then
+  echo "⚠️  qa-cycle: ${#hits[@]} ${KIND} files claim cycle ${best} in ${DIR} — refusing to choose: ${hits[*]##*/}" >&2
+  exit 1
+fi
+printf '%s\n' "${hits[0]}"

@@ -1,0 +1,24 @@
+{
+  "sink": null,
+  "entry": "cli:scripts/release-ci-verdict.mjs",
+  "name": "release-ci-verdict-repo",
+  "call_site": "scripts/release.sh:176",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 13,
+  "passed": 13,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 1,
+  "shells": null,
+  "fake_gh": null,
+  "argv": [
+    "--sha",
+    "0123456789abcdef0123456789abcdef01234567",
+    "--repo",
+    "{input}",
+    "--json"
+  ],
+  "ran_at": "2026-09-29T07:33:09.975Z"
+}

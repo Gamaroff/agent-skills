@@ -10,13 +10,16 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execFile } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
   writeFileSync,
   readFileSync,
   existsSync,
+  rmSync,
+  utimesSync,
+  readdirSync,
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -39,8 +42,14 @@ const {
   checkFindings,
   isOpenFinding,
   listRunFiles,
+  itemById,
+  runPathFor,
+  writeStateFile,
+  STATE_FIELDS,
+  STATE_PHASES,
   STATES,
   COLUMNS,
+  BUG_LINK_RULE,
 } = await import(TOOL);
 
 const HEAD = `| # | Function | What it does | Entry | Stories | Items | Automated by | UAT | Last run | Notes / bug |
@@ -667,4 +676,2119 @@ test("CLI: --findings walks runs/<id>/ recursively, oldest first across director
     check.out,
     /\[ERROR\] runs\/D\.3\/2026-09-23-lan\.md finding 1: bug file not found: \.\.\/\.\.\/\.\.\/bugs\/bug\.9\.gone\.md/,
   );
+});
+
+// ---------- task 141: targeting one named row, and re-running it ----------
+
+test("itemById resolves any row whatever its state, attaching the section title; unknown ids are null", () => {
+  const reg = parseRegistry(REGISTRY);
+  assert.equal(itemById(reg, "D.3").title, "Theater mode");
+  assert.equal(
+    itemById(reg, "D.3").surfaceTitle,
+    "Score",
+    "the section carries the title, the row does not",
+  );
+  assert.equal(
+    itemById(reg, "D.1").state,
+    STATES.accepted,
+    "a ✅ row resolves — the selector would never reach it",
+  );
+  assert.equal(itemById(reg, "Z.9"), null);
+});
+
+test("runPathFor: the day's first run is unsuffixed, then -02 … -10, zero-padded", () => {
+  assert.equal(runPathFor([], "2026-09-22", "lan"), "2026-09-22-lan.md");
+  const files = [];
+  for (let i = 0; i < 10; i++)
+    files.push(runPathFor(files, "2026-09-22", "lan"));
+  assert.deepEqual(files.slice(0, 3), [
+    "2026-09-22-lan.md",
+    "2026-09-22-lan-02.md",
+    "2026-09-22-lan-03.md",
+  ]);
+  assert.equal(
+    files[9],
+    "2026-09-22-lan-10.md",
+    "padded, so -10 sorts after -02",
+  );
+  assert.equal(new Set(files).size, 10, "every path is distinct");
+  assert.equal(
+    runPathFor(["2026-09-22-lan.md"], "2026-09-22", "ci"),
+    "2026-09-22-ci.md",
+    "a different env label is a different sequence",
+  );
+  assert.equal(
+    runPathFor(["runs/D.2/2026-09-22-lan.md"], "2026-09-22", "lan"),
+    "2026-09-22-lan-02.md",
+    "existing entries are compared by basename, so full paths work too",
+  );
+  // An env label ending in -NN would be indistinguishable from a run sequence, so seqKey would
+  // sort run 1 last again — the inversion the sort key exists to remove. Refused at write time,
+  // because at read time nothing knows the env.
+  assert.throws(
+    () => runPathFor([], "2026-09-22", "ci-02"),
+    /may not end in -NN/,
+    "an ambiguous env label is refused rather than written",
+  );
+  assert.equal(
+    runPathFor([], "2026-09-22", "ci-2"),
+    "2026-09-22-ci-2.md",
+    "one digit is not a sequence — only the two-digit form is ambiguous",
+  );
+});
+
+test("CLI: --run-path refuses an env label that would be read as a run sequence", () => {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  const { code, out } = run(root, "--run-path", "D.2", "--env", "ci-02");
+  assert.equal(code, 2, "a usage error, not a written file");
+  assert.match(out, /an env label may not end in -NN/);
+  // A refusal that has already created the directory is a refusal the caller cannot trust — and
+  // asserting the exit code alone would not have noticed: the first version of this fix validated
+  // AFTER mkdirSync and passed every assertion above.
+  assert.equal(
+    existsSync(path.join(root, "docs/qa/runs/D.2")),
+    false,
+    "a refused --run-path writes nothing at all",
+  );
+  assert.equal(
+    run(root, "--run-path", "D.2", "--env", "ci").code,
+    0,
+    "the ordinary label is unaffected",
+  );
+});
+
+test("listRunFiles puts the day's unsuffixed first run BEFORE its sequenced re-runs", () => {
+  // The assertion the whole sequencing scheme rests on. A plain basename sort fails it: "." sorts
+  // after "-", so ["…-lan.md","…-lan-02.md"].sort() yields ["…-lan-02.md","…-lan.md"] and the
+  // day's FIRST run reads as its last. The ordering test above at "CLI: --findings walks runs/…"
+  // uses two DIFFERENT dates and passes either way — it is not cover for this case.
+  const root = mkdtempSync(path.join(os.tmpdir(), "qa-next-runs-"));
+  const runs = path.join(root, "runs");
+  mkdirSync(path.join(runs, "D.2"), { recursive: true });
+  for (const name of [
+    "2026-09-22-lan-10.md",
+    "2026-09-22-lan-02.md",
+    "2026-09-22-lan.md",
+    "2026-09-23-lan.md",
+  ])
+    writeFileSync(path.join(runs, "D.2", name), "# run\n");
+  assert.deepEqual(
+    listRunFiles(runs).map((p) => path.basename(p)),
+    [
+      "2026-09-22-lan.md",
+      "2026-09-22-lan-02.md",
+      "2026-09-22-lan-10.md",
+      "2026-09-23-lan.md",
+    ],
+    "chronological across the mixed set [plain, -02, -10] and into the next day",
+  );
+});
+
+test("CLI: --item describes a named row exactly as --next describes it, and reaches rows --next never would", () => {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  const viaNext = JSON.parse(run(root, "--next", "--json").out);
+  const viaItem = JSON.parse(run(root, "--item", "D.1", "--json").out);
+  assert.equal(viaNext.id, "D.1");
+  assert.deepEqual(
+    viaItem,
+    viaNext,
+    "field-identical — this is what pins the single describeRow; a source grep would not",
+  );
+  assert.deepEqual(
+    JSON.parse(run(root, "--item", "d.1", "--json").out),
+    viaNext,
+    "a lowercase id resolves",
+  );
+  assert.deepEqual(
+    [
+      viaItem.state,
+      viaItem.lastRun,
+      viaItem.priorRuns,
+      viaItem.notes,
+      viaItem.bug,
+    ],
+    ["untested", null, [], "", null],
+    "the re-run fields on a function that has never run",
+  );
+
+  // Take D.1 out of ⬜ so --next can no longer reach it, then resolve it by id.
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/qa/runs/D.1/2026-09-20-lan.md"),
+    "# run\n",
+  );
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.7.x.md"),
+    "---\nstatus: new\n---\n",
+  );
+  assert.equal(
+    run(
+      root,
+      "--set",
+      "D.1",
+      "fail",
+      "--run",
+      "runs/D.1/2026-09-20-lan.md",
+      "--bug",
+      "docs/bugs/bug.7.x.md",
+    ).code,
+    0,
+  );
+  assert.equal(
+    JSON.parse(run(root, "--next", "--json").out).id,
+    "D.2",
+    "the selector has moved on",
+  );
+  const failed = JSON.parse(run(root, "--item", "D.1", "--json").out);
+  assert.equal(failed.state, "fail");
+  assert.equal(failed.lastRun, "runs/D.1/2026-09-20-lan.md");
+  assert.deepEqual(failed.priorRuns, ["runs/D.1/2026-09-20-lan.md"]);
+  assert.equal(
+    failed.bug,
+    "docs/bugs/bug.7.x.md",
+    "the bug link is parsed with checkRegistry's own regex, so Step 4 need not re-parse the registry",
+  );
+  assert.match(run(root, "--item", "D.1").out, /^item: D\.1 — Play a game$/m);
+});
+
+test("CLI: --item on an unknown id exits 4 and leaves the registry byte-identical", () => {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  const before = readFileSync(REG(root), "utf8");
+  const { code, out } = run(root, "--item", "Z.9");
+  assert.equal(
+    code,
+    4,
+    "4 is 'no such row', distinct from the usage family's 2",
+  );
+  assert.match(out, /Z\.9: no registry row/);
+  assert.equal(run(root, "--item", "Z.9", "--json").code, 4);
+  assert.equal(readFileSync(REG(root), "utf8"), before, "nothing was written");
+});
+
+test("CLI: --run-path returns the next free run file and creates its directory; an unknown id exits 4", () => {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  const first = run(root, "--run-path", "D.2", "--env", "lan");
+  assert.equal(first.code, 0);
+  const p1 = first.out.trim();
+  assert.match(p1, /^runs\/D\.2\/\d{4}-\d{2}-\d{2}-lan\.md$/);
+  assert.ok(
+    existsSync(path.join(root, "docs/qa/runs/D.2")),
+    "the function's directory is created",
+  );
+  writeFileSync(path.join(root, "docs/qa", p1), "# run\n");
+  const p2 = run(root, "--run-path", "d.2", "--env", "lan").out.trim();
+  assert.match(
+    p2,
+    /-lan-02\.md$/,
+    "a lowercase id resolves, and the day's second run is sequenced",
+  );
+  assert.notEqual(
+    p1,
+    p2,
+    "a same-day re-run never returns the path already on disk",
+  );
+  assert.match(
+    run(root, "--run-path", "D.2").out.trim(),
+    /-local\.md$/,
+    "--env defaults to local",
+  );
+  assert.equal(run(root, "--run-path", "Z.9").code, 4);
+});
+
+test("CLI: only a fail moves an ✅ accepted row — pass, blocked and n/a keep it and update Last run", () => {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  for (const n of ["r1", "r2", "r3"])
+    writeFileSync(path.join(root, `docs/qa/runs/D.2/${n}.md`), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.x.md"),
+    "---\nstatus: new\n---\n",
+  );
+  const state = () =>
+    readFileSync(REG(root), "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| D.2 |"))
+      .split("|")
+      .map((c) => c.trim());
+
+  run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r1.md");
+  assert.equal(run(root, "--accept", "D.2", "--note", "looks right").code, 0);
+  assert.equal(state()[8], STATES.accepted);
+  const acceptedNote = state()[10];
+  assert.match(acceptedNote, /^accepted \d{4}-\d{2}-\d{2} — looks right$/);
+
+  // pass on ✅ — kept, Last run updated, and the tool SAYS it took that branch.
+  const passed = run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r2.md");
+  assert.equal(passed.code, 0);
+  assert.match(passed.out, /^D\.2: ✅ accepted \(kept\) · \[r2\]/m);
+  assert.equal(
+    state()[8],
+    STATES.accepted,
+    "the owner's sign-off survives a machine re-pass",
+  );
+  assert.equal(state()[9], "[r2](runs/D.2/r2.md)");
+  assert.equal(state()[10], acceptedNote, "and so does its provenance");
+  assert.equal(run(root, "--check").code, 0);
+
+  // blocked and n/a on ✅ — the rule is over the verdict set, not over "pass". These two MANDATE
+  // --note, so a guard that REFUSED --note here made them impossible against an accepted row,
+  // which SKILL.md and the README both say is allowed. The kept path appends instead: the verdict
+  // gets its say and the sign-off survives.
+  for (const verdict of ["blocked", "na"]) {
+    const r = run(root, "--set", "D.2", verdict, "--note", `env: ${verdict}`);
+    assert.equal(r.code, 0, `${verdict} is legitimate against an accepted row`);
+    assert.match(r.out, /✅ accepted \(kept\)/);
+    assert.equal(state()[8], STATES.accepted);
+    assert.ok(
+      state()[10].startsWith(acceptedNote),
+      `the owner's sign-off survives a ${verdict} re-run — appended to, never replaced`,
+    );
+    assert.match(
+      state()[10],
+      new RegExp(`env: ${verdict}$`),
+      "and the verdict's note is there too",
+    );
+  }
+  assert.equal(run(root, "--check").code, 0);
+
+  // THE DOOR THE ENUMERATION MISSED. --bug also writes that cell, took the kept branch, and
+  // replaced the sign-off with a bug link while --check stayed green. Under the append rule no
+  // flag can reopen it, so this leg is the property test for every future one.
+  const withBug = run(
+    root,
+    "--set",
+    "D.2",
+    "pass",
+    "--run",
+    "runs/D.2/r1.md",
+    "--bug",
+    "docs/bugs/bug.1.x.md",
+  );
+  assert.equal(withBug.code, 0);
+  assert.match(withBug.out, /✅ accepted \(kept\)/);
+  assert.ok(
+    state()[10].startsWith(acceptedNote),
+    "--bug appends to the sign-off rather than replacing it",
+  );
+  assert.match(state()[10], /bug\.1\.x/);
+  assert.equal(run(root, "--check").code, 0);
+
+  // untested — the DEMOTION, not a verdict. It must move the row: it is the documented way to
+  // take an owner's ✅ back, and keeping ✅ for it left an accepted row whose Last run had been
+  // cleared by the untested block below, which --check rejects (TASK-141-BUG-1). This is the leg
+  // the original group never sent, which is why all ten mutations went red and none caught it.
+  const demoted = run(root, "--set", "D.2", "untested", "--note", "reopening");
+  assert.equal(demoted.code, 0);
+  assert.doesNotMatch(
+    demoted.out,
+    /\(kept\)/,
+    "untested is the demotion — it is never kept",
+  );
+  assert.equal(state()[8], STATES.untested);
+  assert.equal(state()[9], "", "untested clears Last run, as it always has");
+  assert.equal(state()[10], "reopening");
+  assert.equal(
+    run(root, "--check").code,
+    0,
+    "an ⬜ row needs no run link — the registry is valid after the documented demotion",
+  );
+  assert.equal(
+    JSON.parse(run(root, "--item", "D.2", "--json").out).state,
+    "untested",
+    "and the demoted row is back in the selector's queue (D.1 still shadows it in file order, which is why this asserts the row's state rather than --next)",
+  );
+
+  // Put it back to ✅ for the fail leg below.
+  run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r1.md");
+  run(root, "--accept", "D.2", "--note", "re-accepted");
+
+  // fail — the one verdict that moves it, from ✅ directly.
+  const failed = run(
+    root,
+    "--set",
+    "D.2",
+    "fail",
+    "--run",
+    "runs/D.2/r3.md",
+    "--bug",
+    "docs/bugs/bug.1.x.md",
+  );
+  assert.equal(failed.code, 0);
+  assert.doesNotMatch(failed.out, /\(kept\)/);
+  assert.equal(state()[8], STATES.fail);
+  assert.equal(run(root, "--check").code, 0);
+
+  // and a non-accepted row is untouched by the rule: pass still writes 🟡.
+  run(root, "--set", "D.1", "pass", "--run", "runs/D.2/r1.md");
+  assert.equal(
+    readFileSync(REG(root), "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| D.1 |"))
+      .split("|")
+      .map((c) => c.trim())[8],
+    STATES.pass,
+  );
+});
+
+test("CLI: --clear-note empties Notes / bug, and is refused where clearing would lose something", () => {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  for (const n of ["r1", "r2"])
+    writeFileSync(path.join(root, `docs/qa/runs/D.2/${n}.md`), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.x.md"),
+    "---\nstatus: new\n---\n",
+  );
+  const notes = (id) =>
+    readFileSync(REG(root), "utf8")
+      .split("\n")
+      .find((l) => l.startsWith(`| ${id} |`))
+      .split("|")
+      .map((c) => c.trim())[10];
+
+  run(
+    root,
+    "--set",
+    "D.2",
+    "fail",
+    "--run",
+    "runs/D.2/r1.md",
+    "--bug",
+    "docs/bugs/bug.1.x.md",
+  );
+  assert.match(notes("D.2"), /^\[bug\.1\.x\]/);
+  assert.equal(
+    run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r2.md", "--clear-note")
+      .code,
+    0,
+  );
+  assert.equal(
+    notes("D.2"),
+    "",
+    "a 🟡 that follows a ❌ carries no stale bug link",
+  );
+  assert.equal(run(root, "--check").code, 0);
+
+  const bad = run(
+    root,
+    "--set",
+    "D.2",
+    "pass",
+    "--run",
+    "runs/D.2/r2.md",
+    "--clear-note",
+    "--note",
+    "x",
+  );
+  assert.equal(bad.code, 2);
+  assert.match(bad.out, /--clear-note cannot be combined with --note or --bug/);
+  assert.equal(
+    run(
+      root,
+      "--set",
+      "D.2",
+      "fail",
+      "--run",
+      "runs/D.2/r2.md",
+      "--bug",
+      "docs/bugs/bug.1.x.md",
+      "--clear-note",
+    ).code,
+    2,
+    "--clear-note beside --bug is refused, which is why the fail row of the note table says --bug",
+  );
+
+  // On an accepted row the note cell holds the owner's sign-off, and --check imposes no note
+  // requirement there — so the refusal has to live in cmdSet or the loss would be silent.
+  run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r1.md");
+  run(root, "--accept", "D.2", "--note", "signed off");
+  const signOff = notes("D.2");
+  const refused = run(
+    root,
+    "--set",
+    "D.2",
+    "pass",
+    "--run",
+    "runs/D.2/r2.md",
+    "--clear-note",
+  );
+  assert.equal(refused.code, 2);
+  assert.match(
+    refused.out,
+    /--clear-note cannot empty an accepted row's sign-off note/,
+    "clearing is the one operation append cannot express, so it stays refused",
+  );
+  assert.equal(notes("D.2"), signOff, "byte-identical — nothing was written");
+  assert.equal(run(root, "--check").code, 0);
+});
+
+test("CLI: --item → --run-path → --set → --check composes, and a same-day re-run keeps the first run's findings", () => {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.2.open.md"),
+    "---\nstatus: new\n---\n",
+  );
+  const finding = (n, what) =>
+    `# run\n\n## Findings\n\n| # | Where | What was observed | Severity | Filed as |\n| :--- | :--- | :--- | :--- | :--- |\n| ${n} | /g | ${what} | Minor | [bug.2.open](../../../bugs/bug.2.open.md) |\n`;
+
+  const id = JSON.parse(run(root, "--item", "D.2", "--json").out).id;
+  const first = run(root, "--run-path", id, "--env", "lan").out.trim();
+  writeFileSync(
+    path.join(root, "docs/qa", first),
+    finding(1, "toast fires twice"),
+  );
+  assert.equal(run(root, "--set", id, "pass", "--run", first).code, 0);
+  assert.equal(run(root, "--check").code, 0);
+
+  const second = run(root, "--run-path", id, "--env", "lan").out.trim();
+  assert.notEqual(
+    second,
+    first,
+    "the same day, the same env — a different file",
+  );
+  writeFileSync(
+    path.join(root, "docs/qa", second),
+    finding(1, "still fires twice"),
+  );
+  assert.equal(
+    run(root, "--set", id, "pass", "--run", second, "--clear-note").code,
+    0,
+  );
+  assert.equal(run(root, "--check").code, 0);
+
+  const findings = JSON.parse(run(root, "--findings", "--json").out);
+  assert.deepEqual(
+    findings.map((f) => [f.run, f.what]),
+    [
+      [first, "toast fires twice"],
+      [second, "still fires twice"],
+    ],
+    "both runs' findings survive, oldest first — the first run was not overwritten",
+  );
+  const payload = JSON.parse(run(root, "--item", id, "--json").out);
+  assert.deepEqual(
+    payload.priorRuns,
+    [first, second],
+    "and priorRuns cites both, in order",
+  );
+  assert.equal(payload.lastRun, second);
+});
+
+test("CLI: the commands task 141 does not touch keep their arguments, output and exit codes", () => {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  assert.equal(
+    run(root, "--accept", "D.2").code,
+    2,
+    "--accept still refuses a non-🟡",
+  );
+  assert.equal(
+    run(root, "--set", "D.2", "accepted").code,
+    2,
+    "--set still refuses accepted",
+  );
+  assert.equal(
+    run(root, "--set", "D.2", "pass").code,
+    2,
+    "pass still needs --run",
+  );
+  assert.equal(run(root, "--check").code, 0);
+  assert.equal(run(root, "--coverage").code, 0);
+  assert.equal(run(root, "--findings").code, 0);
+  assert.equal(
+    run(root, "--item").code,
+    2,
+    "a bare --item is a USAGE error — 'you named no row' is not 'you named a row that is not there', and Step 1 maps exit 4 to STOP unknown-item",
+  );
+  assert.equal(
+    run(root, "--item", "--json").code,
+    2,
+    "and a flag-shaped value is not an id either",
+  );
+  assert.equal(run(root, "--run-path").code, 2, "same for --run-path");
+  assert.equal(
+    run(root, "--clear-note").code,
+    0,
+    "--clear-note alone is not a command",
+  );
+  run(root, "--set", "D.1", "na", "--note", "x");
+  run(root, "--set", "D.2", "na", "--note", "x");
+  assert.equal(
+    run(root, "--next").code,
+    3,
+    "--next still exits 3 when nothing is untested",
+  );
+  assert.equal(run(root, "--next", "--json").out.trim(), "null");
+});
+
+test("the run template and SKILL.md state ONE evidence path (TASK-141-BUG-2)", () => {
+  // The skill argues the rule; the template is what the agent fills in. Two authored statements of
+  // one path is the enumeration class, and this pair had already drifted: SKILL.md Step 3 moved to
+  // the run-file basename so a same-day re-run cannot overwrite the first run's screenshots, while
+  // the template still named `<date>-<env>/` — the colliding path the change set exists to remove.
+  // A prose fix nothing enforces drifts again, so the agreement is asserted rather than trusted.
+  const skillDir = path.resolve(__dirname, "../../../skills/qa-next");
+  const skill = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
+  const template = readFileSync(
+    path.join(skillDir, "assets", "run.template.md"),
+    "utf8",
+  );
+  const EVIDENCE_DIR = /\.claude\/state\/qa-next\/<id>\/([^/\s`}]+)\//g;
+
+  const seg = (text) => [...text.matchAll(EVIDENCE_DIR)].map((m) => m[1]);
+  const inSkill = seg(skill);
+  const inTemplate = seg(template);
+
+  // Non-vacuity floor: a regex that matches nothing would make this test pass on exactly the
+  // defect it was written for — "found nothing" and "could not look" must not be one result.
+  assert.ok(
+    inSkill.length >= 1,
+    "SKILL.md must name the evidence directory at least once — if this fails the matcher is broken, not the docs",
+  );
+  assert.ok(
+    inTemplate.length >= 2,
+    "the template names it on both its Report and Evidence lines",
+  );
+  assert.deepEqual(
+    [...new Set([...inSkill, ...inTemplate])],
+    ["<run-file-basename>"],
+    "every statement of the evidence directory, in both files, is the run-file basename",
+  );
+});
+
+test("every command that takes a row id accepts it case-insensitively (TASK-141-BUG-6)", () => {
+  // The POPULATION, enumerated. `normaliseId` was added to --item and --run-path, the two commands
+  // this task introduced, and the four that already took an id kept comparing raw — each site
+  // correct alone, the set never listed. A run carrying the owner's spelling resolved and computed
+  // a run path, then failed at --set: the RECORDING step, after the function had been exercised.
+  // Sampling two of six is what let that through, so this test names all six.
+  const ID_TAKING_COMMANDS = [
+    { label: "--item", argv: (id) => ["--item", id, "--json"] },
+    { label: "--run-path", argv: (id) => ["--run-path", id, "--env", "lan"] },
+    {
+      label: "--set",
+      argv: (id) => ["--set", id, "pass", "--run", "runs/D.2/r1.md"],
+    },
+    { label: "--items", argv: (id) => ["--items", id, "D.2.1"] },
+    { label: "--automated", argv: (id) => ["--automated", id, "a/b.spec.ts"] },
+    { label: "--accept", argv: (id) => ["--accept", id] },
+  ];
+
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+
+  const rejected = [];
+  for (const { label, argv } of ID_TAKING_COMMANDS) {
+    const { code, out } = run(root, ...argv("d.2"));
+    if (code !== 0 || /no registry row/.test(out))
+      rejected.push(`${label} (${code})`);
+  }
+  assert.deepEqual(
+    rejected,
+    [],
+    "every id-taking command must accept the lowercase id the Arguments table promises",
+  );
+  // Non-vacuity: the loop above is only evidence if it actually ran every command.
+  assert.equal(ID_TAKING_COMMANDS.length, 6);
+});
+
+test("a missing id is a usage error on every id-taking command, not a missing row (TASK-141-CR3-4)", () => {
+  // The same population as the case-insensitivity test, asserted for the other boundary property.
+  // `requireIdValue` was applied to the two readers only, so `--accept` with no id produced the
+  // subjectless `uat-status: : no registry row` and `--accept --force` reported
+  // `--FORCE: no registry row` — a flag read as an id. Enumerating the population is what closes it.
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  const bare = [
+    ["--item"],
+    ["--run-path"],
+    ["--set"],
+    ["--items"],
+    ["--automated"],
+    ["--accept"],
+    ["--accept", "--force"],
+  ];
+  const wrong = [];
+  for (const argv of bare) {
+    const { code, out } = run(root, ...argv);
+    if (code !== 2 || /no registry row/.test(out))
+      wrong.push(`${argv.join(" ")} (${code})`);
+  }
+  assert.deepEqual(
+    wrong,
+    [],
+    "a missing or flag-shaped id is exit 2 everywhere — 'you named no row' is never 'no such row'",
+  );
+  assert.equal(bare.length, 7);
+});
+
+test("a pipe in a note survives the render/parse round-trip (TASK-141-BUG-9)", () => {
+  // renderRow and splitCells were written for each other and never met: splitCells has honoured
+  // `\|` through a (?<!\\) lookbehind all along, and renderRow emitted the raw character. A pipe
+  // in a --note therefore split the row, and --check reported a cell-count error that /qa-next
+  // Step 0 treats as HALT `registry-invalid`. On a kept ✅ that became unrepairable in-tool.
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+
+  assert.equal(
+    run(root, "--set", "D.2", "blocked", "--note", "env a | b is down").code,
+    0,
+  );
+  assert.equal(
+    run(root, "--check").code,
+    0,
+    "the row still has its header's cell count — a pipe no longer splits it",
+  );
+  const payload = JSON.parse(run(root, "--item", "D.2", "--json").out);
+  assert.equal(payload.state, "blocked");
+  assert.match(
+    readFileSync(REG(root), "utf8"),
+    /env a \\\| b is down/,
+    "the pipe is stored escaped, which is what splitCells reads back",
+  );
+});
+
+test("the NEWEST bug link wins on an appended note cell (TASK-141-BUG-10)", () => {
+  // The append rule makes Notes / bug multi-valued on a kept ✅ — `--bug` is not refused there, it
+  // appends — and SKILL.md Step 4 re-links "the open bug" from this field, so the FIRST match is
+  // the superseded one. (An earlier draft of this test used --clear-note between the two bugs and
+  // proved nothing: the clear wiped the cell, so it never held both. The cell only accumulates on
+  // the kept path, which is the path the rule created.)
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  for (const n of ["bug.1.old", "bug.7.new"])
+    writeFileSync(
+      path.join(root, `docs/bugs/${n}.md`),
+      "---\nstatus: new\n---\n",
+    );
+
+  run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r1.md");
+  run(root, "--accept", "D.2", "--note", "signed off");
+  run(
+    root,
+    "--set",
+    "D.2",
+    "pass",
+    "--run",
+    "runs/D.2/r1.md",
+    "--bug",
+    "docs/bugs/bug.1.old.md",
+  );
+  run(
+    root,
+    "--set",
+    "D.2",
+    "pass",
+    "--run",
+    "runs/D.2/r1.md",
+    "--bug",
+    "docs/bugs/bug.7.new.md",
+  );
+
+  const notes = readFileSync(REG(root), "utf8")
+    .split("\n")
+    .find((l) => l.startsWith("| D.2 |"))
+    .split("|")
+    .map((c) => c.trim())[10];
+  assert.match(
+    notes,
+    /bug\.1\.old/,
+    "the cell really does hold both — otherwise this proves nothing",
+  );
+  assert.match(notes, /bug\.7\.new/);
+
+  const payload = JSON.parse(run(root, "--item", "D.2", "--json").out);
+  assert.equal(
+    payload.bug,
+    "docs/bugs/bug.7.new.md",
+    "the most recent bug link, not the first one in the cell",
+  );
+  assert.equal(run(root, "--check").code, 0);
+});
+
+test("the append never drops a note, and repetition is the accepted cost (TASK-141-CR4-3)", () => {
+  // Duplicate suppression was removed after three formulations each dropped a genuinely new note:
+  // ` · ` is the registry's separator AND legal inside one, so no comparison can tell a tail
+  // SEGMENT from a compound note's tail. This test pins the trade that was chosen instead — never
+  // lose a note — so that a future attempt to re-add suppression has to face it.
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+  const notes = () =>
+    readFileSync(REG(root), "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| D.2 |"))
+      .split("|")
+      .map((c) => c.trim())[10];
+
+  run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r1.md");
+  run(root, "--accept", "D.2", "--note", "signed off");
+
+  // The ambiguous case, which every suppression rule got wrong in one direction or the other.
+  run(root, "--set", "D.2", "blocked", "--note", "spec a · spec b");
+  run(root, "--set", "D.2", "blocked", "--note", "spec b");
+  assert.match(
+    notes(),
+    /spec a · spec b · spec b$/,
+    "the atomic note is kept even though a compound note's tail reads the same — losing it would be silent data loss",
+  );
+
+  // The accepted cost, asserted so it is a documented property rather than a surprise.
+  for (let i = 0; i < 3; i++)
+    run(root, "--set", "D.2", "blocked", "--note", "no credential");
+  assert.equal(
+    (notes().match(/no credential/g) ?? []).length,
+    3,
+    "an identical reason repeats — noise a reader can see, chosen over a rule that silently drops",
+  );
+
+  // A blank note is still nothing, and never leaves a dangling separator.
+  const before = notes();
+  run(root, "--set", "D.2", "blocked", "--note", "   ");
+  assert.equal(
+    notes(),
+    before,
+    "a whitespace-only note leaves the cell untouched",
+  );
+  assert.doesNotMatch(notes(), /·\s*$/);
+  assert.equal(run(root, "--check").code, 0);
+  assert.ok(
+    notes().startsWith("accepted"),
+    "and the owner's sign-off is still first",
+  );
+});
+
+test("every state in STATES is classified by each of cmdSet's three rules (TASK-141-CR4-4)", () => {
+  // The append rule replaced an enumeration of FLAGS with an enumeration of STATES. This is the
+  // forcing function for the second one: the population is Object.keys(STATES), listed once, and a
+  // seventh state fails here until all three questions are answered for it AND asserted against the
+  // tool. An earlier version probed the tool only when a requirement was TRUE and discarded the
+  // moves-accepted column entirely — so a state classified [false, false, false], the exact default
+  // the finding was raised about, passed having executed no assertion at all.
+  const RULES = {
+    // state → { movesAccepted, needsRun, needsNote }
+    untested: { movesAccepted: true, needsRun: false, needsNote: false },
+    pass: { movesAccepted: false, needsRun: true, needsNote: false },
+    fail: { movesAccepted: true, needsRun: true, needsNote: false },
+    blocked: { movesAccepted: false, needsRun: false, needsNote: true },
+    na: { movesAccepted: false, needsRun: false, needsNote: true },
+    accepted: null, // --set refuses it outright; --accept owns this transition
+  };
+  assert.deepEqual(
+    Object.keys(STATES).sort(),
+    Object.keys(RULES).sort(),
+    "a state was added to STATES without answering the three cmdSet rules for it",
+  );
+
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.x.md"),
+    "---\nstatus: new\n---\n",
+  );
+
+  assert.equal(
+    run(root, "--set", "D.2", "accepted").code,
+    2,
+    "--set refuses accepted",
+  );
+
+  const accept = () => {
+    run(root, "--set", "D.2", "untested", "--note", "reset");
+    run(root, "--set", "D.2", "pass", "--run", "runs/D.2/r1.md");
+    run(root, "--accept", "D.2", "--note", "signed off");
+  };
+  const stateCell = () =>
+    readFileSync(REG(root), "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| D.2 |"))
+      .split("|")
+      .map((c) => c.trim())[8];
+
+  let asserted = 0;
+  for (const [state, rule] of Object.entries(RULES)) {
+    if (!rule) continue;
+    const { movesAccepted, needsRun, needsNote } = rule;
+
+    // BOTH polarities — a `false` is a claim too, and asserting only the `true`s is how a
+    // [false,false,false] state slips through having been tested for nothing.
+    const bare = run(root, "--set", "D.2", state);
+    if (needsRun || needsNote) {
+      assert.equal(
+        bare.code,
+        2,
+        `${state} must refuse a call without its required flag`,
+      );
+    } else {
+      assert.equal(bare.code, 0, `${state} requires neither --run nor --note`);
+    }
+    asserted++;
+
+    // The moves-accepted column, asserted rather than tabulated.
+    accept();
+    const args =
+      state === "fail"
+        ? [
+            "--set",
+            "D.2",
+            "fail",
+            "--run",
+            "runs/D.2/r1.md",
+            "--bug",
+            "docs/bugs/bug.1.x.md",
+          ]
+        : needsRun
+          ? ["--set", "D.2", state, "--run", "runs/D.2/r1.md"]
+          : needsNote
+            ? ["--set", "D.2", state, "--note", `probe ${state}`]
+            : ["--set", "D.2", state, "--note", `probe ${state}`];
+    assert.equal(
+      run(root, ...args).code,
+      0,
+      `${state} against an accepted row should succeed`,
+    );
+    assert.equal(
+      stateCell() !== STATES.accepted,
+      movesAccepted,
+      `${state}: movesAccepted is tabulated as ${movesAccepted} — the tool disagrees`,
+    );
+    asserted++;
+  }
+  // The floor is DERIVED, not a literal: it still catches a `continue` that skips a state, but a
+  // sixth state added to both STATES and RULES — the correct extension this test exists to force —
+  // must not red here with a message pointing at the wrong thing.
+  assert.equal(
+    asserted,
+    Object.values(RULES).filter(Boolean).length * 2,
+    "every classified state contributed both of its assertions against the tool",
+  );
+  assert.equal(run(root, "--check").code, 0);
+});
+
+test("render and parse are inverses — a pipe does not accumulate backslashes (TASK-141-BUG-11)", () => {
+  // renderRow escapes `|`; splitCells must unescape it. Without the unescape every --set
+  // re-escaped an already-escaped pipe, so a hand-authored `a \| b` gained one backslash per
+  // rewrite, --check stayed green throughout, and --item --json handed the backslashes to the
+  // skill. The assertion is idempotence of the WHOLE round trip, which is the property the two
+  // functions have to hold jointly — asserting either one alone would have missed it.
+  const root = corpus();
+  run(root, "--init");
+  addRows(
+    root,
+    "D",
+    "| D.9 | Submit a \\| b | It posts a \\| b. | /g | 7.5 |  |  | ⬜ untested |  |  |\n",
+  );
+  mkdirSync(path.join(root, "docs/qa/runs/D.9"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.9/r1.md"), "# run\n");
+
+  const rowOf = () =>
+    readFileSync(REG(root), "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| D.9 |"));
+
+  run(root, "--set", "D.9", "blocked", "--note", "first");
+  const afterFirst = rowOf();
+  for (let i = 0; i < 5; i++)
+    run(root, "--set", "D.9", "blocked", "--note", `n${i}`);
+  const afterMany = rowOf();
+
+  const fnCell = (row) => row.split(/(?<!\\)\|/).map((c) => c.trim())[2];
+  assert.equal(
+    fnCell(afterMany),
+    fnCell(afterFirst),
+    "the Function cell is byte-identical after five further rewrites — no backslash growth",
+  );
+  assert.match(
+    fnCell(afterFirst),
+    /^Submit a \\\| b$/,
+    "and it is stored escaped exactly once",
+  );
+  assert.equal(
+    JSON.parse(run(root, "--item", "D.9", "--json").out).function,
+    "Submit a | b",
+    "the skill receives the unescaped value",
+  );
+  assert.equal(run(root, "--check").code, 0);
+});
+
+test("--check validates every bug link in the cell, including the one --item hands out (TASK-141-BUG-12)", () => {
+  // describeRow returns the LAST bug link; checkRegistry validated the FIRST. So --check could
+  // prove a different file exists from the one SKILL.md Step 4 opens to append a re-test section.
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  mkdirSync(path.join(root, "docs/qa/runs/D.2"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.2/r1.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.old.md"),
+    "---\nstatus: new\n---\n",
+  );
+
+  // A ❌ row whose cell holds a resolving FIRST link and a missing SECOND one.
+  run(
+    root,
+    "--set",
+    "D.2",
+    "fail",
+    "--run",
+    "runs/D.2/r1.md",
+    "--bug",
+    "docs/bugs/bug.1.old.md",
+  );
+  const reg = REG(root);
+  const text = readFileSync(reg, "utf8").replace(
+    "[bug.1.old](../bugs/bug.1.old.md)",
+    "[bug.1.old](../bugs/bug.1.old.md) · [bug.7.new](../bugs/bug.7.new.md)",
+  );
+  writeFileSync(reg, text);
+
+  assert.equal(
+    JSON.parse(run(root, "--item", "D.2", "--json").out).bug,
+    "docs/bugs/bug.7.new.md",
+    "the payload hands out the newest link",
+  );
+  const check = run(root, "--check");
+  assert.equal(
+    check.code,
+    1,
+    "and --check refuses the row, because that link does not resolve",
+  );
+  assert.match(check.out, /bug file not found: \.\.\/bugs\/bug\.7\.new\.md/);
+});
+
+test("--check validates relative bug links on EVERY row, and leaves prose URLs alone (BUG-14/BUG-15)", () => {
+  // Two findings, one rule. Cycle 5 validated every bug-shaped link but only on `fail` rows, which
+  // (a) made a prose URL in a fail note a hard error on a legal registry — /qa-next Step 0 HALTs
+  // on a non-zero --check — and (b) left the path describeRow PUBLISHES unchecked on the other
+  // four states, which is where SKILL.md Step 4 opens it to append a re-test section.
+  const root = corpus();
+  run(root, "--init");
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.1/r.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.real.md"),
+    "---\nstatus: new\n---\n",
+  );
+
+  // A fail row whose note carries a real link AND a prose URL.
+  addRows(
+    root,
+    "D",
+    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
+  );
+  let check = run(root, "--check");
+  assert.equal(
+    check.code,
+    0,
+    "a scheme-qualified link is a human's prose reference, not a path the tool wrote",
+  );
+  assert.doesNotMatch(check.out, /example\.com/);
+
+  // A blocked row — never validated before — whose published link does not resolve.
+  addRows(
+    root,
+    "D",
+    "| D.2 | Board | A visitor reads. | /g | 7.5 |  |  | ⏸ blocked |  | stale [bug.7.gone](../bugs/bug.7.gone.md) |\n",
+  );
+  assert.equal(
+    JSON.parse(run(root, "--item", "D.2", "--json").out).bug,
+    "docs/bugs/bug.7.gone.md",
+    "the payload publishes it, so --check must cover it",
+  );
+  check = run(root, "--check");
+  assert.equal(check.code, 1, "a stale link on a non-fail row is now caught");
+  assert.match(
+    check.out,
+    /D\.2: bug file not found: \.\.\/bugs\/bug\.7\.gone\.md/,
+  );
+
+  // And the fail-only rule is still fail-only: a blocked row needs no bug link at all.
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.7.gone.md"),
+    "---\nstatus: new\n---\n",
+  );
+  assert.equal(run(root, "--check").code, 0);
+});
+
+test("the link --check validates IS the link --item publishes (TASK-141-BUG-16)", () => {
+  // Cycle 6 closed the validated-vs-published divergence on the ROW-STATE axis and reopened it on
+  // the LINK-SHAPE axis: checkRegistry learned to skip a prose URL, describeRow did not, so the
+  // very fixture the cycle-6 test declares legal was --check green while the payload handed the
+  // skill `https://example.com/issues/99` — which SKILL.md Step 4 opens to append a re-test
+  // section. Both now consume one `bugLinkPaths` (predicate + fragment strip, cycle 8), so this
+  // asserts the PROPERTY (the two agree) rather than either behaviour alone.
+  const root = corpus();
+  run(root, "--init");
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.1/r.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.real.md"),
+    "---\nstatus: new\n---\n",
+  );
+
+  addRows(
+    root,
+    "D",
+    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
+  );
+  assert.equal(
+    run(root, "--check").code,
+    0,
+    "a prose URL is not a check error",
+  );
+  assert.equal(
+    JSON.parse(run(root, "--item", "D.1", "--json").out).bug,
+    "docs/bugs/bug.1.real.md",
+    "and the payload publishes the tool-written link, never the prose URL",
+  );
+
+  // A fail row whose ONLY bug-shaped link is prose does not satisfy the requirement — the base
+  // exited 1 here, and skipping the link must not have quietly relaxed the rule.
+  const root2 = corpus();
+  run(root2, "--init");
+  mkdirSync(path.join(root2, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(path.join(root2, "docs/qa/runs/D.1/r.md"), "# run\n");
+  addRows(
+    root2,
+    "D",
+    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | see [bug.99 discussion](https://example.com/issues/99) |\n",
+  );
+  const only = run(root2, "--check");
+  assert.equal(
+    only.code,
+    1,
+    "a URL alone does not satisfy 'fail requires a bug link'",
+  );
+  assert.match(only.out, /D\.1: fail requires a bug link in Notes/);
+  assert.equal(JSON.parse(run(root2, "--item", "D.1", "--json").out).bug, null);
+});
+
+test("a #fragment on a relative bug link resolves, and the payload is the path that was verified (TASK-141-CR7-3, BUG-18)", () => {
+  // `../bugs/bug.1.real.md#repro` names a file that exists. Reporting it missing is a check that
+  // is wrong about the filesystem, and on a fail row it HALTs the consuming skill. And the payload
+  // must publish the path --check called `exists` on, not the href: cycle 7 stripped the fragment
+  // on the checking side only, so --check passed a link whose published form Step 4 cannot open.
+  const root = corpus();
+  run(root, "--init");
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.1/r.md"), "# run\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.real.md"),
+    "---\nstatus: new\n---\n",
+  );
+  addRows(
+    root,
+    "D",
+    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md#repro) |\n",
+  );
+  assert.equal(
+    run(root, "--check").code,
+    0,
+    "the fragment is stripped before the exists check",
+  );
+  const payload = JSON.parse(run(root, "--item", "D.1", "--json").out);
+  assert.equal(
+    payload.bug,
+    "docs/bugs/bug.1.real.md",
+    "the payload is the verified path — a path ending #repro is not a file",
+  );
+  assert.ok(
+    existsSync(path.join(root, payload.bug)),
+    "and it opens from the repo root",
+  );
+  assert.match(
+    payload.notes,
+    /bug\.1\.real\.md#repro/,
+    "the anchor as the author wrote it is still in notes",
+  );
+});
+
+test("the bug-link rule is stated once: the skeleton writes BUG_LINK_RULE and the README quotes it verbatim (TASK-141-BUG-19)", () => {
+  // The rule had three statements — the code, the README, the skeleton --init writes — and cycles
+  // 6, 7 and 8 each found one of them stale. One string, held here, is the property; re-reading
+  // three sites by hand is the alignment that kept failing.
+  const root = corpus();
+  run(root, "--init");
+  assert.ok(
+    readFileSync(REG(root), "utf8").includes(BUG_LINK_RULE),
+    "the skeleton --init writes carries the rule",
+  );
+  const readme = readFileSync(
+    path.resolve(__dirname, "../../../skills/qa-next/README.md"),
+    "utf8",
+  );
+  const enforces = readme
+    .split("\n")
+    .find((l) => l.startsWith("`--check` enforces:"));
+  assert.ok(enforces, "the README has its --check enforces paragraph");
+  assert.ok(
+    enforces.includes(BUG_LINK_RULE),
+    "the README quotes the rule verbatim, in the --check paragraph",
+  );
+  assert.match(
+    enforces,
+    /are warnings, not errors/,
+    "and still says what --check only warns about",
+  );
+});
+
+test("each clause of BUG_LINK_RULE is what --check does (TASK-141-BUG-20)", () => {
+  // The constant was held to the README and the skeleton, and to behaviour only by keywords — and
+  // cycle 8 pinned the wrong one: it said "repo-relative" while links resolve against the
+  // registry. One row per clause, run through --check, so the words are held to the behaviour.
+  assert.match(BUG_LINK_RULE, /relative to the registry file/);
+  const cases = [
+    [
+      "resolves against the registry",
+      "❌ fail",
+      "[bug.1.real](../bugs/bug.1.real.md)",
+      0,
+      "docs/bugs/bug.1.real.md",
+    ],
+    [
+      "a #fragment is ignored",
+      "❌ fail",
+      "[bug.1.real](../bugs/bug.1.real.md#repro)",
+      0,
+      "docs/bugs/bug.1.real.md",
+    ],
+    [
+      "a repo-relative target is NOT the base",
+      "❌ fail",
+      "[bug.1.real](docs/bugs/bug.1.real.md)",
+      1,
+    ],
+    [
+      "on ANY row — a stale link on ⏸ fails",
+      "⏸ blocked",
+      "stale [bug.9](../bugs/bug.9.gone.md)",
+      1,
+    ],
+    [
+      "a scheme is prose, skipped",
+      "⏸ blocked",
+      "see [bug.9](https://example.com/9)",
+      0,
+      null,
+    ],
+    [
+      "a //host is prose, skipped",
+      "⏸ blocked",
+      "see [bug.9](//example.com/9)",
+      0,
+      null,
+    ],
+    [
+      "an #anchor alone is prose, skipped",
+      "⏸ blocked",
+      "see [bug.9](#nine)",
+      0,
+      null,
+    ],
+    [
+      "`bug.` after an ASCII letter is not a bug link — a debug log is not one",
+      "❌ fail",
+      "[bug.1.real](../bugs/bug.1.real.md) · see [debug.log](../logs/debug.log)",
+      0,
+      "docs/bugs/bug.1.real.md",
+    ],
+    [
+      "an underscore or digit before `bug.` is not a bug link either",
+      "❌ fail",
+      "[bug.1.real](../bugs/bug.1.real.md) · [x_bug.9](../bugs/gone.md) · [1bug.9](../bugs/gone.md)",
+      0,
+      "docs/bugs/bug.1.real.md",
+    ],
+    [
+      "a NON-ASCII letter before `bug.` does not block it — \\b is ASCII-only, and the rule says ASCII",
+      "❌ fail",
+      "[bug.1.real](../bugs/bug.1.real.md) · [ébug.9](../bugs/gone.md)",
+      1,
+      "docs/bugs/gone.md",
+    ],
+  ];
+  // The 5th column is what the payload publishes: a skipped link is prose, so it is never handed
+  // to the skill as `bug`. Exit code alone cannot see a skip removed — an anchor-only link then
+  // resolves to "" (the registry directory, which exists) and --check stays green.
+  for (const [clause, state, notes, want, wantBug] of cases) {
+    const root = corpus();
+    run(root, "--init");
+    mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+    writeFileSync(path.join(root, "docs/qa/runs/D.1/r.md"), "# run\n");
+    mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+    writeFileSync(
+      path.join(root, "docs/bugs/bug.1.real.md"),
+      "---\nstatus: new\n---\n",
+    );
+    const runCell = state === "❌ fail" ? "[r](runs/D.1/r.md)" : "";
+    addRows(
+      root,
+      "D",
+      `| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ${state} | ${runCell} | ${notes} |\n`,
+    );
+    assert.equal(run(root, "--check").code, want, clause);
+    if (wantBug !== undefined)
+      assert.equal(
+        JSON.parse(run(root, "--item", "D.1", "--json").out).bug,
+        wantBug,
+        `${clause} — published bug`,
+      );
+  }
+});
+
+test("the payload's bug round-trips through --set fail --bug (TASK-141-BUG-21)", () => {
+  // SKILL.md Step 4: a repeat failure reads `bug` and links the same bug again. The payload was
+  // registry-relative and --bug takes a repo-relative path, so following Step 4 literally wrote
+  // [bug.1.real](../../../bugs/bug.1.real.md) and turned --check red — from the original commit.
+  const root = corpus();
+  run(root, "--init");
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(path.join(root, "docs/qa/runs/D.1/r.md"), "# run\n");
+  writeFileSync(path.join(root, "docs/qa/runs/D.1/r2.md"), "# run 2\n");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.real.md"),
+    "---\nstatus: new\n---\n",
+  );
+  addRows(
+    root,
+    "D",
+    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) |\n",
+  );
+  const { bug } = JSON.parse(run(root, "--item", "D.1", "--json").out);
+  assert.equal(
+    bug,
+    "docs/bugs/bug.1.real.md",
+    "repo-relative — the form --bug takes",
+  );
+  assert.ok(
+    existsSync(path.join(root, bug)),
+    "and it opens from the repo root",
+  );
+  const set = run(
+    root,
+    "--set",
+    "D.1",
+    "fail",
+    "--run",
+    "runs/D.1/r2.md",
+    "--bug",
+    bug,
+  );
+  assert.equal(set.code, 0, set.out);
+  assert.match(
+    readFileSync(REG(root), "utf8"),
+    /\(\.\.\/bugs\/bug\.1\.real\.md\) \|/,
+    "the re-linked bug is written back in the registry's own form",
+  );
+  const check = run(root, "--check");
+  assert.equal(check.code, 0, check.out);
+});
+
+// ---------- the run state file (task 143) ----------
+//
+// The state file's contract used to be sentences in SKILL.md, and each of task.141's QA cycles 10–12
+// found one defect in them (BUG-21/22/23). It is now owned by uat-status.mjs; these tests are what
+// hold it. Every population below is derived from the STATE_FIELDS export, never restated.
+
+const STATE = (root) => path.join(root, ".claude/state/qa-next.state.json");
+const readStateFile = (root) => JSON.parse(readFileSync(STATE(root), "utf8"));
+// A sample value per --state-set parser, so the loops below need no per-field table.
+const SAMPLE = {
+  phase: "resolved",
+  path: "runs/D.2/2026-09-24-lan.md",
+  json: '{"exit":0,"report":"r"}',
+};
+
+function stateCorpus() {
+  const root = corpus();
+  run(root, "--init");
+  addRows(root, "D", D_ROWS);
+  return root;
+}
+
+test("STATE_FIELDS is the whole state: --state-init writes exactly its fields, --state-set writes exactly the mutable ones", () => {
+  const root = stateCorpus();
+  const init = run(root, "--state-init", "--item", "D.2", "--json");
+  assert.equal(init.code, 0, init.out);
+  const written = readStateFile(root);
+  assert.deepEqual(
+    Object.keys(written).sort(),
+    Object.keys(STATE_FIELDS).sort(),
+    "a field in the schema that init does not write, or one init writes that the schema does not name, is a reader with no writer",
+  );
+  const fields = Object.entries(STATE_FIELDS);
+  assert.ok(
+    fields.some(([, f]) => f.writer === "init") &&
+      fields.some(([, f]) => f.writer === "set"),
+    "non-vacuous: both writers are populated",
+  );
+  for (const [name, spec] of fields) {
+    const before = readStateFile(root);
+    const r = run(root, "--state-set", name, SAMPLE[spec.value] ?? "x");
+    if (spec.writer === "set") {
+      assert.equal(r.code, 0, `${name}: ${r.out}`);
+      assert.deepEqual(
+        readStateFile(root)[name],
+        spec.value === "json" ? JSON.parse(SAMPLE.json) : SAMPLE[spec.value],
+        `--state-set writes ${name}`,
+      );
+    } else {
+      assert.equal(r.code, 2, `${name} is init-only: ${r.out}`);
+      assert.match(r.out, new RegExp(`--state-set ${name}: init-only`));
+      assert.deepEqual(readStateFile(root), before, "and nothing is written");
+    }
+  }
+});
+
+test("--state-init records the payload --item and --next print, and prints it unchanged", () => {
+  const root = stateCorpus();
+  const item = run(root, "--item", "D.2", "--json");
+  const init = run(root, "--state-init", "--item", "D.2", "--json");
+  assert.equal(init.code, 0, init.out);
+  assert.equal(init.out, item.out, "the same payload, byte for byte");
+  const payload = JSON.parse(item.out);
+  const state = readStateFile(root);
+  assert.equal(state.item, payload.id);
+  assert.equal(state.function, payload.function);
+  assert.equal(state.surface, payload.surface);
+  assert.deepEqual(
+    state.stories,
+    payload.stories.map((s) => s.id),
+  );
+  assert.deepEqual(state.uatSpecs, payload.uatSpecs);
+  assert.deepEqual(state.priorRuns, payload.priorRuns);
+  assert.equal(state.bug, payload.bug);
+  assert.equal(state.targeted, true);
+  assert.equal(state.phase, "selected");
+  assert.equal(state.runFile, null);
+  assert.equal(state.filedBug, null);
+  assert.equal(state.lane, null);
+
+  const root2 = stateCorpus();
+  const next = run(root2, "--next", "--json");
+  const init2 = run(root2, "--state-init", "--next", "--json");
+  assert.equal(init2.code, 0, init2.out);
+  assert.equal(init2.out, next.out);
+  assert.equal(readStateFile(root2).targeted, false, "--next is untargeted");
+});
+
+test("--state-init refuses ANY existing state with exit 5 and writes nothing; exit 3 and 4 write nothing (TASK-143-BUG-1)", () => {
+  // Exit 0 means one thing — a fresh selection printed as the payload. Resuming is --state-get's
+  // job (Step 0); a state file seen here is another run, whatever item it names. The first version
+  // printed the stored state on exit 0 for the same item or --next, a shape Step 1 read as a payload.
+  const root = stateCorpus();
+  assert.equal(run(root, "--state-init", "--item", "D.2").code, 0);
+  const before = readFileSync(STATE(root), "utf8");
+  for (const args of [["--item", "D.1"], ["--item", "d.2"], ["--next"]]) {
+    const again = run(root, "--state-init", ...args, "--json");
+    assert.equal(again.code, 5, `${args}: ${again.out}`);
+    assert.match(
+      again.out,
+      /run-in-progress: a qa-next run for D\.2 is in flight/,
+    );
+    assert.equal(
+      again.out.includes('"id"'),
+      false,
+      `${args}: no payload printed`,
+    );
+    assert.equal(readFileSync(STATE(root), "utf8"), before, "nothing written");
+  }
+
+  const empty = stateCorpus();
+  const unknown = run(empty, "--state-init", "--item", "Q.9");
+  assert.equal(unknown.code, 4);
+  assert.equal(existsSync(STATE(empty)), false, "exit 4 writes nothing");
+  for (const id of ["D.1", "D.2"])
+    run(empty, "--set", id, "blocked", "--note", "no env");
+  const none = run(empty, "--state-init", "--next");
+  assert.equal(none.code, 3, none.out);
+  assert.equal(existsSync(STATE(empty)), false, "exit 3 writes nothing");
+  assert.equal(run(empty, "--state-init").code, 2, "neither --item nor --next");
+});
+
+test("eight concurrent --state-init calls: exactly one wins, the rest exit 5 run-in-progress (CR-3)", async () => {
+  // With the exclusive create this holds by construction — link() lets exactly one process place the
+  // file. Without it, processes that all passed the existence check each write, and several exit 0.
+  const root = stateCorpus();
+  const one = () =>
+    new Promise((resolve) =>
+      execFile(
+        "node",
+        [TOOL, "--root", root, "--state-init", "--next", "--json"],
+        (err, stdout, stderr) =>
+          resolve({ code: err ? err.code : 0, out: stdout + stderr }),
+      ),
+    );
+  const results = await Promise.all(Array.from({ length: 8 }, one));
+  const codes = results.map((r) => r.code).sort();
+  assert.deepEqual(
+    codes,
+    [0, 5, 5, 5, 5, 5, 5, 5],
+    JSON.stringify(results.map((r) => r.out.slice(0, 80))),
+  );
+  const winner = results.find((r) => r.code === 0);
+  assert.equal(
+    readStateFile(root).item,
+    JSON.parse(winner.out).id,
+    "the file is the winner's",
+  );
+  assert.deepEqual(
+    readdirSync(path.dirname(STATE(root))),
+    ["qa-next.state.json"],
+    "no temp file left behind",
+  );
+});
+
+test("the lock is created exclusively: a state file that appears after the check is not overwritten (CR-3)", () => {
+  // --state-init checks, then creates. The create is link(), which fails if the file exists, so a
+  // second init that passed the check in the same instant loses instead of replacing the winner.
+  const dir = mkdtempSync(path.join(os.tmpdir(), "qa-next-lock-"));
+  const p = path.join(dir, "qa-next.state.json");
+  writeStateFile(p, { item: "D.1", phase: "selected" }, { exclusive: true });
+  const winner = readFileSync(p, "utf8");
+  assert.throws(
+    () =>
+      writeStateFile(
+        p,
+        { item: "D.2", phase: "selected" },
+        { exclusive: true },
+      ),
+    (e) =>
+      e.code === 5 && /run-in-progress: a qa-next run for D\.1/.test(e.message),
+  );
+  assert.equal(readFileSync(p, "utf8"), winner, "the first lock survives");
+  writeStateFile(p, { item: "D.1", phase: "resolved" });
+  assert.equal(
+    JSON.parse(readFileSync(p, "utf8")).phase,
+    "resolved",
+    "an update replaces",
+  );
+  assert.deepEqual(
+    readdirSync(dir),
+    ["qa-next.state.json"],
+    "no temp file left behind on either path",
+  );
+});
+
+test("--state-get exits 6 with no state; --state-clear is idempotent", () => {
+  const root = stateCorpus();
+  const get = run(root, "--state-get");
+  assert.equal(get.code, 6, get.out);
+  assert.match(get.out, /no-state/);
+  assert.equal(run(root, "--state-set", "phase", "resolved").code, 6);
+  assert.equal(run(root, "--state-init", "--item", "D.2").code, 0);
+  assert.equal(run(root, "--state-get").code, 0);
+  assert.equal(run(root, "--state-clear").code, 0);
+  assert.equal(existsSync(STATE(root)), false);
+  assert.equal(run(root, "--state-clear").code, 0, "a second clear is a no-op");
+  assert.equal(run(root, "--state-get").code, 6);
+});
+
+test("--state-set: phase moves forward only; paths take null; lane takes JSON; unknown fields and values are refused", () => {
+  const root = stateCorpus();
+  run(root, "--state-init", "--item", "D.2");
+  const set = (...a) => run(root, "--state-set", ...a);
+  for (const ph of STATE_PHASES.slice(1, 3))
+    assert.equal(set("phase", ph).code, 0, ph);
+  assert.equal(
+    set("phase", "executed").code,
+    0,
+    "re-setting the current phase is a resume",
+  );
+  const back = set("phase", "resolved");
+  assert.equal(back.code, 2, back.out);
+  assert.match(back.out, /forward only \(executed → resolved is backward\)/);
+  assert.equal(
+    readStateFile(root).phase,
+    "executed",
+    "a refused move writes nothing",
+  );
+  assert.equal(set("phase", "done").code, 2, "not a phase");
+
+  assert.equal(set("filedBug", "docs/bugs/bug.1.x.md").code, 0);
+  assert.equal(set("filedBug", "null").code, 0);
+  assert.equal(
+    readStateFile(root).filedBug,
+    null,
+    "the literal null clears it",
+  );
+  assert.equal(set("runFile", "").code, 2, "an empty path is refused");
+  assert.equal(set("lane", "{not json").code, 2);
+  assert.equal(set("lane", "null").code, 0);
+  assert.equal(readStateFile(root).lane, null);
+
+  const unknown = set("colour", "red");
+  assert.equal(unknown.code, 2);
+  assert.match(unknown.out, /unknown state field/);
+  const proto = set("toString", "x");
+  assert.equal(proto.code, 2);
+  assert.match(
+    proto.out,
+    /unknown state field/,
+    "a prototype key is not a field — not an init-only one either",
+  );
+  assert.equal(set("phase").code, 2, "a missing value is a usage error");
+});
+
+test("a run through the state commands keeps the PRE-run priorRuns and bug (TASK-141-BUG-22/23 shapes)", () => {
+  const root = stateCorpus();
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  for (const b of ["bug.1.old", "bug.2.new"])
+    writeFileSync(
+      path.join(root, `docs/bugs/${b}.md`),
+      "---\nstatus: new\n---\n",
+    );
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/qa/runs/D.1/2026-09-01-lan.md"),
+    "# run\n",
+  );
+  addRows(
+    root,
+    "A",
+    "| A.9 | Placeholder | x | / | 7.5 |  |  | ⬜ untested |  |  |\n",
+  );
+  // D.1 re-shaped as a failed row linking bug.1.old — the re-run the id argument exists for.
+  const reg = readFileSync(REG(root), "utf8").replace(
+    /^\| D\.1 \|.*$/m,
+    "| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
+  );
+  writeFileSync(REG(root), reg);
+  assert.equal(run(root, "--check").code, 0, run(root, "--check").out);
+
+  assert.equal(run(root, "--state-init", "--item", "D.1").code, 0);
+  const runFile = run(root, "--run-path", "D.1", "--env", "lan").out.trim();
+  assert.equal(run(root, "--state-set", "runFile", runFile).code, 0);
+  assert.equal(run(root, "--state-set", "phase", "executed").code, 0);
+  writeFileSync(path.join(root, "docs/qa", runFile), "# run 2\n");
+  const set = run(
+    root,
+    "--set",
+    "D.1",
+    "fail",
+    "--run",
+    runFile,
+    "--bug",
+    "docs/bugs/bug.2.new.md",
+  );
+  assert.equal(set.code, 0, set.out);
+  assert.equal(
+    run(root, "--state-set", "filedBug", "docs/bugs/bug.2.new.md").code,
+    0,
+  );
+  assert.equal(run(root, "--state-set", "phase", "recorded").code, 0);
+  assert.equal(
+    run(root, "--check").code,
+    0,
+    "--check stays green through the run",
+  );
+
+  // The fresh payload has moved on: it counts the run just written and links the new bug.
+  const fresh = JSON.parse(run(root, "--item", "D.1", "--json").out);
+  assert.deepEqual(fresh.priorRuns, ["runs/D.1/2026-09-01-lan.md", runFile]);
+  assert.equal(fresh.bug, "docs/bugs/bug.2.new.md");
+  // The state has not: it is the row as it was when this run began.
+  const state = JSON.parse(run(root, "--state-get", "--json").out);
+  assert.deepEqual(
+    state.priorRuns,
+    ["runs/D.1/2026-09-01-lan.md"],
+    "BUG-22: the pre-run history",
+  );
+  assert.equal(state.bug, "docs/bugs/bug.1.old.md", "BUG-23: the pre-run bug");
+  assert.equal(
+    state.filedBug,
+    "docs/bugs/bug.2.new.md",
+    "this run's bug is a different field",
+  );
+  assert.equal(state.derived, undefined, "a current file derives nothing");
+
+  assert.equal(run(root, "--state-set", "phase", "committed").code, 0);
+  assert.equal(run(root, "--state-clear").code, 0);
+  assert.equal(run(root, "--check").code, 0);
+});
+
+test("a v0.51.0-shape state file is answered with targeted, priorRuns, bug and filedBug derived and named", () => {
+  const root = stateCorpus();
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.old.md"),
+    "---\nstatus: new\n---\n",
+  );
+  mkdirSync(path.join(root, "docs/qa/runs/D.1"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/qa/runs/D.1/2026-09-01-lan.md"),
+    "# run\n",
+  );
+  writeFileSync(
+    path.join(root, "docs/qa/runs/D.1/2026-09-24-lan.md"),
+    "# this run\n",
+  );
+  writeFileSync(
+    REG(root),
+    readFileSync(REG(root), "utf8").replace(
+      /^\| D\.1 \|.*$/m,
+      "| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
+    ),
+  );
+  // Exactly the example object SKILL.md shipped in v0.51.0.
+  const legacy = (phase) => {
+    mkdirSync(path.dirname(STATE(root)), { recursive: true });
+    writeFileSync(
+      STATE(root),
+      JSON.stringify({
+        item: "D.1",
+        function: "Play a game",
+        surface: "D",
+        stories: ["7.5"],
+        uatSpecs: [],
+        lane: null,
+        runFile: "runs/D.1/2026-09-24-lan.md",
+        phase,
+        startedAt: "2026-09-24T00:00:00Z",
+      }),
+    );
+    return JSON.parse(run(root, "--state-get", "--json").out);
+  };
+
+  const mid = legacy("executed");
+  assert.deepEqual(mid.derived, ["targeted", "priorRuns", "bug", "filedBug"]);
+  assert.equal(mid.targeted, false, "v0.51.0 had no id argument");
+  assert.deepEqual(
+    mid.priorRuns,
+    ["runs/D.1/2026-09-01-lan.md"],
+    "this run's own file excluded",
+  );
+  assert.equal(
+    mid.bug,
+    "docs/bugs/bug.1.old.md",
+    "before recorded the row still links the pre-run bug",
+  );
+  assert.equal(mid.filedBug, null);
+
+  const done = legacy("recorded");
+  assert.equal(
+    done.bug,
+    null,
+    "from recorded on, the reuse decision has been made",
+  );
+  assert.equal(
+    done.filedBug,
+    "docs/bugs/bug.1.old.md",
+    "and the row's link is this run's bug",
+  );
+  assert.ok(
+    !("derived" in readStateFile(root)),
+    "derived on read, never written back",
+  );
+});
+
+test("a real v0.51.0 file has runFile null: its own file is found by the file-name date (TASK-143-BUG-2, BUG-3)", () => {
+  // The start date is LOCAL, so this test pins the timezone its child processes run in: under
+  // TZ=Pacific/Kiritimati (UTC+14) 2026-09-24T12:00Z is the 25th and the own file is not excluded
+  // (TASK-143-QA4-2). The two tests below pin their own zones for the same reason.
+  const tz = process.env.TZ;
+  process.env.TZ = "UTC";
+  try {
+    // v0.51.0 never recorded runFile, and wrote exactly one runs/<id>/<date>-<env>.md per date. The
+    // own file is therefore the one dated on or after the run's start — not the row's Last run (a
+    // na/blocked early exit leaves it naming the PREVIOUS run) and not an mtime (a checkout refreshes
+    // those, and v0.51.0's startedAt was hand-written). Cycle 1 used both heuristics; each misfired.
+    const root = stateCorpus();
+    const runs = path.join(root, "docs/qa/runs/D.1");
+    mkdirSync(runs, { recursive: true });
+    const prev = path.join(runs, "2026-09-01-lan.md");
+    writeFileSync(prev, "# an earlier run\n"); // mtime NOW — as a checkout leaves it
+    const startedAt = "2026-09-24T12:00:00Z"; // the same calendar date in every timezone within ±12h
+    const legacy = (phase, lastRun, extra = {}) => {
+      writeFileSync(
+        REG(root),
+        readFileSync(REG(root), "utf8").replace(
+          /^\| D\.1 \|.*$/m,
+          `| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | 🟡 pass | [r](${lastRun}) |  |`,
+        ),
+      );
+      mkdirSync(path.dirname(STATE(root)), { recursive: true });
+      writeFileSync(
+        STATE(root),
+        JSON.stringify({
+          item: "D.1",
+          function: "Play a game",
+          surface: "D",
+          stories: ["7.5"],
+          uatSpecs: [],
+          lane: null,
+          runFile: null,
+          phase,
+          startedAt,
+          ...extra,
+        }),
+      );
+      return JSON.parse(run(root, "--state-get", "--json").out);
+    };
+
+    // Before `executed` this run has written nothing: the history is exact, same-day files included
+    // (TASK-143-BUG-4 — the date rule used to drop a same-day PRIOR run here).
+    writeFileSync(
+      path.join(runs, "2026-09-24-ci.md"),
+      "# an earlier run today, another env\n",
+    );
+    for (const phase of ["selected", "resolved"]) {
+      const early = legacy(phase, "runs/D.1/2026-09-24-ci.md");
+      assert.deepEqual(
+        early.priorRuns,
+        ["runs/D.1/2026-09-01-lan.md", "runs/D.1/2026-09-24-ci.md"],
+        `${phase}: nothing excluded — this run has written no file`,
+      );
+      assert.equal(
+        early.unverifiable,
+        undefined,
+        `${phase}: exact, so not flagged`,
+      );
+    }
+    rmSync(path.join(runs, "2026-09-24-ci.md"));
+
+    // A na/blocked early exit: no run file this run, Last run still names the previous run.
+    const early = legacy("recorded", "runs/D.1/2026-09-01-lan.md");
+    assert.deepEqual(
+      early.priorRuns,
+      ["runs/D.1/2026-09-01-lan.md"],
+      "the previous run is kept",
+    );
+    assert.deepEqual(
+      early.unverifiable,
+      ["priorRuns"],
+      "from executed on it is always flagged",
+    );
+
+    // A run that wrote its file: excluded by its date, at executed (not yet linked) and after.
+    writeFileSync(path.join(runs, "2026-09-24-lan.md"), "# this run\n");
+    for (const [phase, lastRun] of [
+      ["executed", "runs/D.1/2026-09-01-lan.md"],
+      ["recorded", "runs/D.1/2026-09-24-lan.md"],
+    ])
+      assert.deepEqual(
+        legacy(phase, lastRun).priorRuns,
+        ["runs/D.1/2026-09-01-lan.md"],
+        `${phase}: own file excluded, the earlier run kept whatever its mtime`,
+      );
+    assert.deepEqual(
+      legacy("executed", "runs/D.1/2026-09-01-lan.md").unverifiable,
+      ["priorRuns"],
+    );
+
+    // No usable startedAt: nothing can identify the own file, and the answer says so.
+    const blind = legacy("committed", "runs/D.1/2026-09-24-lan.md", {
+      startedAt: "whenever",
+    });
+    assert.deepEqual(blind.unverifiable, ["priorRuns"]);
+    assert.deepEqual(blind.priorRuns, [
+      "runs/D.1/2026-09-01-lan.md",
+      "runs/D.1/2026-09-24-lan.md",
+    ]);
+  } finally {
+    if (tz === undefined) delete process.env.TZ;
+    else process.env.TZ = tz;
+  }
+});
+
+test("a legacy run started near midnight counts the file named by its LOCAL date", () => {
+  // v0.51.0 named the run file by the local date; 02:00Z is still the 23rd in New York, so a start
+  // date taken from UTC alone would miss the run's own 2026-09-23 file.
+  const root = stateCorpus();
+  const runs = path.join(root, "docs/qa/runs/D.1");
+  mkdirSync(runs, { recursive: true });
+  writeFileSync(path.join(runs, "2026-09-01-lan.md"), "# earlier\n");
+  writeFileSync(path.join(runs, "2026-09-23-lan.md"), "# this run\n");
+  mkdirSync(path.dirname(STATE(root)), { recursive: true });
+  writeFileSync(
+    STATE(root),
+    JSON.stringify({
+      item: "D.1",
+      runFile: null,
+      phase: "executed",
+      startedAt: "2026-09-24T02:00:00Z",
+    }),
+  );
+  const out = execFileSync(
+    "node",
+    [TOOL, "--root", root, "--state-get", "--json"],
+    {
+      encoding: "utf8",
+      env: { ...process.env, TZ: "America/New_York" },
+    },
+  );
+  assert.deepEqual(JSON.parse(out).priorRuns, ["runs/D.1/2026-09-01-lan.md"]);
+});
+
+test("east of UTC the previous LOCAL day's run is kept — the start date is local, not the earlier of UTC and local (TASK-143-BUG-4)", () => {
+  // 2026-09-23T20:00Z is the 24th in Tokyo. v0.51.0 named that run 2026-09-24; a genuine run on the
+  // 23rd (local) must stay in priorRuns. The earlier-of-UTC-and-local date (the 23rd) dropped it.
+  const root = stateCorpus();
+  const runs = path.join(root, "docs/qa/runs/D.1");
+  mkdirSync(runs, { recursive: true });
+  writeFileSync(
+    path.join(runs, "2026-09-23-lan.md"),
+    "# the previous local day\n",
+  );
+  writeFileSync(path.join(runs, "2026-09-24-lan.md"), "# this run\n");
+  mkdirSync(path.dirname(STATE(root)), { recursive: true });
+  writeFileSync(
+    STATE(root),
+    JSON.stringify({
+      item: "D.1",
+      runFile: null,
+      phase: "recorded",
+      startedAt: "2026-09-23T20:00:00Z",
+    }),
+  );
+  const out = execFileSync(
+    "node",
+    [TOOL, "--root", root, "--state-get", "--json"],
+    {
+      encoding: "utf8",
+      env: { ...process.env, TZ: "Asia/Tokyo" },
+    },
+  );
+  assert.deepEqual(JSON.parse(out).priorRuns, ["runs/D.1/2026-09-23-lan.md"]);
+});
+
+test("a pre-upgrade run resumed at executed records a fresh run file, and priorRuns stays flagged (TASK-143-QA4-1, BUG-6)", () => {
+  // SKILL.md's resume map: runFile null at executed → --run-path, then --state-set runFile, then
+  // Step 4. The recorded file is excluded, but it does not make the answer exact: it names the file
+  // this run WILL write, not one an interrupted v0.51.0 Step 4 may already have written.
+  const root = stateCorpus();
+  const runs = path.join(root, "docs/qa/runs/D.1");
+  mkdirSync(runs, { recursive: true });
+  writeFileSync(path.join(runs, "2026-09-01-lan.md"), "# earlier\n");
+  mkdirSync(path.dirname(STATE(root)), { recursive: true });
+  writeFileSync(
+    STATE(root),
+    JSON.stringify({
+      item: "D.1",
+      runFile: null,
+      phase: "executed",
+      startedAt: "2026-09-24T12:00:00Z",
+    }),
+  );
+  assert.deepEqual(
+    JSON.parse(run(root, "--state-get", "--json").out).unverifiable,
+    ["priorRuns"],
+  );
+  const runFile = run(root, "--run-path", "D.1", "--env", "lan").out.trim();
+  assert.equal(run(root, "--state-set", "runFile", runFile).code, 0);
+  writeFileSync(
+    path.join(root, "docs/qa", runFile),
+    "# this run, written in Step 4\n",
+  );
+  const state = JSON.parse(run(root, "--state-get", "--json").out);
+  assert.deepEqual(
+    state.priorRuns,
+    ["runs/D.1/2026-09-01-lan.md"],
+    "own file excluded by runFile",
+  );
+  assert.deepEqual(
+    state.unverifiable,
+    ["priorRuns"],
+    "a legacy file is never exact from executed on, runFile or not",
+  );
+});
+
+test("east of UTC a recorded runFile dated the day BEFORE the local start is still excluded (TASK-143-QA7-1)", () => {
+  // --run-path names the file by the UTC date and the legacy date rule reads the LOCAL start date. In
+  // Tokyo, 2026-09-23T20:00Z is the 24th locally while --run-path wrote 2026-09-23, so the date rule
+  // does not catch this run's own file and only the runFile exclusion does. Anywhere at or west of
+  // UTC the date rule covers it too, which is why this test pins the zone.
+  const root = stateCorpus();
+  const runs = path.join(root, "docs/qa/runs/D.1");
+  mkdirSync(runs, { recursive: true });
+  writeFileSync(path.join(runs, "2026-09-01-lan.md"), "# earlier\n");
+  writeFileSync(
+    path.join(runs, "2026-09-23-lan.md"),
+    "# this run, --run-path's UTC date\n",
+  );
+  mkdirSync(path.dirname(STATE(root)), { recursive: true });
+  writeFileSync(
+    STATE(root),
+    JSON.stringify({
+      item: "D.1",
+      runFile: "runs/D.1/2026-09-23-lan.md",
+      phase: "recorded",
+      startedAt: "2026-09-23T20:00:00Z",
+    }),
+  );
+  const out = execFileSync(
+    "node",
+    [TOOL, "--root", root, "--state-get", "--json"],
+    {
+      encoding: "utf8",
+      env: { ...process.env, TZ: "Asia/Tokyo" },
+    },
+  );
+  const state = JSON.parse(out);
+  assert.deepEqual(
+    state.priorRuns,
+    ["runs/D.1/2026-09-01-lan.md"],
+    "the recorded runFile is this run's, whatever its date",
+  );
+  assert.deepEqual(state.unverifiable, ["priorRuns"], "still a legacy answer");
+});
+
+test("a pre-upgrade executed resume never reuses an existing file: a half-written one and an earlier run look the same (TASK-143-BUG-5, BUG-6)", () => {
+  // v0.51.0 set phase: executed at the end of Step 3 and wrote runs/<id>/<local date>-<env>.md at
+  // Step 4.1. A file of that name on resume is EITHER this run's, half-written by an interrupted
+  // Step 4, OR an earlier same-day run of the same item and label, when the interruption came
+  // before Step 4.1. The two are the same bytes on disk, so the resume map takes a fresh name and
+  // the answer stays flagged. The date is the UTC today() that --run-path uses (TASK-143-QA6-1), and
+  // TZ is pinned so the local start date is that same day.
+  const tz = process.env.TZ;
+  process.env.TZ = "UTC";
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const root = stateCorpus();
+    const runs = path.join(root, "docs/qa/runs/D.1");
+    mkdirSync(runs, { recursive: true });
+    writeFileSync(path.join(runs, "2026-09-01-lan.md"), "# earlier\n");
+    const sameName = path.join(runs, `${today}-lan.md`);
+    const body = "# either half-written, or an earlier run's record\n";
+    writeFileSync(sameName, body);
+    mkdirSync(path.dirname(STATE(root)), { recursive: true });
+    writeFileSync(
+      STATE(root),
+      JSON.stringify({
+        item: "D.1",
+        runFile: null,
+        phase: "executed",
+        startedAt: `${today}T12:00:00Z`,
+      }),
+    );
+    const runFile = run(root, "--run-path", "D.1", "--env", "lan").out.trim();
+    assert.equal(
+      runFile,
+      `runs/D.1/${today}-lan-02.md`,
+      "--run-path hands out a fresh name beside the existing file",
+    );
+    assert.equal(run(root, "--state-set", "runFile", runFile).code, 0);
+    assert.equal(
+      readFileSync(sameName, "utf8"),
+      body,
+      "the existing file is never taken over",
+    );
+    const state = JSON.parse(run(root, "--state-get", "--json").out);
+    assert.deepEqual(state.unverifiable, ["priorRuns"], "and not exact");
+    assert.deepEqual(
+      state.priorRuns,
+      ["runs/D.1/2026-09-01-lan.md"],
+      "best effort: the same-day file is excluded by its date, and flagged",
+    );
+  } finally {
+    if (tz === undefined) delete process.env.TZ;
+    else process.env.TZ = tz;
+  }
+});
+
+test("a state file that is not one is refused by name, exit 1", () => {
+  const root = stateCorpus();
+  mkdirSync(path.dirname(STATE(root)), { recursive: true });
+  for (const body of [
+    "{not json",
+    "[]",
+    '{"item":"D.2","phase":"walking"}',
+    '{"phase":"selected"}',
+  ]) {
+    writeFileSync(STATE(root), body);
+    const r = run(root, "--state-get");
+    assert.equal(r.code, 1, `${body}: ${r.out}`);
+    assert.match(r.out, /state-malformed/);
+  }
+  rmSync(STATE(root));
+});
+
+test("--state <path> moves the state file; the default is .claude/state/ under --root", () => {
+  const root = stateCorpus();
+  assert.equal(
+    run(root, "--state-init", "--item", "D.2", "--state", "tmp/s.json").code,
+    0,
+  );
+  assert.ok(existsSync(path.join(root, "tmp/s.json")));
+  assert.equal(existsSync(STATE(root)), false);
+  assert.equal(run(root, "--state-get", "--state", "tmp/s.json").code, 0);
+});
+
+test("runPathFor judges the BUILT name: a two-digit label, an empty one and a path-steering one are refused (TASK-141 PR review 2 CR-1)", () => {
+  for (const env of ["10", "07"])
+    assert.throws(
+      () => runPathFor([], "2026-09-22", env),
+      /reads as a run sequence/,
+      env,
+    );
+  for (const env of ["", "a/b", "a\\b", "..", "../x"])
+    assert.throws(
+      () => runPathFor([], "2026-09-22", env),
+      /may not contain|non-empty/,
+      JSON.stringify(env),
+    );
+  for (const env of ["ci10", "env10", "7", "100"]) {
+    const name = runPathFor([], "2026-09-22", env);
+    assert.equal(name, `2026-09-22-${env}.md`);
+    // The built name must sort as its own day's FIRST run, ahead of a re-run.
+    const re = runPathFor([name], "2026-09-22", env);
+    const dir = mkdtempSync(path.join(os.tmpdir(), "qa-next-seq-"));
+    mkdirSync(path.join(dir, "runs"));
+    for (const f of [re, name]) writeFileSync(path.join(dir, "runs", f), "");
+    assert.deepEqual(
+      listRunFiles(path.join(dir, "runs")),
+      [`runs/${name}`, `runs/${re}`],
+      env,
+    );
+  }
+});
+
+test("CLI: --run-path refuses a two-digit or path-steering --env and creates nothing", () => {
+  const root = stateCorpus();
+  for (const env of ["10", "../x"]) {
+    const r = run(root, "--run-path", "D.2", "--env", env);
+    assert.equal(r.code, 2, r.out);
+    assert.equal(existsSync(path.join(root, "docs/qa/runs/D.2")), false, env);
+  }
 });

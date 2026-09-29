@@ -38,6 +38,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
+import { loadSensitive } from "../spawn-budget.mjs";
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -303,7 +304,7 @@ test("a run of stars collapses — no catastrophic backtracking", () => {
   const elapsed = Date.now() - started;
   assert.ok(
     elapsed < 2000,
-    `40-star glob took ${elapsed}ms — backtracking has returned`,
+    loadSensitive(`40-star glob took ${elapsed}ms — backtracking has returned`),
   );
 
   // Collapsing must be a no-op on MEANING, which is why it is safe: three or more

@@ -1,0 +1,70 @@
+schema: 1
+task: 'task.145.review-outcome-reachability-check'
+task_title: "review-task: trace a criterion's stated outcome through the function that decides it"
+gate: CONCERNS
+status_reason: 'Cycle-3 fixes hold (no HIGH, all gates green, 9/9 mutants red). One medium remains: the pattern line sits in a hallucination list whose protocol files every hallucination as Critical, which contradicts the check''s Important. Two lows and a cleanup remain.'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T23:02:20Z'
+
+top_issues:
+  - id: 'CR4-1'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The reachability line in "Common Hallucination Patterns to Detect" (review-task:883, review-story:976) inherits the Anti-Hallucination Protocol''s "When hallucination detected: #### Critical (Hallucination)" and the Technical Accuracy template''s Critical bucket. A reviewer following the list reports Critical, not the Important that check 10 and check 7 require. In review-story a Critical forces NO-GO.'
+    suggested_action: 'Attach the severity to the pattern line ("→ Important, per check 10/7, not Critical") at both sites, and hold that severity in the test.'
+    suggested_owner: dev
+    bug_ref: 'task.145.bug.9.pattern-line-severity.md'
+  - id: 'CR4-2'
+    severity: low
+    file: 'skills/create-task/SKILL.md'
+    finding: 'The three named-phase clauses diverge. Only review-task rules out "a criterion that promises a later phase will add the branch" and says "Cite that phase". create-task, where such criteria are written, has neither, and NAMED_PHASE holds only the shared prefix.'
+    suggested_action: 'Use the same exclusion and citation at all three sites, and hold both.'
+    suggested_owner: dev
+  - id: 'CR4-3'
+    severity: low
+    file: 'skills/review-bug/SKILL.md'
+    finding: 'A Critical from the in-line stale walk matches both the NEEDS DETAIL row ("any Critical reproducibility gap") and the STALE row, with no precedence between them. The validate verdict block prints "Reproduces:" from the pre-pass only, so a walk-sourced STALE reads "STALE … Reproduces: likely".'
+    suggested_action: 'State that STALE outranks NEEDS DETAIL, and make the verdict block name the stale source (pre-pass or reachability walk).'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 4003
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false.'
+  performance:
+    status: PASS
+    notes: 'Test about 100 ms.'
+  reliability:
+    status: CONCERNS
+    notes: 'Severity contradiction between the check and the hallucination protocol (CR4-1).'
+  maintainability:
+    status: PASS
+    notes: 'The fence handling, section holds and verdict anchors were verified by the independent reviewer.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR4-1; align the named-phase clauses (CR4-2); add STALE precedence and source (CR4-3).'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md', 'skills/create-task/SKILL.md', 'skills/review-bug/SKILL.md']
+  future:
+    - action: 'CR4-4 (cleanup): the CHANGELOG should say the review-task and review-story pattern lines, and mention the review-bug section hold.'
+      refs: ['CHANGELOG.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR4-1 fixed'

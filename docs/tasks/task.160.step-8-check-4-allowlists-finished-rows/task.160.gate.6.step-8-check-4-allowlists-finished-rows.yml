@@ -1,0 +1,52 @@
+schema: 1
+task: 'task.160.step-8-check-4-allowlists-finished-rows'
+task_title: 'Step 8 check 4 allowlists finished rows instead of denying two unfinished ones'
+gate: PASS
+status_reason: 'Cycle 6 gates c3a2bd6f, the fix no gate had read. CR5-1..4 are fixed and test-held (two mutations red). The independent reviewer raised two low, non-blocking items; neither is a high-confidence bug, so the queue is empty.'
+reviewer: 'QA Engineer'
+updated: '2026-09-27T16:42:26Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 80
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 21
+    notes: 'Probe on 36c42825 (code at c3a2bd6f): 12 hostile refused, 9 legitimate admitted, engages. Record: task.160.qa.6.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: one awk pass.'
+  reliability:
+    status: PASS
+    notes: 'The step-8 resume rule now overrides only the Step 8 row. An unfinished Step 7 still wins, and a surviving lock counts. The pre-existing post-commit window is carried in recommendations.future.'
+  maintainability:
+    status: PASS
+    notes: 'Rule stated once (resume contract Phase 0b); the three orchestrators and step-0 point at it.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Carried: the pre-existing Step 8 post-commit resume gap (a284dfdd). /commit-changes removes the lock at step 8, so nothing after that commit leaves a record. A Step 8 HALT commits before its snapshot runs. The detector recommends LOCK_STEP+1 = 9. Filed as follow-up task.161.'
+      refs: ['shared/resources/advance-pipeline-lock.sh', 'shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'CR6-1 (low, advisory): Step 8 says to report the final commit hash in the Phase 2 completion output, but none of the three Phase 2 templates has a Commit field. Add one, or drop the instruction.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md', 'skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md']
+    - action: 'CR6-2 (cleanup): the "Step 8 row set ✅ before its own commit" test overlaps the finished-report case. Replace it with the negative case: a report edited after the commit fails check 5.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

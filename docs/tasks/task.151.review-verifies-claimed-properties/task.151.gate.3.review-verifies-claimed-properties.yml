@@ -1,0 +1,67 @@
+schema: 1
+task: 'task.151.review-verifies-claimed-properties'
+task_title: 'review-task: stack-neutral pre-pass, executed invariants, released-shape diff'
+gate: PASS
+status_reason: 'Gate 2 findings fixed (C2-CR-1 via the atxH2 reader, 3 mutation proofs); cycle 3 found no high or medium issue. One low, high-confidence edge case (U+2028/U+2029 inside a heading) is open in the queue.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T16:10:44Z'
+
+top_issues:
+  - id: 'C3-CR-2'
+    severity: low
+    file: 'shared/resources/prepass-axes.js'
+    finding: 'atxH2 content capture uses . without the s flag, so a heading containing U+2028 or U+2029 returns null and is dropped.'
+    suggested_action: 'Use [^]*? (or the s flag) for the content capture; add a U+2028 table case.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 26
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 5
+    notes: 'argv probe re-run at d0f14c64: engages, 5 executed (2 inputs not materialisable by the filename sink, both exit 2 directly).'
+  performance:
+    status: PASS
+    notes: 'prepass-axes.test.mjs ~0.67 s; review-property-checks.test.js ~0.13 s.'
+  reliability:
+    status: PASS
+    notes: 'Empty headings and read errors handled; remaining edge cases (U+2028 in a heading, HTML-comment headings) are low.'
+  maintainability:
+    status: PASS
+    notes: 'One spec-shaped heading reader pinned by a table; C3-CR-3 prose wording advisory.'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fixed: ['TASK-151-BUG-1', 'TASK-151-BUG-2 (verified: empty headings → fallback; table test + 3 mutation proofs)']
+  gate_2_findings_closed: ['C2-CR-1', 'C2-CR-2', 'C2-CR-5']
+  gate_2_findings_deferred: ['C2-CR-3 (missing --arch root is the no-docs fallback by design)', 'C2-CR-4 (joiners inside headings; none in any known concepts file)']
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'C3-CR-2'
+      action: 'atxH2 content capture uses . without the s flag, so a heading containing U+2028 or U+2029 returns null and is dropped. Fix: use [^]*? (or the s flag); add a U+2028 table case.'
+      refs: ['shared/resources/prepass-axes.js']
+      carried_from: 'top_issues (route 2b, cycle 3)'
+    - action: 'C3-CR-1: skip headings inside HTML comment blocks; C3-CR-2: U+2028 in a heading; C3-CR-3: state the rule as a non-empty H2 other than See also; C2-CR-3, C2-CR-4 as deferred.'
+      refs: ['shared/resources/prepass-axes.js', 'shared/resources/review-task-prepass-prompts.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

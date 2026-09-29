@@ -42,7 +42,15 @@ For each AC item extracted in Step 1:
 - An AC ticked complete with **no test written at all**. When the assertion was finally written it went **red immediately**, having concealed a live defect for the whole period it was assumed present.
 - A test written and cited, but placed in a **smoke/e2e directory excluded from the per-PR job** — so it would never have guarded the PR it was authored for.
 
-Tasks / refactoring work: `test_citation` may be `NOT_APPLICABLE` if the task explicitly states "no unit tests applicable" (cite that line) — mark status `PASS` with note.
+**Two kinds of criterion may carry `test_citation: "NOT_APPLICABLE: …"`, and only these two:**
+
+- **"No unit tests applicable."** A task that says so explicitly (cite that line). Mark `PASS` with a note.
+- **A documentation criterion.** Its whole deliverable is what a document says — a CHANGELOG entry cites the work item, a reference doc is updated, a doc agrees with the code — not what code does. Classify by what the criterion *requires*, not how it is worded: if it can be stated as "file F says S", it is a documentation criterion; if meeting it needs code to do something when run, it is not. For a documentation criterion:
+  - `code_citation` is the document line that meets it (e.g. `CHANGELOG.md:309`). **Read that text.** `note` says in one clause what the cited text states and why that meets the criterion. A citation you did not read is a `FAIL`.
+  - `test_citation` is a test that pins that document when one exists — for a CHANGELOG citation, the repository's changelog corpus guard if it has one; name it, and say in `note` when it runs (a post-merge guard is still a guard). Otherwise `"NOT_APPLICABLE: documentation criterion"`.
+  - `PASS` when the cited text is present and says what the criterion requires. `FAIL` when it is absent or says something else.
+
+`test_runs_per_pr` is `null` on both kinds: the execution rule reads a test lane, and neither has a test in one. **A behaviour criterion never takes either path.** "Hard to test" is not "no unit tests applicable", and describing a behaviour in a document does not make it a documentation criterion. Before this rule existed, every run failed its CHANGELOG criterion for having no test and the orchestrator overrode it by hand; a check that is overridden on every run is not a check.
 
 ### Step 4: Check documentation updates
 
@@ -72,7 +80,7 @@ ac_traceability:
       status: PASS | FAIL
       code_citation: "path/to/file.ts:NN"   # null if not found
       test_citation: "path/to/file.spec.ts:NN"  # null if not found, or "NOT_APPLICABLE: reason"
-      test_runs_per_pr: true | false            # false → status must be FAIL; name the lane in note
+      test_runs_per_pr: true | false | null     # false → status must be FAIL; name the lane in note. null only when test_citation is NOT_APPLICABLE
       note: "optional explanation"
   docs:
     - item: "description of doc item"
@@ -85,4 +93,4 @@ ac_traceability:
 
 **Citation rule**: `status: PASS` requires a non-null citation. Null citation → `status: FAIL`. `NOT_APPLICABLE` must have a `note`.
 
-**Execution rule**: for acceptance criteria, `status: PASS` additionally requires `test_runs_per_pr: true`. A cited test in a lane the PR does not run is a citation, not evidence → `status: FAIL` with the lane named in `note`.
+**Execution rule**: for acceptance criteria with a test citation, `status: PASS` additionally requires `test_runs_per_pr: true`. A cited test in a lane the PR does not run is a citation, not evidence → `status: FAIL` with the lane named in `note`. The two `NOT_APPLICABLE` kinds in Step 3 carry `null` here and are judged by their own rules.

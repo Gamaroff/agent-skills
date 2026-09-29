@@ -675,6 +675,100 @@ test("set-status --status parked without --parked-until is rejected", () => {
   }
 });
 
+test("set-status refuses an --id that more than one file matches, and writes neither (ambiguous-id)", () => {
+  // MUTATION: return matches[0] instead of refusing when matches.length > 1.
+  //
+  // findById used to return the FIRST file with the prefix. With an actioned
+  // entry sorting first, `set-status --id 5` re-parked it and reported ok while
+  // the entry the caller meant stayed open (task.150 QA cycle 3, TASK-150-BUG-4).
+  const { dir, P } = initWs("ambiguous-id");
+  try {
+    obs(P, "0005-a-actioned.md", { id: 4, status: "actioned" });
+    obs(P, "0005-b-target.md", { id: 5, status: "open" });
+    const r = cli([
+      "set-status",
+      "--workspace",
+      dir,
+      "--id",
+      "5",
+      "--status",
+      "parked",
+      "--parked-until",
+      "x",
+      "--json",
+    ]);
+    assert.equal(r.json.reason, "ambiguous-id");
+    assert.equal(r.code, 1);
+    assert.deepEqual(r.json.files, ["0005-a-actioned.md", "0005-b-target.md"]);
+    assert.match(
+      readFileSync(join(P.logDir, "0005-a-actioned.md"), "utf8"),
+      /status: actioned/,
+    );
+    assert.match(
+      readFileSync(join(P.logDir, "0005-b-target.md"), "utf8"),
+      /status: open/,
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("set-status --expect-status refuses when the entry changed since it was read, and writes nothing", () => {
+  // MUTATION: delete the status-changed branch in cmdSetStatus.
+  const { dir, P } = initWs("expect-status");
+  try {
+    obs(P, "0001-x.md", { id: 1, status: "actioned" });
+    const args = (expect) => [
+      "set-status",
+      "--workspace",
+      dir,
+      "--id",
+      "1",
+      "--status",
+      "parked",
+      "--parked-until",
+      "task.1 merged",
+      "--expect-status",
+      expect,
+      "--json",
+    ];
+    const r = cli(args("open"));
+    assert.equal(r.json.reason, "status-changed");
+    assert.equal(r.code, 1);
+    assert.equal(r.json.expected, "open");
+    assert.equal(r.json.actual, "actioned");
+    assert.match(
+      readFileSync(join(P.logDir, "0001-x.md"), "utf8"),
+      /status: actioned/,
+    );
+    // The expectation that matches goes through.
+    const ok = cli(args("actioned"));
+    assert.equal(ok.json.reason, "ok", JSON.stringify(ok.json));
+    assert.match(
+      readFileSync(join(P.logDir, "0001-x.md"), "utf8"),
+      /status: "?parked/,
+    );
+    // An unknown expectation is a usage error, not a silent mismatch.
+    const bad = cli(args("opn"));
+    assert.equal(bad.json.reason, "usage");
+    assert.equal(bad.code, 2);
+    // Every other subcommand rejects the flag rather than ignoring it (CR4-2).
+    const scan = cli([
+      "scan",
+      "--workspace",
+      dir,
+      "--expect-status",
+      "open",
+      "--json",
+    ]);
+    assert.equal(scan.json.reason, "usage");
+    assert.equal(scan.code, 2);
+    assert.match(scan.json.error, /does not accept --expect-status/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("set-status actioned writes a resolved date and touches no non-lifecycle field", () => {
   const { dir, P } = initWs("set-actioned");
   try {

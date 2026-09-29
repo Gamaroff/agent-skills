@@ -1,0 +1,63 @@
+schema: 1
+task: 'task.144.probe-engine-cli-entry-form'
+task_title: 'security-probe: a cli: entry form, so a multi-flag Node CLI''s boundary can be executed instead of declared unverifiable'
+gate: CONCERNS
+status_reason: 'Engine, tests and three of four doc sites are sound (15 new tests green, 14 mutations red, cli: validator probed engages 17/17). One medium finding: skills/review-security/SKILL.md still routes a non-JS entry to shell: only and says "neither form", and no check enforces that every entry-form listing names cli:.'
+reviewer: 'QA Engineer'
+updated: '2026-09-23T17:56:22Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'skills/review-security/SKILL.md'
+    finding: 'Enumeration miss: the diff routed Node CLIs to cli: in security-review-prompt.md limit 3 and the qa-task/qa-story Step 3b paragraphs, but review-security SKILL.md limit 3 (line 155) still names shell: as the only non-JS route and "two positionals" as declined; nothing checks that every site listing the entry forms names cli:.'
+    suggested_action: 'Update review-security SKILL.md limit 3 to name the cli: form (and shell-fn:), and add a population test with a non-vacuity floor asserting every canonical source that routes a non-JS entry names all three non-JS forms.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 81
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    notes: 'The --argv template validator (the boundary this change adds) was executed through the cli: form itself against the engine main: 13 hostile templates (embedded, suffix, dollar-embedded and fixture-embedded slots, two inputs, none, unknown, near-miss and upper-case slots, nested array, string, object, number) all refused with named bad-argv, 4 legitimate accepted, 0 escapes — verdict engages. node stays off SAFE_COMMANDS (task.80 parity test green). Entry containment reuses resolveEntry, unit-tested for cli:.'
+  performance:
+    status: PASS
+    notes: 'One node spawn per case; the uat-status consumer run (5 cases) completes in ~0.5s, far inside the per-case budget. No network.'
+  reliability:
+    status: PASS
+    notes: 'Crash, kill and timeout are errored (never a refusal); a --argv shape error exits 2 before any record write; shell arm refactor kept its 66 tests green. Advisory CR-2: a CLI that catches its own crash and exits 1 is scored rejected — document the limit.'
+  maintainability:
+    status: PASS
+    notes: 'Fixture/env/spawn helpers factored rather than copied; fast gate green (3961/0), bundle:check and check:generated clean. The one doc-site miss is CR-1.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1: name cli: in review-security SKILL.md limit 3 and add the entry-form population test.'
+      refs: ['skills/review-security/SKILL.md', 'shared/resources/tests/probe-boundary-signals.test.mjs']
+  future:
+    - action: 'CR-2 (advisory): state in probe-boundary-rule.md §5 that only an UNCAUGHT error is errored — a CLI that catches its own crash and exits non-zero is scored a refusal.'
+      refs: ['shared/resources/probe-boundary-rule.md']
+    - action: 'CR-3 (cleanup): collapse the two-branch materialiseFixture call in runCliCase to one call.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'A --argv template cannot pass a literal "{input}" string to its target (no escape syntax) — found while probing; name it as a limit or add an escape when a CLI needs one.'
+      refs: ['shared/resources/probe-boundary-rule.md']
+    - action: 'Pre-existing: Step 4b reports zero-blocks-executed on qa-task / qa-story SKILL.md (placeholder blocks need --bind); the diff adds no fenced blocks there.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

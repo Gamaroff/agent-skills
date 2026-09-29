@@ -1,0 +1,65 @@
+schema: 1
+task: 'task.149.qa-evidence-integrity'
+task_title: 'QA evidence integrity: qa-task/qa-story claims that no check reads back'
+gate: CONCERNS
+status_reason: 'BUG-10, CR6-2, CR6-4 closed and mutation-proved; all three boundaries engage (54 probes, 0 reproduced, 0 overblocked). artifact() still differs from qa-cycle.sh on dotfiles: a same-cycle AppleDouble file is chosen and staged as the gate (MEDIUM, reproduced).'
+reviewer: 'QA Engineer'
+updated: '2026-09-26T13:20:00Z'
+
+top_issues:
+  - id: TASK-149-BUG-11
+    severity: medium
+    file: 'shared/resources/qa-read-back.js'
+    finding: 'artifact() scans every readdir entry while qa-cycle.sh''s *.gate.*.yml glob skips dotfiles, so a same-cycle ._task.9.gate.1.x.yml is chosen as the gate, staged into the QA commit and reported (or, if gitignored, a permanent HALT blaming index.lock) — review CR-1, reproduced.'
+    suggested_action: 'One definition of this cycle''s gate/report file: let the helper that counts the cycle name the file, or skip dotfiles as the glob does; test with a same-cycle dotfile.'
+    suggested_owner: dev
+    bug_ref: 'task.149.bug.11.read-back-picks-dotfile-gate.md'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 4226
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 54
+    notes: '--copy-as DEST containment engages 24/24 (copy-as.dotdot-name no longer overblocked); change-log --check-updated engages 14/14; qa-read-back verdict engages 16/16 (new: dotdot-inside staged, unverifiable-link halts, gate-twogates read by its last segment). CI test job SUCCESS at a72aa4ac; TMPDIR=/tmp 37 + 11 pass.'
+  performance:
+    status: PASS
+    notes: 'qa-read-back suite 23 cases ~6 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-149-BUG-11.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory: CR-3 several same-cycle matches are chosen silently; CR-4 the exit-2 cause list differs between the header and Step 12b / 3e; CR-5 the containment predicate exists three times.'
+
+bug_resolution:
+  bugs_closed: ['TASK-149-BUG-10']
+  bugs_new: 1
+
+recommendations:
+  immediate:
+    - action: 'One definition of this cycle''s gate/report file (TASK-149-BUG-11).'
+      refs: ['shared/resources/qa-read-back.js', 'shared/resources/qa-cycle.sh']
+  future:
+    - action: 'CR-2 (pre-existing on develop — base lines 400, 853): security-probe.mjs --entry and --fake-gh containment use a bare startsWith(".."), refusing a ..name path inside the repo (fails closed). Follow-up: move to the shared ..-or-../ test.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-3: halt naming every match when more than one regular file matches the cycle.'
+      refs: ['shared/resources/qa-read-back.js']
+    - action: 'CR-4/CR-5: one exit-2 cause list; one exported isWithin.'
+      refs: ['shared/resources/qa-read-back.js', 'shared/resources/doc-links.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-149-BUG-11 fixed']

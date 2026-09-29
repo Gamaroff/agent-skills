@@ -286,11 +286,11 @@ repository's shared-resources directory; `observation-log.js` sits beside them t
 
 **They are named here rather than linked, deliberately.** A relative link resolves in situ and
 breaks the moment the bundler copies this file into a skill's `references/` directory — which it
-does, without bringing unrelated siblings along, because it keys on the literal
-`shared/resources/<name>` form and never sees a `./`-prefixed link. Writing them in that linkable
-form instead would drag three unrelated engines into every consumer of a skill that bundles this
-contract, to satisfy six cross-references. Nothing under `skills/` is link-checked in CI, so the
-broken form would have shipped green.
+does, without bringing unrelated siblings along, because it keys on the literal shared-resources
+path form (the directory name, a slash, a file name) and never sees a `./`-prefixed link.
+Writing them in that linkable form instead would drag three unrelated engines into every
+consumer of a skill that bundles this contract, to satisfy six cross-references. Nothing under
+`skills/` is link-checked in CI, so the broken form would have shipped green.
 
 ---
 
@@ -410,6 +410,8 @@ Transcribed from `tracker-comment.js` so the
 | `fork-detected` | a second `skill-observations/` exists at another plausible anchor |
 | `invalid-frontmatter` | a file's header could not be parsed |
 | `parked-without-condition` | `status: parked` with no `parked_until` |
+| `ambiguous-id` | `--id` matches more than one file (two files share a numeric prefix); **nothing was written**, and `files[]` names them. Exit `1`. Renumber one by hand before changing either: a first-match lookup here silently rewrote whichever sorted first (task.150) |
+| `status-changed` | `set-status --expect-status s` found the entry reading something else; **nothing was written**, `expected` and `actual` are returned. Exit `1`. The check runs on the file being written, at the moment of writing |
 | `dry-run` | `--dry-run`; nothing read, nothing written |
 | `possible-duplicate` | `write` found an open or parked entry sharing a `skill:` with the candidate whose title overlaps it (Jaccard ≥ 0.28 over distinctive tokens); **nothing was written**. `candidates[]` lists id, title, status and overlap. Exit `0` — a recognised recurrence is a normal outcome. Bump the existing entry, or re-run with `--not-duplicate-of <ids>` naming every candidate; that flag is a recorded judgement, the same shape as `--siblings-checked none`. Resolved entries are never candidates: a recurrence of an actioned defect is a new fact (the fix did not hold) |
 | `usage` | the invocation itself was wrong — unknown subcommand or flag, missing required argument, a flag whose value is absent. Always paired with exit `2`, never `1`: a caller that mistyped a flag has a different problem from one whose guard tripped |

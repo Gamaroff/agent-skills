@@ -1,0 +1,94 @@
+schema: 1
+task: 'task.146.identity-rule-fix-probe'
+task_title: 'qa-fix: a fix to an identity rule must prove both directions — should-merge and should-not-merge'
+gate: CONCERNS
+status_reason: 'The deliverable is in place and every stated criterion holds, but the change leaves a sibling description of the cycle-2 refute directive incomplete, and the new four-bullet assertion has a vacuous path (a fifth bullet after the paragraph passes). Two medium, one low, all introduced by this diff.'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T07:20:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: medium
+    file: 'shared/resources/code-review-prompt.md'
+    finding: >-
+      The cycle-2 section of the shared reviewer contract (line 236, and its bundled copies) describes
+      what the refute pass probes as "the four transitions … teardown · in-flight · error path ·
+      reconnect". The directive it describes now also carries the Identity rules paragraph, so the
+      description is incomplete. This is the "what did this edit make false elsewhere?" defect that
+      qa-fix Step 3.5's documentation table names (from code review CR-1, verified).
+    suggested_action: >-
+      Add one clause to that bullet naming the identity-rule pair (one pair that must be the same, one
+      that must differ, for a key, normaliser or equality change). Then run `npm run bundle` so the
+      copies match. Do not add the probe to the general reviewer's checks, which stays out of scope.
+    suggested_owner: dev
+  - id: 'QA-2'
+    severity: medium
+    file: 'tests/identity-rule-probe.test.js'
+    finding: >-
+      The "sits outside the four-transition list" test counts bullets only between "probe these four
+      transitions" and the Identity rules paragraph. Adding a fifth `•` bullet after the paragraph,
+      in both blocks, leaves all 6 tests green (QA mutation, restored). "four" becomes false and the
+      assertion written to hold it passes (from code review CR-3, mutation-verified).
+    suggested_action: >-
+      Count every `•` bullet in the whole REFUTE PASS block and assert exactly four, keeping the
+      ordering assertion. Mutation-prove it with a fifth bullet placed after the paragraph.
+    suggested_owner: dev
+  - id: 'QA-3'
+    severity: low
+    file: 'skills/qa-task/SKILL.md'
+    finding: >-
+      In both refute blocks, "Review the COMBINATION … at least one real defect of this shape" now
+      directly follows the Identity rules paragraph, so "this shape" reads as referring to identity
+      rules rather than the lifecycle transitions it was written about (from code review CR-2).
+    suggested_action: >-
+      Name the subject in both blocks (e.g. "of the lifecycle shape above"), applied by one script so
+      the blocks stay byte-identical.
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 36
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Prose and one read-only test. No boundary in the change set (boundary: false), no input handling, no secrets.'
+  performance:
+    status: PASS
+    notes: 'The new test file runs in ~0.2s with pure file reads (36 tests in the qa-task/qa-story/identity run took 167ms).'
+  reliability:
+    status: PASS
+    notes: 'The test floors fail loudly on a missing or renamed block (QA mutation M5, from develop). The Step 4b zero-blocks-executed finding exists identically on base, so it is pre-existing.'
+  maintainability:
+    status: PASS
+    notes: 'The findings are captured in top_issues. Otherwise the change is clear, cites its sources, and one script applied it to both twins.'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA-1 and QA-2 (and QA-3) in the next /qa-fix cycle.'
+      refs: ['shared/resources/code-review-prompt.md', 'tests/identity-rule-probe.test.js', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future:
+    - action: >-
+        Pre-existing, not introduced here: Step 4b reports zero-blocks-executed on qa-fix, qa-task and
+        qa-story SKILL.md, with every block placeholder or mutating. The result is identical on
+        origin/develop and the diff changes no fence line.
+      refs: ['skills/qa-fix/SKILL.md', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: >-
+        Pre-existing (observation #181): the Step 3b `mktemp /tmp/qa-code-review-XXXXXX.diff` template
+        is not randomised by BSD mktemp, so a second run fails with File exists.
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-1 and QA-2 fixed']

@@ -1,0 +1,18 @@
+{
+  "sink": "filename",
+  "entry": ".claude/state/t150-probe/wrapper.mjs#parkWrites",
+  "name": "parkWrites",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 10,
+  "passed": 10,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-28T19:56:05.637Z"
+}

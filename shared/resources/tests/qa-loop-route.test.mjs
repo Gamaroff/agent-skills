@@ -64,6 +64,9 @@ const {
 } = require(MODULE_PATH);
 
 const fixture = (name) => readFileSync(join(FIXTURES, name), "utf8");
+// task.148's copies of task.143's real gates — the narrowing-residue shape.
+const NR = join(__dirname, "fixtures", "qa-narrowing-residue");
+const nr = (name) => readFileSync(join(NR, name), "utf8");
 const GLOBS = ["**/*.spec.ts", "**/*.test.*", "tests/**", "**/fixtures/**"];
 
 const FIX = "Running qa-fix (cycle 5 of 5)";
@@ -340,6 +343,38 @@ const ROWS = [
     route: ROUTES.CONTINUE,
     reason: "high-on-last-gate",
   },
+
+  // ── task.148: task.143's real route decisions, pinned ──
+  // These pin what the route classifier returns on the narrowing shape; they
+  // do not by themselves prove the signal is not a route (a route folded in
+  // after the PASS-token check would leave the CONCERNS row green). That
+  // property is held in qa-narrowing-residue.test.mjs: a source read of
+  // classifyLoopRoute, and deep-equal pairs on a PASS gate where the signal fires.
+  {
+    label:
+      "task.143 cycle 3 — narrowing residue on a CONCERNS gate still routes continue (obs #172: an offer, not a route)",
+    input: {
+      cycle: 3,
+      highCounts: [0, 0, 0],
+      latestGateContent: nr("task143-gate-3.yml"),
+      testArtifactGlobs: GLOBS,
+    },
+    route: ROUTES.CONTINUE,
+    reason: "not-a-pass-gate",
+  },
+  {
+    label: "task.143 cycle 5 at the budget — the real run's route 2c decline",
+    input: {
+      cycle: 5,
+      highCounts: [0, 0, 0, 0, 0],
+      mediumCounts: [2, 1, 2, 0],
+      latestGateContent: nr("task143-gate-5.yml"),
+      budgetSpent: true,
+      lastCycleAction: FIX,
+    },
+    route: ROUTES.CONTINUE,
+    reason: "medium-not-falling",
+  },
 ];
 
 for (const row of ROWS) {
@@ -374,6 +409,39 @@ test("a continue after route 2 declined still reports route 2's reason in its de
   });
   assert.equal(r.route, ROUTES.CONTINUE);
   assert.match(r.detail, /route 2 declined: non-test-finding/);
+});
+
+// ── route 2 carries its residue by id, so the exiting gate has no open entry (obs #215) ──
+
+test("route 2 returns the OPEN residue ids, in gate order", () => {
+  const r = classifyLoopRoute({
+    cycle: 3,
+    highCounts: [2, 0, 0],
+    latestGateContent: fixture("residue-cycle3.yml"),
+    testArtifactGlobs: GLOBS,
+  });
+  assert.equal(r.route, ROUTES.DIMINISHING_RETURNS);
+  assert.deepEqual(r.residueIds, ["RECON-005", "RECON-006"]);
+});
+
+test("route 2's residueIds leave out an entry already closed — it is not residue to carry", () => {
+  const gate = fixture("residue-cycle3.yml").replace(
+    /(id: "RECON-005"[\s\S]*?)status: open/,
+    "$1status: closed",
+  );
+  assert.notEqual(
+    gate,
+    fixture("residue-cycle3.yml"),
+    "the fixture edit applied",
+  );
+  const r = classifyLoopRoute({
+    cycle: 3,
+    highCounts: [2, 0, 0],
+    latestGateContent: gate,
+    testArtifactGlobs: GLOBS,
+  });
+  assert.equal(r.route, ROUTES.DIMINISHING_RETURNS);
+  assert.deepEqual(r.residueIds, ["RECON-006"]);
 });
 
 // ── 2b carries the LOW ids the orchestrator moves to recommendations.future ──
@@ -564,5 +632,48 @@ test("the module still touches no filesystem API", () => {
   assert.doesNotMatch(
     src,
     /require\(["']fs["']\)|require\(["']node:fs["']\)|from ["']fs["']/,
+  );
+});
+
+// ── both carrying exits close what they carry (obs #215) ─────────────────────
+//
+// Route 2b always stamped its carried LOWs `status: closed`; route 2 left its residue open, and
+// develop-next's merge gate — which refuses any open entry — then halted an accepted task. The two
+// exits' On-exit lists must carry the SAME stamp, and route 2's must read the ids from residueIds.
+// Read from the step doc by section, not by grepping the whole file: a stamp in one exit's list must
+// not satisfy the other's.
+test("route 2's and route 2b's On-exit lists both stamp carried entries status: closed (obs #215)", () => {
+  const doc = readFileSync(
+    join(__dirname, "..", "develop-pipeline-step-5-6-qa-loop.md"),
+    "utf8",
+  );
+  const onExit = doc
+    .split(/^#### On exit$/m)
+    .slice(1)
+    .map((s) => s.split(/^#{2,4} /m)[0]);
+  assert.equal(
+    onExit.length,
+    2,
+    "non-vacuity: two On-exit sections (route 2, route 2b)",
+  );
+  const [route2, route2b] = onExit;
+  for (const [name, body, route] of [
+    ["route 2", route2, "route 2"],
+    ["route 2b", route2b, "route 2b"],
+  ]) {
+    assert.match(
+      body,
+      /status: closed/,
+      `${name}'s On-exit list does not close what it carries`,
+    );
+    assert.ok(
+      body.includes(`resolution: carried to recommendations.future (${route})`),
+      `${name}'s On-exit list does not write the carried-to resolution`,
+    );
+  }
+  assert.match(
+    route2,
+    /residueIds/,
+    "route 2's list does not read the ids from ROUTE_JSON.residueIds",
   );
 });

@@ -1,0 +1,95 @@
+schema: 1
+task: 'task.147.develop-pipeline-step-mechanics'
+task_title: 'develop pipeline: five steps that fail or overreach on correct input'
+gate: CONCERNS
+status_reason: 'All gate-2 findings are verified fixed (bugs 7-9 closed; nine mutation proofs; 88/88 node tests and 23/23 shell cases, also under TMPDIR=/tmp). The HIGH count has fallen 2, 1, 0. The cycle-3 review of the cycle-2 fixes found three MEDIUM defects at the edges of the new state records and scope normalisation, and two LOW. None of the five is HIGH.'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T10:14:06Z'
+
+top_issues:
+  - id: 'T147-QA3-CR1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-4-create-pr.md'
+    finding: 'The guard and Restore log with `tee -a Issues Log`, which writes untracked `Issues` and `Log` files at the repo root. It predates this task, three occurrences on origin/develop. Combined with the held-path record, a second guard run (the retry that the hold-dir reuse exists for) holds them and appends them to step4-held-paths.txt, and Step 8 check 5 then fails on the pipeline own log files on a correct run.'
+    suggested_action: 'Replace every `| tee -a Issues Log` in the Step 4 blocks with a plain echo (the orchestrator copies the line into the Issues Log). Add a guard-twice assertion that the held record lists only the fixture stray paths and that no `Issues` or `Log` file is created.'
+    suggested_owner: dev
+  - id: 'T147-QA3-CR3'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-8-commit.md'
+    finding: 'When Restore never ran, the held files are still in HOLD_DIR and absent from the tree. Check 5 skips absent held paths, and the passing checklist then deletes step4-hold-dir.txt, which is the only pointer to the stranded files.'
+    suggested_action: 'Check 5 fails, naming the directory, while step4-hold-dir.txt names a non-empty directory. Restore deletes that record, so it only survives when files are still held. The records are deleted only after every check passes, as now.'
+    suggested_owner: dev
+  - id: 'T147-QA3-CR4'
+    severity: medium
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'A scope of `.`, or one with a `.` segment or a double slash (`docs/./tasks/task.1`, `docs//tasks/task.1`), passes the existence check but matches no porcelain path. Every dirty path then reads as outside the scope, and check 3 passes vacuously, which is the sibling of the `..` case refused in cycle 2.'
+    suggested_action: 'Collapse repeated slashes and `.` segments before the existence check, and refuse a scope that normalises to the whole repository. Add cases for `--scope .` and `--scope docs/./tasks/task.1`.'
+    suggested_owner: dev
+  - id: 'T147-QA3-CR2'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-8-commit.md'
+    finding: 'When the held record first line is not {work-item-dir}, Step 8 skips the record silently. A record for this work item spelled differently would drop every held path, with nothing said.'
+    suggested_action: 'When a held record exists whose first line names another work item, print a named warning, so the skip is visible.'
+    suggested_owner: dev
+  - id: 'T147-QA3-CR5'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-4-create-pr.md'
+    finding: 'A tracked change under `.claude/` (for example `.claude/settings.json`) makes the derivation scope the whole `.claude` directory. Where .claude/ is not gitignored, the Step 4 commit would then carry the lock and the step4 records.'
+    suggested_action: 'In the derivation, scope a changed file under `.claude/` by its own path, never by its directory.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 111
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [4]
+  code_review:
+    findings: 5
+    bugs: 5
+    cleanups: 0
+    promoted: ['CR-1', 'CR-2', 'CR-3', 'CR-4', 'CR-5']
+    pre_existing_mechanism: 'CR-1: tee -a Issues Log exists 3 times on origin/develop; promoted because the new held-path record turns it into a Step 8 failure on a correct run'
+  boundary: false
+  probes_executed: 0
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-25'
+  total_iterations: 2
+  verification_method: 'Executed tests running Step 4 and Step 8 blocks across shells, nine mutation proofs, TMPDIR=/tmp run'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary, unchanged.'
+  performance:
+    status: PASS
+    notes: 'The suites take 0.1-6.3s each.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 and CR-3: edge cases of the Step 4 records can fail a correct Step 8 or strand held files. CR-4: a vacuous scope.'
+  maintainability:
+    status: PASS
+    notes: 'Tests run the shipped blocks one per shell.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-3 and CR-4 (MEDIUM), and CR-2 and CR-5 (LOW)'
+      refs: ['shared/resources/develop-pipeline-step-4-create-pr.md', 'shared/resources/develop-pipeline-step-8-commit.md', 'shared/resources/verify-push-state.sh']
+  future:
+    - action: 'Carried: CR-3 (a new untracked dir held at Step 4, gate 1), CR-4 and CR-5 (gate 2, pre-existing unbound PR_NUMBER and Step-0 variables), CR-10 (cross-repository heads), CR-11 (joined-string dedupe), the Step 4b {template}-slot limit (obs #186).'
+      refs: ['shared/resources/develop-pipeline-step-4-create-pr.md', 'shared/resources/develop-pipeline-step-8-commit.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Close the three MEDIUM findings']

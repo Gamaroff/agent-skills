@@ -32,6 +32,12 @@ An earlier handoff said "`npm` is fine". It is not; it was never checked.
 Not just one file — **the whole directory**. `.agents/skills/foo/…` and `skills/foo/…` are the same
 file on disk; editing either edits both. Only the `skills/` path is git-tracked.
 
+The symlink is gitignored, so **a test run in place passes on it where CI fails**: any test that
+reaches `.agents/skills/…` from the repository root resolves it here and nowhere else (obs #149 —
+71/71 locally, 19 red in CI). Build the test's cwd with `makeConsumerRoot()`
+(`evals/shared/lib/consumer-root.mjs`), and check a local green with `npm run test:clean-checkout`,
+which runs `npm test` in a clone of HEAD that has no ignored paths. `scripts/release.sh` gates on it.
+
 ### Never edit `skills/*/references/` — it is generated
 
 `shared/resources/` is the single source of truth. `.git/hooks/pre-commit` runs `npm run bundle`
@@ -106,12 +112,28 @@ The tree-wide property is now asserted directly (*no SKILL.md declares `invokes:
 edges*), which is what covers the shape nobody has thought of yet. Prettier does **not** reflow a long
 inline list, so nothing in the toolchain pushes you into the wrapped form — verified.
 
-### Two tests to distrust differently
+### Load-sensitive tests
 
-- `qa-execute-snippets` is **load-flaky** — it asserts on multi-second timings and fails under
-  parallel load. Re-run that file alone before believing a failure.
-- The **stdout-drain premise test is not flaky any more** (fixed 2026-09-04; the payload is now sized
-  from the pipe buffer). A failure there is real. Do not re-run it away.
+A failure whose message starts `LOAD-SENSITIVE` is a timing assertion that depends on machine load.
+Re-run that file alone (`command node --test <file>`) before believing it; a green alone means
+re-run the gate, not investigate. A failure **without** the marker is real — do not re-run it away.
+The marker is built by `loadSensitive()` in the shared `spawn-budget.mjs` (task 153), and
+`scripts/release.sh` prints this rule when its local test aborts. Every file that carries it:
+
+- `evals/shared/tests/consumer-root.test.mjs`
+- `shared/resources/tests/access-config-parity.test.mjs`
+- `shared/resources/tests/qa-diminishing-returns.test.mjs`
+- `shared/resources/tests/qa-execute-snippets.test.mjs`
+- `skills/session-handoff/tests/handoff-verify.test.js`
+- `tests/bundle-missing-source.test.js`
+- `tests/test-clean-checkout.test.js`
+
+`tests/load-sensitive-marker.test.js` fails when this list and the code disagree, and when a
+wall-clock assertion (`Date.now() - t0 < N`, `elapsed < N`, `ms < …BUDGET_MS`) is added without the marker, or when a
+test file reads a high-resolution clock (`process.hrtime`, `performance.now`) without carrying it.
+
+The **stdout-drain premise test is not load-sensitive any more** (fixed 2026-09-04; the payload is
+now sized from the pipe buffer). A failure there is real. Do not re-run it away.
 
 ### zsh `nomatch` aborts a command with an unmatched glob — before it runs
 

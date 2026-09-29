@@ -31,6 +31,28 @@ Branch on the printed result, not on the exit status:
 | `No problems found. N card blocks resolve — …` | Say nothing about it. A clean preflight is not news. **It is also not an all-clear**: the line names its own scope because it checks the handful of headings the card is built from and nothing else — `task.103` passed it and reached review with ten of eleven mandatory sections. Template completeness is the reviewer's, not this check's. |
 | One or more findings | Print the tool's output verbatim, unedited, and tell the user the check is advisory. Each finding already carries its own `Fix:` line naming the exact heading to add or rename. |
 
+**The preflight also reads the frontmatter `title`** (task.150, obs #128). A title longer than
+`CARD_TITLE_MAX` (defined once, in `jira-sync.js`) is one `important` finding, `title-too-long`,
+because the card's summary line is the title and a paragraph there is unreadable on a board. Its
+`Fix:` names the body H1 when that fits, since the H1 is usually the name the long title was trying
+to be. Use it as the title, and move the rest into `description`. The sync paths'
+`--check-card` does not read the title yet, so this finding is advisory at authoring and not yet
+gated at review. A clean line says it read the title: `… checks the card sections and the title
+only …`.
+
+The title is read from the **raw header**, not from the line-based frontmatter parser, which
+measures something other than the YAML title in many shapes. A card title is one column-0
+`title:` line with a single-line value. **`title-not-inline`** (`important`) is reported for
+anything else: a block scalar (`>-`, `|`), with or without a comment, tag or anchor; a value that
+continues on an indented line; a value on the line after `title:`; an unclosed quote; a second
+`title:` line, including an indented one inside another key; a `title` key written any other way
+(quoted, an explicit `? title`, inside a flow map); a `<<:` merge key; or fences YAML could read
+differently from the sync (an opening `--- # comment`, `----`, a `...` end marker). The header
+runs to the next column-0 `---`, exactly as the sync reads it. Write the title on its own line,
+quoted. **`title-unreadable-bom`**: a byte-order mark before the opening `---` means no frontmatter
+is recognised, so the sync would publish no title. Save the file without the BOM. The preflight
+still reads the title behind the BOM, so an over-bound title there is reported too.
+
 Do **not** paraphrase a finding, and do **not** re-derive the fix. The `Fix:` line is generated from
 the same spec the sync will use; a paraphrase is a second statement of the rule that can disagree
 with the first.

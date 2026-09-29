@@ -1,0 +1,89 @@
+schema: 1
+task: 'task.152.finalise-gaps-path-and-artifact-links'
+task_title: 'finalise: bug-mode gaps path and co-located artifacts in 8a and link guard'
+gate: CONCERNS
+status_reason: 'All three cycle-2 findings are fixed, mutation-proved (G1–G4) and green in CI on 80ef8f8f. The scoped review found one medium defect: the fill helper prints its HALT reasons to stdout, so the 8.3 command substitution swallows them and a refusal exits silently. Three low findings come with it.'
+reviewer: 'QA Engineer'
+updated: '2026-09-26T22:20:00Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/fill-verification-complete.sh'
+    finding: 'Every HALT reason is printed with a plain `echo` to stdout. finalise 8.3 captures the helper with `GAP_TOTAL=$(… count) || exit 1`, so on an unreadable or unbound DoD the reason is swallowed into GAP_TOTAL and the block exits 1 printing nothing.'
+    suggested_action: 'Send every HALT message to stderr (`>&2`). The 7.1/8.1 calls and the tests still see it, and the 8.3 substitution captures only the count.'
+    suggested_owner: dev
+    status: open
+  - id: CR-4
+    severity: low
+    file: 'shared/resources/fill-verification-complete.sh'
+    finding: '`count` prints 0 both when the DoD has no `## Step 5: Acceptance Decision` heading (could not look) and when Step 5 has no gap line (none found). 8.3 does not refuse 0 before its append.'
+    suggested_action: 'Make `count` (and `gaps`) halt when the Step 5 heading is absent, and make 8.3 refuse GAP_TOTAL=0.'
+    suggested_owner: dev
+    status: open
+  - id: CR-6
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: '8.5''s bug branch counts the gap lines with its own inline awk + grep, a second definition of the count the helper now owns.'
+    suggested_action: 'In bug mode take GAP_COUNT from the helper''s `count`, and keep the awk only to extract the body to post.'
+    suggested_owner: dev
+    status: open
+  - id: CR-7
+    severity: low
+    file: 'shared/resources/tests/doc-links.test.mjs'
+    finding: 'The walk comment says the walk and 8a admit the same files. In fact the walk is a superset: it also takes `.bug.` reports and any `sprint-review-summary.md`, which isCoLocatedArtifact refuses without a document beside it.'
+    suggested_action: 'Say that the walk is a superset of what 8a admits, and why (CI reads them all).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 4271
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [1, 2, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 49
+    notes: 'isCoLocatedArtifact re-probed after the UNPREFIXED_ARTIFACTS change: 49 cases, adding the unprefixed summary (legitimate) and its other-dir, subdir, lookalike, .yml, .., NUL and case-variant forms (hostile). 0 reproduced, 0 over-blocked. Record: task.152.qa.3.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a refusal whose reason is swallowed.'
+  maintainability:
+    status: PASS
+    notes: 'The gap count and the artifact set each have one owner. The residue is low-severity wording and a second count at 8.5.'
+
+bug_resolution:
+  fixed_this_cycle: ['CR-1 (gate 2)', 'CR-2 (gate 2)', 'CR-3 (gate 2)']
+  fix_commit: '80ef8f8f'
+  verification: 'CI green on 80ef8f8f; qa-fix mutation proofs G1–G4 covered'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1; fold in CR-4, CR-6, CR-7.'
+      refs: ['shared/resources/fill-verification-complete.sh', 'skills/finalise/SKILL.md', 'shared/resources/tests/doc-links.test.mjs']
+  future:
+    - action: 'Cycle-3 CR-2: walk docs/bugs artifacts (38 tracked; WORK_ITEM_RE has no bug.N). Out of scope by task § 4 ("widening the roots is a follow-up").'
+      refs: ['shared/resources/tests/doc-links.test.mjs']
+    - action: 'Cycle-3 CR-3 (= gate-1 CR-3): finalise engine calls use two path conventions; migrate them together behind a population test.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Cycle-3 CR-5: 8.3''s "check for today''s row before re-running" is prose only; guard it in the block.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Carried: gate-1 CR-4 (sync-jira-bug casing), CR-6 (unreadable --file reported as usage).'
+      refs: ['skills/sync-jira-bug/scripts/sync-jira-bug.js', 'shared/resources/status-history.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

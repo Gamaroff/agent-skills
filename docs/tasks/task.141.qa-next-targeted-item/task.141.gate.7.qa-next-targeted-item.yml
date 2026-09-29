@@ -1,0 +1,88 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: CONCERNS
+status_reason: "No HIGH for the third consecutive gate. Cycle 6 closed the validated-vs-published divergence on the row-state axis and reopened it on the link-shape axis; cycle 7 closes it structurally with one shared predicate used by both the reader and the checker, so the two cannot name different links again."
+reviewer: 'QA Engineer'
+updated: '2026-09-23T01:40:00Z'
+
+top_issues:
+  - id: 'TASK-141-BUG-16'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "checkRegistry learned to skip scheme-qualified links; describeRow did not, and still published the last bug-shaped link regardless of shape. The exact fixture cycle 6's own test declares legal was --check green while --item --json handed the skill `https://example.com/issues/99`, which SKILL.md Step 4 opens. The same skip also let a fail row satisfy 'requires a bug link' with a URL alone and existence-check nothing, where the base exited 1."
+    suggested_action: 'One predicate used by both sites, so validated and published cannot diverge again.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+  - id: 'TASK-141-BUG-17'
+    severity: medium
+    file: 'skills/qa-next/README.md'
+    finding: "README still stated the pre-change rule — '❌ carries a bug link that resolves' — while the code requires a resolvable tool-written link on EVERY row and requires one to be present only on ❌. An owner reading it could not know a stale link on a ⏸/➖/✅ row now exits 1."
+    suggested_action: 'Restate it, and check the other statements of the same rule in the same edit.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+  - id: 'TASK-141-CR7-3'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "The prose-link exemption covered a scheme and a leading # but not a #fragment on a repo-relative path, so `../bugs/bug.1.real.md#repro` errored naming a file that does exist; protocol-relative `//host/x` did the same. Neither is a shape linkTo emits, so only hand-written notes are affected."
+    suggested_action: 'Strip the fragment before the exists check; treat // as prose.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 3944
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged across seven cycles. No single-argument accept/reject export to probe; offline, file-local.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. 41 tests.'
+  reliability:
+    status: PASS
+    notes: "Cycle 6's two MEDIUMs are closed, and closed structurally: one `isToolWrittenLink` is used by describeRow and checkRegistry alike, so the published link IS the validated link by construction rather than by two sites agreeing. The fail-row requirement was also restored to the base's strictness — a URL alone no longer satisfies it."
+  maintainability:
+    status: CONCERNS
+    notes: "The rule was stated in THREE places — checkRegistry, README § Registry states, and the skeleton that `--init` writes into every new registry — and cycle 6 updated one. All three were updated together this cycle, and the skeleton was found by grepping for the rule rather than by being told about it. That third statement had gone unnoticed for six cycles."
+
+bug_resolution:
+  bugs_fixed: 17
+  bugs_remaining: 0
+  fix_date: '2026-09-23'
+  total_iterations: 7
+  verification_method: '34 mutations across seven cycles, every one red'
+
+recommendations:
+  immediate:
+    - action: 'GATE CYCLE 7 — the three fixes above are mutation-proved and green, but the 7-cycle budget is now spent and no gate has read them.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+  future:
+    - action: 'CR7-4 (pre-existing, identical on origin/develop): checkFindings applies no prose-link skip, so the same external URL that is legal in Notes / bug is still a hard error in a run file Filed as cell. Either extend the predicate or document that Filed as accepts only repo-relative bug files.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'bug.16 (filed separately): the main guard is a silent no-op under a symlink, at six sites across five skills.'
+      refs: ['docs/bugs/bug.16.main-guard-silent-noop-under-symlink/bug.16.main-guard-silent-noop-under-symlink.md']
+    - action: 'Accepted limitation (cycle 5): the kept-✅ note cell grows by one segment per re-run.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-3 (cycle 1, still advisory): --set exits 0 whether the row moved or was kept.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'A gate reads the cycle-7 fixes, or the operator accepts them on the evidence'

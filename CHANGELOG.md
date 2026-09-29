@@ -4,6 +4,588 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`release.sh` gates on CI's verdict; load-sensitive tests name themselves (task 153).** A release
+  was certified by a local test run, which passed on 2026-09-21 through five consecutive red `Test`
+  runs on `develop` (obs #150). `release.sh` now reads CI's recorded verdict for `HEAD` —
+  `scripts/release-ci-verdict.mjs`, over `gh run list --commit` — **before** its multi-minute local
+  test, and refuses unless `Test` and `ShellCheck` are green and `Validate Skills` / `Docs link
+  check` are not red when present. `gh` missing, failing or unreadable is *unverifiable*, never
+  green. `--skip-ci-check` is the named escape; `--dry-run` prints *Would have REFUSED*; `--retry`
+  is unchanged. Timing assertions that depend on machine load now say so in their failure text —
+  `loadSensitive()` in `spawn-budget.mjs` prefixes `LOAD-SENSITIVE` — and
+  `docs/contributing/traps.md` § Load-sensitive tests is the one list, held equal to the code by
+  `tests/load-sensitive-marker.test.js` (obs #157). `release.sh` prints the re-run-alone rule when
+  its local test aborts. Session-handoff CR-6 retries only its precondition miss — a timeout before
+  the grandchild forked, 3 s → 6 s → 12 s — instead of dying on `ENOENT` (obs #166).
+- **`/finalise --bug` covers Step 8, the GAPS path (task 152).** The bug-mode skip table stopped at
+  Step 7, so a `--bug` run that found gaps doubled the `## Verification Complete` heading, appended
+  the Change Log row bug mode forbids, wrote a second verdict into the bug report, and then could not
+  post its PR comment (obs #148). Five new rows and markers — `gaps-verification-complete`,
+  `gaps-change-log-row` (skip, forbidden), `gaps-status-history-row`, `gaps-body-section` (skip),
+  `gaps-pr-comment` — held two-way by `finalise-bug-mode.test.mjs`. The `## Verification Complete`
+  fill is now one bundled helper, `fill-verification-complete.sh <DOD_PATH> <accepted|gaps>`, called
+  from 7.1 and 8.1; it refuses a doubled file and a file that already reads the other verdict. In bug
+  mode 8.5 reads the gap list from the DoD file's `## Step 5: Acceptance Decision`. The helper owns
+  the gap count: `gaps` refuses a DoD with no `- [ ]` gap line before it writes anything, and
+  `count` is what 8.3's Status History row reports.
+- **Co-located pipeline artifacts are link-checked where CI checks them (task 152).** CI's
+  `docs-link-check` reads every changed `docs/**/*.md`, but finalise 8a, the fix-and-recheck
+  evaluator and the corpus guard stopped at the work-item document, so task.139 run 2 halted on a CI
+  red in two QA reports that 8a could not admit (obs #155). The evaluator's finding record takes an
+  optional `artifactPaths`, admitted only through `isCoLocatedArtifact` (same directory; the same id
+  stem or the unprefixed `sprint-review-summary.md` finalise writes there; a `.md` pipeline
+  artifact, never a `.bug.` report). The artifact set is defined once in the evaluator
+  (`WORK_ITEM_ARTIFACT_RE`, `UNPREFIXED_ARTIFACTS`) and imported by the corpus guards; the 8a clause and the CI-table row
+  admit a red on the document or its artifacts. `doc-links.test.mjs` walks the 1,000+ artifacts
+  under their own ratchet (`KNOWN_ARTIFACT_LINKS` / `KNOWN_ARTIFACT_FENCES`, 11 links and 2 fences
+  pinned). `qa-task` Step 11, `qa-story` Output 1 and `review-pr` Step 7 now stage the report
+  they wrote and run `doc-links.js --file` on it.
+- **`status-history.js --json` (task 152).** The last pipeline engine without the shared `reason`
+  contract: `--json` prints `{reason, exitCode: 0, file, status}`. The engine appends and never
+  deduplicates, so a repeated call reports `updated` and writes a second row. The module API is
+  unchanged.
+- **qa-fix Step 2.6 and the QA loop's narrowing-residue offer — a structural move before another
+  prose patch (task 148).** A loop could spend its budget at HIGH 0 with each cycle's MEDIUM narrowing
+  one mechanism (task.143: 7 cycles, MEDIUM `2, 1, 2, 0, 1, 1, 0`), and none of its four guards fit
+  that shape. `classifyNarrowingResidue` in `qa-diminishing-returns.js` now fires when every MEDIUM on
+  the last two gates names one `file:` at HIGH 0 (on task.143: cycles 2, 3 and 6). The loop's new 5b
+  *Narrowing-residue offer* passes the result to `/qa-fix` as a prompt block. It is an **offer, not a
+  route**: `classifyLoopRoute` is unchanged, and nothing escalates on it. `qa-fix` Step 2.6 holds the
+  menu (consolidate the contract, scope the claim, waive, patch) and records the chosen move in a
+  fixed fix-summary shape. It also runs when the fixer sees a finding on a subject the previous fix
+  edited (obs #167, #172).
+- **qa-fix Step 3.5's documentation probe reaches every file that restates the subject, and leaves a
+  record (task 148).** Row 1 said "grep the file", so a restatement in another file went unseen
+  (task.124's four-cycle chain, obs #174). It now names a `git grep` population command over every
+  `skills/*/SKILL.md`, every `shared/resources/*.md` and every hand-authored
+  `skills/*/references/*.md` (generated copies are removed by their marker line; `:(glob)` keeps test
+  fixtures out). It requires the population size, asks for the Step 2.6 move chosen when the
+  population is above 1, and requires a `Probe:` block in the fix summary: the command, then each hit
+  as `updated` or `unaffected — {why}` (obs #177). Step 7's fix-summary template gains a slot for
+  these blocks.
+- **`uat-status.mjs` owns `/qa-next`'s run state file — `--state-init`, `--state-get`,
+  `--state-set`, `--state-clear` and an exported `STATE_FIELDS` schema (task 143).**
+  `.claude/state/qa-next.state.json` (the single-flight lock and resume record) was a JSON shape
+  that SKILL.md Steps 0–6 described in prose. No test could see a reader drift from its writer, and
+  task.141's QA cycles 10–12 each found one such defect (BUG-21/22/23). The tool now writes the file.
+  `--state-init (--item <id> | --next)` resolves the row through the same code path as
+  `--item`/`--next` and prints the same payload. It records `priorRuns` and `bug` as they stood when
+  the run began, and nothing can overwrite them. It exits **5** `run-in-progress` whenever a state
+  file exists, whatever item it names, because resuming is `--state-get`'s job. The file is created
+  exclusively (`link`), so two concurrent inits cannot both win. `--state-get` exits **6**
+  when nothing is in flight and **1** `state-malformed` on a file that is not a state file.
+  `--state-set` writes only `phase` (forward only), `runFile`, `filedBug` and `lane`, and refuses an
+  init-only field by name. A state file from v0.51.0, which lacks `targeted`, `priorRuns`, `bug` and
+  `filedBug`, still resumes: each missing field is derived from the row, correct for the phase it is
+  read at, and named in `derived`. Its `runFile` is null (v0.51.0 never recorded one). Before
+  `executed` that does not matter, because the run has written nothing yet and `priorRuns` is exact.
+  A run resumed at `executed` records a fresh `--run-path` as its file before Step 4, and never reuses
+  an existing file. A file named for the same item, date and label may be one an interrupted v0.51.0
+  Step 4 wrote, or an earlier run's committed record, and nothing tells them apart. From `executed`
+  on, whether or not a `runFile` was recorded, the file v0.51.0 wrote is excluded by its name
+  (`<local date>-<env>.md`), and `priorRuns` is also named in `unverifiable`, because nothing v0.51.0
+  recorded can confirm it. SKILL.md now names a command wherever it used to describe JSON.
+  Tests derived from `STATE_FIELDS` cover the schema and are mutation-proved.
+
+- **`security-probe.mjs --entry cli:<path> --argv '<JSON array>'` — a boundary behind a Node CLI's
+  flags is now executed, not declared unverifiable (task 144).** The engine reached a JS export
+  called with **one** argument, a one-positional shell script and a sourced shell function; a
+  multi-flag Node CLI matched none of them, so task.141's finalise recorded `probes_executed: 0`
+  against `uat-status.mjs`'s `--env` guard and was accepted over it. The `cli:` form runs the script
+  under the engine's own `node` with an argv **template** whose one `"{input}"` element becomes each
+  case's input as one argv element — never split, never parsed by a shell — and whose optional
+  `"{fixture}"` elements become that case's fixture directory. A slot is a whole element or nothing:
+  `--env={input}` is refused rather than interpolated. The sandbox is the shell arm's (fixture as
+  cwd inside the sandbox root, `HOME` and `TMPDIR` inside it, stdin empty, the script's directory
+  watched), factored out of `runShellCase` into helpers both arms call rather than copied. **The
+  verdict is the exit status** — 0 accepted, non-zero rejected, a contract the CLI must honour —
+  and a case carrying `expected` is compared exactly as the shell arm compares it. **A crash is not
+  a refusal**: Node's `Node.js vX.Y.Z` footer on stderr, a kill or a timeout is `errored`, so a
+  script that fails to load folds into one `entry-not-probeable` decline instead of scoring as a
+  control that rejects everything. A `--argv` shape error is an **argument error** (exit 2,
+  `bad-argv`, nothing runs, no record written); `runProbeSpec` returns the same `bad-argv` as a
+  decline for a library caller. Record entries gain an **`argv`** key (the template, never the
+  input; `null` for every other form), and a `cli:` control's identity in the record is its **`--name`** (a re-run under one name
+  replaces its entry; two names are two controls), falling back for an unnamed probe to its argv
+  **skeleton** — flags and bare positionals kept, flag values dropped — with a `warning: replaced
+  control` line when an unnamed write replaces an entry whose full argv differs. Three derived keys
+  were each wrong one way in QA (the whole template split re-runs; the flag before `{input}` merged
+  different controls; the skeleton merges `--mode strict` / `--mode lax`), which is why a stated
+  name wins — every other form's key, and so every existing
+  entry-file name, is byte-identical. The first real run is in the suite: `uat-status.mjs --run-path D.1 --env
+  {input}` scores **`present-but-inert`** today (`x-02` refused, `../x` and `a/b` accepted), which is
+  task.143's to fix. `probe-boundary-rule.md` §5 documents the form and §5.1 no longer lists a
+  multi-argument CLI among the declined sinks; both security prompts, the qa-task / qa-story
+  Step 3b paragraph and `review-security`'s own limits name it, and a population test fails any
+  site that routes a non-JS entry without naming `cli:`. `node` stays off `SAFE_COMMANDS` (§2): the engine picks the
+  interpreter and `--entry` fixes the script.
+
+- **`/qa-next <id>` — run the UAT protocol against a named registry row, whatever state that row is
+  in (task 141).** `/qa-next` had exactly one way to choose what it tested: the first `⬜ untested` row in file
+  order. So a `❌` whose bug had been fixed and merged could not be re-tested without
+  `--set <id> untested`, which erases the `Last run` link and the failure history; and a `✅` could
+  never be regression-tested at all, which is the one thing indexing UAT by *user function* was
+  supposed to make a one-line request. The argument makes both a command. Three mechanisms a re-run
+  needs are now properties of `uat-status.mjs` rather than instructions a call site has to remember:
+  `--run-path <id>` returns the next free run file (`<date>-<env>.md`, then `-02`, `-03`), so a
+  same-day re-run cannot silently overwrite the first run's `## Findings` rows — which `--findings`
+  is derived from, so the loss would read as a shorter list nobody could tell was short; `--item
+  <id>` returns the same payload `--next` does, from a single `describeRow`, now carrying `state`,
+  `lastRun`, `priorRuns`, `notes` and `bug` so a repeat failure can re-link the open bug instead of
+  filing a second one against the same defect; and `listRunFiles`' sort key is sequence-aware.
+  That last one is not cosmetic: run 1 of a day carries no suffix and `.` sorts after `-`, so a
+  plain basename sort put the day's *first* run last, in `--findings`, in `priorRuns` and in the
+  "previous run" link — the comparator normalises a missing sequence to `-01`, which also repairs
+  run files already on disk. `--item` on an id with no row exits **4**, distinct from the usage
+  family's 2. `--run-path` **refuses an `--env` label ending in `-NN`** (`ci-02`): such a label is
+  indistinguishable from a run sequence, so the day's first run would sort after its own re-runs —
+  the ambiguity is created at write time and is therefore refused there, since at read time nothing
+  knows the env. `/loop /qa-next` stays untargeted: a loop over a fixed id repeats one function
+  forever.
+
+### Changed
+
+- **CI is required once, at `/finalise` — no QA cycle waits on it (PR #517).** A consumer run made
+  every QA cycle wait about 35 minutes for the PR's CI on one self-hosted runner before writing the
+  gate. Across five cycles that added up to hours, and a sleeping CI host stranded the loop twice.
+  No skill required the wait, but none forbade it. The shared QA-loop doc (§ "CI and the QA loop")
+  and `develop-bug`'s verify loop now say that 5a, 5b and 5c do not wait on CI. A cycle's evidence
+  is the fast gate plus the diff review, and `/finalise` CI readings 1 and 2 are the pipeline's
+  only CI gate. The `qa-task` / `qa-story` gate precondition names the dispatched review as the
+  only wait. `pr-conformance-prompt.md` no longer counts a pending, cancelled or environmental CI
+  run as a finding before `/finalise`; a failure caused by the change still counts.
+  `ci-once-at-finalise.test.mjs` holds all four.
+
+- **The release gate runs the suite in a clean clone of HEAD (task 154).** `scripts/release.sh`
+  ran `npm test` in place, where the gitignored `.agents/skills -> ../skills` symlink makes any test
+  that reaches `.agents/skills/…` from the repo root pass — CI has no such symlink, and
+  `finalise-bug-mode.test.mjs` once passed 71/71 locally while 19 rows failed on every push
+  (obs #149). New `npm run test:clean-checkout` (`scripts/test-clean-checkout.sh`) makes a
+  `git clone --local --shared` of HEAD — full history and tags, tracked files only, no ignored paths
+  — in a directory of its own (`mktemp -d`) inside a repo-local base, `.clean-checkout/` by default
+  (never a temporary directory, which the observation-log tests refuse), links `node_modules`, runs
+  `npm test` there and removes that directory and nothing else: ownership by construction, so the
+  base is never deleted and two concurrent runs never touch each other's clone. It warns that
+  uncommitted changes are not tested. Whether a base is usable is decided once, by `resolveBase()` in
+  `scripts/lib/clean-checkout-base.mjs`, which the runner calls as a CLI and `security-probe.mjs`
+  reaches as an export (17 cases executed, 0 reproduced). `release.sh` now gates on it, with the
+  runner's `CLEAN_CHECKOUT_CMD` test hook cleared; a fixture test pins the gate's order, its
+  abort-on-failure and the cleared hook. The consumer-shaped test root is
+  defined once, `makeConsumerRoot()` in `evals/shared/lib/consumer-root.mjs`, replacing two
+  hand-rolled copies; `consumer-root.test.mjs` proves the snippet it guards fails from a bare
+  directory. create-skill and `docs/contributing/traps.md` carry the rule.
+
+- **The card preflight reads the frontmatter title (task 150, obs #128).** `preflight()` kept only
+  the body, so no finding was ever raised about the title, and 42 of 146 task titles had grown past
+  100 characters (the longest 368), published verbatim as GitHub issue titles. `CARD_TITLE_MAX = 100`
+  and `checkCardTitle` now sit beside `checkCardSections` in `jira-sync.js`. A title over the bound is
+  one `important` finding, `title-too-long`, whose `Fix:` names the body H1 when that fits. It is
+  advisory at authoring (exit 0, 1 under `--strict`), and the clean line says the title was read. The
+  43 legacy long titles are frozen in `card-preflight-corpus.test.mjs`, a list that can only shrink.
+  The title is read from the raw header, not the line-based parser. Any title that is not one
+  column-0 single-line `title:` line (block scalar, tag, anchor, multi-line or next-line value,
+  unclosed quote, duplicate or indented `title:`) gets `title-not-inline`, and a BOM before the
+  frontmatter gets `title-unreadable-bom`, because the parser would otherwise measure the wrong
+  text or read no title at all.
+  The four `sync-jira-* --check-card` paths do not read the title yet (follow-up).
+- **create-task and review-task ask for the evidence behind a claim about the current code (task
+  150, obs #127, #124, #135).** create-task § 3.5 gains three Critical items. A current-state name
+  carries the `grep` hit that found it, or is marked `(unverified)`. A categorised population carries
+  one witness per member, not just a count. A proposed single-statement test shows its key belongs to
+  no other rule and names the restatement it would miss. The Section 3 prompt states the first of
+  these where Technical Background is written. review-task Step 3 gains check 13, *Single-statement
+  test discriminator*. `tests/create-task-authoring-evidence.test.js` holds each rule in its own
+  section, not merely somewhere in the file.
+- **`/create-task --from-observation <id>[,<id>…]` (task 150, obs #147).** It cuts a task from
+  observation-log entries. `seedFromObservations` in `scripts/lib.js` refuses an entry that is not
+  `open` and asks only the questions the entries leave open: the title when a single entry's is over
+  the bound or there are several, and tracker sync. After both files exist, it parks each entry
+  through `observation-log.js set-status`, so parking is no longer a step a session can forget. A
+  round-trip test runs the park vectors through the real engine. The seed keys each entry on its file's numeric prefix, the identity `set-status --id` resolves, and
+  refuses a frontmatter id that disagrees with it. Every park vector carries `--expect-status open`.
+- **`observation-log.js set-status` refuses an ambiguous id, and can refuse a changed entry (task
+  150).** `findById` returned the first file whose numeric prefix matched. When two files shared a
+  prefix (a hand-created file, or a consolidated fork), `set-status --id 5` rewrote whichever sorted
+  first, even an `actioned` entry, and reported `ok`. Every `--id` lookup now answers `ambiguous-id`
+  (exit 1, `files[]` named) and writes nothing. The new `--expect-status <s>` answers `status-changed`
+  (exit 1) when the entry no longer reads `s`, so a caller that selected an entry earlier cannot
+  overwrite a status another session has changed since. Both reasons are added to the contract;
+  existing reasons keep their meanings.
+
+- **The review pre-pass measures a document against this repository's architecture (task 151, obs
+  #130).** Agent B's domain list and pattern axes were hard-coded for a web stack ("backend /
+  frontend / auth / payments / real-time", "API endpoints or payloads"), so on a shell/Node
+  repository it answered `aligned` against axes the repository never defined. They are now slots,
+  `{arch_domains}` and `{arch_axes}`, filled by a new pure helper `prepass-axes.js` from the H2
+  headings of the consumer's `concepts/tech-stack.md` and `concepts/coding-standards.md`; a
+  repository with neither file — or with files that hold no non-empty `## ` heading — gets the former
+  lists as candidates (`source: fallback`); a file that exists but cannot be read exits 1. Agent B now
+  returns `axes_checked`, and an `aligned` with none is treated as a failed agent. review-story's
+  Subagent 3 dispatches from `review-story-prepass-prompts.md` instead of a one-line description.
+  `jira-sync.js` exports its `makeFenceTracker`, which the helper reuses.
+- **review-task, review-story and create-task run a claimed property instead of reading it (task
+  151, obs #161).** A new check — review-task Step 3 check 11, review-story Step 4 check 8, Detection
+  Rule "Invariant Verification", and a create-task 3.5 Critical bullet — tells the reviewer to execute
+  a claimed ordering, uniqueness, idempotence or round-trip of an existing function on the inputs
+  the document proposes. A falsified invariant is **Critical**. task.141's zero-padding sort claim
+  passed every existence check and fails a one-line run.
+- **Compatibility handling is diffed against the released shape (task 151, obs #170).** review-task
+  Step 3 check 12, review-story Step 4 check 9 and a create-task 3.5 Critical bullet derive the
+  legacy shape with `git show <tag>:<path>` from the last release tag; every uncovered field, and a
+  missing tag citation, is **Important**. task.143 covered the one field its QA finding named; the
+  released `v0.51.0` shape lacked three more. Held by `tests/review-property-checks.test.js`, which
+  reuses the item reader now shared in `tests/lib/markdown-section.js`.
+
+- **Breaking — `status-history.js` usage errors exit 2, not 1 (task 152).** An unknown flag, a
+  missing `--file`, a value flag with no operand or an unreadable file now exits **2** (and prints
+  `{"reason":"usage",…}` under `--json`), matching `doc-links.js` and `tracker-comment.js`. The two
+  in-tree call sites (`finalise` 7.3, `ensure-bug-github-issue` B8) read neither the code nor
+  stdout; an out-of-tree caller that branched on exit 1 must read 2.
+- **Breaking — the `status-history.js` CLI writes lifecycle statuses in Title Case (task 152).**
+  `new`, `in-progress`, `ready-for-qa`, `closed` and `reopened` are written as `New`,
+  `In Progress`, `Ready for QA`, `Closed` and `Reopened` — the case 734 of the corpus's 737
+  Status History rows already use. Any other value passes through. Existing rows are untouched, and
+  the exported `upsertStatusHistory` still writes what it is given.
+- **`qa-execute-snippets.mjs --copy-as SRC:DEST` seeds a directory at the path a block addresses
+  (task 149).** `--copy <dir>` places the directory's contents at the temp root, so a correct block
+  that runs `find docs/tasks …` (the `sync-github-*` discovery blocks) failed whatever was copied, and
+  QA routed the finding to `future` by hand every cycle (obs #143). `--copy-as` is repeatable and
+  additive; `--copy` is unchanged. An absolute or escaping `DEST` is exit 2, with the temp root still
+  removed. So is a `DEST` that passes through a symlink already in the working copy, and so is a `DEST`
+  that already exists: `--copy-as` seeds a fresh path and never merges. So is an SRC that contains the sandbox under
+  another spelling (a symlinked `TMPDIR`), which would copy into its own output. The sandbox root is
+  absolute even under a relative `TMPDIR`. QA reproduced both escapes
+  with the probe engine. In cycle 1 a `--copy`-seeded `out -> /elsewhere` carried a write outside the
+  sandbox. In cycle 2 a merge into `.` or a seeded `docs/` followed a link inside it (TASK-149-BUG-1).
+  Refusing merges replaced checking the tree a merge would walk, rather than correcting the same
+  mechanism a second time. qa-task Step 4b, qa-story Phase 1.7 and `qa-runnable-prose-detection.md` name
+  `--copy-as docs:docs`.
+- **An unexported predicate is exported and probed, never recorded as `boundary: false` (task 149).**
+  `security-probe.mjs` returned one message, `export X is not a function`, for an absent export and a
+  non-function one. On task.139 QA recorded `boundary: false` for five cycles over a module-private
+  `isWorkItemDocument`; finalise exported it and found a null-byte hole (obs #156). The decline now
+  says `X is not exported by <path> — … export it and re-run` (same `entry-not-probeable` reason).
+  `probe-boundary-rule.md` §4 and qa-task Step 3b / qa-story Phase 1.6 step 3 state that "it is not
+  exported" is never a reason for `boundary: false`. A `boundary: false` record names each
+  predicate-shaped function the diff adds.
+- **QA runs the validation commands the coding standards name, not only the test runner (task 149).**
+  `coding-standards.md` lists `npm run validate -- skills/<changed-skill>/` first under *Validation
+  before commit*. `npm test` does not run it and no QA step did, so task.141 went green locally and red
+  in CI's `validate` job (obs #163). qa-task Step 4 and qa-story Phase 4 now run each such command and
+  record it; a non-zero result is a `category: bug` finding. qa-story Phase 4 points at the standards
+  file the pipeline loads instead of a `docs/coding-standards.md` that does not exist here. create-task's
+  Section 9 prompt and `task-template.md` list the commands under Code Quality.
+- **QA reads the document's claims back after it writes them — `qa-read-back.js`, run by qa-task
+  Step 12b and qa-story Review Completion item 3e (task 149).** Step 12 linked the QA report and gate
+  and appended a Change Log row, and nothing read either claim back. On task.141 a linked report was
+  never written (CI `link-check` red), and a row was dated after `updated:` (CI §5 red) (obs #164).
+  `shared/resources/qa-read-back.js --doc <work-item>` now **decides**: exit 0 clean, 1 halt, 2 could
+  not look. It checks four things:
+  - This cycle's gate, report and Change Log row exist.
+  - What the run wrote is staged: the document, gate, report, and linked untracked regular files
+    under the work item only. A failed `git add` halts.
+  - Every link resolves against the index.
+  - `updated:` accounts for the newest row.
+
+  Each SKILL.md block is one call with a `{placeholder}` path. The read-back was a fenced block in
+  both skills for three QA cycles, and each cycle found a new gap in it, so it became one script
+  tested directly. It finds the cycle's gate and QA report by asking the new
+  `qa-cycle.sh <dir> --path gate|qa`, which names the one regular file of the current cycle with the
+  same glob and sed that count the cycle, and refuses when none or more than one matches. Exit 2 is
+  reserved for a run that could not complete; every link the run cannot confirm, `unverifiable`
+  included, halts with its own remedy. `doc-links.js` now labels each broken link `untracked`, `ignored` (gitignored,
+  never committable), `outside-repo`, `unverifiable` or `missing`. `missing` is compared component
+  by component against the directory listing, so a case-insensitive disk cannot pass a link that is
+  dead on Linux, and a symlinked target counts only when it leads inside the repository. The state
+  appears in `--json` and on the `✖` line; the `✖` / `FAIL doc-links:` markers are unchanged.
+  `change-log.js` gains `checkUpdatedCoherence()` and its first CLI. The corpus test's §5 now uses
+  it, with an independent witness for any Change Log the shared reader cannot see. The self-assessed
+  checklist item "QA report file created and saved" is replaced by the measured one.
+  `tests/qa-evidence-integrity.test.js` holds all eleven prose sites, section-scoped, and
+  `tests/qa-read-back-block.test.js` runs each delivered block under bash and zsh.
+- **`/commit-changes --scope` stages inside the scope only (task 147, obs #142).** Scope mode ran a
+  bare `git add -u` before its allowlist, so it staged tracked modifications across the whole tree.
+  In a checkout another session was editing, that swept the other session's `package.json`,
+  `CHANGELOG.md` and `README.md` into the commit (task.128). Scope mode is now one pathspec
+  `git add -- <scope paths>`, which stages new, modified and deleted files under the named paths and
+  nothing else. A scoped `git add -u -- <paths>` was not used: it exits 128 on a scope directory that
+  holds only new files. **Behaviour change:** a caller that relied on scope mode to sweep a tracked
+  edit outside its scopes must now pass that path as another `--scope`. Step 4 of the develop
+  pipelines needs none. Its scope derivation now adds the uncommitted tracked diff and scopes
+  root-level files by their own path. Before, it read the committed diff only, and on a normal run
+  nothing is committed before Step 4, so a bounded stage would have left the run's code out of the
+  PR (task 147 review, C1). `verify-push-state.sh` gains a repeatable `--scope`: dirt inside a scope
+  fails check 3, and dirt outside every scope is printed as `! outside scope (warning): <path>`.
+  Without the flag, behaviour is unchanged. Step 8 check 5 passes `--scope "{work-item-dir}"`.
+
+- **A fix to an identity rule proves both directions (task 146, obs #169).** `qa-fix` Step 3.5 gains
+  a third probe table, *For a fix to an identity rule, probe both directions*. A change to a dedupe
+  key, cache key, record identity, normaliser or equality predicate now owes one test pair that must
+  merge and one that must stay apart, drawn from real call sites, including the pair for the
+  direction the finding did not name. On task.144, four of five QA cycles circled one record key.
+  Each fix split what was one or merged what was two, and each fix's test proved only the direction
+  its finding named. The cycle-2 `REFUTE PASS.` directive in `qa-task` and `qa-story` gains an
+  **Identity rules** paragraph. It is placed after the four-transition list and is not a fifth
+  bullet: the list is introduced as "probe these four transitions" for lifecycle changes, and an
+  identity rule shares neither the count nor the trigger. `tests/identity-rule-probe.test.js` holds
+  the table and the paragraph, and that the list still holds four bullets. It also holds that the two
+  refute directives are one text in two files, which no test guarded before (an edit to one alone
+  passed CI). `shared/resources/code-review-prompt.md`'s cycle-2 section describes that directive in
+  prose, so the same edit adds the identity pair there, outside the prompt template, where the general
+  reviewer's checks stay unchanged. The test holds that too.
+
+- **Two authoring rules for skills and observations, installed from the observation review (obs #159,
+  #160).** `create-skill` gains *A skill's behaviour is restated in `docs/reference/`, and nothing reaches
+  it*: a change to what a skill does obliges a `grep` of `docs/reference/commands.md` and
+  `docs/reference/activation-phrases.md`, the two hand-written documents that cite skills by name.
+  `qa-next`'s re-index from stories to user functions left both reference rows describing stories. Its
+  *Three Rules the Corpus Learned by Failing* preamble and `observe-work`'s *How to log* now require a
+  date, duration or count in a failure narrative or an observation's Issue to be measured, with the
+  command named. The staged form of the #159 rule said "four months later"; `git log` put it at one
+  day. The mechanical half of #159 is task.142.
+
+- **Review checks that a criterion's stated outcome is one the deciding function can return (task 145,
+  obs #168).** `/review-task` Step 3 gains check 10, *Outcome reachability*. When a success criterion
+  or test case says what a named function returns for a stated input, the reviewer walks that input
+  through the function's branches as the plan leaves them: today's branches plus any a planned phase
+  adds or changes. A planned branch counts only when a named phase states it. An outcome that no
+  current or planned branch returns is reported as **Important**.
+  Judging against the planned state matters because a task that changes its deciding function is
+  promising an outcome today's code cannot return, and that is the point of the task, not a defect.
+  The same check lands where the defect is introduced: `/create-task` Step 3.5, where it is put to
+  the author and never auto-rewritten to current behaviour. It also lands at the two sibling sites,
+  `/review-story` Step 4 check 7 and `/review-bug` Step 3. In review-bug, a branch that already returns
+  the Expected outcome is routed to the likely-already-fixed rule, unless the pre-pass traced the bug to
+  `reproduces: likely`. In that case the report names the wrong function or input, so it is an Important
+  finding (NEEDS DETAIL) and never STALE. Earlier checks asked whether a
+  named function *exists*; none asked whether it can *produce* what the document promises. task.144
+  promised `present-but-inert` for an accept-all fixture, and `computeVerdict` scores that `absent`.
+  Review read the function in full and passed the claim, and develop found it.
+  `tests/outcome-reachability-check.test.js` holds each site's check item. It holds the three
+  elements (stated input, named function, branch that fires), the site's verdict sentence, and its
+  planned-state and named-phase (or stale-bug) clauses. It also holds the review-task and review-story
+  hallucination-pattern lines, which restate the rule and carry its Important severity, and review-bug's widened
+  likely-already-fixed trigger and the pre-pass guard on it. In review-bug, STALE outranks NEEDS DETAIL.
+- **`uat-status.mjs --set <id> <verdict>`: only a `fail` moves an `✅ accepted` row (task 141).** A `pass`,
+  `blocked` or `na` against an accepted row now leaves `✅` in place and updates only `Last run` and
+  `Notes / bug`; the tool prints `(kept)` so the branch it took is never silent. `fail` is unchanged
+  and still overrides `✅` directly. Without this, a regression sweep over fifty accepted functions
+  would replace fifty owner signatures with fifty machine `🟡`s and bury the one row that actually
+  regressed. The rule is written over the whole verdict set rather than as a special case for
+  `pass`, because the skill's two early exits write `blocked` and `na` — guarding `pass` alone would
+  leave the same defect reachable through another door. The new `--clear-note` (which empties
+  `Notes / bug`, so a `🟡` that follows a `❌` cannot keep the bug link it just disproved) is refused
+  on that kept-`✅` path: the cell holds `--accept`'s `accepted <date>` provenance, and `--check`
+  imposes no note requirement on an accepted row, so the loss would be silent.
+  **Migration**: to move an accepted row deliberately, run `--set <id> untested --note "<why>"`
+  first, then the verdict you want. `qa-next`'s own Steps 2 and 4 are the only callers in this
+  repository. **An `untested` demotion is not a verdict and is not kept** — it is the documented way
+  to take an `✅` back, and it moves the row.
+
+  **The owner's sign-off is never lost.** On a kept `✅` the `Notes / bug` cell is **appended to**,
+  never replaced, whichever flag writes it, so a `blocked` note or a bug link joins the
+  `accepted <date> — <why>` rather than erasing it. `--clear-note` is refused there — clearing is
+  the one operation append cannot express. This is stated as an operation rather than as a list of
+  guarded flags deliberately: two earlier attempts enumerated the ways into that cell and each
+  missed one (`state === "pass"` missed `blocked`/`na`; `clear || note` missed `--bug`), because an
+  enumeration has to be re-checked every time a flag is added and nothing forces that re-check.
+
+- **`release.sh` warns on branches carrying commits not on `develop`, and the release-prep PR is now
+  the only documented promotion path.** Every other pre-release check asks whether what *is* on the
+  branch is sound; none asked what was missing from it, so a branch whose work was finished but never
+  merged passed every gate in the script and every lane in CI — neither looks at an unmerged branch —
+  and then missed every subsequent release in silence. Three were found by hand at the v0.51.0 cut,
+  one of them thirteen days old, one commit from done, and never opened as a PR. The check lists each
+  branch with its commit count and last-commit date, and is advisory: a parked branch is a legitimate
+  state, and refusing to release over one would trade a visible omission for a stuck pipeline.
+  Separately, `releases.md` offered a "Direct fast-forward (solo maintainer, no branch protection on
+  `main`)" path, but `main` *has* branch protection whose one required check is declared on
+  `pull_request` only — a direct push has no PR, so the check can never report and the push lands
+  only by admin bypass, which four consecutive releases used. Nothing was damaged (a `--ff-only` from
+  `develop` cannot invert the promotion direction) but a required check bypassed every four days
+  stops being a guard, and the release quietly depended on `enforce_admins` staying `false`. The
+  direct option is removed and the removal records why, so it is not re-added.
+
+### Fixed
+
+- **The QA loop's diminishing-returns exit closes the residue it carries (obs #215).** Route 2 now stamps each carried `top_issues[]` entry `status: closed` with `resolution: carried to recommendations.future (route 2)`, which is route 2b's own stamp, with the ids taken from a new `residueIds` field on `classifyLoopRoute`'s route-2 result. Before this, route 2 left its residue open, and `/develop-next`'s merge gate, which refuses any open entry, halted a task `/finalise` had already accepted (task 153, PR #515). A guard test holds both exits' On-exit lists to the same stamp. `pr-conformance-prompt.md` notes that gates written before this change may still show route-2 residue open.
+- **The bundler's `not found` warning names its origin and has a reader (task 154).** Every
+  `npm run bundle` — so every pre-commit run — printed `⚠️  shared/resources/<name> not found` with no
+  file, from a placeholder literal in `observation-log-contract.md`, and eleven task reports recorded
+  it as "pre-existing" (obs #151). The literal is gone (the contract now describes the path form in
+  words; a brace placeholder would have matched too). Discovery now carries each citation's origin,
+  and the warning reads `⚠️  shared/resources/<name> not found — cited at <file>:<line>`, once per
+  `(name, origin)` per run, mirroring the comment-only-reference warning. `--check`'s problem-path
+  summary now also prints `N skill(s) checked, U unresolved`, so a scan of nothing is no longer
+  indistinguishable from a scan with nothing wrong. New `tests/bundle-missing-source.test.js`
+  proves the attribution and dedupe on a fixture and requires the live `--check` output to carry
+  none, over a scan count read from `--check` itself. The line-aware collector is one pass over each
+  file rather than one per line, which takes `--check` from 5.8 s to 4.6 s; each of the three new
+  test files fails its own run if it takes 10 s or more.
+
+- **The banner doc defers to the Stop hook instead of restating it, and a HALT names the step that
+  halted (task 164).** Five follow-ups deferred by task 163. The Remaining Work Status doc's
+  re-prompt exception no longer restates the hook's lock-8 position and list, which had already
+  drifted from the hook (it dropped "if any, then Step 8"). It points at the hook's `POSITION` and
+  `STEPS_AHEAD` and says to resolve the reason's list into one `- Step N:` line per step. Its test
+  now cuts the forbidden fragments from the rendered hook reason instead of typing them. A HALT
+  status block names the step being executed, not `current_step`, and lists that step first. So
+  a HALT in Step 7's tail at lock 8 reads `Step 7/8 — {STEP-NAME} ❌ halted` (`FINALISE`, or
+  `FINALISE & CLOSE` on develop-bug); which sub-skills advance the lock early is left to
+  `advance-pipeline-lock.sh`'s `--skill` mapping. The snapshot's `halt_step` is unchanged. The
+  hook's `--complete` floor counts code lines only (at least 2: `COMPLETION_LINE`,
+  `ALREADY_DONE`); three of its five `--complete` lines are comments. Scenario 4b's builtin arm
+  prints a `SKIP` line, and a new `advance-pipeline-lock-4b-setup.test.mjs` drives its missing,
+  builtin and default arms through a test-only `ADVANCE_LOCK_TEST_4B_CMDS` seam.
+- **The Stop hook's step-8 reason names develop-bug's Step 7 checklist and every step still ahead
+  (task 163).** Five follow-ups from task 162's QA gate and PR review. At lock 8 the develop-bug
+  Step 7 tail now reads Part B's bug-close routine, then the Step 7 Completion Checklist, the check
+  that decides whether Step 7 finished, in the hook and the resume contract's Phase 0b sentence
+  alike. At lock 8 the status block no longer lists "the steps still ahead through Step 8", which
+  there was empty or repeated Step 8. It reads "the first unfinished row at or below Step 7, if
+  any, then Step 8", worded after the step-8 rule two lines below it. Lock 3 and every other step
+  keep the generic clause. The Remaining Work Status banner doc now defers to the Stop hook's
+  position and list at a Stop-hook re-prompt, and only there; the ordinary Step 7 → 8 transition
+  still derives both from `current_step`. New tests in `step-8-completion-checklist.test.mjs`
+  render the hook's reason at lock 8 and fail when the hook and the contract describe either tail
+  differently, or when the banner doc's exception loses its scope or either half. The
+  `--complete` population test gains a floor for the hook script. Scenario 4b fails at setup,
+  naming the command, when `command -v` returns empty. It no longer skips a missing command
+  silently, and it still skips a builtin.
+- **`/finalise` judges a documentation criterion by the document, not by a missing test (obs #204).**
+  The AC-traceability agent required a test citation for every success criterion, so a criterion
+  whose deliverable is what a document says — "the CHANGELOG cites the task", "the hooks doc agrees
+  with the hook" — failed on every run even when the agent had found the text and found it correct,
+  and the orchestrator overrode it by hand (task.161 AC14, task.162 AC8/AC9). The prompt now defines a
+  documentation criterion by what it requires ("file F says S"), cites the document line the agent
+  read, cites a pinning test when one exists (the changelog corpus guard, for a CHANGELOG entry) or
+  `NOT_APPLICABLE: documentation criterion`, and carries `test_runs_per_pr: null`. A behaviour
+  criterion cannot take the path: describing a behaviour in a document does not make it one.
+- **The Stop hook's step-8 reason fits every orchestrator (task 162).** At `current_step` 8 the
+  reason described Step 7's tail as "the DoD body to the PR, the tracker update, the Step 7
+  checklist" for all three orchestrators, so a develop-bug stall between `/finalise --bug` and
+  Part B was sent to work that does not close the bug. It now names Part B's bug-close routine
+  (Resolution Summary, status `closed`, parent or registry linkage, tracker-close check) for a
+  develop-bug lock, and the resume contract's step-8 paragraph says the same; the rule itself is
+  unchanged. The status-block position no longer asserts "Step 7/8 ✅ complete" at lock 8 (it reads
+  `Step 8/8 — COMMIT CHANGES ⏳ pending (Step 7 unverified: check its row first)`), a claim that
+  predates task 161. The generic line's unreachable "(or `--complete` if that was Step 8)" clause is
+  gone, and the `--complete` population test now scans the hook script, comments included. Scenario
+  4b's no-jq `PATH` links only `rm` and `dirname`, skipping any name `command -v` does not resolve
+  to an absolute path.
+- **Step 8 keeps its resume record until the Completion Checklist passes (task 161).** The pipeline
+  lock now lives until Step 8's Completion Checklist passes. `advance-pipeline-lock.sh --skill
+  commit-changes` used to remove it at `current_step` 8, which was the Step 8 commit (`a284dfdd`).
+  The push, Cleanup and the blocking checklist after that commit then ran with no lock. A pause or
+  crash there left nothing to resume from, a Step 8 HALT wrote no snapshot, and the Stop hook had
+  nothing to guard. The `commit-changes` arm now removes nothing at any step. The checklist runs
+  checks 2–5, then `--complete` (the one terminal remover), then check 1, so a failed check exits
+  with the lock still at 8. Cleanup no longer removes the lock. The Stop hook's step-8 reason names
+  the checklist, not `/commit-changes` returning, as the end of the step. `develop-pipeline-hooks.md`
+  now says the hook guards step 8, as the script's `-gt 8` always has. The resume detector
+  recommends 8, never a step 9, for a record at step 8. In all three orchestrators the recovery
+  exception now comes before the items it overrides (task.160 pr-review CR-2). Every generic
+  Pipeline Progress update and every `--complete` mention now carries the Step 8 rule (CR-1). Two
+  tests enumerate those populations. Executed tests, under bash and zsh, cover the passing and
+  failing checklist, a HALT at step 8, and `--restore`.
+
+- **Step 8 check 4 allowlists finished rows instead of denying two unfinished ones (task 160).**
+  Check 4 refused a Status cell only when it read `⏳ Pending` or `⏸ Paused`, so every state the
+  list did not name passed: `❌ Failed`, `⚠️ Needs Attention`, `🔄 …`, an empty cell. It now finds the
+  Status column by its header (2nd cell for Task and Story, 3rd for Bug) and accepts only a cell
+  that starts with `✅` (any detail after it) or reads `⏭️ Skipped`. Four behaviours tighten on
+  purpose: (1) a row at `❌ Failed`, `⚠️ Needs Attention`, `🔄 …`, `⏸️ Skipped` or an empty Status
+  fails, and the message prints the row; (2) a table with a header and no step rows fails; (3) a
+  table with no `Status` header cell fails; (4) Step 8 no longer writes `Committed in {hash}` into
+  the report, or sets its own row after the push. It sets that row before `/commit-changes` and
+  edits nothing after it, because check 5 needs a clean tree: 14 of 123 committed completed reports
+  carried Step 8's own row at `⏳ Pending` from the old order. Measured over the same 123 reports,
+  the allowlist refuses none that the deny-list accepted. The check also fails closed when awk
+  itself errors: under BSD awk an unguarded `$col` with no Status column aborted, and the empty
+  command substitution read as a pass.
+
+- **Step 8 check 4 reads the Pipeline Progress table, not the whole report (task 159, obs #200).**
+  The check grepped the whole implementation report for `⏳ Pending`. The PreCompact hook's
+  `## Pipeline Paused` section names that token in prose, so every run that was paused and then
+  resumed failed Step 8's BLOCKING checklist, even with every table row at `✅ Done`. Check 4 now
+  reads only the `|` rows under `## Pipeline Progress`. Two cases tighten on purpose. A `⏸️ Paused`
+  row now fails, because the resume contract treats it as `⏳ Pending`. A report with no Pipeline
+  Progress table now fails too; before, it passed on nothing. Executed bash + zsh cases in
+  `step-8-completion-checklist.test.mjs` hold the change: a paused-and-resumed report built by
+  running the hook's own append block, a Pending row, a Paused row, and a missing table. Each branch
+  is mutation-proved.
+- **`qa-story`'s QA report template closed its fence early (task 152).** A stray four-backtick fence line
+  after *Test Commands Executed* ended the four-backtick template there, so *Coverage Report* onward
+  rendered as real headings of the skill and the template's own closing fence opened one that never
+  closed. Found when the writer-site population test read the section as CommonMark does.
+- **Five develop-pipeline steps that failed or overreached on a correct run (task 147).** Each fix is
+  held by a test that cuts the block out of the shipped document and runs it in a fixture repository
+  under bash and zsh (`shared/resources/tests/lib/executed-prose.mjs`), and each is
+  mutation-proved.
+  - **Step 4 leak check (obs #141).** `git log -1 --name-only HEAD | tail -n +3` fed the `Date:`
+    header and every commit-message line into the loop as paths, so every commit reported a LEAK.
+    It now reads `git diff-tree --no-commit-id --name-only -r HEAD`.
+  - **Step 8 check 3 (obs #173).** The check grepped `**Final Status:**` (colon inside the bold),
+    but the template's story and task variants write `**Final Status**:`, so 105 of 147 completed
+    reports failed it. It now accepts both forms, and the test builds its reports from the template
+    itself.
+  - **Merging on a dirty tree (obs #142).** `gh pr merge --delete-branch` switches the local branch,
+    and on a tree dirty with another session's edits the switch aborted and skipped the remote delete.
+    Both merge sites (develop-next, develop-batch) now pass `--delete-branch` only on a clean tree.
+    Otherwise they merge and delete the remote branch with `git push origin --delete`. The head
+    branch is bound before the merge, and an empty binding halts. develop-next Step 4 re-syncs the
+    base as a step of its own, never chained to the merge or to the tick's commit. That chain raced
+    the index lock three times on 2026-09-21.
+  - **QA loop §5b (obs #171).** The fast gate ran before the cycle's gate and QA report were staged,
+    and the doc-links check reads the tracked tree, so every cycle's first attempt was red. A new
+    step 0-stage stages both files after step 0's no-change check and before the gate.
+  - **Step 3 (obs #162).** The inline route now has a two-fact precondition (a plan file found and a
+    surface map, both recorded this run) and owes `/develop`'s own Story or Task Completion
+    Checklist. `/develop` was the only named route before, so task.141's inline run had no stated
+    path.
+  - **Added during QA, cycles 1–6: new ways a run can stop.** Step 8 check 5 now also fails when
+    Step 4's Pre-flight Guard held files that were never restored. The guard holds untracked paths
+    outside the Step 4 scope and records them in `.claude/state/step4-*.txt`. `verify-push-state.sh
+    --scope` exits 2 on a scope that matches no path git knows: a glob, `:/` magic, a case-folded
+    or symlinked spelling, `..` or the whole repository. The scope check and check 3 share one
+    `path_under` predicate, so no spelling passes vacuously. Step 8 takes `{extra-scope-paths}`,
+    which carries `docs/bugs/bug-registry.md` for a develop-bug general bug. A failed remote-branch
+    delete no longer reads as a failed merge.
+
+- **`security-probe.mjs` and `uat-status.mjs` now run when invoked through the `.agents/skills`
+  symlink (obs #126).** Each engine decided whether it was the entry point by comparing
+  `process.argv[1]`, the symlinked path the caller typed, with `import.meta.url`, which Node has
+  already resolved. Through `.agents/skills/…` the two never matched, so `main()` never ran: no
+  output and exit 0. For the probe engine that is a probe that never executed reading as a clean
+  one. For `/qa-next` it meant every `uat-status.mjs` call returned nothing. Both now compare real
+  paths (`realpathSync`), the form `finalise-fix-and-recheck.mjs`, `qa-execute-snippets.mjs` and four
+  other engines already used. `shared/resources/tests/entrypoint-guard-realpath.test.mjs` holds the
+  whole population: every ESM engine and bundled copy with such a guard must resolve real paths, and
+  both engines are invoked through a symlinked directory and must refuse an unknown flag.
+- **`uat-status.mjs --run-path --env` judges the run file name it builds, not only the label
+  (task 143).** The guard refused a label ending in `-NN`, but a two-digit label (`--env 10`) builds
+  `<date>-10.md`, which the run-file sort key reads as run 10 of env `<date>`. That mis-orders
+  `priorRuns`, `--findings` and the previous-run link (task.141 PR review 2, CR-1). The label also
+  accepted `/`, `\` and `..`, which could steer the printed path out of `runs/<id>/`. The task.144
+  probe `security-probe --entry cli:…uat-status.mjs … --env {input}` read `present-but-inert`
+  against it and now reads `engages` on that case set. Control characters in a label (`\n`, `\r`,
+  `\t`) are still accepted, exactly as before this change, and are left to a follow-up. SKILL.md Step 4.4's `pass` bullet now names the note flag the
+  per-verdict table requires (`--clear-note` on every non-✅ row) (PR review 2, CR-2).
+  **Migration:** an empty, two-digit, or `/`-, `\`- or `..`-bearing `--env` label is refused with
+  exit 2. Use a label with a letter that does not end in `-NN`, such as `ci10`.
+
+- **A `cli:` probe declined before it ran no longer leaves a stale `unverifiable` control in the
+  record (task 144 follow-up, 5c CR-1).** A probe whose entry escaped a wrong `--repo-root` was
+  declined before its `--argv` template reached the result, so it was recorded with `argv: null`
+  and keyed without its `--name` — its corrected re-run then wrote a second entry, and the record
+  kept both the real verdict and the declined one. A declined `cli:` result now carries its
+  template, and a control is a `cli:` control by its entry prefix, so its name is its identity even
+  when there is no template to carry (a library caller's `bad-argv` decline). It never produced a
+  false pass — the stale entry reported executed 0 — but it left a "could not look" beside a
+  "looked and held". Every other form's key, and every existing entry-file name, is unchanged.
+
 ## [v0.51.0] - 2026-09-22
 
 ### Added

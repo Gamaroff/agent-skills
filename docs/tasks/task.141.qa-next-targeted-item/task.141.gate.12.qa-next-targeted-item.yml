@@ -1,0 +1,86 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: CONCERNS
+status_reason: "No HIGH for the eighth consecutive gate. 0c0ed980's Step 6 reordering holds for priorRuns, but the rule it relies on (line 84: 'every later step reads priorRuns and bug from the state file') is too broad for bug: the state file's bug is the row's bug at selection, so Step 6's 'the bug (if any)' prints nothing on a first failure and the old closed bug on a repeat one. The new rule wording also says 'letter' where JS \\b means an ASCII letter."
+reviewer: 'QA Engineer'
+updated: '2026-09-23T13:28:29Z'
+
+top_issues:
+  - id: 'TASK-141-BUG-23'
+    severity: medium
+    file: 'skills/qa-next/SKILL.md'
+    finding: "SKILL.md line 84 says every later step reads priorRuns AND bug from the state file, but the state file's bug is the row's link at selection. The bug this run files or re-links in Step 4.2 is never saved there, so Step 6's 'the bug (if any)' prints no bug after a first failure and the previous (closed) bug after a repeat failure. The rule introduced by the cycle-10 CR-2 fix is correct for priorRuns and over-broad for bug."
+    suggested_action: "Scope the rule: the state file's bug is the row's pre-run bug, used only by Step 4's reuse decision. Save the bug this run filed or re-linked to the state file (e.g. filedBug) at Step 4.2 and have Step 6 print that."
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+  - id: 'TASK-141-CR12-2'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "BUG_LINK_RULE says 'not preceded by a letter, digit or underscore', but \\b without the u flag treats only ASCII as word characters: [ébug.9](x) and [Ωbug.9](x) match and are validated (probed)."
+    suggested_action: "Say 'an ASCII letter, digit or underscore' in the rule (constant and README), and add a clause row with a non-ASCII letter that pins the \\b behaviour."
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+  - id: 'TASK-141-CR12-4'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "The comment above BUG_LINK_RE still says '`bug.` must START A WORD', and the clause-test label still says '`bug.` must start a word', after the rule wording changed."
+    suggested_action: 'Reword the comment and the test label to match the rule.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3947
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged. BUG_LINK_RE probed in memory on non-ASCII and punctuation link texts; no probe-engine run.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. 44 tests in the qa-next suite.'
+  reliability:
+    status: PASS
+    notes: 'No runtime change beyond the rule text in this commit.'
+  maintainability:
+    status: CONCERNS
+    notes: "BUG-23: the state-file rule is over-broad for bug, so Step 6's bug report is wrong on first and repeat failures."
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-23'
+  total_iterations: 12
+  verification_method: 'BUG-23 is prose: the rule now scopes `bug` to Step 4''s reuse decision, and every `bug` reader in SKILL.md was re-read against it. M51 (Unicode-aware lookbehind) and M52 (README drops ASCII) red. 52 mutations across the loop. Fixed by the fixer and not verified by a gate: the budget is spent.'
+
+recommendations:
+  immediate:
+    - action: "BUG-23: scope the state file's bug to Step 4's reuse decision; record this run's bug for Step 6."
+      refs: ['skills/qa-next/SKILL.md']
+  future:
+    - action: "CR12-3 (advisory): a state file written by the pre-task.141 skill has no priorRuns; say what Step 6 does when the key is missing."
+      refs: ['skills/qa-next/SKILL.md']
+    - action: 'CR12-5 (advisory): gate 11 was closed in place by the fixer, and its maintainability note, condition and immediate action still describe BUG-22 as open; the closures were unverified until this gate.'
+      refs: ['docs/tasks/task.141.qa-next-targeted-item/task.141.gate.11.qa-next-targeted-item.yml']
+    - action: 'CR11-2, CR11-3, CR10-1..3, CR9-3, CR8-2 + CR7-4, bug.16, CR-3, kept-✅ growth: unchanged.'
+      refs: ['skills/qa-next/SKILL.md', 'skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'BUG-23 fixed'

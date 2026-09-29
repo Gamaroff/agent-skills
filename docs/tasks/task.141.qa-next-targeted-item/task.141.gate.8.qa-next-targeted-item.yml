@@ -1,0 +1,91 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: CONCERNS
+status_reason: "No HIGH for the fourth consecutive gate. Cycle 7's shared predicate holds on the link-SHAPE axis, but its CR7-3 fragment strip reopened the validated-vs-published divergence on a third axis: --check validates `linkTarget(link)` while --item publishes `link`, so `../bugs/b.md#repro` passes --check and is handed to Step 4 as a path it cannot open. The bug-link rule's two prose restatements still do not match the predicate, and the README hunk deleted a sentence that is still true."
+reviewer: 'QA Engineer'
+updated: '2026-09-23T04:28:04Z'
+
+top_issues:
+  - id: 'TASK-141-BUG-18'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "describeRow publishes `bug` with its #fragment (`../bugs/bug.1.real.md#repro`) while checkRegistry validates `linkTarget(link)`, the fragment stripped — so the published link is not the validated link, contrary to the cycle-7 claim. Measured: --check exit 0, --item --json bug=\"../bugs/bug.1.real.md#repro\"; on origin/develop the same row failed --check. SKILL.md Step 4 opens `bug` to append a re-test section, and a path ending #repro is not a file. The CR7-3 test asserts this payload as intended ('the anchor is the author's')."
+    suggested_action: "Make the value the checker passes to `exists` and the value describeRow publishes the same expression — publish the resolved path (or add a fragment-free path field Step 4 opens) — and change the CR7-3 test's payload assertion to state that property."
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+  - id: 'TASK-141-BUG-19'
+    severity: medium
+    file: 'skills/qa-next/README.md'
+    finding: "The bug-link rule's three statements still disagree. README: skipped links are 'scheme-qualified or anchor-only' (omits `//host`), and the cycle-7 hunk deleted the still-true sentence that uncovered accepted stories and non-accepted referenced stories are warnings, not errors (checkRegistry still pushes both to warns). renderSkeleton: 'a plain URL is prose and is skipped' omits anchor-only and `//host`. Both say 'every bug link the tool wrote', but the predicate cannot know who wrote a link — it validates every repo-relative link whose text contains `bug.`, a human's included."
+    suggested_action: "State the rule once in the predicate's own terms (repo-relative link whose text contains `bug.` must resolve; scheme, `//host` and `#anchor` links are skipped), use identical wording in the README and renderSkeleton, and restore the warnings sentence."
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+  - id: 'TASK-141-CR8-3'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "linkTarget cuts at the FIRST `#`, so a link to a file whose name contains `#` (`../bugs/bug#2.md`, text `bug.2`) now fails --check naming a file that exists; origin/develop passed it. No create-bug-report filename carries `#`, so this reaches hand-named files only."
+    suggested_action: "Strip a fragment only when the full href does not resolve, or fold into BUG-18's fix — the same function decides both."
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-23'
+    resolution: "Not changed in code, by decision: a # in an href begins a fragment (URL semantics), and base passing a raw # was the whole href being treated as a path by accident. BUG_LINK_RULE now says a #fragment is ignored, and the error names the path actually checked (../bugs/bug), so the reading is visible rather than looking like a false negative. No create-bug-report filename contains #. Open to cycle 9 to overturn."
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3944
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged across eight cycles. Offline, file-local; isToolWrittenLink is not an exported accept/reject boundary. Six hostile link shapes were exercised through the CLI against a fixture (fragment, query string, `./` prefix, literal `#` in a filename, run-link fragment) — recorded in the QA report, not through the probe engine, so evidence stays reasoned.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. 41 tests in the qa-next suite.'
+  reliability:
+    status: CONCERNS
+    notes: "BUG-18: the published `bug` path and the validated path differ on the fragment axis — the third axis on which this divergence has appeared (row state in cycle 6, link shape in cycle 7, fragment in cycle 8). The shared predicate is right; what is not shared is the transformation applied after it."
+  maintainability:
+    status: CONCERNS
+    notes: 'BUG-19: two prose restatements of the rule still diverge from the code, and a still-true sentence was deleted.'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-23'
+  total_iterations: 8
+  verification_method: '6 mutations (M35–M40), every one red on the predicted test; 40 across eight cycles, none survived'
+
+recommendations:
+  immediate:
+    - action: 'BUG-18: publish and validate one expression, not one predicate plus a transform applied on one side only.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+    - action: 'BUG-19: one wording of the rule in the README and renderSkeleton, in the predicate''s own terms; restore the warnings sentence.'
+      refs: ['skills/qa-next/README.md', 'skills/qa-next/scripts/uat-status.mjs']
+  future:
+    - action: "CR8-2 + CR7-4 (pre-existing, identical on origin/develop): the prose skip and the fragment strip apply to Notes / bug links only. A run link with a #fragment (`runs/D.1/r.md#items`) and a run file's Filed as cell still treat the fragment and any URL as a filename. One link resolver for every href cmdCheck validates would close both."
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'bug.16 (filed separately): the main guard is a silent no-op under a symlink, at six sites across five skills.'
+      refs: ['docs/bugs/bug.16.main-guard-silent-noop-under-symlink/bug.16.main-guard-silent-noop-under-symlink.md']
+    - action: 'Accepted limitation (cycle 5): the kept-✅ note cell grows by one segment per re-run.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-3 (cycle 1, still advisory): --set exits 0 whether the row moved or was kept.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'BUG-18 and BUG-19 fixed and mutation-proved'

@@ -1,0 +1,18 @@
+{
+  "sink": "path",
+  "entry": ".claude/state/t152-probe-wrapper.mjs#admitsArtifact",
+  "name": "isCoLocatedArtifact",
+  "call_site": "shared/resources/finalise-fix-and-recheck.mjs",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 41,
+  "passed": 41,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-26T19:47:54.174Z"
+}

@@ -51,6 +51,8 @@ Run the bug-appropriate verification signals, in order. **All must pass** for a 
 
 > Standard vs lite: in lite mode (`Minor`/`Trivial` + `Low`/`Medium` only — see Phase 0c), run signals 1 + 2 and skip signal 3. `Blocker`/`Critical`/`Major` bugs always run all three.
 
+**No verify cycle waits on CI.** The PR's CI run is not a signal here: each fix cycle pushes, CI runs in the background as information, and a pending, cancelled or environmentally failing run neither blocks nor fails a cycle. **CI green is required exactly once, on the final commit, at `/finalise`** (`/finalise --bug`, Step 7 — CI readings 1 and 2). This is the same rule as the story/task QA loop's §"CI and the QA loop" in `shared/resources/develop-pipeline-step-5-6-qa-loop.md`; this file is skill-native, so it states the rule itself. The reason is cost: on a single shared runner a per-cycle wait turns into hours, and an environmental CI failure then blocks a loop with nothing to fix.
+
 Determine the verdict:
 
 - **PASS** — regression test green, suite + lint green, no blocking review-code findings → go to **On PASS**.

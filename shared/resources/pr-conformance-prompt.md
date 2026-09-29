@@ -62,10 +62,12 @@ C. TRAIL (category: trail) — the evidence is missing, stale, or contradicts it
    - the highest-numbered gate did not reach 5c. Read this from the implementation report, not from
      the gate: the `### QA Cycle {N}` entry for that gate carries `**Action**: Proceeding to 5c` on
      every accepting route (the QA loop's §5c routes 1, 2, 2b, 2c and 3 — no open finding; the
-     Diminishing-returns exit, whose open residue is test machinery; the Cosmetic-residue exit, whose
+     Diminishing-returns exit, whose test-machinery residue is carried to `recommendations.future` and
+     closed; the Cosmetic-residue exit, whose
      LOWs were carried to `recommendations.future` and closed; the gate-the-last-fix half-cycle's
      own clean gate; a CONCERNS with no open entry) and `Running qa-fix` otherwise. Do NOT flag a gate for its token, and do NOT flag open entries on a gate whose entry
-     reads `Proceeding to 5c` — on route 2 they are the residue the exit declined to fix. Only when
+     reads `Proceeding to 5c` — on a route-2 gate written before obs #215 they are the residue the exit
+     declined to fix, left open under the old rule. Only when
      no implementation report is available fall back to the gate itself: FAIL, or an open entry
      (status absent or `open`) that no active waiver covers, is the trail defect
    - the document says status: accepted but no DoD file exists
@@ -92,6 +94,13 @@ D. CONSISTENCY (category: consistency) — the three views of the same work disa
   task still in progress has no DoD file, and that is correct, not a defect.
 - If there is no work item document, or the diff is empty: return an empty findings list. Never invent
   issues to justify the run.
+- CI STATE IS NOT A FINDING BEFORE /finalise. A CI run that is pending, cancelled, or failing for an
+  environmental reason (runner offline, infrastructure timeout, a job that never started) is not a
+  conformance finding while the work item has not reached `/finalise` — the pipeline gates CI exactly
+  once, on the final commit, at `/finalise`, and no QA cycle waits on it. Leave the CI verdict to
+  `/finalise`; the output contract has no slot for it, so emit nothing. A CI failure attributable to the
+  change — a real test or lint failure on the PR head, quoted from the job's output — can still be a
+  finding.
 
 ## Output contract — emit EXACTLY this YAML and nothing else
 

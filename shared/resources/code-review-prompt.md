@@ -234,8 +234,11 @@ So on **cycle 2 only** (exactly one prior gate exists):
   same pipeline that is now reviewing it, and cycle 1's fixes are the least-reviewed code in the
   change set. Its job is to find the claim that is false, starting with the fixes.
 - Probe the four transitions the steady-state suite structurally cannot see — **teardown ·
-  in-flight · error path · reconnect** (the table in `qa-fix` Step 3.5). At least one real defect of
-  this shape was caused by two earlier fixes that were each correct alone.
+  in-flight · error path · reconnect** (the table in `qa-fix` Step 3.5). At least one real lifecycle
+  defect was caused by two earlier fixes that were each correct alone.
+- For every change to a dedupe, cache or record key, a normaliser or an equality predicate, find
+  **one pair that must be the same and one that must differ** — a key changed to fix one direction
+  has usually broken the other (the identity-rule table in `qa-fix` Step 3.5, obs #169).
 
 Cycles 3+ keep the narrowed scope. This is affordable because the pipeline's convergence check ends
 the loop shortly after cycle 3 when it is not converging: the trade is **two deep cycles instead of

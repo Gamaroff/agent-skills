@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": null,
+      "entry": "cli:shared/resources/qa-execute-snippets.mjs",
+      "name": "qa-execute-snippets --copy-as DEST containment",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 23,
+      "passed": 23,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--file",
+        "/private/tmp/claude-501/-Users-gamaroff-Development-Projects-agent-skills/76cf100f-11e9-4b1a-9566-ce0ce7311073/scratchpad/probe/SKILL.md",
+        "--no-zsh",
+        "--copy",
+        "/private/tmp/claude-501/-Users-gamaroff-Development-Projects-agent-skills/76cf100f-11e9-4b1a-9566-ce0ce7311073/scratchpad/probe/seed",
+        "--copy-as",
+        "{input}"
+      ],
+      "ran_at": "2026-09-26T05:46:25.054Z"
+    },
+    {
+      "sink": null,
+      "entry": "cli:shared/resources/change-log.js",
+      "name": "change-log --check-updated coherence",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 14,
+      "passed": 14,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--check-updated",
+        "--file",
+        "{input}"
+      ],
+      "ran_at": "2026-09-26T05:46:26.528Z"
+    }
+  ],
+  "totals": {
+    "executed": 37,
+    "reproduced": 0
+  },
+  "updated_at": "2026-09-26T05:46:26.528Z"
+}

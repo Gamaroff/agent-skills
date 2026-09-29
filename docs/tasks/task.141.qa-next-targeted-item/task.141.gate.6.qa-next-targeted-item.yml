@@ -1,0 +1,92 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: CONCERNS
+status_reason: "Cycle 5's round-trip fix verified clean under adversarial input — the HIGH is genuinely closed. Two MEDIUMs, both in cycle 5's every-bug-link change and both closed by one correction: validate every repo-relative bug link on every row, rather than every link on fail rows only."
+reviewer: 'QA Engineer'
+updated: '2026-09-23T00:30:00Z'
+
+top_issues:
+  - id: 'TASK-141-BUG-14'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "Validating EVERY bug-shaped link on a fail row turns a non-file link into a hard --check error: a note reading `[bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99)` gives `bug file not found: https://example.com/issues/99`, exit 1, which /qa-next Step 0 treats as HALT registry-invalid. The identical fixture is exit 0 on origin/develop, so this is a regression introduced by cycle 5, not pre-existing."
+    suggested_action: 'Skip links that are not repo-relative file paths before the exists check, so only links the tool itself could have written must resolve.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-BUG-15'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "describeRow publishes `bug` for a row in ANY state, but checkRegistry validates bug links only when the state is fail — so a ⏸ blocked or ✅ accepted row carrying a stale link passes --check at exit 0 while --item --json hands the skill that path and SKILL.md Step 4 opens it to append a re-test section. The same class cycle 5's own fix claimed to close, left open on four of the six states."
+    suggested_action: 'Validate every bug-shaped repo-relative link on every row; keep the "a bug link is required" rule as the fail-only extra.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-CR6-3'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "appendNote's header comment still describes the duplicate suppression cycle 5 removed, contradicting the body comment three lines below it and the observed behaviour. The fifth cycle in which one statement of a rule was updated and its twin was not — this time both inside the same function."
+    suggested_action: 'Delete the stale header lines; the in-body comment already states the rule and its accepted cost.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-CR6-4'
+    severity: low
+    file: 'evals/qa-next/unit/uat-status.test.mjs'
+    finding: "The STATES population test's non-vacuity floor is the literal 10. It does catch a skipped state (verified), but a sixth state added to BOTH STATES and RULES — the correct extension the test exists to force — reds on the floor with a message pointing at the wrong thing."
+    suggested_action: 'Derive the floor from the RULES table so the skipped-state protection survives without the false red on a legitimate new state.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3941
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged across six cycles. No single-argument accept/reject export to probe; offline, file-local.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. 38 tests; full suite 3941.'
+  reliability:
+    status: CONCERNS
+    notes: "BUG-14 is a --check regression that HALTs the consuming skill on a legal registry; BUG-15 leaves a stale path published to it unvalidated. Neither corrupts data. Cycle 5's round-trip fix was verified clean against a literal backslash, an escaped backslash before a pipe, a trailing backslash and a bare pipe in a note, across six rewrites — byte-identical."
+  maintainability:
+    status: CONCERNS
+    notes: 'CR6-3 is a comment contradicting the function it sits on, introduced by the fix that changed the behaviour. That is the fifth cycle in which a rule was restated in two places and one was updated.'
+
+bug_resolution:
+  bugs_fixed: 13
+  bugs_remaining: 2
+  fix_date: '2026-09-22'
+  total_iterations: 6
+  verification_method: '29 mutations across five cycles all red; cycle 6 drove the real CLI over adversarial escape fixtures and 13 one-value mutations of the population test'
+
+recommendations:
+  immediate:
+    - action: 'Validate every bug-shaped repo-relative link on every row; keep the required-link rule fail-only. One change closes BUG-14 and BUG-15.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+    - action: 'Delete appendNote stale header comment; derive the population test floor.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+  future:
+    - action: "PRE-EXISTING, not attributable to this branch and to be filed separately: the `main` guard compares resolve(process.argv[1]) against fileURLToPath(import.meta.url), so invoking the script through a symlinked path — including every macOS mktemp -d copy under /var → /private/var — makes the whole CLI a silent no-op at exit 0. Reproduces identically on origin/develop. It cost this review two confusing probes before being diagnosed. Fix: compare realpathSync(process.argv[1])."
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Accepted limitation (cycle 5): the kept-✅ note cell grows by one segment per re-run; the real fix is an out-of-band separator or a structured cell, not another comparison rule.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-3 (cycle 1, still advisory): --set exits 0 whether the row moved or was kept.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'BUG-14 and BUG-15 fixed'

@@ -1,0 +1,91 @@
+schema: 1
+task: 'task.117.card-preflight-heading-only'
+task_title: 'The card preflight passes a Success Criteria block that renders as a bold label with nothing under it — 15 of 106 task docs'
+gate: CONCERNS
+status_reason: 'All seven cycle-2 findings verified fixed from a clean process; bug.3 closed. Two medium defects remain, both in cycle-2 work: the bare-bold shortcut misses a label whose colon sits inside the bold (**Functional:**), and the Change Log rows written into task.42/43 landed inside fenced example tables. Two low, two cleanups. HIGH count 0 across all three gates — neither the convergence check nor the diminishing-returns exit applies (product-defect-signal); one more fix cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T21:39:07Z'
+
+top_issues:
+  - id: 'CR3-1'
+    severity: medium
+    file: 'shared/resources/jira-sync.js'
+    finding: 'The whole-section early return tests the trailing colon with /:\s*$/ on the raw line, so **Functional:** (colon inside the bold — the shape RE_BOLD_LABEL documents) is returned as prose and reported ok, while **Functional**: is heading-only.'
+    suggested_action: 'Make the colon test see through the closing bold (/:\**\s*$/), matching the terminator shape isLabelOnly uses; fixture for **Label:** alone; mutation-prove.'
+    suggested_owner: dev
+    bug_ref: 'task.117.bug.4.colon-inside-bold-shortcut.md'
+    status: open
+  - id: 'CR3-2'
+    severity: medium
+    file: 'docs/tasks/task.42.change-log-spec-and-engine/task.42.change-log-spec-and-engine.md'
+    finding: 'The Change Log row was appended inside a fenced markdown EXAMPLE in section 3 of task.42 (line 185) and task.43 (line 150) — neither has a real Change Log section — so the spec samples carry a task.117 row and the edit is unlogged.'
+    suggested_action: 'Remove the rows from both fenced samples; create a canonical Change Log section in each carrying the 2026-09-17 row.'
+    suggested_owner: dev
+    bug_ref: 'task.117.bug.5.change-log-rows-inside-fenced-examples.md'
+    status: open
+  - id: 'CR3-3'
+    severity: low
+    file: 'docs/tasks/task.44.change-log-review-and-edit/task.44.change-log-review-and-edit.md'
+    finding: 'The new Change Log row sits after a blank line and directly before ---, rendering as a paragraph/setext heading rather than a table row (line 524).'
+    suggested_action: 'Move the row up so it directly follows the finalise row inside the table.'
+    suggested_owner: dev
+    bug_ref: 'task.117.bug.5.change-log-rows-inside-fenced-examples.md'
+    status: open
+  - id: 'CR3-4'
+    severity: low
+    file: 'shared/resources/jira-sync.js'
+    finding: 'makeFenceTracker caps fence indent at 3 spaces where RE_FENCE allowed any, so a fence nested under a list item at 4+ spaces is untracked and an indented **Bold** line inside it now matches RE_BOLD_LABEL (^\s*) and is deleted.'
+    suggested_action: 'Anchor RE_BOLD_LABEL at column 0 like RE_SUBHEADING — a label under a list item is not a grouping label — with a fixture.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 496
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+  cycle_2_findings_verified_fixed: 7
+  security_probes: 161
+  re_review_scope: 'since 2026-09-16T21:24:48Z (gate 2) — 20 files'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 161
+    notes: 'Same probe re-run after the cycle-2 regex change: no throw, all under 50 ms; RE_BOLD_LABEL now [^*\n]*[^*\n.!?\s] — still linear, the leading class excludes * so it cannot backtrack across the closing marker. Deviations unchanged and all pre-existing or expected.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Corpus 0 of 120 (after task.42/43/44 document fixes); nine mutations across two cycles each red their named test; fast gate 3364/3365.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two near-duplicate heading-only branches in checkCardSections and a fix-text example that the same diff made content (CR3-5); the sync-scope test covers one script of four it claims (CR3-6). Cheap; take with CR3-1.'
+
+recommendations:
+  immediate:
+    - action: 'Colon test sees through the closing bold in the bare-bold shortcut; fixture for **Label:** alone (CR3-1)'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/tests/jira-sync-card-summary.test.mjs']
+    - action: 'Remove the rows from the task.42/43 fenced examples and create real Change Log sections; move task.44 row into its table (CR3-2, CR3-3)'
+      refs: ['docs/tasks/task.42.change-log-spec-and-engine/task.42.change-log-spec-and-engine.md', 'docs/tasks/task.43.change-log-templates-and-creation/task.43.change-log-templates-and-creation.md', 'docs/tasks/task.44.change-log-review-and-edit/task.44.change-log-review-and-edit.md']
+    - action: 'Anchor RE_BOLD_LABEL at column 0 (CR3-4)'
+      refs: ['shared/resources/jira-sync.js']
+  future:
+    - action: 'Collapse the two heading-only branches; colon-bearing example in the fix text (CR3-5); loop the sync-scope test over all four scripts (CR3-6)'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/tests/card-preflight.test.mjs']
+    - action: 'CRLF lists; review-story:2321 — pre-existing, carried from gate 1'
+      refs: ['shared/resources/jira-sync.js', 'skills/review-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR3-1..4 fixed; corpus and suites green'

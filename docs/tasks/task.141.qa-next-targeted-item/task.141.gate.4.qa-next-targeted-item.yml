@@ -1,0 +1,95 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: CONCERNS
+status_reason: "Cycle 3's append rule holds — all four writers of the note cell were enumerated and no path bypasses it. Five residual findings, none HIGH: the append makes a pre-existing pipe-corruption irrecoverable on a kept row, and makes the payload's single bug link ambiguous."
+reviewer: 'QA Engineer'
+updated: '2026-09-22T22:30:00Z'
+
+top_issues:
+  - id: 'TASK-141-BUG-9'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "renderRow joins cells with an unescaped `|`, so a raw pipe in a --note splits the row and --check reports a cell-count error (a /qa-next Step 0 HALT). The CORRUPTION is pre-existing — renderRow is byte-identical on origin/develop and base's cmdSet wrote the raw note too — but the append rule makes it IRRECOVERABLE on a kept ✅: --clear-note is refused there and every later --set appends onto the already-split cell, so the only repairs are a demotion (which destroys the sign-off) or a hand edit."
+    suggested_action: "Escape `|` as `\\|` once inside renderRow, the single writer for every cell the tool emits; splitCells already honours it via its (?<!\\\\) lookbehind, so the round-trip is closed."
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-BUG-10'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "describeRow.bug takes the FIRST bug-shaped link in Notes / bug, and the append rule makes that cell multi-valued on a kept ✅, so an older bug link wins over a newer one — while SKILL.md Step 4.2 tells the skill to re-link precisely that value as 'the open bug'. Verified: the cell `[bug.1.old](…) · accepted … · [bug.7.new](…)` reports bug.1.old."
+    suggested_action: 'Take the LAST bug match so the newest link wins on an appended cell, and say so in the field comment.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-CR4-3'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'The append has no duplicate suppression and no cap: a ✅ row blocked nightly by the same missing credential grows its cell forever, and --clear-note is refused there so it cannot be trimmed without demoting the row.'
+    suggested_action: 'Skip the append when the new segment equals the cell last segment, which keeps the operation an append while bounding the cell.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-CR4-4'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "`kept` is a hand-listed subset of STATES, so the replacement for two failed flag-enumerations is itself an enumeration in the other direction: a seventh state would default to kept-on-accepted with nothing forcing the re-check. cmdSet holds two more such lists (['pass','fail'] needs --run, ['na','blocked'] needs --note) and the population Object.keys(STATES) is listed at none of the three sites."
+    suggested_action: 'Add a test that enumerates Object.keys(STATES) and asserts every state is classified by each of the three rules, so a new state cannot be added silently.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-CR4-5'
+    severity: low
+    file: 'skills/qa-next/README.md'
+    finding: "The new paragraph says a pass, blocked or n/a against an accepted row 'updates Last run', but --run is only required for pass/fail and the cell is written under `if (run)` — a blocked or n/a re-run keeps ✅, appends the note and leaves the stale Last run link untouched."
+    suggested_action: "Qualify to 'updates Last run when the verdict carried one'."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3935
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged across four cycles. No single-argument accept/reject export; offline, file-local, no shell interpolation, no dependency.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. 32 tests. CR4-3 names an unbounded cell, which is a correctness/readability concern rather than a performance one at any realistic size.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-9 leaves a reachable registry-invalid state with no in-tool repair on a kept row. Otherwise the append rule was verified to hold: all four writers of row.notes were enumerated and only one is reachable on a kept row.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR4-4 is the fair criticism of cycle 3 — the structural rule still rests on a hand-listed state set. It is a much smaller and stabler population than the flag set it replaced (STATES is frozen and rarely changes, flags are open-ended), but nothing forces the re-check, and a test enumerating Object.keys(STATES) would.'
+
+bug_resolution:
+  bugs_fixed: 8
+  bugs_remaining: 2
+  fix_date: '2026-09-22'
+  total_iterations: 3
+  verification_method: 'Executed reproductions; 21 mutations across three cycles, all red; writer-set enumeration for the append rule'
+
+recommendations:
+  immediate:
+    - action: 'Escape the pipe in renderRow and cover the round-trip with a test.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+    - action: 'Take the last bug link in describeRow so the newest wins on an appended cell.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+  future:
+    - action: 'CR-3 (cycle 1, still advisory): --set exits 0 whether the row moved or was kept.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'BUG-9 and BUG-10 fixed'

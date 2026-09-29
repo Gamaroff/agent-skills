@@ -1939,6 +1939,187 @@ function formatCardCheck(result, opts = {}) {
   return lines.join("\n");
 }
 
+// A card's summary line is the document's frontmatter `title`. A title is a
+// name, not a summary: the summary belongs in `description`. Nothing bounded
+// it, and the preflight could not see it: `preflight()` kept only the body. On
+// 2026-09-24, 42 of 146 task titles exceeded 100 characters, the longest 368,
+// and GitHub published them verbatim as issue titles (task.150, obs #128).
+//
+// Defined here, once, beside the section spec the same checks read. The
+// authoring preflight, the corpus ratchet and create-task's
+// `--from-observation` seed all import it rather than restating the number.
+const CARD_TITLE_MAX = 100;
+
+/**
+ * One `important` finding when the frontmatter `title` is longer than
+ * `CARD_TITLE_MAX`, else none. A missing title is not this check's business.
+ *
+ * `body` is read only to suggest the fix: when the body's H1 is within the
+ * bound, it is usually the name the long title was trying to be.
+ */
+//
+// The title is read from the RAW header, not from `parseFrontmatter`. That
+// parser reads line by line, and the security probe showed it measuring
+// something other than the YAML title in ten shapes across two DoD runs
+// (task.150): a block scalar (`>-`, `|`), with or without a comment, tag or
+// anchor; a multi-line plain or quoted scalar; a value on the line after
+// `title:`; an indented `title:` inside another block that overwrites the real
+// one; and a byte-order mark before the fence, which hides the whole header.
+// Patching the parser per shape lost every time, so the claim is scoped
+// instead: a card title is ONE column-0 `title:` line with a single-line value,
+// and anything else is `title-not-inline` — refused, never measured.
+//
+// DoD run 3 then found the reader itself deciding two things differently from
+// the sync: where the header ENDS (an indented `---` ended it here, not
+// there), and which lines are the `title` key (a quoted key, an explicit
+// `? title`, a flow map or a `<<:` merge). So the header's edges are now the
+// sync parser's own edges, and any header whose edges YAML could read
+// differently — a fence that is not a bare `---`, a `...` end marker — or
+// that names `title` in any key form but the canonical one, or carries a
+// merge key that could supply it, is refused too. The rule stays one sentence:
+// what is not the canonical shape is not measured.
+const BLOCK_SCALAR_INDICATOR = /^[>|][+-]?[0-9]?[+-]?$/;
+// Every way a header line can name the `title` key: plain, quoted, explicit
+// (`? title`), a list item, or inside a flow map. Only the first form, at
+// column 0 and unquoted, is canonical.
+const TITLE_KEY = /^\s*(?:\?\s*|-\s+)?(["']?)title\1\s*(?::|$)/;
+const FLOW_TITLE_KEY = /[{,]\s*(["']?)title\1\s*:/;
+const MERGE_KEY = /^\s*<<\s*:/;
+
+/**
+ * Read the card title from a document's raw text. Returns
+ * `{ title, problem }`: `problem` is null for a single-line inline title (or no
+ * title at all), else a short reason the title is not inline.
+ */
+function readCardTitle(text) {
+  const src = String(text || "").replace(/^\uFEFF/, "");
+  const lines = src.split(/\r?\n/);
+  // The header's edges exactly as `parseFrontmatter` finds them: it opens when
+  // the text starts with `---` and closes at the next line that starts with
+  // `---` at column 0. An indented `---` is content, to the sync and to YAML.
+  if (!lines[0].startsWith("---")) return { title: "", problem: null };
+  const end = lines.findIndex((l, k) => k > 0 && l.startsWith("---"));
+  if (end < 0) return { title: "", problem: null };
+  const header = lines.slice(1, end);
+  const keyLines = header
+    .map((l, k) => ({ l, k }))
+    .filter(
+      ({ l }) =>
+        TITLE_KEY.test(l) || FLOW_TITLE_KEY.test(l) || MERGE_KEY.test(l),
+    );
+  if (keyLines.length === 0) return { title: "", problem: null };
+  const bareFence = (l) => l.trimEnd() === "---";
+  if (
+    !bareFence(lines[0]) ||
+    !bareFence(lines[end]) ||
+    header.some((l) => /^\.\.\.(\s|$)/.test(l))
+  ) {
+    return {
+      title: "",
+      problem:
+        "the frontmatter fences are not bare `---` lines, so YAML and the sync can disagree about where the header ends",
+    };
+  }
+  if (keyLines.some(({ l }) => MERGE_KEY.test(l))) {
+    return {
+      title: "",
+      problem: "the header has a `<<:` merge key, which can supply the title",
+    };
+  }
+  if (keyLines.length > 1) {
+    return {
+      title: "",
+      problem: `the header names \`title\` ${keyLines.length} times`,
+    };
+  }
+  const { l, k } = keyLines[0];
+  if (!/^title\s*:/.test(l))
+    return {
+      title: "",
+      problem:
+        "the `title` key is not a plain column-0 `title:` line (indented, quoted, explicit or in a flow map)",
+    };
+  const value = l.replace(/^title\s*:/, "").trim();
+  if (value === "")
+    return { title: "", problem: "the value is not on the `title:` line" };
+  if (/^[>|!&*]/.test(value)) {
+    return {
+      title: "",
+      problem: `the value is a YAML ${value[0] === ">" || value[0] === "|" ? "block scalar" : value[0] === "!" ? "tag" : value[0] === "&" ? "anchor" : "alias"} (\`${value}\`)`,
+    };
+  }
+  const next = header[k + 1];
+  if (next !== undefined && /^\s+\S/.test(next)) {
+    return { title: "", problem: "the value continues on an indented line" };
+  }
+  const q = value[0];
+  if ((q === '"' || q === "'") && !(value.length > 1 && value.endsWith(q))) {
+    return {
+      title: "",
+      problem: "the quoted value is not closed on the `title:` line",
+    };
+  }
+  const title = q === '"' || q === "'" ? value.slice(1, -1) : value;
+  return { title, problem: null };
+}
+
+function checkCardTitle(frontmatter, body = "", opts = {}) {
+  const findings = [];
+  // With raw text the BOM is read from it, so a caller cannot forget to pass it.
+  const bom =
+    opts.bom ?? (opts.raw != null && String(opts.raw).charCodeAt(0) === 0xfeff);
+  if (bom) {
+    findings.push({
+      severity: "important",
+      section: "(title)",
+      code: "title-unreadable-bom",
+      message:
+        "The document starts with a byte-order mark, so the tracker sync cannot read its frontmatter — the card would publish no title.",
+      fix: "Save the file as UTF-8 without a BOM.",
+    });
+  }
+  let title;
+  let problem = null;
+  if (opts.raw != null) {
+    ({ title, problem } = readCardTitle(opts.raw));
+  } else {
+    // No raw text (the corpus ratchet, a sync caller): the parsed value is all
+    // there is, and a block-scalar indicator is still refused.
+    title =
+      frontmatter && frontmatter.title != null ? String(frontmatter.title) : "";
+    if (BLOCK_SCALAR_INDICATOR.test(title.trim()))
+      problem = `the value is a YAML block scalar (\`${title.trim()}\`)`;
+  }
+  if (problem) {
+    findings.push({
+      severity: "important",
+      section: "(title)",
+      code: "title-not-inline",
+      message: `The frontmatter title is not a single-line value — ${problem} — so the card's summary line would not be the title.`,
+      fix:
+        "Write the title on the `title:` line itself, quoted, as a name of at most " +
+        CARD_TITLE_MAX +
+        " characters.",
+    });
+    return findings;
+  }
+  if (!title || title.length <= CARD_TITLE_MAX) return findings;
+  const h1 = (/^# (.+)$/m.exec(body) || [])[1] || "";
+  const useH1 = h1 && h1.length <= CARD_TITLE_MAX;
+  return [
+    ...findings,
+    {
+      severity: "important",
+      section: "(title)",
+      code: "title-too-long",
+      message: `The frontmatter title is ${title.length} characters — the card's summary line would be a paragraph (limit ${CARD_TITLE_MAX}).`,
+      fix: useH1
+        ? `Use the H1 as the title ("${h1}", ${h1.length} chars) and move the rest into \`description\`.`
+        : `Shorten the title to a name of at most ${CARD_TITLE_MAX} characters and move the rest into \`description\`.`,
+    },
+  ];
+}
+
 // What a clean result is a claim about — and what it is not.
 //
 // `ok: true` with zero findings reads as a structural all-clear, and it was
@@ -1949,10 +2130,19 @@ function formatCardCheck(result, opts = {}) {
 // scope statement the authoring contract asks for; it is deliberately not a
 // mandatory-section count, which is a per-kind template property this
 // tracker-neutral module has no definition of and must not grow a second one.
+//
+// The title clause keys on the RESULT, not on an options argument: `formatCardCheck`
+// calls this itself, with no options, so an option passed by a caller would reach
+// the JSON `scope` field and never the human-readable line (task.150 review, I1).
+// Only the authoring preflight sets `titleChecked`; the sync callers keep their
+// wording.
 function describeCardScope(result) {
   const resolved = result.blocks.filter((b) => b.status === "ok").length;
   const noun = resolved === 1 ? "card block resolves" : "card blocks resolve";
-  return `${resolved} ${noun} — this checks the card sections only, not template completeness.`;
+  const what = result.titleChecked
+    ? "the card sections and the title only"
+    : "the card sections only";
+  return `${resolved} ${noun} — this checks ${what}, not template completeness.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -5771,6 +5961,9 @@ module.exports = {
   summaryBlockNodes,
   buildCardSections,
   checkCardSections,
+  CARD_TITLE_MAX,
+  checkCardTitle,
+  readCardTitle,
   formatCardCheck,
   describeCardScope,
   isLabelOnly,
@@ -5807,6 +6000,10 @@ module.exports = {
   adfContainsText,
   adfContainsExactText,
   matchCodeFence,
+  // The CommonMark fence tracker behind extractSection. Exported so a heading
+  // reader elsewhere (prepass-axes.js) reuses it rather than adding a third
+  // fence parser beside this one and doc-links.js (task 151).
+  makeFenceTracker,
   firstLineOf,
   COMMENT_MARKER_PREFIX,
   // jira api

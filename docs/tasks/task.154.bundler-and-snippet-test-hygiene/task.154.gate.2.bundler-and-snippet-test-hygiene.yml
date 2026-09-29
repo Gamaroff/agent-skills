@@ -1,0 +1,122 @@
+schema: 1
+task: 'task.154.bundler-and-snippet-test-hygiene'
+task_title: 'Bundler and snippet-test hygiene: attributed warning, symlink-free test run'
+gate: CONCERNS
+status_reason: 'Cycle 1 findings fixed and verified (HIGH closed, by-hand re-probe of 18 candidates all safe). The refute pass found two MEDIUM defects the fixes introduced or left: §2 can pass on a scan of zero resolved skills, and two concurrent runner invocations delete each other''s clone; plus seven LOW edge cases.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T22:21:04Z'
+
+top_issues:
+  - id: 'T154-QA2-1'
+    severity: medium
+    file: 'tests/bundle-missing-source.test.js'
+    finding: 'With every skill unresolved, check_skill returns before discover_needed and check_all prints the ❌ form with 0 problems; §2 (which now accepts ❌ and counts skills on disk) passes a scan that covered nothing (refute CR-1). Bug: task.154.bug.3.missing-source-scan-can-be-vacuous.md'
+    suggested_action: 'Make the scan report its resolved/scanned count on both summary paths and assert that against MIN_SKILLS; fail on any unresolved skill; add an unresolvable-skill fixture.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA2-2'
+    severity: medium
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'The .git marker shows a run created the directory, not that it finished; a concurrent run on the same location passes the check and rm -rfs the first run''s clone mid-test, and the first run''s EXIT trap later deletes the second''s (refute CR-2). Bug: task.154.bug.4.clean-checkout-concurrent-runs.md'
+    suggested_action: 'Hold an atomic PID lock (mkdir of a sibling lock dir) for the whole run; refuse while a live owner holds it (kill -0); take over a dead owner''s; test with a live-PID lock.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA2-3'
+    severity: low
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'platform-variance: DIR comes from fs.realpathSync (keeps the given case on case-insensitive APFS) but REPO_REAL from pwd -P (on-disk case), so a case-variant of the repo path skips the containment refusal; only the marker check stops it (refute CR-3).'
+    suggested_action: 'Resolve with fs.realpathSync.native and resolve REPO the same way; add a case-variant row where the filesystem is case-insensitive.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA2-4'
+    severity: low
+    file: 'scripts/test-clean-checkout.sh'
+    finding: '/private/var/tmp/x is accepted while /var/tmp/x is refused, contradicting the comment that checking both spellings keeps the answer the same on every platform (refute CR-4).'
+    suggested_action: 'Normalise a leading /private/var/ to /var/ before ephemeralReason; add /private/var/tmp to the refusal test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA2-5'
+    severity: low
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'The marker is written after clone+checkout, so a kill during either leaves an unmarked non-empty DIR every later run refuses, recoverable only by hand (refute CR-5).'
+    suggested_action: 'Write the marker right after git clone returns; name the recovery in the refusal message.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA2-6'
+    severity: low
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'ls -A on an unreadable DIR prints nothing, so "could not list" reads as "empty" and the directory is passed to rm -rf (refute CR-6).'
+    suggested_action: 'Refuse when ls -A exits non-zero.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA2-7'
+    severity: low
+    file: 'tests/test-clean-checkout.test.js'
+    finding: 'platform-variance: BASE derives from REPO_ROOT, so in a checkout under /tmp or .claude/worktrees/ every positive runner case gets exit 2 with no message naming the cause (refute CR-7).'
+    suggested_action: 'Add a scratch-base precondition like observation-log.test.mjs SCRATCH_OK that fails once, naming the checkout location.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA2-8'
+    severity: low
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'A tab in CLEAN_CHECKOUT_DIR splits the resolver''s tab-delimited output: the path is still refused, but the message names a truncated path and a garbled reason (by-hand probe).'
+    suggested_action: 'Emit the resolver result as two NUL- or newline-free fields (e.g. refuse control characters in node) so the message is exact.'
+    suggested_owner: dev
+    status: open
+  - id: 'T154-QA2-9'
+    severity: low
+    file: 'scripts/test-clean-checkout.sh'
+    finding: 'A non-existent nested DIR (a/b) leaves the empty parent a/ behind after the run: git clone creates it, the trap removes only a/b (by-hand probe).'
+    suggested_action: 'Refuse a DIR whose parent does not exist, or record and remove the parents the run created.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 15
+  phases_verified: 6/6
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [3, 5]
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-29'
+  total_iterations: 1
+  verification_method: 'By-hand re-probe (18 candidates) + committed tests + QA mutation spot check (F2, F5)'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 18
+    notes: 'Safety re-probe by hand (probe-boundary-rule §5.1, env-var arm): 18 fresh candidates under env -i with a throwaway HOME in a scratch fixture — repo, ., parent, /, foreign, HOME, symlink-to-repo, repo/.., repo/.git, tracked subdir, trailing slash, a file, tab in name, relative, dotdot into /tmp, nested non-existent, empty/default. Every destructive candidate refused with exit 2; nothing outside the clone deleted.'
+  performance:
+    status: PASS
+    notes: 'ci:fast 4419 tests in 248s; new test files 3.8s / 6.0s.'
+  reliability:
+    status: CONCERNS
+    notes: 'Concurrent-run clobber (T154-QA2-2); interrupted-clone lockout (QA2-5).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Vacuous-scan path in §2 (T154-QA2-1); message/edge nits QA2-3..9.'
+
+recommendations:
+  immediate:
+    - action: 'T154-QA2-1: make §2''s floor measure the scan.'
+      refs: ['tests/bundle-missing-source.test.js', 'skills/create-skill/scripts/bundle_skill.py']
+    - action: 'T154-QA2-2: hold an exclusive PID lock for the whole run.'
+      refs: ['scripts/test-clean-checkout.sh', 'tests/test-clean-checkout.test.js']
+  future:
+    - action: 'observation-log.js EPHEMERAL_PATTERNS lacks /private/var/tmp (macOS realpath of /var/tmp) — pre-existing in the engine; follow-up.'
+      refs: ['shared/resources/observation-log.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T154-QA2-1 and T154-QA2-2 fixed']

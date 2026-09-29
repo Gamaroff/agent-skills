@@ -1,0 +1,100 @@
+schema: 1
+task: 'task.147.develop-pipeline-step-mechanics'
+task_title: 'develop pipeline: five steps that fail or overreach on correct input'
+gate: CONCERNS
+status_reason: 'bug.13 is verified fixed. The HIGH count has been 0 for three gates running. The cycle-5 review enumerated 45 scope spellings and found the verify-push-state scope gate still admits spellings that exist but match nothing. Three were reproduced (a glob, a case-folded path, :/ magic), and all pass check 3 vacuously. It named the root cause: the existence gate uses filesystem and pathspec semantics, while check 3 matches literal strings. The normaliser has been patched one spelling at a time since cycle 2, which is the pre-strike shape. The fix is to replace the gate, not add another spelling.'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T10:46:43Z'
+
+top_issues:
+  - id: 'T147-QA5-CR3'
+    severity: medium
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'The --scope existence gate is the wrong predicate. It accepts a scope when `[ -e "$TOP/$s" ]` holds (filesystem semantics: case folding, symlinks) or `git ls-files -- "$s"` matches (pathspec semantics: globs, magic). Check 3 then compares porcelain paths by literal string prefix. Any spelling the two disagree on exists but matches nothing, and the check passes vacuously. The normaliser has been patched one spelling at a time in cycles 2, 3 and 4, and the population behind those patches is still open.'
+    suggested_action: 'Replace the mechanism. A scope is accepted only when the same in_scope predicate check 3 uses matches at least one path git itself reports (`git ls-files -z --cached --others --exclude-standard`; index entries cover deleted files). Keep the ./ // absolute normalisation as a convenience, and make the git-path gate the guarantee.'
+    suggested_owner: dev
+  - id: 'T147-QA5-CR1'
+    severity: medium
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'A glob or magic scope (`docs/tasks/task.1*`, `:/docs/tasks/task.1`) passes the ls-files pathspec fallback and matches nothing literally. Reproduced: exit 0 with the work item dirty.'
+    suggested_action: 'Closed by the CR-3 replacement. Add cases for a glob scope and a :/ scope, each exiting 2.'
+    suggested_owner: dev
+  - id: 'T147-QA5-CR2'
+    severity: medium
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'On a case-insensitive filesystem (macOS), `DOCS/tasks/task.1` passes -e and matches no case-exact porcelain path, so it is a vacuous pass on macOS and a refusal on Linux. Reproduced on macOS: exit 0 with the work item dirty.'
+    suggested_action: 'Closed by the CR-3 replacement, whose git path list is case-exact. Add a case-differing scope case that exits 2 on every platform.'
+    suggested_owner: dev
+  - id: 'T147-QA5-CR4'
+    severity: medium
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'A relative scope through a tracked symlinked directory passes -e, but porcelain never prints a path beneath a symlink, so the scope matches nothing. This is reasoned, not reproduced: the repo has no tracked symlinks.'
+    suggested_action: 'Closed by the CR-3 replacement.'
+    suggested_owner: dev
+  - id: 'T147-QA5-CR6'
+    severity: low
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'The help printer uses a fixed line range, `sed -n 28,39p "$0"`. The five bundled copies carry one extra AUTO-GENERATED header line, so the help they print drops its last line (`2  usage error`). Verified by running the bundled develop-task copy.'
+    suggested_action: 'Print the help by markers, not line numbers.'
+    suggested_owner: dev
+  - id: 'T147-QA5-CR5'
+    severity: low
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'When a symlink leaf or its parent no longer exists, an absolute path through that symlink is refused as "outside this repository", which is the wrong message. It is a refusal, not a vacuous pass.'
+    suggested_action: 'Name the unresolvable path in the refusal message.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 122
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [4]
+  code_review:
+    findings: 6
+    bugs: 5
+    cleanups: 1
+    promoted: ['CR-1', 'CR-2', 'CR-3', 'CR-4', 'CR-5', 'CR-6']
+    spellings_enumerated: 45
+  boundary: false
+  probes_executed: 0
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-25'
+  total_iterations: 4
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary, unchanged.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'A vacuous scope is still reachable through the glob, case-folded and symlink spellings.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The normaliser has been patched one spelling per cycle. Replace the gate instead of adding a sixth spelling.'
+
+recommendations:
+  immediate:
+    - action: 'Replace the verify-push-state scope gate with the check-3 predicate over git own path list (CR-3), which closes CR-1, CR-2 and CR-4. Print the help by markers (CR-6).'
+      refs: ['shared/resources/verify-push-state.sh']
+  future:
+    - action: 'Carried from gates 1-4: a new untracked directory held at Step 4, unbound PR_NUMBER and Step-0 variables (pre-existing), cross-repository heads, joined-string dedupe, and the Step 4b {template}-slot limit (obs #186).'
+      refs: ['shared/resources/develop-pipeline-step-4-create-pr.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Replace the scope gate (CR-3)']

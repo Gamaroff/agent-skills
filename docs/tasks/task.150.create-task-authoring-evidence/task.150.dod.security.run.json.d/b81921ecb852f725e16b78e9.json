@@ -1,0 +1,18 @@
+{
+  "sink": "filename",
+  "entry": ".observation-log-test-tmp/dod-probe/wrapper.mjs#seedSelection",
+  "name": "seedSelection",
+  "call_site": "skills/create-task/scripts/lib.js:311",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 9,
+  "passed": 9,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-28T20:06:00.103Z"
+}

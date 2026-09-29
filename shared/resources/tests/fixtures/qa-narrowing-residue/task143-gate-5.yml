@@ -1,0 +1,63 @@
+schema: 1
+task: 'task.143.qa-next-state-file-owned-by-the-tool'
+task_title: 'qa-next: uat-status.mjs owns the run state file, so its contract is held by tests instead of prose'
+gate: CONCERNS
+status_reason: 'QA4-1 and QA4-2 fixed. One MEDIUM in the same legacy-resume mechanism: the executed-resume instruction ignores a run file an interrupted v0.51.0 Step 4 already wrote, so a second file is created and the first is counted as a prior run without the unverifiable flag. Narrow (pre-upgrade run interrupted inside Step 4).'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T05:46:30Z'
+
+top_issues:
+  - id: 'TASK-143-BUG-5'
+    severity: medium
+    file: 'skills/qa-next/SKILL.md'
+    finding: 'The executed-resume step (runFile null) calls --run-path unconditionally; after an interrupted v0.51.0 Step 4 the own file already exists, so --run-path returns -02, the half-written file is listed in priorRuns unflagged, and the run gets two files (code review CR-1, medium/high).'
+    suggested_action: 'Record the existing <local start date>-<envLabel>.md as runFile when present; call --run-path only otherwise; fix the comment/CHANGELOG claims; test the own-file-already-exists case.'
+    suggested_owner: dev
+    bug_ref: 'task.143.bug.5.executed-resume-ignores-interrupted-step4-file.md'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 61
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 19
+    notes: 'cli: probe re-run (task.143.qa.5.security.run.json): unchanged; only the pre-existing control-character labels reproduce (identical on develop), routed to future.'
+  performance:
+    status: PASS
+    notes: 'No network calls; 61 tests; TMPDIR=/tmp 61/61.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-143-BUG-5 (pre-upgrade run interrupted inside Step 4 only).'
+  maintainability:
+    status: PASS
+    notes: 'No new cleanups.'
+
+bug_resolution:
+  TASK-143-QA4-1: 'FIXED as specified; the instruction it added carries TASK-143-BUG-5'
+  TASK-143-QA4-2: 'FIXED — suite passes under UTC, UTC+14, UTC-11, Asia/Tokyo'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-143-BUG-5.'
+      refs: ['skills/qa-next/SKILL.md']
+  future:
+    - action: 'Refuse control characters in --env labels (pre-existing; probe-reproduced).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Lock ownership check on --state-set (cycle 2 CR-1).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-143-BUG-5 fixed']

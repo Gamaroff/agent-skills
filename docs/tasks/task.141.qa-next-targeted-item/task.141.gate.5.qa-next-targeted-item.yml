@@ -1,0 +1,100 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: FAIL
+status_reason: "Cycle 4's pipe-escaping fix was not idempotent — splitCells never unescaped what renderRow escaped, so backslashes accumulated on every rewrite. Four findings, all fixed in cycle 5, but the 5-cycle budget is now spent and NO GATE HAS READ THOSE FIXES."
+reviewer: 'QA Engineer'
+updated: '2026-09-22T23:40:00Z'
+
+top_issues:
+  - id: 'TASK-141-BUG-11'
+    severity: high
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "renderRow escaped `|` but splitCells never unescaped it, so parse and render were not inverses and every --set re-escaped an already-escaped pipe: an authored `a \\| b` gained one backslash per rewrite, with --check green throughout and the backslashes handed to the skill in --item --json. Introduced by cycle 4; no accumulation on origin/develop, where renderRow does not escape."
+    suggested_action: 'Unescape in splitCells so the two are inverses, and assert idempotence of the whole round trip rather than either half.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-22'
+  - id: 'TASK-141-BUG-12'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "checkRegistry validated the FIRST bug link while describeRow (cycle 4) returns the LAST, so --check proved a different file exists from the one SKILL.md Step 4 opens to append a re-test section."
+    suggested_action: 'Validate every bug link in the cell, which is strictly stronger and removes the divergence.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-22'
+  - id: 'TASK-141-BUG-13'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "appendNote's duplicate suppression both over- and under-suppressed, because ` · ` is the registry's separator AND legal inside a note: no string comparison can tell a tail SEGMENT from a compound note's tail. Three formulations were tried and each dropped a genuinely new note in one direction or another."
+    suggested_action: 'Remove the suppression rather than approximate it; a dropped note is silent data loss, a repeated segment is visible noise. Record the growth as an accepted limitation.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-22'
+  - id: 'TASK-141-CR5-5'
+    severity: low
+    file: 'evals/qa-next/unit/uat-status.test.mjs'
+    finding: "The cycle-4 STATES population test probed the tool only when a requirement was TRUE and discarded the moves-accepted column, so a state classified [false,false,false] — the exact default the finding was about — passed having executed no assertion against the tool. The forcing function was partly vacuous."
+    suggested_action: 'Assert both polarities and assert the moves-accepted column against the tool.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-22'
+  - id: 'TASK-141-CR5-4'
+    severity: low
+    file: 'skills/qa-next/SKILL.md'
+    finding: "SKILL.md Step 4 still stated flatly that a kept re-run 'updates Last run' — the sentence CR4-5 qualified in README the same cycle, in the other file. The fourth cycle running in which a fix updated one statement of a rule and not its twin."
+    suggested_action: 'Qualify it the same way.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-22'
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 3941
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged across five cycles. No single-argument accept/reject export to probe; offline, file-local, no shell interpolation, no dependency.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. 38 tests; full suite 3941.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-11 silently corrupted a cell on every rewrite with --check green, which is the worst shape a defect can take, and it was introduced by the previous cycle fixing a different defect in the same function. Fixed and mutation-proved, but ungated.'
+  maintainability:
+    status: CONCERNS
+    notes: "Five cycles, and the last three findings each came from the previous cycle's fix rather than from the original change. The area is small and the fixes are individually sound; the pattern is that this cell and its separator are genuinely hard, and BUG-13's resolution is the first to say so rather than attempt a fourth rule."
+
+bug_resolution:
+  bugs_fixed: 13
+  bugs_remaining: 0
+  fix_date: '2026-09-22'
+  total_iterations: 5
+  verification_method: '29 mutations across five cycles, every one red; executed reproductions for every finding; full suite and CI green'
+
+recommendations:
+  immediate:
+    - action: 'GATE CYCLE 5 — the four fixes above are mutation-proved and green but no QA cycle has reviewed them. This is the loop-limit escalation, not a clean exit.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+  future:
+    - action: 'Accepted limitation: the note cell on a kept ✅ grows by one segment per re-run, because duplicate suppression cannot be made correct against an in-band separator. If it ever matters, the fix is an out-of-band separator or a structured cell, not another comparison rule.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-3 (cycle 1, still advisory): --set exits 0 whether the row moved or was kept.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions:
+    - 'A QA cycle reads the cycle-5 fixes'

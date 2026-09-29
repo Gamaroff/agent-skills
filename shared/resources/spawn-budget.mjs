@@ -118,3 +118,18 @@ export function neverRan(result) {
     Boolean(result.error) || Boolean(result.signal) || result.status === null
   );
 }
+
+/**
+ * The load-sensitive class (obs #157, #166). A test whose pass depends on machine load must say so
+ * where the failure is READ, not only where the source is read: a red that means "re-run me" and a
+ * red that means "you broke something" are otherwise indistinguishable, and each trip gets
+ * re-diagnosed from scratch. Every caller is listed in the contributing guide's traps page
+ * (§ Load-sensitive tests), and tests/load-sensitive-marker.test.js holds the list and the code
+ * equal. Wrap the MESSAGE only — the marker names the class; it never loosens a threshold.
+ */
+export const LOAD_SENSITIVE = "LOAD-SENSITIVE";
+
+/** @param {string} detail what the assertion measured */
+export function loadSensitive(detail) {
+  return `${LOAD_SENSITIVE} — timing depends on machine load; re-run this file alone before believing it: ${detail}`;
+}

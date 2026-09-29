@@ -24,6 +24,19 @@ Before cutting a repo release:
 > composite and the three workflows run the same set, so a lane added to one and not the other
 > fails `npm test` (task 111).
 
+> **The CI boxes below are enforced by `release.sh`, not only read by you.** Step 2 of the script (labelled 1b in `release.sh`'s own header, which keeps its original numbering)
+> reads CI's recorded verdict for the commit being released (`scripts/release-ci-verdict.mjs`) and
+> refuses unless it is green: `Test` and `ShellCheck` must have a green run for the SHA, and
+> `Validate Skills` and `Docs link check` — path-filtered, so often absent — must not be red when
+> present (task 153). A local run is a claim about one machine; the release is certified by the tree
+> CI built.
+
+> **Load-sensitive reds.** A local test failure whose message starts `LOAD-SENSITIVE` is a timing
+> assertion that depends on machine load. Re-run that file alone (`command node --test <file>`); if
+> it passes alone, re-run the release — do not investigate it. A failure **without** the marker is
+> real. `release.sh` prints this rule when its local test aborts; the list of marked files and the
+> guard that keeps it honest are in [traps.md § Load-sensitive tests](traps.md#load-sensitive-tests).
+
 - [ ] `test.yml` CI workflow is green on the release commit — covers `npm run format:check`, `npm test` (L1–L4 hermetic) and `npm run eval:all` (L4 replay)
 - [ ] `validate.yml` CI workflow is green on the release commit — per-skill `quick_validate.py` plus the bundle-freshness check
 - [ ] `ShellCheck` workflow (`shellcheck.yml`) is green on the release commit — lints tracked shell **sources** only, i.e. `git ls-files '*.sh'` minus `skills/*/references/`, which is roughly a fifth of the files and excludes every bundled copy. It is a separate lane rather than a step in the two above; the header comment explains why, and the short version is that neither could have fired for the change that motivated it
@@ -63,7 +76,7 @@ Before cutting a repo release:
 >   | grep -oE '(task|bug)\.[0-9]+' | sort -u
 > ```
 
-> Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are checked and auto-committed by `release.sh` — no manual pre-check needed. `release.sh` does **not** run `format:check`, `eval:all` or `shellcheck`; those are CI's job, which is why the boxes above are about CI being green and not about a local run.
+> Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are checked and auto-committed by `release.sh` — no manual pre-check needed. `release.sh` does **not** run `format:check`, `eval:all` or `shellcheck` locally; those are CI's job, which is why the boxes above are about CI being green and not about a local run — and it now reads CI's verdict for them before tagging (step 2 below).
 
 ## Branch flow
 
@@ -84,18 +97,7 @@ git pull --rebase
 git push
 ```
 
-Then advance `main`. Two options depending on your branch-protection policy:
-
-**Direct fast-forward** (solo maintainer, no branch protection on `main`):
-
-```bash
-git checkout main
-git pull --rebase
-git merge --ff-only develop
-git push
-```
-
-**PR-based** (recommended for teams with branch protection on `main`):
+Then advance `main` with a release-prep PR:
 
 ```bash
 # From develop, open a release-prep PR. Replace vX.Y.Z with the version
@@ -112,11 +114,26 @@ git checkout main
 git pull --rebase
 ```
 
-In either case (Direct FF or PR-based), `main` is now at the tip you'll release from. Run `release.sh` (see [Cutting a release](#cutting-a-release)), then sync develop forward (see [Sync develop with main after release](#sync-develop-with-main-after-release)).
+`main` is now at the tip you'll release from. Run `release.sh` (see [Cutting a release](#cutting-a-release)), then sync develop forward (see [Sync develop with main after release](#sync-develop-with-main-after-release)).
+
+> **There used to be a "Direct fast-forward" option here, for a "solo maintainer, no branch
+> protection on `main`" — and it was removed on 2026-09-22 because that parenthetical had stopped
+> being true.** `main` carries branch protection whose one required check, *PR into main comes from
+> an allowed branch*, is declared on `pull_request` only. A direct push has no PR, so the check can
+> never report, so the push is refused — and it goes through only by an admin bypass, which works
+> solely because `enforce_admins` is `false`. Four consecutive releases were promoted that way, each
+> printing `Bypassed rule violations for refs/heads/main`.
+>
+> Nothing was damaged by it: `--ff-only` from `develop` cannot give `main` a commit `develop` lacks,
+> which is the inversion the guard exists to prevent. The cost is the other kind. A required check
+> that is routinely bypassed is not a guard, it is a prompt people learn to click through — and the
+> release quietly depended on `enforce_admins` staying `false`, so tightening branch protection
+> would have broken releases for a reason nobody would have connected to the change. Keeping one
+> promotion path that clears the check on its own terms is worth the extra two minutes.
 
 ### Merge-type aesthetics
 
-Only relevant to the PR-based path. The `gh pr merge` flag affects what `main`'s history *looks* like; it does not affect whether the develop sync step is needed (it always is — see below).
+The `gh pr merge` flag affects what `main`'s history *looks* like; it does not affect whether the develop sync step is needed (it always is — see below).
 
 | Flag | Result on `main` | When to use |
 |------|------------------|-------------|
@@ -148,15 +165,21 @@ bash scripts/release.sh --dry-run --minor
 
 # Skip the automatic develop sync:
 bash scripts/release.sh --patch --no-sync-develop
+
+# Release without CI's verdict — only when GitHub is unreachable and you have
+# confirmed CI is green on the release commit another way:
+bash scripts/release.sh --patch --skip-ci-check
 ```
 
 The script:
 1. Confirms you're on `main` with a clean, up-to-date working tree
-2. Runs `npm test`, `npm run validate:all`, `npm run generate-catalog`, and `npm run bundle` — auto-commits any stale catalog or bundled-reference files
-3. Calculates `vX.Y.Z` from the latest git tag + bump type (no tags yet → starts at `v0.0.0`)
-4. Moves `## [Unreleased]` → `## [vX.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and leaves a fresh `[Unreleased]` above it
-5. Commits `chore(release): vX.Y.Z`, creates an annotated tag, and pushes both to origin
-6. Syncs `develop` with `main` (`git checkout develop && git pull --rebase && git merge main && git push && git checkout main`) — skip with `--no-sync-develop`
+2. **Reads CI's verdict for `HEAD`** (`gh run list --commit`, via `scripts/release-ci-verdict.mjs`) and refuses unless it is green — naming the workflow, the run URL and `--skip-ci-check`. It runs before the multi-minute local test, so a red, pending or unreadable CI refuses in seconds. Requires an authenticated `gh`; a missing or failing `gh` is *unverifiable* and refuses. `--dry-run` prints the verdict and ends its summary with *Would have REFUSED* when a real run would. `--skip-ci-check` proceeds with a warning that the release is unverified against CI. `--retry` skips this step — it re-tags an existing release and keeps its own guard
+3. **Warns on any branch carrying commits not on `develop`**, naming each with its commit count and last-commit date — finished work that was never merged is invisible to every other check here and to CI, because neither looks at an unmerged branch. Advisory: a parked branch is legitimate, and a stuck release is worse than a noted omission
+4. Runs `npm run test:clean-checkout` (`npm test` in a clean clone of `HEAD`), `npm run validate:all`, `npm run generate-catalog`, and `npm run bundle` — auto-commits any stale catalog or bundled-reference files. A red local test prints the load-sensitive re-run rule above before exiting
+5. Calculates `vX.Y.Z` from the latest git tag + bump type (no tags yet → starts at `v0.0.0`)
+6. Moves `## [Unreleased]` → `## [vX.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and leaves a fresh `[Unreleased]` above it
+7. Commits `chore(release): vX.Y.Z`, creates an annotated tag, and pushes both to origin
+8. Syncs `develop` with `main` (`git checkout develop && git pull --rebase && git merge main && git push && git checkout main`) — skip with `--no-sync-develop`
 
 The GitHub Actions workflow then handles release creation. No manual `gh release create` needed.
 

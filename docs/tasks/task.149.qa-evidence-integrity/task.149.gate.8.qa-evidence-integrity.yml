@@ -1,0 +1,56 @@
+schema: 1
+task: 'task.149.qa-evidence-integrity'
+task_title: 'QA evidence integrity: qa-task/qa-story claims that no check reads back'
+gate: PASS
+status_reason: 'BUG-11 closed by consolidation: qa-cycle.sh --path is what qa-read-back.js asks for the cycle''s gate and report (dotfiles, directories, symlinks never chosen; an ambiguous cycle refused). Reviewer confirmed every claim; no high-confidence bug. 84 probes engage, 0 reproduced. The remaining finding is a pre-existing second lookup (find -name in the QA skills'' tracker blocks), routed to a follow-up.'
+reviewer: 'QA Engineer'
+updated: '2026-09-26T14:10:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 4238
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 84
+    notes: 'qa-read-back verdict engages 18/18 (new: dotfile-gate read clean, ambiguous-gate halts); qa-cycle.sh (shell, filename sink) engages 28/28; --copy-as DEST containment 24/24; change-log --check-updated 14/14. CI 5/5 SUCCESS at 2892f50b; TMPDIR=/tmp 90/90.'
+  performance:
+    status: PASS
+    notes: 'The read-back now spawns bash three times per run (cycle, --path gate, --path qa) — sub-second; advisory CR-4.'
+  reliability:
+    status: PASS
+    notes: 'Every could-not-look is exit 2 by the scoped contract; every unconfirmed claim halts with a named remedy; the cycle file has one definition in the read-back path.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory: CR-3 extra args after --path <kind> are ignored; CR-4 absolute DIR in the helper''s refusal text; CR-5 --path tests run PATH bash only (3.2 checked by hand).'
+
+bug_resolution:
+  bugs_closed: ['TASK-149-BUG-11']
+  bugs_new: 0
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (pre-existing on develop): the QA skills'' tracker/Phase-0 blocks still find the cycle''s gate with find -name "task.*.gate.${QA_CYCLE}.*.yml" (qa-task SKILL.md THIS_GATE/LATEST_GATE, qa-story, develop-pipeline-step-5-6-qa-loop.md) — misses a zero-padded gate that qa-cycle.sh counts, so BLOCKING_COUNT can read 0. Follow-up: switch each to qa-cycle.sh --path and add a guard test; until then the qa-cycle.sh header should not call --path "the only definition".'
+      refs: ['shared/resources/qa-cycle.sh', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR-2 (low/low): --path ignores the file-name prefix, so a bug''s own gate stored in the parent task directory would make the parent''s cycle ambiguous (a halt, fails closed).'
+      refs: ['shared/resources/qa-cycle.sh']
+    - action: 'Cycle 7 CR-2 (pre-existing): security-probe.mjs containment uses a bare startsWith("..").'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

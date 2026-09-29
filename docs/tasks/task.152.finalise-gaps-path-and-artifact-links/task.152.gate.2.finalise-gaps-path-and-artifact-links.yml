@@ -1,0 +1,76 @@
+schema: 1
+task: 'task.152.finalise-gaps-path-and-artifact-links'
+task_title: 'finalise: bug-mode gaps path and co-located artifacts in 8a and link guard'
+gate: CONCERNS
+status_reason: 'All six cycle-1 findings are fixed, mutation-proved and green in CI (link-check, test, validate, shellcheck). The cycle-2 refute pass found two medium defects: the bug-mode zero-gap refusal runs at 8.5, after 8.1 and 8.3 have already written irreversibly, and the shared artifact set misses the unprefixed sprint-review-summary.md that finalise actually writes.'
+reviewer: 'QA Engineer'
+updated: '2026-09-26T21:52:00Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The zero-gap refusal sits at 8.5, after 8.1 has filled the DoD with GAPS (the helper refuses to re-decide it) and 8.3 has appended a Status History row. 8.3 also takes GAP_TOTAL and DOD_NAME as agent-supplied placeholders rather than deriving them. A run with no gap lines therefore leaves a GAPS DoD with no gaps and a row claiming N gaps, and every retry appends another row, because status-history.js never dedupes.'
+    suggested_action: 'Count the Step 5 `- [ ]` lines and refuse zero in the 8.1 block before the fill. In 8.3, bind DOD_PATH and derive GAP_TOTAL (grep -c over Step 5) and DOD_NAME (basename) in the block. Keep the 8.5 check as a backstop.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'shared/resources/finalise-fix-and-recheck.mjs'
+    finding: 'finalise Step 7 writes `{document-directory}/sprint-review-summary.md` with no id prefix (112 tracked files). isCoLocatedArtifact requires an id-prefixed basename and the artifact corpus walk requires WORK_ITEM_RE, so neither sees these files, although CI docs-link-check reads them. The cycle-1 test asserts only the id-prefixed form, which the pipeline no longer produces (5 legacy files).'
+    suggested_action: 'Admit the exact basename `sprint-review-summary.md` in the document directory, both in isCoLocatedArtifact and in the artifact corpus walk. Test it on the real filename and keep the stem and directory refusals.'
+    suggested_owner: dev
+    status: open
+  - id: CR-3
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'finalise 8.3 and the status-history.js CLI header both advertise `reason: "unchanged"`, but the CLI cannot reach it (upsertStatusHistory always appends). A caller would expect a re-run to be idempotent.'
+    suggested_action: 'State in 8.3 and in the CLI header that a repeated write appends a second row, and that `unchanged` is not produced by the current writer.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 4268
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [2, 3, 4, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 41
+    notes: 'isCoLocatedArtifact re-probed after its regex changed: 41 cases (cycle-1 set plus sprint-review-summary legitimate, other-stem, other-dir and .yml), 0 reproduced, 0 over-blocked. Record: task.152.qa.2.security.run.json. The unprefixed filename (CR-2) is over-blocking, not an escape.'
+  performance:
+    status: PASS
+    notes: 'Artifact walk 2–8 s depending on load; the wall-clock assertion has been removed.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a refusal ordered after two irreversible writes.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-2: the shared artifact set does not match the filename the pipeline writes.'
+
+bug_resolution:
+  fixed_this_cycle: ['QA-2', 'CR-1', 'CR-2', 'QA-1', 'CR-5', 'CR-7']
+  fix_commit: 'b4c9c8b7'
+  verification: 'CI green on b4c9c8b7; each fix reverted → named test red (qa-fix F1–F5; QA spot-checks of CR-2 and CR-1 covered)'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and CR-2; fold in CR-3.'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/finalise-fix-and-recheck.mjs', 'shared/resources/tests/doc-links.test.mjs']
+  future:
+    - action: 'Carried from gate 1 — CR-3 (bare `node references/` calls elsewhere in finalise), CR-4 (sync-jira-bug lowercase via module API), CR-6 (unreadable --file reported as usage).'
+      refs: ['skills/finalise/SKILL.md', 'skills/sync-jira-bug/scripts/sync-jira-bug.js', 'shared/resources/status-history.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed']

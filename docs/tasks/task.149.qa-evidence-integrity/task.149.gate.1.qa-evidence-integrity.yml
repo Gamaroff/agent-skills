@@ -1,0 +1,80 @@
+schema: 1
+task: 'task.149.qa-evidence-integrity'
+task_title: 'QA evidence integrity: qa-task/qa-story claims that no check reads back'
+gate: FAIL
+status_reason: 'The --copy-as DEST containment the task adds is lexical and the probe engine reproduced a write outside the sandbox through a seeded symlink (HIGH). Step 12b / 3e compute the read-back result but nothing in either block halts on it (MEDIUM).'
+reviewer: 'QA Engineer'
+updated: '2026-09-26T04:50:00Z'
+
+top_issues:
+  - id: TASK-149-BUG-1
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'The --copy-as DEST check compares resolve(tmp, dest) as a string, and mkdirSync/cpSync follow a symlink --copy seeded into the working copy, so --copy-as SRC:out/sub writes outside the temp root (probe case copy-as.symlink-through accepted; also code review CR-3).'
+    suggested_action: 'Check realpathSync of the deepest existing ancestor of target against realpathSync(tmp) and refuse otherwise; add a test seeding a symlink via copyFrom that asserts exit 2 and nothing written at the link target.'
+    suggested_owner: dev
+    bug_ref: 'task.149.bug.1.copy-as-symlink-escape.md'
+  - id: TASK-149-BUG-2
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Step 12b (and qa-story item 3e) assign LINKS_RC and LOG_RC and read neither; doc-links exits 1 for both untracked and missing, so the promised halt on a missing link rests on the agent reading the JSON (code review CR-1, verified).'
+    suggested_action: 'Derive the decision in the block: count broken[] entries with state missing from the --json output and exit 1 on any, or when change-log --check-updated exits 1; make the population test require the halt at both sites.'
+    suggested_owner: dev
+    bug_ref: 'task.149.bug.2.step-12b-no-mechanical-halt.md'
+  - id: CR-2
+    severity: low
+    file: 'shared/resources/doc-links.js'
+    finding: 'state: untracked is also reported for a gitignored target that can never be committed, which the QA prose treats as not a defect while CI link-check stays red.'
+    suggested_action: 'Distinguish an ignored target (git check-ignore) as its own state that the QA prose treats like missing.'
+    suggested_owner: dev
+  - id: CR-4
+    severity: low
+    file: 'skills/qa-story/SKILL.md'
+    finding: 'The new 3e and Step 12b blocks read $STORY_FILE / $TASK_DIR bare; an unset input fails as a usage error from the engines rather than naming the missing binding.'
+    suggested_action: 'Guard the input with ${STORY_FILE:?} / ${TASK_DIR:?} so a missing binding is named at the first line of the block.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 4179
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 4]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 27
+    notes: 'Two boundaries probed with security-probe.mjs (cli form, cases files): --copy-as DEST containment present-but-inert (12/13, symlink-through reproduced — write outside the sandbox); change-log --check-updated engages (14/14). The absent-export branch and doc-links state are classifiers of a message/label, not accept/reject boundaries.'
+  performance:
+    status: PASS
+    notes: 'Population test ~0.55s; no network; engine changes add a loop over copyAs pairs and one existsSync per broken link.'
+  reliability:
+    status: CONCERNS
+    notes: 'Step 12b / 3e read-back has no mechanical halt (TASK-149-BUG-2).'
+  maintainability:
+    status: PASS
+    notes: 'One section reader shared by two population tests; checkUpdatedCoherence replaces a private reader in §5 (130 → 132 docs checked).'
+
+recommendations:
+  immediate:
+    - action: 'Resolve --copy-as DEST through realpath of its existing ancestor (TASK-149-BUG-1).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Make Step 12b / 3e halt on a missing link or stale updated inside the block (TASK-149-BUG-2).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future:
+    - action: 'Step 4b on qa-task / qa-story reports zero-blocks-executed (3 / 4 placeholder blocks need --bind) — pre-existing on develop (17 / 15 blocks, identical finding); not introduced here.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'Other Change Log writers (qa-fix, finalise, review-*, edit-*) have no read-back of updated: (code review CR-5) — out of this task''s QA-skill scope; candidate follow-up.'
+      refs: ['skills/qa-fix/SKILL.md', 'skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

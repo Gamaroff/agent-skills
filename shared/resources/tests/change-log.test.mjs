@@ -20,6 +20,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const CL = require("../change-log.js");
@@ -1960,4 +1965,126 @@ test("a hand-authored heading directly above the markers is absorbed, not duplic
     { docType: "task" },
   );
   assert.equal((twice.match(/^## Change Log$/gm) || []).length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// I — checkUpdatedCoherence: the reader beside bumpUpdated (task.149, obs #164)
+// ---------------------------------------------------------------------------
+
+const CL_CLI = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "change-log.js",
+);
+
+function logDoc(updated, rows, extra = "") {
+  return [
+    "---",
+    "id: task.1",
+    "type: task",
+    ...(updated ? [`updated: ${updated}`] : []),
+    "---",
+    "",
+    "# T",
+    "",
+    extra,
+    "## Change Log",
+    "",
+    "| Date | Version | Description | Author |",
+    "| ---- | ------- | ----------- | ------ |",
+    ...rows.map((d) => `| ${d} | 1.0 | x | a |`),
+    "",
+  ].join("\n");
+}
+
+test("I: a row dated after updated: is stale-updated", () => {
+  const r = CL.checkUpdatedCoherence(
+    logDoc("2026-09-22", ["2026-09-20", "2026-09-23"]),
+  );
+  assert.deepEqual(r, {
+    ok: false,
+    reason: "stale-updated",
+    newest: "2026-09-23",
+    updated: "2026-09-22",
+  });
+});
+
+test("I: newest row equal to or older than updated: is ok", () => {
+  assert.equal(
+    CL.checkUpdatedCoherence(logDoc("2026-09-23", ["2026-09-23"])).reason,
+    "ok",
+  );
+  assert.equal(
+    CL.checkUpdatedCoherence(logDoc("2026-09-30", ["2026-09-23"])).reason,
+    "ok",
+  );
+});
+
+test("I: a fenced example row dated later is ignored — it is a picture, not history", () => {
+  const fenced = "```markdown\n| 2099-01-01 | 9.9 | example | a |\n```\n";
+  const withFence = logDoc("2026-09-23", ["2026-09-23"]).replace(
+    "## Change Log\n",
+    "## Change Log\n\n" + fenced,
+  );
+  assert.equal(CL.checkUpdatedCoherence(withFence).ok, true);
+});
+
+test("I: no Change Log is no-log; rows with no updated: are no-updated — both pass", () => {
+  assert.deepEqual(CL.checkUpdatedCoherence("---\ntype: task\n---\n# T\n"), {
+    ok: true,
+    reason: "no-log",
+  });
+  assert.equal(
+    CL.checkUpdatedCoherence(logDoc(null, ["2026-09-23"])).reason,
+    "no-updated",
+  );
+});
+
+test("I: the CLI exits 1 on stale-updated, 0 otherwise, 2 on usage — and requiring the module runs nothing", () => {
+  const dir = mkdtempSync(join(tmpdir(), "change-log-cli-"));
+  try {
+    const stale = join(dir, "stale.md");
+    const ok = join(dir, "ok.md");
+    writeFileSync(stale, logDoc("2026-09-22", ["2026-09-23"]));
+    writeFileSync(ok, logDoc("2026-09-23", ["2026-09-23"]));
+    const run = (args) => {
+      try {
+        return {
+          code: 0,
+          out: execFileSync("node", [CL_CLI, ...args], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+          }),
+        };
+      } catch (e) {
+        return { code: e.status, out: e.stdout };
+      }
+    };
+    const s = run(["--check-updated", "--file", stale, "--json"]);
+    assert.equal(s.code, 1);
+    assert.equal(JSON.parse(s.out).reason, "stale-updated");
+    assert.match(
+      run(["--check-updated", "--file", stale]).out,
+      /^FAIL change-log: .*bumpUpdated/m,
+    );
+    assert.equal(run(["--check-updated", "--file", ok]).code, 0);
+    assert.equal(run(["--check-updated"]).code, 2);
+    assert.equal(run(["--file", ok]).code, 2);
+    assert.equal(
+      run(["--check-updated", "--file", join(dir, "absent.md")]).code,
+      2,
+    );
+    // Side-effect-free on require: no output, no exitCode set.
+    const probe = execFileSync(
+      "node",
+      [
+        "-e",
+        `require(${JSON.stringify(CL_CLI)}); process.stdout.write(String(process.exitCode))`,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(probe, "undefined");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

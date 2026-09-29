@@ -1,0 +1,61 @@
+schema: 1
+task: 'task.144.probe-engine-cli-entry-form'
+task_title: 'security-probe: a cli: entry form, so a multi-flag Node CLI''s boundary can be executed instead of declared unverifiable'
+gate: CONCERNS
+status_reason: 'QA-1 is fixed for its reported shape: a re-run with a different path now replaces its entry (reproduced as 1 control, executed 2; mutation-proved). But keying on the guarded flag alone over-corrects. Two different controls that pass input through the same flag merge into one, so --set … --note {input} and --accept … --note {input} collapse, as do positional add {input} and remove {input}.'
+reviewer: 'QA Engineer'
+updated: '2026-09-23T18:33:53Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'cliControlSlot keys a cli: control only on the element before {input}. Two controls on one script that share the input flag or position (uat-status --set D.1 blocked --note {input} vs --accept D.1 --note {input}; add {input} vs remove {input}) therefore land in one record entry. The later run silently replaces the earlier one, which is the defect the key was introduced to prevent.'
+    suggested_action: 'Key on the template skeleton: keep every flag and every bare positional, drop only the operand values of flags (and the value half of --flag=value). Per-run paths then still collapse while dispatch flags and subcommands stay distinct. Add a test with two dispatch shapes sharing one guarded flag.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 82
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    notes: 'The --argv validator was re-probed on the committed tree: it engages 17 of 17. Record: task.144.qa.3.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'QA-1 replay: 1 control, executed 2. CR-1 is carried in top_issues.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle 2 fix tests are mutation-proved. The QA-1 re-run test went red when whole-template keying was restored.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: key a cli: control on its flag and positional skeleton, and add a two-dispatch-shapes test.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+  future:
+    - action: 'CR-2 (advisory): state both halves of the caught-crash limit. Without expected, a caught crash on a hostile case is a false PASS. An expected that only a refusal produces turns it into a false alarm. Neither makes it errored.'
+      refs: ['shared/resources/probe-boundary-rule.md', 'shared/resources/security-probe.mjs']
+    - action: 'CR-3 (advisory): the skeleton rule reads a bare positional right after a flag as that flag''s value, and a leading-dash value as a flag. Document it.'
+      refs: ['shared/resources/probe-boundary-rule.md']
+    - action: 'CR-4 (cleanup): rename the record test and its comment away from template keying.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

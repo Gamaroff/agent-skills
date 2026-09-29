@@ -1,0 +1,68 @@
+schema: 1
+task: 'task.144.probe-engine-cli-entry-form'
+task_title: 'security-probe: a cli: entry form, so a multi-flag Node CLI''s boundary can be executed instead of declared unverifiable'
+gate: CONCERNS
+status_reason: 'Name-keyed identity fixes gate 4''s findings and is mutation-proved. The new replace warning also fires on a NAMED re-run whose argv differs (reproduced), telling the caller to pass the --name they already passed. Four engine comments still state the skeleton-only key.'
+reviewer: 'QA Engineer'
+updated: '2026-09-23T18:57:03Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'recordRun reports a differing replacement without checking whether the control is named. A named cli: re-run with a new scratch path, which §5 describes as a normal same-name replacement, prints "they share a derived key — pass --name to keep them apart" even though --name was passed. Reproduced.'
+    suggested_action: 'Report only when the entry has no non-blank name, the same test controlKey uses, and add a named differing re-run through runMain that asserts no warning.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'Four engine comments (near lines 1648, 1674, 1847 and 1891) still state the skeleton-only cli: key. The identity population test scans only .md sources.'
+    suggested_action: 'Rewrite those comments as name-first with the skeleton as fallback.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 84
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    notes: 'The --argv validator engages 17 of 17 (task.144.qa.5.security.run.json). The cli tests pass 18 of 18 under TMPDIR=/tmp.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'CR-1 is carried in top_issues.'
+  maintainability:
+    status: PASS
+    notes: 'CR-2 is carried in top_issues.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: gate the replace report on an unnamed entry, and test the named re-run.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+    - action: 'CR-2: rewrite the four engine comments.'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-3 (advisory): key on the trimmed name. A control probed once unnamed and once named lands in two entries; consider reporting a same-argv entry under another key.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-4 (cleanup): the identity predicate misses "its own control" wording, and its floor equals today''s match count.'
+      refs: ['shared/resources/tests/probe-boundary-signals.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed']

@@ -12,6 +12,10 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import {
+  UNPREFIXED_ARTIFACTS,
+  WORK_ITEM_ARTIFACT_RE,
+} from "../finalise-fix-and-recheck.mjs";
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -325,8 +329,10 @@ const KNOWN = new Set([
   "docs/tasks/task.28.develop-task-loop-iteration-audit-subagent/task.28.develop-task-loop-iteration-audit-subagent.md → ../../../../shared/resources/develop-pipeline-step-3-develop-loop.md",
 ]);
 const WORK_ITEM_RE = /(^|\/)(task\.\d+|story\.\d+\.\d+|epic\.\d+)\.[^/]+\.md$/;
-const ARTIFACT_RE =
-  /\.(qa|gate|bug|implementation|review|dod|plan|handover|pr-review|risk|test-design|sprint-review-summary)\./;
+// The ONE definition of "a pipeline artifact beside a work item", imported from
+// the fix-and-recheck evaluator so the corpus guards and 8a's admission rule read
+// the same set (task.152 QA-1).
+const ARTIFACT_RE = WORK_ITEM_ARTIFACT_RE;
 
 function workItemDocs() {
   return execFileSync(
@@ -383,4 +389,327 @@ test("corpus: every work-item document's relative links resolve and every fence 
     [],
     `KNOWN entries no longer dead — delete them so the ratchet tightens:\n  ${healed.join("\n  ")}`,
   );
+});
+
+// ---------------------------------------------------------------------------
+// Corpus guard: every co-located pipeline ARTIFACT — the QA reports, DoD files,
+// implementation reports, reviews and PR reviews the pipeline writes beside a
+// work-item document. The walk above filters them OUT, but CI's docs-link-check
+// reads every changed docs/**/*.md, and on task.139 run 2 it went red on two QA
+// reports this guard could not see (task.152, obs #155). A separate ratchet, not
+// a merge into KNOWN: artifacts are a larger, older corpus carrying consumer-
+// layout links from before this guard existed, so they shrink their own list at
+// their own pace while the document guard stays zero-tolerance. Pinned by
+// file → target (links) and by file (fences) — not by line, which an unrelated
+// edit above moves. Delete an entry with its fix; the ratchet only tightens.
+const KNOWN_ARTIFACT_LINKS = new Set([
+  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.plan.first-task-in-10-minutes.md → ../../../../../standards/document-status-lifecycle.md",
+  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.plan.first-task-in-10-minutes.md → ../../../../../standards/file-naming.md",
+  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.plan.first-task-in-10-minutes.md → ../../../../../standards/task-registry.md",
+  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.plan.first-story-in-60-minutes.md → ../../../../../concepts/quickstart-task.md",
+  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.plan.first-story-in-60-minutes.md → ../../../../../runbooks/story-development.md",
+  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.plan.first-story-in-60-minutes.md → ../../../../../standards/document-status-lifecycle.md",
+  "docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.1.capture-prd-as-worked-example/story.2.1.sprint-review-summary.md → ../../../../../../../../../examples/prd-example/README.md",
+  "docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/story.4.4.day-4-parallel/story.4.4.plan.day-4-parallel.md → ../change-management.md",
+  "docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/story.4.4.day-4-parallel/story.4.4.plan.day-4-parallel.md → ../create-parallel-stories.md",
+  "docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/story.4.4.day-4-parallel/story.4.4.plan.day-4-parallel.md → ../first-week.md",
+  "docs/tasks/task.35.okf-conformance-document-skills/task.35.plan.okf-conformance-document-skills.md → ../../shared/resources/open-knowledge-format.md",
+]);
+const KNOWN_ARTIFACT_FENCES = new Set([
+  "docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/story.4.4.day-4-parallel/story.4.4.plan.day-4-parallel.md",
+  "docs/tasks/task.81.review-security-skill/task.81.bug.1.malformed-nested-fences-in-prompt.md",
+]);
+
+function artifactDocs() {
+  return execFileSync(
+    "git",
+    ["ls-files", "-z", "--", "docs/tasks", "docs/prd", "docs/development"],
+    { cwd: REPO_ROOT, encoding: "utf8" },
+  )
+    .split("\0")
+    .filter(
+      (f) =>
+        f &&
+        f.endsWith(".md") &&
+        ((WORK_ITEM_RE.test(f) && ARTIFACT_RE.test(f)) ||
+          // The unprefixed artifacts finalise writes beside a document — the
+          // evaluator's own list. The walk is a SUPERSET of what 8a admits: it
+          // also reads `.bug.` reports and summaries with no document beside
+          // them, because CI link-checks those too; 8a refuses both.
+          UNPREFIXED_ARTIFACTS.includes(f.slice(f.lastIndexOf("/") + 1))),
+    );
+}
+
+test("corpus: every co-located pipeline artifact's relative links resolve and every fence closes (KNOWN_ARTIFACT_* pinned, ratchet only tightens)", () => {
+  const docs = artifactDocs();
+  assert.ok(
+    docs.length >= 1000,
+    `only ${docs.length} artifacts walked — the walk is broken, not the corpus clean`,
+  );
+  // The unprefixed sprint-review summaries finalise writes are walked too
+  // (112 tracked on 2026-09-26) — the floor holds the walk to the shared list.
+  const unprefixed = docs.filter((f) =>
+    f.endsWith("/sprint-review-summary.md"),
+  );
+  assert.ok(
+    unprefixed.length >= 100,
+    `only ${unprefixed.length} unprefixed sprint-review summaries walked — the walk has dropped UNPREFIXED_ARTIFACTS`,
+  );
+  const repo = repoRoot(REPO_ROOT);
+  const tracked = trackedSet(REPO_ROOT);
+  const dead = [];
+  const openFences = [];
+  let links = 0;
+  for (const f of docs) {
+    const r = checkDocument(f, { root: REPO_ROOT, tracked, repo });
+    links += r.links;
+    for (const b of r.broken) dead.push(`${f} → ${b.target}`);
+    if (r.unterminatedFence) openFences.push(f);
+  }
+  assert.ok(
+    links >= 1000,
+    `only ${links} relative links parsed across ${docs.length} artifacts — the extractor is blind, not the corpus link-free`,
+  );
+  const newDead = dead.filter((d) => !KNOWN_ARTIFACT_LINKS.has(d));
+  const healed = [...KNOWN_ARTIFACT_LINKS].filter((k) => !dead.includes(k));
+  const newFences = openFences.filter((f) => !KNOWN_ARTIFACT_FENCES.has(f));
+  const closedFences = [...KNOWN_ARTIFACT_FENCES].filter(
+    (f) => !openFences.includes(f),
+  );
+  assert.deepEqual(
+    newFences,
+    [],
+    `fence opened and never closed in an artifact — links after it were not scanned:\n  ${newFences.join("\n  ")}`,
+  );
+  assert.deepEqual(
+    newDead,
+    [],
+    `dead relative link(s) in pipeline artifacts — a quoted finding that renders as a link is still a link:\n  ${newDead.join("\n  ")}`,
+  );
+  assert.deepEqual(
+    healed,
+    [],
+    `KNOWN_ARTIFACT_LINKS entries no longer dead — delete them so the ratchet tightens:\n  ${healed.join("\n  ")}`,
+  );
+  assert.deepEqual(
+    closedFences,
+    [],
+    `KNOWN_ARTIFACT_FENCES entries now close — delete them so the ratchet tightens:\n  ${closedFences.join("\n  ")}`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Writer sites (task.152, obs #155): the three skills that write the co-located
+// reports check each report as they write it — the cheapest place to catch a
+// quoted finding that renders as a link, before a push and a CI round trip.
+// Section-scoped: a mention anywhere else in the file is not the step running it.
+// This proves the check is STATED at the step, not that an agent runs it.
+const WRITER_SITES = [
+  ["skills/qa-task/SKILL.md", "### Step 11: Write QA Report", "qa-task"],
+  ["skills/qa-story/SKILL.md", "#### Output 1: QA Report File", "qa-story"],
+  [
+    "skills/review-pr/SKILL.md",
+    "### Step 7 — Write the review report",
+    "review-pr",
+  ],
+];
+
+/** The section under `heading`, to the next heading of the same or a higher
+ *  level — fences are skipped for heading detection only, since the report
+ *  templates these sections carry are full of `#` lines. */
+function section(text, heading) {
+  const lines = text.split("\n");
+  const start = lines.findIndex((l) => l === heading);
+  if (start === -1) return null;
+  const level = heading.match(/^#+/)[0].length;
+  let fence = null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    const m = lines[i].match(/^\s*(`{3,}|~{3,})/);
+    if (m) {
+      if (!fence) fence = m[1];
+      else if (m[1][0] === fence[0] && m[1].length >= fence.length)
+        fence = null;
+      continue;
+    }
+    if (fence) continue;
+    const h = lines[i].match(/^(#{1,6}) /);
+    if (h && h[1].length <= level) {
+      end = i;
+      break;
+    }
+  }
+  return lines.slice(start, end).join("\n");
+}
+
+test("writer sites: qa-task Step 11, qa-story Output 1 and review-pr Step 7 each stage the report and run doc-links.js on it (task.152, obs #155)", () => {
+  let found = 0;
+  for (const [file, heading, skill] of WRITER_SITES) {
+    const body = section(
+      fs.readFileSync(path.join(REPO_ROOT, file), "utf8"),
+      heading,
+    );
+    assert.ok(body, `${file}: section "${heading}" not found`);
+    found++;
+    assert.match(
+      body,
+      new RegExp(
+        `node \\.agents/skills/${skill}/references/doc-links\\.js --file`,
+      ),
+      `${file} § ${heading} does not run references/doc-links.js --file on the report it writes`,
+    );
+    assert.match(
+      body,
+      /^git add /m,
+      `${file} § ${heading} does not stage before checking`,
+    );
+    assert.ok(
+      body.indexOf("git add ") < body.indexOf("doc-links.js --file"),
+      `${file} § ${heading} checks before it stages — the engine resolves against the index`,
+    );
+    // A path that does not exist yet makes `git add` fatal, and a fatal `git add`
+    // stages NOTHING — not even the report. qa-story writes its gate after this
+    // step (Output 2 / qa-gate), so its block must not name the gate; qa-task
+    // writes the gate first (Step 10) and may (task.152 QA cycle 1, CR-1).
+    if (skill === "qa-story") {
+      const addLine = body.split("\n").find((l) => l.startsWith("git add "));
+      assert.doesNotMatch(
+        addLine,
+        /\.gate\./,
+        `${file} § ${heading} stages the gate before it is written — git add fails and stages nothing`,
+      );
+    }
+    assert.ok(
+      fs.existsSync(
+        path.join(REPO_ROOT, "skills", skill, "references", "doc-links.js"),
+      ),
+      `skills/${skill}/references/doc-links.js is not bundled — run npm run bundle`,
+    );
+  }
+  assert.equal(found, 3, "all three writer sections were found");
+});
+
+test("state (task.149, obs #164): a broken link says whether the target is untracked on disk or missing, and the red markers are unchanged", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[report](report.md) [gate](gate.yml) [ok](b.md)\n",
+    );
+    fs.writeFileSync(path.join(dir, "docs", "b.md"), "# b\n");
+    fs.writeFileSync(
+      path.join(dir, "docs", "report.md"),
+      "# written, not committed\n",
+    );
+    execFileSync("git", ["add", "docs/a.md", "docs/b.md"], { cwd: dir });
+
+    const r = checkDocument("docs/a.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => [b.target, b.state]),
+      [
+        ["report.md", "untracked"],
+        ["gate.yml", "missing"],
+      ],
+    );
+
+    let out;
+    try {
+      execFileSync("node", [ENGINE, "--file", "docs/a.md"], {
+        cwd: dir,
+        encoding: "utf8",
+      });
+    } catch (e) {
+      out = e.stdout;
+    }
+    assert.match(out, /^✖ docs\/a\.md:1 → report\.md .*\[untracked\]$/m);
+    assert.match(out, /^✖ docs\/a\.md:1 → gate\.yml .*\[missing\]$/m);
+    assert.match(out, /^FAIL doc-links: 2 finding\(s\) in docs\/a\.md$/m);
+  });
+});
+
+test("state (task.149): outside a repository the disk was already read, so a broken link can only be missing", () => {
+  withNonRepoFixture((dir) => {
+    fs.writeFileSync(path.join(dir, "a.md"), "[x](x.md)\n");
+    const r = checkDocument("a.md", { root: dir });
+    assert.equal(r.tracked, false);
+    assert.deepEqual(
+      r.broken.map((b) => b.state),
+      ["missing"],
+    );
+  });
+});
+
+test("state (task.149 CR-2): a gitignored target on disk is ignored, not untracked — it can never be committed", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(path.join(dir, ".gitignore"), "*.log\n");
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[log](run.log) [new](new.md)\n",
+    );
+    fs.writeFileSync(path.join(dir, "docs", "run.log"), "x\n");
+    fs.writeFileSync(path.join(dir, "docs", "new.md"), "# new\n");
+    execFileSync("git", ["add", ".gitignore", "docs/a.md"], { cwd: dir });
+    const r = checkDocument("docs/a.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => [b.target, b.state]),
+      [
+        ["run.log", "ignored"],
+        ["new.md", "untracked"],
+      ],
+    );
+  });
+});
+
+test("state (TASK-149-BUG-4): a case-mismatched link is missing on every filesystem, and a link above the repository is outside-repo — never untracked", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[r](Report.md) [d](../Docs/b.md) [o](../../outside.md) [ok](new.md)\n",
+    );
+    fs.writeFileSync(path.join(dir, "docs", "report.md"), "# r\n");
+    fs.writeFileSync(path.join(dir, "docs", "b.md"), "# b\n");
+    fs.writeFileSync(path.join(dir, "docs", "new.md"), "# new\n");
+    fs.writeFileSync(path.join(path.dirname(dir), "outside.md"), "# o\n");
+    try {
+      execFileSync("git", ["add", "docs/a.md"], { cwd: dir });
+      const r = checkDocument("docs/a.md", { root: dir });
+      assert.deepEqual(
+        r.broken.map((b) => [b.target, b.state]),
+        [
+          ["Report.md", "missing"],
+          ["../Docs/b.md", "missing"],
+          ["../../outside.md", "outside-repo"],
+          ["new.md", "untracked"],
+        ],
+      );
+    } finally {
+      fs.rmSync(path.join(path.dirname(dir), "outside.md"), { force: true });
+    }
+  });
+});
+
+test("state (TASK-149 CR3-1): a symlinked link target is untracked only when it leads to something real inside the repository", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "docs", "real.md"), "# r\n");
+    fs.symlinkSync("real.md", path.join(dir, "docs", "inside.md"));
+    fs.symlinkSync("nowhere.md", path.join(dir, "docs", "dangling.md"));
+    fs.symlinkSync(os.tmpdir(), path.join(dir, "docs", "ext"));
+    fs.writeFileSync(
+      path.join(dir, "docs", "a.md"),
+      "[i](inside.md) [d](dangling.md) [e](ext)\n",
+    );
+    execFileSync("git", ["add", "docs/a.md", "docs/real.md"], { cwd: dir });
+    const r = checkDocument("docs/a.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => [b.target, b.state]),
+      [
+        ["inside.md", "untracked"],
+        ["dangling.md", "missing"],
+        ["ext", "outside-repo"],
+      ],
+    );
+  });
 });

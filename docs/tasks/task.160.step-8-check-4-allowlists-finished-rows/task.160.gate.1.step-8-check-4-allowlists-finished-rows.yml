@@ -1,0 +1,62 @@
+schema: 1
+task: 'task.160.step-8-check-4-allowlists-finished-rows'
+task_title: 'Step 8 check 4 allowlists finished rows instead of denying two unfinished ones'
+gate: CONCERNS
+status_reason: 'Check 4 allowlist is correct and measured (probe engages, 21/21 cases; 64/64 tests; CI green). One medium finding: four other places still tell Step 8 to update Pipeline Progress after the push, contradicting the new ordering this task introduced.'
+reviewer: 'QA Engineer'
+updated: '2026-09-27T11:10:12Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-8-commit.md'
+    finding: 'Phase 3 removed the post-push Pipeline Progress edit from the Step 8 body, but four restatements still prescribe it: this file''s frontmatter description (line 3, "final push, Pipeline Progress update, and pipeline lock file removal"), skills/develop-task/SKILL.md:232, skills/develop-story/SKILL.md:245 and skills/develop-bug/SKILL.md:244 ("final push, Pipeline Progress ✅, lock removal"). The orchestrators'' Step Transition Protocol action 2 also edits the just-completed row after Step 8 returns, with no Step 8 carve-out, after check 5 has already run.'
+    suggested_action: 'Correct all four restatements to put the Pipeline Progress update before /commit-changes; add an explicit N=8 note to Step Transition Protocol action 2 in develop-task, develop-story and develop-bug SKILL.md (the row is already ✅ Done, so the edit must be a no-op); widen the prose guard test to scan the orchestrator SKILL.md Step 8 paragraphs and the step document''s description.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 64
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 21
+    notes: 'Check 4 is a boundary (its refusal blocks the completion banner). Probed through a one-argument wrapper running the shipped block under bash and zsh: 12 hostile rows refused, 9 legitimate rows admitted, verdict engages, 0 reproduced, no shell disagreement. Record: task.160.qa.1.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'One awk pass over the table rows; no measurable change.'
+  reliability:
+    status: PASS
+    notes: 'Fails closed on no table, no Status column, no step rows and an awk runtime error (mutation-proved M6/M7). Latin-1 locale refuses ⏭️ Skipped (CR-4, advisory): fails closed.'
+  maintainability:
+    status: PASS
+    notes: 'Clear comments on each load-bearing line; one authored source, three generated copies (bundle:check clean). The doc-drift finding is carried in top_issues (CR-1).'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: correct the four post-push Pipeline Progress restatements and add the N=8 carve-out to Step Transition Protocol action 2.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md', 'skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md']
+  future:
+    - action: 'CR-2: the ordering test commits a fully finished report and cannot fail on the order; add the negative case (edit the Step 8 row after commit+push, assert check 5 fails) or rename it.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - action: 'CR-3: widen the prose guard beyond two exact phrases and one file.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - action: 'CR-4: pin the check-4 awk to LC_ALL=C so the byte-wise match is identical on every host.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md']
+    - action: 'CR-5: give the commit hash a named field in the Phase 2 completion templates, or drop the sentence.'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

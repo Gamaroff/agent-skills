@@ -949,8 +949,12 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
      • Reconnect         — after a drop and re-establish, does it converge, or resume from stale
                            state?
 
-   Review the COMBINATION, not only each change: at least one real defect of this shape was caused
-   by two earlier fixes that were each correct alone.
+   Identity rules — for every change to a dedupe, cache or record key, a normaliser or an equality
+   predicate, whether or not it touches a lifecycle: find one pair that must be the same and one
+   that must differ. A key changed to fix one direction has usually broken the other.
+
+   Review the COMBINATION, not only each change: at least one real lifecycle defect of the shape
+   above was caused by two earlier fixes that were each correct alone.
    ```
 
    This costs more than a narrowed cycle-2 pass and is expected to pay for itself, because the
@@ -991,7 +995,17 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    `references/probe-boundary-rule.md` §5) takes the shell-fn form instead:
    `--entry 'shell-fn:<path>#<function>' --sink filename --cases-file <cases.json>`, plus
    `--fake-gh <dir>` when the function's body names `gh` — running `shell:` against a library is
-   the task.125 result: sourced, never called, `absent` behind a full count.
+   the task.125 result: sourced, never called, `absent` behind a full count. A **Node CLI** whose
+   decision sits behind its flags (task.141: `uat-status.mjs --env`) takes the cli form:
+   `--entry 'cli:<path>' --argv '["--flag","{input}"]' --cases-file <cases.json>` — the
+   template's one `"{input}"` element is each case, exit status is the verdict, a crash is
+   `errored`, and each guarded flag is its own control, named with `--name`; "it takes several flags" is never a reason
+   to record `boundary: false`.
+   A predicate the engine cannot import because it is **not exported** — a module-private `const` —
+   takes the same answer: export it (one word) and probe it. "It is not exported" is never a reason to
+   record `boundary: false`; the engine's `entry-not-probeable` detail names the remedy. On task.139
+   QA recorded `boundary: false` for five cycles over `isWorkItemDocument`; finalise exported it and
+   found a null-byte hole (obs #156).
    It takes the candidates from `references/security-input-corpus.mjs` (`corpusFor(<sink>)`)
    itself, imports the entry point in a sandboxed child — or materialises each case as a fixture
    directory and runs the script against it under bash and zsh — and scores each candidate.
@@ -1003,7 +1017,9 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    `nfr_validation.security.evidence` may read `measured` only when that total is positive. An empty
    findings list with `probes_executed: 0` is a review that read the boundary and did not test it,
    which is the defect this item closes. `boundary: false` is the common case and a legitimate skip — record it in the QA
-   report's `## Code Review` section rather than leaving `probes_executed` absent. A boundary that is
+   report's `## Code Review` section rather than leaving `probes_executed` absent. The record names
+   each predicate-shaped function the diff adds and the signal it lacks — a `boundary: false` with no
+   candidates named is not a decision (obs #156). A boundary that is
    read at QA and executed only at the Step 7 DoD probe lands its defect after the gate that should
    have covered it: a 14-star glob compiled to `[^/]*` × 14 passed five green cycles and was found at
    finalise (obs #20).
@@ -1090,6 +1106,13 @@ node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json
 Bind any caller values the documented snippets expect with repeated `--bind NAME=VALUE`, and seed the
 temp working directory from a real directory with `--copy <dir>` so the blocks see real data. Execution
 always happens in that temp copy — never the live tree.
+
+`--copy <dir>` places the directory's **contents** at the temp root. When a block addresses a path —
+`find docs/tasks …` in the `sync-github-*` discovery blocks — seed it at that path instead with
+`--copy-as docs:docs` (`SRC:DEST`, repeatable; `DEST` must be relative, stay inside the temp copy and
+not exist yet — it seeds a fresh path and never merges).
+A block that fails only because it was seeded at the wrong path is a harness finding, not a prose
+finding (obs #143).
 
 Record in the QA report:
 
@@ -1228,13 +1251,25 @@ See NFR Assessment section below for detailed process.
 
 #### Phase 4: Standards Compliance Check
 
-- Verify adherence to `docs/coding-standards.md`
+- Verify adherence to the coding standards file the pipeline loads —
+  `${ARCH_ROOT}/concepts/coding-standards.md` (default `docs/architecture/concepts/coding-standards.md`)
 - Check compliance with `docs/unified-project-structure.md`
 - Validate testing approach against `docs/testing-strategy.md`
 - Ensure all guidelines mentioned in the story are followed
 - **Review TypeScript Compliance Agent findings (Phase 1.5)** against project TypeScript standards
 - **Review Accessibility Agent findings (Phase 1.5)** against project accessibility standards
 - **Cross-check Definition of Done Agent (Phase 1.5)** for standards compliance
+
+**Run the validation commands your coding standards name, not only the test runner.** The coding
+standards file is loaded on every pipeline run (`devLoadAlwaysFiles`). For each command it lists
+under validation (in this repository, `docs/architecture/concepts/coding-standards.md` § *Validation
+before commit*) that the test run the review ran does not already execute, run it over the change set and
+list it under *Test Commands Executed*. Here that is `npm run validate -- skills/<changed-skill>/`
+for each changed skill — the one `npm test` does not cover. A non-zero result is a `category: bug`
+finding at `high` confidence, the shape Step 4b failures already take. A named command you did not
+run is recorded as **not run, with the reason**; a project whose standards name none records "no
+standards-named validation commands". (obs #163: every local gate green, CI's `validate` job red on
+an angle bracket in a `description`.)
 
 #### Phase 5: Acceptance Criteria Validation
 
@@ -1494,7 +1529,6 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 ```bash
 [Command executed]
 ```
-````
 
 ### Coverage Report
 
@@ -1524,9 +1558,30 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 ````
 
+**Check the report's links before leaving this step.** CI's `docs-link-check` reads every changed
+`docs/**/*.md` — a QA report as much as the document beside it — and a quoted finding that contains a
+bracket-paren shape renders as a live link (task.139 run 2 went red on two QA reports; task.152,
+obs #155). The engine resolves against the git index, so a sibling this run wrote reads as dead
+until it is staged — stage first:
+
+```bash
+git add "{story-directory}/story.{epic}.{story}.qa.{number}.{descriptive-name}.md"
+node .agents/skills/qa-story/references/doc-links.js --file "{story-directory}/story.{epic}.{story}.qa.{number}.{descriptive-name}.md"
+```
+
+Exit 1 → fix the quotation (put it in a fence, or break the `[..](..)` shape so it no longer reads
+as a link) and re-run until it exits 0. Exit 2 is a usage error: fix the call. `git add` only
+stages — the pipeline commits these files next anyway, and staging is reversible.
+
+**Stage the report alone here.** The gate does not exist yet — Output 2 (or `qa-gate`) writes it
+after this — and `git add` on a missing path is fatal and stages nothing, so naming it here would
+leave the report unstaged and the check reading an index without it. This report names the gate in
+a code span, not a link, so nothing here depends on it; the Review Completion read-back stages the
+gate once it is written.
+
 #### Output 2: Quality Gate File
 
-> **Precondition — no dispatched review is outstanding.** Do not write a gate while a code review dispatched in this cycle has not returned its `code_review:` block. The gate is a verdict on all the evidence, and a review still running is evidence not yet in hand — a `PASS` written now can be contradicted minutes later by the reviewer it did not wait for (task.106, obs #56). If the diff-review step reports the review as outstanding, wait against its wall-clock budget or resolve it per `references/develop-pipeline-autonomous-defaults.md` §Subagents **before** this step; never write around it.
+> **Precondition — no dispatched review is outstanding.** Do not write a gate while a code review dispatched in this cycle has not returned its `code_review:` block. The gate is a verdict on all the evidence, and a review still running is evidence not yet in hand — a `PASS` written now can be contradicted minutes later by the reviewer it did not wait for (task.106, obs #56). If the diff-review step reports the review as outstanding, wait against its wall-clock budget or resolve it per `references/develop-pipeline-autonomous-defaults.md` §Subagents **before** this step; never write around it. **That is the only wait.** A pending, cancelled or unavailable CI run on the PR is **not** a precondition of this step: CI is gated once, on the final commit, at `/finalise`, and no QA cycle waits on CI before then. If the latest CI state is to hand, record it as `evidence.ci` (informational — for example `pending @ {sha}`); never hold the gate for it.
 
 > **`top_issues[]` holds THIS cycle's findings only.** Do not copy a previous cycle's entries
 > forward, even annotated `status: closed`, and even though carrying the history reads as helpful.
@@ -1765,13 +1820,51 @@ After review:
    | 2026-05-14 |  | QA gate CONCERNS (6/10) — 2 findings | qa-story |
    ```
 
-   One row per QA cycle. `Version` stays blank — only `/finalise` bumps it. Name the decision, the
-   score and the finding count; the detail lives in the QA report this row sits alongside. A clean
+   One row per QA cycle. `Version` stays blank — only `/finalise` bumps it. Set `updated:` with
+   `change-log.js`'s `bumpUpdated(content, <row date>)`, never by hand — item 3e reads it back.
+   Name the decision, the score and the finding count; the detail lives in the QA report this row
+   sits alongside. A clean
    cycle still writes a row. Canonical format:
    [document-change-log.md](references/document-change-log.md).
 
    **For Tasks - Update similar sections** in task file with QA assessment results (the Change Log
    row is written by `qa-task` in its Step 12, with `Author` = `qa-task`)
+
+   e. **Read the claims back** — after (a)–(d), before item 6 posts anything. The edit above wrote
+   links to the report and gate and a Change Log row paired with `updated:`; nothing read them
+   back, and a check that runs before the claim is written cannot check it.
+
+   ```bash
+   # From the repository root. {story-file} is the story (or task) document items 3a–3d just edited — substitute it; the script
+   # refuses an unsubstituted placeholder (exit 2), so a block run as delivered
+   # cannot pass by reading nothing.
+   node .agents/skills/qa-story/references/qa-read-back.js --doc "{story-file}"
+   ```
+
+   `qa-read-back.js` is the read-back, defined once for both QA skills and tested directly
+   (`references/tests/qa-read-back.test.mjs`). It **decides**: exit 0 is clean, exit 1 is a
+   item 3e HALT with each problem and its remedy printed, and exit 2 is "could not look" (bad
+   arguments, an unreadable document, a sibling engine that did not load). Exit 2 is never a pass. It
+   checks four things:
+
+   1. **The claims exist.** This cycle's gate and QA report are in the work item's directory, and the
+      document has a Change Log row. An absent one halts, named.
+   2. **What this run wrote is staged.** The link check reads the index, so the script stages the
+      document, gate and report, plus every linked target that is **`untracked`** and a regular file
+      under the work item's own directory. A `git add` that fails halts. An untracked target elsewhere
+      is left alone and reported, so unrelated work never rides into the QA commit.
+   3. **Every link resolves against the index.** It uses `doc-links.js`, where **`missing`** means
+      never written, or a case-mismatched name that only a case-insensitive disk found. **`ignored`**
+      means gitignored, so it can never be committed. **`outside-repo`** and **`unverifiable`** also
+      halt.
+   4. **`updated:` accounts for the newest row** (`change-log.js` `checkUpdatedCoherence`). When it
+      does not, apply `bumpUpdated(content, <that row's date>)` and re-run.
+
+   **Do not post the QA summary (item 6) over exit 1 or 2.** Posting over it reproduces task.141: a PR comment linked
+   a report that did not exist, found only by CI's `link-check`, and a row was dated after `updated:`,
+   found only by CI's `work-item-artifact-naming` §5. The read-back was a fenced block in both skills
+   for three QA cycles, and each cycle found a new gap in it (task.149 BUG-2, -3, -5, -6, -7). One
+   script replaced the two copies. (obs #164)
 
 4. Recommend next action based on gate decision
 5. If files were modified during refactoring, list them in QA report and ask Dev to update File List
@@ -2040,7 +2133,7 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 
 **Review Completion Checklist — tick off each before marking the review done:**
 
-- [ ] QA report file created and saved (co-located with story/task)
+- [ ] Every artifact the document links to resolves — item 3e ran after the edit: no `missing` link, no `stale-updated`
 - [ ] Gate YAML file created and saved (co-located with story/task)
 - [ ] Story/task `## QA Testing Results` section updated with gate status, quality score, and links to artifacts
 - [ ] Story/task status correct per gate decision — `ready-for-review` on PASS/CONCERNS/WAIVED, `in-progress` on FAIL. Never `Ready for Done`, never `Reopened`, never `accepted` (that is `finalise`'s)

@@ -1,0 +1,79 @@
+schema: 1
+task: 'task.153.release-ci-gate-load-sensitive-tests'
+task_title: "[Task 153] Release gate reads CI's verdict; load-sensitive tests name themselves"
+gate: CONCERNS
+status_reason: 'Cycle-2 refute pass: the load-sensitive guard misses three existing whole-file wall-clock budgets (process.hrtime vs FILE_BUDGET_MS), so its "catches any unmarked wall-clock assertion" claim is false (MEDIUM). Two LOW gated: refusal names the wrong run URL; --repo admits "..". All cycle-1 fixes verified.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T07:22:38Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: medium
+    file: 'tests/load-sensitive-marker.test.js'
+    finding: 'PATTERN sees only "Date.now() - x <" and "elapsed <"; the whole-file budgets "ms < FILE_BUDGET_MS" over process.hrtime in tests/test-clean-checkout.test.js:46, tests/bundle-missing-source.test.js:46 and evals/shared/tests/consumer-root.test.mjs:35 are load-sensitive, unmarked and unlisted — traps.md and the guard header claim otherwise, and release.sh now tells the operator an unmarked red is real.'
+    suggested_action: 'Enumerate by clock source (Date.now, process.hrtime, performance.now feeding a comparison in an assert), widen the guard to it, then mark and list the three files (thresholds unchanged).'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-2'
+    severity: low
+    file: 'scripts/release-ci-verdict.mjs'
+    finding: 'The refusal detail links the first run that has a URL, not the run that produced the verdict — with a green and a red Test run on one SHA it can name the green run.'
+    suggested_action: 'Pick the URL from a run that caused the verdict (a red conclusion for red, a non-completed status for pending); add a two-run case asserting the URL.'
+    suggested_owner: dev
+    status: open
+  - id: 'PRB2-1'
+    severity: low
+    file: 'scripts/release-ci-verdict.mjs'
+    finding: 'The --repo check [A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+ accepts "../x" (probe repo.traversal reproduced, record task.153.qa.2.security.run.json); only release.sh calls it, with a constant, so the exposure is nil, but the validator admits a traversal segment.'
+    suggested_action: 'Owner: alphanumeric and hyphen, not starting with a hyphen; repo: [A-Za-z0-9_.-]+ but not "." or ".."; re-run the probe.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 51
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 25
+    notes: 'Two controls: --sha engages (13/13); --repo present-but-inert — "../x" accepted (1 of 12). Exposure nil (caller passes a constant); tighten the validator. Escapes recorded are gh writing its own device-id under the sandboxed HOME.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1.'
+  reliability:
+    status: PASS
+    notes: 'Fails closed on every unreadable input; --repo pins gh to the right repository.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The load-sensitive list is incomplete (CR2-1) — the checked list is the maintainability claim of this task.'
+
+recommendations:
+  immediate:
+    - action: 'CR2-1: widen the guard by clock source; mark and list the three FILE_BUDGET_MS files.'
+      refs: ['tests/load-sensitive-marker.test.js', 'docs/contributing/traps.md']
+    - action: 'CR2-2: name the run that produced the verdict.'
+      refs: ['scripts/release-ci-verdict.mjs']
+    - action: 'PRB2-1: tighten --repo to GitHub owner/name rules.'
+      refs: ['scripts/release-ci-verdict.mjs']
+  future:
+    - action: 'CR2-3 (advisory): same-line hit after a closed marked call is still credited — compare character offsets.'
+      refs: ['tests/load-sensitive-marker.test.js']
+    - action: 'CR2-4 (advisory): forked should mean the pid file holds a positive integer, not merely exists.'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+    - action: 'CR2-5 (advisory): the [3,6,12] schedule caps retries at 2 — generate by doubling or document the cap.'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['CR2-1 fixed']

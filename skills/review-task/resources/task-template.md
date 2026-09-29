@@ -277,6 +277,7 @@ estimated_effort_hours: 0
 - [ ] All linting passes
 - [ ] No TypeScript compilation errors
 - [ ] Code follows project conventions
+- [ ] Every validation command the coding standards name for the files this task touches (e.g. `npm run validate -- skills/<skill>/` when a `SKILL.md` changes)
 
 ### Migration
 

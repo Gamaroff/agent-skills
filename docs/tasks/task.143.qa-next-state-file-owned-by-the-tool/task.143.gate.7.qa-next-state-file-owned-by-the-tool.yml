@@ -1,0 +1,70 @@
+schema: 1
+task: 'task.143.qa-next-state-file-owned-by-the-tool'
+task_title: 'qa-next: uat-status.mjs owns the run state file, so its contract is held by tests instead of prose'
+gate: CONCERNS
+status_reason: 'BUG-6 and QA6-1 fixed as specified. One LOW: since cycle 6 the date rule also runs when runFile is set, and it masks the runFile exclusion. The QA4-1 test no longer goes red without that exclusion except east of UTC (mutation-verified). The security axis remains CONCERNS on pre-existing labels only.'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T20:41:59Z'
+
+top_issues:
+  - id: 'TASK-143-QA7-1'
+    severity: low
+    file: 'evals/qa-next/unit/uat-status.test.mjs'
+    finding: 'Dropping state.runFile from the own set in stateView leaves the suite 62/62 in the local TZ and in UTC, and only Pacific/Kiritimati goes red. The date rule, which cycle 6 made unconditional, excludes the same file whenever its UTC --run-path date is on or after the local start date. The runFile exclusion is load-bearing only east of UTC, and CI runs in UTC (CR-2, verified by mutation).'
+    suggested_action: 'Add a TZ-pinned test (east of UTC) in which the recorded runFile is dated the day before the local start date and exists on disk, and assert that it is excluded from priorRuns.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-24'
+    resolution: 'Fixed in f8b2c958 (test-only). Quick verification (2026-09-24, pre-merge): dropping state.runFile from own turns the new test red under TZ=UTC (62/63); restored 63/63.'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 62
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 19
+    notes: 'cli: probe re-run (task.143.qa.7.security.run.json, 19 env cases): unchanged from cycle 6. Only whitespace/control-character labels reproduce (space-only, LF, CR, TAB, ESC), each accepted identically on origin/develop. They are pre-existing and routed to future.'
+  performance:
+    status: PASS
+    notes: 'No network calls; 62 tests.'
+  reliability:
+    status: CONCERNS
+    notes: 'Documented limitation, not a queue entry: a pre-upgrade run that an interrupted v0.51.0 Step 4 half-wrote leaves that file beside the fresh one. This run flags it (unverifiable), but a later current-shape run counts it as a prior run (CR-1). This is the trade-off bug 6 chose over overwriting an earlier committed run.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory: the "never taken over" assertion restates --run-path behaviour (CR-4); the test clock can straddle UTC midnight (CR-3).'
+
+bug_resolution:
+  TASK-143-QA7-1: 'FIXED in f8b2c958 — quick verification pre-merge: mutation red under TZ=UTC, green restored (63/63)'
+  TASK-143-BUG-6: 'FIXED — legacy priorRuns flagged from executed on regardless of runFile; resume always takes a fresh --run-path; "stays exact" claim deleted (mutation: both tests red)'
+  TASK-143-QA6-1: 'FIXED — fixture dated from the UTC today() --run-path uses; the -02 hand-out is exercised on any day'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-143-QA7-1 (east-of-UTC runFile exclusion test).'
+      refs: ['evals/qa-next/unit/uat-status.test.mjs']
+  future:
+    - action: 'Surface a same-name file left by an interrupted v0.51.0 Step 4 for the owner to keep or delete (or record it in the state), so later runs do not count it as a prior run (CR-1).'
+      refs: ['skills/qa-next/SKILL.md', 'skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Refuse whitespace-only and control-character --env labels (pre-existing; probe-reproduced on develop and HEAD).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Lock ownership check on --state-set (cycle 2 CR-1).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Take the test date from --run-path output rather than a separate clock read (CR-3), and drop or reword the restating assertion (CR-4).'
+      refs: ['evals/qa-next/unit/uat-status.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: []

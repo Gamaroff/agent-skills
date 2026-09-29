@@ -28,6 +28,7 @@
  *   write --title … --skill …   sweep -> derive -> create -> write
  *        --siblings-checked … --body-file … [--not-duplicate-of 12,34]
  *   set-status --id N --status s [--parked-until …] [--resolution …]
+ *              [--expect-status s]  refuse unless the entry currently reads s
  *   archive                     standalone stale sweep
  *   families [--audit]          read skill-families.md; audit shared rules
  *   checkpoint --note …         append an acknowledgement marker
@@ -38,7 +39,7 @@
  *   0  ok, already, empty, dry-run — and any unhandled throw
  *   1  a guard tripped: scan-broken, id-broken, collision,
  *      ephemeral-workspace, fork-detected, invalid-frontmatter,
- *      parked-without-condition
+ *      parked-without-condition, ambiguous-id, status-changed
  *   2  usage error (unknown subcommand, unknown flag, missing argument)
  *
  * Exit 1 means something DIFFERENT here than in tracker-comment.js, and
@@ -57,6 +58,8 @@
  *   fork-detected             a second skill-observations/ at another anchor
  *   invalid-frontmatter       a file's header could not be parsed
  *   parked-without-condition  status: parked with no parked_until
+ *   ambiguous-id              --id matches more than one file; nothing written
+ *   status-changed            --expect-status did not match; nothing written
  *   dry-run                   --dry-run; nothing read, nothing written
  *   possible-duplicate        `write` found an open/parked entry on the same
  *                             skill with an overlapping title; nothing written
@@ -960,12 +963,19 @@ function cmdWrite(P, args) {
   };
 }
 
-function findById(logDir, id) {
+// Every file whose numeric prefix is `id`, not the first. The ids the engine
+// writes are unique by construction (`wx` create), but a hand-created file or a
+// consolidated fork can put two files on one prefix, and a first-match lookup
+// then rewrites whichever sorts first and reports `ok` (task.150 QA cycle 3,
+// TASK-150-BUG-4: an actioned entry was silently re-parked). Ambiguity is a
+// refusal the caller sees, never a choice the engine makes.
+function findAllById(logDir, id) {
+  const out = [];
   for (const name of listMarkdown(logDir)) {
     const m = /^(\d+)-/.exec(name);
-    if (m && parseInt(m[1], 10) === id) return name;
+    if (m && parseInt(m[1], 10) === id) out.push(name);
   }
-  return null;
+  return out;
 }
 
 /** Rewrite only the four lifecycle keys, in place, leaving every other line alone. */
@@ -1019,6 +1029,13 @@ function cmdSetStatus(P, args) {
       exitCode: 2,
     };
   }
+  if (args.expectStatus != null && !STATUS_VALUES.has(args.expectStatus)) {
+    return {
+      reason: "usage",
+      error: `unknown --expect-status ${args.expectStatus}; expected one of ${[...STATUS_VALUES].join(", ")}`,
+      exitCode: 2,
+    };
+  }
   // `parked` without a condition is not a state, it is a shrug. A later review
   // has nothing to answer yes or no to, so the entry never leaves parked.
   if (args.status === "parked" && !args.parkedUntil) {
@@ -1032,19 +1049,43 @@ function cmdSetStatus(P, args) {
 
   // Re-read the single file immediately before editing it — a parallel review
   // may have resolved it since any earlier scan.
-  const name = findById(P.logDir, args.id);
-  if (!name) {
+  const matches = findAllById(P.logDir, args.id);
+  if (matches.length === 0) {
     return {
       reason: "usage",
       error: `no observation with id ${args.id}`,
       exitCode: 2,
     };
   }
+  if (matches.length > 1) {
+    return {
+      reason: "ambiguous-id",
+      id: args.id,
+      files: matches,
+      error: `id ${args.id} matches ${matches.length} files (${matches.join(", ")}) — renumber one before changing either`,
+      exitCode: 1,
+    };
+  }
+  const name = matches[0];
   const file = path.join(P.logDir, name);
   const text = fs.readFileSync(file, "utf8");
   const fm = parseFrontmatter(text);
   if (!fm) {
     return { reason: "invalid-frontmatter", file: name, exitCode: 1 };
+  }
+  // A caller that selected the entry earlier states what it saw. The check is
+  // on the file being written, at the moment of writing — a re-scan in the
+  // caller's prose can read a different file than the one this call resolves.
+  if (args.expectStatus != null && statusOf(fm) !== args.expectStatus) {
+    return {
+      reason: "status-changed",
+      id: args.id,
+      file: name,
+      expected: args.expectStatus,
+      actual: statusOf(fm),
+      error: `observation ${name} is ${statusOf(fm)}, not ${args.expectStatus} — it changed since it was read; nothing written`,
+      exitCode: 1,
+    };
   }
 
   const updates = { status: args.status };
@@ -1537,6 +1578,10 @@ function parseArgs(argv) {
         args.resolution = value(i, a);
         i++;
         break;
+      case "--expect-status":
+        args.expectStatus = value(i, a);
+        i++;
+        break;
       case "--resolved":
         args.resolved = value(i, a);
         i++;
@@ -1570,6 +1615,14 @@ function parseArgs(argv) {
   // ignores is worse than one it rejects: the caller sees exit 0 and believes
   // the id took effect. Rejecting it here is what makes "there is no --id flag"
   // true from the caller's side rather than only from the implementation's.
+  // Same rule for --expect-status: every other subcommand would accept it and
+  // then ignore it, and a guard the caller believes in but nothing checks is
+  // worse than a rejected flag (task.150 QA cycle 4, CR4-2).
+  if (args.subcommand !== "set-status" && args.expectStatus != null) {
+    throw new UsageError(
+      `${args.subcommand} does not accept --expect-status: only set-status checks the current status before writing.`,
+    );
+  }
   if (args.subcommand === "write" && args.id != null) {
     throw new UsageError(
       "write does not accept --id: ids are always derived. A batch that " +

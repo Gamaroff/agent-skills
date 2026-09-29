@@ -1,0 +1,91 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: FAIL
+status_reason: "Cycle 2's sign-off guard enumerated the doors into the note cell and missed one (--bug), and closed a legitimate path entirely (blocked/na on an accepted row are now impossible, which SKILL.md and README both still say is allowed). The defect class is the guard's own shape, not the missing flag."
+reviewer: 'QA Engineer'
+updated: '2026-09-22T21:10:00Z'
+
+top_issues:
+  - id: 'TASK-141-BUG-7'
+    severity: high
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "`blocked` and `na` REQUIRE --note (earlier guard) and --note is now REFUSED on a kept ✅ (cycle-2 guard), so both verdicts are impossible against an accepted row — while SKILL.md:181/185 and README:99 all still state they leave ✅ and update the note. Step 2's two documented early exits are dead ends on an accepted row."
+    suggested_action: "On a kept ✅ append to the note cell rather than replacing it, so the documented behaviour becomes true and the sign-off survives; keep --clear-note refused."
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-BUG-8'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "The cycle-2 guard enumerates `clear || note` and omits `bug`, so `--set <id> pass --run <p> --bug <b>` on a ✅ row takes the kept branch and silently replaces the owner's `accepted <date> — <why>` with the bug link, --check green. This is the same one-door-closed-another-open class the guard's own comment claims to have eliminated — committed inside the fix for it."
+    suggested_action: "Stop enumerating flags: make the kept path APPEND to the note cell by construction, so no future flag can reopen the door."
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-CR3-3'
+    severity: low
+    file: 'skills/qa-next/README.md'
+    finding: "README § Registry states still says a pass, blocked or n/a against an accepted row leaves ✅ and updates Last run and Notes / bug — made false for blocked and na by cycle 2, and cmdSet's own comment cites this section as the authority for the demotion rule."
+    suggested_action: 'Update in the same edit as BUG-7 so code, SKILL.md and README state one rule.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-141-CR3-4'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "requireIdValue was applied to the two readers only, so `--accept` with no id gives the subjectless `uat-status: : no registry row` and `--accept --force` reports `--FORCE: no registry row`; cmdAccept's and cmdCell's messages echo the un-normalised string while updateRow matched the normalised one."
+    suggested_action: 'Route the writers through requireIdValue too and have their messages use the normalised id.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 65
+
+evidence:
+  tests_reviewed: 3934
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged. No single-argument accept/reject export exists to probe; the tool is offline and file-local. Cycle 2 added no new surface.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. 31 tests, no network, no new walk.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-7 makes two documented verdicts impossible on an accepted row; BUG-8 loses the owner sign-off silently with --check green. Neither corrupts the registry, but both break a documented path.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The pattern is now three cycles old and is the finding: each fix enumerated the doors it knew about. The repair is to make the invariant structural — the kept path appends and never replaces — so the property holds without an enumeration to keep current.'
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 2
+  fix_date: '2026-09-22'
+  total_iterations: 2
+  verification_method: 'Executed reproductions against a fixture registry; 18 mutations across three cycles, all red'
+
+recommendations:
+  immediate:
+    - action: 'Make the kept-✅ note cell append-only by construction; keep --clear-note refused; restore blocked/na as legitimate against an accepted row.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+    - action: 'Align README § Registry states with the restored rule.'
+      refs: ['skills/qa-next/README.md']
+  future:
+    - action: 'CR3-4: route the writer commands through requireIdValue and use the normalised id in their messages.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-3 (cycle 1, still advisory): --set exits 0 whether the row moved or was kept.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK-141-BUG-7 and BUG-8 fixed by the structural append rule'
+    - 'README aligned'

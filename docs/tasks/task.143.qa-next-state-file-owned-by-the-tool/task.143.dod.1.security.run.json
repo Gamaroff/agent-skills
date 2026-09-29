@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "cli:skills/qa-next/scripts/uat-status.mjs",
+      "name": "uat-status --state-set <field>",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 22,
+      "passed": 22,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--root",
+        "/private/tmp/claude-501/-Users-gamaroff-Development-Projects-agent-skills/49776681-06dc-4ff5-8a23-20e55d1f10b1/scratchpad/dod/fixture-L2crdk",
+        "--state-set",
+        "{input}",
+        "null"
+      ],
+      "ran_at": "2026-09-24T20:21:44.839Z"
+    },
+    {
+      "sink": "path",
+      "entry": "cli:skills/qa-next/scripts/uat-status.mjs",
+      "name": "uat-status --env",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 25,
+      "passed": 20,
+      "reproduced": 5,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--root",
+        "/private/tmp/claude-501/-Users-gamaroff-Development-Projects-agent-skills/49776681-06dc-4ff5-8a23-20e55d1f10b1/scratchpad/dod/fixture-L2crdk",
+        "--run-path",
+        "D.1",
+        "--env",
+        "{input}"
+      ],
+      "ran_at": "2026-09-24T20:21:42.494Z"
+    }
+  ],
+  "totals": {
+    "executed": 47,
+    "reproduced": 5
+  },
+  "updated_at": "2026-09-24T20:21:44.839Z"
+}

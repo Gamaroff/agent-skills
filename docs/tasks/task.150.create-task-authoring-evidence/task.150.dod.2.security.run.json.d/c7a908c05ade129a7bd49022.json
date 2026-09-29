@@ -1,0 +1,18 @@
+{
+  "sink": "template-render",
+  "entry": ".observation-log-test-tmp/dod2-probe/adapter.mjs#preflightTitle",
+  "name": "preflightTitle",
+  "call_site": "shared/resources/card-preflight.js:115",
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 27,
+  "passed": 20,
+  "reproduced": 7,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-28T20:21:01.691Z"
+}

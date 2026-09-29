@@ -1,0 +1,22 @@
+{
+  "sink": "path",
+  "entry": "cli:.claude/state/t152-fvc-wrapper.mjs",
+  "name": "fill-verification-complete.sh VERDICT",
+  "call_site": "shared/resources/fill-verification-complete.sh:38",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 16,
+  "passed": 16,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": [
+    "{fixture}",
+    "verdict",
+    "{input}"
+  ],
+  "ran_at": "2026-09-26T20:24:26.168Z"
+}

@@ -1,0 +1,58 @@
+schema: 1
+task: 'task.151.review-verifies-claimed-properties'
+task_title: 'review-task: stack-neutral pre-pass, executed invariants, released-shape diff'
+gate: CONCERNS
+status_reason: 'All 4 phases and 15 success criteria verified; one medium high-confidence bug from the diff review (CR-1: a concepts file with no H2s reads as source architecture with empty lists) enters the queue under code_review_blocking.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T15:47:26Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/prepass-axes.js'
+    finding: 'deriveAxes returns source "architecture" with an empty domains/axes list when a concepts file exists but has no H2 headings; Agent B is then dispatched with blank slots.'
+    suggested_action: 'Treat an empty h2s() result like a missing file for that half (fallback list, source partial/fallback); add a no-H2 fixture test.'
+    suggested_owner: dev
+    bug_ref: 'task.151.bug.1.empty-concepts-file-reads-as-architecture.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 22
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 5
+    notes: 'Boundary rule fired (SC2 says "never"); the helper argv parser probed via the cli form, 7 cases, 5 executed, verdict engages. Two cases errored in the harness (empty string, --arch=/etc); both exit 2 when run directly. Read-only helper, no network, no writes.'
+  performance:
+    status: PASS
+    notes: 'Helper reads at most 2 files; test files run in 749 ms and 130 ms.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 (empty concepts file reads as architecture) and CR-2 (any read error collapses to fallback) — silent degradation of the pre-pass source signal.'
+  maintainability:
+    status: PASS
+    notes: 'One fence parser reused (makeFenceTracker export), one item reader shared in tests/lib; checks named by obs citation; 15 mutation proofs.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 in deriveAxes and add a no-H2 fixture test.'
+      refs: ['shared/resources/prepass-axes.js', 'shared/resources/tests/prepass-axes.test.mjs']
+  future:
+    - action: 'CR-2: fall back only on ENOENT; CR-3: accept 0–3 leading spaces and tab after ##; CR-5: FALLBACK_AXES duplicates axes 3–4 wording; CR-4: correct the hand-run 2 grep claim for "bug".'
+      refs: ['shared/resources/prepass-axes.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

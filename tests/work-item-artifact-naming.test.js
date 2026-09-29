@@ -262,54 +262,68 @@ function collectDocumentsWithFrontmatter() {
   return out;
 }
 
+// The reader is `checkUpdatedCoherence` in change-log.js — the same function
+// qa-task Step 12b and qa-story Review Completion 3e run on the document they
+// just edited (task.149), so this corpus guard and the QA read-back cannot
+// disagree. It reads rows through `extractEntries`, the write path's own
+// classifier, so a fenced EXAMPLE log beside a real one (the engine's test F) is
+// never read as history. It replaced a private reader here that took the FIRST
+// heading containing "Change Log" — a fenced example on task.42, a "Breaking
+// Change 1: … Change Log row" heading on task.44 — found no rows under it, and
+// skipped both documents: 130 checked before the switch, 132 after, 0 offenders
+// either way.
+const { checkUpdatedCoherence } = require(
+  path.join(REPO_ROOT, "shared", "resources", "change-log.js"),
+);
+
 /**
- * The dates of the rows in a document's Change Log, or null when it has none.
- *
- * Scoped to the Change Log SECTION and stripped of fenced blocks before the rows
- * are read. Both matter: documents carry other dated tables, and the change-log
- * engine's own corpus includes documents with a fenced EXAMPLE log beside a real
- * one (its test F covers exactly that). A naive scan for `| YYYY-MM-DD |` across
- * the whole file would read an illustration as history.
+ * An INDEPENDENT witness for the reader above (TASK-149 CR-7). §5 reads through
+ * the same `checkUpdatedCoherence` the QA read-back runs, so the two cannot
+ * disagree — which also means a Change Log that reader fails to see reads
+ * `no-log` in both and is skipped by both. This does not share its matcher: a
+ * heading NAMING "Change Log", outside fenced blocks, followed by a dated table
+ * row before the next heading. It only has to be right about "there is a log
+ * here" for the documents the engine calls log-less.
  */
-function changeLogRowDates(text) {
-  const heading = text.match(/^(#{2,3})\s+.*Change Log.*$/m);
-  if (!heading) return null;
-  const level = heading[1].length;
-  const start = heading.index + heading[0].length;
-  const rest = text.slice(start);
-  // Stop at the next heading of the same or higher level.
-  const next = rest.search(new RegExp(`^#{1,${level}}\\s`, "m"));
-  const section = (next === -1 ? rest : rest.slice(0, next)).replace(
-    /```[\s\S]*?```/g,
-    "",
-  );
-  return [...section.matchAll(/^\|\s*(\d{4}-\d{2}-\d{2})\s*\|/gm)].map(
-    (m) => m[1],
-  );
+function looksLikeAChangeLog(text) {
+  const lines = text.split(/\r?\n/);
+  let fence = null;
+  let inLog = false;
+  for (const line of lines) {
+    const f = line.match(/^\s*(`{3,}|~{3,})/);
+    if (f) {
+      if (fence === null) fence = f[1][0];
+      else if (f[1][0] === fence) fence = null;
+      continue;
+    }
+    if (fence !== null) continue;
+    if (/^#{1,6}\s/.test(line))
+      inLog = /^#{2,3}\s+(\d+\.\s*)?Change Log\b/i.test(line);
+    else if (inLog && /^\|\s*\d{4}-\d{2}-\d{2}/.test(line)) return true;
+  }
+  return false;
 }
 
 test("§5 no Change Log row is dated after its document's frontmatter `updated:`", () => {
   const docs = collectDocumentsWithFrontmatter();
   const offenders = [];
+  const unseen = [];
   let checked = 0;
 
   for (const file of docs) {
     const text = fs.readFileSync(file, "utf8");
-    const fm = text.match(/^---\n([\s\S]*?)\n---\n/);
-    if (!fm) continue;
-    const rows = changeLogRowDates(text);
-    if (!rows || rows.length === 0) continue;
-    const updated = (fm[1].match(/^updated:\s*['"]?(\d{4}-\d{2}-\d{2})/m) ||
-      [])[1];
-    // A log with no `updated:` at all is an OKF gap the review-* skills already
-    // enforce as Critical; not this guard's job, and flagging it here would
-    // report one defect as another.
-    if (!updated) continue;
+    if (!/^---\n[\s\S]*?\n---\n/.test(text)) continue;
+    const r = checkUpdatedCoherence(text);
+    // `no-log` and `no-updated` are not this guard's job: a log with no
+    // `updated:` at all is an OKF gap the review-* skills already enforce as
+    // Critical, and flagging it here would report one defect as another.
+    if (r.reason === "no-log" && looksLikeAChangeLog(text))
+      unseen.push(path.relative(REPO_ROOT, file));
+    if (r.reason === "no-log" || r.reason === "no-updated") continue;
     checked++;
-    const newest = rows.slice().sort().pop();
-    if (newest > updated) {
+    if (!r.ok) {
       offenders.push(
-        `${path.relative(REPO_ROOT, file)} — newest row ${newest} > updated: ${updated}`,
+        `${path.relative(REPO_ROOT, file)} — newest row ${r.newest} > updated: ${r.updated}`,
       );
     }
   }
@@ -324,6 +338,14 @@ test("§5 no Change Log row is dated after its document's frontmatter `updated:`
     `only ${checked} documents with a Change Log AND an \`updated:\` were ` +
       `examined (of ${docs.length} documents scanned) — the scan is broken, ` +
       "not the corpus clean",
+  );
+
+  assert.deepEqual(
+    unseen,
+    [],
+    "checkUpdatedCoherence reads these as having no Change Log, but a " +
+      "'Change Log' heading with dated rows is there — the shared reader is " +
+      "blind to it, so neither this guard nor the QA read-back checks it",
   );
 
   assert.deepEqual(

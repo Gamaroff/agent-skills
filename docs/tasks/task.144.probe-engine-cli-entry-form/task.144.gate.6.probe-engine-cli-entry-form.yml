@@ -1,0 +1,52 @@
+schema: 1
+task: 'task.144.probe-engine-cli-entry-form'
+task_title: 'security-probe: a cli: entry form, so a multi-flag Node CLI''s boundary can be executed instead of declared unverifiable'
+gate: PASS
+status_reason: 'Gate 5 CR-1 and CR-2 are fixed and verified: a named re-run prints no warning (replayed, 0 warnings), the four engine comments are corrected, and the fixes are mutation-proved. The cycle 6 review raised no gating finding; its three low items are advisory and recorded under future.'
+reviewer: 'QA Engineer'
+updated: '2026-09-23T19:24:18Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 85
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    notes: 'The --argv validator engages 17 of 17 through the cli: form (task.144.qa.6.security.run.json). The cli tests pass 19 of 19 under TMPDIR=/tmp. node stays off SAFE_COMMANDS.'
+  performance:
+    status: PASS
+    notes: 'One node spawn per case. The consumer run takes about 0.5 s.'
+  reliability:
+    status: PASS
+    notes: 'A crash, kill or timeout is errored. A --argv shape error exits 2 with no record. The record identity is --name, then the skeleton, and an unnamed differing replacement is reported.'
+  maintainability:
+    status: PASS
+    notes: 'Helpers are shared with the shell arm. Two population tests (routing and identity) have non-vacuity floors. Fast gate: 3967 pass, 0 fail.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (low/medium): the identity population test scans only .md sources. Add security-probe.mjs comment blocks so the engine''s own statements of the cli: key are enumerated.'
+      refs: ['shared/resources/tests/probe-boundary-signals.test.mjs']
+    - action: 'CR-2 (cleanup): store the normalised (trimmed) name in toRecordEntry so the block, the warning and the key read one value.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-3 (cleanup): say in probe-boundary-rule.md §5 that --name is trimmed before keying.'
+      refs: ['shared/resources/probe-boundary-rule.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

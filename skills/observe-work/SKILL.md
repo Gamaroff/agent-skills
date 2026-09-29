@@ -205,6 +205,12 @@ the literal `none` is correct where the target belongs to no family, and it is a
 rather than a missing one. There is deliberately **no `--id` flag**; ids are always derived, and the
 call rejects one.
 
+**A date, a duration or a count in the Issue is measured before it is written, and the command
+that measured it is named in the text** — `git log --date=short -- <path>`, a file's mtime, a
+test's own count. "Months later" or "for a long time" with no instrument behind it is a composed
+figure, and a review that stages a rule from this entry will carry it into the skill as the rule's
+worked example (obs #160).
+
 **Before writing, look for the entry that already says this.** `--siblings-checked` asks about
 sibling *skills*; nothing in it asks about prior *entries*, and the same tracker-comment defect was
 written eight times in five days by sessions that each phrased it afresh (#66, #70, #75, #78, #80,
@@ -321,7 +327,7 @@ command node references/observation-log.js <command> --json
 | Write an observation | `command node references/observation-log.js write --title … --skill … --siblings-checked … --body-file … --json` |
 | Write past a `possible-duplicate` you have judged distinct | `… write … --not-duplicate-of 12,34 --json` |
 | Checkpoint with nothing to log | `command node references/observation-log.js checkpoint --note "no observations" --json` |
-| Resolve one | `command node references/observation-log.js set-status --id N --status actioned --resolution … --json` |
+| Resolve one | `command node references/observation-log.js set-status --id N --status actioned --resolution … --expect-status open --json` (the status you read; `status-changed` / `ambiguous-id` → report, do not retry) |
 | Sweep resolved entries | `command node references/observation-log.js archive --json` |
 | Audit a skill family | `command node references/observation-log.js families --audit --json` |
 

@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "template-render",
+      "entry": "cli:shared/resources/security-probe.mjs",
+      "name": "security-probe --argv template validator",
+      "call_site": "shared/resources/security-probe.mjs:parseArgvTemplate",
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 17,
+      "passed": 17,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--sink",
+        "url-authority",
+        "--entry",
+        "cli:shared/resources/tests/fixtures/security-probe/cli-refuser.mjs",
+        "--argv",
+        "{input}",
+        "--cases-file",
+        "/private/tmp/claude-501/-Users-gamaroff-Development-Projects-agent-skills/50378fe1-a53a-4d7f-a95b-801375970fa0/scratchpad/inner-cases.json"
+      ],
+      "ran_at": "2026-09-23T19:22:05.766Z"
+    }
+  ],
+  "totals": {
+    "executed": 17,
+    "reproduced": 0
+  },
+  "updated_at": "2026-09-23T19:22:05.766Z"
+}

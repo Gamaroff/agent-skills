@@ -411,6 +411,21 @@ sections above it are for humans. Four rules, each of which has a way of going w
 `truncated_count` is the **sum** of the two lenses' counts. The rendered omitted-count note in Step 6
 stays as it is — this field is the machine-readable half of the same fact, not a replacement for it.
 
+**Check the report's links before leaving this step** (only when a file was written — with no work item resolved there is nothing to check). CI's `docs-link-check` reads every changed
+`docs/**/*.md` — a PR review report as much as the document beside it — and a quoted finding that contains a
+bracket-paren shape renders as a live link (task.139 run 2 went red on two QA reports; task.152,
+obs #155). The engine resolves against the git index, so a sibling this run wrote reads as dead
+until it is staged — stage first:
+
+```bash
+git add "{work-item-dir}/{prefix}.pr-review.{n}.{name}.md"
+node .agents/skills/review-pr/references/doc-links.js --file "{work-item-dir}/{prefix}.pr-review.{n}.{name}.md"
+```
+
+Exit 1 → fix the quotation (put it in a fence, or break the `[..](..)` shape so it no longer reads
+as a link) and re-run until it exits 0. Exit 2 is a usage error: fix the call. `git add` only
+stages — the pipeline commits these files next anyway, and staging is reversible.
+
 ### Step 8 — `--comment` (optional)
 
 **One** summary comment, idempotent via the marker `<!-- agent-skills-pr-review -->`, using the find-by-marker → edit-by-id → else-create recipe from `finalise` — the only dual-platform idempotent PR comment in this repo.

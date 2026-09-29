@@ -1,0 +1,96 @@
+schema: 1
+task: 'task.152.finalise-gaps-path-and-artifact-links'
+task_title: 'finalise: bug-mode gaps path and co-located artifacts in 8a and link guard'
+gate: FAIL
+status_reason: 'CI is red on the PR: the implementation report quotes the task.139 link shape unfenced, and both link-check and the new artifact corpus guard fail on it (HIGH). The seven phases are otherwise delivered and mutation-proved, and the new admission predicate engages under 37 executed probes. Three medium findings also remain: the qa-story writer check stages a gate file that does not exist yet, the bug-mode 8.5 post-condition cannot see a missing gap list, and the evaluator omits sprint-review summaries that CI and the new corpus guard both check.'
+reviewer: 'QA Engineer'
+updated: '2026-09-26T20:40:00Z'
+
+top_issues:
+  - id: QA-2
+    severity: high
+    file: 'docs/tasks/task.152.finalise-gaps-path-and-artifact-links/task.152.implementation.1.finalise-gaps-path-and-artifact-links-initial-run.md'
+    finding: 'The Step 3 behavioural-evidence line quotes the task.139 shape inline, so its second bracket-paren span renders as a live relative link to b.md; CI link-check and the new artifact corpus guard both fail on it (PR #495 checks link-check and test red). Step 3 ran green only because the report was untracked then.'
+    suggested_action: 'Put the quotation in a fence (the task Notes already say so), re-run doc-links.js --file on the report, and confirm the artifact corpus test passes.'
+    suggested_owner: dev
+    status: open
+  - id: CR-1
+    severity: medium
+    file: 'skills/qa-story/SKILL.md'
+    finding: 'The Output 1 writer check runs `git add` on the QA report and the gate together, but qa-story writes the gate later (Output 2 / qa-gate); `git add` on a missing path is fatal and stages nothing, so doc-links.js runs against an index without the report.'
+    suggested_action: 'Stage the report alone in Output 1 (or add the gate only when it exists), and state where the gate link becomes resolvable; keep the population test asserting stage-before-check.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'In bug mode 8.5 reads the whole `## Step 5: Acceptance Decision` section, which the template always fills (Decision, QA record, CI rollup), so `[ -n "$GAP_REPORT_BODY" ]` passes when 8.1 never wrote any `- [ ]` gap line and the comment posts with GAP_COUNT=0.'
+    suggested_action: 'In the bug branch require GAP_COUNT > 0 (or the Outcome placeholder gone) before posting, and add a zero-gap fixture to the executed 8.5 bug-mode test.'
+    suggested_owner: dev
+    status: open
+  - id: QA-1
+    severity: medium
+    file: 'shared/resources/finalise-fix-and-recheck.mjs'
+    finding: '`WORK_ITEM_ARTIFACT_RE` omits `sprint-review-summary`, which the corpus guard''s `ARTIFACT_RE` includes: `isCoLocatedArtifact` refuses the 117 tracked sprint-review summaries CI link-checks (one is already pinned dead), and — pre-existing on develop — `isWorkItemDocument` accepts one as a work-item document. Two enumerations of one set, already disagreeing.'
+    suggested_action: 'Add `sprint-review-summary` to `WORK_ITEM_ARTIFACT_RE` and hold the two regexes in agreement with a test (or one shared definition), with a refusal test for a sprint-review summary as documentPath.'
+    suggested_owner: dev
+    status: open
+  - id: CR-5
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The new 8.3 bug-mode block guards only DOC_FILE; an unsubstituted `--status "{…}"` would be written as a literal row, and `{N}` in the notes names both the gap count and the DoD run number.'
+    suggested_action: 'Bind STATUS and the DoD filename as variables under the same `*''{''*` guard, and rename the gap-count placeholder.'
+    suggested_owner: dev
+    status: open
+  - id: CR-7
+    severity: low
+    file: 'shared/resources/tests/doc-links.test.mjs'
+    finding: 'The artifact corpus test asserts a 10-second wall clock, a timing gate that can flake on a loaded runner with no code change (this repo already carries two load-flaky suites).'
+    suggested_action: 'Drop the in-test timing assertion; the measured time belongs in the implementation report, as the success criterion says.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 4263
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [2, 4, 6]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 37
+    notes: 'isCoLocatedArtifact engages: 37 cases executed (11 path-sink corpus inputs grafted onto the document directory, 17 named refusals, 9 legitimate artifacts), 0 reproduced, 0 over-blocked. Record: task.152.qa.1.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Artifact corpus walk ~2.0 s over 1,000+ files; no network.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA-2 (CI red), CR-1 (writer check stages a not-yet-written file) and CR-2 (bug-mode 8.5 post-condition is vacuous).'
+  maintainability:
+    status: CONCERNS
+    notes: 'QA-1: two regexes enumerate the same artifact set and already disagree.'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA-2 (CI red), CR-1, CR-2 and QA-1; fold in CR-5 and CR-7.'
+      refs: ['docs/tasks/task.152.finalise-gaps-path-and-artifact-links/task.152.implementation.1.finalise-gaps-path-and-artifact-links-initial-run.md', 'skills/qa-story/SKILL.md', 'skills/finalise/SKILL.md', 'shared/resources/finalise-fix-and-recheck.mjs', 'shared/resources/tests/doc-links.test.mjs']
+  future:
+    - action: 'CR-3: finalise still calls several engines as bare `node references/…` (7.3 status-history, the `done` and board-warning LEADs, tracker calls, fix-and-recheck); convert them together with a population check.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'CR-4: sync-jira-bug writes Status History through the module API in lowercase; normalise there so both writers agree (module API was out of scope for task.152).'
+      refs: ['skills/sync-jira-bug/scripts/sync-jira-bug.js']
+    - action: 'CR-6: status-history.js reports an unreadable --file as `usage`; consider a distinct reason.'
+      refs: ['shared/resources/status-history.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['QA-2 fixed and CI green', 'CR-1, CR-2 and QA-1 fixed']

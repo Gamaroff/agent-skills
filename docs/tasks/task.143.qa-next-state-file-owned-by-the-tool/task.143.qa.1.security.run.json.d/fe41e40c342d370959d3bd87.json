@@ -1,0 +1,25 @@
+{
+  "sink": "path",
+  "entry": "cli:skills/qa-next/scripts/uat-status.mjs",
+  "name": "uat-status --env",
+  "call_site": null,
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 19,
+  "passed": 16,
+  "reproduced": 3,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": [
+    "--root",
+    "/private/tmp/claude-501/-Users-gamaroff-Development-Projects-agent-skills/01fabb89-eaf1-456d-b1d4-2c16d6fde72f/scratchpad/probe-root",
+    "--run-path",
+    "D.1",
+    "--env",
+    "{input}"
+  ],
+  "ran_at": "2026-09-24T04:53:54.907Z"
+}

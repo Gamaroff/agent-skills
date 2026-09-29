@@ -1,0 +1,18 @@
+{
+  "sink": "path",
+  "entry": ".claude/state/t152-dod-probe-wrapper.mjs#admitsForBug",
+  "name": "isCoLocatedArtifact (bug anchor)",
+  "call_site": "shared/resources/finalise-fix-and-recheck.mjs:109",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 8,
+  "passed": 8,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-26T20:24:11.974Z"
+}

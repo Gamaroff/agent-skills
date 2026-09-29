@@ -1,0 +1,61 @@
+schema: 1
+task: 'task.150.create-task-authoring-evidence'
+task_title: 'create-task: anchored claims, a bounded title, and a --from-observation entry'
+gate: PASS
+status_reason: 'Cycle 4 fixes verified: observe-work review Step 6 passes --expect-status and the flag is rejected outside set-status. No high or medium finding; the end-to-end park probe still engages (22 probes, 0 reproduced). Two low advisory findings carried as follow-ups.'
+reviewer: 'QA Engineer'
+updated: '2026-09-28T19:58:43Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 101
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 22
+    notes: 'task.150.qa.5.security.run.json: parkWrites engages 10/10, seedFromRealScan 12/12; 0 reproduced.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Both set-status callers now pass the write-time status check; ambiguous ids are refused engine-side.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory: CR5-1 (the Step 6 / quick-reference command hard-codes --expect-status open while its prose says to pass the status read), CR5-2 (create-task § 1.1 selects by a padded string prefix rather than the parsed number).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR5-1 (low/medium): use a <status-you-read> placeholder in observe-work review Step 6 and the SKILL.md quick-reference row instead of the literal open.'
+      refs: ['skills/observe-work/references/review-cycle.md', 'skills/observe-work/SKILL.md']
+    - action: 'CR5-2 (cleanup): § 1.1 step 2 should match the parsed numeric prefix, the rule findAllById and fileId use.'
+      refs: ['skills/create-task/SKILL.md']
+    - action: 'Carried from earlier cycles (advisory): cycle-1 CR-1 (bound measures frontmatter title not the published summary), CR-2 (H1 offered with its Technical Task prefix), CR-5 (tautological parity assertion), CR-6 (lib.js loads all of jira-sync.js); cycle-2 CR-5 (firstSentence stops at e.g.).'
+      refs: ['shared/resources/jira-sync.js', 'skills/create-task/scripts/lib.js', 'shared/resources/tests/card-preflight.test.mjs']
+    - action: 'Title check in the four sync-jira-* --check-card paths (task Open Question 2).'
+      refs: ['skills/sync-jira-task/scripts/sync-jira-task.js']
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-09-28'
+  total_iterations: 4
+  verification_method: 'Executed probes each cycle (seed on real scan output; whole park path through the real engine), committed mutation-proved tests, ci:fast.'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

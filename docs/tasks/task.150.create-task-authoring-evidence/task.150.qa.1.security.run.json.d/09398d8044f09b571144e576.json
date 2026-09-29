@@ -1,0 +1,18 @@
+{
+  "sink": "filename",
+  "entry": ".claude/state/t150-probe/wrapper.mjs#titleWithinBound",
+  "name": "titleWithinBound",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 5,
+  "passed": 5,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-28T19:07:09.566Z"
+}

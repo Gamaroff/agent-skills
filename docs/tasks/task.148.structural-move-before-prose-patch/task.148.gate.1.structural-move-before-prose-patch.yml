@@ -1,0 +1,64 @@
+schema: 1
+task: 'task.148.structural-move-before-prose-patch'
+task_title: 'qa-fix and the QA loop: offer a structural move before another prose patch'
+gate: CONCERNS
+status_reason: 'Two high-confidence MEDIUM code-review bugs promoted under code_review_blocking: the Step 3.5 population misses hand-authored skills/*/references/*.md, and the 5b offer snippet fails silently (empty output, rc 0) on a malformed HIGH sequence. All 36 new tests pass and every success criterion is met as written.'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T20:44:38Z'
+
+top_issues:
+  - id: 'TASK-148-CR-1'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'Step 3.5 row 1 population command covers skills/*/SKILL.md and shared/resources/*.md only and calls skills/*/references/ generated, but 70 of 478 tracked skills/*/references/*.md carry no AUTO-GENERATED marker and are hand-authored executed documents (e.g. develop-bug-step-5-6-verify-loop.md, which runs /qa-fix). The fixture test cannot see it: its references decoy is x.md, which the SKILL.md glob could never match.'
+    suggested_action: 'Include hand-authored skills/*/references/*.md in the population (e.g. add the glob and drop files carrying the AUTO-GENERATED marker); make the test decoy a generated file beside a hand-authored one that must count.'
+    suggested_owner: dev
+    bug_ref: 'task.148.bug.1.population-misses-hand-authored-references.md'
+  - id: 'TASK-148-CR-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The offer snippet runs JSON.parse on HIGH_SEQUENCE_JSON outside the engine guard; an empty or malformed value makes node throw, NARROWING_JSON and NARROWING_SIGNAL come back empty with rc 0, so "could not look" reads the same as "no offer" and high-counts-missing never fires (reproduced with HIGH_SEQUENCE_JSON="").'
+    suggested_action: 'Parse inside a try and pass the raw value through so the engine returns high-counts-missing; state a branch for an empty NARROWING_JSON that logs "engine did not run".'
+    suggested_owner: dev
+    bug_ref: 'task.148.bug.2.offer-snippet-silent-on-bad-input.md'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 109
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — classifyNarrowingResidue returns a verdict, but its input is gate YAML the pipeline''s own QA step writes and its verdict only decides whether an advisory prompt block is appended; no corpus sink (url-authority, sql-orm, shell-exec, path, template-render, filename) applies. No new trust boundary; inputs never reach a shell.'
+  performance:
+    status: PASS
+    notes: 'Pure predicate; 109 tests in 0.36s.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-2: the offer snippet fails silently on malformed input.'
+  maintainability:
+    status: PASS
+    notes: 'Single-statement menu held by a test; every rule mutation-proved.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (population) and CR-2 (silent snippet failure).'
+      refs: ['skills/qa-fix/SKILL.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+  future:
+    - action: 'Advisory code-review findings CR-3 to CR-7 (see QA report): the "population above 1 is the consolidate move" wording vs Step 2.6 "forbids nothing"; the snippet inputs being bound only in a prose table; no Probe:/Narrowing residue slot in the Step 7 fix-summary template; the doubled "Narrowing residue:" prefix; the not-a-route pins being weaker than claimed.'
+      refs: ['skills/qa-fix/SKILL.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/tests/qa-loop-route.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed']

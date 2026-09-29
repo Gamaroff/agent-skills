@@ -1,0 +1,69 @@
+schema: 1
+task: 'task.143.qa-next-state-file-owned-by-the-tool'
+task_title: 'qa-next: uat-status.mjs owns the run state file, so its contract is held by tests instead of prose'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes verified: TASK-143-BUG-1 FIXED (refuse-any + exclusive lock, 8-process race test). TASK-143-BUG-2 PARTIAL: its fix introduced two heuristics (Last run, mtime) that misfire on v0.51.0 early exits and refreshed mtimes (TASK-143-BUG-3, refute pass). One stale doc comment (LOW).'
+reviewer: 'QA Engineer'
+updated: '2026-09-24T05:16:00Z'
+
+top_issues:
+  - id: 'TASK-143-BUG-3'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'The legacy priorRuns own-file exclusions added in cycle 1 misfire: Last run from recorded on names the PREVIOUS run after a v0.51.0 na/blocked early exit (no --run), and mtime >= startedAt depends on a hand-written startedAt and on mtimes a checkout can refresh (refute pass CR-2 + CR-3, verified).'
+    suggested_action: 'Identify the own file by the run-file name: v0.51.0 wrote one runs/<id>/<date>-<env>.md per date, so exclude files dated on or after the run start date; mark priorRuns unverifiable when startedAt does not parse.'
+    suggested_owner: dev
+    bug_ref: 'task.143.bug.3.legacy-own-file-heuristics-misfire.md'
+  - id: 'TASK-143-QA2-2'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'The header usage comment still says --state-init exits 5 only when --item names another item, the behaviour cycle 1 removed (refute pass CR-4).'
+    suggested_action: 'Reword to exit 5 run-in-progress whenever a state file exists.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 58
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 19
+    notes: 'cli: probe re-run on the fixed tool (task.143.qa.2.security.run.json): unchanged from cycle 1. All path/sequence/two-digit/empty cases rejected, all legitimate labels accepted, newline/CR/tab accepted. Pre-existing (identical on develop), routed to recommendations.future.'
+  performance:
+    status: PASS
+    notes: 'qa-next suite 58 tests in 28.6s; no network calls.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-143-BUG-3 in the legacy resume path. Cross-run --state-set after an operator clears a live lock (CR-1, advisory) routed to future.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory cleanups: redundant -NN label check now subsumed by the built-name check (CR-5); stateView walks runs/ and parses the registry twice on a legacy read (CR-6).'
+
+bug_resolution:
+  TASK-143-BUG-1: 'FIXED — verified by the refuse-any, exclusive-create and 8-process concurrency tests'
+  TASK-143-BUG-2: 'PARTIAL — own file now excluded when runFile is null, via heuristics that misfire (TASK-143-BUG-3)'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-143-BUG-3 and the stale header comment.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+  future:
+    - action: 'Refuse control characters in --env labels (pre-existing; probe-reproduced).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Make --state-set confirm it still owns the lock (e.g. a startedAt token), so a writer whose lock was cleared cannot change the next run (CR-1).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-143-BUG-3 fixed']

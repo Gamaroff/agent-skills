@@ -1,0 +1,24 @@
+schema: 1
+task: "task.SYNTH.medium-no-file"
+gate: CONCERNS
+status_reason: "One MEDIUM names no `file:`. The narrowing signal needs positive evidence, so it must not fire."
+reviewer: "QA Engineer"
+updated: "2026-09-25T12:00:00Z"
+
+top_issues:
+  - id: "NF-001"
+    severity: medium
+    file: "skills/example/SKILL.md"
+    finding: "Named, correctly filed."
+    suggested_owner: dev
+    status: open
+  - id: "NF-002"
+    severity: medium
+    finding: "No file named. A reader cannot tell whether this is the same mechanism."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80

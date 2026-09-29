@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "template-render",
+      "entry": ".observation-log-test-tmp/dod3-recheck/adapter.mjs#preflightTitle",
+      "name": "preflightTitle",
+      "call_site": "shared/resources/card-preflight.js:133",
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 32,
+      "passed": 32,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-28T20:58:44.621Z"
+    },
+    {
+      "sink": "filename",
+      "entry": ".observation-log-test-tmp/dod3-probe/adapter.mjs#seedSelection",
+      "name": "seedSelection",
+      "call_site": "skills/create-task/scripts/lib.js:308",
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 27,
+      "passed": 27,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-28T20:46:15.581Z"
+    },
+    {
+      "sink": "filename",
+      "entry": ".observation-log-test-tmp/dod3-probe/adapter.mjs#setStatusGuard",
+      "name": "setStatusGuard",
+      "call_site": "shared/resources/observation-log.js:1060",
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 21,
+      "passed": 21,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-28T20:46:18.168Z"
+    },
+    {
+      "sink": "template-render",
+      "entry": ".observation-log-test-tmp/dod3-recheck/adapter.mjs#corpusRatchetTitle",
+      "name": "corpusRatchetTitle",
+      "call_site": "shared/resources/tests/card-preflight-corpus.test.mjs:146",
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 32,
+      "passed": 32,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "ran_at": "2026-09-28T20:58:29.976Z"
+    }
+  ],
+  "totals": {
+    "executed": 112,
+    "reproduced": 0
+  },
+  "updated_at": "2026-09-28T20:58:44.621Z"
+}

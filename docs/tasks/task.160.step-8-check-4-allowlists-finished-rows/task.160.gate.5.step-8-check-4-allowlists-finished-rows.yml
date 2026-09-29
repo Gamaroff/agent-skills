@@ -1,0 +1,78 @@
+schema: 1
+task: 'task.160.step-8-check-4-allowlists-finished-rows'
+task_title: 'Step 8 check 4 allowlists finished rows instead of denying two unfinished ones'
+gate: CONCERNS
+status_reason: 'CR4-1..3 fixed and test-held. The refute found the step-8 rule overreaches in the other direction: /finalise moves the lock to 8 before Step 7 tail work finishes, so "re-run Step 8 whatever the rows read" can skip an unfinished Step 7. Wording fixes, no new mechanism.'
+reviewer: 'QA Engineer'
+updated: '2026-09-27T15:01:36Z'
+
+top_issues:
+  - id: 'CR5-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: '/finalise advances the lock to 8 as its last action (finalise SKILL.md § Pipeline Lock Cooperation; advance-pipeline-lock.sh "finalise) NEXT=8"), before the orchestrator finishes Step 7''s tail (Post DoD Body to PR, Tracker Issue Update, Step 7 Completion Checklist). A pause there leaves a record at step 8, and the contract''s "re-run Step 8 … whatever the row reads" (and the three SKILL.md exceptions) skips the unfinished Step 7 work. Step 8''s report update then marks Step 7 ✅.'
+    suggested_action: 'Scope the rule to the one row it overrides: a record at step 8 means the Step 8 row is not evidence, so resume from the first row that is not finished (rows 1–7 read as before) and otherwise Step 8. Never skip an unfinished Step 7.'
+    suggested_owner: dev
+  - id: 'CR5-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The record is named as the restored lock, the halt snapshot or the orphaned claim; the SKILL.md exceptions name the restored lock or the snapshot. A lock that survived at step 8 (a crash, or the hook not installed; Step 0-lock prints "lock present — nothing to restore") is not covered as written, so the ✅ Step 8 row reads as done.'
+    suggested_action: 'Name the lock''s current_step whether restored or surviving, in the contract and in the three exceptions.'
+    suggested_owner: dev
+  - id: 'CR5-3'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-8-commit.md'
+    finding: '"A HALT anywhere in Step 8 leaves none either" is false for a HALT whose report fails lint: the HALT rule then skips its /commit-changes call, so the lock survives at 8 and the snapshot records step 8.'
+    suggested_action: 'Narrow to HALTs whose commit ran /commit-changes; a lint-failed HALT keeps the record.'
+    suggested_owner: dev
+  - id: 'CR5-4'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md'
+    finding: 'The re-invocation path''s Shared Resume Logic still says "identify the last ✅ step … before skipping it" with no pointer to the step-8 rule, one of the resume entry points the rule has to reach.'
+    suggested_action: 'Point Shared Resume Logic at the resume-contract step-8 rule.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 78
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 21
+    notes: 'Probe on 66d7802d: 12 hostile refused, 9 legitimate admitted, engages. Record: task.160.qa.5.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'The resume-scope regression (CR5-1) is carried in top_issues.'
+  maintainability:
+    status: PASS
+    notes: 'Unchanged.'
+
+recommendations:
+  immediate:
+    - action: 'CR5-1/2: scope the step-8 rule to the Step 8 row, never past an unfinished row 1–7; name the lock whether restored or surviving.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md']
+    - action: 'CR5-3/4: narrow the HALT sentence; point step-0 Shared Resume Logic at the rule.'
+      refs: ['shared/resources/develop-pipeline-step-8-commit.md', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+  future:
+    - action: 'Carried: the pre-existing post-commit window (a284dfdd) and the detector recommending step 9 — follow-up task.'
+      refs: ['shared/resources/advance-pipeline-lock.sh', 'shared/resources/pipeline-resume-detector-prompt.md']
+    - action: 'CR-5 (cleanup): the lifecycle test''s final lock-absent assertion is redundant (the helper already removed it).'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR5-1..4 fixed']

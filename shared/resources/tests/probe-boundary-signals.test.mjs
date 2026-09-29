@@ -225,3 +225,132 @@ test("every site that names the JS entry form also names the shell entry form", 
     `only ${sites} site(s) name the JS entry form — the pattern no longer matches`,
   );
 });
+
+test("every site that routes a non-JS entry names the cli: form too (task.144 CR-1)", () => {
+  // The contract test above keys on sites that spell the JS `--entry` form, and
+  // review-security's SKILL.md routes non-JS entries in prose without ever
+  // spelling it — so when task.144 added `cli:`, that site kept saying `shell:`
+  // was the only route and "two positionals" the decline, and nothing noticed.
+  // This population is keyed on the ROUTING statement itself (the same
+  // predicate the BUG-10 test counts), so a site that routes non-JS entries
+  // cannot omit the form a multi-flag Node CLI takes. It is checked PER BLOCK —
+  // a paragraph or a list item — not per file: a file-level check passes a
+  // stale routing sentence as long as `cli:` appears anywhere else in the same
+  // file, which is every one of these files once any of them is correct (QA
+  // cycle 2, CR-4).
+  const files = [];
+  for (const f of readdirSync(join(REPO_ROOT, "shared/resources"))) {
+    if (f.endsWith(".md")) files.push(`shared/resources/${f}`);
+  }
+  for (const d of readdirSync(join(REPO_ROOT, "skills"))) {
+    files.push(`skills/${d}/SKILL.md`);
+  }
+  const routesNonJs = (t) =>
+    /shell:/.test(t) && /non-JS|not JS|bash script/i.test(t);
+  // A block ends at a blank line or where the next list item begins. A
+  // fenced block is skipped whole: a routing rule is prose, and a command
+  // inside a fence is an example of one form, not a statement of the routes.
+  const blocksOf = (text) => {
+    const blocks = [];
+    let cur = [];
+    let fenced = false;
+    const flush = () => {
+      if (cur.length) blocks.push(cur.join("\n"));
+      cur = [];
+    };
+    for (const line of text.split("\n")) {
+      if (/^\s*```/.test(line)) {
+        flush();
+        fenced = !fenced;
+        continue;
+      }
+      if (fenced) continue;
+      if (line.trim() === "" || /^\s*(?:\d+\.|[-*])\s/.test(line)) flush();
+      if (line.trim() !== "") cur.push(line);
+    }
+    flush();
+    return blocks;
+  };
+  const missing = [];
+  let sites = 0;
+  for (const rel of files) {
+    let text;
+    try {
+      text = read(rel);
+    } catch {
+      continue;
+    }
+    for (const [i, block] of blocksOf(text).entries()) {
+      if (!routesNonJs(block)) continue;
+      sites += 1;
+      if (!/cli:/.test(block))
+        missing.push(`${rel} (block ${i + 1}: ${block.slice(0, 80)}…)`);
+    }
+  }
+  assert.deepEqual(
+    missing,
+    [],
+    "these sites route a non-JS entry but never name cli: — a multi-flag Node CLI has no route from them",
+  );
+  assert.ok(
+    sites >= 5,
+    `only ${sites} routing block(s) found — the predicate no longer matches`,
+  );
+});
+
+test("every block that states a cli: control's record identity names --name (task.144 QA cycle 4, CR-3)", () => {
+  // The cli: record key changed three times in QA — whole template, guarded
+  // flag, skeleton — and each time a site that described it was left stating
+  // the previous rule (the finalise prompt still said "a different template is
+  // a different control" after two changes). The identity is now the caller's
+  // --name, with a derived fallback; a block that describes cli: identity
+  // without naming --name is describing a superseded rule.
+  const files = [];
+  for (const f of readdirSync(join(REPO_ROOT, "shared/resources"))) {
+    if (f.endsWith(".md")) files.push(`shared/resources/${f}`);
+  }
+  for (const d of readdirSync(join(REPO_ROOT, "skills"))) {
+    files.push(`skills/${d}/SKILL.md`);
+  }
+  const KEY =
+    /identity|keyed on|record key|control in the record|replaces (?:only )?its own entry|one entry per|its own control/i;
+  const blocksOf = (text) => {
+    const blocks = [];
+    let cur = [];
+    const flush = () => {
+      if (cur.length) blocks.push(cur.join("\n"));
+      cur = [];
+    };
+    for (const line of text.split("\n")) {
+      if (line.trim() === "" || /^\s*(?:\d+\.|[-*]|```)\s?/.test(line)) flush();
+      if (line.trim() !== "") cur.push(line);
+    }
+    flush();
+    return blocks;
+  };
+  const missing = [];
+  let sites = 0;
+  for (const rel of files) {
+    let text;
+    try {
+      text = read(rel);
+    } catch {
+      continue;
+    }
+    for (const [i, block] of blocksOf(text).entries()) {
+      if (!/cli:/.test(block) || !KEY.test(block)) continue;
+      sites += 1;
+      if (!/--name/.test(block))
+        missing.push(`${rel} (block ${i + 1}: ${block.slice(0, 80)}…)`);
+    }
+  }
+  assert.deepEqual(
+    missing,
+    [],
+    "these blocks state cli: record identity without --name",
+  );
+  assert.ok(
+    sites >= 7,
+    `only ${sites} block(s) state cli: identity — the predicate no longer matches`,
+  );
+});

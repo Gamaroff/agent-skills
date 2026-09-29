@@ -1,0 +1,70 @@
+schema: 1
+task: 'task.144.probe-engine-cli-entry-form'
+task_title: 'security-probe: a cli: entry form, so a multi-flag Node CLI''s boundary can be executed instead of declared unverifiable'
+gate: CONCERNS
+status_reason: 'Cycle 1 CR-1 is fixed and mutation-proved. The cycle 2 refute pass found that keying a cli: control on its whole argv template makes a re-run with any per-run path (a scratch --cases-file, a mkdtemp --root) add a second control: reproduced, 2 controls and executed 4 for one control run twice. Three sites also still state the old {sink, entry} identity.'
+reviewer: 'QA Engineer'
+updated: '2026-09-23T18:16:28Z'
+
+top_issues:
+  - id: QA-1
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'controlKey includes the whole cli: argv template, so a re-run whose template differs only in a per-run operand (an absolute --cases-file or --root path) records a second control instead of replacing the first; reproduced: one control run twice with two temp paths gives 2 controls and totals.executed 4, which overstates probes_executed and leaves the stale verdict in --emit-block. Raised by the refute reviewer as CR-1 (medium/medium), confirmed by execution.'
+    suggested_action: 'Key a cli: control on an identity that is stable across re-runs, namely the template shape with every absolute-path operand normalised, or better the guarded flag (the element before {input}) plus --name when given, and add a test where re-running with a different path operand replaces the entry.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: low
+    file: 'shared/resources/security-review-prompt.md'
+    finding: 'The record-identity contract changed for cli: controls, but security-review-prompt.md:168, review-security SKILL.md (lines 82, 90 and 122) and the engine comments at security-probe.mjs 1644, 1795 and 1838 still say one entry per {sink, entry} and that a re-run of the same {sink, entry} replaces its own.'
+    suggested_action: 'Update every site that states record identity to name the cli: key, using the identity chosen for QA-1.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 81
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    notes: 'The --argv validator was re-probed through the cli: form against the current engine (after the CR-3 refactor): it engages 17 of 17 (13 hostile refused, 4 legitimate accepted, 0 escapes). The record is task.144.qa.2.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1.'
+  reliability:
+    status: PASS
+    notes: 'QA-1 is a record-integrity defect and is tracked in top_issues. Crash, kill and timeout handling is unchanged.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle 1 population test and limits test are mutation-proved (both red on the reverted SKILL.md). Advisory: CR-4 notes the population test is file-level, not block-level.'
+
+recommendations:
+  immediate:
+    - action: 'QA-1: make the cli: control key stable across re-runs, and add a replace-on-re-run test.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+    - action: 'CR-2: update the {sink, entry} identity statements.'
+      refs: ['shared/resources/security-review-prompt.md', 'skills/review-security/SKILL.md', 'shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-3 (advisory): the caught-crash guidance is wrong. Under expected, a caught crash on a hostile case mismatches and scores as a reproduction (a false alarm, never a false pass), not as could-not-look. Correct the wording in probe-boundary-rule.md §5 and the engine header.'
+      refs: ['shared/resources/probe-boundary-rule.md', 'shared/resources/security-probe.mjs']
+    - action: 'CR-4 (advisory): the entry-form population test checks for cli: anywhere in the file; scope it to the routing paragraph or list item.'
+      refs: ['shared/resources/tests/probe-boundary-signals.test.mjs']
+    - action: 'CR-5 (advisory): for a materialised sink the cli: arm writes the case name into the fixture and declines a name carrying a slash. Document this, or skip the file when the name cannot be carried.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/probe-boundary-rule.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-1 and CR-2 fixed']

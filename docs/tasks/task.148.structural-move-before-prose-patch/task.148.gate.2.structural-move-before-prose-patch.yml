@@ -1,0 +1,64 @@
+schema: 1
+task: 'task.148.structural-move-before-prose-patch'
+task_title: 'qa-fix and the QA loop: offer a structural move before another prose patch'
+gate: CONCERNS
+status_reason: 'Cycle 2 refute pass. Both gate-1 findings are fixed and verified. One new high-confidence MEDIUM is promoted: the Step 3.5 documentation probe still triggers only on SKILL.md and shared/resources/*.md, although cycle 1 widened its population to hand-authored references. Two further MEDIUMs (CR-2 cwd-relative population; CR-4 unbound inputs read as a verdict) were reproduced by QA but returned at medium confidence, so they stay advisory.'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T21:04:07Z'
+
+top_issues:
+  - id: 'TASK-148-QA2-CR-1'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'Step 3.5 documentation-probe lead ("When the fix touches a SKILL.md or a shared/resources/*.md") was not widened when cycle 1 widened the population to hand-authored skills/*/references/*.md, so a fix editing only a hand-authored reference (e.g. develop-bug step documents) never triggers the probe or the Probe: block.'
+    suggested_action: 'Widen the trigger to every executed document the population covers; add a test holding the trigger set and the population set equal.'
+    suggested_owner: dev
+    bug_ref: 'task.148.bug.3.probe-trigger-narrower-than-population.md'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 115
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false, as in cycle 1. The predicate verdict gates only an advisory prompt block; its input is pipeline-written gate YAML; no corpus sink applies. Unchanged by cycle 1.'
+  performance:
+    status: PASS
+    notes: 'Pure predicate; unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'Advisory CR-2 and CR-4, reproduced by QA: a population run from a subdirectory returns 0 (the root run returns 5), and an unbound CYCLE reads as below-cycle-floor. Both are "could not look" states reported as verdicts.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle 1 fixes mutation-proved (8/8).'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-148-QA2-CR-1 (probe trigger).'
+      refs: ['skills/qa-fix/SKILL.md']
+  future:
+    - action: 'Advisory, reproduced by QA — take in the same cycle if possible: CR-2 (use :(top,glob) pathspecs; a population below 1 means the probe failed), CR-4 (map the could-not-look reasons and a non-integer cycle to NARROWING_SIGNAL=error). Others: CR-3 (skip the offer on a 5c REQUEST CHANGES re-entry), CR-5 (the prose says 5a binds values 5a does not bind), CR-6 (escaping rule for pasted blocks in FIX_SUMMARY), CR-7 (strip a :line suffix from file:), CR-8 (pin the marker to the header position), CR-9 (stale test header).'
+      refs: ['skills/qa-fix/SKILL.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/qa-diminishing-returns.js', 'tests/qa-fix-structural-move.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-148-QA2-CR-1 fixed']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-09-25'
+  total_iterations: 1
+  verification_method: 'Mutation-proved tests (8/8) + refute-pass review of the whole branch diff'

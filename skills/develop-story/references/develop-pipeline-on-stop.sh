@@ -80,7 +80,7 @@ fi
 #
 # `-gt 8`, not `-ge 8`. Under the corrected semantics `current_step: 8` means
 # "Step 8 (commit-changes) is still to run", and Step 8 signals completion by
-# REMOVING the lock (`advance-pipeline-lock.sh --complete`). So a lock that is
+# REMOVING the lock (the Completion Checklist's `advance-pipeline-lock.sh --complete`). So a lock that is
 # still present at 8 is a pipeline that has not committed yet — precisely the
 # state the hook exists to guard. `-ge 8` stopped guarding the final step, which
 # is the one whose omission leaves work uncommitted.
@@ -222,12 +222,81 @@ else
   fi
 fi
 
+# At Step 8 the thing to run is the whole step-8 doc, not /commit-changes alone: the lock
+# outlives the Step 8 commit (task 161), so a stop after it is still Step 8, and "invoke
+# /commit-changes" would send the orchestrator back to the one part already done
+# (task.161 QA cycle 2, CR-2). Same for develop-bug, which follows the same step doc.
+if [ "$NEXT" = "8" ]; then
+  NEXT_SKILL="Step 8 per the step-8 doc (report update → /commit-changes → push → Cleanup → Completion Checklist)"
+fi
+
 # The completion sentence. Inside the story/task QA loop it is the sub-step's own
-# (THEN_WHAT, above); everywhere else it is the generic advance.
+# (THEN_WHAT, above); at Step 8 it is the Completion Checklist; everywhere else it
+# is the generic advance.
+#
+# Step 8 does NOT end when /commit-changes returns. The lock outlives that commit
+# (task 161) and is removed only by the Completion Checklist's own `--complete`, its last action,
+# after checks 2–5 pass. The generic line ("once /commit-changes has completed …") would hand an
+# orchestrator that yielded during the push or the checklist the one instruction that skips the
+# checklist. Same for all three orchestrators: develop-bug follows the same step doc.
+#
+# Only the description of Step 7's tail differs by orchestrator. develop-bug's Step 7 is
+# /finalise --bug (Part A, whose lock cooperation advances the lock to 8) and then Part B, the
+# bug-close routine that actually closes the bug (develop-bug-step-7-close-bug.md), then that
+# document's Step 7 Completion Checklist, which decides whether Step 7 finished. The checklist is a
+# section of its own, beside Parts A and B, and covers Part A's items too (task 163). A
+# story/task tail is the DoD body, the tracker update and the Step 7 checklist. The resume
+# contract's Phase 0b sentence names both tails in the same words; a parity test holds them
+# together (step-8-completion-checklist.test.mjs). The routing rule is the same
+# for all three; the parenthetical only names the work (task 162; task.161 gate.3 CR-2).
+#
+# The lock reads 8 from the end of /finalise, before Step 7's tail and before Step 8's own
+# report update, so the line may not assume either ran (task.161 QA cycle 1, CR-2). It does
+# not invent a finer rule for where to resume: it states the resume contract's one step-8
+# rule (an unfinished row at or below Step 7 wins; otherwise re-run Step 8 from its start).
+# A finer rule written here sent a Step 7-tail stall to Step 8's report update, which ticks
+# row 7 without the tail ever running (task.161 QA cycle 2, CR-1).
+if [ "$SKILL" = "develop-bug" ]; then
+  STEP7_TAIL="for Step 7: Part B's bug-close routine — the Resolution Summary, status \`closed\`, the parent or registry linkage and the tracker-close check — then the Step 7 Completion Checklist (develop-bug-step-7-close-bug.md)"
+else
+  STEP7_TAIL="for Step 7: the DoD body to the PR, the tracker update, the Step 7 checklist"
+fi
 if [ "$NEXT" = "5" ] && [ "$SKILL" != "develop-bug" ]; then
   COMPLETION_LINE="$THEN_WHAT"
+elif [ "$NEXT" = "8" ]; then
+  COMPLETION_LINE="Step 8 is NOT finished when /commit-changes returns. Resume by the step-8 rule the resume contract states (Phase 0b): a lock at 8 is not evidence that Step 7 finished, because /finalise moves it there before Step 7's tail runs. If a Pipeline Progress row at or below Step 7 in \`${REPORT}\` is unfinished, finish that step first (${STEP7_TAIL}). Otherwise run Step 8 from its start; re-running it is safe. Step 8 ends only when its Completion Checklist passes, and the checklist runs \`advance-pipeline-lock.sh --complete\` itself as its last action. Never run \`--complete\` on your own because the commit landed."
 else
-  COMPLETION_LINE="Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to ${ADVANCE_TO} (or \`--complete\` if that was Step 8)."
+  COMPLETION_LINE="Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to ${ADVANCE_TO}."
+fi
+
+# "Advance the lock yourself" at Step 8 would mean the Completion Checklist's `--complete`,
+# which only that checklist may run (task.161 QA cycle 2, CR-2).
+if [ "$NEXT" = "8" ]; then
+  ALREADY_DONE="**If Step 8 has genuinely already finished**, re-run its Completion Checklist: the checklist, not you, runs \`--complete\`."
+else
+  ALREADY_DONE="**If Step ${NEXT} has genuinely already finished, do NOT skip ahead on the strength of this message**: advance the lock yourself and continue from the real next step."
+fi
+
+# The Remaining Work Status position. At Step 8 the lock is not evidence that Step 7 finished
+# (/finalise moves it to 8 before Step 7's tail runs), so the position may not assert "Step 7/8 ✅
+# complete" two lines above the rule that denies it. It names Step 8 as pending, in the banner
+# doc's own "Step N/8 — NAME ⏳ …" form, and Step 7 as unverified (task 162; task.161 gate.3
+# CR-1, pre-existing: develop rendered the same line before task 161).
+if [ "$NEXT" = "8" ]; then
+  POSITION="Step 8/8 — ${NEXT_NAME} ⏳ pending (Step 7 unverified: check its row first)"
+else
+  POSITION="Step $((NEXT - 1))/8 ✅ complete"
+fi
+
+# The steps the status block lists after the position. Below 8 they run to Step 8. At 8 the list
+# is worded after the completion line's rule, not narrower: that line sends the first unfinished
+# row at or below Step 7 back first, which is usually Step 7's tail but can be an earlier row after
+# a --restore (task 163; task.162 pr-review.1 CR-2; QA cycle 2 CR-3). The banner doc defers to
+# this reason at a Stop-hook re-prompt rather than restating it.
+if [ "$NEXT" = "8" ]; then
+  STEPS_AHEAD="then the steps still ahead: the first unfinished row at or below Step 7, if any, then Step 8"
+else
+  STEPS_AHEAD="then the steps still ahead through Step 8"
 fi
 
 REASON=$(cat <<EOF
@@ -237,11 +306,11 @@ REASON=$(cat <<EOF
 
 That call is an idempotent re-assert (the lock already reads ${NEXT}); it exists to anchor this turn into "still working" rather than to move the pipeline on.
 
-Then: emit the Remaining Work Status block (position \`Step $((NEXT - 1))/8 ✅ complete\`, then the steps still ahead through Step 8) → banner \`═══ ${BANNER_PREFIX} PIPELINE: STEP ${NEXT}/8 — ${NEXT_NAME} ═══\` → invoke ${NEXT_SKILL}. Status block and banner are one contiguous output, no prose around them.
+Then: emit the Remaining Work Status block (position \`${POSITION}\`, ${STEPS_AHEAD}) → banner \`═══ ${BANNER_PREFIX} PIPELINE: STEP ${NEXT}/8 — ${NEXT_NAME} ═══\` → invoke ${NEXT_SKILL}. Status block and banner are one contiguous output, no prose around them.
 
 ${COMPLETION_LINE}
 
-⚠️ This hook names the step the lock says is PENDING. It cannot tell whether you stalled during that step or just after it, so it always assumes during — repeating a step is recoverable, skipping one is not. **If Step ${NEXT} has genuinely already finished, do NOT skip ahead on the strength of this message**: advance the lock yourself and continue from the real next step.
+⚠️ This hook names the step the lock says is PENDING. It cannot tell whether you stalled during that step or just after it, so it always assumes during — repeating a step is recoverable, skipping one is not. ${ALREADY_DONE}
 
 Cannot continue? Apply terminal HALT (SKILL.md): /commit-changes report, snapshot lock to develop-pipeline.last-halt.json, rm lock, surface halt banner. An interruption (a question, a pause, a denied permission) is NOT a blockage — do not signal the tracker blocked for one.
 EOF

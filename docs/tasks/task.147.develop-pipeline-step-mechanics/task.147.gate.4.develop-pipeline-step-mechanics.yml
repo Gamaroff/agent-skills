@@ -1,0 +1,72 @@
+schema: 1
+task: 'task.147.develop-pipeline-step-mechanics'
+task_title: 'develop pipeline: five steps that fail or overreach on correct input'
+gate: CONCERNS
+status_reason: 'All gate-3 findings are verified fixed: bugs 10-12 are closed, all 7 mutation proofs go red, and the suites pass 94/94 node tests and 26/26 shell cases, also under TMPDIR=/tmp. One MEDIUM remains, reproduced: the cycle-3 dot-segment normalisation strips a leading ./ once, so a relative .//docs scope becomes /docs, matches no porcelain path, and check 3 passes vacuously. HIGH count per gate: 2, 1, 0, 0.'
+reviewer: 'QA Engineer'
+updated: '2026-09-25T10:32:55Z'
+
+top_issues:
+  - id: 'T147-QA4-CR1'
+    severity: medium
+    file: 'shared/resources/verify-push-state.sh'
+    finding: 'A relative scope beginning with ./ followed by more slashes (.//docs/tasks/task.1) has ./ stripped once before the slash collapse, which leaves /docs/tasks/task.1. That still passes the existence check ($TOP//docs exists) but matches no porcelain path. Reproduced: with the work item own file dirty, `--scope .//docs/tasks/task.1` reports it as outside the scope and check 3 says the tree is clean.'
+    suggested_action: 'After the collapse loops, strip any leading / from a relative scope, or refuse a relative scope that still starts with /. Add a `.//docs/tasks/task.1` case beside cases 24-26.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 120
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [4]
+  code_review:
+    findings: 2
+    bugs: 1
+    cleanups: 1
+    promoted: ['CR-1']
+    advisory: ['CR-2 (cleanup: the record-cleanup test does not seed step4-hold-dir.txt)']
+  boundary: false
+  probes_executed: 0
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-25'
+  total_iterations: 3
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary, unchanged.'
+  performance:
+    status: PASS
+    notes: 'The suites stay under 10s each; the leak check takes 7.3s at load average 11 and ran in about 3s idle.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a vacuous scope on one pathological relative spelling.'
+  maintainability:
+    status: PASS
+    notes: 'Unchanged.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and add the .//docs case'
+      refs: ['shared/resources/verify-push-state.sh']
+  future:
+    - action: 'CR-2 (cleanup): seed step4-hold-dir.txt in the record-cleanup test and assert it is removed'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - action: 'Carried from gates 1-3: a new untracked directory held at Step 4, unbound PR_NUMBER and Step-0 variables (pre-existing), cross-repository heads, joined-string dedupe, and the Step 4b {template}-slot limit (obs #186).'
+      refs: ['shared/resources/develop-pipeline-step-4-create-pr.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Close CR-1']

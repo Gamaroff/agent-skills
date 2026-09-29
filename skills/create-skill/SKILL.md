@@ -168,6 +168,14 @@ report two states*.
 Each of these is a rule that existed nowhere until a failure that every gate passed. Each is stated
 with the failure and the alternative, because a rule without its failure reads as a preference.
 
+**A figure in a failure narrative is measured, and the measurement is named.** A date, an elapsed
+time or a count in a **The failure.** paragraph is taken from an instrument before it is written —
+`git log --date=short -- <path>`, a `wc -l`, a test's own count — and the text names the command or
+the commit it came from. A figure composed to make the failure feel weightier is a fabricated
+premise, and in a corpus where rules are justified by their failures a fabricated premise is
+load-bearing: the staged form of the rule below first said the stale rows were found "four months
+later"; `git log` put it at one day (obs #160).
+
 ### Runnable prose carries no positional-parameter token
 
 **The rule.** A fenced `bash`/`sh`/`shell` block in a `SKILL.md` — a block an agent is meant to copy
@@ -216,6 +224,16 @@ out of three inline copies in `finalise` (obs #146, task.138) — is sourced the
 **Why a shared function has to be a file.** Every fenced block runs as its own shell; a function
 defined in one block does not exist in the next, so a helper written inline is copied into every
 block that needs it and the copies drift. `finalise` carried `newest_numbered` three times.
+
+**Testing such a block.** A test that executes it runs it from a consumer-shaped root —
+`makeConsumerRoot(repoRoot, prefix)` in `evals/shared/lib/consumer-root.mjs` — never from the
+repository root and never from the inherited cwd. This repository's root resolves
+`.agents/skills/…` only through the developer's gitignored `.agents/skills -> ../skills` symlink,
+which CI's checkout does not have: `finalise-bug-mode.test.mjs` passed 71/71 locally and failed 19
+rows on every CI push until it was moved (obs #149). The helper is the one builder; its own test
+proves the same snippet fails from a bare directory, so the hazard is not an assumption. To confirm
+a local green means a CI green, run `npm run test:clean-checkout`, which runs the suite in a clone
+of HEAD with no gitignored paths — the release gate uses it for the same reason.
 
 ### An optional file is found with `find -name`, never a bare glob
 
@@ -323,6 +341,34 @@ Three were real — `verify-push-state.sh` in the three develop pipelines, invok
 `yaml-subset.js` in four Jira skills, step-0/step-1 docs in `qa-task`/`qa-story`, and others last
 touched by work that had since moved on, kept byte-identical to sources they no longer needed
 (task 122, obs #118).
+
+### A skill's behaviour is restated in `docs/reference/`, and nothing reaches it
+
+**The rule.** A change to what a skill *does* — its unit of work, its arguments, its stop
+conditions — obliges a sweep of the two hand-written reference documents that cite it by name:
+
+```bash
+grep -n "<skill-name>" docs/reference/commands.md docs/reference/activation-phrases.md
+```
+
+Every row those return is a second statement of the behaviour just changed. Update it in the same
+commit, or delete the row. `docs/reference/skill-catalog.md` needs no sweep — it is generated, and
+`npm run check:generated` fails when it drifts; that difference is the whole point of the rule.
+
+**The failure.** `qa-next` was re-indexed from stories to **user functions** on 2026-09-22
+(`cd1a5ab4`, `1bb0e546`). The same series of commits rewrote its `SKILL.md`, rewrote its `README.md`,
+cited the rework in the changelog and regenerated the catalog. It left both reference rows untouched,
+so within a day of being written — by the same author, in the same branch series —
+`docs/reference/commands.md` said the skill would "resolve the **story's** ACs to checklist items"
+and preview "the **story** `--next` would select", and `docs/reference/activation-phrases.md`
+offered "UAT the next accepted **story**" as the phrase that activates it. Nothing was broken and no
+gate was red: a reader simply learned the wrong model of the skill from the document written to
+teach it. Found by reading, while planning unrelated work on the same skill (obs #159).
+
+A skill's behaviour is documented in four places — `SKILL.md`, the skill's `README.md`,
+`docs/reference/commands.md`, `docs/reference/activation-phrases.md` — of which one is generated and
+three are not. The author editing the skill directory sees two of the four; the `grep` above is what
+puts the other two in front of them.
 
 ## Skill Creation Process
 

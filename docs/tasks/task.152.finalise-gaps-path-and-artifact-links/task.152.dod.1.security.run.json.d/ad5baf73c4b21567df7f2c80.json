@@ -1,0 +1,22 @@
+{
+  "sink": "path",
+  "entry": "cli:.claude/state/t152-fvc-wrapper.mjs",
+  "name": "fill-verification-complete.sh DOD_PATH",
+  "call_site": "shared/resources/fill-verification-complete.sh:32",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 7,
+  "passed": 7,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": [
+    "{fixture}",
+    "path",
+    "{input}"
+  ],
+  "ran_at": "2026-09-26T20:24:28.952Z"
+}

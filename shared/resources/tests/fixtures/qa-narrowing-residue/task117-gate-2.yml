@@ -1,0 +1,87 @@
+schema: 1
+task: 'task.117.card-preflight-heading-only'
+task_title: 'The card preflight passes a Success Criteria block that renders as a bold label with nothing under it — 15 of 106 task docs'
+gate: CONCERNS
+status_reason: 'All three cycle-1 findings verified fixed from a clean process and their bugs closed. The refute pass found one medium defect in the cycle-1 fix itself — a dot anywhere in the line (a filename, a version) disqualifies a bold label, so the original defect survives through that shape — plus three low bugs and three cleanups in the same area. One more fix cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T21:24:48Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: medium
+    file: 'shared/resources/jira-sync.js'
+    finding: 'RE_BOLD_LABEL ([^*\n.!?]+) and isLabelOnly (/[.!?]/ anywhere) treat a dot anywhere in the line as a terminator, so **Changes to jira-sync.js**: followed by a list is neither dropped nor reported and the card publishes the label and stops — the task.117 defect through a filename.'
+    suggested_action: 'Test for a TRAILING terminator only: forbid [.!?] immediately before the closing ** in RE_BOLD_LABEL, and use /[.!?]\s*$/ in isLabelOnly; fixtures for **jira-sync.js changes**: (label) and **None.** (content).'
+    suggested_owner: dev
+    bug_ref: 'task.117.bug.3.dot-anywhere-disqualifies-label.md'
+    status: open
+  - id: 'CR2-2'
+    severity: low
+    file: 'shared/resources/jira-sync.js'
+    finding: 'The heading-only omitted count is paras.length - 1, which counts blocks ABOVE the label and fences beneath it, so for **Before** (GitHub): + a fence the message promises content beneath will reach the card if the label becomes ###, when it would yield empty instead.'
+    suggested_action: 'Count only summarisable (prose/list) paragraphs after the label for the stopped branch; fall back to the nothing-under-it wording when what remains is all tables or code.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-3'
+    severity: low
+    file: 'skills/create-task/SKILL.md'
+    finding: 'create-task, create-story and create-epic re-derive the heading-only remedy as put a sentence or list under the label rather than deleting it — wrong for the stopped form the code now distinguishes, and against the contract rule not to re-derive the fix.'
+    suggested_action: 'Say only that heading-only means present-and-useless and that the tool Fix: line names the remedy for each of its two forms.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-4'
+    severity: low
+    file: 'shared/resources/jira-sync.js'
+    finding: 'RE_BOLD_LABEL makes the colon optional, so a bold-only line that IS the whole section (**None** as a Breaking Changes body) is dropped and reported heading-only, while the isLabelOnly comment promises None is content.'
+    suggested_action: 'A bare bold line is a label when content follows it and content when it is the whole section; pin both with fixtures and say so in the comment.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 490
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+  cycle_1_findings_verified_fixed: 3
+  security_probes: 161
+  refute_pass: true
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 161
+    notes: 'Same 161-input probe re-run against the tightened property: no throw, all under 50 ms. Deviations: the two **** cases (refused as heading-only, safe direction) and CRLF list detection (pre-existing, untouched) as in cycle 1; one probe expectation written against cycle-1 semantics (**Before** (GitHub): now reported as heading-only with its text retained, which is the intended outcome) — probe updated, not the code.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1 — linear per-line regex; ReDoS shapes under 50 ms.'
+  reliability:
+    status: PASS
+    notes: 'Corpus 0 of 120; four mutations each red their named test; fast gate 3358/3359.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Three cleanups in the same area: fence parity toggling in dropHeadingLines where makeFenceTracker exists for exactly that failure (CR2-5); the scope sentence documented under sync-jira-* --check-card but emitted only by card-preflight.js --json (CR2-6); two block shapes for one status and neither carries kind (CR2-7). Cheap; take them with CR2-1.'
+
+recommendations:
+  immediate:
+    - action: 'Trailing-terminator-only label test in RE_BOLD_LABEL and isLabelOnly, with fixtures for a filename label and a bold sentence (CR2-1)'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/tests/jira-sync-card-summary.test.mjs']
+    - action: 'Count only summarisable blocks after the label for the stopped message (CR2-2); bare bold line alone is content (CR2-4); create-* prose stops re-deriving the remedy (CR2-3)'
+      refs: ['shared/resources/jira-sync.js', 'skills/create-task/SKILL.md', 'skills/create-story/SKILL.md', 'skills/create-epic/SKILL.md']
+  future:
+    - action: 'makeFenceTracker in dropHeadingLines and the list-grouping loop (CR2-5); scope in the four sync scripts --check-card JSON (CR2-6); one heading-only block shape with kind (CR2-7)'
+      refs: ['shared/resources/jira-sync.js', 'skills/sync-jira-task/scripts/sync-jira-task.js', 'shared/resources/tracker-card-summary.md']
+    - action: 'CRLF line handling in RE_BULLET / RE_ORDERED — pre-existing (carried from gate 1)'
+      refs: ['shared/resources/jira-sync.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR2-1 fixed and mutation-proven; CR2-2/3/4 addressed; suites green'

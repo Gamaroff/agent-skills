@@ -107,9 +107,32 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 
 ### LOOP (both orchestrators — execute identically)
 
+#### Inline implementation instead of `/develop` (iteration 1 only)
+
+The orchestrator may implement the work itself, **in place of** invoking `/develop`, only when
+**both** of these are already recorded in the Decisions Log for this run:
+
+1. `Plan file found: {path} — included as implementation context for /develop` (Plan File
+   Discovery above). A plan reused from a prior session counts only if its freshness check passed this run.
+2. `Pre-develop surface map: …` (the Explore pass above, or its inline fallback).
+
+A plan that names every hunk is what makes this worth it: `/develop` would only re-read it
+(task.141 shipped a 599-line plan and implemented inline, with no stated route to do so; obs #162).
+
+**The inline path owes every post-condition `/develop` leaves.** It satisfies each item of
+`/develop`'s **Story Completion Checklist** (story) or **Task Completion Checklist** (task) in
+`skills/develop/SKILL.md`, cited here and not restated, so the two cannot drift. That includes
+the one Change Log row under "After loop exits" below, which the inline path writes *instead of*
+`/develop`, never beside it. Record `Step 3 inline — /develop not invoked: {one-line reason}` in the
+Decisions Log.
+
+Item 2 of the loop body (the loop audit) runs **unchanged**. An incomplete inline pass therefore
+reads `In Progress` and re-enters the loop, and from iteration 2 onward the loop always invokes
+`/develop`. On any other input (no plan file, or no surface map), invoke `/develop`.
+
 #### develop-story loop body
 
-1. Invoke `/develop` with the story file path. On iteration 1, pass the always-load file contents (from `ALWAYS_LOAD_FILES`), the Explore surface map, and the plan file (or note that all were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see story checkboxes for completed tasks."
+1. Invoke `/develop` with the story file path (or, on iteration 1 only, implement inline per §"Inline implementation instead of `/develop`" above when its two-fact precondition holds). On iteration 1, pass the always-load file contents (from `ALWAYS_LOAD_FILES`), the Explore surface map, and the plan file (or note that all were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see story checkboxes for completed tasks."
 2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress using the **shared loop-audit prompt** (`shared/resources/loop-audit-prompt.md`). Mark the wait: `bash .agents/skills/develop-story/references/set-waiting-on.sh "step-3 loop audit iter $ITER"` beside the dispatch, `… --clear` once the audit JSON is read.
 
    Substitute: `<DOC_TYPE>=story`, `<DOC_PATH>={story_path}`, `<TASKS_SECTION>=## Tasks`. Pass the resulting prompt verbatim to the Explore subagent.
@@ -126,7 +149,7 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 
 #### develop-task loop body
 
-1. Invoke `/develop` with the task file path. On iteration 1, pass the always-load file contents (from `ALWAYS_LOAD_FILES`), the Explore surface map, and the plan file (or note that all were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see task checkboxes for completed phases."
+1. Invoke `/develop` with the task file path (or, on iteration 1 only, implement inline per §"Inline implementation instead of `/develop`" above when its two-fact precondition holds). On iteration 1, pass the always-load file contents (from `ALWAYS_LOAD_FILES`), the Explore surface map, and the plan file (or note that all were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see task checkboxes for completed phases."
 2. After `/develop` returns, dispatch an Explore subagent (read-only) to audit iteration progress using the **shared loop-audit prompt** (`shared/resources/loop-audit-prompt.md`). Mark the wait: `bash .agents/skills/develop-task/references/set-waiting-on.sh "step-3 loop audit iter $ITER"` beside the dispatch, `… --clear` once the audit JSON is read.
 
    Substitute: `<DOC_TYPE>=task`, `<DOC_PATH>={task_path}`, `<TASKS_SECTION>=## Implementation Plan`. Pass the resulting prompt verbatim to the Explore subagent.
@@ -266,7 +289,8 @@ keeps a five-iteration loop from producing five rows.
 
 The write belongs to `/develop`, not to this step document. This step states the contract; the
 skill performs it. Duplicating the write in both places is how a document ends up with two rows
-for one event. Canonical format: [document-change-log.md](document-change-log.md).
+for one event. **On the inline path** (§"Inline implementation instead of `/develop`") the
+orchestrator writes this row, because `/develop` did not run. It is still exactly one row. Canonical format: [document-change-log.md](document-change-log.md).
 
 **Post development completion to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty). Execute this before the lock-advance Bash call — it is a tool call, not prose, and does not violate the no-prose-before-lock-advance rule:
 

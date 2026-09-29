@@ -1,0 +1,92 @@
+schema: 1
+task: 'task.141.qa-next-targeted-item'
+task_title: '/qa-next <id> — target a specific registry item'
+gate: PASS
+status_reason: "No HIGH or MEDIUM. Cycle 9's fix holds: the dispatched reviewer ran the real tool against seven --registry layouts (default, qa/reg.md, a root-level registry, ./-prefixed, a ..-normalised path, a deep subdirectory) and with --root away from the cwd. In every case the payload's `bug` was repo-relative, opened from the root, round-tripped through `--set … fail --bug`, and left --check green. `join(root, registryDir, rel)` equals `join(root, repoPathOf(rel))` for `../../../x`, `/x`, `.` and `''`. What remains is three LOW cleanups in test strength and comment accuracy; none is a runtime defect."
+reviewer: 'QA Engineer'
+updated: '2026-09-23T06:10:53Z'
+
+top_issues:
+  - id: 'TASK-141-CR10-1'
+    severity: low
+    file: 'evals/qa-next/unit/uat-status.test.mjs'
+    finding: "The round-trip test seeds `[bug.1.real](../bugs/bug.1.real.md)`, which is byte-identical to what `--set` writes back, so its 'written back in the registry's own form' regex would pass if `--set` ignored `--bug`. The test's other assertions (repo-relative value, --check green after the round trip) do hold the defect it names: M41 reds it."
+    suggested_action: 'Seed a different spelling of the same file (e.g. with `#repro`) and assert that the post-`--set` cell is the canonical link and no longer contains the seed.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK-141-CR10-2'
+    severity: low
+    file: 'evals/qa-next/unit/uat-status.test.mjs'
+    finding: "The clause test's `bug: null` column for the three prose clauses runs only on `⏸ blocked` rows, so it cannot tell 'skipped as prose' from 'describeRow published nothing for this row state'."
+    suggested_action: "Put each prose link on a `❌ fail` row after a real bug link and assert that the published `bug` is still the real link's path."
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK-141-CR10-3'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: "The comments on bugLinkPaths (~536) and in checkRegistry (~479-482) still say the published path IS the path `exists` is called on; after cycle 9 it is `repoPathOf` of that path, and the same-file guarantee lives in cmdCheck's `exists` closure. One header line was also not reflowed."
+    suggested_action: 'Reword both comments to say where the same-file guarantee is enforced; reflow the line.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3947
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged across ten cycles. Offline, file-local. Path shapes that climb above the root (`../../../x`, `/x`) were exercised through the CLI by the reviewer, not through the probe engine.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. 44 tests in the qa-next suite.'
+  reliability:
+    status: PASS
+    notes: "BUG-21 is closed and verified across seven registry layouts: `bug` round-trips through `--bug` and --check stays green."
+  maintainability:
+    status: PASS
+    notes: 'BUG-20 is closed: the rule names its real base and is held clause by clause to --check. Three LOW test and comment cleanups remain (CR10-1..3).'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-141-CR10-1'
+      action: 'Round-trip test: seed a different spelling of the same file (e.g. with #repro), and assert the post-`--set` cell is the canonical link and no longer the seed.'
+      refs: ['evals/qa-next/unit/uat-status.test.mjs']
+      carried_from: 'top_issues (route 2b, cycle 10)'
+    - id: 'TASK-141-CR10-2'
+      action: 'Clause test: put each prose link on a fail row after a real bug link, and assert the published bug is still the real link.'
+      refs: ['evals/qa-next/unit/uat-status.test.mjs']
+      carried_from: 'top_issues (route 2b, cycle 10)'
+    - id: 'TASK-141-CR10-3'
+      action: 'Reword the bugLinkPaths and checkRegistry comments to say the same-file guarantee is enforced by `repoPathOf` in cmdCheck `exists`; reflow the long header line.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+      carried_from: 'top_issues (route 2b, cycle 10)'
+    - action: "CR9-3 (pre-existing): `exists` is existsSync, which is true for a directory. Require a regular file for bug links (M44's first survival showed it is reachable)."
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: "CR8-2 + CR7-4 (pre-existing): the run link and a run file's Filed as get neither the fragment strip nor the prose skip."
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'bug.16 (filed separately): the main guard is a silent no-op under a symlink.'
+      refs: ['docs/bugs/bug.16.main-guard-silent-noop-under-symlink/bug.16.main-guard-silent-noop-under-symlink.md']
+    - action: 'Accepted limitation (cycle 5): the kept-✅ note cell grows by one segment per re-run.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-3 (cycle 1, advisory): --set exits 0 whether the row moved or was kept.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
