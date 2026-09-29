@@ -5,18 +5,20 @@ type: task
 description: "Make release.sh refuse to tag unless CI's own verdict for the commit is green (a local npm test is a claim about one machine), make every load-sensitive test assertion say so in its failure message and hold that list in one mechanically checked place, fix the session-handoff CR-6 process-group test so a leader killed before it forks is retried rather than reported as ENOENT, and name the re-run-alone class beside the release checklist."
 tags: [release, ci, tests, flaky-tests, session-handoff, spawn-budget, observation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-29
 assignee:
 estimated_effort_hours: 16
 github_issue: 483
+completed_date: 2026-09-29
+pr_number: 515
 ---
 
 # Technical Task: Release gate reads CI's verdict; load-sensitive tests name themselves
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.153.review.1.release-ci-gate-load-sensitive-tests.md` implemented 2026-09-29
 
@@ -544,13 +546,11 @@ None.
 - **Non-critical**: a refusal over a good commit — use `--skip-ci-check` and fix forward.
 
 ---
-
 <!-- change-log-start -->
-
 ## Change Log
 
-| Date       | Version | Description                                                                                     | Author      |
-| ---------- | ------- | ----------------------------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #150, #157, #158, #166 (2026-09-24 observation review) | create-task |
 | 2026-09-29 | 1.1     | Review passed (8/10) — reflected task.154's `npm run test:clean-checkout` step, guarded the CI block against `--retry`, re-anchored four drifted line refs | review-task |
 | 2026-09-29 |         | Status → ready-for-development | review-task |
@@ -560,7 +560,7 @@ None.
 | 2026-09-29 |         | QA gate CONCERNS (90/100) — 3 findings gated (1 MEDIUM), 3 advisory | qa-task |
 | 2026-09-29 |         | QA findings fixed — gate 1 CR-1..CR-5, gate 2 CR2-1..CR2-5 + PRB2-1 (3 more load-sensitive files marked and listed), 2 iterations; fast gate green | qa-fix |
 | 2026-09-29 |         | QA gate PASS (95/100) — 1 LOW finding (QA3-1), 5 advisory | qa-task |
-
+| 2026-09-29 | 1.2 | DoD passed — accepted (PR #515) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -572,6 +572,35 @@ None.
 - [x] Phase 3: the load-sensitive marker and its list
 - [x] Phase 4: CR-6 tolerates its precondition miss
 - [x] Phase 5: docs and validation
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.153.qa.3.release-ci-gate-load-sensitive-tests.md`
+**Gate File**: `task.153.gate.3.release-ci-gate-load-sensitive-tests.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100 (3 QA cycles; exit by the diminishing-returns route; 5c `/review-pr` APPROVE)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 14/14 success criteria traced to code and to tests that run on every PR
+✅ **Tests:** 59 new tests; mutations M1–M10 red; `npm run ci` green
+✅ **PR Review:** PR #515 — `/review-pr` APPROVE (5 LOW findings, advisory)
+✅ **CI:** SUCCESS on the decision head `e56cefbf` (5 checks)
+✅ **Documentation:** CHANGELOG `(task 153)`, `docs/contributing/releases.md`, `docs/contributing/traps.md` § Load-sensitive tests
+✅ **Security Review:** PASS — boundary probed, 26 candidates executed, 0 reproduced
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal release tooling
+
+**Carried (LOW, non-blocking):** QA3-1 (CR-6 schedule vs fixture lifetime at `HANDOFF_SPAWN_RETRIES>=3`), `gh run list` cap of 50 with no truncation check, release runbook does not mention the CI gate.
+
+**Task marked as ACCEPTED on:** 2026-09-29
+
+**Detailed Verification Log:** See `task.153.dod.1.release-ci-gate-load-sensitive-tests.md` for complete verification evidence and timestamps.
 
 ---
 
