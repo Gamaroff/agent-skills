@@ -39,22 +39,88 @@ def find_repo_root(skill_path):
     return None
 
 
-def collect_shared_refs(content):
-    """Return list of filenames referenced via shared/resources/<filename>.
+# The ONE parse of a `shared/resources/<name>` reference (task.126). The bundler's
+# discovery, the packager and `validate_skill` below all read references through
+# `parse_shared_refs`; there used to be three copies of this pattern, and none of
+# them knew that `#` starts a fragment, so `shared/resources/X.md#anchor` named a
+# file called `X.md#anchor` — validation failed on it and the bundler warned
+# "missing source".
+#
+# `(?<![\w-]/)` — never match inside an absolute URL such as
+# `https://…/blob/develop/shared/resources/x.md`, which the bundler writes into
+# bundled copies for targets a skill does not ship. Without the guard the
+# packager's walk over references/ rediscovered every such URL as a reference
+# and vendored the file it deliberately did not bundle.
+SHARED_REF_LINE_RE = re.compile(r'(?<![\w-]/)shared/resources/([^\s`\'")\]*]+)')
 
-    Filters out empty matches (e.g. when the regex captures only a trailing
-    sentence punctuation like 'shared/resources/.' which strips to '').
-    """
-    # `(?<![\w-]/)` — never match inside an absolute URL such as
-    # `https://…/blob/develop/shared/resources/x.md`, which the bundler now
-    # writes into bundled copies for targets a skill does not ship. Without the
-    # guard the packager's walk over references/ rediscovered every such URL as
-    # a reference and vendored the file it deliberately did not bundle.
-    refs = [
-        f.rstrip('.,;:')
-        for f in re.findall(r'(?<![\w-]/)shared/resources/([^\s`\'")\]*]+)', content)
-    ]
-    return [r for r in refs if r]
+# The comment form of a citation. Both prefixes, because the bundler rewrites
+# `shared/resources/X` to `references/X` in place in every skill file and in every
+# bundled copy — a comment written with the first prefix is read back with the
+# second on every run after the first.
+CITE_COMMENT_RE = re.compile(
+    r'<!--\s*cite:\s*(?:\.\./)*(?:shared/resources|references)/[^\s>]+\s*-->'
+)
+
+# A citation copies ONE file; a dependency copies the file and its closure. Only a
+# document can be cited: a script copied without the siblings it requires or
+# sources is broken, so a fragment or cite comment on any other target still reads
+# as a dependency — the fail-safe direction.
+CITE = 'cite'
+DEP = 'dep'
+CITABLE_SUFFIXES = ('.md',)
+
+
+def split_fragment(raw):
+    """Split a captured reference into (name, has_fragment).
+
+    Trailing sentence punctuation is stripped first, as it always was, then the
+    name is cut at the first `#`. `name` may come back empty (a bare
+    `shared/resources/.`); callers drop those."""
+    raw = raw.rstrip('.,;:')
+    name, sep, _ = raw.partition('#')
+    return name.rstrip('.,;:'), bool(sep)
+
+
+def ref_kind(name, has_fragment, in_cite_comment):
+    """`cite` for a document named with a fragment or inside a cite comment,
+    `dep` for everything else. The one statement of the edge rule."""
+    if (has_fragment or in_cite_comment) and name.endswith(CITABLE_SUFFIXES):
+        return CITE
+    return DEP
+
+
+def cite_comment_spans(content):
+    """[(start, end)] of every `<!-- cite: … -->` in `content`."""
+    return [m.span() for m in CITE_COMMENT_RE.finditer(content)]
+
+
+def in_spans(pos, spans):
+    return any(start <= pos < end for start, end in spans)
+
+
+def parse_shared_refs(content):
+    """Return [(line_no, name, kind)] for every shared/resources/<name> reference.
+
+    One pass over the text: the name class excludes whitespace, so no match spans
+    a newline, and counting newlines between matches gives the line (a per-line
+    loop cost 1.9 s of a 7.2 s `bundle --check`, task 154). Empty names are
+    dropped. Pure."""
+    spans = cite_comment_spans(content)
+    out = []
+    line, pos = 1, 0
+    for m in SHARED_REF_LINE_RE.finditer(content):
+        line += content.count('\n', pos, m.start())
+        pos = m.start()
+        name, has_fragment = split_fragment(m.group(1))
+        if name:
+            out.append((line, name, ref_kind(name, has_fragment, in_spans(m.start(), spans))))
+    return out
+
+
+def collect_shared_refs(content):
+    """Return list of filenames referenced via shared/resources/<filename>,
+    fragment stripped. A view of `parse_shared_refs`."""
+    return [name for _, name, _ in parse_shared_refs(content)]
 
 
 def validate_skill(skill_path):

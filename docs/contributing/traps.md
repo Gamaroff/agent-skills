@@ -40,10 +40,21 @@ which runs `npm test` in a clone of HEAD that has no ignored paths. `scripts/rel
 
 ### Never edit `skills/*/references/` — it is generated
 
-`shared/resources/` is the single source of truth. `.git/hooks/pre-commit` runs `npm run bundle`
-whenever `shared/resources/` or any `SKILL.md` is staged and **re-stages the result** — so a fix
-applied only to a bundled copy is silently reverted. Edit the source, then bundle. A second
-`npm run bundle` must be a clean no-op (it is, as of 2026-09-10).
+`shared/resources/` is the single source of truth. `.githooks/pre-commit` (the repo's
+`core.hooksPath`) runs `npm run bundle` whenever `shared/resources/` or any `SKILL.md` is staged and
+**re-stages the result** — so a fix applied only to a bundled copy is silently reverted. Edit the
+source, then bundle. A second `npm run bundle` must be a clean no-op (it is, as of 2026-09-10).
+
+**An untracked generated copy refuses the commit** (task.126). A copy the hook's own bundle run
+creates is staged for you. A copy that was *already* untracked when you committed — what a manual
+`npm run bundle` leaves behind — used to get a one-line warning while the commit went ahead without
+it. Every local check then passed, because the file is on disk, and `bundle:check` failed in CI a
+push later. The hook now exits 1 and names the paths. "Generated" means the copy has a source (`shared/resources/<path>`); a hand-written `references/` file has none, and stays a warning. Either `git add` them, or remove the
+`shared/resources/` mention that produced them. A document you only point a reader at can be *cited*
+(`references/X.md#section`) and then costs one file, not its closure: `create-skill` § Cite or depend.
+`BUNDLE_PRECOMMIT_WARN=1` downgrades the refusal to the old warning. The bundler never deletes a
+copy, so one a change stops reaching is yours to `git rm`; `bundle:check` reports it `UNREACHED`
+until you do.
 
 ### CI check counts differ per PR — legitimately
 

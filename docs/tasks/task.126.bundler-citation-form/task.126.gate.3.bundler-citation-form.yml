@@ -1,0 +1,57 @@
+schema: 1
+task: 'task.126.bundler-citation-form'
+task_title: 'Bundler citation form, per-skill closure count, pre-commit refusal'
+gate: PASS
+status_reason: 'Both cycle-2 findings are fixed and each is held by a test that goes red when reverted. The cycle-3 review of every file changed since gate 2 found no correctness bug, only two low cleanups (advisory). The fast gate passes 4537/4538 with 0 fail, and bundle:check is clean.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T18:05:57Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 25
+  phases_verified: 3/3
+  head: '3ab65ee9'
+  ci: 'not read — CI is gated once, at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false, unchanged from cycles 1–2. The Python parser and the argument-less hook are not modelled by the probe engine; both are held by behavioural tests and mutations. No new input surface.'
+  performance:
+    status: PASS
+    notes: 'Discovery cost unchanged; one git ls-tree per run.'
+  reliability:
+    status: PASS
+    notes: 'The refused-commit retry now succeeds on both remedy paths (tests plus mutations F6/F7). A refused run leaves the tree and index as it found them.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory cleanups: an unreachable fallback plus stale comments in expected_bytes (CR-1); revert_new''s tracked-copy branch has no test (CR-2).'
+
+bug_resolution:
+  cycle_2_findings_fixed: 2
+  advisory_folded_in: 4
+  fix_commits: ['c049a146', '3ab65ee9']
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1: pass shipped straight to rewrite_md_links, drop the dead fallback, and bring the expected_bytes docstring and the bundle_skill/check_skill comments in line with "reached when given".'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'CR-2: add a hook test where a tracked copy is rewritten before a refusal, and assert it is restored from the index.'
+      refs: ['tests/pre-commit-hook.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

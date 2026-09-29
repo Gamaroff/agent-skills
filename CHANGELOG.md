@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Bundler citation form, per-skill closure count, and a pre-commit that refuses an untracked
+  generated copy (task 126).**
+  - **A citation copies one file.** A reference to an `.md` target carrying a `#fragment`, or
+    written inside `<!-- cite: … -->`, now copies that document alone and follows nothing it names.
+    That holds in both spellings: `shared/resources/X.md#section`, and the `references/X.md#section`
+    form the bundler rewrites skill files into. A bare mention stays a dependency (the file and its
+    closure), and so does any cite of a script. A cited copy's mentions of files the skill does not
+    ship become upstream URLs, not `references/` paths to nothing.
+  - **The fragment is no longer part of the file name.** One parser, `parse_shared_refs` in
+    `quick_validate.py`, now serves validation, the packager and discovery. Before, all three read
+    the `#fragment` into the file name, so `validate:all` failed on a fragment reference and the
+    bundler warned that its source was missing.
+  - **Every bundle run reports each skill's closure.** The status line reads
+    `closure M (±K vs committed)`. `±K` is a net difference, read from `HEAD` with one
+    `git ls-tree` per run.
+  - **The three task.116 pointers now cite the autonomous-defaults document.** The pointers are in
+    `qa-fix`, `review-task` and `review-story`. Their closures drop 37→21, 45→27 and 46→29, and the
+    51 copies nothing now reaches are deleted.
+  - **`.githooks/pre-commit` refuses an untracked generated copy.** A generated `references/` copy (one with a
+    `shared/resources/` source) left untracked in the tree now exits 1, where it used to warn and let `bundle:check` fail in CI a
+    push later. `BUNDLE_PRECOMMIT_WARN=1` restores the warning.
+  - Rule: `create-skill` § "Cite or depend", and AGENTS.md § Shared Resources.
+
 ### Changed
 
 - **The QA read-back requires this cycle's links; the current gate and path containment each have

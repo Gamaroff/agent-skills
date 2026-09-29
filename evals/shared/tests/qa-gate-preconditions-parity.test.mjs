@@ -361,9 +361,11 @@ test("every dispatch site points at the Subagents table and repeats the liveness
     const i = lineOf(text, anchor);
     assert.ok(i > -1, `${name}: anchor line not found in ${path}`);
     const line = text.split("\n")[i];
+    // By section name, or — the citation form (task.126), which bundles the hub
+    // alone — by the heading's real slug. Any other fragment names no heading.
     assert.match(
       line,
-      /develop-pipeline-autonomous-defaults\.md` §Subagents/,
+      /develop-pipeline-autonomous-defaults\.md(?:` §Subagents|#subagents--unavailable-failed-slow`)/,
       `${name} must point at the Subagents table by section`,
     );
     assert.ok(

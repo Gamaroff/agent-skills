@@ -291,6 +291,36 @@ from a red CI run rather than from the file that should have taught it (obs #114
 in `authoring-card-preflight.md` cost a second push in one QA cycle). The rule lived only as a comment
 in `jira-sync.js`; it lives here now, and in AGENTS.md § Shared Resources.
 
+### Cite or depend — a reference is one of two edges
+
+**The rule.** A reference to a shared resource is either a **dependency** or a **citation**, and the
+bundler copies them differently:
+
+| Edge | How it is written | What is copied |
+| --- | --- | --- |
+| Dependency | a bare mention: the shared path, or `references/<doc>.md` in a skill file | the file **and everything it reaches** |
+| Citation | an `.md` target with a fragment — `references/<doc>.md#<heading-slug>` — or a bare mention inside `<!-- cite: … -->` | the file **alone**; nothing it names is followed |
+
+Both spellings count, the shared path and the `references/` form. The bundler rewrites the first
+into the second in place, so a skill file only ever holds the second after its first bundle. The
+comment form takes either prefix for the same reason.
+
+**Depend** on a document whose procedure the skill executes, or on a script it runs. **Cite** a
+document you only point a reader at: "the rule is in §X of that file". A cite of a script
+(`.js`, `.mjs`, `.sh`, `.json`) is read as a dependency however it is written, because a script
+copied without the siblings it requires is broken. The fragment must be the heading's real slug
+(`## Subagents — unavailable, failed, slow` → `subagents--unavailable-failed-slow`). The bundler
+does not check it, but a link checker does.
+
+**The failure.** A one-line pointer from `qa-fix`, `review-task` and `review-story` to the
+autonomous-defaults document, for one paragraph, cost each skill the document's whole closure:
+16, 18 and 17 files that none of them reads (task.116, obs #83). Authors facing that bill restate the
+rule instead, which is the drift the one-source rule exists to prevent. The bundler's status line
+now prints `· closure M (±K vs committed)` per skill, so a closure that jumps is a number in the
+output at the moment it is caused. `±K` is a net difference, so it shows that the closure moved, not
+which copies moved. A closure that shrinks leaves copies behind: the bundler never deletes one, and
+`--check` reports each `UNREACHED` until you `git rm` it (task.126).
+
 ### In a `.js` under `shared/resources/`, a `shared/resources/` path in a comment is a dependency
 
 **The rule.** `bundle_skill.py`'s reference scanner (`SHARED_REF_RE`) matches a
