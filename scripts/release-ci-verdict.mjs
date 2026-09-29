@@ -189,7 +189,7 @@ export function fetchRuns(sha, { spawn = spawnSync, repo = "" } = {}) {
 }
 
 const USAGE =
-  "usage: release-ci-verdict.mjs --sha <40-hex> [--repo <owner/name>] [--json]";
+  "usage: release-ci-verdict.mjs --sha <40-hex> [--repo <owner/name>] [--json | --tsv]";
 
 /** @returns {number} exit code — 0 green, 1 anything else, 2 usage */
 export function main(
@@ -198,10 +198,15 @@ export function main(
 ) {
   let sha = "";
   let json = false;
+  // --tsv: one line, "<reason>\t<detail>", for a shell caller. release.sh reads it with one
+  // `read`, instead of spawning node twice more to pick fields out of --json — two extra spawns
+  // per release run were enough to push a spawn-heavy test file past its wall-clock budget.
+  let tsv = false;
   let repo = "";
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--json") json = true;
+    else if (a === "--tsv") tsv = true;
     else if (a === "--sha") sha = argv[++i] ?? "";
     else if (a === "--repo") repo = argv[++i] ?? "";
     else if (a === "--help" || a === "-h") {
@@ -228,7 +233,9 @@ export function main(
   stdout.write(
     json
       ? JSON.stringify({ ...result, exitCode }) + "\n"
-      : `CI ${result.reason} for ${sha.slice(0, 8)} — ${result.detail}\n`,
+      : tsv
+        ? `${result.reason}\t${String(result.detail).replace(/[\t\n]/g, " ")}\n`
+        : `CI ${result.reason} for ${sha.slice(0, 8)} — ${result.detail}\n`,
   );
   return exitCode;
 }

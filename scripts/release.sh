@@ -170,13 +170,15 @@ ok "Up to date with origin/main"
 # keeps its own guard, so it skips this one. Pinned by tests/release-ci-gate.test.js.
 if [[ "$RETRY" == false ]]; then
   heading "CI verdict"
-  CI_JSON=$(command node "$(dirname "$0")/release-ci-verdict.mjs" --sha "$LOCAL" --repo "$REPO_SLUG" --json) || true
-  ci_field() {
-    printf '%s' "$CI_JSON" | command node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let v;try{v=JSON.parse(s)[process.argv[1]]}catch{}process.stdout.write(typeof v==="string"?v:"")})' "$1"
-  }
-  CI_REASON=$(ci_field reason)
-  CI_DETAIL=$(ci_field detail)
-  [[ -z "$CI_REASON" ]] && CI_REASON="unverifiable" && CI_DETAIL="release-ci-verdict.mjs printed no verdict"
+  # One spawn: --tsv prints "<reason><TAB><detail>". A missing or unrecognised reason is
+  # unverifiable — the verdict fails closed here too, never open.
+  CI_LINE=$(command node "$(dirname "$0")/release-ci-verdict.mjs" --sha "$LOCAL" --repo "$REPO_SLUG" --tsv) || true
+  CI_REASON=${CI_LINE%%$'\t'*}
+  CI_DETAIL=${CI_LINE#*$'\t'}
+  case "$CI_REASON" in
+    green|red|pending|unverifiable) ;;
+    *) CI_REASON="unverifiable"; CI_DETAIL="release-ci-verdict.mjs printed no verdict" ;;
+  esac
   if [[ "$CI_REASON" == "green" ]]; then
     ok "CI green for ${LOCAL:0:8} — ${CI_DETAIL}"
   elif [[ "$SKIP_CI_CHECK" == true ]]; then

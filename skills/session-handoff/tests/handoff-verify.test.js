@@ -1400,6 +1400,37 @@ function retryUntilForked(scheduleSeconds, attempt) {
   );
 }
 
+// The CR-6 schedule and the fixture lifetimes it needs, as data, so a unit case can hold the
+// invariant. slow.js must outlive EVERY scheduled timeout — an attempt longer than slow.js sees the
+// command exit instead of timing out, reads as forked, and fails without the LOAD-SENSITIVE marker
+// (QA cycle 3, QA3-1: a fixed 20 s slow.js vs a 24 s fourth attempt at HANDOFF_SPAWN_RETRIES=3).
+// The grandchild must outlive slow.js, or a leader-only kill reads as a group kill (M10).
+function cr6Schedule(retries) {
+  return Array.from({ length: 1 + retries }, (_, k) => 3 * 2 ** k);
+}
+function cr6Lifetimes(schedule) {
+  const slowMs = (Math.max(...schedule) + 10) * 1000;
+  return { slowMs, grandchildMs: slowMs + 100_000 };
+}
+
+test("cr6Lifetimes: every scheduled attempt times out inside slow.js, and the grandchild outlives slow.js (QA3-1)", () => {
+  for (let retries = 0; retries <= 6; retries++) {
+    const schedule = cr6Schedule(retries);
+    const { slowMs, grandchildMs } = cr6Lifetimes(schedule);
+    assert.equal(schedule.length, 1 + retries);
+    assert.equal(schedule[0], 3, "the idle-machine path is one 3 s attempt");
+    for (const t of schedule)
+      assert.ok(
+        t * 1000 < slowMs,
+        `retries=${retries}: a ${t}s attempt outlives slow.js (${slowMs} ms)`,
+      );
+    assert.ok(
+      grandchildMs > slowMs,
+      `retries=${retries}: the grandchild must outlive slow.js`,
+    );
+  }
+});
+
 test("retryUntilForked: a first-attempt hit runs one attempt", () => {
   const calls = [];
   const r = retryUntilForked([3, 6, 12], (t) => {
@@ -1465,29 +1496,28 @@ test("cli: a `command ` prefix is stripped, the argv runs without a shell, and a
   // 3 s → 6 s → 12 s). Each attempt gets a FRESH dir: a pid file left by a
   // missed attempt must not satisfy the next one.
   //
-  // The grandchild outlives slow.js (120 s vs 20 s, and `c.unref()` so the
-  // child handle does not keep slow.js alive until the grandchild exits). The
+  // The grandchild outlives slow.js (cr6Lifetimes: slow.js lives 10 s past the
+  // longest scheduled timeout, the grandchild 100 s past slow.js; `c.unref()` so
+  // the child handle does not keep slow.js alive until the grandchild exits). The
   // verifier's runner resolves when slow.js releases the pipes, so without both
   // the kill assertion was vacuous: a verifier that killed only the leader
   // waited for the whole tree to end on its own, and the grandchild then read as
   // killed — mutation M10 (kill the leader alone) passed. Now, under M10, the
-  // grandchild is still alive when the verifier returns at ~20 s.
+  // grandchild is still alive when the verifier returns.
   // Doubling from 3 s, one entry per attempt — HANDOFF_SPAWN_RETRIES=5 gives six attempts, not a
-  // silent cap at three (QA cycle 2, CR2-5).
-  const schedule = Array.from(
-    { length: 1 + spawnBudget("HANDOFF").retries },
-    (_, k) => 3 * 2 ** k,
-  );
+  // silent cap at three (QA cycle 2, CR2-5) — with the fixture sized to the longest (QA3-1).
+  const schedule = cr6Schedule(spawnBudget("HANDOFF").retries);
+  const { slowMs, grandchildMs } = cr6Lifetimes(schedule);
   const r = retryUntilForked(schedule, (t) => {
     const dir = tempDir();
     const pidFile = path.join(dir, "child.pid");
     fs.writeFileSync(
       path.join(dir, "slow.js"),
       `const { spawn } = require("child_process");
-       const c = spawn(process.execPath, ["-e", "setTimeout(function(){}, 120000)"], { stdio: "ignore" });
+       const c = spawn(process.execPath, ["-e", "setTimeout(function(){}, ${grandchildMs})"], { stdio: "ignore" });
        c.unref();
        require("fs").writeFileSync(${JSON.stringify(pidFile)}, String(c.pid));
-       setTimeout(function(){}, 20000);`,
+       setTimeout(function(){}, ${slowMs});`,
     );
     fs.writeFileSync(path.join(dir, "package.json"), SLOW_PACKAGE_JSON);
     fs.writeFileSync(

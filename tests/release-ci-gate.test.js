@@ -74,7 +74,7 @@ const GREEN = [run("Test", "success", 1), run("ShellCheck", "success", 2)];
 const RED = [run("Test", "failure", 3), run("ShellCheck", "success", 4)];
 
 /** A scratch origin + clone on `main`, with `develop` present and both pushed. */
-function sandbox() {
+function sandbox({ verdictStub = "" } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-ci-gate-"));
   TEMP_DIRS.push(root);
   const origin = path.join(root, "origin.git");
@@ -89,6 +89,12 @@ function sandbox() {
       path.join(work, "scripts", f),
     );
   }
+  // Replaces the verdict module BEFORE the initial commit, so the tree stays clean for pre-flight.
+  if (verdictStub)
+    fs.writeFileSync(
+      path.join(work, "scripts", "release-ci-verdict.mjs"),
+      verdictStub,
+    );
   fs.writeFileSync(
     path.join(work, "CHANGELOG.md"),
     "# Changelog\n\n## [Unreleased]\n\n### Fixed\n\n- something (task 153)\n",
@@ -121,9 +127,9 @@ function sandbox() {
 
 function release(
   args,
-  { runs = GREEN, ghExit = 0, npmExit = 0, tag = "" } = {},
+  { runs = GREEN, ghExit = 0, npmExit = 0, tag = "", verdictStub = "" } = {},
 ) {
-  const box = sandbox();
+  const box = sandbox({ verdictStub });
   if (tag) {
     sh("git", ["tag", "-a", tag, "-m", tag], box.work);
     sh("git", ["push", "-q", "origin", tag], box.work);
@@ -261,4 +267,20 @@ test("--retry skips the CI check (it re-tags an existing release and keeps its o
   assert.doesNotMatch(r.out, /CI verdict/);
   assert.doesNotMatch(r.out, /REFUSED/);
   assert.match(r.out, /Would have retried: v0\.0\.1/);
+});
+
+test("a verdict module that prints something unrecognisable refuses as unverifiable — never green", () => {
+  for (const out of [
+    "",
+    "greenish\tlooks fine",
+    "no tab at all",
+    "GREEN\tshouting",
+  ]) {
+    const r = release(["--patch"], {
+      verdictStub: `process.stdout.write(${JSON.stringify(out)}); process.exitCode = 0;\n`,
+    });
+    assert.equal(r.status, 1, JSON.stringify(out) + "\n" + r.out);
+    assert.match(r.out, /CI is unverifiable/);
+    assert.equal(r.npmCalled, false);
+  }
 });

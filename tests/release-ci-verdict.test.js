@@ -329,6 +329,24 @@ test("cli: --repo reaches gh as -R; a malformed --repo is a usage error and gh i
   }
 });
 
+test("cli: --tsv prints reason<TAB>detail on one line, for release.sh's single read", () => {
+  const red = cli(
+    ["--sha", SHA, "--tsv"],
+    json([
+      run("Test", "failure", "completed", 7),
+      run("ShellCheck", "success"),
+    ]),
+  );
+  assert.equal(red.status, 1);
+  assert.match(
+    red.stdout,
+    /^red\tTest: red \(https:\/\/github\.com\/o\/r\/actions\/runs\/7\)\n$/,
+  );
+  const green = cli(["--sha", SHA, "--tsv"], json(GREEN_REQUIRED));
+  assert.equal(green.status, 0);
+  assert.match(green.stdout, /^green\t[^\t\n]+\n$/);
+});
+
 test("cli: without --json prints one human line", () => {
   const r = cli(
     ["--sha", SHA],
