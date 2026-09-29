@@ -266,3 +266,38 @@ test("K — the packager ships a fragment-cited file under its real name, with n
     "the fragment is never part of a shipped name",
   );
 });
+
+test("L — a cited copy points at what it does not ship upstream, and at what it does locally", (t) => {
+  // A cited document is copied without its closure, so `references/leaf-a.md`
+  // in the copy would send a reader to a file that is not there — the
+  // executable-instructions guard fails on exactly that. The mention becomes the
+  // upstream URL instead (the task.108 rule for links, applied to prose). A
+  // mention of something the skill DOES ship stays local, and a placeholder that
+  // names no real file is left as it always was.
+  const shared = {
+    ...SHARED,
+    "hub.md":
+      "# Hub\n\n## The rule\n\nSee `shared/resources/leaf-a.md#part` and `shared/resources/deep.md`.\n" +
+      "Template: `shared/resources/{name}.md`.\n",
+  };
+  const fx = fixture(
+    t,
+    "Rule: `shared/resources/hub.md#the-rule`. Uses `shared/resources/deep.md`.\n",
+    { shared },
+  );
+  fx.bundle();
+  assert.deepEqual(fx.bundled(), ["deep.md", "hub.md"]);
+  const hub = fs.readFileSync(
+    path.join(fx.skillDir, "references", "hub.md"),
+    "utf-8",
+  );
+  assert.match(
+    hub,
+    /`https:\/\/github\.com\/Gamaroff\/agent-skills\/blob\/develop\/shared\/resources\/leaf-a\.md#part`/,
+  );
+  assert.match(hub, /`references\/deep\.md`/, "a shipped sibling stays local");
+  assert.match(hub, /`references\/\{name\}\.md`/, "a placeholder is untouched");
+  // The URL form is never rediscovered: a second run adds nothing.
+  fx.bundle();
+  assert.deepEqual(fx.bundled(), ["deep.md", "hub.md"]);
+});

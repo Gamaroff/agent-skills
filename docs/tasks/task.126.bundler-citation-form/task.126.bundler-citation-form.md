@@ -362,6 +362,7 @@ Bugs found during QA land at `task.126.bug.[N].[name].md` in this directory.
   is re-processed as one.
 - **Status line.** `closure_note` appends `· closure M (±K vs committed)` from one cached
   `git ls-files` per run. It omits the comparison outside a repository.
+- **Mentions a cited copy cannot satisfy.** Added after the first fast gate. `executable-instructions.test.js` failed because the cited hub copy named `references/develop-pipeline-resume-contract.md` and `references/develop-pipeline-lite-mode.md`, which the three skills no longer ship. `rewrite_text` now takes an `unshipped` predicate from `expected_bytes`. A mention of a real shared file the skill does not ship becomes its upstream URL, which is the task.108 rule for links applied to prose. Shipped files and placeholders are unchanged, and only the three hub copies changed in the tree. `qa-gate-preconditions-parity.test.mjs` now accepts the citation form of the §Subagents pointer.
 - **Phase 2.** `.githooks/pre-commit` refuses the untracked part of its pre-existing dirty set
   (`LEFT`). `BUNDLE_PRECOMMIT_WARN=1` downgrades the refusal to a warning.
 - **Phase 3.** Adds "Cite or depend" to `create-skill` and a paragraph to AGENTS.md. It converts the
@@ -370,10 +371,10 @@ Bugs found during QA land at `task.126.bug.[N].[name].md` in this directory.
   `.git/hooks/pre-commit` path.
 
 **Testing results.**
-- **New tests.** 13 in `tests/bundle-citation.test.js` and 6 in `tests/pre-commit-hook.test.js`.
+- **New tests.** 14 in `tests/bundle-citation.test.js` and 6 in `tests/pre-commit-hook.test.js`.
   `bundle-missing-source.test.js` §1d gains two fragment inputs.
-- **Mutations.** 12, each reverted and each red, recorded in the implementation report: 8 on the
-  parser and discovery, 4 on the hook. One of the hook mutations is the pathspec without its
+- **Mutations.** 13, each reverted and each red, recorded in the implementation report: 9 on the
+  parser, discovery and rewrite, 4 on the hook. One of the hook mutations is the pathspec without its
   trailing `*`.
 - **Tree.** `bundle:check` is clean. `validate:all` passes 129 skills, and `check:generated`
   and `bundled-links` are green. A second `npm run bundle` is a no-op.

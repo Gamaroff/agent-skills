@@ -12,7 +12,8 @@ All notable changes to this project will be documented in this file. Format foll
     written inside `<!-- cite: … -->`, now copies that document alone and follows nothing it names.
     That holds in both spellings: `shared/resources/X.md#section`, and the `references/X.md#section`
     form the bundler rewrites skill files into. A bare mention stays a dependency (the file and its
-    closure), and so does any cite of a script.
+    closure), and so does any cite of a script. A cited copy's mentions of files the skill does not
+    ship become upstream URLs, not `references/` paths to nothing.
   - **The fragment is no longer part of the file name.** One parser, `parse_shared_refs` in
     `quick_validate.py`, now serves validation, the packager and discovery. Before, all three read
     the `#fragment` into the file name, so `validate:all` failed on a fragment reference and the

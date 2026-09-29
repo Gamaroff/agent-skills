@@ -274,16 +274,30 @@ def inject_header(content, filename, suffix):
     return header + content
 
 
-def rewrite_text(content, suffix):
+def rewrite_text(content, suffix, unshipped=None):
     """Rewrite `shared/resources/X` references to their bundled `references/X` form.
 
     Module-level rather than nested inside `bundle_skill()` because the freshness
     write path and the ambiguity gate must agree on it exactly: a bundled copy is
     the source PLUS a banner PLUS this rewrite, so a naive checksum can never
     match. One definition, two callers.
+
+    `unshipped(name)` — optional, `.md` only — says a mention names a real shared
+    file this skill does NOT ship. Such a mention becomes its upstream URL instead
+    of a `references/X` that would point a reader at nothing: the task.108 rule
+    for links, applied to the prose mention. Before task.126 the case could not
+    arise, because every mention in a bundled document was followed and so
+    shipped; a CITED document is copied without its closure, so its mentions of
+    that closure are exactly this case. The URL form is not rediscovered by any
+    scanner (`SHARED_REF_RE`'s lookbehind refuses it), so it never bundles.
     """
     if suffix == '.md':
-        return SHARED_REF_RE.sub(lambda m: f"references/{m.group(1)}", content)
+        def md(m):
+            name = m.group(1).rstrip('.,;:').partition('#')[0].rstrip('.,;:')
+            if unshipped is not None and name and unshipped(name):
+                return f"{UPSTREAM_BASE}shared/resources/{m.group(1)}"
+            return f"references/{m.group(1)}"
+        return SHARED_REF_RE.sub(md, content)
     if suffix in ('.js', '.mjs'):
         # Both forms are applied to both suffixes: a `.js` file may be ESM in a
         # consumer whose package.json says so, and a `.mjs` file may still use
@@ -442,12 +456,17 @@ def expected_bytes(src, name, refs_dir, bundled_names):
     and the checker cannot disagree about what "in sync" means.
     """
     suffix = Path(name).suffix
+    located = _skill_dirs(str(refs_dir)) if suffix == '.md' else None
+    unshipped = None
+    if located is not None:
+        shared_root = Path(located[0]) / 'shared' / 'resources'
+        shipped = set(bundled_names)
+        unshipped = lambda n: n not in shipped and (shared_root / n).is_file()
     try:
-        content = rewrite_text(src.read_text(), suffix)
+        content = rewrite_text(src.read_text(), suffix, unshipped)
     except UnicodeDecodeError:
         return src.read_bytes()
     if suffix == '.md':
-        located = _skill_dirs(str(refs_dir))
         if located is not None:
             repo_root, skill_dir = located
             src_dir = src.parent.resolve().relative_to(repo_root).as_posix()
