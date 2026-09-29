@@ -95,6 +95,13 @@ D. CONSISTENCY (category: consistency) — the three views of the same work disa
   task still in progress has no DoD file, and that is correct, not a defect.
 - If there is no work item document, or the diff is empty: return an empty findings list. Never invent
   issues to justify the run.
+- CI STATE IS NOT A FINDING BEFORE /finalise. A CI run that is pending, cancelled, or failing for an
+  environmental reason (runner offline, infrastructure timeout, a job that never started) is not a
+  conformance finding while the work item has not reached `/finalise` — the pipeline gates CI exactly
+  once, on the final commit, at `/finalise`, and no QA cycle waits on it. Leave the CI verdict to
+  `/finalise`; the output contract has no slot for it, so emit nothing. A CI failure attributable to the
+  change — a real test or lint failure on the PR head, quoted from the job's output — can still be a
+  finding.
 
 ## Output contract — emit EXACTLY this YAML and nothing else
 
