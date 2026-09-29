@@ -14,7 +14,7 @@
 | ---------------- | ------ | -------- |
 | TASK-129-CR-1 explicit `--root` widened to the repo top | FIXED | CR-1 test; mutation → red |
 | TASK-129-CR-2 `node "$VAR"` invisible | FIXED | `setup-consumer.sh:614` counted for gh-stage and jira-stage, `:1213` excluded; mutation → red |
-| CR-3..CR-7 (advisory) | FIXED | tests for CR-4/5/6; CR-3 closed by the CR-1 fix; CR-7 comment reworded |
+| CR-3..CR-7 (advisory) | FIXED (CR-7 PARTIAL) | tests for CR-4/5/6; CR-3 closed by the CR-1 fix; CR-7: comment reworded, but the `c69f5115^` fixture was **not** committed as a test — corrected after PR review 1 (PC-1) |
 
 ## Review Methodology
 

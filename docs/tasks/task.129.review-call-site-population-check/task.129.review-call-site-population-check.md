@@ -167,7 +167,7 @@ None.
 **Command**: `npm test` (per phase: `npm run ci:fast`)
 
 ### Integration Tests
-- [x] Automated: `call-sites.js --engine tracker-comment --root <git archive of c69f5115^>` returns the two sites the task.121 review found unnamed. (`c69f5115` is the commit that widened task.121 after review; the document as reviewed is `c69f5115^`.)
+- [x] Scripted, run by hand (not a committed test): `call-sites.js --engine tracker-comment --root <git archive of c69f5115^>` returns the two sites the task.121 review found unnamed — recorded in the implementation report, Step 3. Not committed as a test because it needs history a shallow CI clone does not carry; the `--root`-as-given behaviour it relies on is covered by the committed CR-1 test. (`c69f5115` is the commit that widened task.121 after review; the document as reviewed is `c69f5115^`.)
 - [x] Hand run, recorded in the implementation report: check 14 applied to `git show c69f5115^:docs/tasks/task.121.cycle-scoped-qa-tracker-comments/task.121.cycle-scoped-qa-tracker-comments.md` reports those two sites as Important.
 
 ### Contract Tests
@@ -266,8 +266,8 @@ No blocking issues. Three advisory findings (C4-CR-1..3) are recorded in the gat
 
 - [x] Phase 1: call-sites.js
 - [x] Phase 2: review check
-- [ ] QA: `task.129.qa.[N].review-call-site-population-check.md`
-- [ ] Gate: `task.129.gate.[N].review-call-site-population-check.yml`
+- [x] QA: `task.129.qa.[N].review-call-site-population-check.md` — cycles 1–4; latest qa.4
+- [x] Gate: `task.129.gate.[N].review-call-site-population-check.yml` — gate.4 PASS (100)
 
 ## References
 
