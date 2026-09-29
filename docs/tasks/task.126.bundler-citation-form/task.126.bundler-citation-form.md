@@ -5,11 +5,13 @@ type: task
 description: "bundle_skill.py follows every shared/resources/X mention recursively with no notion of cite vs depend: a one-line pointer from qa-fix, review-task and review-story to develop-pipeline-autonomous-defaults.md pulled 15–16 files each into skills that read none of them (task.116, ~48 generated files whose only relationship to the change is a sentence). And when a bundle run generates a new untracked references/ copy, the pre-commit hook prints an advisory and lets the commit through; bundle:check then fails in CI a push later (task.99). Give the bundler a citation form that copies one file, print the transitive count per skill on every run so growth is visible when it is caused, and make the pre-commit fail — not warn — on a new untracked generated copy. Observations #83, #114 (mechanism half)."
 tags: [create-skill, bundler, pre-commit]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-09-17
 updated: 2026-09-29
+completed_date: 2026-09-29
+pr_number: 524
 assignee:
 estimated_effort_hours: 8
 github_issue: 426
@@ -17,7 +19,7 @@ github_issue: 426
 
 # Technical Task: Citing a hub shared resource bundles its whole transitive closure
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.126.review.1.bundler-citation-form.md` implemented 2026-09-29
 **GitHub Issue**: [#426](https://github.com/Gamaroff/agent-skills/issues/426)
 
@@ -342,9 +344,9 @@ None.
 - Both cycle-2 findings are fixed and mutation-proven.
 - Advisory: an unreachable fallback and stale comments in `expected_bytes` (CR-1); `revert_new`'s tracked-copy branch has no test (CR-2).
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
 
-**Status:** IN PROGRESS (the document stays `ready-for-review`)
+**Status:** SUPERSEDED. Run 1 found these gaps; the operator decisions below closed them, and run 2 accepted the task (see the next section).
 
 ### QA Gate Status
 
@@ -384,11 +386,35 @@ Both gaps are closed by a recorded operator decision, not by new evidence. `/fin
 
 **Detailed Verification Log:** see `task.126.dod.1.bundler-citation-form.md` for the complete verification evidence and timestamps.
 
+## Definition of Done - PASSED ✅ (run 2)
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.126.qa.3.bundler-citation-form.md`
+**Gate File**: `task.126.gate.3.bundler-citation-form.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR review (5c)**: ✅ APPROVE — `task.126.pr-review.1.bundler-citation-form.md`
+
+Every Definition of Done criterion was verified, with two recorded operator waivers:
+
+✅ **Acceptance Criteria:** 6 of 7 met with code and per-PR tests. AC5 (bundle time) is ⚠️ **waived** by operator decision 1, on measured evidence showing the branch faster than develop.
+✅ **Mutation proofs:** run 2's AC agent found five new tests with no recorded mutation. /finalise ran and recorded those proofs, D1–D5, and every one went red. Every test task.126 added now has a recorded red mutation.
+✅ **PR & Tests:** PR #524; CI reading 1 SUCCESS @ `67b4ed23` over 5 checks
+✅ **Documentation:** CHANGELOG, create-skill § Cite or depend, AGENTS.md, traps.md
+⚠️ **Security Review:** one low finding: probe mode executed no candidates on the pre-commit boundary. It is **accepted** by operator decision 2, on fixture-test evidence. The tooling follow-up is observation #221.
+⚠️ **Compliance Review:** NOT_APPLICABLE (an internal tooling refactor)
+
+**Task marked as ACCEPTED on:** 2026-09-29
+
+**Detailed Verification Log:** see `task.126.dod.2.bundler-citation-form.md` for the complete verification evidence, including the "Deviations recorded, not hidden" block.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-09-17 | 1.0 | Initial draft — observation review 2026-09-17 (obs #83, #114) | create-task |
 | 2026-09-29 | 1.1 | Review 4/10 → 8/10 after fixes — cite detected on the `references/` spelling; one fragment-stripping parser in quick_validate.py; `git rm` of UNREACHED copies; hook refusal on untracked ∩ LEFT with a working pathspec; measured closure criteria; node hook test | review-task |
 | 2026-09-29 |  | Status → ready-for-development | review-task |
@@ -398,6 +424,7 @@ Both gaps are closed by a recorded operator decision, not by new evidence. `/fin
 | 2026-09-29 |  | QA gate PASS (100/100) — 0 findings (2 advisory cleanups) | qa-task |
 | 2026-09-29 |  | DoD incomplete — 2 gaps identified (AC5 has no automated test; security probe executed no candidates on the pre-commit boundary) | finalise |
 | 2026-09-29 |  | Operator decisions recorded: AC5 waived on measured bundle-time evidence; security probe-mode finding accepted on fixture-test evidence (tests/pre-commit-hook.test.js, observation #221) | operator |
+| 2026-09-29 | 1.2 | DoD verified (run 2) — accepted (PR #524); AC5 and the security probe-mode finding under recorded operator waivers; five missing mutation proofs recorded at finalise | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
