@@ -980,6 +980,21 @@ cost is not mainly CI minutes (four of the five superseded runs there died withi
 ten minutes of runner time). It is that **every fix commit reached merge without a completed CI run
 of its own**, because a cycle's second push kept cancelling its own in-flight run.
 
+**CI and the QA loop — no cycle waits on CI.** QA cycles (5a/5b) and the 5c review do **not** wait
+for the PR's CI run. Each cycle pushes as above, and CI runs in the background as free information:
+read its latest state if it is to hand, never block on it. A cycle's suite evidence is the local fast
+gate (`develop.fastGateCommand`, step 0a) plus the diff review. **CI green is required exactly once,
+on the final commit, at `/finalise`** — its CI reading 1 (the acceptance decision) and CI reading 2
+(on the acceptance commit) are this pipeline's only CI gate.
+(`/develop-next`'s and `/develop-batch`'s merge step waits on CI again, on that same final head —
+after the loop, never inside it.)
+
+The reason is cost, not principle. On a single shared runner a per-cycle wait turns into hours:
+tinker-city task.122 waited about 35 minutes per cycle across cycles 3–7, and a sleeping CI host
+stranded the loop twice. An environmental CI failure then blocks a loop that has nothing to fix.
+Waiting also buys nothing `/finalise` does not already buy, because every cycle but the last is
+superseded by the next push.
+
 Staging the gate here does **not** conflict with qa-fix's "Dev does not modify gate YAML files"
 (`qa-fix` Step 6): this orchestrator stages a gate that `/qa-gate` wrote during 5a. `/qa-fix` never
 touches it. Nor does it move anything the resume contract reads — cycle reconstruction counts
