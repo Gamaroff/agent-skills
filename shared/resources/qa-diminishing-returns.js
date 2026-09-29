@@ -657,7 +657,8 @@ function route(routeName, reason, detail, extra) {
  * @param {string|null} [input.lastCycleAction]  the `**Action**` row of cycle N's entry; route 2c
  *   requires it to read `Running qa-fix …`
  * @returns {{route: string, reason: string, detail: string, findings: Array,
- *            verdict?: string, lowIds?: string[], mediumSequence?: number[]}}
+ *            verdict?: string, lowIds?: string[], residueIds?: string[],
+ *            mediumSequence?: number[]}}
  */
 function classifyLoopRoute(input) {
   let cycle;
@@ -776,8 +777,18 @@ function classifyLoopRoute(input) {
     testArtifactGlobs,
   });
   if (dr.verdict === VERDICTS.EXIT) {
+    // residueIds: the OPEN entries this exit carries, by id, in gate order — the
+    // route-2 counterpart of route 2b's lowIds. The step doc stamps each one
+    // `status: closed` with a carried-to resolution, so the gate that leaves the
+    // loop has no open entry for develop-next's merge gate to refuse (obs #215:
+    // task.153 was accepted with its residue open and halted at merge).
+    const residueIds = readTopIssues(latestGateContent)
+      .filter(isOpen)
+      .map((e) => e.id)
+      .filter((id) => typeof id === "string" && id !== "");
     return route(ROUTES.DIMINISHING_RETURNS, dr.reason, dr.detail, {
       verdict: dr.verdict,
+      residueIds,
       findings: dr.findings,
     });
   }
