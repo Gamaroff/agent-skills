@@ -52,11 +52,22 @@ The list is data as well as prose: `probe-boundary-signals.mjs` (beside `securit
 writer, a formatter, a schema migration, a logging change — none of these are boundaries, however
 security-adjacent they look. Probe mode must **not** fire on them.
 
-**Record the decision explicitly, either way**, as the `boundary:` field of the returned YAML —
-`true` when the rule fired, `false` when it did not. Do **not** signal the decision by leaving `probes`
-empty: an empty `probes` is also the correct output for a boundary that *was* probed and held, and those
-two outcomes must stay distinguishable. A `boundary: false` is a legitimate, expected skip, not an
-omission; say so in `summary`.
+**Record the decision explicitly**, as the `boundary:` field of the returned YAML — `true` when the
+rule fired, `false` when it did not, or `internal` in the one case below. Do **not** signal the decision
+by leaving `probes` empty: an empty `probes` is also the correct output for a boundary that *was* probed
+and held, and those two outcomes must stay distinguishable. A `boundary: false` is a legitimate,
+expected skip, not an omission; say so in `summary`.
+
+**`boundary: internal` — the rule fired on a validator of the pipeline's own artefact, and no sink fits
+it.** Record it only when **both** hold: the predicate's only input is an artefact this repository's
+own pipeline writes (an implementation report, a DoD summary, a gate file), **and** no corpus sink's
+legitimate cases are documents that predicate is meant to accept. It requires `internal_reason:` — one
+sentence naming the artefact and why no sink fits. It is **not available** once a sink models the
+shape: `markdown-structure` models the implementation report, so `report-lint.js#lintReport` is
+`boundary: true` and probed with `--args-json` (Step 4), never `internal`. `internal` is a recorded
+decision, not a skipped question — it exists so the task.124 shape (a Markdown validator with no sink,
+FAILed on the zero-guard and overruled by hand) becomes a rule instead of an override. A validator of
+external input is never `internal`, whatever its shape.
 
 ### Step 2: Run story-type-specific checklist
 
@@ -115,8 +126,9 @@ down once, in [`shared/resources/security-input-corpus.md`](security-input-corpu
 machine-readable peer `shared/resources/security-input-corpus.mjs`. You do not import them yourself:
 the engine in step 3 calls `corpusFor(sink)` for the sink you name, so choosing the sink **is**
 choosing the candidates. Sinks: `url-authority` | `sql-orm` | `shell-exec` | `path` |
-`template-render` — pick by what the boundary *decides* (where a connection goes, what reaches a
-query, what reaches a shell, what location is read or written, what is interpolated into output).
+`template-render` | `filename` | `markdown-structure` — pick by what the boundary *decides* (where a
+connection goes, what reaches a query, what reaches a shell, what location is read or written, what is
+interpolated into output, which directory entry counts, whether an implementation report is whole).
 
 Each case carries the input, **why** it is dangerous, and **what a correct implementation does to
 it** — so the corpus says what a pass looks like, not merely what to try. Between them the cases
@@ -142,6 +154,18 @@ reasoning about it is precisely what the checklist already does, and what it get
 # import, and read as unverifiable (executed: 0) without it.
 node PROMPT_DIR/security-probe.mjs \
   --sink <sink> --entry '<path-from-repo-root>#<exportName>' \
+  --repo-root "$(git rev-parse --show-toplevel)" \
+  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+
+# A JS export that takes a CONFIGURATION ARGUMENT after its input — `(text, opts)`,
+# like report-lint.js#lintReport — takes --args-json: a JSON array of fixed
+# arguments appended after every case's input. State them; the engine never
+# guesses one. A validator answering `{ ok: false, … }` is read as refusing.
+# LINT_JS is report-lint.js's path from the repo root (where the diff puts it);
+# ARGS_JSON is `[{"sections": <its loadTemplate() result>}]`, JSON-encoded.
+node PROMPT_DIR/security-probe.mjs \
+  --sink markdown-structure --entry "$LINT_JS#lintReport" \
+  --args-json "$ARGS_JSON" \
   --repo-root "$(git rev-parse --show-toplevel)" \
   --record <STORY_DIR>/<stem>.dod.security.run.json --json
 
@@ -200,7 +224,10 @@ outcome this form exists to end. **Nor is "it is a sourced function"**: that is 
 form's case, and running `shell:` against a library instead is the task.125 outcome — `absent`
 behind a full count — that *that* form exists to end. **Nor is "it is a multi-flag CLI" or "the
 function takes three arguments"** when a Node CLI calls it: that is the `cli:` form's case, and
-recording it unverifiable is the task.141 outcome that form exists to end.
+recording it unverifiable is the task.141 outcome that form exists to end. **Nor is "it takes a
+second argument"** for a JS export whose extra argument is plain data: that is `--args-json`'s case,
+and recording it unverifiable is the task.124 outcome (`lintReport`, overruled by hand) it exists to
+end.
 
 **4. Report only what reproduced — but count everything you ran.** A candidate you did not run is not a
 finding. A candidate that ran and returned its expected verdict is not a finding either. `probes[]`
@@ -224,7 +251,9 @@ sentence. A fix that closes a hole by refusing everything is also a defect, and 
 direction an over-strict boundary looks identical to a correct one.
 
 **Zero executed candidates on a boundary deliverable is a finding, not a pass.** If `boundary: true` and
-`probes_executed: 0`, emit a check with `status: FAIL` named `probe mode executed no candidates`. A step
+`probes_executed: 0`, emit a check with `status: FAIL` named `probe mode executed no candidates`. The
+guard applies to `boundary: true` only. `boundary: internal` is not a way around it: it is available
+only when no sink fits (Step 1b), and without `internal_reason` it is a FAIL of its own. A step
 that reports success without having run anything is the exact defect this step exists to catch, and it
 must not be able to hide inside its own output.
 
@@ -257,7 +286,8 @@ security_review:
       status: PASS | FAIL | NOT_APPLICABLE
       citation: null
       note: "optional"
-  boundary: true | false # REQUIRED. Did Step 1b's rule fire? Never inferred from `probes`.
+  boundary: true | false | internal # REQUIRED. Did Step 1b's rule fire? Never inferred from `probes`.
+  internal_reason: "the artefact, and why no sink fits" # REQUIRED when boundary is internal; omit otherwise
   probes_executed: 0 # REQUIRED when boundary is true. Every candidate actually run, including
     # the legitimate inputs of step 5 and every candidate that behaved correctly —
     # totals.executed from the engine's run record (--record), never composed by hand.
@@ -291,6 +321,8 @@ mode executed no candidates` FAIL from Step 4.
 question was not answered, and the reader must treat probe mode as unverified rather than as skipped. A
 missing `probes_executed` under `boundary: true` counts as **zero**, and takes the FAIL above: a count
 that was never reported is not evidence that any work happened. Emit both keys explicitly, every time.
+A `boundary: internal` with no `internal_reason` is a FAIL: the reason is the whole of the decision, and
+an `internal` that names nothing is indistinguishable from a probe that was skipped.
 
 **An empty `probes` is not by itself a failure — it is the good result when `probes_executed` is high.**
 What is never a pass is a boundary that executed nothing.

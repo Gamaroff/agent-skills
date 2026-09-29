@@ -214,6 +214,12 @@ const PROMPT_MAY_MENTION = Object.freeze([
   // one suppression was covering the one genuine paraphrase in the file: the
   // exemption list papering over exactly what it warns about. The example was
   // changed instead, and the exemption removed.
+  //
+  // "###" (task.131): a markdown heading marker. The markdown-structure sink's
+  // inputs are whole reports, so their whitespace tokens include heading
+  // markers — and every prompt in this repository is markdown with `###`
+  // headings. It is syntax the two share, not a quoted input.
+  "###",
 ]);
 
 /**
@@ -561,7 +567,10 @@ test("the probe render branches on boundary, not on list emptiness", () => {
 
 test("an absent boundary renders as unverified, never as 'not a boundary'", () => {
   assert.ok(
-    has(skill(), "{if security_result.boundary is absent or not a boolean:}"),
+    has(
+      skill(),
+      '{if security_result.boundary is absent, or is neither a boolean nor "internal":}',
+    ),
     "skills/finalise/SKILL.md: a missing `boundary` falls into the `false` branch, so an agent that " +
       "never answered the question is reported as having answered 'not a boundary'. That moves the " +
       "conflation up a level rather than removing it.",
@@ -574,6 +583,75 @@ test("an absent boundary renders as unverified, never as 'not a boundary'", () =
     has(source(), "A missing `boundary` is not `false`"),
     `${PROMPT}: the prompt no longer states that omitting boundary is not a way to answer it`,
   );
+});
+
+test("task.131: boundary: internal renders as an explicit skip, and without internal_reason as a FAIL", () => {
+  assert.ok(
+    has(skill(), '{else if security_result.boundary == "internal":}'),
+    "skills/finalise/SKILL.md: `boundary: internal` has no render branch of its own — it falls into " +
+      "the unverified branch, or worse the zero-guard, which is the task.124 FAIL it exists to replace",
+  );
+  assert.ok(
+    has(skill(), "{if security_result.internal_reason is absent or empty:}"),
+    "skills/finalise/SKILL.md: an `internal` with no reason must render as a FAIL, not as a skip",
+  );
+  assert.ok(has(skill(), "Internal artefact recorded without a reason"));
+  assert.ok(has(skill(), "Internal artefact — not probeable by the engine"));
+  // The internal branch must sit BEFORE the bare {else:} that opens the
+  // boundary: true render — otherwise the zero-guard fires on an internal.
+  const block = skill();
+  const internalAt = block.indexOf(
+    '{else if security_result.boundary == "internal":}',
+  );
+  const zeroAt = block.indexOf(
+    "{if security_result.probes_executed is absent or == 0:}",
+  );
+  assert.ok(internalAt !== -1 && zeroAt !== -1 && internalAt < zeroAt);
+  assert.ok(
+    has(source(), "boundary: true | false | internal"),
+    `${PROMPT}: the output schema does not offer \`internal\``,
+  );
+  assert.ok(
+    has(source(), "A `boundary: internal` with no `internal_reason` is a FAIL"),
+    `${PROMPT}: the prompt no longer states that internal needs a reason`,
+  );
+  assert.ok(
+    has(source(), "The guard applies to `boundary: true` only"),
+    `${PROMPT}: the zero-guard no longer says which boundary value it keys on`,
+  );
+});
+
+test("task.131: every canonical source that renders or states the boundary schema names `internal`", () => {
+  // Keyed on COMPOUND literals, never bare `boundary:` — that matches 16 files,
+  // most of them prose about some other boundary (loop-supervisor, the
+  // PreCompact hook's "Last step boundary:", report fixtures), so a test keyed
+  // on it would be red at the wrong sites (review-task check 13).
+  const KEYS = ["boundary: true | false", "security_result.boundary"];
+  const roots = [
+    join(repoRoot, "shared", "resources"),
+    ...readdirSync(join(repoRoot, "skills")).map((d) =>
+      join(repoRoot, "skills", d),
+    ),
+  ];
+  const hits = [];
+  for (const dir of roots) {
+    if (!existsSync(dir) || !statSync(dir).isDirectory()) continue;
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith(".md")) continue;
+      const text = readFileSync(join(dir, f), "utf-8");
+      if (KEYS.some((k) => text.includes(k))) hits.push([join(dir, f), text]);
+    }
+  }
+  assert.ok(
+    hits.length >= 2,
+    `population floor: found ${hits.map(([p]) => p).join(", ")}`,
+  );
+  for (const [path, text] of hits) {
+    assert.ok(
+      text.includes("internal"),
+      `${path} states or renders the boundary schema and never names \`internal\``,
+    );
+  }
 });
 
 test("an absent probes_executed counts as zero, not as a pass", () => {
