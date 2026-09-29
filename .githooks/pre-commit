@@ -73,6 +73,34 @@ fi
 # Pre-existing drift is left alone, but never silently: an unmentioned dirty
 # bundle is how source and its bundled copies drift apart in the first place.
 LEFT="$(comm -12 "$PRE_FILE" "$POST_FILE")"
+
+# An UNTRACKED copy in that pre-existing set is refused, not warned about
+# (task.126, observation #114). It is what a manual `npm run bundle` before the
+# commit leaves behind: the copy is on disk, so every local check passes, and it
+# is absent from the commit, so `bundle:check` fails in CI a push later (task.99
+# paid one QA cycle for it). A modified tracked copy stays a warning — it is
+# pre-existing work, and the committed tree is still consistent without it.
+# The pathspec keeps its trailing `*` (see REFS_PATHSPEC above): without it the
+# listing is empty and this refusal would never fire.
+UNTRACKED_LEFT="$(comm -12 \
+  <(printf '%s\n' "$LEFT" | sed '/^$/d' | sort) \
+  <(git ls-files --others --exclude-standard -- "$REFS_PATHSPEC" | sort))"
+if [ -n "$UNTRACKED_LEFT" ]; then
+  {
+    echo ""
+    echo "✗ Untracked generated copies in skills/*/references/ — bundle:check will fail in CI:"
+    printf '%s\n' "$UNTRACKED_LEFT" | sed 's/^/      /'
+    echo ""
+    echo "  git add them, or remove the shared/resources/ mention that produced them"
+    echo "  (a document you only point at can be cited instead: create-skill § Cite or depend)."
+  } >&2
+  if [ "${BUNDLE_PRECOMMIT_WARN:-0}" != "1" ]; then
+    echo "  BUNDLE_PRECOMMIT_WARN=1 downgrades this to a warning." >&2
+    exit 1
+  fi
+  echo "  BUNDLE_PRECOMMIT_WARN=1 is set — proceeding." >&2
+fi
+
 if [ -n "$LEFT" ]; then
   echo "⚠ $(printf '%s\n' "$LEFT" | wc -l | tr -d ' ') pre-existing bundle change(s) left unstaged:"
   printf '%s\n' "$LEFT" | head -5 | sed 's/^/      /'
