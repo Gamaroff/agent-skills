@@ -36,14 +36,23 @@ First pipeline run for task 154: remove the placeholder literal behind the bundl
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; audit 28/28 Ready for Review @ `63d039b6`; 6 mutation proofs | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #513: https://github.com/Gamaroff/agent-skills/pull/513 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.154.qa.{N}.*.md`; `task.154.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles (FAIL → CONCERNS ×3 → PASS 100); 8 bugs closed; runner redesigned at cycle 3; 5c APPROVE | —                    |
-| 7. finalise                | ❌ Gaps    | `task.154.dod.{N}.*.md`; task `status: accepted`                      | DoD 1: 3 gaps (Security probe unreachable, medium; AC5; AC6); CI reading 1 SUCCESS @ `060e9377`; gaps PR comment posted; HALTED | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.154.dod.{N}.*.md`; task `status: accepted`                      | DoD 1: 3 gaps → closed in `78ab4858`; DoD 2 ACCEPTED (`task.154.dod.2…`); CI reading 1 SUCCESS @ `78ab4858`, reading 2 SUCCESS @ `27562faa`; registry ticked; #484 closed | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Report committed and pushed; tree clean | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
 ---
 
 ## Decisions Log
+
+### Step 7 — finalise (DoD 2) — 2026-09-29T05:29Z
+
+- DoD 1 (gaps) → gaps closed in `78ab4858` at the user's direction → `/finalise` re-run as DoD 2.
+- DoD 2 agents: AC PARTIAL → closed in-run (AC8 quoted mutation lines, AC10 clean-checkout run recorded, runbook pre-flight); Security PASS (probe 17 executed / 0 reproduced, record `task.154.dod.2.security.run.json`); Compliance N/A; Docs PASS.
+- Prompts: each DoD agent was given its prompt file with placeholders substituted, to read in full, rather than the text pasted inline (same content; `<stem>` bound to `task.154.dod.2`).
+- CI reading 1: SUCCESS @ `78ab485873a3` over 5 checks; CI reading 2: SUCCESS @ `27562faa297d` over 5 checks (acceptance head).
+- Acceptance commit `27562faa` (task doc, DoD 2, sprint review, registry, runbook, security record); first attempt hit a transient `index.lock` and was retried once; 6b assertions OK; 6d CHANGELOG cites task 154.
+- registry-tick → `ticked` (`planned` → `accepted`). Canonical PR comment posted (issuecomment-5884260598). Tracker #484: doc link already on `develop`; `done` comment `posted`; close `performed` (state CLOSED); gh-stage done → `already`.
 
 ### Pipeline Startup — 2026-09-28
 
@@ -90,6 +99,15 @@ First pipeline run for task 154: remove the placeholder literal behind the bundl
 | Runner copies the working tree (`cp -R`) instead of cloning | test-clean-checkout.test.js | ✖ 3 cases — the check passes in the copy; positive control and dirty-tree case red |
 | Point finalise-bug-mode back at REPO_ROOT as cwd | npm run test:clean-checkout | ✖ in the clean clone: 88 tests, 42 pass, **46 fail**; in place the same commit reads 88/88 pass — the point of the runner. Proven on a temporary commit, then `git reset --soft` to `63d039b6` and the file restored; tree clean |
 
+| Drop `env -u CLEAN_CHECKOUT_CMD` from release.sh's gate (M-A, after DoD 1) | test-clean-checkout release-gate case | ✖ `the gate is the first npm call, runs without the test hook, and nothing runs after it fails` — the hook arrived as `echo hijacked` |
+| Change release.sh's gate to `npm test` (M-B) | test-clean-checkout release-gate case | ✖ same assertion — first call `test`, not `run test:clean-checkout` |
+| Let `resolveBase` accept an empty base (M-C) | test-clean-checkout export case | ✖ `Missing expected exception.` |
+| Skip `resolveBase`'s ephemeral check (M-D) | test-clean-checkout temporary-directory case | ✖ `expected exit 2 for /tmp/clean-checkout-x, got 0` |
+| `FILE_BUDGET_MS = 1` in bundle-missing-source (M-E) | its root after-hook | ✖ `this file took 5073 ms, over its 1 ms budget (task 154 AC6)` |
+| `FILE_BUDGET_MS = 1` in test-clean-checkout (M-F) | its root after-hook | ✖ `this file took 181 ms, over its 1 ms budget (task 154 AC6)` |
+| `FILE_BUDGET_MS = 1` in consumer-root (M-G) | its root after-hook | ✖ `this file took 35 ms, over its 1 ms budget (task 154 AC6)` |
+| Skip `resolveBase`'s ephemeral check, probed (M-H) | `security-probe.mjs` with the task's cases file | ✖ verdict `present-but-inert`, reproduced `tmp, private-tmp, var-tmp, private-var-tmp, traversal-into-tmp` |
+
 All restored; each file re-run green after restore.
 
 #### Verification on the committed branch (`63d039b6`)
@@ -98,6 +116,12 @@ All restored; each file re-run green after restore.
 - New test files: bundle-missing-source 5.3s (5 tests), consumer-root 0.23s (2), test-clean-checkout 1.3s (6) — all under 10s.
 - `npm run -s bundle` prints 0 `not found` lines; `bundle:check` 129 skills, 0 problems; `lint:shell` clean (76 scripts); `quick_validate` create-skill ✓, observe-work ✓.
 - The pre-commit hook's bundle run on each of the five commits printed no `not found` line.
+
+#### Verification on the DoD 1 gap-fix commit (`78ab4858`)
+
+- `npm run test:clean-checkout`: rc=0 — 4424 tests, 4423 pass, 0 fail, 1 skipped (clean clone of `78ab4858`).
+- A first attempt under `npm run -s` failed 5 tests in `evals/shared/tests/fast-gate-precondition.test.mjs`. The cause is not this change: the inherited `npm_config_loglevel=silent` alone reproduces it in place (12/12 pass without it, 7/12 with it). `release.sh` runs the gate without `-s`.
+- `eval:all`, `validate:all` (129 passed) and `check:generated` rc=0; `bundle:check` 129 skills, 0 problems; `lint:shell` clean; `prettier --check .` clean. CI on `78ab4858`: 5/5 SUCCESS.
 - Loop audit iter 1 (Explore): `{"status":"ready-for-review","completed":28,"total":28,"last_commit_hash":"63d039b6…"}` → exit loop. Change Log row written by the inline path (one row). Development completion comment posted to github issue 484 (develop-complete → posted).
 
 ### Step 4 — create-pr
@@ -122,6 +146,11 @@ _Problems encountered and how they were resolved or escalated._
   - AC6: the under-10 s limit was measured once, not asserted.
   - AC13 (observations to `actioned`) is post-merge and not counted as a gap.
   - Fix-and-recheck was not reachable: two sections fail, and one finding is medium. QA gate PASS 100; CI green.
+- **DoD 1 gaps closed (user-directed, 2026-09-29)** — no QA cycle re-run; verified inline:
+  - Security: the base decision moved to `scripts/lib/clean-checkout-base.mjs` (`resolveBase`, one export; the runner calls it as a CLI). It now also refuses an empty base. `security-probe.mjs` with `task.154.security-probe-cases.json` (13 hostile, 4 legitimate) → `engages`, executed 17, reproduced 0, overblocked 0, escapes 0; dev record `.claude/state/t154-dev-probe.run.json` (the DoD 2 security agent records its own). Discrimination: with the ephemeral check bypassed, the same run → `present-but-inert`, 5 reproduced (tmp, private-tmp, var-tmp, private-var-tmp, traversal-into-tmp).
+  - AC5: new fixture test runs `release.sh --patch` with a fake `npm`: the gate is the first call, a failing gate stops the release, and `CLEAN_CHECKOUT_CMD` arrives unset (review-pr CR-2, now `env -u CLEAN_CHECKOUT_CMD`).
+  - AC6: each new test file has a root after-hook failing its run at ≥ 10 s. The CI log of run 36496198771 showed `bundle-missing-source` near 9 s under suite contention, so the bundler's line-aware collector became one pass per file (`--check` 5.8 s → 4.6 s, output byte-identical before/after).
+  - Mutation proofs M-A..M-H, all red then restored (`.claude/state/t154-mutations.log`): release hook kept; gate as `npm test`; empty base accepted; ephemeral check bypassed (runner test); budget = 1 ms in each of the three files; probe discrimination.
 - **Spec change**: the clean-checkout runner's design changed in QA cycle 3 (per-run `mktemp -d` directory inside a base) after three cycles of findings on the named-location design; task §3 was brought into line in cycle 4.
 
 ---
@@ -187,13 +216,13 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-29T05:29Z
+**Final Status**: Completed
 **Branch**: `feature/task.154.bundler-and-snippet-test-hygiene`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/513
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 5 (FAIL 70 → CONCERNS 80 ×3 → PASS 100); 5c APPROVE
+**DoD Summary**: `task.154.dod.2.bundler-and-snippet-test-hygiene.md` — ACCEPTED (run 1: 3 gaps, closed in `78ab4858`)
+**Tracker debt**: none — #484 `done` comment posted, issue closed, board `already` at Done
 
 ---
 
