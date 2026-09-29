@@ -43,7 +43,7 @@ objects. Reduce per workflow, then across workflows; the worst verdict wins
 | else (no runs, or only `cancelled` / `skipped` / `neutral`) | `unverifiable` for `required`; ignored for `whenPresent` |
 
 Two `Test` runs per SHA is normal — the release commit is pushed to `main`, then to `develop` by the
-sync step (`release.sh:369-386`); `gh run list --commit 398107e6…` shows exactly that for v0.51.0. The
+sync step (`release.sh:374-392`); `gh run list --commit 398107e6…` shows exactly that for v0.51.0. The
 rule reads all of them: one red among them is red.
 
 **Signatures.**
@@ -75,8 +75,9 @@ drain-safe exit the repository already uses (see the `stdout-drain-on-exit` test
 # A local npm test is a claim about this machine. The release is certified by the
 # verdict CI recorded for this SHA — obs #150: the local suite was green through
 # five consecutive red Test runs on develop (2026-09-21).
+if [[ "$RETRY" == false ]]; then   # pre-flight runs for --retry too; --retry keeps its own guard
 heading "CI verdict"
-CI_JSON=$(command node scripts/release-ci-verdict.mjs --sha "$LOCAL" --json) || true
+CI_JSON=$(command node "$(dirname "$0")/release-ci-verdict.mjs" --sha "$LOCAL" --json) || true
 CI_REASON=$(printf '%s' "$CI_JSON" | command node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).reason)}catch{process.stdout.write("unverifiable")}})')
 if [[ "$CI_REASON" == "green" ]]; then
   ok "CI green for ${LOCAL:0:8}"
@@ -91,21 +92,26 @@ else
   echo "Wait for CI to finish green, or pass --skip-ci-check if you have confirmed it another way."
   exit 1
 fi
+fi
 ```
 
 - `$LOCAL` is the SHA the `:137-152` block just proved equal to `origin/main` — reuse it, do not
   re-read `HEAD`.
 - Parse the flag in the `case` at `:53-75`: `--skip-ci-check) SKIP_CI_CHECK="true"; shift ;;` (quoted
   like the neighbouring arms, per the SC2209 comment at `:55-57`).
-- `--retry` does not run this block (it re-tags an existing release; its own guard is `:252-261`).
-- Summary block (`:389-400`): when `WOULD_REFUSE` is set, print `Would have REFUSED: ${WOULD_REFUSE}`.
+- `--retry` does not run this block — the `RETRY == false` guard above is required, because the
+  pre-flight section has no `RETRY` condition of its own (it re-tags an existing release; its own
+  guard is `:257-268`).
+- The module is addressed relative to the script (`$(dirname "$0")`), not the cwd.
+- Summary block (`:394-421`, the `DRY_RUN` arm): when `WOULD_REFUSE` is set, print `Would have REFUSED: ${WOULD_REFUSE}`.
 - Header (`:4-32`): add the usage line and the step; change `# Requires:` to name `gh (authenticated)`.
 
-**The `npm test` wrapper** (replaces `:185-191`):
+**The local-test wrapper** (replaces `:191-197`; task.154 changed the step to
+`npm run test:clean-checkout`, skipped under `--dry-run` — keep both):
 
 ```bash
-if ! npm test; then
-  err "npm test failed."
+if ! env -u CLEAN_CHECKOUT_CMD npm run test:clean-checkout; then
+  err "npm run test:clean-checkout failed."
   echo "  If the failing assertion says LOAD-SENSITIVE, re-run that file alone"
   echo "  (command node --test <file>). If it passes alone, re-run the release —"
   echo "  do not investigate it. Anything without the marker is a real red."
@@ -150,7 +156,7 @@ Do not write the `docs/…` path as a `shared/resources/…` literal anywhere in
 **The four assertions** — wrap only the message; the threshold stays:
 
 ```js
-// qa-execute-snippets.test.mjs:795 — before
+// qa-execute-snippets.test.mjs:796 — before
 assert.ok(elapsed < 10_000, `the 30s sleep must be truncated, took ${elapsed}ms`);
 // after
 assert.ok(elapsed < 10_000, loadSensitive(`the 30s sleep must be truncated, took ${elapsed}ms`));
