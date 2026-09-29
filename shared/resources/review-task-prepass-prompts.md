@@ -65,7 +65,7 @@ For each extracted symbol or feature name, grep the codebase (excluding docs/, n
 
 Assess whether the task's core deliverable appears to already be implemented, partially implemented, or not yet present.
 
-If the task enumerates call sites of one of this repository's engines (tracker-comment.js, stakeholder-summary-cli.js, gh-stage.js, jira-stage.js, tracker-issue.js) — it lists them, counts them, or says "all call sites of" — do not confirm the names it gives one by one: a grep for a named site cannot see an unnamed one. Run, from the repository root, `command node .agents/skills/review-task/references/call-sites.js --engine <engine> --json` and list every site it returns that the task does not name. If it answers `reason: no-roots`, this tree cannot be measured: omit population_diff and add a finding with symbol `call-sites`, found_at `not found`, note `no-roots — population not measurable here`.
+If the task enumerates call sites of one of this repository's engines (tracker-comment.js, stakeholder-summary-cli.js, gh-stage.js, jira-stage.js, tracker-issue.js) — it lists them, counts them, or says "all call sites of" — do not confirm the names it gives one by one: a grep for a named site cannot see an unnamed one. Run, from the repository root, `command node .agents/skills/review-task/references/call-sites.js --engine <engine> --json` and list every site it returns that the task does not name. If it exits non-zero (`no-roots`, `unreadable`, `internal-error`, `output-closed`), the population is not known: omit population_diff and add a finding with symbol `call-sites`, found_at `not found`, note `<reason> — population not measured`.
 
 Return ONLY this YAML block (no other text):
 

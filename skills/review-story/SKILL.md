@@ -1022,9 +1022,11 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      which is measured as given. `reason: no-roots` (exit 1) means the root is not a skills
      source tree (no `shared/resources/` beside a `skills/*/SKILL.md`) — a consumer install keeps
      skills only as bundled copies — so there is no population to diff: record the check as not
-     applicable, never as a zero. `reason: unreadable` (exit 3) means the population is unknown.
-     A site reached only through a shell variable (`node "$VAR"`) is found on a best-effort
-     rule the collector's header states; name any the rule misses by hand
+     applicable, never as a zero. Any other non-zero exit (`unreadable`, `internal-error`,
+     `output-closed`) means the population is unknown: record that, and diff nothing. A site
+     reached only through a shell variable (`node "$VAR"`) is found on a best-effort rule the
+     collector's header states, so it may be missed or over-counted: confirm any such site by
+     reading the script before reporting it, and name any the rule misses by hand
    - Diff the collector's `file:line` list against the document's. Every collector site the
      document does not name → **Important**, worded as a choice for the author: "in scope — add it"
      or "an exclusion — state why". A stated exclusion is not a finding. A count in the document

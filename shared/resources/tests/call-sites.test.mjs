@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
@@ -510,26 +510,105 @@ test("REASONS: every non-zero exit code belongs to exactly one reason", () => {
   );
 });
 
-test("REASONS: each reason is reachable, and the CLI's exit code is the table's", () => {
-  // One driver per reason. A reason nobody can reach is a promise the table
-  // makes and the CLI never keeps; a reason reached with another code is the
-  // defect two QA cycles found in the hand-written header.
+test("REASONS: every row is driven, and the exit code is the table's", async () => {
+  // One driver per row, and the driver set IS the table's key set: a row with
+  // no driver is a promise the table makes and nothing checks, which is what
+  // this test's first version left for internal-error and unreadable (QA cycle
+  // 3, C3-CR-2). The CLI-level rows run a child; the two that need a fault run
+  // main() in-process with one fs/path method stubbed, so neither depends on
+  // file permissions (a root-run CI would skip a chmod-based driver).
   const consumer = buildTree({
     "scripts/build.sh": "echo hi\n",
     ".agents/skills/x/SKILL.md": "# x\n",
   });
   const emptyTree = buildTree({ "shared/resources/none.md": "x\n", ...MARKER });
+  const { main } = require(CLI);
+  const nodeFs = require("node:fs");
+  const nodePath = require("node:path");
+
+  // In-process: stub, capture stdout, restore — always.
+  const inProcess = (args, stub) => {
+    const writes = [];
+    const realWrite = process.stdout.write;
+    const realErr = process.stderr.write;
+    const undo = stub();
+    process.stdout.write = (c) => (writes.push(String(c)), true);
+    process.stderr.write = () => true;
+    try {
+      const code = main(args);
+      return { code, json: JSON.parse(writes.join("")) };
+    } finally {
+      process.stdout.write = realWrite;
+      process.stderr.write = realErr;
+      undo();
+    }
+  };
+  const stubOnce = (obj, key, fn) => () => {
+    const real = obj[key];
+    obj[key] = fn(real);
+    return () => (obj[key] = real);
+  };
+
+  // A child whose stdout the parent closes before the child can write.
+  const closedEarly = () =>
+    new Promise((resolve) => {
+      const child = spawn(
+        process.execPath,
+        [CLI, "--engine", "tracker-comment", "--root", FIXTURE, "--json"],
+        {
+          stdio: ["ignore", "pipe", "ignore"],
+        },
+      );
+      child.stdout.destroy();
+      child.on("exit", (code) => resolve(code));
+    });
+
   const drivers = {
-    ok: ["--engine", "tracker-comment", "--root", FIXTURE],
-    empty: ["--engine", "gh-stage", "--root", emptyTree],
-    "no-roots": ["--engine", "gh-stage", "--root", consumer],
-    usage: ["--engine", "toString"],
+    ok: () =>
+      runCli(["--engine", "tracker-comment", "--root", FIXTURE, "--json"]),
+    empty: () =>
+      runCli(["--engine", "gh-stage", "--root", emptyTree, "--json"]),
+    "no-roots": () =>
+      runCli(["--engine", "gh-stage", "--root", consumer, "--json"]),
+    usage: () => runCli(["--engine", "toString", "--json"]),
+    unreadable: () =>
+      inProcess(
+        ["--engine", "tracker-comment", "--root", FIXTURE, "--json"],
+        stubOnce(nodeFs, "readdirSync", (real) => (dir, ...rest) => {
+          if (
+            String(dir).endsWith(`${nodePath.sep}skills`) &&
+            !String(dir).endsWith(`references${nodePath.sep}skills`)
+          ) {
+            const e = new Error("EACCES: permission denied");
+            e.code = "EACCES";
+            throw e;
+          }
+          return real(dir, ...rest);
+        }),
+      ),
+    "internal-error": () =>
+      inProcess(
+        ["--engine", "tracker-comment", "--root", FIXTURE, "--json"],
+        stubOnce(nodePath, "relative", () => () => {
+          throw new Error("unclassified");
+        }),
+      ),
+    "output-closed": closedEarly,
   };
   try {
-    for (const [reason, args] of Object.entries(drivers)) {
-      const r = runCli([...args, "--json"]);
-      const j = JSON.parse(r.stdout);
-      assert.equal(j.reason, reason, `${args.join(" ")}`);
+    assert.deepEqual(
+      Object.keys(drivers).sort(),
+      Object.keys(REASONS).sort(),
+      "every REASONS row needs a driver",
+    );
+    for (const [reason, drive] of Object.entries(drivers)) {
+      const r = await drive();
+      if (reason === "output-closed") {
+        assert.equal(r, REASONS[reason].exitCode, `${reason}: exit ${r}`);
+        continue;
+      }
+      const j = r.json ?? JSON.parse(r.stdout);
+      assert.equal(j.reason, reason, `${reason}: got ${j.reason}`);
       assert.equal(
         r.code,
         REASONS[reason].exitCode,
@@ -540,6 +619,34 @@ test("REASONS: each reason is reachable, and the CLI's exit code is the table's"
   } finally {
     fs.rmSync(consumer, { recursive: true, force: true });
     fs.rmSync(emptyTree, { recursive: true, force: true });
+  }
+});
+
+test("C3-CR-3: a --root that exists but cannot be stat'd is unreadable, not usage", () => {
+  const { main } = require(CLI);
+  const nodeFs = require("node:fs");
+  const real = nodeFs.statSync;
+  const writes = [];
+  const realWrite = process.stdout.write;
+  const realErr = process.stderr.write;
+  nodeFs.statSync = (p, ...rest) => {
+    if (p === FIXTURE) {
+      const e = new Error("EACCES");
+      e.code = "EACCES";
+      throw e;
+    }
+    return real(p, ...rest);
+  };
+  process.stdout.write = (c) => (writes.push(String(c)), true);
+  process.stderr.write = () => true;
+  try {
+    const code = main(["--engine", "gh-stage", "--root", FIXTURE, "--json"]);
+    assert.equal(JSON.parse(writes.join("")).reason, "unreadable");
+    assert.equal(code, REASONS.unreadable.exitCode);
+  } finally {
+    nodeFs.statSync = real;
+    process.stdout.write = realWrite;
+    process.stderr.write = realErr;
   }
 });
 

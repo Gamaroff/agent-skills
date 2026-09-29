@@ -42,8 +42,9 @@
  * Contract:
  *   node call-sites.js --engine <name> [--root <dir>] [--json]
  *   Every outcome is a row of REASONS below — reason, exit code and meaning are
- *   defined there ONCE, every exit path takes its code from that table, and
- *   call-sites.test.mjs drives each row and asserts the code. Two cycles of QA
+ *   defined there ONCE, every exit path takes its code from that table (the
+ *   two exits Node takes on its own go through installExitGuards), and
+ *   call-sites.test.mjs drives each row and asserts that its drivers cover them all. Two cycles of QA
  *   each found this header's hand-written list saying something the code did
  *   not do (QA cycle 2, narrowing-residue move: consolidate the contract).
  *   --json → { reason, exitCode, engine, root, count, sites: [{ file, line,
@@ -112,6 +113,8 @@ const REASONS = Object.freeze({
     meaning:
       "the walk ran over a source tree and found none — a claim about the instrument as much as the tree",
   }),
+  // The name predates the marker it now tests (QA cycle 2) and is kept stable:
+  // the prose sites and callers branch on it.
   "no-roots": Object.freeze({
     exitCode: 1,
     meaning:
@@ -130,6 +133,11 @@ const REASONS = Object.freeze({
   "internal-error": Object.freeze({
     exitCode: 4,
     meaning: "the collector failed for a reason it does not classify",
+  }),
+  "output-closed": Object.freeze({
+    exitCode: 5,
+    meaning:
+      "the reader closed stdout before the result was written (EPIPE) — nothing was delivered",
   }),
 });
 
@@ -210,9 +218,6 @@ function shippedSources(root) {
   }
   return out.filter(isFile);
 }
-
-/** The roots `shippedSources` walks. */
-const ROOTS = Object.freeze(["shared/resources", "skills", "scripts"]);
 
 /** Is `root` a tree this collector can measure? The marker is the pair only a
  *  skills SOURCE tree has: `shared/resources/` and at least one
@@ -390,8 +395,10 @@ function run(argv, json) {
   let isDir = false;
   try {
     isDir = fs.statSync(candidate).isDirectory();
-  } catch {
-    isDir = false;
+  } catch (e) {
+    // Only "not there" is a usage error; a root that exists and cannot be
+    // stat'd is `unreadable` (QA cycle 3, C3-CR-3).
+    if (!ABSENT.has(e.code)) throw new Unreadable(candidate, e);
   }
   if (!isDir) return usage(json, `--root is not a directory: ${candidate}`);
   const root = given ? candidate : resolveRoot(candidate);
@@ -452,8 +459,8 @@ function main(argv) {
 
 module.exports = {
   ENGINES,
-  ROOTS,
   REASONS,
+  installExitGuards,
   collect,
   shippedSources,
   isSourceTree,
@@ -461,6 +468,30 @@ module.exports = {
   main,
 };
 
+/** The two exits Node takes on its own, both with code 1 — the code `no-roots`
+ *  owns. A reader that closes the pipe early raises EPIPE on stdout
+ *  asynchronously, after main() has returned; an exception outside main()'s
+ *  try is uncaught. Route both through REASONS (QA cycle 3, C3-CR-1). */
+function installExitGuards(stream = process.stdout, proc = process) {
+  stream.on("error", (e) => {
+    proc.exitCode =
+      e && e.code === "EPIPE"
+        ? REASONS["output-closed"].exitCode
+        : REASONS["internal-error"].exitCode;
+  });
+  proc.on("uncaughtException", (e) => {
+    try {
+      proc.stderr.write(`call-sites: ${e && e.stack ? e.stack : e}\n`);
+    } catch {
+      // stderr gone too — the exit code is all that is left to say
+    }
+    proc.exit(REASONS["internal-error"].exitCode);
+  });
+}
+
 // process.exitCode, never a hard exit: exiting after a stdout write truncates
 // the write at ~64KB when the caller pipes it (bug.3).
-if (require.main === module) process.exitCode = main(process.argv.slice(2));
+if (require.main === module) {
+  installExitGuards();
+  process.exitCode = main(process.argv.slice(2));
+}

@@ -115,7 +115,7 @@ None. The test keeps its floor; the review gains a check.
 
 **Changes**:
 - [x] Lift `collectCallSites()` with both of its shapes (`tracker-comment`, `stakeholder-summary-cli`) unchanged; add engine shapes for `gh-stage`, `jira-stage`, `tracker-issue`; add the two shell roots.
-- [x] CLI `--engine <name> [--root <dir>] [--json]` → `{ reason, engine, root, count, sites }`; `reason` `ok` (exit 0) or `empty` (exit 0, zero sites — a claim about the instrument, reported rather than hidden); `no-roots` (exit 1) when the root is not a skills source tree — no `shared/resources/` beside a `skills/*/SKILL.md` (QA cycles 1–2); `unreadable` (exit 3) and `internal-error` (exit 4), every outcome defined once in the `REASONS` table (QA cycle 2); exit 2 with `reason: usage` on an unknown engine or bad flag. An explicit `--root` is measured as given (CR-1); `node "$VAR"` is a site when VAR may hold the engine's path in that shell function (CR-2).
+- [x] CLI `--engine <name> [--root <dir>] [--json]` → `{ reason, engine, root, count, sites }`; `reason` `ok` (exit 0) or `empty` (exit 0, zero sites — a claim about the instrument, reported rather than hidden); `no-roots` (exit 1) when the root is not a skills source tree — no `shared/resources/` beside a `skills/*/SKILL.md` (QA cycles 1–2); `unreadable` (exit 3), `internal-error` (exit 4) and `output-closed` (exit 5, EPIPE), every outcome defined once in the `REASONS` table and every row driven by a test (QA cycles 2–3); exit 2 with `reason: usage` on an unknown engine or bad flag. An explicit `--root` is measured as given (CR-1); `node "$VAR"` is a site when VAR may hold the engine's path in that shell function (CR-2).
 - [x] Test: fixture tree with one site per root class and one bannered decoy; the live tree's counts equal the guard's (24 / 12 at `01c8701f`).
 
 **Dependencies**: none.
@@ -234,18 +234,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.129.qa.2.review-call-site-population-check.md](./task.129.qa.2.review-call-site-population-check.md)
-- **Gate File**: [task.129.gate.2.review-call-site-population-check.yml](./task.129.gate.2.review-call-site-population-check.yml)
-- **Previous cycle**: [task.129.qa.1.review-call-site-population-check.md](./task.129.qa.1.review-call-site-population-check.md)
+- **Full Report**: [task.129.qa.3.review-call-site-population-check.md](./task.129.qa.3.review-call-site-population-check.md)
+- **Gate File**: [task.129.gate.3.review-call-site-population-check.yml](./task.129.gate.3.review-call-site-population-check.yml)
+- **Previous cycles**: [qa.1](./task.129.qa.1.review-call-site-population-check.md), [qa.2](./task.129.qa.2.review-call-site-population-check.md)
 
 ### Test Coverage Summary
-- **Tests Executed**: 37 (collector + guard suites); `npm run ci:fast` 4,570 pass
+- **Tests Executed**: 42 (collector + guard suites); `npm run ci:fast` 4,575 pass
 - **Phases Verified**: 2/2
-- **Critical Issues**: 0 (2 medium: TASK-129-C2-CR-1, TASK-129-C2-CR-2)
+- **Critical Issues**: 0 (2 medium: TASK-129-C3-CR-1, TASK-129-C3-CR-2)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's fixes hold. The refute pass found `no-roots` accepting a consumer's own `scripts/` (C2-CR-1) and exit 1 also meaning a crash (C2-CR-2).
+An EPIPE on stdout still exits 1 outside the `REASONS` contract (C3-CR-1), and the every-row test covers four of six rows (C3-CR-2).
 
 ## Change Log
 
@@ -258,6 +258,7 @@ Cycle 1's fixes hold. The refute pass found `no-roots` accepting a consumer's ow
 | 2026-09-29 |  | Implemented — `call-sites.js` (5 engines, `--root`), guard lifted (24 / 12 unchanged), review-task check 14 / review-story check 10, both Agent C prompts, create-task 3.5 twin; 3 new/changed test files, 17 + 10 new tests | develop-task (inline) |
 | 2026-09-29 |  | QA gate CONCERNS (80/100) — 2 medium findings (CR-1 root override, CR-2 node "$VAR" invisible) | qa-task |
 | 2026-09-29 |  | QA gate CONCERNS (80/100) — cycle 2, 2 medium findings (no-roots marker too weak, exit 1 ambiguous with a crash) | qa-task |
+| 2026-09-29 |  | QA gate CONCERNS (80/100) — cycle 3, 2 medium findings (EPIPE bypasses the exit contract; every-row test covers 4 of 6 rows) | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
