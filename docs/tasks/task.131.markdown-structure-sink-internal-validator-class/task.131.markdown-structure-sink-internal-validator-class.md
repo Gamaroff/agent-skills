@@ -297,6 +297,27 @@ None — additive corpus and an additive field.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-30
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.131.qa.1.markdown-structure-sink-internal-validator-class.md](./task.131.qa.1.markdown-structure-sink-internal-validator-class.md)
+- **Gate File**: [task.131.gate.1.markdown-structure-sink-internal-validator-class.yml](./task.131.gate.1.markdown-structure-sink-internal-validator-class.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 4593
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+`lintReport` probed by execution engages (15/15, measured). Two medium findings: the `--args-json` prompt example reads unbound variables ([bug 1](./task.131.bug.1.prompt-probe-example-unbound-variables.md)), and an `internal` boundary without a reason is rendered as a FAIL but not enforced at acceptance ([bug 2](./task.131.bug.2.internal-without-reason-not-enforced.md)). One low: a vacuous half of the enumeration test.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -306,6 +327,8 @@ None — additive corpus and an additive field.
 | 2026-09-30 | 1.1 | Review 1 (7/10 → 9/10 after fixes, 0 critical / 6 important applied): runner `ok === false` rule added (lintReport's `{ok:false}` scored `accepted`); hostile cases inline and isolated per problem code (mutant unreachable via the 5-code fixture); fixtures referenced from the engine test, not the corpus; compound `boundary` enumeration keys; `SINK_BLURB` + regenerated `.md`; `internal` disqualification scoped; effort 4h → 6h | review-task |
 | 2026-09-30 |  | Status → ready-for-development | review-task |
 | 2026-09-30 |  | Implemented — 20 source files (+ bundled copies), 13 new tests; also fixed `change-log.js#fencedRanges` on CRLF, found by the new probe | develop |
+| 2026-09-30 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-09-30 |  | QA findings fixed — cycle 1: 2 medium + 1 low (TASK-131-BUG-1, TASK-131-BUG-2, CR-4) + 2 cleanups, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

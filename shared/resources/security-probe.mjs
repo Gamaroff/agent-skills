@@ -1033,7 +1033,9 @@ export function runProbeSpec({
             entryPath: resolved.entryPath,
             exportName: resolved.exportName,
             input: c.input,
-            extraArgs: base.args ?? [],
+            // null when --args-json was not given; the runner's own
+            // Array.isArray default is the one place the fallback lives.
+            extraArgs: base.args,
           }),
           cwd: workDir,
           env: sandboxEnv({ cwd: workDir }),

@@ -616,6 +616,15 @@ test("task.131: boundary: internal renders as an explicit skip, and without inte
     `${PROMPT}: the prompt no longer states that internal needs a reason`,
   );
   assert.ok(
+    has(source(), "named `internal boundary recorded without a reason`"),
+    `${PROMPT}: an internal with no reason names no FAIL check — the agent's overall can still read PASS`,
+  );
+  assert.ok(
+    has(skill(), "forces `SEC_OVERALL = FAIL`"),
+    "skills/finalise/SKILL.md Step 3c: a reason-less internal must force SEC_OVERALL — Step 6 decides " +
+      "on SEC_OVERALL, and the rendered ❌ line alone cannot fail the DoD (TASK-131-BUG-2)",
+  );
+  assert.ok(
     has(source(), "The guard applies to `boundary: true` only"),
     `${PROMPT}: the zero-guard no longer says which boundary value it keys on`,
   );
@@ -626,7 +635,13 @@ test("task.131: every canonical source that renders or states the boundary schem
   // most of them prose about some other boundary (loop-supervisor, the
   // PreCompact hook's "Last step boundary:", report fixtures), so a test keyed
   // on it would be red at the wrong sites (review-task check 13).
-  const KEYS = ["boundary: true | false", "security_result.boundary"];
+  // The third key is the qa-task/qa-story Step 3b sentence, which states the
+  // decision without the schema literal (task.131 QA cycle 1, CR-4).
+  const KEYS = [
+    "boundary: true | false",
+    "security_result.boundary",
+    "`boundary: false` is the common case",
+  ];
   const roots = [
     join(repoRoot, "shared", "resources"),
     ...readdirSync(join(repoRoot, "skills")).map((d) =>
@@ -642,13 +657,18 @@ test("task.131: every canonical source that renders or states the boundary schem
       if (KEYS.some((k) => text.includes(k))) hits.push([join(dir, f), text]);
     }
   }
+  // Floor 4: the prompt, finalise, qa-task and qa-story. Fewer means a key
+  // stopped matching a site, which reads exactly like a clean population.
   assert.ok(
-    hits.length >= 2,
+    hits.length >= 4,
     `population floor: found ${hits.map(([p]) => p).join(", ")}`,
   );
   for (const [path, text] of hits) {
+    // A COMPOUND literal: bare "internal" was already in finalise/SKILL.md on
+    // develop ("internally"), so that half of the check passed vacuously.
     assert.ok(
-      text.includes("internal"),
+      text.includes("boundary: internal") ||
+        text.includes("true | false | internal"),
       `${path} states or renders the boundary schema and never names \`internal\``,
     );
   }

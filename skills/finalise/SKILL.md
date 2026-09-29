@@ -505,6 +505,12 @@ Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RE
 After all 4 agents complete, parse each YAML result. Handle agent failures:
 
 - **Agent returns valid YAML**: extract `overall` field → `AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`
+- **`boundary: internal` with no `internal_reason` forces `SEC_OVERALL = FAIL`**, whatever the agent's
+  own `overall` says. The reason is the whole of that decision, and an `overall: PASS` beside a
+  reason-less `internal` is the self-report the zero-guard exists to refuse; the ❌ line Step 3d
+  renders is not enough on its own, because Step 6 decides on `SEC_OVERALL`, not on the summary
+  (task.131 QA cycle 1, TASK-131-BUG-2). The agent should already have emitted the
+  `internal boundary recorded without a reason` FAIL check; this override is what holds when it did not.
 - **Agent errors or returns unparseable output**: set that section's overall to `NEEDS_MANUAL_REVIEW`; mark section for manual verification in the DoD running summary; continue with remaining sections
 
 **Never abort due to a single agent failure.** One failed section = manual review for that section only.

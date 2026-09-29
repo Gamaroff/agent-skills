@@ -162,11 +162,9 @@ node PROMPT_DIR/security-probe.mjs \
 # like report-lint.js#lintReport — takes --args-json: a JSON array of fixed
 # arguments appended after every case's input. State them; the engine never
 # guesses one. A validator answering `{ ok: false, … }` is read as refusing.
-# LINT_JS is report-lint.js's path from the repo root (where the diff puts it);
-# ARGS_JSON is `[{"sections": <its loadTemplate() result>}]`, JSON-encoded.
 node PROMPT_DIR/security-probe.mjs \
-  --sink markdown-structure --entry "$LINT_JS#lintReport" \
-  --args-json "$ARGS_JSON" \
+  --sink markdown-structure --entry '<path-from-repo-root>/report-lint.js#lintReport' \
+  --args-json '<[{"sections": <the loadTemplate() result>}], as JSON>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
   --record <STORY_DIR>/<stem>.dod.security.run.json --json
 
@@ -211,6 +209,12 @@ node PROMPT_DIR/security-probe.mjs \
   --record <STORY_DIR>/<stem>.dod.security.run.json --json
 ```
 
+**Building the `--args-json` value** for `lintReport`: it is `[{"sections": …}]`, where `sections` is
+what that module's `loadTemplate()` returns — the whole object, keyed by variant, not one variant's
+list. Print it with `node --print 'JSON.stringify([{sections: require("<abs-path>/report-lint.js").loadTemplate()}])'`
+and pass the output as the one operand, single-quoted. Anything else that is not a JSON array is refused
+`bad-args` before any case runs.
+
 The engine imports the entry in a sandboxed child, calls it on every corpus case for the sink —
 both directions — and prints a JSON result whose `executed` is the count of candidates that
 actually ran, whose `reproduced[]` names the hostile cases that were accepted, and whose
@@ -254,7 +258,8 @@ direction an over-strict boundary looks identical to a correct one.
 **Zero executed candidates on a boundary deliverable is a finding, not a pass.** If `boundary: true` and
 `probes_executed: 0`, emit a check with `status: FAIL` named `probe mode executed no candidates`. The
 guard applies to `boundary: true` only. `boundary: internal` is not a way around it: it is available
-only when no sink fits (Step 1b), and without `internal_reason` it is a FAIL of its own. A step
+only when no sink fits (Step 1b), and without `internal_reason` it is a FAIL of its own — emit a check
+with `status: FAIL` named `internal boundary recorded without a reason`, and `overall: FAIL`. A step
 that reports success without having run anything is the exact defect this step exists to catch, and it
 must not be able to hide inside its own output.
 
@@ -323,7 +328,9 @@ question was not answered, and the reader must treat probe mode as unverified ra
 missing `probes_executed` under `boundary: true` counts as **zero**, and takes the FAIL above: a count
 that was never reported is not evidence that any work happened. Emit both keys explicitly, every time.
 A `boundary: internal` with no `internal_reason` is a FAIL: the reason is the whole of the decision, and
-an `internal` that names nothing is indistinguishable from a probe that was skipped.
+an `internal` that names nothing is indistinguishable from a probe that was skipped. It carries the
+`internal boundary recorded without a reason` FAIL check, and `/finalise` forces the security result to
+FAIL on this shape whatever `overall` says.
 
 **An empty `probes` is not by itself a failure — it is the good result when `probes_executed` is high.**
 What is never a pass is a boundary that executed nothing.

@@ -2778,24 +2778,26 @@ test("task.131: args is declined bad-args on a non-JS form or when it is not an 
 });
 
 test("task.131: --args-json on the CLI — a JS entry runs; a non-array, non-JSON or shell entry exits 2", () => {
-  const ok = runMain([
-    "--sink",
-    "url-authority",
-    "--entry",
-    `${FIXTURES}/args-control.mjs#validateHost`,
-    "--args-json",
-    JSON.stringify([{ allow: ["db.internal", "db.internal:5432"] }]),
-    "--cases-file",
-    (() => {
-      const d = mkdtempSync(join(tmpdir(), "probe-args-"));
-      const f = join(d, "cases.json");
-      writeFileSync(f, JSON.stringify(CASES));
-      return f;
-    })(),
-    "--json",
-  ]);
-  assert.equal(ok.rc, 0, ok.err);
-  assert.equal(JSON.parse(ok.out).verdict, "engages");
+  const casesDir = mkdtempSync(join(tmpdir(), "probe-args-"));
+  try {
+    const casesFile = join(casesDir, "cases.json");
+    writeFileSync(casesFile, JSON.stringify(CASES));
+    const ok = runMain([
+      "--sink",
+      "url-authority",
+      "--entry",
+      `${FIXTURES}/args-control.mjs#validateHost`,
+      "--args-json",
+      JSON.stringify([{ allow: ["db.internal", "db.internal:5432"] }]),
+      "--cases-file",
+      casesFile,
+      "--json",
+    ]);
+    assert.equal(ok.rc, 0, ok.err);
+    assert.equal(JSON.parse(ok.out).verdict, "engages");
+  } finally {
+    rmSync(casesDir, { recursive: true, force: true });
+  }
   for (const [label, argv] of Object.entries({
     "not JSON": ["--entry", entry("engaging-control"), "--args-json", "[oops"],
     "not an array": ["--entry", entry("engaging-control"), "--args-json", "{}"],

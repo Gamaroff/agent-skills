@@ -163,7 +163,8 @@ others. It is available only when **both** hold:
 - no corpus sink's legitimate cases are documents that predicate is meant to accept.
 
 It requires an `internal_reason` naming the artefact and why no sink fits; an
-`internal` without one is a FAIL. **A sink disqualifies it for the shape it
+`internal` without one is a FAIL (the `internal boundary recorded without a reason` check, and `/finalise` forces
+the security result to FAIL on that shape — `finalise-dod-security-prompt.md` states it). **A sink disqualifies it for the shape it
 models**: `markdown-structure` models the implementation report, so
 `report-lint.js#lintReport` is `boundary: true` and probed. A validator of any
 other document is not disqualified by that sink — probing it there would score
