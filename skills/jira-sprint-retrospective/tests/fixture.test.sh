@@ -188,6 +188,19 @@ assert_contains "tz.202.added"      "true"  "$(pluck PROJ-202 addedMidSprint)"
 assert_contains "tz.203.carried"    "true"  "$(pluck PROJ-203 carriedOver)"
 assert_contains "tz.203.notAdded"   "false" "$(pluck PROJ-203 addedMidSprint)"
 
+# A join puts the sprint into the list; it is not any event that merely lists it.
+# Closing a sprint rolls its unfinished issues on ("5434" -> "5434, 5500") and a
+# later backlog move drops the next sprint ("5434, 5500" -> "5434"). Both carry
+# 5434 in `to`, both land after the start, and both used to read as mid-sprint
+# discovery — on a live sprint, 65 added against 46 real joins.
+assert_contains "join.204.rollover.notAdded"  "false" "$(pluck PROJ-204 addedMidSprint)"
+assert_contains "join.205.backlog.notAdded"   "false" "$(pluck PROJ-205 addedMidSprint)"
+assert_contains "join.205.backlog.noDate"     "null"  "$(pluck PROJ-205 addedDate)"
+# Carry-over is decided by the LATEST join at or before the start
+assert_contains "carry.206.backIn.carried"    "true"  "$(pluck PROJ-206 carriedOver)"
+assert_contains "carry.206.backIn.notAdded"   "false" "$(pluck PROJ-206 addedMidSprint)"
+assert_contains "carry.207.fromBacklog.not"   "false" "$(pluck PROJ-207 carriedOver)"
+
 # ADF is walked to arbitrary depth, not just the first level of paragraphs
 assert_contains "adf.deep" "Nested ADF deep leaf" "$(pluck PROJ-203 description)"
 # Roster excludes the unassigned issue but counts it
