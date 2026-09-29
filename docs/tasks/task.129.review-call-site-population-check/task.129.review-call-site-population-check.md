@@ -227,25 +227,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-29
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.129.qa.3.review-call-site-population-check.md](./task.129.qa.3.review-call-site-population-check.md)
-- **Gate File**: [task.129.gate.3.review-call-site-population-check.yml](./task.129.gate.3.review-call-site-population-check.yml)
-- **Previous cycles**: [qa.1](./task.129.qa.1.review-call-site-population-check.md), [qa.2](./task.129.qa.2.review-call-site-population-check.md)
+- **Full Report**: [task.129.qa.4.review-call-site-population-check.md](./task.129.qa.4.review-call-site-population-check.md)
+- **Gate File**: [task.129.gate.4.review-call-site-population-check.yml](./task.129.gate.4.review-call-site-population-check.yml)
+- **Previous cycles**: [qa.1](./task.129.qa.1.review-call-site-population-check.md), [qa.2](./task.129.qa.2.review-call-site-population-check.md), [qa.3](./task.129.qa.3.review-call-site-population-check.md)
 
 ### Test Coverage Summary
-- **Tests Executed**: 42 (collector + guard suites); `npm run ci:fast` 4,575 pass
+- **Tests Executed**: 43 (collector + guard suites); `npm run ci:fast` 4,576 pass
 - **Phases Verified**: 2/2
-- **Critical Issues**: 0 (2 medium: TASK-129-C3-CR-1, TASK-129-C3-CR-2)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-An EPIPE on stdout still exits 1 outside the `REASONS` contract (C3-CR-1), and the every-row test covers four of six rows (C3-CR-2).
+No blocking issues. Three advisory findings (C4-CR-1..3) are recorded in the gate's `recommendations.future`.
 
 ## Change Log
 
@@ -259,6 +259,7 @@ An EPIPE on stdout still exits 1 outside the `REASONS` contract (C3-CR-1), and t
 | 2026-09-29 |  | QA gate CONCERNS (80/100) — 2 medium findings (CR-1 root override, CR-2 node "$VAR" invisible) | qa-task |
 | 2026-09-29 |  | QA gate CONCERNS (80/100) — cycle 2, 2 medium findings (no-roots marker too weak, exit 1 ambiguous with a crash) | qa-task |
 | 2026-09-29 |  | QA gate CONCERNS (80/100) — cycle 3, 2 medium findings (EPIPE bypasses the exit contract; every-row test covers 4 of 6 rows) | qa-task |
+| 2026-09-29 |  | QA gate PASS (100/100) — cycle 4, 0 blocking findings, 3 advisory | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
