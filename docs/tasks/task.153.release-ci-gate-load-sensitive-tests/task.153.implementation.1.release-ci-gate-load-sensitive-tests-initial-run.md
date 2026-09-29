@@ -3,7 +3,7 @@
 **Task**: `task.153.release-ci-gate-load-sensitive-tests.md`
 **Run Number**: 1
 **Started**: 2026-09-29 08:29
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -34,10 +34,10 @@ Gate `release.sh` on CI's recorded verdict for HEAD, mark every load-sensitive a
 | 1. create-branch           | ✅ Done    | Branch `feature/task.153.*` exists in git                             | Branch created at `426e6976` from `develop`; pushed with upstream | —                    |
 | 2. review-task             | ✅ Done    | `task.153.review.{N}.{name}.md` exists (or skip logged)               | `task.153.review.1.release-ci-gate-load-sensitive-tests.md` — READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; ci:fast 2 runs — run 1 red (1 real: test-clean-checkout drove release.sh into the new CI step), fixed; run 2 green 4469/0 | `.summaries/step-3-test-triage-1.json` |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.153.qa.{N}.*.md`; `task.153.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.153.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #515: https://github.com/Gamaroff/agent-skills/pull/515 | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.153.qa.{N}.*.md`; `task.153.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 QA cycles (PASS 95 → CONCERNS 90 → PASS 95), 2 qa-fix cycles; exit by diminishing-returns (route 2); 5c `/review-pr` APPROVE (5 LOW findings) — `task.153.pr-review.1.release-ci-gate-load-sensitive-tests.md` | `.summaries/step-5-traceability-mapper.json` |
+| 7. finalise                | ✅ Done    | `task.153.dod.{N}.*.md`; task `status: accepted`                      | `task.153.dod.1.release-ci-gate-load-sensitive-tests.md` — ACCEPTED; acceptance commit `0c23a046`; CI 1 & 2 SUCCESS; #483 closed | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final report commit + push; lock completed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -96,6 +96,37 @@ Gate `release.sh` on CI's recorded verdict for HEAD, mark every load-sensitive a
 - Fast gate run 1: 1 real failure — `tests/test-clean-checkout.test.js` drives the real `release.sh`, which now refused at step 1b (and called the real `gh`). Fixed with a green `gh` stub in that test's `bin/`. Run 2: 4470 tests, 4469 pass, 0 fail.
 - Observation #214 logged (absence assertion after a wait is vacuous when the wait outlasts the target).
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS (14): the work-item dir, CHANGELOG.md, docs/contributing, scripts, shared/resources, shared/resources/tests, skills/{finalise,qa-story,qa-task,review-security}/references (+ qa-story/qa-task references/tests), skills/session-handoff/tests, tests. No out-of-scope untracked files — nothing held. Leak check: all five commits in scope.
+- /commit-changes: 5 commits (544b2e48 feat(release), 1655ac7b feat(spawn-budget), bdd29b5c test(session-handoff), e7b820a1 docs(contributing), e5861149 docs(task.153)).
+- PR body written from the known diff rather than the Explore summariser — the change was authored this session; recorded as a deviation.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/515 (base develop, Closes #483). Post-PR state: OPEN (checked inline with `gh pr view`, not the poller subagent).
+- Tracker comment in-review → posted. GitHub board: in-review → stage-disabled.
+
+### Steps 5–6 — QA loop
+
+- Traceability mapper dispatched (standard mode, Success Criteria present); agent was read-only, so the orchestrator wrote `.summaries/qa-traceability-matrix.md` from its returned matrix (14 criteria: 7 full, 4 partial, 3+1 none by design).
+- Board QA-start re-assert: in-review → stage-disabled.
+- Full `npm run ci` (run during Step 4): exit 0 — the two `npm run ci` success-criteria boxes ticked.
+- QA cycle 1: boundary probe (`cli:` on `--sha`) engages, 13 executed; code review 5 findings, CR-1 gated. Route classifier → continue (high-counts-missing at cycle 1) → 5b.
+- QA cycle 1 — changes-requested: stage-disabled. Narrowing offer: not signalled (below-cycle-floor). Third strike: n/a (no HIGH). qa-fix ingested findings inline (all five already in context from the gate just written) — no ingester subagent. Post-fix PR state: OPEN (inline `gh pr view`).
+- QA cycle 2 — changes-requested: stage-disabled. Route: continue (not-a-pass-gate). Narrowing offer: not signalled (no-medium on gate 1). Third strike: n/a. Commit hit a transient `.git/index.lock` (VS Code's git integration was running); retried, clean. Post-fix PR state: OPEN.
+- Step 5c: `/review-pr --effort medium --comment` — both lenses (code + conformance) dispatched in parallel; verdict APPROVE (PC-1 pr_number pending finalise, PC-2 §1/§7 omit the three cycle-2 files; CR-1 run-list cap 50, CR-2/CR-3 cleanups). Report committed with Step 7. ready-for-merge → stage-disabled.
+- qa-read-back first attempt hit a transient `.git/index.lock` (gone 3 s later, no git process found); retry clean.
+
+### Step 7 — finalise
+
+- /finalise invoked (task mode). Four DoD agents in one parallel message: AC traceability PASS (14/14), security PASS (boundary; independently probed, 26 executed, 0 reproduced, record `task.153.dod.1.security.run.json`), compliance NOT_APPLICABLE, docs PASS (advisory: release runbook does not mention the CI gate).
+- DoD summary: docs/tasks/task.153.release-ci-gate-load-sensitive-tests/task.153.dod.1.release-ci-gate-load-sensitive-tests.md
+- CI reading 1: SUCCESS @ e56cefbf8571 (5 checks, 120 s poll); CI reading 2: SUCCESS @ 0c23a0460842 over 5 checks after 150 s (the acceptance commit).
+- Acceptance commit `0c23a046` (document `status: accepted` + Change Log 1.2, DoD, sprint review, registry ticked, DoD security record), pushed; tracked-and-pushed assertions passed; PR head = acceptance head.
+- Canonical PR summary posted: https://github.com/Gamaroff/agent-skills/pull/515#issuecomment-5886009096
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/515#issuecomment-5886017236
+- Tracker: Document link already on `develop`; `done` comment → posted; GitHub Issue #483 — close: CLOSED ✅ (post-close check inline with `gh issue view`, not the poller subagent); board: done → already (Done).
+- Accept gap: journal `.claude/state/tracker-actions.jsonl` absent (access.tracker full) — Tracker debt: none.
+- Task completed.
+
 ---
 
 ## Issues Log
@@ -106,18 +137,55 @@ _Problems encountered and how they were resolved or escalated._
 
 ---
 
+## Completion Summary
+
+Implemented task 153 in one inline develop pass from the co-located plan: `scripts/release-ci-verdict.mjs` and its wiring as `release.sh` step 1b (CI's recorded verdict for HEAD, read before the local test, fail-closed, `--skip-ci-check`, dry-run *Would have REFUSED*, `--retry` untouched), `loadSensitive()` in `spawn-budget.mjs` with a three-direction guard and the one list in `traps.md`, and CR-6's precondition-miss retry. Three QA cycles: cycle 1 found a guard span hole (plus four advisory items, all fixed); cycle 2's refute pass found the guard missed three `FILE_BUDGET_MS` whole-file budgets (MEDIUM — fixed by a clock-source census and marking the files) and the probe found `--repo ../x` accepted (fixed); cycle 3 left one LOW in test machinery (QA3-1, carried). Notable decisions: the review re-anchored the task to task.154's `test:clean-checkout` step and guarded the CI block against `--retry`; mutation M10 revealed the pre-existing CR-6 group-kill assertion was vacuous (fixture fixed: grandchild outlives `slow.js`, `c.unref()`); QA raised QA3-1 itself from criterion verification rather than inflate a reviewer's confidence. Accepted with CI SUCCESS on both the decision head and the acceptance head.
+
+---
+
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1 — 2026-09-29
+**Gate Result**: PASS (95/100) — one open LOW entry
+**Issues Found**: CR-1 (LOW, bug/high, gated): `enclosingAssert` in the marker guard does not check the matched call spans the hit line. Advisory: CR-2 (no `-R` for gh), CR-3 (inline `on:`), CR-4 (dead DEFINER filter), CR-5 (releases.md step numbering)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: CR-1 span check in `enclosingAssert` (+ unit case); CR-2 `--repo`/`-R` pinned to REPO_SLUG; CR-3 inline `on:` flagged; CR-4 dead filter removed; CR-5 releases.md numbering. Each behavioural fix mutation-proven. Fast gate green first attempt (4475/0).
+**Commit**: `4c6bc610`
+
+### QA Cycle 2 — 2026-09-29
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: CR2-1 (MEDIUM): guard pattern misses three `ms < FILE_BUDGET_MS` process.hrtime budgets; CR2-2 (LOW): refusal names the first run's URL, not the causing run; PRB2-1 (LOW, probe): `--repo ../x` accepted. Advisory: CR2-3, CR2-4, CR2-5
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: CR2-1 guard widened (budget spelling + direction C clock-source census), 3 files marked and listed; CR2-2 causing run's URL; PRB2-1 `isRepoSlug`; advisory CR2-3/4/5. Mutation-proven except CR2-4/CR2-5 (race/env-only). Fast gate green first attempt (4478/0).
+**Commit**: `c61f1f01`
+
+### QA Cycle 3 — 2026-09-29
+**Gate Result**: PASS (95/100) — one open LOW entry
+**Issues Found**: QA3-1 (LOW, raised by QA from criterion verification of reviewer CR3-1): at `HANDOFF_SPAWN_RETRIES>=3` a CR-6 attempt outlives the fixture and fails without the marker. Advisory: CR3-2..CR3-6. Both probe controls engage (26/0).
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: Diminishing-returns exit taken — HIGH is 0 for cycles 2 and 3, and all 1 remaining findings are in test machinery — the loop has finished working rather than stopped working. This is a CLEAN exit, not a stall: nothing was blocked and nothing is being accepted over. The residue is recorded in the gate's `recommendations.future`.
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-29 09:52
+**Final Status**: Completed
 **Branch**: `feature/task.153.release-ci-gate-load-sensitive-tests`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/515
+**QA Iterations**: 3 QA cycles (2 qa-fix cycles), exit by the diminishing-returns route; 5c `/review-pr` APPROVE
+**DoD Summary**: docs/tasks/task.153.release-ci-gate-load-sensitive-tests/task.153.dod.1.release-ci-gate-load-sensitive-tests.md
+**Tracker debt**: none
