@@ -108,7 +108,11 @@ test("BUNDLE_PRECOMMIT_WARN=1 downgrades the refusal to a warning", (t) => {
   const res = r.commit({ BUNDLE_PRECOMMIT_WARN: "1" });
   assert.equal(res.status, 0, res.stdout + res.stderr);
   assert.match(res.stderr, /Untracked generated copies/);
-  assert.doesNotMatch(r.git("ls-files"), /skills\/fx\/references\/stray\.md/, "still not committed");
+  assert.doesNotMatch(
+    r.git("ls-files"),
+    /skills\/fx\/references\/stray\.md/,
+    "still not committed",
+  );
 });
 
 test("a copy the hook's own bundle run creates is staged, not refused", (t) => {
