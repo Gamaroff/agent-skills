@@ -84,6 +84,10 @@ const P = (dir) => ({
   "{epic}": "2",
   "{story}": "3",
   "{story-or-task-prefix}": "task.7",
+  // The step docs address a bundled helper through the pipeline placeholder;
+  // any one member resolves in the consumer root (task.158).
+  "{develop-story|develop-task|develop-bug}": "develop-task",
+  "{develop-story|develop-task}": "develop-task",
 });
 const subst = (text, dir) =>
   Object.entries(P(dir)).reduce((t, [k, v]) => t.split(k).join(v), text);
@@ -94,7 +98,7 @@ const ROWS = [
   {
     file: "skills/qa-task/SKILL.md",
     needle: "PRIOR_CYCLE=$(bash",
-    more: 3,
+    more: 6,
     cwd: "repo",
     env: "TASK_DIR",
     varName: "LATEST_GATE",
@@ -120,17 +124,24 @@ const ROWS = [
     expect: "0",
   },
   {
+    // task.158: THIS_GATE comes from qa-cycle.sh --path gate, gated on the cycle
+    // the same block derives — so the row derives it too.
     file: "skills/qa-task/SKILL.md",
-    needle: "THIS_GATE=$(find",
+    needle: 'THIS_GATE=""',
+    more: 4,
+    cwd: "repo",
     env: "TASK_DIR",
-    pre: "QA_CYCLE=2",
+    pre: 'QA_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" 2>/dev/null)',
     varName: "THIS_GATE",
     expect: "",
+    kind: "gate",
+    ext: "yml",
+    stem: "task.7",
   },
   {
     file: "skills/qa-story/SKILL.md",
     needle: "PRIOR_CYCLE=$(bash",
-    more: 3,
+    more: 6,
     cwd: "repo",
     env: "STORY_DIR",
     varName: "LATEST_GATE",
@@ -156,12 +167,19 @@ const ROWS = [
     expect: "0",
   },
   {
+    // task.158: THIS_GATE comes from qa-cycle.sh --path gate, gated on the cycle
+    // the same block derives — so the row derives it too.
     file: "skills/qa-story/SKILL.md",
-    needle: "THIS_GATE=$(find",
+    needle: 'THIS_GATE=""',
+    more: 4,
+    cwd: "repo",
     env: "STORY_DIR",
-    pre: "QA_CYCLE=2",
+    pre: 'QA_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR" 2>/dev/null)',
     varName: "THIS_GATE",
     expect: "",
+    kind: "gate",
+    ext: "yml",
+    stem: "story.2.3",
   },
   // step-7-finalise
   {
@@ -183,11 +201,24 @@ const ROWS = [
     stem: "task.7",
   },
   {
+    // task.158: the completion comment's gate file comes from qa-cycle.sh --path gate.
     file: "shared/resources/develop-pipeline-step-7-finalise.md",
-    needle: "FINAL_GATE=$(find",
-    more: 1,
+    needle: "FINAL_GATE_FILE=$(bash",
+    more: 4,
+    cwd: "repo",
+    varName: "FINAL_GATE_FILE",
+    expect: "",
+    kind: "gate",
+    ext: "yml",
+    stem: "task.7",
+  },
+  {
+    file: "shared/resources/develop-pipeline-step-7-finalise.md",
+    needle: "FINAL_GATE_FILE=$(bash",
+    more: 4,
+    cwd: "repo",
     varName: "FINAL_GATE",
-    expectOneOf: ["", "N/A"],
+    expect: "N/A",
   },
   {
     file: "shared/resources/develop-pipeline-step-7-finalise.md",
@@ -248,22 +279,14 @@ const ROWS = [
     needle: 'find {task-directory} -maxdepth 1 -name "task.{id}.plan',
     stdout: "",
   },
-  // step-5-6 (three-line numeric pipeline)
+  // step-5-6 — one qa-cycle.sh block for both pipelines since task.158
   {
     file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
-    needle:
-      'find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.gate',
-    more: 2,
-    stdout: "",
-    kind: "gate",
-    ext: "yml",
-    stem: "story.2.3",
-  },
-  {
-    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
-    needle: 'find {task-directory} -maxdepth 1 -name "task.{id}.gate',
-    more: 2,
-    stdout: "",
+    needle: "QA_CYCLE=$(bash .agents/skills/{develop-story|develop-task}/",
+    more: 8,
+    cwd: "repo",
+    varName: "LATEST_GATE",
+    expect: "",
     kind: "gate",
     ext: "yml",
     stem: "task.7",
@@ -282,11 +305,15 @@ const ROWS = [
     expect: "",
   },
   {
+    // task.158: the cycle comes from qa-cycle.sh; rc 1 (no gate) reads 0.
     file: "shared/resources/develop-pipeline-resume-contract.md",
-    needle: "QA_CYCLE=$(find {doc-directory}",
-    more: 2,
+    needle:
+      "QA_CYCLE=$(bash .agents/skills/{develop-story|develop-task|develop-bug}/",
+    more: 3,
+    cwd: "repo",
     varName: "QA_CYCLE",
     expect: "0",
+    numberOnly: { kind: "gate", ext: "yml", stem: "task.7" },
   },
   // resume detector prompt
   {

@@ -214,6 +214,23 @@ const DERIVES_CYCLE =
 // plain or with escaped dots (`\.gate\.`), as a sed/grep pattern would.
 const INLINE_DERIVATION =
   /=\$\((?![^)]*qa-cycle\.sh)[^\n]*\\?\.gate\\?\.[^\n]*(?:\[0-9\]|\[\[:digit:\]\]|\\d|\bawk\b|\bcut -d)/;
+// task.158 — the second grammar: a `find`/`ls` that SELECTS a gate file by name
+// (`find … -name "task.*.gate.${N}.*.yml" | head -1`, `find … gate.*.yml | awk | sort |
+// tail -1`). INLINE_DERIVATION misses it when nothing is extracted into an
+// assignment, and it missed a zero-padded `gate.02` and took the first of two
+// files silently. A COUNT (`| wc -l`, the PRIOR_GATES cycle-2 test) selects
+// nothing and is not one; a line that calls the helper is not one.
+const GATE_SELECTION =
+  /\b(?:find|ls)\b(?![^\n]*qa-cycle\.sh)(?![^\n]*\bwc -l\b)[^\n]*\\?\.gate\\?\./;
+// The develop-pipeline step docs that select the current gate (task.158). Kept
+// apart from SKILLS: the other guards over SKILLS assume a single-skill
+// `.agents/skills/<name>/` path, and these docs address the helper through the
+// `{develop-story|develop-task|develop-bug}` placeholder instead.
+const STEP_DOCS = [
+  "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
+  "shared/resources/develop-pipeline-resume-contract.md",
+  "shared/resources/develop-pipeline-step-7-finalise.md",
+];
 
 function fencedBlocks(file) {
   const lines = fs.readFileSync(path.join(REPO_ROOT, file), "utf8").split("\n");
@@ -311,15 +328,43 @@ test("no shipped skill carries an inline gate-number derivation any more", () =>
   // over fenced blocks with continuations JOINED (see fencedBlocks), because
   // the derivation this repository actually shipped spanned two lines.
   const hits = [];
-  for (const file of SKILLS) {
+  let blocks = 0;
+  for (const file of [...SKILLS, ...STEP_DOCS]) {
     for (const b of fencedBlocks(file)) {
+      blocks += 1;
       for (const l of b.text.split("\n")) {
         if (INLINE_DERIVATION.test(l))
-          hits.push(`${file}: block at line ${b.start}`);
+          hits.push(`${file}: block at line ${b.start} (derivation)`);
+        if (GATE_SELECTION.test(l))
+          hits.push(`${file}: block at line ${b.start} (gate selection)`);
       }
     }
   }
+  assert.ok(
+    blocks > 50,
+    `scanned ${blocks} fenced blocks — the scan is reading something`,
+  );
   assert.deepEqual(hits, []);
+});
+
+test("the gate-selection guard catches each shape the QA skills and step docs shipped, and passes a count or a helper call (task.158)", () => {
+  // Verbatim from develop before task.158, backslash continuations joined as
+  // fencedBlocks joins them. Each is a selection the helper now owns.
+  const SHIPPED = [
+    '   [ -n "$PRIOR_CYCLE" ] && LATEST_GATE=$(find "$TASK_DIR" -maxdepth 1 -name "task.*.gate.${PRIOR_CYCLE}.*.yml" 2>/dev/null | head -1)',
+    '  THIS_GATE=$(find "$STORY_DIR" -maxdepth 1 -name "story.*.gate.${QA_CYCLE:-none}.*.yml" 2>/dev/null | head -1)',
+    'find {task-directory} -maxdepth 1 -name "task.{id}.gate.*.yml" 2>/dev/null | awk -F\'gate\\\\.\' \'{ split($2, a, "."); printf "%d\\t%s\\n", a[1], $0 }\' | sort -k1,1 -n | tail -1 | cut -f2-',
+    'QA_CYCLE=$(find {doc-directory} -maxdepth 1 \\( -name "story.*.gate.*.yml" -o -name "task.*.gate.*.yml" \\) 2>/dev/null | sed -E \'s/.*\\.gate\\.([0-9]+)\\..*/\\1/\' | sort -n | tail -1)',
+    "   FINAL_GATE=$(find {story-or-task-directory} -maxdepth 1 -name \"*.gate.*.yml\" 2>/dev/null | sed -E 's/^(.*\\.gate\\.)([0-9]+)(\\..*)$/\\2 \\1\\2\\3/' | sort -n | tail -1 | cut -d' ' -f2- | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo \"N/A\")",
+    'LATEST_GATE=$(ls -t "$DIR"/*.gate.*.yml 2>/dev/null | head -1)',
+  ];
+  for (const l of SHIPPED) assert.equal(GATE_SELECTION.test(l), true, l);
+  const ALLOWED = [
+    '   PRIOR_GATES=$(find "$TASK_DIR" -maxdepth 1 -name "task.*.gate.*.yml" 2>/dev/null | wc -l | tr -d \' \')',
+    '  THIS_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate); rc=$?',
+    '   DOD_PATH=$(find {story-or-task-directory} -maxdepth 1 -name "*.dod.*.md" 2>/dev/null | sort -n | tail -1)',
+  ];
+  for (const l of ALLOWED) assert.equal(GATE_SELECTION.test(l), false, l);
 });
 
 test("the inline-derivation guard catches the two-line continued form it was written for (TASK-121-BUG-5)", () => {
@@ -353,6 +398,41 @@ test("the helper is bundled into every skill whose prose calls it", () => {
   const missing = SKILLS.map((f) =>
     path.join(path.dirname(f), "references", "qa-cycle.sh"),
   ).filter((p) => !fs.existsSync(path.join(REPO_ROOT, p)));
+  assert.deepEqual(missing, []);
+});
+
+test("every bundled step doc whose qa-cycle.sh call names its own skill has the helper beside it (task.158)", () => {
+  // The population is derived from the tree: every skill that bundles one of
+  // STEP_DOCS, and every skill the doc's invocation path names — the
+  // `{develop-story|develop-task|develop-bug}` group, or a single name. A skill
+  // named there without the helper would exit 127 in a consumer install.
+  const CALL =
+    /\.agents\/skills\/(\{[a-z|-]+\}|[a-z-]+)\/references\/qa-cycle\.sh/g;
+  const checked = [];
+  const missing = [];
+  for (const skill of fs.readdirSync(path.join(REPO_ROOT, "skills"))) {
+    for (const doc of STEP_DOCS) {
+      const copy = path.join("skills", skill, "references", path.basename(doc));
+      if (!fs.existsSync(path.join(REPO_ROOT, copy))) continue;
+      const text = fs.readFileSync(path.join(REPO_ROOT, copy), "utf8");
+      const named = new Set(
+        [...text.matchAll(CALL)].flatMap((m) =>
+          m[1].replace(/[{}]/g, "").split("|"),
+        ),
+      );
+      if (!named.has(skill)) continue;
+      checked.push(`${skill}:${path.basename(doc)}`);
+      const helper = path.join("skills", skill, "references", "qa-cycle.sh");
+      if (!fs.existsSync(path.join(REPO_ROOT, helper)))
+        missing.push(`${copy} → ${helper}`);
+    }
+  }
+  const skills = new Set(checked.map((c) => c.split(":")[0]));
+  assert.deepEqual(
+    [...skills].sort(),
+    ["develop-bug", "develop-story", "develop-task"],
+    `the step docs call the helper from these skills: ${checked.join(", ")}`,
+  );
   assert.deepEqual(missing, []);
 });
 

@@ -153,12 +153,16 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    TASK_DIR=$(dirname "$TASK_FILE")
    # The current gate is the HIGHEST-numbered one, and the number has ONE definition — the bundled
    # qa-cycle.sh (task.121). It refuses (rc 1, empty) when no numbered gate exists, which is the
-   # first-review case. The path is then a quoted find on that number: an unmatched bare glob
-   # aborts the whole command under zsh, and `ls -t` ties on a fresh checkout (obs #144/#145).
+   # first-review case. The FILE comes from the same helper's --path mode (task.158): the
+   # name-glob lookup it replaced missed a zero-padded gate.02, and took the first of two
+   # files silently. A cycle that no ONE regular file carries is refused, never read as "no gate".
    PRIOR_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" 2>/dev/null); rc=$?
    [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
    LATEST_GATE=""
-   [ -n "$PRIOR_CYCLE" ] && LATEST_GATE=$(find "$TASK_DIR" -maxdepth 1 -name "task.*.gate.${PRIOR_CYCLE}.*.yml" 2>/dev/null | head -1)
+   if [ -n "$PRIOR_CYCLE" ]; then
+     LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate); rc=$?
+     [ "$rc" -eq 0 ] || { echo "⚠️  qa-cycle.sh --path gate refused cycle $PRIOR_CYCLE (rc=$rc) — resolve the gate files named above, then re-run" >&2; exit 1; }
+   fi
    ```
 
 2. **If gate file exists, read and analyze:**
@@ -1261,8 +1265,9 @@ Step 12b HALT with each problem and its remedy printed, and exit 2 is "could not
 arguments, an unreadable document, a sibling engine that did not load). Exit 2 is never a pass. It
 checks four things:
 
-1. **The claims exist.** This cycle's gate and QA report are in the work item's directory, and the
-   document has a Change Log row. An absent one halts, named.
+1. **The claims exist.** This cycle's gate and QA report are in the work item's directory, the
+   document links **those two files** — not an earlier cycle's (task.158) — and it has a Change Log
+   row. An absent one halts, named.
 2. **What this run wrote is staged.** The link check reads the index, so the script stages the
    document, gate and report, plus every linked target that is **`untracked`** and a regular file
    under the work item's own directory. A `git add` that fails halts. An untracked target elsewhere
@@ -1493,7 +1498,14 @@ if [ -n "$QA_ISSUE" ]; then
   # cannot name different rounds. Re-resolve rather than reusing LATEST_GATE
   # from Step 2: that one names the PREVIOUS run's gate (read to decide whether
   # to re-review), and this run has written a newer one since.
-  THIS_GATE=$(find "$TASK_DIR" -maxdepth 1 -name "task.*.gate.${QA_CYCLE:-none}.*.yml" 2>/dev/null | head -1)
+  # The file from the same helper (task.158): the name-glob lookup it replaced missed a
+  # zero-padded gate.02 and read BLOCKING_COUNT 0 on a gate with a HIGH entry. A cycle no ONE
+  # file carries (two claim it) stops here — an empty THIS_GATE would post "nothing blocking".
+  THIS_GATE=""
+  if [ -n "$QA_CYCLE" ]; then
+    THIS_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate); rc=$?
+    [ "$rc" -eq 0 ] || { echo "⚠️  qa-cycle.sh --path gate refused cycle $QA_CYCLE (rc=$rc) — resolve the gate files named above" >&2; exit 1; }
+  fi
   # `|| true`, NOT `|| echo 0`. `grep -c` PRINTS "0" and EXITS 1 when it matches
   # nothing, so `|| echo 0` appends a second zero and the variable becomes the
   # two-line string "0\n0" — which the engine's numeric coercion then reads as

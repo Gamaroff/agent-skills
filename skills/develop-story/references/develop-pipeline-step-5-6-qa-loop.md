@@ -135,25 +135,29 @@ Log in Decisions Log: "GitHub board: QA-start re-assert → {landed / already / 
 
 ## Finding the Latest Gate File
 
-Use a format-agnostic regex to extract the numeric `{N}` from each filename, sort numerically, and pick the highest. Robust to story/task names that contain dots.
-
-#### develop-story
-
-```bash
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.gate.*.yml" 2>/dev/null \
-  | awk -F'gate\\.' '{ split($2, a, "."); printf "%d\t%s\n", a[1], $0 }' \
-  | sort -k1,1 -n | tail -1 | cut -f2-
-```
-
-#### develop-task
+The latest gate is the one file `qa-cycle.sh` names: the highest-numbered cycle, zero-padding
+normalised (`gate.02` is cycle 2), a directory or a dotfile never a candidate, and two files claiming
+one cycle **refused** rather than picked. The helper is `qa-cycle.sh`, bundled beside this document
+(the invocation path below is what the bundler follows); the QA skills ask the same helper, so the loop and the QA run cannot disagree about
+which gate is current (task.158 — this section used to carry its own `find | awk | sort` grammar).
 
 ```bash
-find {task-directory} -maxdepth 1 -name "task.{id}.gate.*.yml" 2>/dev/null \
-  | awk -F'gate\\.' '{ split($2, a, "."); printf "%d\t%s\n", a[1], $0 }' \
-  | sort -k1,1 -n | tail -1 | cut -f2-
+QA_CYCLE=$(bash .agents/skills/{develop-story|develop-task}/references/qa-cycle.sh "{story-or-task-directory}"); rc=$?
+# rc 1 = the helper REFUSED (no numbered gate yet) → empty. Anything else is a broken invocation.
+[ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
+LATEST_GATE=""
+if [ -n "$QA_CYCLE" ]; then
+  LATEST_GATE=$(bash .agents/skills/{develop-story|develop-task}/references/qa-cycle.sh "{story-or-task-directory}" --path gate); rc=$?
+  # A cycle that no ONE regular file carries (two claim it) is a stop, never "no gate".
+  [ "$rc" -eq 0 ] || { echo "⚠️  qa-cycle.sh --path gate refused cycle $QA_CYCLE (rc=$rc) — resolve the gate files named above" >&2; exit 1; }
+fi
 ```
 
-The gate file pattern is `…gate.{N}.{name}.yml` — the awk splits on `gate.`, takes the first `.`-delimited token from the right side as `{N}`. Names containing dots (e.g. `auth.v2`) no longer affect ordering.
+An empty `QA_CYCLE` (and so an empty `LATEST_GATE`) means no QA run has written a gate yet.
+
+> The helper reads every `*.gate.*.yml` in the directory. The story form this replaced was keyed on
+> the story's own stem (`story.{epic}.{story}.gate.*`); no co-located bug writes a gate today, and a
+> stem filter for the helper is a recorded follow-up (task.149 gate 8 CR-2).
 
 **Note (tasks only)**: The legacy path `docs/qa/gates/tasks/` is deprecated. qa-task v2.0 co-locates gate files in the task directory alongside the task document.
 

@@ -426,9 +426,11 @@ If the last completed step was within the QA loop, reconstruct the cycle count *
 disk**, and use the `### QA Cycle` entries in the implementation report as the cross-check:
 
 ```bash
-# The gate is what a QA run leaves behind whether or not it ran inside this pipeline.
-QA_CYCLE=$(find {doc-directory} -maxdepth 1 \( -name "story.*.gate.*.yml" -o -name "task.*.gate.*.yml" \) 2>/dev/null \
-  | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/' | sort -n | tail -1)
+# The gate is what a QA run leaves behind whether or not it ran inside this pipeline. The cycle
+# comes from the ONE definition the QA skills use (task.158): a zero-padded `gate.02` is 2.
+QA_CYCLE=$(bash .agents/skills/{develop-story|develop-task|develop-bug}/references/qa-cycle.sh "{doc-directory}" 2>/dev/null); rc=$?
+# rc 1 = no numbered gate → 0 (a fresh start). Anything else is a broken invocation: HALT.
+[ "$rc" -le 1 ] || { echo "HALT: qa-cycle.sh not runnable (rc=$rc) — cannot reconstruct the QA cycle" >&2; exit 1; }
 QA_CYCLE=${QA_CYCLE:-0}
 COMPLETED=$(grep -c "^### QA Cycle" {implementation-report-path})
 CYCLES_OUTSIDE_LOOP=$((QA_CYCLE - COMPLETED))     # derived here, never stored — see below
