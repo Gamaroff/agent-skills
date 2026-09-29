@@ -433,8 +433,16 @@ disk**, and use the `### QA Cycle` entries in the implementation report as the c
 # {doc-directory} halts instead of reading as a fresh start (task.158 QA cycle 1, CR-2).
 [ -d "{doc-directory}" ] || { echo "HALT: {doc-directory} is not a directory — cannot reconstruct the QA cycle" >&2; exit 1; }
 QA_CYCLE=$(bash .agents/skills/{develop-story|develop-task|develop-bug}/references/qa-cycle.sh "{doc-directory}" 2>/dev/null); rc=$?
-# rc 1 = no numbered gate → 0 (a fresh start). Anything else is a broken invocation: HALT.
+# rc 1 = no numbered gate. Anything else is a broken invocation: HALT.
 [ "$rc" -le 1 ] || { echo "HALT: qa-cycle.sh not runnable (rc=$rc) — cannot reconstruct the QA cycle" >&2; exit 1; }
+# rc 1 is TWO states, and only one is a fresh start: no gate file at all (→ 0), or gate
+# files none of which carries a usable cycle number (unnumbered, gate.0, over 9 digits).
+# The second is a directory the helper cannot read — resuming it at cycle 1 would write a
+# gate.1 beside files nobody accounted for — so it halts (task.158 QA cycle 2, QA2-CR-1).
+# A count, not a selection: it only asks whether any gate file exists.
+if [ -z "$QA_CYCLE" ] && [ "$(find "{doc-directory}" -maxdepth 1 -name '*.gate.*.yml' 2>/dev/null | wc -l | tr -d ' ')" -gt 0 ]; then
+  echo "HALT: {doc-directory} holds gate files but none carries a usable cycle number — rename them (*.gate.{N}.{name}.yml) before resuming" >&2; exit 1
+fi
 QA_CYCLE=${QA_CYCLE:-0}
 COMPLETED=$(grep -c "^### QA Cycle" {implementation-report-path})
 CYCLES_OUTSIDE_LOOP=$((QA_CYCLE - COMPLETED))     # derived here, never stored — see below

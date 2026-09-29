@@ -309,7 +309,7 @@ const ROWS = [
     file: "shared/resources/develop-pipeline-resume-contract.md",
     needle:
       "QA_CYCLE=$(bash .agents/skills/{develop-story|develop-task|develop-bug}/",
-    more: 3,
+    more: 11,
     cwd: "repo",
     varName: "QA_CYCLE",
     expect: "0",
@@ -428,4 +428,62 @@ for (const row of ROWS) {
       });
     }
   }
+}
+
+// task.158 QA cycle 2 (QA2-CR-1, QA2-CR-3) — the resume contract's cycle reconstruction, run
+// whole from its `[ -d "{doc-directory}" ]` guard to its `QA_CYCLE=${QA_CYCLE:-0}` default,
+// under both shells, in the four states that decide it. The helper answers rc 1 for three of
+// them, and only one of those is a fresh start.
+function resumeBlock(dir) {
+  const file = "shared/resources/develop-pipeline-resume-contract.md";
+  const lines = readFileSync(path.join(REPO, file), "utf8").split("\n");
+  const start = lines.findIndex((l) =>
+    l.trim().startsWith('[ -d "{doc-directory}" ]'),
+  );
+  const end = lines.findIndex(
+    (l, i) => i > start && l.trim() === "QA_CYCLE=${QA_CYCLE:-0}",
+  );
+  assert.ok(
+    start !== -1 && end > start,
+    `${file}: the resume block moved — update this test`,
+  );
+  return `${subst(lines.slice(start, end + 1).join("\n"), dir)}\nprintf '%s' "$QA_CYCLE"\n`;
+}
+
+for (const shell of SHELLS) {
+  test(`[${shell}] resume contract: missing dir, unnumbered gates, empty dir and gate.02 are four answers, not one`, () => {
+    const base = mkdtempSync(path.join(tmpdir(), "ofl-resume-"));
+    try {
+      const missing = path.join(base, "no-such-dir");
+      let r = run(shell, resumeBlock(missing), CONSUMER_ROOT);
+      assert.notEqual(r.status, 0, "a missing directory halts");
+      assert.match(r.stderr, /is not a directory/);
+
+      const unnumbered = path.join(base, "unnumbered");
+      mkdirSync(unnumbered);
+      writeFileSync(path.join(unnumbered, "task.7.gate.x.yml"), "gate: PASS\n");
+      r = run(shell, resumeBlock(unnumbered), CONSUMER_ROOT);
+      assert.notEqual(
+        r.status,
+        0,
+        "unnumbered gates halt — they are not a fresh start",
+      );
+      assert.match(r.stderr, /none carries a usable cycle number/);
+
+      const empty = path.join(base, "empty");
+      mkdirSync(empty);
+      r = run(shell, resumeBlock(empty), CONSUMER_ROOT);
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(r.stdout, "0", "no gate file at all is the fresh start");
+
+      const padded = path.join(base, "padded");
+      mkdirSync(padded);
+      writeFileSync(path.join(padded, "task.7.gate.02.x.yml"), "gate: PASS\n");
+      r = run(shell, resumeBlock(padded), CONSUMER_ROOT);
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(r.stdout, "2", "a zero-padded gate is its number");
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
 }

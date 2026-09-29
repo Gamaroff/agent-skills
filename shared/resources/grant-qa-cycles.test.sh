@@ -216,6 +216,11 @@ D="$T/agree"; L="$D/lock.json"; mkdoc "$D/doc" 02 9 010; printf '{"current_step"
 WANT=$(( $(bash "$(dirname "$SCRIPT")/qa-cycle.sh" "$D/doc") + 1 ))
 run "$L" "$D/none.json" "$D/doc" 1 >/dev/null 2>&1
 [ "$(jq -r '.qa_max_cycles' "$L")" = "$WANT" ] && [ "$WANT" = "11" ] && pass "grant base equals qa-cycle.sh's cycle (gate.010 → 10, +1 = 11)" || fail "grant agrees with qa-cycle.sh" "want=$WANT lock=$(cat "$L")"
+# Gate files that carry no usable cycle number are refused with the helper's own reason — not
+# reported as "no gate" over a directory that has gate files (task.158 QA cycle 2, QA2-CR-1).
+D="$T/unnumbered"; L="$D/lock.json"; mkdir -p "$D/doc"; : > "$D/doc/task.42.gate.example.yml"; printf '{"current_step":5}\n' > "$L"
+ERR=$(run "$L" "$D/none.json" "$D/doc" 2 2>&1 >/dev/null); RC=$?
+[ "$RC" -ne 0 ] && echo "$ERR" | grep -q "carry no cycle number" && [ "$(jq -r '.qa_max_cycles // "absent"' "$L")" = "absent" ] && pass "unnumbered gate files → refused with the helper's reason, nothing written" || fail "unnumbered gates" "rc=$RC err=$ERR"
 # Without its sibling the grant refuses by name — it never falls back to a private derivation.
 D="$T/lonely"; L="$D/lock.json"; mkdir -p "$D/bin"; mkdoc "$D/doc" 3; printf '{"current_step":5}\n' > "$L"
 cp "$SCRIPT" "$D/bin/grant-qa-cycles.sh"

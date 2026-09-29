@@ -11,9 +11,10 @@ All notable changes to this project will be documented in this file. Format foll
   document does not link the gate and QA report `qa-cycle.sh --path` names for the current cycle;
   before, a cycle-2 document still linking `gate.1`/`qa.1` read clean because every link
   resolved. `doc-links.js` `checkDocument` returns the additive `resolved[]` it already computed.
-  Every current-cycle gate lookup — `qa-task`/`qa-story` Phase 0 and Step 13b, the QA loop's
-  latest gate, the resume contract's cycle reconstruction, Step 7's completion comment — now asks
-  `qa-cycle.sh`, so a zero-padded `gate.02` is found (Step 13b read `BLOCKING_COUNT` 0 on a gate
+  Every current-cycle gate lookup in the QA skills and the develop-pipeline step docs —
+  `qa-task`/`qa-story` Phase 0 and Step 13b, the QA loop's latest gate, the resume contract's
+  cycle reconstruction (which now halts on gate files with no usable number instead of resuming
+  at cycle 1), Step 7's completion comment — now asks `qa-cycle.sh`, so a zero-padded `gate.02` is found (Step 13b read `BLOCKING_COUNT` 0 on a gate
   with a HIGH entry) and two files claiming one cycle stop the block instead of the first being
   taken. `grant-qa-cycles.sh` takes its base cycle from the same helper — its private sed kept a
   zero-padded `08` and died with `value too great for base`. The helper is now bundled into the

@@ -419,14 +419,19 @@ function shellHelperLines() {
   for (const dir of dirs)
     for (const f of fs.readdirSync(path.join(REPO_ROOT, dir))) {
       if (!f.endsWith(".sh") || f.endsWith(".test.sh")) continue;
-      const lines = fs
+      // Split first, then join each backslash continuation onto the line it starts on, so a
+      // reported line number is the logical line's FIRST physical line (QA cycle 2, QA2-CR-4).
+      const raw = fs
         .readFileSync(path.join(REPO_ROOT, dir, f), "utf8")
-        .replace(/\\\n\s*/g, " ")
         .split("\n");
-      lines.forEach((l, i) => {
-        if (!/^\s*#/.test(l))
-          out.push({ file: `${dir}/${f}`, line: i + 1, text: l });
-      });
+      for (let i = 0; i < raw.length; i++) {
+        const start = i;
+        let text = raw[i];
+        while (/\\$/.test(text) && i + 1 < raw.length)
+          text = text.slice(0, -1) + " " + raw[++i].replace(/^\s*/, "");
+        if (!/^\s*#/.test(text))
+          out.push({ file: `${dir}/${f}`, line: start + 1, text });
+      }
     }
   return out;
 }
@@ -457,6 +462,32 @@ test("no shipped shell helper but qa-cycle.sh derives the QA cycle (task.158 CR-
     ),
     "the predicate recognises qa-cycle.sh's own derivation",
   );
+});
+
+test("shellHelperLines reports the first physical line of a continued command (QA2-CR-4)", () => {
+  // Every reported line must hold the text it reports, so a hit points at the real source line.
+  // Joining continuations before splitting shifted every later line number in a file.
+  const lines = shellHelperLines();
+  const cache = new Map();
+  const src = (file) => {
+    if (!cache.has(file))
+      cache.set(
+        file,
+        fs.readFileSync(path.join(REPO_ROOT, file), "utf8").split("\n"),
+      );
+    return cache.get(file);
+  };
+  const continued = lines.filter((l) => /\\$/.test(src(l.file)[l.line - 1]));
+  assert.ok(
+    continued.length > 5,
+    `${continued.length} continued commands — the case is exercised`,
+  );
+  const wrong = lines
+    .filter(
+      (l) => !l.text.startsWith(src(l.file)[l.line - 1].replace(/\\$/, "")),
+    )
+    .map((l) => `${l.file}:${l.line}`);
+  assert.deepEqual(wrong.slice(0, 5), []);
 });
 
 test("the shell-helper guard catches the loop grant-qa-cycles.sh shipped (task.158 CR-1)", () => {

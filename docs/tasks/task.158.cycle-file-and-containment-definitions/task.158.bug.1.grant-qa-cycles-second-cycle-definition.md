@@ -4,7 +4,7 @@
 **Bug ID**: TASK-158-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 1, code review CR-1)
 **Date Found**: 2026-09-29
 
@@ -116,3 +116,4 @@ regular file. The same crash reproduces on `develop` (the script is unchanged by
 | 2026-09-29 | New          | qa-task    | QA cycle 1, code review CR-1               |
 | 2026-09-29 | In Progress  | qa-fix     | Investigation started                      |
 | 2026-09-29 | Ready for QA | qa-fix     | grant-qa-cycles.sh asks qa-cycle.sh        |
+| 2026-09-29 | Closed       | qa-task    | QA cycle 2: reproduction exits 0, qa_max_cycles 10 |

@@ -118,13 +118,21 @@ if [ ! -f "$QA_CYCLE_SH" ]; then
   echo "grant-qa-cycles: qa-cycle.sh not found beside this script ($QA_CYCLE_SH) — re-bundle the skill" >&2
   exit 1
 fi
-QA_CYCLE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" 2>/dev/null); rc=$?
+# The helper's stderr is kept, not discarded: its rc 1 covers both "no gate file" and "gate
+# files with no usable cycle number", and only its message tells them apart (task.158 QA
+# cycle 2, QA2-CR-1).
+QA_CYCLE_ERR=$(mktemp)
+QA_CYCLE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" 2>"$QA_CYCLE_ERR"); rc=$?
+QA_CYCLE_WHY=$(sed -n '1s/^⚠️ *qa-cycle: *//p' "$QA_CYCLE_ERR"); rm -f "$QA_CYCLE_ERR"
 if [ "$rc" -gt 1 ]; then
   echo "grant-qa-cycles: qa-cycle.sh not runnable (rc=$rc) — cannot reconstruct the QA cycle" >&2
   exit 1
 fi
 if [ -z "$QA_CYCLE" ]; then
-  echo "grant-qa-cycles: no *.gate.{N}.*.yml in '$DOC_DIR' — nothing to grant against" >&2
+  # A separate default, not ${QA_CYCLE_WHY:-…}: the default text holds `{N}`, whose `}`
+  # would close the expansion early.
+  [ -n "$QA_CYCLE_WHY" ] || QA_CYCLE_WHY="no *.gate.{N}.*.yml in '$DOC_DIR'"
+  echo "grant-qa-cycles: nothing to grant against — $QA_CYCLE_WHY" >&2
   exit 1
 fi
 # The report's entry count is the other half of the reconstruction. `|| true`, not

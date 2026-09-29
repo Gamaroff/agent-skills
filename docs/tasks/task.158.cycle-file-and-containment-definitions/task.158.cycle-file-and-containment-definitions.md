@@ -445,18 +445,19 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.158.qa.1.cycle-file-and-containment-definitions.md](./task.158.qa.1.cycle-file-and-containment-definitions.md)
-- **Gate File**: [task.158.gate.1.cycle-file-and-containment-definitions.yml](./task.158.gate.1.cycle-file-and-containment-definitions.yml)
+- **Full Report**: [task.158.qa.2.cycle-file-and-containment-definitions.md](./task.158.qa.2.cycle-file-and-containment-definitions.md)
+- **Gate File**: [task.158.gate.2.cycle-file-and-containment-definitions.yml](./task.158.gate.2.cycle-file-and-containment-definitions.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 289
+- **Tests Executed**: 291
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR-1 (medium): `grant-qa-cycles.sh` keeps a second cycle definition and crashes on a zero-padded gate — [bug report](./task.158.bug.1.grant-qa-cycles-second-cycle-definition.md)
-- Advisory: CR-2 (resume rc 1 conflation), CR-3 (cycle-mode prose), CR-4 (fake-gh fixture at repo root)
+- Cycle 1 CR-1 fixed — [bug report](./task.158.bug.1.grant-qa-cycles-second-cycle-definition.md) Ready for QA → verified
+- QA2-CR-1 (medium): the resume block reads a directory of unnumbered gates as a fresh start where develop failed loudly
+- Advisory: QA2-CR-2 (develop-next merge-gate prose lookup), QA2-CR-3 (`[ -d ]` HALT untested), QA2-CR-4 (guard line numbers)
 
 ---
 
@@ -470,6 +471,7 @@ None.
 | 2026-09-29 |         | Status → ready-for-development | review-task |
 | 2026-09-29 |         | Implemented — 16 files (+3 bundled `qa-cycle.sh` copies), 12 new tests; status → ready-for-review | develop |
 | 2026-09-29 |         | QA gate CONCERNS (90/100) — 1 medium finding (CR-1), 3 low | qa-task |
+| 2026-09-29 |         | QA gate CONCERNS (90/100) — cycle 2: CR-1 verified fixed; 1 medium (QA2-CR-1), 1 advisory medium, 2 low | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -545,3 +547,4 @@ block, and an empty directory reads as the first review, with resume reconstruct
 **Open** (non-blocking, out of scope):
 - ⚠️ `qa-cycle.sh --path` counts a co-located bug's gate in the parent directory (task.149 gate 8 CR-2)
 - ⚠️ obs #196: 5c routes LOW documentation findings to Step 7, where finalise's Docs section blocks on the same items
+- ⚠️ `develop-next` SKILL.md's merge gate reads "the newest `*.gate.{N}.*.yml`" by its own prose rule (QA cycle 2, QA2-CR-2). It is outside this task's six named sites and is prose, not a fenced lookup, so neither guard sees it; moving it onto `qa-cycle.sh --path gate` needs the helper bundled into `develop-next` — a follow-up
