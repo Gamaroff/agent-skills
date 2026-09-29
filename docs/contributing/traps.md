@@ -133,6 +133,7 @@ The marker is built by `loadSensitive()` in the shared `spawn-budget.mjs` (task 
 
 - `evals/shared/tests/consumer-root.test.mjs`
 - `shared/resources/tests/access-config-parity.test.mjs`
+- `shared/resources/tests/call-sites.test.mjs`
 - `shared/resources/tests/qa-diminishing-returns.test.mjs`
 - `shared/resources/tests/qa-execute-snippets.test.mjs`
 - `skills/session-handoff/tests/handoff-verify.test.js`

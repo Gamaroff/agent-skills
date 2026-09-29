@@ -483,6 +483,7 @@ After the Implementation Plan and Technical Background are populated, decide whe
 - **A current-state name nobody grepped** (obs #127): every field, function and file location the Technical Background asserts about the current code has a `grep` hit cited as `path:line`, or is marked `(unverified)`. Grep each one now. The author who names a field is the one who greps for it.
 - **A categorised population without a witness per member** (obs #124): when the document sorts a measured population into classes (used / dead / prose, real dependency / not), each **member** carries its witness, meaning the `file:line` of its invocation or the grep that returned nothing. A count carries its command (obs #117). A category needs its witness, one per member. Where the classification drives a design (a regex keyed on an invocation spelling), quote at least one real instance of that spelling from the tree. task.122 counted 15 correctly and categorised 7 of them wrongly.
 - **A single-statement test keyed on a shared token** (obs #135): for each proposed single-statement, population or allowlist test, (a) grep the key it proposes and list every hit. If any hit belongs to a different rule, the key is shared, and the test needs a positive marker or a compound (verb + discriminator) pattern. (b) Name a restatement that would **not** match the key and say how the test sees it. (c) If the test's population is derived from directories, do not name a site to add. Name the regex change and a non-vacuity assertion instead. task.130 keyed a test on `loop-limit|not-converging`, a token another rule also uses: it would have been red at the wrong site and blind to the token-free restatement behind task.124 bug 13.
+- **A call-site list from recall** (obs #120): when the task enumerates call sites of one of this repository's engines (the collector's `--engine` names: `tracker-comment`, `stakeholder-summary-cli`, `gh-stage`, `jira-stage`, `tracker-issue`) — a list, a count, or "all call sites of" — measure the population instead of recalling it: `command node .agents/skills/create-task/references/call-sites.js --engine "{engine}" --json` from the repository root. Paste its count and command into the Files Summary (obs #117) and name every site it returns, each as in scope or as a stated exclusion. A `no-roots` answer (exit 1) means this is not a skills source tree (no `shared/resources/` beside a `skills/*/SKILL.md`): say so in place of a count, never write 0. Any other non-zero exit means the count is unknown — say that, not 0. `review-task` Step 3 check 14 diffs the list against the same collector. task.121 named three sites and one duplicate; the collector found two more in scope, one a consumer a success criterion would have forbidden.
 
 #### ⚡ Should Add (present to user for confirmation)
 
@@ -835,6 +836,8 @@ For EACH phase:
 ```
 
 ### Section 7: Files Summary
+
+Where the task's scope is "the call sites of engine X", the list comes from the collector, not from memory — see the call-site item in 3.5 (obs #120).
 
 ```
 Categorize all files:

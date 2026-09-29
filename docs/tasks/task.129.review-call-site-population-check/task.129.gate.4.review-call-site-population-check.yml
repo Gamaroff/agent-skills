@@ -1,0 +1,55 @@
+schema: 1
+task: 'task.129.review-call-site-population-check'
+task_title: "A call-site list in a task document is the author's recall, not a measurement"
+gate: PASS
+status_reason: 'Cycle 3 fixes verified: EPIPE and uncaught exits routed through REASONS, every row driven, --root EACCES unreadable, prose consistent. No high-confidence correctness bug in the scoped diff; three advisory findings recorded for 5c and follow-up.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T22:20:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: 2/2
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: []
+
+bug_resolution:
+  cycle_3: 'TASK-129-C3-CR-1 and C3-CR-2 fixed in c32d933d and verified (EPIPE → output-closed exit 5, reproduced 3/3 before; all 7 REASONS rows driven with key coverage asserted).'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false (unchanged): the collector gates no action.'
+  performance:
+    status: PASS
+    notes: 'CLI sub-second on the live tree.'
+  reliability:
+    status: PASS
+    notes: 'Every exit path, including EPIPE and uncaught exceptions, now leaves through REASONS with a unique non-zero code.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory C4-CR-1: four prose sites hand-list non-zero reasons without a test tying them to REASONS.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'C4-CR-1 (medium/medium, advisory): the four prose sites that hand-list non-zero reasons omit usage and no test ties them to Object.keys(REASONS); say "any non-zero exit" and drop the lists, or test them.'
+      refs: ['shared/resources/review-task-prepass-prompts.md', 'shared/resources/review-story-prepass-prompts.md', 'skills/review-task/SKILL.md', 'skills/review-story/SKILL.md']
+    - action: 'C4-CR-2: unit-test installExitGuards directly with a fake stream/proc (non-EPIPE error, uncaughtException).'
+      refs: ['shared/resources/call-sites.js']
+    - action: 'C4-CR-3: the output-closed driver should reject on child error and time out.'
+      refs: ['shared/resources/tests/call-sites.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

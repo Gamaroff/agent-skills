@@ -1,0 +1,67 @@
+schema: 1
+task: 'task.129.review-call-site-population-check'
+task_title: "A call-site list in a task document is the author's recall, not a measurement"
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes hold (populations 24/12 equal to the guard; check texts identical; isSourceTree right for repo, export and consumer). Two medium defects remain in the REASONS contract: an EPIPE on stdout bypasses emit() and exits 1, and the every-row test drives only four of six rows.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T21:40:00Z'
+
+top_issues:
+  - id: 'TASK-129-C3-CR-1'
+    severity: medium
+    file: 'shared/resources/call-sites.js'
+    finding: 'A reader that closes the pipe before the stdout write raises an unhandled EPIPE and Node exits 1 — the code REASONS reserves for no-roots (reproduced 3/3: `call-sites.js --engine tracker-issue --json | (exit 0)` → pipestatus 1).'
+    suggested_action: 'Handle process.stdout "error" and uncaughtException by setting the exit code from REASONS; add a test that closes stdout early.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-129-C3-CR-2'
+    severity: medium
+    file: 'shared/resources/tests/call-sites.test.mjs'
+    finding: 'The "each reason is reachable" test drives ok, empty, no-roots and usage only; internal-error has no driver and unreadable is reached only by a test that skips as root. Nothing asserts the drivers cover Object.keys(REASONS), so the header claim that the test drives each row is false.'
+    suggested_action: 'Assert driver keys equal Object.keys(REASONS); drive unreadable and internal-error in-process with fs stubbed to throw a coded and an uncoded error.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 42
+  phases_verified: 2/2
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1]
+
+bug_resolution:
+  cycle_2: 'TASK-129-C2-CR-1 and C2-CR-2 fixed in a65b1737 and verified (consumer install → no-roots; prototype engine names → usage exit 2).'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false (unchanged): the collector gates no action.'
+  performance:
+    status: PASS
+    notes: 'unchanged'
+  reliability:
+    status: CONCERNS
+    notes: 'C3-CR-1: one exit path still bypasses the contract.'
+  maintainability:
+    status: PASS
+    notes: 'C3-CR-5: ROOTS exported but unused.'
+
+recommendations:
+  immediate:
+    - action: 'Fix C3-CR-1 and C3-CR-2.'
+      refs: ['shared/resources/call-sites.js', 'shared/resources/tests/call-sites.test.mjs']
+  future:
+    - action: 'C3-CR-3: --root stat EACCES → unreadable, not usage. C3-CR-4: the checks name over-counting and exit 4. C3-CR-5: drop the unused ROOTS export.'
+      refs: ['shared/resources/call-sites.js', 'skills/review-task/SKILL.md', 'skills/review-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['C3-CR-1 and C3-CR-2 fixed']

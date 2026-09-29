@@ -300,7 +300,7 @@ options:
 Before formulating questions in any step, consult the pre-pass summaries from Phase 1.5:
 
 - **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` as a question in the technical accuracy phase (Step 3). If `alignment` is `aligned`, record its `axes_checked` (and the `prepass-axes.js` `source`) in one line under the report's Technical Accuracy section, so an `aligned` measured against the wrong axes is visible in the report rather than silent.
-- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings as a question during completeness review (Step 6) — ask whether the task should be scoped down or closed.
+- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings as a question during completeness review (Step 6) — ask whether the task should be scoped down or closed. If it returned a non-empty `population_diff`, each entry is a Step 3 check 14 finding — confirm it against the collector and report it there.
 
 If a pre-pass summary is absent (agent failed or returned `alignment: unknown` / `implementation_status: unknown`): treat that axis as unreviewed and rely on in-line discovery for that phase.
 
@@ -930,6 +930,40 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       token-free restatement that caused task.124 bug 13
     - Flag as **Important** when the key is shared or no token-free restatement is addressed
 
+14. **Call-site population** (obs #120):
+    - Trigger: the document enumerates invocations of one of this repository's engines — it lists
+      call sites, gives a count of them, or scopes itself as "all call sites of" `tracker-comment.js`,
+      `stakeholder-summary-cli.js`, `gh-stage.js`, `jira-stage.js` or `tracker-issue.js`. A document
+      that touches one call and says so is not asked to count the world
+    - Measure the population with `call-sites.js`, the collector the guard tests import, from the
+      repository root:
+
+      ```bash
+      command node .agents/skills/review-task/references/call-sites.js --engine "{engine}" --json
+      ```
+
+      `reason: empty` is a claim about the instrument before it is one about the tree: check the
+      root before believing a zero. A document written against an earlier tree is measured against
+      that tree: export it with `git archive <rev> | tar -x -C <dir>` and pass `--root <dir>`,
+      which is measured as given. `reason: no-roots` (exit 1) means the root is not a skills
+      source tree (no `shared/resources/` beside a `skills/*/SKILL.md`) — a consumer install keeps
+      skills only as bundled copies — so there is no population to diff: record the check as not
+      applicable, never as a zero. Any other non-zero exit (`unreadable`, `internal-error`,
+      `output-closed`) means the population is unknown: record that, and diff nothing. A site
+      reached only through a shell variable (`node "$VAR"`) is found on a best-effort rule the
+      collector's header states, so it may be missed or over-counted: confirm any such site by
+      reading the script before reporting it, and name any the rule misses by hand
+    - Diff the collector's `file:line` list against the document's. Every collector site the
+      document does not name → **Important**, worded as a choice for the author: "in scope — add it"
+      or "an exclusion — state why". A stated exclusion is not a finding. A count in the document
+      that disagrees with the collector's → **Important**
+    - A list confirmed name by name is the author's recall, not a measurement: pre-pass Agent C's
+      grep for the symbols a document names cannot see a site the document does not name
+    - Worked example: task.121 named three `tracker-comment.js` sites and one orchestrator
+      duplicate, and the pre-pass confirmed each. The collector found a second orchestrator
+      duplicate and a live `develop-bug` consumer that one of its success criteria would have
+      forbidden — both in scope, both found only because the reviewer happened to run it
+
 **Common Hallucination Patterns to Detect**:
 
 - ❌ Libraries not in package.json or tech stack
@@ -942,6 +976,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ A property of an existing function asserted for new inputs, and never run on them (check 11)
 - ❌ Legacy or compatibility handling scoped from the finding that prompted it, not diffed against the released shape (check 12)
 - ❌ A test key that another rule's sites also match (check 13)
+- ❌ A list of an engine's call sites taken from the author's recall, never diffed against the collector (check 14)
 
 **Issues to Flag**:
 
@@ -1992,6 +2027,7 @@ This skill implements rigorous safeguards to DETECT hallucinations:
 5. **Schema Verification**: Database fields MUST exist in Prisma schema
 6. **Config Key Verification**: Every config key, env var or flag MUST have a reader in the tree
 7. **Invariant Verification**: A property claimed of an existing function under new inputs MUST be executed on those inputs — an existence check and a behaviour check are different instruments, and passing the first is not evidence for the second (Step 3 check 11)
+8. **Population Verification**: A document's list of an engine's call sites MUST be diffed against the collector's (`call-sites.js`) — a list confirmed name by name is the author's recall, not a measurement (Step 3 check 14)
 
 ### Reporting Hallucinations
 
