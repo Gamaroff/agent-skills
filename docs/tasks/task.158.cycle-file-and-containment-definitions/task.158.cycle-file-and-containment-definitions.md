@@ -438,26 +438,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-29
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.158.qa.2.cycle-file-and-containment-definitions.md](./task.158.qa.2.cycle-file-and-containment-definitions.md)
-- **Gate File**: [task.158.gate.2.cycle-file-and-containment-definitions.yml](./task.158.gate.2.cycle-file-and-containment-definitions.yml)
+- **Full Report**: [task.158.qa.3.cycle-file-and-containment-definitions.md](./task.158.qa.3.cycle-file-and-containment-definitions.md)
+- **Gate File**: [task.158.gate.3.cycle-file-and-containment-definitions.yml](./task.158.gate.3.cycle-file-and-containment-definitions.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 291
+- **Tests Executed**: 294
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 1 CR-1 fixed — [bug report](./task.158.bug.1.grant-qa-cycles-second-cycle-definition.md) Ready for QA → verified
-- QA2-CR-1 (medium): the resume block reads a directory of unnumbered gates as a fresh start where develop failed loudly
-- Advisory: QA2-CR-2 (develop-next merge-gate prose lookup), QA2-CR-3 (`[ -d ]` HALT untested), QA2-CR-4 (guard line numbers)
+- Cycle 1 CR-1 and cycle 2 QA2-CR-1 fixed and verified under execution — [bug report](./task.158.bug.1.grant-qa-cycles-second-cycle-definition.md) closed
+- Future work: a distinct `qa-cycle.sh` exit code for gate files with no usable number (QA3-CR-1, pre-existing at Phase 0); five low cleanups in the gate's `recommendations.future`
 
 ---
 
@@ -472,6 +471,7 @@ None.
 | 2026-09-29 |         | Implemented — 16 files (+3 bundled `qa-cycle.sh` copies), 12 new tests; status → ready-for-review | develop |
 | 2026-09-29 |         | QA gate CONCERNS (90/100) — 1 medium finding (CR-1), 3 low | qa-task |
 | 2026-09-29 |         | QA gate CONCERNS (90/100) — cycle 2: CR-1 verified fixed; 1 medium (QA2-CR-1), 1 advisory medium, 2 low | qa-task |
+| 2026-09-29 |         | QA gate PASS (100/100) — cycle 3: QA2-CR-1 verified fixed; 0 gating findings, 1 pre-existing medium and 5 low routed to future | qa-task |
 <!-- change-log-end -->
 
 ---
