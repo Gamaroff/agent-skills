@@ -468,6 +468,24 @@ test("release.sh gates on the clean-checkout runner first, stops when it fails, 
         '[ -n "$NPM_GATE_OK" ] && [ "$*" = "run test:clean-checkout" ] && exit 0\nexit 1\n',
       { mode: 0o755 },
     );
+    // CI is green for this fixture: release.sh reads CI's verdict before the gate
+    // (task 153), and this test is about the gate, not the CI check — which
+    // tests/release-ci-gate.test.js holds. A stub, so the run makes no network call.
+    fs.writeFileSync(
+      path.join(bin, "gh"),
+      "#!/bin/sh\necho '" +
+        JSON.stringify(
+          ["Test", "ShellCheck"].map((workflowName, i) => ({
+            workflowName,
+            status: "completed",
+            conclusion: "success",
+            event: "push",
+            databaseId: i + 1,
+          })),
+        ) +
+        "'\n",
+      { mode: 0o755 },
+    );
     const release = (extra) => {
       fs.rmSync(log, { force: true });
       const r = spawnSync(

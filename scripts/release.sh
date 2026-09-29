@@ -8,9 +8,14 @@
 #   bash scripts/release.sh --dry-run --minor      # preview without writing
 #   bash scripts/release.sh --retry [<tag>]        # re-run CI for an orphaned tag
 #   bash scripts/release.sh --patch --no-sync-develop  # skip the develop sync step
+#   bash scripts/release.sh --patch --skip-ci-check    # release without CI's verdict (see below)
 #
 # What it does (fresh release):
 #   1. Confirms working tree is clean and on main
+#   1b. Reads CI's verdict for HEAD (scripts/release-ci-verdict.mjs) and refuses
+#      unless it is green — before the multi-minute local test. A local run is a
+#      claim about one machine (obs #150). --skip-ci-check proceeds with a
+#      warning; use it only when CI has been confirmed another way.
 #   2. Warns on branches carrying commits not on develop (advisory — finished
 #      work that never merged is invisible to every other check and to CI)
 #   3. Runs pre-release checks (npm run test:clean-checkout, validate:all, generate-catalog, bundle)
@@ -29,7 +34,8 @@
 #   re-creates it at current main HEAD, re-pushes — triggers the workflow
 #   afresh. Aborts if a published Release already exists for that tag.
 #
-# Requires: node >=22 (npm test uses node --test glob support), git, curl, sed (BSD or GNU both work)
+# Requires: node >=22 (npm test uses node --test glob support), git, curl, sed (BSD or GNU both work),
+#           gh (authenticated) for a fresh release's CI check — not needed for --retry
 
 set -euo pipefail
 
@@ -48,6 +54,8 @@ DRY_RUN=false
 RETRY=false
 RETRY_TAG=""
 SYNC_DEVELOP=true
+SKIP_CI_CHECK=false
+WOULD_REFUSE=""
 REPO_SLUG="Gamaroff/agent-skills"
 
 while [[ $# -gt 0 ]]; do
@@ -60,6 +68,7 @@ while [[ $# -gt 0 ]]; do
     --patch) BUMP="patch"; shift ;;
     --dry-run) DRY_RUN="true"; shift ;;
     --no-sync-develop) SYNC_DEVELOP="false"; shift ;;
+    --skip-ci-check) SKIP_CI_CHECK="true"; shift ;;
     --retry)
       RETRY=true; shift
       # Optional positional tag argument — consume it only if it looks like a tag
@@ -152,6 +161,43 @@ if [[ "$LOCAL" != "$REMOTE" ]]; then
 fi
 ok "Up to date with origin/main"
 
+# ── 1b. CI verdict for the commit being released ─────────────────────────────
+# A local test run is a claim about this machine. The release is certified by the
+# verdict CI recorded for this SHA — obs #150: the local suite was green through
+# five consecutive red Test runs on develop (2026-09-21). It runs BEFORE the local
+# test so a red CI refuses in seconds, not minutes. $LOCAL is the SHA the block
+# above just proved equal to origin/main. --retry re-tags an existing release and
+# keeps its own guard, so it skips this one. Pinned by tests/release-ci-gate.test.js.
+if [[ "$RETRY" == false ]]; then
+  heading "CI verdict"
+  CI_JSON=$(command node "$(dirname "$0")/release-ci-verdict.mjs" --sha "$LOCAL" --json) || true
+  ci_field() {
+    printf '%s' "$CI_JSON" | command node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let v;try{v=JSON.parse(s)[process.argv[1]]}catch{}process.stdout.write(typeof v==="string"?v:"")})' "$1"
+  }
+  CI_REASON=$(ci_field reason)
+  CI_DETAIL=$(ci_field detail)
+  [[ -z "$CI_REASON" ]] && CI_REASON="unverifiable" && CI_DETAIL="release-ci-verdict.mjs printed no verdict"
+  if [[ "$CI_REASON" == "green" ]]; then
+    ok "CI green for ${LOCAL:0:8} — ${CI_DETAIL}"
+  elif [[ "$SKIP_CI_CHECK" == true ]]; then
+    warn "CI is ${CI_REASON} for ${LOCAL:0:8} — ${CI_DETAIL}"
+    warn "Proceeding UNVERIFIED against CI (--skip-ci-check)"
+  elif [[ "$DRY_RUN" == true ]]; then
+    warn "CI is ${CI_REASON} for ${LOCAL:0:8} — ${CI_DETAIL}"
+    warn "A real run would refuse here. Pass --skip-ci-check only if CI is confirmed another way."
+    WOULD_REFUSE="CI ${CI_REASON} for ${LOCAL:0:8}"
+  else
+    err "CI is ${CI_REASON} for ${LOCAL:0:8} — refusing to release"
+    echo "  ${CI_DETAIL}"
+    if [[ "$CI_REASON" == "pending" ]]; then
+      echo "  CI is still running for ${LOCAL:0:8} — re-run when it finishes."
+    else
+      echo "  Wait for CI to finish green, or pass --skip-ci-check if you have confirmed it another way."
+    fi
+    exit 1
+  fi
+fi
+
 # ── 2. pre-release checks ─────────────────────────────────────────────────────
 heading "Pre-release checks"
 
@@ -192,7 +238,16 @@ info "Running npm run test:clean-checkout ..."
 if [[ "$DRY_RUN" == true ]]; then
   echo -e "${YELLOW}[dry-run]${NC} would run: npm run test:clean-checkout"
 else
-  env -u CLEAN_CHECKOUT_CMD npm run test:clean-checkout
+  # A red here is either a real failure or a load-timing one; the failure text
+  # says which (obs #157). Print the rule at the moment it is needed.
+  if ! env -u CLEAN_CHECKOUT_CMD npm run test:clean-checkout; then
+    err "npm run test:clean-checkout failed."
+    echo "  If the failing assertion says LOAD-SENSITIVE, re-run that file alone"
+    echo "  (command node --test <file>). If it passes alone, re-run the release —"
+    echo "  do not investigate it. Anything without the marker is a real red."
+    echo "  List: docs/contributing/traps.md § Load-sensitive tests"
+    exit 1
+  fi
 fi
 ok "Tests passed"
 
@@ -400,6 +455,9 @@ if [[ "$DRY_RUN" == true ]]; then
     echo "  Would have retried: ${NEXT_VERSION}"
   else
     echo "  Would have released: ${NEXT_VERSION}"
+    if [[ -n "$WOULD_REFUSE" ]]; then
+      echo "  Would have REFUSED: ${WOULD_REFUSE} (pass --skip-ci-check to override)"
+    fi
     if [[ "$SYNC_DEVELOP" == true ]]; then
       echo "  Would have synced develop with main"
     fi
