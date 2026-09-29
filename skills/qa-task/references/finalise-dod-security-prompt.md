@@ -70,11 +70,15 @@ shape: `markdown-structure` models the implementation report, so `report-lint.js
 
 **Entries disqualified from `internal`** — a sink models their input, so they are probed instead. This
 list is what `/finalise` Step 3c checks the reason's entry against; extend it when a sink is added
-for a new shape:
+for a new shape. **An entry matches a row when its file's basename and its export both equal the
+row's** — `<any-dir>/report-lint.js#lintReport`, from the source tree or a bundled copy, matches
+`report-lint.js#lintReport`; the directory never decides.
 
 | Entry | Sink that fits |
 | --- | --- |
-| `report-lint.js#lintReport` | `markdown-structure` | `internal` is a recorded
+| `report-lint.js#lintReport` | `markdown-structure` |
+
+`internal` is a recorded
 decision, not a skipped question — it exists so the task.124 shape (a Markdown validator with no sink,
 FAILed on the zero-guard and overruled by hand) becomes a rule instead of an override. A validator of
 external input is never `internal`, whatever its shape.
@@ -267,8 +271,11 @@ direction an over-strict boundary looks identical to a correct one.
 **Zero executed candidates on a boundary deliverable is a finding, not a pass.** If `boundary: true` and
 `probes_executed: 0`, emit a check with `status: FAIL` named `probe mode executed no candidates`. The
 guard applies to `boundary: true` only. `boundary: internal` is not a way around it: it is available
-only when no sink fits (Step 1b), and without `internal_reason` it is a FAIL of its own — emit a check
-with `status: FAIL` named `internal boundary recorded without a reason`, and `overall: FAIL`. A step
+only when no sink fits (Step 1b), and without a valid `internal_reason` it is a FAIL of its own — emit a
+check with `status: FAIL` named `internal boundary recorded without a reason`, and `overall: FAIL`,
+whenever the reason is absent or whitespace-only, does not begin with a `path#export` entry, or names
+an entry the *Entries disqualified from `internal`* table matches — the same three shapes `/finalise`
+Step 3c forces to FAIL. A step
 that reports success without having run anything is the exact defect this step exists to catch, and it
 must not be able to hide inside its own output.
 

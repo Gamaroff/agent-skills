@@ -632,9 +632,26 @@ test("task.131: boundary: internal renders as an explicit skip, and without inte
     has(skill(), "Entries disqualified from `internal`"),
     "skills/finalise/SKILL.md Step 3c: the override must check the reason's entry against the disqualified table",
   );
+  // The row must END after its second cell: a paragraph joined onto it
+  // renders as an extra cell (task.131 QA cycle 3, CR-3).
   assert.ok(
-    /\| `report-lint\.js#lintReport` \| `markdown-structure` \|/.test(source()),
+    /^\| `report-lint\.js#lintReport` \| `markdown-structure` \|$/m.test(
+      source(),
+    ),
     `${PROMPT}: lintReport must be listed as disqualified from internal — a sink models it`,
+  );
+  // BUG-7: an entry matches a row on basename + export, stated in both places.
+  assert.ok(
+    has(
+      source(),
+      "matches a row when its file's basename and its export both equal the row's",
+    ),
+    `${PROMPT}: the disqualified-entries table states no matching rule — a full path would not match a basename row`,
+  );
+  assert.ok(has(skill(), "matched on file basename plus export"));
+  // QA-6: the prompt asks for the FAIL check on every shape Step 3c forces.
+  assert.ok(
+    has(source(), "the same three shapes `/finalise` Step 3c forces to FAIL"),
   );
   // QA-4: Step 3c and the Step 3d render must agree on an empty reason.
   assert.ok(has(skill(), "not whitespace-only"));

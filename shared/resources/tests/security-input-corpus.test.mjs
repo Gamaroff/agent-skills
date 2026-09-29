@@ -569,18 +569,34 @@ test("the prose peer states the method ordering and both directions", () => {
 // "five sinks" and "called with exactly one argument" after markdown-structure
 // and --args-json landed (TASK-131-BUG-5). Derived from SINKS, so adding a sink
 // turns this red until both prompts name it.
-test("every sink is named in each prompt that enumerates the sinks", () => {
-  const PROMPTS = [
-    "finalise-dod-security-prompt.md",
-    "security-review-prompt.md",
+test("every sink is named in each prompt's sink enumeration", () => {
+  // The ENUMERATION, not the whole file: a sink named anywhere else (a
+  // shell-form comment, an example) says nothing about the list a reader
+  // chooses from. develop's finalise prompt named `filename` in a comment
+  // while its Sinks: list omitted it, and a whole-file check passed on that
+  // drift (task.131 QA cycle 3, TASK-131-BUG-6). Each extract is bounded by
+  // two anchors, and a floor on the extract keeps a moved anchor from reading
+  // as a clean empty list.
+  const ENUMERATIONS = [
+    ["finalise-dod-security-prompt.md", "Sinks: ", "— pick by"],
+    ["security-review-prompt.md", "`SINKS` (", "No sink fits"],
   ];
-  for (const prompt of PROMPTS) {
+  for (const [prompt, from, to] of ENUMERATIONS) {
     const text = readFileSync(join(here, "..", prompt), "utf-8");
-    const missing = SINKS.filter((s) => !text.includes(`\`${s}\``));
+    const a = text.indexOf(from);
+    const b = a === -1 ? -1 : text.indexOf(to, a);
+    assert.ok(a !== -1 && b > a, `${prompt}: enumeration anchors not found`);
+    const extract = text.slice(a, b);
+    const named = SINKS.filter((sink) => extract.includes(`\`${sink}\``));
+    assert.ok(
+      named.length >= 5,
+      `${prompt}: the extracted enumeration names only ${named.length} sink(s) — the anchors probably moved`,
+    );
+    const missing = SINKS.filter((sink) => !named.includes(sink));
     assert.deepEqual(
       missing,
       [],
-      `${prompt} lists sinks but does not name: ${missing.join(", ")}`,
+      `${prompt}'s sink enumeration does not name: ${missing.join(", ")}`,
     );
   }
 });

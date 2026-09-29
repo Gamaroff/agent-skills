@@ -508,7 +508,8 @@ After all 4 agents complete, parse each YAML result. Handle agent failures:
 - **`boundary: internal` forces `SEC_OVERALL = FAIL` unless its `internal_reason` holds**, whatever the
   agent's own `overall` says. It holds when it is present and not whitespace-only, **begins with the
   entry as `path#export`**, and that entry is **not** in the prompt's *Entries disqualified from
-  `internal`* table (an entry a sink models is probed, never skipped). A reason that fails any of the
+  `internal`* table — matched on file basename plus export, so a full or bundled path to a listed file
+still matches; an entry a sink models is probed, never skipped. A reason that fails any of the
   three is the self-report the zero-guard exists to refuse, and Step 6 decides on `SEC_OVERALL`, not on
   the rendered summary (task.131 QA cycles 1–2, TASK-131-BUG-2 and BUG-3). The agent should already
   have emitted the `internal boundary recorded without a reason` FAIL check; this override is what

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-131-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute review, verified)
 **Date Found**: 2026-09-30
 
@@ -42,3 +42,4 @@ Add `markdown-structure` (and `filename`) to the sink table; document `--args-js
 |------|--------|------------|-------|
 | 2026-09-30 | New | QA Engineer | Filed from QA cycle 2 |
 | 2026-09-30 | Ready for QA | qa-fix | Fix implemented (cycle 2) |
+| 2026-09-30 | Closed | QA Engineer | Verified in QA cycle 3 (gate.3) |

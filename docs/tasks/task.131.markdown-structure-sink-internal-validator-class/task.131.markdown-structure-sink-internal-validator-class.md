@@ -302,21 +302,21 @@ None — additive corpus and an additive field.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 70/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.131.qa.2.markdown-structure-sink-internal-validator-class.md](./task.131.qa.2.markdown-structure-sink-internal-validator-class.md)
-- **Gate File**: [task.131.gate.2.markdown-structure-sink-internal-validator-class.yml](./task.131.gate.2.markdown-structure-sink-internal-validator-class.yml)
+- **Full Report**: [task.131.qa.3.markdown-structure-sink-internal-validator-class.md](./task.131.qa.3.markdown-structure-sink-internal-validator-class.md)
+- **Gate File**: [task.131.gate.3.markdown-structure-sink-internal-validator-class.yml](./task.131.gate.3.markdown-structure-sink-internal-validator-class.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 4593
+- **Tests Executed**: 4594
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's three findings are fixed. The cycle-2 refute pass found that the `internal` precondition is not enforced ([bug 3](./task.131.bug.3.internal-precondition-not-enforced.md)), and that two `boundary` consumers were missed: the bug-mode DoD template ([bug 4](./task.131.bug.4.bug-dod-template-lacks-internal.md)) and `/review-security`'s sink table ([bug 5](./task.131.bug.5.review-security-sink-table.md)). There is also one low finding (empty-reason split).
+Cycle 2's fixes are verified. Two medium gaps remain in them: the sink-enumeration test is vacuous ([bug 6](./task.131.bug.6.sink-enumeration-test-vacuous.md)), and the disqualified-entry check has no matching rule ([bug 7](./task.131.bug.7.disqualified-entry-matching-rule.md)). There are also two lows: table formatting, and prompt/finalise agreement.
 
 <!-- change-log-start -->
 ## Change Log
@@ -328,8 +328,9 @@ Cycle 1's three findings are fixed. The cycle-2 refute pass found that the `inte
 | 2026-09-30 |  | Status → ready-for-development | review-task |
 | 2026-09-30 |  | Implemented — 20 source files (+ bundled copies), 13 new tests; also fixed `change-log.js#fencedRanges` on CRLF, found by the new probe | develop |
 | 2026-09-30 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
-| 2026-09-30 |  | QA findings fixed — 2 iterations: cycle 1 BUG-1, BUG-2, CR-4 (+2 cleanups); cycle 2 BUG-3, BUG-4, BUG-5, QA-4 (+ sink-enumeration guard) | qa-fix |
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — cycle 2 refute pass: 4 findings (3 medium, 1 low) | qa-task |
+| 2026-09-30 |  | QA gate CONCERNS (80/100) — cycle 3: 4 findings (2 medium, 2 low) | qa-task |
+| 2026-09-30 |  | QA findings fixed — 3 iterations: cycle 1 BUG-1, BUG-2, CR-4 (+2 cleanups); cycle 2 BUG-3, BUG-4, BUG-5, QA-4; cycle 3 BUG-6, BUG-7, CR-3-3, QA-6 | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

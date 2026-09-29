@@ -1,0 +1,83 @@
+schema: 1
+task: 'task.131.markdown-structure-sink-internal-validator-class'
+task_title: 'A markdown-structure sink and an internal-artefact decision for the security probe'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes verified (BUG-3, BUG-4, BUG-5, QA-4). Cycle 3 found two medium gaps in those fixes: the new sink-enumeration test is satisfied by any backticked mention anywhere in a prompt, and the disqualified-entries check has no stated matching rule for a full path against a basename entry; plus a table row that swallowed the next paragraph and a prompt/finalise disagreement on which invalid reasons the agent flags. HIGH 0 for three gates; lintReport probe engages 15/15.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T23:04:09Z'
+
+top_issues:
+  - id: 'TASK-131-CR-3-1'
+    severity: medium
+    file: 'shared/resources/tests/security-input-corpus.test.mjs'
+    finding: 'The sink-enumeration test passes when a backticked sink name appears anywhere in the prompt; develop''s finalise prompt already named  in a shell-form comment while its Sinks: list omitted it, so the test would have passed on the drift it exists to catch.'
+    suggested_action: 'Extract the enumeration itself (the Sinks: sentence in finalise-dod-security-prompt.md; the SINKS sentence and Choosing-the-sink table in security-review-prompt.md) and check each SINKS entry against that text only, with a floor on the extracted text.'
+    suggested_owner: dev
+    bug_ref: 'task.131.bug.6.sink-enumeration-test-vacuous.md'
+    status: open
+  - id: 'TASK-131-QA-5'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 3c requires a path#export entry and checks it against a table listing report-lint.js#lintReport by basename, with no matching rule, so shared/resources/report-lint.js#lintReport compared literally is not disqualified (cycle-3 review CR-2, verified).'
+    suggested_action: 'State the matching rule — an entry matches a table row when its file basename and export equal the row''s — in the prompt beside the table and in Step 3c; pin it in the contract test.'
+    suggested_owner: dev
+    bug_ref: 'task.131.bug.7.disqualified-entry-matching-rule.md'
+    status: open
+  - id: 'TASK-131-CR-3-3'
+    severity: low
+    file: 'shared/resources/finalise-dod-security-prompt.md'
+    finding: 'The disqualified-entries table row has the following paragraph joined onto it, so GFM renders the rule as an extra cell and continuation rows.'
+    suggested_action: 'End the row after its second cell and put a blank line before the paragraph.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-131-QA-6'
+    severity: low
+    file: 'shared/resources/finalise-dod-security-prompt.md'
+    finding: 'The prompt asks for the FAIL check only for a missing reason, while finalise Step 3c expects it for all invalid shapes (no entry, disqualified entry) (cycle-3 review CR-4, verified).'
+    suggested_action: 'Make the prompt instruction cover every shape Step 3c forces FAIL on.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 4594
+  phases_verified: 3/3
+  ci: 'not read — gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    notes: 'lintReport through markdown-structure with --args-json → engages, 15/15; record task.131.qa.3.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'unchanged'
+  reliability:
+    status: PASS
+    notes: 'unchanged'
+  maintainability:
+    status: PASS
+    notes: 'bundle:check 0 problems; validate passes for finalise and review-security.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-131-CR-3-1 and TASK-131-QA-5 (and the two lows).'
+      refs: ['shared/resources/tests/security-input-corpus.test.mjs', 'skills/finalise/SKILL.md', 'shared/resources/finalise-dod-security-prompt.md']
+  future:
+    - action: 'Carried from gate 2: args not part of the JS control key (CR-5); ok-rule wording vs behaviour (CR-6); duplicated Document sinks paragraph (CR-7).'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/security-input-corpus.md']
+    - action: 'Carried from gate 1: CRLF fence detection in jira-sync.js and doc-links.js (pre-existing).'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/doc-links.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-131-CR-3-1 and TASK-131-QA-5 fixed']
