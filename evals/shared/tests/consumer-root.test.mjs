@@ -16,7 +16,7 @@
  * Behaviour, not source text: both cases spawn bash and read its exit status.
  * Run: node --test evals/shared/tests/consumer-root.test.mjs
  */
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
@@ -24,6 +24,18 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeConsumerRoot } from "../lib/consumer-root.mjs";
+
+// Task 154 AC6: this file runs in under 10 s. Timed from module load, so every
+// test and fixture counts; a failing root after-hook fails the run.
+const FILE_BUDGET_MS = 10_000;
+const FILE_STARTED = process.hrtime.bigint();
+after(() => {
+  const ms = Number(process.hrtime.bigint() - FILE_STARTED) / 1e6;
+  assert.ok(
+    ms < FILE_BUDGET_MS,
+    `this file took ${Math.round(ms)} ms, over its ${FILE_BUDGET_MS} ms budget (task 154 AC6)`,
+  );
+});
 
 const REPO = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

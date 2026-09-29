@@ -184,12 +184,15 @@ fi
 
 # In a clean clone of HEAD, not in place: the in-place tree carries the
 # gitignored `.agents/skills` symlink, which CI's checkout does not, so an
-# in-place green can hide a CI red (obs #149, task 154).
+# in-place green can hide a CI red (obs #149, task 154). CLEAN_CHECKOUT_CMD is
+# the runner's test hook: a value left in the shell would replace `npm test`
+# with anything at all, so the release clears it. Pinned by
+# tests/test-clean-checkout.test.js.
 info "Running npm run test:clean-checkout ..."
 if [[ "$DRY_RUN" == true ]]; then
   echo -e "${YELLOW}[dry-run]${NC} would run: npm run test:clean-checkout"
 else
-  npm run test:clean-checkout
+  env -u CLEAN_CHECKOUT_CMD npm run test:clean-checkout
 fi
 ok "Tests passed"
 

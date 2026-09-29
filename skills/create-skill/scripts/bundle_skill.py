@@ -146,17 +146,26 @@ def comment_only_refs(text):
     return out
 
 
+SHARED_REF_LINE_RE = re.compile(r'(?<![\w-]/)shared/resources/([^\s`\'")\]*]+)')
+
+
 def shared_refs_with_lines(text):
     """Return [(line_no, name)] for every shared/resources/<name> citation in
     `text` — the same match and punctuation strip as
     quick_validate.collect_shared_refs, plus the line, so a missing source can be
-    reported against the file and line that cited it. Pure."""
+    reported against the file and line that cited it. Pure.
+
+    One pass over the whole text, not one per line: the name class excludes
+    whitespace, so no match spans a newline and the matches are the same. The
+    per-line loop cost 1.9 s of a 7.2 s `--check` (task 154 DoD, AC6)."""
     out = []
-    for i, line in enumerate(text.split('\n'), 1):
-        for m in re.finditer(r'(?<![\w-]/)shared/resources/([^\s`\'")\]*]+)', line):
-            name = m.group(1).rstrip('.,;:')
-            if name:
-                out.append((i, name))
+    line, pos = 1, 0
+    for m in SHARED_REF_LINE_RE.finditer(text):
+        line += text.count('\n', pos, m.start())
+        pos = m.start()
+        name = m.group(1).rstrip('.,;:')
+        if name:
+            out.append((line, name))
     return out
 
 

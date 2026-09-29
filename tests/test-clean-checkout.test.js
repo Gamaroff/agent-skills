@@ -36,6 +36,18 @@ const { spawn, spawnSync } = require("child_process");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+// Task 154 AC6: this file runs in under 10 s. Timed from module load, so every
+// test and fixture counts; a failing root after-hook fails the run.
+const FILE_BUDGET_MS = 10_000;
+const FILE_STARTED = process.hrtime.bigint();
+test.after(() => {
+  const ms = Number(process.hrtime.bigint() - FILE_STARTED) / 1e6;
+  assert.ok(
+    ms < FILE_BUDGET_MS,
+    `this file took ${Math.round(ms)} ms, over its ${FILE_BUDGET_MS} ms budget (task 154 AC6)`,
+  );
+});
+
 const REPO_ROOT = path.resolve(__dirname, "..");
 const RUNNER = path.join(REPO_ROOT, "scripts", "test-clean-checkout.sh");
 const BASE = path.join(REPO_ROOT, ".clean-checkout-test-tmp");
@@ -429,6 +441,108 @@ test("the runner refuses an unusable base, and deletes nothing when it does", ()
       const r = runRunner(fx, "true", { CLEAN_CHECKOUT_DIR: "/" });
       assert.equal(r.status, 2, `/ as a base: ${r.stderr}`);
     }
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("release.sh gates on the clean-checkout runner first, stops when it fails, and clears the test hook", () => {
+  // Behaviour, not source text: release.sh runs against a fixture on `main`
+  // whose origin is in sync, with a fake `npm` on PATH that logs each call and
+  // the CLEAN_CHECKOUT_CMD it inherited (task 154 DoD, AC5; review-pr CR-2).
+  const fx = makeFixture();
+  try {
+    const origin = path.join(fx.wrapper, "origin.git");
+    git(fx.repo, "checkout", "--quiet", "-B", "main");
+    git(fx.wrapper, "init", "--quiet", "--bare", origin);
+    git(fx.repo, "remote", "add", "origin", origin);
+    git(fx.repo, "push", "--quiet", "origin", "main");
+    const bin = path.join(fx.wrapper, "bin");
+    fs.mkdirSync(bin);
+    const log = path.join(fx.wrapper, "npm.log");
+    // Passes the gate when NPM_GATE_OK is set, and fails every other call so the
+    // release stops at the step after the gate.
+    fs.writeFileSync(
+      path.join(bin, "npm"),
+      '#!/bin/sh\nprintf \'%s|%s\\n\' "$*" "${CLEAN_CHECKOUT_CMD-<unset>}" >> "$NPM_LOG"\n' +
+        '[ -n "$NPM_GATE_OK" ] && [ "$*" = "run test:clean-checkout" ] && exit 0\nexit 1\n',
+      { mode: 0o755 },
+    );
+    const release = (extra) => {
+      fs.rmSync(log, { force: true });
+      const r = spawnSync(
+        "bash",
+        [path.join(REPO_ROOT, "scripts", "release.sh"), "--patch"],
+        {
+          cwd: fx.repo,
+          encoding: "utf-8",
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            NPM_LOG: log,
+            CLEAN_CHECKOUT_CMD: "echo hijacked",
+            ...extra,
+          },
+        },
+      );
+      const calls = fs.existsSync(log)
+        ? fs.readFileSync(log, "utf-8").trim().split("\n")
+        : [];
+      return { r, calls };
+    };
+
+    const failing = release({});
+    assert.notEqual(
+      failing.r.status,
+      0,
+      "a failing gate must stop the release",
+    );
+    assert.deepEqual(
+      failing.calls,
+      ["run test:clean-checkout|<unset>"],
+      `the gate is the first npm call, runs without the test hook, and nothing runs after it fails:\n${failing.r.stdout}${failing.r.stderr}`,
+    );
+    assert.ok(
+      !failing.r.stdout.includes("Tests passed"),
+      "a failed gate must not report a pass",
+    );
+
+    // Positive control: a passing gate reports it and the release moves on.
+    const passing = release({ NPM_GATE_OK: "1" });
+    assert.deepEqual(
+      passing.calls.map((c) => c.split("|")[0]),
+      ["run test:clean-checkout", "run validate:all"],
+      `${passing.r.stdout}${passing.r.stderr}`,
+    );
+    assert.ok(passing.r.stdout.includes("Tests passed"), passing.r.stdout);
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("the base decision is one export: it returns the resolved base, or throws the reason", async () => {
+  // security-probe.mjs reaches the decision through this export (task 154 DoD);
+  // the runner calls the same module as a CLI, so the two cannot disagree.
+  const { pathToFileURL } = require("url");
+  const lib = path.join(REPO_ROOT, "scripts", "lib", "clean-checkout-base.mjs");
+  const { resolveBase } = await import(pathToFileURL(lib).href);
+  const fx = makeFixture();
+  try {
+    assert.equal(
+      resolveBase(fx.baseDir),
+      path.join(fs.realpathSync(fx.wrapper), "base"),
+    );
+    assert.throws(() => resolveBase(""), /empty/);
+    assert.throws(
+      () => resolveBase("/tmp/clean-checkout"),
+      /refuses as a scratch base/,
+    );
+    assert.throws(
+      () => resolveBase(path.join(fx.wrapper, "a", "b")),
+      /parent directory does not exist/,
+    );
+    const usage = spawnSync(process.execPath, [lib], { encoding: "utf-8" });
+    assert.equal(usage.status, 2, "the CLI takes exactly one base");
   } finally {
     fx.cleanup();
   }

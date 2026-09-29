@@ -36,6 +36,18 @@ const { execFileSync, spawnSync } = require("child_process");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+// Task 154 AC6: this file runs in under 10 s. Timed from module load, so every
+// test and fixture counts; a failing root after-hook fails the run.
+const FILE_BUDGET_MS = 10_000;
+const FILE_STARTED = process.hrtime.bigint();
+test.after(() => {
+  const ms = Number(process.hrtime.bigint() - FILE_STARTED) / 1e6;
+  assert.ok(
+    ms < FILE_BUDGET_MS,
+    `this file took ${Math.round(ms)} ms, over its ${FILE_BUDGET_MS} ms budget (task 154 AC6)`,
+  );
+});
+
 const REPO_ROOT = path.resolve(__dirname, "..");
 const SCRIPTS = path.join(REPO_ROOT, "skills", "create-skill", "scripts");
 const BUNDLER = path.join(SCRIPTS, "bundle_skill.py");

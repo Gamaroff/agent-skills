@@ -19,8 +19,8 @@
 # The base is never where observation-log.js classifies a path as ephemeral
 # (/tmp, /private/tmp, /var/tmp, .claude/worktrees/): observation-log.test.mjs
 # refuses a scratch base there, so a clone under it goes red where CI is green.
-# The check asks the engine's own ephemeralReason(), on the resolved path and on
-# the path as given.
+# scripts/lib/clean-checkout-base.mjs asks the engine's own ephemeralReason(),
+# on the resolved path and on the path as given.
 #
 # Uncommitted changes are NOT tested; this runs HEAD, as a release cuts from
 # committed state. A dirty tree is warned about so the difference is visible.
@@ -38,47 +38,15 @@ refuse() {
 }
 
 REPO=$(git rev-parse --show-toplevel)
-# The engine is this script's sibling in THIS repository, not a file of the repo
-# being tested — tests/test-clean-checkout.test.js runs the script against a
-# fixture repo that has no shared/resources/.
-ENGINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/shared/resources/observation-log.js"
+# The decision is this script's sibling in THIS repository, not a file of the
+# repo being tested — tests/test-clean-checkout.test.js runs the script against
+# a fixture repo that has no scripts/lib/ or shared/resources/.
+DECIDE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/clean-checkout-base.mjs"
 
-# Decide whether the base is usable, in one place. Prints `OK` then the resolved
-# base on the next line, or `REFUSE` then the reason. The base must not carry a
-# control character (it could not be reported or split safely), must not be
-# ephemeral in either spelling (macOS resolves /var/tmp to /private/var/tmp,
-# which the engine does not list), and must be an existing writable directory —
-# or a path whose parent is one, so the one `mkdir` below creates it and no
-# parent this script would never remove.
-DECISION=$(command node -e '
-  const fs = require("fs");
-  const path = require("path");
-  const { ephemeralReason } = require(process.argv[1]);
-  const raw = process.argv[2];
-  const say = (verdict, text) => { process.stdout.write(verdict + "\n" + text); process.exit(0); };
-  if (/[\u0000-\u001f\u007f]/.test(raw)) say("REFUSE", JSON.stringify(raw) + " — it contains a control character");
-  const given = path.resolve(raw);
-  let p = given;
-  const tail = [];
-  while (!fs.existsSync(p) && path.dirname(p) !== p) { tail.unshift(path.basename(p)); p = path.dirname(p); }
-  const abs = path.join(fs.realpathSync.native(p), ...tail);
-  // Again on the resolved path: a symlink component can carry a control
-  // character the given path did not.
-  if (/[\u0000-\u001f\u007f]/.test(abs)) say("REFUSE", JSON.stringify(abs) + " — it resolves to a path with a control character");
-  const spellings = [abs, given];
-  for (const s of [abs, given]) if (s.startsWith("/private/var/")) spellings.push(s.slice("/private".length));
-  for (const s of spellings) {
-    const why = ephemeralReason(s);
-    if (why) say("REFUSE", abs + " — " + why + ", which observation-log.test.mjs refuses as a scratch base; set CLEAN_CHECKOUT_DIR elsewhere");
-  }
-  const target = tail.length === 0 ? abs : path.dirname(abs);
-  if (tail.length > 1) say("REFUSE", abs + " — its parent directory does not exist; create it first");
-  let st;
-  try { st = fs.statSync(target); } catch (e) { say("REFUSE", target + " — it cannot be read (" + e.code + ")"); }
-  if (!st.isDirectory()) say("REFUSE", target + " — it is not a directory");
-  try { fs.accessSync(target, fs.constants.W_OK | fs.constants.X_OK); } catch (e) { say("REFUSE", target + " — it is not writable (" + e.code + ")"); }
-  say("OK", abs);
-' "$ENGINE" "${CLEAN_CHECKOUT_DIR:-$REPO/.clean-checkout}") \
+# Decide whether the base is usable, in one place: scripts/lib/clean-checkout-base.mjs
+# (its header lists every refusal). It prints `OK` then the resolved base on the
+# next line, or `REFUSE` then the reason.
+DECISION=$(command node "$DECIDE" "${CLEAN_CHECKOUT_DIR:-$REPO/.clean-checkout}") \
   || refuse "${CLEAN_CHECKOUT_DIR:-$REPO/.clean-checkout} — the base check did not run"
 case "$DECISION" in
   OK$'\n'/*) BASE=${DECISION#OK$'\n'} ;;

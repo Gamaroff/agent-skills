@@ -378,7 +378,7 @@ can land in either order, or as two PRs.
 2. ✅ `skills/create-skill/scripts/bundle_skill.py`: origin-carrying discovery and attributed warning
 3. ✅ `evals/shared/tests/finalise-bug-mode.test.mjs`: import the helper
 4. ✅ `evals/shared/tests/optional-file-lookups.test.mjs`: import the helper
-5. ✅ `scripts/release.sh`: gate runs `test:clean-checkout`
+5. ✅ `scripts/release.sh`: gate runs `test:clean-checkout`, with the `CLEAN_CHECKOUT_CMD` hook cleared
 6. ✅ `package.json`: `test:clean-checkout` script
 7. ✅ `.gitignore`: `.clean-checkout/`, `.clean-checkout-test-tmp/`
 
@@ -386,12 +386,16 @@ can land in either order, or as two PRs.
 
 8. ✅ `evals/shared/lib/consumer-root.mjs`: the one consumer-root builder
 9. ✅ `scripts/test-clean-checkout.sh`: the clean-checkout runner
+9a. ✅ `scripts/lib/clean-checkout-base.mjs`: the base decision, one export (`resolveBase`) the runner
+    calls as a CLI and `security-probe.mjs` reaches (added to close DoD 1's security gap)
 
 ### Files to Add (Tests)
 
 10. ✅ `tests/bundle-missing-source.test.js`: inside the `tests/*.test.js` glob in `package.json`
 11. ✅ `evals/shared/tests/consumer-root.test.mjs`: inside the `evals/shared/tests/*.test.mjs` glob
 12. ✅ `tests/test-clean-checkout.test.js`: inside the `tests/*.test.js` glob
+12a. ✅ `docs/tasks/task.154.bundler-and-snippet-test-hygiene/task.154.security-probe-cases.json`: the
+    base decision's probe cases (13 hostile, 4 legitimate; absolute paths on the machine that ran it)
 
 ### Files Regenerated
 
@@ -436,6 +440,19 @@ None.
 | Remove the `symlinkSync` from `makeConsumerRoot` | `consumer-root.test.mjs` (the helper-root case) |
 | Point `finalise-bug-mode.test.mjs` back at `REPO_ROOT` as `cwd` | `npm run test:clean-checkout` (the file's 19 rows); in-place `npm test` stays green, which is the point |
 | Make the runner copy the working tree including ignored files (`cp -R`) instead of cloning | `test-clean-checkout.test.js` |
+| Drop `env -u CLEAN_CHECKOUT_CMD`, or change the gate to `npm test`, in `release.sh` | `test-clean-checkout.test.js` (the release-gate case) |
+| Let `resolveBase` accept an empty base, or skip its ephemeral check | `test-clean-checkout.test.js` (the export case; the temporary-directory case) |
+| Set a file's `FILE_BUDGET_MS` to 1 | that file's root after-hook |
+
+### Security probe (the base decision)
+
+`scripts/lib/clean-checkout-base.mjs#resolveBase` is the boundary: it accepts or refuses a clone base.
+Its probe cases are in `task.154.security-probe-cases.json`, written for this boundary's semantics:
+the stock `path` sink assumes a containment root, and a base may legitimately be anywhere writable.
+Command: `command node shared/resources/security-probe.mjs --cases-file
+docs/tasks/task.154.bundler-and-snippet-test-hygiene/task.154.security-probe-cases.json --entry
+scripts/lib/clean-checkout-base.mjs#resolveBase --repo-root "$(pwd -P)" --json`. The cases carry
+absolute paths on the machine that wrote them; regenerate them on another machine.
 
 ### Integration Tests
 
@@ -448,6 +465,8 @@ None.
 - The runner adds one `git clone --local --shared` (objects are shared, not copied) to the suite's
   own run time. The implementation report records wall time for in-place and clean-checkout runs
   (`time npm test`, `time npm run test:clean-checkout`).
+- Each new test file carries a root after-hook that fails its run at 10 s or more, timed from
+  module load (AC6).
 
 ### Regression
 
@@ -609,9 +628,9 @@ None.
 
 ---
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified (run 1, historical — closed)
 
-**Status:** IN PROGRESS
+**Status:** CLOSED — all three gaps closed after DoD 1; `/finalise` re-runs as DoD 2.
 
 ### QA Gate Status
 
@@ -623,11 +642,11 @@ None.
 ### Missing Criteria:
 
 1. **Security Review:**
-   - [ ] The base-location refusal in `scripts/test-clean-checkout.sh:53-87` is an inline `node -e` predicate reading an environment variable. No `security-probe.mjs` entry form reaches it, so probe mode executed 0 candidates (medium). Move the decision into an importable module and probe it through `path#export`.
+   - [x] The base-location refusal in `scripts/test-clean-checkout.sh:53-87` is an inline `node -e` predicate reading an environment variable. No `security-probe.mjs` entry form reaches it, so probe mode executed 0 candidates (medium). Move the decision into an importable module and probe it through `path#export`.
 
 2. **Acceptance Criteria:**
-   - [ ] AC5: no test pins `scripts/release.sh` running `npm run test:clean-checkout` as its test gate.
-   - [ ] AC6: the under-10 s limit per new test file was measured once (5.3 s, 0.23 s, 1.3 s) but is not asserted. Either assert it or restate the criterion as a recorded measurement.
+   - [x] AC5: no test pins `scripts/release.sh` running `npm run test:clean-checkout` as its test gate.
+   - [x] AC6: the under-10 s limit per new test file was measured once (5.3 s, 0.23 s, 1.3 s) but is not asserted. Either assert it or restate the criterion as a recorded measurement.
 
 AC13 (observations #149 and #151 set to `actioned`) is post-merge by definition and is not counted as a gap.
 
@@ -660,6 +679,7 @@ AC13 (observations #149 and #151 set to `actioned`) is post-merge by definition 
 | 2026-09-29 |         | QA gate PASS (100/100) — 0 findings, 4 advisory cleanups | qa-task |
 | 2026-09-29 |         | QA findings fixed — gate PASS (100/100), 4 iterations, 8 bugs closed | qa-fix |
 | 2026-09-29 |         | DoD incomplete — 3 gaps identified (task.154.dod.1) | finalise |
+| 2026-09-29 |         | DoD 1 gaps closed — base decision extracted to `scripts/lib/clean-checkout-base.mjs` and probed (17/0); release gate test; per-file 10 s budget | develop-task |
 
 <!-- change-log-end -->
 

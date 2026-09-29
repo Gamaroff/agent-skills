@@ -144,7 +144,11 @@ All notable changes to this project will be documented in this file. Format foll
   (never a temporary directory, which the observation-log tests refuse), links `node_modules`, runs
   `npm test` there and removes that directory and nothing else: ownership by construction, so the
   base is never deleted and two concurrent runs never touch each other's clone. It warns that
-  uncommitted changes are not tested. `release.sh` now gates on it. The consumer-shaped test root is
+  uncommitted changes are not tested. Whether a base is usable is decided once, by `resolveBase()` in
+  `scripts/lib/clean-checkout-base.mjs`, which the runner calls as a CLI and `security-probe.mjs`
+  reaches as an export (17 cases executed, 0 reproduced). `release.sh` now gates on it, with the
+  runner's `CLEAN_CHECKOUT_CMD` test hook cleared; a fixture test pins the gate's order, its
+  abort-on-failure and the cleared hook. The consumer-shaped test root is
   defined once, `makeConsumerRoot()` in `evals/shared/lib/consumer-root.mjs`, replacing two
   hand-rolled copies; `consumer-root.test.mjs` proves the snippet it guards fails from a bare
   directory. create-skill and `docs/contributing/traps.md` carry the rule.
@@ -392,7 +396,9 @@ All notable changes to this project will be documented in this file. Format foll
   summary now also prints `N skill(s) checked, U unresolved`, so a scan of nothing is no longer
   indistinguishable from a scan with nothing wrong. New `tests/bundle-missing-source.test.js`
   proves the attribution and dedupe on a fixture and requires the live `--check` output to carry
-  none, over a scan count read from `--check` itself.
+  none, over a scan count read from `--check` itself. The line-aware collector is one pass over each
+  file rather than one per line, which takes `--check` from 5.8 s to 4.6 s; each of the three new
+  test files fails its own run if it takes 10 s or more.
 
 - **The banner doc defers to the Stop hook instead of restating it, and a HALT names the step that
   halted (task 164).** Five follow-ups deferred by task 163. The Remaining Work Status doc's
