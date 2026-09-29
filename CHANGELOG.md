@@ -23,8 +23,8 @@ All notable changes to this project will be documented in this file. Format foll
   - **The three task.116 pointers now cite the autonomous-defaults document.** The pointers are in
     `qa-fix`, `review-task` and `review-story`. Their closures drop 37→21, 45→27 and 46→29, and the
     51 copies nothing now reaches are deleted.
-  - **`.githooks/pre-commit` refuses an untracked generated copy.** A `references/` copy left
-    untracked in the tree now exits 1, where it used to warn and let `bundle:check` fail in CI a
+  - **`.githooks/pre-commit` refuses an untracked generated copy.** A generated `references/` copy (one with a
+    `shared/resources/` source) left untracked in the tree now exits 1, where it used to warn and let `bundle:check` fail in CI a
     push later. `BUNDLE_PRECOMMIT_WARN=1` restores the warning.
   - Rule: `create-skill` § "Cite or depend", and AGENTS.md § Shared Resources.
 

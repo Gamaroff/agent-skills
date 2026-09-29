@@ -320,6 +320,29 @@ None.
 - **Critical**: a skill loses a file it invokes.
 - **Non-critical**: message wording.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-29
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.126.qa.1.bundler-citation-form.md](./task.126.qa.1.bundler-citation-form.md)
+- **Gate File**: [task.126.gate.1.bundler-citation-form.yml](./task.126.gate.1.bundler-citation-form.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 27 (new + changed); 122 in the wider bundler/link/parity set
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0 (1 medium: CR-1)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- **CR-1 (medium, reproduced)**: the pre-commit refusal also refuses an untracked *skill-native* `references/` file that has no shared source, and names it a generated copy.
+- **CR-3 (low, reproduced, advisory)**: an aborted commit leaves the hook's `NEW` copies staged.
+- **Advisory**: CR-2 (decide "unshipped" on `needed`), CR-4, CR-5 (cleanups).
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -329,6 +352,7 @@ None.
 | 2026-09-29 | 1.1 | Review 4/10 → 8/10 after fixes — cite detected on the `references/` spelling; one fragment-stripping parser in quick_validate.py; `git rm` of UNREACHED copies; hook refusal on untracked ∩ LEFT with a working pathspec; measured closure criteria; node hook test | review-task |
 | 2026-09-29 |  | Status → ready-for-development | review-task |
 | 2026-09-29 |  | Implemented phases 1–3 (inline, develop-task Step 3): one parser with edge kinds, closure status line, hook refusal, three pointers cited, 51 unreached copies removed; status → ready-for-review | develop |
+| 2026-09-29 |  | QA gate CONCERNS (90/100) — 1 finding (CR-1, hook over-refuses skill-native files) | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -369,6 +393,15 @@ Bugs found during QA land at `task.126.bug.[N].[name].md` in this directory.
   three pointers, runs `npm run bundle`, and `git rm`s the 51 `UNREACHED` copies, a set
   identical to the one the review predicted. It also corrects `traps.md`'s stale
   `.git/hooks/pre-commit` path.
+
+- **QA fix cycle 1** (gate 1 CONCERNS, CR-1 open, with the advisory items folded in):
+  - **CR-1:** the hook refuses only untracked copies whose `shared/resources/` source exists. A hand-written `references/` file stays a warning.
+  - **CR-3:** the refusal now runs before the `NEW` copies are staged, so a refused commit leaves the index as it found it.
+  - **`set -e` bug in the first attempt.** The fix's own test caught it: a `[ -f … ] && printf` loop under `set -euo pipefail` ended the hook silently with exit 1.
+  - **CR-2:** "unshipped" is decided on `needed`, not on the on-disk copies.
+  - **CR-4:** `rewrite_text` and `comment_only_refs` use `split_fragment`.
+  - **CR-5:** "vs committed" reads `HEAD` (`git ls-tree`), not the index.
+  - **Tests.** Hook tests 6 → 8; bundler tests 14 → 15 (M), and J is extended. 5 more mutations, each red.
 
 **Testing results.**
 - **New tests.** 14 in `tests/bundle-citation.test.js` and 6 in `tests/pre-commit-hook.test.js`.

@@ -49,7 +49,7 @@ source, then bundle. A second `npm run bundle` must be a clean no-op (it is, as 
 creates is staged for you. A copy that was *already* untracked when you committed — what a manual
 `npm run bundle` leaves behind — used to get a one-line warning while the commit went ahead without
 it. Every local check then passed, because the file is on disk, and `bundle:check` failed in CI a
-push later. The hook now exits 1 and names the paths. Either `git add` them, or remove the
+push later. The hook now exits 1 and names the paths. "Generated" means the copy has a source (`shared/resources/<path>`); a hand-written `references/` file has none, and stays a warning. Either `git add` them, or remove the
 `shared/resources/` mention that produced them. A document you only point a reader at can be *cited*
 (`references/X.md#section`) and then costs one file, not its closure: `create-skill` § Cite or depend.
 `BUNDLE_PRECOMMIT_WARN=1` downgrades the refusal to the old warning. The bundler never deletes a

@@ -59,6 +59,10 @@ function repo(t) {
   };
   write("skills/fx/SKILL.md", "# v1\n");
   write("skills/fx/references/tracked.md", "generated\n");
+  // A "generated" copy is one with a source: `stray.md` and `fresh.md` have one,
+  // `native-guide.md` (written by the tests below) deliberately does not.
+  write("shared/resources/stray.md", "source\n");
+  write("shared/resources/fresh.md", "source\n");
   git("add", "-A");
   // The seed commit must not run the hook's bundle against an empty stub list.
   git("-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", "seed");
@@ -104,7 +108,7 @@ test("BUNDLE_PRECOMMIT_WARN=1 downgrades the refusal to a warning", (t) => {
   const res = r.commit({ BUNDLE_PRECOMMIT_WARN: "1" });
   assert.equal(res.status, 0, res.stdout + res.stderr);
   assert.match(res.stderr, /Untracked generated copies/);
-  assert.doesNotMatch(r.git("ls-files"), /stray\.md/, "still not committed");
+  assert.doesNotMatch(r.git("ls-files"), /skills\/fx\/references\/stray\.md/, "still not committed");
 });
 
 test("a copy the hook's own bundle run creates is staged, not refused", (t) => {
@@ -133,4 +137,32 @@ test("a commit touching no SKILL.md or shared resource is not gated at all", (t)
   r.git("add", "README.md");
   const res = r.commit();
   assert.equal(res.status, 0, res.stdout + res.stderr);
+});
+
+test("an untracked SKILL-NATIVE references/ file (no shared source) is warned about, not refused", (t) => {
+  // 89 tracked references/ files in this repository have no shared source: a
+  // hand-written reference is normal, bundle:check does not judge it, and the
+  // hook must not call it a generated copy (task.126 QA-1, CR-1).
+  const r = repo(t);
+  r.write("skills/fx/references/native-guide.md", "hand-written\n");
+  r.touchSkill();
+  const res = r.commit();
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.doesNotMatch(res.stderr, /Untracked generated copies/);
+  assert.match(res.stdout + res.stderr, /pre-existing bundle change/);
+});
+
+test("a refused commit leaves the index as it found it — the hook's NEW copies are not staged", (t) => {
+  // The refusal runs before the NEW copies are staged; otherwise an aborted
+  // commit would leave bundled files in the index (task.126 QA-1, CR-3).
+  const r = repo(t);
+  r.write("skills/fx/references/stray.md", "generated\n");
+  r.write("bundle-creates.txt", "skills/fx/references/fresh.md\n");
+  r.touchSkill();
+  const res = r.commit();
+  assert.notEqual(res.status, 0, res.stdout + res.stderr);
+  assert.deepEqual(
+    r.git("diff", "--cached", "--name-only").trim().split("\n"),
+    ["skills/fx/SKILL.md"],
+  );
 });

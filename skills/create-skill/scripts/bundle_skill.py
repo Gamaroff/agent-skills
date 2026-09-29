@@ -32,6 +32,7 @@ from quick_validate import (
     in_spans,
     parse_shared_refs,
     ref_kind,
+    split_fragment,
 )
 
 # `(?<![\w-]/)` — never match inside an absolute URL: the link pass below writes
@@ -148,7 +149,7 @@ def comment_only_refs(text):
         if not COMMENT_LINE_RE.match(line) or BUNDLE_DECL_RE.search(line):
             continue
         for m in SHARED_REF_RE.finditer(line):
-            target = m.group(1).rstrip('.,;:')
+            target, _ = split_fragment(m.group(1))
             if target:
                 out.append((i, target))
     return out
@@ -293,7 +294,7 @@ def rewrite_text(content, suffix, unshipped=None):
     """
     if suffix == '.md':
         def md(m):
-            name = m.group(1).rstrip('.,;:').partition('#')[0].rstrip('.,;:')
+            name, _ = split_fragment(m.group(1))
             if unshipped is not None and name and unshipped(name):
                 return f"{UPSTREAM_BASE}shared/resources/{m.group(1)}"
             return f"references/{m.group(1)}"
@@ -443,7 +444,7 @@ def _relocate_target(target, src_dir, dst_dir, skill_dir, bundled_names):
     return f"{new}{trailing}{sep}{fragment}"
 
 
-def expected_bytes(src, name, refs_dir, bundled_names):
+def expected_bytes(src, name, refs_dir, bundled_names, reached=None):
     """The exact bytes `<skill>/references/<name>` must hold for source `src`.
 
     This is the single definition of "in sync". Undecodable sources bypass all
@@ -460,7 +461,14 @@ def expected_bytes(src, name, refs_dir, bundled_names):
     unshipped = None
     if located is not None:
         shared_root = Path(located[0]) / 'shared' / 'resources'
-        shipped = set(bundled_names)
+        # What a prose mention may point at locally is what discovery REACHES
+        # (`reached` — the bundler's `needed`), not what happens to sit on disk:
+        # a source-backed copy nothing reaches is UNREACHED and owed a `git rm`,
+        # and a copy's bytes must not change the moment that removal lands, or a
+        # commit carrying only the removal leaves this copy STALE in CI
+        # (task.126 QA-1, CR-2). Callers with no discovery pass (the packager,
+        # which ships what is on disk) fall back to `bundled_names`.
+        shipped = set(reached) if reached is not None else set(bundled_names)
         unshipped = lambda n: n not in shipped and (shared_root / n).is_file()
     try:
         content = rewrite_text(src.read_text(), suffix, unshipped)
@@ -1191,7 +1199,7 @@ def check_skill(skill_path):
             report(rel, 'AMBIGUOUS', f'unreadable: {exc.__class__.__name__}')
             continue
 
-        if actual != expected_bytes(src, rel, refs_dir, bundled_names):
+        if actual != expected_bytes(src, rel, refs_dir, bundled_names, needed):
             report(rel, 'STALE', 'content differs from the rewritten source')
             continue
 
@@ -1349,19 +1357,31 @@ def check_all(targets):
 
 @functools.lru_cache(maxsize=None)
 def _tracked_refs(repo_root):
-    """Every tracked `skills/*/references/*` path, repo-relative — ONE `git
-    ls-files` per run, however many skills `--all` bundles. None when git cannot
-    answer (not a repository, git missing): the status line then omits the
-    comparison rather than inventing one."""
+    """Every COMMITTED `skills/*/references/*` path, repo-relative — read from
+    HEAD, not the index, so "vs committed" means what it says after a staged
+    `git rm` and inside the pre-commit hook's own run (task.126 QA-1, CR-5). ONE
+    git call per run, however many skills `--all` bundles. An empty set in a
+    repository with no commit yet; None when git cannot answer (not a
+    repository, git missing): the status line then omits the comparison rather
+    than inventing one."""
     import subprocess
+    def git(*args):
+        return subprocess.run(['git', '-C', str(repo_root), *args],
+                              capture_output=True, text=True, check=True).stdout
     try:
-        out = subprocess.run(
-            ['git', '-C', str(repo_root), 'ls-files', '--', 'skills/*/references/*'],
-            capture_output=True, text=True, check=True,
-        ).stdout
-    except (OSError, subprocess.CalledProcessError):
+        out = git('ls-tree', '-r', '--name-only', 'HEAD', '--', 'skills')
+    except OSError:
         return None
-    return frozenset(line for line in out.splitlines() if line)
+    except subprocess.CalledProcessError:
+        try:
+            git('rev-parse', '--git-dir')
+        except (OSError, subprocess.CalledProcessError):
+            return None
+        return frozenset()          # a repository, but nothing committed yet
+    return frozenset(
+        line for line in out.splitlines()
+        if line.startswith('skills/') and '/references/' in line
+    )
 
 
 def closure_note(skill_path, shared_dir, needed):
@@ -1425,7 +1445,7 @@ def bundle_skill(skill_path):
             why = _skip_reason(refs_dir / name, name)
             print(f"  SKIPPED references/{name} — {why}, left alone")
             continue
-        if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names)):
+        if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names, needed)):
             bundled += 1
             print(f"  bundled references/{name}")
 
@@ -1444,7 +1464,7 @@ def bundle_skill(skill_path):
             why = _skip_reason(refs_dir / name, name)
             print(f"  SKIPPED references/{name} — {why}, left alone")
             continue
-        if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names)):
+        if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names, needed)):
             reconciled += 1
             print(f"  reconciled references/{name} (not reached by discovery)")
 

@@ -233,6 +233,22 @@ test("J — the status line reports the closure, and the gap to the committed co
   out = fx.bundle();
   assert.match(out, /· closure 1 \(-4 vs committed\)/);
   assert.equal(fx.bundled().length, 5, "the bundler deleted nothing");
+  // "vs committed" reads HEAD, not the index: staging the removal of the four
+  // copies must not move the figure until the removal is committed (QA-1, CR-5).
+  fx.sh("git", [
+    "rm",
+    "-q",
+    "-f",
+    "skills/fixture-skill/references/deep.md",
+    "skills/fixture-skill/references/leaf-a.md",
+    "skills/fixture-skill/references/leaf-b.js",
+    "skills/fixture-skill/references/sib.js",
+  ]);
+  out = fx.bundle();
+  assert.match(out, /· closure 1 \(-4 vs committed\)/);
+  fx.sh("git", ["commit", "-q", "-m", "drop unreached"]);
+  out = fx.bundle();
+  assert.match(out, /· closure 1 \(\+0 vs committed\)/);
 });
 
 test("J2 — outside a git repository the comparison is omitted, not invented", (t) => {
@@ -300,4 +316,23 @@ test("L — a cited copy points at what it does not ship upstream, and at what i
   // The URL form is never rediscovered: a second run adds nothing.
   fx.bundle();
   assert.deepEqual(fx.bundled(), ["deep.md", "hub.md"]);
+});
+
+test("M — a cited copy's bytes do not depend on which UNREACHED copies are still on disk", (t) => {
+  // "Unshipped" is decided on what discovery REACHES, not on what sits on disk.
+  // Otherwise the cited copy keeps local mentions while stale copies exist and
+  // switches to URLs the moment they are removed — so a commit carrying only
+  // the removal leaves the cited copy STALE in CI (QA-1, CR-2).
+  const fx = fixture(t, "Read `shared/resources/hub.md`.\n", { git: true });
+  fx.bundle(); // dependency: hub and its whole closure land on disk
+  fx.writeSkill("Rule: `references/hub.md#the-rule`.\n"); // now a citation
+  fx.bundle(); // leaf-a.md and the rest are still on disk, UNREACHED
+  const hubPath = path.join(fx.skillDir, "references", "hub.md");
+  const withLeftovers = fs.readFileSync(hubPath, "utf-8");
+  assert.match(withLeftovers, /\/blob\/develop\/shared\/resources\/leaf-a\.md/);
+  for (const n of ["deep.md", "leaf-a.md", "leaf-b.js", "sib.js"]) {
+    fs.rmSync(path.join(fx.skillDir, "references", n));
+  }
+  fx.bundle();
+  assert.equal(fs.readFileSync(hubPath, "utf-8"), withLeftovers);
 });

@@ -1,0 +1,65 @@
+schema: 1
+task: 'task.126.bundler-citation-form'
+task_title: 'Bundler citation form, per-skill closure count, pre-commit refusal'
+gate: CONCERNS
+status_reason: 'All three phases are delivered, and every stated criterion measures as met. The diff review found one high-confidence medium bug, reproduced by execution: the new pre-commit refusal also refuses an untracked hand-written references/ file with no shared source, and names it a generated copy.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T17:42:51Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: '.githooks/pre-commit'
+    finding: 'UNTRACKED_LEFT treats every untracked file under skills/*/references/ as a generated copy. An untracked, skill-native reference with no shared/resources source is refused as well, with the false claim that bundle:check will fail in CI. Reproduced in a fixture repo: native-guide.md refused, commit exit 1.'
+    suggested_action: 'Refuse only untracked paths whose shared/resources source exists (the path after references/). Leave a skill-native untracked file on the old warning. Add a hook test for it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 27
+  phases_verified: 3/3
+  head: 'e9d986fb'
+  ci: 'not read — CI is gated once, at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false. Candidates named: ref_kind / parse_shared_refs are Python, which the probe engine does not import; .githooks/pre-commit takes no caller-supplied input value, since it decides on git index state (the shell form models one positional argument). Path containment (_within) is unchanged, and a fragment-stripped traversal name still meets it. Both candidates are covered by executed tests: 14 + 6, plus 13 mutations.'
+  performance:
+    status: PASS
+    notes: 'bundle --all 4.86/5.00/5.01 s on develop vs 4.61/4.63/4.61 s on the branch; --check 4.65–4.77 s vs 4.34–4.38 s. _tracked_refs is one git call per run.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: the hook over-refuses skill-native untracked files. CR-3 (advisory, reproduced): a refusal after the NEW git add leaves the NEW copies staged on an aborted commit.'
+  maintainability:
+    status: PASS
+    notes: 'One parser now serves all three consumers. CR-4 cleanup: rewrite_text re-implements split_fragment.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: scope the hook refusal to untracked copies that have a shared/resources source.'
+      refs: ['.githooks/pre-commit', 'tests/pre-commit-hook.test.js']
+  future:
+    - action: 'CR-3 (reproduced): run the refusal before the NEW git add, so an aborted commit leaves the index as it was. Cheap enough to fold into the CR-1 fix.'
+      refs: ['.githooks/pre-commit']
+    - action: 'CR-2: base the unshipped-to-URL decision on the reached closure (needed), not on needed ∪ on-disk copies, so a cited copy''s bytes do not depend on which UNREACHED copies have been deleted yet.'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'CR-4: use quick_validate.split_fragment in rewrite_text (and comment_only_refs), so the fragment rule has one statement.'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'CR-5: _tracked_refs reads the index, not HEAD. Use git ls-tree HEAD, or relabel the figure "vs index".'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']
