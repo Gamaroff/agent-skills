@@ -4,7 +4,7 @@
 **Bug ID**: TASK-131-BUG-7
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 3 review CR-2, verified)
 **Date Found**: 2026-09-30
 
@@ -38,3 +38,4 @@ State the rule beside the table and in Step 3c, and pin both in the contract tes
 |------|--------|------------|-------|
 | 2026-09-30 | New | QA Engineer | Filed from QA cycle 3 |
 | 2026-09-30 | Ready for QA | qa-fix | Fix implemented (cycle 3) |
+| 2026-09-30 | Closed | QA Engineer | Verified in QA cycle 4 (gate.4) |

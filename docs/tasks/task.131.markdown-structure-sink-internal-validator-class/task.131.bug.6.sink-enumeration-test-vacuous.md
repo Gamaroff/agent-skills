@@ -4,7 +4,7 @@
 **Bug ID**: TASK-131-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 3 review CR-1, verified)
 **Date Found**: 2026-09-30
 
@@ -42,3 +42,4 @@ Extract the enumeration text by an anchor. Assert a floor on the extract so a mo
 |------|--------|------------|-------|
 | 2026-09-30 | New | QA Engineer | Filed from QA cycle 3 |
 | 2026-09-30 | Ready for QA | qa-fix | Fix implemented (cycle 3) |
+| 2026-09-30 | Closed | QA Engineer | Verified in QA cycle 4 (gate.4) |

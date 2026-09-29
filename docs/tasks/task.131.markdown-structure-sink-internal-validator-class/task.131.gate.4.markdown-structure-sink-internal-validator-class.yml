@@ -1,0 +1,99 @@
+schema: 1
+task: 'task.131.markdown-structure-sink-internal-validator-class'
+task_title: 'A markdown-structure sink and an internal-artefact decision for the security probe'
+gate: PASS
+status_reason: 'Cycle 3 fixes verified (BUG-6, BUG-7, CR-3-3, QA-6). No HIGH or MEDIUM finding; four LOW residues in the guards and prose around the internal decision. lintReport probe engages 15/15 (measured).'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T23:14:51Z'
+
+top_issues:
+  - id: 'TASK-131-CR-4-1'
+    severity: low
+    file: 'shared/resources/tests/security-input-corpus.test.mjs'
+    finding: 'The security-review-prompt.md extract spans both the SINKS sentence and the choosing-the-sink table, so a sink dropped from only one of the two adjacent lists still passes.'
+    suggested_action: 'Extract the sentence and the table separately and require each to name every sink.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'TASK-131-CR-4-2'
+    severity: low
+    file: 'shared/resources/finalise-dod-security-prompt.md'
+    finding: 'The Omitting-a-field paragraph (lines 345-348) still states the reason-less FAIL for a missing internal_reason only, narrower than the Step 4 instruction widened in cycle 3.'
+    suggested_action: 'Reword it to the three shapes, or point back to the Step 4 paragraph, and pin it.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'TASK-131-CR-4-3'
+    severity: low
+    file: 'shared/resources/tests/security-input-corpus.test.mjs'
+    finding: 'The named.length >= 5 floor is redundant with the missing-sinks deepEqual, and its comment overstates what it protects against.'
+    suggested_action: 'Replace it with an upper bound on the extract, or delete it and correct the comment.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'TASK-131-CR-4-4'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'One continuation line of the Step 3c bullet is not indented and renders only by lazy continuation.'
+    suggested_action: 'Indent it two spaces.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 4594
+  phases_verified: 3/3
+  ci: 'not read — gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    notes: 'lintReport through markdown-structure with --args-json → engages, 15/15; record task.131.qa.4.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'unchanged; probe 1.6 s'
+  reliability:
+    status: PASS
+    notes: 'unchanged'
+  maintainability:
+    status: PASS
+    notes: 'bundle:check 0 problems; validate passes.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-131-CR-4-1'
+      action: 'The security-review-prompt.md extract spans both the SINKS sentence and the choosing-the-sink table, so a sink dropped from only one of the two adjacent lists still passes. — Extract the sentence and the table separately and require each to name every sink.'
+      refs: ['shared/resources/tests/security-input-corpus.test.mjs']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - id: 'TASK-131-CR-4-2'
+      action: 'The Omitting-a-field paragraph (lines 345-348) still states the reason-less FAIL for a missing internal_reason only, narrower than the Step 4 instruction widened in cycle 3. — Reword it to the three shapes, or point back to the Step 4 paragraph, and pin it.'
+      refs: ['shared/resources/finalise-dod-security-prompt.md']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - id: 'TASK-131-CR-4-3'
+      action: 'The named.length >= 5 floor is redundant with the missing-sinks deepEqual, and its comment overstates what it protects against. — Replace it with an upper bound on the extract, or delete it and correct the comment.'
+      refs: ['shared/resources/tests/security-input-corpus.test.mjs']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - id: 'TASK-131-CR-4-4'
+      action: 'One continuation line of the Step 3c bullet is not indented and renders only by lazy continuation. — Indent it two spaces.'
+      refs: ['skills/finalise/SKILL.md']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - action: 'Carried from gate 2: args not part of the JS control key (CR-5); ok-rule wording vs behaviour (CR-6); duplicated Document sinks paragraph (CR-7).'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/security-input-corpus.md']
+    - action: 'Carried from gate 1: CRLF fence detection in jira-sync.js and doc-links.js (pre-existing).'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/doc-links.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

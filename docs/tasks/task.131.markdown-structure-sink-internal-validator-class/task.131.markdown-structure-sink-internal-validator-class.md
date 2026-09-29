@@ -299,15 +299,15 @@ None — additive corpus and an additive field.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.131.qa.3.markdown-structure-sink-internal-validator-class.md](./task.131.qa.3.markdown-structure-sink-internal-validator-class.md)
-- **Gate File**: [task.131.gate.3.markdown-structure-sink-internal-validator-class.yml](./task.131.gate.3.markdown-structure-sink-internal-validator-class.yml)
+- **Full Report**: [task.131.qa.4.markdown-structure-sink-internal-validator-class.md](./task.131.qa.4.markdown-structure-sink-internal-validator-class.md)
+- **Gate File**: [task.131.gate.4.markdown-structure-sink-internal-validator-class.yml](./task.131.gate.4.markdown-structure-sink-internal-validator-class.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 4594
@@ -316,7 +316,18 @@ None — additive corpus and an additive field.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 2's fixes are verified. Two medium gaps remain in them: the sink-enumeration test is vacuous ([bug 6](./task.131.bug.6.sink-enumeration-test-vacuous.md)), and the disqualified-entry check has no matching rule ([bug 7](./task.131.bug.7.disqualified-entry-matching-rule.md)). There are also two lows: table formatting, and prompt/finalise agreement.
+All earlier findings are fixed (bugs 1–7 closed). Four LOW residues were carried to the gate's `recommendations.future` through the Cosmetic-residue exit (see Deferred Work).
+
+## Deferred Work
+
+Carried from gate 4 by the Cosmetic-residue exit (route 2b); closed in `top_issues[]`, open in `recommendations.future`:
+
+- **TASK-131-CR-4-1**: split the review-security sink-enumeration extract into its sentence and its table.
+- **TASK-131-CR-4-2**: align the prompt's Omitting-a-field paragraph with the three FAIL shapes.
+- **TASK-131-CR-4-3**: replace the redundant `>= 5` floor with an upper bound, or correct its comment.
+- **TASK-131-CR-4-4**: indent one Step 3c continuation line.
+
+Also carried from earlier gates: `args` is not in the JS control key; the ok-rule wording; the duplicated corpus-doc paragraph; CRLF fence detection in `jira-sync.js` and `doc-links.js` (pre-existing).
 
 <!-- change-log-start -->
 ## Change Log
@@ -331,6 +342,7 @@ Cycle 2's fixes are verified. Two medium gaps remain in them: the sink-enumerati
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — cycle 2 refute pass: 4 findings (3 medium, 1 low) | qa-task |
 | 2026-09-30 |  | QA gate CONCERNS (80/100) — cycle 3: 4 findings (2 medium, 2 low) | qa-task |
 | 2026-09-30 |  | QA findings fixed — 3 iterations: cycle 1 BUG-1, BUG-2, CR-4 (+2 cleanups); cycle 2 BUG-3, BUG-4, BUG-5, QA-4; cycle 3 BUG-6, BUG-7, CR-3-3, QA-6 | qa-fix |
+| 2026-09-30 |  | QA gate PASS (100/100) — cycle 4: 4 LOW carried to recommendations.future (Cosmetic-residue exit) | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
