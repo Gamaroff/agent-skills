@@ -552,6 +552,7 @@ None.
 | 2026-09-29 |         | QA gate PASS (95/100) — 1 LOW finding gated (CR-1), 4 advisory | qa-task |
 | 2026-09-29 |         | QA gate CONCERNS (90/100) — 3 findings gated (1 MEDIUM), 3 advisory | qa-task |
 | 2026-09-29 |         | QA findings fixed — gate 1 CR-1..CR-5, gate 2 CR2-1..CR2-5 + PRB2-1 (3 more load-sensitive files marked and listed), 2 iterations; fast gate green | qa-fix |
+| 2026-09-29 |         | QA gate PASS (95/100) — 1 LOW finding (QA3-1), 5 advisory | qa-task |
 
 <!-- change-log-end -->
 
@@ -569,25 +570,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-29
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.153.qa.2.release-ci-gate-load-sensitive-tests.md](./task.153.qa.2.release-ci-gate-load-sensitive-tests.md)
-- **Gate File**: [task.153.gate.2.release-ci-gate-load-sensitive-tests.yml](./task.153.gate.2.release-ci-gate-load-sensitive-tests.yml)
+- **Full Report**: [task.153.qa.3.release-ci-gate-load-sensitive-tests.md](./task.153.qa.3.release-ci-gate-load-sensitive-tests.md)
+- **Gate File**: [task.153.gate.3.release-ci-gate-load-sensitive-tests.yml](./task.153.gate.3.release-ci-gate-load-sensitive-tests.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 51 new; `npm run ci:fast` green
+- **Tests Executed**: 59 new; `npm run ci:fast` green
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One MEDIUM: the load-sensitive guard misses three `FILE_BUDGET_MS` whole-file budgets (process.hrtime),
-so its list is incomplete. Two LOW gated: the refusal names the wrong run URL; `--repo` admits `..`.
+All gate-2 findings fixed. One LOW open (QA3-1): with `HANDOFF_SPAWN_RETRIES>=3` a CR-6 attempt
+outlives the fixture and fails without the marker. Five advisory items.
 
 ---
 
