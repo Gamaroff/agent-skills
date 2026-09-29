@@ -2667,16 +2667,21 @@ test("resolveEntry: an entry under a `..name` directory inside the root is accep
 
 test("shell-fn entry: a --fake-gh directory named `..name` inside the repo root is accepted, and the repo root itself is still bad-fake-gh (task.158)", () => {
   // The name must begin with `..` at the FIRST segment below the root — that is
-  // the only place a bare startsWith("..") misfires — so the fixture sits at the
-  // repository root, and is removed in `finally`.
-  const dotdot = mkdtempSync(join(REPO_ROOT, "..t158-fake-gh-"));
+  // the only place a bare startsWith("..") misfires. A disposable root holds the
+  // library under probe and the `..name` fake-gh directory, so nothing is ever
+  // written into the live repository (task.158 QA cycle 1, CR-4).
+  const root = mkdtempSync(join(tmpdir(), "probe-dotdot-gh-"));
+  const dotdot = join(root, "..fake-gh");
   try {
+    mkdirSync(join(root, dirname(FN_LIB)), { recursive: true });
+    cpSync(join(REPO_ROOT, FN_LIB), join(root, FN_LIB));
     cpSync(join(REPO_ROOT, FAKE_GH), dotdot, { recursive: true });
     const ok = runProbeSpec({
       sink: "filename",
       entry: FN_ENTRY,
       cases: LABEL_CASES,
       fakeGh: basename(dotdot),
+      repoRoot: root,
     });
     assert.notEqual(ok.reason, "bad-fake-gh", JSON.stringify(ok.reason));
     assert.ok(ok.executed > 0, `the probe ran: ${JSON.stringify(ok.reason)}`);
@@ -2685,6 +2690,7 @@ test("shell-fn entry: a --fake-gh directory named `..name` inside the repo root 
       entry: FN_ENTRY,
       cases: LABEL_CASES,
       fakeGh: ".",
+      repoRoot: root,
     });
     assert.equal(atRoot.reason, "bad-fake-gh");
     // Refused by CONTAINMENT, not by the later "no gh in it" check — the root
@@ -2692,6 +2698,6 @@ test("shell-fn entry: a --fake-gh directory named `..name` inside the repo root 
     assert.match(atRoot.declined[0].detail, /is outside/);
     assert.equal(atRoot.executed, 0);
   } finally {
-    rmSync(dotdot, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 });

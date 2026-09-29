@@ -429,6 +429,9 @@ disk**, and use the `### QA Cycle` entries in the implementation report as the c
 ```bash
 # The gate is what a QA run leaves behind whether or not it ran inside this pipeline. The cycle
 # comes from the ONE definition the QA skills use (task.158): a zero-padded `gate.02` is 2.
+# The helper's rc 1 also means "no such directory" — checked first, so a mis-substituted
+# {doc-directory} halts instead of reading as a fresh start (task.158 QA cycle 1, CR-2).
+[ -d "{doc-directory}" ] || { echo "HALT: {doc-directory} is not a directory — cannot reconstruct the QA cycle" >&2; exit 1; }
 QA_CYCLE=$(bash .agents/skills/{develop-story|develop-task|develop-bug}/references/qa-cycle.sh "{doc-directory}" 2>/dev/null); rc=$?
 # rc 1 = no numbered gate → 0 (a fresh start). Anything else is a broken invocation: HALT.
 [ "$rc" -le 1 ] || { echo "HALT: qa-cycle.sh not runnable (rc=$rc) — cannot reconstruct the QA cycle" >&2; exit 1; }

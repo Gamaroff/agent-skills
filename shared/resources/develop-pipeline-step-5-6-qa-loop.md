@@ -135,8 +135,9 @@ Log in Decisions Log: "GitHub board: QA-start re-assert → {landed / already / 
 ## Finding the Latest Gate File
 
 The latest gate is the one file `qa-cycle.sh` names: the highest-numbered cycle, zero-padding
-normalised (`gate.02` is cycle 2), a directory or a dotfile never a candidate, and two files claiming
-one cycle **refused** rather than picked. The helper is `qa-cycle.sh`, bundled beside this document
+normalised (`gate.02` is cycle 2), a dotfile never a candidate, the file named only when it is a
+regular one (a directory named like a gate can raise the cycle, and then `--path` refuses it), and two
+files claiming one cycle **refused** rather than picked. The helper is `qa-cycle.sh`, bundled beside this document
 (the invocation path below is what the bundler follows); the QA skills ask the same helper, so the loop and the QA run cannot disagree about
 which gate is current (task.158 — this section used to carry its own `find | awk | sort` grammar).
 

@@ -15,9 +15,11 @@ All notable changes to this project will be documented in this file. Format foll
   latest gate, the resume contract's cycle reconstruction, Step 7's completion comment — now asks
   `qa-cycle.sh`, so a zero-padded `gate.02` is found (Step 13b read `BLOCKING_COUNT` 0 on a gate
   with a HIGH entry) and two files claiming one cycle stop the block instead of the first being
-  taken. The helper is now bundled into `develop-story`, `develop-task` and `develop-bug`, and
-  `tests/qa-cycle.test.js` fails on a `find`/`ls` gate selection left in the QA skills or the
-  step docs. `security-probe.mjs` `--entry` and `--fake-gh` use the shared `isWithin`, so a
+  taken. `grant-qa-cycles.sh` takes its base cycle from the same helper — its private sed kept a
+  zero-padded `08` and died with `value too great for base`. The helper is now bundled into the
+  develop-* skills and, through the grant script, the review-* skills; `tests/qa-cycle.test.js`
+  fails on a `find`/`ls` gate selection left in the QA skills or the step docs, and on a
+  gate-number derivation in any shipped shell helper but `qa-cycle.sh`. `security-probe.mjs` `--entry` and `--fake-gh` use the shared `isWithin`, so a
   `..name` directory inside the repository is no longer refused (the root itself still is);
   `doc-links.js` exports the one CommonJS `isWithin`, and a parity test holds it to the ESM one in
   `qa-execute-snippets.mjs`.

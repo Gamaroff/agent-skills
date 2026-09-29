@@ -401,6 +401,80 @@ test("the helper is bundled into every skill whose prose calls it", () => {
   assert.deepEqual(missing, []);
 });
 
+// task.158 QA cycle 1, CR-1 — the shell helpers are part of the population. grant-qa-cycles.sh
+// reconstructed the cycle with its own sed loop, beside the resume contract that had just moved
+// onto qa-cycle.sh; the fenced-block guards above never read a .sh file, so it was invisible to
+// them. A gate-file loop, a gate-number derivation or a gate selection in any shipped shell helper
+// other than qa-cycle.sh itself is a second definition. Comment lines are skipped; continuations
+// are joined as fencedBlocks joins them.
+const GATE_LOOP = /\bfor\b[^\n]*\*\.gate\.\*/;
+function shellHelperLines() {
+  const dirs = ["shared/resources", "scripts"].concat(
+    fs
+      .readdirSync(path.join(REPO_ROOT, "skills"))
+      .map((sk) => path.join("skills", sk, "scripts"))
+      .filter((d) => fs.existsSync(path.join(REPO_ROOT, d))),
+  );
+  const out = [];
+  for (const dir of dirs)
+    for (const f of fs.readdirSync(path.join(REPO_ROOT, dir))) {
+      if (!f.endsWith(".sh") || f.endsWith(".test.sh")) continue;
+      const lines = fs
+        .readFileSync(path.join(REPO_ROOT, dir, f), "utf8")
+        .replace(/\\\n\s*/g, " ")
+        .split("\n");
+      lines.forEach((l, i) => {
+        if (!/^\s*#/.test(l))
+          out.push({ file: `${dir}/${f}`, line: i + 1, text: l });
+      });
+    }
+  return out;
+}
+const derivesGate = (l) =>
+  INLINE_DERIVATION.test(l) || GATE_SELECTION.test(l) || GATE_LOOP.test(l);
+
+test("no shipped shell helper but qa-cycle.sh derives the QA cycle (task.158 CR-1)", () => {
+  const lines = shellHelperLines();
+  const files = new Set(lines.map((l) => l.file));
+  assert.ok(
+    files.size > 20,
+    `scanned ${files.size} shell helpers — the scan is reading something`,
+  );
+  assert.ok(
+    files.has("shared/resources/grant-qa-cycles.sh"),
+    "the helper CR-1 was about is in the population",
+  );
+  const hits = lines
+    .filter(
+      (l) => l.file !== "shared/resources/qa-cycle.sh" && derivesGate(l.text),
+    )
+    .map((l) => `${l.file}:${l.line}`);
+  assert.deepEqual(hits, []);
+  // Non-vacuity on the live tree: the one definition is itself caught by the same predicate.
+  assert.ok(
+    lines.some(
+      (l) => l.file === "shared/resources/qa-cycle.sh" && derivesGate(l.text),
+    ),
+    "the predicate recognises qa-cycle.sh's own derivation",
+  );
+});
+
+test("the shell-helper guard catches the loop grant-qa-cycles.sh shipped (task.158 CR-1)", () => {
+  // Verbatim from develop before task.158.
+  const SHIPPED = [
+    'for f in "$DOC_DIR"/*.gate.*.yml; do',
+    "  n=$(printf '%s' \"$f\" | sed -E 's/.*\\.gate\\.([0-9]+)\\..*/\\1/')",
+  ];
+  for (const l of SHIPPED) assert.equal(derivesGate(l), true, l);
+  assert.equal(
+    derivesGate(
+      'QA_CYCLE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" 2>/dev/null); rc=$?',
+    ),
+    false,
+    "a call to the helper is not a derivation",
+  );
+});
+
 test("every bundled step doc whose qa-cycle.sh call names its own skill has the helper beside it (task.158)", () => {
   // The population is derived from the tree: every skill that bundles one of
   // STEP_DOCS, and every skill the doc's invocation path names — the

@@ -34,8 +34,9 @@
 # zeros, the greedy segment, dotfiles). The same glob and the same sed decide both the
 # cycle and the file, so they cannot disagree. It is the ONLY definition the QA skills
 # (Phase 0, Step 13b) and the develop-pipeline step docs (the QA loop's latest gate, the
-# resume contract's cycle reconstruction, Step 7's completion comment) use (task.158);
-# tests/qa-cycle.test.js fails on a `find`/`sed` gate selection left in any of them. The one
+# resume contract's cycle reconstruction, Step 7's completion comment) and grant-qa-cycles.sh
+# use (task.158); tests/qa-cycle.test.js fails on a `find`/`sed` gate selection left in any
+# of them, and on a gate-number derivation in any other shipped shell helper. The one
 # deliberate exception is finalise's stem-keyed `newest_numbered` lookup, which must exclude a
 # co-located bug's gate — which this directory-wide glob cannot. Candidates are regular files only — not a directory named like a gate,
 # not a symlink. Exit 1, nothing on stdout, one ⚠️ line on stderr when no file

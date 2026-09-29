@@ -205,6 +205,23 @@ printf '{"current_step":5,"qa_max_cycles":"abc"}\n' > "$L"
 ERR=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$D/none" bash "$SCRIPT" "$D/doc" 1 2>&1 >/dev/null); RC=$?
 [ "$RC" -eq 0 ] && echo "$ERR" | grep -q "not an integer" && [ "$(jq -r '.qa_max_cycles' "$L")" = "3" ] && pass "non-integer qa_max_cycles warned and overwritten (C4-CR-7)" || fail "non-integer budget" "rc=$RC err=$ERR"
 
+# ── task.158 CR-1: the cycle comes from qa-cycle.sh, the one definition ──────────
+# A zero-padded gate is cycle 8, not the string "08" — which `$((QA_CYCLE + K))` rejected
+# with "value too great for base" and recorded no grant.
+D="$T/padded"; L="$D/lock.json"; mkdoc "$D/doc" 1 08; printf '{"current_step":5}\n' > "$L"
+ERR=$(run "$L" "$D/none.json" "$D/doc" 2 2>&1 >/dev/null); RC=$?
+[ "$RC" -eq 0 ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "10" ] && pass "zero-padded gate.08 is cycle 8 → qa_max_cycles 10 (task.158 CR-1)" || fail "zero-padded gate" "rc=$RC lock=$(cat "$L") err=$ERR"
+# The grant and qa-cycle.sh read the same number from the same directory.
+D="$T/agree"; L="$D/lock.json"; mkdoc "$D/doc" 02 9 010; printf '{"current_step":5}\n' > "$L"
+WANT=$(( $(bash "$(dirname "$SCRIPT")/qa-cycle.sh" "$D/doc") + 1 ))
+run "$L" "$D/none.json" "$D/doc" 1 >/dev/null 2>&1
+[ "$(jq -r '.qa_max_cycles' "$L")" = "$WANT" ] && [ "$WANT" = "11" ] && pass "grant base equals qa-cycle.sh's cycle (gate.010 → 10, +1 = 11)" || fail "grant agrees with qa-cycle.sh" "want=$WANT lock=$(cat "$L")"
+# Without its sibling the grant refuses by name — it never falls back to a private derivation.
+D="$T/lonely"; L="$D/lock.json"; mkdir -p "$D/bin"; mkdoc "$D/doc" 3; printf '{"current_step":5}\n' > "$L"
+cp "$SCRIPT" "$D/bin/grant-qa-cycles.sh"
+ERR=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$D/none.json" bash "$D/bin/grant-qa-cycles.sh" "$D/doc" 2 2>&1 >/dev/null); RC=$?
+[ "$RC" -ne 0 ] && echo "$ERR" | grep -q "qa-cycle.sh not found" && [ "$(jq -r '.qa_max_cycles // "absent"' "$L")" = "absent" ] && pass "qa-cycle.sh missing beside the script → named refusal, nothing written" || fail "missing qa-cycle.sh sibling" "rc=$RC err=$ERR"
+
 # ── refusals ─────────────────────────────────────────────────────────────────
 D="$T/refuse"; L="$D/lock.json"; mkdir -p "$D"; mkdoc "$D/doc" 5; printf '{"current_step":5}\n' > "$L"
 for BAD in "" 0 -1 2.5 two "2 3"; do
