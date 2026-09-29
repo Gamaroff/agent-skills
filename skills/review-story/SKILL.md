@@ -383,7 +383,7 @@ Before formulating questions in any step, consult the pre-pass summaries from St
 
 - **PREPASS_A** (epic alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` during the epic alignment review (Step 3) and carry them to the Unified Question Point.
 - **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` during the technical accuracy review (Step 4) and carry them to the Unified Question Point. If `alignment` is `aligned`, record its `axes_checked` (and the `prepass-axes.js` `source`) in one line of the report's Technical Accuracy section.
-- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings during the completeness review (Step 5) and carry them to the Unified Question Point — ask whether the story should be scoped down or closed.
+- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings during the completeness review (Step 5) and carry them to the Unified Question Point — ask whether the story should be scoped down or closed. If it returned a non-empty `population_diff`, each entry is a Step 4 check 10 finding — confirm it against the collector and report it there.
 
 Severity `low` findings from any summary: add to the review report findings list but do not elevate to a user question unless they cluster with other issues.
 
@@ -1004,6 +1004,32 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      its QA finding named; the released shape at `v0.51.0` also lacked `targeted`, `bug` and
      `filedBug`
 
+10. **Call-site population** (obs #120):
+   - Trigger: the document enumerates invocations of one of this repository's engines — it lists
+     call sites, gives a count of them, or scopes itself as "all call sites of" `tracker-comment.js`,
+     `stakeholder-summary-cli.js`, `gh-stage.js`, `jira-stage.js` or `tracker-issue.js`. A document
+     that touches one call and says so is not asked to count the world
+   - Measure the population with `call-sites.js`, the collector the guard tests import, from the
+     repository root:
+
+     ```bash
+     command node .agents/skills/review-story/references/call-sites.js --engine "{engine}" --json
+     ```
+
+     `reason: empty` is a claim about the instrument before it is one about the tree: check the
+     root before believing a zero. A document written against an earlier tree is measured against
+     that tree: export it with `git archive <rev> | tar -x -C <dir>` and pass `--root <dir>`
+   - Diff the collector's `file:line` list against the document's. Every collector site the
+     document does not name → **Important**, worded as a choice for the author: "in scope — add it"
+     or "an exclusion — state why". A stated exclusion is not a finding. A count in the document
+     that disagrees with the collector's → **Important**
+   - A list confirmed name by name is the author's recall, not a measurement: pre-pass Agent C's
+     grep for the symbols a document names cannot see a site the document does not name
+   - Worked example: task.121 named three `tracker-comment.js` sites and one orchestrator
+     duplicate, and the pre-pass confirmed each. The collector found a second orchestrator
+     duplicate and a live `develop-bug` consumer that one of its success criteria would have
+     forbidden — both in scope, both found only because the reviewer happened to run it
+
 **Common Hallucination Patterns to Detect**:
 
 - ❌ "Uses the standard React patterns" (vague, no source)
@@ -1016,6 +1042,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ An outcome no current or planned branch of the named function returns for the stated input. Report it as **Important** under check 7, not as a Critical hallucination
 - ❌ A property of an existing function asserted for new inputs, and never run on them (check 8)
 - ❌ Legacy or compatibility handling scoped from a finding, not diffed against the released shape (check 9)
+- ❌ A list of an engine's call sites taken from the author's recall, never diffed against the collector (check 10)
 
 **Issues to Flag**:
 
@@ -2607,6 +2634,7 @@ This skill implements rigorous safeguards to DETECT hallucinations:
 4. **Vague Source Detection**: Flag generic sources without specific references
 5. **Assumption Verification**: Check explicit assumptions against reality
 6. **Invariant Verification**: A property claimed of an existing function under new inputs MUST be executed on those inputs — an existence check and a behaviour check are different instruments, and passing the first is not evidence for the second (Step 4 check 8)
+7. **Population Verification**: A document's list of an engine's call sites MUST be diffed against the collector's (`call-sites.js`) — a list confirmed name by name is the author's recall, not a measurement (Step 4 check 10)
 
 ### Reporting Hallucinations
 
