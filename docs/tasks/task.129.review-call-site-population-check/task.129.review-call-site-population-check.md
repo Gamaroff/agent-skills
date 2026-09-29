@@ -5,11 +5,13 @@ type: task
 description: "review-task Step 3 check 6 inventories same-class functions; nothing inventories call sites. When a task's scope is 'these N invocations of engine X', the review verifies the N it names and never counts the population — on task.121 the document listed three tracker-comment.js sites and one orchestrator duplicate, and the collector the task's own guard reuses (collectCallSites() in comment-slot-coverage.test.mjs, sub-second) found two more in scope: a second orchestrator duplicate and a live develop-bug consumer that a success criterion would have forbidden. Both became Important findings the pre-pass grep for named symbols could not see. Add a call-site population check to review-task Step 3 (check 14) and review-story Step 4 (check 10): when a document enumerates invocations of a shared engine, run the collector for that engine (or the documented grep shape across shared/resources, skills/*/SKILL.md, un-bannered references/, tracked shell), diff against the list, and flag every unnamed site as in-scope or as an exclusion the document must state. Ship a small `call-sites.js` so the reviewer, the guard tests and create-task run one collector. Observation #120."
 tags: [review-task, review-story, create-task, call-sites, tracker-comment]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-18
 updated: 2026-09-29
+completed_date: 2026-09-29
+pr_number: 525
 assignee:
 estimated_effort_hours: 5
 github_issue: 432
@@ -17,7 +19,7 @@ github_issue: 432
 
 # Technical Task: A call-site list in a task document is the author's recall, not a measurement
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.129.review.1.review-call-site-population-check.md` implemented 2026-09-29
 **GitHub Issue**: [#432](https://github.com/Gamaroff/agent-skills/issues/432)
 
@@ -194,7 +196,7 @@ None.
 - [x] Mutation proof: remove a root class from the collector → the fixture test names it.
 
 ### Migration
-- [ ] Observation #120 closes naming the PR.
+- [x] Observation #120 closes naming the PR — closed `actioned` 2026-09-29, resolution names PR #525.
 
 ## 10. Risk Assessment
 
@@ -247,6 +249,31 @@ None.
 ### Key Findings
 No blocking issues. Three advisory findings (C4-CR-1..3) are recorded in the gate's `recommendations.future`.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.129.qa.4.review-call-site-population-check.md`
+**Gate File**: `task.129.gate.4.review-call-site-population-check.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (4 cycles; HIGH 0 throughout)
+**PR Review (5c)**: CONCERNS — `task.129.pr-review.1.review-call-site-population-check.md`; PC-1..PC-3 corrected, CR-1 a follow-up
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Acceptance Criteria:** 7/7, each with committed code and a per-PR test (AC7 a documentation criterion — obs #120 closed naming PR #525)
+✅ **Tests:** `call-sites.test.mjs` (32 tests incl. the `c69f5115^` fixture, the 2 s bound and the no-restated-shape guard), `tests/review-call-site-population-check.test.js` (10), guard `comment-slot-coverage.test.mjs` unchanged populations (24 / 12); `npm run ci:fast` green
+✅ **PR:** #525 — CI reading 1 SUCCESS @ `cf6426853772` over 5 checks
+✅ **Documentation:** CHANGELOG `[Unreleased]`; review-task check 14, review-story check 10, both Agent C prompts, create-task 3.5
+✅ **Security Review:** PASS — not a boundary (a measurement that gates no action); no secrets or unsafe patterns
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal review tooling
+
+**Task marked as ACCEPTED on:** 2026-09-29
+
+**Detailed Verification Log:** See `task.129.dod.2.review-call-site-population-check.md` for complete verification evidence and timestamps (run 1: `task.129.dod.1.review-call-site-population-check.md`, gaps identified, superseded).
+
 ## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
 
 **Status:** IN PROGRESS (run 1) — all four gaps fixed before run 2: AC2, AC4, AC5 tests added to `call-sites.test.mjs` (each mutation-proved); obs #120 closed naming PR #525.
@@ -277,12 +304,11 @@ No blocking issues. Three advisory findings (C4-CR-1..3) are recorded in the gat
 **Gap Report Generated:** 2026-09-29
 
 **Detailed Verification Log:** See `task.129.dod.1.review-call-site-population-check.md` for complete verification evidence and timestamps.
-
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-09-18 | 1.0 | Initial draft — observation review 2026-09-18 (obs #120) | create-task |
 | 2026-09-29 | 1.1 | Review passed (8/10) — renumbered to review-task check 14 / review-story check 10; corrected the collector's roots and existing engines (24 / 12 baseline); named both pre-pass files; presence test replaces the families audit; fixture at `c69f5115^` with `--root`; site schema defined | review-task |
 | 2026-09-29 |  | Status → ready-for-development | review-task |
@@ -293,6 +319,7 @@ No blocking issues. Three advisory findings (C4-CR-1..3) are recorded in the gat
 | 2026-09-29 |  | QA gate PASS (100/100) — cycle 4, 0 blocking findings, 3 advisory | qa-task |
 | 2026-09-29 |  | DoD incomplete — 4 gaps identified (AC2, AC4, AC5, AC7) | finalise |
 | 2026-09-29 |  | DoD gaps fixed — 3 tests (AC2 c69f5115^ fixture, AC4 ≤ 2 s, AC5 no restated shape), each mutation-proved; obs #120 closed naming PR #525 | develop |
+| 2026-09-29 | 1.2 | DoD run 2 passed — accepted (PR #525) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
