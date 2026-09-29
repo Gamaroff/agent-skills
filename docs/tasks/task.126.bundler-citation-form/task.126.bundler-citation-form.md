@@ -342,6 +342,39 @@ None.
 - Both cycle-2 findings are fixed and mutation-proven.
 - Advisory: an unreachable fallback and stale comments in `expected_bytes` (CR-1); `revert_new`'s tracked-copy branch has no test (CR-2).
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (the document stays `ready-for-review`)
+
+### QA Gate Status
+
+**QA Report**: `task.126.qa.3.bundler-citation-form.md`
+**Gate File**: `task.126.gate.3.bundler-citation-form.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR review (5c)**: ✅ APPROVE — `task.126.pr-review.1.bundler-citation-form.md`
+**CI reading 1**: ✅ SUCCESS @ `4654c4870290` (5 checks)
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] AC5 "No measurable change to bundle time" has no automated test. The evidence is a measurement re-executed at finalise: the branch is faster than develop on `--all` and `--check`. A human decides whether to waive, or to reword the criterion to the per-PR 10 s budget in `tests/bundle-missing-source.test.js`.
+
+2. **Security Review:**
+   - [ ] The pre-commit refusal is a boundary, and the probe engine cannot execute it: no entry form materialises a git-repository fixture (`probes_executed: 0`, severity low). A human decides whether to record the fixture-repo tests (10 cases, 7 mutations) as adequate evidence, or to open a tooling task for a git-fixture probe form.
+
+### Next Steps:
+
+- [ ] Decide AC5: waive with the measured evidence, or reword it to the enforced per-PR budget
+- [ ] Decide the security finding: record the fixture-test judgement, or open the probe-engine tooling task
+- [ ] Re-run `/finalise`
+
+**Estimated Effort:** Small, if decided by waiver or rewording.
+
+**Gap Report Generated:** 2026-09-29
+
+**Detailed Verification Log:** see `task.126.dod.1.bundler-citation-form.md` for the complete verification evidence and timestamps.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -354,6 +387,7 @@ None.
 | 2026-09-29 |  | QA gate CONCERNS (90/100) — 1 finding (CR-1, hook over-refuses skill-native files) | qa-task |
 | 2026-09-29 |  | QA gate CONCERNS (80/100) — 2 findings (CR-1 refused-commit retry loop, CR-2 link relocation on on-disk copies) | qa-task |
 | 2026-09-29 |  | QA gate PASS (100/100) — 0 findings (2 advisory cleanups) | qa-task |
+| 2026-09-29 |  | DoD incomplete — 2 gaps identified (AC5 has no automated test; security probe executed no candidates on the pre-commit boundary) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking

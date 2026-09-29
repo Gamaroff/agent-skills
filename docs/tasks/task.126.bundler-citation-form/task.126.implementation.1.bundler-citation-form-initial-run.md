@@ -34,9 +34,9 @@ Adds a non-transitive citation form to the bundler, prints each skill's closure 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.{id}.*` exists in git                             | `feature/task.126.bundler-citation-form` off `develop` at `f7ca1985`; work-started comment posted; board transitioned | —                    |
 | 2. review-task             | ✅ Done    | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | `task.126.review.1.bundler-citation-form.md` — REQUIRES REWORK as written (4/10, 4 critical) → READY TO IMPLEMENT after fixes (8/10); Planned → Ready for Development; committed | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map). Commits e2971aba, 2a746231, 68fecaa2, ebe60ff0, 4b5675e5. Loop audit: ready-for-review, 12/12. Fast gate: 2 iterations; iter 2 green bar one load-sensitive timing failure that re-ran clean alone | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #524: https://github.com/Gamaroff/agent-skills/pull/524 (OPEN); in-review comment posted; board in-review: stage-disabled | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: gate 1 CONCERNS 90 → gate 2 CONCERNS 80 → gate 3 PASS 100. 5c /review-pr: APPROVE (`task.126.pr-review.1.bundler-citation-form.md`). ready-for-merge: stage-disabled | — |
+| 7. finalise                | ⚠️ Needs Attention | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | `task.126.dod.1.bundler-citation-form.md` — GAPS IDENTIFIED, NOT ACCEPTED (2 gaps: AC5 has no automated test; the security probe executed no candidates on the pre-commit boundary). CI reading 1: SUCCESS @ 4654c487. HALT | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -67,6 +67,7 @@ Adds a non-transitive citation form to the bundler, prints each skill's closure 
 - Step 3 Phase 1 (e2971aba, style fix 2a746231): one parser `quick_validate.parse_shared_refs` (line, name, kind), fragment stripped; `SHARED_REF_LINE_RE` removed; `refs_refs_with_kind` for the `references/` spelling; `discover_needed` kinds + cite→dep upgrade; status line `· closure M (±K vs committed)` from one cached `git ls-files`.
 - Step 3 Phase 2 (68fecaa2): `.githooks/pre-commit` refuses untracked ∩ LEFT; `BUNDLE_PRECOMMIT_WARN=1` escape hatch; node hook test (6); traps.md entry + stale `.git/hooks` path fixed.
 - Step 3 Phase 3 (ebe60ff0): three pointers converted to `#subagents--unavailable-failed-slow`; `npm run bundle` → closures 37→21, 45→27, 46→29 (exactly the review's measurement); `--check` UNREACHED set diffed against the predicted set — identical, 51 files — then `git rm`'d; 9 bundled copies re-relativised (links to dropped siblings → upstream, task.108). The commit ran through the new hook: all skills in sync, no refusal.
+- Step 3 Phase 3 `git diff --stat` (`git show --stat ebe60ff0`): 67 files changed, 149 insertions(+), 29788 deletions(-). The three skills alone (`-- skills/qa-fix skills/review-task skills/review-story`) account for 63 files, 12 insertions(+) and 29757 deletions(-). By status: 51 D (the `git rm`'d `UNREACHED` copies) and 16 M (3 pointer edits, 9 re-relativised bundled copies, create-skill SKILL.md, AGENTS.md, CHANGELOG.md, the task doc). The follow-up fix 4b5675e5 changed 8 files, 73 insertions(+), 15 deletions(-). Recorded here after 5c PC-1.
 - Step 3 fix (4b5675e5), found by fast gate iter 1: `executable-instructions.test.js` — the cited hub copy named `references/develop-pipeline-{resume-contract,lite-mode}.md`, no longer shipped. Fixed at the source: `rewrite_text` takes an `unshipped` predicate from `expected_bytes`; an unshipped real shared file becomes its upstream URL. Only the three hub copies changed in the tree. `qa-gate-preconditions-parity` accepts the citation form of the §Subagents pointer (it pinned the old text). This was not scope creep: it is the task's own conversion made correct, and the review's "cited section's dependencies" limit was recorded as a Known Issue in the task.
 - Performance: `--all` develop 4.86/5.00/5.01 s → branch 4.61/4.63/4.61 s; `--check` 4.65–4.77 → 4.34–4.38 s (3 runs each, detached develop worktree).
 - Loop audit (inline, mechanical count — not an Explore subagent): {"status":"ready-for-review","completed":12,"total":12,"last_commit_hash":"4b5675e5…"} → EXIT loop.
@@ -93,12 +94,20 @@ Adds a non-transitive citation form to the bundler, prints each skill's closure 
 Each mutation was applied with a count-asserted replace, run, and restored from a backup; `git diff --stat` confirmed the tree afterwards.
 - Step 3 inline — /develop not invoked: the plan names every hunk against re-verified anchors and the surface map is recorded; /develop would only re-read both (obs #162 route). The inline path owes /develop's Task Completion Checklist.
 - Step 4 staging scope (15 paths, `.claude/state/step4-scope-paths.txt`): the work-item dir, `.githooks`, `AGENTS.md`, `CHANGELOG.md`, `docs/contributing`, `evals/shared/tests`, `skills/create-skill{,/scripts}`, `skills/{qa-fix,review-story,review-task}{,/references}`, `tests`. Pre-flight: no untracked file outside scope, so nothing held. All code was already committed in Step 3; this commit carries the implementation report's first version.
+- Step 4: implementation report first committed in e9d986fb. PR #524 opened with `gh pr create` (base `develop`, `Closes #426`): the report commit already carried the only uncommitted file, so /create-pr's auto-commit had nothing left to stage. Lock `pr_url` set. Leak check: nothing out of scope (every commit was scoped by path). Post-PR state: OPEN, checked directly with `gh pr view`, not with the poller subagent. GitHub board: in-review → stage-disabled (this repo's ladder does not map in-review).
 
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+- **Step 7 /finalise: DoD gaps, HALT.** The four agents returned AC PARTIAL, Security FAIL (low), Compliance NOT_APPLICABLE and Docs PASS. Two gaps remain, and both concern the form of the evidence, not a code defect:
+  1. **AC5, "No measurable change to bundle time", has no automated test.** It was re-measured at finalise on 4654c487 against develop f7ca1985, 3 runs each. `--all`: 5.20/5.11/5.32 s on develop vs 4.94/4.87/4.82 s on the branch. `--check`: 5.08/4.97/5.05 s vs 5.67/4.73/4.74 s. `tests/bundle-missing-source.test.js` §2 enforces a 10 s per-PR budget on `--check` of the live tree, but that is not the criterion as worded. **Needs a human decision**: waive with the measurement, or reword the criterion to the budget.
+  2. **Security: "probe mode executed no candidates"** (severity low). The finalise security agent judged the pre-commit refusal a boundary. That disagrees with the QA gates' `boundary: false`, and the agent's reading is the stricter and more literal one: a refusal whose false prevents an action. The probe engine has no entry form for a decision made from git state. `shell:` runs in a sandbox that is not a git repository, so the first git call fails whatever the input. The control is tested by 10 fixture-repo cases and 7 mutations, which are not an engine count. **Needs a human decision**: record the fixture tests as adequate evidence, or open a tooling task for a git-fixture probe form.
+- AC7 (observations #83 and #114 closed naming the PR) was returned FAIL (unverifiable) by the agent, which cannot see the out-of-repo log. The main context verified it by reading both entries: `actioned`, with a resolution naming PR #524. This lost independence and is recorded in the DoD.
+- Fix-and-recheck (Step 8a) did not apply: two sections are FAIL, and the security finding was not produced by execution.
+- The Step 4 PR review comment and the gaps PR comment are both posted. The task status stays `ready-for-review`. A Change Log gaps row was written, and a gap report added to the task body.
 
 - Fast gate iter 1 (TEST_EXIT=1, 2 failures): `executable-instructions.test.js` (a real gap — fixed in 4b5675e5) and `qa-gate-preconditions-parity.test.mjs` (pinned the old pointer text — updated). Log retained: `.claude/state/test-output-1-1790702565.log`.
 - Fast gate iter 2 (TEST_EXIT=1, 1 failure): `tests/bundle-missing-source.test.js` file-level timing budget — 23.4 s against 10 s under full-suite load. The message says LOAD-SENSITIVE; re-run alone twice: 7/7 pass, 6.9 s and 5.6 s. Treated as load, not a regression (the branch bundles faster than develop). 4532/4534 otherwise green.
@@ -110,14 +119,46 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-09-29
+
+**Gate Result**: CONCERNS
+**Issues Found**: 1 open — CR-1 (medium/high, reproduced): `.githooks/pre-commit` refuses an untracked skill-native `references/` file as a generated copy. Advisory: CR-2, CR-3 (reproduced), CR-4, CR-5.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fix**: 20739100 fixed CR-1 and folded in CR-2, CR-3, CR-4 and CR-5. The fix's own new test also caught a `set -e` bug in its first attempt. The ingester subagent was skipped, because the orchestrator wrote gate 1 and held the findings. Five more mutations were run, each red. The probe population was 5, and none restated the rule. The PR and tracker `qa-fix-1` comments were posted.
+
 ---
+
+### QA Cycle 2 — 2026-09-29
+
+**Gate Result**: CONCERNS
+**Issues Found**: 2 open. CR-1 (medium/high, reproduced): a refused commit leaves the hook's own NEW copies on disk, so the retry is refused again. CR-2 (medium/high): rewrite_md_links still relocates on the on-disk copies. Advisory: CR-3 (medium/medium), CR-4, CR-5, CR-6. Both gating findings are in the cycle-1 fixes; the refute pass worked as designed. Fast gate: first run red on formatting only (fixed in fc83a5d0); the re-run passed 4535/4536, 0 fail.
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fix**: Cycle 2's fixes are split across two commits. c049a146 carries the gate, report and task doc. 3ab65ee9 carries the code: CR-1 `revert_new`, CR-2 links on reach, and CR-3 to CR-6. The first `git add` hit a transient `.git/index.lock`, and my command chained `git commit` with `;` instead of `&&`, so the commit ran on what the QA read-back had already staged. I committed the code as a follow-up and did not rewrite pushed history. /qa-fix's procedure ran inline, because it was already loaded from cycle 1. Three more mutations were run, each red. The probe population was 1 (create-skill SKILL.md, updated). The PR and tracker `qa-fix-2` comments were posted.
+
+### QA Cycle 3 — 2026-09-29
+
+**Gate Result**: PASS
+**Issues Found**: none gating. 2 advisory cleanups: an unreachable fallback and stale comments in expected_bytes; revert_new's tracked branch has no test. Fast gate 4537/4538, 0 fail.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — `task.126.pr-review.1.bundler-citation-form.md`. There are 6 low findings: 4 conformance findings (PC-1 to PC-4, bookkeeping) and 2 code cleanups (CR-1, CR-2). None gates.
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Final Status**: Escalated — /finalise DoD gaps (2), HALT at Step 7
 **Branch**: `feature/task.126.bundler-citation-form`
-**PR**: {populated after Step 4}
+**PR**: [#524](https://github.com/Gamaroff/agent-skills/pull/524)
 **QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**DoD Summary**: `task.126.dod.1.bundler-citation-form.md` — GAPS IDENTIFIED
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
