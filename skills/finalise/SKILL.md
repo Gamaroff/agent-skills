@@ -481,7 +481,9 @@ Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RE
 > `boundary: true` means the security agent's Step 1b identified a **boundary deliverable** — a predicate,
 > validator, classifier or allow/deny-list — and it then generated candidate inputs, **executed** them
 > against the shipped code, and reported only those that reproduced. `boundary: false` means the rule did
-> not fire, which is the common and expected case.
+> not fire, which is the common and expected case. `boundary: internal` means the rule fired on a
+> validator of the pipeline's own artefact that no corpus sink models — a recorded decision with an
+> `internal_reason`, rendered as an explicit skip, never as the zero-guard FAIL and never as `false`.
 >
 > **Read `probes` together with `probes_executed`, never alone.** No reproduced probe with a high
 > `probes_executed` is the *good* outcome — the boundary was probed and held. No reproduced probe with
@@ -489,18 +491,29 @@ Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RE
 > executed no candidates` FAIL in `checks`, rendered like any other failed check. Branching on list
 > emptiness alone would report the best outcome and the worst one identically.
 >
-> **Three absences are three different things, and none of them is `false`.** A missing `boundary`
+> **Four absences are four different things, and none of them is `false`.** A missing `boundary`
 > means the agent did not answer the question — render it as unverified, never as "not a boundary". A
 > missing `probes_executed` under `boundary: true` counts as zero, because a count that was never
-> reported is not evidence that work happened. And the held-case branch keys on *no probe having
-> reproduced*, not on the list being empty — an entry carrying `reproduced: false` must not be able to
-> suppress the verdict line by making the list non-empty. See `references/finalise-dod-security-prompt.md`.
+> reported is not evidence that work happened. A `boundary: internal` with no `internal_reason` is a
+> FAIL — the reason is the whole of that decision, and without it the skip is indistinguishable from a
+> probe nobody ran. And the held-case branch keys on *no probe having reproduced*, not on the list
+> being empty — an entry carrying `reproduced: false` must not be able to suppress the verdict line by
+> making the list non-empty. See `references/finalise-dod-security-prompt.md`.
 
 #### Step 3c: Aggregate Results
 
 After all 4 agents complete, parse each YAML result. Handle agent failures:
 
 - **Agent returns valid YAML**: extract `overall` field → `AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`
+- **`boundary: internal` forces `SEC_OVERALL = FAIL` unless its `internal_reason` holds**, whatever the
+  agent's own `overall` says. It holds when it is present and not whitespace-only, **begins with the
+  entry as `path#export`**, and that entry is **not** in the prompt's *Entries disqualified from
+  `internal`* table — matched on file basename plus export, so a full or bundled path to a listed file
+still matches; an entry a sink models is probed, never skipped. A reason that fails any of the
+  three is the self-report the zero-guard exists to refuse, and Step 6 decides on `SEC_OVERALL`, not on
+  the rendered summary (task.131 QA cycles 1–2, TASK-131-BUG-2 and BUG-3). The agent should already
+  have emitted the `internal boundary recorded without a reason` FAIL check; this override is what
+  holds when it did not.
 - **Agent errors or returns unparseable output**: set that section's overall to `NEEDS_MANUAL_REVIEW`; mark section for manual verification in the DoD running summary; continue with remaining sections
 
 **Never abort due to a single agent failure.** One failed section = manual review for that section only.
@@ -569,12 +582,21 @@ Append sections to the running summary file. **One append per section** — not 
 
 ### Probe Results
 
-{if security_result.boundary is absent or not a boolean:}
+{if security_result.boundary is absent, or is neither a boolean nor "internal":}
 ⚠️ **The security agent reported no boundary decision.** This is not the same as "not a boundary" —
 the question was not answered, so probe mode is **unverified**. Treat it as a finding and re-run the
 agent; do not read it as a skip.
 {else if security_result.boundary == false:}
 _Probe mode did not fire — the deliverable is not a boundary._
+{else if security_result.boundary == "internal":}
+{if security_result.internal_reason is absent, whitespace-only, does not begin with a path#export entry, or names an entry the prompt disqualifies:}
+❌ **Internal artefact recorded without a valid reason.** `boundary: internal` names no entry, no
+reason no sink fits, or an entry a sink already models — a FAIL (Step 3c forced `SEC_OVERALL` to FAIL):
+the reason is the whole of the decision.
+{else:}
+⚠️ **Internal artefact — not probeable by the engine**: {security_result.internal_reason}. A recorded
+decision, not the zero-guard: no corpus sink models this input.
+{endif}
 {else:}
 **Candidates executed:** {security_result.probes_executed, or "not reported" if absent} — **reproduced:** {count of security_result.probes where reproduced == true}
 

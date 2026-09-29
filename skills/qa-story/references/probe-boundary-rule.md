@@ -78,8 +78,19 @@ is the machine-readable half of the same statement:
   **over-blocking**.
 
 A control "rejects" by throwing, or by returning `null` / `undefined` / `false` —
-the non-throwing rejection shape a validator commonly uses. Treating a `false`
-return as acceptance would score a working control as absent.
+the non-throwing rejection shape a validator commonly uses — or by returning a
+**result object whose own `ok` is `false`** (`{ ok: false, problems }`, the shape
+`report-lint.js#lintReport` answers with; task.131). Treating any of these as
+acceptance would score a working control as absent: before the result-object rule,
+every report `lintReport` refused scored `accepted`. The rule is narrow — own
+property, strictly `false`, a plain non-array object — so no other return value
+changes meaning.
+
+A JS export whose second argument is plain configuration — `lintReport(text,
+{ sections })` — is probed with `--args-json '[…]'`: a JSON array the caller states,
+appended after every case's input. The engine never guesses an argument; without
+the flag such an export throws on every case, which scores `rejects-every-input`,
+not a verdict.
 
 The verdict branches, in the order they are checked:
 
@@ -139,6 +150,38 @@ Declining conditions, each reported with its reason:
 | `unknown-sink` | No corpus for that sink. `corpusFor` throws rather than returning `[]`, deliberately. |
 | `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). |
 | `case-errored` | One case timed out or its child never ran. |
+| `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` entry, which cannot append an argument to a call. |
+
+### `boundary: internal` is a decision, not a verdict
+
+`declined` and `executed: 0` describe a probe. `boundary: internal` describes the
+**decision not to run one**, and it is recorded as a third value of the Step 1b
+`boundary:` field (`true | false | internal`), never folded into either of the
+others. It is available only when **both** hold:
+
+- the predicate's only input is an artefact this repository's own pipeline writes —
+  an implementation report, a DoD summary, a gate file; **and**
+- no corpus sink's legitimate cases are documents that predicate is meant to accept.
+
+It requires an `internal_reason` that begins with the entry (`path#export`) and names the artefact
+and why no sink fits; an entry the prompt's *Entries disqualified from `internal`* table lists is
+probed, never recorded `internal`, and `/finalise` Step 3c forces FAIL on it; an
+`internal` without one is a FAIL (the `internal boundary recorded without a reason` check, and `/finalise` forces
+the security result to FAIL on that shape — `finalise-dod-security-prompt.md` states it). **A sink disqualifies it for the shape it
+models**: `markdown-structure` models the implementation report, so
+`report-lint.js#lintReport` is `boundary: true` and probed. A validator of any
+other document is not disqualified by that sink — probing it there would score
+the sink's legitimate reports `overblocked` for being the wrong document, which
+says nothing about the validator. A validator of **external** input is never
+`internal`.
+
+The class exists because the zero-guard had two outcomes and met a third shape:
+on task.124 the finalise agent classed `lintReport` a boundary, found no sink and
+no way to pass its second argument, and returned the zero-guard FAIL —
+a verdict the operator then overruled by hand. A rule that ends in "a human
+decides" on a recurring shape is a rule with a missing branch; `internal` is that
+branch, and the sink plus `--args-json` are why `lintReport` itself no longer
+takes it.
 
 ## 5. Containment, and what it does not cover
 

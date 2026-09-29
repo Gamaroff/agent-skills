@@ -118,9 +118,13 @@ function fencedRanges(content) {
 
   for (const line of lines) {
     const lineLen = line.length + 1; // +1 for the newline consumed by split
+    // A CRLF line keeps its `\r` after split("\n"), and `.` does not match a line
+    // terminator, so `(.*)$` never matched a CRLF fence (task.131). Match on the
+    // line without it; the offsets above still count it.
+    const bare = line.endsWith("\r") ? line.slice(0, -1) : line;
     // Up to 3 leading spaces are allowed before a fence; 4+ makes it an indented
     // code block, which has no fence to match.
-    const m = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    const m = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(bare);
 
     if (m) {
       const char = m[1][0];

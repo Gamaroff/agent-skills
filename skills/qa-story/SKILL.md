@@ -1023,7 +1023,12 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    which is the defect this item closes. `boundary: false` is the common case and a legitimate skip — record it in the QA
    report's `## Code Review` section rather than leaving `probes_executed` absent. The record names
    each predicate-shaped function the diff adds and the signal it lacks — a `boundary: false` with no
-   candidates named is not a decision (obs #156). A boundary that is
+   candidates named is not a decision (obs #156). The field is three-valued — `true | false | internal`:
+   `boundary: internal` is for a validator whose only input is an artefact this pipeline writes and
+   that no corpus sink models, recorded with its `internal_reason` in the same section; it is not
+   available once a sink fits (`markdown-structure` fits the implementation report, so
+   `report-lint.js#lintReport` is probed with `--args-json`, never `internal`). The rule:
+   `references/probe-boundary-rule.md` § "`boundary: internal` is a decision, not a verdict". A boundary that is
    read at QA and executed only at the Step 7 DoD probe lands its defect after the gate that should
    have covered it: a 14-star glob compiled to `[^/]*` × 14 passed five green cycles and was found at
    finalise (obs #20).

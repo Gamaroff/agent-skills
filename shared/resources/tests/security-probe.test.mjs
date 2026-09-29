@@ -31,6 +31,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 import {
   ARGV_SLOTS,
@@ -2699,5 +2700,245 @@ test("shell-fn entry: a --fake-gh directory named `..name` inside the repo root 
     assert.equal(atRoot.executed, 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── task.131: --args-json, the { ok: false } rule, and markdown-structure ────
+
+const requireCjs = createRequire(import.meta.url);
+const { loadTemplate } = requireCjs("../report-lint.js");
+const LINT_ENTRY = "shared/resources/report-lint.js#lintReport";
+const LINT_ARGS = () => [{ sections: loadTemplate() }];
+
+test("task.131: a returned { ok: false } is a rejection and { ok: true } an acceptance", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: `${FIXTURES}/result-object-control.mjs#validateHost`,
+    cases: CASES,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.deepEqual(r.reproduced, []);
+  assert.deepEqual(r.overblocked, []);
+  assert.equal(r.executed, CASES.length);
+});
+
+test("task.131: an INHERITED ok is not read — the rule is own-property only", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: `${FIXTURES}/result-object-control.mjs#inheritedOk`,
+    cases: CASES,
+  });
+  assert.equal(
+    r.verdict,
+    "absent",
+    "every answer is a truthy object → accepted",
+  );
+  assert.equal(r.reproduced.length, hostileOnly.length);
+});
+
+test("task.131: without --args-json a two-argument control rejects everything; with it, it engages", () => {
+  const argsEntry = `${FIXTURES}/args-control.mjs#validateHost`;
+  const bare = runProbeSpec({
+    sink: "url-authority",
+    entry: argsEntry,
+    cases: CASES,
+  });
+  assert.equal(bare.verdict, "unverifiable");
+  assert.equal(bare.reason, "rejects-every-input");
+  assert.equal(bare.args, null);
+
+  const args = [{ allow: legitimateOnly.map((c) => c.input) }];
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: argsEntry,
+    cases: CASES,
+    args,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.deepEqual(r.args, args, "the result states how the export was called");
+  assert.deepEqual(toRecordEntry(r).args, args, "and so does the record");
+});
+
+test("task.131: args is declined bad-args on a non-JS form or when it is not an array", () => {
+  const notArray = runProbeSpec({
+    sink: "url-authority",
+    entry: `${FIXTURES}/args-control.mjs#validateHost`,
+    cases: CASES,
+    args: { allow: [] },
+  });
+  assert.equal(notArray.verdict, "unverifiable");
+  assert.equal(notArray.reason, "bad-args");
+  const shell = runProbeSpec({
+    sink: "filename",
+    entry: `shell:${FIXTURES}/runs-names.sh`,
+    args: [1],
+  });
+  assert.equal(shell.reason, "bad-args");
+  assert.equal(shell.executed, 0);
+});
+
+test("task.131: --args-json on the CLI — a JS entry runs; a non-array, non-JSON or shell entry exits 2", () => {
+  const casesDir = mkdtempSync(join(tmpdir(), "probe-args-"));
+  try {
+    const casesFile = join(casesDir, "cases.json");
+    writeFileSync(casesFile, JSON.stringify(CASES));
+    const ok = runMain([
+      "--sink",
+      "url-authority",
+      "--entry",
+      `${FIXTURES}/args-control.mjs#validateHost`,
+      "--args-json",
+      JSON.stringify([{ allow: ["db.internal", "db.internal:5432"] }]),
+      "--cases-file",
+      casesFile,
+      "--json",
+    ]);
+    assert.equal(ok.rc, 0, ok.err);
+    assert.equal(JSON.parse(ok.out).verdict, "engages");
+  } finally {
+    rmSync(casesDir, { recursive: true, force: true });
+  }
+  for (const [label, argv] of Object.entries({
+    "not JSON": ["--entry", entry("engaging-control"), "--args-json", "[oops"],
+    "not an array": ["--entry", entry("engaging-control"), "--args-json", "{}"],
+    "shell entry": [
+      "--entry",
+      `shell:${FIXTURES}/runs-names.sh`,
+      "--args-json",
+      "[1]",
+    ],
+    "cli entry": [
+      "--entry",
+      `cli:${FIXTURES}/cli-refuser.mjs`,
+      "--argv",
+      '["{input}"]',
+      "--args-json",
+      "[1]",
+    ],
+  })) {
+    const r = runMain(["--sink", "url-authority", ...argv]);
+    assert.equal(r.rc, 2, `${label}: ${r.err}`);
+    assert.match(r.err, /bad-args/, label);
+  }
+});
+
+test("task.131: lintReport through the markdown-structure sink engages — every hostile refused, every legitimate accepted", () => {
+  const cases = corpusFor("markdown-structure");
+  const r = runProbeSpec({
+    sink: "markdown-structure",
+    entry: LINT_ENTRY,
+    args: LINT_ARGS(),
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, cases.length);
+  assert.deepEqual(r.reproduced, []);
+  assert.deepEqual(r.overblocked, []);
+  assert.deepEqual(r.declined, []);
+});
+
+test("task.131: each markdown-structure hostile case trips exactly the code(s) it is named for", () => {
+  // The isolation property is what makes the mutant below catchable: a case
+  // tripping several codes still refuses when one check is dropped.
+  const { lintReport } = requireCjs("../report-lint.js");
+  const EXPECTED = {
+    "duplicated-header-block": ["header-block-duplicated"],
+    "second-h1": ["multiple-h1"],
+    "trailing-duplicate-body": [
+      "section-duplicated",
+      "trailing-duplicate-body",
+    ],
+    "section-out-of-order": ["section-out-of-order"],
+    "section-duplicated": ["section-duplicated"],
+    "heading-only-inside-fence": ["section-missing"],
+    "heading-only-inside-fence-crlf": ["section-missing"],
+    "qa-cycle-duplicated": ["qa-cycle-duplicated"],
+    "empty-document": ["variant-undetected"],
+  };
+  const hostile = corpusFor("markdown-structure").filter(
+    (c) => c.direction === "hostile",
+  );
+  assert.deepEqual(
+    hostile.map((c) => c.id.replace("markdown-structure.", "")).sort(),
+    Object.keys(EXPECTED).sort(),
+    "every hostile case has an expectation, and no expectation is orphaned",
+  );
+  for (const c of hostile) {
+    const r = lintReport(c.input, { sections: loadTemplate() });
+    const codes = [...new Set(r.problems.map((p) => p.code))].sort();
+    assert.deepEqual(
+      codes,
+      EXPECTED[c.id.replace("markdown-structure.", "")],
+      c.id,
+    );
+  }
+});
+
+test("task.131: the real report-lint fixtures score the same way through the runner — corrupt refused, green accepted", () => {
+  const FIX = join(REPO_ROOT, "shared/resources/tests/fixtures/report-lint");
+  const green = readdirSync(join(FIX, "green")).filter((f) =>
+    f.endsWith(".md"),
+  );
+  assert.ok(green.length >= 5, "the five green fixtures are present");
+  const cases = [
+    {
+      id: "fixture.corrupt-task117",
+      sink: "markdown-structure",
+      input: readFileSync(join(FIX, "corrupt-task117.md"), "utf8"),
+      why: "task.117's doubled HALT commit",
+      correct: "refused",
+      direction: "hostile",
+    },
+    ...green.map((f) => ({
+      id: `fixture.green.${f}`,
+      sink: "markdown-structure",
+      input: readFileSync(join(FIX, "green", f), "utf8"),
+      why: "an accepted report",
+      correct: "accepted",
+      direction: "legitimate",
+    })),
+  ];
+  const r = runProbeSpec({
+    sink: "markdown-structure",
+    entry: LINT_ENTRY,
+    cases,
+    args: LINT_ARGS(),
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, cases.length);
+});
+
+test("task.131: a lintReport mutant without the header-block check is caught by the isolated case", () => {
+  // Copied, never edited in place: the mutant lives in a temp dir inside the
+  // repo root (the engine's containment) beside the two files it requires.
+  const dir = mkdtempSync(
+    join(REPO_ROOT, "shared/resources/tests/.t131-mutant-"),
+  );
+  try {
+    for (const f of [
+      "report-lint.js",
+      "change-log.js",
+      "implementation-report-template.md",
+    ]) {
+      cpSync(join(REPO_ROOT, "shared/resources", f), join(dir, f));
+    }
+    const src = readFileSync(join(dir, "report-lint.js"), "utf8");
+    const push =
+      /problems\.push\(\{\s*code: "header-block-duplicated",[\s\S]*?\}\);\n/;
+    assert.ok(
+      push.test(src),
+      "the header-block push is where the mutant expects it",
+    );
+    writeFileSync(join(dir, "report-lint.js"), src.replace(push, ""));
+    const r = runProbeSpec({
+      sink: "markdown-structure",
+      entry: `${relative(REPO_ROOT, dir)}/report-lint.js#lintReport`,
+      args: LINT_ARGS(),
+    });
+    assert.deepEqual(r.reproduced, [
+      "markdown-structure.duplicated-header-block",
+    ]);
+    assert.equal(r.verdict, "present-but-inert");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

@@ -291,6 +291,28 @@ reviewer asks the question on every diff (`code-review-prompt.md` check E), and
 `tests/unbound-default-reads.test.js` walks the whole population with a reasoned inputs list and
 a pin list that goes red the moment a pinned read gains a writer. (obs #133, task.132)
 
+## Never end a rule in "a human decides" on a shape that recurs
+
+**The rule:** when a rule's only outcome for a recurring shape is "a human should decide", the rule
+is missing a branch. Name the shape, state its precondition, and give it a recorded value — then
+the decision is auditable and repeatable instead of an override someone has to remember to make.
+
+**Why:** the finalise security agent met `report-lint.js#lintReport` on task.124 — a validator of
+the pipeline's own implementation report. The boundary rule fired, no corpus sink modelled a
+Markdown document, the engine could not pass the function's second argument, and the zero-guard
+returned FAIL. The agent's own summary said "a human should either accept the not-probeable
+classification or add a sink"; the operator overruled it by hand. Six QA gates and that DoD each
+re-derived the same reasoning — the same paragraph, seven times, with no mechanism behind it.
+
+**How to do it right:** task.131 added the missing branch and removed the need for it in the one
+case seen so far. `boundary: internal` (with a required `internal_reason`) records "the rule fired
+on a validator of a pipeline-written artefact that no sink models"; the `markdown-structure` sink
+and the engine's `--args-json` make `lintReport` itself probeable, so it is `boundary: true` and no
+longer takes the new branch. The branch exists for the next validator. `/finalise` enforces what can
+be checked mechanically — the reason must name its entry, and an entry on the prompt's disqualified
+list (a sink models it) forces a FAIL — and leaves the rest where it can be read: whether a *new*
+validator's shape has a sink is the agent's judgement, recorded in the reason for the reviewer.
+
 ## See also
 
 - [Troubleshooting](./troubleshooting.md) — what to do when something breaks

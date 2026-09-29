@@ -1,0 +1,78 @@
+schema: 1
+task: 'task.131.markdown-structure-sink-internal-validator-class'
+task_title: 'A markdown-structure sink and an internal-artefact decision for the security probe'
+gate: CONCERNS
+status_reason: 'All phases implemented and the lintReport probe engages (15/15, measured). Two medium findings: the new prompt probe block reads two unbound variables (CR-1), and an internal boundary with no reason renders a FAIL that the acceptance decision never reads (QA-1). One low: a vacuous half of the enumeration test (CR-4).'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T22:37:35Z'
+
+top_issues:
+  - id: 'TASK-131-CR-1'
+    severity: medium
+    file: 'shared/resources/finalise-dod-security-prompt.md'
+    finding: 'The new --args-json probe example reads $LINT_JS and $ARGS_JSON with no writer in the block; run as written --entry becomes "#lintReport" and --args-json "" exits 2 bad-args, and the block never says how to build ARGS_JSON.'
+    suggested_action: 'Bind both in the block (LINT_JS=<path-from-repo-root>/report-lint.js; ARGS_JSON built from loadTemplate()) or use <placeholder> forms like the sibling examples.'
+    suggested_owner: dev
+    bug_ref: 'task.131.bug.1.prompt-probe-example-unbound-variables.md'
+    status: open
+  - id: 'TASK-131-QA-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Success criterion "without a reason it is a FAIL" holds only in the rendered Probe Results: the prompt names no FAIL check for an internal boundary with no internal_reason, and Step 6 accepts on the agent-reported SEC_OVERALL, so the task can be accepted while its summary shows a FAIL (code review CR-2, verified against SKILL.md:507/727).'
+    suggested_action: 'Name a required FAIL check (e.g. internal boundary recorded without a reason) in the prompt, as the zero-guard does, and make finalise Step 3c force SEC_OVERALL to FAIL when boundary is internal and internal_reason is empty; pin both in finalise-dod-prompt-contract.test.mjs.'
+    suggested_owner: dev
+    bug_ref: 'task.131.bug.2.internal-without-reason-not-enforced.md'
+    status: open
+  - id: 'TASK-131-CR-4'
+    severity: low
+    file: 'evals/shared/tests/finalise-dod-prompt-contract.test.mjs'
+    finding: 'The enumeration test asserts text.includes("internal"), which finalise SKILL.md already satisfied on develop via "internally", and its keys miss the qa-task/qa-story Step 3b wording.'
+    suggested_action: 'Assert a compound literal (boundary: internal / true | false | internal) and add a key matching the qa-task/qa-story sentence so both join the population.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 4593
+  phases_verified: 3/3
+  ci: 'not read — gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    notes: 'Boundary rule fired (SC: corrupt reports refused). security-probe.mjs --sink markdown-structure --entry shared/resources/report-lint.js#lintReport --args-json <loadTemplate()> → engages, 15 executed, 0 reproduced, 0 overblocked; record task.131.qa.1.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'SC probe run under 10 s: 1.6 s wall-clock for 15 cases.'
+  reliability:
+    status: PASS
+    notes: 'Additive flag and sink; the runner rule is own-property ok===false only, pinned both ways and against inherited ok; bad-args declines before any case runs.'
+  maintainability:
+    status: PASS
+    notes: 'Generated corpus doc regenerated (parity green); bundle:check 0 problems; validate passes for finalise/qa-task/qa-story.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-131-CR-1 and TASK-131-QA-1 (see top_issues).'
+      refs: ['shared/resources/finalise-dod-security-prompt.md', 'skills/finalise/SKILL.md']
+  future:
+    - action: 'CRLF fence detection is still missing in two other fence matchers — jira-sync.js makeFenceTracker (line 1207, split("\n")) and doc-links.js FENCE_OPEN/CLOSE_RE (lines 74-75). Pre-existing on develop (identical patterns), so not introduced by this change; enumerate every {3,}|~{3,} matcher in shared/resources and apply one fix with a CRLF test per site (code review CR-3). Follow-up task to be filed.'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/doc-links.js']
+    - action: 'CR-5 (cleanup): the probe-args mkdtemp dir in security-probe.test.mjs is never removed.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'CR-6 (cleanup): extraArgs empty-array default lives both at the spawn site and in the runner.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-131-CR-1 and TASK-131-QA-1 fixed']

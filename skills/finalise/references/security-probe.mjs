@@ -28,6 +28,12 @@
  *                        with exactly one "{input}" element and optionally
  *                        "{fixture}" elements. Required with cli:, refused
  *                        (exit 2, `bad-argv`) with every other form
+ *   --args-json <json>   a JSON ARRAY of fixed extra arguments appended after the
+ *                        case's input on every call — `fn(input, ...args)` — so a
+ *                        `(text, opts)` validator is probeable (task.131). The JS
+ *                        entry form only: refused (exit 2, `bad-args`) with every
+ *                        other form. Recorded as `args`. The engine never guesses
+ *                        an argument; the caller states it
  *   --cases-file <path>  JSON array of cases, replacing the corpus for this run
  *   --fake-gh <dir>      a directory holding an executable `gh`, prepended to
  *                        PATH for every shell run (with FAKE_GH=1 in its env) so
@@ -268,13 +274,27 @@ async function run() {
   }
 
   try {
-    const returned = await fn(spec.input);
+    const extra = Array.isArray(spec.extraArgs) ? spec.extraArgs : [];
+    const returned = await fn(spec.input, ...extra);
     // A control "rejects" by throwing, or by answering with a value that means
     // "no". Returning null/undefined/false is the non-throwing rejection shape a
     // validator commonly uses; treating it as acceptance would score a working
-    // control as absent.
+    // control as absent. So is a RESULT OBJECT whose own ok is false — the
+    // shape report-lint.js#lintReport answers with ({ ok, variant, problems }).
+    // Without it every refusal such a validator makes scored accepted and a
+    // working validator read absent (task.131). Own property, strictly false,
+    // plain non-array object: nothing else changes meaning.
+    const refusedByResult =
+      typeof returned === "object" &&
+      returned !== null &&
+      !Array.isArray(returned) &&
+      Object.prototype.hasOwnProperty.call(returned, "ok") &&
+      returned.ok === false;
     const rejected =
-      returned === null || returned === undefined || returned === false;
+      returned === null ||
+      returned === undefined ||
+      returned === false ||
+      refusedByResult;
     return { stage: "call", outcome: rejected ? "rejected" : "accepted" };
   } catch (e) {
     return { stage: "call", outcome: "rejected", threw: String(e && e.message) };
@@ -708,6 +728,8 @@ export function computeVerdict(caseResults) {
  *                                 for every shell run (shell and shell-fn forms)
  * @param {string[]|string} [spec.argv] the cli: form's argv template (task.144) —
  *                                 required with cli:, a `bad-argv` decline with any other form
+ * @param {Array} [spec.args]      fixed extra arguments appended after each case's input
+ *                                 (task.131) — the JS form only, a `bad-args` decline otherwise
  * @param {number} [spec.timeoutMs] per-case timeout; defaults to the shared spawn budget
  * @param {string} [spec.repoRoot] containment root; defaults to the repository root
  * @returns {{sink, entry, verdict, reason, executed, passed, reproduced, overblocked, declined, cases}}
@@ -718,6 +740,7 @@ export function runProbeSpec({
   cases,
   fakeGh,
   argv,
+  args,
   timeoutMs,
   repoRoot = defaultRepoRoot(),
 } = {}) {
@@ -762,6 +785,9 @@ export function runProbeSpec({
     // The cli: form's argv TEMPLATE, or null (task.144). The template, never a
     // substituted input: the record says how the CLI was called, not with what.
     argv: null,
+    // The fixed extra arguments every JS call received after its input, or null
+    // (task.131). Stated so the record says how the export was called.
+    args: null,
   };
 
   // `declined` is its own state and is NEVER folded into `executed: 0`. Both
@@ -812,6 +838,23 @@ export function runProbeSpec({
     );
   }
   base.argv = template;
+  // `args` — validated here for the same reason `argv` is: a library caller
+  // crosses this boundary, not main(). Only the JS runner can append an
+  // argument to a call; the shell and cli: forms take their input as a file or
+  // an argv element, so args there would be recorded without being used —
+  // declined, not ignored, like --fake-gh on the JS form.
+  if (args !== undefined && args !== null) {
+    if (isShellForm || isCliForm) {
+      return decline(
+        "bad-args",
+        "--args-json applies to the JS entry form (path#export) only — the shell and cli: forms take their input from the case",
+      );
+    }
+    if (!Array.isArray(args)) {
+      return decline("bad-args", "--args-json must be a JSON array");
+    }
+    base.args = args;
+  }
   if (
     isCliForm &&
     !CLI_EXTENSIONS.some((x) => resolved.entryPath.endsWith(x))
@@ -991,6 +1034,9 @@ export function runProbeSpec({
             entryPath: resolved.entryPath,
             exportName: resolved.exportName,
             input: c.input,
+            // null when --args-json was not given; the runner's own
+            // Array.isArray default is the one place the fallback lives.
+            extraArgs: base.args,
           }),
           cwd: workDir,
           env: sandboxEnv({ cwd: workDir }),
@@ -1063,6 +1109,7 @@ export function runProbeSpec({
       escapes,
       shells: shells ?? null,
       fakeGh: fakeGhDir,
+      args: base.args,
     };
   }
 
@@ -1106,6 +1153,7 @@ export function runProbeSpec({
     cases: caseResults,
     fakeGh: fakeGhDir,
     argv: template,
+    args: base.args,
   };
 }
 
@@ -1804,6 +1852,8 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     // The cli: form's argv template (task.144), or null for every other form.
     // Part of the control's key — see controlKey.
     argv: Array.isArray(result.argv) ? [...result.argv] : null,
+    // The JS form's fixed extra arguments (task.131), or null.
+    args: Array.isArray(result.args) ? [...result.args] : null,
     ran_at: new Date().toISOString(),
   };
 }
@@ -2135,6 +2185,7 @@ const OPERAND_FLAGS = Object.freeze({
   "--cases-file": "casesFile",
   "--fake-gh": "fakeGh",
   "--argv": "argv",
+  "--args-json": "argsJson",
   "--repo-root": "repoRoot",
   "--record": "record",
   "--name": "name",
@@ -2249,6 +2300,32 @@ export function main(argv = process.argv.slice(2)) {
     }
   }
 
+  // `--args-json` shape errors are ARGUMENT errors, like --argv's: exit 2 before
+  // any case runs and before any record is touched.
+  let extraArgs;
+  if (opts.argsJson !== undefined) {
+    if (
+      isCliEntry ||
+      opts.entry.startsWith(SHELL_PREFIX) ||
+      opts.entry.startsWith(SHELL_FN_PREFIX)
+    ) {
+      process.stderr.write(
+        "bad-args: --args-json applies to the JS entry form (path#export) only\n",
+      );
+      return 2;
+    }
+    try {
+      extraArgs = JSON.parse(opts.argsJson);
+    } catch (e) {
+      process.stderr.write(`bad-args: --args-json is not JSON: ${e.message}\n`);
+      return 2;
+    }
+    if (!Array.isArray(extraArgs)) {
+      process.stderr.write("bad-args: --args-json must be a JSON array\n");
+      return 2;
+    }
+  }
+
   let cases;
   if (opts.casesFile) {
     try {
@@ -2274,6 +2351,7 @@ export function main(argv = process.argv.slice(2)) {
     cases,
     fakeGh: opts.fakeGh,
     argv: opts.argv,
+    args: extraArgs,
     timeoutMs: opts.timeoutMs,
     ...(opts.repoRoot ? { repoRoot: resolve(opts.repoRoot) } : {}),
   });
