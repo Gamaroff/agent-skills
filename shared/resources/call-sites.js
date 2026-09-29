@@ -40,18 +40,11 @@
  *
  * Contract:
  *   node call-sites.js --engine <name> [--root <dir>] [--json]
- *     exit 0, reason `ok`     — sites found; one `file:line` per site
- *     exit 0, reason `empty`  — the walk ran and found none. Reported, never
- *                               folded into `ok`: an empty population is a claim
- *                               about the instrument as much as the tree, and a
- *                               reassuring zero is the answer nobody questions
- *     exit 1, reason `no-roots` — none of the roots exists under the root: this
- *                               is not a tree the collector can measure (a
- *                               consumer install keeps skills as bundled copies
- *                               under .agents/skills/), so no number is reported
- *     exit 2, reason `usage`  — unknown engine, unknown flag, a flag with no
- *                               operand, or a root that is not a directory.
- *                               `--engine gh-stage.js` is accepted as `gh-stage`
+ *   Every outcome is a row of REASONS below — reason, exit code and meaning are
+ *   defined there ONCE, every exit path takes its code from that table, and
+ *   call-sites.test.mjs drives each row and asserts the code. Two cycles of QA
+ *   each found this header's hand-written list saying something the code did
+ *   not do (QA cycle 2, narrowing-residue move: consolidate the contract).
  *   --json → { reason, exitCode, engine, root, count, sites: [{ file, line,
  *              engine, stage, kind, slots }] }
  *
@@ -108,11 +101,56 @@ const ENGINES = Object.freeze({
 
 const BANNER = "AUTO-GENERATED";
 
+/** Every outcome the CLI can report. `exitCode` is unique per non-zero reason,
+ *  so a caller can branch on the code alone: exit 1 is ONLY `no-roots`, never a
+ *  crash that happened to exit 1 (QA cycle 2, C2-CR-2). */
+const REASONS = Object.freeze({
+  ok: Object.freeze({ exitCode: 0, meaning: "sites found" }),
+  empty: Object.freeze({
+    exitCode: 0,
+    meaning:
+      "the walk ran over a source tree and found none — a claim about the instrument as much as the tree",
+  }),
+  "no-roots": Object.freeze({
+    exitCode: 1,
+    meaning:
+      "not a source tree (no shared/resources/ beside a skills/*/SKILL.md) — a consumer install keeps skills as bundled copies; no number is reported",
+  }),
+  usage: Object.freeze({
+    exitCode: 2,
+    meaning:
+      "unknown engine, unknown flag, a flag with no operand, or a root that is not a directory",
+  }),
+  unreadable: Object.freeze({
+    exitCode: 3,
+    meaning:
+      "a directory or file under the root could not be read — the population is unknown, not empty",
+  }),
+  "internal-error": Object.freeze({
+    exitCode: 4,
+    meaning: "the collector failed for a reason it does not classify",
+  }),
+});
+
+/** A read failure the CLI reports as `unreadable`, carrying the path. */
+class Unreadable extends Error {
+  constructor(where, cause) {
+    super(`${where}: ${cause.code || cause.message}`);
+    this.where = where;
+  }
+}
+
+// "Not there" is the only quiet answer. Anything else — EACCES, EIO — means the
+// walk could not look, and reporting it as an empty directory would turn
+// "could not look" into "found nothing" (QA cycle 2, C2-CR-5).
+const ABSENT = new Set(["ENOENT", "ENOTDIR", "ELOOP"]);
+
 function listDir(dir) {
   try {
     return fs.readdirSync(dir).sort();
-  } catch {
-    return [];
+  } catch (e) {
+    if (ABSENT.has(e.code)) return [];
+    throw new Unreadable(dir, e);
   }
 }
 
@@ -122,8 +160,17 @@ function listDir(dir) {
 function isFile(abs) {
   try {
     return fs.statSync(abs).isFile();
-  } catch {
-    return false;
+  } catch (e) {
+    if (ABSENT.has(e.code)) return false;
+    throw new Unreadable(abs, e);
+  }
+}
+
+function readText(abs) {
+  try {
+    return fs.readFileSync(abs, "utf8");
+  } catch (e) {
+    throw new Unreadable(abs, e);
   }
 }
 
@@ -131,7 +178,7 @@ function isFile(abs) {
  *  a `description:` routinely runs past 400 characters on its own, so the head
  *  is taken by LINES (a structural bound), not by bytes. */
 function isBannered(abs) {
-  const head = fs.readFileSync(abs, "utf8").split("\n").slice(0, 20).join("\n");
+  const head = readText(abs).split("\n").slice(0, 20).join("\n");
   return head.includes(BANNER);
 }
 
@@ -163,20 +210,25 @@ function shippedSources(root) {
   return out.filter(isFile);
 }
 
-/** The roots `shippedSources` walks. None of them existing is not an empty
- *  population: it is a tree this collector cannot measure — a consumer install,
- *  where skills live under `.agents/skills/` as bundled copies (QA cycle 1,
- *  CR-4). */
+/** The roots `shippedSources` walks. */
 const ROOTS = Object.freeze(["shared/resources", "skills", "scripts"]);
 
-function hasRoots(root) {
-  return ROOTS.some((r) => {
-    try {
-      return fs.statSync(path.join(root, r)).isDirectory();
-    } catch {
-      return false;
-    }
-  });
+/** Is `root` a tree this collector can measure? The marker is the pair only a
+ *  skills SOURCE tree has: `shared/resources/` and at least one
+ *  `skills/<name>/SKILL.md`. "Any root exists" accepted a consumer's own
+ *  `scripts/` and answered `empty` in every install that had one (QA cycle 2,
+ *  C2-CR-1). */
+function isSourceTree(root) {
+  let shared = false;
+  try {
+    shared = fs.statSync(path.join(root, "shared", "resources")).isDirectory();
+  } catch (e) {
+    if (!ABSENT.has(e.code))
+      throw new Unreadable(path.join(root, "shared", "resources"), e);
+  }
+  if (!shared) return false;
+  const skills = path.join(root, "skills");
+  return listDir(skills).some((d) => isFile(path.join(skills, d, "SKILL.md")));
 }
 
 /**
@@ -185,18 +237,25 @@ function hasRoots(root) {
  * setup-consumer.sh does exactly this. A shape that needs the filename on the
  * `node` line cannot see it (QA cycle 1, CR-2). So each file is read twice: the
  * variables assigned the engine's path, then the lines that run `node` on one of
- * them — the variable's most recent assignment above the `node` line decides.
+ * them.
+ *
+ * This is a BEST-EFFORT derivation, and its limits are stated here rather than
+ * patched with more rules (QA cycle 2, narrowing-residue move: scope the claim —
+ * C2-CR-3, C2-CR-4). A variable counts when it was assigned the engine's path
+ * earlier in the same shell function (a function header resets the set). So:
+ *   - within a function, a later reassignment to another value does NOT cancel
+ *     an earlier engine assignment (both arms of an if/elif reach the call);
+ *   - a top-level engine variable used inside a later function is NOT seen;
+ *   - in a Markdown source the set spans the file's fenced blocks, which are
+ *     separate shells.
+ * The review checks say the same in one sentence: a site reached only through
+ * a variable may be missed or over-counted, and the reviewer names it by hand.
  */
 const PREFIX = String.raw`^\s*(?:\[[^\]]*\]\s*&&\s*)?(?:(?:tracker_call_with_retry|tracker_write)\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=)?\$?\(?\s*(?:command\s+)?node\s+`;
 
-/** For each line, the variables that MAY hold the engine's path there: assigned
- *  it anywhere earlier in the same shell function. Both arms of an if/elif
- *  reach the `node` line after it — setup-consumer.sh sets `_cli` to
- *  jira-stage.js in one arm and gh-stage.js in the other — so a later
- *  assignment does not cancel an earlier one. A function header resets the set:
- *  the same script reuses `local _cli=` for a different CLI in a later
- *  function, and a file-wide set read that `node "$_cli"` as an engine site.
- *  Returns an array of Sets, one per line (the state before that line). */
+/** For each line, the variables that MAY hold the engine's path there (the rule
+ *  and its limits are stated above). Returns an array of Sets, one per line —
+ *  the state before that line. */
 function engineVarsByLine(lines, file) {
   const assign =
     /^\s*(?:local\s+|export\s+|readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)=(\S*)/;
@@ -239,12 +298,14 @@ function viaVariable(line, vars) {
  * `--stage "qa-gate-${N}"` captures `qa-gate-` — the caller strips the hyphen.
  */
 function collect({ engine, root }) {
-  const spec = ENGINES[engine];
+  // Own properties only: `ENGINES["toString"]` is a function on the prototype,
+  // and reading `.file` off it threw a TypeError (QA cycle 2, C2-CR-2).
+  const spec = Object.hasOwn(ENGINES, engine) ? ENGINES[engine] : null;
   if (!spec) throw new Error(`unknown engine: ${engine}`);
   const sites = [];
   for (const abs of shippedSources(root)) {
     const rel = path.relative(root, abs);
-    const lines = fs.readFileSync(abs, "utf8").split("\n");
+    const lines = readText(abs).split("\n");
     const varsAt = engineVarsByLine(lines, spec.file);
     for (let i = 0; i < lines.length; i++) {
       if (!spec.re.test(lines[i]) && !viaVariable(lines[i], varsAt[i]))
@@ -277,19 +338,26 @@ function resolveRoot(dir) {
     : dir;
 }
 
-function usage(json, error) {
-  process.stderr.write(
-    `${error ? `call-sites: ${error}\n` : ""}usage: call-sites.js --engine <${Object.keys(ENGINES).join("|")}> [--root <dir>] [--json]\n`,
-  );
+/** Write one outcome and return its exit code — the only path by which the CLI
+ *  ends, so a code cannot disagree with its reason. */
+function emit(json, reason, fields, human) {
+  const { exitCode } = REASONS[reason];
   if (json)
     process.stdout.write(
-      JSON.stringify({ reason: "usage", exitCode: 2, error }) + "\n",
+      JSON.stringify({ reason, exitCode, ...fields }, null, 2) + "\n",
     );
-  return 2;
+  else if (human) process.stdout.write(human);
+  return exitCode;
 }
 
-function main(argv) {
-  const json = argv.includes("--json");
+function usage(json, error) {
+  process.stderr.write(
+    `call-sites: ${error}\nusage: call-sites.js --engine <${Object.keys(ENGINES).join("|")}> [--root <dir>] [--json]\n`,
+  );
+  return emit(json, "usage", { error }, null);
+}
+
+function run(argv, json) {
   let engine = null;
   let rootArg = null;
   for (let i = 0; i < argv.length; i += 1) {
@@ -310,7 +378,8 @@ function main(argv) {
   // `--engine gh-stage.js` is the natural spelling after reading a document
   // that names engines by file; accept it (QA cycle 1, CR-5).
   engine = engine.replace(/\.js$/, "");
-  if (!ENGINES[engine]) return usage(json, `unknown engine: ${engine}`);
+  if (!Object.hasOwn(ENGINES, engine))
+    return usage(json, `unknown engine: ${engine}`);
   // An explicit --root is measured AS GIVEN. Resolving it to an enclosing git
   // top level replaced a tree exported inside a work tree with the current
   // one, and reported that as `ok` (QA cycle 1, CR-1). Only the cwd default is
@@ -325,54 +394,68 @@ function main(argv) {
   }
   if (!isDir) return usage(json, `--root is not a directory: ${candidate}`);
   const root = given ? candidate : resolveRoot(candidate);
-  if (!hasRoots(root)) {
-    const error = `none of ${ROOTS.join(", ")} exists under ${root} — not a tree this collector can measure (a consumer install keeps skills under .agents/skills/ as bundled copies)`;
-    if (json)
-      process.stdout.write(
-        JSON.stringify(
-          { reason: "no-roots", exitCode: 1, engine, root, error },
-          null,
-          2,
-        ) + "\n",
-      );
-    else process.stdout.write(`no-roots call-sites: ${error}\n`);
-    return 1;
+  if (!isSourceTree(root)) {
+    const error = `${root} has no shared/resources/ beside a skills/*/SKILL.md — not a tree this collector can measure (a consumer install keeps skills under .agents/skills/ as bundled copies)`;
+    return emit(
+      json,
+      "no-roots",
+      { engine, root, error },
+      `no-roots call-sites: ${error}\n`,
+    );
   }
   const sites = collect({ engine, root });
   const reason = sites.length ? "ok" : "empty";
-  if (json) {
-    const out = sites.map(({ text: _text, ...s }) => s);
-    process.stdout.write(
-      JSON.stringify(
-        { reason, exitCode: 0, engine, root, count: sites.length, sites: out },
-        null,
-        2,
-      ) + "\n",
-    );
-    return 0;
-  }
-  for (const s of sites) {
-    const tag = s.stage
-      ? ` --stage ${s.stage}`
-      : s.kind
-        ? ` --kind ${s.kind}`
-        : "";
-    process.stdout.write(`${s.file}:${s.line}${tag}\n`);
-  }
-  process.stdout.write(
-    sites.length
+  const human =
+    sites
+      .map((s) => {
+        const tag = s.stage
+          ? ` --stage ${s.stage}`
+          : s.kind
+            ? ` --kind ${s.kind}`
+            : "";
+        return `${s.file}:${s.line}${tag}\n`;
+      })
+      .join("") +
+    (sites.length
       ? `ok call-sites: ${sites.length} ${engine} site(s) under ${root}\n`
-      : `empty call-sites: no ${engine} site under ${root} — check the root before believing the zero\n`,
+      : `empty call-sites: no ${engine} site under ${root} — check the root before believing the zero\n`);
+  const out = sites.map(({ text: _text, ...s }) => s);
+  return emit(
+    json,
+    reason,
+    { engine, root, count: sites.length, sites: out },
+    human,
   );
-  return 0;
+}
+
+function main(argv) {
+  const json = argv.includes("--json");
+  try {
+    return run(argv, json);
+  } catch (e) {
+    // Every failure leaves through REASONS. An uncaught throw exits 1 in Node —
+    // the code `no-roots` owns — which is exactly the ambiguity C2-CR-2 found.
+    if (e instanceof Unreadable) {
+      process.stderr.write(`call-sites: cannot read ${e.message}\n`);
+      return emit(json, "unreadable", { error: e.message }, null);
+    }
+    process.stderr.write(`call-sites: ${e && e.stack ? e.stack : e}\n`);
+    return emit(
+      json,
+      "internal-error",
+      { error: String((e && e.message) || e) },
+      null,
+    );
+  }
 }
 
 module.exports = {
   ENGINES,
   ROOTS,
+  REASONS,
   collect,
   shippedSources,
-  hasRoots,
+  isSourceTree,
   resolveRoot,
   main,
 };

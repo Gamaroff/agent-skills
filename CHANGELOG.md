@@ -9,8 +9,10 @@ All notable changes to this project will be documented in this file. Format foll
 - **A call-site list in a task or story is measured at review, not trusted (task 129, obs #120).**
   - `shared/resources/call-sites.js` is the one collector of engine invocations in shipped source —
     `tracker-comment`, `stakeholder-summary-cli`, `gh-stage`, `jira-stage`, `tracker-issue` — with a
-    CLI (`--engine <name> [--root <dir>] [--json]`; `ok` / `empty` / exit 2 `usage`). `--root` measures
-    an exported earlier tree, which is what reviewing an old document needs.
+    CLI (`--engine <name> [--root <dir>] [--json]`). Its outcomes are one table, `REASONS`: `ok` / `empty`
+    (exit 0), `no-roots` (1, not a skills source tree), `usage` (2), `unreadable` (3), `internal-error`
+    (4). An explicit `--root` is measured as given, so an exported earlier tree can be measured wherever
+    it sits; `node "$VAR"` sites are found on a stated best-effort rule.
   - `comment-slot-coverage.test.mjs` now imports it instead of carrying its own copy; its populations
     are unchanged (24 tracker-comment, 12 stakeholder-summary-cli sites).
   - review-task gains Step 3 check 14 and review-story Step 4 check 10 ("Call-site population"): run

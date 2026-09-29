@@ -26,6 +26,10 @@ const { ENGINES, collect } = require(CLI);
 const CALL =
   "node .agents/skills/x/references/tracker-comment.js --issue 1 --stage review --json";
 
+// The source-tree marker: shared/resources/ beside a skills/*/SKILL.md. A tree
+// without it is `no-roots` (QA cycle 2, C2-CR-1).
+const MARKER = { "skills/marker/SKILL.md": "# marker\n" };
+
 // Root class → [relative path, content]. Every entry holds exactly one site.
 const ROOT_CLASSES = {
   "shared/resources/*.md": [
@@ -239,7 +243,10 @@ test("CLI: unknown engine, missing operand and a non-directory root are usage er
 });
 
 test("CLI: a root with no site reports `empty`, exit 0 — never folded into `ok`", () => {
-  const root = buildTree({ "shared/resources/none.md": "nothing here\n" });
+  const root = buildTree({
+    "shared/resources/none.md": "nothing here\n",
+    ...MARKER,
+  });
   try {
     const r = runCli(["--engine", "gh-stage", "--root", root, "--json"]);
     assert.equal(r.code, 0);
@@ -342,6 +349,11 @@ test("CR-1: an explicit --root inside a git work tree is measured as given, not 
       path.join(exported, "b.md"),
       "```bash\n" + CALL + "\n```\n",
     );
+    // Both trees carry the source-tree marker (a skills/*/SKILL.md).
+    for (const base of [repo, path.join(repo, "export")]) {
+      fs.mkdirSync(path.join(base, "skills", "m"), { recursive: true });
+      fs.writeFileSync(path.join(base, "skills", "m", "SKILL.md"), "# m\n");
+    }
     const j = JSON.parse(
       runCli([
         "--engine",
@@ -457,6 +469,7 @@ test("CR-5: `--engine gh-stage.js` is accepted as `gh-stage`", () => {
 test("CR-6: a directory named like a source, or a dangling symlink, is skipped — not thrown", () => {
   const root = buildTree({
     "shared/resources/real.md": "```bash\n" + CALL + "\n```\n",
+    ...MARKER,
   });
   try {
     fs.mkdirSync(path.join(root, "shared", "resources", "dir.md"));
@@ -474,6 +487,109 @@ test("CR-6: a directory named like a source, or a dangling symlink, is skipped �
       ["shared/resources/real.md"],
     );
   } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── QA cycle 2 — the contract, defined once in REASONS ──────────────────────
+
+const { REASONS } = require(CLI);
+
+test("REASONS: every non-zero exit code belongs to exactly one reason", () => {
+  const nonZero = Object.entries(REASONS).filter(([, r]) => r.exitCode !== 0);
+  const codes = nonZero.map(([, r]) => r.exitCode);
+  assert.equal(
+    new Set(codes).size,
+    codes.length,
+    `shared codes: ${JSON.stringify(nonZero)}`,
+  );
+  assert.equal(
+    REASONS["no-roots"].exitCode,
+    1,
+    "exit 1 is no-roots — the create-task and review prose act on it",
+  );
+});
+
+test("REASONS: each reason is reachable, and the CLI's exit code is the table's", () => {
+  // One driver per reason. A reason nobody can reach is a promise the table
+  // makes and the CLI never keeps; a reason reached with another code is the
+  // defect two QA cycles found in the hand-written header.
+  const consumer = buildTree({
+    "scripts/build.sh": "echo hi\n",
+    ".agents/skills/x/SKILL.md": "# x\n",
+  });
+  const emptyTree = buildTree({ "shared/resources/none.md": "x\n", ...MARKER });
+  const drivers = {
+    ok: ["--engine", "tracker-comment", "--root", FIXTURE],
+    empty: ["--engine", "gh-stage", "--root", emptyTree],
+    "no-roots": ["--engine", "gh-stage", "--root", consumer],
+    usage: ["--engine", "toString"],
+  };
+  try {
+    for (const [reason, args] of Object.entries(drivers)) {
+      const r = runCli([...args, "--json"]);
+      const j = JSON.parse(r.stdout);
+      assert.equal(j.reason, reason, `${args.join(" ")}`);
+      assert.equal(
+        r.code,
+        REASONS[reason].exitCode,
+        `${reason}: exit ${r.code}`,
+      );
+      assert.equal(j.exitCode, REASONS[reason].exitCode);
+    }
+  } finally {
+    fs.rmSync(consumer, { recursive: true, force: true });
+    fs.rmSync(emptyTree, { recursive: true, force: true });
+  }
+});
+
+test("C2-CR-1: a consumer install with its own scripts/ is no-roots, not empty", () => {
+  const consumer = buildTree({
+    "scripts/build.sh": "echo hi\n",
+    "skills/README.md": "a consumer folder that happens to be called skills\n",
+  });
+  try {
+    const r = runCli(["--engine", "gh-stage", "--root", consumer, "--json"]);
+    assert.equal(JSON.parse(r.stdout).reason, "no-roots");
+    assert.equal(r.code, 1);
+  } finally {
+    fs.rmSync(consumer, { recursive: true, force: true });
+  }
+});
+
+test("C2-CR-2: a prototype name is an unknown engine (usage, exit 2), never a crash", () => {
+  for (const name of [
+    "toString",
+    "constructor",
+    "__proto__",
+    "hasOwnProperty",
+  ]) {
+    const r = runCli(["--engine", name, "--json"]);
+    assert.equal(r.code, 2, `${name}: exit ${r.code}\n${r.stderr}`);
+    assert.equal(JSON.parse(r.stdout).reason, "usage");
+  }
+  assert.throws(
+    () => collect({ engine: "toString", root: FIXTURE }),
+    /unknown engine/,
+  );
+});
+
+test("C2-CR-5: an unreadable directory is `unreadable` (exit 3), not an empty one", (t) => {
+  if (process.getuid && process.getuid() === 0)
+    return t.skip("root reads everything");
+  const root = buildTree({
+    "shared/resources/a.md": "```bash\n" + CALL + "\n```\n",
+    ...MARKER,
+  });
+  const locked = path.join(root, "skills", "locked");
+  fs.mkdirSync(path.join(locked, "references"), { recursive: true });
+  fs.chmodSync(path.join(locked, "references"), 0o000);
+  try {
+    const r = runCli(["--engine", "tracker-comment", "--root", root, "--json"]);
+    assert.equal(JSON.parse(r.stdout).reason, "unreadable", r.stdout);
+    assert.equal(r.code, REASONS.unreadable.exitCode);
+  } finally {
+    fs.chmodSync(path.join(locked, "references"), 0o755);
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
