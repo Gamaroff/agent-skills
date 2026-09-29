@@ -24,7 +24,15 @@ import re
 import sys
 from pathlib import Path
 
-from quick_validate import find_repo_root
+from quick_validate import (
+    CITE,
+    DEP,
+    cite_comment_spans,
+    find_repo_root,
+    in_spans,
+    parse_shared_refs,
+    ref_kind,
+)
 
 # `(?<![\w-]/)` — never match inside an absolute URL: the link pass below writes
 # `https://…/blob/develop/shared/resources/x.md` into bundled copies for targets
@@ -146,26 +154,28 @@ def comment_only_refs(text):
     return out
 
 
-SHARED_REF_LINE_RE = re.compile(r'(?<![\w-]/)shared/resources/([^\s`\'")\]*]+)')
-
-
 def shared_refs_with_lines(text):
-    """Return [(line_no, name)] for every shared/resources/<name> citation in
-    `text` — the same match and punctuation strip as
-    quick_validate.collect_shared_refs, plus the line, so a missing source can be
-    reported against the file and line that cited it. Pure.
+    """Return [(line_no, name)] for every shared/resources/<name> reference in
+    `text` — a view of quick_validate.parse_shared_refs, so it names exactly what
+    collect_shared_refs names (fragment stripped), plus the line, so a missing
+    source can be reported against the file and line that cited it. Pure."""
+    return [(line, name) for line, name, _ in parse_shared_refs(text)]
 
-    One pass over the whole text, not one per line: the name class excludes
-    whitespace, so no match spans a newline and the matches are the same. The
-    per-line loop cost 1.9 s of a 7.2 s `--check` (task 154 DoD, AC6)."""
+
+def refs_refs_with_kind(text):
+    """Return [(name, kind)] for every `references/<name>` spelling in `text`.
+
+    This is the spelling every skill file carries once the bundler has rewritten
+    `shared/resources/X` in place, so a citation must be recognisable here too —
+    otherwise converting a skill's pointer to the citation form changes nothing
+    (task.126 review, C1). `REFS_REF_RE`'s name group ends at the extension, so a
+    fragment is the character that follows it."""
+    spans = cite_comment_spans(text)
     out = []
-    line, pos = 1, 0
-    for m in SHARED_REF_LINE_RE.finditer(text):
-        line += text.count('\n', pos, m.start())
-        pos = m.start()
-        name = m.group(1).rstrip('.,;:')
-        if name:
-            out.append((line, name))
+    for m in REFS_REF_RE.finditer(text):
+        name = m.group(1)
+        has_fragment = text[m.end(1):m.end(1) + 1] == '#'
+        out.append((name, ref_kind(name, has_fragment, in_spans(m.start(1), spans))))
     return out
 
 
@@ -559,8 +569,10 @@ def discover_needed(skill_path, shared_dir, refs_dir):
     ]
 
     needed = {}           # filename -> source Path
-    pending = []          # (name, origin) from shared/resources/X — warn if missing
-    pending_quiet = []    # candidates from references/X — many are skill-native, silent
+    # Every queue entry carries its edge kind (task.126): a CITE copies the file
+    # alone, a DEP copies the file and everything it reaches.
+    pending = []          # (name, origin, kind) from shared/resources/X — warn if missing
+    pending_quiet = []    # (name, kind) from references/X — many are skill-native, silent
     for f in skill_files:
         try:
             text = f.read_text()
@@ -571,22 +583,27 @@ def discover_needed(skill_path, shared_dir, refs_dir):
             # claiming it was the only unguarded read, which left the crash live.
             continue
         rel_f = _rel(f, repo_root)
-        pending.extend((n, (rel_f, ln)) for ln, n in shared_refs_with_lines(text))
+        pending.extend((n, (rel_f, ln), k) for ln, n, k in parse_shared_refs(text))
         warn_comment_only_refs(f, text, repo_root)
-        for m in REFS_REF_RE.finditer(text):
-            pending_quiet.append(m.group(1))
+        pending_quiet.extend(refs_refs_with_kind(text))
 
-    seen = set()
+    # name -> the strongest kind it has been processed as. A name first reached
+    # as a CITE and later as a DEP is processed again, as a DEP, so its closure
+    # is followed: a file reached both ways is bundled once, with its closure.
+    seen = {}
     while pending or pending_quiet:
         if pending:
-            name, origin = pending.pop()
+            name, origin, kind = pending.pop()
             quiet = False
         else:
-            name, origin = pending_quiet.pop(), None
+            (name, kind), origin = pending_quiet.pop(), None
             quiet = True
-        if name in seen:
+        prev = seen.get(name)
+        if prev == DEP or (prev is not None and (kind == CITE or name not in needed)):
+            # Already processed at least this strongly — or processed once and
+            # refused (out of tree, no source), which a stronger edge cannot fix.
             continue
-        seen.add(name)
+        seen[name] = kind
         # `name` is an unsanitised regex capture whose class permits `.` and `/`,
         # so `shared/resources/../../OUTSIDE.md` escaped both refs_dir and the
         # skill: the bundler printed `bundled references/../../OUTSIDE.md` and
@@ -606,20 +623,24 @@ def discover_needed(skill_path, shared_dir, refs_dir):
                 warn_missing_source(name, origin)
             continue
         needed[name] = src
+        if kind == CITE:
+            # A citation is a leaf: the cited document is copied, and nothing it
+            # names — shared, sibling or invocation — is followed from here.
+            continue
         try:
             text = src.read_text()
         except (UnicodeDecodeError, OSError):
             continue
         rel_src = _rel(src, repo_root)
-        pending.extend((n, (rel_src, ln)) for ln, n in shared_refs_with_lines(text))
+        pending.extend((n, (rel_src, ln), k) for ln, n, k in parse_shared_refs(text))
         warn_comment_only_refs(src, text, repo_root)
         # Sibling edges carry the citing file but no line: the regexes match
         # across the whole text, and the file is what a reader needs to act.
         if src.suffix in ('.js', '.mjs'):
-            pending.extend((m.group(1), (rel_src, None)) for m in JS_SIBLING_RE.finditer(text))
-            pending.extend((m.group(1), (rel_src, None)) for m in JS_ESM_SIBLING_RE.finditer(text))
+            pending.extend((m.group(1), (rel_src, None), DEP) for m in JS_SIBLING_RE.finditer(text))
+            pending.extend((m.group(1), (rel_src, None), DEP) for m in JS_ESM_SIBLING_RE.finditer(text))
         if src.suffix == '.sh':
-            pending.extend((m.group(1), (rel_src, None)) for m in SH_SIBLING_RE.finditer(text))
+            pending.extend((m.group(1), (rel_src, None), DEP) for m in SH_SIBLING_RE.finditer(text))
         if src.suffix in ('.md', '.sh'):
             # `pending_quiet`, not `pending`: a missing source here is not an
             # authoring error worth a warning — it is a skill-native script that
@@ -628,7 +649,7 @@ def discover_needed(skill_path, shared_dir, refs_dir):
                 who, invoked = m.group(1), m.group(2)
                 names = who.strip('{}').split('|') if who.startswith('{') else [who]
                 if skill_path.name in names:
-                    pending_quiet.append(invoked)
+                    pending_quiet.append((invoked, DEP))
 
     return needed, skill_files
 
@@ -1307,6 +1328,44 @@ def check_all(targets):
     return 1
 
 
+@functools.lru_cache(maxsize=None)
+def _tracked_refs(repo_root):
+    """Every tracked `skills/*/references/*` path, repo-relative — ONE `git
+    ls-files` per run, however many skills `--all` bundles. None when git cannot
+    answer (not a repository, git missing): the status line then omits the
+    comparison rather than inventing one."""
+    import subprocess
+    try:
+        out = subprocess.run(
+            ['git', '-C', str(repo_root), 'ls-files', '--', 'skills/*/references/*'],
+            capture_output=True, text=True, check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return frozenset(line for line in out.splitlines() if line)
+
+
+def closure_note(skill_path, shared_dir, needed):
+    """` · closure M (±K vs committed)` for the status line (task.126).
+
+    M is what discovery reaches — `len(needed)`. The comparison is against the
+    COMMITTED source-backed copies: tracked `references/` files that have a
+    shared source. A closure that grew prints `+K`, one that shrank prints `-K`;
+    the second is the number of copies a conversion left for `git rm` (the
+    bundler never deletes one, and `--check` reports each as UNREACHED)."""
+    note = f" · closure {len(needed)}"
+    repo_root = shared_dir.parent.parent
+    tracked = _tracked_refs(repo_root)
+    if tracked is None:
+        return note
+    prefix = f"skills/{skill_path.name}/references/"
+    committed = sum(
+        1 for p in tracked
+        if p.startswith(prefix) and (shared_dir / p[len(prefix):]).is_file()
+    )
+    return f"{note} ({len(needed) - committed:+d} vs committed)"
+
+
 def bundle_skill(skill_path):
     resolved = resolve_paths(skill_path)
     if resolved is None:
@@ -1418,9 +1477,10 @@ def bundle_skill(skill_path):
             detail.append(f"{len(unlanded)} sourced sibling(s) not bundled")
         if scan_broken:
             detail.append(f"{len(scan_broken)} file(s) the sibling scan could not read")
-        print(f"❌ {skill_path.name}: {status}, " + ", ".join(detail))
+        print(f"❌ {skill_path.name}: {status}, " + ", ".join(detail)
+              + closure_note(skill_path, shared_dir, needed))
         return False
-    print(f"✅ {skill_path.name}: {status}")
+    print(f"✅ {skill_path.name}: {status}" + closure_note(skill_path, shared_dir, needed))
     return True
 
 

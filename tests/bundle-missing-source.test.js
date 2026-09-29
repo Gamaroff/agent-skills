@@ -194,14 +194,17 @@ test("§1c the same citation described in words produces no warning", () => {
 
 test("§1d the line-aware collector names what collect_shared_refs names", () => {
   // Every shape the collector has to agree on: plain, trailing punctuation, a
-  // `../`-prefixed path, a brace placeholder, two on one line, and an absolute
-  // URL that must NOT match.
+  // `../`-prefixed path, a brace placeholder, two on one line, an absolute
+  // URL that must NOT match, and a `#fragment`, which is never part of the name
+  // (task.126: both collectors used to name `four.md#anchor`, a file that does
+  // not exist, so validation failed on every citation).
   const text = [
     "See shared/resources/one.md.",
     "and `shared/resources/{name}` too",
     "../shared/resources/two.js, shared/resources/three.sh;",
     "https://github.com/o/r/blob/develop/shared/resources/url.md",
     "shared/resources/.",
+    "See shared/resources/four.md#anchor. And [x](shared/resources/five.js#L3)",
   ].join("\n");
   const py = [
     "import json, sys",
@@ -224,6 +227,8 @@ test("§1d the line-aware collector names what collect_shared_refs names", () =>
     [2, "{name}"],
     [3, "two.js"],
     [3, "three.sh"],
+    [6, "four.md"],
+    [6, "five.js"],
   ]);
 });
 
