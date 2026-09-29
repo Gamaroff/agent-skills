@@ -51,12 +51,28 @@ const CORPUS = path.join(
   "resources",
   "security-input-corpus.mjs",
 );
+// The load helper (bug.2) and its LOAD-SENSITIVE marker (task 153) — assembled from parts like
+// CORPUS above, so the bundler does not read it as a shared-resources reference.
+const SPAWN_BUDGET = path.join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "shared",
+  "resources",
+  "spawn-budget.mjs",
+);
 
 let mod;
 let corpusFor;
+let loadSensitive;
+let spawnBudget;
 test.before(async () => {
   mod = await import(pathToFileURL(SCRIPT).href);
   ({ corpusFor } = await import(pathToFileURL(CORPUS).href));
+  ({ loadSensitive, spawnBudget } = await import(
+    pathToFileURL(SPAWN_BUDGET).href
+  ));
 });
 
 /** Every mkdtemp is registered here and removed after the run (CR-13). */
@@ -1360,33 +1376,126 @@ test("cli: missing file → reason=missing exit 1; unknown flag → usage exit 2
   assert.match(help.stderr, /usage: handoff-verify/);
 });
 
+// Retry ONLY a precondition miss: the verifier timed out before the grandchild existed, so the
+// run proves nothing about the group kill (obs #166 — on a loaded box the chain verifier → npm →
+// sh → node slow.js → grandchild may not have forked when the timer fires). Any other outcome
+// without a pid file is a real failure: retrying it would hide a verifier that stopped starting
+// the command at all. Same idea as spawn-budget's neverRan(), one generation further down.
+function retryUntilForked(scheduleSeconds, attempt) {
+  const misses = [];
+  for (const t of scheduleSeconds) {
+    const r = attempt(t); // { obj, forked, pidFile, t }
+    if (r.forked) return r;
+    const timedOut = /timeout \(/.test(r.obj?.lines?.[0]?.detail ?? "");
+    if (!timedOut)
+      assert.fail(
+        `no grandchild and no timeout — not a load miss: ${JSON.stringify(r.obj)}`,
+      );
+    misses.push(t);
+  }
+  assert.fail(
+    loadSensitive(
+      `the grandchild never started within ${misses.join("s, ")}s timeouts`,
+    ),
+  );
+}
+
+test("retryUntilForked: a first-attempt hit runs one attempt", () => {
+  const calls = [];
+  const r = retryUntilForked([3, 6, 12], (t) => {
+    calls.push(t);
+    return { forked: true, t };
+  });
+  assert.deepEqual(calls, [3]);
+  assert.equal(r.t, 3);
+});
+
+test("retryUntilForked: a timeout miss is retried at the next timeout, and the hit is returned", () => {
+  const calls = [];
+  const r = retryUntilForked([3, 6, 12], (t) => {
+    calls.push(t);
+    return t === 3
+      ? { forked: false, obj: { lines: [{ detail: "timeout (3s)" }] } }
+      : { forked: true, t };
+  });
+  assert.deepEqual(calls, [3, 6]);
+  assert.equal(r.t, 6);
+});
+
+test("retryUntilForked: a miss that is not a timeout fails at once and is not retried", () => {
+  const calls = [];
+  assert.throws(
+    () =>
+      retryUntilForked([3, 6, 12], (t) => {
+        calls.push(t);
+        return { forked: false, obj: { lines: [{ detail: "exit 1" }] } };
+      }),
+    /not a load miss/,
+  );
+  assert.deepEqual(calls, [3]);
+});
+
+test("retryUntilForked: every attempt a timeout miss fails with the LOAD-SENSITIVE marker", () => {
+  const calls = [];
+  assert.throws(
+    () =>
+      retryUntilForked([3, 6, 12], (t) => {
+        calls.push(t);
+        return {
+          forked: false,
+          obj: { lines: [{ detail: `timeout (${t}s)` }] },
+        };
+      }),
+    /^AssertionError.*LOAD-SENSITIVE.*3s, 6s, 12s timeouts/s,
+  );
+  assert.deepEqual(calls, [3, 6, 12]);
+});
+
 test("cli: a `command ` prefix is stripped, the argv runs without a shell, and a timeout kills the whole process group (CR-6)", () => {
-  const dir = tempDir();
-  const pidFile = path.join(dir, "child.pid");
   // slow.js forks a grandchild that records its pid and sleeps; the group
   // kill must reach it, not only slow.js. It runs as the fixture's `npm test`
   // — `node slow.js` is no longer a shape the node arm admits, since gate 7
   // (bug.8) closed `node <script>` to an exact list — so the tree the kill
   // must cover is verifier → npm → sh → node slow.js → grandchild.
-  fs.writeFileSync(
-    path.join(dir, "slow.js"),
-    `const { spawn } = require("child_process");
-     const c = spawn(process.execPath, ["-e", "setTimeout(function(){}, 20000)"], { stdio: "ignore" });
-     require("fs").writeFileSync(${JSON.stringify(pidFile)}, String(c.pid));
-     setTimeout(function(){}, 20000);`,
-  );
-  fs.writeFileSync(path.join(dir, "package.json"), SLOW_PACKAGE_JSON);
-  fs.writeFileSync(
-    path.join(dir, "handoff.md"),
-    TABLE_HEADER + "| Slow | `command npm test` | **done** |\n",
-  );
-  // 3 s, not 1: under load node can take longer than a second to start, and
-  // a leader killed before it forked proves nothing about the group kill.
-  const r = runCli(["handoff.md", "--json", "--timeout", "3"], dir);
-  const obj = JSON.parse(r.stdout);
-  assert.equal(obj.lines[0].verdict, "unverifiable");
-  assert.match(obj.lines[0].detail, /timeout \(3s\)/);
-  const grandchild = Number(fs.readFileSync(pidFile, "utf8"));
+  //
+  // 3 s on an idle machine. Under load node can take longer than that to
+  // start, and a leader killed before it forked proves nothing about the group
+  // kill — so that one outcome (a timeout with no pid file) is retried at
+  // double the timeout, retries from spawnBudget("HANDOFF") (default 2:
+  // 3 s → 6 s → 12 s). Each attempt gets a FRESH dir: a pid file left by a
+  // missed attempt must not satisfy the next one.
+  //
+  // The grandchild outlives slow.js (120 s vs 20 s, and `c.unref()` so the
+  // child handle does not keep slow.js alive until the grandchild exits). The
+  // verifier's runner resolves when slow.js releases the pipes, so without both
+  // the kill assertion was vacuous: a verifier that killed only the leader
+  // waited for the whole tree to end on its own, and the grandchild then read as
+  // killed — mutation M10 (kill the leader alone) passed. Now, under M10, the
+  // grandchild is still alive when the verifier returns at ~20 s.
+  const schedule = [3, 6, 12].slice(0, 1 + spawnBudget("HANDOFF").retries);
+  const r = retryUntilForked(schedule, (t) => {
+    const dir = tempDir();
+    const pidFile = path.join(dir, "child.pid");
+    fs.writeFileSync(
+      path.join(dir, "slow.js"),
+      `const { spawn } = require("child_process");
+       const c = spawn(process.execPath, ["-e", "setTimeout(function(){}, 120000)"], { stdio: "ignore" });
+       c.unref();
+       require("fs").writeFileSync(${JSON.stringify(pidFile)}, String(c.pid));
+       setTimeout(function(){}, 20000);`,
+    );
+    fs.writeFileSync(path.join(dir, "package.json"), SLOW_PACKAGE_JSON);
+    fs.writeFileSync(
+      path.join(dir, "handoff.md"),
+      TABLE_HEADER + "| Slow | `command npm test` | **done** |\n",
+    );
+    const res = runCli(["handoff.md", "--json", "--timeout", String(t)], dir);
+    const obj = JSON.parse(res.stdout);
+    return { obj, forked: fs.existsSync(pidFile), pidFile, t };
+  });
+  assert.equal(r.obj.lines[0].verdict, "unverifiable");
+  assert.match(r.obj.lines[0].detail, new RegExp(`timeout \\(${r.t}s\\)`));
+  const grandchild = Number(fs.readFileSync(r.pidFile, "utf8"));
   assert.ok(grandchild > 0);
   let alive = true;
   try {
@@ -1427,7 +1536,7 @@ test("runner: output beyond the cap makes the figure unverifiable, never a compa
   });
   assert.ok(
     Date.now() - t0 < 40000,
-    `resolved at the cap, not at exit (${Date.now() - t0} ms)`,
+    loadSensitive(`resolved at the cap, not at exit (${Date.now() - t0} ms)`),
   );
   assert.equal(r.status, null, "killed at the cap, not exited");
   assert.equal(r.truncated, true);
