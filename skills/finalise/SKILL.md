@@ -505,12 +505,14 @@ Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RE
 After all 4 agents complete, parse each YAML result. Handle agent failures:
 
 - **Agent returns valid YAML**: extract `overall` field → `AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`
-- **`boundary: internal` with no `internal_reason` forces `SEC_OVERALL = FAIL`**, whatever the agent's
-  own `overall` says. The reason is the whole of that decision, and an `overall: PASS` beside a
-  reason-less `internal` is the self-report the zero-guard exists to refuse; the ❌ line Step 3d
-  renders is not enough on its own, because Step 6 decides on `SEC_OVERALL`, not on the summary
-  (task.131 QA cycle 1, TASK-131-BUG-2). The agent should already have emitted the
-  `internal boundary recorded without a reason` FAIL check; this override is what holds when it did not.
+- **`boundary: internal` forces `SEC_OVERALL = FAIL` unless its `internal_reason` holds**, whatever the
+  agent's own `overall` says. It holds when it is present and not whitespace-only, **begins with the
+  entry as `path#export`**, and that entry is **not** in the prompt's *Entries disqualified from
+  `internal`* table (an entry a sink models is probed, never skipped). A reason that fails any of the
+  three is the self-report the zero-guard exists to refuse, and Step 6 decides on `SEC_OVERALL`, not on
+  the rendered summary (task.131 QA cycles 1–2, TASK-131-BUG-2 and BUG-3). The agent should already
+  have emitted the `internal boundary recorded without a reason` FAIL check; this override is what
+  holds when it did not.
 - **Agent errors or returns unparseable output**: set that section's overall to `NEEDS_MANUAL_REVIEW`; mark section for manual verification in the DoD running summary; continue with remaining sections
 
 **Never abort due to a single agent failure.** One failed section = manual review for that section only.
@@ -586,9 +588,10 @@ agent; do not read it as a skip.
 {else if security_result.boundary == false:}
 _Probe mode did not fire — the deliverable is not a boundary._
 {else if security_result.boundary == "internal":}
-{if security_result.internal_reason is absent or empty:}
-❌ **Internal artefact recorded without a reason.** `boundary: internal` names no artefact and no reason
-no sink fits — a FAIL: the reason is the whole of the decision.
+{if security_result.internal_reason is absent, whitespace-only, does not begin with a path#export entry, or names an entry the prompt disqualifies:}
+❌ **Internal artefact recorded without a valid reason.** `boundary: internal` names no entry, no
+reason no sink fits, or an entry a sink already models — a FAIL (Step 3c forced `SEC_OVERALL` to FAIL):
+the reason is the whole of the decision.
 {else:}
 ⚠️ **Internal artefact — not probeable by the engine**: {security_result.internal_reason}. A recorded
 decision, not the zero-guard: no corpus sink models this input.

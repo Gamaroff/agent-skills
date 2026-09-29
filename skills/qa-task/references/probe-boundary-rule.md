@@ -163,7 +163,9 @@ others. It is available only when **both** hold:
   an implementation report, a DoD summary, a gate file; **and**
 - no corpus sink's legitimate cases are documents that predicate is meant to accept.
 
-It requires an `internal_reason` naming the artefact and why no sink fits; an
+It requires an `internal_reason` that begins with the entry (`path#export`) and names the artefact
+and why no sink fits; an entry the prompt's *Entries disqualified from `internal`* table lists is
+probed, never recorded `internal`, and `/finalise` Step 3c forces FAIL on it; an
 `internal` without one is a FAIL (the `internal boundary recorded without a reason` check, and `/finalise` forces
 the security result to FAIL on that shape — `finalise-dod-security-prompt.md` states it). **A sink disqualifies it for the shape it
 models**: `markdown-structure` models the implementation report, so

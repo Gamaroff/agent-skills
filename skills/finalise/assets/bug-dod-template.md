@@ -60,7 +60,7 @@
 **Story Type:** {bug — the fix's surface, e.g. shell hook + Node CLI}
 **Overall Security Status:** {✅ PASS | ❌ FAIL | ⚠️ NOT_APPLICABLE}
 
-{per-check lines from the security agent YAML — access gate, fail-closed, injection surface; and the boundary decision: `boundary: true` with `probes_executed: N` and the reproduced list, or `boundary: false` with the reason}
+{per-check lines from the security agent YAML — access gate, fail-closed, injection surface; and the boundary decision: `boundary: true` with `probes_executed: N` and the reproduced list, `boundary: false` with the reason, or `boundary: internal` with its `internal_reason` rendered as an explicit skip — and as a ❌ FAIL when that reason is missing, does not begin with a `path#export` entry, or names an entry a sink models (finalise Step 3c)}
 
 ---
 

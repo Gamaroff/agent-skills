@@ -592,10 +592,13 @@ test("task.131: boundary: internal renders as an explicit skip, and without inte
       "the unverified branch, or worse the zero-guard, which is the task.124 FAIL it exists to replace",
   );
   assert.ok(
-    has(skill(), "{if security_result.internal_reason is absent or empty:}"),
+    has(
+      skill(),
+      "{if security_result.internal_reason is absent, whitespace-only, does not begin with a path#export entry, or names an entry the prompt disqualifies:}",
+    ),
     "skills/finalise/SKILL.md: an `internal` with no reason must render as a FAIL, not as a skip",
   );
-  assert.ok(has(skill(), "Internal artefact recorded without a reason"));
+  assert.ok(has(skill(), "Internal artefact recorded without a valid reason"));
   assert.ok(has(skill(), "Internal artefact — not probeable by the engine"));
   // The internal branch must sit BEFORE the bare {else:} that opens the
   // boundary: true render — otherwise the zero-guard fires on an internal.
@@ -619,6 +622,28 @@ test("task.131: boundary: internal renders as an explicit skip, and without inte
     has(source(), "named `internal boundary recorded without a reason`"),
     `${PROMPT}: an internal with no reason names no FAIL check — the agent's overall can still read PASS`,
   );
+  // BUG-3: the precondition is checked where it can be — the reason names
+  // its entry, and a disqualified entry (a sink models it) forces FAIL.
+  assert.ok(
+    has(skill(), "begins with the entry as `path#export`"),
+    "skills/finalise/SKILL.md Step 3c: an internal whose reason names no entry must force FAIL",
+  );
+  assert.ok(
+    has(skill(), "Entries disqualified from `internal`"),
+    "skills/finalise/SKILL.md Step 3c: the override must check the reason's entry against the disqualified table",
+  );
+  assert.ok(
+    /\| `report-lint\.js#lintReport` \| `markdown-structure` \|/.test(source()),
+    `${PROMPT}: lintReport must be listed as disqualified from internal — a sink models it`,
+  );
+  // QA-4: Step 3c and the Step 3d render must agree on an empty reason.
+  assert.ok(has(skill(), "not whitespace-only"));
+  assert.ok(
+    has(
+      skill(),
+      "is absent, whitespace-only, does not begin with a path#export entry",
+    ),
+  );
   assert.ok(
     has(skill(), "forces `SEC_OVERALL = FAIL`"),
     "skills/finalise/SKILL.md Step 3c: a reason-less internal must force SEC_OVERALL — Step 6 decides " +
@@ -641,12 +666,16 @@ test("task.131: every canonical source that renders or states the boundary schem
     "boundary: true | false",
     "security_result.boundary",
     "`boundary: false` is the common case",
+    "the boundary decision: `boundary: true`",
   ];
+  // skills/<d>/assets/ too: the bug-mode DoD template states the decision
+  // there, and a root list without it missed the site (task.131 QA cycle 2).
   const roots = [
     join(repoRoot, "shared", "resources"),
-    ...readdirSync(join(repoRoot, "skills")).map((d) =>
+    ...readdirSync(join(repoRoot, "skills")).flatMap((d) => [
       join(repoRoot, "skills", d),
-    ),
+      join(repoRoot, "skills", d, "assets"),
+    ]),
   ];
   const hits = [];
   for (const dir of roots) {
@@ -657,10 +686,11 @@ test("task.131: every canonical source that renders or states the boundary schem
       if (KEYS.some((k) => text.includes(k))) hits.push([join(dir, f), text]);
     }
   }
-  // Floor 4: the prompt, finalise, qa-task and qa-story. Fewer means a key
-  // stopped matching a site, which reads exactly like a clean population.
+  // Floor 5: the prompt, finalise, qa-task, qa-story and the bug-mode DoD
+  // template. Fewer means a key stopped matching a site, which reads exactly
+  // like a clean population.
   assert.ok(
-    hits.length >= 4,
+    hits.length >= 5,
     `population floor: found ${hits.map(([p]) => p).join(", ")}`,
   );
   for (const [path, text] of hits) {

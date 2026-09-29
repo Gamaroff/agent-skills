@@ -308,8 +308,10 @@ re-derived the same reasoning — the same paragraph, seven times, with no mecha
 case seen so far. `boundary: internal` (with a required `internal_reason`) records "the rule fired
 on a validator of a pipeline-written artefact that no sink models"; the `markdown-structure` sink
 and the engine's `--args-json` make `lintReport` itself probeable, so it is `boundary: true` and no
-longer takes the new branch. The branch exists for the next validator — and is unavailable to any
-shape a sink already models, so it cannot become a way around the guard.
+longer takes the new branch. The branch exists for the next validator. `/finalise` enforces what can
+be checked mechanically — the reason must name its entry, and an entry on the prompt's disqualified
+list (a sink models it) forces a FAIL — and leaves the rest where it can be read: whether a *new*
+validator's shape has a sink is the agent's judgement, recorded in the reason for the reviewer.
 
 ## See also
 

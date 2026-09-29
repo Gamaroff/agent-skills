@@ -4,7 +4,7 @@
 **Bug ID**: TASK-131-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (success-criteria verification; code review CR-2)
 **Date Found**: 2026-09-30
 
@@ -55,3 +55,6 @@ Name the check in the prompt (Step 4 and the schema notes): `internal boundary r
 | 2026-09-30 | New | QA Engineer | Filed from QA cycle 1 |
 | 2026-09-30 | In Progress | qa-fix | Investigation |
 | 2026-09-30 | Ready for QA | qa-fix | Fix implemented (cycle 1) |
+| 2026-09-30 | Closed | QA Engineer | Verified in QA cycle 2 (gate.2) |
+
+> QA cycle 2: fixed as specified. A residual split (an empty or whitespace-only reason renders ❌ while Step 3c reads only "no reason") is tracked separately as TASK-131-QA-4 (low), and the unenforced precondition as TASK-131-BUG-3.

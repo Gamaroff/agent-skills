@@ -4,7 +4,7 @@
 **Bug ID**: TASK-131-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (code review CR-1)
 **Date Found**: 2026-09-30
 
@@ -59,3 +59,4 @@ Bind `LINT_JS` to a `<path-from-repo-root>` placeholder and build `ARGS_JSON` in
 | 2026-09-30 | New | QA Engineer | Filed from QA cycle 1 |
 | 2026-09-30 | In Progress | qa-fix | Investigation |
 | 2026-09-30 | Ready for QA | qa-fix | Fix implemented (cycle 1) |
+| 2026-09-30 | Closed | QA Engineer | Verified in QA cycle 2 (gate.2) |

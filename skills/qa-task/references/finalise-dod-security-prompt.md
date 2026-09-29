@@ -62,10 +62,19 @@ expected skip, not an omission; say so in `summary`.
 **`boundary: internal` — the rule fired on a validator of the pipeline's own artefact, and no sink fits
 it.** Record it only when **both** hold: the predicate's only input is an artefact this repository's
 own pipeline writes (an implementation report, a DoD summary, a gate file), **and** no corpus sink's
-legitimate cases are documents that predicate is meant to accept. It requires `internal_reason:` — one
-sentence naming the artefact and why no sink fits. It is **not available** once a sink models the
+legitimate cases are documents that predicate is meant to accept. It requires `internal_reason:` — beginning with
+the entry as `path#export`, then one sentence naming the artefact and why no sink fits
+(`tools/dod-lint.js#lintDod — reads the DoD summary; no sink models a DoD summary`). It is **not available** once a sink models the
 shape: `markdown-structure` models the implementation report, so `report-lint.js#lintReport` is
-`boundary: true` and probed with `--args-json` (Step 4), never `internal`. `internal` is a recorded
+`boundary: true` and probed with `--args-json` (Step 4), never `internal`.
+
+**Entries disqualified from `internal`** — a sink models their input, so they are probed instead. This
+list is what `/finalise` Step 3c checks the reason's entry against; extend it when a sink is added
+for a new shape:
+
+| Entry | Sink that fits |
+| --- | --- |
+| `report-lint.js#lintReport` | `markdown-structure` | `internal` is a recorded
 decision, not a skipped question — it exists so the task.124 shape (a Markdown validator with no sink,
 FAILed on the zero-guard and overruled by hand) becomes a rule instead of an override. A validator of
 external input is never `internal`, whatever its shape.
@@ -293,7 +302,7 @@ security_review:
       citation: null
       note: "optional"
   boundary: true | false | internal # REQUIRED. Did Step 1b's rule fire? Never inferred from `probes`.
-  internal_reason: "the artefact, and why no sink fits" # REQUIRED when boundary is internal; omit otherwise
+  internal_reason: "<path#export> — <the artefact, and why no sink fits>" # REQUIRED when boundary is internal; omit otherwise
   probes_executed: 0 # REQUIRED when boundary is true. Every candidate actually run, including
     # the legitimate inputs of step 5 and every candidate that behaved correctly —
     # totals.executed from the engine's run record (--record), never composed by hand.

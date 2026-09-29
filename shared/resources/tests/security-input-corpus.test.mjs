@@ -559,3 +559,28 @@ test("the prose peer states the method ordering and both directions", () => {
       `the thing that misleads, and saying so is the point of the ordering.`,
   );
 });
+
+// ---------------------------------------------------------------------------
+// The prompts that LIST the sinks name every one of them (task.131 QA cycle 2)
+// ---------------------------------------------------------------------------
+// Two prompts tell a reader which sinks exist and how to choose one. Each is a
+// second enumeration of SINKS, and an enumeration that drifts sends a reader to
+// `unverifiable` for a control a sink already fits: /review-security still said
+// "five sinks" and "called with exactly one argument" after markdown-structure
+// and --args-json landed (TASK-131-BUG-5). Derived from SINKS, so adding a sink
+// turns this red until both prompts name it.
+test("every sink is named in each prompt that enumerates the sinks", () => {
+  const PROMPTS = [
+    "finalise-dod-security-prompt.md",
+    "security-review-prompt.md",
+  ];
+  for (const prompt of PROMPTS) {
+    const text = readFileSync(join(here, "..", prompt), "utf-8");
+    const missing = SINKS.filter((s) => !text.includes(`\`${s}\``));
+    assert.deepEqual(
+      missing,
+      [],
+      `${prompt} lists sinks but does not name: ${missing.join(", ")}`,
+    );
+  }
+});
