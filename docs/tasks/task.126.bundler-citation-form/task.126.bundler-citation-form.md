@@ -226,7 +226,7 @@ bundling before and after Phase 1 and diffing.
 
 1. ✅ `skills/create-skill/scripts/quick_validate.py` — the one parser (name + kind, fragment stripped)
 2. ✅ `skills/create-skill/scripts/bundle_skill.py` — edge kinds in `discover_needed`, `REFS_REF_RE` seed, reporting
-3. ✅ `skills/create-skill/scripts/package_skill.py` — use the shared parser (strip the fragment)
+3. ✅ `skills/create-skill/scripts/package_skill.py` — **no edit needed**: it already imports `collect_shared_refs`, which is now a view of the shared parser, so it strips the fragment through that import (held by `bundle-citation.test.js` K)
 4. ✅ `.githooks/pre-commit` — refuse an untracked generated copy
 
 ### Files to Modify (Tests)
@@ -266,7 +266,7 @@ source-backed copy on disk), and `bundle:check` reports each as `UNREACHED` unti
 - [x] `--all` wall time within noise — measured 2026-09-29, 3 runs each: develop 4.86/5.00/5.01 s, branch 4.61/4.63/4.61 s (`--check`: 4.65–4.77 s → 4.34–4.38 s). Faster, because the three skills bundle 51 fewer files.
 
 ### Consumer Tests
-- [ ] `setup-consumer.sh` tarball of `qa-fix` still runs its documented steps (nothing it reads was dropped). **Not run as a tarball install.** Checked statically instead: no file left in any of the three skills names a removed copy by `references/<name>` or `.agents/skills/<skill>/references/<name>`, apart from the cited hub copy itself. The cited §Subagents section's one dependency (`read-config.sh`) still ships in all three. Left for QA.
+- [x] `setup-consumer.sh` tarball of `qa-fix` still runs its documented steps (nothing it reads was dropped). **Not run as a tarball install.** Checked statically instead: no file left in any of the three skills names a removed copy by `references/<name>` or `.agents/skills/<skill>/references/<name>`, apart from the cited hub copy itself. The cited §Subagents section's one dependency (`read-config.sh`) still ships in all three. QA cycle 1 accepted this as equivalent evidence (`task.126.qa.1`, Success Criteria table: "PASS (equivalent evidence)"). `setup-consumer.sh` configures credentials; it does not install skills.
 
 ## 9. Success Criteria
 
@@ -283,7 +283,7 @@ source-backed copy on disk), and `bundle:check` reports each as `UNREACHED` unti
 - [x] One definition of the edge rules; mutation proofs recorded for each test.
 
 ### Migration
-- [ ] Observations #83, #114 close naming the PR.
+- [x] Observations #83, #114 close naming the PR — both set `actioned` on 2026-09-29, resolution naming PR #524 (merge pending in the same /develop-next run).
 
 ## 10. Risk Assessment
 
@@ -361,8 +361,8 @@ None.
 - [x] Phase 1: citation edges
 - [x] Phase 2: pre-commit refusal
 - [x] Phase 3: authoring surface + conversions
-- [ ] QA: `task.126.qa.[N].bundler-citation-form.md`
-- [ ] Gate: `task.126.gate.[N].bundler-citation-form.yml`
+- [x] QA: `task.126.qa.3.bundler-citation-form.md` (3 cycles)
+- [x] Gate: `task.126.gate.3.bundler-citation-form.yml` — PASS 100
 
 ## References
 
