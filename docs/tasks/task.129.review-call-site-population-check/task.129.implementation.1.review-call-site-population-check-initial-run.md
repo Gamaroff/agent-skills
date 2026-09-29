@@ -35,9 +35,9 @@ Lift `collectCallSites()` into a shared `call-sites.js` collector and add a call
 | 1. create-branch           | ✅ Done | Branch `feature/task.129.*` exists in git                              | Branch created at `01c8701f`; pushed with upstream | —                    |
 | 2. review-task             | ✅ Done | `task.129.review.{N}.{name}.md` exists (or skip logged)                | review.1 — READY TO IMPLEMENT 8/10; 0 critical, 9 important applied; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan + surface map); 2 fast-gate iterations; 7/7 phase items; ci:fast green | `.summaries/step-3-iteration-audit-1.json` |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.129.qa.{N}.*.md`; `task.129.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.129.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #525: https://github.com/Gamaroff/agent-skills/pull/525 | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.129.qa.{N}.*.md`; `task.129.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles; gate 4 PASS 100; 5c CONCERNS (pr-review.1) | — |
+| 7. finalise                | ❌ Failed | `task.129.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: AC2, AC4, AC5, AC7 — dod.1; HALT | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -87,12 +87,32 @@ Lift `collectCallSites()` into a shared `call-sites.js` collector and add a call
 
 - SCOPE_PATHS: docs/tasks/task.129.review-call-site-population-check, CHANGELOG.md, shared/resources, shared/resources/tests, skills/create-task, skills/review-story, skills/review-story/references, skills/review-task, skills/review-task/references, plus `tests/review-call-site-population-check.test.js` added by hand (a new untracked file in a directory with no tracked change).
 - Pre-flight guard: every untracked path is in scope — nothing held.
+- Commits: `79b0bfa4` docs(task.129) review 1 + report; `a4132da0` feat(review) collector + checks. Leak check OK.
+- PR #525: https://github.com/Gamaroff/agent-skills/pull/525 (base develop, Closes #432). `in-review` comment on #432 posted. Post-PR state: OPEN. Lock `pr_url` set.
+
+- QA Cycle 1 — changes-requested: stage-disabled. QA-start re-assert (in-review): stage-disabled. Traceability mapper skipped — Success Criteria are checkbox lists, not a table (HAS_SUCCESS_CRITERIA_TABLE=false).
+- qa-fix Change Log row deferred to loop exit (one row per fix loop, per the contract).
+- Cycle 2 qa-read-back: first run halted with 1 problem whose text was not captured (only the summary line was kept); the re-run staged the document itself and passed. Recorded as an instrument gap in my run, not a pass on the first attempt.
+- Narrowing residue — every MEDIUM on gates 1 and 2 names shared/resources/call-sites.js (TASK-129-CR-1, TASK-129-CR-2, TASK-129-C2-CR-1, TASK-129-C2-CR-2); HIGH 0 on both. Offer passed to qa-fix Step 2.6.
+- QA Cycle 2 — changes-requested: stage-disabled.
+- Cycle 3: convergence check n/a (HIGH 0,0,0 — nothing to stall). Route classifier: continue (not-a-pass-gate; route 2 declined: product-defect-signal). Narrowing offer: false (medium-files-differ — call-sites.js and its test). QA Cycle 3 — changes-requested: stage-disabled.
+- Cycle 3 read-back first halted on a transient `.git/index.lock` (no lock file present when checked; staged by hand with retries, then clean). Likely the same cause as cycle 2's uncaptured read-back problem.
+- Scratchpad directory expired mid-run; temp files moved to `.claude/state/`.
+### Step 5c / Step 7 — 2026-09-29
+
+- 5c PR review 1: CONCERNS (PC-1 medium/high, CR-1 medium/medium, PC-2/PC-3 low). PC-1..PC-3 corrected before finalise in `a374a5cb` (doc wording, qa.2 row, CHANGELOG, progress ticks); CR-1 left as a follow-up.
+- /finalise invoked (not inlined). DoD agents: AC PARTIAL (3/7 with per-PR test evidence), Security PASS (boundary: false, candidates named), Compliance NOT_APPLICABLE, Docs PASS.
+- CI reading 1: SUCCESS @ `a374a5cb5d45` over 5 checks.
+- Decision: NOT ACCEPTED — 4 gaps (AC2, AC4, AC5, AC7). Fix-and-recheck (8a) not applicable: four gaps, not one low finding. Status stays ready-for-review; gaps row written; gap report added to the task body; gaps PR comment posted.
 
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+- **Step 7 HALT — DoD gaps (4):** AC2 the task.121 `c69f5115^` fixture has no committed test (the stated shallow-clone reason is wrong: `test.yml` uses `fetch-depth: 0`); AC4 no test asserts the CLI ≤ 2 s; AC5 no test fails if the guard restates an engine shape; AC7 observation #120 not closed naming PR #525. Estimated ≈1 hour. See `task.129.dod.1.review-call-site-population-check.md`.
+- Open follow-up (not a DoD gap): PR-review CR-1 — exit 1 also occurs on MODULE_NOT_FOUND, so prose branching on exit 1 should branch on the JSON `reason`.
 
 - Step 3 iteration 1: fast gate failed on `transition-protocol-parity.test.mjs` (a skill naming `tracker-comment.js` must bundle it). Cause: literal engine filenames in create-task 3.5. Fixed by naming engines by `--engine` value. Triage: `.summaries/step-3-test-triage-1.json`.
 
@@ -102,14 +122,60 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-09-29
+**Gate Result**: CONCERNS
+**Issues Found**: 2 medium (TASK-129-CR-1 explicit --root inside a repo resolved to the repo top; TASK-129-CR-2 node "$VAR" invocations invisible), 5 advisory (CR-3..CR-7)
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: CR-1 explicit --root measured as given; CR-2 `node "$VAR"` sites tracked per shell function (setup-consumer.sh:614); CR-4 no-roots exit 1 + prose at 5 sites; CR-5 .js accepted; CR-6 non-regular files skipped; CR-7 test comment. 6 tests, each mutation-proved. Doc-fix probe population 5, move: patch. Fast gate: 4,570 pass.
+**Commit**: `a7f2342a`
+**Post-fix PR state**: OPEN (gh pr view; poller not dispatched — one field, read directly)
+
+### QA Cycle 2 — 2026-09-29
+**Gate Result**: CONCERNS
+**Issues Found**: 2 medium (TASK-129-C2-CR-1 no-roots accepts a consumer scripts/; TASK-129-C2-CR-2 exit 1 also means a crash), 4 advisory. All cycle-1 findings verified fixed.
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: narrowing-residue offer taken — consolidate (REASONS table: unique non-zero exit per reason, every exit path reads it, one test drives each row; isSourceTree marker; unreadable) and scope the claim (variable rule limits stated). 5 tests, 4 mutations → red. Doc-fix probe population 5 (3 updated, 2 unaffected). Fast gate: 4,575 pass.
+**Commit**: `a65b1737`
+**Post-fix PR state**: OPEN
+
+### QA Cycle 3 — 2026-09-29
+**Gate Result**: CONCERNS
+**Issues Found**: 2 medium (TASK-129-C3-CR-1 EPIPE exits 1 outside REASONS; TASK-129-C3-CR-2 every-row test drives 4 of 6 rows), 3 advisory. Cycle-2 findings verified fixed.
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+**Fixes Applied**: C3-CR-1 installExitGuards + output-closed row (exit 5); C3-CR-2 every-row test covers all 7 REASONS rows and asserts key coverage; C3-CR-3/4/5. 4 mutations → red. Doc probe population 5, all updated, move: patch. Fast gate 4,576 pass.
+**Commit**: `c32d933d`
+**Post-fix PR state**: OPEN
+
+### QA Cycle 4 — 2026-09-29
+**Gate Result**: PASS
+**Issues Found**: none blocking; 3 advisory (C4-CR-1 prose reason lists untested against REASONS; C4-CR-2 installExitGuards arms untested directly; C4-CR-3 output-closed driver lacks error/timeout)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — `task.129.pr-review.1.review-call-site-population-check.md` (PC-1 medium/high: §8 fixture ticked as automated but a hand run; CR-1 medium/medium: exit 1 also on MODULE_NOT_FOUND; PC-2, PC-3 low). Not blocking — ready-for-merge: stage-disabled.
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**Gate + report commit**: `0f3a8cd6` (pushed before 5c)
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Final Status**: Escalated — HALT at Step 7 (DoD gaps)
 **Branch**: feature/task.129.review-call-site-population-check
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/525
+**QA Iterations**: 4 (gate 4 PASS 100; 5c CONCERNS)
+**DoD Summary**: task.129.dod.1.review-call-site-population-check.md — GAPS IDENTIFIED
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}

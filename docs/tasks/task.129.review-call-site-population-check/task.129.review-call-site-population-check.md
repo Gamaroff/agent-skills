@@ -247,6 +247,37 @@ None.
 ### Key Findings
 No blocking issues. Three advisory findings (C4-CR-1..3) are recorded in the gate's `recommendations.future`.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.129.qa.4.review-call-site-population-check.md`
+**Gate File**: `task.129.gate.4.review-call-site-population-check.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] AC2 — commit the task.121 `c69f5115^` fixture as a test (CI checks out with full history)
+   - [ ] AC4 — assert the CLI completes within 2 s on the live tree
+   - [ ] AC5 — assert the guard test restates no call-site shape
+   - [ ] AC7 — close observation #120 naming PR #525
+
+### Next Steps:
+
+- [ ] Add the three tests to `shared/resources/tests/call-sites.test.mjs` / `comment-slot-coverage.test.mjs`
+- [ ] Close obs #120 with `observation-log.js set-status … --resolution "PR #525"`
+- [ ] Re-run `/finalise`
+
+**Estimated Effort:** Small (≈1 hour)
+
+**Gap Report Generated:** 2026-09-29
+
+**Detailed Verification Log:** See `task.129.dod.1.review-call-site-population-check.md` for complete verification evidence and timestamps.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -260,6 +291,7 @@ No blocking issues. Three advisory findings (C4-CR-1..3) are recorded in the gat
 | 2026-09-29 |  | QA gate CONCERNS (80/100) — cycle 2, 2 medium findings (no-roots marker too weak, exit 1 ambiguous with a crash) | qa-task |
 | 2026-09-29 |  | QA gate CONCERNS (80/100) — cycle 3, 2 medium findings (EPIPE bypasses the exit contract; every-row test covers 4 of 6 rows) | qa-task |
 | 2026-09-29 |  | QA gate PASS (100/100) — cycle 4, 0 blocking findings, 3 advisory | qa-task |
+| 2026-09-29 |  | DoD incomplete — 4 gaps identified (AC2, AC4, AC5, AC7) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
