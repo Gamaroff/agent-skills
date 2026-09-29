@@ -322,27 +322,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-29
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.126.qa.2.bundler-citation-form.md](./task.126.qa.2.bundler-citation-form.md)
-- **Gate File**: [task.126.gate.2.bundler-citation-form.yml](./task.126.gate.2.bundler-citation-form.yml)
+- **Full Report**: [task.126.qa.3.bundler-citation-form.md](./task.126.qa.3.bundler-citation-form.md)
+- **Gate File**: [task.126.gate.3.bundler-citation-form.yml](./task.126.gate.3.bundler-citation-form.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 23 (hook + citation), within the 131-test bundler/link/hook/parity set
+- **Tests Executed**: 25 (hook + citation), within the 133-test bundler/link/hook/parity set; fast gate 4537/4538
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 (2 medium: CR-1, CR-2)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- All five cycle-1 findings are fixed. CR-2 is only partly fixed: prose mentions are covered, Markdown links are not.
-- **CR-1 (medium, reproduced)**: a refused commit leaves the hook's own new copies on disk, so a retry that follows the printed remedy is refused again.
-- **CR-2 (medium)**: link relocation still decides on the on-disk copies, not on what the skill reaches.
-- Advisory: CR-3 (the remedy for an unreached leftover copy), CR-4, CR-5, CR-6 (cleanups).
+- Both cycle-2 findings are fixed and mutation-proven.
+- Advisory: an unreachable fallback and stale comments in `expected_bytes` (CR-1); `revert_new`'s tracked-copy branch has no test (CR-2).
 
 ## Change Log
 
@@ -355,6 +353,7 @@ None.
 | 2026-09-29 |  | Implemented phases 1–3 (inline, develop-task Step 3): one parser with edge kinds, closure status line, hook refusal, three pointers cited, 51 unreached copies removed; status → ready-for-review | develop |
 | 2026-09-29 |  | QA gate CONCERNS (90/100) — 1 finding (CR-1, hook over-refuses skill-native files) | qa-task |
 | 2026-09-29 |  | QA gate CONCERNS (80/100) — 2 findings (CR-1 refused-commit retry loop, CR-2 link relocation on on-disk copies) | qa-task |
+| 2026-09-29 |  | QA gate PASS (100/100) — 0 findings (2 advisory cleanups) | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
