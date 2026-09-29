@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A validator of a pipeline-written document is probed by execution, and one no sink fits is a
+  recorded decision rather than a hand-overruled FAIL (task 131).**
+  - `security-input-corpus.mjs` gains a `markdown-structure` sink: 9 hostile implementation reports,
+    each a valid report with one defect so it trips one `report-lint` problem code, and 6
+    legitimate ones (fenced examples, CRLF, the optional section, an untemplated heading).
+  - `security-probe.mjs` gains `--args-json '[…]'` (JS entry form only; `bad-args` otherwise),
+    appending fixed arguments after every case's input, recorded as `args`; and its JS runner now
+    reads a returned own `ok === false` as a refusal. Before it, every report `lintReport` refused
+    scored `accepted`. `lintReport` through the new sink now scores `engages` (15 of 15, 1.6 s).
+  - `boundary:` in the finalise security schema is `true | false | internal`. `internal` needs an
+    `internal_reason`, renders in finalise Step 3d as an explicit skip (a FAIL without the reason),
+    and is unavailable once a sink models the shape. Rule: `probe-boundary-rule.md`. Motivating
+    case: task.124 DoD § Step 5, where the agent FAILed `lintReport` on the zero-guard and the
+    operator overruled it by hand.
+
 - **A call-site list in a task or story is measured at review, not trusted (task 129, obs #120).**
   - `shared/resources/call-sites.js` is the one collector of engine invocations in shipped source —
     `tracker-comment`, `stakeholder-summary-cli`, `gh-stage`, `jira-stage`, `tracker-issue` — with a
@@ -44,6 +59,11 @@ All notable changes to this project will be documented in this file. Format foll
   - Rule: `create-skill` § "Cite or depend", and AGENTS.md § Shared Resources.
 
 ### Changed
+
+- **`change-log.js#fencedRanges` detects fences in CRLF documents (task 131).** `(.*)$` could not
+  match the `\r` a CRLF line keeps after `split("\n")`, so no fence was ever found: `report-lint`
+  refused a clean CRLF report that quoted one in a fence and accepted a CRLF report whose required
+  section existed only inside a fence. Found by the new `markdown-structure` probe.
 
 - **The QA read-back requires this cycle's links; the current gate and path containment each have
   one definition (task 158).** Three residues from task.149. `qa-read-back.js` now halts when the
