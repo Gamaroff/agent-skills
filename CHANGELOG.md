@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`release.sh` gates on CI's verdict; load-sensitive tests name themselves (task 153).** A release
+  was certified by a local test run, which passed on 2026-09-21 through five consecutive red `Test`
+  runs on `develop` (obs #150). `release.sh` now reads CI's recorded verdict for `HEAD` —
+  `scripts/release-ci-verdict.mjs`, over `gh run list --commit` — **before** its multi-minute local
+  test, and refuses unless `Test` and `ShellCheck` are green and `Validate Skills` / `Docs link
+  check` are not red when present. `gh` missing, failing or unreadable is *unverifiable*, never
+  green. `--skip-ci-check` is the named escape; `--dry-run` prints *Would have REFUSED*; `--retry`
+  is unchanged. Timing assertions that depend on machine load now say so in their failure text —
+  `loadSensitive()` in `spawn-budget.mjs` prefixes `LOAD-SENSITIVE` — and
+  `docs/contributing/traps.md` § Load-sensitive tests is the one list, held equal to the code by
+  `tests/load-sensitive-marker.test.js` (obs #157). `release.sh` prints the re-run-alone rule when
+  its local test aborts. Session-handoff CR-6 retries only its precondition miss — a timeout before
+  the grandchild forked, 3 s → 6 s → 12 s — instead of dying on `ENOENT` (obs #166).
 - **`/finalise --bug` covers Step 8, the GAPS path (task 152).** The bug-mode skip table stopped at
   Step 7, so a `--bug` run that found gaps doubled the `## Verification Complete` heading, appended
   the Change Log row bug mode forbids, wrote a second verdict into the bug report, and then could not
