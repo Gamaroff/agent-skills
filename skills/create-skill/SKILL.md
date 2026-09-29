@@ -317,8 +317,9 @@ autonomous-defaults document, for one paragraph, cost each skill the document's 
 16, 18 and 17 files that none of them reads (task.116, obs #83). Authors facing that bill restate the
 rule instead, which is the drift the one-source rule exists to prevent. The bundler's status line
 now prints `· closure M (±K vs committed)` per skill, so a closure that jumps is a number in the
-output at the moment it is caused. A closure that shrinks leaves copies behind: the bundler never
-deletes one, and `--check` reports each `UNREACHED` until you `git rm` it (task.126).
+output at the moment it is caused. `±K` is a net difference, so it shows that the closure moved, not
+which copies moved. A closure that shrinks leaves copies behind: the bundler never deletes one, and
+`--check` reports each `UNREACHED` until you `git rm` it (task.126).
 
 ### In a `.js` under `shared/resources/`, a `shared/resources/` path in a comment is a dependency
 

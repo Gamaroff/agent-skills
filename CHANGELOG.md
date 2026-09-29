@@ -19,7 +19,8 @@ All notable changes to this project will be documented in this file. Format foll
     the `#fragment` into the file name, so `validate:all` failed on a fragment reference and the
     bundler warned that its source was missing.
   - **Every bundle run reports each skill's closure.** The status line reads
-    `closure M (±K vs committed)`, from one `git ls-files` per run.
+    `closure M (±K vs committed)`. `±K` is a net difference, read from `HEAD` with one
+    `git ls-tree` per run.
   - **The three task.116 pointers now cite the autonomous-defaults document.** The pointers are in
     `qa-fix`, `review-task` and `review-story`. Their closures drop 37→21, 45→27 and 46→29, and the
     51 copies nothing now reaches are deleted.

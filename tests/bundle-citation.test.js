@@ -323,13 +323,28 @@ test("M — a cited copy's bytes do not depend on which UNREACHED copies are sti
   // Otherwise the cited copy keeps local mentions while stale copies exist and
   // switches to URLs the moment they are removed — so a commit carrying only
   // the removal leaves the cited copy STALE in CI (QA-1, CR-2).
-  const fx = fixture(t, "Read `shared/resources/hub.md`.\n", { git: true });
+  // The hub carries a sibling Markdown LINK as well as the prose mention: links
+  // relocate on the same reached set, or the copy still changes bytes when an
+  // UNREACHED copy is removed, and can disagree with itself (QA-2, CR-2).
+  const shared = {
+    ...SHARED,
+    "hub.md": SHARED["hub.md"] + "\nSee [leaf A](leaf-a.md) for the details.\n",
+  };
+  const fx = fixture(t, "Read `shared/resources/hub.md`.\n", {
+    git: true,
+    shared,
+  });
   fx.bundle(); // dependency: hub and its whole closure land on disk
   fx.writeSkill("Rule: `references/hub.md#the-rule`.\n"); // now a citation
   fx.bundle(); // leaf-a.md and the rest are still on disk, UNREACHED
   const hubPath = path.join(fx.skillDir, "references", "hub.md");
   const withLeftovers = fs.readFileSync(hubPath, "utf-8");
   assert.match(withLeftovers, /\/blob\/develop\/shared\/resources\/leaf-a\.md/);
+  assert.match(
+    withLeftovers,
+    /\[leaf A\]\(https:\/\/github\.com\/Gamaroff\/agent-skills\/blob\/develop\/shared\/resources\/leaf-a\.md\)/,
+    "the link points where the prose mention points",
+  );
   for (const n of ["deep.md", "leaf-a.md", "leaf-b.js", "sib.js"]) {
     fs.rmSync(path.join(fx.skillDir, "references", n));
   }

@@ -170,3 +170,38 @@ test("a refused commit leaves the index as it found it — the hook's NEW copies
     ["skills/fx/SKILL.md"],
   );
 });
+
+test("following the printed remedy and retrying goes through — the refused run left none of its own copies behind", (t) => {
+  // A refused commit that left the run's NEW copies on disk made the retry
+  // refuse again, naming files the author never made (task.126 QA-2, CR-1).
+  const r = repo(t);
+  r.write("skills/fx/references/stray.md", "generated\n");
+  r.write("bundle-creates.txt", "skills/fx/references/fresh.md\n");
+  r.touchSkill();
+  const first = r.commit();
+  assert.notEqual(first.status, 0, first.stdout + first.stderr);
+  assert.ok(
+    !fs.existsSync(path.join(r.root, "skills/fx/references/fresh.md")),
+    "the refused run removed the copy it wrote",
+  );
+  r.git("add", "skills/fx/references/stray.md"); // the printed remedy
+  const retry = r.commit();
+  assert.equal(retry.status, 0, retry.stdout + retry.stderr);
+  const files = r.git("ls-files");
+  assert.match(files, /skills\/fx\/references\/fresh\.md/);
+  assert.match(files, /skills\/fx\/references\/stray\.md/);
+});
+
+test("the unstaged-source refusal's own remedy — stage the source, retry — goes through", (t) => {
+  const r = repo(t);
+  r.write("shared/resources/fresh.md", "edited source\n"); // unstaged shared edit
+  r.write("bundle-creates.txt", "skills/fx/references/fresh.md\n");
+  r.touchSkill();
+  const first = r.commit();
+  assert.notEqual(first.status, 0, first.stdout + first.stderr);
+  assert.match(first.stderr, /shared sources have unstaged edits/);
+  r.git("add", "shared/resources/fresh.md"); // the printed remedy
+  const retry = r.commit();
+  assert.equal(retry.status, 0, retry.stdout + retry.stderr);
+  assert.match(r.git("ls-files"), /skills\/fx\/references\/fresh\.md/);
+});

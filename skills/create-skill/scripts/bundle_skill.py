@@ -155,14 +155,6 @@ def comment_only_refs(text):
     return out
 
 
-def shared_refs_with_lines(text):
-    """Return [(line_no, name)] for every shared/resources/<name> reference in
-    `text` — a view of quick_validate.parse_shared_refs, so it names exactly what
-    collect_shared_refs names (fragment stripped), plus the line, so a missing
-    source can be reported against the file and line that cited it. Pure."""
-    return [(line, name) for line, name, _ in parse_shared_refs(text)]
-
-
 def refs_refs_with_kind(text):
     """Return [(name, kind)] for every `references/<name>` spelling in `text`.
 
@@ -459,6 +451,7 @@ def expected_bytes(src, name, refs_dir, bundled_names, reached=None):
     suffix = Path(name).suffix
     located = _skill_dirs(str(refs_dir)) if suffix == '.md' else None
     unshipped = None
+    shipped = None
     if located is not None:
         shared_root = Path(located[0]) / 'shared' / 'resources'
         # What a prose mention may point at locally is what discovery REACHES
@@ -479,8 +472,15 @@ def expected_bytes(src, name, refs_dir, bundled_names, reached=None):
             repo_root, skill_dir = located
             src_dir = src.parent.resolve().relative_to(repo_root).as_posix()
             dst_dir = (refs_dir.resolve() / name).parent.relative_to(repo_root).as_posix()
+            # Links relocate on the SAME set the prose mentions do — what the
+            # skill reaches when a discovery pass supplied it — so one copy
+            # cannot send a target upstream in prose and keep it local in a link,
+            # and its bytes do not move when an UNREACHED copy is removed
+            # (task.126 QA-2, CR-2). The packager passes no `reached` and keeps
+            # the on-disk set, because its zip ships what is on disk.
             content = rewrite_md_links(
-                content, src_dir, dst_dir, skill_dir, set(bundled_names)
+                content, src_dir, dst_dir, skill_dir,
+                shipped if shipped is not None else set(bundled_names),
             )
     return inject_header(content, name, suffix).encode('utf-8')
 
@@ -1389,9 +1389,12 @@ def closure_note(skill_path, shared_dir, needed):
 
     M is what discovery reaches — `len(needed)`. The comparison is against the
     COMMITTED source-backed copies: tracked `references/` files that have a
-    shared source. A closure that grew prints `+K`, one that shrank prints `-K`;
-    the second is the number of copies a conversion left for `git rm` (the
-    bundler never deletes one, and `--check` reports each as UNREACHED)."""
+    shared source. `±K` is the NET difference: a closure that grew prints
+    `+K`, one that shrank prints `-K`, and a skill that gained N copies while
+    stranding N others prints `+0`, exactly like one in sync. So it says the
+    closure MOVED, not which copies are owed a `git rm`: that list is
+    `--check`'s UNREACHED report, because the bundler never deletes a copy
+    (task.126 QA-2, CR-4)."""
     note = f" · closure {len(needed)}"
     repo_root = shared_dir.parent.parent
     tracked = _tracked_refs(repo_root)

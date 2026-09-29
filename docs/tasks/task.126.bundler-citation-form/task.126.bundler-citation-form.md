@@ -405,6 +405,15 @@ Bugs found during QA land at `task.126.bug.[N].[name].md` in this directory.
   - **CR-5:** "vs committed" reads `HEAD` (`git ls-tree`), not the index.
   - **Tests.** Hook tests 6 → 8; bundler tests 14 → 15 (M), and J is extended. 5 more mutations, each red.
 
+- **QA fix cycle 2** (gate 2 CONCERNS, found by the cycle-2 refute pass and located in the cycle-1 fixes):
+  - **CR-1:** a refused commit now reverts the copies its own run wrote (`revert_new`), so a retry that follows either printed remedy goes through.
+  - **CR-2:** Markdown links relocate on the same reached set as prose mentions.
+  - **CR-3:** the refusal names both remedies.
+  - **CR-4:** the closure figure is described as a net delta.
+  - **CR-5:** the CHANGELOG now names `git ls-tree HEAD`.
+  - **CR-6:** the dead `shared_refs_with_lines` is retired, and §1d now asserts `parse_shared_refs` against a fixed expectation.
+  - **Tests.** Hook tests 8 → 10, and M is extended with a link. Three more mutations, each red.
+
 **Testing results.**
 - **New tests.** 14 in `tests/bundle-citation.test.js` and 6 in `tests/pre-commit-hook.test.js`.
   `bundle-missing-source.test.js` §1d gains two fragment inputs.

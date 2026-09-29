@@ -192,12 +192,17 @@ test("§1c the same citation described in words produces no warning", () => {
   }
 });
 
-test("§1d the line-aware collector names what collect_shared_refs names", () => {
-  // Every shape the collector has to agree on: plain, trailing punctuation, a
-  // `../`-prefixed path, a brace placeholder, two on one line, an absolute
-  // URL that must NOT match, and a `#fragment`, which is never part of the name
-  // (task.126: both collectors used to name `four.md#anchor`, a file that does
+test("§1d the one parser names each reference, its line and its kind — and the name-only view agrees", () => {
+  // Every shape the parser has to get right: plain, trailing punctuation, a
+  // `../`-prefixed path, a brace placeholder, two on one line, an absolute URL
+  // that must NOT match, and a `#fragment`, which is never part of the name
+  // (task.126: the collectors used to name `four.md#anchor`, a file that does
   // not exist, so validation failed on every citation).
+  //
+  // Asserted against a FIXED expectation, not against another view of the same
+  // parser: comparing two views of one function cannot fail (task.126 QA-2,
+  // CR-6 — the line-aware view that used to be compared here had no remaining
+  // production caller once discovery called the parser directly).
   const text = [
     "See shared/resources/one.md.",
     "and `shared/resources/{name}` too",
@@ -209,26 +214,28 @@ test("§1d the line-aware collector names what collect_shared_refs names", () =>
   const py = [
     "import json, sys",
     `sys.path.insert(0, ${JSON.stringify(SCRIPTS)})`,
-    "from quick_validate import collect_shared_refs",
-    "from bundle_skill import shared_refs_with_lines",
+    "from quick_validate import collect_shared_refs, parse_shared_refs",
     "t = sys.stdin.read()",
-    "print(json.dumps({'names': collect_shared_refs(t), 'lines': shared_refs_with_lines(t)}))",
+    "print(json.dumps({'names': collect_shared_refs(t), 'refs': parse_shared_refs(t)}))",
   ].join("\n");
   const out = JSON.parse(
     execFileSync("python3", ["-c", py], { input: text, encoding: "utf-8" }),
   );
-  assert.deepEqual(
-    out.lines.map(([, name]) => name),
-    out.names,
-    "shared_refs_with_lines must name exactly what collect_shared_refs names",
-  );
-  assert.deepEqual(out.lines, [
-    [1, "one.md"],
-    [2, "{name}"],
-    [3, "two.js"],
-    [3, "three.sh"],
-    [6, "four.md"],
-    [6, "five.js"],
+  assert.deepEqual(out.refs, [
+    [1, "one.md", "dep"],
+    [2, "{name}", "dep"],
+    [3, "two.js", "dep"],
+    [3, "three.sh", "dep"],
+    [6, "four.md", "cite"],
+    [6, "five.js", "dep"],
+  ]);
+  assert.deepEqual(out.names, [
+    "one.md",
+    "{name}",
+    "two.js",
+    "three.sh",
+    "four.md",
+    "five.js",
   ]);
 });
 

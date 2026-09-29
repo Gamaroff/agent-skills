@@ -47,6 +47,26 @@ npm run bundle --silent
 dirty_refs >"$POST_FILE"
 
 NEW="$(comm -13 "$PRE_FILE" "$POST_FILE")"
+
+# Undo what THIS run's bundle wrote, before any refusal exits. A refused commit
+# must leave the tree as the author left it: copies the run created and did not
+# stage would otherwise sit on disk, untracked, and the retry that follows the
+# printed remedy would find them in PRE and POST alike, count them as
+# pre-existing, and refuse again, naming files the author never made
+# (task.126 QA-2, CR-1). Every NEW path was clean before the run (it is not in
+# PRE), so a tracked one is restored from the index and an untracked one is
+# removed; the next run regenerates both.
+revert_new() {
+  [ -n "$NEW" ] || return 0
+  printf '%s\n' "$NEW" | while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    if git ls-files --error-unmatch -- "$p" >/dev/null 2>&1; then
+      git checkout -q -- "$p"
+    else
+      rm -f -- "$p"
+    fi
+  done
+}
 # Pre-existing drift is left alone, but never silently: an unmentioned dirty
 # bundle is how source and its bundled copies drift apart in the first place.
 LEFT="$(comm -12 "$PRE_FILE" "$POST_FILE")"
@@ -81,11 +101,14 @@ if [ -n "$UNTRACKED_LEFT" ]; then
     echo "✗ Untracked generated copies in skills/*/references/ — bundle:check will fail in CI:"
     printf '%s\n' "$UNTRACKED_LEFT" | sed 's/^/      /'
     echo ""
-    echo "  git add them, or remove the shared/resources/ mention that produced them"
-    echo "  (a document you only point at can be cited instead: create-skill § Cite or depend)."
+    echo "  For each one: git add it if the skill still reaches it; delete it if"
+    echo "  \`npm run bundle:check\` reports it UNREACHED (the bundler never deletes a copy,"
+    echo "  and committing an unreached one fails CI the same way). A document you only"
+    echo "  point at can be cited instead: create-skill § Cite or depend."
   } >&2
   if [ "${BUNDLE_PRECOMMIT_WARN:-0}" != "1" ]; then
     echo "  BUNDLE_PRECOMMIT_WARN=1 downgrades this to a warning." >&2
+    revert_new
     exit 1
   fi
   echo "  BUNDLE_PRECOMMIT_WARN=1 is set — proceeding." >&2
@@ -106,6 +129,7 @@ if [ -n "$NEW" ]; then
       echo "  The bundled copies would embed source this commit does not carry."
       echo "  Stage them (git add shared/resources/...), or stash them, then retry."
     } >&2
+    revert_new
     exit 1
   fi
 
