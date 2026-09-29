@@ -561,6 +561,9 @@ None.
 | 2026-09-29 |         | QA findings fixed — gate 1 CR-1..CR-5, gate 2 CR2-1..CR2-5 + PRB2-1 (3 more load-sensitive files marked and listed), 2 iterations; fast gate green | qa-fix |
 | 2026-09-29 |         | QA gate PASS (95/100) — 1 LOW finding (QA3-1), 5 advisory | qa-task |
 | 2026-09-29 | 1.2 | DoD passed — accepted (PR #515) | finalise |
+| 2026-09-29 |  | QA gate CONCERNS (90/100) — cycle 4, post-acceptance: 1 MEDIUM (CR4-1, verdict parse fails open) | qa-task |
+| 2026-09-29 |  | QA findings fixed after acceptance — QA3-1 and CR4-1, 2 commits; fast gate green | qa-fix |
+| 2026-09-29 |  | QA gate PASS (100/100) — cycle 5, no open finding, 3 LOW advisory | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -609,22 +612,23 @@ All Definition of Done criteria have been verified:
 **QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-29
-**Quality Score**: 95/100
+**Quality Score**: 100/100
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.153.qa.3.release-ci-gate-load-sensitive-tests.md](./task.153.qa.3.release-ci-gate-load-sensitive-tests.md)
-- **Gate File**: [task.153.gate.3.release-ci-gate-load-sensitive-tests.yml](./task.153.gate.3.release-ci-gate-load-sensitive-tests.yml)
+- **Full Report**: [task.153.qa.5.release-ci-gate-load-sensitive-tests.md](./task.153.qa.5.release-ci-gate-load-sensitive-tests.md)
+- **Gate File**: [task.153.gate.5.release-ci-gate-load-sensitive-tests.yml](./task.153.gate.5.release-ci-gate-load-sensitive-tests.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 59 new; `npm run ci:fast` green
+- **Tests Executed**: 64 new; `npm run ci:fast` green
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All gate-2 findings fixed. One LOW open (QA3-1): with `HANDOFF_SPAWN_RETRIES>=3` a CR-6 attempt
-outlives the fixture and fails without the marker. Five advisory items.
+Cycles 4–5 ran after acceptance to close QA3-1, which the merge gate refused to carry. That fix
+also found and fixed a fail-open in the new one-spawn verdict parse (CR4-1). No open finding
+remains. Three LOW advisory items are in gate 5's `recommendations.future`.
 
 ---
 

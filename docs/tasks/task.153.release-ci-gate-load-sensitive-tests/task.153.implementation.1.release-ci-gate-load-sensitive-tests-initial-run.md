@@ -127,6 +127,14 @@ Gate `release.sh` on CI's recorded verdict for HEAD, mark every load-sensitive a
 - Accept gap: journal `.claude/state/tracker-actions.jsonl` absent (access.tracker full) — Tracker debt: none.
 - Task completed.
 
+### Post-acceptance — develop-next merge gate HALT and fix (operator approved)
+
+- `/develop-next` Step 3 refused the merge: gate 3 carried QA3-1 `status: open` (the diminishing-returns exit leaves residue open; the merge gate counts it — obs #215). Operator chose "fix it".
+- Fix `940390b8`: CR-6 fixture sized to its schedule (`cr6Schedule`/`cr6Lifetimes`). The fast gate then went red twice on `tests/test-clean-checkout.test.js`, reported `LOAD-SENSITIVE — … this file took 10037 ms` (then 10192 ms) against a 10 s budget, and the file passed alone in 8.1 s. The marker worked as designed. The cause was task 153's own step 1b, which spawned `node` three times per `release.sh` run (about 108 ms each). The fix is `--tsv` plus one `read`.
+- QA cycle 4 (gate 4 CONCERNS): the new parse failed open on a bare `green` with no TAB (CR4-1, MEDIUM). Fix `dcda808f` requires a single line containing a TAB and a known reason, and accepts `green` only on exit 0. Each guard is mutation-proven.
+- QA cycle 5 (gate 5 PASS 100, refute pass): no open finding; 3 LOW advisory items.
+- The accepted DoD (`task.153.dod.1`) is not edited. It verified `0c23a046`. The two fix commits are verified by gates 4–5 and by develop-next Step 3's own head re-check, CI rollup and `npm run ci`.
+
 ---
 
 ## Issues Log
@@ -176,6 +184,28 @@ _Track each QA review/fix cycle._
 **MEDIUM findings**: 0
 **PR Review**: APPROVE
 **Loop exit**: Diminishing-returns exit taken — HIGH is 0 for cycles 2 and 3, and all 1 remaining findings are in test machinery — the loop has finished working rather than stopped working. This is a CLEAN exit, not a stall: nothing was blocked and nothing is being accepted over. The residue is recorded in the gate's `recommendations.future`.
+**Action**: Proceeding to 5c (PR conformance review)
+
+### QA Cycle 4 — 2026-09-29
+**Origin**: post-acceptance, after the develop-next merge gate refused gate 3's open QA3-1
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: CR4-1 (MEDIUM): the one-spawn verdict parse fails open on a bare `green`
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+**Fixes Applied**: TAB required, single line, green only on exit 0; distinct refusal details; `--tsv` documented
+**Commit**: `dcda808f`
+
+### QA Cycle 5 — 2026-09-29
+**Origin**: post-acceptance refute pass over `940390b8` + `dcda808f`
+**Gate Result**: PASS (100/100) — no open entry
+**Issues Found**: none gated; CR5-1..CR5-3 advisory (LOW)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: pending — 5c not yet run
+**Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review)
 
 ---
