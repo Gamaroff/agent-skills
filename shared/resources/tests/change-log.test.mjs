@@ -581,6 +581,35 @@ test("F: fencedRanges reports nothing for a document with no fences", () => {
   assert.deepEqual(CL.fencedRanges("# Doc\n\nJust prose.\n"), []);
 });
 
+test("F: fencedRanges finds a fence in a CRLF document, with the same offsets the LF lines imply", () => {
+  // Found by task.131's markdown-structure probe: `(.*)$` cannot match the `\r`
+  // a CRLF line keeps after split("\n") — `.` excludes line terminators — so no
+  // fence was ever detected in a CRLF document. report-lint then read a fenced
+  // `## Issues Log` as the real section (a missing section passed) and a quoted
+  // report as a second H1 + header block (a valid report was refused).
+  const lf = ["# Doc", "", "```", "## Change Log", "```", "", "tail"].join(
+    "\n",
+  );
+  const crlf = lf.replace(/\n/g, "\r\n");
+  const ranges = CL.fencedRanges(crlf);
+  assert.equal(ranges.length, 1, "one fenced block in the CRLF document");
+  const [a, b] = ranges[0];
+  assert.equal(
+    crlf.slice(a, a + 3),
+    "```",
+    "the range starts at the opening fence",
+  );
+  assert.ok(
+    crlf.slice(a, b).includes("## Change Log"),
+    "the fenced heading is inside the range",
+  );
+  assert.equal(
+    crlf.slice(b).startsWith("\r\ntail") || crlf.slice(b).startsWith("tail"),
+    true,
+    "the range ends after the closing fence line, before the prose that follows",
+  );
+});
+
 test("F: markers NAMED in inline code spans are not a marker block", () => {
   // Found by running the engine against task.42's own document: the Phase 2
   // checklist names both markers in backticks, and unguarded that pair reads as a
