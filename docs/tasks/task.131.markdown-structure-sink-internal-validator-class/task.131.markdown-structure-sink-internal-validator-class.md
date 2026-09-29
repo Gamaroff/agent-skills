@@ -5,19 +5,21 @@ type: task
 description: "On task.124 the finalise security agent classed report-lint.js#lintReport a boundary, found no sink in security-input-corpus.mjs for a Markdown-structure validator, could not import a two-argument entry, and returned FAIL on the zero-guard — a verdict the operator then had to overrule by hand. Add a markdown-structure sink (hostile + legitimate report shapes), let the probe engine bind a fixed second argument, and make the rule name the outcome it reached."
 tags: [security-probe, finalise, corpus, report-lint]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-20
 updated: 2026-09-30
 assignee:
 estimated_effort_hours: 6
 risk_level: low
+completed_date: 2026-09-30
+pr_number: 526
 github_issue: 438
 ---
 
 # Technical Task: A markdown-structure sink and an internal-artefact decision for the security probe
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.131.review.1.markdown-structure-sink-internal-validator-class.md` implemented 2026-09-30
 **GitHub Issue**: [#438](https://github.com/Gamaroff/agent-skills/issues/438)
 
@@ -330,6 +332,28 @@ Carried from gate 4 by the Cosmetic-residue exit (route 2b); closed in `top_issu
 - **TASK-131-CR-4-4**: indent one Step 3c continuation line.
 
 Also carried from earlier gates: `args` is not in the JS control key; the ok-rule wording; the duplicated corpus-doc paragraph; CRLF fence detection in `jira-sync.js` and `doc-links.js` (pre-existing).
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.131.qa.4.markdown-structure-sink-internal-validator-class.md`
+**Gate File**: `task.131.gate.4.markdown-structure-sink-internal-validator-class.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (4 QA cycles; 7 bugs raised and closed; Step 5c PR review CONCERNS)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 6/6 met — sink both directions with per-code isolation; `lintReport` probe engages 15/15; `internal` rendered and enforced; probe 1.6 s; mutation proofs; CHANGELOG + consumer enumeration
+✅ **Tests:** `npm run ci:fast` 4,594 tests, 0 failures; CI SUCCESS on `8a0504150c8d`
+✅ **Documentation:** CHANGELOG `[Unreleased]`, probe-boundary-rule, finalise prompt, finalise/qa-task/qa-story SKILL.md, review-security prompt, anti-patterns; bundled copies regenerated
+✅ **Security Review:** boundary probed by execution — 15 executed, 0 reproduced
+⚠️ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-30
+
+**Detailed Verification Log:** See `task.131.dod.1.markdown-structure-sink-internal-validator-class.md` for complete verification evidence and timestamps.
 
 <!-- change-log-start -->
 ## Change Log
@@ -345,6 +369,7 @@ Also carried from earlier gates: `args` is not in the JS control key; the ok-rul
 | 2026-09-30 |  | QA gate CONCERNS (80/100) — cycle 3: 4 findings (2 medium, 2 low) | qa-task |
 | 2026-09-30 |  | QA findings fixed — 3 iterations: cycle 1 BUG-1, BUG-2, CR-4 (+2 cleanups); cycle 2 BUG-3, BUG-4, BUG-5, QA-4; cycle 3 BUG-6, BUG-7, CR-3-3, QA-6 | qa-fix |
 | 2026-09-30 |  | QA gate PASS (100/100) — cycle 4: 4 LOW carried to recommendations.future (Cosmetic-residue exit) | qa-task |
+| 2026-09-30 | 1.2 | DoD passed — accepted (PR #526) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking

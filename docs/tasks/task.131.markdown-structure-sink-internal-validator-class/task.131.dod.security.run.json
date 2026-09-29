@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "markdown-structure",
+      "entry": "shared/resources/report-lint.js#lintReport",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 15,
+      "passed": 15,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        {
+          "sections": {
+            "story": [
+              {
+                "name": "Summary",
+                "optional": false
+              },
+              {
+                "name": "Pipeline Configuration",
+                "optional": false
+              },
+              {
+                "name": "Pipeline Progress",
+                "optional": false
+              },
+              {
+                "name": "Decisions Log",
+                "optional": false
+              },
+              {
+                "name": "Issues Log",
+                "optional": false
+              },
+              {
+                "name": "Tracker Actions Required",
+                "optional": true
+              },
+              {
+                "name": "QA Iteration History",
+                "optional": false
+              },
+              {
+                "name": "Completion",
+                "optional": false
+              }
+            ],
+            "task": [
+              {
+                "name": "Summary",
+                "optional": false
+              },
+              {
+                "name": "Pipeline Configuration",
+                "optional": false
+              },
+              {
+                "name": "Pipeline Progress",
+                "optional": false
+              },
+              {
+                "name": "Decisions Log",
+                "optional": false
+              },
+              {
+                "name": "Issues Log",
+                "optional": false
+              },
+              {
+                "name": "Tracker Actions Required",
+                "optional": true
+              },
+              {
+                "name": "QA Iteration History",
+                "optional": false
+              },
+              {
+                "name": "Completion",
+                "optional": false
+              }
+            ],
+            "bug": [
+              {
+                "name": "Pipeline Progress",
+                "optional": false
+              },
+              {
+                "name": "Decisions Log",
+                "optional": false
+              },
+              {
+                "name": "Issues Log",
+                "optional": false
+              },
+              {
+                "name": "Completion",
+                "optional": false
+              }
+            ]
+          }
+        }
+      ],
+      "ran_at": "2026-09-29T23:19:57.508Z"
+    }
+  ],
+  "totals": {
+    "executed": 15,
+    "reproduced": 0
+  },
+  "updated_at": "2026-09-29T23:19:57.508Z"
+}
