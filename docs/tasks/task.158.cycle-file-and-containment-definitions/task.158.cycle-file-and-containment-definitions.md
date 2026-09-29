@@ -5,18 +5,20 @@ type: task
 description: "Three residues carried out of task.149. From cycle 2 on, qa-read-back.js passes a document whose links still point at the previous cycle. The QA skills and pipeline step docs find the current gate with a second `find -name` grammar that disagrees with qa-cycle.sh. And security-probe.mjs refuses a legitimate `..name` path with a bare `startsWith(\"..\")` containment test."
 tags: [qa-task, qa-story, qa-read-back, qa-cycle, security-probe, doc-links, follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-26
 updated: 2026-09-29
 assignee:
 estimated_effort_hours: 8
 github_issue: 494
+completed_date: 2026-09-29
+pr_number: 521
 ---
 
 # Technical Task: QA read-back requires this cycle's links; one definition each for the cycle's gate file and for path containment
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.158.review.1.cycle-file-and-containment-definitions.md` implemented 2026-09-29
 
@@ -361,7 +363,7 @@ Not applicable. The read-back gains one set lookup, and each changed block trade
 - [x] The extended guard reports zero hits on the shipped files and at least one hit per old shape in its fixtures
 - [x] One ESM `isWithin` and one CJS `isWithin`, held deep-equal by the parity test over one case table. The copies in `qa-read-back.js` and `linkState` are removed
 - [x] Every new assertion is mutation-proved, with the runs recorded in the implementation report
-- [ ] `npm run ci` is clean. That covers ci:fast, eval:all, validate:all, check:generated, bundle:check and lint:shell
+- [x] `npm run ci` is clean. That covers ci:fast, eval:all, validate:all, check:generated, bundle:check and lint:shell (2026-09-29, before `/finalise`: exit 0, 4512 pass / 0 fail, bundle freshness 129/0)
 - [x] `npm run validate -- skills/qa-task/` and `npm run validate -- skills/qa-story/` are clean
 
 ### Migration
@@ -436,6 +438,34 @@ None.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.158.qa.3.cycle-file-and-containment-definitions.md`
+**Gate File**: `task.158.gate.3.cycle-file-and-containment-definitions.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (3 QA cycles; 5c `/review-pr` APPROVE)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 13/13 success criteria met, with code and per-PR test citations
+✅ **Tests & PR:**
+- PR #521 CI green on `1a9d4bb7` (test, validate, link-check, shellcheck).
+- Local `npm run ci` exit 0.
+- Every new assertion is mutation-proved.
+✅ **Documentation:** CHANGELOG (task 158), QA skills, step docs and the `qa-cycle.sh` header
+✅ **Security Review:** PASS. Measured with 22 probe executions, and every reproduction is attributed.
+⚠️ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-29
+
+**Detailed Verification Log:** See `task.158.dod.1.cycle-file-and-containment-definitions.md` for the complete verification evidence and timestamps.
+
+---
+
 ## QA Testing Results
 
 **QA Status**: PASS
@@ -459,12 +489,11 @@ None.
 - Future work: a distinct `qa-cycle.sh` exit code for gate files with no usable number (QA3-CR-1, pre-existing at Phase 0); five low cleanups in the gate's `recommendations.future`
 
 ---
-
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-26 | 1.0     | Initial draft — cut from task.149's carried follow-ups (5c CR-1; gate 8 and gate 7 `recommendations.future`) | create-task |
 | 2026-09-29 | 1.1     | Review passed (8/10) — added the ambiguous-cycle stop and the `qa-cycle.sh` bundling requirement for the step docs | review-task |
 | 2026-09-29 |         | Status → ready-for-development | review-task |
@@ -472,6 +501,8 @@ None.
 | 2026-09-29 |         | QA gate CONCERNS (90/100) — 1 medium finding (CR-1), 3 low | qa-task |
 | 2026-09-29 |         | QA gate CONCERNS (90/100) — cycle 2: CR-1 verified fixed; 1 medium (QA2-CR-1), 1 advisory medium, 2 low | qa-task |
 | 2026-09-29 |         | QA gate PASS (100/100) — cycle 3: QA2-CR-1 verified fixed; 0 gating findings, 1 pre-existing medium and 5 low routed to future | qa-task |
+| 2026-09-29 |         | QA findings fixed — gate PASS (100/100), 2 iterations (CR-1 grant cycle definition; QA2-CR-1 unnumbered gates on resume) | qa-fix |
+| 2026-09-29 | 1.2 | DoD passed — accepted (PR #521) | finalise |
 <!-- change-log-end -->
 
 ---
