@@ -321,7 +321,7 @@ No API change to `spawn-budget.mjs`: the new export is additive and `spawnBudget
       saying the CI boxes are now enforced by `release.sh`
 - [x] § Cutting a release: the new step and `--skip-ci-check`; renumber the script steps
 - [x] CHANGELOG `[Unreleased]` cites `(task 153)`
-- [ ] Mutation proofs recorded in the implementation report; `npm run ci` green
+- [x] Mutation proofs recorded in the implementation report; `npm run ci` green
 
 ---
 
@@ -445,7 +445,7 @@ None.
       direction A; (M9) a `traps.md` line deleted → direction B;
       (M10) `killGroup` in `handoff-verify.mjs` kills only the leader → CR-6 still red on
       *"the grandchild outlived the timeout"*
-- [ ] `npm run ci` green, including `lint:shell` on `release.sh` and `bundle:check`
+- [x] `npm run ci` green, including `lint:shell` on `release.sh` and `bundle:check`
 
 ### Migration
 
@@ -549,6 +549,8 @@ None.
 | 2026-09-29 |         | Status → ready-for-development | review-task |
 | 2026-09-29 |         | Implemented — 4 files added (1 script, 3 test files), 11 modified, 6 bundled copies regenerated; 46 new tests; mutations M1–M10 red (M10 after a CR-6 fixture fix) | develop |
 | 2026-09-29 |         | Status → ready-for-review | develop |
+| 2026-09-29 |         | QA gate PASS (95/100) — 1 LOW finding gated (CR-1), 4 advisory | qa-task |
+| 2026-09-29 |         | QA findings fixed — CR-1 gated + CR-2..CR-5 advisory, 1 iteration; fast gate green | qa-fix |
 
 <!-- change-log-end -->
 
@@ -561,6 +563,30 @@ None.
 - [x] Phase 3: the load-sensitive marker and its list
 - [x] Phase 4: CR-6 tolerates its precondition miss
 - [x] Phase 5: docs and validation
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-29
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.153.qa.1.release-ci-gate-load-sensitive-tests.md](./task.153.qa.1.release-ci-gate-load-sensitive-tests.md)
+- **Gate File**: [task.153.gate.1.release-ci-gate-load-sensitive-tests.yml](./task.153.gate.1.release-ci-gate-load-sensitive-tests.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 46 new; `npm run ci` green
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues. One LOW code-review bug gated for qa-fix (CR-1: the marker guard's
+`enclosingAssert` does not check the call spans the hit line); four advisory items (CR-2..CR-5).
 
 ---
 

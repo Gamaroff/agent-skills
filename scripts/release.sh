@@ -170,7 +170,7 @@ ok "Up to date with origin/main"
 # keeps its own guard, so it skips this one. Pinned by tests/release-ci-gate.test.js.
 if [[ "$RETRY" == false ]]; then
   heading "CI verdict"
-  CI_JSON=$(command node "$(dirname "$0")/release-ci-verdict.mjs" --sha "$LOCAL" --json) || true
+  CI_JSON=$(command node "$(dirname "$0")/release-ci-verdict.mjs" --sha "$LOCAL" --repo "$REPO_SLUG" --json) || true
   ci_field() {
     printf '%s' "$CI_JSON" | command node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let v;try{v=JSON.parse(s)[process.argv[1]]}catch{}process.stdout.write(typeof v==="string"?v:"")})' "$1"
   }

@@ -28,7 +28,8 @@
  * `gh` missing, unauthenticated, failing, or printing something that is not a JSON array is
  * `unverifiable`, never `green`. A gate that cannot read its input must not report a pass.
  *
- * CLI: `release-ci-verdict.mjs --sha <40-hex> [--json]` — prints one object whose `reason` is
+ * CLI: `release-ci-verdict.mjs --sha <40-hex> [--repo <owner/name>] [--json]` — prints one object
+ * whose `reason` is
  * `green`, `red`, `pending` or `unverifiable`. Exit 0 green, 1 anything else, 2 usage.
  */
 import { spawnSync } from "node:child_process";
@@ -123,10 +124,17 @@ export function ciVerdict(runs, workflows = WORKFLOWS, sha = "") {
  * non-zero exit or output that is not a JSON array is `{ error }` — the caller reports it as
  * `unverifiable`.
  */
-export function fetchRuns(sha, { spawn = spawnSync } = {}) {
+/**
+ * `repo` (owner/name) is passed as `-R` when given. Without it gh infers the repository from the
+ * git remotes, and a clone with several remotes and no default makes gh fail — which fails closed
+ * (unverifiable), but refuses a green release for a reason that has nothing to do with CI (QA
+ * cycle 1, CR-2). release.sh passes its REPO_SLUG.
+ */
+export function fetchRuns(sha, { spawn = spawnSync, repo = "" } = {}) {
   const r = spawn(
     "gh",
     [
+      ...(repo ? ["-R", repo] : []),
       "run",
       "list",
       "--commit",
@@ -158,7 +166,8 @@ export function fetchRuns(sha, { spawn = spawnSync } = {}) {
   return { runs: parsed };
 }
 
-const USAGE = "usage: release-ci-verdict.mjs --sha <40-hex> [--json]";
+const USAGE =
+  "usage: release-ci-verdict.mjs --sha <40-hex> [--repo <owner/name>] [--json]";
 
 /** @returns {number} exit code — 0 green, 1 anything else, 2 usage */
 export function main(
@@ -167,10 +176,12 @@ export function main(
 ) {
   let sha = "";
   let json = false;
+  let repo = "";
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--json") json = true;
     else if (a === "--sha") sha = argv[++i] ?? "";
+    else if (a === "--repo") repo = argv[++i] ?? "";
     else if (a === "--help" || a === "-h") {
       stderr.write(USAGE + "\n");
       return 0;
@@ -183,7 +194,11 @@ export function main(
     stderr.write(`--sha must be a full 40-character commit SHA\n${USAGE}\n`);
     return 2;
   }
-  const fetched = fetchRuns(sha, { spawn });
+  if (repo !== "" && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) {
+    stderr.write(`--repo must be owner/name\n${USAGE}\n`);
+    return 2;
+  }
+  const fetched = fetchRuns(sha, { spawn, repo });
   const result = fetched.error
     ? { reason: "unverifiable", sha, workflows: [], detail: fetched.error }
     : ciVerdict(fetched.runs, WORKFLOWS, sha);

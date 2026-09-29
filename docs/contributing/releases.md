@@ -24,7 +24,7 @@ Before cutting a repo release:
 > composite and the three workflows run the same set, so a lane added to one and not the other
 > fails `npm test` (task 111).
 
-> **The CI boxes below are enforced by `release.sh`, not only read by you.** Step 1b of the script
+> **The CI boxes below are enforced by `release.sh`, not only read by you.** Step 2 of the script (labelled 1b in `release.sh`'s own header, which keeps its original numbering)
 > reads CI's recorded verdict for the commit being released (`scripts/release-ci-verdict.mjs`) and
 > refuses unless it is green: `Test` and `ShellCheck` must have a green run for the SHA, and
 > `Validate Skills` and `Docs link check` — path-filtered, so often absent — must not be red when
@@ -76,7 +76,7 @@ Before cutting a repo release:
 >   | grep -oE '(task|bug)\.[0-9]+' | sort -u
 > ```
 
-> Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are checked and auto-committed by `release.sh` — no manual pre-check needed. `release.sh` does **not** run `format:check`, `eval:all` or `shellcheck` locally; those are CI's job, which is why the boxes above are about CI being green and not about a local run — and it now reads CI's verdict for them before tagging (step 1b below).
+> Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are checked and auto-committed by `release.sh` — no manual pre-check needed. `release.sh` does **not** run `format:check`, `eval:all` or `shellcheck` locally; those are CI's job, which is why the boxes above are about CI being green and not about a local run — and it now reads CI's verdict for them before tagging (step 2 below).
 
 ## Branch flow
 

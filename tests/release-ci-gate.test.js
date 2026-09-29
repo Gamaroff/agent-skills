@@ -104,7 +104,7 @@ function sandbox() {
   // gh: GH_EXIT non-zero → an auth-style failure; otherwise print the fixture file.
   fs.writeFileSync(
     path.join(bin, "gh"),
-    '#!/bin/sh\nif [ "${GH_EXIT:-0}" != 0 ]; then\n  echo "To get started with GitHub CLI, please run:  gh auth login" >&2\n  exit "$GH_EXIT"\nfi\ncat "$GH_FIXTURE"\n',
+    '#!/bin/sh\necho "$*" >> "$GH_ARGS_LOG"\nif [ "${GH_EXIT:-0}" != 0 ]; then\n  echo "To get started with GitHub CLI, please run:  gh auth login" >&2\n  exit "$GH_EXIT"\nfi\ncat "$GH_FIXTURE"\n',
     { mode: 0o755 },
   );
   fs.writeFileSync(
@@ -131,6 +131,7 @@ function release(
   const fixture = path.join(box.root, "runs.json");
   fs.writeFileSync(fixture, JSON.stringify(runs));
   const marker = path.join(box.root, "npm-called");
+  const ghArgs = path.join(box.root, "gh-args");
   const r = spawnSync("bash", [path.join("scripts", "release.sh"), ...args], {
     cwd: box.work,
     encoding: "utf8",
@@ -141,6 +142,7 @@ function release(
       GH_FIXTURE: fixture,
       GH_EXIT: String(ghExit),
       NPM_MARKER: marker,
+      GH_ARGS_LOG: ghArgs,
       NPM_EXIT: String(npmExit),
       NO_COLOR: "1",
     },
@@ -148,7 +150,14 @@ function release(
   });
   const out = `${r.stdout}\n${r.stderr}`;
   const tags = sh("git", ["tag"], box.work);
-  return { status: r.status, out, npmCalled: fs.existsSync(marker), tags };
+  const ghCalls = fs.existsSync(ghArgs) ? fs.readFileSync(ghArgs, "utf8") : "";
+  return {
+    status: r.status,
+    out,
+    npmCalled: fs.existsSync(marker),
+    tags,
+    ghCalls,
+  };
 }
 
 test("red CI refuses before the local test runs, naming the workflow and the escape hatch", () => {
@@ -166,6 +175,11 @@ test("red CI refuses before the local test runs, naming the workflow and the esc
     "npm ran — the CI check did not come BEFORE the local test",
   );
   assert.equal(r.tags, "", "nothing tagged");
+  assert.match(
+    r.ghCalls,
+    /^-R Gamaroff\/agent-skills run list --commit [0-9a-f]{40} /,
+    "gh is pinned to REPO_SLUG (CR-2)",
+  );
 });
 
 test("gh failing (unauthenticated) refuses as unverifiable", () => {

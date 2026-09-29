@@ -190,6 +190,17 @@ test("fetchRuns: asks gh for this commit's runs with the fields the rule reads",
   const fields = seen[seen.indexOf("--json") + 1].split(",");
   for (const f of ["workflowName", "status", "conclusion", "databaseId", "url"])
     assert.ok(fields.includes(f), f);
+  assert.ok(!seen.includes("-R"), "no -R when no repo is given");
+});
+
+test("fetchRuns: a repo is passed to gh as -R, so a multi-remote clone cannot pick the wrong one (CR-2)", () => {
+  let seen;
+  const spawn = (cmd, args) => {
+    seen = args;
+    return { status: 0, stdout: "[]" };
+  };
+  mod.fetchRuns(SHA, { spawn, repo: "Gamaroff/agent-skills" });
+  assert.deepEqual(seen.slice(0, 2), ["-R", "Gamaroff/agent-skills"]);
 });
 
 // ── the CLI, with a PATH-stubbed gh ────────────────────────────────────────
@@ -265,6 +276,20 @@ test("cli: a missing or short --sha is a usage error (exit 2), and gh is never a
   assert.equal(cli(["--bogus"], "exit 0").status, 2);
 });
 
+test("cli: --repo reaches gh as -R; a malformed --repo is a usage error and gh is never asked", () => {
+  const ok = cli(
+    ["--sha", SHA, "--repo", "o/r", "--json"],
+    `[ "$1" = "-R" ] && [ "$2" = "o/r" ] || { echo "no -R o/r: $*" >&2; exit 9; }\n` +
+      json(GREEN_REQUIRED),
+  );
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  for (const bad of ["o", "o/r/x", "o r/x", "--json"]) {
+    const r = cli(["--sha", SHA, "--repo", bad], "echo called >&2; exit 0");
+    assert.equal(r.status, 2, bad);
+    assert.doesNotMatch(r.stderr, /called/);
+  }
+});
+
 test("cli: without --json prints one human line", () => {
   const r = cli(
     ["--sha", SHA],
@@ -300,8 +325,45 @@ function readWorkflow(file) {
       if (inPush && /^ {4}paths(-ignore)?:/.test(l)) pushPaths = true;
     }
   }
-  return { name, push, pushPaths };
+  // Only the block form is read. An inline trigger (`on: push`, `on: [push, pull_request]`) is
+  // reported unreadable rather than read as "not push-triggered" — the parity cases below would
+  // otherwise pass over exactly the workflow they cannot see (QA cycle 1, CR-3).
+  return { name, push, pushPaths, readable: onAt >= 0 };
 }
+
+test("readWorkflow: an inline on: is unreadable, never 'not push-triggered' (CR-3)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "release-ci-verdict-wf-"));
+  try {
+    for (const on of ["on: push", "on: [push, pull_request]"]) {
+      const file = path.join(dir, "w.yml");
+      fs.writeFileSync(file, `name: W\n${on}\njobs: {}\n`);
+      assert.equal(readWorkflow(file).readable, false, on);
+    }
+    const block = path.join(dir, "b.yml");
+    fs.writeFileSync(block, "name: B\non:\n  push:\n    branches: [main]\n");
+    assert.deepEqual(readWorkflow(block), {
+      name: "B",
+      push: true,
+      pushPaths: false,
+      readable: true,
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("parity: every workflow's trigger is in the block form this reader can see", () => {
+  const files = fs.readdirSync(WORKFLOW_DIR).filter((f) => /\.ya?ml$/.test(f));
+  assert.ok(files.length >= 4, `non-vacuity: ${files.length} workflow file(s)`);
+  const unreadable = files.filter(
+    (f) => !readWorkflow(path.join(WORKFLOW_DIR, f)).readable,
+  );
+  assert.deepEqual(
+    unreadable,
+    [],
+    "inline on: — rewrite it as a block, or teach readWorkflow the form",
+  );
+});
 
 test("parity: every WORKFLOWS name is a workflow's name:, with the push shape its list claims", () => {
   const files = fs.readdirSync(WORKFLOW_DIR).filter((f) => /\.ya?ml$/.test(f));

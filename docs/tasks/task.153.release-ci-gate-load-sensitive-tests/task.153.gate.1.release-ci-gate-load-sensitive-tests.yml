@@ -1,0 +1,63 @@
+schema: 1
+task: 'task.153.release-ci-gate-load-sensitive-tests'
+task_title: "[Task 153] Release gate reads CI's verdict; load-sensitive tests name themselves"
+gate: PASS
+status_reason: 'All 5 phases verified, npm run ci green (exit 0), boundary probe engages (13/13), M1-M10 red. One LOW high-confidence code-review bug (CR-1) is promoted under code_review_blocking and routed to qa-fix.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T07:06:49Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: low
+    file: 'tests/load-sensitive-marker.test.js'
+    finding: 'enclosingAssert walks up to the nearest assert( within 5 lines and returns it without checking the call spans the hit line, so an unmarked wall-clock comparison outside any assert, sitting just below a marked assert, reads as marked — direction A passes on the case it exists to catch.'
+    suggested_action: 'Track the line where the matched call closes and return null when it closes above the hit line; add a unit case with a marked assert followed by an unmarked comparison.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 46
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 13
+    notes: 'Boundary: release-ci-verdict.mjs --sha (cli: form). 11 hostile SHAs refused (exit 2) before gh is spawned; 2 legitimate SHAs accepted. Verdict engages. One recorded escape is gh writing its own device-id under the sandboxed HOME, not the code under test. Record: task.153.qa.1.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'One gh call before the multi-minute local test; CR-6 idle path unchanged at one 3 s attempt; no thresholds raised.'
+  reliability:
+    status: PASS
+    notes: 'Fails closed: gh missing/failing/non-array is unverifiable, never green; pending refuses with a re-run instruction; --retry unaffected (tested).'
+  maintainability:
+    status: PASS
+    notes: 'One WORKFLOWS table with a parity test; one load-sensitive list with a two-direction guard; npm run ci green incl. lint:shell and bundle:check.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1: enclosingAssert must confirm the matched call spans the hit line.'
+      refs: ['tests/load-sensitive-marker.test.js']
+  future:
+    - action: 'CR-2: pass --repo/-R to gh from REPO_SLUG so a multi-remote clone with no default is not refused as unverifiable.'
+      refs: ['scripts/release-ci-verdict.mjs', 'scripts/release.sh']
+    - action: 'CR-3: readWorkflow should flag an inline on: form instead of reading it as not push-triggered.'
+      refs: ['tests/release-ci-verdict.test.js']
+    - action: 'CR-4: drop the DEFINER filter, which the *.test.* pathspec already makes a no-op.'
+      refs: ['tests/load-sensitive-marker.test.js']
+    - action: 'CR-5: releases.md says step 1b in prose but numbers the CI step 2 in the list; use one numbering.'
+      refs: ['docs/contributing/releases.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']
