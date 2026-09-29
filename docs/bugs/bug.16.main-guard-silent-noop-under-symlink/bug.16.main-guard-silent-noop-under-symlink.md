@@ -7,10 +7,12 @@ created: '2026-09-23'
 updated: '2026-09-23'
 related: 'none — cross-cutting (six CLI entry-point guards across five skills and shared/resources)'
 description: "Six scripts guard their CLI entry point with resolve(process.argv[1]) === fileURLToPath(import.meta.url). resolve() does not follow symlinks and import.meta.url is fully resolved, so invoking any of them through a symlinked path — which includes every macOS mktemp -d copy, since /var is a symlink to /private/var — makes the whole CLI a silent no-op: exit 0, no output, no writes, indistinguishable from a clean run."
+github_issue: 522
 ---
 
 **Bug ID**: bug.16
 **Related**: none — cross-cutting
+**GitHub**: [#522](https://github.com/Gamaroff/agent-skills/issues/522)
 **Status**: 🆕 New
 **Priority**: Medium
 **Severity**: Major
@@ -103,3 +105,9 @@ Found during task.141's QA cycle 6, by a dispatched reviewer that had itself bee
 Filed separately from that task's PR because it is **pre-existing** — it reproduces identically on
 `origin/develop` and is untouched by that branch — and because its scope is six files across five
 skills, not the one the task happened to be editing.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-09-29 | New | ensure-bug-github-issue | GitHub issue created (#522) |
