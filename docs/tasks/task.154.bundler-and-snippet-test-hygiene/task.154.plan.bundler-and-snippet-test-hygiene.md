@@ -103,7 +103,9 @@ correctly. Check `npm run -s bundle 2>&1 | grep -c 'not found'` → `0`.
 
    Because `seen` is per skill, a shared source bundled by N skills would otherwise print N times
    under `--all`. The dedupe set prevents that, for the same reason given in the comment above
-   `_WARNED_COMMENT_ORIGINS`.
+   `_WARNED_COMMENT_ORIGINS`. Within one skill only the first citation discovery reaches is reported,
+   because `seen` is keyed on the name; the dedupe set is what stops the same `(name, origin)` repeating
+   across skills.
 
 ### Phase 3: CI reader — `tests/bundle-missing-source.test.js`
 
@@ -122,7 +124,8 @@ with `fs.mkdtempSync` holding `shared/resources/` and `skills/<fixture>/`. Run
 - **§1 parity.** For a fixture text with several citations, `shared_refs_with_lines` names equal
   `collect_shared_refs`. Import both through `python3 -c`.
 - **§2 live tree.** `execFileSync("python3", [BUNDLER, "--check"], { cwd: REPO_ROOT })`. Assert zero
-  lines matching `/not found/`. Assert the summary line `bundle freshness: (\d+) skill\(s\) checked`
+  lines matching `/shared\/resources\/.* not found/` (a bare `/not found/` also matches the unrelated
+  `SKILL.md not found` at `bundle_skill.py:775`). Assert the summary line `bundle freshness: (\d+) skill\(s\) checked`
   captures ≥ 100, which is the non-vacuity floor (129 on 2026-09-24).
 
 Mutation table: see task § 8. Revert each change, record the red output, and restore.
@@ -195,6 +198,7 @@ rm -rf "$DIR"
 trap 'rm -rf "$DIR"' EXIT
 git clone --quiet --local --shared "$REPO" "$DIR"
 git -C "$DIR" checkout --quiet --detach "$(git -C "$REPO" rev-parse HEAD)"
+[ -d "$REPO/node_modules" ] || { echo "test-clean-checkout: $REPO/node_modules is missing — run npm ci first" >&2; exit 2; }
 ln -s "$REPO/node_modules" "$DIR/node_modules"
 cd "$DIR"
 eval "${CLEAN_CHECKOUT_CMD:-npm test}"

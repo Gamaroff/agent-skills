@@ -1,0 +1,138 @@
+[
+  {
+    "id": "empty",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "",
+    "why": "An empty base resolves to the working directory, which is wherever the caller happened to stand.",
+    "correct": "Reject empty input explicitly."
+  },
+  {
+    "id": "tmp",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/tmp/clean-checkout",
+    "why": "observation-log.test.mjs refuses a scratch base under /tmp, so a clone there goes red where CI is green.",
+    "correct": "Reject: ephemeral."
+  },
+  {
+    "id": "private-tmp",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/private/tmp/clean-checkout",
+    "why": "The resolved spelling of /tmp on macOS.",
+    "correct": "Reject: ephemeral."
+  },
+  {
+    "id": "var-tmp",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/var/tmp/clean-checkout",
+    "why": "The engine lists /var/tmp.",
+    "correct": "Reject: ephemeral."
+  },
+  {
+    "id": "private-var-tmp",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/private/var/tmp/clean-checkout",
+    "why": "macOS resolves /var/tmp to /private/var/tmp, which the engine does not list; the decision checks both spellings.",
+    "correct": "Reject: ephemeral in the /var/tmp spelling."
+  },
+  {
+    "id": "traversal-into-tmp",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/Users/gamaroff/Development/Projects/agent-skills/../../../../../../../tmp/clean-checkout",
+    "why": "Lexically inside the repository's parents, resolved into /tmp.",
+    "correct": "Resolve before classifying; reject."
+  },
+  {
+    "id": "worktree",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/Users/gamaroff/Development/Projects/agent-skills/.claude/worktrees/clean-checkout",
+    "why": "A .claude/worktrees/ path is torn down with its worktree.",
+    "correct": "Reject: ephemeral."
+  },
+  {
+    "id": "root",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/",
+    "why": "The filesystem root exists and is a directory; only writability refuses it.",
+    "correct": "Reject: not writable."
+  },
+  {
+    "id": "newline",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/Users/gamaroff/Development/Projects/agent-skills/clean\ncheckout",
+    "why": "A newline cannot be reported or split safely by the runner's two-line verdict.",
+    "correct": "Reject: control character."
+  },
+  {
+    "id": "nul",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/Users/gamaroff/Development/Projects/agent-skills/clean\u0000checkout",
+    "why": "A NUL truncates at the syscall layer.",
+    "correct": "Reject: control character."
+  },
+  {
+    "id": "missing-parent",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/Users/gamaroff/Development/Projects/agent-skills/no-such-parent/clean-checkout",
+    "why": "The runner's single mkdir would have to create a parent it never removes.",
+    "correct": "Reject: parent does not exist."
+  },
+  {
+    "id": "file",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/Users/gamaroff/Development/Projects/agent-skills/package.json",
+    "why": "A file is not a directory to clone into.",
+    "correct": "Reject: not a directory."
+  },
+  {
+    "id": "unwritable",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "/usr/bin",
+    "why": "An existing directory the user cannot write.",
+    "correct": "Reject: not writable."
+  },
+  {
+    "id": "repo-root",
+    "sink": "path",
+    "direction": "legitimate",
+    "input": "/Users/gamaroff/Development/Projects/agent-skills",
+    "why": "An existing writable non-ephemeral directory.",
+    "correct": "Accept."
+  },
+  {
+    "id": "default-base",
+    "sink": "path",
+    "direction": "legitimate",
+    "input": "/Users/gamaroff/Development/Projects/agent-skills/.clean-checkout",
+    "why": "The runner's default base.",
+    "correct": "Accept."
+  },
+  {
+    "id": "missing-one-level",
+    "sink": "path",
+    "direction": "legitimate",
+    "input": "/Users/gamaroff/Development/Projects/agent-skills/.clean-checkout-probe-new",
+    "why": "A missing base whose parent exists: the runner creates it.",
+    "correct": "Accept (the decision writes nothing)."
+  },
+  {
+    "id": "dots-in-name",
+    "sink": "path",
+    "direction": "legitimate",
+    "input": "/Users/gamaroff/Development/Projects/agent-skills/clean..checkout",
+    "why": "'..' as a substring is not traversal.",
+    "correct": "Accept."
+  }
+]

@@ -52,6 +52,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:shell": "bash scripts/lint-shell.sh",
+    "test:clean-checkout": "bash scripts/test-clean-checkout.sh",
     "generate-catalog": "python3 skills/create-skill/scripts/generate_catalog.py",
     "generate-skill-deps": "node scripts/generate-skill-dependencies.mjs",
     "skill-deps:candidates": "node scripts/generate-skill-dependencies.mjs --report-candidates",

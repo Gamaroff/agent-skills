@@ -22,13 +22,13 @@ import {
   writeFileSync,
   readFileSync,
   mkdirSync,
-  symlinkSync,
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnBudget } from "../../../shared/resources/spawn-budget.mjs";
+import { makeConsumerRoot } from "../lib/consumer-root.mjs";
 
 const REPO = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -39,15 +39,7 @@ const REPO = path.resolve(
 // the repo root only through the developer's gitignored `.agents/skills ->
 // ../skills` symlink, which is why those rows passed locally and failed on CI
 // (no `.agents/` there). So "repo" means this consumer-shaped root, never REPO.
-const CONSUMER_ROOT = mkdtempSync(path.join(tmpdir(), "ofl-consumer-"));
-mkdirSync(path.join(CONSUMER_ROOT, ".agents"));
-symlinkSync(
-  path.join(REPO, "skills"),
-  path.join(CONSUMER_ROOT, ".agents", "skills"),
-);
-process.on("exit", () =>
-  rmSync(CONSUMER_ROOT, { recursive: true, force: true }),
-);
+const CONSUMER_ROOT = makeConsumerRoot(REPO, "ofl-consumer-");
 const { timeoutMs: SPAWN_TIMEOUT_MS } = spawnBudget("optional-file-lookups");
 const SHELLS = [
   "bash",

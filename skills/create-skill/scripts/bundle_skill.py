@@ -24,7 +24,7 @@ import re
 import sys
 from pathlib import Path
 
-from quick_validate import collect_shared_refs, find_repo_root
+from quick_validate import find_repo_root
 
 # `(?<![\w-]/)` — never match inside an absolute URL: the link pass below writes
 # `https://…/blob/develop/shared/resources/x.md` into bundled copies for targets
@@ -144,6 +144,59 @@ def comment_only_refs(text):
             if target:
                 out.append((i, target))
     return out
+
+
+SHARED_REF_LINE_RE = re.compile(r'(?<![\w-]/)shared/resources/([^\s`\'")\]*]+)')
+
+
+def shared_refs_with_lines(text):
+    """Return [(line_no, name)] for every shared/resources/<name> citation in
+    `text` — the same match and punctuation strip as
+    quick_validate.collect_shared_refs, plus the line, so a missing source can be
+    reported against the file and line that cited it. Pure.
+
+    One pass over the whole text, not one per line: the name class excludes
+    whitespace, so no match spans a newline and the matches are the same. The
+    per-line loop cost 1.9 s of a 7.2 s `--check` (task 154 DoD, AC6)."""
+    out = []
+    line, pos = 1, 0
+    for m in SHARED_REF_LINE_RE.finditer(text):
+        line += text.count('\n', pos, m.start())
+        pos = m.start()
+        name = m.group(1).rstrip('.,;:')
+        if name:
+            out.append((line, name))
+    return out
+
+
+def _rel(path, repo_root):
+    try:
+        return str(path.relative_to(repo_root))
+    except ValueError:
+        return str(path)
+
+
+# Missing citations already warned about this run, keyed (name, origin). The
+# same reasoning as _WARNED_COMMENT_ORIGINS below: `seen` in discover_needed is
+# per skill, so a shared source bundled by N skills would print its missing
+# citation N times under `--all`. Within one skill only the citation discovery
+# reaches first is reported, because `seen` is keyed on the name alone.
+_WARNED_MISSING = set()
+
+
+def warn_missing_source(name, origin):
+    """Print one attributed not-found warning per (name, origin) per run."""
+    if origin is None:
+        where = "an unrecorded origin"
+    elif origin[1]:
+        where = f"{origin[0]}:{origin[1]}"
+    else:
+        where = origin[0]
+    key = (name, where)
+    if key in _WARNED_MISSING:
+        return
+    _WARNED_MISSING.add(key)
+    print(f"⚠️  shared/resources/{name} not found — cited at {where}")
 
 
 # Origins already warned about this run. A shared source is visited once per
@@ -506,7 +559,7 @@ def discover_needed(skill_path, shared_dir, refs_dir):
     ]
 
     needed = {}           # filename -> source Path
-    pending = []          # candidates from shared/resources/X — warn if missing
+    pending = []          # (name, origin) from shared/resources/X — warn if missing
     pending_quiet = []    # candidates from references/X — many are skill-native, silent
     for f in skill_files:
         try:
@@ -517,7 +570,8 @@ def discover_needed(skill_path, shared_dir, refs_dir):
             # pass 3 below — an earlier version guarded only this one while
             # claiming it was the only unguarded read, which left the crash live.
             continue
-        pending.extend(collect_shared_refs(text))
+        rel_f = _rel(f, repo_root)
+        pending.extend((n, (rel_f, ln)) for ln, n in shared_refs_with_lines(text))
         warn_comment_only_refs(f, text, repo_root)
         for m in REFS_REF_RE.finditer(text):
             pending_quiet.append(m.group(1))
@@ -525,10 +579,10 @@ def discover_needed(skill_path, shared_dir, refs_dir):
     seen = set()
     while pending or pending_quiet:
         if pending:
-            name = pending.pop()
+            name, origin = pending.pop()
             quiet = False
         else:
-            name = pending_quiet.pop()
+            name, origin = pending_quiet.pop(), None
             quiet = True
         if name in seen:
             continue
@@ -549,20 +603,23 @@ def discover_needed(skill_path, shared_dir, refs_dir):
         # `..`-leaf fixture). A directory is not a bundleable source.
         if not src.is_file():
             if not quiet:
-                print(f"⚠️  shared/resources/{name} not found")
+                warn_missing_source(name, origin)
             continue
         needed[name] = src
         try:
             text = src.read_text()
         except (UnicodeDecodeError, OSError):
             continue
-        pending.extend(collect_shared_refs(text))
+        rel_src = _rel(src, repo_root)
+        pending.extend((n, (rel_src, ln)) for ln, n in shared_refs_with_lines(text))
         warn_comment_only_refs(src, text, repo_root)
+        # Sibling edges carry the citing file but no line: the regexes match
+        # across the whole text, and the file is what a reader needs to act.
         if src.suffix in ('.js', '.mjs'):
-            pending.extend(m.group(1) for m in JS_SIBLING_RE.finditer(text))
-            pending.extend(m.group(1) for m in JS_ESM_SIBLING_RE.finditer(text))
+            pending.extend((m.group(1), (rel_src, None)) for m in JS_SIBLING_RE.finditer(text))
+            pending.extend((m.group(1), (rel_src, None)) for m in JS_ESM_SIBLING_RE.finditer(text))
         if src.suffix == '.sh':
-            pending.extend(m.group(1) for m in SH_SIBLING_RE.finditer(text))
+            pending.extend((m.group(1), (rel_src, None)) for m in SH_SIBLING_RE.finditer(text))
         if src.suffix in ('.md', '.sh'):
             # `pending_quiet`, not `pending`: a missing source here is not an
             # authoring error worth a warning — it is a skill-native script that
@@ -1229,6 +1286,11 @@ def check_all(targets):
         f"❌ bundle freshness: {len(all_problems)} problem(s) "
         f"across {skills_affected} skill(s)"
     )
+    # The scan's own size, on the problem path too. The clean line above carries
+    # it; without this one a run whose every target went unresolved printed
+    # `0 problem(s) across 0 skill(s)` and a reader could not tell a scan of
+    # nothing from a scan with nothing wrong (task 154 QA cycle 2).
+    print(f"   {len(targets) - unresolved} skill(s) checked, {unresolved} unresolved")
 
     # Only classes that actually occurred are named. A summary that lists the
     # whole taxonomy every run puts every class name in stdout, which makes

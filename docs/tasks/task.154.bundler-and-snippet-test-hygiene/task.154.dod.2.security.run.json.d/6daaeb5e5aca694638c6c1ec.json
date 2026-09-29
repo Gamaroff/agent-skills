@@ -1,0 +1,18 @@
+{
+  "sink": "path",
+  "entry": "scripts/lib/clean-checkout-base.mjs#resolveBase",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 17,
+  "passed": 17,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "ran_at": "2026-09-29T05:20:40.309Z"
+}

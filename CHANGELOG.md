@@ -134,6 +134,25 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The release gate runs the suite in a clean clone of HEAD (task 154).** `scripts/release.sh`
+  ran `npm test` in place, where the gitignored `.agents/skills -> ../skills` symlink makes any test
+  that reaches `.agents/skills/…` from the repo root pass — CI has no such symlink, and
+  `finalise-bug-mode.test.mjs` once passed 71/71 locally while 19 rows failed on every push
+  (obs #149). New `npm run test:clean-checkout` (`scripts/test-clean-checkout.sh`) makes a
+  `git clone --local --shared` of HEAD — full history and tags, tracked files only, no ignored paths
+  — in a directory of its own (`mktemp -d`) inside a repo-local base, `.clean-checkout/` by default
+  (never a temporary directory, which the observation-log tests refuse), links `node_modules`, runs
+  `npm test` there and removes that directory and nothing else: ownership by construction, so the
+  base is never deleted and two concurrent runs never touch each other's clone. It warns that
+  uncommitted changes are not tested. Whether a base is usable is decided once, by `resolveBase()` in
+  `scripts/lib/clean-checkout-base.mjs`, which the runner calls as a CLI and `security-probe.mjs`
+  reaches as an export (17 cases executed, 0 reproduced). `release.sh` now gates on it, with the
+  runner's `CLEAN_CHECKOUT_CMD` test hook cleared; a fixture test pins the gate's order, its
+  abort-on-failure and the cleared hook. The consumer-shaped test root is
+  defined once, `makeConsumerRoot()` in `evals/shared/lib/consumer-root.mjs`, replacing two
+  hand-rolled copies; `consumer-root.test.mjs` proves the snippet it guards fails from a bare
+  directory. create-skill and `docs/contributing/traps.md` carry the rule.
+
 - **The card preflight reads the frontmatter title (task 150, obs #128).** `preflight()` kept only
   the body, so no finding was ever raised about the title, and 42 of 146 task titles had grown past
   100 characters (the longest 368), published verbatim as GitHub issue titles. `CARD_TITLE_MAX = 100`
@@ -366,6 +385,20 @@ All notable changes to this project will be documented in this file. Format foll
   direct option is removed and the removal records why, so it is not re-added.
 
 ### Fixed
+
+- **The bundler's `not found` warning names its origin and has a reader (task 154).** Every
+  `npm run bundle` — so every pre-commit run — printed `⚠️  shared/resources/<name> not found` with no
+  file, from a placeholder literal in `observation-log-contract.md`, and eleven task reports recorded
+  it as "pre-existing" (obs #151). The literal is gone (the contract now describes the path form in
+  words; a brace placeholder would have matched too). Discovery now carries each citation's origin,
+  and the warning reads `⚠️  shared/resources/<name> not found — cited at <file>:<line>`, once per
+  `(name, origin)` per run, mirroring the comment-only-reference warning. `--check`'s problem-path
+  summary now also prints `N skill(s) checked, U unresolved`, so a scan of nothing is no longer
+  indistinguishable from a scan with nothing wrong. New `tests/bundle-missing-source.test.js`
+  proves the attribution and dedupe on a fixture and requires the live `--check` output to carry
+  none, over a scan count read from `--check` itself. The line-aware collector is one pass over each
+  file rather than one per line, which takes `--check` from 5.8 s to 4.6 s; each of the three new
+  test files fails its own run if it takes 10 s or more.
 
 - **The banner doc defers to the Stop hook instead of restating it, and a HALT names the step that
   halted (task 164).** Five follow-ups deferred by task 163. The Remaining Work Status doc's

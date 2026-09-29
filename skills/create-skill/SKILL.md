@@ -225,6 +225,16 @@ out of three inline copies in `finalise` (obs #146, task.138) — is sourced the
 defined in one block does not exist in the next, so a helper written inline is copied into every
 block that needs it and the copies drift. `finalise` carried `newest_numbered` three times.
 
+**Testing such a block.** A test that executes it runs it from a consumer-shaped root —
+`makeConsumerRoot(repoRoot, prefix)` in `evals/shared/lib/consumer-root.mjs` — never from the
+repository root and never from the inherited cwd. This repository's root resolves
+`.agents/skills/…` only through the developer's gitignored `.agents/skills -> ../skills` symlink,
+which CI's checkout does not have: `finalise-bug-mode.test.mjs` passed 71/71 locally and failed 19
+rows on every CI push until it was moved (obs #149). The helper is the one builder; its own test
+proves the same snippet fails from a bare directory, so the hazard is not an assumption. To confirm
+a local green means a CI green, run `npm run test:clean-checkout`, which runs the suite in a clone
+of HEAD with no gitignored paths — the release gate uses it for the same reason.
+
 ### An optional file is found with `find -name`, never a bare glob
 
 **The rule.** A fenced `bash` block that locates a file that **may not exist** — the newest

@@ -66,3 +66,9 @@ secrets.yml
 # Scratch space for shared/resources/tests/observation-log.test.mjs.
 # Must NOT be under a path the engine classifies as ephemeral (see that file).
 .observation-log-test-tmp/
+
+# Clean-checkout runner (scripts/test-clean-checkout.sh) and its fixture test's
+# scratch base. Repo-local, never a temporary directory, for the same reason as
+# the observation-log scratch above.
+.clean-checkout/
+.clean-checkout-test-tmp/

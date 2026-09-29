@@ -5,10 +5,12 @@ type: task
 description: "Two local-only blind spots in the repository's own tooling. (1) bundle_skill.py prints an unattributed `shared/resources/<name> not found` warning on every bundle and every pre-commit run, caused by a placeholder literal in observation-log-contract.md; remove the literal, make the warning name the citing file and line, and give it a CI reader. (2) Snippet tests that reach `.agents/skills/…` pass locally only through the developer's gitignored symlink; the two known instances are fixed, but nothing stops the next one — add a shared consumer-root helper, a clean-checkout test runner for the local release gate, and the create-skill rule."
 tags: [create-skill, bundle, testing, ci, observe-work, observation]
 category: testing
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-29
+completed_date: 2026-09-29
+pr_number: 513
 assignee:
 estimated_effort_hours: 16
 github_issue: 484
@@ -16,7 +18,9 @@ github_issue: 484
 
 # Technical Task: Bundler and snippet-test hygiene — an attributed warning and a symlink-free test run
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.154.review.1.bundler-and-snippet-test-hygiene.md` implemented 2026-09-28
 
 **GitHub Issue**: [#484](https://github.com/Gamaroff/agent-skills/issues/484)
 
@@ -195,8 +199,10 @@ that the live tree is clean.
   the form in words ("the literal shared-resources path form") and contains no
   `shared/resources/<…>` literal. The bundled copy is regenerated.
 - **Attributed warning.** Discovery keeps each candidate's origin, `(file, line)`, beside its name.
-  The warning becomes `⚠️  shared/resources/<name> not found — cited at <rel-file>:<line>` and prints
-  once per `(origin, name)` per run. Line-aware collection is a new pure helper next to
+  The warning becomes `⚠️  shared/resources/<name> not found — cited at <rel-file>:<line>`. Within one
+  skill it names the citation discovery reaches first, because `seen` stays keyed on the name (Risk 2),
+  so a second file in the same closure citing the same missing name is not reported separately.
+  Across skills it prints once per `(name, origin)` per run. Line-aware collection is a new pure helper next to
   `comment_only_refs`. `collect_shared_refs` in `quick_validate.py` keeps its signature, because
   `package_skill.py` and `quick_validate.py` still call it.
 - **CI reader.** `tests/bundle-missing-source.test.js` §1 builds a fixture repo whose shared source
@@ -209,10 +215,14 @@ that the live tree is clean.
   fails from a bare temporary directory.
 - **Clean-checkout runner.** `scripts/test-clean-checkout.sh` makes a `git clone --local --shared`
   of `HEAD`. That clone has full history and tags, keeps tracked files even when they match
-  `.gitignore`, and has no ignored files, like CI's `fetch-depth: 0` checkout. It goes into
-  `${CLEAN_CHECKOUT_DIR:-<repo>/.clean-checkout}`. That location is repo-local and gitignored, and
-  it is never a temporary directory, for the `EPHEMERAL_PATTERNS` reason above. The script links
-  `node_modules`, runs `npm test` there, and removes the clone at start and on exit. It warns when
+  `.gitignore`, and has no ignored files, like CI's `fetch-depth: 0` checkout. Each run clones into
+  a directory of its own, made with `mktemp -d` inside the base
+  `${CLEAN_CHECKOUT_DIR:-<repo>/.clean-checkout}`, and deletes that directory and nothing else. The
+  base is repo-local and gitignored, it is never a temporary directory (for the `EPHEMERAL_PATTERNS`
+  reason above), and it is never deleted. Ownership comes from construction: no other run or tool can
+  name a directory `mktemp` has just created, so concurrent runs cannot collide. (QA cycles 1–3
+  replaced a first design that cloned into the named location itself; see the implementation report.)
+  The script links `node_modules` and runs `npm test` in its run directory. It warns when
   the working tree has uncommitted changes, because those are not what it tests.
   `npm run test:clean-checkout` calls it, and `scripts/release.sh` runs it in place of the
   in-place `npm test`.
@@ -276,36 +286,38 @@ can land in either order, or as two PRs.
 **Files**: `shared/resources/observation-log-contract.md`,
 `skills/observe-work/references/observation-log-contract.md` (generated)
 
-- [ ] Rephrase line 290 so it names the form in words, with no `shared/resources/` followed by a
+- [x] Rephrase line 290 so it names the form in words, with no `shared/resources/` followed by a
       name, placeholder or brace
-- [ ] `npm run bundle`. The warning line disappears, and the bundled copy's line 290 reads
+- [x] `npm run bundle`. The warning line disappears, and the bundled copy's line 290 reads
       correctly
-- [ ] `bundle:check` still reports 0 problems
+- [x] `bundle:check` still reports 0 problems
 
 ### Phase 2: Attribute the warning (Risk: Low)
 
 **Files**: `skills/create-skill/scripts/bundle_skill.py`
 
-- [ ] Add `shared_refs_with_lines(text)`, a pure function returning `[(line_no, name)]` next to
+- [x] Add `shared_refs_with_lines(text)`, a pure function returning `[(line_no, name)]` next to
       `comment_only_refs`, using the same regex and punctuation strip as `collect_shared_refs`
-- [ ] `pending` carries `(name, origin)` entries, with origin = `(rel_path, line_no)` for
+- [x] `pending` carries `(name, origin)` entries, with origin = `(rel_path, line_no)` for
       `shared/resources/` citations and JS/shell sibling edges
-- [ ] The not-found branch prints `⚠️  shared/resources/<name> not found — cited at <rel>:<line>`,
+- [x] The not-found branch prints `⚠️  shared/resources/<name> not found — cited at <rel>:<line>`,
       deduplicated per run through a `_WARNED_MISSING` set that mirrors `_WARNED_COMMENT_ORIGINS`
-- [ ] `seen`-set semantics stay the same: a name is still resolved once per skill
+- [x] `seen`-set semantics stay the same: a name is still resolved once per skill, so within one skill
+      the warning names the first citation discovery reaches, not every citation of that name
 
 ### Phase 3: CI reader for the warning (Risk: Low)
 
 **Files**: `tests/bundle-missing-source.test.js`
 
-- [ ] §1 fixture: a temporary repo with `shared/resources/a.md` citing
+- [x] §1 fixture: a temporary repo with `shared/resources/a.md` citing
       `shared/resources/missing.md` on line 3, and a skill citing `a.md`. The bundler's stdout
       contains `missing.md not found — cited at shared/resources/a.md:3`, exactly once
-- [ ] §1 negative: the same fixture with the citation rephrased in words produces no `not found`
+- [x] §1 negative: the same fixture with the citation rephrased in words produces no `not found`
       line
-- [ ] §2 live tree: `bundle_skill.py --check` stdout has zero `not found` lines, and its summary line
+- [x] §2 live tree: `bundle_skill.py --check` stdout has zero lines matching `shared/resources/.* not found`
+      (not a bare `not found`, which also matches the unrelated `SKILL.md not found` at `:775`), and its summary line
       reports at least 100 skills checked, which is the non-vacuity floor
-- [ ] Mutation-prove both halves (see § 8)
+- [x] Mutation-prove both halves (see § 8)
 
 ### Phase 4: Shared consumer-root helper (Risk: Low)
 
@@ -314,46 +326,48 @@ can land in either order, or as two PRs.
 `evals/shared/tests/optional-file-lookups.test.mjs`,
 `evals/shared/tests/consumer-root.test.mjs`
 
-- [ ] `makeConsumerRoot(repoRoot, prefix)`: a temporary directory with
+- [x] `makeConsumerRoot(repoRoot, prefix)`: a temporary directory with
       `.agents/skills -> <repoRoot>/skills`, cleaned up on process exit
-- [ ] Replace the two hand-rolled blocks with the import, keeping each file's explanatory comment
+- [x] Replace the two hand-rolled blocks with the import, keeping each file's explanatory comment
       at the call site
-- [ ] The helper test: sourcing `newest-numbered.sh` through `.agents/skills/finalise/references/`
+- [x] The helper test: sourcing `newest-numbered.sh` through `.agents/skills/finalise/references/`
       succeeds from the helper root and fails from a bare `mkdtemp` directory (the premise)
-- [ ] Both migrated files keep their pass counts (71 and 84) in the clean-checkout run
+- [x] Both migrated files keep their pass counts (71 and 84) in the clean-checkout run
 
 ### Phase 5: Clean-checkout runner and release gate (Risk: Medium)
 
 **Files**: `scripts/test-clean-checkout.sh`, `package.json`, `scripts/release.sh`,
 `tests/test-clean-checkout.test.js`
 
-- [ ] The runner clones `HEAD` with `git clone --local --shared --quiet` into
-      `${CLEAN_CHECKOUT_DIR:-<repo>/.clean-checkout}`, links `node_modules`, runs `npm test` (or the
-      command in `$CLEAN_CHECKOUT_CMD`) in the clone, propagates the exit code, and removes the
-      clone at start and on exit
-- [ ] It refuses a clone location that matches a temporary-directory pattern (`/tmp`,
+- [x] The runner clones `HEAD` with `git clone --local --shared --quiet` into its own `mktemp -d`
+      directory inside the base `${CLEAN_CHECKOUT_DIR:-<repo>/.clean-checkout}`, links
+      `node_modules`, runs `npm test` (or the command in `$CLEAN_CHECKOUT_CMD`) in the clone,
+      propagates the exit code, and removes its run directory on exit. It never deletes the base
+- [x] It refuses a clone location that matches a temporary-directory pattern (`/tmp`,
       `/private/tmp`, `/var/tmp`), naming the reason
-- [ ] It prints a warning when `git status --porcelain` is non-empty
-- [ ] Add `.clean-checkout/` and `.clean-checkout-test-tmp/` to `.gitignore`
-- [ ] Add `"test:clean-checkout": "bash scripts/test-clean-checkout.sh"` to `package.json`
-- [ ] `scripts/release.sh` pre-release step runs `npm run test:clean-checkout` in place of
+- [x] It prints a warning when `git status --porcelain` is non-empty
+- [x] It refuses, naming the reason, when `$REPO/node_modules` does not exist (a dangling link would make
+      `npm test` fail with an unrelated module-resolution error)
+- [x] Add `.clean-checkout/` and `.clean-checkout-test-tmp/` to `.gitignore`
+- [x] Add `"test:clean-checkout": "bash scripts/test-clean-checkout.sh"` to `package.json`
+- [x] `scripts/release.sh` pre-release step runs `npm run test:clean-checkout` in place of
       `npm test`, and the dry-run message is updated to match
-- [ ] Fixture test: a temporary git repo whose committed test passes only through a gitignored
+- [x] Fixture test: a temporary git repo whose committed test passes only through a gitignored
       symlink. It passes when run in place and fails under the runner (with `CLEAN_CHECKOUT_CMD`
       pointed at the fixture's test), which proves the runner excludes ignored paths
-- [ ] `bash -n` and `npm run lint:shell` pass on the new script
+- [x] `bash -n` and `npm run lint:shell` pass on the new script
 
 ### Phase 6: Rule, trap, docs (Risk: Low)
 
 **Files**: `skills/create-skill/SKILL.md`, `docs/contributing/traps.md`, `CHANGELOG.md`
 
-- [ ] create-skill § *A helper a fenced block executes is addressed from the repository root*:
+- [x] create-skill § *A helper a fenced block executes is addressed from the repository root*:
       add a paragraph saying that a test executing such a block must run it from
       `makeConsumerRoot()`, never from the repository root or the inherited cwd, and that
       `npm run test:clean-checkout` is how to confirm a local green (obs #149)
-- [ ] traps.md § *`.agents/skills` is a symlink*: one paragraph with the failure and the runner
-- [ ] CHANGELOG `[Unreleased]` › Changed / Fixed, citing `(task 154)`
-- [ ] `npm run ci:fast`, `npm run bundle:check`, `npm run lint:shell`, and
+- [x] traps.md § *`.agents/skills` is a symlink*: one paragraph with the failure and the runner
+- [x] CHANGELOG `[Unreleased]` › Changed / Fixed, citing `(task 154)`
+- [x] `npm run ci:fast`, `npm run bundle:check`, `npm run lint:shell`, and
       `npm run validate:all` for create-skill and observe-work
 
 ---
@@ -366,7 +380,7 @@ can land in either order, or as two PRs.
 2. ✅ `skills/create-skill/scripts/bundle_skill.py`: origin-carrying discovery and attributed warning
 3. ✅ `evals/shared/tests/finalise-bug-mode.test.mjs`: import the helper
 4. ✅ `evals/shared/tests/optional-file-lookups.test.mjs`: import the helper
-5. ✅ `scripts/release.sh`: gate runs `test:clean-checkout`
+5. ✅ `scripts/release.sh`: gate runs `test:clean-checkout`, with the `CLEAN_CHECKOUT_CMD` hook cleared
 6. ✅ `package.json`: `test:clean-checkout` script
 7. ✅ `.gitignore`: `.clean-checkout/`, `.clean-checkout-test-tmp/`
 
@@ -374,12 +388,16 @@ can land in either order, or as two PRs.
 
 8. ✅ `evals/shared/lib/consumer-root.mjs`: the one consumer-root builder
 9. ✅ `scripts/test-clean-checkout.sh`: the clean-checkout runner
+9a. ✅ `scripts/lib/clean-checkout-base.mjs`: the base decision, one export (`resolveBase`) the runner
+    calls as a CLI and `security-probe.mjs` reaches (added to close DoD 1's security gap)
 
 ### Files to Add (Tests)
 
 10. ✅ `tests/bundle-missing-source.test.js`: inside the `tests/*.test.js` glob in `package.json`
 11. ✅ `evals/shared/tests/consumer-root.test.mjs`: inside the `evals/shared/tests/*.test.mjs` glob
 12. ✅ `tests/test-clean-checkout.test.js`: inside the `tests/*.test.js` glob
+12a. ✅ `docs/tasks/task.154.bundler-and-snippet-test-hygiene/task.154.security-probe-cases.json`: the
+    base decision's probe cases (13 hostile, 4 legitimate; absolute paths on the machine that ran it)
 
 ### Files Regenerated
 
@@ -424,6 +442,19 @@ None.
 | Remove the `symlinkSync` from `makeConsumerRoot` | `consumer-root.test.mjs` (the helper-root case) |
 | Point `finalise-bug-mode.test.mjs` back at `REPO_ROOT` as `cwd` | `npm run test:clean-checkout` (the file's 19 rows); in-place `npm test` stays green, which is the point |
 | Make the runner copy the working tree including ignored files (`cp -R`) instead of cloning | `test-clean-checkout.test.js` |
+| Drop `env -u CLEAN_CHECKOUT_CMD`, or change the gate to `npm test`, in `release.sh` | `test-clean-checkout.test.js` (the release-gate case) |
+| Let `resolveBase` accept an empty base, or skip its ephemeral check | `test-clean-checkout.test.js` (the export case; the temporary-directory case) |
+| Set a file's `FILE_BUDGET_MS` to 1 | that file's root after-hook |
+
+### Security probe (the base decision)
+
+`scripts/lib/clean-checkout-base.mjs#resolveBase` is the boundary: it accepts or refuses a clone base.
+Its probe cases are in `task.154.security-probe-cases.json`, written for this boundary's semantics:
+the stock `path` sink assumes a containment root, and a base may legitimately be anywhere writable.
+Command: `command node shared/resources/security-probe.mjs --cases-file
+docs/tasks/task.154.bundler-and-snippet-test-hygiene/task.154.security-probe-cases.json --entry
+scripts/lib/clean-checkout-base.mjs#resolveBase --repo-root "$(pwd -P)" --json`. The cases carry
+absolute paths on the machine that wrote them; regenerate them on another machine.
 
 ### Integration Tests
 
@@ -436,6 +467,8 @@ None.
 - The runner adds one `git clone --local --shared` (objects are shared, not copied) to the suite's
   own run time. The implementation report records wall time for in-place and clean-checkout runs
   (`time npm test`, `time npm run test:clean-checkout`).
+- Each new test file carries a root after-hook that fails its run at 10 s or more, timed from
+  module load (AC6).
 
 ### Regression
 
@@ -448,37 +481,37 @@ None.
 
 ### Functional
 
-- [ ] `npm run -s bundle 2>&1 | grep -c 'not found'` prints `0` on the task branch
+- [x] `npm run -s bundle 2>&1 | grep -c 'not found'` prints `0` on the task branch
       (test: `tests/bundle-missing-source.test.js` §2)
-- [ ] An unresolvable `shared/resources/` citation in a shared source produces exactly one line
+- [x] An unresolvable `shared/resources/` citation in a shared source produces exactly one line
       naming the citing file and line (test: `tests/bundle-missing-source.test.js` §1)
-- [ ] `evals/shared/lib/consumer-root.mjs` is the only consumer-root builder: neither migrated file
+- [x] `evals/shared/lib/consumer-root.mjs` is the only consumer-root builder: neither migrated file
       calls `symlinkSync` for `.agents/skills` itself (test:
       `evals/shared/tests/consumer-root.test.mjs` asserts the helper root succeeds and a bare root
       fails)
-- [ ] `npm run test:clean-checkout` fails on a fixture whose test passes only through a gitignored
+- [x] `npm run test:clean-checkout` fails on a fixture whose test passes only through a gitignored
       symlink (test: `tests/test-clean-checkout.test.js`)
-- [ ] `scripts/release.sh` runs `npm run test:clean-checkout` as its test gate
+- [x] `scripts/release.sh` runs `npm run test:clean-checkout` as its test gate
 
 ### Performance
 
-- [ ] Each new test file runs in under 10 seconds on the dev Mac (`command node --test <file>`
+- [x] Each new test file runs in under 10 seconds on the dev Mac (`command node --test <file>`
       wall time, recorded)
-- [ ] The clean-checkout run's wall time is recorded next to the in-place run's in the implementation
+- [x] The clean-checkout run's wall time is recorded next to the in-place run's in the implementation
       report
 
 ### Code Quality
 
-- [ ] Every row of § 8's mutation table was reverted, observed red, and restored, with the red
+- [x] Every row of § 8's mutation table was reverted, observed red, and restored, with the red
       output quoted in the implementation report
-- [ ] `npm run ci:fast`, `npm run bundle:check` (0 problems), `npm run lint:shell` and
+- [x] `npm run ci:fast`, `npm run bundle:check` (0 problems), `npm run lint:shell` and
       `npm run validate:all` are clean
-- [ ] `npm run test:clean-checkout` is green on the committed task branch
+- [x] `npm run test:clean-checkout` is green on the committed task branch
 
 ### Migration
 
-- [ ] create-skill carries the testing paragraph citing obs #149, and traps.md carries the trap
-- [ ] CHANGELOG `[Unreleased]` cites `(task 154)`
+- [x] create-skill carries the testing paragraph citing obs #149, and traps.md carries the trap
+- [x] CHANGELOG `[Unreleased]` cites `(task 154)`
 - [ ] Observations #149 and #151 are set to `actioned` when this task's PR merges
 
 ---
@@ -513,9 +546,11 @@ None.
 1. **A future placeholder reintroduced in a skill file.** Pass 3 rewrites a skill file's
    `shared/resources/<x>` to `references/<x>` without a warning, so the §2 live scan cannot see it.
    See Notes, and the out-of-scope item on pass-3 rewrites.
-2. **A clone nested in the repository.** An interrupted run can leave `.clean-checkout/` behind.
-   It is gitignored, so anything that scans through `git ls-files` never sees it, and the runner
-   deletes it at start. An in-place test that walks the filesystem from the repository root would
+2. **A clone nested in the repository.** A killed run (SIGKILL, OOM) leaves its `run.XXXXXX`
+   directory under `.clean-checkout/`. The runner never reclaims it, because it deletes only its own
+   run directory. Remove a leftover by hand: `rm -rf .clean-checkout/run.*` when no run is active.
+   It is gitignored, so anything that scans through `git ls-files` never sees it. An in-place test
+   that walks the filesystem from the repository root would
    see a second `skills/` tree. Check the walkers (`bundled-links.test.js`,
    `bundle-comment-origin.test.js`) with a leftover clone present, or set `CLEAN_CHECKOUT_DIR`
    outside the repository and outside every temporary directory.
@@ -568,26 +603,121 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-29
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.154.qa.5.bundler-and-snippet-test-hygiene.md](./task.154.qa.5.bundler-and-snippet-test-hygiene.md)
+- **Gate File**: [task.154.gate.5.bundler-and-snippet-test-hygiene.yml](./task.154.gate.5.bundler-and-snippet-test-hygiene.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 4422 (fast gate); 11 runner tests (also under `TMPDIR=/tmp`)
+- **Phases Verified**: 6/6
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+- 5 QA cycles; 8 bugs found and closed. A structural redesign of the clean-checkout runner in cycle 3 made each run own its own `mktemp -d` directory.
+- No open findings. Four advisory cleanups are recorded in gate 5 `recommendations.future`.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.154.qa.5.bundler-and-snippet-test-hygiene.md`
+**Gate File**: `task.154.gate.5.bundler-and-snippet-test-hygiene.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified (DoD run 2, after run 1's three gaps were closed in `78ab4858`):
+
+✅ **Acceptance Criteria:** 12 of 13 met; AC13 (observations #149 and #151 to `actioned`) happens at merge
+✅ **Tests & CI:** 5/5 checks SUCCESS @ `78ab4858`; `npm run test:clean-checkout` 4424 tests, 0 fail
+✅ **Documentation:** CHANGELOG (Changed + Fixed), create-skill rule, traps.md, release runbook
+✅ **Security Review:** ✅ PASS. `resolveBase` probed through its export: 17 executed, 0 reproduced, 0 overblocked
+✅ **Compliance Review:** NOT_APPLICABLE (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-29
+
+**Detailed Verification Log:** See [`task.154.dod.2.bundler-and-snippet-test-hygiene.md`](./task.154.dod.2.bundler-and-snippet-test-hygiene.md) (run 1, gaps: [`task.154.dod.1.bundler-and-snippet-test-hygiene.md`](./task.154.dod.1.bundler-and-snippet-test-hygiene.md)).
+
+---
+
+## Definition of Done - Gaps Identified (run 1, historical — closed)
+
+**Status:** CLOSED — all three gaps closed after DoD 1; `/finalise` re-runs as DoD 2.
+
+### QA Gate Status
+
+**QA Report**: `task.154.qa.5.bundler-and-snippet-test-hygiene.md`
+**Gate File**: `task.154.gate.5.bundler-and-snippet-test-hygiene.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Security Review:**
+   - [x] The base-location refusal in `scripts/test-clean-checkout.sh:53-87` is an inline `node -e` predicate reading an environment variable. No `security-probe.mjs` entry form reaches it, so probe mode executed 0 candidates (medium). Move the decision into an importable module and probe it through `path#export`.
+
+2. **Acceptance Criteria:**
+   - [x] AC5: no test pins `scripts/release.sh` running `npm run test:clean-checkout` as its test gate.
+   - [x] AC6: the under-10 s limit per new test file was measured once (5.3 s, 0.23 s, 1.3 s) but is not asserted. Either assert it or restate the criterion as a recorded measurement.
+
+AC13 (observations #149 and #151 set to `actioned`) is post-merge by definition and is not counted as a gap.
+
+### Next Steps:
+
+- Close the three items above, then re-run `/finalise`.
+- Advisory: `docs/runbooks/release-and-install.md:13` still lists plain `npm test` in the manual pre-flight.
+
+**Estimated Effort:** Small to Medium (1-2 hours)
+
+**Gap Report Generated:** 2026-09-29
+**Detailed Verification Log:** See [`task.154.dod.1.bundler-and-snippet-test-hygiene.md`](./task.154.dod.1.bundler-and-snippet-test-hygiene.md).
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description                                                                   | Author      |
-| ---------- | ------- | ----------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #149, #151 (2026-09-24 observation review) | create-task |
-
+| 2026-09-28 | 1.1     | Review passed (9/10) — per-origin dedupe promise restated to match `seen`; §2 key narrowed; runner refuses a missing `node_modules` | review-task |
+| 2026-09-28 |         | Status → ready-for-development | review-task |
+| 2026-09-28 |         | Implemented — 17 files, 3 new test files (13 tests), 6 mutation proofs | develop-task (inline) |
+| 2026-09-29 |         | QA gate FAIL (70/100) — 2 findings (1 HIGH, 1 MEDIUM) | qa-task |
+| 2026-09-29 |         | QA gate CONCERNS (80/100) — 9 findings (2 MEDIUM, 7 LOW) | qa-task |
+| 2026-09-29 |         | QA gate CONCERNS (80/100) — 6 findings (2 MEDIUM, 4 LOW) | qa-task |
+| 2026-09-29 |         | QA gate CONCERNS (80/100) — 4 findings (2 MEDIUM, 2 LOW) | qa-task |
+| 2026-09-29 |         | QA gate PASS (100/100) — 0 findings, 4 advisory cleanups | qa-task |
+| 2026-09-29 |         | QA findings fixed — gate PASS (100/100), 4 iterations, 8 bugs closed | qa-fix |
+| 2026-09-29 |         | DoD incomplete — 3 gaps identified (task.154.dod.1) | finalise |
+| 2026-09-29 |         | DoD 1 gaps closed — base decision extracted to `scripts/lib/clean-checkout-base.mjs` and probed (17/0); release gate test; per-file 10 s budget | develop-task |
+| 2026-09-29 | 1.2 | DoD passed — accepted (PR #513) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Remove the placeholder literal
-- [ ] Phase 2: Attribute the warning
-- [ ] Phase 3: CI reader for the warning
-- [ ] Phase 4: Shared consumer-root helper
-- [ ] Phase 5: Clean-checkout runner and release gate
-- [ ] Phase 6: Rule, trap, docs
+- [x] Phase 1: Remove the placeholder literal
+- [x] Phase 2: Attribute the warning
+- [x] Phase 3: CI reader for the warning
+- [x] Phase 4: Shared consumer-root helper
+- [x] Phase 5: Clean-checkout runner and release gate
+- [x] Phase 6: Rule, trap, docs
 
 ---
 
