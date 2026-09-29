@@ -168,11 +168,16 @@ test("F — the cite comment copies one file, in both prefixes", (t) => {
 test("G — a citation is a leaf even inside a dependency's closure", (t) => {
   const shared = {
     ...SHARED,
-    "hub.md": "# Hub\n\nSee `shared/resources/leaf-a.md#leaf-a` for the rule.\n",
+    "hub.md":
+      "# Hub\n\nSee `shared/resources/leaf-a.md#leaf-a` for the rule.\n",
   };
   const fx = fixture(t, "Read `shared/resources/hub.md`.\n", { shared });
   fx.bundle();
-  assert.deepEqual(fx.bundled(), ["hub.md", "leaf-a.md"], "deep.md not followed");
+  assert.deepEqual(
+    fx.bundled(),
+    ["hub.md", "leaf-a.md"],
+    "deep.md not followed",
+  );
 });
 
 test("H — a name reached as a cite and as a dependency is bundled once, with its closure", (t) => {
@@ -202,7 +207,10 @@ test("I — validation passes on a fragment reference (it used to name `hub.md#t
     "print(json.dumps({'ok': ok, 'msg': msg}))",
   ].join("\n");
   const out = JSON.parse(
-    execFileSync("python3", ["-c", py], { encoding: "utf-8" }).trim().split("\n").pop(),
+    execFileSync("python3", ["-c", py], { encoding: "utf-8" })
+      .trim()
+      .split("\n")
+      .pop(),
   );
   assert.equal(out.ok, true, out.msg);
 });
@@ -215,7 +223,10 @@ test("J — the status line reports the closure, and the gap to the committed co
   fx.sh("git", ["add", "-A"]);
   fx.sh("git", ["commit", "-q", "-m", "fixture"]);
   out = fx.bundle();
-  assert.match(out, /✅ fixture-skill: in sync · closure 5 \(\+0 vs committed\)/);
+  assert.match(
+    out,
+    /✅ fixture-skill: in sync · closure 5 \(\+0 vs committed\)/,
+  );
   // Convert to a citation: the closure shrinks, and the four copies it stopped
   // reaching are what `git rm` is owed — the bundler never deletes one.
   fx.writeSkill("Rule: `references/hub.md#the-rule`.\n");
@@ -249,5 +260,9 @@ test("K — the packager ships a fragment-cited file under its real name, with n
   const out = execFileSync("python3", ["-c", py], { encoding: "utf-8" });
   assert.doesNotMatch(out, /not found|Validation failed/, out);
   assert.match(out, /fixture-skill\/references\/hub\.md/, out);
-  assert.doesNotMatch(out, /hub\.md#/, "the fragment is never part of a shipped name");
+  assert.doesNotMatch(
+    out,
+    /hub\.md#/,
+    "the fragment is never part of a shipped name",
+  );
 });
