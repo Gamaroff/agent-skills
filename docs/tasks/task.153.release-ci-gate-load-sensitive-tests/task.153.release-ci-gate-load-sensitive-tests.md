@@ -169,7 +169,11 @@ several runs per workflow, not read one.
   `--sha <sha> [--json]` that fetches runs with
   `gh run list --commit <sha> --json workflowName,status,conclusion,event,databaseId --limit 50` and
   prints one JSON object with a `reason` of `green`, `red`, `pending` or `unverifiable`, following the
-  repository's `--json reason` contract (exit 0 green, 1 anything else, 2 usage).
+  repository's `--json reason` contract (exit 0 green, 1 anything else, 2 usage). As built it also
+  takes `--repo <owner/name>` (passed to `gh` as `-R`; QA cycle 1) and `--tsv`, which prints one line,
+  `<reason><TAB><detail>` (QA3-1 fix). `release.sh` reads `--tsv` with one `node` spawn and fails
+  closed on empty output, a line with no TAB, more than one line, an unknown reason, and `green` with a
+  non-zero exit (QA cycle 4, CR4-1).
 - The workflow table is **one constant** in that module: `required` = `Test`, `ShellCheck`;
   `whenPresent` = `Validate Skills`, `Docs link check`. A parity test reads the four `name:` fields and
   `on.push` blocks from `.github/workflows/` and fails if the constant and the files disagree.
@@ -564,6 +568,7 @@ None.
 | 2026-09-29 |  | QA gate CONCERNS (90/100) — cycle 4, post-acceptance: 1 MEDIUM (CR4-1, verdict parse fails open) | qa-task |
 | 2026-09-29 |  | QA findings fixed after acceptance — QA3-1 and CR4-1, 2 commits; fast gate green | qa-fix |
 | 2026-09-29 |  | QA gate PASS (100/100) — cycle 5, no open finding, 3 LOW advisory | qa-task |
+| 2026-09-29 |  | Target Architecture records the as-built --repo and --tsv CLI and release.sh's fail-closed parse (PR re-review PC-3) | develop |
 <!-- change-log-end -->
 
 ---

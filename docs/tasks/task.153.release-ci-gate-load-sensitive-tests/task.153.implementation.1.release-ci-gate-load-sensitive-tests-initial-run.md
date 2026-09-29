@@ -35,7 +35,7 @@ Gate `release.sh` on CI's recorded verdict for HEAD, mark every load-sensitive a
 | 2. review-task             | ✅ Done    | `task.153.review.{N}.{name}.md` exists (or skip logged)               | `task.153.review.1.release-ci-gate-load-sensitive-tests.md` — READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; ci:fast 2 runs — run 1 red (1 real: test-clean-checkout drove release.sh into the new CI step), fixed; run 2 green 4469/0 | `.summaries/step-3-test-triage-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #515: https://github.com/Gamaroff/agent-skills/pull/515 | —                    |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.153.qa.{N}.*.md`; `task.153.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 QA cycles (PASS 95 → CONCERNS 90 → PASS 95), 2 qa-fix cycles; exit by diminishing-returns (route 2); 5c `/review-pr` APPROVE (5 LOW findings) — `task.153.pr-review.1.release-ci-gate-load-sensitive-tests.md` | `.summaries/step-5-traceability-mapper.json` |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.153.qa.{N}.*.md`; `task.153.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 QA cycles (PASS 95 → CONCERNS 90 → PASS 95 → [post-acceptance] CONCERNS 90 → PASS 100), 4 fix commits; cycles 1–3 exited by diminishing-returns (route 2), 5c APPROVE (`pr-review.1`); cycles 4–5 after the merge-gate HALT, 5c re-run CONCERNS (`pr-review.2`, conformance only) | `.summaries/step-5-traceability-mapper.json` |
 | 7. finalise                | ✅ Done    | `task.153.dod.{N}.*.md`; task `status: accepted`                      | `task.153.dod.1.release-ci-gate-load-sensitive-tests.md` — ACCEPTED; acceptance commit `0c23a046`; CI 1 & 2 SUCCESS; #483 closed | —                    |
 | 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final report commit + push; lock completed | —                    |
 
@@ -204,7 +204,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: none gated; CR5-1..CR5-3 advisory (LOW)
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — 5c not yet run
+**PR Review**: CONCERNS (`task.153.pr-review.2`, conformance lens only: the DoD predates the fix commits; two doc drifts)
 **Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review)
 
@@ -216,6 +216,6 @@ _Track each QA review/fix cycle._
 **Final Status**: Completed
 **Branch**: `feature/task.153.release-ci-gate-load-sensitive-tests`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/515
-**QA Iterations**: 3 QA cycles (2 qa-fix cycles), exit by the diminishing-returns route; 5c `/review-pr` APPROVE
+**QA Iterations**: 5 QA cycles — 3 before acceptance (2 qa-fix cycles, diminishing-returns exit, 5c APPROVE) and 2 after it (QA3-1 and CR4-1 fixed; gate 5 PASS 100; 5c re-run CONCERNS on the stale DoD, answered by `/finalise` dod.2)
 **DoD Summary**: docs/tasks/task.153.release-ci-gate-load-sensitive-tests/task.153.dod.1.release-ci-gate-load-sensitive-tests.md
 **Tracker debt**: none
