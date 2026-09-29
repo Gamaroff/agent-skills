@@ -64,6 +64,10 @@ const FLOORS = Object.freeze({
   // script states (nine digits, zero). Four legitimate is the floor the task
   // set; five ship.
   filename: { hostile: 8, legitimate: 4 },
+  // task.131: one hostile case per report-lint problem code (plus the CRLF
+  // variant of a fenced-only section that found the fencedRanges defect), and
+  // the report shapes a correct validator must still accept.
+  "markdown-structure": { hostile: 9, legitimate: 6 },
 });
 
 const byDirection = (sink, direction) =>
