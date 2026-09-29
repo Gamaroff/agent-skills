@@ -24,6 +24,19 @@ Before cutting a repo release:
 > composite and the three workflows run the same set, so a lane added to one and not the other
 > fails `npm test` (task 111).
 
+> **The CI boxes below are enforced by `release.sh`, not only read by you.** Step 2 of the script (labelled 1b in `release.sh`'s own header, which keeps its original numbering)
+> reads CI's recorded verdict for the commit being released (`scripts/release-ci-verdict.mjs`) and
+> refuses unless it is green: `Test` and `ShellCheck` must have a green run for the SHA, and
+> `Validate Skills` and `Docs link check` — path-filtered, so often absent — must not be red when
+> present (task 153). A local run is a claim about one machine; the release is certified by the tree
+> CI built.
+
+> **Load-sensitive reds.** A local test failure whose message starts `LOAD-SENSITIVE` is a timing
+> assertion that depends on machine load. Re-run that file alone (`command node --test <file>`); if
+> it passes alone, re-run the release — do not investigate it. A failure **without** the marker is
+> real. `release.sh` prints this rule when its local test aborts; the list of marked files and the
+> guard that keeps it honest are in [traps.md § Load-sensitive tests](traps.md#load-sensitive-tests).
+
 - [ ] `test.yml` CI workflow is green on the release commit — covers `npm run format:check`, `npm test` (L1–L4 hermetic) and `npm run eval:all` (L4 replay)
 - [ ] `validate.yml` CI workflow is green on the release commit — per-skill `quick_validate.py` plus the bundle-freshness check
 - [ ] `ShellCheck` workflow (`shellcheck.yml`) is green on the release commit — lints tracked shell **sources** only, i.e. `git ls-files '*.sh'` minus `skills/*/references/`, which is roughly a fifth of the files and excludes every bundled copy. It is a separate lane rather than a step in the two above; the header comment explains why, and the short version is that neither could have fired for the change that motivated it
@@ -63,7 +76,7 @@ Before cutting a repo release:
 >   | grep -oE '(task|bug)\.[0-9]+' | sort -u
 > ```
 
-> Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are checked and auto-committed by `release.sh` — no manual pre-check needed. `release.sh` does **not** run `format:check`, `eval:all` or `shellcheck`; those are CI's job, which is why the boxes above are about CI being green and not about a local run.
+> Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are checked and auto-committed by `release.sh` — no manual pre-check needed. `release.sh` does **not** run `format:check`, `eval:all` or `shellcheck` locally; those are CI's job, which is why the boxes above are about CI being green and not about a local run — and it now reads CI's verdict for them before tagging (step 2 below).
 
 ## Branch flow
 
@@ -152,16 +165,21 @@ bash scripts/release.sh --dry-run --minor
 
 # Skip the automatic develop sync:
 bash scripts/release.sh --patch --no-sync-develop
+
+# Release without CI's verdict — only when GitHub is unreachable and you have
+# confirmed CI is green on the release commit another way:
+bash scripts/release.sh --patch --skip-ci-check
 ```
 
 The script:
 1. Confirms you're on `main` with a clean, up-to-date working tree
-2. **Warns on any branch carrying commits not on `develop`**, naming each with its commit count and last-commit date — finished work that was never merged is invisible to every other check here and to CI, because neither looks at an unmerged branch. Advisory: a parked branch is legitimate, and a stuck release is worse than a noted omission
-3. Runs `npm test`, `npm run validate:all`, `npm run generate-catalog`, and `npm run bundle` — auto-commits any stale catalog or bundled-reference files
-4. Calculates `vX.Y.Z` from the latest git tag + bump type (no tags yet → starts at `v0.0.0`)
-5. Moves `## [Unreleased]` → `## [vX.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and leaves a fresh `[Unreleased]` above it
-6. Commits `chore(release): vX.Y.Z`, creates an annotated tag, and pushes both to origin
-7. Syncs `develop` with `main` (`git checkout develop && git pull --rebase && git merge main && git push && git checkout main`) — skip with `--no-sync-develop`
+2. **Reads CI's verdict for `HEAD`** (`gh run list --commit`, via `scripts/release-ci-verdict.mjs`) and refuses unless it is green — naming the workflow, the run URL and `--skip-ci-check`. It runs before the multi-minute local test, so a red, pending or unreadable CI refuses in seconds. Requires an authenticated `gh`; a missing or failing `gh` is *unverifiable* and refuses. `--dry-run` prints the verdict and ends its summary with *Would have REFUSED* when a real run would. `--skip-ci-check` proceeds with a warning that the release is unverified against CI. `--retry` skips this step — it re-tags an existing release and keeps its own guard
+3. **Warns on any branch carrying commits not on `develop`**, naming each with its commit count and last-commit date — finished work that was never merged is invisible to every other check here and to CI, because neither looks at an unmerged branch. Advisory: a parked branch is legitimate, and a stuck release is worse than a noted omission
+4. Runs `npm run test:clean-checkout` (`npm test` in a clean clone of `HEAD`), `npm run validate:all`, `npm run generate-catalog`, and `npm run bundle` — auto-commits any stale catalog or bundled-reference files. A red local test prints the load-sensitive re-run rule above before exiting
+5. Calculates `vX.Y.Z` from the latest git tag + bump type (no tags yet → starts at `v0.0.0`)
+6. Moves `## [Unreleased]` → `## [vX.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and leaves a fresh `[Unreleased]` above it
+7. Commits `chore(release): vX.Y.Z`, creates an annotated tag, and pushes both to origin
+8. Syncs `develop` with `main` (`git checkout develop && git pull --rebase && git merge main && git push && git checkout main`) — skip with `--no-sync-develop`
 
 The GitHub Actions workflow then handles release creation. No manual `gh release create` needed.
 

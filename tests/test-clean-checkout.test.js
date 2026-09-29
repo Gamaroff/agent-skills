@@ -40,11 +40,19 @@ const assert = require("node:assert/strict");
 // test and fixture counts; a failing root after-hook fails the run.
 const FILE_BUDGET_MS = 10_000;
 const FILE_STARTED = process.hrtime.bigint();
-test.after(() => {
+test.after(async () => {
   const ms = Number(process.hrtime.bigint() - FILE_STARTED) / 1e6;
+  // A whole-file wall-clock budget is load-sensitive (task 153): the failure says so.
+  const { loadSensitive } = await import(
+    require("url").pathToFileURL(
+      path.join(__dirname, "..", "shared", "resources", "spawn-budget.mjs"),
+    ).href
+  );
   assert.ok(
     ms < FILE_BUDGET_MS,
-    `this file took ${Math.round(ms)} ms, over its ${FILE_BUDGET_MS} ms budget (task 154 AC6)`,
+    loadSensitive(
+      `this file took ${Math.round(ms)} ms, over its ${FILE_BUDGET_MS} ms budget (task 154 AC6)`,
+    ),
   );
 });
 
@@ -466,6 +474,24 @@ test("release.sh gates on the clean-checkout runner first, stops when it fails, 
       path.join(bin, "npm"),
       '#!/bin/sh\nprintf \'%s|%s\\n\' "$*" "${CLEAN_CHECKOUT_CMD-<unset>}" >> "$NPM_LOG"\n' +
         '[ -n "$NPM_GATE_OK" ] && [ "$*" = "run test:clean-checkout" ] && exit 0\nexit 1\n',
+      { mode: 0o755 },
+    );
+    // CI is green for this fixture: release.sh reads CI's verdict before the gate
+    // (task 153), and this test is about the gate, not the CI check — which
+    // tests/release-ci-gate.test.js holds. A stub, so the run makes no network call.
+    fs.writeFileSync(
+      path.join(bin, "gh"),
+      "#!/bin/sh\necho '" +
+        JSON.stringify(
+          ["Test", "ShellCheck"].map((workflowName, i) => ({
+            workflowName,
+            status: "completed",
+            conclusion: "success",
+            event: "push",
+            databaseId: i + 1,
+          })),
+        ) +
+        "'\n",
       { mode: 0o755 },
     );
     const release = (extra) => {

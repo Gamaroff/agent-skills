@@ -1,0 +1,54 @@
+schema: 1
+task: 'task.153.release-ci-gate-load-sensitive-tests'
+task_title: "[Task 153] Release gate reads CI's verdict; load-sensitive tests name themselves"
+gate: PASS
+status_reason: 'Post-acceptance cycle 5 (refute pass over 940390b8 + dcda808f). QA3-1 and CR4-1 are fixed and mutation-proven. The verdict parse fails closed on empty, no-TAB, multi-line, unknown-reason and green-with-non-zero-exit output. No open finding; three LOW advisory items go to future.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T10:27:03Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 64
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 26
+    notes: 'CLI controls engage with --tsv (record task.153.qa.4.security.run.json, re-used: the CLI did not change in dcda808f). The shell parse is held by the gate harness: 9 malformed outputs plus green-with-exit-1 all refuse, each guard mutation-proven.'
+  performance:
+    status: PASS
+    notes: 'One node spawn per release run. The full-suite fast gate is green; test-clean-checkout is inside its budget.'
+  reliability:
+    status: PASS
+    notes: 'Fails closed on every malformed verdict line the reviewer could construct, except NUL bytes inside the line (CR5-1, unreachable: the module emits fixed reason strings).'
+  maintainability:
+    status: PASS
+    notes: 'The CR-6 fixture invariant is a tested fact for retries 0..6.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR5-1 (low/low):  drops NUL bytes; document it, or have the module refuse to write a reason outside its fixed set.'
+      refs: ['scripts/release.sh', 'scripts/release-ci-verdict.mjs']
+    - action: 'CR5-2 (cleanup): the release.sh comment says more than one line fails closed; trailing blank lines are stripped by , and only an embedded newline is refused.'
+      refs: ['scripts/release.sh']
+    - action: 'CR5-3 (cleanup): no test gives --tsv a detail containing a TAB or newline, so the flattening is unpinned.'
+      refs: ['tests/release-ci-verdict.test.js']
+    - action: 'From the PR review: gh run list cap of 50 has no truncation check; the release runbook does not mention the CI gate.'
+      refs: ['scripts/release-ci-verdict.mjs', 'docs/runbooks/release-and-install.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

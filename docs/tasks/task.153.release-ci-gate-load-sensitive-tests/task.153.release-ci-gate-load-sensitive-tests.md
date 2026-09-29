@@ -5,18 +5,22 @@ type: task
 description: "Make release.sh refuse to tag unless CI's own verdict for the commit is green (a local npm test is a claim about one machine), make every load-sensitive test assertion say so in its failure message and hold that list in one mechanically checked place, fix the session-handoff CR-6 process-group test so a leader killed before it forks is retried rather than reported as ENOENT, and name the re-run-alone class beside the release checklist."
 tags: [release, ci, tests, flaky-tests, session-handoff, spawn-budget, observation]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-29
 assignee:
 estimated_effort_hours: 16
 github_issue: 483
+completed_date: 2026-09-29
+pr_number: 515
 ---
 
 # Technical Task: Release gate reads CI's verdict; load-sensitive tests name themselves
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.153.review.1.release-ci-gate-load-sensitive-tests.md` implemented 2026-09-29
 
 **GitHub Issue**: [#483](https://github.com/Gamaroff/agent-skills/issues/483)
 
@@ -32,8 +36,8 @@ test holds in sync with the code. The one live instance that keeps tripping — 
 is fixed so that it tolerates load instead of only naming it.
 
 **Scope**: `scripts/release.sh` plus one new decision module; one new export in
-`shared/resources/spawn-budget.mjs`; the CR-6 test; four wall-clock assertions; two contributing docs;
-three new test files.
+`shared/resources/spawn-budget.mjs`; the CR-6 test; four wall-clock assertions (seven after QA cycle 2 —
+see § 7); two contributing docs; three new test files.
 
 **Key deliverables**:
 
@@ -58,7 +62,8 @@ its own failure text, so it is re-run rather than re-diagnosed.
 ### Current Problems
 
 1. **The release gate reads the wrong verdict.** `release.sh` runs `npm test` on the maintainer's
-   checkout (`scripts/release.sh:185-191`, *`info "Running npm test ..."`*) and never asks CI. On
+   checkout (since task.154: `npm run test:clean-checkout` in a clean clone of `HEAD`,
+   `scripts/release.sh:191-197`) and never asks CI. On
    2026-09-21 that local run passed while the `Test` workflow on `develop` had been red for five
    consecutive pushes — an environment-only pass through the gitignored `.agents/skills` symlink
    (obs #150, citing obs #149). The checklist says "`test.yml` CI workflow is green on the release
@@ -98,14 +103,19 @@ its own failure text, so it is re-run rather than re-diagnosed.
 
 - `scripts/release.sh:115-153` — pre-flight: on `main`, clean tree, `HEAD` equal to `origin/main`
   (*`ok "Up to date with origin/main"`* at `:153`).
-- `scripts/release.sh:185-191` — `npm test` under `set -euo pipefail` (`:34`): a red exits the script
-  with no message of its own.
+- `scripts/release.sh:191-197` — the local test step. **Changed by task.154 after this document was
+  written**: it is now `env -u CLEAN_CHECKOUT_CMD npm run test:clean-checkout` (runs `npm test` in a
+  clean clone of `HEAD`, so the gitignored `.agents/skills` symlink no longer leaks in) and is
+  **skipped under `--dry-run`**. It still runs under `set -euo pipefail` (`:34`): a red exits the
+  script with no message of its own. The clean clone removes obs #149's specific divergence; it is
+  still one machine's verdict, not CI's. Throughout this document "the local `npm test`" means this
+  step.
 - `scripts/release.sh:201-229` — catalog and bundle regenerate and may **auto-commit**; `:357-365`
   commits `chore(release): vX.Y.Z` and tags. **The tagged commit is therefore never a commit CI has
   run** — it is `HEAD`-at-start plus generated files and a CHANGELOG move. The only commit that can
   carry a CI verdict is `HEAD` as it stands after the `:153` sync check.
 - `scripts/release.sh:32` — *`# Requires: node >=22 …, git, curl, sed`*; `gh` is not a dependency
-  today. The one GitHub call, the `--retry` guard at `:252-261`, uses unauthenticated `curl`.
+  today. The one GitHub call, the `--retry` guard at `:257-268`, uses unauthenticated `curl`.
 - `.github/workflows/release.yml` (*`- name: Run tests`*) runs `npm test` **after** the tag is pushed;
   a red there leaves an orphan tag, which is what `release.sh --retry` recovers
   (`docs/contributing/releases.md:223-244`). That is a post-tag gate, not a pre-tag one.
@@ -123,7 +133,7 @@ its own failure text, so it is re-run rather than re-diagnosed.
 `gh run list --commit 398107e6118ac20880885585463f82d71797b909 --json workflowName,conclusion,status,event,headSha`
 (the current `origin/main`, `chore(release): v0.51.0`, 2026-09-22) returned **two** `Test` and **two**
 `ShellCheck` runs, all `completed/success`, plus one `Release` — the same SHA is pushed to `main` and
-then to `develop` by the sync step (`release.sh:369-386`). A verdict rule must therefore reduce
+then to `develop` by the sync step (`release.sh:374-392`). A verdict rule must therefore reduce
 several runs per workflow, not read one.
 
 **Load-sensitive tests.**
@@ -139,7 +149,7 @@ several runs per workflow, not read one.
   — four on 2026-09-24:
   - `shared/resources/tests/access-config-parity.test.mjs:613` (*`Date.now() - t0 < 200`*)
   - `shared/resources/tests/qa-diminishing-returns.test.mjs:305` (*`elapsed < 2000`*)
-  - `shared/resources/tests/qa-execute-snippets.test.mjs:795` (*`elapsed < 10_000`*) — the one
+  - `shared/resources/tests/qa-execute-snippets.test.mjs:796` (*`elapsed < 10_000`*) — the one
     `traps.md` already names
   - `skills/session-handoff/tests/handoff-verify.test.js:1429` (*`Date.now() - t0 < 40000`*, PRB-7,
     whose comment records a 10 s bound going red under the full suite)
@@ -159,7 +169,11 @@ several runs per workflow, not read one.
   `--sha <sha> [--json]` that fetches runs with
   `gh run list --commit <sha> --json workflowName,status,conclusion,event,databaseId --limit 50` and
   prints one JSON object with a `reason` of `green`, `red`, `pending` or `unverifiable`, following the
-  repository's `--json reason` contract (exit 0 green, 1 anything else, 2 usage).
+  repository's `--json reason` contract (exit 0 green, 1 anything else, 2 usage). As built it also
+  takes `--repo <owner/name>` (passed to `gh` as `-R`; QA cycle 1) and `--tsv`, which prints one line,
+  `<reason><TAB><detail>` (QA3-1 fix). `release.sh` reads `--tsv` with one `node` spawn and fails
+  closed on empty output, a line with no TAB, more than one line, an unknown reason, and `green` with a
+  non-zero exit (QA cycle 4, CR4-1).
 - The workflow table is **one constant** in that module: `required` = `Test`, `ShellCheck`;
   `whenPresent` = `Validate Skills`, `Docs link check`. A parity test reads the four `name:` fields and
   `on.push` blocks from `.github/workflows/` and fails if the constant and the files disagree.
@@ -167,8 +181,11 @@ several runs per workflow, not read one.
   on the SHA it just verified equals `origin/main`. Anything but `green` exits 1 naming the workflow,
   the run URL and `--skip-ci-check`. `--skip-ci-check` proceeds with a warning that names the risk.
   `--dry-run` prints the verdict and, if it would refuse, ends its summary with *"Would have REFUSED"*.
-- The `npm test` step is wrapped: on a red it prints the load-sensitive instruction (below) before
-  exiting 1.
+- The local test step (`npm run test:clean-checkout`, non-dry-run only) is wrapped: on a red it
+  prints the load-sensitive instruction (below) before exiting 1.
+- The pre-flight block runs for `--retry` too (it has no `RETRY` condition), so the CI-verdict block
+  is guarded `if [[ "$RETRY" == false ]]` — `--retry` re-tags an existing release and keeps its own
+  guard.
 
 **Load-sensitive tests.**
 
@@ -192,7 +209,7 @@ outcome without a pid file is a real failure and is **not** retried. Retries exh
 
 ### Same-class mechanism inventory (obs #103)
 
-- **`--retry` GitHub check** (`release.sh:252-261`) asks "is a Release already published for this
+- **`--retry` GitHub check** (`release.sh:257-268`) asks "is a Release already published for this
   tag". The new check **sits beside** it: it asks "what did CI conclude for this SHA". Different
   question, different endpoint; neither replaces the other. The new check uses `gh` rather than the
   `curl` precedent because it has to be testable with a `PATH` stub, as
@@ -270,47 +287,47 @@ No API change to `spawn-budget.mjs`: the new export is additive and `spawnBudget
 
 **Files**: `scripts/release-ci-verdict.mjs`, `tests/release-ci-verdict.test.js`
 
-- [ ] `ciVerdict(runs, WORKFLOWS)` — pure; the reduction rule in the plan's verdict table
-- [ ] CLI `--sha` / `--json`; `gh` absent, unauthenticated or failing → `unverifiable`, never `green`
-- [ ] `WORKFLOWS` constant and the parity test against `.github/workflows/*.yml`
+- [x] `ciVerdict(runs, WORKFLOWS)` — pure; the reduction rule in the plan's verdict table
+- [x] CLI `--sha` / `--json`; `gh` absent, unauthenticated or failing → `unverifiable`, never `green`
+- [x] `WORKFLOWS` constant and the parity test against `.github/workflows/*.yml`
 
 ### Phase 2: wire it into `release.sh` (Risk: Medium)
 
 **Files**: `scripts/release.sh`, `tests/release-ci-gate.test.js`
 
-- [ ] Call the module after the `origin/main` sync check, before the unmerged-branch warning and `npm test`
-- [ ] `--skip-ci-check` flag; header usage and `# Requires:` line name `gh`
-- [ ] `--dry-run` prints the verdict and the *Would have REFUSED* summary line
-- [ ] Wrap `npm test`: on failure print the load-sensitive instruction, then exit 1
-- [ ] `npm run lint:shell` clean
+- [x] Call the module after the `origin/main` sync check, before the unmerged-branch warning and `npm test`
+- [x] `--skip-ci-check` flag; header usage and `# Requires:` line name `gh`
+- [x] `--dry-run` prints the verdict and the *Would have REFUSED* summary line
+- [x] Wrap `npm test`: on failure print the load-sensitive instruction, then exit 1
+- [x] `npm run lint:shell` clean
 
 ### Phase 3: the load-sensitive marker and its list (Risk: Low)
 
 **Files**: `shared/resources/spawn-budget.mjs`, the four wall-clock test files, `docs/contributing/traps.md`,
 `tests/load-sensitive-marker.test.js`
 
-- [ ] `LOAD_SENSITIVE` + `loadSensitive(detail)`; `npm run bundle` refreshes the four copies
-- [ ] Build each enumerated assertion's message with `loadSensitive()`; thresholds unchanged
-- [ ] `traps.md` § *Load-sensitive tests* lists each marked file
-- [ ] Guard test, both directions, with non-vacuity floors
+- [x] `LOAD_SENSITIVE` + `loadSensitive(detail)`; `npm run bundle` refreshes the four copies
+- [x] Build each enumerated assertion's message with `loadSensitive()`; thresholds unchanged
+- [x] `traps.md` § *Load-sensitive tests* lists each marked file
+- [x] Guard test, both directions, with non-vacuity floors
 
 ### Phase 4: CR-6 tolerates its precondition miss (Risk: Medium)
 
 **Files**: `skills/session-handoff/tests/handoff-verify.test.js`
 
-- [ ] Extract `retryUntilForked(schedule, attempt)` in the test file; unit-test it with a fake attempt
-- [ ] CR-6 uses it: fresh dir per attempt, 3 s doubling, `spawnBudget("HANDOFF").retries` retries
-- [ ] Retry only on *timeout and no pid file*; exhausted → `loadSensitive(...)`; group-kill assertion unchanged
+- [x] Extract `retryUntilForked(schedule, attempt)` in the test file; unit-test it with a fake attempt
+- [x] CR-6 uses it: fresh dir per attempt, 3 s doubling, `spawnBudget("HANDOFF").retries` retries
+- [x] Retry only on *timeout and no pid file*; exhausted → `loadSensitive(...)`; group-kill assertion unchanged
 
 ### Phase 5: docs and validation (Risk: Low)
 
 **Files**: `docs/contributing/releases.md`, `CHANGELOG.md`
 
-- [ ] § Release checklist: a note naming the load-sensitive class and the re-run-alone rule, and
+- [x] § Release checklist: a note naming the load-sensitive class and the re-run-alone rule, and
       saying the CI boxes are now enforced by `release.sh`
-- [ ] § Cutting a release: the new step and `--skip-ci-check`; renumber the script steps
-- [ ] CHANGELOG `[Unreleased]` cites `(task 153)`
-- [ ] Mutation proofs recorded in the implementation report; `npm run ci` green
+- [x] § Cutting a release: the new step and `--skip-ci-check`; renumber the script steps
+- [x] CHANGELOG `[Unreleased]` cites `(task 153)`
+- [x] Mutation proofs recorded in the implementation report; `npm run ci` green
 
 ---
 
@@ -334,13 +351,20 @@ All three test files are inside the existing `'tests/*.test.js'` glob in `packag
    `npm run bundle`, never hand-edited
 8. ✅ `shared/resources/tests/access-config-parity.test.mjs` — marker at `:613`
 9. ✅ `shared/resources/tests/qa-diminishing-returns.test.mjs` — marker at `:305`
-10. ✅ `shared/resources/tests/qa-execute-snippets.test.mjs` — marker at `:795`
+10. ✅ `shared/resources/tests/qa-execute-snippets.test.mjs` — marker at `:796`
 11. ✅ `skills/{qa-story,qa-task}/references/tests/qa-execute-snippets.test.mjs` — regenerated by
     `npm run bundle`
 12. ✅ `skills/session-handoff/tests/handoff-verify.test.js` — CR-6 restructure; marker on PRB-7 `:1429`
 13. ✅ `docs/contributing/traps.md` — § Load-sensitive tests
 14. ✅ `docs/contributing/releases.md` — class note, new script step, `--skip-ci-check`
 15. ✅ `CHANGELOG.md`
+16. ✅ `tests/test-clean-checkout.test.js` — green `gh` stub (it drives `release.sh`); its `FILE_BUDGET_MS` after-hook marked (QA cycle 2, CR2-1)
+17. ✅ `tests/bundle-missing-source.test.js` — `FILE_BUDGET_MS` after-hook marked (QA cycle 2, CR2-1)
+18. ✅ `evals/shared/tests/consumer-root.test.mjs` — `FILE_BUDGET_MS` after-hook marked (QA cycle 2, CR2-1)
+
+> The three whole-file budgets (`ms < FILE_BUDGET_MS` over `process.hrtime`) were added by task.154
+> after this document's 2026-09-24 enumeration; QA cycle 2 found them and the guard now also
+> enumerates by high-resolution clock source (direction C), so `traps.md` lists seven files.
 
 ### Files to Delete
 
@@ -400,29 +424,29 @@ None.
 
 ### Functional
 
-- [ ] `release.sh` exits 1 before `npm test` runs when CI for `HEAD` is red, pending or unverifiable
+- [x] `release.sh` exits 1 before `npm test` runs when CI for `HEAD` is red, pending or unverifiable
       — held by `tests/release-ci-gate.test.js` (the `npm` marker file is absent)
-- [ ] `--skip-ci-check` proceeds and prints that the release is unverified against CI — held by
+- [x] `--skip-ci-check` proceeds and prints that the release is unverified against CI — held by
       `tests/release-ci-gate.test.js`
-- [ ] `--dry-run` prints the verdict and *Would have REFUSED* when it would refuse — held by
+- [x] `--dry-run` prints the verdict and *Would have REFUSED* when it would refuse — held by
       `tests/release-ci-gate.test.js`
-- [ ] `ciVerdict` returns the verdict in every row of the plan's table; `gh` missing or failing is
+- [x] `ciVerdict` returns the verdict in every row of the plan's table; `gh` missing or failing is
       `unverifiable`, never `green` — held by `tests/release-ci-verdict.test.js`
-- [ ] A failing local `npm test` in `release.sh` prints the load-sensitive re-run instruction — held
+- [x] A failing local `npm test` in `release.sh` prints the load-sensitive re-run instruction — held
       by `tests/release-ci-gate.test.js`
-- [ ] CR-6 retries a precondition miss and does not retry any other failure; exhausted retries fail
+- [x] CR-6 retries a precondition miss and does not retry any other failure; exhausted retries fail
       with the `LOAD-SENSITIVE` marker — held by `handoff-verify.test.js`
-- [ ] Every assertion the enumeration pattern finds, and CR-6, carry the marker, and `traps.md` lists
+- [x] Every assertion the enumeration pattern finds, and CR-6, carry the marker, and `traps.md` lists
       exactly the files that do — held by `tests/load-sensitive-marker.test.js`
 
 ### Performance
 
-- [ ] CR-6 still takes one 3 s attempt on an idle machine (no raised timeout)
-- [ ] The three new test files make no network call (`gh` is always a stub)
+- [x] CR-6 still takes one 3 s attempt on an idle machine (no raised timeout)
+- [x] The three new test files make no network call (`gh` is always a stub)
 
 ### Code Quality
 
-- [ ] Each mutation below turns its named test red, recorded in the implementation report:
+- [x] Each mutation below turns its named test red, recorded in the implementation report:
       (M1) `ciVerdict` treats `failure` as green → `release-ci-verdict.test.js`;
       (M2) no runs counted as green → `release-ci-verdict.test.js`;
       (M3) the CI call moved after `npm test` → `release-ci-gate.test.js` (marker file present);
@@ -430,18 +454,18 @@ None.
       (M5) a `WORKFLOWS` name changed → the parity case;
       (M6) `retryUntilForked` returns the first attempt → `handoff-verify.test.js`;
       (M7) it retries a non-timeout miss → `handoff-verify.test.js`;
-      (M8) the marker removed from `qa-execute-snippets.test.mjs:795` → `load-sensitive-marker.test.js`
+      (M8) the marker removed from `qa-execute-snippets.test.mjs:796` → `load-sensitive-marker.test.js`
       direction A; (M9) a `traps.md` line deleted → direction B;
       (M10) `killGroup` in `handoff-verify.mjs` kills only the leader → CR-6 still red on
       *"the grandchild outlived the timeout"*
-- [ ] `npm run ci` green, including `lint:shell` on `release.sh` and `bundle:check`
+- [x] `npm run ci` green, including `lint:shell` on `release.sh` and `bundle:check`
 
 ### Migration
 
-- [ ] `docs/contributing/releases.md` documents the CI step, `--skip-ci-check` and the load-sensitive
+- [x] `docs/contributing/releases.md` documents the CI step, `--skip-ci-check` and the load-sensitive
       re-run rule beside the checklist
-- [ ] CHANGELOG `[Unreleased]` cites `(task 153)`
-- [ ] The implementation report records one `release.sh --dry-run --patch` against real `main`
+- [x] CHANGELOG `[Unreleased]` cites `(task 153)`
+- [x] The implementation report records one `release.sh --dry-run --patch` against real `main`
       showing the verdict line (evidence the `gh` query shape works against the live API; not held
       by CI)
 
@@ -526,26 +550,101 @@ None.
 - **Non-critical**: a refusal over a good commit — use `--skip-ci-check` and fix forward.
 
 ---
-
 <!-- change-log-start -->
-
 ## Change Log
 
-| Date       | Version | Description                                                                                     | Author      |
-| ---------- | ------- | ----------------------------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #150, #157, #158, #166 (2026-09-24 observation review) | create-task |
-
+| 2026-09-29 | 1.1     | Review passed (8/10) — reflected task.154's `npm run test:clean-checkout` step, guarded the CI block against `--retry`, re-anchored four drifted line refs | review-task |
+| 2026-09-29 |         | Status → ready-for-development | review-task |
+| 2026-09-29 |         | Implemented — 4 files added (1 script, 3 test files), 11 modified, 6 bundled copies regenerated; 46 new tests; mutations M1–M10 red (M10 after a CR-6 fixture fix) | develop |
+| 2026-09-29 |         | Status → ready-for-review | develop |
+| 2026-09-29 |         | QA gate PASS (95/100) — 1 LOW finding gated (CR-1), 4 advisory | qa-task |
+| 2026-09-29 |         | QA gate CONCERNS (90/100) — 3 findings gated (1 MEDIUM), 3 advisory | qa-task |
+| 2026-09-29 |         | QA findings fixed — gate 1 CR-1..CR-5, gate 2 CR2-1..CR2-5 + PRB2-1 (3 more load-sensitive files marked and listed), 2 iterations; fast gate green | qa-fix |
+| 2026-09-29 |         | QA gate PASS (95/100) — 1 LOW finding (QA3-1), 5 advisory | qa-task |
+| 2026-09-29 | 1.2 | DoD passed — accepted (PR #515) | finalise |
+| 2026-09-29 |  | QA gate CONCERNS (90/100) — cycle 4, post-acceptance: 1 MEDIUM (CR4-1, verdict parse fails open) | qa-task |
+| 2026-09-29 |  | QA findings fixed after acceptance — QA3-1 and CR4-1, 2 commits; fast gate green | qa-fix |
+| 2026-09-29 |  | QA gate PASS (100/100) — cycle 5, no open finding, 3 LOW advisory | qa-task |
+| 2026-09-29 |  | Target Architecture records the as-built --repo and --tsv CLI and release.sh's fail-closed parse (PR re-review PC-3) | develop |
+| 2026-09-29 | 1.3 | DoD re-verified on the post-acceptance head — accepted (PR #515), gate 5 | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: CI verdict module
-- [ ] Phase 2: wire it into `release.sh`
-- [ ] Phase 3: the load-sensitive marker and its list
-- [ ] Phase 4: CR-6 tolerates its precondition miss
-- [ ] Phase 5: docs and validation
+- [x] Phase 1: CI verdict module
+- [x] Phase 2: wire it into `release.sh`
+- [x] Phase 3: the load-sensitive marker and its list
+- [x] Phase 4: CR-6 tolerates its precondition miss
+- [x] Phase 5: docs and validation
+
+---
+
+## Definition of Done — run 2 (current)
+
+**Status:** ACCEPTED (re-verified on the post-acceptance head)
+
+Gate 5 PASS 100/100, no open entry. Acceptance criteria 14/14. Security PASS: 26 probes, 0 reproduced, and the `--tsv` parse fails closed. Docs PASS. Compliance N/A. CI SUCCESS on `9dc369d7`. QA3-1 and CR4-1 were fixed after run 1 (`940390b8`, `dcda808f`).
+
+**Detailed Verification Log:** `task.153.dod.2.release-ci-gate-load-sensitive-tests.md`
+
+---
+
+## Definition of Done — run 1 (historical, superseded)
+
+**Status:** ACCEPTED at `0c23a046` — superseded by run 2
+
+### QA Report Summary
+
+**QA Report**: `task.153.qa.3.release-ci-gate-load-sensitive-tests.md`
+**Gate File**: `task.153.gate.3.release-ci-gate-load-sensitive-tests.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100 (3 QA cycles; exit by the diminishing-returns route; 5c `/review-pr` APPROVE)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 14/14 success criteria traced to code and to tests that run on every PR
+✅ **Tests:** 59 new tests; mutations M1–M10 red; `npm run ci` green
+✅ **PR Review:** PR #515 — `/review-pr` APPROVE (5 LOW findings, advisory)
+✅ **CI:** SUCCESS on the decision head `e56cefbf` (5 checks)
+✅ **Documentation:** CHANGELOG `(task 153)`, `docs/contributing/releases.md`, `docs/contributing/traps.md` § Load-sensitive tests
+✅ **Security Review:** PASS — boundary probed, 26 candidates executed, 0 reproduced
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal release tooling
+
+**Carried (LOW, non-blocking):** QA3-1 (CR-6 schedule vs fixture lifetime at `HANDOFF_SPAWN_RETRIES>=3`), `gh run list` cap of 50 with no truncation check, release runbook does not mention the CI gate.
+
+**Task marked as ACCEPTED on:** 2026-09-29
+
+**Detailed Verification Log:** See `task.153.dod.1.release-ci-gate-load-sensitive-tests.md` for complete verification evidence and timestamps.
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-29
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.153.qa.5.release-ci-gate-load-sensitive-tests.md](./task.153.qa.5.release-ci-gate-load-sensitive-tests.md)
+- **Gate File**: [task.153.gate.5.release-ci-gate-load-sensitive-tests.yml](./task.153.gate.5.release-ci-gate-load-sensitive-tests.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 64 new; `npm run ci:fast` green
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Cycles 4–5 ran after acceptance to close QA3-1, which the merge gate refused to carry. That fix
+also found and fixed a fail-open in the new one-spawn verdict parse (CR4-1). No open finding
+remains. Three LOW advisory items are in gate 5's `recommendations.future`.
 
 ---
 

@@ -1,0 +1,22 @@
+{
+  "sink": "shell-exec",
+  "entry": "cli:scripts/release-ci-verdict.mjs",
+  "name": "release-ci-verdict-sha",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 13,
+  "passed": 13,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": [
+    "--sha",
+    "{input}",
+    "--tsv"
+  ],
+  "ran_at": "2026-09-29T10:30:57.924Z"
+}
