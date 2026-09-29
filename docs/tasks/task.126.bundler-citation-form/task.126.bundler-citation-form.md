@@ -358,15 +358,24 @@ None.
 ### Missing Criteria:
 
 1. **Acceptance Criteria:**
-   - [ ] AC5 "No measurable change to bundle time" has no automated test. The evidence is a measurement re-executed at finalise: the branch is faster than develop on `--all` and `--check`. A human decides whether to waive, or to reword the criterion to the per-PR 10 s budget in `tests/bundle-missing-source.test.js`.
+   - [x] _Waived by operator 2026-09-29 — decision 1 below._ AC5 "No measurable change to bundle time" has no automated test. The evidence is a measurement re-executed at finalise: the branch is faster than develop on `--all` and `--check`. A human decides whether to waive, or to reword the criterion to the per-PR 10 s budget in `tests/bundle-missing-source.test.js`.
 
 2. **Security Review:**
-   - [ ] The pre-commit refusal is a boundary, and the probe engine cannot execute it: no entry form materialises a git-repository fixture (`probes_executed: 0`, severity low). A human decides whether to record the fixture-repo tests (10 cases, 7 mutations) as adequate evidence, or to open a tooling task for a git-fixture probe form.
+   - [x] _Accepted by operator 2026-09-29 — decision 2 below._ The pre-commit refusal is a boundary, and the probe engine cannot execute it: no entry form materialises a git-repository fixture (`probes_executed: 0`, severity low). A human decides whether to record the fixture-repo tests (10 cases, 7 mutations) as adequate evidence, or to open a tooling task for a git-fixture probe form.
+
+### Operator decisions (2026-09-29)
+
+Both gaps are closed by a recorded operator decision, not by new evidence. `/finalise` applies them as waivers and cites them under "Deviations recorded, not hidden". No other finding is waived.
+
+1. **AC5 "No measurable change to bundle time" is waived.** Evidence is a measurement re-executed at finalise, 3 runs each on `4654c487` vs develop `f7ca1985`: `--all` develop 5.20/5.11/5.32 s vs branch 4.94/4.87/4.82 s; `--check` 5.08/4.97/5.05 s vs 5.67/4.73/4.74 s. `tests/bundle-missing-source.test.js` §2 also enforces a 10 s per-PR budget on `--check`.
+   - [x] Recorded as a waiver.
+2. **Security "probe mode executed no candidates" (low) is accepted on fixture-test evidence.** The pre-commit refusal decides from git state, and `security-probe.mjs` has no git-repo entry form (observation #221). The control is held by `tests/pre-commit-hook.test.js`: 10 cases plus 7 recorded mutations (F1–F3, H1–H4, F6–F7). Tooling follow-up: #221.
+   - [x] Recorded as an accepted finding.
 
 ### Next Steps:
 
-- [ ] Decide AC5: waive with the measured evidence, or reword it to the enforced per-PR budget
-- [ ] Decide the security finding: record the fixture-test judgement, or open the probe-engine tooling task
+- [x] Decide AC5: waive with the measured evidence, or reword it to the enforced per-PR budget — **waived** (decision 1)
+- [x] Decide the security finding: record the fixture-test judgement, or open the probe-engine tooling task — **fixture-test judgement recorded** (decision 2); tooling follow-up is observation #221
 - [ ] Re-run `/finalise`
 
 **Estimated Effort:** Small, if decided by waiver or rewording.
@@ -388,6 +397,7 @@ None.
 | 2026-09-29 |  | QA gate CONCERNS (80/100) — 2 findings (CR-1 refused-commit retry loop, CR-2 link relocation on on-disk copies) | qa-task |
 | 2026-09-29 |  | QA gate PASS (100/100) — 0 findings (2 advisory cleanups) | qa-task |
 | 2026-09-29 |  | DoD incomplete — 2 gaps identified (AC5 has no automated test; security probe executed no candidates on the pre-commit boundary) | finalise |
+| 2026-09-29 |  | Operator decisions recorded: AC5 waived on measured bundle-time evidence; security probe-mode finding accepted on fixture-test evidence (tests/pre-commit-hook.test.js, observation #221) | operator |
 <!-- change-log-end -->
 
 ## Progress Tracking
