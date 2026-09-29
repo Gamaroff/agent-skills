@@ -27,7 +27,7 @@ github_issue: 438
 
 The finalise DoD security agent applies `probe-boundary-rule.md` § Step 1b: an exported verdict predicate fires probe mode, and a boundary with `probes_executed: 0` is a FAIL. On task.124 that rule met `report-lint.js#lintReport` — a validator of the pipeline's own implementation report — and had no way to run: no sink in `security-input-corpus.mjs` models Markdown structure, and the entry takes `(text, { sections })`, which `security-probe.mjs` (one-argument calls) records as `unverifiable`. The agent did the honest thing and failed; the operator overruled it by hand (task.124 DoD § Step 5). This task gives the rule a way to run and a way to say "internal artefact, not probeable by this engine" that is a recorded decision rather than a FAIL to be overruled.
 
-**Scope**: `shared/resources/security-input-corpus.{mjs,md}` (new sink), `shared/resources/security-probe.mjs` (`--args-json` fixed extra arguments), `shared/resources/probe-boundary-rule.md` and `finalise-dod-security-prompt.md` (the internal-artefact decision), `qa-task`/`qa-story` Step 3b (same wording), tests.
+**Scope**: `shared/resources/change-log.js` (`fencedRanges` CRLF fix — a defect the new probe found during development; regression tests in `change-log.test.mjs` and `report-lint.test.mjs`), `shared/resources/security-input-corpus.{mjs,md}` (new sink), `shared/resources/security-probe.mjs` (`--args-json` fixed extra arguments), `shared/resources/probe-boundary-rule.md` and `finalise-dod-security-prompt.md` (the internal-artefact decision), `qa-task`/`qa-story` Step 3b (same wording), tests.
 
 **Key deliverables**: (1) `markdown-structure` sink — hostile cases are **inline** minimal report shapes, **each tripping exactly one** `lintReport` problem code (duplicated header block, second H1, trailing duplicate body, out-of-order section, duplicated section, heading swallowed by a fence, undetectable variant/empty document); legitimate cases are minimal valid task and story reports (inline, plus a CRLF variant and a `## Change Log` inside a fence that must not count); (2) `--args-json '[{"sections": <loadTemplate()>}]'` on the engine so a `(text, opts)` predicate is probeable, **and** a runner rule that reads a returned `{ ok: false }` as a rejection — without it every corrupt report scores `accepted`; (3) a third `boundary` value — `internal` — for a validator whose only input is an artefact the pipeline writes, rendered as an explicit skip with a reason, never as the zero-guard FAIL.
 
@@ -181,6 +181,8 @@ The finalise DoD security agent applies `probe-boundary-rule.md` § Step 1b: an 
 5. ✅ `shared/resources/finalise-dod-security-prompt.md` — schema + zero-guard wording
 6. ✅ `skills/finalise/SKILL.md` — Step 3d rendering
 7. ✅ `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md` — Step 3b vocabulary
+
+8a. ✅ `shared/resources/change-log.js` — `fencedRanges` CRLF fix (found by the new probe; see Scope)
 
 ### Files to Modify (Tests)
 
@@ -350,8 +352,8 @@ Also carried from earlier gates: `args` is not in the JS control key; the ok-rul
 - [x] Phase 1: the sink
 - [x] Phase 2: `--args-json`
 - [x] Phase 3: `internal`
-- [ ] QA: `task.131.qa.[N].markdown-structure-sink-internal-validator-class.md`
-- [ ] Gate: `task.131.gate.[N].markdown-structure-sink-internal-validator-class.yml`
+- [x] QA: `task.131.qa.[N].markdown-structure-sink-internal-validator-class.md` — 4 cycles, latest `task.131.qa.4.markdown-structure-sink-internal-validator-class.md`
+- [x] Gate: `task.131.gate.[N].markdown-structure-sink-internal-validator-class.yml` — latest `task.131.gate.4.markdown-structure-sink-internal-validator-class.yml` (PASS 100)
 
 ## References
 
