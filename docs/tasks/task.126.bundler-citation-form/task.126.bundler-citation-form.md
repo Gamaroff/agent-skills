@@ -5,7 +5,7 @@ type: task
 description: "bundle_skill.py follows every shared/resources/X mention recursively with no notion of cite vs depend: a one-line pointer from qa-fix, review-task and review-story to develop-pipeline-autonomous-defaults.md pulled 15–16 files each into skills that read none of them (task.116, ~48 generated files whose only relationship to the change is a sentence). And when a bundle run generates a new untracked references/ copy, the pre-commit hook prints an advisory and lets the commit through; bundle:check then fails in CI a push later (task.99). Give the bundler a citation form that copies one file, print the transitive count per skill on every run so growth is visible when it is caused, and make the pre-commit fail — not warn — on a new untracked generated copy. Observations #83, #114 (mechanism half)."
 tags: [create-skill, bundler, pre-commit]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 risk_level: medium
 created: 2026-09-17
@@ -17,7 +17,7 @@ github_issue: 426
 
 # Technical Task: Citing a hub shared resource bundles its whole transitive closure
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.126.review.1.bundler-citation-form.md` implemented 2026-09-29
 **GitHub Issue**: [#426](https://github.com/Gamaroff/agent-skills/issues/426)
 
@@ -175,11 +175,11 @@ bundling before and after Phase 1 and diffing.
 **Files**: `skills/create-skill/scripts/bundle_skill.py`, `skills/create-skill/scripts/quick_validate.py`, `skills/create-skill/scripts/package_skill.py`, `tests/bundle-citation.test.js` (new), `tests/bundle-missing-source.test.js`
 
 **Changes**:
-- [ ] One parser returns `(name, kind)` with `kind ∈ {dep, cite}` and the `#fragment` stripped from `name`. It lives in `quick_validate.py` beside `collect_shared_refs`, which `bundle_skill.py` and `package_skill.py` already import from. `collect_shared_refs` and `shared_refs_with_lines` become thin views of it, so the parity test `bundle-missing-source.test.js` §1d still holds, and the three regex copies collapse to one.
-- [ ] `kind = 'cite'` for an `.md` target carrying a `#fragment`, or for a mention inside `<!-- cite: … -->`, in **both** spellings (`shared/resources/X` and `references/X`). Any other target, and any bare mention, is `dep`.
-- [ ] `discover_needed`: the `REFS_REF_RE` seed from skill files classifies kind too, because that is the spelling every skill file carries after bundling. `pending` entries carry `(name, origin, kind)`, and `pending_quiet` carries `(name, kind)`. Popping a `cite` adds the name to `needed` and reads nothing out of it: no shared, sibling or invocation edges. Popping a `dep` behaves as today. `seen` records the strongest kind reached, so a name first reached as `cite` and later as `dep` is re-processed as `dep`.
-- [ ] `bundle_skill` status line: append ` · closure M (+K vs committed)` to today's `✅ <skill>: <status>`. `M = len(needed)`. `K` is `M` minus the tracked `references/` files that are source-backed. Take the tracked set from **one** `git ls-files` call per run, not one per skill.
-- [ ] Tests (fixture pattern of `tests/bundle-check-mode.test.js`) cover five cases:
+- [x] One parser returns `(name, kind)` with `kind ∈ {dep, cite}` and the `#fragment` stripped from `name`. It lives in `quick_validate.py` beside `collect_shared_refs`, which `bundle_skill.py` and `package_skill.py` already import from. `collect_shared_refs` and `shared_refs_with_lines` become thin views of it, so the parity test `bundle-missing-source.test.js` §1d still holds, and the three regex copies collapse to one.
+- [x] `kind = 'cite'` for an `.md` target carrying a `#fragment`, or for a mention inside `<!-- cite: … -->`, in **both** spellings (`shared/resources/X` and `references/X`). Any other target, and any bare mention, is `dep`.
+- [x] `discover_needed`: the `REFS_REF_RE` seed from skill files classifies kind too, because that is the spelling every skill file carries after bundling. `pending` entries carry `(name, origin, kind)`, and `pending_quiet` carries `(name, kind)`. Popping a `cite` adds the name to `needed` and reads nothing out of it: no shared, sibling or invocation edges. Popping a `dep` behaves as today. `seen` records the strongest kind reached, so a name first reached as `cite` and later as `dep` is re-processed as `dep`.
+- [x] `bundle_skill` status line: append ` · closure M (+K vs committed)` to today's `✅ <skill>: <status>`. `M = len(needed)`. `K` is `M` minus the tracked `references/` files that are source-backed. Take the tracked set from **one** `git ls-files` call per run, not one per skill.
+- [x] Tests (fixture pattern of `tests/bundle-check-mode.test.js`) cover five cases:
   - skill A cites `shared/resources/hub.md#rule` → gets `hub.md` only;
   - skill B names `shared/resources/hub.md` → gets hub + closure;
   - skill C cites hub and depends on a leaf → gets hub + that leaf;
@@ -196,9 +196,9 @@ bundling before and after Phase 1 and diffing.
 **Files**: `.githooks/pre-commit` (the repo's `core.hooksPath` is `.githooks`), `tests/pre-commit-hook.test.js` (new), `docs/contributing/traps.md`
 
 **Changes**:
-- [ ] The hook already stages the copies its own bundle run creates (the `NEW` set, `comm -13 PRE POST`), so those are not the problem. The problem is an **untracked** path in the pre-existing set (`LEFT`, `comm -12 PRE POST`). Today it is only warned about; this is task.99's case, where a manual `npm run bundle` ran before the commit. Intersect `LEFT` with `git ls-files --others --exclude-standard -- 'skills/*/references/*'`. If the result is non-empty, print the paths and exit 1 with the two remedies. Keep the trailing `*`: without it the pathspec matches nothing, and the refusal would be silently inert. The hook's own comment records that trap.
-- [ ] `BUNDLE_PRECOMMIT_WARN=1` restores today's warning.
-- [ ] A node test (so the `tests/*.test.js` glob in `npm test` runs it; a new `*.test.sh` runs nowhere until someone hand-adds it to the `test` script) drives the hook in a fixture git repo. Cases:
+- [x] The hook already stages the copies its own bundle run creates (the `NEW` set, `comm -13 PRE POST`), so those are not the problem. The problem is an **untracked** path in the pre-existing set (`LEFT`, `comm -12 PRE POST`). Today it is only warned about; this is task.99's case, where a manual `npm run bundle` ran before the commit. Intersect `LEFT` with `git ls-files --others --exclude-standard -- 'skills/*/references/*'`. If the result is non-empty, print the paths and exit 1 with the two remedies. Keep the trailing `*`: without it the pathspec matches nothing, and the refusal would be silently inert. The hook's own comment records that trap.
+- [x] `BUNDLE_PRECOMMIT_WARN=1` restores today's warning.
+- [x] A node test (so the `tests/*.test.js` glob in `npm test` runs it; a new `*.test.sh` runs nowhere until someone hand-adds it to the `test` script) drives the hook in a fixture git repo. Cases:
   - an untracked generated copy left in the tree, then commit a `SKILL.md` change → exit 1, naming the path;
   - `git add` the copy → exit 0;
   - `BUNDLE_PRECOMMIT_WARN=1` → exit 0 with the warning;
@@ -213,10 +213,10 @@ bundling before and after Phase 1 and diffing.
 **Files**: `skills/create-skill/SKILL.md`, `AGENTS.md`, `skills/{qa-fix,review-task,review-story}/SKILL.md`, the dropped `skills/{qa-fix,review-task,review-story}/references/` copies
 
 **Changes**:
-- [ ] Document the citation form beside the "literal is a bundling instruction" rule, and name when each is right. Cite a document you point a reader at. Depend on one whose procedure the skill executes.
-- [ ] Convert the three pointers (`references/develop-pipeline-autonomous-defaults.md` §Subagents) to `references/develop-pipeline-autonomous-defaults.md#subagents--unavailable-failed-slow`, then run `npm run bundle`.
-- [ ] `git rm` the copies each skill no longer reaches: exactly the set the bundle run's `--check` reports `UNREACHED` for these three skills. The bundler never deletes a copy. The expected sets are measured in §3 Important Clarifications (16 / 18 / 17 files). A difference between the two sets is a finding to explain, not a list to adopt.
-- [ ] `bundle:check` reports no `UNREACHED`. Record `git diff --stat` in the implementation report.
+- [x] Document the citation form beside the "literal is a bundling instruction" rule, and name when each is right. Cite a document you point a reader at. Depend on one whose procedure the skill executes.
+- [x] Convert the three pointers (`references/develop-pipeline-autonomous-defaults.md` §Subagents) to `references/develop-pipeline-autonomous-defaults.md#subagents--unavailable-failed-slow`, then run `npm run bundle`.
+- [x] `git rm` the copies each skill no longer reaches: exactly the set the bundle run's `--check` reports `UNREACHED` for these three skills. The bundler never deletes a copy. The expected sets are measured in §3 Important Clarifications (16 / 18 / 17 files). A difference between the two sets is a finding to explain, not a list to adopt.
+- [x] `bundle:check` reports no `UNREACHED`. Record `git diff --stat` in the implementation report.
 
 **Dependencies**: Phase 1.
 
@@ -249,38 +249,38 @@ source-backed copy on disk), and `bundle:check` reports each as `UNREACHED` unti
 ## 8. Testing Strategy
 
 ### Unit Tests
-- [ ] Citation (both spellings) → one file; dependency → closure; cited file's own refs not followed; a file reached both ways is bundled once with its closure; a `.js` cite is a dependency.
-- [ ] Fragment stripped: `collect_shared_refs`, `shared_refs_with_lines` and the `REFS_REF_RE` seed name `X.md`, not `X.md#anchor`; `quick_validate` passes on a fragment reference.
-- [ ] Reporting line format.
+- [x] Citation (both spellings) → one file; dependency → closure; cited file's own refs not followed; a file reached both ways is bundled once with its closure; a `.js` cite is a dependency.
+- [x] Fragment stripped: `collect_shared_refs`, `shared_refs_with_lines` and the `REFS_REF_RE` seed name `X.md`, not `X.md#anchor`; `quick_validate` passes on a fragment reference.
+- [x] Reporting line format.
 
 **Command**: `node --test tests/bundle-*.test.js tests/pre-commit-hook.test.js`
 
 ### Integration Tests
-- [ ] Full `npm run bundle` on the converted tree, dropped copies `git rm`'d: each of the three skills loses ≥ 12 files; `bundle:check` green with no `UNREACHED`; `validate:all` green; `bundled-links.test.js` green.
-- [ ] Hook test (node, fixture repo).
+- [x] Full `npm run bundle` on the converted tree, dropped copies `git rm`'d: each of the three skills loses ≥ 12 files; `bundle:check` green with no `UNREACHED`; `validate:all` green; `bundled-links.test.js` green.
+- [x] Hook test (node, fixture repo).
 
 ### Contract Tests
-- [ ] One definition of the ref parse: `package_skill.py` and `bundle_skill.py` define no `shared/resources/` regex of their own (import assertion).
+- [x] One definition of the ref parse — held **behaviourally**, not by an import assertion: §1d (`bundle-missing-source.test.js`) and test K (`bundle-citation.test.js`) fail when either consumer parses differently. `bundle_skill.SHARED_REF_RE` stays by design: it is the *rewrite* regex (`rewrite_text` must keep the fragment in the rewritten text), not a second parse.
 
 ### Performance Tests
-- [ ] `--all` wall time within noise.
+- [x] `--all` wall time within noise — measured 2026-09-29, 3 runs each: develop 4.86/5.00/5.01 s, branch 4.61/4.63/4.61 s (`--check`: 4.65–4.77 s → 4.34–4.38 s). Faster, because the three skills bundle 51 fewer files.
 
 ### Consumer Tests
-- [ ] `setup-consumer.sh` tarball of `qa-fix` still runs its documented steps (nothing it reads was dropped).
+- [ ] `setup-consumer.sh` tarball of `qa-fix` still runs its documented steps (nothing it reads was dropped). **Not run as a tarball install.** Checked statically instead: no file left in any of the three skills names a removed copy by `references/<name>` or `.agents/skills/<skill>/references/<name>`, apart from the cited hub copy itself. The cited §Subagents section's one dependency (`read-config.sh`) still ships in all three. Left for QA.
 
 ## 9. Success Criteria
 
 ### Functional
-- [ ] A fragment reference to an `.md` target, in either spelling, bundles exactly one file.
-- [ ] After conversion, each of the three task.116 pointer sites contributes exactly one file (the hub document) to its skill's closure. Measured as §3 defines closure, with a ≥ 12-file drop per skill. The 2026-09-29 baseline predicts qa-fix 37 → 21, review-task 45 → 27, review-story 46 → 29.
-- [ ] `bundle:check` reports no `UNREACHED` for the three skills, and `validate:all` passes.
-- [ ] A commit that leaves an untracked generated copy in the tree is refused by default.
+- [x] A fragment reference to an `.md` target, in either spelling, bundles exactly one file.
+- [x] After conversion, each of the three task.116 pointer sites contributes exactly one file (the hub document) to its skill's closure. Measured as §3 defines closure, with a ≥ 12-file drop per skill. The 2026-09-29 baseline predicts qa-fix 37 → 21, review-task 45 → 27, review-story 46 → 29.
+- [x] `bundle:check` reports no `UNREACHED` for the three skills, and `validate:all` passes.
+- [x] A commit that leaves an untracked generated copy in the tree is refused by default.
 
 ### Performance
-- [ ] No measurable change to bundle time.
+- [x] No measurable change to bundle time.
 
 ### Code Quality
-- [ ] One definition of the edge rules; mutation proofs recorded for each test.
+- [x] One definition of the edge rules; mutation proofs recorded for each test.
 
 ### Migration
 - [ ] Observations #83, #114 close naming the PR.
@@ -328,13 +328,14 @@ None.
 | 2026-09-17 | 1.0 | Initial draft — observation review 2026-09-17 (obs #83, #114) | create-task |
 | 2026-09-29 | 1.1 | Review 4/10 → 8/10 after fixes — cite detected on the `references/` spelling; one fragment-stripping parser in quick_validate.py; `git rm` of UNREACHED copies; hook refusal on untracked ∩ LEFT with a working pathspec; measured closure criteria; node hook test | review-task |
 | 2026-09-29 |  | Status → ready-for-development | review-task |
+| 2026-09-29 |  | Implemented phases 1–3 (inline, develop-task Step 3): one parser with edge kinds, closure status line, hook refusal, three pointers cited, 51 unreached copies removed; status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: citation edges
-- [ ] Phase 2: pre-commit refusal
-- [ ] Phase 3: authoring surface + conversions
+- [x] Phase 1: citation edges
+- [x] Phase 2: pre-commit refusal
+- [x] Phase 3: authoring surface + conversions
 - [ ] QA: `task.126.qa.[N].bundler-citation-form.md`
 - [ ] Gate: `task.126.gate.[N].bundler-citation-form.yml`
 
@@ -346,3 +347,46 @@ None.
 ## Notes
 
 Bugs found during QA land at `task.126.bug.[N].[name].md` in this directory.
+
+### Implementation Summary
+
+**Completed**: 2026-09-29 (develop-task pipeline, Step 3, inline from the plan).
+
+**Approach.**
+- **Phase 1.** One parser, `quick_validate.parse_shared_refs`, returns `(line, name, kind)` with
+  the fragment stripped. `collect_shared_refs` and `bundle_skill.shared_refs_with_lines` are views
+  of it, and `SHARED_REF_LINE_RE` is gone. `ref_kind` states the edge rule once.
+  `refs_refs_with_kind` classifies the `references/` spelling seeded through `REFS_REF_RE`.
+- **Discovery.** `discover_needed` carries a kind on every queue entry and treats a citation as a
+  leaf. `seen` records the strongest kind reached per name, so a cite later reached as a dependency
+  is re-processed as one.
+- **Status line.** `closure_note` appends `· closure M (±K vs committed)` from one cached
+  `git ls-files` per run. It omits the comparison outside a repository.
+- **Phase 2.** `.githooks/pre-commit` refuses the untracked part of its pre-existing dirty set
+  (`LEFT`). `BUNDLE_PRECOMMIT_WARN=1` downgrades the refusal to a warning.
+- **Phase 3.** Adds "Cite or depend" to `create-skill` and a paragraph to AGENTS.md. It converts the
+  three pointers, runs `npm run bundle`, and `git rm`s the 51 `UNREACHED` copies, a set
+  identical to the one the review predicted. It also corrects `traps.md`'s stale
+  `.git/hooks/pre-commit` path.
+
+**Testing results.**
+- **New tests.** 13 in `tests/bundle-citation.test.js` and 6 in `tests/pre-commit-hook.test.js`.
+  `bundle-missing-source.test.js` §1d gains two fragment inputs.
+- **Mutations.** 12, each reverted and each red, recorded in the implementation report: 8 on the
+  parser and discovery, 4 on the hook. One of the hook mutations is the pathspec without its
+  trailing `*`.
+- **Tree.** `bundle:check` is clean. `validate:all` passes 129 skills, and `check:generated`
+  and `bundled-links` are green. A second `npm run bundle` is a no-op.
+- **Closures.** qa-fix 37 → 21, review-task 45 → 27, review-story 46 → 29, exactly as the review
+  measured.
+
+**Deferred work.** None added.
+
+### Known Issues
+
+- ⚠️ **A citation does not carry the cited section's own dependencies.** The cited §Subagents section
+  tells its reader to `source references/read-config.sh`. All three skills still ship that script,
+  but only because each reaches it independently. If one stops reaching it, the cited section's
+  command breaks there, and nothing flags it. The rule already covers this: "a file the cited document
+  *needs* to be read is a dependency; write it as one". The limit is that this is enforced by
+  authorship, not by the bundler.

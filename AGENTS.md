@@ -180,6 +180,16 @@ Canonical rules: [`docs/standards/bug-registry.md`](./docs/standards/bug-registr
 
 Never use symlinks or relative paths.
 
+**Cite or depend.** A bare mention (`shared/resources/X`, or `references/X` in a skill file) is a
+dependency: it bundles X and everything X reaches. A fragment reference to an `.md` target
+(`shared/resources/X.md#section`, or `references/X.md#section`) is a citation: it bundles X alone,
+and so does a bare mention inside `<!-- cite: … -->`. Point a reader at a hub document by citing
+it, or the skill inherits the hub's whole closure. A script is always a dependency. The bundler
+prints each skill's `closure M (±K vs committed)`, never deletes a copy a change stops reaching
+(`--check` reports it `UNREACHED` until it is `git rm`'d), and the pre-commit hook refuses a commit
+that leaves an untracked generated copy behind. Rule and failure: `skills/create-skill/SKILL.md`
+§ "Cite or depend" (task 126).
+
 **Inside `shared/resources/` itself, cite a sibling by bare filename** (`see change-log.js`), never
 by the `shared/resources/<file>` literal: within a shared source that literal is a bundling
 instruction, not a reference — the bundler copies the named file into every skill that bundles the
