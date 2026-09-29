@@ -167,14 +167,14 @@ None.
 **Command**: `npm test` (per phase: `npm run ci:fast`)
 
 ### Integration Tests
-- [x] Scripted, run by hand (not a committed test): `call-sites.js --engine tracker-comment --root <git archive of c69f5115^>` returns the two sites the task.121 review found unnamed — recorded in the implementation report, Step 3. Not committed as a test because it needs history a shallow CI clone does not carry; the `--root`-as-given behaviour it relies on is covered by the committed CR-1 test. (`c69f5115` is the commit that widened task.121 after review; the document as reviewed is `c69f5115^`.)
+- [x] Committed test (`call-sites.test.mjs` "AC2: at c69f5115^ …"): `git archive c69f5115^` → `call-sites.js --engine tracker-comment --root <export>` returns the two sites the task.121 review found unnamed, and the document as reviewed does not name the develop-bug one. CI checks out full history (`test.yml` `fetch-depth: 0`); a shallow clone skips the test and says why. Added after DoD run 1 flagged it (the first run's hand-run-only claim was the gap). (`c69f5115` is the commit that widened task.121 after review; the document as reviewed is `c69f5115^`.)
 - [x] Hand run, recorded in the implementation report: check 14 applied to `git show c69f5115^:docs/tasks/task.121.cycle-scoped-qa-tracker-comments/task.121.cycle-scoped-qa-tracker-comments.md` reports those two sites as Important.
 
 ### Contract Tests
 - [x] `tests/review-call-site-population-check.test.js`: the check is present, with its trigger, command and verdicts, at review-task Step 3, review-story Step 4, both Detection Rules lists and create-task 3.5. (No family in `skill-families.md` covers the review skills, so the families audit cannot hold this.)
 
 ### Performance Tests
-- [x] CLI ≤ 2 s on the live tree.
+- [x] CLI ≤ 2 s on the live tree — asserted by `call-sites.test.mjs` "AC4: …" (added after DoD run 1).
 
 ### Consumer Tests
 - [ ] Next task that scopes "all call sites of X" carries a collector count in §7 and the review confirms it.
@@ -190,7 +190,7 @@ None.
 - [x] No measurable change to review wall-clock (one sub-second command; CLI ≤ 2 s on the live tree).
 
 ### Code Quality
-- [x] One collector, three consumers; no restated engine shape — `comment-slot-coverage.test.mjs` defines no regex of its own.
+- [x] One collector, three consumers; no restated engine shape — `comment-slot-coverage.test.mjs` defines no call-site shape of its own, asserted by `call-sites.test.mjs` "AC5: …" (added after DoD run 1).
 - [x] Mutation proof: remove a root class from the collector → the fixture test names it.
 
 ### Migration
@@ -247,9 +247,9 @@ None.
 ### Key Findings
 No blocking issues. Three advisory findings (C4-CR-1..3) are recorded in the gate's `recommendations.future`.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
 
-**Status:** IN PROGRESS
+**Status:** IN PROGRESS (run 1) — all four gaps fixed before run 2: AC2, AC4, AC5 tests added to `call-sites.test.mjs` (each mutation-proved); obs #120 closed naming PR #525.
 
 ### QA Gate Status
 
@@ -292,6 +292,7 @@ No blocking issues. Three advisory findings (C4-CR-1..3) are recorded in the gat
 | 2026-09-29 |  | QA gate CONCERNS (80/100) — cycle 3, 2 medium findings (EPIPE bypasses the exit contract; every-row test covers 4 of 6 rows) | qa-task |
 | 2026-09-29 |  | QA gate PASS (100/100) — cycle 4, 0 blocking findings, 3 advisory | qa-task |
 | 2026-09-29 |  | DoD incomplete — 4 gaps identified (AC2, AC4, AC5, AC7) | finalise |
+| 2026-09-29 |  | DoD gaps fixed — 3 tests (AC2 c69f5115^ fixture, AC4 ≤ 2 s, AC5 no restated shape), each mutation-proved; obs #120 closed naming PR #525 | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking

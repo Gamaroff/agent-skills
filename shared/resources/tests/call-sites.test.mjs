@@ -16,6 +16,7 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { loadSensitive } from "../spawn-budget.mjs";
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -699,4 +700,125 @@ test("C2-CR-5: an unreadable directory is `unreadable` (exit 3), not an empty on
     fs.chmodSync(path.join(locked, "references"), 0o755);
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+// ── DoD run 1 gaps (task.129 finalise) ──────────────────────────────────────
+// Three success criteria had evidence that was real but not a committed test.
+// Each test below is that evidence, run on every PR.
+
+test("AC2: at c69f5115^ the collector returns the two sites task.121's document did not name", (t) => {
+  // The worked example the whole check exists for (obs #120). task.121 as
+  // reviewed named qa-task, qa-story, qa-fix and the orchestrator's qa-cycle
+  // block; the guard's collector found two more in scope. The tree is exported
+  // with `git archive` — CI checks out full history (test.yml fetch-depth: 0).
+  // A shallow clone cannot answer, and says so rather than passing.
+  const shallow = spawnSync("git", ["rev-parse", "--is-shallow-repository"], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  }).stdout.trim();
+  if (shallow === "true")
+    return t.skip("shallow clone — c69f5115^ is not in history");
+  const rev = "c69f5115^";
+  assert.equal(
+    spawnSync("git", ["rev-parse", "--verify", "-q", `${rev}^{commit}`], {
+      cwd: REPO_ROOT,
+    }).status,
+    0,
+    `${rev} is not in this clone's history — the fixture cannot be measured`,
+  );
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "call-sites-c69-"));
+  try {
+    // Only the collector's roots, and the task.121 document the check reads.
+    const doc =
+      "docs/tasks/task.121.cycle-scoped-qa-tracker-comments/task.121.cycle-scoped-qa-tracker-comments.md";
+    const archive = spawnSync(
+      "sh",
+      [
+        "-c",
+        `git archive "${rev}" shared/resources skills scripts "${doc}" | tar -x -C "${root}"`,
+      ],
+      { cwd: REPO_ROOT, encoding: "utf8" },
+    );
+    assert.equal(archive.status, 0, archive.stderr);
+
+    const r = runCli(["--engine", "tracker-comment", "--root", root, "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    const sites = JSON.parse(r.stdout).sites.map(
+      (s) => `${s.file}:${s.line} ${s.stage}`,
+    );
+    const unnamed = [
+      "shared/resources/develop-pipeline-step-5-6-qa-loop.md:905 qa-fix-",
+      "skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md:89 qa-cycle-",
+    ];
+    for (const site of unnamed) {
+      assert.ok(
+        sites.includes(site),
+        `collector at ${rev} did not return ${site}; got:\n${sites.join("\n")}`,
+      );
+    }
+    // And the document the review read does not name the develop-bug consumer —
+    // which is what makes it a finding rather than a confirmation.
+    const text = fs.readFileSync(path.join(root, doc), "utf8");
+    assert.ok(
+      !text.includes("develop-bug-step-5-6-verify-loop"),
+      "task.121 at c69f5115^ already names the verify-loop site",
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("AC4: the CLI measures the live tree in under 2 s", () => {
+  // The success criterion's bound, asserted. Measured at ~0.2 s; the bound is
+  // the criterion's, not a tuned one, so load headroom is ~10x.
+  const start = process.hrtime.bigint();
+  const r = runCli(["--engine", "tracker-comment", "--json"], {
+    cwd: REPO_ROOT,
+  });
+  const ms = Number(process.hrtime.bigint() - start) / 1e6;
+  assert.equal(r.code, 0, r.stderr);
+  assert.ok(
+    ms < 2000,
+    loadSensitive(
+      `call-sites.js took ${ms.toFixed(0)} ms on the live tree (criterion: < 2000 ms)`,
+    ),
+  );
+});
+
+test("AC5: the guard test restates no call-site shape — it imports the collector", () => {
+  // One collector, no second enumeration. The guard used to carry its own
+  // collectCallSites()/shippedDocs() and two engine regexes; any of them coming
+  // back is a second definition of "what a call site is" that can drift from
+  // the one the review runs.
+  const guard = fs.readFileSync(
+    path.join(HERE, "comment-slot-coverage.test.mjs"),
+    "utf8",
+  );
+  assert.match(
+    guard,
+    /require\([\s\S]{0,80}call-sites\.js/,
+    "the guard no longer imports call-sites.js",
+  );
+  for (const def of ["function collectCallSites", "function shippedDocs"]) {
+    assert.ok(
+      !guard.includes(def),
+      `the guard defines ${def} again — import it from call-sites.js`,
+    );
+  }
+  // A call-site shape is an INVOCATION pattern: every one the collector defines
+  // anchors on `node\s+` before the engine's file. The key is that anchor, not
+  // the filename — the guard legitimately keeps a regex naming tracker-issue.js
+  // for its comment-before-close ordering rule, which is not a call-site shape
+  // (a filename key was red at the wrong site on its first run).
+  for (const { re } of Object.values(ENGINES)) {
+    assert.match(
+      re.source,
+      /node\\s\+/,
+      "every collector shape anchors on node\\s+ — the key below relies on it",
+    );
+  }
+  assert.ok(
+    !guard.includes("node\\s+"),
+    "the guard carries a `node\\s+` invocation regex — a restated call-site shape",
+  );
 });
