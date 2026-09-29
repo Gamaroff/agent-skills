@@ -569,6 +569,7 @@ None.
 | 2026-09-29 |  | QA findings fixed after acceptance — QA3-1 and CR4-1, 2 commits; fast gate green | qa-fix |
 | 2026-09-29 |  | QA gate PASS (100/100) — cycle 5, no open finding, 3 LOW advisory | qa-task |
 | 2026-09-29 |  | Target Architecture records the as-built --repo and --tsv CLI and release.sh's fail-closed parse (PR re-review PC-3) | develop |
+| 2026-09-29 | 1.3 | DoD re-verified on the post-acceptance head — accepted (PR #515), gate 5 | finalise |
 <!-- change-log-end -->
 
 ---
@@ -583,9 +584,19 @@ None.
 
 ---
 
-## Definition of Done - PASSED ✅
+## Definition of Done — run 2 (current)
 
-**Status:** ACCEPTED
+**Status:** ACCEPTED (re-verified on the post-acceptance head)
+
+Gate 5 PASS 100/100, no open entry. Acceptance criteria 14/14. Security PASS: 26 probes, 0 reproduced, and the `--tsv` parse fails closed. Docs PASS. Compliance N/A. CI SUCCESS on `9dc369d7`. QA3-1 and CR4-1 were fixed after run 1 (`940390b8`, `dcda808f`).
+
+**Detailed Verification Log:** `task.153.dod.2.release-ci-gate-load-sensitive-tests.md`
+
+---
+
+## Definition of Done — run 1 (historical, superseded)
+
+**Status:** ACCEPTED at `0c23a046` — superseded by run 2
 
 ### QA Report Summary
 

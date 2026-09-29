@@ -69,7 +69,7 @@ one list a test keeps equal to the code.
 
 ### Code Review
 
-- 3 QA cycles (PASS 95 → CONCERNS 90 → PASS 95), 2 fix cycles; `/review-pr` APPROVE.
+- 5 QA cycles (PASS 95 → CONCERNS 90 → PASS 95, then after acceptance CONCERNS 90 → PASS 100); `/review-pr` APPROVE, then a conformance re-review whose only substantive finding (a stale DoD) is answered by DoD run 2.
 
 ---
 
@@ -95,7 +95,7 @@ one list a test keeps equal to the code.
 ### Documentation Links
 
 - [Task document](./task.153.release-ci-gate-load-sensitive-tests.md)
-- [DoD summary](./task.153.dod.1.release-ci-gate-load-sensitive-tests.md)
+- [DoD summary (run 2)](./task.153.dod.2.release-ci-gate-load-sensitive-tests.md)
 
 ---
 
@@ -128,7 +128,6 @@ _None — command-line tooling._
 
 ### Current Limitations
 
-- CR-6 at `HANDOFF_SPAWN_RETRIES>=3`: a late attempt outlives the fixture (QA3-1, LOW).
 - `gh run list` is capped at 50 runs with no truncation check (LOW).
 
 ### Suggested Follow-Up Stories
