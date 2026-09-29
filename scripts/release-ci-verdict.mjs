@@ -28,8 +28,9 @@
  * `gh` missing, unauthenticated, failing, or printing something that is not a JSON array is
  * `unverifiable`, never `green`. A gate that cannot read its input must not report a pass.
  *
- * CLI: `release-ci-verdict.mjs --sha <40-hex> [--repo <owner/name>] [--json]` — prints one object
- * whose `reason` is
+ * CLI: `release-ci-verdict.mjs --sha <40-hex> [--repo <owner/name>] [--json | --tsv]` — `--json`
+ * prints one object; `--tsv` prints ONE line, `<reason><TAB><detail>` (tabs and newlines in the
+ * detail flattened to spaces), which is what release.sh reads. Either way the `reason` is
  * `green`, `red`, `pending` or `unverifiable`. Exit 0 green, 1 anything else, 2 usage.
  */
 import { spawnSync } from "node:child_process";

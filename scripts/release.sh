@@ -170,15 +170,27 @@ ok "Up to date with origin/main"
 # keeps its own guard, so it skips this one. Pinned by tests/release-ci-gate.test.js.
 if [[ "$RETRY" == false ]]; then
   heading "CI verdict"
-  # One spawn: --tsv prints "<reason><TAB><detail>". A missing or unrecognised reason is
-  # unverifiable — the verdict fails closed here too, never open.
-  CI_LINE=$(command node "$(dirname "$0")/release-ci-verdict.mjs" --sha "$LOCAL" --repo "$REPO_SLUG" --tsv) || true
-  CI_REASON=${CI_LINE%%$'\t'*}
-  CI_DETAIL=${CI_LINE#*$'\t'}
-  case "$CI_REASON" in
-    green|red|pending|unverifiable) ;;
-    *) CI_REASON="unverifiable"; CI_DETAIL="release-ci-verdict.mjs printed no verdict" ;;
+  # One spawn: --tsv prints ONE line, "<reason><TAB><detail>". Fails closed on everything else:
+  # empty output, a line with no TAB (a bare "green" split to "green" before this — QA cycle 4,
+  # CR4-1), more than one line, an unknown reason, and a "green" whose module exit was not 0.
+  CI_EXIT=0
+  CI_LINE=$(command node "$(dirname "$0")/release-ci-verdict.mjs" --sha "$LOCAL" --repo "$REPO_SLUG" --tsv) || CI_EXIT=$?
+  CI_REASON=""
+  CI_DETAIL=""
+  case "$CI_LINE" in
+    "") CI_DETAIL="release-ci-verdict.mjs printed nothing (exit $CI_EXIT)" ;;
+    *$'\n'*) CI_DETAIL="release-ci-verdict.mjs printed more than one line" ;;
+    *$'\t'*)
+      CI_REASON=${CI_LINE%%$'\t'*}
+      CI_DETAIL=${CI_LINE#*$'\t'}
+      case "$CI_REASON" in
+        green) [[ "$CI_EXIT" -eq 0 ]] || { CI_REASON=""; CI_DETAIL="release-ci-verdict.mjs said green but exited $CI_EXIT"; } ;;
+        red|pending|unverifiable) ;;
+        *) CI_DETAIL="release-ci-verdict.mjs printed an unrecognised verdict: ${CI_LINE}"; CI_REASON="" ;;
+      esac ;;
+    *) CI_DETAIL="release-ci-verdict.mjs printed a line with no TAB: ${CI_LINE}" ;;
   esac
+  [[ -n "$CI_REASON" ]] || CI_REASON="unverifiable"
   if [[ "$CI_REASON" == "green" ]]; then
     ok "CI green for ${LOCAL:0:8} — ${CI_DETAIL}"
   elif [[ "$SKIP_CI_CHECK" == true ]]; then

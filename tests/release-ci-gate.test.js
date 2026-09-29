@@ -275,6 +275,10 @@ test("a verdict module that prints something unrecognisable refuses as unverifia
     "greenish\tlooks fine",
     "no tab at all",
     "GREEN\tshouting",
+    "green",
+    "green\n",
+    "green\nred\tx",
+    "green\tok\nred\tx",
   ]) {
     const r = release(["--patch"], {
       verdictStub: `process.stdout.write(${JSON.stringify(out)}); process.exitCode = 0;\n`,
@@ -283,4 +287,15 @@ test("a verdict module that prints something unrecognisable refuses as unverifia
     assert.match(r.out, /CI is unverifiable/);
     assert.equal(r.npmCalled, false);
   }
+});
+
+test("a module that prints green but exits non-zero is unverifiable, not green (CR4-1)", () => {
+  const r = release(["--patch"], {
+    verdictStub:
+      'process.stdout.write("green\\tTest, ShellCheck green\\n"); process.exitCode = 1;\n',
+  });
+  assert.equal(r.status, 1, r.out);
+  assert.match(r.out, /CI is unverifiable/);
+  assert.match(r.out, /said green but exited 1/);
+  assert.equal(r.npmCalled, false);
 });

@@ -1,0 +1,59 @@
+schema: 1
+task: 'task.153.release-ci-gate-load-sensitive-tests'
+task_title: "[Task 153] Release gate reads CI's verdict; load-sensitive tests name themselves"
+gate: CONCERNS
+status_reason: 'Post-acceptance cycle 4 over fix 940390b8 (QA3-1 + one-spawn verdict parse). QA3-1 is fixed and re-proven. The new --tsv parse in release.sh fails OPEN on a bare "green" with no TAB, and it discards the module exit status (MEDIUM).'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T10:17:00Z'
+
+top_issues:
+  - id: 'CR4-1'
+    severity: medium
+    file: 'scripts/release.sh'
+    finding: 'A verdict line that is exactly "green" (no TAB) parses as reason green, because both parameter expansions return the whole line; "|| true" discards the module exit status that would contradict it. Reproduced: CI_LINE=green gives CI_REASON=green.'
+    suggested_action: 'Accept only a single line containing a TAB; treat green as green only when the module also exited 0; add bare "green" and a multi-line case to the gate test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 62
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 26
+    notes: 'The CLI controls engage (26/0, record task.153.qa.4.security.run.json). The shell-side parse in release.sh fails open on one input shape (CR4-1); the gate test harness reproduces it.'
+  performance:
+    status: PASS
+    notes: 'One node spawn per release run instead of three; test-clean-checkout back under its 10 s budget in the full suite.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR4-1.'
+  maintainability:
+    status: PASS
+    notes: 'cr6Schedule/cr6Lifetimes make the fixture invariant a tested fact.'
+
+recommendations:
+  immediate:
+    - action: 'CR4-1: parse fails closed — TAB required, single line, green only with exit 0.'
+      refs: ['scripts/release.sh', 'tests/release-ci-gate.test.js']
+  future:
+    - action: 'CR4-2 (cleanup): distinguish "empty output" from "unrecognised reason" in the fallback detail.'
+      refs: ['scripts/release.sh']
+    - action: 'CR4-3 (cleanup): the module header documents only --json; add --tsv.'
+      refs: ['scripts/release-ci-verdict.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['CR4-1 fixed']
