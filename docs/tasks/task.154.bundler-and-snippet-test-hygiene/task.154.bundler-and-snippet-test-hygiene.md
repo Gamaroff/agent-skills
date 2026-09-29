@@ -5,10 +5,12 @@ type: task
 description: "Two local-only blind spots in the repository's own tooling. (1) bundle_skill.py prints an unattributed `shared/resources/<name> not found` warning on every bundle and every pre-commit run, caused by a placeholder literal in observation-log-contract.md; remove the literal, make the warning name the citing file and line, and give it a CI reader. (2) Snippet tests that reach `.agents/skills/…` pass locally only through the developer's gitignored symlink; the two known instances are fixed, but nothing stops the next one — add a shared consumer-root helper, a clean-checkout test runner for the local release gate, and the create-skill rule."
 tags: [create-skill, bundle, testing, ci, observe-work, observation]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-24
 updated: 2026-09-29
+completed_date: 2026-09-29
+pr_number: 513
 assignee:
 estimated_effort_hours: 16
 github_issue: 484
@@ -16,7 +18,7 @@ github_issue: 484
 
 # Technical Task: Bundler and snippet-test hygiene — an attributed warning and a symlink-free test run
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.154.review.1.bundler-and-snippet-test-hygiene.md` implemented 2026-09-28
 
@@ -628,6 +630,31 @@ None.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.154.qa.5.bundler-and-snippet-test-hygiene.md`
+**Gate File**: `task.154.gate.5.bundler-and-snippet-test-hygiene.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified (DoD run 2, after run 1's three gaps were closed in `78ab4858`):
+
+✅ **Acceptance Criteria:** 12 of 13 met; AC13 (observations #149 and #151 to `actioned`) happens at merge
+✅ **Tests & CI:** 5/5 checks SUCCESS @ `78ab4858`; `npm run test:clean-checkout` 4424 tests, 0 fail
+✅ **Documentation:** CHANGELOG (Changed + Fixed), create-skill rule, traps.md, release runbook
+✅ **Security Review:** ✅ PASS. `resolveBase` probed through its export: 17 executed, 0 reproduced, 0 overblocked
+✅ **Compliance Review:** NOT_APPLICABLE (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-29
+
+**Detailed Verification Log:** See [`task.154.dod.2.bundler-and-snippet-test-hygiene.md`](./task.154.dod.2.bundler-and-snippet-test-hygiene.md) (run 1, gaps: [`task.154.dod.1.bundler-and-snippet-test-hygiene.md`](./task.154.dod.1.bundler-and-snippet-test-hygiene.md)).
+
+---
+
 ## Definition of Done - Gaps Identified (run 1, historical — closed)
 
 **Status:** CLOSED — all three gaps closed after DoD 1; `/finalise` re-runs as DoD 2.
@@ -661,13 +688,11 @@ AC13 (observations #149 and #151 set to `actioned`) is post-merge by definition 
 **Detailed Verification Log:** See [`task.154.dod.1.bundler-and-snippet-test-hygiene.md`](./task.154.dod.1.bundler-and-snippet-test-hygiene.md).
 
 ---
-
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description                                                                   | Author      |
-| ---------- | ------- | ----------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-24 | 1.0     | Initial draft — cut from observations #149, #151 (2026-09-24 observation review) | create-task |
 | 2026-09-28 | 1.1     | Review passed (9/10) — per-origin dedupe promise restated to match `seen`; §2 key narrowed; runner refuses a missing `node_modules` | review-task |
 | 2026-09-28 |         | Status → ready-for-development | review-task |
@@ -680,7 +705,7 @@ AC13 (observations #149 and #151 set to `actioned`) is post-merge by definition 
 | 2026-09-29 |         | QA findings fixed — gate PASS (100/100), 4 iterations, 8 bugs closed | qa-fix |
 | 2026-09-29 |         | DoD incomplete — 3 gaps identified (task.154.dod.1) | finalise |
 | 2026-09-29 |         | DoD 1 gaps closed — base decision extracted to `scripts/lib/clean-checkout-base.mjs` and probed (17/0); release gate test; per-file 10 s budget | develop-task |
-
+| 2026-09-29 | 1.2 | DoD passed — accepted (PR #513) | finalise |
 <!-- change-log-end -->
 
 ---

@@ -10,7 +10,7 @@
 ### 1. Pre-flight checks
 
 ```bash
-npm test
+npm run test:clean-checkout   # the suite in a clean clone of HEAD — what release.sh gates on
 npm run validate:all
 npm run generate-catalog   # commit any diff
 ```
