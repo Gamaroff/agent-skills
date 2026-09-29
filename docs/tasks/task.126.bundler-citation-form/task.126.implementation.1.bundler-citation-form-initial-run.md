@@ -3,7 +3,7 @@
 **Task**: `task.126.bundler-citation-form.md`
 **Run Number**: 1
 **Started**: 2026-09-29 17:03
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Adds a non-transitive citation form to the bundler, prints each skill's closure 
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map). Commits e2971aba, 2a746231, 68fecaa2, ebe60ff0, 4b5675e5. Loop audit: ready-for-review, 12/12. Fast gate: 2 iterations; iter 2 green bar one load-sensitive timing failure that re-ran clean alone | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #524: https://github.com/Gamaroff/agent-skills/pull/524 (OPEN); in-review comment posted; board in-review: stage-disabled | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: gate 1 CONCERNS 90 → gate 2 CONCERNS 80 → gate 3 PASS 100. 5c /review-pr: APPROVE (`task.126.pr-review.1.bundler-citation-form.md`). ready-for-merge: stage-disabled | — |
-| 7. finalise                | ⚠️ Needs Attention | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | `task.126.dod.1.bundler-citation-form.md` — GAPS IDENTIFIED, NOT ACCEPTED (2 gaps: AC5 has no automated test; the security probe executed no candidates on the pre-commit boundary). CI reading 1: SUCCESS @ 4654c487. HALT | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | `task.126.dod.1.bundler-citation-form.md` — GAPS (run 1, HALT). Run 2 after the operator decisions: `task.126.dod.2.bundler-citation-form.md` — ACCEPTED, with AC5 waived and the security probe-mode finding accepted (operator decisions 1–2), and five missing mutation proofs (D1–D5) recorded. CI reading 1: SUCCESS @ 67b4ed23; CI reading 2: SUCCESS @ 6344e4f1. Issue #426 closed, board done | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report final commit; pushed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -95,6 +95,21 @@ Each mutation was applied with a count-asserted replace, run, and restored from 
 - Step 3 inline — /develop not invoked: the plan names every hunk against re-verified anchors and the surface map is recorded; /develop would only re-read both (obs #162 route). The inline path owes /develop's Task Completion Checklist.
 - Step 4 staging scope (15 paths, `.claude/state/step4-scope-paths.txt`): the work-item dir, `.githooks`, `AGENTS.md`, `CHANGELOG.md`, `docs/contributing`, `evals/shared/tests`, `skills/create-skill{,/scripts}`, `skills/{qa-fix,review-story,review-task}{,/references}`, `tests`. Pre-flight: no untracked file outside scope, so nothing held. All code was already committed in Step 3; this commit carries the implementation report's first version.
 - Step 4: implementation report first committed in e9d986fb. PR #524 opened with `gh pr create` (base `develop`, `Closes #426`): the report commit already carried the only uncommitted file, so /create-pr's auto-commit had nothing left to stage. Lock `pr_url` set. Leak check: nothing out of scope (every commit was scoped by path). Post-PR state: OPEN, checked directly with `gh pr view`, not with the poller subagent. GitHub board: in-review → stage-disabled (this repo's ladder does not map in-review).
+
+### Step 7 resume — 2026-09-29 (run 2 of /finalise)
+
+- Resume: `advance-pipeline-lock.sh --restore` rebuilt the lock at step 7 from the halt snapshot. The operator chose "Resume from last completed step". Artifacts from Steps 1–6 were verified on disk (review.1, qa/gate 1–3, pr-review.1). The detector subagent was not dispatched, because the operator's resume prompt named the step and the state explicitly.
+- Operator decisions recorded in the task document (`67b4ed23`): (1) AC5 is waived on the measured bundle-time evidence; (2) the security probe-mode finding (low) is accepted on fixture-test evidence, with follow-up in observation #221.
+- DoD summary: `task.126.dod.2.bundler-citation-form.md` — ✅ ACCEPTED. The agents returned AC PARTIAL, Security FAIL (low; the waived item only), Compliance NOT_APPLICABLE and Docs PASS. Both waivers were applied in Step 6 and cited under "Deviations recorded, not hidden".
+- **New AC6 finding in run 2, not waived:** five new tests had no recorded mutation. They were bundle-citation B and J2, and pre-commit-hook `:94`, `:118` and `:137`. The finding was closed by execution, not by a waiver: `.claude/state/t126-dod2-mutate.mjs` ran mutations D1–D5 with a count-asserted split/join. Each named test went red and was green again after the restore, and `git status` was clean afterwards. No code changed, and Step 8a was not used. The proofs were verified inline, not by a further QA cycle.
+- CI reading 1: SUCCESS @ 67b4ed23839c (5 checks, background poll, 120 s); CI reading 2: SUCCESS @ 6344e4f140a1 (5 checks, background poll, 150 s). The acceptance commit is `6344e4f1`. The first `git add && git commit` hit a transient `.git/index.lock`, so nothing was committed; the retry landed all 4 artefacts.
+- Registry: `registry-tick.js` → ticked (task 126: planned → accepted). CHANGELOG cites task 126.
+- PR canonical summary: https://github.com/Gamaroff/agent-skills/pull/524#issuecomment-5896216268
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/524#issuecomment-5896217537
+- GitHub Issue #426: Document link re-pointed to `develop`; the `done` comment was posted; close: CLOSED ✅ (confirmed with `gh issue view --json state`).
+- GitHub Issue #426 — board: done → already (closing the issue had already moved the card).
+- Accept gap: no deferred-mutation journal, so tracker debt is none.
+- Task completed.
 
 ---
 
@@ -155,10 +170,12 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated — /finalise DoD gaps (2), HALT at Step 7
+**Finished**: 2026-09-29 19:40
+**Final Status**: Completed
 **Branch**: `feature/task.126.bundler-citation-form`
 **PR**: [#524](https://github.com/Gamaroff/agent-skills/pull/524)
-**QA Iterations**: {populated at end}
-**DoD Summary**: `task.126.dod.1.bundler-citation-form.md` — GAPS IDENTIFIED
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 3
+**DoD Summary**: `task.126.dod.2.bundler-citation-form.md` — ACCEPTED (run 1, `dod.1`, found gaps and is superseded)
+**Tracker debt**: none
+
+**Completion Summary**: task.126 implemented three things. The bundler has a non-transitive citation form: a fragment reference, or a bare mention inside `<!-- cite: … -->`, copies one file. Every bundle run prints a per-skill closure line. The pre-commit hook refuses a commit that leaves an untracked generated `references/` copy behind. The three task.116 pointer sites now cite the hub, which shrinks their closures by 16–18 files each and deleted 51 unreached copies. QA took 3 cycles (CONCERNS 90 → CONCERNS 80 → PASS 100), and 5c `/review-pr` returned APPROVE. /finalise halted once on two evidence-form gaps. The operator waived AC5 on measured bundle time and accepted the security probe-mode finding on fixture-test evidence (follow-up obs #221). Run 2 then found and closed a third gap by recording five missing mutation proofs (D1–D5), and accepted the task.
