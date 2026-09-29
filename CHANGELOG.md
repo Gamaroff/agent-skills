@@ -147,6 +147,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **CI is required once, at `/finalise` — no QA cycle waits on it (PR #517).** A consumer run made
+  every QA cycle wait about 35 minutes for the PR's CI on one self-hosted runner before writing the
+  gate. Across five cycles that added up to hours, and a sleeping CI host stranded the loop twice.
+  No skill required the wait, but none forbade it. The shared QA-loop doc (§ "CI and the QA loop")
+  and `develop-bug`'s verify loop now say that 5a, 5b and 5c do not wait on CI. A cycle's evidence
+  is the fast gate plus the diff review, and `/finalise` CI readings 1 and 2 are the pipeline's
+  only CI gate. The `qa-task` / `qa-story` gate precondition names the dispatched review as the
+  only wait. `pr-conformance-prompt.md` no longer counts a pending, cancelled or environmental CI
+  run as a finding before `/finalise`; a failure caused by the change still counts.
+  `ci-once-at-finalise.test.mjs` holds all four.
+
 - **The release gate runs the suite in a clean clone of HEAD (task 154).** `scripts/release.sh`
   ran `npm test` in place, where the gitignored `.agents/skills -> ../skills` symlink makes any test
   that reaches `.agents/skills/…` from the repo root pass — CI has no such symlink, and
