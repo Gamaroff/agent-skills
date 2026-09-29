@@ -1018,7 +1018,10 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 
      `reason: empty` is a claim about the instrument before it is one about the tree: check the
      root before believing a zero. A document written against an earlier tree is measured against
-     that tree: export it with `git archive <rev> | tar -x -C <dir>` and pass `--root <dir>`
+     that tree: export it with `git archive <rev> | tar -x -C <dir>` and pass `--root <dir>`,
+     which is measured as given. `reason: no-roots` (exit 1) means the root holds none of the
+     source trees the collector walks — a consumer install keeps skills only as bundled copies —
+     so there is no population to diff: record the check as not applicable, never as a zero
    - Diff the collector's `file:line` list against the document's. Every collector site the
      document does not name → **Important**, worded as a choice for the author: "in scope — add it"
      or "an exclusion — state why". A stated exclusion is not a finding. A count in the document

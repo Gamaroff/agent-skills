@@ -46,15 +46,22 @@
  *                               folded into `ok`: an empty population is a claim
  *                               about the instrument as much as the tree, and a
  *                               reassuring zero is the answer nobody questions
+ *     exit 1, reason `no-roots` — none of the roots exists under the root: this
+ *                               is not a tree the collector can measure (a
+ *                               consumer install keeps skills as bundled copies
+ *                               under .agents/skills/), so no number is reported
  *     exit 2, reason `usage`  — unknown engine, unknown flag, a flag with no
- *                               operand, or a root that is not a directory
+ *                               operand, or a root that is not a directory.
+ *                               `--engine gh-stage.js` is accepted as `gh-stage`
  *   --json → { reason, exitCode, engine, root, count, sites: [{ file, line,
  *              engine, stage, kind, slots }] }
  *
- * Root. `--root` (default: the cwd) is resolved to its git top level when it is
- * inside a repository, and used as given when it is not — an exported tree
- * (`git archive <rev> | tar -x`) has no `.git`, and measuring a population as
- * of an earlier commit is exactly what reviewing an old document needs. Never
+ * Root. With no `--root`, the cwd's git top level (the cwd itself outside a
+ * repository), so the CLI answers the same from any directory in the repo. An
+ * explicit `--root` is measured AS GIVEN — never widened to an enclosing
+ * repository: an exported tree (`git archive <rev> | tar -x -C <dir>`) has no
+ * `.git` of its own, and measuring a population as of an earlier commit is
+ * exactly what reviewing an old document needs, wherever the export sits. Never
  * `__dirname`: bundled into `.agents/skills/<skill>/references/`, this file
  * would otherwise measure the inside of a skill.
  */
@@ -110,6 +117,17 @@ function listDir(dir) {
   }
 }
 
+/** A name that passes a suffix filter is read only when it is a regular file:
+ *  a directory named `x.md` or a dangling symlink would otherwise throw out of
+ *  the walk, outside the CLI's exit-code contract (QA cycle 1, CR-6). */
+function isFile(abs) {
+  try {
+    return fs.statSync(abs).isFile();
+  } catch {
+    return false;
+  }
+}
+
 /** A generated `references/` copy carries the banner after its frontmatter —
  *  a `description:` routinely runs past 400 characters on its own, so the head
  *  is taken by LINES (a structural bound), not by bytes. */
@@ -128,12 +146,12 @@ function shippedSources(root) {
   const skills = path.join(root, "skills");
   for (const skill of listDir(skills)) {
     const md = path.join(skills, skill, "SKILL.md");
-    if (fs.existsSync(md)) out.push(md);
+    if (isFile(md)) out.push(md);
     const refs = path.join(skills, skill, "references");
     for (const f of listDir(refs)) {
       if (!f.endsWith(".md")) continue;
       const abs = path.join(refs, f);
-      if (!isBannered(abs)) out.push(abs);
+      if (isFile(abs) && !isBannered(abs)) out.push(abs);
     }
     const scripts = path.join(skills, skill, "scripts");
     for (const f of listDir(scripts)) {
@@ -143,7 +161,70 @@ function shippedSources(root) {
   for (const f of listDir(path.join(root, "scripts"))) {
     if (f.endsWith(".sh")) out.push(path.join(root, "scripts", f));
   }
-  return out;
+  return out.filter(isFile);
+}
+
+/** The roots `shippedSources` walks. None of them existing is not an empty
+ *  population: it is a tree this collector cannot measure — a consumer install,
+ *  where skills live under `.agents/skills/` as bundled copies (QA cycle 1,
+ *  CR-4). */
+const ROOTS = Object.freeze(["shared/resources", "skills", "scripts"]);
+
+function hasRoots(root) {
+  return ROOTS.some((r) => {
+    try {
+      return fs.statSync(path.join(root, r)).isDirectory();
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * A shell script names an engine once and runs it through a variable:
+ * `_cli=".agents/…/gh-stage.js"` then `_out=$(node "$_cli" --init-workflow)` —
+ * setup-consumer.sh does exactly this. A shape that needs the filename on the
+ * `node` line cannot see it (QA cycle 1, CR-2). So each file is read twice: the
+ * variables assigned the engine's path, then the lines that run `node` on one of
+ * them — the variable's most recent assignment above the `node` line decides.
+ */
+const PREFIX = String.raw`^\s*(?:\[[^\]]*\]\s*&&\s*)?(?:(?:tracker_call_with_retry|tracker_write)\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=)?\$?\(?\s*(?:command\s+)?node\s+`;
+
+/** For each line, the variables that MAY hold the engine's path there: assigned
+ *  it anywhere earlier in the same shell function. Both arms of an if/elif
+ *  reach the `node` line after it — setup-consumer.sh sets `_cli` to
+ *  jira-stage.js in one arm and gh-stage.js in the other — so a later
+ *  assignment does not cancel an earlier one. A function header resets the set:
+ *  the same script reuses `local _cli=` for a different CLI in a later
+ *  function, and a file-wide set read that `node "$_cli"` as an engine site.
+ *  Returns an array of Sets, one per line (the state before that line). */
+function engineVarsByLine(lines, file) {
+  const assign =
+    /^\s*(?:local\s+|export\s+|readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)=(\S*)/;
+  const header =
+    /^\s*(?:function\s+[A-Za-z_][A-Za-z0-9_-]*(?:\s*\(\s*\))?|[A-Za-z_][A-Za-z0-9_-]*\s*\(\s*\))\s*\{?\s*$/;
+  const isEngine = new RegExp(
+    String.raw`^["']?[^"'\s]*` +
+      file.replace(/[.]/g, "\\.") +
+      String.raw`["']?$`,
+  );
+  let current = new Set();
+  const byLine = [];
+  for (const l of lines) {
+    if (header.test(l)) current = new Set();
+    byLine.push(new Set(current));
+    const m = assign.exec(l);
+    if (m && isEngine.test(m[2])) current.add(m[1]);
+  }
+  return byLine;
+}
+
+function viaVariable(line, vars) {
+  if (vars.size === 0) return false;
+  const m = new RegExp(
+    PREFIX + String.raw`["']?\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?["']?(?:\s|\)|$)`,
+  ).exec(line);
+  return Boolean(m && vars.has(m[1]));
 }
 
 /**
@@ -165,8 +246,10 @@ function collect({ engine, root }) {
   for (const abs of shippedSources(root)) {
     const rel = path.relative(root, abs);
     const lines = fs.readFileSync(abs, "utf8").split("\n");
+    const varsAt = engineVarsByLine(lines, spec.file);
     for (let i = 0; i < lines.length; i++) {
-      if (!spec.re.test(lines[i])) continue;
+      if (!spec.re.test(lines[i]) && !viaVariable(lines[i], varsAt[i]))
+        continue;
       let text = lines[i];
       let j = i;
       while (text.trimEnd().endsWith("\\") && j + 1 < lines.length) {
@@ -209,7 +292,7 @@ function usage(json, error) {
 function main(argv) {
   const json = argv.includes("--json");
   let engine = null;
-  let rootArg = process.cwd();
+  let rootArg = null;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--json") continue;
@@ -225,15 +308,37 @@ function main(argv) {
     return usage(json, `unknown argument ${a}`);
   }
   if (!engine) return usage(json, "--engine is required");
+  // `--engine gh-stage.js` is the natural spelling after reading a document
+  // that names engines by file; accept it (QA cycle 1, CR-5).
+  engine = engine.replace(/\.js$/, "");
   if (!ENGINES[engine]) return usage(json, `unknown engine: ${engine}`);
+  // An explicit --root is measured AS GIVEN. Resolving it to an enclosing git
+  // top level replaced a tree exported inside a work tree with the current
+  // one, and reported that as `ok` (QA cycle 1, CR-1). Only the cwd default is
+  // resolved, so the CLI works from any directory inside the repository.
+  const given = rootArg !== null;
+  const candidate = given ? rootArg : process.cwd();
   let isDir = false;
   try {
-    isDir = fs.statSync(rootArg).isDirectory();
+    isDir = fs.statSync(candidate).isDirectory();
   } catch {
     isDir = false;
   }
-  if (!isDir) return usage(json, `--root is not a directory: ${rootArg}`);
-  const root = resolveRoot(rootArg);
+  if (!isDir) return usage(json, `--root is not a directory: ${candidate}`);
+  const root = given ? candidate : resolveRoot(candidate);
+  if (!hasRoots(root)) {
+    const error = `none of ${ROOTS.join(", ")} exists under ${root} — not a tree this collector can measure (a consumer install keeps skills under .agents/skills/ as bundled copies)`;
+    if (json)
+      process.stdout.write(
+        JSON.stringify(
+          { reason: "no-roots", exitCode: 1, engine, root, error },
+          null,
+          2,
+        ) + "\n",
+      );
+    else process.stdout.write(`no-roots call-sites: ${error}\n`);
+    return 1;
+  }
   const sites = collect({ engine, root });
   const reason = sites.length ? "ok" : "empty";
   if (json) {
@@ -263,7 +368,15 @@ function main(argv) {
   return 0;
 }
 
-module.exports = { ENGINES, collect, shippedSources, resolveRoot, main };
+module.exports = {
+  ENGINES,
+  ROOTS,
+  collect,
+  shippedSources,
+  hasRoots,
+  resolveRoot,
+  main,
+};
 
 // process.exitCode, never a hard exit: exiting after a stdout write truncates
 // the write at ~64KB when the caller pipes it (bug.3).

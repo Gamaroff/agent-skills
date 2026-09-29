@@ -296,10 +296,13 @@ test("CLI: run from a subdirectory, the root resolves to the repository top leve
   assert.equal(path.resolve(fromSub.root), path.resolve(fromTop.root));
 });
 
-test("live tree: the CLI returns exactly the sites the guard test collects", () => {
-  // The guard (comment-slot-coverage.test.mjs) imports collect(); this proves
-  // the CLI a reviewer runs reports the same population, so the review and the
-  // guard cannot disagree. Floors are the guard's own.
+test("live tree: the CLI serialises exactly what collect() returns, from the repo top", () => {
+  // What this proves is narrow, and says so (QA cycle 1, CR-7): the guard
+  // (comment-slot-coverage.test.mjs) imports collect(), so the two cannot
+  // disagree about the SHAPES — that is structural, not tested here. This
+  // catches the other half: the CLI's root resolution and JSON serialisation
+  // reporting a different population from the function it wraps. Floors are the
+  // guard's own.
   for (const [engine, floor] of [
     ["tracker-comment", 20],
     ["stakeholder-summary-cli", 9],
@@ -315,5 +318,162 @@ test("live tree: the CLI returns exactly the sites the guard test collects", () 
       j.count >= floor,
       `${engine}: only ${j.count} sites — the walk is probably broken`,
     );
+  }
+});
+
+// ── QA cycle 1 fixes ────────────────────────────────────────────────────────
+
+test("CR-1: an explicit --root inside a git work tree is measured as given, not widened", () => {
+  // A tree exported for an earlier commit can sit anywhere — including inside
+  // this checkout. Resolving --root to the enclosing top level reported the
+  // CURRENT tree as `ok`.
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "call-sites-repo-"));
+  try {
+    assert.equal(spawnSync("git", ["init", "-q"], { cwd: repo }).status, 0);
+    // The enclosing repo carries two sites; the export inside it carries one.
+    fs.mkdirSync(path.join(repo, "shared", "resources"), { recursive: true });
+    fs.writeFileSync(
+      path.join(repo, "shared", "resources", "a.md"),
+      "```bash\n" + CALL + "\n" + CALL + "\n```\n",
+    );
+    const exported = path.join(repo, "export", "shared", "resources");
+    fs.mkdirSync(exported, { recursive: true });
+    fs.writeFileSync(
+      path.join(exported, "b.md"),
+      "```bash\n" + CALL + "\n```\n",
+    );
+    const j = JSON.parse(
+      runCli([
+        "--engine",
+        "tracker-comment",
+        "--root",
+        path.join(repo, "export"),
+        "--json",
+      ]).stdout,
+    );
+    assert.equal(j.root, path.join(repo, "export"));
+    assert.equal(
+      j.count,
+      1,
+      "the export's one site, not the enclosing repo's two",
+    );
+    // With no --root, from inside the repo, the top level is still found.
+    const top = JSON.parse(
+      runCli(["--engine", "tracker-comment", "--json"], {
+        cwd: path.join(repo, "shared"),
+      }).stdout,
+    );
+    assert.equal(fs.realpathSync(top.root), fs.realpathSync(repo));
+    assert.equal(
+      top.count,
+      2,
+      "the enclosing repo's own two — export/ is not one of its roots",
+    );
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('CR-2: `node "$VAR"` is a site when VAR may hold the engine\'s path in that function', () => {
+  // The setup-consumer.sh shape: one variable, set per branch, run once — and a
+  // later function that reuses the name for a different CLI.
+  const script = [
+    "init_workflow() {",
+    '  if [[ "$TRACKER" == jira ]]; then',
+    '    _cli=".agents/skills/develop-task/references/jira-stage.js"',
+    "  else",
+    '    _cli=".agents/skills/develop-task/references/gh-stage.js"',
+    "  fi",
+    '  _out=$(node "$_cli" --init-workflow --json 2>/dev/null) || true',
+    "}",
+    "",
+    "resolve_set() {",
+    '  local _cli="${_tmpdir}/shared/resources/resolve-skill-set-cli.mjs"',
+    '  _out=$(node "$_cli" "${_args[@]}"); _rc=$?',
+    "}",
+    'node "${UNRELATED}" --stage done',
+    "",
+  ].join("\n");
+  const root = buildTree({ "scripts/setup.sh": script });
+  try {
+    for (const engine of ["gh-stage", "jira-stage"]) {
+      const sites = collect({ engine, root }).map((s) => `${s.file}:${s.line}`);
+      assert.deepEqual(
+        sites,
+        ["scripts/setup.sh:7"],
+        `${engine}: both branches reach line 7, and only line 7`,
+      );
+    }
+    assert.deepEqual(collect({ engine: "tracker-comment", root }), []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("CR-2: the live tree counts setup-consumer.sh's engine call under both engines", () => {
+  for (const engine of ["gh-stage", "jira-stage"]) {
+    const lines = collect({ engine, root: REPO_ROOT })
+      .filter((s) => s.file === "scripts/setup-consumer.sh")
+      .map((s) => s.text);
+    assert.equal(
+      lines.length,
+      1,
+      `${engine}: expected the one --init-workflow call, got ${lines.length}`,
+    );
+    assert.match(lines[0], /--init-workflow/);
+  }
+});
+
+test("CR-4: a tree with none of the roots is `no-roots`, exit 1 — never a zero", () => {
+  const root = buildTree({
+    ".agents/skills/x/references/tracker-comment.js": "x\n",
+  });
+  try {
+    const r = runCli(["--engine", "tracker-comment", "--root", root, "--json"]);
+    assert.equal(r.code, 1);
+    const j = JSON.parse(r.stdout);
+    assert.equal(j.reason, "no-roots");
+    assert.equal(j.count, undefined, "no-roots reports no number");
+    assert.match(
+      runCli(["--engine", "tracker-comment", "--root", root]).stdout,
+      /^no-roots call-sites:/m,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("CR-5: `--engine gh-stage.js` is accepted as `gh-stage`", () => {
+  const a = JSON.parse(
+    runCli(["--engine", "gh-stage.js", "--root", FIXTURE, "--json"]).stdout,
+  );
+  const b = JSON.parse(
+    runCli(["--engine", "gh-stage", "--root", FIXTURE, "--json"]).stdout,
+  );
+  assert.equal(a.engine, "gh-stage");
+  assert.deepEqual(a.sites, b.sites);
+});
+
+test("CR-6: a directory named like a source, or a dangling symlink, is skipped — not thrown", () => {
+  const root = buildTree({
+    "shared/resources/real.md": "```bash\n" + CALL + "\n```\n",
+  });
+  try {
+    fs.mkdirSync(path.join(root, "shared", "resources", "dir.md"));
+    fs.mkdirSync(path.join(root, "skills", "alpha", "references", "sub.md"), {
+      recursive: true,
+    });
+    fs.symlinkSync(
+      path.join(root, "nowhere.sh"),
+      path.join(root, "shared", "resources", "dangling.sh"),
+    );
+    const r = runCli(["--engine", "tracker-comment", "--root", root, "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(
+      JSON.parse(r.stdout).sites.map((s) => s.file),
+      ["shared/resources/real.md"],
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });

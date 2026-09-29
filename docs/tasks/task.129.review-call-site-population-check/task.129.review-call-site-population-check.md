@@ -115,7 +115,7 @@ None. The test keeps its floor; the review gains a check.
 
 **Changes**:
 - [x] Lift `collectCallSites()` with both of its shapes (`tracker-comment`, `stakeholder-summary-cli`) unchanged; add engine shapes for `gh-stage`, `jira-stage`, `tracker-issue`; add the two shell roots.
-- [x] CLI `--engine <name> [--root <dir>] [--json]` → `{ reason, engine, root, count, sites }`; `reason` `ok` (exit 0) or `empty` (exit 0, zero sites — a claim about the instrument, reported rather than hidden); exit 2 with `reason: usage` on an unknown engine or bad flag.
+- [x] CLI `--engine <name> [--root <dir>] [--json]` → `{ reason, engine, root, count, sites }`; `reason` `ok` (exit 0) or `empty` (exit 0, zero sites — a claim about the instrument, reported rather than hidden); `no-roots` (exit 1) when the root holds none of the walked trees (QA cycle 1, CR-4); exit 2 with `reason: usage` on an unknown engine or bad flag. An explicit `--root` is measured as given (CR-1); `node "$VAR"` is a site when VAR may hold the engine's path in that shell function (CR-2).
 - [x] Test: fixture tree with one site per root class and one bannered decoy; the live tree's counts equal the guard's (24 / 12 at `01c8701f`).
 
 **Dependencies**: none.
@@ -225,6 +225,27 @@ None.
 - **Critical**: the guard scanning fewer sites than before.
 - **Non-critical**: check wording.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-29
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.129.qa.1.review-call-site-population-check.md](./task.129.qa.1.review-call-site-population-check.md)
+- **Gate File**: [task.129.gate.1.review-call-site-population-check.yml](./task.129.gate.1.review-call-site-population-check.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 76 (affected suites); `npm run ci:fast` 4,564 pass
+- **Phases Verified**: 2/2
+- **Critical Issues**: 0 (2 medium: TASK-129-CR-1, TASK-129-CR-2)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+An explicit `--root` inside a git work tree is replaced by the repo top level (CR-1), and `node "$VAR"` invocations of an engine are invisible to the collector (CR-2).
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -234,6 +255,7 @@ None.
 | 2026-09-29 | 1.1 | Review passed (8/10) — renumbered to review-task check 14 / review-story check 10; corrected the collector's roots and existing engines (24 / 12 baseline); named both pre-pass files; presence test replaces the families audit; fixture at `c69f5115^` with `--root`; site schema defined | review-task |
 | 2026-09-29 |  | Status → ready-for-development | review-task |
 | 2026-09-29 |  | Implemented — `call-sites.js` (5 engines, `--root`), guard lifted (24 / 12 unchanged), review-task check 14 / review-story check 10, both Agent C prompts, create-task 3.5 twin; 3 new/changed test files, 17 + 10 new tests | develop-task (inline) |
+| 2026-09-29 |  | QA gate CONCERNS (80/100) — 2 medium findings (CR-1 root override, CR-2 node "$VAR" invisible) | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

@@ -1,0 +1,71 @@
+schema: 1
+task: 'task.129.review-call-site-population-check'
+task_title: "A call-site list in a task document is the author's recall, not a measurement"
+gate: CONCERNS
+status_reason: 'All phases delivered and every suite green (ci:fast, CI 5/5), but the diff review found two high-confidence medium bugs in call-sites.js: an explicit --root inside a repository is replaced by the repo top level, and node "$VAR" invocations of an engine are invisible.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T20:05:00Z'
+
+top_issues:
+  - id: 'TASK-129-CR-1'
+    severity: medium
+    file: 'shared/resources/call-sites.js'
+    finding: 'resolveRoot() also runs on an explicit --root, so a tree exported into a directory inside a git work tree (for example node_modules/.x) is silently replaced by the enclosing repo top level and the CLI reports the CURRENT tree with reason ok (reproduced: --root node_modules/.cs-probe → root=<repo>, count 12).'
+    suggested_action: 'Resolve to the git top level only for the cwd default; use an explicit --root as given. Add a test that exports into a subdirectory of a repository.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-129-CR-2'
+    severity: medium
+    file: 'shared/resources/call-sites.js'
+    finding: 'Shapes require the engine filename on the same line as node, so scripts/setup-consumer.sh:614 (_out=$(node "$_cli" …) with _cli set to gh-stage.js / jira-stage.js at :595/:597) is invisible; the newly added scripts/ root yields zero sites and an "all gh-stage call sites" list looks complete without it.'
+    suggested_action: 'Collect in-file VAR=…<engine>.js assignments and match node "$VAR" / node "${VAR}" against them; add a fixture from the setup-consumer shape.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 76
+  phases_verified: 2/2
+  ci: 'SUCCESS 5/5 @ a4132da0'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — the collector is a measurement; nothing is gated on its result. Candidates considered: isBannered (unexported predicate excluding generated copies from a count), ENGINES[*].re (line shapes that decide what is counted), --root/resolveRoot (reads any directory by design; no containment claim in header or success criteria). No network, no writes, no execution of scanned content.'
+  performance:
+    status: PASS
+    notes: 'CLI 0.17 s on the live tree (target ≤ 2 s); guard test 0.4 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 (root override) and CR-4 (empty conflates no-roots with no-sites in a consumer install) make a zero or a count untrustworthy in two situations the prose names.'
+  maintainability:
+    status: PASS
+    notes: 'One collector, two consumers today (guard + CLI); guard defines no regex of its own; presence test holds all five prose sites.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and CR-2 (see top_issues).'
+      refs: ['shared/resources/call-sites.js', 'shared/resources/tests/call-sites.test.mjs']
+  future:
+    - action: 'CR-4: distinguish no-roots (consumer install) from no-sites; state in the check that the population is measurable in the agent-skills source tree.'
+      refs: ['shared/resources/call-sites.js', 'skills/review-task/SKILL.md', 'skills/review-story/SKILL.md']
+    - action: 'CR-5: accept an optional .js suffix on --engine, or name --engine values in the checks and Agent C prompts.'
+      refs: ['shared/resources/call-sites.js']
+    - action: 'CR-6: skip non-regular files in shippedSources.'
+      refs: ['shared/resources/call-sites.js']
+    - action: 'CR-7: reword the live-tree test comment; commit the c69f5115^ export fixture as a test.'
+      refs: ['shared/resources/tests/call-sites.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed']
