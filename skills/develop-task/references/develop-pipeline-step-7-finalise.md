@@ -344,8 +344,14 @@ If `TRACKER_ISSUE` is set, post the completion comment and confirm the Done tran
 
    ```bash
    DOD_PATH=$(find {story-or-task-directory} -maxdepth 1 -name "*.dod.*.md" 2>/dev/null | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
-   FINAL_GATE=$(find {story-or-task-directory} -maxdepth 1 -name "*.gate.*.yml" 2>/dev/null | sed -E 's/^(.*\.gate\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2- \
-     | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
+   # The gate file from the one definition the QA skills use (task.158). This comment is
+   # non-blocking and post-finalise, so a refusal (no gate, or two files claiming the cycle)
+   # renders N/A with the helper's warning on stderr rather than dropping the comment.
+   FINAL_GATE_FILE=$(bash .agents/skills/{develop-story|develop-task|develop-bug}/references/qa-cycle.sh "{story-or-task-directory}" --path gate); rc=$?
+   [ "$rc" -le 1 ] || echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — QA Gate renders N/A" >&2
+   FINAL_GATE=""
+   [ -n "$FINAL_GATE_FILE" ] && FINAL_GATE=$(grep '^gate:' "$FINAL_GATE_FILE" 2>/dev/null | awk '{print $2}')
+   FINAL_GATE=${FINAL_GATE:-N/A}
 
    mkdir -p .claude/state
    # Terminator at COLUMN 0 — an indented terminator does not close an

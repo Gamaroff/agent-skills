@@ -106,20 +106,6 @@ function artifact(dir, kind) {
   throw new Error(`qa-cycle.sh --path ${kind} not runnable (rc ${r.status})`);
 }
 
-/**
- * True when `child` is `parent` or beneath it. `..name` is a child, not an
- * escape: only `..` itself or a `../` prefix leaves (CR6-4) — the same test
- * qa-execute-snippets.mjs isWithin() applies.
- */
-function isWithin(parent, child) {
-  const rel = path.relative(parent, child);
-  return !(
-    rel === ".." ||
-    rel.startsWith(`..${path.sep}`) ||
-    path.isAbsolute(rel)
-  );
-}
-
 // One remedy per link state, so the caller is told what to fix (TASK-149-BUG-10).
 // `unverifiable` is not a missing artifact: git answered neither yes nor no for
 // that path — most often a link that passes through a symlinked directory.
@@ -255,7 +241,7 @@ function readBackUnguarded(docArg) {
   for (const b of links.broken) {
     if (b.state !== "untracked") continue;
     const abs = path.join(root, b.resolved);
-    const inside = isWithin(dir, abs);
+    const inside = engines.docLinks.isWithin(dir, abs);
     if (inside && fs.lstatSync(abs).isFile()) stage(abs);
   }
 
@@ -269,6 +255,19 @@ function readBackUnguarded(docArg) {
     out.problems.push(
       `${b.target} (line ${b.line}) ${REMEDY[b.state] ? REMEDY[b.state](rel(dir)) : `is ${b.state} — write the artifact or fix the link`}`,
     );
+  }
+  // task.158 — existence is not the claim. The document must link THIS cycle's
+  // gate and report: a cycle-2 document still linking gate.1 / qa.1 resolves
+  // every link and has a Change Log row, and read clean before this check.
+  const linked = new Set(links.resolved);
+  for (const [what, abs] of [
+    ["gate", gate],
+    ["QA report", report],
+  ]) {
+    if (abs && !linked.has(rel(abs)))
+      out.problems.push(
+        `the document does not link this cycle's ${what} ${path.basename(abs)} — the Step 12 edit did not land (or it still links a previous cycle's)`,
+      );
   }
   if (links.unterminatedFence)
     out.problems.push(

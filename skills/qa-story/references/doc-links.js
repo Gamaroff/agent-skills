@@ -241,9 +241,7 @@ function linkState(tracked, base, resolved) {
     } catch {
       return "missing";
     }
-    const rel = path.relative(fs.realpathSync(base), real);
-    if (rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel))
-      return "outside-repo";
+    if (!isWithin(fs.realpathSync(base), real)) return "outside-repo";
   }
   const r = spawnSync("git", ["check-ignore", "-q", "--", resolved], {
     cwd: base,
@@ -282,6 +280,22 @@ function dirSet(tracked) {
 }
 
 const toPosix = (p) => p.split(path.sep).join("/");
+
+/**
+ * True when `child` is `parent` or lies beneath it — the CommonJS definition of
+ * the containment test; qa-execute-snippets.mjs isWithin() is the ESM one, and
+ * a parity test holds the two to one case table (task.158). `..name` is a child,
+ * not an escape: only `..` itself or a `../` prefix leaves (TASK-149 CR6-4).
+ * Pure — no filesystem access.
+ */
+function isWithin(parent, child) {
+  const rel = path.relative(parent, child);
+  return !(
+    rel === ".." ||
+    rel.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(rel)
+  );
+}
 
 /**
  * Check one document. `file` is relative to `root` (default: cwd) or absolute.
@@ -331,6 +345,10 @@ function checkDocument(
     trackedIn === undefined ? (repo ? trackedSet(repo) : null) : trackedIn;
   const dirs = tracked ? dirSet(tracked) : null;
   const broken = [];
+  // Every link's repository-relative resolved path, resolved or not — so a
+  // caller can ask "does this document link X?" with the one resolution rule
+  // below rather than a second one (task.158: qa-read-back's this-cycle check).
+  const resolvedAll = [];
   for (const { target, line } of links) {
     const noFragment = target.split("#")[0];
     if (noFragment === "") continue;
@@ -339,6 +357,7 @@ function checkDocument(
         path.posix.join(path.posix.dirname(rel), decodeSafe(noFragment)),
       )
       .replace(/\/$/, "");
+    resolvedAll.push(resolved);
     const exists = tracked
       ? tracked.has(resolved) || dirs.has(resolved)
       : fs.existsSync(path.join(base, resolved));
@@ -354,6 +373,7 @@ function checkDocument(
     file: rel,
     root: base,
     links: links.length,
+    resolved: resolvedAll,
     broken,
     unterminatedFence: links.unterminatedFence,
     tracked: tracked !== null,
@@ -432,6 +452,7 @@ module.exports = {
   checkDocument,
   repoRoot,
   trackedSet,
+  isWithin,
   main,
 };
 

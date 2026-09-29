@@ -82,6 +82,12 @@ export PIPELINE_LOCK="$LOCK" PIPELINE_HALT_SNAPSHOT="$SNAPSHOT"
 # every skill that bundles this script also gets the sibling (QA cycle 2, CR-6):
 # bundle-dependency: shared/resources/advance-pipeline-lock.sh
 ADVANCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/advance-pipeline-lock.sh"
+# The QA cycle has ONE definition, the sibling qa-cycle.sh (task.158 CR-1): this script
+# carried its own sed loop, which kept a zero-padded gate's `08` and then died in
+# `$((QA_CYCLE + K))` with "value too great for base" while the resume contract, one step
+# earlier in the same procedure, read cycle 8.
+# bundle-dependency: shared/resources/qa-cycle.sh
+QA_CYCLE_SH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/qa-cycle.sh"
 
 usage() {
   echo "Usage: grant-qa-cycles.sh <doc-dir> <k> [<implementation-report>]   (k = positive integer, no leading zero)" >&2
@@ -106,16 +112,28 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-# 1. Reconstruct QA_CYCLE from disk: the highest {N} over *.gate.{N}.*.yml.
-QA_CYCLE=""
-for f in "$DOC_DIR"/*.gate.*.yml; do
-  [ -e "$f" ] || continue
-  n=$(printf '%s' "$f" | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/')
-  case "$n" in ''|*[!0-9]*) continue ;; esac
-  if [ -z "$QA_CYCLE" ] || [ "$n" -gt "$QA_CYCLE" ]; then QA_CYCLE="$n"; fi
-done
+# 1. Reconstruct QA_CYCLE from disk through qa-cycle.sh — the highest {N} over
+#    *.gate.{N}.*.yml, leading zeros stripped (gate.08 is 8). rc 1 is its refusal (no
+#    numbered gate); anything else means the helper did not run.
+if [ ! -f "$QA_CYCLE_SH" ]; then
+  echo "grant-qa-cycles: qa-cycle.sh not found beside this script ($QA_CYCLE_SH) — re-bundle the skill" >&2
+  exit 1
+fi
+# The helper's stderr is kept, not discarded: its rc 1 covers both "no gate file" and "gate
+# files with no usable cycle number", and only its message tells them apart (task.158 QA
+# cycle 2, QA2-CR-1).
+QA_CYCLE_ERR=$(mktemp)
+QA_CYCLE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" 2>"$QA_CYCLE_ERR"); rc=$?
+QA_CYCLE_WHY=$(sed -n '1s/^⚠️ *qa-cycle: *//p' "$QA_CYCLE_ERR"); rm -f "$QA_CYCLE_ERR"
+if [ "$rc" -gt 1 ]; then
+  echo "grant-qa-cycles: qa-cycle.sh not runnable (rc=$rc) — cannot reconstruct the QA cycle" >&2
+  exit 1
+fi
 if [ -z "$QA_CYCLE" ]; then
-  echo "grant-qa-cycles: no *.gate.{N}.*.yml in '$DOC_DIR' — nothing to grant against" >&2
+  # A separate default, not ${QA_CYCLE_WHY:-…}: the default text holds `{N}`, whose `}`
+  # would close the expansion early.
+  [ -n "$QA_CYCLE_WHY" ] || QA_CYCLE_WHY="no *.gate.{N}.*.yml in '$DOC_DIR'"
+  echo "grant-qa-cycles: nothing to grant against — $QA_CYCLE_WHY" >&2
   exit 1
 fi
 # The report's entry count is the other half of the reconstruction. `|| true`, not

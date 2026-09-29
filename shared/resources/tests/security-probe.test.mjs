@@ -19,6 +19,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -2633,5 +2634,70 @@ test("cli entry: a named cli: control is keyed on its name even when the result 
     assert.equal(rec.controls[0].verdict, "engages");
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.158 (TASK-149 gate 7 CR-2) — both containment sites use isWithin, so a
+// directory whose name BEGINS with two dots is inside the root, not an escape.
+// A bare startsWith("..") refused it. The root itself stays refused: isWithin(root,
+// root) is true, so that refusal is a separate `=== root` test at each site.
+test("resolveEntry: an entry under a `..name` directory inside the root is accepted; the root itself, `../x` and an outside absolute path are still refused (task.158)", () => {
+  const root = mkdtempSync(join(tmpdir(), "probe-dotdot-"));
+  try {
+    const inside = resolveEntry("..fixtures/control.mjs#f", root);
+    assert.equal(inside.ok, true, JSON.stringify(inside));
+    assert.equal(inside.exportName, "f");
+    const deep = resolveEntry("shell:..fixtures/sub/c.sh", root);
+    assert.equal(deep.ok, true, JSON.stringify(deep));
+    for (const bad of [
+      ".#f",
+      "../x.mjs#f",
+      "..fixtures/../../x.mjs#f",
+      "/etc/passwd#x",
+      "shell:../x.sh",
+    ]) {
+      const r = resolveEntry(bad, root);
+      assert.equal(r.ok, false, bad);
+      assert.equal(r.reason, "outside-repo-root", bad);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: a --fake-gh directory named `..name` inside the repo root is accepted, and the repo root itself is still bad-fake-gh (task.158)", () => {
+  // The name must begin with `..` at the FIRST segment below the root — that is
+  // the only place a bare startsWith("..") misfires. A disposable root holds the
+  // library under probe and the `..name` fake-gh directory, so nothing is ever
+  // written into the live repository (task.158 QA cycle 1, CR-4).
+  const root = mkdtempSync(join(tmpdir(), "probe-dotdot-gh-"));
+  const dotdot = join(root, "..fake-gh");
+  try {
+    mkdirSync(join(root, dirname(FN_LIB)), { recursive: true });
+    cpSync(join(REPO_ROOT, FN_LIB), join(root, FN_LIB));
+    cpSync(join(REPO_ROOT, FAKE_GH), dotdot, { recursive: true });
+    const ok = runProbeSpec({
+      sink: "filename",
+      entry: FN_ENTRY,
+      cases: LABEL_CASES,
+      fakeGh: basename(dotdot),
+      repoRoot: root,
+    });
+    assert.notEqual(ok.reason, "bad-fake-gh", JSON.stringify(ok.reason));
+    assert.ok(ok.executed > 0, `the probe ran: ${JSON.stringify(ok.reason)}`);
+    const atRoot = runProbeSpec({
+      sink: "filename",
+      entry: FN_ENTRY,
+      cases: LABEL_CASES,
+      fakeGh: ".",
+      repoRoot: root,
+    });
+    assert.equal(atRoot.reason, "bad-fake-gh");
+    // Refused by CONTAINMENT, not by the later "no gh in it" check — the root
+    // holds no gh either, so the reason alone cannot tell the two apart.
+    assert.match(atRoot.declined[0].detail, /is outside/);
+    assert.equal(atRoot.executed, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

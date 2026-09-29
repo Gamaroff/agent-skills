@@ -171,7 +171,7 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { sandboxEnv, snapshotTree } from "./qa-execute-snippets.mjs";
+import { isWithin, sandboxEnv, snapshotTree } from "./qa-execute-snippets.mjs";
 import { MATERIALISED_SINKS, corpusFor } from "./security-input-corpus.mjs";
 import { spawnBudget, neverRan, readInt } from "./spawn-budget.mjs";
 // Re-exported so the signal list ships beside the engine in every bundled copy:
@@ -412,8 +412,11 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
     ? resolve(rawPath)
     : resolve(root, rawPath);
 
+  // The root itself is refused (a directory is not an entry); anything else must
+  // lie beneath it. isWithin, not a bare startsWith(".."), so an entry under a
+  // `..name` directory is inside, not an escape (task.158; TASK-149 gate 7 CR-2).
+  const escapes = entryPath === root || !isWithin(root, entryPath);
   const rel = relative(root, entryPath);
-  const escapes = rel === "" || rel.startsWith("..") || isAbsolute(rel);
   if (escapes) {
     return {
       ok: false,
@@ -865,8 +868,7 @@ export function runProbeSpec({
     }
     const root = resolve(repoRoot);
     fakeGhDir = isAbsolute(fakeGh) ? resolve(fakeGh) : resolve(root, fakeGh);
-    const rel = relative(root, fakeGhDir);
-    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+    if (fakeGhDir === root || !isWithin(root, fakeGhDir)) {
       return decline("bad-fake-gh", `${fakeGhDir} is outside ${root}`);
     }
     try {
