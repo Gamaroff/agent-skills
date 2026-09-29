@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.52.0] - 2026-09-29
+
 ### Added
 
 - **`release.sh` gates on CI's verdict; load-sensitive tests name themselves (task 153).** A release
