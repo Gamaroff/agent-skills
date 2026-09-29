@@ -399,6 +399,7 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The QA loop's diminishing-returns exit closes the residue it carries (obs #215).** Route 2 now stamps each carried `top_issues[]` entry `status: closed` with `resolution: carried to recommendations.future (route 2)`, which is route 2b's own stamp, with the ids taken from a new `residueIds` field on `classifyLoopRoute`'s route-2 result. Before this, route 2 left its residue open, and `/develop-next`'s merge gate, which refuses any open entry, halted a task `/finalise` had already accepted (task 153, PR #515). A guard test holds both exits' On-exit lists to the same stamp. `pr-conformance-prompt.md` notes that gates written before this change may still show route-2 residue open.
 - **The bundler's `not found` warning names its origin and has a reader (task 154).** Every
   `npm run bundle` — so every pre-commit run — printed `⚠️  shared/resources/<name> not found` with no
   file, from a placeholder literal in `observation-log-contract.md`, and eleven task reports recorded

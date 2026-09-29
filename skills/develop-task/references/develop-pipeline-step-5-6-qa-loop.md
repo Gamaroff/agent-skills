@@ -673,7 +673,18 @@ default rather than as an opt-out. See [`configuration.md`](https://github.com/G
    to Step 7 is 5c returning `APPROVE` or `CONCERNS`, and this must not become the one path that
    reaches Step 7 without a PR conformance review — that would make it a *weaker* exit than a clean
    gate takes, on a run that by construction has stopped finding blockers.
-4. Record the residual in the gate's `recommendations.future` **and** on the work item.
+4. **Carry the residue, by id, and close it in `top_issues[]`** — `ROUTE_JSON`'s `residueIds` names
+   the open entries in gate order. Copy each to the gate's `recommendations.future` with its finding
+   text and `suggested_action`, plus `carried_from: top_issues (route 2, cycle {N})`. Then stamp the
+   `top_issues[]` entry `status: closed` with
+   `resolution: carried to recommendations.future (route 2)`, which is route 2b's own stamp, and
+   record the same ids on the work item under **Deferred Work**. Commit the gate and QA report before 5c (path 1), because the gate was just edited.
+
+   > **Why the entries are closed, not left open.** `/develop-next` and `/develop-batch` merge only
+   > a gate with no open entry (Step 3's matrix), and `/finalise` accepts before they run. An exit that
+   > leaves its residue `open` hands an accepted task to a merge gate that must refuse it. task.153
+   > was accepted with route 2's one LOW still open and halted at merge (obs #215). The stamp keeps what
+   > QA raised visible, and `resolution:` tells a carried entry from a fixed one.
 5. Write `describeDiminishingReturns(r)` verbatim into this cycle's `### QA Cycle {N}` entry, on its
    own `**Loop exit**` row. A reader six months later must be able to tell this exit from a stall,
    and the message is a function rather than a sentence composed here precisely so it is assertable.
@@ -1324,7 +1335,7 @@ when in fact they were never delivered.
 > | :--- | :--- | :--- |
 > | `PASS` (route 1) | no open entry — empty, or only `status: closed` entries | — nothing to mistake |
 > | `WAIVED` (route 1) | its HIGH entries, with `waiver.active: true` | **No.** They were waived on purpose; the outcome-branching list above says re-running qa-fix on them "would churn against an intentionally-waived gate" |
-> | `CONCERNS` (route 2, the Diminishing-returns exit) | the test-machinery residue that exit declined to fix | **No.** Leave it where the exit put it — the gate's `recommendations.future` and the work item |
+> | `CONCERNS` (route 2, the Diminishing-returns exit) | the test-machinery residue that exit declined to fix, stamped `status: closed` and carried to `recommendations.future` (a gate written before obs #215 may still show it open) | **No.** Leave it where the exit put it — the gate's `recommendations.future` and the work item |
 > | `CONCERNS` (route 3, no open entry) | empty, or only `status: closed` entries | — nothing to mistake; the reservation lives in `nfr_validation` and `status_reason` |
 >
 > **Only the review's findings are the work**, and they arrive in the `pr_review=` report, not in the
