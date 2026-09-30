@@ -1,0 +1,121 @@
+schema: 2
+task: 'task.155.qa-results-section-engine'
+task_title: 'QA Testing Results section: one write engine, one placement, refused when duplicated'
+gate: CONCERNS
+status_reason: 'PR review 4 is verified: task.141''s Deferred Work block and all 11 Bug Reports lists survive 4 writes, the REL-026 merge is gone, and nothing outside the span is lost. The new carry brings four low findings with 0 tracked instances on their trigger paths; one deletes (REL-030) and one stacks copies exponentially (REL-028), so Reliability stays CONCERNS.'
+reviewer: 'QA Engineer'
+head: '5322ba05d485b4fa691e291c9e46ea73167a64a4'
+updated: '2026-09-30T23:05:14Z'
+
+top_issues:
+  - id: 'REL-028'
+    severity: low
+    status: waived
+    resolution: 'waived by operator rule 2026-10-01 (duplicates; 0 corpus instances)'
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code review CR-1 (medium/high; promoted, and rated low on evidence as REL-024 was). mergeCarried (line 181) collects each carried name on its own. A `#### Deferred Work` inside a Bug Reports block (under `### Bug Reports`, or after a sibling `#### Bug Reports`) is carried twice: inside the Bug Reports block and as its own block. The copies double on every write (probe: 2, 4, 8, 16, 32 copies over 5 replaces). The reverse nesting (`### Deferred Work` holding `#### Bug Reports`) adds one stable extra copy. Effect: duplicates, never deletes. Corpus: 0 nested carried blocks in the 155 tracked sections. The trigger is plausible because carried blocks are appended at the end of the section, and the route-2/2b writer names no heading level, so a `####` record written at the end of the section nests under the carried `### Bug Reports`.'
+    suggested_action: 'Collect the carried blocks for every name in one pass, ordered by offset. Skip any block inside a block already taken. Add a nesting test that writes several times, for both directions.'
+    suggested_owner: dev
+  - id: 'REL-029'
+    severity: low
+    status: waived
+    resolution: 'waived by operator rule 2026-10-01 (refuses; 0 corpus instances)'
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code review CR-3 (low/medium), measured. The new refusal (normaliseSection, line 465) matches any `###`/`####` heading that starts with a carried name, in any case and with any suffix. So a QA render with its own heading, such as `### Bug Reports filed this cycle`, `### Deferred work items considered` or `#### Deferred Work (none this cycle)`, is refused as bad-section and Step 12 halts. The halt has no hint that names this cause, which widens REL-019. Effect: refuses, never deletes. Corpus: 0 QA-owned headings of this shape in the 155 tracked sections. 12 of 155 tracked sections are refused if re-rendered verbatim (the 11 Bug Reports lists and task.141): that is the intended rule, but an agent that keeps the list will halt with no hint. Both Step 12 templates are accepted.'
+    suggested_action: 'Refuse only the exact carried heading, with an optional numeric suffix. Add a bad-section hint to both Step 12 HALT messages that names a carried block in the render as one cause.'
+    suggested_owner: dev
+  - id: 'REL-030'
+    severity: low
+    status: waived
+    resolution: 'accepted by explicit operator decision 2026-10-01 (deletes a bold Deferred Work label inside the section; 0 instances); fix moved to source in a follow-up task'
+    file: 'shared/resources/qa-results.js'
+    finding: 'PC-1 residue, the Deferred Work analogue of REL-027. The route-2/2b step says to record ids "on the work item under **Deferred Work**" and names no heading or position. A bold `**Deferred Work**:` label inside the QA section is not carried, so a replace deletes the record while the write reports `replaced` (probe). Effect: deletes. Corpus: 0 bold Deferred Work labels inside a tracked QA section. Both halves of the trigger are observed separately: task.140 recorded route 2b as a bold label (in `## Implementation Summary`), and task.141 recorded it inside its QA section (as `###`, now carried). Not a regression: before 5322ba05 every Deferred Work block in the section was deleted.'
+    suggested_action: 'Name a heading and a position outside the QA section in develop-pipeline-step-5-6-qa-loop.md routes 2/2b (for example `## Deferred Work` after Rollback), or carry a bold label as well as a heading.'
+    suggested_owner: dev
+  - id: 'REL-031'
+    severity: low
+    status: closed
+    resolution: 'fixed post-gate: doc drift, qa-story indentation, N2 test name (no behaviour change)'
+    file: 'docs/tasks/task.155.qa-results-section-engine/task.155.qa-results-section-engine.md'
+    finding: 'Code review CR-2 (low/high) plus QA. The PR review 3 CR-1 bullet (line 468), edited in 5322ba05, still says task.141''s `### Deferred Work` is QA-owned and replaced whole. The gate 9 bullet (line 470) says it would be replaced on a further QA write. Both contradict the code and the PR review 4 bullet. Two more items: the qa-story SKILL.md insertion (line 1894) lost its 3-space list indentation, and test N2 is named "in document order" although the engine appends in CARRIED_SUBSECTIONS order (probe: Deferred Work before Bug Reports comes back reordered). Effect: cosmetic.'
+    suggested_action: 'Rewrite both task.141 sentences to say the block has been carried since PR review 4. Re-indent the two qa-story lines. Rename N2, or assert the fixed order.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 68
+  phases_verified: 4/4
+  ci: 'ci:fast locally at 5322ba05: 4,784 tests, 4,782 pass, 1 fail, 1 skipped. The one failure was test-clean-checkout, which ran 10,271 ms against a 10,000 ms budget. It is known to be load-sensitive; re-run alone it passed 13/13. The qa-results engine, wiring and corpus tests passed 68/68. bundle:check: 129 skills, 0 problems. Both bundled engine copies are byte-identical to the source apart from the header. validate passes for qa-task and qa-story. PR CI was not awaited (gated at /finalise).'
+  outside_span: 'QA engine alone, 1,992 tracked docs/**/*.md x 4 writes: 1,835 created then replaced 3 times, 155 replaced 4 times, 2 unplaceable (the known REL-011 pair). 0 lines lost outside the span, 0 multiple, and a 5th identical write changed 0 docs. With upsertChangeLog rows between the writes: 0 probe rows lost, 0 sections left inside a log. This is identical to the gate-9 engine at 18a0ec99, run through the same harness.'
+  inside_span: '12 tracked sections hold a carried block (the 11 Bug Reports lists and task.141''s Deferred Work). All of their lines are kept verbatim through 4 writes, with 1 heading each. The gate-9 engine lost task.141''s 18 non-blank Deferred Work lines. Writers into the section, from a grep of every SKILL.md and shared/resources/*.md: create-bug-report Step 5 (Bug Reports), qa-fix (updates Bug Reports statuses in place) and the route-2/2b loop exit (Deferred Work; no heading or position named). task.52''s `### Fixes (qa-fix cycle 1)` in its QA section is ad hoc text that no skill instructs; it was classed as QA-owned at gate 9.'
+  refusal_false_positives: 'Both Step 12 templates (qa-task, qa-story) are accepted as replaced on task.141 and task.116. Of the 155 tracked sections re-rendered verbatim, 143 are replaced and 12 are bad-section: exactly the 12 that hold a carried block, as the rule intends. The gate-9 engine replaced all 155. There are 0 QA-owned carried-name headings (REL-029).'
+  fault_injection: 'A stray ```, ~~~, 4-backtick or indented ```js after each of the 155 headings gave 155 unbounded for each shape; an HTML comment and a stray tick gave 155 replaced each; 0 lines lost. Stray fence plus a closed ```bash block at each of 16,976 later positions (to end of file): 5,144 replaced, 11,832 unbounded. 35 lines were lost, all from task.117''s and task.45''s template comment, ignoring thematic breaks. The gate-9 engine gave identical figures.'
+  probes: 'Nesting (REL-028): #### DW under ### BR gives 2/4/8/16/32 copies; ### DW holding #### BR is stable at 2. Flat ### BR and ### DW: stable, 1 each. Order: DW before BR is reordered. Two ### DW blocks: the second folds without its heading and its content is kept (PR review 4 CR-4). Render refusals: `### Deferred work items considered`, `#### Deferred Work (none this cycle)`, `### Bug Reports filed this cycle` and `#### deferred work` are refused; `### Deferred`, `### Deferred-Work`, `**Deferred Work**:` and a fenced heading are accepted. A bold `**Deferred Work**:` in the section is deleted (REL-030).'
+  step_4b: 'Both SKILL.md files changed. qa-task: 20 blocks (1 runnable, 3 placeholder, 16 mutating), bash+zsh, 0 findings. qa-story: 19 blocks (1 runnable, 4 placeholder, 14 mutating), bash+zsh, 0 findings.'
+  mutation_proofs: 'Live file snapshotted with cp and restored, and git status unchanged. Baseline 59/59. Dropping Deferred Work from CARRIED_SUBSECTIONS turned L2, N1 and N2 red (covered). Removing the normaliseSection refusal turned L2 red (covered). tests/qa-results-corpus.test.js stays green under the first mutation (no-red-untested for task.141 at corpus level; unit N1 covers it).'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 4]
+
+bug_resolution:
+  previous_gate: 'task.155.gate.9.qa-results-section-engine.yml (CONCERNS 90)'
+  verified_fixed: ['PC-1 (PR review 4: task.141 Deferred Work carried; 0 of 18 lines lost)', 'REL-026 (a render with its own list is refused, so the line merge is gone; test L2 mutation-proven)']
+  still_present_as_waived_or_deferred: ['REL-024', 'REL-025', 'REL-027']
+  deferred: ['REL-007', 'REL-008', 'REL-009', 'REL-018', 'REL-019', 'CR-5 (gate 6)', 'CRLF seam preservation', 'setext H1/H2', 'PR review 4 CR-4 (second carried block folds without its heading)']
+  fix_commit: '5322ba05d485b4fa691e291c9e46ea73167a64a4'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'A pure string transform with no network, shell or file I/O. boundary: internal (unchanged): the inputs are a pipeline-written work item and a pipeline-rendered section, and no corpus sink models this section.'
+  performance:
+    status: PASS
+    notes: 'The engine tests run in about 0.2 s. The 1,992-document corpus runs take seconds, and the 16,976-position sweep takes under a minute.'
+  reliability:
+    status: CONCERNS
+    notes: 'Nothing outside the span is lost, and all 12 tracked carried blocks are kept. Inside the span one silent deletion path is new (REL-030, a bold Deferred Work label) and REL-027 remains deferred. One stacking path is new and grows exponentially (REL-028). All have 0 tracked instances.'
+  maintainability:
+    status: PASS
+    notes: 'Both new branches are mutation-proven. linksIn is now dead code (CR-5 cleanup). The task document and qa-story carry stale or cosmetic prose (REL-031).'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'REL-028'
+      severity: low
+      finding: 'Code review CR-1 (medium/high; promoted, and rated low on evidence as REL-024 was). mergeCarried (line 181) collects each carried name on its own. A `#### Deferred Work` inside a Bug Reports block (under `### Bug Reports`, or after a sibling `#### Bug Reports`) is carried twice: inside the Bug Reports block and as its own block. The copies double on every write (probe: 2, 4, 8, 16, 32 copies over 5 replaces). The reverse nesting (`### Deferred Work` holding `#### Bug Reports`) adds one stable extra copy. Effect: duplicates, never deletes. Corpus: 0 nested carried blocks in the 155 tracked sections. The trigger is plausible because carried blocks are appended at the end of the section, and the route-2/2b writer names no heading level, so a `####` record written at the end of the section nests under the carried `### Bug Reports`.'
+      suggested_action: 'Collect the carried blocks for every name in one pass, ordered by offset. Skip any block inside a block already taken. Add a nesting test that writes several times, for both directions.'
+      carried_from: 'top_issues (operator decision 2026-10-01, cycle 10)'
+    - id: 'REL-029'
+      severity: low
+      finding: 'Code review CR-3 (low/medium), measured. The new refusal (normaliseSection, line 465) matches any `###`/`####` heading that starts with a carried name, in any case and with any suffix. So a QA render with its own heading, such as `### Bug Reports filed this cycle`, `### Deferred work items considered` or `#### Deferred Work (none this cycle)`, is refused as bad-section and Step 12 halts. The halt has no hint that names this cause, which widens REL-019. Effect: refuses, never deletes. Corpus: 0 QA-owned headings of this shape in the 155 tracked sections. 12 of 155 tracked sections are refused if re-rendered verbatim (the 11 Bug Reports lists and task.141): that is the intended rule, but an agent that keeps the list will halt with no hint. Both Step 12 templates are accepted.'
+      suggested_action: 'Refuse only the exact carried heading, with an optional numeric suffix. Add a bad-section hint to both Step 12 HALT messages that names a carried block in the render as one cause.'
+      carried_from: 'top_issues (operator decision 2026-10-01, cycle 10)'
+    - id: 'REL-030'
+      severity: low
+      finding: 'PC-1 residue, the Deferred Work analogue of REL-027. The route-2/2b step says to record ids "on the work item under **Deferred Work**" and names no heading or position. A bold `**Deferred Work**:` label inside the QA section is not carried, so a replace deletes the record while the write reports `replaced` (probe). Effect: deletes. Corpus: 0 bold Deferred Work labels inside a tracked QA section. Both halves of the trigger are observed separately: task.140 recorded route 2b as a bold label (in `## Implementation Summary`), and task.141 recorded it inside its QA section (as `###`, now carried). Not a regression: before 5322ba05 every Deferred Work block in the section was deleted.'
+      suggested_action: 'Name a heading and a position outside the QA section in develop-pipeline-step-5-6-qa-loop.md routes 2/2b (for example `## Deferred Work` after Rollback), or carry a bold label as well as a heading.'
+      carried_from: 'top_issues (operator decision 2026-10-01, cycle 10)'
+    - action: 'REL-028: collect carried blocks in one pass by offset and skip nested ones; add a nesting repeat-write test'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+    - action: 'REL-029: refuse only the exact carried heading; add a bad-section hint to both Step 12 HALT messages (with REL-019)'
+      refs: ['shared/resources/qa-results.js', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'REL-030: name a heading and an out-of-section position for the route-2/2b Deferred Work record, or carry a bold label'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/qa-results.js']
+    - action: 'REL-031: correct the two task.141 sentences, re-indent qa-story lines 1893-1895, rename or strengthen test N2'
+      refs: ['docs/tasks/task.155.qa-results-section-engine/task.155.qa-results-section-engine.md', 'skills/qa-story/SKILL.md', 'shared/resources/tests/qa-results.test.mjs']
+    - action: 'CR-5 cleanup: delete the now-unused linksIn and re-bundle'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Carried: REL-024, REL-025, REL-027 (gate 9), REL-007..010, REL-018, REL-019, CR-5 (gate 6), CRLF seams, setext (see the task Deferred Work)'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Operator rule applied to REL-028..031 (orchestrator)']

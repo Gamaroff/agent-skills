@@ -1891,8 +1891,8 @@ After review:
    heading — scanned ignoring fences, so a fenced `# comment` counts) and a write that would not read back as one section (`unplaceable`). On any
    refusal the step halts; a hand edit is not a fallback. A `### Bug Reports`
    list (`create-bug-report`) or `### Deferred Work` block (the pipeline's loop exit) already inside the
-section is carried through the replace; the rendered section must not include either — a render
-that does is refused as `bad-section`. Write (a) **before** the Change Log row in (d). A hand-rolled
+   section is carried through the replace; the rendered section must not include either — a render
+   that does is refused as `bad-section`. Write (a) **before** the Change Log row in (d). A hand-rolled
    `slice(indexOf(…), indexOf("## Change Log"))` stacked four copies on task.145 (obs #178).
 
    b. **QA Completion Summary** section (if testing is complete):

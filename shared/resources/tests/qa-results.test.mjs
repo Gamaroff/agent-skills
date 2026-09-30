@@ -697,7 +697,7 @@ test("N1 PC-1: a ### Deferred Work block inside the section survives every repla
   assert.equal(count(out, "### Deferred Work"), 1);
 });
 
-test("N2 both carried blocks survive together, in document order", () => {
+test("N2 both carried blocks survive together (appended in CARRIED_SUBSECTIONS order)", () => {
   const deferred = "### Deferred Work\n\n- REL-7 carried";
   const doc = markerDoc(`${section(1)}\n\n${bugList}\n\n${deferred}\n\n`);
   const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
