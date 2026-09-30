@@ -89,6 +89,25 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The QA Testing Results section has one writer, one place, and refuses to stack (task 155, obs #178).**
+  `qa-task` Step 12 and `qa-story` Step 12 item 3 said "replace the section whole" and named no tool,
+  so every run hand-wrote the edit — and a hand-written replace whose two boundaries come from two
+  independent searches stacked four copies on task.145 and left three in task.65. Both now write
+  through `shared/resources/qa-results.js` (`findQaResults` / `upsertQaResults`), which reuses
+  `change-log.js`'s fence, inline-code and frontmatter guards rather than a second scanner. A write
+  returns `replaced`, `relocated` (one section found inside the change-log block is moved out),
+  `created`, or refuses with `multiple` / `bad-section` and writes nothing; the Step 12 call halts on
+  a refusal instead of falling back to a hand edit. A heading counts when its text **begins**
+  `QA Testing Results`, so suffixed copies (`— Cycle 2 (re-review)`) are seen. A section ends before
+  the change-log block, so a replace can never delete `<!-- change-log-start -->`, and a `---`
+  separator after it survives. **One visible change:** a new section lands immediately before the
+  change-log block (else before `## Progress Tracking` / `## Dev Agent Record`), so a document that
+  placed it elsewhere is unchanged until QA next *creates* one there — an existing single section is
+  replaced where it stands. task.65's two stale copies are removed; `tests/qa-results-corpus.test.js`
+  fails when any tracked document carries two, or one inside the change-log block, and
+  `tests/qa-results-step12-wiring.test.js` executes both skills' Step 12 block from a consumer-shaped
+  checkout.
+
 - **A QA gate records the commit it judged, and the next cycle scopes from that commit (task 135, obs #136).**
   - **Breaking: gates are `schema: 2`.** `qa-task`, `qa-story` and `qa-gate` write `head:` (from
     `git rev-parse HEAD` at review time) and `updated:` (from `date -u`, never typed). Schema-1

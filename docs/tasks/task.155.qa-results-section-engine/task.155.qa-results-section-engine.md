@@ -5,10 +5,10 @@ type: task
 description: "Give the work item's `## QA Testing Results` section a write engine beside change-log.js. It replaces the section whole, places it in one canonical position outside the change-log block, and refuses a document that already carries more than one. Wire qa-task and qa-story Step 12 to it, repair the one corrupted document in the corpus, and hold the invariant with a corpus test."
 tags: [qa-task, qa-story, change-log, engine, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-30
 assignee:
 estimated_effort_hours: 16
 github_issue: 486
@@ -16,7 +16,9 @@ github_issue: 486
 
 # Technical Task: QA Testing Results section — one write engine, one placement, refused when duplicated
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.155.review.1.qa-results-section-engine.md` implemented 2026-09-30
 
 **GitHub Issue**: [#486](https://github.com/Gamaroff/agent-skills/issues/486)
 
@@ -109,9 +111,18 @@ appears.
 - **`shared/resources/qa-results.js`** (new, CommonJS, pure, no I/O). It requires `./change-log.js`
   for `protectedRanges`, `insideProtected`, `bodyStart`, `findChangeLog` and `ANCHORS`.
   - `findQaResults(content)` → `{ sections: [{ start, end, insideChangeLog }] }`. It finds every
-    `## QA Testing Results` heading that is not inside a fence or an inline code span. Each span ends
-    at the next unprotected heading of level ≤ 2, or at the change-log end marker when the section
-    sits inside the block.
+    H2 heading whose text **begins** `QA Testing Results` (`/^## QA Testing Results\b[^\n]*$/gm`, so
+    `## QA Testing Results — Cycle 2 (re-review)` counts) that is not inside a fence or an inline
+    code span. An H3 `### QA Testing Results` is a subsection and does not count. Each span ends at
+    the **earliest** of: the next unprotected heading of level ≤ 2; the change-log block's start,
+    when the block starts after the section; the change-log end marker, when the section sits
+    inside the block. Without the block-start bound a section placed directly before the block runs
+    to `## Change Log` and a replace deletes `<!-- change-log-start -->` (review C2: 5 corpus
+    documents have that shape today, and every document the engine writes will).
+  - **Separators are not part of a span.** Trailing blank lines and one `---` thematic break
+    immediately before the terminator stay where they are on every write. The written section is
+    separated by one blank line on each side, with runs of three or more newlines at the seam
+    collapsed (the `trimSeam` rule, re-implemented; it is private to `change-log.js`).
   - `upsertQaResults(content, section, { docType })` → `{ content, reason }`, where `reason` is one
     of these:
 
@@ -128,7 +139,8 @@ appears.
     Otherwise immediately before `ANCHORS[docType]`. Otherwise at the end of the document.
 - **Step 12** in both QA skills: render the section from the gate as today, then write it with one
   `node -e` call to the engine. Stop and surface the `reason` on `multiple` or `bad-section`; never
-  fall back to a hand edit.
+  fall back to a hand edit. The QA section is written **before** the Change Log row, so the
+  change-log write sees a relocated section already outside its block.
 - **Corpus guard**: a test over every tracked `docs/**/*.md` that carries the heading. Each document
   must have at most one `## QA Testing Results` and none inside the change-log markers. There is a
   non-vacuity floor on the number of documents scanned.
@@ -154,7 +166,8 @@ appears.
 
 - ✅ `shared/resources/qa-results.js` and `shared/resources/tests/qa-results.test.mjs`
 - ✅ `qa-task` Step 12 and `qa-story` Step 12 write through the engine; bundle refresh
-- ✅ `tests/qa-results-corpus.test.js`, plus the repair of task.65
+- ✅ `tests/qa-results-corpus.test.js`, plus the repair of task.65 (stacked copies)
+- ✅ `tests/qa-results-step12-wiring.test.js`: the executed Step 12 call
 - ✅ CHANGELOG `[Unreleased]`
 
 ### Out of Scope
@@ -186,33 +199,35 @@ section found inside the change-log block moves to the canonical position on its
 
 **Files**: `shared/resources/qa-results.js`, `shared/resources/tests/qa-results.test.mjs`
 
-- [ ] `findQaResults`: every unprotected `## QA Testing Results` heading, its span, and whether it sits inside the change-log marker block
-- [ ] `upsertQaResults`: the five reasons in § 3's table, and the canonical position order (change-log block → `ANCHORS[docType]` → end)
-- [ ] Reuse `change-log.js` exports for fences, inline code, frontmatter and the change-log block. Define no second fence scanner
-- [ ] Unit tests for each reason, plus: a fenced example heading is ignored; a hand-written `## Change Log` with no markers; a document with neither; the task.145 corruption shape (heading inside the markers) → `relocated`, then `replaced` on the next write
+- [x] `findQaResults`: every unprotected `## QA Testing Results` heading, its span, and whether it sits inside the change-log marker block
+- [x] `upsertQaResults`: the five reasons in § 3's table, and the canonical position order (change-log block → `ANCHORS[docType]` → end)
+- [x] Heading match is prefix-based on H2 (`/^## QA Testing Results\b[^\n]*$/gm`); the span end is bounded by the change-log block start; trailing separators stay outside the span
+- [x] Reuse `change-log.js` exports for fences, inline code, frontmatter and the change-log block. Define no second fence scanner
+- [x] Unit tests for each reason, plus: a fenced example heading is ignored; a hand-written `## Change Log` with no markers; a document with neither; the task.145 corruption shape (heading inside the markers) → `relocated`, then `replaced` on the next write; create → replace on a marker document leaves exactly one start and one end marker; a suffixed heading (`## QA Testing Results — Cycle 2`) is found; a `---` separator survives a replace
 
 ### Phase 2: wire the QA skills (Risk: Medium)
 
 **Files**: `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, and their bundled `references/` (generated)
 
-- [ ] qa-task Step 12: after rendering, write through `upsertQaResults` with one `node -e` call. On `multiple` / `bad-section`, halt and print the `reason`. Never hand-edit as a fallback. Cite obs #178
-- [ ] qa-story Step 12 item 3: the same, with `docType` story / task as the document is
-- [ ] `npm run bundle`; confirm both skills ship `references/qa-results.js` with `npm run bundle:check`, and that no copy is `UNREACHED`
+- [x] qa-task Step 12: after rendering, write through `upsertQaResults` with one `node -e` call. On `multiple` / `bad-section`, halt and print the `reason`. Never hand-edit as a fallback. Cite obs #178
+- [x] qa-story Step 12 item 3: the same, with `docType` story / task as the document is
+- [x] `tests/qa-results-step12-wiring.test.js`: extract each skill's Step 12 `node -e` block, run it from a consumer-shaped cwd against a fixture, assert one section
+- [x] `npm run bundle`; confirm both skills ship `references/qa-results.js` with `npm run bundle:check`, and that no copy is `UNREACHED`
 
 ### Phase 3: corpus guard and repair (Risk: Low)
 
 **Files**: `tests/qa-results-corpus.test.js`, `docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md`
 
-- [ ] Corpus test over tracked `docs/**/*.md` carrying the heading: at most one section, and none inside the change-log markers. There is a floor on documents scanned
-- [ ] Repair task.65: keep the copy whose **Gate File** link names the highest-numbered gate and remove the others. Record the removed copies' gate numbers in the implementation report
-- [ ] Mutation-prove: re-add a copy to task.65 → the corpus test goes red, naming the file
+- [x] Corpus test over tracked `docs/**/*.md` carrying the heading: at most one section, and none inside the change-log markers. There is a floor on documents scanned
+- [x] Repair task.65: keep the copy whose **Gate File** link names the highest-numbered gate and remove the others. Record the removed copies' gate numbers in the implementation report
+- [x] Mutation-prove: re-add a copy to task.65 → the corpus test goes red, naming the file
 
 ### Phase 4: docs and validation (Risk: Low)
 
 **Files**: `CHANGELOG.md`
 
-- [ ] CHANGELOG `[Unreleased]` › Changed cites `(task 155)`
-- [ ] `npm run ci:fast`, `npm run bundle:check`, `npm run validate` for qa-task and qa-story
+- [x] CHANGELOG `[Unreleased]` › Changed cites `(task 155)`
+- [x] `npm run ci:fast`, `npm run bundle:check`, `npm run validate` for qa-task and qa-story
 
 ---
 
@@ -223,17 +238,18 @@ section found inside the change-log block moves to the canonical position on its
 1. ✅ `shared/resources/qa-results.js`: the engine
 2. ✅ `shared/resources/tests/qa-results.test.mjs`: engine unit tests
 3. ✅ `tests/qa-results-corpus.test.js`: corpus guard (inside the `tests/*.test.js` glob in `package.json`)
+4. ✅ `tests/qa-results-step12-wiring.test.js`: executes each QA skill's Step 12 call against a fixture
 
 ### Files to Modify
 
-4. ✅ `skills/qa-task/SKILL.md`: Step 12 writes through the engine
-5. ✅ `skills/qa-story/SKILL.md`: Step 12 item 3 writes through the engine
-6. ✅ `docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md`: two stacked copies removed
-7. ✅ `CHANGELOG.md`
+5. ✅ `skills/qa-task/SKILL.md`: Step 12 writes through the engine
+6. ✅ `skills/qa-story/SKILL.md`: Step 12 item 3 writes through the engine
+7. ✅ `docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md`: two stacked copies removed
+8. ✅ `CHANGELOG.md`
 
 ### Generated (never edited by hand; `npm run bundle`)
 
-8. `skills/qa-task/references/qa-results.js`, `skills/qa-story/references/qa-results.js`
+9. `skills/qa-task/references/qa-results.js`, `skills/qa-story/references/qa-results.js`
 
 ### Files to Delete
 
@@ -257,9 +273,10 @@ None.
 
 ### Corpus survey (the figure the guard re-measures, obs #117)
 
-- **Definition**: tracked files (`git ls-files 'docs/**/*.md'`) whose text has a line exactly
-  `## QA Testing Results`. For each, count the headings and record whether the first one falls
-  between the change-log markers.
+- **Definition**: tracked files (`git ls-files 'docs/**/*.md'`) whose text has an unprotected H2
+  heading beginning `QA Testing Results` (the engine's own match — suffixed headings such as
+  `## QA Testing Results — Cycle 2 (re-review)` count). For each, count the headings and record
+  whether any falls between the change-log markers.
 - **Command**: the survey script in the plan file (§ Phase 3). The corpus test records the numbers;
   this document does not state them, because they change with every QA run.
 
@@ -280,25 +297,25 @@ None.
 
 ### Functional
 
-- [ ] `upsertQaResults` returns each of `replaced`, `relocated`, `created`, `multiple`, `bad-section` in the case § 3 names, and writes nothing on the last two
-- [ ] A fenced or inline-code `## QA Testing Results` is never found and never replaced
-- [ ] qa-task and qa-story Step 12 write through the engine; the extracted Step 12 call, run against a fixture, leaves exactly one section
-- [ ] The corpus guard passes on the tree after the task.65 repair and fails, naming the file, when a second copy is re-added
+- [x] `upsertQaResults` returns each of `replaced`, `relocated`, `created`, `multiple`, `bad-section` in the case § 3 names, and writes nothing on the last two
+- [x] A fenced or inline-code `## QA Testing Results` is never found and never replaced
+- [x] qa-task and qa-story Step 12 write through the engine; the extracted Step 12 call, run against a fixture, leaves exactly one section
+- [x] The corpus guard passes on the tree after the task.65 repair and fails, naming the file, when a second copy is re-added
 
 ### Performance
 
-- [ ] The engine and corpus tests run in under two seconds combined
-- [ ] No network access
+- [x] The engine and corpus tests run in under two seconds combined
+- [x] No network access
 
 ### Code Quality
 
-- [ ] No second fence scanner: `qa-results.js` imports its protection primitives from `change-log.js`
-- [ ] Every new assertion is mutation-proved, and the implementation report records each result
-- [ ] `npm run ci:fast`, `npm run bundle:check` and `npm run validate` are clean
+- [x] No second fence scanner: `qa-results.js` imports its protection primitives from `change-log.js`
+- [x] Every new assertion is mutation-proved, and the implementation report records each result
+- [x] `npm run ci:fast`, `npm run bundle:check` and `npm run validate` are clean
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 155)`
+- [x] CHANGELOG `[Unreleased]` cites `(task 155)`
 - [ ] Observation #178 is set to `actioned` when this task's PR merges
 
 ---
@@ -364,6 +381,9 @@ None.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-25 | 1.0     | Initial draft | create-task |
+| 2026-09-30 | 1.1     | Review NEEDS REVISION (6/10) → fixed: prefix heading match (task.65's suffixed copies), span bounded by the change-log start, separators preserved, Step 12 wiring test file named | review-task |
+| 2026-09-30 |         | Status → ready-for-development | review-task |
+| 2026-09-30 |         | Implemented — 11 files (1 engine + 2 bundled copies, 3 test files, 2 skills, task.65 repair, CHANGELOG), 31 tests | develop |
 
 <!-- change-log-end -->
 
@@ -371,10 +391,10 @@ None.
 
 ## Progress Tracking
 
-- [ ] Phase 1: the engine
-- [ ] Phase 2: wire the QA skills
-- [ ] Phase 3: corpus guard and repair
-- [ ] Phase 4: docs and validation
+- [x] Phase 1: the engine
+- [x] Phase 2: wire the QA skills
+- [x] Phase 3: corpus guard and repair
+- [x] Phase 4: docs and validation
 
 ---
 
