@@ -111,10 +111,12 @@ All notable changes to this project will be documented in this file. Format foll
   (`unplaceable`). Before a
   replace or relocate, the text it would remove is scanned **ignoring fences**, and the write is
   refused (`unbounded`) if that text carries a change-log marker, an H1/H2 or a Change Log heading —
-  one stray fence in a section can no longer widen a write over the log. A `### Bug Reports` block —
-  which `create-bug-report` writes inside this section — is carried whole through every replace
-  (`####` groups and tables included, several blocks folded into one), so a QA cycle never drops a
-  task's bug links; every other subsection is QA's own and is replaced whole.
+  one stray fence in a section can no longer widen a write over the log. Two blocks other writers put inside this section are carried whole through every replace —
+  `### Bug Reports` (`create-bug-report`) and `### Deferred Work` (the develop pipelines' route-2/2b
+  exit) — with `####` groups and tables, several blocks folded into one; a render that brings its own
+  copy of either is refused. Every other subsection is QA's own and is replaced whole. A trailing HTML
+  comment block before the next section is kept as a separator. Known residuals (a list under a
+  non-standard label, duplicate comment peels) are recorded in the task's Deferred Work.
   **One visible change:** a new section lands immediately before the
   change-log block (else before `## Progress Tracking` / `## Dev Agent Record`), so a document that
   placed it elsewhere is unchanged until QA next *creates* one there — an existing single section is

@@ -26,8 +26,8 @@ top_issues:
     suggested_owner: dev
   - id: 'REL-026'
     severity: low
-    status: waived
-    resolution: 'waived by operator rule 2026-10-01 (deletes link-less structure lines only when a render brings its own Bug Reports list, which no Step 12 template does - 0 plausible instances)'
+    status: closed
+    resolution: 'fixed in cycle 9 5b (PR review 4): a render that brings its own carried block is refused (bad-section), so the line-by-line merge that dropped linkless lines no longer exists'
     file: 'shared/resources/qa-results.js'
     finding: 'Code review CR-3 (medium/medium) and CR-5 (cleanup). When the render brings its own `### Bug Reports`, mergeCarried (line 197) keeps only old lines that name a link the render lacks. Old lines with no link are dropped: `#### Open Bugs`, `- None`, a table header, bold group labels. A multi-link old line is re-added whole when any one of its links is missing, which duplicates an entry the render already has. Table rows are spliced under a bullet list. Effect: deletes structure and linkless lines and duplicates entries; no bug link is lost. Corpus: 0 on the path, because neither Step 12 template renders a Bug Reports list. With a rendered list, tasks 116, 42, 76 and 94 would lose 12 structure lines, and task.120''s two-link line would duplicate.'
     suggested_action: 'Key an entry by its first link and carry the old block''s unmatched remainder whole, or state in both Step 12 notes that a render must not include a Bug Reports list.'
@@ -35,7 +35,7 @@ top_issues:
   - id: 'REL-027'
     severity: low
     status: waived
-    resolution: 'waived by operator rule 2026-10-01 (deletes only under a non-standard label no writer produces - 0 corpus instances)'
+    resolution: 'deferred by explicit operator decision 2026-10-01 (AskUserQuestion after PR review 4): deletes a list only under a non-standard label no writer produces; 0 corpus instances'
     file: 'shared/resources/qa-results.js'
     finding: 'REL-023 residue. The heading pattern (line 138) matches `### Bug reports`, `#### Bug Reports` and `### Bug Reports (1)`. It does not match the bold `**Bug Reports**` label that gate 8 named, `### Bug Report` (singular) or `### Bugs`. In those three cases the list is dropped while the write reports `replaced` (probe). Effect: deletes. Corpus: 0 lists that create-bug-report wrote use these shapes (it writes the exact `### Bug Reports`). There is 1 QA-owned bold label, in task.83''s `### QA Reports`.'
     suggested_action: 'Match a bold label and the singular form, or make the exact `### Bug Reports` heading a stated contract in create-bug-report Step 5.'

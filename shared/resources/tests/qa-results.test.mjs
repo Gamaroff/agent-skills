@@ -575,14 +575,16 @@ test("L1 CR-1: create-bug-report's ### Bug Reports list is carried through every
   assert.doesNotMatch(out, /cycle [123]\)/);
 });
 
-test("L2 a render with its own ### Bug Reports keeps its entries and gains the old ones it lacks", () => {
+test("L2 a render that brings its own carried block is bad-section — the engine owns carrying", () => {
   const doc = markerDoc(`${section(1)}\n\n${bugList}\n\n`);
-  const owned = `${section(2)}\n\n### Bug Reports\n\n- [task.9.bug.1.x.md](./task.9.bug.1.x.md) - ✅ Closed`;
-  const r = QR.upsertQaResults(doc, owned, { docType: "task" });
-  assert.equal(count(r.content, "### Bug Reports"), 1);
-  assert.match(r.content, /bug\.1\.x\.md\) - ✅ Closed/); // the render's entry wins
-  assert.doesNotMatch(r.content, /bug\.1\.x\.md\) - 🆕 New/);
-  assert.match(r.content, /bug\.2\.y\.md/); // the old entry it lacked is kept (REL-023)
+  for (const own of [
+    `${section(2)}\n\n### Bug Reports\n\n- [task.9.bug.1.x.md](./task.9.bug.1.x.md) - ✅ Closed`,
+    `${section(2)}\n\n### Deferred Work\n\n- REL-1 carried`,
+  ]) {
+    const r = QR.upsertQaResults(doc, own, { docType: "task" });
+    assert.equal(r.reason, "bad-section");
+    assert.equal(r.content, doc);
+  }
 });
 
 test("L3 QA's own stale subsections are still replaced whole", () => {
@@ -676,4 +678,29 @@ test("M6 a rich Bug Reports block — #### groups, a table, bold labels — is c
   const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
   assert.equal(r.reason, "replaced");
   assert.ok(r.content.includes(rich), "the block is carried verbatim");
+});
+
+// ---------------------------------------------------------------------------
+// N — PR review 4 (task.155 5c): the pipeline's Deferred Work record is carried
+// ---------------------------------------------------------------------------
+
+test("N1 PC-1: a ### Deferred Work block inside the section survives every replace", () => {
+  const deferred =
+    "### Deferred Work\n\nCarried from gate 3 (route 2b):\n\n- **REL-7** (LOW) — a residual shape\n- **REL-8** (LOW) — another\n\n| Id | Reason |\n|---|---|\n| REL-7 | cosmetic |";
+  let out = markerDoc(`${section(1)}\n\n${deferred}\n\n`);
+  for (let n = 2; n <= 4; n++) {
+    const r = QR.upsertQaResults(out, section(n), { docType: "task" });
+    assert.equal(r.reason, "replaced");
+    out = r.content;
+  }
+  assert.ok(out.includes(deferred), "carried verbatim");
+  assert.equal(count(out, "### Deferred Work"), 1);
+});
+
+test("N2 both carried blocks survive together, in document order", () => {
+  const deferred = "### Deferred Work\n\n- REL-7 carried";
+  const doc = markerDoc(`${section(1)}\n\n${bugList}\n\n${deferred}\n\n`);
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "replaced");
+  assert.ok(r.content.includes(bugList) && r.content.includes(deferred));
 });

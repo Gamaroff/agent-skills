@@ -1367,7 +1367,9 @@ carries more than one (`multiple`) — it never guesses which copy is current. I
 section it cannot bound (`unbounded`: an unclosed fence, or removed text that carries a change-log
 marker, an H1/H2 or a Change Log heading — scanned ignoring fences, so a fenced `# comment` counts) and a write that would not read back as one
 section (`unplaceable`). On any refusal the step halts; a hand edit is not a fallback. A `### Bug Reports`
-list that `create-bug-report` wrote inside the section is carried through the replace. Write the section **before** the Change Log row below,
+list (`create-bug-report`) or `### Deferred Work` block (the pipeline's loop exit) already inside the
+section is carried through the replace; the rendered section must not include either — a render
+that does is refused as `bad-section`. Write the section **before** the Change Log row below,
 so the change-log write sees a relocated section already outside its block. A hand-rolled
 `slice(indexOf(…), indexOf("## Change Log"))` stacked four copies on task.145 (obs #178).
 

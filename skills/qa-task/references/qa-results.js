@@ -122,7 +122,11 @@ const RE_STRUCTURAL = [
 // CR-1). The list is closed on purpose: every other `###` in the section is QA's
 // own and is replaced whole — carrying all of them would preserve stale cycle
 // history, which is exactly what "replace whole" exists to remove.
-const CARRIED_SUBSECTIONS = ["Bug Reports"];
+// Two writers own subsections here: create-bug-report Step 5 (`### Bug Reports`)
+// and the develop pipelines' route-2/2b loop exit, which records carried finding ids
+// "on the work item under Deferred Work" — task.141 carries that block inside its QA
+// section, and a replace deleted 52 lines of it (task.155 PR review 4, PC-1).
+const CARRIED_SUBSECTIONS = ["Bug Reports", "Deferred Work"];
 
 // A carried subsection: a `###`/`####` heading naming it (any case, any trailing text
 // such as ` (2)` — REL-023), then everything up to the next unprotected heading of
@@ -169,41 +173,24 @@ const linksIn = (text) =>
   new Set([...text.matchAll(/\]\(([^)\s]+)/g)].map((m) => m[1]));
 
 // Merge every carried subsection found in `removed` into `body` (task.155 QA cycle 8,
-// REL-020/023). With no list in the render: the first old block is kept whole and any
-// later ones are appended beneath it, each body once — a second `### Bug Reports`
-// (create-bug-report checks for an H2 but writes an H3, so it can open one) folds into
-// the first instead of being dropped. With a list in the render: the render's list is
-// kept, and every old line naming a link the render lacks is appended to it — nothing
-// the old list recorded is lost, and the render's entries win where they overlap.
+// REL-020/023): the first old block whole, later ones folded beneath it, so a second
+// `### Bug Reports` (create-bug-report checks for an H2 but writes an H3, so it can
+// open one) is kept rather than dropped. A render never brings its own carried block —
+// `normaliseSection` refuses one — so the engine alone owns carrying and nothing has to
+// be reconciled line by line (PR review 4, REL-026: that reconciliation dropped every
+// line without a link).
 function mergeCarried(body, removed) {
   let out = body;
   for (const name of CARRIED_SUBSECTIONS) {
     const old = collectBlocks(removed, name);
     if (!old.length) continue;
-    const mine = collectBlocks(out, name);
-    if (!mine.length) {
-      const parts = [old[0].whole];
-      for (const b of old.slice(1)) {
-        if (b.body && !parts.some((p) => p.includes(b.body)))
-          parts.push(b.body);
-      }
-      out = `${out}\n\n${parts.join("\n\n")}`;
-      continue;
+    // The first block is kept whole; later ones fold in beneath it, each body once.
+    // A later block's own heading line is dropped — its content is not.
+    const parts = [old[0].whole];
+    for (const b of old.slice(1)) {
+      if (b.body && !parts.some((p) => p.includes(b.body))) parts.push(b.body);
     }
-    const have = new Set(mine.flatMap((b) => [...linksIn(b.whole)]));
-    const missing = [];
-    for (const b of old) {
-      for (const line of b.body.split("\n")) {
-        const targets = [...linksIn(line)];
-        if (targets.length && targets.some((t) => !have.has(t))) {
-          targets.forEach((t) => have.add(t));
-          missing.push(line);
-        }
-      }
-    }
-    if (!missing.length) continue;
-    const at = mine[0].end;
-    out = `${out.slice(0, at)}\n${missing.join("\n")}${out.slice(at)}`;
+    out = `${out}\n\n${parts.join("\n\n")}`;
   }
   return out;
 }
@@ -474,6 +461,10 @@ function normaliseSection(section) {
   // Never write a section the next write would have to refuse: the structural guard
   // below is fence-blind, so a fenced `## Example` in the section is refused here too.
   if (removesStructure(body)) return null;
+  // A carried block belongs to another writer; the engine carries the document's own
+  // copy through, so a render that brings one is refused rather than reconciled.
+  if (CARRIED_SUBSECTIONS.some((n) => collectBlocks(body, n).length))
+    return null;
   // The heading must itself be a section heading (`## QA Testing Resultsx` is not).
   // A second H1/H2 in the body is already refused by removesStructure above.
   if (findQaResults(body).sections.length !== 1) return null;
