@@ -3,7 +3,7 @@
 **Task**: `task.140.shell-fn-sentinel-hardening.md`
 **Run Number**: 1
 **Started**: 2026-09-30 07:43
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -34,7 +34,7 @@ Close the seven limits recorded on task.136 (library EXIT trap, errexit source s
 | 1. create-branch           | ✅ Done | Branch `feature/task.140.*` exists in git                             | Branch created at `1dce6511`; pushed with upstream | —                    |
 | 2. review-task             | ✅ Done | `task.140.review.{N}.{name}.md` exists (or skip logged)               | `task.140.review.1.shell-fn-sentinel-hardening.md` — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; audit 17/17 `ready-for-review` | `.summaries/step-3-loop-audit-1.json` |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #527: https://github.com/Gamaroff/agent-skills/pull/527 | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.140.qa.{N}.*.md`; `task.140.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.140.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -104,9 +104,31 @@ Close the seven limits recorded on task.136 (library EXIT trap, errexit source s
 - `npm run ci:fast` → exit 0 (log removed).
 - Loop audit iter 1 (Explore, 10 s): `{status: ready-for-review, completed: 17, total: 17}` → loop exit. Development-complete comment `posted` on #464.
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS (`.claude/state/step4-scope-paths.txt`): the work-item dir, `.github/workflows`, `CHANGELOG.md`, `scripts`, `shared/resources`, `shared/resources/tests`, four `skills/*/references` dirs, and `evals/shared/tests` — the last added by hand: the new parity test sits in a directory with no tracked change, so the Pre-flight Guard held it; it was restored and its directory passed as an extra `--scope`, as the step doc directs. Nothing else held.
+- `/create-pr --base develop --issue 464` → `/commit-changes` split four commits: `493110df` docs (review 1), `4f66f054` fix (engine + tests + rule + bundle), `2a8891cb` ci (lanes + parity test), `30fbfa13` docs (task, report, CHANGELOG). Pushed.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/527 (state OPEN). PR body written from the diff directly — the Explore PR-body summariser was not dispatched (this session had already read every hunk).
+- Leak check over every branch commit: no path outside SCOPE_PATHS.
+- Tracker: in-review comment `posted` on #464; board in-review → `stage-disabled` (this repo's workflow does not map the moment — correct outcome). Lock `pr_url` set.
+
+### Steps 5–6 — QA loop
+
+- QA_MAX_CYCLES=5 (lock has no `qa_max_cycles`). Board QA-start re-assert: `in-review` → `stage-disabled` (as at Step 4).
+- Traceability mapper (Explore, 70 s) → `.summaries/qa-traceability-matrix.md`, written by the orchestrator (read-only subagent returned the content); 7 criteria, coverage full 4 / unit 2 / partial 2 / none 1.
+- **Cycle 1** — `/qa-task` with `code_review_blocking=true`: gate `task.140.gate.1` CONCERNS 80/100; boundary probe of `resolveEntry` 21 executed (symlink-escape refused, reproduced at base); code review 5 bugs + 1 cleanup, 3 promoted. PR comment and `qa-gate-1` tracker comment posted. Route: open entries, cycle 1 → 5b.
+- **Cycle 1, 5b** — changes-requested → `stage-disabled`. Third strike / narrowing offer: not applicable (cycle 1, `below-cycle-floor`). `/qa-fix` ran inline (Step 1b: the orchestrator wrote this gate, so the ingester would have re-read the same file — independence loss recorded). Fixes: CR-1 (shadow `trap` during the source; design executed on bash 5.3 / 3.2 / zsh 5.9 before editing), CR-2 + CR-6 (real paths at the fake-gh check and inside `namesGh`), CR-3 (quote/backslash prefix, source after `;`/`&&`/`||`/`then`/`do`), CR-5 (outside-dir assertion). 3 rows red → green; 108/108; mutants F1–F5 each red on its own row. Step 3.5 probe: population 5, only rule §5 restates the mechanisms (updated). Fast gate attempt 1 green. Commit `9023813b` (fix + gate.1 + qa.1 + security record + bug.1/.2), one push. PR comment and `qa-fix-1` tracker comment posted.
+- **Cycle 2, 5a** — refute pass over the whole diff + safety re-probe (judgement on gate 1 CR-2); reviewer 209 s. Gate 2 CONCERNS 70/100: both cycle-1 mechanisms (trap shadow, static gh detector) are open-ended enumerations. Attributed to this change by judgement (identical verdict at base; recorded in bug.3/bug.4). `TMPDIR=/tmp` variance 30/30; boundary re-probe 21 executed, unchanged. PR + `qa-gate-2` comments posted. Route: cycle 2, open mediums → 5b. Narrowing-residue engine: `signal: true` (every MEDIUM on gates 1–2 names `security-probe.mjs`, HIGH 0) → offer passed to qa-fix Step 2.6.
+- **Cycle 2, 5b** — Step 2.6 move: **replace** (pipeline offer + repeat subject). BUG-3: positive source-completed marker per spawn under `work/.probe-harness/` (the escape sentinel skips `work/`); cycle-1 trap shadow removed; `unset -f TRAPEXIT … || :` (zsh returns 1 for an undefined function — a library `set -e` then ended the harness, which the pre-existing task.136 errexit row caught). BUG-4: run-time trip-wire `gh` first on PATH when no `--fake-gh`; post-run decline `needs-fake-gh`; absolute-path limit stated + pinned. CR-5: ancestor realpath. Two test libraries were initially wrong (a root-relative `source` fails at run time, cwd is the fixture dir) — fixed to absolute paths. 112/112; G1–G5 each red on its own row. Probe population 8, only §5 updated. Fast gate green on attempt 1. Commit `8e739a7e`, one push; PR + `qa-fix-2` comments posted.
+
+- **Cycle 3, 5a** — safety re-probe over the whole diff (judgement on gate 2's host-gh bypass); reviewer 258 s. `TMPDIR=/tmp` 53/53; re-probe 21 executed, unchanged; green path engages 20; `shell:qa-cycle.sh` engages 28. Gate 3 FAIL 60/100: BUG-5 (HIGH) and BUG-6 (medium), both reproduced by execution and both in cycle-2 code. PR + `qa-gate-3` comments posted.
+- **Convergence check tripped** on HIGH `0, 0, 1` → *QA Loop Not Converging* escalation; 5b not run. See the escalation entry above.
+
 ## Issues Log
 
 - **Step 3 — a success criterion the plan could not meet.** `"$GH" api` is an uppercase variable; the planned `GH_COMMAND_WORD` matches lowercase `gh` only, so the §9 criterion was unreachable by the plan. Added `GH_VARIABLE`. The Step 2 review's check 10 (outcome reachability) should have walked that input through the regex and did not.
+- **Step 5 cycle 3 — the convergence check escalated on a first-time HIGH.** Sequence `0, 0, 1` satisfies the formula literally. Not overridden (develop-next: hard HALTs stop the run). Observation logged.
+- **Step 5a cycle 1 — transient `.git/index.lock`.** `qa-read-back.js` failed to stage two files on its first run (lock held by another process; the script stages with sequential `spawnSync`); clean on an immediate retry. Not a defect in the script.
 - **Step 3 — the plan's red-lane proof used an info-tier finding.** SC2086 is `info`; both lanes gate at `--severity=warning`. Used SC2034. Also the plan's relative-source path was one directory short for a lib in a `mkdtemp` dir.
 
 _Problems encountered and how they were resolved or escalated._
@@ -117,14 +139,66 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-09-30
+**Gate Result**: CONCERNS
+**Issues Found**: 3 — CR-1 (medium; own EXIT trap + errexit scored, a 97 → 1 regression on bash 5 / zsh; TASK-140-BUG-1), CR-2 (medium; `--fake-gh` containment still lexical; TASK-140-BUG-2), CR-3 (low; quoted/backslashed gh, non-line-initial source)
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+### QA Cycle 2 — 2026-09-30
+**Gate Result**: CONCERNS
+**Issues Found**: 3 — CR-1 (medium; trap shadow bypassed by lowercase `exit`, `builtin trap`, `command trap`, zsh `TRAPEXIT`; TASK-140-BUG-3), CR-2 (medium; gh spellings the static detector misses; TASK-140-BUG-4), CR-3 (medium; `source` not followed after reserved words/grouping; BUG-4). Cycle 1 findings all fixed; BUG-1, BUG-2 closed.
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+### QA Cycle 3 — 2026-09-30
+**Gate Result**: FAIL
+**Issues Found**: 2 — CR-1 (**high**; the trip-wire's needs-fake-gh decline discards escapes/shells/cases — reproduced 0 vs 20 escapes; TASK-140-BUG-5), CR-2 (medium; trip-wire marker path lost under `env -i`; TASK-140-BUG-6). Cycle 2 findings fixed; BUG-3, BUG-4 closed. 3 advisory → future.
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop not converging
+
+### QA Loop Not Converging — 2026-09-30
+
+Convergence stall: The pipeline stopped after 3 qa-task/qa-fix cycles: the HIGH finding
+count failed to strictly decrease across two consecutive cycles, so the
+loop was no longer converging. The remaining findings are NOT accepted —
+they are handed over below.
+
+**Final gate status**: FAIL
+**HIGH findings per cycle**: 0, 0, 1 — still rising
+**Remaining issues** (from final gate file):
+- CR-1 — high — `shared/resources/security-probe.mjs` — the run-time `needs-fake-gh` decline spreads `base`, discarding the run's escapes, shells and cases (TASK-140-BUG-5)
+- CR-2 — medium — `shared/resources/security-probe.mjs` — the trip-wire stub reads its marker path from the environment, so `env -i PATH="$PATH" gh` is not recorded and the run is scored (TASK-140-BUG-6)
+
+**What was attempted per cycle**:
+- Cycle 1: shadowed `trap` during the source; real-path `--fake-gh` containment; widened the gh detector (quotes, backslash, source after separators)
+- Cycle 2: replaced both mechanisms — positive source-completed marker (trap shadow removed); run-time trip-wire `gh` on PATH; ancestor realpath
+- Cycle 3: review only (convergence check tripped before 5b)
+
+**Likely root cause**: not a stall in the usual sense. Every file the fixes touched is `security-probe.mjs`, but the cycle-3 HIGH is a first-time defect in cycle 2's *new* code (the trip-wire's decline path reuses `decline()`, which carries no run evidence), not a finding the loop failed to reduce. HIGH was 0 on gates 1 and 2. The formula `HIGH_N > 0 AND HIGH_N >= HIGH_{N-1} AND HIGH_{N-1} >= HIGH_{N-2}` reads `0, 0, 1` as a stall; its worked examples do not cover that sequence. Logged as an observation against the develop-task step-5-6 rule.
+
+**Recommended next steps**:
+1. Grant 1–2 more cycles (Phase 0b "Resume at 5a with {k} more cycles"): both fixes are small — return `escapes`/`shells`/`cases`/`fakeGh` in the run-time decline with a non-vacuous row, and bake the marker path into the stub text with an `env -i` row.
+2. Decide the advisory CR-4 (PATH prepend reaches a real gh past the trip-wire): state it in rule §5 as a second limit with a pinning row, or strip gh-holding directories from the child PATH.
+3. Decide whether the convergence check should require `HIGH_{N-1} > 0` (a HIGH first raised this cycle has had no chance to be reduced).
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-30 06:58 (halted)
+**Final Status**: Escalated — QA Loop Not Converging at cycle 3
 **Branch**: feature/task.140.shell-fn-sentinel-hardening
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/527
+**QA Iterations**: 3 (2 fix cycles)
+**DoD Summary**: not reached
+**Tracker debt**: none

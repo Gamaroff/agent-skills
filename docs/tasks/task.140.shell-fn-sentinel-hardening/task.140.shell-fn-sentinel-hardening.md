@@ -5,7 +5,7 @@ type: task
 description: "Close the seven limits task.136's QA cycle 3, PR review and finalise recorded with concrete, verified fixes: shadow `exit` during the source so a library-installed EXIT trap cannot displace the 97 sentinel; apply the `needs-fake-gh` decline to the `shell:` form too; widen `GH_COMMAND_WORD` and follow one level of top-level `source`; capture the source's status as a simple command so `set -e` libraries whose top-level precondition fails are declined; put the extensionless fake `gh` under both ShellCheck lanes; drop the dead `!isShellFn &&`; and decide the pre-existing `resolveEntry` symlink limit (realpath before containment, or a stated limit with a row)."
 tags: [security, probe, shell-fn, fake-gh, shellcheck, task-136-follow-up]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: High
 created: 2026-09-22
 updated: 2026-09-30
@@ -17,7 +17,7 @@ github_issue: 464
 
 # Technical Task: Harden the `shell-fn:` sentinels and the fake-`gh` coverage
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.140.review.1.shell-fn-sentinel-hardening.md` implemented 2026-09-30
 **GitHub Issue**: [#464](https://github.com/Gamaroff/agent-skills/issues/464)
 
@@ -318,27 +318,26 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 70/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.140.qa.2.shell-fn-sentinel-hardening.md](./task.140.qa.2.shell-fn-sentinel-hardening.md)
-- **Gate File**: [task.140.gate.2.shell-fn-sentinel-hardening.yml](./task.140.gate.2.shell-fn-sentinel-hardening.yml)
+- **Full Report**: [task.140.qa.3.shell-fn-sentinel-hardening.md](./task.140.qa.3.shell-fn-sentinel-hardening.md)
+- **Gate File**: [task.140.gate.3.shell-fn-sentinel-hardening.yml](./task.140.gate.3.shell-fn-sentinel-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 108 (+30 under `TMPDIR=/tmp`)
+- **Tests Executed**: 112 (+53 under `TMPDIR=/tmp`)
 - **Phases Verified**: 4/4 (1 with issues)
-- **Critical Issues**: 0 HIGH, 3 MEDIUM, 2 LOW (advisory)
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 1 HIGH, 1 MEDIUM (+3 advisory)
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 1's three findings are fixed and closed ([BUG-1](./task.140.bug.1.library-trap-plus-errexit-scored.md), [BUG-2](./task.140.bug.2.fake-gh-containment-still-lexical.md)).
-- [TASK-140-BUG-3](./task.140.bug.3.trap-shadow-bypassed.md): four trap-install shapes bypass the trap shadow — replace it with a positive source-completed marker.
-- [TASK-140-BUG-4](./task.140.bug.4.gh-detector-open-ended.md): six gh spellings / source forms bypass the static detector — add a run-time trip-wire `gh`.
-- Fix cycle 2: both mechanisms replaced — BUG-3 and BUG-4 **Ready for QA**; re-review pending.
+- Cycle 2's findings are fixed and closed ([BUG-3](./task.140.bug.3.trap-shadow-bypassed.md), [BUG-4](./task.140.bug.4.gh-detector-open-ended.md)).
+- [TASK-140-BUG-5](./task.140.bug.5.tripwire-decline-drops-escapes.md) (HIGH): the trip-wire's decline discards the run's escape evidence.
+- [TASK-140-BUG-6](./task.140.bug.6.tripwire-marker-lost-under-env-i.md): a `gh` call under `env -i` is not recorded by the trip-wire.
 
 <!-- change-log-start -->
 ## Change Log
@@ -353,6 +352,7 @@ None.
 | 2026-09-30 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-09-30 |  | QA findings fixed — cycle 1: trap/errexit, fake-gh real paths, detector shapes; cycle 2: mechanisms replaced (source-completed marker, run-time gh trip-wire, ancestor realpath); 2 fix cycles, 7 rows, 10 mutants | qa-fix |
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (3 medium) + 2 advisory | qa-task |
+| 2026-09-30 |  | QA gate FAIL (60/100) — 2 findings (1 high, 1 medium) + 3 advisory | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

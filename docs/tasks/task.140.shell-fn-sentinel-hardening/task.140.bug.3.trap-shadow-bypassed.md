@@ -4,7 +4,7 @@
 **Bug ID**: TASK-140-BUG-3
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✔️ Closed
 **Found By**: QA Engineer (QA cycle 2 refute pass, code review CR-1)
 **Date Found**: 2026-09-30
 
@@ -57,3 +57,4 @@ The harness body writes `$PROBE_SOURCED` (a per-spawn file under `work/.probe-ha
 | --- | --- | --- | --- |
 | 2026-09-30 | New | QA (cycle 2) | Filed from the refute pass |
 | 2026-09-30 | Ready for QA | qa-fix (cycle 2) | Mechanism replaced; mutation-proved |
+| 2026-09-30 | Closed | QA (cycle 3) | Verified: rows green on bash + zsh (and under TMPDIR=/tmp); mutants G1–G5 red them. Cycle 3 found defects in the new mechanisms themselves — filed as BUG-5 / BUG-6 |
