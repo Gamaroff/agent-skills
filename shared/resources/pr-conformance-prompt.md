@@ -74,6 +74,14 @@ C. TRAIL (category: trail) — the evidence is missing, stale, or contradicts it
    - QA report count does not match gate count
    - a handover file exists with outstanding (unticked) actions
    - a co-located bug report that is still open
+   - the work item's Change Log lost rows since the PR's base. The log is append-only, and a row that
+     disappears is a loss whatever removed it. Two QA cycles once read past six rows a hand repair
+     dropped, and only a diff against an earlier commit found them (obs #137). Run, from the
+     repository root, `command node .agents/skills/review-pr/references/change-log.js
+     --check-append-only --file <doc> --against "$(git merge-base HEAD origin/<base>)" --json`
+     (read-only). A `rows-dropped` result lists the rows: each one is a trail defect, and `ref`
+     quotes it. `new-document` is not a finding. A usage exit (2) means the base could not be read:
+     say so, and never report it as a clean log (the check is `change-log.js` `rowsDropped`)
 
 D. CONSISTENCY (category: consistency) — the three views of the same work disagree:
    - document status: vs PR state vs tracker issue/card state

@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A Change Log row that disappears between two revisions is reported (task 133, obs #137).**
+  - `change-log.js` gains `rowsDropped(prev, next)` and `--check-append-only --file <doc> --against
+    <rev> [--json]`: exit 1 `rows-dropped` lists each row `<rev>` carried that the file no longer
+    does; `ok` and `new-document` exit 0; an unresolvable revision is usage (2), never
+    `new-document`. Rows match on date + description, so a legacy-marker migration and a reorder
+    are not losses; counted as a multiset.
+  - The 5c conformance lens (`pr-conformance-prompt.md` § C. TRAIL) runs it against the PR's
+    merge-base. Recovery for a flagged row: `git show <good-commit>:<doc>`.
+  - Why not a guard in the writer: at `fdba78d9` a hand repair dropped six of task.130's rows, and
+    `upsertChangeLog` keeps all six on that same shape. A writer-side guard could never have
+    fired. A September sweep also finds 16 in-place rewrites of a `qa-fix` row, against the
+    spec's "never rewritten".
+
 - **A validator of a pipeline-written document is probed by execution, and one no sink fits is a
   recorded decision rather than a hand-overruled FAIL (task 131).**
   - `security-input-corpus.mjs` gains a `markdown-structure` sink: 9 hostile implementation reports,
@@ -85,6 +98,22 @@ All notable changes to this project will be documented in this file. Format foll
   `qa-execute-snippets.mjs`.
 
 ### Fixed
+
+- **task.130's residue: eleven advisory findings closed (task 133).**
+  - `advance-pipeline-lock.sh`: the `--accept-legacy` advice prints once, only when nothing
+    restores. A matched claim beside a bystander legacy snapshot now restores quietly. The header's
+    first bullet no longer says an absent directory "matches". The stamp is stated in the
+    header, `grant-qa-cycles.sh` and `develop-pipeline-pause.md`. The no-overwrite scenario is
+    now falsifiable: it seeds `./doc/` against `$R/doc`.
+  - Resume contract § Consume Output: an unparsable snapshot, a directory-less one and another
+    document's are three named HALTs. An unrecognised `stale-snapshot`-prefixed label prints
+    `unrecognised … kept`. Every `{doc-directory}` substitution is quoted.
+  - Detector prompt Step 1 states `choose_candidate()`'s legacy-refusal and provenance rules;
+    `tests/detector-candidate-rule.test.mjs` pins them against the script and runs the listing
+    under zsh.
+  - The five `--restore` citation sites make the restore conditional on § Restore the lock. The
+    seven lint `2)` arms cite one step-8 statement of every `usage(` cause. Test D's verb
+    word-list is replaced by a token floor.
 
 - **The `shell-fn:` sentinel and the fake-`gh` gate reach every library shape task.136's reviewers
   constructed (task 140).** Seven limits recorded on task.136 (gate 3 `recommendations.future`,

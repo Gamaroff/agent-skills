@@ -2117,3 +2117,164 @@ test("I: the CLI exits 1 on stale-updated, 0 otherwise, 2 on usage — and requi
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// J — append-only across revisions (task.133; obs #137)
+//
+// At fdba78d9 a hand repair of task.130's corrupted Change Log block dropped six rows; two QA
+// cycles read the document and missed it. upsertChangeLog did not do it — run on the pre-repair
+// shape it keeps all six (J2 pins that) — so the check compares two revisions, not a write's
+// input and output. The fixtures are the two revisions' blocks, verbatim, as .txt so no Markdown
+// tool reformats or link-checks them.
+// ---------------------------------------------------------------------------
+
+const FX = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
+const readFx = (n) =>
+  require("node:fs").readFileSync(
+    join(FX, `change-log-append-only.task130-${n}.txt`),
+    "utf8",
+  );
+
+test("J1: rowsDropped names exactly the six rows fdba78d9 removed from task.130's log", () => {
+  const dropped = CL.rowsDropped(readFx("parent"), readFx("repair"));
+  assert.equal(dropped.length, 6, dropped.join("\n"));
+  assert.ok(dropped.every(CL.isEntryRow), "a dropped entry is not a row");
+  assert.ok(
+    dropped.some((r) => r.includes("Initial draft — follow-ups from task.124")),
+    "the 1.0 row is not among the dropped",
+  );
+});
+
+test("J2: the writer keeps every row — an append, even on the corrupted shape, drops none", () => {
+  const parent = readFx("parent");
+  const next = CL.upsertChangeLog(parent, ENTRY, { docType: "task" });
+  assert.deepEqual(CL.rowsDropped(parent, next), []);
+  assert.equal(CL.extractEntries(next).length, 7);
+});
+
+test("J3: a legacy-marker migration and a reorder are not losses", () => {
+  const legacy = [
+    "---",
+    "type: story",
+    "---",
+    "# S",
+    "",
+    "<!-- jira-sync-changelog-start -->",
+    "## Change Log",
+    "",
+    "| Date | Change |",
+    "|------|--------|",
+    "| 2026-04-28 09:40 | Initial Jira story created |",
+    "| 2026-04-29 10:00 | Status → in-progress |",
+    "<!-- jira-sync-changelog-end -->",
+    "",
+  ].join("\n");
+  const migrated = CL.upsertChangeLog(legacy, ENTRY, { docType: "story" });
+  assert.match(migrated, /change-log-start/);
+  assert.deepEqual(CL.rowsDropped(legacy, migrated), []);
+  const rows = CL.extractEntries(migrated);
+  const reordered = migrated
+    .replace(rows[0], "\u0000")
+    .replace(rows[1], rows[0])
+    .replace("\u0000", rows[1]);
+  assert.deepEqual(CL.rowsDropped(migrated, reordered), []);
+  // Multiset, not set: one of two identical rows removed IS a loss.
+  const twice = CL.upsertChangeLog(migrated, ENTRY, { docType: "story" });
+  assert.equal(CL.rowsDropped(twice, migrated).length, 1);
+});
+
+test("J4: --check-append-only compares the file with its copy at --against <rev>", () => {
+  const dir = mkdtempSync(join(tmpdir(), "change-log-append-only-"));
+  const git = (...a) =>
+    execFileSync("git", a, {
+      cwd: dir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  const run = (args) => {
+    try {
+      return {
+        code: 0,
+        out: execFileSync("node", [CL_CLI, ...args], {
+          cwd: dir,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+        }),
+      };
+    } catch (e) {
+      return { code: e.status, out: e.stdout };
+    }
+  };
+  try {
+    git("init", "-q");
+    git("config", "user.email", "t@example.com");
+    git("config", "user.name", "t");
+    writeFileSync(join(dir, "doc.md"), readFx("parent"));
+    git("add", "doc.md");
+    git("commit", "-q", "-m", "parent");
+    // appended — ok
+    writeFileSync(
+      join(dir, "doc.md"),
+      CL.upsertChangeLog(readFx("parent"), ENTRY, { docType: "task" }),
+    );
+    let r = run([
+      "--check-append-only",
+      "--file",
+      "doc.md",
+      "--against",
+      "HEAD",
+      "--json",
+    ]);
+    assert.equal(r.code, 0, r.out);
+    assert.equal(JSON.parse(r.out).reason, "ok");
+    // the fdba78d9 repair — six rows dropped
+    writeFileSync(join(dir, "doc.md"), readFx("repair"));
+    r = run([
+      "--check-append-only",
+      "--file",
+      "doc.md",
+      "--against",
+      "HEAD",
+      "--json",
+    ]);
+    assert.equal(r.code, 1, r.out);
+    const j = JSON.parse(r.out);
+    assert.equal(j.reason, "rows-dropped");
+    assert.equal(j.dropped.length, 6);
+    assert.match(
+      run(["--check-append-only", "--file", "doc.md", "--against", "HEAD"]).out,
+      /^FAIL change-log: .*6 row/m,
+    );
+    // absent at the revision — a new document, not a loss
+    writeFileSync(join(dir, "new.md"), readFx("repair"));
+    r = run([
+      "--check-append-only",
+      "--file",
+      "new.md",
+      "--against",
+      "HEAD",
+      "--json",
+    ]);
+    assert.equal(r.code, 0, r.out);
+    assert.equal(JSON.parse(r.out).reason, "new-document");
+    // an unknown revision is a usage error, never "new-document"
+    assert.equal(
+      run([
+        "--check-append-only",
+        "--file",
+        "doc.md",
+        "--against",
+        "no-such-rev",
+      ]).code,
+      2,
+    );
+    assert.equal(run(["--check-append-only", "--file", "doc.md"]).code, 2);
+    // --against belongs to --check-append-only only
+    assert.equal(
+      run(["--check-updated", "--file", "doc.md", "--against", "HEAD"]).code,
+      2,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

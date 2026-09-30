@@ -844,6 +844,46 @@ function checkUpdatedCoherence(content) {
 }
 
 // ---------------------------------------------------------------------------
+// Append-only across revisions (task.133; obs #137)
+// ---------------------------------------------------------------------------
+
+// A row's identity is its date and its description. Version and author are not part of it: a
+// legacy row migrated into the canonical four columns gains an author (and its date loses the
+// HH:MM) without being a different row, and the migration must not read as a loss.
+function entryKey(row) {
+  const cells = rowCells(migrateLegacyRow(row));
+  return `${(cells[0] || "").slice(0, 10)}\u0000${cells[2] || ""}`;
+}
+
+/**
+ * The rows of `prevContent`'s Change Log that `nextContent`'s no longer carries.
+ *
+ * The log is append-only, so a row that disappears between two revisions is a loss — whatever
+ * removed it. At fdba78d9 a hand repair of a corrupted block dropped six rows and two QA cycles
+ * read past it; the writer did not do it (`upsertChangeLog` keeps every row it can see), so the
+ * check has to compare two revisions rather than a write's input and output. Both sides are read
+ * with `extractEntries`, the reader the writer uses. Counted as a multiset: one of two
+ * identical rows removed is a loss, and a reorder is not.
+ *
+ * @returns {string[]} the dropped rows, as `prevContent` spelled them
+ */
+function rowsDropped(prevContent, nextContent) {
+  const have = new Map();
+  for (const row of extractEntries(String(nextContent))) {
+    const k = entryKey(row);
+    have.set(k, (have.get(k) || 0) + 1);
+  }
+  const dropped = [];
+  for (const row of extractEntries(String(prevContent))) {
+    const k = entryKey(row);
+    const n = have.get(k) || 0;
+    if (n > 0) have.set(k, n - 1);
+    else dropped.push(row.trim());
+  }
+  return dropped;
+}
+
+// ---------------------------------------------------------------------------
 // Legacy row parsing
 // ---------------------------------------------------------------------------
 
@@ -910,6 +950,7 @@ module.exports = {
   bumpUpdated,
   // check
   checkUpdatedCoherence,
+  rowsDropped,
 };
 
 // ---------------------------------------------------------------------------
@@ -920,8 +961,37 @@ module.exports = {
 //     exit 0  ok / no-log / no-updated
 //     exit 1  stale-updated — the newest row is dated after `updated:`; apply
 //             bumpUpdated(content, <newest row date>) and re-run
-//     exit 2  usage — no --check-updated, no --file, or the file is unreadable
+//
+//   node change-log.js --check-append-only --file <doc> --against <rev> [--json]
+//     exit 0  ok (no row lost since <rev>) / new-document (the file is absent at <rev>)
+//     exit 1  rows-dropped — each row <rev> carried that the file no longer does is printed
+//
+//   exit 2 (both modes)  usage — no mode, no --file, an unreadable file, --against on the
+//                        wrong mode or missing, or a <rev> git cannot resolve
 // ---------------------------------------------------------------------------
+
+const USAGE =
+  "usage: change-log.js --check-updated --file <doc> [--json]\n       change-log.js --check-append-only --file <doc> --against <rev> [--json]";
+
+// The file's content at <rev>, read with git from the file's own directory so any checkout
+// layout works. null when the path does not exist at <rev>; throws on anything else (an unknown
+// revision must never read as a new document).
+function contentAt(file, rev) {
+  const path = require("path");
+  const { execFileSync } = require("child_process");
+  try {
+    return execFileSync("git", ["show", `${rev}:./${path.basename(file)}`], {
+      cwd: path.dirname(path.resolve(file)),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } catch (e) {
+    const err = String(e.stderr || e.message);
+    if (/does not exist in|exists on disk, but not in/.test(err)) return null;
+    throw new Error(err.trim().split("\n")[0]);
+  }
+}
 
 function main(argv) {
   const json = argv.includes("--json");
@@ -932,35 +1002,76 @@ function main(argv) {
   const usage = (error) =>
     say(
       { reason: "usage", exitCode: 2, error },
-      `change-log: ${error}\nusage: change-log.js --check-updated --file <doc> [--json]`,
+      `change-log: ${error}\n${USAGE}`,
       json ? process.stdout : process.stderr,
     );
   let file = null;
-  let check = false;
+  let against = null;
+  let mode = null;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--json") continue;
-    if (a === "--check-updated") {
-      check = true;
+    if (a === "--check-updated" || a === "--check-append-only") {
+      if (mode && mode !== a) return usage("one mode per call");
+      mode = a;
       continue;
     }
-    if (a === "--file") {
+    if (a === "--file" || a === "--against") {
       const v = argv[i + 1];
       if (v === undefined || v.startsWith("--"))
-        return usage("--file needs an operand");
-      file = v;
+        return usage(`${a} needs an operand`);
+      if (a === "--file") file = v;
+      else against = v;
       i += 1;
       continue;
     }
     return usage(`unknown argument ${a}`);
   }
-  if (!check) return usage("--check-updated is the only mode");
+  if (!mode)
+    return usage("a mode is required: --check-updated or --check-append-only");
   if (!file) return usage("--file is required");
+  if (mode === "--check-updated" && against !== null)
+    return usage("--against belongs to --check-append-only");
+  if (mode === "--check-append-only" && against === null)
+    return usage("--check-append-only needs --against <rev>");
   let content;
   try {
     content = require("fs").readFileSync(file, "utf8");
   } catch (e) {
     return usage(`--file ${file}: ${e.message}`);
+  }
+  if (mode === "--check-append-only") {
+    let prev;
+    try {
+      prev = contentAt(file, against);
+    } catch (e) {
+      return usage(`--against ${against}: ${e.message}`);
+    }
+    if (prev === null)
+      return say(
+        { ok: true, reason: "new-document", file, against, exitCode: 0 },
+        `ok change-log: ${file} — absent at ${against}, nothing to compare`,
+      );
+    const dropped = rowsDropped(prev, content);
+    if (dropped.length === 0)
+      return say(
+        { ok: true, reason: "ok", file, against, exitCode: 0 },
+        `ok change-log: ${file} — no Change Log row lost since ${against}`,
+      );
+    return say(
+      {
+        ok: false,
+        reason: "rows-dropped",
+        file,
+        against,
+        dropped,
+        exitCode: 1,
+      },
+      [
+        `FAIL change-log: ${file} — ${dropped.length} row(s) present at ${against} are gone; recover them (git show ${against}:<doc>) — the log is append-only`,
+        ...dropped.map((r) => `  ${r}`),
+      ].join("\n"),
+    );
   }
   const r = checkUpdatedCoherence(content);
   const exitCode = r.ok ? 0 : 1;

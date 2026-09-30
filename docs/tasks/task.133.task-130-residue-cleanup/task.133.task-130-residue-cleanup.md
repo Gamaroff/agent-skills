@@ -5,7 +5,7 @@ type: task
 description: "Close the advisory residue task.130 carried out of its QA loop and Step 5c review: make the no-overwrite lock scenario falsifiable, state the --accept-legacy stamp where the --restore contract is mirrored, replace test D's word-list regex with the exact-label floor, condition the five --restore citation clauses, give the detector prompt the legacy/provenance candidate rule, name the two silent cases in the delete block and every lint rc=2 cause, quote the doc-directory placeholder, silence the bystander-legacy advice on a successful restore, pin the detector's already-find-based candidate listing under zsh, and give change-log.js a cross-revision append-only check."
 tags: [pipeline, resume, tests, enumeration, change-log]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-09-20
 updated: 2026-09-30
@@ -17,7 +17,7 @@ risk_level: low
 
 # Technical Task: Residue of task.130's seven QA cycles — eleven advisory findings, grouped by file
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.133.review.1.task-130-residue-cleanup.md` implemented 2026-09-30
 **GitHub Issue**: [#442](https://github.com/Gamaroff/agent-skills/issues/442)
 
@@ -127,47 +127,47 @@ Nothing else is breaking either: the `legacy-snapshot:` advice moves but the exi
 **Risk**: Low
 **Files**: `advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`, `grant-qa-cycles.sh`, `develop-pipeline-pause.md`
 
-- [ ] Seed the no-overwrite scenario's candidate with `./doc/` written from `$R`, restore with `$R/doc`, assert the lock keeps `./doc/`; mutation: unconditional assignment → red
-- [ ] Header bullets (`#   • a candidate with NO task_or_story_directory …`) and `grant-qa-cycles.sh:52-54`, `develop-pipeline-pause.md:80` state: stamped with `<doc-dir>` as spelled; a present value is kept
-- [ ] Header bullet `:70-72`: drop *"an ABSENT directory is the pre-task.123 shape and matches"*; an absent directory is refused (next bullets), not matched
-- [ ] Move the `--accept-legacy … or delete it` advice to the final no-candidate branch; per-candidate line → `skipped: no task_or_story_directory`; scenario: matched claim + bystander legacy → exit 0 and stderr carries no `--accept-legacy` advice
+- [x] Seed the no-overwrite scenario's candidate with `./doc/` written from `$R`, restore with `$R/doc`, assert the lock keeps `./doc/`; mutation: unconditional assignment → red
+- [x] Header bullets (`#   • a candidate with NO task_or_story_directory …`) and `grant-qa-cycles.sh:52-54`, `develop-pipeline-pause.md:80` state: stamped with `<doc-dir>` as spelled; a present value is kept
+- [x] Header bullet `:70-72`: drop *"an ABSENT directory is the pre-task.123 shape and matches"*; an absent directory is refused (next bullets), not matched
+- [x] Move the `--accept-legacy … or delete it` advice to the final no-candidate branch; per-candidate line → `skipped: no task_or_story_directory`; scenario: matched claim + bystander legacy → exit 0 and stderr carries no `--accept-legacy` advice
 
 ### Phase 2: Contract delete block — three named outcomes, quoted placeholder
 
 **Risk**: Low
 **Files**: `develop-pipeline-resume-contract.md`, `tests/stale-snapshot-delete.test.mjs`
 
-- [ ] Pass 2: `jq -e 'type == "object"'` first → HALT `"$p is not a JSON object"`; keep the directory HALT for a parsed object with no directory; test: unparsable snapshot → the new text, directory-less object → the old text
-- [ ] Second jq pass: prefix matches that are neither the verdict nor the two skip notes print `unrecognised stale-snapshot label — kept: <concern>`; test: trailing-space label and the pre-task.130 `— PR merged; deleted` label both print and keep
-- [ ] Quote `{doc-directory}` at the four substitution sites; test: a doc-directory with a space binds and deletes under both shells
+- [x] Pass 2: `jq -e 'type == "object"'` first → HALT `"$p is not a JSON object"`; keep the directory HALT for a parsed object with no directory; test: unparsable snapshot → the new text, directory-less object → the old text
+- [x] Second jq pass: prefix matches that are neither the verdict nor the two skip notes print `unrecognised stale-snapshot label — kept: <concern>`; test: trailing-space label and the pre-task.130 `— PR merged; deleted` label both print and keep
+- [x] Quote `{doc-directory}` at the four substitution sites; test: a doc-directory with a space binds and deletes under both shells
 
 ### Phase 3: Detector prompt — the candidate rule once, glob-safe listing
 
 **Risk**: Low
 **Files**: `pipeline-resume-detector-prompt.md`, a new `tests/detector-candidate-rule.test.mjs`
 
-- [ ] Step 1: drop a directory-less candidate and file it as a delta object naming `--accept-legacy`; a directory-matched claim outranks a legacy snapshot regardless of mtime; cite `choose_candidate()` as the authority
-- [ ] The listing fence is already `find`-based (task.137); pin it — test: block extracted by its anchor and executed under `zsh -f` and `bash --noprofile --norc` with no `.pausing.*` present lists the existing `last-halt.json`; mutation: the old `ls -t … .pausing.*` glob → red under zsh
-- [ ] Test: the prompt's Step 1 names both rules (marker-anchored, not phrase-matched), and `advance-pipeline-lock.sh` still carries the same two behaviours (scenario references)
+- [x] Step 1: drop a directory-less candidate and file it as a delta object naming `--accept-legacy`; a directory-matched claim outranks a legacy snapshot regardless of mtime; cite `choose_candidate()` as the authority
+- [x] The listing fence is already `find`-based (task.137); pin it — test: block extracted by its anchor and executed under `zsh -f` and `bash --noprofile --norc` with no `.pausing.*` present lists the existing `last-halt.json`; mutation: the old `ls -t … .pausing.*` glob → red under zsh
+- [x] Test: the prompt's Step 1 names both rules (marker-anchored, not phrase-matched), and `advance-pipeline-lock.sh` still carries the same two behaviours (scenario references)
 
 ### Phase 4: Citations and messages stated once — `--restore` clauses, lint `2)` arm, test D
 
 **Risk**: Low
 **Files**: step-0 doc, three SKILL.md, `develop-pipeline-step-8-commit.md`, `tests/who-restores-single-statement.test.mjs`, `tests/report-lint-call-sites.test.mjs`, `tests/stale-snapshot-delete.test.mjs`
 
-- [ ] Five `--restore` citation sites (the population `sites()` derives): imperative inside a conditional naming § Restore the lock; test (ii) asserts the conditional form at each site; mutation: main-clause imperative restored at one site → red
-- [ ] Lint `2)` arm: one sentence in step-8 naming every `usage(` cause (six today); all seven `2)` echoes (site (1) ×3, site (2) ×3, site (4)) cite it; `report-lint-call-sites.test.mjs` asserts the citation at every site and that step-8's sentence names each `usage(` call's cause (read from `report-lint.js`, not restated); mutation: one cause dropped from the sentence → red
-- [ ] Test D: drop the word-list negative; assert no backticked `stale-snapshot` token other than the exact label or a quoted skip note; mutation: `stale-snapshot*` phrasing → red, accurate "share the prefix" clause → green
+- [x] Five `--restore` citation sites (the population `sites()` derives): imperative inside a conditional naming § Restore the lock; test (ii) asserts the conditional form at each site; mutation: main-clause imperative restored at one site → red
+- [x] Lint `2)` arm: one sentence in step-8 naming every `usage(` cause (six today); all seven `2)` echoes (site (1) ×3, site (2) ×3, site (4)) cite it; `report-lint-call-sites.test.mjs` asserts the citation at every site and that step-8's sentence names each `usage(` call's cause (read from `report-lint.js`, not restated); mutation: one cause dropped from the sentence → red
+- [x] Test D: drop the word-list negative; assert no backticked `stale-snapshot` token other than the exact label or a quoted skip note; mutation: `stale-snapshot*` phrasing → red, accurate "share the prefix" clause → green
 
 ### Phase 5: `change-log.js` append-only check + 5c TRAIL row
 
 **Risk**: Low (read-only; `upsertChangeLog` untouched)
 **Files**: `change-log.js`, `tests/change-log.test.mjs`, `pr-conformance-prompt.md`
 
-- [ ] `rowsDropped(prevContent, nextContent)` — rows of `prev`'s Change Log (`extractEntries`) absent from `next`'s, compared on the trimmed row; exported
-- [ ] CLI `--check-append-only --file <doc> --against <rev>`: `git show <rev>:<doc>`; prints each dropped row; exit 1 when any, 0 otherwise (`reason`: `ok` / `rows-dropped` / `new-document`); `--json` like the other modes
-- [ ] Tests: the real pair `fdba78d9~1` → `fdba78d9` of the task.130 document (fixtures copied into the test, not read from git) reports exactly six dropped rows; a normal `upsertChangeLog` append reports none; a legacy-marker migration reports none; a document absent at `<rev>` is `new-document`; mutation: `rowsDropped` returning `[]` → the fixture test red
-- [ ] `pr-conformance-prompt.md` § C. TRAIL: *"the Change Log lost rows since the base — run `change-log.js --check-append-only --file <doc> --against <merge-base>`; any dropped row is a trail defect"*
+- [x] `rowsDropped(prevContent, nextContent)` — rows of `prev`'s Change Log (`extractEntries`) absent from `next`'s, compared on the trimmed row; exported
+- [x] CLI `--check-append-only --file <doc> --against <rev>`: `git show <rev>:<doc>`; prints each dropped row; exit 1 when any, 0 otherwise (`reason`: `ok` / `rows-dropped` / `new-document`); `--json` like the other modes
+- [x] Tests: the real pair `fdba78d9~1` → `fdba78d9` of the task.130 document (fixtures copied into the test, not read from git) reports exactly six dropped rows; a normal `upsertChangeLog` append reports none; a legacy-marker migration reports none; a document absent at `<rev>` is `new-document`; mutation: `rowsDropped` returning `[]` → the fixture test red
+- [x] `pr-conformance-prompt.md` § C. TRAIL: *"the Change Log lost rows since the base — run `change-log.js --check-append-only --file <doc> --against <merge-base>`; any dropped row is a trail defect"*
 
 ---
 
@@ -194,11 +194,13 @@ Nothing else is breaking either: the `legacy-snapshot:` advice moves but the exi
 14. ✅ `shared/resources/tests/report-lint-call-sites.test.mjs` — one-message citation; cause list vs `usage(` calls
 15. ✅ `shared/resources/tests/change-log.test.mjs` — append-only check (fixture pair from task.130 `fdba78d9~1`/`fdba78d9`)
 16. 🆕 `shared/resources/tests/detector-candidate-rule.test.mjs` — Step 1 rule + listing pinned under zsh
+16a. 🆕 `shared/resources/tests/fixtures/change-log-append-only.task130-{parent,repair}.txt` — the task.130 Change Log block at `fdba78d9~1` and `fdba78d9`, verbatim (`.txt` so no Markdown tool reformats or link-checks them)
 
 ### Files to Modify (Documentation)
 
 17. ✅ `CHANGELOG.md` — [Unreleased] entry (Added: the append-only check; Fixed: the rest)
 18. ✅ `skills/*/references/` — regenerated by `npm run bundle`
+19. ✅ `docs/tasks/task.130.…/task.130.resume-residue-bug-variant-base-and-who-restores.md` — Deferred Work annotated item by item (Migration criterion)
 
 ### Files to Delete
 
@@ -237,26 +239,26 @@ Not applicable — one extra `jq -e` per stale delta; the append-only check is o
 
 ### Functional
 
-- [ ] The no-overwrite scenario is red under an unconditional `.task_or_story_directory = $dir`
-- [ ] A matched claim beside a bystander legacy snapshot restores with exit 0 and no `--accept-legacy` advice on stderr; a legacy-only candidate set still prints it
-- [ ] An unparsable snapshot, a directory-less object and an unrecognised `stale-snapshot`-prefixed label each produce their own message; nothing is deleted in any of the three
-- [ ] The detector prompt's Step 1 states the legacy-refusal and provenance rules; a test executes its listing under `zsh -f` with no `.pausing.*` present and sees the existing `last-halt.json`
-- [ ] `change-log.js --check-append-only` reports exactly the six rows `fdba78d9` dropped from the task.130 document (fixture pair), reports none for a normal append and a legacy-marker migration, and exits 1 / 0 accordingly
-- [ ] Every `2)` lint arm cites the one step-8 sentence, and that sentence names every `usage(` cause in `report-lint.js`
+- [x] The no-overwrite scenario is red under an unconditional `.task_or_story_directory = $dir`
+- [x] A matched claim beside a bystander legacy snapshot restores with exit 0 and no `--accept-legacy` advice on stderr; a legacy-only candidate set still prints it
+- [x] An unparsable snapshot, a directory-less object and an unrecognised `stale-snapshot`-prefixed label each produce their own message; nothing is deleted in any of the three
+- [x] The detector prompt's Step 1 states the legacy-refusal and provenance rules; a test executes its listing under `zsh -f` with no `.pausing.*` present and sees the existing `last-halt.json`
+- [x] `change-log.js --check-append-only` reports exactly the six rows `fdba78d9` dropped from the task.130 document (fixture pair), reports none for a normal append and a legacy-marker migration, and exits 1 / 0 accordingly
+- [x] Every `2)` lint arm cites the one step-8 sentence, and that sentence names every `usage(` cause in `report-lint.js`
 
 ### Performance
 
-- [ ] Resume cost unchanged beyond one `jq -e` per stale delta
+- [x] Resume cost unchanged beyond one `jq -e` per stale delta
 
 ### Code Quality
 
-- [ ] `ci:fast`, `eval:develop-task`, both shell suites, `bundle:check`, `lint:shell`, Prettier green
-- [ ] Every phase's mutation proof recorded in the implementation report
+- [x] `ci:fast`, `eval:develop-task`, both shell suites, `bundle:check`, `lint:shell`, Prettier green
+- [x] Every phase's mutation proof recorded in the implementation report
 
 ### Migration
 
-- [ ] CHANGELOG [Unreleased] entry names the append-only check and the recovery (`git show <good-commit>:<doc>`)
-- [ ] Task.130's Deferred Work list is annotated: each item → this task, task.134, task.135 or task.128
+- [x] CHANGELOG [Unreleased] entry names the append-only check and the recovery (`git show <good-commit>:<doc>`)
+- [x] Task.130's Deferred Work list is annotated: each item → this task, task.134, task.135 or task.128
 
 ---
 
@@ -302,7 +304,6 @@ None (review 1 removed the writer-side throw, the one change every appender woul
 - **Non-critical**: a HALT message wording; a test assertion tighter than intended.
 
 ---
-
 <!-- change-log-start -->
 ## Change Log
 
@@ -311,15 +312,16 @@ None (review 1 removed the writer-side throw, the one change every appender woul
 | 2026-09-20 | 1.0 | Initial draft — task.130 Deferred Work, gates 5–7 advisories, pr-review.1 CR-2/CR-3, obs #137 | create-task |
 | 2026-09-30 | 1.1 | Review 1 (8/10, 1 critical / 4 important, all applied): Phase 5 rescoped from a writer-side shrink throw to a cross-revision append-only check (upsertChangeLog keeps all six rows on the fdba78d9~1 shape — executed; the loss was a hand edit); Phase 3 listing already find-based since task.137 — pinned by a test, not rewritten; Phase 1 adds the stale ":70-72 absent … matches" header bullet; Phase 4 covers five --restore sites and seven lint 2) arms with causes derived from usage(); Breaking Changes → none | review-task |
 | 2026-09-30 |  | Status → ready-for-development | review-task |
+| 2026-09-30 |  | Implemented — 5 phases, 5 commits; 13 source/doc files + 3 SKILL.md, 1 new suite + 5 extended (+13 tests), 2 fixtures; 15 mutation proofs; task.130 Deferred Work annotated | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: lock script
-- [ ] Phase 2: contract delete block
-- [ ] Phase 3: detector prompt
-- [ ] Phase 4: citations and messages
-- [ ] Phase 5: change-log append-only check
+- [x] Phase 1: lock script
+- [x] Phase 2: contract delete block
+- [x] Phase 3: detector prompt
+- [x] Phase 4: citations and messages
+- [x] Phase 5: change-log append-only check
 - [ ] QA: `task.133.qa.[N].task-130-residue-cleanup.md`
 - [ ] Gate: `task.133.gate.[N].task-130-residue-cleanup.yml`
 
@@ -332,6 +334,16 @@ None (review 1 removed the writer-side throw, the one change every appender woul
 - `docs/reference/anti-patterns.md` — enumeration class
 
 ## Notes
+
+### Implementation Summary (develop, 2026-09-30)
+
+- **Approach**: one commit per phase, each red-first where a test was new, each with a mutation proof. Implemented inline from the plan (the plan named every hunk); `/develop` was not invoked. Phase 5 follows review 1's rescope: a cross-revision `rowsDropped` + `--check-append-only`, not a writer-side throw.
+- **Commits**: Phase 1 `0f10e889`, Phase 2 `f23a1a11`, Phase 3 `779b6bef`, Phase 4 `dd195467`, Phase 5 + docs in the commit that carries this note.
+- **Testing Results**: `npm run ci:fast` → 4626/4629. The two failures were the load-sensitive timing budgets in `tests/bundle-missing-source.test.js` and `tests/test-clean-checkout.test.js` (10198 ms against a 10000 ms budget, with a history sweep running in parallel); run alone, they pass 7/7 and 13/13. `advance-pipeline-lock.test.sh` 99/99, `grant-qa-cycles.test.sh` 46/46, `eval:develop-task` 17/17 fixtures, `lint:shell` clean, `bundle:check` 0 problems. New or extended suites: stale-snapshot-delete (+R, S, P-with-space; D reworked), detector-candidate-rule (new, 4), who-restores (+iv), report-lint-call-sites (+D), change-log (+J1–J4).
+- **Mutation proofs**: 15, all red. The list is in the implementation report § Step 3.
+- **Phase 5 non-vacuity**: 128 tracked documents that carry a Change Log, checked against `origin/develop` → 0 flagged. task.130's whole history → only `fdba78d9` (6 rows). A September sweep of 293 commit/parent pairs → 17 commits that drop a row: `fdba78d9`, plus 16 where `qa-fix` rewrote its own row in place. That is evidence for open obs #183, not new scope.
+- **Deferred Work**: `qa-fix` rewriting its row across cycles (obs #183 — the check now measures it). The 5c lens compares against the merge-base only, so a row added and then rewritten on the same branch is invisible to it; a per-commit mode would close that. Two unquoted `{doc-directory}` sites outside § Consume Output (`:329`, `:489`). PreCompact hook lint site (3) still has no rc split (exempt in `report-lint-call-sites.test.mjs`).
+- **Completion Date**: 2026-09-30
 
 - QA artifacts land beside this file: `task.133.qa.[N].*.md`, `task.133.bug.[N].*.md`, `task.133.gate.[N].*.yml`.
 - Independent of tasks 134 and 135; shares `develop-pipeline-resume-contract.md` with neither (134 touches `qa-diminishing-returns.js` and the step-5-6 file; 135 touches the qa-* gate writers and `qa-re-review-scope.md`).
