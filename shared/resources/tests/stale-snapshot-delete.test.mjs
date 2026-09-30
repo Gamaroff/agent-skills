@@ -246,65 +246,65 @@ for (const sh of SHELLS) {
   });
 
   for (const leaf of ["task.1.x", "task.1 with space"])
-  test(`P [${sh}] — TWO SHELLS: bind block in one process, delete block in another → deleted (bug 9) — doc dir '${leaf}'`, () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "two-shell-"));
-    const state = path.join(dir, ".claude", "state");
-    fs.mkdirSync(state, { recursive: true });
-    const docDir = path.join(dir, "docs", "tasks", leaf);
-    fs.mkdirSync(docDir, { recursive: true });
-    const bin = path.join(dir, "bin");
-    fs.mkdirSync(bin);
-    fs.writeFileSync(path.join(bin, "gh"), GH_STUB.merged, { mode: 0o755 });
-    const snap = path.join(state, "develop-pipeline.last-halt.json");
-    fs.writeFileSync(
-      snap,
-      JSON.stringify({
-        task_or_story_directory: docDir,
-        pr_url: "https://github.com/x/y/pull/1",
-      }) + "\n",
-    );
-    const json = JSON.stringify({
-      schema_version: 1,
-      recommended_step: 1,
-      blocking_issues: [],
-      deltas_since_pause: [
-        { path: snap, concern: "stale-snapshot: PR merged" },
-      ],
-    });
-    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
-    const bind = bindBlock()
-      .replace(/\{doc-directory\}/g, docDir)
-      .replace(
-        /\{the JSON object the detector returned, pasted verbatim\}/,
-        json,
+    test(`P [${sh}] — TWO SHELLS: bind block in one process, delete block in another → deleted (bug 9) — doc dir '${leaf}'`, () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "two-shell-"));
+      const state = path.join(dir, ".claude", "state");
+      fs.mkdirSync(state, { recursive: true });
+      const docDir = path.join(dir, "docs", "tasks", leaf);
+      fs.mkdirSync(docDir, { recursive: true });
+      const bin = path.join(dir, "bin");
+      fs.mkdirSync(bin);
+      fs.writeFileSync(path.join(bin, "gh"), GH_STUB.merged, { mode: 0o755 });
+      const snap = path.join(state, "develop-pipeline.last-halt.json");
+      fs.writeFileSync(
+        snap,
+        JSON.stringify({
+          task_or_story_directory: docDir,
+          pr_url: "https://github.com/x/y/pull/1",
+        }) + "\n",
       );
-    const r1 = spawnSync(sh, argvFor(sh, bind), {
-      cwd: dir,
-      encoding: "utf8",
-      env,
+      const json = JSON.stringify({
+        schema_version: 1,
+        recommended_step: 1,
+        blocking_issues: [],
+        deltas_since_pause: [
+          { path: snap, concern: "stale-snapshot: PR merged" },
+        ],
+      });
+      const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+      const bind = bindBlock()
+        .replace(/\{doc-directory\}/g, docDir)
+        .replace(
+          /\{the JSON object the detector returned, pasted verbatim\}/,
+          json,
+        );
+      const r1 = spawnSync(sh, argvFor(sh, bind), {
+        cwd: dir,
+        encoding: "utf8",
+        env,
+      });
+      assert.equal(r1.status, 0, `bind block: ${r1.stderr}`);
+      const del =
+        deleteBlock().replace(/\{doc-directory\}/g, docDir) +
+        '\necho "BLOCK_DONE"\n';
+      const r2 = spawnSync(sh, argvFor(sh, del), {
+        cwd: dir,
+        encoding: "utf8",
+        env,
+      });
+      assert.equal(
+        r2.status,
+        0,
+        `delete block (fresh shell): stdout ${r2.stdout} stderr ${r2.stderr}`,
+      );
+      assert.match(r2.stdout, /removed \(PR .* is MERGED; directory matches\)/);
+      assert.equal(
+        fs.existsSync(snap),
+        false,
+        "snapshot still on disk after a two-shell run",
+      );
+      fs.rmSync(dir, { recursive: true, force: true });
     });
-    assert.equal(r1.status, 0, `bind block: ${r1.stderr}`);
-    const del =
-      deleteBlock().replace(/\{doc-directory\}/g, docDir) +
-      '\necho "BLOCK_DONE"\n';
-    const r2 = spawnSync(sh, argvFor(sh, del), {
-      cwd: dir,
-      encoding: "utf8",
-      env,
-    });
-    assert.equal(
-      r2.status,
-      0,
-      `delete block (fresh shell): stdout ${r2.stdout} stderr ${r2.stderr}`,
-    );
-    assert.match(r2.stdout, /removed \(PR .* is MERGED; directory matches\)/);
-    assert.equal(
-      fs.existsSync(snap),
-      false,
-      "snapshot still on disk after a two-shell run",
-    );
-    fs.rmSync(dir, { recursive: true, force: true });
-  });
 
   test(`F [${sh}] — a delta with no concern is a non-match, not a jq abort; exit 0, snapshot kept`, () => {
     const r = run(sh, {
@@ -465,12 +465,21 @@ for (const sh of SHELLS) {
 
   test(`R [${sh}] — Pass 2: unparsable, directory-less and foreign snapshots are three named HALTs; all kept`, () => {
     const cases = [
-      [{ snapshotRaw: "{not json\n" }, /HALT: .* is not a JSON object — its evidence cannot be read/],
       [
-        { snapshotRaw: JSON.stringify({ pr_url: "https://github.com/x/y/pull/1" }) + "\n" },
+        { snapshotRaw: "{not json\n" },
+        /HALT: .* is not a JSON object — its evidence cannot be read/,
+      ],
+      [
+        {
+          snapshotRaw:
+            JSON.stringify({ pr_url: "https://github.com/x/y/pull/1" }) + "\n",
+        },
         /HALT: .* carries no task_or_story_directory — /,
       ],
-      [{ snapshotDir: "docs/tasks/task.2.other" }, /HALT: .* is not a snapshot for .* \(task_or_story_directory: 'docs\/tasks\/task\.2\.other'\)/],
+      [
+        { snapshotDir: "docs/tasks/task.2.other" },
+        /HALT: .* is not a snapshot for .* \(task_or_story_directory: 'docs\/tasks\/task\.2\.other'\)/,
+      ],
     ];
     const seen = new Set();
     for (const [opts, re] of cases) {
@@ -479,9 +488,18 @@ for (const sh of SHELLS) {
       assert.match(r.stdout, re);
       assert.match(r.stdout, /nothing deleted/);
       assert.equal(r.exists, true, `${re}: snapshot deleted`);
-      seen.add(r.stdout.split("\n").find((l) => l.startsWith("HALT:")).replace(/'[^']*'/g, ""));
+      seen.add(
+        r.stdout
+          .split("\n")
+          .find((l) => l.startsWith("HALT:"))
+          .replace(/'[^']*'/g, ""),
+      );
     }
-    assert.equal(seen.size, 3, `three outcomes share a message: ${[...seen].join(" | ")}`);
+    assert.equal(
+      seen.size,
+      3,
+      `three outcomes share a message: ${[...seen].join(" | ")}`,
+    );
   });
 
   test(`S [${sh}] — an unrecognised stale-snapshot-prefixed label is reported and kept, not silently skipped`, () => {
@@ -490,17 +508,27 @@ for (const sh of SHELLS) {
       "stale-snapshot: /x/last-halt.json — PR merged; deleted", // the pre-task.130 label
     ]) {
       const r = run(sh, { concern });
-      assert.equal(r.status, 0, `[${concern}] stdout ${r.stdout} stderr ${r.stderr}`);
+      assert.equal(
+        r.status,
+        0,
+        `[${concern}] stdout ${r.stdout} stderr ${r.stderr}`,
+      );
       assert.equal(r.exists, true, `[${concern}] snapshot deleted`);
       assert.ok(
-        r.stdout.includes(`unrecognised stale-snapshot label — kept: '${concern}'`),
+        r.stdout.includes(
+          `unrecognised stale-snapshot label — kept: '${concern}'`,
+        ),
         `[${concern}] no 'unrecognised … kept' line; stdout: ${r.stdout}`,
       );
     }
     // …and the verdict and both skip notes stay silent on this line.
     for (const concern of ["stale-snapshot: PR merged", ...SKIP_NOTES]) {
       const r = run(sh, { concern, prState: "open" });
-      assert.doesNotMatch(r.stdout, /unrecognised stale-snapshot label/, `[${concern}] reported as unrecognised`);
+      assert.doesNotMatch(
+        r.stdout,
+        /unrecognised stale-snapshot label/,
+        `[${concern}] reported as unrecognised`,
+      );
     }
   });
 
