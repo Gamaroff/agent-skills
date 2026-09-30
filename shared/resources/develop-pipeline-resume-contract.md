@@ -344,7 +344,7 @@ in Phase 0b — so neither has a step that puts the lock back unless it is state
 (obs #123; QA cycle 2, CR-2). Who restores, and when, is stated once — under Phase 0a,
 **Restore the lock (both resume paths)** — and this paragraph only points at it (task.130;
 obs #132: five restatements of that rule produced bugs 9 → 11 → 12 → 13, each fixed at one site
-while the others stayed wrong). When that section says the command runs here, run:
+while the others stayed wrong). When **Restore the lock (both resume paths)** says the command runs here — and only then — run:
 
 ```bash
 bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --restore {doc-directory}

@@ -43,12 +43,14 @@ command node .agents/skills/{develop-story|develop-task|develop-bug}/references/
 case $rc in
   0) ;;
   1) echo "HALT: report failed lint — repair $REPORT by hand before committing (see the problems above)"; exit 1 ;;
-  2) echo "HALT: report-lint usage error — the call site is wrong, not the report"; exit 1 ;;
+  2) echo "HALT: report-lint usage error (rc 2) — the call site is wrong, not the report; causes: develop-pipeline-step-8-commit.md § report-lint usage error"; exit 1 ;;
   *) echo "HALT: report-lint.js not runnable (rc $rc) — check the bundled path"; exit 1 ;;
 esac
 ```
 
 Engine: `references/report-lint.js`; expected sections come from `references/implementation-report-template.md`, the one definition. A `problems` result is a HALT with nothing committed; the linter never repairs. The exit is read into `rc` **before** the `case` — inside a `*)` arm `$?` no longer names the linter's status — and the three non-zero arms carry distinct messages because they name three different repairs: the report (1), the call site (2), the install (127 or anything else). A single `|| { HALT }` reported all three as "the report failed lint" (task.130; task.124 cycle-1 CR-7).
+
+**report-lint usage error (rc 2).** This is the one statement of the `2)` arm; every `2)` arm in the develop pipelines cites it and none restates it (task.130 gate 5 CR-6; task.133). `report-lint.js` exits 2 when it **refused its inputs and judged nothing**: a flag given no value (`needs a value`), an `unknown argument`, `--file is required`, `--variant must be one of …`, `cannot read <file>`, or a template it could not load. Its `report-lint:` line on stderr names which one. Fix the call or the path and re-run; the report was never read, so exit 2 says nothing about it.
 
 ## Invoke /commit-changes
 

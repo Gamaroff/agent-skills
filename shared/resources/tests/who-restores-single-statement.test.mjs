@@ -20,6 +20,11 @@
 //         (paste the old Phase 0b sentence back → red on the contract; paste develop-bug's
 //         "no re-entry grant" sentence back → red on develop-bug — the token-free case)
 //   (iii) each of the five sites carries the citation phrase
+//   (iv)  at each of the five sites, every sentence that tells the reader to RUN the restore
+//         carries the rule as its condition — `when … Restore the lock (both resume paths) …
+//         run` — never an unconditional imperative with the citation in a parenthetical
+//         (task.130 gate 5 CR-2; task.133). Restore "Run this **before** any step advances:" at
+//         one site → red. Non-vacuity: every site has at least one such sentence.
 //   Sites are located by heading / bold-lead anchor, never by line number; the grant-offer prose
 //   is outside every checked site by construction.
 
@@ -144,6 +149,39 @@ test("(iii) every citation site points at the one statement", () => {
       text,
       CITATION,
       `${label} does not cite "Restore the lock (both resume paths)"`,
+    );
+  }
+});
+
+// A sentence tells the reader to run the restore when it carries the verb `run` (not "runs",
+// not "the run") ahead of the command it names: `--restore`, "the command below", "this", or a
+// colon introducing the fence. Sentences end at ". " or at a newline; a `task.130`-style dot is
+// not a boundary.
+const RUN_IMPERATIVE =
+  /(?:^|[^\w-])[Rr]un(?!s\b)(?! as\b)\b[^.]*?(--restore|the command below|\bthis\b|:\s*$)/;
+const CONDITIONAL =
+  /\bwhen\b[^]*?Restore the lock \(both resume paths\)[^]*?\b[Rr]un\b/i;
+
+function sentences(text) {
+  return text
+    .split(/\n{2,}|(?<=[.!?])\s+(?=[A-Z*"`(])/)
+    .map((x) => x.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+test("(iv) every sentence that runs the restore is conditional on the one statement", () => {
+  for (const [label, text] of Object.entries(sites())) {
+    const prose = text.replace(/```[\s\S]*?```/g, "");
+    const imperatives = sentences(prose).filter((x) => RUN_IMPERATIVE.test(x));
+    assert.ok(
+      imperatives.length >= 1,
+      `${label}: no sentence tells the reader to run the restore — the site moved or the reader broke`,
+    );
+    const bare = imperatives.filter((x) => !CONDITIONAL.test(x));
+    assert.deepEqual(
+      bare,
+      [],
+      `${label}: an unconditional restore imperative (the rule belongs in the condition, not a parenthetical):\n  ${bare.map((x) => x.slice(0, 160)).join("\n  ")}`,
     );
   }
 });

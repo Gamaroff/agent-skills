@@ -15,7 +15,8 @@
 //       PR MERGED → deleted, exit 0                                    (drop `rm -f` → red)
 //   B — a delta whose concern is not the exact verdict label is left in place (widen select → red)
 //   C — a path that survives the rm is a HALT with exit 1                 (drop the re-read → red)
-//   D — no orchestrator SKILL.md carries a copy of the loop; each cites the section
+//   D — no orchestrator SKILL.md carries a copy of the loop; each cites the section, and names no
+//       backticked stale-snapshot token but the exact label or a skip note  (`stale-snapshot*` → red)
 //   E — no persisted detector file HALTs                                     (drop the -s guard → red)
 //   F — a delta with no `concern` is a non-match, kept, exit 0               (drop `// ""` → red)
 //   G — a non-array deltas_since_pause / unparsable JSON HALTs with exit 1   (drop the `||` → red)
@@ -653,10 +654,21 @@ test("D — no orchestrator SKILL.md copies the loop; each cites § Consume Outp
     // selector exact equality; the three citations kept the original prefix wording for three more
     // cycles because this test read only for the citation, not for what it said (cycle 5, bug 12).
     // A description wider than the selector promises a delete the block refuses.
-    assert.doesNotMatch(
-      citation[0],
-      /(starts|start with|starting with|prefix|startswith)[^\n]*stale-snapshot/i,
-      `${rel} describes the delete label as a PREFIX; the selector is exact equality`,
+    //
+    // The floor is a property of the backticked TOKENS the citation names, not of its verbs: a
+    // word list ("starts", "prefix", …) missed "begins with" and rejected the accurate "the two
+    // skip notes share the prefix" (task.130 gate 6 CR-1; task.133). Every backticked
+    // `stale-snapshot…` token must be the exact verdict label or a quoted skip note.
+    const tokens = [...citation[0].matchAll(/`(stale-snapshot[^`]*)`/g)].map(
+      (m) => m[1],
+    );
+    const allowed = (t) =>
+      t === "stale-snapshot: PR merged" ||
+      t.startsWith("stale-snapshot check skipped");
+    assert.deepEqual(
+      tokens.filter((t) => !allowed(t)),
+      [],
+      `${rel} names a stale-snapshot token other than the exact label or a skip note`,
     );
     assert.match(
       citation[0],
