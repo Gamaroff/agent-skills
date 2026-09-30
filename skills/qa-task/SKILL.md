@@ -1335,6 +1335,44 @@ Add (or replace) the QA Results section in the task document:
 {Brief summary, or "No critical issues identified"}
 ```
 
+**Write the section through the engine — one call, never a hand edit.** Save the rendered section
+to `.claude/state/qa-results-section.md`, then:
+
+```bash
+# QA Testing Results writer (task 155) — replaces, relocates or creates the one section.
+[ -f "$TASK_FILE" ] || { echo "HALT: TASK_FILE ('$TASK_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
+command node -e '
+  const fs = require("fs");
+  const QR = require("./.agents/skills/qa-task/references/qa-results.js");
+  const [file, sectionFile, docType] = process.argv.slice(1);
+  const r = QR.upsertQaResults(fs.readFileSync(file, "utf8"),
+                               fs.readFileSync(sectionFile, "utf8"), { docType });
+  if (!["replaced", "relocated", "created"].includes(r.reason)) {
+    console.error(`HALT qa-results: ${r.reason}${r.count ? ` (${r.count} sections)` : ""} — ${file} not written.` +
+      (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." :
+       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 or a Change Log heading (a fenced `# comment` counts). Fix that section by hand, re-run." :
+       r.reason === "unplaceable" ? " The write would not read back as exactly one section (an unclosed fence near the insertion point?). Fix by hand, re-run." : ""));
+    process.exit(1);
+  }
+  fs.writeFileSync(file, r.content);
+  fs.unlinkSync(sectionFile); // consumed: a stale copy must not feed the next cycle
+  console.log(`qa-results: ${r.reason}`);
+' "$TASK_FILE" .claude/state/qa-results-section.md task
+```
+
+The engine is `references/qa-results.js`. It places a new section immediately before the
+change-log block (else before `## Progress Tracking`, else at the end), moves one it finds
+**inside** the change-log block out of it (`relocated`), and **refuses** a document that already
+carries more than one (`multiple`) — it never guesses which copy is current. It also refuses a
+section it cannot bound (`unbounded`: an unclosed fence, or removed text that carries a change-log
+marker, an H1/H2 or a Change Log heading — scanned ignoring fences, so a fenced `# comment` counts) and a write that would not read back as one
+section (`unplaceable`). On any refusal the step halts; a hand edit is not a fallback. A `### Bug Reports`
+list (`create-bug-report`) or `### Deferred Work` block (the pipeline's loop exit) already inside the
+section is carried through the replace; the rendered section must not include either — a render
+that does is refused as `bad-section`. Write the section **before** the Change Log row below,
+so the change-log write sees a relocated section already outside its block. A hand-rolled
+`slice(indexOf(…), indexOf("## Change Log"))` stacked four copies on task.145 (obs #178).
+
 **Update task status based on gate decision** — the same rule `qa-story` states, and the only
 vocabulary the lifecycle admits:
 

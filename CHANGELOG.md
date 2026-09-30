@@ -89,6 +89,44 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The QA Testing Results section has one writer, one place, and refuses to stack (task 155, obs #178).**
+  `qa-task` Step 12 and `qa-story` Step 12 item 3 said "replace the section whole" and named no tool,
+  so every run hand-wrote the edit — and a hand-written replace whose two boundaries come from two
+  independent searches stacked four copies on task.145 and left three in task.65. Both now write
+  through `shared/resources/qa-results.js` (`findQaResults` / `upsertQaResults`), which reuses
+  `change-log.js`'s fence, inline-code and frontmatter guards rather than a second scanner. A write
+  returns `replaced`, `relocated` (one section found inside the change-log block is moved out),
+  `created`, or refuses with `multiple` / `bad-section` and writes nothing; the Step 12 call halts on
+  a refusal instead of falling back to a hand edit. A heading counts when its text **begins**
+  `QA Testing Results`, so suffixed copies (`— Cycle 2 (re-review)`) are seen. A section ends before
+  the change-log block, so a replace can never delete `<!-- change-log-start -->`, and a `---`
+  separator after it survives. A section found between a change-log heading and its table — inside
+  any marker block, current or legacy, or under a marker-less `## Change Log` — is relocated rather than
+  replaced in place, so the log's rows are not taken with it (the residual shapes — REL-007, REL-008's
+  two row-dropping layouts, setext headings — are recorded in the task's Deferred Work). A section
+  string is refused (`bad-section`) when it carries an unclosed fence or, scanned **ignoring fences**,
+  any line that reads as a change-log marker, an H1/H2 or a Change Log heading — so a fenced
+  `## Example` or a bash `# comment` in the rendered section is refused too, a deliberate trade that
+  never deletes; and any write that would not read back as exactly one section is refused
+  (`unplaceable`). Before a
+  replace or relocate, the text it would remove is scanned **ignoring fences**, and the write is
+  refused (`unbounded`) if that text carries a change-log marker, an H1/H2 or a Change Log heading —
+  one stray fence in a section can no longer widen a write over the log. Two blocks other writers put inside this section are carried whole through every replace —
+  `### Bug Reports` (`create-bug-report`) and `### Deferred Work` (the develop pipelines' route-2/2b
+  exit) — with `####` groups and tables, several blocks folded into one; a render that brings its own
+  copy of either is refused. Every other subsection is QA's own and is replaced whole. A trailing HTML
+  comment block before the next section is kept as a separator. Known residuals are recorded in the task's Deferred Work — among them
+  one accepted deletion path (a bold `**Deferred Work**` label written inside the section is not
+  carried; the fix is to pin that record outside the section, in a follow-up task), a list under a
+  non-standard label, and duplicate-only shapes (nested carried blocks, comment peels).
+  **One visible change:** a new section lands immediately before the
+  change-log block (else before `## Progress Tracking` / `## Dev Agent Record`), so a document that
+  placed it elsewhere is unchanged until QA next *creates* one there — an existing single section is
+  replaced where it stands. task.65's two stale copies are removed; `tests/qa-results-corpus.test.js`
+  fails when any tracked document carries two, or one inside the change-log block, and
+  `tests/qa-results-step12-wiring.test.js` executes both skills' Step 12 block from a consumer-shaped
+  checkout.
+
 - **A QA gate records the commit it judged, and the next cycle scopes from that commit (task 135, obs #136).**
   - **Breaking: gates are `schema: 2`.** `qa-task`, `qa-story` and `qa-gate` write `head:` (from
     `git rev-parse HEAD` at review time) and `updated:` (from `date -u`, never typed). Schema-1

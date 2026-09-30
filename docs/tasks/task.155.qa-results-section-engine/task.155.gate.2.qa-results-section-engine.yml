@@ -1,0 +1,85 @@
+schema: 2
+task: 'task.155.qa-results-section-engine'
+task_title: 'QA Testing Results section: one write engine, one placement, refused when duplicated'
+gate: CONCERNS
+status_reason: 'All five cycle-1 fixes hold and are mutation-proven, and the engine replaces all 155 tracked corpus sections cleanly, but the REL-002 fix introduced a regression (a legitimate section after a finished change log that quotes a Date|Version table is relocated and leaves a stale tail behind) and does not cover legacy log headers, which still lose every row.'
+reviewer: 'QA Engineer'
+head: '99838ae868c4793d572e028dbbfec6b18ed929e6'
+updated: '2026-09-30T19:18:04Z'
+
+top_issues:
+  - id: 'REL-004'
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'The REL-002 rule `logFollows = block || (changeLog && changeLog.start < start)` fires for any section placed after the change log, including after a finished marker-less table and after a closed marker block (hasMarkers is never checked). A legitimate section that quotes a `| Date | Version |` table is cut at that table and reported `relocated`, and its stale tail stays behind the log, under `## Change Log` when there are no markers. Reproduced on the fixed engine; the engine at 6d6c166d returned `replaced` cleanly on both shapes, so this is a regression from cycle 1 (CR-1).'
+    suggested_action: 'Treat a marker-less section as misplaced only when the change-log heading has no table of its own before the section (the heading''s body up to the section is blank), and never when markers exist and the section is outside every block; add F4 variants with a quoted Date|Version table for both the marker-less and the closed-marker shape.'
+    suggested_owner: dev
+    status: open
+  - id: 'REL-005'
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'RE_LOG_HEADER matches only `| Date | Version |`, so the REL-002 layout over a log with a legacy header (`| Date | Change | Author |`) is still classed `replaced`, and the write deletes every Change Log row. Reproduced: 2 rows before, 0 after. The REL-002 fix is incomplete for headers change-log.js already accepts (CR-2).'
+    suggested_action: 'End the misplaced span at the first unprotected log table row, using change-log.js''s header vocabulary (Date|Version|Description|Author|Change) or its exported RE_ENTRY_ROW, rather than the single canonical header; add a legacy-header twin of F2.'
+    suggested_owner: dev
+    status: open
+  - id: 'REL-006'
+    severity: low
+    file: 'shared/resources/qa-results.js'
+    finding: 'In a genuine REL-002 layout where the misplaced section itself quotes a `| Date | Version |` table, the span is cut at the section''s own table rather than the log''s header, so relocation moves only the section''s head and leaves its remaining stale lines inside the Change Log above the real rows (CR-3, reproduced; the pre-fix engine deleted the rows instead, so this is better but not correct).'
+    suggested_action: 'Cut at the header that starts the log''s own entry rows (the last matching header before the other end candidates), not the first match after the section heading.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 33
+  phases_verified: 4/4
+  ci: 'ci:fast exit 0 locally @ 99838ae868c4 (4748 tests, 4747 pass, 0 fail, 1 skipped)'
+  corpus_run: '155 tracked docs/**/*.md carrying the section, written in a temp copy: 155 replaced, 0 relocated/multiple/bad-section, change-log markers and dated rows unchanged, second write clean'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+bug_resolution:
+  previous_gate: 'task.155.gate.1.qa-results-section-engine.yml (CONCERNS 70)'
+  verified_fixed: ['REL-001', 'REL-002 (canonical header only; see REL-005)', 'REL-003', 'CR-3', 'CR-4']
+  deferred: ['CRLF seam preservation (LOW, recommendations.future)']
+  fix_commit: '99838ae868c4793d572e028dbbfec6b18ed929e6'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Pure string transform, no network; Step 12 passes paths as argv to node -e, never into script text. boundary: internal (inputs are a work-item document and a pipeline-rendered section; no corpus sink models them).'
+  performance:
+    status: PASS
+    notes: 'Engine, corpus and wiring tests (33) run in ~1.2 s, under the 2 s criterion.'
+  reliability:
+    status: CONCERNS
+    notes: 'Refusals write nothing; cycle-1 fixes hold; REL-004 leaves a stale tail while reporting relocated, REL-005 still deletes rows under a legacy header. No corpus document triggers either today.'
+  maintainability:
+    status: PASS
+    notes: 'Reuses change-log.js primitives; bundles fresh; every reason unit-tested and every cycle-1 fix mutation-proven.'
+
+recommendations:
+  immediate:
+    - action: 'Fix REL-004: narrow the marker-less misplacement rule so it cannot fire on a section after a finished log or a closed marker block'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+    - action: 'Fix REL-005: end a misplaced span at any change-log table header or entry row, not only the canonical one'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+  future:
+    - action: 'REL-006: cut a misplaced span at the log''s own header, not a table quoted inside the section'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Preserve CRLF line endings at the write seams (carried from gate 1)'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'REL-004 and REL-005 fixed and re-reviewed'

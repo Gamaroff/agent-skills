@@ -1,0 +1,90 @@
+schema: 2
+task: 'task.155.qa-results-section-engine'
+task_title: 'QA Testing Results section: one write engine, one placement, refused when duplicated'
+gate: PASS
+status_reason: 'REL-004, REL-005 and REL-006 are fixed and each is mutation-proven, and the engine rewrites all 155 tracked corpus sections cleanly and byte-stably. Two low residuals remain in how the engine recognises the log table (a quoted Date table left as a stale tail, and a log with two Date tables losing its first). Neither shape occurs in the corpus or can be rendered by either QA template.'
+reviewer: 'QA Engineer'
+head: '65dcca836fb242d7de96db94daf4f7b3a659debc'
+updated: '2026-09-30T19:36:31Z'
+
+top_issues:
+  - id: 'REL-007'
+    severity: low
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code-review CR-1, which the reviewer rated medium with high confidence and QA downgraded to low because it is not plausible in the corpus. A misplaced section that quotes a Date-headed table is cut at its own table in two places: inside a marker block after the log rows (the obs #178 position), and directly under a marker-less log with no table (the task.19/task.22 H3 bullet-log shape). The write reports relocated but leaves the quoted rows and the tail in the log, where change-log.js reads them as entries. Reproduced as P1 and P6. P1 is already present at 6d6c166d, and P6 first appears in cycle 1 (99838ae8). Of the 155 tracked QA sections, 0 quote a Date-headed table, and neither the qa-task nor the qa-story Step 12 template renders one.'
+    suggested_action: 'Apply the table cut only when no Date-headed table of the log lies between the log start (block.start or changeLog.start) and the section, and treat a section with no log table after it as a whole-section relocation. Add G-style tests for both positions.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'REL-008'
+    severity: low
+    file: 'shared/resources/qa-results.js'
+    finding: 'This regression comes from the REL-006 fix, which changed the table cut from first to last. When a misplaced section precedes a log that holds two Date-headed tables (for example a canonical table plus a legacy | Date | Change | table), the cut lands at the last table, so the first table and its rows go with the section and are deleted (P2: 2 rows became 1, where 99838ae8 kept 2). In the same class, a log whose header is not Date-first (| Date (UTC) |, | Change | Date |) or has no header still loses its rows under a misplaced section (P4, P5; pre-existing since 6d6c166d). There are 0 corpus logs with two Date tables, 0 misplaced sections, and the non-Date-first headers occur only in a PRD and in quoted task prose.'
+    suggested_action: 'Cut at the first Date-headed table that starts after the section''s own content rather than the last one in the span. Alternatively, end the span at the first line change-log.js RE_ENTRY_ROW recognises, and add a two-table fixture.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 39
+  phases_verified: 4/4
+  ci: 'ci:fast locally @ 65dcca836fb2: 4755 tests, 4753 pass, 1 fail, 1 skipped. The fail is tests/test-clean-checkout.test.js over its 10 s budget (10168 ms) under concurrent load, labelled LOAD-SENSITIVE; alone it ran 13/13 pass in 7.7 s. PR CI not awaited (gated at /finalise).'
+  corpus_run: '155 tracked docs/**/*.md carrying the section, rewritten in a temp copy: 155 replaced, 0 relocated/multiple/bad-section, markers and dated rows unchanged, second write byte-stable'
+  mutation_proofs: 'M1 end-equality → G6 red; M2 canonical-only header → G3 red; M3 first-not-last table → G4 red; M5 tableless check removed → G1 red; M4 !hasMarkers removed → no red (absorbed: a marker block end can never equal a heading start)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  previous_gate: 'task.155.gate.2.qa-results-section-engine.yml (CONCERNS 70)'
+  verified_fixed: ['REL-004', 'REL-005', 'REL-006']
+  deferred: ['CRLF seam preservation (LOW, recommendations.future; re-reported as code-review CR-2)']
+  fix_commit: '65dcca836fb242d7de96db94daf4f7b3a659debc'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Pure string transform with no network access. Step 12 passes paths as argv to node -e, never into the script text. boundary: internal: the inputs are a pipeline-written work-item document and a pipeline-rendered section, and the markdown-structure sink models implementation reports, not this section.'
+  performance:
+    status: PASS
+    notes: 'The 39 engine, wiring and corpus tests run in about 0.8 s, under the 2 s criterion. The corpus dry run over 155 documents is sub-second.'
+  reliability:
+    status: PASS
+    notes: 'Refusals write nothing, and the REL-004/005/006 fixes hold and are mutation-proven. REL-007 and REL-008 are low log-table-recognition residuals with 0 corpus instances.'
+  maintainability:
+    status: PASS
+    notes: 'The engine reuses change-log.js primitives and the bundle is fresh. Cleanups CR-3 (a dead before.endsWith check) and CR-4 (a redundant findQaResults call in normaliseSection) are advisory.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'REL-007'
+      severity: low
+      finding: 'Code-review CR-1, which the reviewer rated medium with high confidence and QA downgraded to low because it is not plausible in the corpus. A misplaced section that quotes a Date-headed table is cut at its own table in two places: inside a marker block after the log rows (the obs #178 position), and directly under a marker-less log with no table (the task.19/task.22 H3 bullet-log shape). The write reports relocated but leaves the quoted rows and the tail in the log, where change-log.js reads them as entries. Reproduced as P1 and P6. P1 is already present at 6d6c166d, and P6 first appears in cycle 1 (99838ae8). Of the 155 tracked QA sections, 0 quote a Date-headed table, and neither the qa-task nor the qa-story Step 12 template renders one.'
+      suggested_action: 'Apply the table cut only when no Date-headed table of the log lies between the log start (block.start or changeLog.start) and the section, and treat a section with no log table after it as a whole-section relocation. Add G-style tests for both positions.'
+      refs: ['shared/resources/qa-results.js']
+      carried_from: 'top_issues (route 2b, cycle 3)'
+    - id: 'REL-008'
+      severity: low
+      finding: 'This regression comes from the REL-006 fix, which changed the table cut from first to last. When a misplaced section precedes a log that holds two Date-headed tables (for example a canonical table plus a legacy | Date | Change | table), the cut lands at the last table, so the first table and its rows go with the section and are deleted (P2: 2 rows became 1, where 99838ae8 kept 2). In the same class, a log whose header is not Date-first (| Date (UTC) |, | Change | Date |) or has no header still loses its rows under a misplaced section (P4, P5; pre-existing since 6d6c166d). There are 0 corpus logs with two Date tables, 0 misplaced sections, and the non-Date-first headers occur only in a PRD and in quoted task prose.'
+      suggested_action: 'Cut at the first Date-headed table that starts after the section''s own content rather than the last one in the span. Alternatively, end the span at the first line change-log.js RE_ENTRY_ROW recognises, and add a two-table fixture.'
+      refs: ['shared/resources/qa-results.js']
+      carried_from: 'top_issues (route 2b, cycle 3)'
+    - action: 'REL-007/REL-008: tie the misplaced-span cut to the log''s own table position (the first Date table after the section content, or the first RE_ENTRY_ROW), and add fixtures for the quoted-table-in-block, stub-log and two-table shapes'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+    - action: 'Preserve CRLF line endings at the write seams (code-review CR-2, carried from gates 1 and 2)'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Cleanups: drop the dead before.endsWith("\n\n") check (CR-3) and the redundant findQaResults call in normaliseSection (CR-4)'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

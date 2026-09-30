@@ -33,7 +33,9 @@ const {
 } = require("./change-log.js");
 
 const HEADING = "## QA Testing Results";
-const RE_QA = /^## QA Testing Results[ \t]*$/gm;
+// Prefix match on H2: task.65's stacked copies are titled "## QA Testing Results — Cycle 2 (re-review)"
+// (review C1). An exact-line match counted task.65 as one section.
+const RE_QA = /^## QA Testing Results\b[^\n]*$/gm;
 
 function findQaResults(content) {
   const ranges = protectedRanges(content);
@@ -42,8 +44,11 @@ function findQaResults(content) {
   for (const m of content.matchAll(RE_QA)) {
     if (m.index < bodyStart(content) || insideProtected(ranges, m.index)) continue;
     const insideChangeLog = !!(cl && cl.hasMarkers && m.index > cl.start && m.index < cl.end);
-    // End: next unprotected heading of level <= 2 after the body, or the change-log
-    // end marker when inside the block, whichever comes first.
+    // End: the earliest of the next unprotected heading of level <= 2, the change-log
+    // block START when the block follows the section (review C2 — otherwise a section
+    // placed before the block runs to `## Change Log` and a replace deletes the start
+    // marker), and the change-log end marker when inside the block. Trailing blank
+    // lines and one `---` before the terminator are a separator, not span.
     // Reuse the same end-scan shape as findChangeLog's hand-written branch.
     sections.push({ start: m.index, end: /* computed */ 0, insideChangeLog });
   }

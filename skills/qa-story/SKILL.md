@@ -1856,6 +1856,45 @@ After review:
    [Brief summary of critical issues or concerns, or "No critical issues identified"]
    ```
 
+   **Write (a) through the engine — one call, never a hand edit.** Save the rendered section to
+   `.claude/state/qa-results-section.md`, then:
+
+   ```bash
+   # QA Testing Results writer (task 155) — replaces, relocates or creates the one section.
+   [ -f "$STORY_FILE" ] || { echo "HALT: STORY_FILE ('$STORY_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
+   case "$(basename "$STORY_FILE")" in task.*) QA_DOC_TYPE=task ;; *) QA_DOC_TYPE=story ;; esac
+   command node -e '
+     const fs = require("fs");
+     const QR = require("./.agents/skills/qa-story/references/qa-results.js");
+     const [file, sectionFile, docType] = process.argv.slice(1);
+     const r = QR.upsertQaResults(fs.readFileSync(file, "utf8"),
+                                  fs.readFileSync(sectionFile, "utf8"), { docType });
+     if (!["replaced", "relocated", "created"].includes(r.reason)) {
+       console.error(`HALT qa-results: ${r.reason}${r.count ? ` (${r.count} sections)` : ""} — ${file} not written.` +
+         (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." :
+       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 or a Change Log heading (a fenced `# comment` counts). Fix that section by hand, re-run." :
+       r.reason === "unplaceable" ? " The write would not read back as exactly one section (an unclosed fence near the insertion point?). Fix by hand, re-run." : ""));
+       process.exit(1);
+     }
+     fs.writeFileSync(file, r.content);
+     fs.unlinkSync(sectionFile); // consumed: a stale copy must not feed the next cycle
+     console.log(`qa-results: ${r.reason}`);
+   ' "$STORY_FILE" .claude/state/qa-results-section.md "$QA_DOC_TYPE"
+   ```
+
+   The engine is `references/qa-results.js`. It places a new section immediately before the
+   change-log block (else before `## Dev Agent Record` for a story, `## Progress Tracking` for a
+   task, else at the end), moves one it finds **inside** the change-log block out of it
+   (`relocated`), and **refuses** a document that already carries more than one (`multiple`) — it
+   never guesses which copy is current. It also refuses a section it cannot bound (`unbounded`: an
+   unclosed fence, or removed text that carries a change-log marker, an H1/H2 or a Change Log
+   heading — scanned ignoring fences, so a fenced `# comment` counts) and a write that would not read back as one section (`unplaceable`). On any
+   refusal the step halts; a hand edit is not a fallback. A `### Bug Reports`
+   list (`create-bug-report`) or `### Deferred Work` block (the pipeline's loop exit) already inside the
+   section is carried through the replace; the rendered section must not include either — a render
+   that does is refused as `bad-section`. Write (a) **before** the Change Log row in (d). A hand-rolled
+   `slice(indexOf(…), indexOf("## Change Log"))` stacked four copies on task.145 (obs #178).
+
    b. **QA Completion Summary** section (if testing is complete):
 
    ```markdown
@@ -1901,7 +1940,8 @@ After review:
    > These are **story/task** statuses. **Bug-report** statuses are a separate lifecycle
    > (`New | In Progress | Ready for QA | Reopened | Closed`) and `Reopened` remains correct there.
 
-   d. **Append the verdict row to `## Change Log`** — in the same edit as (a)–(c), bumping
+   d. **Append the verdict row to `## Change Log`** — after (a) is written through the engine and in
+   the same pass as (b)–(c), bumping
    frontmatter `updated`:
 
    ```markdown
