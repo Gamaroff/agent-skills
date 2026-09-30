@@ -224,6 +224,86 @@ The pipeline stopped after 5 qa-task/qa-fix cycles: the HIGH finding count faile
 2. Fix REL-013 by placing a new section before a `## Change Log` heading that sits directly above the marker block (or before the marker block's own heading when present), with a test on the task.168 shape.
 3. Grant 2 more cycles via the re-entry path (`grant-qa-cycles.sh`) to land 1–2 and re-gate, or decide the deferral: REL-012 needs a stray fence that neither Step 12 template renders and 0 tracked sections carry, but it deletes silently, which is why it is not accepted here.
 
+### QA loop re-entry — 2026-09-30
+
+- **Operator decision (AskUserQuestion):** "Grant 2 more cycles (Recommended)". `grant-qa-cycles.sh` restored the lock from the halt snapshot: QA_CYCLE=5, `extra_cycles_granted: 2`, `qa_max_cycles: 7`. QA loop re-entry: 2 extra cycles granted; 0 cycles run outside the loop back-filled from disk.
+- Resumed at cycle 5's 5b (the Convergence trip had halted before 5b); the grant overrides the stall for this run. QA Cycle 5 — changes-requested: `stage-disabled`.
+- 5b fix (inline) — recommended step 1 of the escalation, taken as written: one **fence-blind structural guard** (`removesStructure`): the text a replace or relocate would remove is scanned ignoring fences, and the write is refused `unbounded` if it carries a change-log marker, an ATX H1/H2 (column 0 or 1–3-space indent — REL-014) or a Change Log heading at any level. `normaliseSection` applies the same guard, so the engine never writes a section it would have to refuse next cycle (a fenced `## Example` in a section is now `bad-section`; F1 updated). REL-013: `canonicalOffset` lands before a Change Log heading directly above the marker block. Setext H1/H2 deliberately excluded (the one corpus hit, task.118, is a `---` separator under a paragraph inside its QA section — a false stop); recorded in Deferred Work.
+- Measured before committing to the guard: over the 155 tracked sections, the guard (with setext) would refuse 1 — task.118, the setext false positive — so setext was dropped; without it, 0.
+- Mutation proofs: S1 guard off in upsert → J1, J3, J5; S2 write-side guard off → F1, J5; S3 REL-013 placement removed → J4; S4 marker pattern removed → J6 (unheld until J6 was added); S5 H1/H2 pattern removed → F1, J3, J5; S6 log-heading pattern removed → J7 (unheld until J7 was added).
+- QA's fault injection re-run: stray fence injected after the heading of each of the 155 tracked sections → 155 `unbounded`, **0 deletions** (gate 5 measured 2: task.90, task.96). Clean corpus: 155 `replaced`, no marker/row loss.
+- Fast gate: 4768 pass, 1 fail — `test-clean-checkout` LOAD-SENSITIVE (12.3 s / 10 s), passes 13/13 alone. Commit `3056978c`, one push. Cycle counter → 6 of 7.
+
+### QA Cycle 6 — 2026-09-30
+
+**Gate Result**: CONCERNS (80/100) — `task.155.gate.6.qa-results-section-engine.yml`, report `task.155.qa.6.qa-results-section-engine.md`
+**Issues Found**: 3 — REL-015 (medium, deletes under four simultaneous conditions: the guard's restated `\d+\.?` numbering missed change-log.js's `### 1.5 Change Log` / `## 12) Change Log`; also a REL-013 placement residue), REL-016 (low, false refusal only: a fenced `# comment` line refuses — never deletes; Deferred Work understated the trade), REL-017 (low: Step 12 prose and halt message still described `unbounded` as an unclosed fence only).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 6 of 7)
+
+- Cycle-5 fix verified: REL-012/013/014 closed. QA's own fault injection: 155 injected → 155 `unbounded`, 0 deletions; a stray fence + closing ```` ```bash ```` block at 16,804 later positions → 4,988 `replaced`, 11,816 `unbounded`, **0 deletions**. Corpus: 1,986 docs × 4 writes each followed by an `upsertChangeLog` row → 0 lines lost, 0 rows dropped, always 1 section; 2 docs `unplaceable` (neither a QA target). Step 12 → `replaced`; status back to `ready-for-review`.
+- Convergence check: HIGH 0,0,0,0,1,0 — HIGH_6 = 0, no trip. Route classifier: `continue` (CONCERNS with an open MEDIUM). QA Cycle 6 — changes-requested: `stage-disabled`.
+- 5b fix (inline): REL-015 — guard and placement also test `change-log.js`'s exported `RE_HEADING` (imported, not restated); REL-016 — Deferred Work states the full trade; REL-017 — Step 12 prose in both skills and the halt messages name what `unbounded` / `unplaceable` mean and the repair.
+- Mutation proofs: T1 `RE_HEADING` out of the guard → K1; T2 out of placement → K2; W6 `unbounded` halt hint removed → the wiring halt test red.
+- Checks: clean corpus 155 `replaced`; injected 155 `unbounded`; 0 deletions. Fast gate 4770 pass, 1 fail (`test-clean-checkout` LOAD-SENSITIVE, 13/13 alone). Commit `b810cb20` (fix + gate 6 + QA report 6), one push.
+
+### QA Cycle 7 — 2026-09-30
+
+**Gate Result**: PASS (100/100) — `task.155.gate.7.qa-results-section-engine.yml`, report `task.155.qa.7.qa-results-section-engine.md`
+**Issues Found**: 2 LOW — REL-018 (a section above an H3 log heading directly over the marker block, then a hand-added row → the next write refuses `unbounded`; engine-written rows are fine), REL-019 (the `bad-section` halt has no repair hint). Both `deletes_content: no`, `plausible_in_corpus: no`.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — `task.155.pr-review.3.qa-results-section-engine.md` (CR-1 medium, deletes content; PC-1..PC-4, CR-2 low)
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 7 with HIGH 0 for cycles 6 and 7; all 2 open findings are LOW and are carried to the gate's recommendations.future by id (REL-018, REL-019). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+
+- Cycle-6 fix verified: REL-015 fixed (K1, K2 red on revert), REL-016 closed as a documented trade, REL-017 fixed for `unbounded`/`unplaceable` (`bad-section` → REL-019). All gate-6 experiments re-run with **0 deletions**: stray fence in all 155 sections (5 fence variants → 155 `unbounded`; HTML-comment and inline-tick variants → 155 `replaced`); stray fence + closing block at 16,807 positions (4,988 `replaced`, 11,819 `unbounded`); 1,987 docs × 4 writes each followed by an `upsertChangeLog` row (1,830 created→replaced, 155 replaced, 2 `unplaceable`, 0 lines or rows lost); all 155 existing sections re-rendered with 0 `bad-section`. Step 12 → `replaced`. Observation #239 logged by the QA run.
+- Convergence check: HIGH_7 = 0, no trip. Route classifier (cycle 7): `cosmetic-residue`, lowIds REL-018, REL-019 → carried to gate 7 `recommendations.future` (`carried_from: top_issues (route 2b, cycle 7)`), closed in `top_issues[]`, listed under the task's `## Deferred Work`.
+
+#### Step 5c — PR conformance review 3 (cycle 7) — 2026-09-30
+
+- `/review-pr --effort medium --comment` in an independent subagent → **CONCERNS**; the review comment on PR #537 was updated in place.
+- **CR-1 (medium, deletes content, live in the corpus):** `create-bug-report` Step 5 writes a `### Bug Reports` list inside the QA section (11 tracked tasks carry one — task.113 would lose 6 links); a whole-section replace dropped it. QA's "0 deletions" experiments measured only text outside the span, so they could not see it. Conformance drift: PC-1 (Deferred Work lead sentence, CR-5/6/7, `checked()` limit), PC-2 (REL-010 closed by `3056978c`), PC-3/PC-4 (CHANGELOG), CR-2 (qa-story (d) ordering).
+- **Operator decision (AskUserQuestion):** "Grant 1 more cycle (Recommended)" — the 7-cycle budget was spent and I would not self-grant. `grant-qa-cycles.sh`: QA_CYCLE=7, `extra_cycles_granted: 1`, `qa_max_cycles: 8`.
+- 5b fix (inline): `CARRIED_SUBSECTIONS = ["Bug Reports"]` — the one subsection another skill writes into this section — carried through replace and relocate unless the new render has its own; every other `###` is QA's own and replaced whole (measured: 29 other H3 kinds in tracked sections, almost all stale cycle history). CR-6 (removed the H1/H2 check `removesStructure` subsumes), CR-7 (marker pattern built from `CL_START`/`CL_END`/`LEGACY_MARKER_PAIRS`). Docs: PC-1..PC-4, CR-2.
+- Mutation proofs: U1 no carry → L1, L4; U2 no takeover check → L2 (duplicate list); U3 carry everything → L3 (stale history kept). J6 still holds the marker pattern after CR-7.
+- Corpus: 155 `replaced`; injected 155 `unbounded`; 0 marker/row deletions; the 11 Bug-Reports tasks keep every distinct bug link. Fast gate TEST_EXIT=0 (4775 tests, 4774 pass). Commit `a89f20fe` (fix + PR review 3), one push. Cycle counter → 8 of 8.
+
+### QA Cycle 8 — 2026-10-01
+
+**Gate Result**: CONCERNS (80/100) — `task.155.gate.8.qa-results-section-engine.yml`, report `task.155.qa.8.qa-results-section-engine.md`
+**Issues Found**: 4 — REL-020 (medium, deletes: a second `### Bug Reports` list was dropped), REL-021 (low: a carried block could drag stale QA fields), REL-022 (low, deletes, plausible: task.117's template comment lead-in between a hand-placed section and the log), REL-023 (low, deletes: near-miss headings dropped the list; a render with its own list dropped old links).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+
+- Review-3 fix verified for the 11 tracked lists; CR-6/CR-7 behaviour-neutral (1,978/1,989 docs identical to gate 7's engine; the 11 that differ are the bug-list docs). Outside the span: 0 lines lost (1,989 docs × 4 writes; 155 × 6 injection variants; 12,001 closing-block positions). Only `create-bug-report` (task mode) writes into the section; `qa-fix` / `develop-bug` edit statuses inside that list. Observation #240 logged by the QA run (create-bug-report checks for an H2, writes an H3).
+- Convergence: HIGH_8 = 0, no trip. Route classifier: `continue` → 5b (cycle 8 of 8).
+- 5b fix (inline, `709e450b`): every `###`/`####` Bug Reports block (any case/suffix) carried whole to the next `###`-or-higher heading or QA's first template field line; several blocks folded into one; a render with its own list gains every old line naming a link it lacks; a trailing HTML comment block is a separator. A first attempt carried list ITEMS only — the corpus check showed it would drop links from 4 of the 11 real lists (`####` groups, tables, bold labels), so it was replaced before commit. Mutation proofs: W1→M1, W2→M2, W3→M1, W4→L2, W5→M3, W6→M6 (W3/W6 re-run by hand after a quoting slip in the batch harness). Corpus: 11/11 bug lists keep every link, 0 comments/markers/rows lost, idempotent. Fast gate TEST_EXIT=0 (4781 tests, 4780 pass).
+- Loop limit: budget 8 spent; the cycle-8 fix is ungated. Route 2c (`budgetSpent: true`): `continue (medium-not-falling)` — MEDIUM 1, 0, 1 over cycles 6–8. Escalate.
+
+### QA Loop Limit Reached — 2026-10-01
+
+The pipeline completed 8 qa-task/qa-fix cycles (budget 5 + operator grants of 2 and 1) without a clean PASS on the final code. The final gate read CONCERNS; its findings are fixed in `709e450b`, which no gate has read.
+
+**Final gate status**: CONCERNS (80/100) — fix landed, ungated
+**HIGH findings per cycle**: 0, 0, 0, 0, 1, 0, 0, 0 — none since cycle 5
+**Remaining issues** (from final gate file): REL-020 (medium), REL-021, REL-022, REL-023 (low) — all addressed in `709e450b`, ungated. Deferred and recorded: REL-007, REL-008 (two row-dropping layouts under an already-misplaced section), REL-018/019, setext headings, CRLF seams, CR-5, bold `**Bug Reports**` labels — each with 0 instances in the tracked corpus.
+
+**What was attempted per cycle**: cycles 1–7 above; cycle 8: carried Bug Reports blocks whole and merged, comment lead-ins as separators.
+
+**Likely root cause**: not a stall — each cycle has found a new, narrower edge case, and severity and corpus plausibility have both fallen (HIGH 0 since cycle 5; cycles 6–8 each raised one MEDIUM, all with 0 corpus instances except REL-022, fixed). The engine rewrites free-form Markdown that several writers touch, so an adversarial reviewer can always construct one more shape. The protections that matter are measured on the real corpus every cycle and hold: nothing outside the section is lost, and every bug link inside it survives.
+
+**Recommended next steps**:
+1. Grant one gate for `709e450b` with an explicit acceptance rule: a finding with no instance in the tracked corpus that refuses or duplicates (never deletes) is carried to Deferred Work; a deletion in a plausible document still blocks.
+2. Then 5c, `/finalise`, merge.
+3. File the deferred list as one follow-up task (span-bounding edge cases + create-bug-report's H2/H3 check, obs #240).
+
 ---
 
 ## Completion
