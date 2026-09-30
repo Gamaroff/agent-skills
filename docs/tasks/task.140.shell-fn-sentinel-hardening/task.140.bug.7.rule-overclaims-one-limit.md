@@ -4,7 +4,7 @@
 **Bug ID**: TASK-140-BUG-7
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 4, code review CR-1/CR-2/CR-3, provenance-checked)
 **Date Found**: 2026-09-30
 
@@ -54,3 +54,4 @@ State the three shapes in §5 as limits beside the absolute path, and pin the PA
 | ---- | ------ | ---------- | ----- |
 | 2026-09-30 | New | QA Engineer | QA cycle 4 |
 | 2026-09-30 | Ready for QA | qa-fix | Fixed in cycle 4 5b |
+| 2026-09-30 | Closed | QA Engineer | Verified cycle 5 |
