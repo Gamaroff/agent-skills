@@ -5,7 +5,9 @@ type: task
 description: "docs/reference/commands.md and docs/reference/activation-phrases.md restate what 64 skills do, and nothing connects a skill's directory to the rows that cite it — qa-next's rows went stale within a day of the rework that invalidated them. Add tests/reference-doc-skill-pinning.test.js: every command a row names resolves to a skill, every --flag a row advertises is one that skill's SKILL.md documents, and every skill named in the activation table exists — each with a non-vacuity floor so a broken extractor cannot pass by finding nothing."
 tags: [documentation, guard, reference-docs, drift, observation-159]
 category: testing
-status: ready-for-review
+status: accepted
+completed_date: 2026-09-30
+pr_number: 534
 priority: Medium
 created: 2026-09-22
 updated: 2026-09-30
@@ -17,7 +19,7 @@ github_issue: 467
 
 # Technical Task: Pin the hand-written reference docs to the skills they describe
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.142.review.1.reference-doc-skill-pinning.md` implemented 2026-09-30
 
@@ -495,12 +497,36 @@ additions.
 
 Three QA cycles. Cycle 2 (refute pass, after the re-scope) found the cost tests spied on code the live assertions did not run; fixed and mutation-proven in cycle 3. Advisory follow-ups: substring flag match, unchecked activation flags, empty-vs-missing `SKILL.md` message, corpus resolved twice.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.142.qa.3.reference-doc-skill-pinning.md`
+**Gate File**: `task.142.gate.3.reference-doc-skill-pinning.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 15/15 — each traced to code plus a per-PR test or a read document line
+✅ **Tests:** 17 in `tests/reference-doc-skill-pinning.test.js`, in the `npm test` glob; CI green on PR #534
+✅ **PR Review:** 5c `/review-pr` APPROVE (conformance: 0 findings)
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry; `commands.md:143` fixed
+✅ **Security Review:** PASS — test-only, no spawn/network, boundary: false
+✅ **Compliance Review:** NOT_APPLICABLE
+
+**Task marked as ACCEPTED on:** 2026-09-30
+
+**Detailed Verification Log:** See `task.142.dod.2.reference-doc-skill-pinning.md` for complete verification evidence. Run 1 (`task.142.dod.1`) is superseded.
+
 ## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
 > Superseded 2026-09-30 by the re-scope below: AC7 and AC8 are now pinned by tests; AC9 and AC16
 > moved to Deferred Work because neither can pass before merge. `/finalise` run 2 verifies afresh.
 
-**Status:** IN PROGRESS (document status unchanged: `ready-for-review`)
+**Status at run 1:** IN PROGRESS (document status then `ready-for-review`)
 
 ### QA Gate Status
 
@@ -604,13 +630,11 @@ its file and line, not just the first.
   cost properties that are testable (no spawn/network, memoised reads) are pinned instead.
 - Generating `commands.md` from skill frontmatter, and pinning the skills' `README.md`s — § Notes,
   Future Improvements; out of scope here.
-
 <!-- change-log-start -->
-
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-22 | 1.0     | Initial draft | create-task |
 | 2026-09-30 | 1.1     | Review 9/10 after fixes — resolver rule corrected (word-start `/name`, unescaped-pipe split), CommonJS, existing guards named, one real finding (`/session-handoff --read`) recorded for Phase 3, counts re-measured | review-task |
 | 2026-09-30 |         | Status → ready-for-development | review-task |
@@ -621,7 +645,7 @@ its file and line, not just the first.
 | 2026-09-30 |         | QA gate CONCERNS (90/100) — 1 finding (cost tests spied on code the assertions did not run) | qa-task |
 | 2026-09-30 |         | QA findings fixed — gate PASS (100/100), 1 iteration | qa-fix |
 | 2026-09-30 |         | QA gate PASS (100/100) — 0 blocking, 3 low advisory findings | qa-task |
-
+| 2026-09-30 | 1.3 | DoD passed — accepted (PR #534) | finalise |
 <!-- change-log-end -->
 
 ---
