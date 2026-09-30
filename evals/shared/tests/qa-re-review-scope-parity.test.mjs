@@ -182,9 +182,11 @@ for (const [name, text] of skillText) {
  * ------------------------------------------------------------------------- */
 
 // The guard, verbatim. `SAFETY_REPROBE` must appear ON the existing
-// `PRIOR_GATES` condition — not as a separate `if` ahead of it.
+// `PRIOR_GATES` condition — not as a separate `if` ahead of it. Since task.135 the guard no longer
+// requires a prior-gate date: the scope comes from the gate's `head:`, and a gate without one runs
+// unscoped INSIDE this branch, so the executed proof lives in qa-scope-from-head.test.mjs.
 const GUARD =
-  'if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ] && [ "$SAFETY_REPROBE" != "true" ]; then';
+  'if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then';
 
 for (const [name, text] of skillText) {
   test(`${name} extends the existing PRIOR_GATES guard with SAFETY_REPROBE`, () => {
@@ -237,7 +239,7 @@ for (const [name, text] of skillText) {
     assert.ok(
       text.includes(
         "Re-review scope: unscoped (prior gate failed on security)",
-      ) && text.includes("Re-review scope: since"),
+      ) && text.includes("Re-review scope: files changed since gate"),
       `${name} must record both scope outcomes in the QA report's Review Methodology`,
     );
   });

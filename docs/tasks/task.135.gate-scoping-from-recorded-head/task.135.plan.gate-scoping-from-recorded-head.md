@@ -17,7 +17,7 @@ Replace one typed input (`updated:`) with one recorded fact (`head:`) at the gat
 
 ### Phase 1: `head:` on the gate
 
-**Files to modify:** `skills/qa-task/SKILL.md` (gate YAML template, the `updated: '{ISO-8601 timestamp}'` line, and the "Write gate YAML" step); `skills/qa-story/SKILL.md` (same); every `schema: 1` reader.
+**Files to modify:** `skills/qa-task/SKILL.md` (gate YAML template, the `updated: '{ISO-8601 timestamp}'` line, and the "Write gate YAML" step); `skills/qa-story/SKILL.md` (same); `skills/qa-gate/SKILL.md` (same template — review 1, Q1); every `schema: 1` reader.
 
 **Exact changes:** template header becomes
 ```yaml
@@ -40,7 +40,7 @@ Readers: `grep -rn "schema: 1\|schema === 1\|schema == 1" shared/resources evals
 
 ### Phase 2: Scope and trigger from the head
 
-**Files to modify:** `shared/resources/qa-re-review-scope.md` (§ the fenced snippet under "Default scoping" and the table row `| 3+ | ≥2 | since LAST_GATE_DATE | false |`); both skills' Step 3b step 1 fence; `qa-task` Phase 0 step 3 (`GATE_DATE`/`DOC_DATE`/`CODE_MOVED`); `develop-pipeline-step-5-6-qa-loop.md` (grep `updated:` — one sentence in the Step 3b description).
+**Files to modify:** `shared/resources/qa-re-review-scope.md` (§ the fenced snippet under "Default scoping" and the table row `| 3+ | ≥2 | since LAST_GATE_DATE | false |`); both skills' Step 3b step 1 fence; `qa-task` Phase 0 step 3 (`GATE_DATE`/`DOC_DATE`/`CODE_MOVED` — `qa-story` has no such block); both skills' Step 3b lead-in sentence and `Re-review scope: since {LAST_GATE_DATE}` recording line; `evals/shared/tests/qa-re-review-scope-parity.test.mjs` (the pinned guard literal and the `Re-review scope: since` assertion). Review 1: `develop-pipeline-step-5-6-qa-loop.md` carries no gate-date sentence — nothing to change there.
 
 **Exact changes** (the shared snippet; paste verbatim into both Step 3b blocks):
 ```bash
@@ -54,7 +54,9 @@ if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then            
       || { echo "HALT: gate $PRIOR_GATES names head $LAST_GATE_HEAD, which this checkout does not have — fetch, or run unscoped deliberately"; exit 1; }
     git merge-base --is-ancestor "$LAST_GATE_HEAD" HEAD \
       || { echo "HALT: gate $PRIOR_GATES's head $LAST_GATE_HEAD is not an ancestor of HEAD — the branch was rewritten; re-record the gate's head or run unscoped deliberately"; exit 1; }
-    mapfile -t FILES < <(git diff --name-only "$LAST_GATE_HEAD"..HEAD)   # zsh: FILES=("${(@f)$(git diff --name-only "$LAST_GATE_HEAD"..HEAD)}")
+    FILES=()
+    while IFS= read -r f; do [ -n "$f" ] && FILES+=("$f"); done \
+      < <(git diff --name-only "$LAST_GATE_HEAD"..HEAD)
     if [ "${#FILES[@]}" -eq 0 ]; then
       echo "HALT: nothing changed since gate $PRIOR_GATES's head ${LAST_GATE_HEAD:0:12} — there is no fix to review; check the cycle order"; exit 1
     fi
@@ -66,7 +68,7 @@ else
   …unchanged whole-branch / refute / re-probe arm…
 fi
 ```
-Note the new HALT on an **empty** file list: with `--since`, "nothing since the stamp" was indistinguishable from "stamp in the future"; with a head it means no commit landed after the gate, which on cycle 3+ is a sequencing error worth stopping on. The existing "N files but empty diff" guard stays — it catches a pathspec that expanded to nothing. Both shells: `mapfile` is bash-only; the zsh spelling is in the comment and the executed test runs both.
+Note the new HALT on an **empty** file list: with `--since`, "nothing since the stamp" was indistinguishable from "stamp in the future"; with a head it means no commit landed after the gate, which on cycle 3+ is a sequencing error worth stopping on. The existing "N files but empty diff" guard stays — it catches a pathspec that expanded to nothing. Both shells: the `while read` array loop is the form both skills already carry (obs #76, #110) and splits identically under bash and zsh — review 1 replaced an earlier `mapfile` draft, which is bash-only; the executed test runs both.
 
 Phase 0 trigger (`qa-task` step 3): replace the three-variable block with
 ```bash
@@ -81,7 +83,7 @@ fi
 ```
 and the skip conditions read `CODE_MOVED -eq 0 && DOC_MOVED -eq 0 && …`. The `|| echo 1` fails toward re-review when git cannot answer.
 
-Table row: `| 3+ | ≥2 | since gate N's head: (git diff <head>..HEAD) | false |`. The `develop-pipeline-step-5-6-qa-loop.md` sentence *"files changed since the last gate's `updated:` date"* → *"files changed since the last gate's `head:`"*.
+Table row: `| 3+ | ≥2 | since gate N's head: (git diff <head>..HEAD) | false |`. The Step 3b lead-in sentence in both skills, *"files changed since the last gate's `updated:` date"* → *"files changed since the last gate's `head:`"*.
 
 Executed test (add to `shared/resources/tests/` as `qa-scope-from-head.test.mjs`, following `probe-base-binding.test.mjs`'s extract-by-anchor pattern): scratch repo with base, two fix commits, a gate file whose `head:` is the first fix and whose `updated:` is `date -u -v+3H` (macOS) / `+3 hours`; run the snippet under bash and `zsh -f` → `FILES` is exactly the second commit's files; then flip the gate to schema 1 (no head) → the `unscoped` line prints and the diff is the whole branch. Mutation: snippet reverted to `--since=$LAST_GATE_DATE` → the future-dated case yields an empty list → red.
 
@@ -104,7 +106,7 @@ checked++;
 ```
 Mutation fixtures live under `tests/fixtures/gate-head/` and are read by a second test in the same file (a future-dated `updated:` → red; missing `head:` → red), so the corpus test's assertions are proven live without touching a real gate.
 
-5c § D row: *"`updated:` earlier than the author time of the commit `head:` names (`git log -1 --format=%aI <head>`) — the gate claims to predate the tree it judged (task.130 5c PC-2)"*; drop the mtime comparison.
+5c: add a gate row to the trail section — *"a gate's `updated:` earlier than the author time of the commit its `head:` names (`git log -1 --format=%aI <head>`) — the gate claims to predate the tree it judged (task.130 re-check PC-2)"*. § D's existing `updated:` row is about the work document and stays (review 1, Q3).
 
 CHANGELOG [Unreleased] › Changed, with a **Breaking:** marker for `schema: 2`.
 

@@ -211,7 +211,7 @@ the other behaviour-driving keys the QA skills already read (`status`, `github_i
 **QA (`/qa-story`, `/qa-task`) — bounded across the up-to-5-cycle QA loop:**
 - First review: `git diff <base>...HEAD > <DIFF_FILE>` (base = the resolved target branch, default `develop`).
 - Re-review (QA cycle ≥ 3): scope to files changed since the last gate — reuse the skill's existing
-  `git log --since="{gate_date}" --name-only` set, diff only those paths, so each cycle re-reviews
+  `git diff --name-only "{gate_head}"..HEAD` set (the commit the last gate judged, from its `head:`), diff only those paths, so each cycle re-reviews
   only what changed. **One carve-out overrides this**: when the prior gate failed on a safety axis,
   the re-review runs unscoped at *any* cycle and the prompt gains a SAFETY RE-PROBE directive. The
   trigger and its non-triggers are stated once in

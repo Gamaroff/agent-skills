@@ -73,6 +73,34 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **A QA gate records the commit it judged, and the next cycle scopes from that commit (task 135, obs #136).**
+  - **Breaking: gates are `schema: 2`.** `qa-task`, `qa-story` and `qa-gate` write `head:` (from
+    `git rev-parse HEAD` at review time) and `updated:` (from `date -u`, never typed). Schema-1
+    gates stay valid and are not backfilled; they read as "no head". A consumer whose own tooling
+    accepts only `schema: 1` adds `2`.
+  - Cycle 3+ of the QA loop scopes to `git diff --name-only <head>..HEAD`, not
+    `git log --since=<updated:>`. A gate with no head runs the cycle unscoped and says so; a head
+    this checkout lacks, or one off the branch, is a HALT naming the cause. The block is stated once
+    in `qa-re-review-scope.md` and is byte-identical in both skills' Step 3b.
+  - `qa-task` Phase 0's re-review trigger counts source commits since the head
+    (`git rev-list --count`) and measures document edits from the commit that wrote the gate. A
+    gate with no head always re-reviews.
+  - The 5c conformance lens gains two trail rows: a gate whose `updated:` precedes its head's
+    author time, and a gate whose `head:` does not resolve or is not an ancestor of the PR head.
+    § D's `updated:` row, which is about the work document, is unchanged.
+  - The trigger counts every change outside the task's own directory — committed, uncommitted or
+    untracked — and the scope block refuses cycle 3+ when `SAFETY_REPROBE` is not bound in its
+    shell, so a security FAIL can never narrow the next cycle. Both blocks bind the latest gate
+    themselves: every fenced block is its own shell.
+  - `gate-head-freshness.test.mjs` holds only rules a branch rewrite cannot break — format, and
+    author time when the head resolves. `develop-batch` rebases open PRs and `mergeStrategy` allows
+    squash, so existence and ancestry are checked in the loop and at 5c instead.
+  - Why: on task.130 four gates carried local time labelled `Z`, up to three hours in the future,
+    so cycle 4's `--since` matched nothing, and gate 7 predated the commit it reviewed. New tests:
+    `qa-scope-from-head.test.mjs` (the scope and trigger blocks executed under bash and zsh) and
+    `gate-head-freshness.test.mjs` (every schema-2 gate in `docs/`). `qa-fix`'s gate template is
+    schema 2 too.
+
 - **`change-log.js#fencedRanges` detects fences in CRLF documents (task 131).** `(.*)$` could not
   match the `\r` a CRLF line keeps after `split("\n")`, so no fence was ever found: `report-lint`
   refused a clean CRLF report that quoted one in a fence and accepted a CRLF report whose required
