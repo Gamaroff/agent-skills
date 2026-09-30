@@ -212,10 +212,12 @@ takes it.
 - **There is no OS-level sandbox.** The module under probe runs with full Node
   privileges — exactly as `qa-runnable-prose-detection.md` §3aa already says of
   the snippet path. The containment contains *the harness*, not the repository.
-- **A path that does not exist yet cannot be realpath'd.** It keeps its lexical
-  form through the containment check and is then refused by the readable-file
-  check before any spawn; the residual is a symlink that appears between those
-  two checks, a race nothing here defends against.
+- **A path that does not exist yet is contained by its deepest existing
+  ancestor**, realpath'd, with the missing segments re-joined — so a missing leaf
+  under a symlinked intermediate is refused where the link really points, and a
+  missing file under a symlinked root stays inside it. The residual is a symlink
+  that appears between the containment check and the readable-file check, a race
+  nothing here defends against.
 - **The engine reaches four entry forms, and "not importable" is not a decline.**
   `path#export` imports a JS module; `shell:path` runs a **shell script that
   takes one positional argument** — `bash <script> <fixture-dir>` per case, under
@@ -267,7 +269,15 @@ takes it.
     the start of a line or after `;`, `&&`, `||`, `then` or `do`, its path tried
     against the library's directory, then the root, one level deep, and is not followed when
     it holds a `$` or lies outside the root. A mention in a comment matches too;
-    that is a decline the caller answers by passing the fixture. Otherwise: run bare, the real `gh` fails from the
+    that is a decline the caller answers by passing the fixture. **That text
+    check is only the fast path; the guarantee is at run time.** With no
+    `--fake-gh`, a **trip-wire `gh`** is first on `PATH`: it records the call and
+    exits 127, so the host `gh` never runs, and a run that reached it is declined
+    `needs-fake-gh` with nothing scored — whatever the spelling (`${GH_BIN:-gh}`,
+    `GH_CLI=gh; "$GH_CLI"`, a wrapper however it sources `gh-labels.sh`). A library
+    that mentions `gh` but never calls it is scored. **The one limit:** an
+    **absolute path** to a real `gh` bypasses `PATH` and runs; a row pins it
+    (task.140 QA cycle 2). Otherwise: run bare, the real `gh` fails from the
     sandbox cwd, the function takes its read-failed passthrough, and the verdict
     would land on `absent` / `present-but-inert` — the values a missing control
     produces — with nothing but `fake_gh: null` to say "could not look". The
@@ -279,12 +289,16 @@ takes it.
   `source` an EXIT trap is armed **and `exit` is shadowed by a function** that
   calls `builtin exit 97`, so a **top-level `exit` inside the library** (a
   `|| exit 1` guard, say) is the same named decline even when the library has
-  installed its own `trap … EXIT` first. `trap` is shadowed for the same span —
-  errexit ends the shell without calling `exit`, so the EXIT trap alone decides
-  the status there — and drops any installation naming `EXIT` / `0` / `SIGEXIT`
-  while passing every other trap to the builtin. Both functions are unset before
-  the function under probe runs; a library that defines its own `exit` or `trap`
-  loses it (none here does). The source's status is taken as a **simple command**, not on
+  installed its own `trap … EXIT` first. **The decision, though, is a positive
+  marker, not an exit code**: once the source has returned 0 the body writes a
+  per-spawn marker under the work dir, and the runner declines whenever it is
+  absent — so every way the shell can die during the source reads the same: an
+  explicit exit, errexit, a replaced EXIT trap however it was installed (`trap …
+  exit`, `builtin trap`, `command trap`, zsh's `TRAPEXIT`), `exec`. Filtering how a
+  library installs a trap is an enumeration over shell syntax with no last entry
+  (task.140 QA cycle 2). `exit` is unset before the function under probe runs,
+  and a `TRAPEXIT` the library defined is unset too; a library that defines its
+  own `exit` loses it (none here does). The source's status is taken as a **simple command**, not on
   the left of `||` — where both shells suspend errexit for everything the
   library runs at top level — so a `set -e` library whose top-level command
   fails is declined, as a consumer's own `source` would have aborted, rather

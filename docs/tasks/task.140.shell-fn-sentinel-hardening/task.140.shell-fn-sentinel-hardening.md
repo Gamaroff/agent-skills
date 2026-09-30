@@ -321,24 +321,24 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 80/100
+**Quality Score**: 70/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.140.qa.1.shell-fn-sentinel-hardening.md](./task.140.qa.1.shell-fn-sentinel-hardening.md)
-- **Gate File**: [task.140.gate.1.shell-fn-sentinel-hardening.yml](./task.140.gate.1.shell-fn-sentinel-hardening.yml)
+- **Full Report**: [task.140.qa.2.shell-fn-sentinel-hardening.md](./task.140.qa.2.shell-fn-sentinel-hardening.md)
+- **Gate File**: [task.140.gate.2.shell-fn-sentinel-hardening.yml](./task.140.gate.2.shell-fn-sentinel-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 121 (+19 consumer)
+- **Tests Executed**: 108 (+30 under `TMPDIR=/tmp`)
 - **Phases Verified**: 4/4 (1 with issues)
-- **Critical Issues**: 0 HIGH, 2 MEDIUM, 1 LOW
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 3 MEDIUM, 2 LOW (advisory)
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-- CR-1 / [TASK-140-BUG-1](./task.140.bug.1.library-trap-plus-errexit-scored.md): a library that installs its own EXIT trap and then fails under `set -e` is scored — a regression (97 → 1) for one ordering on bash 5 / zsh.
-- CR-2 / [TASK-140-BUG-2](./task.140.bug.2.fake-gh-containment-still-lexical.md): `--fake-gh` containment is still lexical.
-- CR-3 (low): quoted/backslashed `gh` and a non-line-initial `source` are not detected.
-- Fix cycle 1: all three fixed — bugs 1 and 2 **Ready for QA**; re-review pending.
+- Cycle 1's three findings are fixed and closed ([BUG-1](./task.140.bug.1.library-trap-plus-errexit-scored.md), [BUG-2](./task.140.bug.2.fake-gh-containment-still-lexical.md)).
+- [TASK-140-BUG-3](./task.140.bug.3.trap-shadow-bypassed.md): four trap-install shapes bypass the trap shadow — replace it with a positive source-completed marker.
+- [TASK-140-BUG-4](./task.140.bug.4.gh-detector-open-ended.md): six gh spellings / source forms bypass the static detector — add a run-time trip-wire `gh`.
+- Fix cycle 2: both mechanisms replaced — BUG-3 and BUG-4 **Ready for QA**; re-review pending.
 
 <!-- change-log-start -->
 ## Change Log
@@ -351,7 +351,8 @@ None.
 | 2026-09-30 |  | Status → ready-for-development | review-task |
 | 2026-09-30 |  | Implemented — 8 files (engine, 2 test files, 2 lint lanes, rule, CHANGELOG, bundled copies), 7 new tests, 9 mutants | develop |
 | 2026-09-30 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
-| 2026-09-30 |  | QA findings fixed — CR-1 (trap shadow), CR-2 (fake-gh real paths), CR-3 (detector shapes), 1 fix cycle, 3 rows, 5 mutants | qa-fix |
+| 2026-09-30 |  | QA findings fixed — cycle 1: trap/errexit, fake-gh real paths, detector shapes; cycle 2: mechanisms replaced (source-completed marker, run-time gh trip-wire, ancestor realpath); 2 fix cycles, 7 rows, 10 mutants | qa-fix |
+| 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (3 medium) + 2 advisory | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

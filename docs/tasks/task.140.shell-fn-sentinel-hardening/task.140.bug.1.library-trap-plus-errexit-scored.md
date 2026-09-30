@@ -4,7 +4,7 @@
 **Bug ID**: TASK-140-BUG-1
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✔️ Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-1)
 **Date Found**: 2026-09-30
 
@@ -67,3 +67,4 @@ For the duration of the source, also shadow `trap` so a library cannot displace 
 | --- | --- | --- | --- |
 | 2026-09-30 | New | QA (cycle 1) | Filed from code review CR-1 |
 | 2026-09-30 | Ready for QA | qa-fix (cycle 1) | Fix + row; mutation-proved |
+| 2026-09-30 | Closed | QA (cycle 2) | Verified: the fix row is green on bash + zsh and its mutant reds it; see qa.2 Re-Review Context |

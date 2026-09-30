@@ -178,7 +178,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { isWithin, sandboxEnv, snapshotTree } from "./qa-execute-snippets.mjs";
@@ -560,14 +568,37 @@ const GH_VARIABLE = /\$\{?GH(?![A-Za-z0-9_])/;
  */
 const SOURCE_LINE =
   /(?:^|[;&|]|\b(?:then|do)\b)[ \t]*(?:source|\.)[ \t]+["']?([^"'\s;|&)]+)["']?/gm;
-/** `realpathSync` when the path exists, else the path unchanged. */
+/**
+ * The real path of `p`, or — when `p` does not exist — the real path of its
+ * deepest existing ancestor with the missing segments re-joined. So a missing
+ * leaf under a symlinked intermediate is contained by where the link really
+ * points, and a missing file under a symlinked root is still inside it
+ * (task.140 QA cycle 2, CR-5).
+ */
 function realpathSafe(p) {
-  try {
-    return realpathSync(p);
-  } catch {
-    return p;
+  const missing = [];
+  let cur = p;
+  for (;;) {
+    try {
+      return join(realpathSync(cur), ...missing);
+    } catch {
+      const parent = dirname(cur);
+      if (parent === cur) return p;
+      missing.unshift(basename(cur));
+      cur = parent;
+    }
   }
 }
+/** The trip-wire's marker file, under the harness dir. */
+const GH_TRIPPED = "gh-tripped";
+/**
+ * The trip-wire gh: first on PATH when a shell-form run has no --fake-gh. It
+ * never answers — it records the call and exits 127 ("command not found").
+ */
+const TRIPWIRE_GH =
+  '#!/bin/sh\n: > "$PROBE_GH_TRIPPED" 2>/dev/null\necho "security-probe: gh invoked without --fake-gh (trip-wire)" >&2\nexit 127\n';
+/** Per-process counter naming each spawn's source-completed marker. */
+let harnessSeq = 0;
 /**
  * Does this library or script — or a file it sources at top level — name `gh`?
  * ONE level, deliberately: the indirection this repository uses is a library
@@ -661,16 +692,21 @@ const SHELL_FN_BODY =
   // errexit ends the source, the trap maps it to 97, and the explicit test
   // keeps the non-zero-last-command case. Verified bash 5.3 / 3.2, zsh 5.9.
   //
-  // `trap` is shadowed too, because errexit ends the shell WITHOUT calling the
-  // `exit` function: the EXIT trap alone decides the status there, so a library
-  // that installed its own (`trap true EXIT; set -e; false`) was scored again.
-  // The shadow drops any installation naming EXIT / 0 / SIGEXIT and passes every
-  // other trap to the builtin; it is unset before the harness's own
-  // `trap - EXIT`, which it would otherwise swallow (task.140 QA cycle 1, CR-1).
-  `exit() { builtin exit ${SHELL_FN_SOURCE_FAILED}; }; ` +
-  `trap() { for __s in "$@"; do case "$__s" in EXIT|0|SIGEXIT) return 0;; esac; done; builtin trap "$@"; }; ` +
-  `builtin trap 'exit ${SHELL_FN_SOURCE_FAILED}' EXIT; ` +
-  `source "$1"; src=$?; unset -f trap; trap - EXIT; unset -f exit; [ "$src" -eq 0 ] || exit ${SHELL_FN_SOURCE_FAILED}; ` +
+  // The DECISION, though, is a positive marker, not an exit code: once the
+  // source has returned 0 the body writes `$PROBE_SOURCED` (a file under the
+  // work dir, named per spawn by runShellCase), and the runner declines
+  // whenever it is absent. Every way the shell can die during the source then
+  // reads the same — an explicit exit, errexit, a replaced EXIT trap however it
+  // was installed (`trap … exit`, `builtin trap`, `command trap`, zsh's
+  // TRAPEXIT), `exec`. Filtering trap installations was an enumeration over
+  // shell syntax with no last entry (task.140 QA cycle 2, CR-1 / BUG-3); the
+  // shadowed `exit` and the EXIT trap stay only so the common case still names
+  // exit 97. A TRAPEXIT the library defined is unset so it cannot run at the
+  // harness's own exit — `|| :`, because zsh's `unset -f` of an undefined
+  // function returns 1, and under a library's `set -e` that ended the harness.
+  `exit() { builtin exit ${SHELL_FN_SOURCE_FAILED}; }; trap 'exit ${SHELL_FN_SOURCE_FAILED}' EXIT; ` +
+  `source "$1"; src=$?; trap - EXIT; unset -f exit; unset -f TRAPEXIT 2>/dev/null || :; ` +
+  `[ "$src" -eq 0 ] || exit ${SHELL_FN_SOURCE_FAILED}; : > "$PROBE_SOURCED" || exit ${SHELL_FN_SOURCE_FAILED}; ` +
   `shift; fn="$1"; shift; ` +
   `typeset -f "$fn" >/dev/null 2>&1 || exit ${SHELL_FN_NOT_DEFINED}; ` +
   // The function runs in a SUBSHELL: a function that calls `exit` would
@@ -1083,6 +1119,18 @@ export function runProbeSpec({
   const sandboxTmp = join(sandboxRoot, "tmp");
   mkdirSync(sandboxHome);
   mkdirSync(sandboxTmp);
+  // The harness's own files — source-completed markers and the trip-wire gh —
+  // live under the WORK dir, which the escape sentinel deliberately skips.
+  const harnessDir = join(workDir, ".probe-harness");
+  if (isShellForm) {
+    mkdirSync(join(harnessDir, "bin"), { recursive: true });
+    if (fakeGhDir === null) {
+      writeFileSync(join(harnessDir, "bin", "gh"), TRIPWIRE_GH, {
+        mode: 0o755,
+      });
+    }
+  }
+  let ghTripped = false;
 
   const caseResults = [];
   const escapes = [];
@@ -1111,6 +1159,7 @@ export function runProbeSpec({
           entryPath: resolved.entryPath,
           fnName: resolved.fnName ?? null,
           fakeGhDir,
+          harnessDir,
           shells,
           sandboxRoot,
           sandboxHome,
@@ -1187,8 +1236,23 @@ export function runProbeSpec({
         detail: detail ?? null,
       });
     }
+    ghTripped = isShellForm && existsSync(join(harnessDir, GH_TRIPPED));
   } finally {
     rmSync(sandboxRoot, { recursive: true, force: true });
+  }
+
+  // The run reached `gh` with no fixture: the trip-wire answered instead of the
+  // host binary, and whatever the cases then did was shaped by a stub, so
+  // nothing is scored. This is the GUARANTEE the pre-spawn detector above only
+  // approximates — it sees every PATH-resolved spelling (`${GH_BIN:-gh}`, an
+  // assign-then-call variable, a wrapper however it sources gh-labels.sh). An
+  // absolute path to a real gh bypasses PATH and is a stated limit
+  // (probe-boundary-rule.md §5).
+  if (ghTripped) {
+    return decline(
+      "needs-fake-gh",
+      `${resolved.entryPath} invoked \`gh\` at run time with no --fake-gh — the trip-wire on PATH answered, so nothing was scored; pass --fake-gh <dir>`,
+    );
   }
 
   // An import or export failure is a property of the ENTRY, not of one case, so
@@ -1459,6 +1523,7 @@ function runShellCase(
     entryPath,
     fnName = null,
     fakeGhDir = null,
+    harnessDir,
     shells,
     sandboxRoot,
     sandboxHome,
@@ -1582,7 +1647,18 @@ function runShellCase(
       // FAKE_GH=1, so a stray invocation from any other context exits 2.
       env.PATH = `${fakeGhDir}:${env.PATH}`;
       env.FAKE_GH = "1";
+    } else {
+      // No fixture: the TRIP-WIRE gh is first on PATH instead. It records that it
+      // was called and exits 127, so the host gh never runs, and runProbeSpec
+      // declines the whole run `needs-fake-gh` (task.140 QA cycle 2, BUG-4).
+      env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
+      env.PROBE_GH_TRIPPED = join(harnessDir, GH_TRIPPED);
     }
+    // The source-completed marker, one per spawn, under the WORK dir — the
+    // sentinel skips it, so the marker is never read as an escape.
+    const sourcedMark =
+      fnName === null ? null : join(harnessDir, `sourced-${++harnessSeq}`);
+    if (sourcedMark !== null) env.PROBE_SOURCED = sourcedMark;
     const child = watchedSpawn(
       shell,
       argv,
@@ -1597,12 +1673,17 @@ function runShellCase(
       },
     );
 
+    const sourced = sourcedMark !== null && existsSync(sourcedMark);
+    if (sourcedMark !== null) rmSync(sourcedMark, { force: true });
     let outcome;
     let detail = null;
     if (neverRan(child)) {
       outcome = "errored";
       detail = child.signal ? `timed out after ${timeoutMs}ms` : "never ran";
-    } else if (fnName !== null && child.status === SHELL_FN_SOURCE_FAILED) {
+    } else if (
+      fnName !== null &&
+      (child.status === SHELL_FN_SOURCE_FAILED || !sourced)
+    ) {
       // The source itself failed — a syntax error, a `return` at top level,
       // an `exit` in the library (re-mapped by the EXIT trap around the
       // source — BUG-2). A property of the ENTRY, so every case
@@ -1610,7 +1691,7 @@ function runShellCase(
       // Without the reserved exit this read as N mismatches and scored
       // `absent` with a full count (task.136).
       outcome = "errored";
-      detail = `source "${entryPath}" failed (exit ${SHELL_FN_SOURCE_FAILED}): ${(child.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`;
+      detail = `source "${entryPath}" failed (exit ${child.status}): ${(child.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`;
     } else if (fnName !== null && child.status === SHELL_FN_NOT_DEFINED) {
       outcome = "errored";
       detail = `function "${fnName}" is not defined after sourcing "${entryPath}" (exit ${SHELL_FN_NOT_DEFINED})`;

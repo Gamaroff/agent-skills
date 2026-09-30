@@ -4,7 +4,7 @@
 **Bug ID**: TASK-140-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✔️ Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-2)
 **Date Found**: 2026-09-30
 
@@ -56,3 +56,4 @@ Both sides of the fake-gh check now go through `realpathSafe`. `namesGh` also re
 | --- | --- | --- | --- |
 | 2026-09-30 | New | QA (cycle 1) | Filed from code review CR-2 |
 | 2026-09-30 | Ready for QA | qa-fix (cycle 1) | Fix + row; mutation-proved |
+| 2026-09-30 | Closed | QA (cycle 2) | Verified: the fix row is green on bash + zsh and its mutant reds it; see qa.2 Re-Review Context |
