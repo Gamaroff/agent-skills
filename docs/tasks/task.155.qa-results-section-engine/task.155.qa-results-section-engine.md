@@ -443,12 +443,12 @@ None.
 
 ## Deferred Work
 
-Carried from QA gate 3 (`task.155.gate.3.qa-results-section-engine.yml`, route 2b cosmetic-residue exit) to `recommendations.future`, closed in `top_issues[]`:
+Carried from QA gates 3 and 4 (route 2b cosmetic-residue exits) to each gate's `recommendations.future` and closed in `top_issues[]`, plus the PR-review items deferred at 5c. One follow-up task should take REL-007…011 and PC-1 together — they are all in the same span-bounding code:
 
 - **REL-007** (LOW) — a misplaced section that itself quotes a Date-headed table can be cut at its own table (inside a marker block after the log rows, or under a table-less marker-less log). 0 of 155 tracked sections quote such a table.
-- **REL-008** (LOW) — a misplaced section before a log holding two Date-headed tables loses the first table's rows; a log header that is not Date-first is not recognised. 0 corpus logs have either shape.
-- CRLF seam preservation and two small cleanups (gate 3 `recommendations.future`).
-- **PC-1** (LOW, PR review 1) — the Change Log write that follows Step 12 collapses the blank line before `<!-- change-log-start -->`. That seam belongs to `change-log.js`'s `upsertChangeLog`, not this engine.
+- **REL-008** (LOW) — **can delete Change Log rows**, but only under a section that is already misplaced inside a log: before a log holding two Date-headed tables the first table's rows are lost, and under a log whose header is not Date-first (`| Date (UTC) |`, `| Change | Date |`, none) the rows are lost too. 0 corpus logs have either shape, and 0 misplaced sections remain after the task.65 repair.
+- CRLF seam preservation and small cleanups (gate 3 and gate 4 `recommendations.future`, including gate 4's CR-3).
+- **PC-1** (LOW, PR review 1) — the Change Log write that follows Step 12 collapses the blank line before `<!-- change-log-start -->`, so § 3's "one blank line on each side" holds after the engine's write but not after the Change Log write that follows it. That seam belongs to `change-log.js`'s `upsertChangeLog`, not this engine; the follow-up task above should decide whether `upsertChangeLog` preserves it.
 - **REL-009** (LOW, gate 4) — the CR-2 trailing-break strip leaves the blank line before the break, so a replace can add one blank line; the following Change Log write absorbs it. Whitespace only.
-- **REL-010** (LOW, gate 4, regression from `182367ee`) — in a marker-less document, a section that carries its own `### Change Log` subheading is taken for the log, so each replace keeps the old tail. Duplicates, never deletes; 0 corpus sections carry that subheading and neither Step 12 template renders one.
-- **REL-011** (LOW, gate 4) — an unclosed fence running to the end of a document makes `created` append the section inside the fence, invisible to the next read. 0 story/task/epic documents have this shape.
+- **REL-010** (LOW, gate 4, regression from `182367ee`) — in a marker-less document, a section that carries its own `### Change Log` subheading is taken for the log, so each replace keeps the old tail — the document grows without `multiple` ever firing, which is the guarantee this task exists for. Duplicates, never deletes; 0 corpus sections carry that subheading and neither Step 12 template renders one.
+- **REL-011** (LOW, gate 4) — an unclosed fence running to the end of a document made `created` append the section inside the fence, invisible to the next read, so copies stacked without `multiple`. **Fixed at PR review 2**: a write that does not read back as one section is now refused (`unplaceable`).

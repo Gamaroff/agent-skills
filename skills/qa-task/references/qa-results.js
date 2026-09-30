@@ -22,6 +22,15 @@
 //   created    none                                       → inserted at the canonical position
 //   multiple   more than one                              → NOTHING written
 //   bad-section the new section is not one section        → NOTHING written
+//   unbounded  the existing section opens a fence that never closes → NOTHING written
+//   unplaceable the write would not read back as exactly one section → NOTHING written
+//
+// The last two exist because an unclosed fence protects everything after it: every
+// later heading and marker becomes "example text", the span runs to EOF, and a
+// replace deleted the Change Log and every later section while reporting
+// `replaced` (task.155 PR review 2, CR-1). A write is therefore checked twice —
+// the section it would replace must be bounded, and the result must read back as
+// one section — and refused rather than committed when either fails.
 //
 // `multiple` REFUSES rather than guesses. Which copy is current is a judgement
 // the engine cannot make (task.65's rule — keep the copy linking the highest gate —
@@ -51,6 +60,7 @@ const {
   CL_START,
   CL_END,
   LEGACY_MARKER_PAIRS,
+  fencedRanges,
   protectedRanges,
   insideProtected,
   bodyStart,
@@ -148,6 +158,17 @@ function lastTableStart(content, from, to, ranges) {
   return found;
 }
 
+// Does a fence that opens in [from, to) never close? A sentinel appended past the
+// end sits inside a fenced range only when that range is unclosed (fencedRanges
+// runs an unclosed fence to EOF); a closed fence at EOF ends before it.
+function unclosedFence(content, from, to) {
+  const probe = `${content}\n\n\u0000`;
+  const sentinel = probe.length - 1;
+  return fencedRanges(probe).some(
+    ([s, e]) => s >= from && s < to && sentinel >= s && sentinel < e,
+  );
+}
+
 // The first unprotected match of `re` (non-global) at or after `from`.
 function firstUnprotected(content, re, from, ranges) {
   const g = new RegExp(re.source, "gm");
@@ -231,6 +252,7 @@ function findQaResults(content) {
       start,
       end: trimSeparator(content, start, rawEnd),
       insideChangeLog,
+      unbounded: unclosedFence(content, start, rawEnd),
       heading: m[0].replace(/\r$/, ""),
     });
   }
@@ -283,6 +305,8 @@ function normaliseSection(section) {
       "",
     );
   if (!body.startsWith(HEADING)) return null;
+  // An unbalanced fence would make the section unbounded the moment it is written.
+  if (unclosedFence(body, 0, body.length)) return null;
   if (findQaResults(body).sections.length !== 1) return null;
   const firstLineEnd = body.indexOf("\n");
   if (
@@ -306,7 +330,9 @@ function normaliseSection(section) {
  * @param {string} section            the rendered section, starting `## QA Testing Results`
  * @param {object} [opts]
  * @param {string} [opts.docType]     story | task | epic — picks the fallback anchor
- * @returns {{ content: string, reason: string, count?: number }}
+ * @returns {{ content: string, reason: string, count?: number }}  reason is one of
+ *   replaced | relocated | created (written) or multiple | bad-section | unbounded |
+ *   unplaceable (content returned unchanged). Callers write only on the first three.
  */
 function upsertQaResults(content, section, { docType = "" } = {}) {
   const body = normaliseSection(section);
@@ -316,15 +342,20 @@ function upsertQaResults(content, section, { docType = "" } = {}) {
   if (sections.length > 1) {
     return { content, reason: "multiple", count: sections.length };
   }
+  if (sections.some((s) => s.unbounded))
+    return { content, reason: "unbounded" };
+  const checked = (out, reason) => {
+    const post = findQaResults(out).sections;
+    return post.length === 1 && !post[0].unbounded
+      ? { content: out, reason }
+      : { content, reason: "unplaceable" };
+  };
 
   if (sections.length === 1 && !sections[0].insideChangeLog) {
     const { start, end } = sections[0];
     const rest = content.slice(end);
     const sep = rest === "" ? "\n" : rest.startsWith("\n") ? "\n" : "\n\n";
-    return {
-      content: content.slice(0, start) + body + sep + rest,
-      reason: "replaced",
-    };
+    return checked(content.slice(0, start) + body + sep + rest, "replaced");
   }
 
   let base = content;
@@ -341,10 +372,7 @@ function upsertQaResults(content, section, { docType = "" } = {}) {
         : `${before}\n${after}`;
     reason = "relocated";
   }
-  return {
-    content: insertAt(base, canonicalOffset(base, docType), body),
-    reason,
-  };
+  return checked(insertAt(base, canonicalOffset(base, docType), body), reason);
 }
 
 module.exports = { HEADING, RE_QA, findQaResults, upsertQaResults };

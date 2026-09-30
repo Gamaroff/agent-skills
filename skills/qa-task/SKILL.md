@@ -1347,7 +1347,7 @@ command node -e '
   const [file, sectionFile, docType] = process.argv.slice(1);
   const r = QR.upsertQaResults(fs.readFileSync(file, "utf8"),
                                fs.readFileSync(sectionFile, "utf8"), { docType });
-  if (r.reason === "multiple" || r.reason === "bad-section") {
+  if (!["replaced", "relocated", "created"].includes(r.reason)) {
     console.error(`HALT qa-results: ${r.reason}${r.count ? ` (${r.count} sections)` : ""} — ${file} not written.` +
       (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." : ""));
     process.exit(1);
@@ -1361,8 +1361,9 @@ command node -e '
 The engine is `references/qa-results.js`. It places a new section immediately before the
 change-log block (else before `## Progress Tracking`, else at the end), moves one it finds
 **inside** the change-log block out of it (`relocated`), and **refuses** a document that already
-carries more than one (`multiple`) — it never guesses which copy is current. On either refusal the
-step halts; a hand edit is not a fallback. Write the section **before** the Change Log row below,
+carries more than one (`multiple`) — it never guesses which copy is current. It also refuses a
+section it cannot bound (`unbounded`: an unclosed fence) and a write that would not read back as one
+section (`unplaceable`). On any refusal the step halts; a hand edit is not a fallback. Write the section **before** the Change Log row below,
 so the change-log write sees a relocated section already outside its block. A hand-rolled
 `slice(indexOf(…), indexOf("## Change Log"))` stacked four copies on task.145 (obs #178).
 

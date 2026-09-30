@@ -129,6 +129,26 @@ for (const { skill, fileVar, docName } of SKILLS) {
     }
   });
 
+  test(`${skill} Step 12 writer halts on an unbounded section and writes nothing`, () => {
+    const [block] = extractBlock(skill);
+    const dir = consumerDir(skill);
+    try {
+      const doc = path.join(dir, docName);
+      const broken = `---\ntype: task\n---\n\n## QA Testing Results\n\n\`\`\`\nstray\n\n${LOG}<!-- change-log-end -->\n`;
+      fs.writeFileSync(doc, broken);
+      fs.writeFileSync(
+        path.join(dir, ".claude", "state", "qa-results-section.md"),
+        section(2),
+      );
+      const r = run(block, dir, fileVar, doc);
+      assert.notEqual(r.status, 0);
+      assert.match(r.stderr, /HALT qa-results: unbounded/);
+      assert.equal(fs.readFileSync(doc, "utf8"), broken);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(`${skill} Step 12 writer halts on stacked sections and writes nothing`, () => {
     const [block] = extractBlock(skill);
     const dir = consumerDir(skill);

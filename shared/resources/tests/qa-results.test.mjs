@@ -413,3 +413,46 @@ test("H2 CR-2: a trailing --- in the caller's section does not stack across repl
   assert.equal(count(out, "\n---\n"), 1); // the frontmatter close only
   assert.equal(qaCount(out), 1);
 });
+
+// ---------------------------------------------------------------------------
+// I — PR review 2 (task.155 5c): an unclosed fence must never widen a write
+// ---------------------------------------------------------------------------
+
+test("I1 CR-1: a section with an unbalanced fence is bad-section, never written", () => {
+  const doc = markerDoc();
+  const slip = `${section(1)}\n\n\`\`\`bash\nnpm test\n`;
+  const r = QR.upsertQaResults(doc, slip, { docType: "task" });
+  assert.equal(r.reason, "bad-section");
+  assert.equal(r.content, doc);
+  const nested = `${section(1)}\n\n\`\`\`\`markdown\n\`\`\`\ninner\n\`\`\`\n`; // outer never closed
+  assert.equal(
+    QR.upsertQaResults(doc, nested, { docType: "task" }).reason,
+    "bad-section",
+  );
+});
+
+test("I2 CR-1: an existing section holding an unclosed fence is unbounded — nothing after it is touched", () => {
+  const doc = `${FM}## Body\n\ntext\n\n## QA Testing Results\n\n\`\`\`\nstray\n\n${LOG}\n## Notes\n\nkeep me\n`;
+  const [s] = QR.findQaResults(doc).sections;
+  assert.equal(s.unbounded, true);
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.content, doc);
+});
+
+test("I3 REL-011: a created section that would land inside an unclosed fence is unplaceable", () => {
+  const doc = `${FM}## Body\n\n\`\`\`\nnever closed\n`;
+  const r = QR.upsertQaResults(doc, section(1), { docType: "task" });
+  assert.equal(r.reason, "unplaceable");
+  assert.equal(r.content, doc);
+});
+
+test("I4 a balanced fence in the section, at its very end, is fine", () => {
+  const ok = `${section(1)}\n\n\`\`\`bash\nnpm test\n\`\`\``;
+  let out = markerDoc();
+  for (let n = 0; n < 3; n++)
+    out = QR.upsertQaResults(out, ok, { docType: "task" }).content;
+  assert.equal(qaCount(out), 1);
+  assert.equal(count(out, "<!-- change-log-end -->"), 1);
+  assert.match(out, /\| 2026-09-25 \| 1\.0 \| Initial draft/);
+});
