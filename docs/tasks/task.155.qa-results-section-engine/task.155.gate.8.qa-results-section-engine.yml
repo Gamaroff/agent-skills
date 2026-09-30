@@ -1,0 +1,100 @@
+schema: 2
+task: 'task.155.qa-results-section-engine'
+task_title: 'QA Testing Results section: one write engine, one placement, refused when duplicated'
+gate: CONCERNS
+status_reason: 'The PR-review-3 carry works for every tracked Bug Reports list (11 of 11 kept verbatim through 4 writes) and CR-6/CR-7 changed no behaviour, but the carry takes only the first `### Bug Reports` heading, so a second list in the same section is silently dropped while the write reports `replaced` (REL-020, medium). Three low findings: stale QA fields ride along with the carried list (REL-021), a replace still deletes a create-task template comment that sits inside an old span (REL-022), and a rendered or near-miss heading drops the list with no signal (REL-023).'
+reviewer: 'QA Engineer'
+head: 'a89f20feb0891fd5e2f4d79963ae403eb65454e7'
+updated: '2026-09-30T22:08:13Z'
+
+top_issues:
+  - id: 'REL-020'
+    severity: medium
+    status: open
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code review CR-1 (bug, medium, high confidence; promoted under code_review_blocking). carriedSubsections (line 137) carries only the FIRST `### Bug Reports` in the old span, and that block ends at the next H1-H3 heading, which is the second `### Bug Reports`. So a section holding two lists loses the second on every replace, and the write reports `replaced`. Reproduced: two lists, then cycles 2-3, left bug.1 and lost bug.2. create-bug-report task-mode Step 5 checks for `## Bug Reports` (H2) but writes `### Bug Reports` (H3), so a literal reading adds a new heading on each call. 0 of the 11 tracked lists have two headings.'
+    suggested_action: 'Carry every unprotected `### Bug Reports` block in the removed span, or merge them under one heading. Add a test with two separate headings, and one with a `### Key Findings` after the list; mutation M4 (no end-at-heading stop) reds no test today.'
+    suggested_owner: dev
+  - id: 'REL-021'
+    severity: low
+    status: open
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code review CR-2 (medium/medium). The carried block runs from `### Bug Reports` to the next H1-H3 heading or to the end of the span, so text after the list that is not a heading is carried on every cycle. Repro: with the list directly under `## QA Testing Results`, the previous render''s `**QA Status**` and `**Quality Score**: 10/100` stayed below the current `30/100` through cycles 2-3. This is the obs #92 shape, where stale fields look current. Nothing is deleted. 0 of 11 tracked lists sit above QA fields: 7 are followed by `### Key Findings`, and 4 run to the span end (task.45 carries its change-log lead-in comment, which keeps it).'
+    suggested_action: 'End the carried block at the end of the list: the first blank line followed by a line that is neither a list item, a table row nor an H4/bold sub-label. Add the list-under-heading repro as a test.'
+    suggested_owner: dev
+  - id: 'REL-022'
+    severity: low
+    status: open
+    file: 'shared/resources/qa-results.js'
+    finding: 'Found by the inside-the-span measurement. When an old section was hand-placed above the template separator, the span also holds text the create-task template owns, and a replace deletes it. task.117 (tracked, accepted): a replace deletes `---` and the 6-line `<!-- Append-only ... -->` change-log lead-in comment between the section and `<!-- change-log-start -->`. trimSeparator trims only blanks and one break, and the structural guard ignores HTML comments. task.45 has the same shape and survives only because its Bug Reports list is last, so the carry takes the comment along. Engine-created sections land after the comment, so new writes cannot create this shape. The comment does not render.'
+    suggested_action: 'In trimSeparator, treat a trailing HTML comment block (plus the break above it) directly before the terminator as separator, not span. Or add it to what the guard refuses, and add a task.117-shaped test.'
+    suggested_owner: dev
+  - id: 'REL-023'
+    severity: low
+    status: open
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code review CR-3/CR-4 (low/medium). The carry keys on one exact line, `^###[ \t]+Bug Reports[ \t]*$`. Two cases lose the list with no signal. (1) `### Bug Reports (1)`, `### Bug reports`, `#### Bug Reports` or a bold `**Bug Reports**` label: reproduced, each dropped on replace. (2) A render that includes its own `### Bug Reports` counts as taking the list over, so a render that lists only this cycle''s bugs drops every earlier link. Test L2 asserts that drop, and neither SKILL.md note warns the renderer. All 11 tracked lists use the exact heading, and neither Step 12 template renders one.'
+    suggested_action: 'Match the heading case-insensitively at H3-H4 with an optional trailing count, and merge the old and new lists by link target instead of letting the new one take over. At minimum, state in both Step 12 notes that a rendered `### Bug Reports` must list every earlier bug.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 60
+  phases_verified: 4/4
+  ci: 'ci:fast locally @ a89f20feb089: 4,776 tests, 4,774 pass, 1 skipped, 1 load-timing failure (test-clean-checkout 10.2 s over a 10 s budget) that passes alone (13/13). qa-results engine, wiring and corpus: 60/60. bundle:check 129 skills, 0 problems. The qa-task and qa-story bundled engines are byte-identical to the source apart from the header. validate qa-task and qa-story pass. PR CI not awaited (gated at /finalise).'
+  inside_span: 'Replaced each of the 155 tracked sections with a fresh render and checked every line of the old span. All 11 `### Bug Reports` lists were kept verbatim, including task.116''s H4 sub-lists and task.42''s table, with one heading each and no growth over 4 writes. Every other lost subsection is QA history (Key Findings, cycle logs, and task.141''s Deferred Work, which is named as QA-owned). Outside that, the only text lost that another writer owns is task.117''s template comment (REL-022). No other skill writes into the section: of skills/*/SKILL.md and shared/resources/*.md, only qa-task, qa-story and the develop loop doc name it. create-bug-report writes the list, and qa-fix and develop-bug only edit statuses inside it.'
+  outside_span: 'Corpus: 1,989 tracked docs/**/*.md, each written 4 times and followed each time by an upsertChangeLog row. 1,832 were created and then replaced 3 times, 155 replaced 4 times, 2 unplaceable (the known REL-011 plan and bug docs). 0 multiple, 0 left inside a log, 0 probe rows dropped, 0 Bug Reports lines lost. The QA engine alone lost 0 lines outside the section. The 6 lines lost with the Change Log writes are header rows and a `### 1.5 Change Log` heading that upsertChangeLog migrates, not this engine.'
+  fault_injection: 'Stray fence after each of the 155 section headings: fence, ~~~, 4-backtick and indented ```js each gave 155 unbounded; an HTML comment and an inline tick each gave 155 replaced; 0 lines lost after the span in every case. A stray fence plus a closing ```bash block at each of 12,001 later line positions: 331 replaced, 11,670 unbounded, 0 original lines lost after the span. In all 331 replaced cases the block landed in the gap before the terminator, where it is section content.'
+  cr6_cr7_parity: 'Differential run against the gate-7 engine (b810cb20). 1,989 docs gave identical output except the 11 with Bug Reports lists. 155 sections x 8 injected render shapes (fenced H2, fenced # comment, second H2, indented H2, unclosed fence, H3, H1) gave identical reasons and output (1,240/1,240). The CR-7 marker regex agrees with the old literal on 27 marker probes (6 markers, indented 3 and 4, trailing text, near-misses). J6, F1 and A5 pass.'
+  step_4b: 'Applies (both SKILL.md changed). qa-execute-snippets: qa-task 1 runnable / 3 placeholder / 16 mutating, qa-story 1 / 4 / 14; 0 findings; bash and zsh.'
+  mutation_proofs: 'Isolated copies. Replace carry removed: L1 red. Relocate carry removed: L4 red. Takeover check removed: L2 red. All covered. End-at-next-heading stop removed: no test red (no-red-untested; this is REL-020''s test gap). Baseline 51/51 before and after; live engine byte-identical; working tree unchanged.'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+bug_resolution:
+  previous_gate: 'task.155.gate.7.qa-results-section-engine.yml (PASS 100, route 2b)'
+  verified_fixed: ['PR review 3 CR-1: 11/11 tracked Bug Reports lists carried through replace and relocate', 'CR-6: behaviour-neutral (parity 1,240/1,240)', 'CR-7: behaviour-neutral (27/27 marker probes)']
+  deferred: ['REL-007', 'REL-008', 'REL-009', 'REL-018', 'REL-019', 'PC-1', 'CR-5', 'CRLF seam preservation', 'setext H1/H2']
+  fix_commit: 'a89f20feb0891fd5e2f4d79963ae403eb65454e7'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'A pure string transform with no network and no shell. boundary: internal (unchanged): the inputs are a pipeline-written work item and a pipeline-rendered section, and no corpus sink models this section.'
+  performance:
+    status: PASS
+    notes: 'The 51 engine tests run in about 0.2 s, and the 1,989-document, 4-write corpus run takes seconds.'
+  reliability:
+    status: CONCERNS
+    notes: 'Outside the span, nothing is lost. Inside it, the carry drops a second Bug Reports list silently (REL-020). A task.117-shaped span loses a template comment (REL-022). A near-miss or rendered heading drops the list with no signal (REL-023).'
+  maintainability:
+    status: PASS
+    notes: 'CARRIED_SUBSECTIONS is a closed, commented list. The CR-7 marker pattern is built from change-log.js constants, and CR-6 removed a subsumed check. The carry has no test in which the list is followed by another heading (M4).'
+
+recommendations:
+  immediate:
+    - action: 'REL-020: carry every `### Bug Reports` block in the span; add two-heading and list-then-heading tests'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+  future:
+    - action: 'REL-021: end the carried block at the end of the list'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'REL-022: keep a trailing template comment and break out of the span'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'REL-023: tolerant heading match; merge rather than take over, or document the takeover in both Step 12 notes'
+      refs: ['shared/resources/qa-results.js', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'create-bug-report task-mode Step 5 checks for `## Bug Reports` but writes `### Bug Reports`, and names a "QA & Quality Assurance section" the task template does not have; align both (outside this task''s change set)'
+      refs: ['skills/create-bug-report/SKILL.md']
+    - action: 'Carried: REL-007..010, REL-018, REL-019, PC-1, CR-5, CRLF seams, setext (see the task Deferred Work and gate 7)'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/change-log.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['REL-020 fixed, or deferred explicitly as a known limit in Deferred Work']

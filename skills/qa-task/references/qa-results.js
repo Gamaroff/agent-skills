@@ -124,25 +124,86 @@ const RE_STRUCTURAL = [
 // history, which is exactly what "replace whole" exists to remove.
 const CARRIED_SUBSECTIONS = ["Bug Reports"];
 
-// The carried subsections present in `removed` and absent from `body`, verbatim.
-// A subsection runs from its `###` heading to the next unprotected heading of
-// level <= 3, or the end of the removed span. When the new body renders its own
-// copy, the renderer has taken the subsection over and the old one is not carried.
-function carriedSubsections(removed, body) {
-  const out = [];
-  const rangesOld = protectedRanges(removed);
-  const rangesNew = protectedRanges(body);
+// A carried subsection: a `###`/`####` heading naming it (any case, any trailing text
+// such as ` (2)` — REL-023), then everything up to the next unprotected heading of
+// level <= 3, or the first of QA's OWN template field lines (`**QA Status**:` …),
+// whichever comes first. Real lists are richer than bullets — `####` groups, tables,
+// bold labels (task.116, task.42, task.76, task.94) — so the block is carried whole;
+// QA's own fields are never carried, so a list written above them cannot drag a stale
+// verdict along (task.155 QA cycle 8, REL-021).
+const RE_QA_FIELD =
+  /^\*\*(?:QA Status|QA Engineer|Testing Date|Quality Score|Gate Decision)\*\*:/;
+
+function collectBlocks(text, name) {
+  const ranges = protectedRanges(text);
+  const re = new RegExp(`^#{3,4}[ \\t]+${name}\\b[^\\n]*$`, "gim");
+  const blocks = [];
+  for (const m of text.matchAll(re)) {
+    if (insideProtected(ranges, m.index)) continue;
+    const bodyAt = m.index + m[0].length + 1;
+    let end = text.length;
+    let offset = bodyAt;
+    for (const line of text.slice(bodyAt).split("\n")) {
+      const bare = line.replace(/\r$/, "");
+      if (
+        !insideProtected(ranges, offset) &&
+        (/^#{1,3}[ \t]/.test(bare) || RE_QA_FIELD.test(bare))
+      ) {
+        end = offset;
+        break;
+      }
+      offset += line.length + 1;
+    }
+    const whole = text.slice(m.index, Math.min(end, text.length)).trimEnd();
+    blocks.push({
+      whole,
+      body: whole.slice(m[0].length).replace(/^\n+/, ""),
+      end: m.index + whole.length,
+    });
+  }
+  return blocks;
+}
+
+// The link targets a block of text names — a bug entry's identity.
+const linksIn = (text) =>
+  new Set([...text.matchAll(/\]\(([^)\s]+)/g)].map((m) => m[1]));
+
+// Merge every carried subsection found in `removed` into `body` (task.155 QA cycle 8,
+// REL-020/023). With no list in the render: the first old block is kept whole and any
+// later ones are appended beneath it, each body once — a second `### Bug Reports`
+// (create-bug-report checks for an H2 but writes an H3, so it can open one) folds into
+// the first instead of being dropped. With a list in the render: the render's list is
+// kept, and every old line naming a link the render lacks is appended to it — nothing
+// the old list recorded is lost, and the render's entries win where they overlap.
+function mergeCarried(body, removed) {
+  let out = body;
   for (const name of CARRIED_SUBSECTIONS) {
-    const re = new RegExp(`^###[ \\t]+${name}[ \\t]*$`, "m");
-    if (firstUnprotected(body, re, 0, rangesNew) !== -1) continue;
-    const at = firstUnprotected(removed, re, 0, rangesOld);
-    if (at === -1) continue;
-    const bodyAt = removed.indexOf("\n", at);
-    const next =
-      bodyAt === -1
-        ? -1
-        : firstUnprotected(removed, /^#{1,3}[ \t]/, bodyAt + 1, rangesOld);
-    out.push(removed.slice(at, next === -1 ? removed.length : next).trimEnd());
+    const old = collectBlocks(removed, name);
+    if (!old.length) continue;
+    const mine = collectBlocks(out, name);
+    if (!mine.length) {
+      const parts = [old[0].whole];
+      for (const b of old.slice(1)) {
+        if (b.body && !parts.some((p) => p.includes(b.body)))
+          parts.push(b.body);
+      }
+      out = `${out}\n\n${parts.join("\n\n")}`;
+      continue;
+    }
+    const have = new Set(mine.flatMap((b) => [...linksIn(b.whole)]));
+    const missing = [];
+    for (const b of old) {
+      for (const line of b.body.split("\n")) {
+        const targets = [...linksIn(line)];
+        if (targets.length && targets.some((t) => !have.has(t))) {
+          targets.forEach((t) => have.add(t));
+          missing.push(line);
+        }
+      }
+    }
+    if (!missing.length) continue;
+    const at = mine[0].end;
+    out = `${out.slice(0, at)}\n${missing.join("\n")}${out.slice(at)}`;
   }
   return out;
 }
@@ -171,15 +232,29 @@ function trimSeparator(content, start, rawEnd) {
   const popBlanks = () => {
     while (lines.length > 1 && isBlank(lines[lines.length - 1])) lines.pop();
   };
-  popBlanks();
-  const last = lines[lines.length - 1].replace(/\r$/, "");
-  if (
-    lines.length > 2 &&
-    RE_BREAK.test(last) &&
-    isBlank(lines[lines.length - 2])
-  ) {
-    lines.pop();
+  // Peel separators off the tail until none is left: blank lines, one thematic break
+  // with a blank line above it, and an HTML comment block standing on its own lines
+  // (a template's lead-in comment for the block below — task.155 QA cycle 8, REL-022).
+  for (;;) {
     popBlanks();
+    const last = lines[lines.length - 1].replace(/\r$/, "");
+    if (
+      lines.length > 2 &&
+      RE_BREAK.test(last) &&
+      isBlank(lines[lines.length - 2])
+    ) {
+      lines.pop();
+      continue;
+    }
+    if (/-->[ \t]*$/.test(last)) {
+      let k = lines.length - 1;
+      while (k > 0 && !/^[ \t]{0,3}<!--/.test(lines[k])) k--;
+      if (k > 1 && (isBlank(lines[k - 1]) || RE_BREAK.test(lines[k - 1]))) {
+        lines.length = k;
+        continue;
+      }
+    }
+    break;
   }
   const kept = lines.join("\n").length;
   // Keep the last content line's newline inside the span when the text has one.
@@ -440,8 +515,7 @@ function upsertQaResults(content, section, { docType = "" } = {}) {
 
   if (sections.length === 1 && !sections[0].insideChangeLog) {
     const { start, end } = sections[0];
-    const carried = carriedSubsections(content.slice(start, end), body);
-    const written = [body, ...carried].join("\n\n");
+    const written = mergeCarried(body, content.slice(start, end));
     const rest = content.slice(end);
     const sep = rest === "" ? "\n" : rest.startsWith("\n") ? "\n" : "\n\n";
     return checked(content.slice(0, start) + written + sep + rest, "replaced");
@@ -454,10 +528,7 @@ function upsertQaResults(content, section, { docType = "" } = {}) {
     // Inside the block: cut it out, then insert at the canonical position computed
     // on the post-removal text (the block start, which the removal did not move).
     const { start, end } = sections[0];
-    written = [
-      body,
-      ...carriedSubsections(content.slice(start, end), body),
-    ].join("\n\n");
+    written = mergeCarried(body, content.slice(start, end));
     const before = content.slice(0, start).replace(/\n+$/, "\n");
     const after = content.slice(end).replace(/^\n+/, "");
     base =

@@ -111,9 +111,10 @@ All notable changes to this project will be documented in this file. Format foll
   (`unplaceable`). Before a
   replace or relocate, the text it would remove is scanned **ignoring fences**, and the write is
   refused (`unbounded`) if that text carries a change-log marker, an H1/H2 or a Change Log heading —
-  one stray fence in a section can no longer widen a write over the log. A `### Bug Reports` list —
-  which `create-bug-report` writes inside this section — is carried through every replace, so a QA
-  cycle never drops a task's bug links; every other subsection is QA's own and is replaced whole.
+  one stray fence in a section can no longer widen a write over the log. A `### Bug Reports` block —
+  which `create-bug-report` writes inside this section — is carried whole through every replace
+  (`####` groups and tables included, several blocks folded into one), so a QA cycle never drops a
+  task's bug links; every other subsection is QA's own and is replaced whole.
   **One visible change:** a new section lands immediately before the
   change-log block (else before `## Progress Tracking` / `## Dev Agent Record`), so a document that
   placed it elsewhere is unchanged until QA next *creates* one there — an existing single section is

@@ -575,13 +575,14 @@ test("L1 CR-1: create-bug-report's ### Bug Reports list is carried through every
   assert.doesNotMatch(out, /cycle [123]\)/);
 });
 
-test("L2 a render that carries its own ### Bug Reports takes it over — no duplicate", () => {
+test("L2 a render with its own ### Bug Reports keeps its entries and gains the old ones it lacks", () => {
   const doc = markerDoc(`${section(1)}\n\n${bugList}\n\n`);
   const owned = `${section(2)}\n\n### Bug Reports\n\n- [task.9.bug.1.x.md](./task.9.bug.1.x.md) - ✅ Closed`;
   const r = QR.upsertQaResults(doc, owned, { docType: "task" });
   assert.equal(count(r.content, "### Bug Reports"), 1);
-  assert.match(r.content, /✅ Closed/);
-  assert.doesNotMatch(r.content, /bug\.2\.y/);
+  assert.match(r.content, /bug\.1\.x\.md\) - ✅ Closed/); // the render's entry wins
+  assert.doesNotMatch(r.content, /bug\.1\.x\.md\) - 🆕 New/);
+  assert.match(r.content, /bug\.2\.y\.md/); // the old entry it lacked is kept (REL-023)
 });
 
 test("L3 QA's own stale subsections are still replaced whole", () => {
@@ -605,4 +606,74 @@ test("L4 the Bug Reports list is carried on relocate too", () => {
     r.content.indexOf("### Bug Reports") <
       r.content.indexOf("<!-- change-log-start -->"),
   );
+});
+
+// ---------------------------------------------------------------------------
+// M — QA cycle 8 (task.155 gate 8): the carried list, exactly
+// ---------------------------------------------------------------------------
+
+test("M1 REL-020: two Bug Reports lists are merged into one, no link lost", () => {
+  const second =
+    "### Bug Reports\n\n- [task.9.bug.3.z.md](./task.9.bug.3.z.md) - 🆕 New - Priority: Medium - 2026-09-30";
+  const doc = markerDoc(
+    `${section(1)}\n\n${bugList}\n\n### Key Findings (old)\n\nx\n\n${second}\n\n`,
+  );
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "replaced");
+  assert.equal(count(r.content, "### Bug Reports"), 1);
+  for (const b of ["bug.1.x", "bug.2.y", "bug.3.z"])
+    assert.match(r.content, new RegExp(b));
+  assert.doesNotMatch(r.content, /Key Findings \(old\)/); // QA-owned, replaced whole
+});
+
+test("M2 REL-021: only the list is carried — stale QA text after it is not", () => {
+  const top = `## QA Testing Results\n\n${bugList}\n**QA Status**: FAIL\n**Quality Score**: 10/100\n\n- stale finding from the last cycle`;
+  const doc = markerDoc(`${top}\n\n`);
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "replaced");
+  assert.doesNotMatch(r.content, /10\/100|QA Status\*\*: FAIL|stale finding/);
+  assert.match(r.content, /bug\.2\.y/);
+});
+
+test("M3 REL-023: near-miss headings still carry their list", () => {
+  for (const h of [
+    "### Bug reports",
+    "#### Bug Reports",
+    "### Bug Reports (2)",
+  ]) {
+    const doc = markerDoc(
+      `${section(1)}\n\n${bugList.replace("### Bug Reports", h)}\n\n`,
+    );
+    const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+    assert.match(r.content, /bug\.1\.x/, h);
+    assert.match(r.content, /bug\.2\.y/, h);
+  }
+});
+
+test("M4 REL-022: a template comment between the section and the log survives a replace", () => {
+  const lead =
+    "<!-- The Change Log below is append-only.\n     Add a row per event. -->";
+  const doc = `${FM}## Body\n\ntext\n\n${section(1)}\n\n---\n\n${lead}\n\n${LOG}`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "replaced");
+  assert.ok(r.content.includes(lead));
+  assert.match(r.content, /None \(cycle 2\)\.\n\n---\n\n<!-- The Change Log/);
+});
+
+test("M5 a carried list does not grow across replaces", () => {
+  let out = markerDoc(`${section(1)}\n\n${bugList}\n\n`);
+  const once = QR.upsertQaResults(out, section(2), { docType: "task" }).content;
+  const twice = QR.upsertQaResults(once, section(2), {
+    docType: "task",
+  }).content;
+  assert.equal(twice, once);
+});
+
+test("M6 a rich Bug Reports block — #### groups, a table, bold labels — is carried whole", () => {
+  const rich =
+    "### Bug Reports\n\n#### Open Bugs\n- None\n\n#### Closed (cycle 6)\n- [Bug 9.7](./task.9.bug.7.a.md) - closed\n\n| Bug | Status |\n|---|---|\n| [TASK-9-BUG-8](./task.9.bug.8.b.md) | fixed |\n\n**Open Bugs**\n\n- [bug.9](./task.9.bug.9.c.md) - open";
+  const doc = markerDoc(`${section(1)}\n\n${rich}\n\n`);
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "replaced");
+  assert.ok(r.content.includes(rich), "the block is carried verbatim");
 });
