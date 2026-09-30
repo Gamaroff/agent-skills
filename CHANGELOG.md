@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The two hand-written reference pages are pinned to the skills they describe (task 142, obs #159).**
+  - `tests/reference-doc-skill-pinning.test.js` fails when a `docs/reference/commands.md` row
+    names a slash command with no `skills/<name>/SKILL.md`, when a row's first cell advertises a
+    `--flag` that skill's `SKILL.md` never mentions, or when `docs/reference/activation-phrases.md`
+    names a skill that does not exist. Rows that name no command must match a named
+    `NON_SKILL_ROWS` list exactly, in both directions. Each group has a floor, so an extractor that
+    stops matching fails rather than passing on nothing.
+  - Its first run found one real defect: `/session-handoff --read` advertised a flag the skill
+    never documents (read mode is asked for by intent). The row now describes read mode.
+  - Its own cost is pinned too: resolving the whole corpus spawns no process, opens no connection,
+    and reads each `SKILL.md` once — two spy-based tests, each mutation-proven.
+  - What it does not pin, stated in its header: whether a row *describes* the skill correctly —
+    the `qa-next` story→function drift that motivated it was prose, and no assertion sees prose.
+    The reverse direction (every skill appears in both pages) stays
+    `tests/skill-doc-coverage.test.js`.
+
 - **A Change Log row that disappears between two revisions is reported (task 133, obs #137).**
   - `change-log.js` gains `rowsDropped(prev, next)` and `--check-append-only --file <doc> --against
     <rev> [--json]`: exit 1 `rows-dropped` lists each row `<rev>` carried that the file no longer

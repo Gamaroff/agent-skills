@@ -5,10 +5,12 @@ type: task
 description: "docs/reference/commands.md and docs/reference/activation-phrases.md restate what 64 skills do, and nothing connects a skill's directory to the rows that cite it — qa-next's rows went stale within a day of the rework that invalidated them. Add tests/reference-doc-skill-pinning.test.js: every command a row names resolves to a skill, every --flag a row advertises is one that skill's SKILL.md documents, and every skill named in the activation table exists — each with a non-vacuity floor so a broken extractor cannot pass by finding nothing."
 tags: [documentation, guard, reference-docs, drift, observation-159]
 category: testing
-status: planned
+status: accepted
+completed_date: 2026-09-30
+pr_number: 534
 priority: Medium
 created: 2026-09-22
-updated: 2026-09-22
+updated: 2026-09-30
 assignee:
 estimated_effort_hours: 4
 risk_level: low
@@ -17,7 +19,9 @@ github_issue: 467
 
 # Technical Task: Pin the hand-written reference docs to the skills they describe
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.142.review.1.reference-doc-skill-pinning.md` implemented 2026-09-30
 
 **GitHub Issue**: [#467](https://github.com/Gamaroff/agent-skills/issues/467)
 
@@ -87,13 +91,18 @@ fails CI on the commit that introduces the mismatch, instead of being found by s
 
 - `docs/reference/commands.md` — a set of Markdown tables. Every command row begins `` | ` `` and its
   first cell is a backticked invocation: `` `/develop-story <path>` ``, `` `/qa-next --dry-run` ``,
-  `` `/loop /develop-next` ``, `` `run-loop.mjs status` ``. Measured: 79 rows, 75 of them slash
-  commands naming 64 distinct skills, 11 rows carrying at least one `--flag`.
+  `` `/loop /develop-next` ``, `` `run-loop.mjs status` ``. A first cell may itself contain an
+  escaped pipe (`` `/review-pr [PR\|branch]` ``, line 60; `/tracker-reconcile`, line 116), and may
+  quote a script path after the command (`/session-handoff`, line 143). Measured at `80f460bc` with
+  the rule in § Target Architecture: 80 rows, 76 of them slash commands naming 63 distinct skills, 4
+  non-skill rows, 20 flag assertions.
 - `docs/reference/activation-phrases.md` — two-column tables; the right-hand cell backticks the skill
   name, and any flag as a **separate** backticked span in the same cell —
-  `` `review-bug` (the second phrasing picks `--validate`) ``. Measured: 69 backticked tokens, of
-  which 67 are skill mentions naming 62 distinct skills and 2 are standalone flags that the
-  extractor must reject.
+  `` `review-bug` (the second phrasing picks `--validate`) ``. Measured at `80f460bc`: 73 backticked
+  spans in the right-hand cells, of which 67 are skill mentions naming 62 distinct skills, 2 are
+  standalone flags, and 4 are other non-skill spans (`` `/develop-story` `` and `` `/develop-task` ``
+  at line 32, the built-in `` `/security-review` `` at line 33, `` `handoff-verify.mjs` `` at line
+  108) that the extractor must reject.
 - `docs/reference/skill-catalog.md` — **generated** by
   `skills/create-skill/scripts/generate_catalog.py` and guarded by `npm run check:generated`. It is
   the control case: it tracked the `qa-next` rework without anyone remembering to update it.
@@ -101,6 +110,12 @@ fails CI on the commit that introduces the mismatch, instead of being found by s
   no framework. Nearest neighbours in shape: `tests/bundled-links.test.js` (walks a corpus, asserts a
   property per item, floors the count) and `tests/mutation-call-site-coverage.test.js` (scans
   canonical sources for a forbidden invocation, with an allowlist).
+- **Existing guards over the same two pages** (same-class inventory). `tests/skill-doc-coverage.test.js`
+  asserts the **reverse** direction — every `skills/<name>/SKILL.md` is named in both pages, or sits
+  on one of its two adoption lists. `tests/restricted-access-docs.test.js` reads both pages for the
+  task.57 access labels only. The new file **sits beside** both: neither asserts that a name or flag
+  the pages mention exists, and merging page → skill into the skill → page guard would couple two
+  failure messages that point at different fixes (add a row vs. fix a row).
 
 ### Target Architecture
 
@@ -112,10 +127,15 @@ extractCommandRows(md)  →  [{ raw, invocation, skill, flags, line }]
 extractActivationSkills(md) → [{ skill, flags, line }]
 ```
 
-`skill` resolution: take the **last** `/<name>` token in the cell, so `` `/loop /develop-next` ``
-resolves to `develop-next` rather than to the `/loop` built-in. A cell with no `/` token is a
-non-skill row, matched against a small named allowlist (`run-loop.mjs …`) and counted, never silently
-dropped.
+The row is split on **unescaped** pipes (`/(?<!\\)\|/`), so `` `/review-pr [PR\|branch]` `` stays one
+cell. `skill` resolution: of the `/<name>` tokens that begin at a **word start** in the first cell —
+start of cell, whitespace, a backtick or `(` — take the **last**, so `` `/loop /develop-next` ``
+resolves to `develop-next` rather than to the `/loop` built-in, and a quoted path such as
+`.agents/skills/session-handoff/scripts/handoff-verify.mjs` contributes nothing (its `/` segments
+follow a letter). Plain "last `/token` in the cell" resolves line 143 to `handoff-verify` — measured
+during review. A cell with no word-start `/` token is a non-skill row, matched against a small named
+allowlist (`run-loop.mjs …`) and counted, never silently dropped. Flags are every `--flag` in the
+first cell.
 
 ### Important Clarifications
 
@@ -174,11 +194,14 @@ CI on a reference row that is already wrong, which is the point.
 
 **Changes**:
 
-- [ ] `extractCommandRows(md)` — rows beginning `` | ` ``, first cell, last `/<name>` token wins,
-      `--flag` tokens collected, line number retained for the failure message.
-- [ ] `extractActivationSkills(md)` — right-hand cell, first backticked token is the skill, the rest
-      are flags.
-- [ ] `NON_SKILL_ROWS` — the named allowlist for `run-loop.mjs run|dry-run|status|watch`, asserted to
+- [x] `extractCommandRows(md)` — rows beginning `` | ` ``, split on unescaped pipes, first cell,
+      last **word-start** `/<name>` token wins, `--flag` tokens collected, line number retained for
+      the failure message. CommonJS (`require`), like every neighbour in `tests/` —
+      `package.json` is `"type": "commonjs"`.
+- [x] `extractActivationSkills(md)` — right-hand cell; each backticked span whose head token starts
+      with a letter or digit and is `[a-z0-9-]+` is a skill mention. Spans starting `--`, `/` or
+      carrying a `.` (a script name) are not, and are skipped.
+- [x] `NON_SKILL_ROWS` — the named allowlist for `run-loop.mjs run|dry-run|status|watch`, asserted to
       be **exactly** what the extractor could not resolve, so a new unresolvable row fails rather than
       joining a silent bucket.
 
@@ -196,13 +219,14 @@ CI on a reference row that is already wrong, which is the point.
 
 **Changes**:
 
-- [ ] Every extracted command resolves to a `skills/<name>/SKILL.md` that exists.
-- [ ] Every `--flag` in a command row appears literally in that skill's `SKILL.md`.
-- [ ] Every skill named in `activation-phrases.md` resolves to `skills/<name>/`.
-- [ ] Floors, from today's measurement and stated as *at least*: ≥ 70 command rows, ≥ 12 flag
-      assertions, ≥ 58 activation-table skills. Each floor is its own assertion with a message saying
+- [x] Every extracted command resolves to a `skills/<name>/SKILL.md` that exists.
+- [x] Every `--flag` in a command row appears literally in that skill's `SKILL.md`.
+- [x] Every skill named in `activation-phrases.md` resolves to `skills/<name>/`.
+- [x] Floors, stated as *at least* and re-measured against the tree as built (the review measured
+      80 rows, 20 flag assertions and 67 activation mentions at `80f460bc`): ≥ 70 command rows,
+      ≥ 16 flag assertions, ≥ 58 activation-table skills. Each floor is its own assertion with a message saying
       the extractor is probably broken, not that the corpus shrank.
-- [ ] Failure messages name the **file and line** of the offending row and the skill it names.
+- [x] Failure messages name the **file and line** of the offending row and the skill it names.
 
 **Dependencies**: Phase 1.
 
@@ -220,12 +244,16 @@ CI on a reference row that is already wrong, which is the point.
 
 **Changes**:
 
-- [ ] Run against the tree as it stands. Measured in advance: 0 flag failures, 0 unresolvable skills
-      once `/loop` is handled — so a red first run means the extractor is wrong, not the corpus.
-- [ ] Fix anything it legitimately finds, in the same commit.
-- [ ] Write the header comment: what this test pins, and — explicitly — that prose drift is not
+- [x] Run against the tree as it stands. Measured during review (at `80f460bc`, with the corrected
+      rule): 0 unresolvable skills, exactly the 4 `run-loop.mjs` non-skill rows, and **one** real flag
+      failure — `commands.md:143` advertises `/session-handoff --read`, and
+      `skills/session-handoff/SKILL.md` never mentions `--read` (read mode is a mode, invoked by
+      intent; its script is `handoff-verify.mjs`). Any other red means the extractor is wrong.
+- [x] Fix row 143 to describe read mode without inventing a flag.
+- [x] Fix anything it legitimately finds, in the same commit.
+- [x] Write the header comment: what this test pins, and — explicitly — that prose drift is not
       pinned, with the `qa-next` story→function case named as the example it would have missed.
-- [ ] Mutation-prove all three groups.
+- [x] Mutation-prove all three groups.
 
 **Dependencies**: Phases 1–2.
 
@@ -266,11 +294,11 @@ behaviour is pinned independently of what the real documents happen to contain.
 
 **Actions**:
 
-- [ ] A row with a plain command resolves to that skill.
-- [ ] `` `/loop /develop-next` `` resolves to `develop-next`, not `loop`.
-- [ ] A row with two flags yields both.
-- [ ] A non-slash row is returned as unresolvable, not dropped.
-- [ ] An activation cell of `` `review-bug --validate` `` yields skill `review-bug`, flag
+- [x] A row with a plain command resolves to that skill.
+- [x] `` `/loop /develop-next` `` resolves to `develop-next`, not `loop`.
+- [x] A row with two flags yields both.
+- [x] A non-slash row is returned as unresolvable, not dropped.
+- [x] An activation cell of `` `review-bug --validate` `` yields skill `review-bug`, flag
       `--validate`.
 
 **Command**: `npm test`
@@ -285,8 +313,8 @@ behaviour is pinned independently of what the real documents happen to contain.
 
 **Actions**:
 
-- [ ] All three groups green on the current tree.
-- [ ] Each floor assertion passes with the real counts, and fails when the extractor is stubbed to
+- [x] All three groups green on the current tree.
+- [x] Each floor assertion passes with the real counts, and fails when the extractor is stubbed to
       return `[]`.
 
 **Command**: `npm test`
@@ -299,8 +327,8 @@ behaviour is pinned independently of what the real documents happen to contain.
 
 **Actions**:
 
-- [ ] `npm test` overall result unchanged apart from the new file's cases.
-- [ ] `npm run check:generated` still green — this task touches nothing generated.
+- [x] `npm test` overall result unchanged apart from the new file's cases.
+- [x] `npm run check:generated` still green — this task touches nothing generated.
 
 ---
 
@@ -331,34 +359,33 @@ skill named, memoised), process spawns (zero), network calls (zero).
 
 ### Functional
 
-- [ ] Every command named in `commands.md` resolves to an existing skill, or to the named non-skill
+- [x] Every command named in `commands.md` resolves to an existing skill, or to the named non-skill
       allowlist.
-- [ ] Every `--flag` a command row advertises exists in that skill's `SKILL.md`.
-- [ ] Every skill named in `activation-phrases.md` exists.
-- [ ] `/loop /develop-next` resolves to `develop-next`.
-- [ ] A row naming a deleted skill fails the test (proved by mutation).
-- [ ] A row advertising a non-existent flag fails the test (proved by mutation).
+- [x] Every `--flag` a command row advertises exists in that skill's `SKILL.md`.
+- [x] Every skill named in `activation-phrases.md` exists.
+- [x] `/loop /develop-next` resolves to `develop-next`.
+- [x] A row naming a deleted skill fails the test (proved by mutation).
+- [x] A row advertising a non-existent flag fails the test (proved by mutation).
 
 ### Performance
 
-- [ ] No process spawn, no network call.
-- [ ] `SKILL.md` reads are memoised per skill, not per row.
-- [ ] No measurable change to `npm test` wall-clock.
+- [x] No process spawn, no network call — pinned by "resolving the whole corpus spawns no process and
+      opens no connection" (spies on `child_process`, `net`, `http`, `https`, `fetch`).
+- [x] `SKILL.md` reads are memoised per skill, not per row — pinned by "each SKILL.md is read once per
+      run, however many rows name it" (spy on `fs.readFileSync`, with a non-vacuity floor).
 
 ### Code Quality
 
-- [ ] `node:test` + `node:assert` only, matching `tests/bundled-links.test.js`.
-- [ ] Three floor assertions, each with a message pointing at the extractor rather than the corpus.
-- [ ] Failure messages carry file, line and the offending token.
-- [ ] A header comment stating what the test does **not** catch, naming the story→function case.
-- [ ] Prettier clean; `npm test` green with the `.claude/skills` symlink moved aside.
+- [x] `node:test` + `node:assert` only, matching `tests/bundled-links.test.js`.
+- [x] Three floor assertions, each with a message pointing at the extractor rather than the corpus.
+- [x] Failure messages carry file, line and the offending token.
+- [x] A header comment stating what the test does **not** catch, naming the story→function case.
+- [x] Prettier clean; `npm test` green with the `.claude/skills` symlink moved aside.
 
 ### Migration
 
-- [ ] `CHANGELOG.md` `[Unreleased]` records the new guard.
-- [ ] Observation #159 marked `actioned` once this merges **and** the staged `create-skill` rule is
-      installed — the two halves close it together.
-- [ ] No consumer-facing change; nothing to migrate.
+- [x] `CHANGELOG.md` `[Unreleased]` records the new guard.
+- [x] No consumer-facing change; nothing to migrate.
 
 ---
 
@@ -446,14 +473,179 @@ additions.
 
 ---
 
-<!-- change-log-start -->
+## QA Testing Results
 
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-30
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.142.qa.3.reference-doc-skill-pinning.md](./task.142.qa.3.reference-doc-skill-pinning.md)
+- **Gate File**: [task.142.gate.3.reference-doc-skill-pinning.yml](./task.142.gate.3.reference-doc-skill-pinning.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 17 (9 fixture, 6 live-corpus, 2 cost); full `ci:fast` suite 4714 pass / 0 fail
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Three QA cycles. Cycle 2 (refute pass, after the re-scope) found the cost tests spied on code the live assertions did not run; fixed and mutation-proven in cycle 3. Advisory follow-ups: substring flag match, unchecked activation flags, empty-vs-missing `SKILL.md` message, corpus resolved twice.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.142.qa.3.reference-doc-skill-pinning.md`
+**Gate File**: `task.142.gate.3.reference-doc-skill-pinning.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 15/15 — each traced to code plus a per-PR test or a read document line
+✅ **Tests:** 17 in `tests/reference-doc-skill-pinning.test.js`, in the `npm test` glob; CI green on PR #534
+✅ **PR Review:** 5c `/review-pr` APPROVE (conformance: 0 findings)
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry; `commands.md:143` fixed
+✅ **Security Review:** PASS — test-only, no spawn/network, boundary: false
+✅ **Compliance Review:** NOT_APPLICABLE
+
+**Task marked as ACCEPTED on:** 2026-09-30
+
+**Detailed Verification Log:** See `task.142.dod.2.reference-doc-skill-pinning.md` for complete verification evidence. Run 1 (`task.142.dod.1`) is superseded.
+
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
+
+> Superseded 2026-09-30 by the re-scope below: AC7 and AC8 are now pinned by tests; AC9 and AC16
+> moved to Deferred Work because neither can pass before merge. `/finalise` run 2 verifies afresh.
+
+**Status at run 1:** IN PROGRESS (document status then `ready-for-review`)
+
+### QA Gate Status
+
+**QA Report**: `task.142.qa.1.reference-doc-skill-pinning.md`
+**Gate File**: `task.142.gate.1.reference-doc-skill-pinning.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Success Criteria — Performance (behaviour criteria with no test):**
+   - [ ] AC7 — no process spawn, no network call: true by inspection, pinned by no test
+   - [ ] AC8 — `SKILL.md` reads memoised per skill: true by inspection, pinned by no test
+   - [ ] AC9 — no measurable `npm test` wall-clock change: measured ~133 ms, no test or budget asserts it
+
+2. **Success Criteria — Migration (post-merge by construction):**
+   - [ ] AC16 — observation #159 marked `actioned`: can only happen after the merge, so it cannot pass at `/finalise`
+
+### Next Steps:
+
+- [ ] Pin AC7 and AC8 with behavioural tests, or re-scope them
+- [ ] Re-scope AC9 and AC16 out of the pre-merge Success Criteria (e.g. into Deferred Work)
+- [ ] Re-run `/finalise`
+
+**Estimated Effort:** Small (1-2 hours)
+
+**Gap Report Generated:** 2026-09-30
+
+**Detailed Verification Log:** See `task.142.dod.1.reference-doc-skill-pinning.md` for complete verification evidence.
+
+## Implementation Notes
+
+### Implementation Summary
+
+- `tests/reference-doc-skill-pinning.test.js` (new, CommonJS): two extractors, a named
+  `NON_SKILL_ROWS` list asserted exactly, three live-corpus groups with floors, nine fixture tests.
+- `docs/reference/commands.md:143`: the one real finding — `/session-handoff --read` advertised a
+  flag `skills/session-handoff/SKILL.md` never mentions. The row now describes read mode.
+- `CHANGELOG.md` `[Unreleased]` › Added.
+
+### Approach
+
+Implemented inline from the plan, as corrected by `task.142.review.1`: split rows on unescaped
+pipes; resolve the **last word-start** `/name` token of the first cell; collect every `--flag` in the
+first cell; treat an activation span as a skill only when its head is `[a-z0-9][a-z0-9-]*`. Failures
+are collected into one array per test and asserted empty, so a red run lists every offending row with
+its file and line, not just the first.
+
+### Testing Results
+
+- `command node --test tests/reference-doc-skill-pinning.test.js`: 15 pass, 0 fail, ~170 ms, no
+  process spawn, no network; `SKILL.md` reads memoised per skill.
+- Live counts at `80f460bc` + this change: 80 command rows (76 slash, 63 skills), 4 non-skill rows,
+  20 flag assertions, 67 activation mentions over 62 skills. Floors: ≥ 70 / ≥ 16 / ≥ 58.
+- Mutation proofs — each turned the named assertion red and was restored:
+
+  | Mutation | Red |
+  | :--- | :--- |
+  | Original row 143 (`/session-handoff --read`) restored | flag existence |
+  | `/qa-next --dry-run --nope` | flag existence |
+  | `run-loop.mjs watch` → `run-loop.mjs tail` | `NON_SKILL_ROWS` exact (both messages: unexpected + stale) |
+  | `mv skills/qa-next skills/qa-next.bak` | command resolution + activation resolution |
+  | `extractCommandRows` → `[]` | command floor, flag floor, `NON_SKILL_ROWS`, 6 fixtures |
+  | `extractActivationSkills` → `[]` | activation floor, 2 fixtures |
+  | First `/token` wins instead of last | command resolution (`/loop`), 1 fixture |
+  | Plain `split("\|")` | the escaped-pipe fixture |
+  | Any `/name`, not word-start | command resolution (row 143 → `handoff-verify`), 1 fixture |
+  | Activation head check removed | activation resolution, 1 fixture |
+
+- `npm run ci:fast` with both `.claude/skills` and `.agents/skills` symlinks moved aside: prettier
+  clean; 4,713 tests, 4,712 pass, 0 fail, 1 skipped (pre-existing). `npm run check:generated` green.
+
+### Re-scope after `/finalise` run 1 (2026-09-30)
+
+- Two tests added under `describe("the guard's cost")`: no spawn / no network (spies on
+  `child_process`, `net`, `http`, `https`, `fetch` around a full corpus resolution), and one
+  `SKILL.md` read per skill (spy on `fs.readFileSync`, with a non-vacuity floor). `skillMd`
+  became a `makeSkillMd()` factory and `resolveCorpus()` runs the same code paths the assertions use.
+  The file is now 17 tests.
+- Mutation-proven: memoisation removed → "read once" red; an `execSync` in the lookup → "no
+  spawn" red; an `http.get` in the lookup → "no spawn" red. All restored; baseline green.
+- The wall-clock and obs #159 criteria moved to Deferred Work (see there).
+- QA cycle 2 (refute pass) found the cost tests spied on `resolveCorpus()` while the live assertions
+  repeated its lookups inline (CR-1), `withSpies` passed silently on a missing target (CR-2), and
+  would restore before async work ran (CR-3). Fixed: the live-corpus groups now assert on what
+  `resolveCorpus()` returns, `withSpies` reports and the tests assert the installed count, a promise
+  from `fn` is refused, and the header names the destructured-import blind spot. Mutation-proven:
+  a spawn in the flag loop, a misspelled spy target and an async `fn` each turn the no-spawn test red.
+
+### Completion Date
+
+2026-09-30
+
+### Deferred Work
+
+- Observation #159 → `actioned` after merge (the `create-skill` half was installed 2026-09-25, PR
+  #487, so the merge of this task is the last condition). Moved out of § 9 Migration after
+  `/finalise` run 1: an item that can only happen after merge can never pass at acceptance.
+- `npm test` wall-clock: the file runs in ~130–170 ms locally. Moved out of § 9 Performance after
+  `/finalise` run 1 — a wall-clock claim with no budget test is not a pre-merge criterion; the two
+  cost properties that are testable (no spawn/network, memoised reads) are pinned instead.
+- Generating `commands.md` from skill frontmatter, and pinning the skills' `README.md`s — § Notes,
+  Future Improvements; out of scope here.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-22 | 1.0     | Initial draft | create-task |
-
+| 2026-09-30 | 1.1     | Review 9/10 after fixes — resolver rule corrected (word-start `/name`, unescaped-pipe split), CommonJS, existing guards named, one real finding (`/session-handoff --read`) recorded for Phase 3, counts re-measured | review-task |
+| 2026-09-30 |         | Status → ready-for-development | review-task |
+| 2026-09-30 |         | Implemented — 1 new test file (15 tests), 1 reference-doc row fixed, CHANGELOG entry | develop |
+| 2026-09-30 |         | QA gate PASS (100/100) — 0 blocking, 2 low advisory findings | qa-task |
+| 2026-09-30 |         | DoD incomplete — 4 gaps identified | finalise |
+| 2026-09-30 | 1.2     | Success Criteria re-scoped after DoD gaps (user-approved): no-spawn and memoised-read criteria now pinned by two tests; wall-clock and obs #159 items moved to Deferred Work | Claude |
+| 2026-09-30 |         | QA gate CONCERNS (90/100) — 1 finding (cost tests spied on code the assertions did not run) | qa-task |
+| 2026-09-30 |         | QA findings fixed — gate PASS (100/100), 1 iteration | qa-fix |
+| 2026-09-30 |         | QA gate PASS (100/100) — 0 blocking, 3 low advisory findings | qa-task |
+| 2026-09-30 | 1.3 | DoD passed — accepted (PR #534) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -462,23 +654,23 @@ additions.
 
 ### Phase 1: The extractors
 
-- [ ] `extractCommandRows`
-- [ ] `extractActivationSkills`
-- [ ] `NON_SKILL_ROWS` asserted exactly
+- [x] `extractCommandRows`
+- [x] `extractActivationSkills`
+- [x] `NON_SKILL_ROWS` asserted exactly
 
 ### Phase 2: The assertions and their floors
 
-- [ ] Command resolution
-- [ ] Flag existence
-- [ ] Activation-table resolution
-- [ ] Three floors, with extractor-blaming messages
+- [x] Command resolution
+- [x] Flag existence
+- [x] Activation-table resolution
+- [x] Three floors, with extractor-blaming messages
 
 ### Phase 3: First run, and what it surfaces
 
-- [ ] Green against the live corpus
-- [ ] Any real finding fixed in the same commit
-- [ ] Header comment naming what is not pinned
-- [ ] All three groups mutation-proved
+- [x] Green against the live corpus
+- [x] Any real finding fixed in the same commit
+- [x] Header comment naming what is not pinned
+- [x] All three groups mutation-proved
 
 ---
 
@@ -514,7 +706,12 @@ additions.
 **Open** (non-blocking):
 
 - ⚠️ `/loop` is a Claude Code built-in, not a skill; it appears only as the wrapper in
-  `` `/loop /develop-next` ``. Handled by taking the last `/` token.
+  `` `/loop /develop-next` ``. Handled by taking the last **word-start** `/` token.
+- ⚠️ `activation-phrases.md` also backticks non-skill spans — `` `/develop-story` ``,
+  `` `/develop-task` ``, the built-in `` `/security-review` ``, `` `handoff-verify.mjs` `` — which the
+  head-token regex rejects. Correct, and silent; the header comment says so.
+- ⚠️ Both `.claude/skills → ../skills` and `.agents/skills → ../skills` are gitignored symlinks;
+  move both aside before trusting a local green.
 - ⚠️ `activation-phrases.md` backticks the skill and its flag as two **separate** spans in one cell,
   so `--validate` and `--review` arrive as their own tokens. `[a-z0-9-]+` matches them — the head
   token must be required to start with a letter or digit, or the test is red on arrival at
