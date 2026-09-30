@@ -12,6 +12,7 @@ updated: 2026-09-30
 assignee:
 estimated_effort_hours: 16
 github_issue: 486
+pr_number: 537
 ---
 
 # Technical Task: QA Testing Results section — one write engine, one placement, refused when duplicated
@@ -445,3 +446,4 @@ Carried from QA gate 3 (`task.155.gate.3.qa-results-section-engine.yml`, route 2
 - **REL-007** (LOW) — a misplaced section that itself quotes a Date-headed table can be cut at its own table (inside a marker block after the log rows, or under a table-less marker-less log). 0 of 155 tracked sections quote such a table.
 - **REL-008** (LOW) — a misplaced section before a log holding two Date-headed tables loses the first table's rows; a log header that is not Date-first is not recognised. 0 corpus logs have either shape.
 - CRLF seam preservation and two small cleanups (gate 3 `recommendations.future`).
+- **PC-1** (LOW, PR review 1) — the Change Log write that follows Step 12 collapses the blank line before `<!-- change-log-start -->`. That seam belongs to `change-log.js`'s `upsertChangeLog`, not this engine.

@@ -381,3 +381,35 @@ test("G6 a section further down, after a table-less marker-less log and another 
   assert.equal(r.reason, "replaced");
   assert.doesNotMatch(r.content, /Stale tail line|quoted/);
 });
+
+// ---------------------------------------------------------------------------
+// H — PR review 1 findings (task.155 5c)
+// ---------------------------------------------------------------------------
+
+test("H1 CR-1: a section above a marker-less ### Change Log never swallows the log", () => {
+  const doc = `${FM}## Dev Notes\n\nx\n\n### Change Log\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | Initial draft | create-story |\n`;
+  let out = doc;
+  for (let n = 1; n <= 3; n++) {
+    const r = QR.upsertQaResults(out, section(n), { docType: "story" });
+    assert.equal(r.reason, n === 1 ? "created" : "replaced");
+    out = r.content;
+  }
+  assert.equal(qaCount(out), 1);
+  assert.match(
+    out,
+    /None \(cycle 3\)\.\n\n### Change Log\n\n\| Date \| Version/,
+  );
+  assert.match(
+    out,
+    /\| 2026-09-25 \| 1\.0 \| Initial draft \| create-story \|/,
+  );
+});
+
+test("H2 CR-2: a trailing --- in the caller's section does not stack across replaces", () => {
+  let out = `${FM}## Body\n\ntext\n\n## Next\n`;
+  for (let n = 1; n <= 3; n++) {
+    out = QR.upsertQaResults(out, `${section(n)}\n\n---\n`, {}).content;
+  }
+  assert.equal(count(out, "\n---\n"), 1); // the frontmatter close only
+  assert.equal(qaCount(out), 1);
+});

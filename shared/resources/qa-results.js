@@ -189,6 +189,13 @@ function findQaResults(content) {
       // runs to `## Change Log` and a replace deletes the start marker (review C2).
       const next = blocks.find((b) => b.start > start);
       if (next) candidates.push(next.start);
+      // The same holds for a marker-less log: an H3 `### Change Log` does not end a
+      // `##` span, so a section created directly above one swallowed the whole log on
+      // its next replace. The cycle-1 rewrite narrowed this bound to marker blocks
+      // and lost the case (task.155 PR review 1, CR-1).
+      if (changeLog && !changeLog.hasMarkers && changeLog.start > start) {
+        candidates.push(changeLog.start);
+      }
     }
     // A section written between a change-log heading and that log's table must not
     // carry the table away. Two shapes, and only these two (task.155 QA cycles 1–2,
@@ -265,7 +272,15 @@ function insertAt(content, pos, body) {
 // added another (task.155 QA cycle 1, REL-001).
 function normaliseSection(section) {
   if (typeof section !== "string") return null;
-  const body = section.replace(/^(?:[ \t]*\r?\n)+/, "").replace(/\s+$/, "");
+  // A trailing thematic break is a separator, never section content: the span
+  // excludes it on read, so keeping it here stacked one `---` per replace
+  // (task.155 PR review 1, CR-2).
+  const body = section
+    .replace(/^(?:[ \t]*\r?\n)+/, "")
+    .replace(
+      /(?:\r?\n[ \t]{0,3}(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}))?\s*$/,
+      "",
+    );
   if (!body.startsWith(HEADING)) return null;
   if (findQaResults(body).sections.length !== 1) return null;
   const firstLineEnd = body.indexOf("\n");
