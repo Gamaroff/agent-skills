@@ -347,17 +347,17 @@ All cycle 1–2 findings are fixed and verified, and all four bugs are closed. C
 ### Missing Criteria:
 
 1. **Acceptance Criteria:**
-   - [ ] SC-F4b: the `zsh -f` listing guard (`tests/detector-candidate-rule.test.mjs` C) registers its zsh arm only where zsh exists. CI's ubuntu-latest has none (run 36696439670 ran only `C [bash]`), and the bash arm cannot see the `nomatch` regression. Suggested fix: a `bash -O failglob` arm, which fails an unmatched glob as zsh does and runs per-PR.
+   - [x] SC-F4b: the `zsh -f` listing guard (`tests/detector-candidate-rule.test.mjs` C) registers its zsh arm only where zsh exists. CI's ubuntu-latest has none (run 36696439670 ran only `C [bash]`), and the bash arm cannot see the `nomatch` regression. Suggested fix: a `bash -O failglob` arm, which fails an unmatched glob as zsh does and runs per-PR.
 
 2. **Security Review:**
    - [ ] Zero-guard: Step 1b fires on `choose_candidate()` (`shared/resources/advance-pipeline-lock.sh`). The probe engine declined `entry-not-probeable` (sourcing the script runs its top-level parse), so it executed 0 candidates (`task.133.dod.security.run.json`). Needed: a CLI-form probe of `--restore --which` with a cases file, a recorded §5.1 by-hand probe, or a documented human override. The diff changes only where a message prints.
 
 3. **Housekeeping:**
-   - [ ] Tick the Progress Tracking QA and Gate items.
+   - [x] Tick the Progress Tracking QA and Gate items.
 
 ### Next Steps:
 
-- [ ] **BLOCKING**: SC-F4b per-PR arm
+- [x] **BLOCKING**: SC-F4b per-PR arm
 - [ ] **BLOCKING**: execute `choose_candidate()` against hostile candidates, or record the override
 - [ ] Re-run `/finalise`
 
@@ -390,8 +390,8 @@ All cycle 1–2 findings are fixed and verified, and all four bugs are closed. C
 - [x] Phase 3: detector prompt
 - [x] Phase 4: citations and messages
 - [x] Phase 5: change-log append-only check
-- [ ] QA: `task.133.qa.[N].task-130-residue-cleanup.md`
-- [ ] Gate: `task.133.gate.[N].task-130-residue-cleanup.yml`
+- [x] QA: `task.133.qa.[N].task-130-residue-cleanup.md`
+- [x] Gate: `task.133.gate.[N].task-130-residue-cleanup.yml`
 
 ## References
 

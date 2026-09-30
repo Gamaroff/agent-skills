@@ -16,9 +16,14 @@
 //   B — the script behaves as the prompt says: an older matched claim beside a NEWER legacy
 //       snapshot → --restore --which names the claim, with and without --accept-legacy; a
 //       legacy-only set → nothing, exit 1   (rank by mtime alone → red; accept legacy → red)
-//   C — the prompt's listing fence, executed under `zsh -f` and bash with no `.pausing.*`
-//       present, lists the existing last-halt.json; with a newer claim, the claim comes first
-//                                                   (the pre-task.137 `ls` glob → red under zsh)
+//   C — the prompt's listing fence, executed under `zsh -f`, bash, and `bash -O failglob` with no
+//       `.pausing.*` present, lists the existing last-halt.json; with a newer claim, the claim
+//       comes first          (the pre-task.137 `ls` glob → red under zsh and under bash failglob)
+//
+// The failglob arm is the one that runs on every PR: CI's ubuntu runner has no zsh, so the zsh
+// arm registers only where zsh is installed, and plain bash passes an unmatched glob through
+// unchanged — it cannot see the regression. `failglob` fails an unmatched glob the way zsh's
+// `nomatch` does, so the guard no longer depends on the host having zsh.
 //
 // The prose is found by marker, not by phrase: a restatement that drops the marker reads as a
 // missing rule, which is the failure this test exists to see.
@@ -37,11 +42,16 @@ const RES = path.resolve(HERE, "..");
 const PROMPT = path.join(RES, "pipeline-resume-detector-prompt.md");
 const LOCK_SH = path.join(RES, "advance-pipeline-lock.sh");
 const hasZsh = spawnSync("zsh", ["-c", "true"]).status === 0;
-const SHELLS = hasZsh ? ["bash", "zsh"] : ["bash"];
+const SHELLS = hasZsh
+  ? ["bash", "bash-failglob", "zsh"]
+  : ["bash", "bash-failglob"];
+const binFor = (shell) => (shell === "zsh" ? "zsh" : "bash");
 const argvFor = (shell, script) =>
   shell === "zsh"
     ? ["-f", "-c", script]
-    : ["--noprofile", "--norc", "-c", script];
+    : shell === "bash-failglob"
+      ? ["--noprofile", "--norc", "-O", "failglob", "-c", script]
+      : ["--noprofile", "--norc", "-c", script];
 
 // Step 1 runs from its heading to the next `### ` heading.
 function step1() {
@@ -198,7 +208,7 @@ for (const sh of SHELLS) {
       fs.writeFileSync(snap, "{}");
       const old = new Date("2026-01-01T00:00:00Z");
       fs.utimesSync(snap, old, old);
-      let r = spawnSync(sh, argvFor(sh, listingFence()), {
+      let r = spawnSync(binFor(sh), argvFor(sh, listingFence()), {
         cwd: dir,
         encoding: "utf8",
       });
@@ -212,7 +222,7 @@ for (const sh of SHELLS) {
         path.join(state, "develop-pipeline.lock.pausing.77"),
         "{}",
       );
-      r = spawnSync(sh, argvFor(sh, listingFence()), {
+      r = spawnSync(binFor(sh), argvFor(sh, listingFence()), {
         cwd: dir,
         encoding: "utf8",
       });
