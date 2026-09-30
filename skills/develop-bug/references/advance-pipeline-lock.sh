@@ -230,6 +230,15 @@ choose_candidate() {
   local matched_newest=-1 legacy_newest=-1 legacy_chosen=""
   for c in "${candidates[@]}"; do
     jq -e 'type == "object"' "$c" >/dev/null 2>&1 || { echo "advance-pipeline-lock: '$c' is not a JSON object — skipped" >&2; continue; }
+    # Refuse a directory holding a control character BEFORE the shell reads it (bug.17). The
+    # `$(jq -r …)` below is not a faithful copy of the JSON string: zsh keeps an embedded NUL and
+    # canon()'s `cd` truncates at it, and both shells strip a trailing newline — so `<doc>\u0000x`
+    # and `<doc>\n` each read back as `<doc>` and passed the compare for a string the candidate
+    # does not hold. The test runs in jq, on the JSON value, where no shell has touched it.
+    if jq -e '(.task_or_story_directory // "") | type == "string" and (explode | any(. < 32 or . == 127))' "$c" >/dev/null 2>&1; then
+      echo "advance-pipeline-lock: '$c' has a task_or_story_directory containing a control character — refusing to restore from it" >&2
+      continue
+    fi
     c_dir=$(jq -r '.task_or_story_directory // ""' "$c")
     if [ -z "$c_dir" ] && [ "$ACCEPT_LEGACY" != "1" ]; then
       # A snapshot with no directory predates task.123 and can belong to ANY document; a match

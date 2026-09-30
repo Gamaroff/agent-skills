@@ -99,6 +99,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`--restore` refuses a candidate whose directory holds a control character (bug 17, #529).**
+  - `advance-pipeline-lock.sh` `choose_candidate()` read `task_or_story_directory` through
+    `$(jq -r …)`, which does not copy the JSON string exactly. zsh keeps an embedded NUL, and
+    `canon()`'s `cd` truncates at it. Both shells strip a trailing newline. So `<doc>\u0000x` under
+    zsh and `<doc>\n` under **either** shell read back as `<doc>` and passed the provenance
+    check.
+  - A `jq` test on the JSON value now refuses any U+0000–U+001F or U+007F before the shell reads
+    it. The candidate is skipped by name and is never chosen or consumed. The same change covers
+    `--restore --which` and `grant-qa-cycles.sh`'s never-lower guard, which read the same
+    selection.
+  - `advance-pipeline-lock.test.sh` adds five cases per shell. Before the fix, 9 of those 10 cases
+    failed.
+
 - **task.130's residue: eleven advisory findings closed (task 133).**
   - `advance-pipeline-lock.sh`: the `--accept-legacy` advice prints once, only when nothing
     restores. A matched claim beside a bystander legacy snapshot now restores quietly. The header's
