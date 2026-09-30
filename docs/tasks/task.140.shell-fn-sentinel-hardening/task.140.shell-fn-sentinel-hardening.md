@@ -314,29 +314,29 @@ None.
 
 **Testing results.** `security-probe.test.mjs` 105/105 (100 pre-existing + 5 new). Seven mutants, each red on its own row only (recorded in the implementation report). `lint-lane-fixture-parity.test.mjs` 2/2, two mutants red. `npm run lint:shell`: 78 source shell scripts (was 77), clean. task.136 green path: `engages`, executed 20, bash + zsh; without `--fake-gh` the same call now declines `needs-fake-gh`. `npm run ci:fast` exit 0; `bundle:check` 0.
 
-**Deferred work.** None. The residual the rule names — a symlink that appears between the containment check and the readable-file check — is a race nothing here defends against, stated in `probe-boundary-rule.md` §5.
+**Deferred work.** From gate 5, by route 2b (cosmetic residue): CR-1 and CR-2, two LOW wording points in rule §5 → `recommendations.future`. From gate 4: the `gh` containment bypasses (PATH prepend, `--fake-gh` bypass, backgrounded call; pre-existing at `origin/develop`) are stated as limits; closing them is follow-up work. The residual the rule names — a symlink that appears between the containment check and the readable-file check — is a race nothing here defends against, stated in `probe-boundary-rule.md` §5.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.140.qa.4.shell-fn-sentinel-hardening.md](./task.140.qa.4.shell-fn-sentinel-hardening.md)
-- **Gate File**: [task.140.gate.4.shell-fn-sentinel-hardening.yml](./task.140.gate.4.shell-fn-sentinel-hardening.yml)
+- **Full Report**: [task.140.qa.5.shell-fn-sentinel-hardening.md](./task.140.qa.5.shell-fn-sentinel-hardening.md)
+- **Gate File**: [task.140.gate.5.shell-fn-sentinel-hardening.yml](./task.140.gate.5.shell-fn-sentinel-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 114 (+55 under `TMPDIR=/tmp`)
-- **Phases Verified**: 4/4 (1 with a concern)
-- **Critical Issues**: 0 HIGH, 1 MEDIUM
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Tests Executed**: 115 (+56 under `TMPDIR=/tmp`)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 0 MEDIUM (2 LOW)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 3's findings are fixed and closed ([BUG-5](./task.140.bug.5.tripwire-decline-drops-escapes.md), [BUG-6](./task.140.bug.6.tripwire-marker-lost-under-env-i.md)), each mutation-proven.
-- [TASK-140-BUG-7](./task.140.bug.7.rule-overclaims-one-limit.md) (medium): rule §5 names one trip-wire limit; three more were executed. The bypasses themselves are identical at `origin/develop` and go to a follow-up.
+- [TASK-140-BUG-7](./task.140.bug.7.rule-overclaims-one-limit.md) is fixed and closed; all seven bugs are closed.
+- Two LOW precision points remain in rule §5's wording. The `gh` containment bypasses are pre-existing and stated as limits; closing them is follow-up work.
 
 <!-- change-log-start -->
 ## Change Log
@@ -355,6 +355,7 @@ None.
 | 2026-09-30 |  | QA findings fixed — cycle 3 (after an operator grant of 2 cycles): the trip-wire decline keeps escapes/cases/shells; the stub carries its marker path, so `env -i` is recorded; 2 rows, 2 mutants | qa-fix |
 | 2026-09-30 |  | QA gate CONCERNS (80/100) — 1 finding (1 medium); 3 pre-existing containment bypasses to follow-up | qa-task |
 | 2026-09-30 |  | QA findings fixed — cycle 4: rule §5 states the three further trip-wire limits (PATH prepend, fake-gh bypass, backgrounded call) with a pinning row | qa-fix |
+| 2026-09-30 |  | QA gate PASS (100/100) — 2 findings (2 low) | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
