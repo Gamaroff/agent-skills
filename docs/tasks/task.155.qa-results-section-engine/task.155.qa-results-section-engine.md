@@ -5,7 +5,7 @@ type: task
 description: "Give the work item's `## QA Testing Results` section a write engine beside change-log.js. It replaces the section whole, places it in one canonical position outside the change-log block, and refuses a document that already carries more than one. Wire qa-task and qa-story Step 12 to it, repair the one corrupted document in the corpus, and hold the invariant with a corpus test."
 tags: [qa-task, qa-story, change-log, engine, observation]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-09-25
 updated: 2026-09-30
@@ -17,7 +17,7 @@ pr_number: 537
 
 # Technical Task: QA Testing Results section — one write engine, one placement, refused when duplicated
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.155.review.1.qa-results-section-engine.md` implemented 2026-09-30
 
@@ -377,27 +377,27 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.155.qa.4.qa-results-section-engine.md](./task.155.qa.4.qa-results-section-engine.md)
-- **Gate File**: [task.155.gate.4.qa-results-section-engine.yml](./task.155.gate.4.qa-results-section-engine.yml)
+- **Full Report**: [task.155.qa.5.qa-results-section-engine.md](./task.155.qa.5.qa-results-section-engine.md)
+- **Gate File**: [task.155.gate.5.qa-results-section-engine.yml](./task.155.gate.5.qa-results-section-engine.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 41 task tests. Full `ci:fast` ran 4757 tests: 4755 pass, 1 load-sensitive failure that passes alone, 1 skipped. A corpus dry run over 1,837 documents in a temp copy (155 replaces and 1,682 create-then-replace runs) lost no marker, dated row or heading.
+- **Tests Executed**: 46 engine and wiring tests. Full `ci:fast` ran 4762 tests: 4761 pass, 0 fail, 1 skipped. A corpus dry run over 1,842 documents in a temp copy lost no marker, dated row or heading, and 2 documents were refused `unplaceable`.
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 high, 0 medium, 3 low (in the gate)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 1 high, 1 medium, 1 low (in the gate)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- The PR review 1 fixes hold. CR-1 (the marker-less `### Change Log` bound) and CR-2 (the trailing-break strip) are each mutation-proven by H1 and H2, and `pr_number` is set.
-- REL-009 (low): the break strip leaves one blank line, which grows per replace unless a Change Log write follows.
-- REL-010 (low; a regression from the CR-1 fix): a section carrying its own `### Change Log` subheading stacks its stale tail. The corpus has 0 instances.
-- REL-011 (low; present since the first commit): an unclosed fence at the end of a document makes `created` stack copies. The corpus has 0 target documents with this shape.
+- CR-1 (PR review 2) is only partly closed. Both of the reviewer's repros are refused. REL-011 is fixed (`unplaceable`).
+- REL-012 (high): a stray fence in the section that a later fenced block closes still deletes the Change Log and the sections between, reported as `replaced`. The read-back counts sections, not the text around them. Injected into the corpus, it deletes content from task.90 and task.96.
+- REL-013 (medium): a `## Change Log` heading directly above the marker block leaves the section between them. Layout only; 6 tracked tasks have this shape.
+- REL-014 (low): setext and indented headings are not span boundaries. 0 corpus sections are affected.
 <!-- change-log-start -->
 ## Change Log
 
@@ -411,6 +411,7 @@ None.
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low); cycle 2 | qa-task |
 | 2026-09-30 |  | QA gate PASS (100/100) — 2 low findings (REL-007, REL-008); cycle 3 | qa-task |
 | 2026-09-30 |  | QA gate PASS (100/100) — 3 low findings (REL-009, REL-010, REL-011); cycle 4 | qa-task |
+| 2026-09-30 |  | QA gate FAIL (60/100) — 3 findings (1 high REL-012, 1 medium REL-013, 1 low REL-014); cycle 5 | qa-task |
 <!-- change-log-end -->
 
 ---

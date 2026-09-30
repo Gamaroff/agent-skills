@@ -1,0 +1,88 @@
+schema: 2
+task: 'task.155.qa-results-section-engine'
+task_title: 'QA Testing Results section: one write engine, one placement, refused when duplicated'
+gate: FAIL
+status_reason: 'CR-1 is closed only for a fence that runs to the end of the document. A stray fence in the section that a LATER fenced block closes still deletes the Change Log block and every section up to the next heading after that block, reported as replaced, because checked() counts sections and never compares what surrounds them (REL-012, high).'
+reviewer: 'QA Engineer'
+head: '07e0d85412e934a286a439a0a29de474c0712053'
+updated: '2026-09-30T20:32:02Z'
+
+top_issues:
+  - id: 'REL-012'
+    severity: high
+    status: open
+    file: 'shared/resources/qa-results.js'
+    finding: 'unclosedFence() only flags a fence that runs to EOF. When an existing section holds a stray fence and any later fenced block in the document closes it (the later block''s own closing ```), the fence range is closed, so the section is not unbounded. Every heading and change-log marker inside that range is protected, rawEnd moves to the first heading after the later block, and replace (or relocate) deletes the whole Change Log block and the sections between. The result reports replaced, and checked() passes because it only counts sections. Reproduced: marker doc -> change-log-start/end, the dated row and ## Dev Notes lost; marker-less doc -> the ## Change Log table lost; a section inside the log -> the markers and the original row lost. Corpus: a stray fence injected under the heading of each of the 155 tracked sections gives 153 unbounded and 2 replaced, and the 2 replaced delete content: task.90 loses 8,092 bytes and task.96 loses 16,657 bytes including its Change Log. The trigger needs a hand-written stray fence (0 of 155 sections have one today, and the engine now refuses to write one), which is the same trigger class PR review 2 rated HIGH as CR-1(b).'
+    suggested_action: 'Treat as unbounded any fence that opens inside the section and whose range covers a line the span would otherwise have ended at (an H1/H2, a change-log marker, a marker-less log heading, found without that fence''s protection). Also make checked() compare the change-log marker lines and dated rows outside the old and new section spans before and after the write, refusing unplaceable on any difference. Add a two-block regression test: a stray fence in the section plus a later fenced block, red before the fix.'
+    suggested_owner: dev
+  - id: 'REL-013'
+    severity: medium
+    status: open
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code-review CR-1 (medium, high confidence). When a document puts ## Change Log directly ABOVE <!-- change-log-start --> (6 tracked tasks: 58, 127, 134, 137, 138, 168), canonicalOffset returns the marker offset, so created and relocated place the section between the heading and the marker. The following upsertChangeLog then writes its own heading inside the block, leaving an empty orphan ## Change Log above the QA section. Reproduced on task.168 over 3 cycles: 2 Change Log headings, rows 1 -> 4, none lost. Layout only, nothing deleted.'
+    suggested_action: 'When the marker block is preceded (blank lines only) by an unprotected Change Log heading, place the section above that heading; add a heading-above-marker fixture to the unit and wiring tests.'
+    suggested_owner: dev
+  - id: 'REL-014'
+    severity: low
+    status: open
+    file: 'shared/resources/qa-results.js'
+    finding: 'A setext H1/H2 (a line underlined with --- or ===) or an ATX heading indented 1 to 3 spaces after a section is not a boundary, because RE_H1_H2 only matches ATX at column 0. A replace deletes that heading and its body up to the next column-0 heading (reproduced: Setext/------ and "  ## Indented" each lost with their body). 0 of 155 tracked section spans contain either shape. The one near-miss is task.118''s trailing setext underline, which is the gate 4 CR-3 cosmetic.'
+    suggested_action: 'Bound the span on setext underlines and 0 to 3-space-indented ATX headings too, or refuse (unbounded) when either appears unprotected in the span.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 46
+  phases_verified: 4/4
+  ci: 'ci:fast locally @ 07e0d85412e9: 4762 tests, 4761 pass, 0 fail, 1 skipped (EXIT 0). bundle:check 0 problems; validate qa-task and qa-story pass; both generated qa-results.js copies match the source apart from the header. PR CI not awaited (gated at /finalise).'
+  corpus_run: '1,985 tracked docs/**/*.md copied to a temp directory. 1,842 documents were written 3 times: 1,685 created,replaced,replaced; 155 replaced x3; 2 unplaceable x3 (the former REL-011 documents, now refused). 0 documents lost a change-log marker, dated row, H1/H2 or Change Log heading outside the section, write 3 equalled write 2 with the section swapped, and none ended with more than one section.'
+  cr1_repros: 'PR review 2 repro (a): the nested-fence slip section is refused bad-section, nothing written. Repro (b): the marker-less document with a hand-written unclosed fence is refused unbounded, nothing written. A variant of (b) where a later fenced block closes the stray fence still deletes (REL-012).'
+  other_probes: 'No deletion found for a CRLF document with or without a fenced section, a CRLF stray fence (refused unbounded), an HTML comment opened in the section or holding a ## line, an indented marker, an unclosed inline code span, a section quoting a bare change-log start or end marker, or a fenced ## example.'
+  step_4b: 'qa-execute-snippets: qa-task 1 runnable / 3 placeholder / 16 mutating; qa-story 1 / 4 / 14; bash and zsh; 0 findings. The changed Step 12 blocks are also executed by tests/qa-results-step12-wiring.test.js.'
+  mutation_proofs: 'unclosedFence check removed from normaliseSection -> I1 red (covered); the unbounded refusal removed -> I2 and both Step 12 wiring unbounded tests red (covered); checked() forced true -> I3 red (covered). cp snapshot restored, baseline 46/46 green, git status unchanged.'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+bug_resolution:
+  previous_gate: 'task.155.gate.4.qa-results-section-engine.yml (PASS 100)'
+  verified_fixed: ['CR-1 (PR review 2): partially; the EOF-unclosed form is refused, the closed-later form is REL-012', 'REL-011 (gate 4): created inside an unclosed fence is now unplaceable', 'PC-1..PC-5 (PR review 2): Deferred Work and CHANGELOG wording']
+  deferred: ['REL-007', 'REL-008', 'REL-009', 'REL-010', 'PC-1', 'CRLF seam preservation']
+  fix_commit: '07e0d85412e934a286a439a0a29de474c0712053'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'A pure string transform with no network access and no shell. boundary: internal (unchanged): the inputs are a pipeline-written work item and a pipeline-rendered section, and no corpus sink models this section.'
+  performance:
+    status: PASS
+    notes: 'The 46 engine and wiring tests run in about 1 s. The 1,842-document dry run takes seconds.'
+  reliability:
+    status: CONCERNS
+    notes: 'The EOF form of CR-1 is refused and the post-write read-back closes REL-011, but REL-012 still deletes content while reporting replaced. The read-back only counts sections, so it cannot detect loss around them.'
+  maintainability:
+    status: PASS
+    notes: 'The generated copies match the source and the bundle is fresh. Advisory cleanup (code-review CR-2, same as gate 4 CR-3): normaliseSection repeats the thematic-break pattern instead of using RE_BREAK.'
+
+recommendations:
+  immediate:
+    - action: 'REL-012: refuse a section whose stray fence is closed by a later block, and make checked() compare the markers and dated rows outside the section before and after the write'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+  future:
+    - action: 'REL-013: place the section above a Change Log heading that sits directly over the marker block'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'REL-014: bound the span on setext and indented headings'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Carried: REL-007..010, PC-1, CRLF seams, RE_BREAK reuse (see the task Deferred Work)'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/change-log.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['REL-012 fixed and mutation-proven']
