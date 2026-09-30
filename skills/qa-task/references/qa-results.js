@@ -22,7 +22,9 @@
 //   created    none                                       → inserted at the canonical position
 //   multiple   more than one                              → NOTHING written
 //   bad-section the new section is not one section        → NOTHING written
-//   unbounded  the existing section opens a fence that never closes → NOTHING written
+//   unbounded  the existing section cannot be bounded safely — it opens a fence that
+//              never closes, or the text a write would remove carries a change-log
+//              marker, an H1/H2 or a change-log heading      → NOTHING written
 //   unplaceable the write would not read back as exactly one section → NOTHING written
 //
 // The last two exist because an unclosed fence protects everything after it: every
@@ -80,6 +82,36 @@ const RE_LOG_HEADER = /^\|[ \t]*Date[ \t]*\|/i;
 // directly under a paragraph line, `---` is a setext H2 underline, not a break.
 const RE_BREAK =
   /^[ \t]{0,3}(?:-[ \t]*){3,}$|^[ \t]{0,3}(?:\*[ \t]*){3,}$|^[ \t]{0,3}(?:_[ \t]*){3,}$/;
+
+// Any heading that names a change log, at any level (the marker-less H3 form is how
+// the story and epic templates emit it).
+const RE_LOG_HEADING = /^ {0,3}#{1,6}[ \t]+(?:\d+\.?[ \t]+)?Change Log\b/i;
+// What a replace or relocate may never remove, scanned in the removed text IGNORING
+// fences: a change-log marker, an ATX H1/H2 (column 0 or indented 1–3 spaces), or a
+// change-log heading at any level. Fence-blind on purpose — every earlier bound was
+// protection-aware, so one stray fence in the section re-paired every fence after it
+// and the span widened over real headings and markers as "example text"
+// (task.155 PR review 2 CR-1; QA cycle 5 REL-012, REL-014). A setext underline is
+// deliberately NOT structural: this repository never authors setext headings, and
+// the one corpus instance is a `---` separator directly under a paragraph inside a
+// QA section, which refusing would turn into a false stop.
+const RE_STRUCTURAL = [
+  /^ {0,3}<!-- (?:change-log|jira-sync-changelog|github-sync-changelog)-(?:start|end) -->/,
+  /^ {0,3}#{1,2}(?:[ \t]|$)/,
+  RE_LOG_HEADING,
+];
+
+// Does the text a write would remove carry anything outside the section itself?
+// The first line is the section's own heading and is exempt.
+function removesStructure(removed) {
+  return removed
+    .split("\n")
+    .slice(1)
+    .some((line) => {
+      const l = line.replace(/\r$/, "");
+      return RE_STRUCTURAL.some((re) => re.test(l));
+    });
+}
 
 const isBlank = (line) => /^[ \t]*\r?$/.test(line);
 
@@ -275,7 +307,17 @@ function anchorOffset(content, docType) {
 // before the doc-type anchor, else at the end. Never "before the first ##".
 function canonicalOffset(content, docType) {
   const changeLog = findChangeLog(content);
-  if (changeLog) return changeLog.start;
+  if (changeLog) {
+    // A `## Change Log` heading written directly ABOVE the marker block (outside it)
+    // belongs to the log: land before the heading, not between it and the marker,
+    // or the next Change Log write strands it empty (task.155 QA cycle 5, REL-013).
+    if (changeLog.hasMarkers) {
+      const above = content.slice(0, changeLog.start).replace(/\s+$/, "");
+      const lineStart = above.lastIndexOf("\n") + 1;
+      if (RE_LOG_HEADING.test(above.slice(lineStart))) return lineStart;
+    }
+    return changeLog.start;
+  }
   const anchor = anchorOffset(content, docType);
   return anchor === -1 ? content.length : anchor;
 }
@@ -307,6 +349,9 @@ function normaliseSection(section) {
   if (!body.startsWith(HEADING)) return null;
   // An unbalanced fence would make the section unbounded the moment it is written.
   if (unclosedFence(body, 0, body.length)) return null;
+  // Never write a section the next write would have to refuse: the structural guard
+  // below is fence-blind, so a fenced `## Example` in the section is refused here too.
+  if (removesStructure(body)) return null;
   if (findQaResults(body).sections.length !== 1) return null;
   const firstLineEnd = body.indexOf("\n");
   if (
@@ -342,8 +387,13 @@ function upsertQaResults(content, section, { docType = "" } = {}) {
   if (sections.length > 1) {
     return { content, reason: "multiple", count: sections.length };
   }
-  if (sections.some((s) => s.unbounded))
+  if (
+    sections.some(
+      (s) => s.unbounded || removesStructure(content.slice(s.start, s.end)),
+    )
+  ) {
     return { content, reason: "unbounded" };
+  }
   const checked = (out, reason) => {
     const post = findQaResults(out).sections;
     return post.length === 1 && !post[0].unbounded

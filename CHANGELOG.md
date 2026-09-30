@@ -104,7 +104,10 @@ All notable changes to this project will be documented in this file. Format foll
   any marker block, current or legacy, or under a marker-less `## Change Log` — is relocated rather than
   replaced in place, so the log's rows are not taken with it (one residual shape is recorded in the
   task's Deferred Work); a section string carrying a second H1/H2, or an unclosed fence, is refused,
-  and so is any write that would not read back as exactly one section (`unbounded` / `unplaceable`). **One visible change:** a new section lands immediately before the
+  and so is any write that would not read back as exactly one section (`unplaceable`). Before a
+  replace or relocate, the text it would remove is scanned **ignoring fences**, and the write is
+  refused (`unbounded`) if that text carries a change-log marker, an H1/H2 or a Change Log heading —
+  one stray fence in a section can no longer widen a write over the log. **One visible change:** a new section lands immediately before the
   change-log block (else before `## Progress Tracking` / `## Dev Agent Record`), so a document that
   placed it elsewhere is unchanged until QA next *creates* one there — an existing single section is
   replaced where it stands. task.65's two stale copies are removed; `tests/qa-results-corpus.test.js`

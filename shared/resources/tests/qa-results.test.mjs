@@ -258,7 +258,7 @@ test("E6 replace is idempotent on the section text", () => {
 // F — QA cycle 1 findings (task.155 gate 1)
 // ---------------------------------------------------------------------------
 
-test("F1 REL-001: a section carrying a second H1/H2 is bad-section; a fenced one is not", () => {
+test("F1 REL-001: a section carrying a second H1/H2 is bad-section; a fenced H2 is refused too (cycle 5)", () => {
   const doc = markerDoc();
   const withSibling = `${section(1)}\n\n## QA Completion Summary\n\nDone.`;
   const r = QR.upsertQaResults(doc, withSibling, { docType: "task" });
@@ -269,7 +269,7 @@ test("F1 REL-001: a section carrying a second H1/H2 is bad-section; a fenced one
   const fenced = `${section(1)}\n\n\`\`\`markdown\n## Example heading\n\`\`\``;
   assert.equal(
     QR.upsertQaResults(doc, fenced, { docType: "task" }).reason,
-    "created",
+    "bad-section", // since cycle 5: the fence-blind guard refuses what it could not later replace
   );
   const h3 = `${section(1)}\n\n### Sub-heading\n\nx`;
   assert.equal(
@@ -455,4 +455,78 @@ test("I4 a balanced fence in the section, at its very end, is fine", () => {
   assert.equal(qaCount(out), 1);
   assert.equal(count(out, "<!-- change-log-end -->"), 1);
   assert.match(out, /\| 2026-09-25 \| 1\.0 \| Initial draft/);
+});
+
+// ---------------------------------------------------------------------------
+// J — QA cycle 5 (task.155 gate 5): a write never removes structure
+// ---------------------------------------------------------------------------
+
+test("J1 REL-012: a stray fence closed by a LATER fence cannot widen a replace over the Change Log", () => {
+  const stray = `${section(1)}\n\n\`\`\`\nstray\n\n`;
+  const doc = `${FM}## Body\n\ntext\n\n${stray}${LOG}\n## Notes\n\n\`\`\`bash\necho later\n\`\`\`\n\n## After\n\nkeep me\n`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.content, doc);
+});
+
+test("J2 REL-012: the same shape under a marker-less log refuses too", () => {
+  const doc = `${FM}## Body\n\n${section(1)}\n\n\`\`\`\nstray\n\n## Change Log\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n\n\`\`\`\nlater\n\`\`\`\n`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.content, doc);
+});
+
+test("J3 REL-014: an indented H2 after the section is never swallowed", () => {
+  const doc = `${FM}${section(1)}\n\n  ## Indented next section\n\nkeep me\n`;
+  const r = QR.upsertQaResults(doc, section(2));
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.content, doc);
+});
+
+test("J4 REL-013: a ## Change Log heading directly above the marker block stays with its block", () => {
+  const log = `## Change Log\n\n<!-- change-log-start -->\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n\n<!-- change-log-end -->\n`;
+  const doc = `${FM}## Body\n\ntext\n\n${log}`;
+  const r = QR.upsertQaResults(doc, section(1), { docType: "task" });
+  assert.equal(r.reason, "created");
+  assert.match(
+    r.content,
+    /None \(cycle 1\)\.\n\n## Change Log\n\n<!-- change-log-start -->/,
+  );
+  const r2 = QR.upsertQaResults(r.content, section(2), { docType: "task" });
+  assert.equal(r2.reason, "replaced");
+  assert.match(
+    r2.content,
+    /None \(cycle 2\)\.\n\n## Change Log\n\n<!-- change-log-start -->/,
+  );
+});
+
+test("J5 a section the engine writes is always one it can replace next cycle", () => {
+  const fencedH2 = `${section(1)}\n\n\`\`\`markdown\n## Example\n\`\`\``;
+  assert.equal(
+    QR.upsertQaResults(markerDoc(), fencedH2, { docType: "task" }).reason,
+    "bad-section",
+  );
+  // A hand-edited document that already carries one is refused, never widened.
+  const doc = markerDoc(`${fencedH2}\n\n`);
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.content, doc);
+});
+
+test("J6 the guard catches a bare marker block alone (no heading in the removed text)", () => {
+  const block =
+    "<!-- change-log-start -->\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n\n<!-- change-log-end -->\n";
+  const doc = `${FM}## Body\n\n${section(1)}\n\n\`\`\`\nstray\n\n${block}\n\`\`\`bash\necho\n\`\`\`\n\n## Next\n\nkeep\n`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.content, doc);
+});
+
+test("J7 the guard catches a marker-less ### Change Log alone", () => {
+  const log =
+    "### Change Log\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n";
+  const doc = `${FM}## Body\n\n${section(1)}\n\n\`\`\`\nstray\n\n${log}\n\`\`\`bash\necho\n\`\`\`\n\n## Next\n\nkeep\n`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "story" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.content, doc);
 });
