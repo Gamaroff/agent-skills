@@ -5,10 +5,10 @@ type: task
 description: "Close the seven limits task.136's QA cycle 3, PR review and finalise recorded with concrete, verified fixes: shadow `exit` during the source so a library-installed EXIT trap cannot displace the 97 sentinel; apply the `needs-fake-gh` decline to the `shell:` form too; widen `GH_COMMAND_WORD` and follow one level of top-level `source`; capture the source's status as a simple command so `set -e` libraries whose top-level precondition fails are declined; put the extensionless fake `gh` under both ShellCheck lanes; drop the dead `!isShellFn &&`; and decide the pre-existing `resolveEntry` symlink limit (realpath before containment, or a stated limit with a row)."
 tags: [security, probe, shell-fn, fake-gh, shellcheck, task-136-follow-up]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-09-22
-updated: 2026-09-22
+updated: 2026-09-30
 assignee:
 estimated_effort_hours: 8
 risk_level: medium
@@ -17,7 +17,8 @@ github_issue: 464
 
 # Technical Task: Harden the `shell-fn:` sentinels and the fake-`gh` coverage
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.140.review.1.shell-fn-sentinel-hardening.md` implemented 2026-09-30
 **GitHub Issue**: [#464](https://github.com/Gamaroff/agent-skills/issues/464)
 
 ---
@@ -92,7 +93,7 @@ lint lanes              FILES += tracked files under tests/fixtures whose first 
 - **Why shadow `exit` rather than only the trap.** The EXIT trap fires *after* the shell decides to exit with the library's code; a library that installed its own EXIT trap replaced ours. A function named `exit` intercepts the *call*, before any trap, and `builtin exit` inside it is the one the harness wants. `unset -f exit` after the source restores the builtin for the function call. Verified by the cycle-3 reviewer under bash 5.3, bash 3.2 and zsh 5.9.
 - **Why take the source's status as a simple command.** In a `||` list both shells suspend errexit for everything on the left, including the library's top-level commands; `source "$1"; src=$?` restores errexit's effect (the EXIT trap catches the resulting exit) and the explicit `[ "$src" -eq 0 ] || exit 97` keeps the non-zero-last-command case. Verified by the PR-review code lens: 97 for errexit-mid-file, non-zero-last-command and top-level-exit; 0 for a clean library.
 - **The symlink limit is a decision.** `realpathSync` on a path that exists closes it for every real file; a path that does not yet exist cannot be realpath'd and is then refused by the readable-regular-file check before any spawn (as the finalise agent noted) — so the residual is only "a symlink that appears between the two checks", which is a TOCTOU nobody is defending. If the implementer chooses *not* to realpath, the alternative is a row that asserts the limit and a rule paragraph that says it is accepted — the point is that the `future` line ends.
-- **Sits beside, not replaces.** Every change is inside the arm task.136 added; the `shell:` and JS arms' existing rows must stay green unchanged (66 rows today).
+- **Sits beside, not replaces.** Every change is inside the arm task.136 added; the `shell:` and JS arms' existing rows must stay green unchanged — every `test(` row in the file at the branch point (`grep -cE '^\s*test\(' shared/resources/tests/security-probe.test.mjs`; the run records the number).
 
 ---
 
@@ -130,41 +131,41 @@ None — API stable. Two behaviours tighten: a `shell:` script naming `gh` witho
 **Risk**: Low
 **Files**: `shared/resources/tests/security-probe.test.mjs`
 
-- [ ] Row: a library that installs `trap "true" EXIT` then `[ -n "$NOPE" ] || exit 1` → `entry-not-probeable`, executed 0 (red today: scored `absent`)
-- [ ] Row: `set -e` + `false` at top level then a function → `entry-not-probeable` (red today: sourced to completion, scored)
-- [ ] Row: a `shell:` script whose body names `gh`, no `--fake-gh` → `needs-fake-gh` (red today: scored)
-- [ ] Rows: libraries reaching `gh` as `gh;`, `gh>/dev/null`, `"$GH" api`, and via `source ../../shared/resources/gh-labels.sh` → each `needs-fake-gh` without the fixture (red today)
-- [ ] Row: the symlink case — a real symlink under a temp dir inside the repo root pointing outside it → `outside-repo-root` (red today) — or, if the limit is kept, a row that asserts the current acceptance and cites the rule paragraph
-- [ ] All 66 existing rows unchanged
+- [x] Row: a library that installs `trap "true" EXIT` then `[ -n "$NOPE" ] || exit 1` → `entry-not-probeable`, executed 0 (red today: scored `absent`)
+- [x] Row: `set -e` + `false` at top level then a function → `entry-not-probeable` (red today: sourced to completion, scored)
+- [x] Row: a `shell:` script whose body names `gh`, no `--fake-gh` → `needs-fake-gh` (red today: scored)
+- [x] Rows: libraries reaching `gh` as `gh;`, `gh>/dev/null`, `"$GH" api`, and via `source ../../shared/resources/gh-labels.sh` → each `needs-fake-gh` without the fixture (red today)
+- [x] Row: the symlink case — a real symlink under a temp dir inside the repo root pointing outside it → `outside-repo-root` (red today) — or, if the limit is kept, a row that asserts the current acceptance and cites the rule paragraph
+- [x] Every pre-existing row unchanged (count at the branch point, recorded in the implementation report)
 
 ### Phase 2: The body and the gates
 
 **Risk**: Medium
 **Files**: `shared/resources/security-probe.mjs`
 
-- [ ] `SHELL_FN_BODY`: shadow `exit` around the source; `src=$?` capture; `unset -f exit`; the rest unchanged
-- [ ] `needs-fake-gh`: `isShellForm && fakeGhDir === null`
-- [ ] `GH_COMMAND_WORD` terminators; `sourcedLibraries(text, entryPath, root)` → one level of `source`/`.` paths resolved against the library's directory then the root, read when they exist inside the root, tested with the same regex
-- [ ] Remove `!isShellFn &&`
-- [ ] `resolveEntry`: `realpathSync` when the path exists, before `relative(root, …)` (or: the stated-limit alternative, with the rule updated)
-- [ ] Mutation proofs: each Phase 1 row goes red when its change is reverted; record all in the implementation report
+- [x] `SHELL_FN_BODY`: shadow `exit` around the source; `src=$?` capture; `unset -f exit`; the rest unchanged
+- [x] `needs-fake-gh`: `isShellForm && fakeGhDir === null`
+- [x] `GH_COMMAND_WORD` terminators; `sourcedLibraries(text, entryPath, root)` → one level of `source`/`.` paths resolved against the library's directory then the root, read when they exist inside the root, tested with the same regex
+- [x] Remove `!isShellFn &&`
+- [x] `resolveEntry`: `realpathSync` when the path exists, before `relative(root, …)` (or: the stated-limit alternative, with the rule updated)
+- [x] Mutation proofs: each Phase 1 row goes red when its change is reverted; record all in the implementation report
 
 ### Phase 3: The lint lanes
 
 **Risk**: Low
 **Files**: `scripts/lint-shell.sh`, `.github/workflows/shellcheck.yml`
 
-- [ ] Same file-list change in both: after the `*.sh` selection, append tracked files under `tests/fixtures/` whose first line is a bash shebang (or the explicit `tests/fixtures/fake-gh/gh`); the `>= 200` and empty-list guards unchanged; the count line still prints
-- [ ] `npm run lint:shell` → the fixture is in the count; introduce a deliberate SC2086 into a scratch copy of the fixture and confirm the lane goes red (then discard the copy)
+- [x] Same file-list change in both: after the `*.sh` selection, append tracked files under `tests/fixtures/` whose first line is a bash shebang — compared as the whole first line (`head -n 1`), never a byte count (or the explicit `tests/fixtures/fake-gh/gh`); the `>= 200` and empty-list guards unchanged; the count line still prints
+- [x] `npm run lint:shell` → the fixture is in the count; introduce a deliberate SC2086 into a scratch copy of the fixture and confirm the lane goes red (then discard the copy)
 
 ### Phase 4: Rule, bundle, CHANGELOG
 
 **Risk**: Low
 **Files**: `shared/resources/probe-boundary-rule.md`, `skills/*/references/`, `CHANGELOG.md`
 
-- [ ] §5: the sentinel paragraph names the shadowed `exit` and the status capture; the fake-gh paragraph says both shell forms; the symlink sentence either removed (closed) or rewritten as an owned limit with its row named
-- [ ] `npm run bundle`; `bundle:check` 0; `probe-boundary-signals.test.mjs` green
-- [ ] CHANGELOG [Unreleased]; the seven items closed by reference to their source artefacts
+- [x] §5: the sentinel paragraph names the shadowed `exit` and the status capture; the fake-gh paragraph says both shell forms; the symlink sentence either removed (closed) or rewritten as an owned limit with its row named
+- [x] `npm run bundle`; `bundle:check` 0; `probe-boundary-signals.test.mjs` green
+- [x] CHANGELOG [Unreleased]; the seven items closed by reference to their source artefacts
 
 ---
 
@@ -188,6 +189,10 @@ None — API stable. Two behaviours tighten: a `shell:` script naming `gh` witho
 5. ✅ `shared/resources/probe-boundary-rule.md` — §5
 6. ✅ `CHANGELOG.md`
 7. ✅ `skills/*/references/` — regenerated
+
+### Files Added (Tests)
+
+8. ✅ `evals/shared/tests/lint-lane-fixture-parity.test.mjs` — the two lanes' fixture blocks are byte-identical, and the block selects the fake `gh` (added during development: nothing held the twin lanes together)
 
 ### Files to Delete
 
@@ -226,22 +231,22 @@ Not applicable — one extra `readFileSync` per sourced path at gate time.
 
 ### Functional
 
-- [ ] A library with its own EXIT trap, and a `set -e` library whose top-level command fails, both decline `entry-not-probeable` with executed 0 under bash and zsh
-- [ ] A `shell:` script naming `gh` without `--fake-gh` declines `needs-fake-gh`; `gh;`, `gh>`, `"$GH"` and a one-level `source` of `gh-labels.sh` are detected
-- [ ] The symlink case is refused `outside-repo-root` — or the limit is pinned by a row and stated as accepted in the rule
-- [ ] The task.136 green path (`engages` 20/20) unchanged; all 66 pre-existing rows green
+- [x] A library with its own EXIT trap, and a `set -e` library whose top-level command fails, both decline `entry-not-probeable` with executed 0 under bash and zsh
+- [x] A `shell:` script naming `gh` without `--fake-gh` declines `needs-fake-gh`; `gh;`, `gh>`, `"$GH"` and a one-level `source` of `gh-labels.sh` are detected
+- [x] The symlink case is refused `outside-repo-root` — or the limit is pinned by a row and stated as accepted in the rule
+- [x] The task.136 green path (`engages` 20/20) unchanged; every pre-existing row green
 
 ### Performance
 
-- [ ] `security-probe.test.mjs` wall-clock within noise of today's ~30 s
+- [x] `security-probe.test.mjs` wall-clock within noise of today's ~30 s
 
 ### Code Quality
 
-- [ ] One mutation proof per change recorded; `ci:fast`, `bundle:check`, Prettier green; `npm run lint:shell` counts the fixture and stays under the 200 guard
+- [x] One mutation proof per change recorded; `ci:fast`, `bundle:check`, Prettier green; `npm run lint:shell` counts the fixture and stays under the 200 guard
 
 ### Migration
 
-- [ ] Both lint lanes changed in one commit and byte-equivalent in their file-list expression; rule §5 updated once, prompts unchanged (they cite it); CHANGELOG
+- [x] Both lint lanes changed in one commit and byte-equivalent in their file-list expression; rule §5 updated once, prompts unchanged (they cite it); CHANGELOG
 
 ---
 
@@ -277,7 +282,7 @@ None.
 
 - **Triggers**: the task.136 green path stops engaging, or any pre-existing row goes red.
 - **Steps**: revert Phase 2; keep Phase 1's rows (red, `todo`-marked) and Phase 3's lane change; `npm run bundle`; push.
-- **Validation**: 66 rows green; the fixture still linted.
+- **Validation**: every pre-existing row green; the fixture still linted.
 
 ### Partial Rollback (1-2 hours)
 
@@ -293,6 +298,24 @@ None.
 - **Non-critical**: wording in §5.
 
 ---
+## Implementation Summary
+
+**Completed:** 2026-09-30 — branch `feature/task.140.shell-fn-sentinel-hardening`, implementation report `task.140.implementation.1.shell-fn-sentinel-hardening-initial-run.md`.
+
+**Approach.** Red rows first (five, in `security-probe.test.mjs` § task.140), then the engine, then the lanes, then the rule. Symlink limit: **option A** (realpath both sides before containment) — a root reached through a symlink and an in-tree symlink to an in-tree file both still resolve, and both are asserted.
+
+**Deviations from the plan, each measured:**
+
+- `"$GH" api` could not be caught by the planned `GH_COMMAND_WORD` (it matches lowercase `gh` only), though §9 requires it. Added `GH_VARIABLE = /\$\{?GH(?![A-Za-z0-9_])/` — `$GH_TOKEN` is asserted *not* to match.
+- The plan's red-lane proof used SC2086, which is **info**-tier; both lanes gate at `--severity=warning`, so it could never go red. SC2034 (warning) was used instead: the same bad fixture lints red with the new block and green without it.
+- The lane block uses builtin `read`, not `head`: `lint-shell-absent-binary.test.mjs` runs the script on a PATH of bash, git, grep and sed only.
+- The `../../../` relative-source path in the plan is one level short for a lib inside a `mkdtemp` directory; the row uses `../../../../`.
+- The file wall-clock "~30 s" had decayed: an untouched worktree at the branch point takes 63.0 s, this branch 63.1 s (`time command node --test shared/resources/tests/security-probe.test.mjs`) — within noise.
+
+**Testing results.** `security-probe.test.mjs` 105/105 (100 pre-existing + 5 new). Seven mutants, each red on its own row only (recorded in the implementation report). `lint-lane-fixture-parity.test.mjs` 2/2, two mutants red. `npm run lint:shell`: 78 source shell scripts (was 77), clean. task.136 green path: `engages`, executed 20, bash + zsh; without `--fake-gh` the same call now declines `needs-fake-gh`. `npm run ci:fast` exit 0; `bundle:check` 0.
+
+**Deferred work.** None. The residual the rule names — a symlink that appears between the containment check and the readable-file check — is a race nothing here defends against, stated in `probe-boundary-rule.md` §5.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -300,14 +323,17 @@ None.
 |------|---------|-------------|--------|
 | 2026-09-22 | 1.0 | Initial draft — the seven limits recorded on task.136 (gate 3 `future`, PR review CR-1/CR-3, DoD SC5) with the reviewers' verified fixes | create-task |
 | 2026-09-22 |  | Priority Medium → High (owner decision); issue label and board priority updated | edit-task |
+| 2026-09-30 | 1.1 | Review passed (9/10 after fixes) — fixed the plan's never-matching `head -c 21` shebang test (`head -n 1`), source-follow resolves library dir then root, `isWithin` containment, decayed row/lint counts replaced by their commands | review-task |
+| 2026-09-30 |  | Status → ready-for-development | review-task |
+| 2026-09-30 |  | Implemented — 8 files (engine, 2 test files, 2 lint lanes, rule, CHANGELOG, bundled copies), 7 new tests, 9 mutants | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: the red rows
-- [ ] Phase 2: the body and the gates
-- [ ] Phase 3: the lint lanes
-- [ ] Phase 4: rule, bundle, CHANGELOG
+- [x] Phase 1: the red rows
+- [x] Phase 2: the body and the gates
+- [x] Phase 3: the lint lanes
+- [x] Phase 4: rule, bundle, CHANGELOG
 - [ ] QA: `task.140.qa.[N].shell-fn-sentinel-hardening.md`
 - [ ] Gate: `task.140.gate.[N].shell-fn-sentinel-hardening.yml`
 
@@ -323,5 +349,5 @@ None.
 ## Notes
 
 - QA artifacts land beside this file: `task.140.qa.[N].*.md`, `task.140.bug.[N].*.md`, `task.140.gate.[N].*.yml`.
-- Independent of task.139. Shares `security-probe.mjs` with task.131 (markdown-structure sink, planned) — land one, rebase the other.
+- Independent of task.139. Shares `security-probe.mjs` with task.131 (markdown-structure sink), which merged first (PR #526); this task is cut on top of it.
 - The verified bodies are in the source artefacts; the plan reproduces them verbatim so the implementer executes rather than re-derives.
