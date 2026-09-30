@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Minor'
 priority: 'Low'
 created: '2026-09-30'
@@ -12,7 +12,7 @@ github_issue: 529
 **Bug ID**: bug.17.zsh-nul-truncates-candidate-directory
 **Related**: None — cross-cutting bug (no single owner)
 **GitHub**: [#529](https://github.com/Gamaroff/agent-skills/issues/529)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Low
 **Severity**: Minor
 **Created**: 2026-09-30
@@ -139,9 +139,14 @@ bash: advance-pipeline-lock: '.claude/state/develop-pipeline.lock.pausing.1' is 
 | 2026-09-30 | Ready for QA | develop-bug | Fix verified — bug scenario gone |
 | 2026-09-30 | Ready for QA | finalise | DoD incomplete — 1 gap(s) — bug.17.dod.1.zsh-nul-truncates-candidate-directory.md |
 | 2026-09-30 | Ready for QA | finalise | DoD verified — bug.17.dod.2.zsh-nul-truncates-candidate-directory.md (security zero-guard overridden by operator) |
+| 2026-09-30 | Closed | develop-bug | Fix verified and accepted |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 1
+**Time to Resolution**: same day (filed 2026-09-30, closed 2026-09-30)
+**Final Fix Details**: `choose_candidate()` compared a lossy shell read of `task_or_story_directory`. zsh kept an embedded NUL that `canon()`'s `cd` then truncated at, and both shells strip trailing newlines, so `<doc>` + NUL + anything, or `<doc>\n`, matched `<doc>`. A `jq -e` test on the JSON value now refuses any U+0000–U+001F or U+007F before the shell reads it, in the one selection function behind `--restore`, `--restore --which` and `grant-qa-cycles.sh`'s guard. PR #530.
+**Lessons Learned**: The `$(…)` read is not a faithful copy of the JSON string, so a value must be validated where it is still JSON, before any shell sees it. The report named zsh only, but probing showed bash also accepted a NUL at the end and a trailing newline. A shell-divergence bug is worth probing under both shells for the whole value class, not just the reported instance. The security DoD needed an operator override because the probe engine cannot call a flag + positional shell script (obs #231).

@@ -9,8 +9,8 @@ started: '2026-09-30T10:29:09Z'
 # Implementation Report — bug.17
 
 **Started:** 2026-09-30T10:29:09Z
-**Finished:** —
-**Final Status:** Halted — finalise DoD gaps (Step 7)
+**Finished:** 2026-09-30T11:51:45Z
+**Final Status:** Completed
 **Branch model:** bugfix (base: develop, PR target: develop)
 **Severity / Priority:** Minor / Low
 **Lite mode:** on
@@ -25,8 +25,8 @@ started: '2026-09-30T10:29:09Z'
 | 3 | investigate-fix | ✅ Done | Reproduced (zsh NUL; also `\n` under both shells); control-char refusal in `choose_candidate()`; 10 regression cases, 9 red pre-fix; ci:fast + lint:shell green | |
 | 4 | create-pr | ✅ Done | PR #530: https://github.com/Gamaroff/agent-skills/pull/530 | |
 | 5–6 | verify-fix loop | ✅ Done | Cycle 1 PASS (lite: signals 1+2) | |
-| 7 | finalise-close | ⚠️ Needs Attention | `/finalise --bug` → GAPS (1): security zero-guard (engine cannot reach `--restore <dir>`); HALT for operator decision | |
-| 8 | commit-changes | ⏳ Pending | | |
+| 7 | finalise-close | ✅ Done | Run 1 GAPS (security zero-guard) → operator override → `/finalise --bug` run 2 ACCEPTED (dod.2); CI reading 1 SUCCESS @ 521805a8, reading 2 SUCCESS @ fb026755; bug closed, registry row closed, #529 CLOSED | |
+| 8 | commit-changes | ✅ Done | Final report commit + push; Completion Checklist | |
 
 ## Decisions Log
 
@@ -58,6 +58,11 @@ started: '2026-09-30T10:29:09Z'
 - 2026-09-30T10:48:17Z — DoD agents: fix-evidence PASS (independent scratch mutation: 100 passed / 9 failed); docs PASS; compliance N/A; security FAIL (medium) — `probe mode executed no candidates`.
 - 2026-09-30T10:48:17Z — Decision: GAPS. Step 8a not applicable (finding is medium; fix belongs in `security-probe.mjs`). task.133 cleared the same engine gap only by an explicit operator override; that approval was for task.133 and is not reused here without asking.
 - 2026-09-30T10:48:17Z — Gaps path: DoD `bug.17.dod.1.zsh-nul-truncates-candidate-directory.md` filled (gaps); Status History row `DoD incomplete — 1 gap(s)`; engine record `bug.17.dod.security.run.json` + by-hand record `bug.17.dod.security.by-hand-probe.md` saved; gaps PR comment posted (#530 issuecomment-5909659347); registry-tick → not-a-task.
+- 2026-09-30T11:51:45Z — Resumed after the halt: operator instruction "override it" (security zero-guard, bug.17 only). The lock was restored with `--restore` at step 7.
+- 2026-09-30T11:51:45Z — `/finalise --bug` run 2: `git diff 40894377..521805a8` touches only the bug directory, so dod.1's agent results stand on an unchanged code tree. Re-ran locally: advance-pipeline-lock.test.sh 109/109, grant-qa-cycles 46/46, bundle:check 0. CI reading 1: SUCCESS @ 521805a8 over 5 checks. Acceptance commit `fb026755` pushed; 6b assertions OK. CI reading 2: SUCCESS @ fb026755 over 5 checks.
+- 2026-09-30T11:51:45Z — Side-effects: canonical PR comment posted; tracker `done` comment posted; #529 closed (read back as CLOSED); board `done` → already. Issue document links re-pointed to `develop`.
+- 2026-09-30T11:51:45Z — GitHub rewrote the literal text `\u0000`/`\u001f` in the issue and PR bodies to caret notation (`\^@`, `\^_`), even when the JSON sent was correct. Both bodies were reworded to use NUL / U+001F. See § GitHub body mangling below.
+- 2026-09-30T11:51:45Z — Part B: Resolution Summary written; status `closed` in frontmatter and body; Status History `Closed` row; bug-registry row 17 → `closed`.
 
 ## Issues Log
 
@@ -75,8 +80,16 @@ started: '2026-09-30T10:29:09Z'
 
 1. **Security zero-guard (medium).** The probe engine has no entry form for a shell script taking a flag + positional (`advance-pipeline-lock.sh --restore [--which] <doc-dir>`): `shell-fn:` exits 97 on source, `cli:` is `.mjs`/`.js` only, `shell:` reaches only the numeric arm → `totals.executed: 0`. Same gap as task.133 dod.2 (obs #231). Supplementary §5.1 by-hand probe: 66/66 post-fix, 8 mismatches pre-fix. Resolution options: operator override on that evidence (task.133's path), or the obs #231 engine extension first.
 
+### GitHub body mangling — 2026-09-30
+
+GitHub stores the literal text `\u0000` in an issue or PR body as `\^@`, and `\u001f` as `\^_` (checked on the raw API JSON after a PATCH whose payload held the correct `\u0000`). #529's reproduction step and #530's summary were affected. Both were reworded to name NUL / U+001F in words. Not a blocker. Logged as an observation.
+
+## Completion Summary
+
+Fixed `choose_candidate()`'s provenance guard in `advance-pipeline-lock.sh`. It now refuses a candidate whose `task_or_story_directory` holds a control character, which it checks on the JSON value before the lossy shell read. That closes the reported zsh NUL case and two wider cases found during the fix: a trailing newline under both shells, and a NUL at the end under bash. Took 1 verify cycle (lite mode). `/finalise --bug` raised one gap, the security zero-guard, because the probe engine cannot call a flag + positional shell script (obs #231). The operator overrode it on a by-hand probe (66/66 post-fix, 8 mismatches pre-fix).
+
 ## Completion
 
 **Branch:** `bugfix/bug.17.zsh-nul-truncates-candidate-directory`
 **PR:** https://github.com/Gamaroff/agent-skills/pull/530
-**DoD Summary:** `bug.17.dod.1.zsh-nul-truncates-candidate-directory.md` (GAPS — 1)
+**DoD Summary:** `bug.17.dod.2.zsh-nul-truncates-candidate-directory.md` (ACCEPTED, security zero-guard overridden by operator); run 1 `bug.17.dod.1…` (GAPS — 1)
