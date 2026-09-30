@@ -182,19 +182,34 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    branch can apply, establish that neither has moved since. Gather both freshness signals:
 
    ```bash
-   GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
-   DOC_DATE=$(grep -E '^updated:' "$TASK_FILE"  | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
+   # The commit the gate judged (its `head:`), never its typed `updated:` — a timestamp in the
+   # future made `git log --since` hide every later commit from this check (task.135).
+   GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
    DOC_STATUS=$(grep -E '^status:' "$TASK_FILE" | head -1 | awk '{print $(2)}')
-   # Any commit touching source since the gate was written?
-   CODE_MOVED=$(git log --since="$GATE_DATE" --name-only --format="" -- \
-     apps packages 2>/dev/null | sort -u | head -1)
+   if [ -n "$GATE_HEAD" ]; then
+     # Source commits since the commit the gate judged. `|| echo 1` fails toward re-review when
+     # git cannot answer (a head this checkout does not have).
+     CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- apps packages shared skills evals 2>/dev/null || echo 1)
+     # The document is compared from the commit that last wrote the GATE, not from the head: a QA
+     # cycle edits the task document itself (QA Results, Change Log) after the head it records, and
+     # those edits land beside the gate. Measured from the head, every gate would read "document
+     # moved" and the skip branch below could never fire.
+     GATE_COMMIT=$(git log -1 --format=%H -- "$LATEST_GATE" 2>/dev/null)
+     if [ -n "$GATE_COMMIT" ]; then
+       git diff --quiet "$GATE_COMMIT"..HEAD -- "$TASK_FILE" 2>/dev/null && DOC_MOVED=0 || DOC_MOVED=1
+     else
+       DOC_MOVED=1                   # gate not committed yet — nothing to measure from
+     fi
+   else
+     CODE_MOVED=1; DOC_MOVED=1       # a gate with no head (schema 1) cannot vouch for the present tree
+   fi
    ```
 
    **Skip re-review (exit with success message) ONLY when ALL of:**
    - Gate status is `PASS`
    - AND `top_issues` list is empty
-   - AND `CODE_MOVED` is empty — no source commit since the gate
-   - AND `DOC_DATE` is not newer than `GATE_DATE` — the task document has not been edited since
+   - AND `CODE_MOVED` is `0` — no source commit since the commit the gate judged
+   - AND `DOC_MOVED` is `0` — the task document has not been edited since the gate was committed
    - AND `DOC_STATUS` is not one of `in-progress` / `ready-for-development` / `planned` — a status
      that moved *backwards* from `accepted` means the work was reopened
    - Message: "Task already has clean PASS gate with no concerns, and neither the code nor the
@@ -204,8 +219,9 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    - Gate status is `CONCERNS`, `FAIL`, or `WAIVED`
    - OR `top_issues` has items (even if gate is PASS)
    - OR no gate file exists (first review)
-   - OR **source changed since the gate** (`CODE_MOVED` non-empty)
-   - OR **the document changed since the gate** (`DOC_DATE` > `GATE_DATE`)
+   - OR **source changed since the gate's head** (`CODE_MOVED` > 0)
+   - OR **the document changed since the gate was committed** (`DOC_MOVED` = 1)
+   - OR **the gate carries no `head:`** (schema 1) — both of the above read `1`
    - OR **the document was reopened** (status moved backwards from `accepted`)
    - Message: "Performing QA re-review (previous gate: {status} with {count} issues; {reason})"
 
@@ -300,11 +316,14 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    gate's `top_issues[]` and the task's own Success Criteria — read the shared rule and set
    `SAFETY_REPROBE=true` if either holds.
 
-   Default scoping (when `SAFETY_REPROBE` is false) narrows to files changed since the last gate:
+   Default scoping (when `SAFETY_REPROBE` is false) narrows to files changed since the commit the
+   last gate judged — its `head:`:
 
    ```bash
-   git log --since="{gate_date}" --name-only --format="" | sort -u
+   git diff --name-only "{gate_head}"..HEAD
    ```
+
+   A gate with no `head:` (schema 1) runs unscoped and says so; Step 3b holds the whole rule.
 
    Include a **Re-Review Context** section at the top of the new QA report listing each previous
    issue and its current status (FIXED / PARTIAL / NOT FIXED), and a **New Findings This Cycle**
@@ -378,7 +397,7 @@ For each phase in the implementation plan:
 
 Adversarially review the change set's **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the document-anchored checks above do not provide. Governed by the **Adaptive Review Strategy**: run a single light pass in lite/small/re-review; a full pass otherwise; skip entirely when the diff touches no reviewable code. **One exception, and it overrides the strategy: cycle 2 is always a full refute pass** (step 1 below). A re-review that gets shallower each cycle is how a loop runs five times and learns nothing after the first.
 
-1. **Scope the diff** to this cycle's changes and write it to a patch file (keeps diff bytes out of main context). First review → the whole branch diff. **Cycle 2 (exactly one prior gate) → the whole branch diff again, reviewed to refute** (see the refute directive under step 2). Cycle 3+ → files changed since the last gate's `updated:` date:
+1. **Scope the diff** to this cycle's changes and write it to a patch file (keeps diff bytes out of main context). First review → the whole branch diff. **Cycle 2 (exactly one prior gate) → the whole branch diff again, reviewed to refute** (see the refute directive under step 2). Cycle 3+ → files changed since the commit the last gate judged — its `head:`, never its `updated:` (task.135):
 
    ```bash
    BASE_REF=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)   # standalone tasks usually target develop
@@ -386,26 +405,44 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
    # How many gates already exist? 0 = first review, 1 = cycle 2, 2+ = cycle 3 and later.
    PRIOR_GATES=$(find "$TASK_DIR" -maxdepth 1 -name "task.*.gate.*.yml" 2>/dev/null | wc -l | tr -d ' ')   # "0" with no gate — an `ls` glob left this EMPTY under zsh and the -ge below errored (obs #145)
-   # Re-review only: derive the prior gate's date from its `updated:` field ($LATEST_GATE set in Phase 0).
-   LAST_GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
+   # The commit the prior gate judged, read from its `head:` field ($LATEST_GATE set in Phase 0) —
+   # never from its `updated:`. A typed timestamp in the future made `git log --since` match nothing,
+   # one in the past widened the scope, and neither shows in the output (task.135). A schema-1 gate
+   # has no head, and reads as empty here.
+   LAST_GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
    # $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
    # guard, not a second block in front of it — two places assigning $DIFF_FILE is how one of them
    # silently stops mattering.
-   if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since last gate
+   if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since the last gate's head
      REFUTE_PASS=false
-     # An ARRAY, read line by line, and expanded as "${FILES[@]}". A scalar $FILES expanded bare
-     # word-splits under bash and does NOT under zsh: there the whole newline-joined list is one
-     # pathspec that matches nothing, git diff writes an empty patch, and the reviewer reviews
-     # nothing while reporting clean (obs #76, #110 — task.110 cycle 3). The array form splits
-     # the same way in both shells.
-     FILES=()
-     while IFS= read -r f; do [ -n "$f" ] && FILES+=("$f"); done \
-       < <(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
-     [ "${#FILES[@]}" -gt 0 ] && git diff "$BASE...HEAD" -- "${FILES[@]}" > "$DIFF_FILE"
-     # Non-vacuity: files changed but the scoped patch is empty ⇒ the scoping is wrong, not the
-     # code clean. Refuse to dispatch on nothing.
-     if [ "${#FILES[@]}" -gt 0 ] && [ ! -s "$DIFF_FILE" ]; then
-       echo "HALT: ${#FILES[@]} files changed since $LAST_GATE_DATE but the scoped diff is empty — check the pathspec expansion"; exit 1
+     if [ -z "$LAST_GATE_HEAD" ]; then
+       # No head (a schema-1 gate): scoping needs the commit the gate judged, and a timestamp is not
+       # one. Run unscoped and say so — never fall back to `--since`.
+       echo "Re-review scope: unscoped — prior gate carries no head: (schema 1)"
+       git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
+     else
+       git cat-file -e "${LAST_GATE_HEAD}^{commit}" 2>/dev/null \
+         || { echo "HALT: gate $PRIOR_GATES names head $LAST_GATE_HEAD, which this checkout does not have — fetch it, or run this cycle unscoped deliberately"; exit 1; }
+       git merge-base --is-ancestor "$LAST_GATE_HEAD" HEAD \
+         || { echo "HALT: the head of gate $PRIOR_GATES ($LAST_GATE_HEAD) is not an ancestor of HEAD — the branch was rewritten; re-record the gate's head: or run this cycle unscoped deliberately"; exit 1; }
+       # An ARRAY, read line by line, and expanded as "${FILES[@]}". A scalar $FILES expanded bare
+       # word-splits under bash and does NOT under zsh: there the whole newline-joined list is one
+       # pathspec that matches nothing, git diff writes an empty patch, and the reviewer reviews
+       # nothing while reporting clean (obs #76, #110 — task.110 cycle 3). The array form splits
+       # the same way in both shells.
+       FILES=()
+       while IFS= read -r f; do [ -n "$f" ] && FILES+=("$f"); done \
+         < <(git diff --name-only "$LAST_GATE_HEAD"..HEAD)
+       if [ "${#FILES[@]}" -eq 0 ]; then
+         echo "HALT: nothing changed since the head of gate $PRIOR_GATES (${LAST_GATE_HEAD:0:12}) — there is no fix to review; check the cycle order"; exit 1
+       fi
+       git diff "$BASE...HEAD" -- "${FILES[@]}" > "$DIFF_FILE"
+       # Non-vacuity: files changed but the scoped patch is empty ⇒ the scoping is wrong, not the
+       # code clean. Refuse to dispatch on nothing.
+       if [ ! -s "$DIFF_FILE" ]; then
+         echo "HALT: ${#FILES[@]} files changed since ${LAST_GATE_HEAD:0:12} but the scoped diff is empty — check the pathspec expansion"; exit 1
+       fi
+       echo "Re-review scope: files changed since gate $PRIOR_GATES (head ${LAST_GATE_HEAD:0:12}; ${#FILES[@]} files) — default"
      fi
    else                                                             # first review, cycle 2, or safety re-probe — whole branch diff
      [ "$PRIOR_GATES" = "1" ] && REFUTE_PASS=true || REFUTE_PASS=false
@@ -870,16 +907,32 @@ Create gate file co-located with the task document:
 
 **Location**: `{task-directory}/task.{id}.gate.{number}.{descriptive-name}.yml`
 
+**Bind the head and the clock before writing the YAML** — both are read, never typed (task.135):
+
+```bash
+GATE_HEAD=$(git rev-parse HEAD)                  # the commit this review judged — the next cycle scopes from it
+GATE_UPDATED=$(date -u +%Y-%m-%dT%H:%M:%SZ)      # UTC, from the clock
+```
+
+This skill makes no commit between the review and this write, so `HEAD` here is the tree the review read.
+Substitute both values into the YAML. A gate whose `updated:` was typed rather than read from the
+clock is the defect task.135 removed: on task.130 four gates carried local time with a `Z` suffix,
+up to three hours in the future, and the next cycle's `git log --since` scope matched nothing.
+`head:` is the commit **reviewed**, not the commit the gate is committed in — the gate lands in a
+later commit. The repository's gate-head freshness test fails a `schema: 2` gate whose
+`head:` is missing, is not in the history, or postdates its `updated:`.
+
 **Gate YAML Schema:**
 
 ```yaml
-schema: 1
+schema: 2
 task: 'task.{id}.{name}'
 task_title: '{task title}'
 gate: PASS|CONCERNS|FAIL|WAIVED
 status_reason: '1-2 sentence explanation of gate decision'
 reviewer: 'QA Engineer'
-updated: '{ISO-8601 timestamp}'
+head: '{GATE_HEAD}'        # 40-hex — git rev-parse HEAD when the review was performed
+updated: '{GATE_UPDATED}'  # date -u +%Y-%m-%dT%H:%M:%SZ at write time — never typed
 
 top_issues: [] # Empty if no issues; otherwise a list of entries shaped:
   # - id: '{PREFIX-###}'
@@ -1013,7 +1066,8 @@ Create QA report co-located with the task document:
 
 ```
 Re-review scope: unscoped (prior gate failed on security)
-Re-review scope: since {LAST_GATE_DATE} (default)
+Re-review scope: files changed since gate {N} (head {12-hex}; {k} files) — default
+Re-review scope: unscoped — prior gate carries no head: (schema 1)
 ```
 
 Naming the scope is what makes a quiet cycle auditable. Without it, "we found nothing" and "we did
@@ -1617,7 +1671,7 @@ When bug fixes are applied after a CONCERNS or FAIL gate, determine the appropri
 3. **Gate YAML** (update in place — do not create a new file unless significant re-testing occurred):
    - Update `gate` field (e.g. CONCERNS → PASS)
    - Update `status_reason`
-   - Update `updated` timestamp
+   - Re-bind `head:` and `updated:` exactly as in Step 10 — the gate now vouches for the commit the fixes were verified on
    - Add `status: closed` and `fixed_date` to each resolved issue in `top_issues`
    - Update `quality_score`
    - Add `bug_resolution` section
@@ -1628,6 +1682,7 @@ When bug fixes are applied after a CONCERNS or FAIL gate, determine the appropri
 ```yaml
 gate: PASS  # Was: CONCERNS
 status_reason: 'Bugs #1 and #2 fixed. Tests passing, lint clean.'
+head: '9c41d0e2b7a85f3e6d1c0b9a8f7e6d5c4b3a2f1e'  # re-bound: the commit the fixes were verified on
 updated: '2026-03-20T14:30:00Z'
 
 top_issues:

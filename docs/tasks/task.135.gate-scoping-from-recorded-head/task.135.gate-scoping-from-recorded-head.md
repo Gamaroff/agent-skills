@@ -5,10 +5,10 @@ type: task
 description: "Stop deriving the QA loop's re-review scope and the re-review trigger from a hand-written gate timestamp — on task.130 four gates were stamped in local time labelled Z (up to three hours in the future), so `git log --since` matched nothing and silently widened to the whole branch, and a later gate preceded the commit it reviewed. Gates record `head:` (the commit reviewed); cycle N+1 scopes `git diff <head>..HEAD`; `updated:` is written by the clock and checked against the head's author time."
 tags: [pipeline, qa-loop, qa-task, qa-story, scoping]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-30
 assignee:
 estimated_effort_hours: 4
 github_issue: 444
@@ -17,7 +17,8 @@ risk_level: medium
 
 # Technical Task: Gate scoping from a recorded head, not a typed timestamp
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.135.review.1.gate-scoping-from-recorded-head.md` implemented 2026-09-30
 **GitHub Issue**: [#444](https://github.com/Gamaroff/agent-skills/issues/444)
 
 ---
@@ -73,7 +74,7 @@ Three places read a gate file's `updated:` as if it were a clock: the re-review 
   substituted into the YAML — never a literal typed into the template.
 - **Scope**: `LAST_GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" | …)`; `git cat-file -e "$LAST_GATE_HEAD^{commit}" || HALT "gate N names a head this checkout does not have"`; `git merge-base --is-ancestor "$LAST_GATE_HEAD" HEAD || HALT "gate N's head is not an ancestor of HEAD — the branch was rewritten"`; `FILES=$(git diff --name-only "$LAST_GATE_HEAD"..HEAD)`; the non-vacuity guard stays. The table row reads *"since gate N's `head:`"*. A `schema: 1` gate with no `head:` → the cycle runs **unscoped** and says so (`scope: unscoped — prior gate carries no head (schema 1)`), never `--since`.
 - **Re-review trigger**: `CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- apps packages shared skills …)`; the document-edited check becomes `git diff --quiet "$GATE_HEAD"..HEAD -- "$TASK_FILE"`.
-- **5c row**: *"`updated:` earlier than `git log -1 --format=%aI <head>` — the gate claims to predate the commit it judged"*.
+- **5c row** (new, trail section): *"a gate's `updated:` earlier than `git log -1 --format=%aI <head>` — the gate claims to predate the commit it judged"*. The existing § D row (the work document's `updated:` vs its sibling artifacts) is unchanged.
 - **Test** `shared/resources/tests/gate-head-freshness.test.mjs`: for every `*.gate.*.yml` under `docs/` with `schema: 2`: `head:` present and 40-hex; `git cat-file -e`; `git merge-base --is-ancestor <head> <branch tip>`; `updated:` ≥ the head's author time; plus a non-vacuity floor (≥ 1 schema-2 gate once the first ships; the corpus test skips schema-1 gates and counts them).
 
 ### Important Clarifications
@@ -88,11 +89,12 @@ Three places read a gate file's `updated:` as if it were a clock: the re-review 
 
 ### In Scope
 
-✅ `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md` — gate template (`schema: 2`, `head:`), gate write block, Phase 0 trigger, Step 3b scope
-✅ `shared/resources/qa-re-review-scope.md` — snippet + table
-✅ `shared/resources/pr-conformance-prompt.md` § D
+✅ `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md` — gate template (`schema: 2`, `head:`), gate write block, Step 3b scope (lead-in sentence, snippet, `Re-review scope:` recording line); `qa-task` Phase 0 trigger (`qa-story` has no clock-based Phase 0 trigger — its step 3 keys on gate status and issue count only)
+✅ `skills/qa-gate/SKILL.md` — the same gate template (`schema: 1`, typed `updated:` at the template block): `schema: 2`, `head:`, clock-written `updated:` (review Q1 — the grep condition in Out of Scope is met)
+✅ `evals/shared/tests/qa-re-review-scope-parity.test.mjs` — pins the old guard literally (`[ -n "$LAST_GATE_DATE" ]`) and the text `Re-review scope: since`; move both assertions onto the head form
+✅ `shared/resources/qa-re-review-scope.md` — snippet + table + the `Re-review scope:` example line
+✅ `shared/resources/pr-conformance-prompt.md` — a new gate row in the trail section (§ D's `updated:` row is about the work document and stays)
 ✅ 🆕 `shared/resources/tests/gate-head-freshness.test.mjs`
-✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — the one sentence citing "files changed since the last gate's `updated:` date"
 ✅ `npm run bundle`; CHANGELOG
 
 ### Out of Scope
@@ -100,7 +102,8 @@ Three places read a gate file's `updated:` as if it were a clock: the re-review 
 ❌ Backfilling `head:` on existing gates
 ❌ The implementation report's Decisions Log format
 ❌ Route 2c (task.134); task.130 residue (task.133)
-❌ `qa-gate` skill's standalone gate writer — verify it emits the same template; include only if it does (grep first)
+❌ `qa-story` Phase 0 freshness trigger — it has none today; adding one is a separate change
+❌ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — carries no gate-date sentence (grep `updated:`); nothing to change
 
 ---
 
@@ -127,30 +130,32 @@ Three places read a gate file's `updated:` as if it were a clock: the re-review 
 ### Phase 1: `head:` on the gate, timestamps from the clock
 
 **Risk**: Low
-**Files**: both SKILL.md gate templates + write blocks
+**Files**: `qa-task`, `qa-story` and `qa-gate` SKILL.md gate templates + write blocks
 
-- [ ] `schema: 2`; `head: '{GATE_HEAD}'`; `updated: '{GATE_UPDATED}'`; the write block binds both from `git rev-parse HEAD` / `date -u`
-- [ ] Grep every `schema: 1` reader (`shared/resources/*.js`, `evals/`, tests) and accept 2
-- [ ] Eval fixtures that assert gate content: re-record or widen to accept `head:`
+- [x] `schema: 2`; `head: '{GATE_HEAD}'`; `updated: '{GATE_UPDATED}'`; the write block binds both from `git rev-parse HEAD` / `date -u`
+- [x] Grep every `schema: 1` reader (`shared/resources/*.js`, `evals/`, tests) and accept 2
+- [x] Eval fixtures that assert gate content: re-record or widen to accept `head:`
 
 ### Phase 2: Scope and trigger from the head
 
 **Risk**: Medium (every cycle-3+ review's input changes)
 **Files**: `qa-re-review-scope.md`, both SKILL.md Step 3b + Phase 0
 
-- [ ] Snippet: `LAST_GATE_HEAD` read; `cat-file -e` and `merge-base --is-ancestor` HALTs; `FILES` from `git diff --name-only <head>..HEAD`; schema-1 gate → unscoped with the stated reason; table row updated
-- [ ] Phase 0 trigger: `rev-list --count <head>..HEAD -- <paths>`; document-edited via `git diff --quiet <head>..HEAD -- <doc>`
-- [ ] Step 5-6 file: the "since the last gate's `updated:` date" sentence → "since gate N's `head:`"
-- [ ] Executed test of the snippet (bash + zsh): a gate whose `updated:` is three hours in the future and whose `head:` is two commits back scopes to exactly the two commits' files (today: empty → whole branch)
+- [x] Snippet written with the both-shell `while IFS= read -r f; do …; done < <(…)` array loop the skills already carry (obs #76, #110) — not `mapfile`, which is bash-only; the shared snippet (today a scalar `$FILES`) is rewritten to the same form so it and both Step 3b blocks match
+- [x] Snippet: `LAST_GATE_HEAD` read; `cat-file -e` and `merge-base --is-ancestor` HALTs; `FILES` from `git diff --name-only <head>..HEAD`; schema-1 gate → unscoped with the stated reason; table row updated
+- [x] `qa-task` Phase 0 trigger: `rev-list --count <head>..HEAD -- <paths>`; document-edited via `git diff --quiet <head>..HEAD -- <doc>`
+- [x] Step 3b lead-in sentence in both skills ("files changed since the last gate's `updated:` date") → "since the last gate's `head:`"; the `Re-review scope: since {LAST_GATE_DATE}` recording line in both skills and the example in `qa-re-review-scope.md` → `Re-review scope: files changed since gate N (head <12-hex>) — default` / `unscoped — prior gate carries no head (schema 1)`
+- [x] `qa-re-review-scope-parity.test.mjs`: the pinned guard literal and the `Re-review scope: since` assertion move to the head form
+- [x] Executed test of the snippet (bash + zsh): a gate whose `updated:` is three hours in the future and whose `head:` is two commits back scopes to exactly the two commits' files (today: empty → whole branch)
 
 ### Phase 3: Freshness test and the 5c row
 
 **Risk**: Low
 **Files**: 🆕 `tests/gate-head-freshness.test.mjs`, `pr-conformance-prompt.md`
 
-- [ ] Corpus test over `docs/**/*.gate.*.yml`: schema-2 gates carry a 40-hex `head:` that exists, is an ancestor of the branch tip, and whose author time ≤ `updated:`; schema-1 gates counted and skipped; non-vacuity floor
-- [ ] Mutation: a fixture gate with `updated:` before its head's author time → red; `head:` absent → red
-- [ ] 5c § D row rewritten to compare against the head's author time
+- [x] Corpus test over `docs/**/*.gate.*.yml`: schema-2 gates carry a 40-hex `head:` that exists, is an ancestor of the branch tip, and whose author time ≤ `updated:`; schema-1 gates counted and skipped; non-vacuity floor
+- [x] Mutation: a fixture gate with `updated:` before its head's author time → red; `head:` absent → red
+- [x] 5c: a new gate row in the trail section — a gate whose `updated:` precedes the author time of its `head:` (`git log -1 --format=%aI <head>`) claims to predate the tree it judged (task.130 re-check PC-2, filed as `trail`). § D's `updated:` row concerns the work document and is left unchanged
 
 ---
 
@@ -159,15 +164,16 @@ Three places read a gate file's `updated:` as if it were a clock: the re-review 
 ### Files to Modify (Core Implementation)
 
 1. ✅ `skills/qa-task/SKILL.md` — gate template, write block, Phase 0 step 3, Step 3b
-2. ✅ `skills/qa-story/SKILL.md` — same
+2. ✅ `skills/qa-story/SKILL.md` — gate template, write block, Step 3b (no Phase 0 trigger to change)
+2a. ✅ `skills/qa-gate/SKILL.md` — gate template + write block
 3. ✅ `shared/resources/qa-re-review-scope.md` — snippet, table
-4. ✅ `shared/resources/pr-conformance-prompt.md` — § D row
-5. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — one sentence
+4. ✅ `shared/resources/pr-conformance-prompt.md` — new gate row in the trail section
 
 ### Files to Modify (Tests)
 
 6. 🆕 `shared/resources/tests/gate-head-freshness.test.mjs`
-7. ✅ `evals/develop-task/step-isolation/*` fixtures asserting gate frontmatter (grep `updated:`/`schema:` in `scenario.json`)
+7. ✅ `evals/shared/tests/qa-re-review-scope-parity.test.mjs` — guard literal and `Re-review scope:` assertion
+7a. ✅ `evals/develop-task/step-isolation/*` — replay gates are `schema: 1` and stay valid; change only an assertion that reads the template
 8. ✅ any test reading `schema: 1`
 
 ### Files to Modify (Documentation)
@@ -195,7 +201,7 @@ None.
 
 ### Contract Tests
 
-- `bundle:check` 0; the step-5-6 sentence, the scope table and both Step 3b blocks name the same input (`head:`), asserted by grep in the freshness test (no `--since=` under `skills/qa-*/SKILL.md` Step 3b or `qa-re-review-scope.md`).
+- `bundle:check` 0; the two Step 3b lead-in sentences, the scope table and both Step 3b blocks name the same input (`head:`), asserted by grep in the freshness test (no `--since=` under `skills/qa-*/SKILL.md` Step 3b or `qa-re-review-scope.md`).
 
 ### Performance Tests
 
@@ -211,22 +217,22 @@ Not applicable — two `git` reads per cycle.
 
 ### Functional
 
-- [ ] A gate written by either skill carries `schema: 2`, a 40-hex `head:` equal to the reviewed commit, and an `updated:` from the clock
-- [ ] Cycle N+1's file list equals `git diff --name-only <gate N head>..HEAD` regardless of the gate's `updated:`; a future-dated gate no longer yields an empty list or the whole branch
-- [ ] The re-review trigger re-reviews after a commit that a future-dated gate would have hidden
-- [ ] A schema-1 prior gate produces an unscoped cycle with the reason printed, never `--since`
+- [x] A gate written by either skill carries `schema: 2`, a 40-hex `head:` equal to the reviewed commit, and an `updated:` from the clock
+- [x] Cycle N+1's file list equals `git diff --name-only <gate N head>..HEAD` regardless of the gate's `updated:`; a future-dated gate no longer yields an empty list or the whole branch
+- [x] The re-review trigger re-reviews after a commit that a future-dated gate would have hidden
+- [x] A schema-1 prior gate produces an unscoped cycle with the reason printed, never `--since`
 
 ### Performance
 
-- [ ] Not applicable
+- [x] Not applicable
 
 ### Code Quality
 
-- [ ] Freshness test green over the corpus; three mutation proofs recorded; no `--since=` remains in the scope paths
+- [x] Freshness test green over the corpus; three mutation proofs recorded; no `--since=` remains in the scope paths
 
 ### Migration
 
-- [ ] CHANGELOG names schema 2 as Breaking with the reader migration; schema-1 gates untouched
+- [x] CHANGELOG names schema 2 as Breaking with the reader migration; schema-1 gates untouched
 
 ---
 
@@ -281,14 +287,17 @@ None.
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-09-20 | 1.0 | Initial draft — obs #136; task.130 cycle 4 `--since` widening, 5c PC-2; gates 1–4 stamped local-as-Z | create-task |
+| 2026-09-30 | 1.1 | Review passed (8/10) — 6 important fixes applied: parity test and `qa-gate` template added to scope, both-shell array loop over `mapfile`, 5c gate row added rather than § D rewritten, Phase 0 trigger scoped to `qa-task`, step-5-6 edit retargeted to the Step 3b lead-ins, recording lines | review-task |
+| 2026-09-30 |  | Status → ready-for-development | review-task |
+| 2026-09-30 |  | Implemented — 10 authored files (8 modified, 2 new tests), 21 new tests, 4 mutation proofs; bundled copies regenerated | develop |
 
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: `head:` on the gate
-- [ ] Phase 2: scope and trigger from the head
-- [ ] Phase 3: freshness test + 5c row
+- [x] Phase 1: `head:` on the gate
+- [x] Phase 2: scope and trigger from the head
+- [x] Phase 3: freshness test + 5c row
 - [ ] QA: `task.135.qa.[N].gate-scoping-from-recorded-head.md`
 - [ ] Gate: `task.135.gate.[N].gate-scoping-from-recorded-head.yml`
 

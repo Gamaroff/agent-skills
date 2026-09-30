@@ -73,6 +73,10 @@ C. TRAIL (category: trail) — the evidence is missing, stale, or contradicts it
      (status absent or `open`) that no active waiver covers, is the trail defect
    - the document says status: accepted but no DoD file exists
    - QA report count does not match gate count
+   - a gate whose `updated:` is earlier than the author time of the commit its `head:` names
+     (`git log -1 --format=%aI <head>`) — the gate claims to predate the tree it judged (task.130
+     re-check PC-2; task.135). Compare as instants, not strings: `%aI` carries an offset and
+     `updated:` a `Z`. A gate with no `head:` (`schema: 1`) is not a finding — it predates the field
    - a handover file exists with outstanding (unticked) actions
    - a co-located bug report that is still open
    - the work item's Change Log lost rows since the PR's base. The log is append-only, and a row that

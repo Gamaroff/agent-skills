@@ -21,11 +21,33 @@ Both questions must be asked on every re-review, and both answered in the report
 
 The default is unchanged and stays the default. It is a cost control, and a correct one:
 
-| Cycle | `PRIOR_GATES` | Diff scope | `REFUTE_PASS` |
-| ----- | ------------- | ---------------------- | ------------- |
-| 1     | 0             | whole branch           | `false`       |
-| 2     | 1             | whole branch           | `true`        |
-| 3+    | ≥2            | since `LAST_GATE_DATE` | `false`       |
+| Cycle | `PRIOR_GATES` | Diff scope                                             | `REFUTE_PASS` |
+| ----- | ------------- | ------------------------------------------------------ | ------------- |
+| 1     | 0             | whole branch                                           | `false`       |
+| 2     | 1             | whole branch                                           | `true`        |
+| 3+    | ≥2            | since gate N's `head:` (`git diff --name-only <head>..HEAD`) | `false`       |
+
+### The cycle-3+ scope comes from the gate's `head:`, not its `updated:`
+
+Every gate records `head:` — the commit the review was performed against, from `git rev-parse HEAD`
+at gate-write time — and the next cycle's file list is `git diff --name-only <head>..HEAD`. It used
+to be `git log --since=<updated:>`, and `updated:` was typed by the agent writing the gate. On
+task.130 four gates carried local time with a `Z` suffix, up to three hours in the future: cycle
+4's `--since` matched nothing, and the scope had to be rebuilt by hand from the fix commit's hash.
+A timestamp in the past widens the scope instead, and neither error shows in the output. Two
+commits cannot be typed wrong in a way `git` accepts silently (task.135).
+
+- **A gate with no `head:`** (every `schema: 1` gate) runs the cycle **unscoped**, and prints
+  `Re-review scope: unscoped — prior gate carries no head: (schema 1)`. It never falls back to
+  `--since`. Old gates are not backfilled: a head cannot be given to one honestly.
+- **A head this checkout does not have**, or **one that is not an ancestor of `HEAD`** (the branch
+  was rewritten), is a HALT that names the cause. The pipeline never rebases, so this should not
+  fire; if it does, re-record the gate's `head:` or run the cycle unscoped deliberately.
+- **Nothing changed since the head** is a HALT too: on cycle 3+ it means no fix landed after the
+  gate, which is a sequencing error. In practice the list always holds the gate and QA report
+  themselves, which land in a commit after the head they record.
+- The **patch** is still `git diff <base>...HEAD -- <files>` — the branch's cumulative change on
+  those files, so the reviewer has context. Only the *file list* comes from `<head>..HEAD`.
 
 ## The carve-out: `SAFETY_REPROBE`
 
@@ -172,11 +194,46 @@ fired. Two independent blocks assigning `DIFF_FILE` is the failure mode to avoid
 silently and the first looks implemented:
 
 ```bash
-if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ] && [ "$SAFETY_REPROBE" != "true" ]; then
+# The commit the prior gate judged, read from its `head:` field ($LATEST_GATE set in Phase 0) —
+# never from its `updated:`. A typed timestamp in the future made `git log --since` match nothing,
+# one in the past widened the scope, and neither shows in the output (task.135). A schema-1 gate
+# has no head, and reads as empty here.
+LAST_GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
+# $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
+# guard, not a second block in front of it — two places assigning $DIFF_FILE is how one of them
+# silently stops mattering.
+if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since the last gate's head
   REFUTE_PASS=false
-  FILES=$(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
-  [ -n "$FILES" ] && git diff "$BASE...HEAD" -- $FILES > "$DIFF_FILE"
-else
+  if [ -z "$LAST_GATE_HEAD" ]; then
+    # No head (a schema-1 gate): scoping needs the commit the gate judged, and a timestamp is not
+    # one. Run unscoped and say so — never fall back to `--since`.
+    echo "Re-review scope: unscoped — prior gate carries no head: (schema 1)"
+    git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
+  else
+    git cat-file -e "${LAST_GATE_HEAD}^{commit}" 2>/dev/null \
+      || { echo "HALT: gate $PRIOR_GATES names head $LAST_GATE_HEAD, which this checkout does not have — fetch it, or run this cycle unscoped deliberately"; exit 1; }
+    git merge-base --is-ancestor "$LAST_GATE_HEAD" HEAD \
+      || { echo "HALT: the head of gate $PRIOR_GATES ($LAST_GATE_HEAD) is not an ancestor of HEAD — the branch was rewritten; re-record the gate's head: or run this cycle unscoped deliberately"; exit 1; }
+    # An ARRAY, read line by line, and expanded as "${FILES[@]}". A scalar $FILES expanded bare
+    # word-splits under bash and does NOT under zsh: there the whole newline-joined list is one
+    # pathspec that matches nothing, git diff writes an empty patch, and the reviewer reviews
+    # nothing while reporting clean (obs #76, #110 — task.110 cycle 3). The array form splits
+    # the same way in both shells.
+    FILES=()
+    while IFS= read -r f; do [ -n "$f" ] && FILES+=("$f"); done \
+      < <(git diff --name-only "$LAST_GATE_HEAD"..HEAD)
+    if [ "${#FILES[@]}" -eq 0 ]; then
+      echo "HALT: nothing changed since the head of gate $PRIOR_GATES (${LAST_GATE_HEAD:0:12}) — there is no fix to review; check the cycle order"; exit 1
+    fi
+    git diff "$BASE...HEAD" -- "${FILES[@]}" > "$DIFF_FILE"
+    # Non-vacuity: files changed but the scoped patch is empty ⇒ the scoping is wrong, not the
+    # code clean. Refuse to dispatch on nothing.
+    if [ ! -s "$DIFF_FILE" ]; then
+      echo "HALT: ${#FILES[@]} files changed since ${LAST_GATE_HEAD:0:12} but the scoped diff is empty — check the pathspec expansion"; exit 1
+    fi
+    echo "Re-review scope: files changed since gate $PRIOR_GATES (head ${LAST_GATE_HEAD:0:12}; ${#FILES[@]} files) — default"
+  fi
+else                                                             # first review, cycle 2, or safety re-probe — whole branch diff
   [ "$PRIOR_GATES" = "1" ] && REFUTE_PASS=true || REFUTE_PASS=false
   git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
 fi
@@ -219,7 +276,8 @@ one line:
 
 ```
 Re-review scope: unscoped (prior gate failed on security)
-Re-review scope: since 2026-08-31T21:55:00Z (default)
+Re-review scope: files changed since gate 3 (head 3479b14a0c1d; 7 files) — default
+Re-review scope: unscoped — prior gate carries no head: (schema 1)
 ```
 
 Naming the scope is what makes a quiet cycle auditable. Without it, "we found nothing" and "we did
