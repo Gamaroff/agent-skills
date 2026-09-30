@@ -81,6 +81,15 @@ const RE_ENTRY_ROW = /^\|\s*\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?\s*\|/;
 
 const isEntryRow = (line) => RE_ENTRY_ROW.test(line);
 
+// A table data row the parser does not recognise — not an entry row, not a separator, not a
+// header. The writer PRESERVES these (a `| Version | Date | … |` log has one in every row), so any
+// reader that has to see what the writer carries must use this predicate, not isEntryRow alone
+// (TASK-133-QA-3). One definition: upsertChangeLog and carriedRows both call it.
+const isUnparsedRow = (line) =>
+  !isEntryRow(line) &&
+  !/^\s*\|[\s\-:|]+\|\s*$/.test(line) &&
+  !/^\s*\|\s*(Date|Version|Description|Author|Change)\b/i.test(line);
+
 // ---------------------------------------------------------------------------
 // Scope guards — frontmatter and fenced code
 // ---------------------------------------------------------------------------
@@ -610,12 +619,7 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
     //
     // Header and separator lines are excluded because the regenerated block
     // supplies its own.
-    const unparsed = tableLines.filter(
-      (l) =>
-        !isEntryRow(l) &&
-        !/^\s*\|[\s\-:|]+\|\s*$/.test(l) &&
-        !/^\s*\|\s*(Date|Version|Description|Author|Change)\b/i.test(l),
-    );
+    const unparsed = tableLines.filter(isUnparsedRow);
     const migrated = found.legacyAuthor
       ? migrateLegacyEntries(existing, {
           legacyAuthor: found.legacyAuthor,
@@ -861,19 +865,44 @@ function entryKey(row) {
  * removed it. At fdba78d9 a hand repair of a corrupted block dropped six rows and two QA cycles
  * read past it; the writer did not do it (`upsertChangeLog` keeps every row it can see), so the
  * check has to compare two revisions rather than a write's input and output. Both sides are read
- * with `extractEntries`, the reader the writer uses. Counted as a multiset: one of two
+ * with `carriedRows` — every row the writer carries, parsed or not, from every block it sweeps. Counted as a multiset: one of two
  * identical rows removed is a loss, and a reorder is not.
  *
- * @returns {string[]} the dropped rows, as `prevContent` spelled them
+ * @returns {string[]} the dropped rows — as `prevContent` spelled them, except a row from a second
+ *   legacy block, which is reported in the canonical four-column form the writer would carry it in
  */
+// Every row the writer carries through a rewrite: the chosen block's entry rows AND its preserved
+// unparsed rows (the same partition upsertChangeLog regenerates from), plus the entry rows of every
+// other block it would sweep in. extractEntries alone saw none of a Version-first log and none of a
+// second legacy block, so a lost row there read as "no row lost" (TASK-133-QA-3).
+function carriedRows(content) {
+  const text = String(content);
+  const found = findChangeLog(text);
+  if (!found) return [];
+  const own = splitCarriedLines(text, found).tableLines.filter(
+    (l) => isEntryRow(l) || isUnparsedRow(l),
+  );
+  const head = collapseOtherLegacyBlocks(
+    text.slice(0, found.start),
+    "",
+    found.legacyAuthor,
+  );
+  const tail = collapseOtherLegacyBlocks(
+    text.slice(found.end),
+    "",
+    found.legacyAuthor,
+  );
+  return [...own, ...head.entries, ...tail.entries];
+}
+
 function rowsDropped(prevContent, nextContent) {
   const have = new Map();
-  for (const row of extractEntries(String(nextContent))) {
+  for (const row of carriedRows(nextContent)) {
     const k = entryKey(row);
     have.set(k, (have.get(k) || 0) + 1);
   }
   const dropped = [];
-  for (const row of extractEntries(String(prevContent))) {
+  for (const row of carriedRows(prevContent)) {
     const k = entryKey(row);
     const n = have.get(k) || 0;
     if (n > 0) have.set(k, n - 1);
@@ -984,6 +1013,11 @@ function contentAt(file, rev) {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
       maxBuffer: 64 * 1024 * 1024,
+      // The "absent at <rev>" test below reads git's stderr, and git translates it: under a German
+      // or French locale the English phrases never match and a new document would read as a
+      // usage error. Pin the C locale; LANGUAGE outranks LC_ALL for gettext, so clear it too
+      // (TASK-133-QA-6).
+      env: { ...process.env, LC_ALL: "C", LANGUAGE: "" },
     });
   } catch (e) {
     const err = String(e.stderr || e.message);

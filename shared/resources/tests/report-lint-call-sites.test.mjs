@@ -160,8 +160,12 @@ function usageCauses() {
   const calls = [...src.matchAll(/\busage\(\s*([`"'])((?:(?!\1).)*)\1/g)].map(
     (m) => m[2],
   );
-  const nonLiteral = (src.match(/\busage\(\s*[A-Za-z_$][\w$.]*\s*\)/g) || [])
-    .length;
+  // A CALL, never the declaration: `function usage(msg)` has the same shape, and counting it made
+  // this number >= 1 on every source, so the template-cause assertion ran unconditionally and could
+  // not see a non-literal call disappear (TASK-133-QA-7).
+  const nonLiteral = (
+    src.match(/(?<!function\s+)\busage\(\s*[A-Za-z_$][\w$.]*\s*\)/g) || []
+  ).length;
   const fixed = calls.map(
     (c) =>
       c
@@ -191,6 +195,11 @@ test("D — step-8 states the exit-2 causes once; every 2) arm cites it", () => 
       statement.includes(cause),
       `${STEP8}: the exit-2 statement omits the usage( cause '${cause}'`,
     );
+  assert.equal(
+    nonLiteral,
+    (read(LINT_JS).match(/\busage\(e\.message\)/g) || []).length,
+    "the non-literal count is not the number of usage(<variable>) CALLS",
+  );
   if (nonLiteral > 0)
     assert.match(
       statement,

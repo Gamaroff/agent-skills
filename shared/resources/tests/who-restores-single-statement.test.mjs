@@ -212,3 +212,39 @@ test("the one statement carries both discriminators (the rule was moved, not los
     "the restore command is gone from the statement",
   );
 });
+
+// (v) the one statement says how the IN-PLACE path evaluates it. Every citation site makes the
+// restore conditional on this section, and the section's opening condition names the detector's
+// `source` and the Resume prompt — neither exists for a session continuing in place after a pause
+// or HALT. Without this rule a literal reading skips the restore there (TASK-133-QA-4).
+test("(v) the one statement states the in-place evaluation, at its marker", () => {
+  const section = slice(
+    read(CONTRACT),
+    /### Restore the lock \(both resume paths\)/,
+    /\n### /,
+    "one statement",
+  );
+  const n = section.split("<!-- restore: in-place -->").length - 1;
+  assert.equal(
+    n,
+    1,
+    `expected the in-place marker once in the statement, found ${n}`,
+  );
+  const at = section.indexOf("<!-- restore: in-place -->");
+  const rule = section.slice(at, section.indexOf("\n\n", at));
+  assert.match(
+    rule,
+    /halt_reason/,
+    "the in-place rule does not read the snapshot's halt_reason",
+  );
+  assert.match(
+    rule,
+    /pause_reason/,
+    "the in-place rule does not read the snapshot's pause_reason",
+  );
+  assert.match(
+    rule,
+    /no detector|without the detector/i,
+    "the in-place rule does not say the detector is absent",
+  );
+});

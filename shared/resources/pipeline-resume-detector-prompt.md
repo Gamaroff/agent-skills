@@ -124,6 +124,8 @@ Set an output field `source: "lock" | "halt_snapshot" | "orphaned_claim" | "none
 
 If no lock is present and no candidate survives step 1 (none exist, or every one belongs to another document): set `blocking_issues: ["No active lock, no halt snapshot and no orphaned claim for this document — cannot determine resume step"]`, `recommended_step: 1`, `source: "none"`. The orchestrator should treat this as a fresh start — and still surface any dropped candidates.
 
+<!-- candidate-rule: legacy-only --> **Unless a candidate was dropped only for being legacy.** When no candidate survives and at least one was dropped under the legacy rule in item 1, this is not a fresh start. It is a snapshot the helper refuses to guess about. Set `blocking_issues: ["Only a legacy snapshot (no task_or_story_directory) is on disk — restore it deliberately with advance-pipeline-lock.sh --restore --accept-legacy <doc-dir> if it is this document's, or delete it; not a fresh start"]`, `recommended_step: 1`, `source: "none"`. The blocking issue makes the orchestrator HALT for the operator, as the SKILL.md Step 0-lock paragraphs require. A fresh run would otherwise reach Step 8, which deletes a sole legacy snapshot, and the recovery window would close with nobody having decided (task.133 QA-5).
+
 If the file is present but invalid JSON: add `"Lock/snapshot file unreadable — cannot determine resume step"` to `blocking_issues`.
 
 If branch does not exist locally: add `"Branch recorded in lock/snapshot does not exist — manual recovery required"` to `blocking_issues`.

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-133-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 1, Step 3b code review CR-1)
 **Date Found**: 2026-09-30
 
@@ -69,3 +69,4 @@ Reject an empty or whitespace-only `--against` operand as usage (exit 2) before 
 | 2026-09-30 | New | QA Engineer | Found in QA cycle 1 (CR-1) |
 | 2026-09-30 | In Progress | qa-fix | Root cause: presence-only operand check |
 | 2026-09-30 | Ready for QA | qa-fix | Guard + J4 cases; mutation-proven |
+| 2026-09-30 | Closed | QA Engineer | Verified in cycle 2: empty, space, tab, unresolvable merge-base → rc 2; J4 green |

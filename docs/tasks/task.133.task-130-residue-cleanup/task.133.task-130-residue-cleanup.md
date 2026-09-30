@@ -307,28 +307,31 @@ None (review 1 removed the writer-side throw, the one change every appender woul
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
 **Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.133.qa.1.task-130-residue-cleanup.md](./task.133.qa.1.task-130-residue-cleanup.md)
-- **Gate File**: [task.133.gate.1.task-130-residue-cleanup.yml](./task.133.gate.1.task-130-residue-cleanup.yml)
+- **Full Report**: [task.133.qa.2.task-130-residue-cleanup.md](./task.133.qa.2.task-130-residue-cleanup.md)
+- **Gate File**: [task.133.gate.2.task-130-residue-cleanup.yml](./task.133.gate.2.task-130-residue-cleanup.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 4629
+- **Tests Executed**: 4626
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1 (HIGH — [bug 1](./task.133.bug.1.check-append-only-empty-against-reads-index.md))
+- **Critical Issues**: 0 (3 MEDIUM, 2 LOW)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Bug Reports
 
-- [Bug 1: `--check-append-only --against ""` reads the index](./task.133.bug.1.check-append-only-empty-against-reads-index.md) - ✅ Ready for QA - Priority: P1 (Fixed 2026-09-30)
+- [Bug 1: `--check-append-only --against ""` reads the index](./task.133.bug.1.check-append-only-empty-against-reads-index.md) - ✅ Closed - Priority: P1 (Fixed 2026-09-30, verified cycle 2)
+- [Bug 2: append-only check blind to rows the writer keeps](./task.133.bug.2.append-only-check-blind-to-rows-extractentries-skips.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-30)
+- [Bug 3: conditional restore unevaluable on the in-place path](./task.133.bug.3.restore-condition-unevaluable-on-in-place-path.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-30)
+- [Bug 4: legacy-only candidate set reads as a fresh start](./task.133.bug.4.detector-legacy-only-reads-as-fresh-start.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-30)
 
 ### Key Findings
-`--check-append-only --against ""` reads the index and reports a clean log (exit 0). An unresolvable merge-base therefore makes the new 5c TRAIL check fail open (TASK-133-QA-1, HIGH). Also one LOW: the bind-block comment claims wider quoting than the change delivers (TASK-133-QA-2).
+Cycle 1's HIGH is fixed and verified. The cycle-2 refute pass found three MEDIUMs in the original change (QA-3, QA-4, QA-5), each a place where two states reach one answer or a condition cannot be evaluated where it is read. It also found two LOWs (QA-6 locale, QA-7 vacuous sub-assertion).
 <!-- change-log-start -->
 ## Change Log
 
@@ -340,6 +343,8 @@ None (review 1 removed the writer-side throw, the one change every appender woul
 | 2026-09-30 |  | Implemented — 5 phases, 5 commits; 13 source/doc files + 3 SKILL.md, 1 new suite + 5 extended (+13 tests), 2 fixtures; 15 mutation proofs; task.130 Deferred Work annotated | develop |
 | 2026-09-30 |  | QA gate FAIL (70/100) — 1 HIGH (empty --against reads the index and reports a clean log) + 1 LOW | qa-task |
 | 2026-09-30 |  | QA findings fixed — cycle 1: TASK-133-QA-1 (empty --against is usage, exit 2; J4 +2 cases, mutation-proven), TASK-133-QA-2 (quoting claim narrowed to § Consume Output, CHANGELOG too); 1 iteration | qa-fix |
+| 2026-09-30 |  | QA gate CONCERNS (70/100) — cycle 2 refute pass: 0 HIGH, 3 MEDIUM, 2 LOW; bug 1 verified closed | qa-task |
+| 2026-09-30 |  | QA findings fixed — cycle 2: QA-3 (rowsDropped reads every carried row; J5), QA-4 (in-place restore evaluation stated once; who-restores v), QA-5 (legacy-only blocks, never a fresh start; A2), QA-6 (git pinned to the C locale), QA-7 (non-literal count excludes the declaration); 1 iteration, 5 mutation proofs | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

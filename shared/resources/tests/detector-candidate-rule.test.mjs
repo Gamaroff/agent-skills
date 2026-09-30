@@ -95,6 +95,24 @@ test("A — Step 1 states the legacy and provenance rules, once each, at their m
   );
 });
 
+// A2 — a set whose ONLY candidates were legacy is not a fresh start: the prompt's no-candidate
+// rule gives it its own blocking issue naming the recovery, so the orchestrator HALTs for the
+// operator — the "never a fresh start" the SKILL.md Step 0-lock paragraphs promise (TASK-133-QA-5).
+test("A2 — a legacy-only candidate set blocks with the recovery, never a fresh start", () => {
+  const rule = ruleAt(step1(), "legacy-only");
+  assert.match(
+    rule,
+    /--restore --accept-legacy/,
+    "legacy-only rule does not name the recovery",
+  );
+  assert.match(rule, /blocking_issues/, "legacy-only rule does not block");
+  assert.doesNotMatch(
+    rule,
+    /treat this as a fresh start/i,
+    "legacy-only rule reads as a fresh start",
+  );
+});
+
 function sandbox() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "detector-rule-"));
   const state = path.join(dir, "state");

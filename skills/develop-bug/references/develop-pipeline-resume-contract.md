@@ -201,6 +201,14 @@ restores depends on the snapshot's `halt_reason`** (task.124 QA cycle 3, CR-1):
   re-invocation path exactly as the in-session continuation does (QA cycle 2, CR-2; the step-0
   doc's Shared Resume Logic states the call).
 
+<!-- restore: in-place --> **On the in-place path the same two bullets decide, read from disk.** A
+session that continues in place after a pause or a HALT has no detector run and no Resume prompt,
+so the `source` and "chooses Resume" above do not exist for it. Evaluate the bullets from the
+candidate on disk instead: the halt snapshot's own `halt_reason` (or its `pause_reason`) and
+the pipeline named by its `skill`. An orphaned `.lock.pausing.<pid>` claim carries neither
+reason and takes the second bullet. When nothing is on disk, there is nothing to restore
+(task.133 QA-4).
+
 A numeric advance with no lock is an error, so a resume that skips whichever of these applies
 fails at its first transition.
 

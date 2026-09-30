@@ -2257,6 +2257,41 @@ test("J4: --check-append-only compares the file with its copy at --against <rev>
     ]);
     assert.equal(r.code, 0, r.out);
     assert.equal(JSON.parse(r.out).reason, "new-document");
+    // …under a translated git too: "absent at <rev>" is not decided from English stderr, or a German
+    // or French locale turns a new document into usage exit 2 (TASK-133-QA-6).
+    for (const [LANGUAGE, LC_ALL] of [
+      ["de", "de_DE.UTF-8"],
+      ["fr", "fr_FR.UTF-8"],
+    ]) {
+      let out;
+      try {
+        out = execFileSync(
+          "node",
+          [
+            CL_CLI,
+            "--check-append-only",
+            "--file",
+            "new.md",
+            "--against",
+            "HEAD",
+            "--json",
+          ],
+          {
+            cwd: dir,
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+            env: { ...process.env, LANGUAGE, LC_ALL },
+          },
+        );
+      } catch (e) {
+        out = e.stdout;
+      }
+      assert.equal(
+        JSON.parse(out).reason,
+        "new-document",
+        `[${LANGUAGE}] ${out}`,
+      );
+    }
     // an unknown revision is a usage error, never "new-document"
     assert.equal(
       run([
@@ -2292,4 +2327,69 @@ test("J4: --check-append-only compares the file with its copy at --against <rev>
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("J5: rows the writer keeps but extractEntries skips are compared too (TASK-133-QA-3)", () => {
+  const mk = (rows, extra = []) =>
+    [
+      "---",
+      "type: task",
+      "---",
+      "# T",
+      "",
+      "<!-- change-log-start -->",
+      "## Change Log",
+      "",
+      "| Version | Date | Change | Author |",
+      "|---|---|---|---|",
+      ...rows,
+      "<!-- change-log-end -->",
+      "",
+      ...extra,
+    ].join("\n");
+  // A Version-first log: no row passes isEntryRow, yet upsertChangeLog preserves every one.
+  const prev = mk([
+    "| 1.0 | 2026-01-01 | first | a |",
+    "| 1.1 | 2026-01-02 | second | b |",
+  ]);
+  const next = mk(["| 1.0 | 2026-01-01 | first | a |"]);
+  assert.equal(
+    CL.extractEntries(prev).length,
+    0,
+    "premise: the reader sees none of them",
+  );
+  assert.ok(
+    CL.upsertChangeLog(prev, ENTRY, { docType: "task" }).includes(
+      "| 1.1 | 2026-01-02 | second | b |",
+    ),
+    "premise: the writer keeps them",
+  );
+  assert.deepEqual(CL.rowsDropped(prev, next), [
+    "| 1.1 | 2026-01-02 | second | b |",
+  ]);
+  assert.deepEqual(
+    CL.rowsDropped(prev, CL.upsertChangeLog(prev, ENTRY, { docType: "task" })),
+    [],
+  );
+  // A second, legacy block the writer would sweep in: its rows count as carried.
+  const legacy = [
+    "<!-- jira-sync-changelog-start -->",
+    "| Date | Change |",
+    "|------|--------|",
+    "| 2026-04-28 09:40 | Initial Jira story created |",
+    "<!-- jira-sync-changelog-end -->",
+  ];
+  const twoBlocks = mk(["| 1.0 | 2026-01-01 | first | a |"], legacy);
+  assert.deepEqual(
+    CL.rowsDropped(
+      twoBlocks,
+      CL.upsertChangeLog(twoBlocks, ENTRY, { docType: "story" }),
+    ),
+    [],
+  );
+  assert.deepEqual(
+    CL.rowsDropped(twoBlocks, mk(["| 1.0 | 2026-01-01 | first | a |"])),
+    // reported in the canonical form the writer would carry it in
+    ["| 2026-04-28 |  | Initial Jira story created | sync-jira |"],
+  );
 });
