@@ -377,27 +377,26 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.155.qa.6.qa-results-section-engine.md](./task.155.qa.6.qa-results-section-engine.md)
-- **Gate File**: [task.155.gate.6.qa-results-section-engine.yml](./task.155.gate.6.qa-results-section-engine.yml)
+- **Full Report**: [task.155.qa.7.qa-results-section-engine.md](./task.155.qa.7.qa-results-section-engine.md)
+- **Gate File**: [task.155.gate.7.qa-results-section-engine.yml](./task.155.gate.7.qa-results-section-engine.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 45 engine tests. Full `ci:fast` ran 4,771 tests: 4,768 pass, 1 skipped, and 2 load-timing failures that pass alone. A stray fence injected into all 155 tracked sections (7 variants, plus a closing block at 16,804 later positions) deleted nothing. A 4-write corpus run over 1,986 documents, with a Change Log row after each write, lost no line outside the section.
+- **Tests Executed**: 47 engine tests and 8 wiring tests. Full `ci:fast` ran 4,772 tests: 4,770 pass, 1 skipped, and 1 load-timing failure that passes alone. The gate-6 experiments were re-run: a stray fence injected into all 155 tracked sections (7 variants), a closing block at 16,807 later positions, and a 4-write corpus run over 1,987 documents with a Change Log row after each write. None deleted anything.
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-REL-012, REL-013 and REL-014 are fixed. Three findings remain, none of which touches a tracked QA-written document:
-- REL-015 (medium): the guard's Change Log heading pattern is narrower than `change-log.js`, so a dotted-numbered `### 1.5 Change Log` can still be deleted or stranded.
-- REL-016 (low): a fenced `# comment` line in a section is refused.
-- REL-017 (low): the Step 12 prose still says `unbounded` means only an unclosed fence.
+REL-015 is fixed, REL-016 is recorded as an accepted trade, and REL-017 is fixed for `unbounded` and `unplaceable`. Two low findings remain. Both refuse and never delete, and neither has an instance in the corpus:
+- REL-018 (low): an H3 log heading directly above the marker block makes the second write `unbounded` when the Change Log row was hand-appended.
+- REL-019 (low): the `bad-section` halt names no repair.
 <!-- change-log-start -->
 ## Change Log
 
@@ -413,6 +412,7 @@ REL-012, REL-013 and REL-014 are fixed. Three findings remain, none of which tou
 | 2026-09-30 |  | QA gate PASS (100/100) — 3 low findings (REL-009, REL-010, REL-011); cycle 4 | qa-task |
 | 2026-09-30 |  | QA gate FAIL (60/100) — 3 findings (1 high REL-012, 1 medium REL-013, 1 low REL-014); cycle 5 | qa-task |
 | 2026-09-30 |  | QA gate CONCERNS (80/100) — 3 findings (1 medium, 2 low), cycle 6 | qa-task |
+| 2026-09-30 |  | QA gate PASS (100/100) — 2 low findings (REL-018, REL-019); cycle 7 | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -457,3 +457,5 @@ Carried from QA gates 3 and 4 (route 2b cosmetic-residue exits) to each gate's `
 - **REL-012 / REL-013 / REL-014** (QA gate 5) — **fixed in cycle 5's fix**, not deferred: a fence-blind structural guard refuses any replace or relocate whose removed text carries a change-log marker, an H1/H2 (column 0 or indented) or a Change Log heading, and a section is refused on write if the guard would refuse to replace it; a `## Change Log` heading directly above the marker block now stays with its block. **Deferred:** a setext H1/H2 after the section is not treated as structural — this repository never authors setext headings, and the one corpus instance (task.118) is a `---` separator under a paragraph inside a QA section, where refusing would be a false stop.
 - **REL-015** (QA gate 6) — **fixed in cycle 6's fix**: the guard and the REL-013 placement now also test `change-log.js`'s own `RE_HEADING` (numbered forms such as `### 1.5 Change Log`, `## 12) Change Log`), imported rather than restated.
 - **REL-016** (LOW, gate 6) — **accepted trade, refuses and never deletes**: the structural guard is fence-blind, so *any* fenced line that reads as an ATX H1/H2 — a fenced `## Example`, and also a bash or YAML `# comment` inside a fenced block — makes a new section `bad-section` and an existing one `unbounded`; Step 12 halts with the reason and nothing is written. 0 of 155 tracked sections contain a fence, and neither Step 12 template renders one.
+- **REL-018** (LOW, gate 7) — **refuses, never deletes**: with an H3 log heading directly above the marker block, a section placed above that heading spans it; if the next Change Log row is then added by hand rather than through `upsertChangeLog`, the following write is refused `unbounded`. Engine-written rows (the Step 12 path) give `created → replaced → replaced`.
+- **REL-019** (LOW, gate 7) — the `bad-section` halt carries no repair hint, and neither SKILL.md defines the reason (it is what a rendered section with a fenced `# comment` gets — the REL-016 trade).

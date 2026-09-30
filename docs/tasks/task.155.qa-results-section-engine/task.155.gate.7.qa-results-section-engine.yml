@@ -1,0 +1,91 @@
+schema: 2
+task: 'task.155.qa-results-section-engine'
+task_title: 'QA Testing Results section: one write engine, one placement, refused when duplicated'
+gate: PASS
+status_reason: 'REL-015 is closed: every Change Log heading change-log.js recognises is now structure, and all gate-6 repros, fault injection (7 variants x 155 sections, plus a closing block at 16,807 positions) and a 4-write corpus run delete nothing. Two low findings remain, both refusals that never delete: an H3 log heading directly above the markers makes the second write unbounded when the Change Log row was hand-appended (REL-018), and the bad-section halt names no repair (REL-019).'
+reviewer: 'QA Engineer'
+head: 'b810cb202194ee822e7154075eec48dcec2b879b'
+updated: '2026-09-30T21:35:24Z'
+
+top_issues:
+  - id: 'REL-018'
+    severity: low
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+    file: 'shared/resources/qa-results.js'
+    finding: 'False refusal (also code-review CR-1, medium/medium). With an H3 log heading directly above the marker block (### Change Log since cycle 5; ### 1.5 and ### 2) Change Log since b810cb20), canonicalOffset places a new section above the heading, but findQaResults ends the section at the marker, so the heading is inside the span and the next write is unbounded. It halts only when the Change Log row was not written by upsertChangeLog, which absorbs the heading into the block: hand-appended row gives created,unbounded; engine row gives created,replaced,replaced. Nothing is deleted. 0 tracked documents have an H3 or numbered log heading above a marker block (6 have ## Change Log, which is bounded), and Step 12 does not require upsertChangeLog for the row.'
+    suggested_action: 'When the block has markers and the line directly above it is a log heading (RE_LOG_HEADING or RE_HEADING), add that line as a span-end candidate in findQaResults, and add a create-then-replace test for the ### heading-above-marker shape with a hand-appended row.'
+    suggested_owner: dev
+  - id: 'REL-019'
+    severity: low
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'REL-017 residue: the Step 12 halt now names the repair for unbounded and unplaceable, but bad-section prints only "HALT qa-results: bad-section — <file> not written." and neither SKILL.md defines bad-section. It is the reason the REL-016 trade produces (a fenced # comment in the rendered section, reproduced), so the operator gets no hint.'
+    suggested_action: 'Add a bad-section hint to the halt in both skills (the rendered section must start with ## QA Testing Results, hold one section, balanced fences, and no line that reads as an H1/H2, marker or Change Log heading, fenced or not), and name bad-section in the Step 12 prose.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 55
+  phases_verified: 4/4
+  ci: 'ci:fast locally @ b810cb202194: 4,772 tests, 4,770 pass, 1 skipped, 1 load-timing failure (test-clean-checkout 10.6 s over a 10 s budget) that passes alone (13/13). qa-results engine + wiring: 55/55. bundle:check 129 skills, 0 problems; validate qa-task and qa-story pass. PR CI not awaited (gated at /finalise).'
+  fault_injection: 'Stray fence after each of the 155 tracked section headings: 155 unbounded, 0 deletions, for fence, fence at the section end, ~~~, 4-backtick and indented ```js; HTML comment and inline tick are replaced with 0 deletions. A stray fence plus a closing ```bash block at each of 16,807 later positions: 4,988 replaced, 11,819 unbounded, 0 deletions (gate 6: 4,988 / 11,816 / 0).'
+  corpus_run: '1,987 tracked docs/**/*.md written 4 times, each followed by an upsertChangeLog row: 1,830 created then replaced x3, 155 replaced x4, 2 unplaceable (the former REL-011 plan and bug documents). 0 lines lost outside the section, 0 rows dropped, always one section, never inside the log. The 155 existing sections re-rendered as the new section: 155 replaced, 0 bad-section.'
+  repros: 'Gate-6 REL-015 deletion shape: ### 1.5 Change Log and ## 12) Change Log with a stray fence and a later block are unbounded, row and heading kept (gate 6: replaced, log deleted). Placement: ### 1.5 Change Log above the markers now lands above the heading. Gate 5 shapes (marker doc, marker-less ## / ### logs, section inside the log, legacy jira pair, indented H1/H2) all unbounded, nothing lost. Setext, tab-indented and <h2> are replaced, as deferred.'
+  step_4b: 'Applies (both SKILL.md changed). qa-execute-snippets: qa-task 1 runnable / 3 placeholder / 16 mutating, qa-story 1 / 4 / 14, 0 findings, bash and zsh. The Step 12 node -e block is refused as mutating (node, fail-closed); it is executed by tests/qa-results-step12-wiring.test.js (8/8, bash) and was run for real under zsh to write this cycle''s section.'
+  mutation_proofs: 'Isolated copies. RE_HEADING removed from RE_STRUCTURAL -> K1 red; RE_HEADING removed from canonicalOffset -> K2 red; unbounded halt hint removed from both SKILL.md copies -> wiring tests 3 and 7 red. All covered; baseline 47/47 and 8/8 before and after; live files byte-identical.'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+bug_resolution:
+  previous_gate: 'task.155.gate.6.qa-results-section-engine.yml (CONCERNS 80)'
+  verified_fixed: ['REL-015 (medium): deletion and placement', 'REL-016 (low): documented as an accepted trade in Deferred Work and in the unbounded halt text', 'REL-017 (low): unbounded and unplaceable prose and halts; bad-section residue is REL-019']
+  deferred: ['REL-007', 'REL-008', 'REL-009', 'REL-010', 'PC-1', 'CRLF seam preservation', 'setext H1/H2']
+  fix_commit: 'b810cb202194ee822e7154075eec48dcec2b879b'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'A pure string transform with no network access and no shell. boundary: internal (unchanged): the inputs are a pipeline-written work item and a pipeline-rendered section, and no corpus sink models this section.'
+  performance:
+    status: PASS
+    notes: '47 engine tests run in about 0.2 s; the 1,987-document, 4-write corpus run takes seconds.'
+  reliability:
+    status: PASS
+    notes: 'No deletion path found: every heading change-log.js recognises as a log is now structure, and fault injection and the corpus run lose nothing. The remaining findings refuse safely (REL-018, REL-019). The checked() read-back still counts only sections (carried).'
+  maintainability:
+    status: PASS
+    notes: 'RE_HEADING is imported, not restated. RE_LOG_HEADING stays as a broader net beside it. Advisory cleanups CR-6 and CR-7 from gate 6 are unchanged.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'REL-018'
+      severity: low
+      finding: 'False refusal (also code-review CR-1, medium/medium). With an H3 log heading directly above the marker block (### Change Log since cycle 5; ### 1.5 and ### 2) Change Log since b810cb20), canonicalOffset places a new section above the heading, but findQaResults ends the section at the marker, so the heading is inside the span and the next write is unbounded. It halts only when the Change Log row was not written by upsertChangeLog, which absorbs the heading into the block: hand-appended row gives created,unbounded; engine row gives created,replaced,replaced. Nothing is deleted. 0 tracked documents have an H3 or numbered log heading above a marker block (6 have ## Change Log, which is bounded), and Step 12 does not require upsertChangeLog for the row.'
+      suggested_action: 'When the block has markers and the line directly above it is a log heading (RE_LOG_HEADING or RE_HEADING), add that line as a span-end candidate in findQaResults, and add a create-then-replace test for the ### heading-above-marker shape with a hand-appended row.'
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - id: 'REL-019'
+      severity: low
+      finding: 'REL-017 residue: the Step 12 halt now names the repair for unbounded and unplaceable, but bad-section prints only "HALT qa-results: bad-section — <file> not written." and neither SKILL.md defines bad-section. It is the reason the REL-016 trade produces (a fenced # comment in the rendered section, reproduced), so the operator gets no hint.'
+      suggested_action: 'Add a bad-section hint to the halt in both skills (the rendered section must start with ## QA Testing Results, hold one section, balanced fences, and no line that reads as an H1/H2, marker or Change Log heading, fenced or not), and name bad-section in the Step 12 prose.'
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'REL-018: end the span at a log heading directly above the marker block; add a ### heading-above-marker round-trip test with a hand-appended row'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+    - action: 'REL-019: a bad-section hint in both Step 12 halts, and bad-section named in the prose'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'Carried: REL-007..010, PC-1, CRLF seams, setext, CR-5/6/7 (see the task Deferred Work and gate 6)'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/change-log.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
