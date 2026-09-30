@@ -57,7 +57,7 @@ The corpus freshness test keeps only rules a branch rewrite cannot break; existe
 
 ### Test Coverage
 
-- **Unit Tests:** 45 new tests across the two new suites (bash + zsh variants), plus the updated parity suite
+- **Unit Tests:** 60 tests in the two new suites — 51 in `qa-scope-from-head.test.mjs`, 9 in `gate-head-freshness.test.mjs`, measured with `node --test` on a host with zsh (bash and zsh variants count separately) — plus the updated parity suite (58)
 - **Mutation proofs:** 21 (M1–M21), each reddening its predicted test
 - **QA:** 4 cycles (FAIL 60 → FAIL 40 → FAIL 40 → CONCERNS 90); 13 bugs filed and closed; 5c PR review APPROVE
 
