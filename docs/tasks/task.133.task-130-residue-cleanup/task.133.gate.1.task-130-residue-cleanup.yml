@@ -4,7 +4,7 @@ task_title: "Residue of task.130's seven QA cycles — eleven advisory findings,
 gate: FAIL
 status_reason: 'All five phases verified and every suite is green, but the diff review reproduced one high-confidence HIGH: --check-append-only --against "" reads the index and reports a clean log (exit 0). An unresolvable merge-base therefore makes the new 5c TRAIL check fail open.'
 reviewer: 'QA Engineer'
-updated: '2026-09-30T12:40:00Z'
+updated: '2026-09-30T08:50:17Z'
 
 top_issues:
   - id: TASK-133-QA-1

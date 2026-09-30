@@ -4,7 +4,7 @@ task_title: "Residue of task.130's seven QA cycles — eleven advisory findings,
 gate: CONCERNS
 status_reason: 'Cycle 1 fixed TASK-133-QA-1 (verified, mutation-proven). The cycle-2 refute pass found three MEDIUMs in the original change: the append-only check cannot see rows the writer keeps; the conditional Step 0-lock restore cites a condition the in-place path cannot evaluate; a legacy-only candidate set is reported as a fresh start. HIGH 0.'
 reviewer: 'QA Engineer'
-updated: '2026-09-30T13:25:00Z'
+updated: '2026-09-30T09:12:32Z'
 
 top_issues:
   - id: TASK-133-QA-3

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-133-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 2, refute pass CR-2)
 **Date Found**: 2026-09-30
 
@@ -46,3 +46,4 @@ Add one sentence to § Restore the lock stating that the in-place continuation e
 |------|--------|------------|-------|
 | 2026-09-30 | New | QA Engineer | Found in QA cycle 2 (refute pass) |
 | 2026-09-30 | Ready for QA | qa-fix | Fixed in cycle 2 |
+| 2026-09-30 | Closed | QA Engineer | Verified in cycle 3 |

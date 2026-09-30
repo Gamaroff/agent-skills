@@ -31,7 +31,7 @@ Cycle 1's fixes hold. The cycle-2 refute pass re-read the whole branch. It found
 
 ### Review Methodology
 
-Direct tools, plus one dispatched Explore reviewer. It was dispatched ~13:10 and returned ~13:14, inside the 10-minute budget. **Refute pass (cycle 2): the whole `origin/develop...HEAD` branch diff**, 2599 lines, excluding generated `references/` copies.
+Direct tools, plus one dispatched Explore reviewer. It ran 229 s (the agent's own reported duration) and returned by 09:07:01Z (output-file mtime), inside the 10-minute budget. **Refute pass (cycle 2): the whole `origin/develop...HEAD` branch diff**, 2599 lines, excluding generated `references/` copies.
 
 Re-review scope: unscoped (cycle 2 refute pass). `SAFETY_REPROBE=false`, because the prior gate's security was `PASS reasoned`.
 

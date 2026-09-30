@@ -1,0 +1,62 @@
+schema: 1
+task: 'task.133.task-130-residue-cleanup'
+task_title: "Residue of task.130's seven QA cycles — eleven advisory findings, grouped by file"
+gate: PASS
+status_reason: 'All five cycle-2 findings (QA-3..QA-7) verified fixed; bugs 2-4 closed. The cycle-3 scoped review raised three advisory findings (medium/medium, low/medium ×2) and no high-confidence bug; none gates.'
+reviewer: 'QA Engineer'
+updated: '2026-09-30T09:28:15Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 4629
+  phases_verified: 5/5
+  ci: 'not read this cycle (informational)'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged: choose_candidate() decision logic untouched and has no probe-engine entry form; rowsDropped/carriedRows report a diff (boundary false). contentAt still passes argv (no shell) and now a pinned env.'
+  performance:
+    status: PASS
+    notes: 'carriedRows adds one splitCarriedLines and two sweeps per revision; the check runs once per document at 5c.'
+  reliability:
+    status: PASS
+    notes: 'QA-3 and QA-5 fixed: a Version-first dropped row is reported; a legacy-only set blocks with the recovery. Residual advisories in recommendations.future.'
+  maintainability:
+    status: PASS
+    notes: 'isUnparsedRow is now one predicate shared by writer and reader; each new rule sits at a marker a test reads.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'cycle-3 CR-1: legacy-only and fresh-start share source none and differ only in blocking_issues text; give the legacy-only case a structured value (source or flag) and update the schema row and step-0 §0b.'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'cycle-3 CR-2: on a case-insensitive filesystem a differently-cased --file reads "exists on disk, but not in" and reports new-document; resolve the tracked spelling first.'
+      refs: ['shared/resources/change-log.js']
+    - action: 'cycle-3 CR-3: the J4 locale loop should assert git actually translates under each locale, or skip it with a message, so a host without catalogs cannot pass it vacuously.'
+      refs: ['shared/resources/tests/change-log.test.mjs']
+    - action: 'Carried: quote every fenced *-directory placeholder (cycle-1 CR-2 population); new-document vs rename (cycle-1 CR-3); PreCompact site (3) rc 2 (cycle-2 CR-4); merge-base-only lens (obs #183).'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-on-precompact.sh']
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-09-30'
+  total_iterations: 2
+  verification_method: 'QA-3 reproduction re-run (dropped Version-first row now reported); J5, who-restores (v), A2, J4 locale, D; Step 4b on both changed prose files'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

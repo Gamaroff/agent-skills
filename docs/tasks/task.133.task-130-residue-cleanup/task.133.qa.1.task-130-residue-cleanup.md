@@ -37,7 +37,7 @@ All five phases were verified against the diff. Every suite is green, and every 
 
 ### Review Methodology
 
-Direct tools, plus one dispatched Explore subagent for the Step 3b diff review. It was dispatched at 12:24 and returned about 2 minutes later, well inside the 10-minute budget. This was the first review, so the scope was the whole branch diff against `origin/develop`, 2169 lines. Generated `skills/*/references/` copies were excluded, because they are byte copies of `shared/resources/*` and `bundle:check` verifies them. Traceability mapper skipped: the Success Criteria are checklists, not a table (`HAS_SUCCESS_CRITERIA_TABLE=false`).
+Direct tools, plus one dispatched Explore subagent for the Step 3b diff review. It ran 105 s (the agent's own reported duration) and returned by 08:47:52Z (output-file mtime), well inside the 10-minute budget. This was the first review, so the scope was the whole branch diff against `origin/develop`, 2169 lines. Generated `skills/*/references/` copies were excluded, because they are byte copies of `shared/resources/*` and `bundle:check` verifies them. Traceability mapper skipped: the Success Criteria are checklists, not a table (`HAS_SUCCESS_CRITERIA_TABLE=false`).
 
 Step 4b runnable prose: 9 changed files executed under bash and zsh. See Code Review.
 

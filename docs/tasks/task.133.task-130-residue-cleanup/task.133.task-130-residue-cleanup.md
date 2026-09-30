@@ -307,31 +307,31 @@ None (review 1 removed the writer-side throw, the one change every appender woul
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 70/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 90/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.133.qa.2.task-130-residue-cleanup.md](./task.133.qa.2.task-130-residue-cleanup.md)
-- **Gate File**: [task.133.gate.2.task-130-residue-cleanup.yml](./task.133.gate.2.task-130-residue-cleanup.yml)
+- **Full Report**: [task.133.qa.3.task-130-residue-cleanup.md](./task.133.qa.3.task-130-residue-cleanup.md)
+- **Gate File**: [task.133.gate.3.task-130-residue-cleanup.yml](./task.133.gate.3.task-130-residue-cleanup.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 4626
+- **Tests Executed**: 4629
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (3 MEDIUM, 2 LOW)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Bug Reports
 
-- [Bug 1: `--check-append-only --against ""` reads the index](./task.133.bug.1.check-append-only-empty-against-reads-index.md) - ✅ Closed - Priority: P1 (Fixed 2026-09-30, verified cycle 2)
-- [Bug 2: append-only check blind to rows the writer keeps](./task.133.bug.2.append-only-check-blind-to-rows-extractentries-skips.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-30)
-- [Bug 3: conditional restore unevaluable on the in-place path](./task.133.bug.3.restore-condition-unevaluable-on-in-place-path.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-30)
-- [Bug 4: legacy-only candidate set reads as a fresh start](./task.133.bug.4.detector-legacy-only-reads-as-fresh-start.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-30)
+- [Bug 1: `--check-append-only --against ""` reads the index](./task.133.bug.1.check-append-only-empty-against-reads-index.md) - ✅ Closed - Priority: P1
+- [Bug 2: append-only check blind to rows the writer keeps](./task.133.bug.2.append-only-check-blind-to-rows-extractentries-skips.md) - ✅ Closed - Priority: P2
+- [Bug 3: conditional restore unevaluable on the in-place path](./task.133.bug.3.restore-condition-unevaluable-on-in-place-path.md) - ✅ Closed - Priority: P2
+- [Bug 4: legacy-only candidate set reads as a fresh start](./task.133.bug.4.detector-legacy-only-reads-as-fresh-start.md) - ✅ Closed - Priority: P2
 
 ### Key Findings
-Cycle 1's HIGH is fixed and verified. The cycle-2 refute pass found three MEDIUMs in the original change (QA-3, QA-4, QA-5), each a place where two states reach one answer or a condition cannot be evaluated where it is read. It also found two LOWs (QA-6 locale, QA-7 vacuous sub-assertion).
+All cycle 1–2 findings are fixed and verified, and all four bugs are closed. Cycle 3 raised three advisory findings, carried in the gate's `recommendations.future`. Gates 1–2's `updated:` timestamps had been composed and were corrected to their measured write times (obs #230).
 <!-- change-log-start -->
 ## Change Log
 
@@ -345,6 +345,7 @@ Cycle 1's HIGH is fixed and verified. The cycle-2 refute pass found three MEDIUM
 | 2026-09-30 |  | QA findings fixed — cycle 1: TASK-133-QA-1 (empty --against is usage, exit 2; J4 +2 cases, mutation-proven), TASK-133-QA-2 (quoting claim narrowed to § Consume Output, CHANGELOG too); 1 iteration | qa-fix |
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — cycle 2 refute pass: 0 HIGH, 3 MEDIUM, 2 LOW; bug 1 verified closed | qa-task |
 | 2026-09-30 |  | QA findings fixed — cycle 2: QA-3 (rowsDropped reads every carried row; J5), QA-4 (in-place restore evaluation stated once; who-restores v), QA-5 (legacy-only blocks, never a fresh start; A2), QA-6 (git pinned to the C locale), QA-7 (non-literal count excludes the declaration); 1 iteration, 5 mutation proofs | qa-fix |
+| 2026-09-30 |  | QA gate PASS (90/100) — cycle 3: QA-3..QA-7 verified, bugs 2–4 closed; 3 advisory findings carried; gates 1–2 updated: corrected to measured write times | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
