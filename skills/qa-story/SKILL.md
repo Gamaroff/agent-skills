@@ -907,7 +907,10 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    ```bash
    BASE_REF=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)   # resolve the PR's actual base (default develop)
    BASE="origin/${BASE_REF:-develop}"
-   DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
+   # X's LAST: BSD mktemp (macOS) randomises only a trailing run of X's. With a suffix after them it
+   # creates the literal name once and fails on every later run, leaving DIFF_FILE empty (obs #181).
+   # GNU reads a trailing suffix as implied --suffix, so Linux CI never saw it.
+   DIFF_FILE=$(mktemp "${TMPDIR:-/tmp}/qa-code-review.XXXXXX")
    # How many gates already exist? 0 = first review, 1 = cycle 2, 2+ = cycle 3 and later.
    # $STORY_DIR is an input bound by the agent in this shell; unbound, find reads nothing, PRIOR_GATES is
    # 0 and every cycle silently takes the first-review branch (task.135 QA cycle 3, CR3-3).

@@ -127,6 +127,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The QA skills' Step 3b temp file works more than once on macOS (obs #181).** `qa-task` and
+  `qa-story` bound `DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)`. BSD `mktemp` randomises
+  only a trailing run of X's, so it created that literal file once and failed on every later run,
+  leaving `DIFF_FILE` empty — no patch on the whole-branch arm, a HALT blaming the pathspec on the
+  scoped arm. GNU reads the `.diff` as an implied suffix, so Linux CI never saw it; the literal file
+  had been in `/tmp` since 2026-09-26 when task.135's cycle-3 dogfood hit it. The template is now
+  `"${TMPDIR:-/tmp}/qa-code-review.XXXXXX"`. `mktemp-template-portable.test.mjs` runs the shipped
+  line twice under bash and zsh, and sweeps every shipped skill, script and shared resource for a
+  template with anything after its X's (`-t` forms are portable and pass).
+
 - **`--restore` refuses a candidate whose directory holds a control character (bug 17, #529).**
   - `advance-pipeline-lock.sh` `choose_candidate()` read `task_or_story_directory` through
     `$(jq -r …)`, which does not copy the JSON string exactly. zsh keeps an embedded NUL, and
