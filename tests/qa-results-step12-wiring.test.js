@@ -112,6 +112,11 @@ for (const { skill, fileVar, docName } of SKILLS) {
       const r2 = run(block, dir, fileVar, doc);
       assert.equal(r2.status, 0, r2.stderr);
       assert.match(r2.stdout, /qa-results: replaced/);
+      assert.equal(
+        fs.existsSync(sectionFile),
+        false,
+        "the consumed section file is removed (CR-4)",
+      );
 
       const text = fs.readFileSync(doc, "utf8");
       const { sections } = findQaResults(text);
@@ -139,6 +144,12 @@ for (const { skill, fileVar, docName } of SKILLS) {
       assert.notEqual(r.status, 0);
       assert.match(r.stderr, /HALT qa-results: multiple \(2 sections\)/);
       assert.equal(fs.readFileSync(doc, "utf8"), stacked);
+      assert.ok(
+        fs.existsSync(
+          path.join(dir, ".claude", "state", "qa-results-section.md"),
+        ),
+        "a refused write keeps the section file for the operator",
+      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

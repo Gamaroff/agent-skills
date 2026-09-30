@@ -374,17 +374,38 @@ None.
 
 ---
 
-<!-- change-log-start -->
+## QA Testing Results
 
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-30
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.155.qa.1.qa-results-section-engine.md](./task.155.qa.1.qa-results-section-engine.md)
+- **Gate File**: [task.155.gate.1.qa-results-section-engine.yml](./task.155.gate.1.qa-results-section-engine.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 29 task tests; full `ci:fast` 4744 (4743 pass, 0 fail, 1 skipped)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 high, 2 medium, 1 low (in the gate)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- REL-001 (medium): a rendered section that carries a second H2 is accepted, and that H2 stacks one more copy on every later write.
+- REL-002 (medium): a section between a marker-less `## Change Log` heading and its table is "replaced" by deleting the table rows.
+- REL-003 (low): a section inside the later of two change-log marker blocks deletes that block's end marker.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-25 | 1.0     | Initial draft | create-task |
 | 2026-09-30 | 1.1     | Review NEEDS REVISION (6/10) → fixed: prefix heading match (task.65's suffixed copies), span bounded by the change-log start, separators preserved, Step 12 wiring test file named | review-task |
 | 2026-09-30 |         | Status → ready-for-development | review-task |
 | 2026-09-30 |         | Implemented — 11 files (1 engine + 2 bundled copies, 3 test files, 2 skills, task.65 repair, CHANGELOG), 31 tests | develop |
-
+| 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low) | qa-task |
 <!-- change-log-end -->
 
 ---

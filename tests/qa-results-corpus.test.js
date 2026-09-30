@@ -17,6 +17,11 @@
  *      disagree about what they are counting.
  *   2. A non-vacuity floor on documents that carry a section. A scan that found
  *      nothing has proved nothing: a broken pathspec reads as a clean corpus.
+ *   3. An independent count agrees with the engine's, per document. The raw count
+ *      is a line scan with its own fence toggle — deliberately NOT the engine's
+ *      protected ranges — so an engine that silently under-counts (a heading regex
+ *      that stopped matching, a protection bug that hides real headings) cannot
+ *      certify its own blindness (task.155 QA cycle 1, CR-3).
  *
  * A failure names every offending file. The repair rule the engine's callers print
  * (and task.65 used): keep the copy whose Gate File link names the highest gate,
@@ -46,13 +51,49 @@ function trackedDocs() {
   return out.split("\0").filter(Boolean);
 }
 
+// Headings counted without the engine: `## QA Testing Results…` lines outside a
+// ``` / ~~~ fence, past a leading frontmatter block. Inline code cannot put a
+// heading at column 0, so fences are the only protection a line scan needs.
+function rawCount(text) {
+  const lines = text.split("\n");
+  let i = 0;
+  if (lines[0] === "---") {
+    i = lines.indexOf("---", 1) + 1 || lines.length;
+  }
+  let fence = null;
+  let n = 0;
+  for (; i < lines.length; i++) {
+    const f = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(lines[i]);
+    // A backtick opener whose rest holds a backtick is inline code, not a fence
+    // (CommonMark; task.42 line 315 opens with four backticks inside a code span).
+    const opener = f && !(f[1][0] === "`" && f[2].includes("`"));
+    if (f && (fence || opener)) {
+      if (!fence) fence = f[1];
+      else if (
+        f[1][0] === fence[0] &&
+        f[1].length >= fence.length &&
+        f[2].trim() === ""
+      )
+        fence = null;
+      continue;
+    }
+    if (!fence && /^## QA Testing Results\b/.test(lines[i])) n++;
+  }
+  return n;
+}
+
 function survey() {
   const offenders = [];
+  const disagreements = [];
   let scanned = 0;
   for (const rel of trackedDocs()) {
     const text = fs.readFileSync(path.join(REPO_ROOT, rel), "utf8");
     if (!text.includes("QA Testing Results")) continue;
     const { sections } = findQaResults(text);
+    const raw = rawCount(text);
+    if (raw !== sections.length) {
+      disagreements.push(`${rel}: engine ${sections.length}, line scan ${raw}`);
+    }
     if (sections.length === 0) continue;
     scanned++;
     const inside = sections.filter((s) => s.insideChangeLog).length;
@@ -62,11 +103,16 @@ function survey() {
       );
     }
   }
-  return { scanned, offenders };
+  return { scanned, offenders, disagreements };
 }
 
 test("no tracked document stacks QA Testing Results sections or hides one in the change log", () => {
-  const { scanned, offenders } = survey();
+  const { scanned, offenders, disagreements } = survey();
+  assert.deepEqual(
+    disagreements,
+    [],
+    `findQaResults and an independent line scan disagree — one of them is broken:\n  ${disagreements.join("\n  ")}`,
+  );
   assert.ok(
     scanned >= FLOOR_DOCS,
     `scan-broken: only ${scanned} documents carry a QA Testing Results section (floor ${FLOOR_DOCS})`,

@@ -47,6 +47,9 @@
 // directly before the terminator stay where they are on every write.
 
 const {
+  CL_START,
+  CL_END,
+  LEGACY_MARKER_PAIRS,
   protectedRanges,
   insideProtected,
   bodyStart,
@@ -56,9 +59,9 @@ const {
 
 const HEADING = "## QA Testing Results";
 const RE_QA = /^## QA Testing Results\b[^\n]*$/gm;
-const RE_H1_H2 = /^#{1,2}[ \t]/gm;
+const RE_H1_H2 = /^#{1,2}[ \t]/;
 // The Change Log's own table header (document-change-log.md: Date | Version | …).
-const RE_LOG_HEADER = /^\|[ \t]*Date[ \t]*\|[ \t]*Version[ \t]*\|/m;
+const RE_LOG_HEADER = /^\|[ \t]*Date[ \t]*\|[ \t]*Version[ \t]*\|/;
 // A thematic break line. Only counted as a separator when a blank line precedes it:
 // directly under a paragraph line, `---` is a setext H2 underline, not a break.
 const RE_BREAK =
@@ -91,9 +94,42 @@ function trimSeparator(content, start, rawEnd) {
   return content[start + kept] === "\n" ? start + kept + 1 : start + kept;
 }
 
-// Offset where the change-log block's END marker begins (markers only).
-function endMarkerStart(content, changeLog) {
-  return content.lastIndexOf("<!--", changeLog.end - 1);
+// EVERY change-log marker block, current and legacy, as { start, endMarker, end }.
+// `findChangeLog` answers "which block is the log" (the earliest); containment needs
+// all of them — a dual-synced document carries a legacy pair and the current pair,
+// and a section inside the later block must still be bounded by ITS end marker
+// (task.155 QA cycle 1, REL-003). Markers are matched the way findChangeLog's
+// findMarkerBlock matches them: unprotected start, first unprotected end after it.
+function markerBlocks(content, ranges) {
+  const blocks = [];
+  const pairs = [{ start: CL_START, end: CL_END }, ...LEGACY_MARKER_PAIRS];
+  for (const { start: open, end: close } of pairs) {
+    let from = 0;
+    for (;;) {
+      const s = content.indexOf(open, from);
+      if (s === -1) break;
+      from = s + open.length;
+      if (insideProtected(ranges, s)) continue;
+      let e = content.indexOf(close, from);
+      while (e !== -1 && insideProtected(ranges, e)) {
+        e = content.indexOf(close, e + close.length);
+      }
+      if (e === -1) break;
+      blocks.push({ start: s, endMarker: e, end: e + close.length });
+      from = e + close.length;
+    }
+  }
+  return blocks.sort((a, b) => a.start - b.start);
+}
+
+// The first unprotected match of `re` (non-global) at or after `from`.
+function firstUnprotected(content, re, from, ranges) {
+  const g = new RegExp(re.source, "gm");
+  g.lastIndex = from;
+  for (let m = g.exec(content); m; m = g.exec(content)) {
+    if (!insideProtected(ranges, m.index)) return m.index;
+  }
+  return -1;
 }
 
 /**
@@ -108,32 +144,39 @@ function findQaResults(content) {
   const changeLog = findChangeLog(content);
   const sections = [];
 
+  const blocks = markerBlocks(content, ranges);
+
   for (const m of content.matchAll(RE_QA)) {
     if (m.index < from || insideProtected(ranges, m.index)) continue;
     const start = m.index;
-    const insideChangeLog = !!(
-      changeLog &&
-      changeLog.hasMarkers &&
-      start > changeLog.start &&
-      start < changeLog.end
-    );
+    const bodyOffset = start + m[0].length;
+    const block = blocks.find((b) => start > b.start && start < b.end);
+    let insideChangeLog = !!block;
 
     const candidates = [content.length];
-    const bodyOffset = start + m[0].length;
-    for (const hm of content.slice(bodyOffset).matchAll(RE_H1_H2)) {
-      const abs = bodyOffset + hm.index;
-      if (insideProtected(ranges, abs)) continue;
-      candidates.push(abs);
-      break;
+    const nextHeading = firstUnprotected(content, RE_H1_H2, bodyOffset, ranges);
+    if (nextHeading !== -1) candidates.push(nextHeading);
+    if (block) {
+      candidates.push(block.endMarker);
+    } else {
+      // A section before a marker block ends at that block, never inside it: the
+      // canonical position is directly before the block, so "next ≤ 2 heading" alone
+      // runs to `## Change Log` and a replace deletes the start marker (review C2).
+      const next = blocks.find((b) => b.start > start);
+      if (next) candidates.push(next.start);
     }
-    if (changeLog) {
-      if (insideChangeLog) {
-        candidates.push(endMarkerStart(content, changeLog));
-        // A section written between `## Change Log` and its table must not carry the
-        // table away with it on relocate: the log's own header row ends the section.
-        const tbl = RE_LOG_HEADER.exec(content.slice(bodyOffset));
-        if (tbl) candidates.push(bodyOffset + tbl.index);
-      } else if (changeLog.start > start) candidates.push(changeLog.start);
+    // A section written between a change-log heading and that log's table — inside a
+    // marker block, or after a marker-less `## Change Log` — must not carry the table
+    // away: the log's own header row ends it. In the marker-less shape the section is
+    // misplaced exactly as it is inside a marker block, and a replace there deleted
+    // every Change Log row (task.155 QA cycle 1, REL-002).
+    const logFollows = block || (changeLog && changeLog.start < start);
+    if (logFollows) {
+      const tbl = firstUnprotected(content, RE_LOG_HEADER, bodyOffset, ranges);
+      if (tbl !== -1 && tbl < Math.min(...candidates)) {
+        candidates.push(tbl);
+        insideChangeLog = true;
+      }
     }
     const rawEnd = Math.min(...candidates);
 
@@ -177,12 +220,27 @@ function insertAt(content, pos, body) {
 }
 
 // Normalise the caller's section: leading blank lines and trailing whitespace go;
-// it must then be exactly one section.
+// it must then be exactly one section AND nothing else. A second H1/H2 inside it —
+// qa-story's `## QA Completion Summary` rendered into the same file, say — would sit
+// past the section's own span once written, so every later write left that copy and
+// added another (task.155 QA cycle 1, REL-001).
 function normaliseSection(section) {
   if (typeof section !== "string") return null;
   const body = section.replace(/^(?:[ \t]*\r?\n)+/, "").replace(/\s+$/, "");
   if (!body.startsWith(HEADING)) return null;
   if (findQaResults(body).sections.length !== 1) return null;
+  const firstLineEnd = body.indexOf("\n");
+  if (
+    firstLineEnd !== -1 &&
+    firstUnprotected(
+      body,
+      RE_H1_H2,
+      firstLineEnd + 1,
+      protectedRanges(body),
+    ) !== -1
+  ) {
+    return null;
+  }
   return body;
 }
 

@@ -253,3 +253,72 @@ test("E6 replace is idempotent on the section text", () => {
   }).content;
   assert.equal(twice, once);
 });
+
+// ---------------------------------------------------------------------------
+// F — QA cycle 1 findings (task.155 gate 1)
+// ---------------------------------------------------------------------------
+
+test("F1 REL-001: a section carrying a second H1/H2 is bad-section; a fenced one is not", () => {
+  const doc = markerDoc();
+  const withSibling = `${section(1)}\n\n## QA Completion Summary\n\nDone.`;
+  const r = QR.upsertQaResults(doc, withSibling, { docType: "task" });
+  assert.equal(r.reason, "bad-section");
+  assert.equal(r.content, doc);
+  const withH1 = `${section(1)}\n\n# Stray title`;
+  assert.equal(QR.upsertQaResults(doc, withH1).reason, "bad-section");
+  const fenced = `${section(1)}\n\n\`\`\`markdown\n## Example heading\n\`\`\``;
+  assert.equal(
+    QR.upsertQaResults(doc, fenced, { docType: "task" }).reason,
+    "created",
+  );
+  const h3 = `${section(1)}\n\n### Sub-heading\n\nx`;
+  assert.equal(
+    QR.upsertQaResults(doc, h3, { docType: "task" }).reason,
+    "created",
+  );
+});
+
+test("F2 REL-002: marker-less ## Change Log with the section before its table → relocated, rows kept", () => {
+  const table =
+    "| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | Initial draft | create-task |\n";
+  const doc = `${FM}## Body\n\ntext\n\n## Change Log\n\n${section(1)}\n\n${table}\n## Progress Tracking\n`;
+  const [s] = QR.findQaResults(doc).sections;
+  assert.equal(s.insideChangeLog, true);
+  const r1 = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r1.reason, "relocated");
+  assert.match(
+    r1.content,
+    /None \(cycle 2\)\.\n\n## Change Log\n\n\| Date \| Version/,
+  );
+  assert.match(r1.content, /\| 2026-09-25 \| 1\.0 \| Initial draft/);
+  const r2 = QR.upsertQaResults(r1.content, section(3), { docType: "task" });
+  assert.equal(r2.reason, "replaced");
+  assert.equal(qaCount(r2.content), 1);
+  assert.match(r2.content, /\| 2026-09-25 \| 1\.0 \| Initial draft/);
+});
+
+test("F3 REL-003: a section inside a LATER marker block is contained, and its end marker survives", () => {
+  const legacy =
+    "<!-- jira-sync-changelog-start -->\n\n## Jira Sync Log\n\n| Date | Change |\n| --- | --- |\n| 2026-01-01 | synced |\n\n<!-- jira-sync-changelog-end -->\n";
+  const current = LOG.replace(
+    "<!-- change-log-end -->",
+    `${section(1)}\n\n<!-- change-log-end -->`,
+  );
+  const doc = `${FM}## Body\n\ntext\n\n${legacy}\n${current}\n## Progress Tracking\n`;
+  const [s] = QR.findQaResults(doc).sections;
+  assert.equal(s.insideChangeLog, true);
+  assert.ok(s.end <= doc.indexOf("<!-- change-log-end -->"));
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "relocated");
+  assert.equal(count(r.content, "<!-- change-log-end -->"), 1);
+  assert.equal(count(r.content, "<!-- jira-sync-changelog-end -->"), 1);
+  assert.equal(qaCount(r.content), 1);
+  assert.equal(QR.findQaResults(r.content).sections[0].insideChangeLog, false);
+});
+
+test("F4 a section AFTER a marker-less change log with no table following is not misplaced", () => {
+  const doc = `${FM}## Change Log\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n\n${section(1)}\n\n## Next\n`;
+  const [s] = QR.findQaResults(doc).sections;
+  assert.equal(s.insideChangeLog, false);
+  assert.equal(QR.upsertQaResults(doc, section(2)).reason, "replaced");
+});

@@ -1353,6 +1353,7 @@ command node -e '
     process.exit(1);
   }
   fs.writeFileSync(file, r.content);
+  fs.unlinkSync(sectionFile); // consumed: a stale copy must not feed the next cycle
   console.log(`qa-results: ${r.reason}`);
 ' "$TASK_FILE" .claude/state/qa-results-section.md task
 ```

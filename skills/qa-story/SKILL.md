@@ -1875,6 +1875,7 @@ After review:
        process.exit(1);
      }
      fs.writeFileSync(file, r.content);
+     fs.unlinkSync(sectionFile); // consumed: a stale copy must not feed the next cycle
      console.log(`qa-results: ${r.reason}`);
    ' "$STORY_FILE" .claude/state/qa-results-section.md "$QA_DOC_TYPE"
    ```
