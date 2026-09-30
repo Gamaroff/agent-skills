@@ -384,19 +384,20 @@ None.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.155.qa.3.qa-results-section-engine.md](./task.155.qa.3.qa-results-section-engine.md)
-- **Gate File**: [task.155.gate.3.qa-results-section-engine.yml](./task.155.gate.3.qa-results-section-engine.yml)
+- **Full Report**: [task.155.qa.4.qa-results-section-engine.md](./task.155.qa.4.qa-results-section-engine.md)
+- **Gate File**: [task.155.gate.4.qa-results-section-engine.yml](./task.155.gate.4.qa-results-section-engine.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 39 task tests. Full `ci:fast` ran 4755 tests: 4753 pass, 1 load-sensitive timing failure that passes alone, 1 skipped. A corpus dry run over 155 documents in a temp copy returned all `replaced` and was byte-stable on a second write.
+- **Tests Executed**: 41 task tests. Full `ci:fast` ran 4757 tests: 4755 pass, 1 load-sensitive failure that passes alone, 1 skipped. A corpus dry run over 1,837 documents in a temp copy (155 replaces and 1,682 create-then-replace runs) lost no marker, dated row or heading.
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 high, 0 medium, 2 low (in the gate)
+- **Critical Issues**: 0 high, 0 medium, 3 low (in the gate)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- REL-004, REL-005 and REL-006 are fixed. Each fix is mutation-proven by a committed G-test.
-- REL-007 (low; code-review CR-1, downgraded from medium): a misplaced section that quotes a Date table leaves a stale tail in the log. The corpus has 0 instances.
-- REL-008 (low; a regression from the REL-006 first→last change): a log with two Date tables loses the first under a misplaced section. The corpus has 0 instances.
+- The PR review 1 fixes hold. CR-1 (the marker-less `### Change Log` bound) and CR-2 (the trailing-break strip) are each mutation-proven by H1 and H2, and `pr_number` is set.
+- REL-009 (low): the break strip leaves one blank line, which grows per replace unless a Change Log write follows.
+- REL-010 (low; a regression from the CR-1 fix): a section carrying its own `### Change Log` subheading stacks its stale tail. The corpus has 0 instances.
+- REL-011 (low; present since the first commit): an unclosed fence at the end of a document makes `created` stack copies. The corpus has 0 target documents with this shape.
 <!-- change-log-start -->
 ## Change Log
 
@@ -409,6 +410,7 @@ None.
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low); cycle 2 | qa-task |
 | 2026-09-30 |  | QA gate PASS (100/100) — 2 low findings (REL-007, REL-008); cycle 3 | qa-task |
+| 2026-09-30 |  | QA gate PASS (100/100) — 3 low findings (REL-009, REL-010, REL-011); cycle 4 | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -447,3 +449,6 @@ Carried from QA gate 3 (`task.155.gate.3.qa-results-section-engine.yml`, route 2
 - **REL-008** (LOW) — a misplaced section before a log holding two Date-headed tables loses the first table's rows; a log header that is not Date-first is not recognised. 0 corpus logs have either shape.
 - CRLF seam preservation and two small cleanups (gate 3 `recommendations.future`).
 - **PC-1** (LOW, PR review 1) — the Change Log write that follows Step 12 collapses the blank line before `<!-- change-log-start -->`. That seam belongs to `change-log.js`'s `upsertChangeLog`, not this engine.
+- **REL-009** (LOW, gate 4) — the CR-2 trailing-break strip leaves the blank line before the break, so a replace can add one blank line; the following Change Log write absorbs it. Whitespace only.
+- **REL-010** (LOW, gate 4, regression from `182367ee`) — in a marker-less document, a section that carries its own `### Change Log` subheading is taken for the log, so each replace keeps the old tail. Duplicates, never deletes; 0 corpus sections carry that subheading and neither Step 12 template renders one.
+- **REL-011** (LOW, gate 4) — an unclosed fence running to the end of a document makes `created` append the section inside the fence, invisible to the next read. 0 story/task/epic documents have this shape.

@@ -1,0 +1,109 @@
+schema: 2
+task: 'task.155.qa-results-section-engine'
+task_title: 'QA Testing Results section: one write engine, one placement, refused when duplicated'
+gate: PASS
+status_reason: 'The PR review 1 fixes hold: CR-1 and CR-2 are each mutation-proven by a committed test, and pr_number is set. A 1,837-document corpus dry run and the story-template ### Change Log shape found no deletion. Three new low findings remain: whitespace growth, a stale tail from a section carrying a Change Log subheading, and stacking under an unclosed fence. None occurs in any document these skills write.'
+reviewer: 'QA Engineer'
+head: '182367eee7dcef174a391b3a0b77afd14a3ed14b'
+updated: '2026-09-30T20:00:28Z'
+
+top_issues:
+  - id: 'REL-009'
+    severity: low
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code-review CR-1 (rated medium, high confidence). The CR-2 trailing-break strip removes the break but leaves the blank line before it. A section ending \n\n---\n therefore grows the document by one blank line per replace, measured at EOF and before an anchor. A following Change Log write absorbs it (0 growth over 5 cycles in the task-marker, story ## and story ### shapes). H2 counts only ---, so it cannot see this. Whitespace only, nothing deleted, and no Step 12 template renders a trailing ---.'
+    suggested_action: 'Trim trailing whitespace again after removing the break, and make H2 assert the exact bytes between the section and the next heading across cycles.'
+    suggested_owner: dev
+  - id: 'REL-010'
+    severity: low
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code-review CR-2 (rated medium, high confidence), a regression from 182367ee. The new marker-less bound uses findChangeLog, which returns the first Change Log heading. When the document has no marker block and the section precedes the real log or there is none, a section carrying its own ### Change Log subheading becomes the log, and each replace keeps the old tail (3 writes left 3 tails; 6bf14169 left 1). Duplication, not deletion. 0 of 155 corpus sections carry the subheading, and neither Step 12 template renders one.'
+    suggested_action: 'Return bad-section from normaliseSection when the body contains an unprotected change-log RE_HEADING, so the section content can never set the bound.'
+    suggested_owner: dev
+  - id: 'REL-011'
+    severity: low
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+    file: 'shared/resources/qa-results.js'
+    finding: 'When an unclosed fence runs to the end of the document and no change log or anchor lies outside it, created appends the section inside the fence. findQaResults cannot see it, so every write creates another copy (3 writes, 3 copies) and multiple never fires. The same happens at 6d6c166d. The corpus has 2 such documents, a story plan and a task bug report; neither is a Step 12 target, and no story, task or epic work item has this shape.'
+    suggested_action: 'After inserting, re-run findQaResults and refuse (for example reason unplaceable) unless exactly one section is found, writing nothing.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 41
+  phases_verified: 4/4
+  ci: 'ci:fast locally @ 182367eee7dc: 4757 tests, 4755 pass, 1 fail, 1 skipped. The fail is tests/test-clean-checkout.test.js (known load-flaky), which ran 13/13 alone in 8.0 s. bundle:check 0 problems; quick_validate qa-task and qa-story pass. PR CI not awaited (gated at /finalise).'
+  corpus_run: '1,983 tracked docs/**/*.md copied to a temp directory. Each of 1,837 documents (155 with a section, 1,682 story/task/epic without one) got 3 writes: 1,680 created,replaced,replaced; 155 replaced x3; 2 created x3 (REL-011, non-target documents). In every document, change-log markers, dated rows outside fences, H1/H2 headings and Change Log headings were unchanged, and write 3 equalled write 2 apart from the sentinel in all but the 2 REL-011 documents.'
+  story_template_probe: 'Story shape with a marker-less ### Change Log (and the ## variant), 5 cycles of QA write followed by upsertChangeLog: 1 section, rows 2 to 6 with none lost, 0 blank growth. Deletion probes S1-S9 all passed: an H3 log under sign-off, at EOF, under Notes & Updates, and below an existing section; two marker-less logs; legacy markers plus a later H3 log.'
+  mutation_proofs: 'new marker-less bound disabled -> H1 red (covered); trailing-break strip reverted to /\s+$/ -> H2 red (covered); cp snapshot restored, baseline green'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  previous_gate: 'task.155.gate.3.qa-results-section-engine.yml (PASS 100)'
+  verified_fixed: ['CR-1 (PR review 1)', 'CR-2 (PR review 1, with REL-009 residue)', 'PC-2 (PR review 1)']
+  deferred: ['REL-007', 'REL-008', 'PC-1', 'CRLF seam preservation']
+  fix_commit: '182367eee7dcef174a391b3a0b77afd14a3ed14b'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Pure string transform with no network access and no shell. Step 12 passes paths as argv to node -e. boundary: internal (unchanged from gate 3): the inputs are a pipeline-written work item and a pipeline-rendered section, and no corpus sink models this section.'
+  performance:
+    status: PASS
+    notes: 'The 41 engine, wiring and corpus tests run in about 0.8 s. The 1,983-document dry run takes seconds.'
+  reliability:
+    status: PASS
+    notes: 'The CR-1 bound closes the one content-deleting path PR review 1 found, and neither the deletion probes nor the corpus run reopened it. Refusals write nothing. REL-009/010/011 are low: each adds whitespace or duplicates content, and none deletes anything.'
+  maintainability:
+    status: PASS
+    notes: 'The generated copies match the source and the bundle is fresh. Advisory cleanup CR-3: normaliseSection hand-writes a break regex instead of RE_BREAK with its blank-line-before rule, so a closing setext underline is stripped.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'REL-009'
+      severity: low
+      finding: 'Code-review CR-1 (rated medium, high confidence). The CR-2 trailing-break strip removes the break but leaves the blank line before it. A section ending \n\n---\n therefore grows the document by one blank line per replace, measured at EOF and before an anchor. A following Change Log write absorbs it (0 growth over 5 cycles in the task-marker, story ## and story ### shapes). H2 counts only ---, so it cannot see this. Whitespace only, nothing deleted, and no Step 12 template renders a trailing ---.'
+      suggested_action: 'Trim trailing whitespace again after removing the break, and make H2 assert the exact bytes between the section and the next heading across cycles.'
+      refs: ['shared/resources/qa-results.js']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - id: 'REL-010'
+      severity: low
+      finding: 'Code-review CR-2 (rated medium, high confidence), a regression from 182367ee. The new marker-less bound uses findChangeLog, which returns the first Change Log heading. When the document has no marker block and the section precedes the real log or there is none, a section carrying its own ### Change Log subheading becomes the log, and each replace keeps the old tail (3 writes left 3 tails; 6bf14169 left 1). Duplication, not deletion. 0 of 155 corpus sections carry the subheading, and neither Step 12 template renders one.'
+      suggested_action: 'Return bad-section from normaliseSection when the body contains an unprotected change-log RE_HEADING, so the section content can never set the bound.'
+      refs: ['shared/resources/qa-results.js']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - id: 'REL-011'
+      severity: low
+      finding: 'When an unclosed fence runs to the end of the document and no change log or anchor lies outside it, created appends the section inside the fence. findQaResults cannot see it, so every write creates another copy (3 writes, 3 copies) and multiple never fires. The same happens at 6d6c166d. The corpus has 2 such documents, a story plan and a task bug report; neither is a Step 12 target, and no story, task or epic work item has this shape.'
+      suggested_action: 'After inserting, re-run findQaResults and refuse (for example reason unplaceable) unless exactly one section is found, writing nothing.'
+      refs: ['shared/resources/qa-results.js']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - action: 'REL-009: trim trailing whitespace after the break strip; make H2 byte-exact'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+    - action: 'REL-010: refuse a section that carries an unprotected Change Log heading (bad-section)'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'REL-011: verify after writing and refuse when the written section cannot be found again'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'CR-3 cleanup: reuse RE_BREAK and the blank-line-before rule in normaliseSection'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Carried: REL-007, REL-008, PC-1, CRLF seams (see the task Deferred Work)'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/change-log.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
