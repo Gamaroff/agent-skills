@@ -42,8 +42,16 @@ commits cannot be typed wrong in a way `git` accepts silently (task.135).
   `Re-review scope: unscoped — prior gate carries no head: (schema 1)`. It never falls back to
   `--since`. Old gates are not backfilled: a head cannot be given to one honestly.
 - **A head this checkout does not have**, or **one that is not an ancestor of `HEAD`** (the branch
-  was rewritten), is a HALT that names the cause. The pipeline never rebases, so this should not
-  fire; if it does, re-record the gate's `head:` or run the cycle unscoped deliberately.
+  was rewritten), is a HALT that names the cause. Nothing rewrites a branch inside the QA loop, so
+  this should not fire there; it can fire afterwards — `develop-batch` rebases each item onto the
+  new tip before merging it, and `developNext.mergeStrategy` accepts `squash` and `rebase`. If it
+  fires mid-loop, re-record the gate's `head:` or run the cycle unscoped deliberately. (The same
+  fact is why the gate-head freshness test judges a gate against history only while its own branch
+  is under review.)
+- **The block reads `$LATEST_GATE`, and binds it itself.** Each skill's Step 3b preamble sets it
+  with `qa-cycle.sh --path gate` in the same shell — Phase 0 binds it too, but every fenced block
+  is its own shell. With two or more gates and no readable file bound, the block HALTs rather than
+  report "schema 1" (task.135 QA cycle 1, CR-2).
 - **Nothing changed since the head** is a HALT too: on cycle 3+ it means no fix landed after the
   gate, which is a sequencing error. In practice the list always holds the gate and QA report
   themselves, which land in a commit after the head they record.
@@ -198,14 +206,19 @@ silently and the first looks implemented:
 # The commit the prior gate judged, read from its `head:` field ($LATEST_GATE set in Phase 0) —
 # never from its `updated:`. A typed timestamp in the future made `git log --since` match nothing,
 # one in the past widened the scope, and neither shows in the output (task.135). A schema-1 gate
-# has no head, and reads as empty here.
+# has no head, and reads as empty here. $LATEST_GATE is bound by the caller's own preamble in THIS
+# shell — Phase 0 binds it too, but in another shell (task.135 QA cycle 1, CR-2).
 LAST_GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
 # $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
 # guard, not a second block in front of it — two places assigning $DIFF_FILE is how one of them
 # silently stops mattering.
 if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since the last gate's head
   REFUTE_PASS=false
-  if [ -z "$LAST_GATE_HEAD" ]; then
+  if [ ! -f "$LATEST_GATE" ] || [ ! -r "$LATEST_GATE" ]; then
+    # Two or more gates exist, so an empty or unreadable $LATEST_GATE is a binding failure, not a
+    # schema-1 gate. Saying "schema 1" here would record a false cause on every cycle 3+.
+    echo "HALT: $PRIOR_GATES gates exist but LATEST_GATE ('$LATEST_GATE') is not a readable file — bind it with qa-cycle.sh --path gate in this shell"; exit 1
+  elif [ -z "$LAST_GATE_HEAD" ]; then
     # No head (a schema-1 gate): scoping needs the commit the gate judged, and a timestamp is not
     # one. Run unscoped and say so — never fall back to `--since`.
     echo "Re-review scope: unscoped — prior gate carries no head: (schema 1)"
@@ -230,7 +243,7 @@ if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3
     # Non-vacuity: files changed but the scoped patch is empty ⇒ the scoping is wrong, not the
     # code clean. Refuse to dispatch on nothing.
     if [ ! -s "$DIFF_FILE" ]; then
-      echo "HALT: ${#FILES[@]} files changed since ${LAST_GATE_HEAD:0:12} but the scoped diff is empty — check the pathspec expansion"; exit 1
+      echo "HALT: ${#FILES[@]} files changed since ${LAST_GATE_HEAD:0:12} but the scoped diff is empty — the pathspec matched nothing, or every one of those files is back to its base content; check before reviewing nothing"; exit 1
     fi
     echo "Re-review scope: files changed since gate $PRIOR_GATES (head ${LAST_GATE_HEAD:0:12}; ${#FILES[@]} files) — default"
   fi

@@ -19,9 +19,13 @@
 //   D — a head that is not an ancestor of HEAD is a HALT naming the rewrite, nothing dispatched
 //   E — the three copies of the scope block (shared rule, qa-task, qa-story) are one block
 //   F — qa-task's Phase 0 trigger: a source commit after a future-dated gate's head re-reviews;
-//       a clean PASS whose document edits landed with the gate skips; no head re-reviews
+//       a clean PASS whose document edits landed with the gate skips; no head re-reviews; a
+//       commit outside the old five-directory list counts (CR-3); an uncommitted document edit
+//       counts (CR-4)
+//   G — two gates exist but $LATEST_GATE is unbound in this shell → HALT, never "schema 1"; and
+//       each skill's Step 3b preamble binds it with qa-cycle.sh (CR-2)
 
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -84,6 +88,13 @@ function triggerBlock() {
 
 // ── Scratch repository ────────────────────────────────────────────────────────
 
+// Removed after every test in the file, pass or fail (CR-7): a per-test rmSync after the
+// assertions leaked the directory whenever a git call or an assertion threw.
+const TMP = [];
+after(() => {
+  for (const d of TMP) fs.rmSync(d, { recursive: true, force: true });
+});
+
 function git(cwd, ...args) {
   return execFileSync("git", args, {
     cwd,
@@ -117,6 +128,7 @@ const FUTURE = new Date(Date.now() + 3 * 3600 * 1000)
  */
 function scratch({ head = "fix1", schema = 2 } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-scope-head-"));
+  TMP.push(dir);
   git(dir, "init", "-q", "-b", "develop");
   commitFile(dir, "base.txt", "base\n", "base");
   git(dir, "checkout", "-q", "-b", "feature");
@@ -280,6 +292,7 @@ for (const sh of SHELLS) {
 
   test(`F2 [${sh}] — a clean PASS whose document edits landed with the gate skips`, () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-trigger-"));
+    TMP.push(dir);
     git(dir, "init", "-q", "-b", "develop");
     const head = commitFile(
       dir,
@@ -317,3 +330,81 @@ for (const sh of SHELLS) {
     assert.match(r.stdout, /CODE_MOVED=1 DOC_MOVED=1/);
   });
 }
+
+// ── F4/F5 — the trigger's coverage (CR-3, CR-4) ───────────────────────────────
+
+function passFixture() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-trigger-"));
+  TMP.push(dir);
+  git(dir, "init", "-q", "-b", "develop");
+  const head = commitFile(dir, "skills/a.sh", "echo a\n", "the reviewed tree");
+  fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+  const doc = path.join(dir, "docs", "task.9.x.md");
+  fs.writeFileSync(doc, "status: ready-for-review\n## QA Results\n");
+  const gate = path.join(dir, "docs", "task.9.gate.1.x.yml");
+  fs.writeFileSync(
+    gate,
+    `schema: 2\ngate: PASS\nhead: '${head}'\nupdated: '${FUTURE}'\ntop_issues: []\n`,
+  );
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "qa: gate 1 + report");
+  return { dir, gate, doc };
+}
+
+for (const sh of SHELLS) {
+  test(`F4 [${sh}] — a commit outside the old apps/packages/shared/skills/evals list re-reviews`, () => {
+    const fx = passFixture();
+    commitFile(fx.dir, "scripts/tool.sh", "echo t\n", "a script change");
+    const r = runTrigger(sh, fx, fx.doc);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /CODE_MOVED=1 DOC_MOVED=0/);
+  });
+
+  test(`F5 [${sh}] — an uncommitted edit to the task document re-reviews`, () => {
+    const fx = passFixture();
+    fs.appendFileSync(fx.doc, "- [ ] a new success criterion\n");
+    const r = runTrigger(sh, fx, fx.doc);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /CODE_MOVED=0 DOC_MOVED=1/);
+  });
+
+  test(`F6 [${sh}] — an uncommitted source edit re-reviews`, () => {
+    const fx = passFixture();
+    fs.appendFileSync(path.join(fx.dir, "skills", "a.sh"), "echo edited\n");
+    const r = runTrigger(sh, fx, fx.doc);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /CODE_MOVED=1 DOC_MOVED=0/);
+  });
+
+  // ── G — the block cannot see the gate ─────────────────────────────────────
+  test(`G [${sh}] — two gates but no LATEST_GATE bound in this shell HALTs, never "schema 1"`, () => {
+    const fx = scratch();
+    fx.gate = "";
+    const r = runScope(sh, fx);
+    assert.equal(r.status, 1, r.stdout);
+    assert.match(
+      r.stdout,
+      /HALT: 2 gates exist but LATEST_GATE \(''\) is not a readable file/,
+    );
+    assert.doesNotMatch(r.stdout, /schema 1/);
+  });
+}
+
+test("G — each skill's Step 3b fence binds LATEST_GATE with qa-cycle.sh before the scope block", () => {
+  for (const [f, skill, dirVar] of [
+    [QA_TASK, "qa-task", "TASK_DIR"],
+    [QA_STORY, "qa-story", "STORY_DIR"],
+  ]) {
+    const code = block(f, /^LAST_GATE_HEAD=\$\(grep -E '\^head:'/m);
+    const bind = `[ -n "\${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/${skill}/references/qa-cycle.sh "$${dirVar}" --path gate 2>/dev/null)`;
+    const at = code.indexOf(bind);
+    assert.ok(
+      at >= 0,
+      `${path.relative(ROOT, f)}: Step 3b does not bind LATEST_GATE in its own shell`,
+    );
+    assert.ok(
+      at < code.indexOf("LAST_GATE_HEAD="),
+      "the binding must precede its first reader",
+    );
+  }
+});

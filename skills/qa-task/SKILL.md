@@ -187,16 +187,23 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
    DOC_STATUS=$(grep -E '^status:' "$TASK_FILE" | head -1 | awk '{print $(2)}')
    if [ -n "$GATE_HEAD" ]; then
-     # Source commits since the commit the gate judged. `|| echo 1` fails toward re-review when
-     # git cannot answer (a head this checkout does not have).
-     CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- apps packages shared skills evals 2>/dev/null || echo 1)
+     # Commits since the commit the gate judged, on EVERY path except docs/ — the gate, the QA
+     # report and the task document live there and move on every cycle. A fixed list of source
+     # directories missed scripts/, tests/, package.json and a consumer's src/ (task.135 CR-3).
+     # `|| echo 1` fails toward re-review when git cannot answer (a head this checkout lacks).
+     CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- . ':(exclude)docs' 2>/dev/null || echo 1)
+     # An uncommitted edit outside docs/ is movement too: the gate never read it.
+     git diff --quiet HEAD -- . ':(exclude)docs' 2>/dev/null || CODE_MOVED=$((CODE_MOVED + 1))
      # The document is compared from the commit that last wrote the GATE, not from the head: a QA
      # cycle edits the task document itself (QA Results, Change Log) after the head it records, and
      # those edits land beside the gate. Measured from the head, every gate would read "document
-     # moved" and the skip branch below could never fire.
+     # moved" and the skip branch below could never fire. This relies on the QA loop committing
+     # the document edits WITH the gate; a split commit reads as "moved" and costs one re-review.
+     # The comparison is commit-to-WORKING-TREE, so an uncommitted edit to the document counts
+     # (task.135 CR-4).
      GATE_COMMIT=$(git log -1 --format=%H -- "$LATEST_GATE" 2>/dev/null)
      if [ -n "$GATE_COMMIT" ]; then
-       git diff --quiet "$GATE_COMMIT"..HEAD -- "$TASK_FILE" 2>/dev/null && DOC_MOVED=0 || DOC_MOVED=1
+       git diff --quiet "$GATE_COMMIT" -- "$TASK_FILE" 2>/dev/null && DOC_MOVED=0 || DOC_MOVED=1
      else
        DOC_MOVED=1                   # gate not committed yet — nothing to measure from
      fi
@@ -208,7 +215,7 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    **Skip re-review (exit with success message) ONLY when ALL of:**
    - Gate status is `PASS`
    - AND `top_issues` list is empty
-   - AND `CODE_MOVED` is `0` — no source commit since the commit the gate judged
+   - AND `CODE_MOVED` is `0` — nothing outside `docs/` changed since the commit the gate judged, committed or not
    - AND `DOC_MOVED` is `0` — the task document has not been edited since the gate was committed
    - AND `DOC_STATUS` is not one of `in-progress` / `ready-for-development` / `planned` — a status
      that moved *backwards* from `accepted` means the work was reopened
@@ -219,7 +226,7 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    - Gate status is `CONCERNS`, `FAIL`, or `WAIVED`
    - OR `top_issues` has items (even if gate is PASS)
    - OR no gate file exists (first review)
-   - OR **source changed since the gate's head** (`CODE_MOVED` > 0)
+   - OR **anything outside `docs/` changed since the gate's head**, committed or not (`CODE_MOVED` > 0)
    - OR **the document changed since the gate was committed** (`DOC_MOVED` = 1)
    - OR **the gate carries no `head:`** (schema 1) — both of the above read `1`
    - OR **the document was reopened** (status moved backwards from `accepted`)
@@ -405,17 +412,27 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
    # How many gates already exist? 0 = first review, 1 = cycle 2, 2+ = cycle 3 and later.
    PRIOR_GATES=$(find "$TASK_DIR" -maxdepth 1 -name "task.*.gate.*.yml" 2>/dev/null | wc -l | tr -d ' ')   # "0" with no gate — an `ls` glob left this EMPTY under zsh and the -ge below errored (obs #145)
+   # The latest gate, bound in THIS shell — Phase 0 binds $LATEST_GATE in its own block, which is
+   # another shell, so reading it here unbound made every cycle 3+ run unscoped (task.135 CR-2).
+   # Empty on a first review (qa-cycle.sh refuses with no numbered gate); the block below HALTs
+   # when two or more gates exist and none could be bound.
+   [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate 2>/dev/null)
    # The commit the prior gate judged, read from its `head:` field ($LATEST_GATE set in Phase 0) —
    # never from its `updated:`. A typed timestamp in the future made `git log --since` match nothing,
    # one in the past widened the scope, and neither shows in the output (task.135). A schema-1 gate
-   # has no head, and reads as empty here.
+   # has no head, and reads as empty here. $LATEST_GATE is bound by the caller's own preamble in THIS
+   # shell — Phase 0 binds it too, but in another shell (task.135 QA cycle 1, CR-2).
    LAST_GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
    # $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
    # guard, not a second block in front of it — two places assigning $DIFF_FILE is how one of them
    # silently stops mattering.
    if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since the last gate's head
      REFUTE_PASS=false
-     if [ -z "$LAST_GATE_HEAD" ]; then
+     if [ ! -f "$LATEST_GATE" ] || [ ! -r "$LATEST_GATE" ]; then
+       # Two or more gates exist, so an empty or unreadable $LATEST_GATE is a binding failure, not a
+       # schema-1 gate. Saying "schema 1" here would record a false cause on every cycle 3+.
+       echo "HALT: $PRIOR_GATES gates exist but LATEST_GATE ('$LATEST_GATE') is not a readable file — bind it with qa-cycle.sh --path gate in this shell"; exit 1
+     elif [ -z "$LAST_GATE_HEAD" ]; then
        # No head (a schema-1 gate): scoping needs the commit the gate judged, and a timestamp is not
        # one. Run unscoped and say so — never fall back to `--since`.
        echo "Re-review scope: unscoped — prior gate carries no head: (schema 1)"
@@ -440,7 +457,7 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
        # Non-vacuity: files changed but the scoped patch is empty ⇒ the scoping is wrong, not the
        # code clean. Refuse to dispatch on nothing.
        if [ ! -s "$DIFF_FILE" ]; then
-         echo "HALT: ${#FILES[@]} files changed since ${LAST_GATE_HEAD:0:12} but the scoped diff is empty — check the pathspec expansion"; exit 1
+         echo "HALT: ${#FILES[@]} files changed since ${LAST_GATE_HEAD:0:12} but the scoped diff is empty — the pathspec matched nothing, or every one of those files is back to its base content; check before reviewing nothing"; exit 1
        fi
        echo "Re-review scope: files changed since gate $PRIOR_GATES (head ${LAST_GATE_HEAD:0:12}; ${#FILES[@]} files) — default"
      fi

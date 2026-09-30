@@ -280,6 +280,30 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-30
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.135.qa.1.gate-scoping-from-recorded-head.md](./task.135.qa.1.gate-scoping-from-recorded-head.md)
+- **Gate File**: [task.135.gate.1.gate-scoping-from-recorded-head.yml](./task.135.gate.1.gate-scoping-from-recorded-head.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 79 (three suites) + develop-task / develop-story eval replays
+- **Phases Verified**: 3/3
+- **Critical Issues**: 1 HIGH, 2 MEDIUM promoted (CR-1–CR-3); 1 MEDIUM advisory (CR-4)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- CR-1: the freshness test's history rules go red after a rebase or squash merge ([bug 1](./task.135.bug.1.freshness-test-red-after-rebase-or-squash.md))
+- CR-2: the Step 3b block reads `$LATEST_GATE` from another shell and always runs unscoped ([bug 2](./task.135.bug.2.step-3b-reads-latest-gate-from-another-shell.md))
+- CR-3: the Phase 0 trigger counts five directories only ([bug 3](./task.135.bug.3.code-moved-counts-only-five-directories.md))
+- CR-4 (advisory): uncommitted document edits are invisible to the trigger ([bug 4](./task.135.bug.4.doc-moved-ignores-uncommitted-edits.md))
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -290,6 +314,7 @@ None.
 | 2026-09-30 | 1.1 | Review passed (8/10) — 6 important fixes applied: parity test and `qa-gate` template added to scope, both-shell array loop over `mapfile`, 5c gate row added rather than § D rewritten, Phase 0 trigger scoped to `qa-task`, step-5-6 edit retargeted to the Step 3b lead-ins, recording lines | review-task |
 | 2026-09-30 |  | Status → ready-for-development | review-task |
 | 2026-09-30 |  | Implemented — 10 authored files (8 modified, 2 new tests), 21 new tests, 4 mutation proofs; bundled copies regenerated | develop |
+| 2026-09-30 |  | QA gate FAIL (60/100) — 1 high, 2 medium promoted, 1 medium advisory | qa-task |
 
 <!-- change-log-end -->
 

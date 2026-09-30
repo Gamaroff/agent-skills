@@ -896,17 +896,27 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
    # How many gates already exist? 0 = first review, 1 = cycle 2, 2+ = cycle 3 and later.
    PRIOR_GATES=$(find "$STORY_DIR" -maxdepth 1 -name "story.*.gate.*.yml" 2>/dev/null | wc -l | tr -d ' ')   # "0" with no gate — an `ls` glob left this EMPTY under zsh and the -ge below errored (obs #145)
+   # The latest gate, bound in THIS shell — Phase 0 binds $LATEST_GATE in its own block, which is
+   # another shell, so reading it here unbound made every cycle 3+ run unscoped (task.135 CR-2).
+   # Empty on a first review (qa-cycle.sh refuses with no numbered gate); the block below HALTs
+   # when two or more gates exist and none could be bound.
+   [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR" --path gate 2>/dev/null)
    # The commit the prior gate judged, read from its `head:` field ($LATEST_GATE set in Phase 0) —
    # never from its `updated:`. A typed timestamp in the future made `git log --since` match nothing,
    # one in the past widened the scope, and neither shows in the output (task.135). A schema-1 gate
-   # has no head, and reads as empty here.
+   # has no head, and reads as empty here. $LATEST_GATE is bound by the caller's own preamble in THIS
+   # shell — Phase 0 binds it too, but in another shell (task.135 QA cycle 1, CR-2).
    LAST_GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
    # $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
    # guard, not a second block in front of it — two places assigning $DIFF_FILE is how one of them
    # silently stops mattering.
    if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since the last gate's head
      REFUTE_PASS=false
-     if [ -z "$LAST_GATE_HEAD" ]; then
+     if [ ! -f "$LATEST_GATE" ] || [ ! -r "$LATEST_GATE" ]; then
+       # Two or more gates exist, so an empty or unreadable $LATEST_GATE is a binding failure, not a
+       # schema-1 gate. Saying "schema 1" here would record a false cause on every cycle 3+.
+       echo "HALT: $PRIOR_GATES gates exist but LATEST_GATE ('$LATEST_GATE') is not a readable file — bind it with qa-cycle.sh --path gate in this shell"; exit 1
+     elif [ -z "$LAST_GATE_HEAD" ]; then
        # No head (a schema-1 gate): scoping needs the commit the gate judged, and a timestamp is not
        # one. Run unscoped and say so — never fall back to `--since`.
        echo "Re-review scope: unscoped — prior gate carries no head: (schema 1)"
@@ -931,7 +941,7 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
        # Non-vacuity: files changed but the scoped patch is empty ⇒ the scoping is wrong, not the
        # code clean. Refuse to dispatch on nothing.
        if [ ! -s "$DIFF_FILE" ]; then
-         echo "HALT: ${#FILES[@]} files changed since ${LAST_GATE_HEAD:0:12} but the scoped diff is empty — check the pathspec expansion"; exit 1
+         echo "HALT: ${#FILES[@]} files changed since ${LAST_GATE_HEAD:0:12} but the scoped diff is empty — the pathspec matched nothing, or every one of those files is back to its base content; check before reviewing nothing"; exit 1
        fi
        echo "Re-review scope: files changed since gate $PRIOR_GATES (head ${LAST_GATE_HEAD:0:12}; ${#FILES[@]} files) — default"
      fi
