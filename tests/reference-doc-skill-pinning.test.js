@@ -17,6 +17,8 @@
  *      exactly, so a new non-skill row fails instead of joining a silent skip.
  *   2. Every --flag in a commands.md row's first cell appears in that skill's SKILL.md.
  *   3. Every skill named in activation-phrases.md resolves to skills/<name>/SKILL.md.
+ *   4. Its own cost: resolving the whole corpus spawns no process, opens no
+ *      connection, and reads each SKILL.md once — so it stays a cheap file read.
  *   Each group carries a floor. An empty result is a claim about the instrument:
  *   a scan that finds nothing means either there is nothing to find or the
  *   extractor is broken, and those look identical from here.
@@ -125,17 +127,32 @@ function extractActivationSkills(md) {
   return named;
 }
 
-// Memoised per skill, not per row: 80 rows name 63 skills.
-const skillMdCache = new Map();
-function skillMd(name) {
-  if (!skillMdCache.has(name)) {
-    const p = path.join(REPO_ROOT, "skills", name, "SKILL.md");
-    skillMdCache.set(
-      name,
-      fs.existsSync(p) ? fs.readFileSync(p, "utf8") : null,
-    );
+// Memoised per skill, not per row: 80 rows name 63 skills. A factory, so the
+// cost tests below can run the whole resolution against a fresh cache.
+function makeSkillMd() {
+  const cache = new Map();
+  return (name) => {
+    if (!cache.has(name)) {
+      const p = path.join(REPO_ROOT, "skills", name, "SKILL.md");
+      cache.set(name, fs.existsSync(p) ? fs.readFileSync(p, "utf8") : null);
+    }
+    return cache.get(name);
+  };
+}
+const skillMd = makeSkillMd();
+
+// Everything the live-corpus groups below do, in one pass: read both pages,
+// resolve every row and mention, look up every flag. The cost tests run this
+// under spies, so they measure the same code paths the assertions use.
+function resolveCorpus(lookup) {
+  const rows = extractCommandRows(fs.readFileSync(COMMANDS, "utf8"));
+  const named = extractActivationSkills(fs.readFileSync(PHRASES, "utf8"));
+  for (const r of rows) {
+    const body = r.skill && lookup(r.skill);
+    if (body) for (const flag of r.flags) body.includes(flag);
   }
-  return skillMdCache.get(name);
+  for (const n of named) lookup(n.skill);
+  return { rows, named };
 }
 
 describe("extractors (fixtures, independent of the live corpus)", () => {
@@ -298,5 +315,86 @@ describe("activation-phrases.md names skills that exist", () => {
           `activation-phrases.md:${n.line}: names \`${n.skill}\`, but skills/${n.skill}/SKILL.md does not exist`,
       );
     assert.deepEqual(missing, []);
+  });
+});
+
+describe("the guard's cost", () => {
+  // Replace every named function on a module object with a recorder, run fn,
+  // then restore. Call sites use member access (fs.readFileSync, not a
+  // destructured copy), so a patched module object is what they reach.
+  function withSpies(targets, fn) {
+    const calls = [];
+    const saved = [];
+    for (const [label, obj, names] of targets) {
+      for (const name of names) {
+        if (typeof obj[name] !== "function") continue;
+        const orig = obj[name];
+        saved.push([obj, name, orig]);
+        obj[name] = function (...args) {
+          calls.push({ fn: `${label}.${name}`, args });
+          return orig.apply(this, args);
+        };
+      }
+    }
+    try {
+      fn();
+    } finally {
+      for (const [obj, name, orig] of saved) obj[name] = orig;
+    }
+    return calls;
+  }
+
+  test("resolving the whole corpus spawns no process and opens no connection", () => {
+    const calls = withSpies(
+      [
+        [
+          "child_process",
+          require("child_process"),
+          [
+            "spawn",
+            "spawnSync",
+            "exec",
+            "execSync",
+            "execFile",
+            "execFileSync",
+            "fork",
+          ],
+        ],
+        ["net", require("net"), ["connect", "createConnection"]],
+        ["http", require("http"), ["request", "get"]],
+        ["https", require("https"), ["request", "get"]],
+        ["globalThis", globalThis, ["fetch"]],
+      ],
+      () => resolveCorpus(makeSkillMd()),
+    );
+    assert.deepEqual(
+      calls.map((c) => c.fn),
+      [],
+      "the guard must stay a pure file read — no spawn, no network",
+    );
+  });
+
+  test("each SKILL.md is read once per run, however many rows name it", () => {
+    let corpus;
+    const calls = withSpies([["fs", fs, ["readFileSync"]]], () => {
+      corpus = resolveCorpus(makeSkillMd());
+    });
+    const skillReads = calls
+      .map((c) => String(c.args[0]))
+      .filter((p) => p.endsWith(`${path.sep}SKILL.md`));
+    const distinct = new Set(skillReads);
+    assert.equal(
+      skillReads.length,
+      distinct.size,
+      `${skillReads.length} SKILL.md reads for ${distinct.size} skills — the lookup is not memoised`,
+    );
+    // Non-vacuity: the corpus names each of these skills more than once, so a
+    // run with no repeats proves nothing unless the reads actually happened.
+    const mentions =
+      corpus.rows.filter((r) => r.skill).length + corpus.named.length;
+    assert.ok(
+      distinct.size >= 58 && mentions > distinct.size,
+      `only ${distinct.size} SKILL.md reads over ${mentions} mentions — the spy saw too little to judge memoisation`,
+    );
   });
 });

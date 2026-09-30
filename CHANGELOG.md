@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file. Format foll
     stops matching fails rather than passing on nothing.
   - Its first run found one real defect: `/session-handoff --read` advertised a flag the skill
     never documents (read mode is asked for by intent). The row now describes read mode.
+  - Its own cost is pinned too: resolving the whole corpus spawns no process, opens no connection,
+    and reads each `SKILL.md` once — two spy-based tests, each mutation-proven.
   - What it does not pin, stated in its header: whether a row *describes* the skill correctly —
     the `qa-next` story→function drift that motivated it was prose, and no assertion sees prose.
     The reverse direction (every skill appears in both pages) stays

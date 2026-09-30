@@ -367,9 +367,10 @@ skill named, memoised), process spawns (zero), network calls (zero).
 
 ### Performance
 
-- [x] No process spawn, no network call.
-- [x] `SKILL.md` reads are memoised per skill, not per row.
-- [x] No measurable change to `npm test` wall-clock.
+- [x] No process spawn, no network call — pinned by "resolving the whole corpus spawns no process and
+      opens no connection" (spies on `child_process`, `net`, `http`, `https`, `fetch`).
+- [x] `SKILL.md` reads are memoised per skill, not per row — pinned by "each SKILL.md is read once per
+      run, however many rows name it" (spy on `fs.readFileSync`, with a non-vacuity floor).
 
 ### Code Quality
 
@@ -382,9 +383,6 @@ skill named, memoised), process spawns (zero), network calls (zero).
 ### Migration
 
 - [x] `CHANGELOG.md` `[Unreleased]` records the new guard.
-- [ ] Observation #159 marked `actioned` once this merges **and** the staged `create-skill` rule is
-      installed — the two halves close it together. _Post-merge: the `create-skill` half was installed
-      2026-09-25 (PR #487), so the merge of this task is the last condition._
 - [x] No consumer-facing change; nothing to migrate.
 
 ---
@@ -497,7 +495,10 @@ additions.
 
 No critical issues. Two low advisory findings: CR-1 (the flag check is a substring match, so `--read` would pass on `--read-only`) and CR-2 (an unused activation `flags` field).
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
+
+> Superseded 2026-09-30 by the re-scope below: AC7 and AC8 are now pinned by tests; AC9 and AC16
+> moved to Deferred Work because neither can pass before merge. `/finalise` run 2 verifies afresh.
 
 **Status:** IN PROGRESS (document status unchanged: `ready-for-review`)
 
@@ -572,13 +573,29 @@ its file and line, not just the first.
 - `npm run ci:fast` with both `.claude/skills` and `.agents/skills` symlinks moved aside: prettier
   clean; 4,713 tests, 4,712 pass, 0 fail, 1 skipped (pre-existing). `npm run check:generated` green.
 
+### Re-scope after `/finalise` run 1 (2026-09-30)
+
+- Two tests added under `describe("the guard's cost")`: no spawn / no network (spies on
+  `child_process`, `net`, `http`, `https`, `fetch` around a full corpus resolution), and one
+  `SKILL.md` read per skill (spy on `fs.readFileSync`, with a non-vacuity floor). `skillMd`
+  became a `makeSkillMd()` factory and `resolveCorpus()` runs the same code paths the assertions use.
+  The file is now 17 tests.
+- Mutation-proven: memoisation removed → "read once" red; an `execSync` in the lookup → "no
+  spawn" red; an `http.get` in the lookup → "no spawn" red. All restored; baseline green.
+- The wall-clock and obs #159 criteria moved to Deferred Work (see there).
+
 ### Completion Date
 
 2026-09-30
 
 ### Deferred Work
 
-- Observation #159 → `actioned` after merge (the `create-skill` half is already installed).
+- Observation #159 → `actioned` after merge (the `create-skill` half was installed 2026-09-25, PR
+  #487, so the merge of this task is the last condition). Moved out of § 9 Migration after
+  `/finalise` run 1: an item that can only happen after merge can never pass at acceptance.
+- `npm test` wall-clock: the file runs in ~130–170 ms locally. Moved out of § 9 Performance after
+  `/finalise` run 1 — a wall-clock claim with no budget test is not a pre-merge criterion; the two
+  cost properties that are testable (no spawn/network, memoised reads) are pinned instead.
 - Generating `commands.md` from skill frontmatter, and pinning the skills' `README.md`s — § Notes,
   Future Improvements; out of scope here.
 
@@ -594,6 +611,7 @@ its file and line, not just the first.
 | 2026-09-30 |         | Implemented — 1 new test file (15 tests), 1 reference-doc row fixed, CHANGELOG entry | develop |
 | 2026-09-30 |         | QA gate PASS (100/100) — 0 blocking, 2 low advisory findings | qa-task |
 | 2026-09-30 |         | DoD incomplete — 4 gaps identified | finalise |
+| 2026-09-30 | 1.2     | Success Criteria re-scoped after DoD gaps (user-approved): no-spawn and memoised-read criteria now pinned by two tests; wall-clock and obs #159 items moved to Deferred Work | Claude |
 
 <!-- change-log-end -->
 
