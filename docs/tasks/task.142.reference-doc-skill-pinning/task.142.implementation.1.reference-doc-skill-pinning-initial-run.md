@@ -3,7 +3,7 @@
 **Task**: `task.142.reference-doc-skill-pinning.md`
 **Run Number**: 1
 **Started**: 2026-09-30 18:07
-**Status**: In Progress
+**Status**: Halted — DoD gaps
 
 ---
 
@@ -34,9 +34,9 @@ Add `tests/reference-doc-skill-pinning.test.js`, pinning every command, flag and
 | 1. create-branch           | ✅ Done    | Branch `feature/task.142.*` exists in git                             | Branch created at `80f460bc`; pushed with upstream | —                    |
 | 2. review-task             | ✅ Done    | `task.142.review.{N}.{name}.md` exists (or skip logged)               | `task.142.review.1.reference-doc-skill-pinning.md` — 9/10 after fixes; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; audit 13/13, `ready-for-review`; `ci:fast` 4712 pass / 0 fail | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.142.qa.{N}.*.md`; `task.142.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.142.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #534: https://github.com/Gamaroff/agent-skills/pull/534 | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.142.qa.{N}.*.md`; `task.142.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle, gate PASS (100); 5c APPROVE — `task.142.pr-review.1.reference-doc-skill-pinning.md` | `.summaries/step-5-traceability-mapper.json` |
+| 7. finalise                | ❌ Failed  | `task.142.dod.{N}.*.md`; task `status: accepted`                      | DoD gaps: 4 (AC7/8/9 untested behaviour criteria; AC16 post-merge by construction) — `task.142.dod.1.reference-doc-skill-pinning.md` | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -83,11 +83,40 @@ Add `tests/reference-doc-skill-pinning.test.js`, pinning every command, flag and
 - `npm run ci:fast` with `.claude/skills` and `.agents/skills` moved aside: exit 0 — 4713 tests, 4712 pass, 0 fail, 1 skipped (pre-existing). `npm run check:generated`: green.
 - Loop audit iter 1 (Explore, 9s): `{"status":"ready-for-review","completed":13,"total":13}` → exit loop. Persisted to `.summaries/step-3-loop-audit-1.json`.
 
+
+### Step 4 — create-pr — 2026-09-30
+
+- SCOPE_PATHS: `docs/tasks/task.142.reference-doc-skill-pinning`, `CHANGELOG.md`, `docs/reference`, `tests/reference-doc-skill-pinning.test.js` — the last added by hand: a new untracked file in a directory with no tracked change is not in the derived scope (step-4 doc § Build Staging Scope). Pre-flight guard: 0 files held.
+- Commits: `426c88b9` docs(task.142) review + task docs + report; `45d685d0` test(reference-docs) guard + commands.md fix + CHANGELOG. Leak check: OK.
+- PR body written inline from the two commits (pr-body summariser subagent not dispatched — the diff is 3 files and fully described by the commits).
+- PR created: https://github.com/Gamaroff/agent-skills/pull/534 (base `develop`, `Closes #467`). Post-PR state: OPEN, 0 errors (checked inline with `gh pr view`).
+- Tracker comment (in-review): posted. GitHub board: in-review → stage-disabled.
+- Lock `pr_url` set.
+
+
+### Steps 5–6 — QA loop — 2026-09-30
+
+- QA-start board re-assert: in-review → stage-disabled. Traceability mapper: general-purpose subagent (Explore cannot write the matrix file), 56s; 17 criteria (11 full / 4 partial / 1 unit / 1 none); `.summaries/step-5-traceability-mapper.json`.
+- Cycle 1: `/qa-task` with `code_review_blocking=true` → gate 1 PASS (100/100). Step 3b reviewer (Explore, 63s): CR-1 bug low/medium, CR-2 cleanup — neither high-confidence, so advisory. QA re-proved two mutations on `develop-batch`. Pre-5c commit `docs(task.142): QA cycle 1` pushed; trail asserted on `origin`.
+- Step 5c: `/review-pr --effort medium --comment` → **APPROVE** (conformance 0 findings; code lens CR-1/CR-2, both low — same as QA). Report `task.142.pr-review.1.reference-doc-skill-pinning.md`; PR summary comment posted. ready-for-merge → stage-disabled.
+
+---
+
+### Step 7 — finalise — 2026-09-30
+
+- Four DoD agents (Explore, parallel): AC traceability PARTIAL (13/17), security PASS (boundary: false), compliance NOT_APPLICABLE, docs PASS.
+- CI reading 1: SUCCESS @ `d836d7d0f2bb` over 4 checks.
+- Decision: **GAPS — not accepted** (decision matrix: AC column not met). Fix-and-recheck (Step 8a) not applicable: four open criteria in one section, and AC16 cannot close pre-merge.
+- Gap report written to the task body and the DoD file; Change Log row `DoD incomplete — 4 gaps identified`; status left `ready-for-review`. Gaps PR comment: https://github.com/Gamaroff/agent-skills/pull/534#issuecomment-5915461642 — gap count taken from `### Missing Criteria` only (4), not every `- [ ]` in the section (7 including Next Steps).
+- No CI reading 2, no tracker close, no board `done` — the publish boundary is for the accepted path only.
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+- **Step 7 HALT — DoD gaps (4).** The task's own Success Criteria include three behaviour claims no test pins (AC7 no spawn/network, AC8 memoised reads, AC9 wall-clock) and one post-merge item (AC16, obs #159 → actioned). The finalise AC rule forbids treating a behaviour criterion as documentation or "not applicable". Each needs a human decision: add a behavioural test, or re-scope the criterion (AC9 and AC16 look like re-scope candidates — AC16 can never pass at `/finalise`). Then re-run `/develop-task` (resume) or `/finalise`.
 
 ---
 
@@ -95,14 +124,24 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-09-30
+
+**Gate Result**: PASS
+**Issues Found**: none blocking; 2 low advisory code-review findings (CR-1 substring flag match at `tests/reference-doc-skill-pinning.test.js:265`, CR-2 unused activation `flags` field) → `recommendations.future`
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-30 16:32 UTC (halted)
+**Final Status**: Escalated — Step 7 DoD gaps (4)
 **Branch**: feature/task.142.reference-doc-skill-pinning
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/534
+**QA Iterations**: 1
+**DoD Summary**: `task.142.dod.1.reference-doc-skill-pinning.md` (GAPS)
+**Tracker debt**: none

@@ -497,6 +497,39 @@ additions.
 
 No critical issues. Two low advisory findings: CR-1 (the flag check is a substring match, so `--read` would pass on `--read-only`) and CR-2 (an unused activation `flags` field).
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (document status unchanged: `ready-for-review`)
+
+### QA Gate Status
+
+**QA Report**: `task.142.qa.1.reference-doc-skill-pinning.md`
+**Gate File**: `task.142.gate.1.reference-doc-skill-pinning.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Success Criteria — Performance (behaviour criteria with no test):**
+   - [ ] AC7 — no process spawn, no network call: true by inspection, pinned by no test
+   - [ ] AC8 — `SKILL.md` reads memoised per skill: true by inspection, pinned by no test
+   - [ ] AC9 — no measurable `npm test` wall-clock change: measured ~133 ms, no test or budget asserts it
+
+2. **Success Criteria — Migration (post-merge by construction):**
+   - [ ] AC16 — observation #159 marked `actioned`: can only happen after the merge, so it cannot pass at `/finalise`
+
+### Next Steps:
+
+- [ ] Pin AC7 and AC8 with behavioural tests, or re-scope them
+- [ ] Re-scope AC9 and AC16 out of the pre-merge Success Criteria (e.g. into Deferred Work)
+- [ ] Re-run `/finalise`
+
+**Estimated Effort:** Small (1-2 hours)
+
+**Gap Report Generated:** 2026-09-30
+
+**Detailed Verification Log:** See `task.142.dod.1.reference-doc-skill-pinning.md` for complete verification evidence.
+
 ## Implementation Notes
 
 ### Implementation Summary
@@ -560,6 +593,7 @@ its file and line, not just the first.
 | 2026-09-30 |         | Status → ready-for-development | review-task |
 | 2026-09-30 |         | Implemented — 1 new test file (15 tests), 1 reference-doc row fixed, CHANGELOG entry | develop |
 | 2026-09-30 |         | QA gate PASS (100/100) — 0 blocking, 2 low advisory findings | qa-task |
+| 2026-09-30 |         | DoD incomplete — 4 gaps identified | finalise |
 
 <!-- change-log-end -->
 
