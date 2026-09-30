@@ -1251,9 +1251,10 @@ export function runProbeSpec({
   // host binary, and whatever the cases then did was shaped by a stub, so
   // nothing is scored. This is the GUARANTEE the pre-spawn detector above only
   // approximates — it sees every PATH-resolved spelling (`${GH_BIN:-gh}`, an
-  // assign-then-call variable, a wrapper however it sources gh-labels.sh). An
-  // absolute path to a real gh bypasses PATH and is a stated limit
-  // (probe-boundary-rule.md §5).
+  // assign-then-call variable, a wrapper however it sources gh-labels.sh) —
+  // while the stub stays first on PATH and the call happens inside the spawn.
+  // An absolute path, a library PATH prepend and a call backgrounded past the
+  // spawn all reach a real gh unrecorded: stated limits (probe-boundary-rule.md §5).
   //
   // The decline still carries what the runs OBSERVED — escapes, the cases, the
   // shells — as entry-not-probeable does: nothing is scored, but a side effect
@@ -1667,8 +1668,9 @@ function runShellCase(
       env.FAKE_GH = "1";
     } else {
       // No fixture: the TRIP-WIRE gh is first on PATH instead. It records that it
-      // was called and exits 127, so the host gh never runs, and runProbeSpec
-      // declines the whole run `needs-fake-gh` (task.140 QA cycle 2, BUG-4).
+      // was called and exits 127, so a PATH-resolved gh never reaches the host
+      // binary, and runProbeSpec declines the whole run `needs-fake-gh` (task.140
+      // QA cycle 2, BUG-4). Its limits are stated in probe-boundary-rule.md §5.
       env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
     }
     // The source-completed marker, one per spawn, under the WORK dir — the

@@ -102,8 +102,9 @@ All notable changes to this project will be documented in this file. Format foll
     `.` — at a line start or after `;`, `&&`, `||`, `then`, `do`; library directory, then root — so a
     wrapper that sources `gh-labels.sh` is declined too. That text check is the fast path: with no
     `--fake-gh` a **trip-wire `gh`** is first on `PATH`, so the host `gh` never runs and a run that
-    reached it is declined whatever the spelling. The one limit — an absolute path to a real `gh` —
-    is stated in rule §5 and pinned by a row.
+    reached it is declined whatever the spelling. Its limits — an absolute path to a real `gh`, a
+    library that puts another directory ahead of it on `PATH`, and a `gh` call backgrounded past
+    the spawn — are stated in rule §5, and the first two are pinned by rows.
   - `resolveEntry` and the `--fake-gh` check compare **real** paths, both sides: a symlink inside the
     root that points out of it is refused (`outside-repo-root` / `bad-fake-gh`) before anything
     imports or spawns it; a missing path is contained by its deepest existing ancestor. The limit carried since

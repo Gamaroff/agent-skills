@@ -2213,6 +2213,41 @@ test("shell entry forms: an ABSOLUTE path to a gh binary bypasses the trip-wire 
   }
 });
 
+test("shell entry forms: a library that puts another directory ahead of the trip-wire on PATH reaches it — a stated limit this row pins (task.140 QA cycle 4, TASK-140-BUG-7)", () => {
+  const outside = mkdtempSync(join(tmpdir(), "t140-prepend-gh-"));
+  const dir = t140Libs("gh-prepend", {});
+  try {
+    mkdirSync(join(outside, "bin"));
+    const mark = join(outside, "ran");
+    writeFileSync(
+      join(outside, "bin", "gh"),
+      `#!/bin/sh\n: > ${JSON.stringify(mark)}\n`,
+      {
+        mode: 0o755,
+      },
+    );
+    writeFileSync(
+      join(dir, "prepend.sh"),
+      `#!/usr/bin/env bash\nf() { export PATH=${JSON.stringify(join(outside, "bin"))}:"$PATH"; X=gh; "$X" api x; printf '%s\\n' "$1"; }\n`,
+      { mode: 0o644 },
+    );
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, join(dir, "prepend.sh"))}#f`,
+      cases: LABEL_CASES,
+    });
+    assert.notEqual(
+      r.reason,
+      "needs-fake-gh",
+      "the limit: a gh ahead of the trip-wire on PATH answers instead",
+    );
+    assert.ok(existsSync(mark), "the prepended gh did run");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 test("resolveEntry: a missing path is contained by its deepest existing ancestor (task.140 QA cycle 2, CR-5)", () => {
   const outside = mkdtempSync(join(tmpdir(), "t140-missing-"));
   const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, ".t140-missing-"));

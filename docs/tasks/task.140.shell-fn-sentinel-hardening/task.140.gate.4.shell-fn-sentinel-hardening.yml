@@ -1,0 +1,69 @@
+schema: 1
+task: 'task.140.shell-fn-sentinel-hardening'
+task_title: 'Harden the shell-fn: sentinels and the fake-gh coverage'
+gate: CONCERNS
+status_reason: 'Cycle 3 fixes hold (BUG-5, BUG-6 closed; each row mutation-proven). The safety re-probe found three ways past the gh containment; all three are identical at origin/develop and go to future. What this change adds is rule §5 claiming a single limit (TASK-140-BUG-7).'
+reviewer: 'QA Engineer'
+updated: '2026-09-30T07:30:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/probe-boundary-rule.md'
+    finding: 'Section 5 names an absolute path as the trip-wire''s one limit. A library PATH prepend (with or without --fake-gh) and a gh call backgrounded past teardown also reach a real gh unrecorded, and the run is scored. Executed at HEAD and at base (TASK-140-BUG-7).'
+    suggested_action: 'State the PATH-prepend, fake-gh-bypass and backgrounded-call shapes as limits in section 5 beside the absolute path, and pin the PATH-prepend shape with a row.'
+    suggested_owner: dev
+    bug_ref: 'task.140.bug.7.rule-overclaims-one-limit.md'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 114
+  phases_verified: '4/4'
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 69
+    notes: 'Run record totals.executed 69: resolveEntry wrapper 21 (present-but-inert; the one reproduced case is the pre-existing encoded-traversal), gh_labels_filter + fake gh engages 20, shell:qa-cycle.sh engages 28. Safety re-probe (unscoped): 3 containment bypasses, all identical at base (pre-existing) -> future; the rule overclaim is CONCERNS.'
+  performance:
+    status: PASS
+    notes: 'TMPDIR=/tmp shell rows 55/55; full file 114/114.'
+  reliability:
+    status: PASS
+    notes: 'BUG-6 closed: env -i is recorded under shell-fn: and shell:.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle 3 fix is small and mirrors the entry-not-probeable branch.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-7: state the three further trip-wire limits in rule section 5 with a pinning row'
+      refs: ['shared/resources/probe-boundary-rule.md', 'shared/resources/tests/security-probe.test.mjs']
+  future:
+    - action: 'Close the gh containment bypasses (pre-existing at base): a post-source gh function shadow and the harness bin re-prepended after the source; a fixture-answered marker for --fake-gh (TASK-136-BUG-1 class); a process-group kill before the marker check and teardown. File as a follow-up task.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-4 (low confidence, not executed): a noexec TMPDIR makes PATH lookup skip the stub; self-test the stub once and decline harness-unavailable'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried from gate 3: --fake-gh gh-symlink to host binary; zshexit hooks; prompt recipes silent on --fake-gh for shell:; .githooks/pre-commit unlinted; encoded-traversal literal filename'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/security-review-prompt.md', 'scripts/lint-shell.sh']
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 1
+  fix_date: '2026-09-30'
+  total_iterations: 3
+  verification_method: 'Rows at ab079810 green on bash + zsh and under TMPDIR=/tmp; one mutant per fix, each red on its own row only'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-7 fixed']

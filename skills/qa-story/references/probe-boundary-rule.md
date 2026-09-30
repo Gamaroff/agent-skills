@@ -280,9 +280,16 @@ takes it.
     text, not in the environment. The decline still reports what the runs
     observed — `escapes`, `cases`, `shells` — as `entry-not-probeable` does: an
     unscored run's side effect is still a side effect (task.140 QA cycle 3). A
-    library that mentions `gh` but never calls it is scored. **The one limit:** an
-    **absolute path** to a real `gh` bypasses `PATH` and runs; a row pins it
-    (task.140 QA cycle 2). Otherwise: run bare, the real `gh` fails from the
+    library that mentions `gh` but never calls it is scored. **The limits** — each
+    reaches a real `gh` with nothing recorded, and the run is scored: an
+    **absolute path** to a real `gh` (it bypasses `PATH`); a library that puts
+    another directory **ahead of the trip-wire on `PATH`** (`export
+    PATH="/usr/local/bin:$PATH"`) — with `--fake-gh` given this bypasses the
+    fixture too, and the record still names the fixture; and a `gh` call
+    **backgrounded past the spawn**, which runs after the sandbox and its
+    trip-wire are gone. Rows pin the absolute path and the `PATH` prepend
+    (task.140 QA cycles 2 and 4). All three behave the same before task.140;
+    closing them is follow-up work. Otherwise: run bare, the real `gh` fails from the
     sandbox cwd, the function takes its read-failed passthrough, and the verdict
     would land on `absent` / `present-but-inert` — the values a missing control
     produces — with nothing but `fake_gh: null` to say "could not look". The

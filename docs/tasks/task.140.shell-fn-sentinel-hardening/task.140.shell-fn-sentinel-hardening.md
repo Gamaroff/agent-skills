@@ -318,26 +318,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.140.qa.3.shell-fn-sentinel-hardening.md](./task.140.qa.3.shell-fn-sentinel-hardening.md)
-- **Gate File**: [task.140.gate.3.shell-fn-sentinel-hardening.yml](./task.140.gate.3.shell-fn-sentinel-hardening.yml)
+- **Full Report**: [task.140.qa.4.shell-fn-sentinel-hardening.md](./task.140.qa.4.shell-fn-sentinel-hardening.md)
+- **Gate File**: [task.140.gate.4.shell-fn-sentinel-hardening.yml](./task.140.gate.4.shell-fn-sentinel-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 112 (+53 under `TMPDIR=/tmp`)
-- **Phases Verified**: 4/4 (1 with issues)
-- **Critical Issues**: 1 HIGH, 1 MEDIUM (+3 advisory)
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Tests Executed**: 114 (+55 under `TMPDIR=/tmp`)
+- **Phases Verified**: 4/4 (1 with a concern)
+- **Critical Issues**: 0 HIGH, 1 MEDIUM
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 2's findings are fixed and closed ([BUG-3](./task.140.bug.3.trap-shadow-bypassed.md), [BUG-4](./task.140.bug.4.gh-detector-open-ended.md)).
-- [TASK-140-BUG-5](./task.140.bug.5.tripwire-decline-drops-escapes.md) (HIGH): the trip-wire's decline discards the run's escape evidence.
-- [TASK-140-BUG-6](./task.140.bug.6.tripwire-marker-lost-under-env-i.md): a `gh` call under `env -i` is not recorded by the trip-wire.
+- Cycle 3's findings are fixed and closed ([BUG-5](./task.140.bug.5.tripwire-decline-drops-escapes.md), [BUG-6](./task.140.bug.6.tripwire-marker-lost-under-env-i.md)), each mutation-proven.
+- [TASK-140-BUG-7](./task.140.bug.7.rule-overclaims-one-limit.md) (medium): rule §5 names one trip-wire limit; three more were executed. The bypasses themselves are identical at `origin/develop` and go to a follow-up.
 
 <!-- change-log-start -->
 ## Change Log
@@ -354,6 +353,8 @@ None.
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (3 medium) + 2 advisory | qa-task |
 | 2026-09-30 |  | QA gate FAIL (60/100) — 2 findings (1 high, 1 medium) + 3 advisory | qa-task |
 | 2026-09-30 |  | QA findings fixed — cycle 3 (after an operator grant of 2 cycles): the trip-wire decline keeps escapes/cases/shells; the stub carries its marker path, so `env -i` is recorded; 2 rows, 2 mutants | qa-fix |
+| 2026-09-30 |  | QA gate CONCERNS (80/100) — 1 finding (1 medium); 3 pre-existing containment bypasses to follow-up | qa-task |
+| 2026-09-30 |  | QA findings fixed — cycle 4: rule §5 states the three further trip-wire limits (PATH prepend, fake-gh bypass, backgrounded call) with a pinning row | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

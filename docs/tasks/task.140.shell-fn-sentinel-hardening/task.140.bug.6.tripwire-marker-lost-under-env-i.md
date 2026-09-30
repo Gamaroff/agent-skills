@@ -4,7 +4,7 @@
 **Bug ID**: TASK-140-BUG-6
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 3, code review CR-2)
 **Date Found**: 2026-09-30
 
@@ -49,3 +49,4 @@ Write the absolute marker path into the stub's text when it is created, not into
 | ---- | ------ | ---------- | ----- |
 | 2026-09-30 | New | QA Engineer | QA cycle 3 |
 | 2026-09-30 | Ready for QA | qa-fix | Fixed in cycle 3 5b |
+| 2026-09-30 | Closed | QA Engineer | Verified cycle 4; mutation-proven |
