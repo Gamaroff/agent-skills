@@ -60,8 +60,11 @@ const {
 const HEADING = "## QA Testing Results";
 const RE_QA = /^## QA Testing Results\b[^\n]*$/gm;
 const RE_H1_H2 = /^#{1,2}[ \t]/;
-// The Change Log's own table header (document-change-log.md: Date | Version | …).
-const RE_LOG_HEADER = /^\|[ \t]*Date[ \t]*\|[ \t]*Version[ \t]*\|/;
+// A change-log table's header row: first cell `Date`, whatever follows. The current
+// spec's `| Date | Version | … |` and the legacy sync logs' `| Date | Change |` both
+// match; only the header's first cell is fixed across every shape (task.155 QA
+// cycle 2, REL-005).
+const RE_LOG_HEADER = /^\|[ \t]*Date[ \t]*\|/i;
 // A thematic break line. Only counted as a separator when a blank line precedes it:
 // directly under a paragraph line, `---` is a setext H2 underline, not a break.
 const RE_BREAK =
@@ -122,6 +125,28 @@ function markerBlocks(content, ranges) {
   return blocks.sort((a, b) => a.start - b.start);
 }
 
+// Offset of the LAST unprotected change-log table header in [from, to): a line
+// matching RE_LOG_HEADER whose previous line is not itself a table row.
+function lastTableStart(content, from, to, ranges) {
+  let found = -1;
+  let offset = from;
+  let prevRow = false;
+  for (const line of content.slice(from, to).split("\n")) {
+    const isRow = /^\|/.test(line);
+    if (
+      isRow &&
+      !prevRow &&
+      RE_LOG_HEADER.test(line) &&
+      !insideProtected(ranges, offset)
+    ) {
+      found = offset;
+    }
+    prevRow = isRow;
+    offset += line.length + 1;
+  }
+  return found;
+}
+
 // The first unprotected match of `re` (non-global) at or after `from`.
 function firstUnprotected(content, re, from, ranges) {
   const g = new RegExp(re.source, "gm");
@@ -165,15 +190,29 @@ function findQaResults(content) {
       const next = blocks.find((b) => b.start > start);
       if (next) candidates.push(next.start);
     }
-    // A section written between a change-log heading and that log's table — inside a
-    // marker block, or after a marker-less `## Change Log` — must not carry the table
-    // away: the log's own header row ends it. In the marker-less shape the section is
-    // misplaced exactly as it is inside a marker block, and a replace there deleted
-    // every Change Log row (task.155 QA cycle 1, REL-002).
-    const logFollows = block || (changeLog && changeLog.start < start);
-    if (logFollows) {
-      const tbl = firstUnprotected(content, RE_LOG_HEADER, bodyOffset, ranges);
-      if (tbl !== -1 && tbl < Math.min(...candidates)) {
+    // A section written between a change-log heading and that log's table must not
+    // carry the table away. Two shapes, and only these two (task.155 QA cycles 1–2,
+    // REL-002/004): inside a marker block; or directly under a marker-less
+    // `## Change Log` whose own body holds no Date-headed table yet — its table is
+    // then below this section. A
+    // section merely somewhere after a finished log is placed correctly and is
+    // replaced like any other, even when it quotes a Date-headed table (REL-004).
+    // The log's table is the LAST Date-headed table in the span: a table the stale
+    // section quotes comes before the log's own (REL-006).
+    const underTablelessLog =
+      !block &&
+      changeLog &&
+      !changeLog.hasMarkers &&
+      changeLog.end === start &&
+      lastTableStart(content, changeLog.start, start, ranges) === -1;
+    if (block || underTablelessLog) {
+      const tbl = lastTableStart(
+        content,
+        bodyOffset,
+        Math.min(...candidates),
+        ranges,
+      );
+      if (tbl !== -1) {
         candidates.push(tbl);
         insideChangeLog = true;
       }

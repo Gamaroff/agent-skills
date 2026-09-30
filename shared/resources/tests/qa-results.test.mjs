@@ -322,3 +322,62 @@ test("F4 a section AFTER a marker-less change log with no table following is not
   assert.equal(s.insideChangeLog, false);
   assert.equal(QR.upsertQaResults(doc, section(2)).reason, "replaced");
 });
+
+// ---------------------------------------------------------------------------
+// G — QA cycle 2 findings (task.155 gate 2): the misplaced shape, precisely
+// ---------------------------------------------------------------------------
+
+const quoted =
+  "## QA Testing Results\n\n**QA Status**: PASS\n\n### Key Findings\n\n| Date | Version | Note |\n| --- | --- | --- |\n| 2026-01-01 | 0.1 | quoted |\n\nStale tail line.";
+
+test("G1 REL-004: a section after a finished marker-less log, quoting a Date table, is replaced whole", () => {
+  const doc = `${FM}## Change Log\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n\n${quoted}\n\n## Next\n`;
+  assert.equal(QR.findQaResults(doc).sections[0].insideChangeLog, false);
+  const r = QR.upsertQaResults(doc, section(2));
+  assert.equal(r.reason, "replaced");
+  assert.doesNotMatch(r.content, /Stale tail line|quoted/);
+  assert.match(r.content, /\| 2026-09-25 \| 1\.0 \| x \| y \|/);
+});
+
+test("G2 REL-004: a section after a closed marker block, quoting a Date table, is replaced whole", () => {
+  const doc = `${FM}## Body\n\ntext\n\n${LOG}\n${quoted}\n\n## Next\n`;
+  assert.equal(QR.findQaResults(doc).sections[0].insideChangeLog, false);
+  const r = QR.upsertQaResults(doc, section(2));
+  assert.equal(r.reason, "replaced");
+  assert.doesNotMatch(r.content, /Stale tail line|quoted/);
+});
+
+test("G3 REL-005: a legacy | Date | Change | log under a marker-less heading keeps its rows", () => {
+  const doc = `${FM}## Body\n\ntext\n\n## Change Log\n\n${section(1)}\n\n| Date | Change |\n| --- | --- |\n| 2026-01-01 | synced |\n| 2026-01-02 | resynced |\n`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "relocated");
+  assert.match(r.content, /## Change Log\n\n\| Date \| Change \|/);
+  assert.equal(count(r.content, "synced |"), 2);
+  assert.doesNotMatch(r.content, /cycle 1/);
+});
+
+test("G4 REL-006: a misplaced section that quotes a Date table leaves nothing of itself in the log", () => {
+  const doc = `${FM}## Body\n\ntext\n\n## Change Log\n\n${quoted}\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | Initial draft | create-task |\n`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "relocated");
+  const log = r.content.slice(r.content.indexOf("## Change Log"));
+  assert.doesNotMatch(log, /Stale tail line|quoted|QA Status/);
+  assert.match(log, /\| 2026-09-25 \| 1\.0 \| Initial draft/);
+});
+
+test("G5 a marker-less log with prose but no table above the section is still the misplaced shape", () => {
+  const doc = `${FM}## Change Log\n\nSee below.\n\n${section(1)}\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n`;
+  assert.equal(QR.findQaResults(doc).sections[0].insideChangeLog, true);
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "relocated");
+  assert.match(r.content, /See below\.\n\n\| Date \| Version/);
+  assert.match(r.content, /\| 2026-09-25 \| 1\.0 \| x \| y \|/);
+});
+
+test("G6 a section further down, after a table-less marker-less log and another section, is not misplaced", () => {
+  const doc = `${FM}## Change Log\n\nNone yet.\n\n## Other\n\nx\n\n${quoted}\n\n## Next\n`;
+  assert.equal(QR.findQaResults(doc).sections[0].insideChangeLog, false);
+  const r = QR.upsertQaResults(doc, section(2));
+  assert.equal(r.reason, "replaced");
+  assert.doesNotMatch(r.content, /Stale tail line|quoted/);
+});
