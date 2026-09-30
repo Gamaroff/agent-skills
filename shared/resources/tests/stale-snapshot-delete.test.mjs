@@ -31,6 +31,12 @@
 //   P — bind block and delete block in TWO processes → deleted        (read the variable again → red)
 //   N2 — a snapshot with no pr_url is KEPT before any gh call          (drop the guard → red)
 //   Q — the detector prompt files no bare-string note                  (restore a string site → red)
+//   R — Pass 2 names three evidence failures apart: an unparsable snapshot, a parsed object with
+//       no directory, another document's directory — each a HALT, each kept  (drop the
+//       `type == "object"` arm → the unparsable case reads as 'no directory' → red; task.133)
+//   S — a `stale-snapshot`-prefixed concern that is neither the verdict nor a skip note is
+//       reported `unrecognised … kept`, never silently skipped      (drop the pass → red; task.133)
+//   P — also run with a {doc-directory} holding a SPACE: every substitution is quoted (task.133)
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -239,11 +245,12 @@ for (const sh of SHELLS) {
     assert.equal(r.exists, true);
   });
 
-  test(`P [${sh}] — TWO SHELLS: bind block in one process, delete block in another → deleted (bug 9)`, () => {
+  for (const leaf of ["task.1.x", "task.1 with space"])
+  test(`P [${sh}] — TWO SHELLS: bind block in one process, delete block in another → deleted (bug 9) — doc dir '${leaf}'`, () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "two-shell-"));
     const state = path.join(dir, ".claude", "state");
     fs.mkdirSync(state, { recursive: true });
-    const docDir = path.join(dir, "docs", "tasks", "task.1.x");
+    const docDir = path.join(dir, "docs", "tasks", leaf);
     fs.mkdirSync(docDir, { recursive: true });
     const bin = path.join(dir, "bin");
     fs.mkdirSync(bin);
@@ -454,6 +461,47 @@ for (const sh of SHELLS) {
       /HALT: .* is not a snapshot for .* — the detector mislabelled it; nothing deleted/,
     );
     assert.equal(r.exists, true, "a mislabelled live snapshot was deleted");
+  });
+
+  test(`R [${sh}] — Pass 2: unparsable, directory-less and foreign snapshots are three named HALTs; all kept`, () => {
+    const cases = [
+      [{ snapshotRaw: "{not json\n" }, /HALT: .* is not a JSON object — its evidence cannot be read/],
+      [
+        { snapshotRaw: JSON.stringify({ pr_url: "https://github.com/x/y/pull/1" }) + "\n" },
+        /HALT: .* carries no task_or_story_directory — /,
+      ],
+      [{ snapshotDir: "docs/tasks/task.2.other" }, /HALT: .* is not a snapshot for .* \(task_or_story_directory: 'docs\/tasks\/task\.2\.other'\)/],
+    ];
+    const seen = new Set();
+    for (const [opts, re] of cases) {
+      const r = run(sh, { concern: "stale-snapshot: PR merged", ...opts });
+      assert.equal(r.status, 1, `${re}: stdout ${r.stdout} stderr ${r.stderr}`);
+      assert.match(r.stdout, re);
+      assert.match(r.stdout, /nothing deleted/);
+      assert.equal(r.exists, true, `${re}: snapshot deleted`);
+      seen.add(r.stdout.split("\n").find((l) => l.startsWith("HALT:")).replace(/'[^']*'/g, ""));
+    }
+    assert.equal(seen.size, 3, `three outcomes share a message: ${[...seen].join(" | ")}`);
+  });
+
+  test(`S [${sh}] — an unrecognised stale-snapshot-prefixed label is reported and kept, not silently skipped`, () => {
+    for (const concern of [
+      "stale-snapshot: PR merged ", // trailing space — not the verdict
+      "stale-snapshot: /x/last-halt.json — PR merged; deleted", // the pre-task.130 label
+    ]) {
+      const r = run(sh, { concern });
+      assert.equal(r.status, 0, `[${concern}] stdout ${r.stdout} stderr ${r.stderr}`);
+      assert.equal(r.exists, true, `[${concern}] snapshot deleted`);
+      assert.ok(
+        r.stdout.includes(`unrecognised stale-snapshot label — kept: '${concern}'`),
+        `[${concern}] no 'unrecognised … kept' line; stdout: ${r.stdout}`,
+      );
+    }
+    // …and the verdict and both skip notes stay silent on this line.
+    for (const concern of ["stale-snapshot: PR merged", ...SKIP_NOTES]) {
+      const r = run(sh, { concern, prState: "open" });
+      assert.doesNotMatch(r.stdout, /unrecognised stale-snapshot label/, `[${concern}] reported as unrecognised`);
+    }
   });
 
   test(`N [${sh}] — PR re-check OPEN or gh failure → snapshot KEPT, exit 0, reason named`, () => {

@@ -34,8 +34,10 @@ HALTs at its own guard (cycle 2, bug 5). **Bind once, here:**
 ```bash
 # 1. Persist the JSON the Explore dispatch RETURNED — verbatim, from the tool result, into the
 #    pipeline's summary directory. The quoted heredoc keeps the JSON's own quotes and $ intact.
-mkdir -p {doc-directory}/.summaries
-cat > {doc-directory}/.summaries/step-0a-resume-detector.json <<'DETECTOR_EOF'
+# Every {doc-directory} substitution is QUOTED — a document directory with a space splits
+# into two words otherwise (task.130 gate 5 CR-7; task.133).
+mkdir -p "{doc-directory}/.summaries"
+cat > "{doc-directory}/.summaries/step-0a-resume-detector.json" <<'DETECTOR_EOF'
 {the JSON object the detector returned, pasted verbatim}
 DETECTOR_EOF
 # 2. Bind and validate. `deltas_since_pause` must be an ARRAY OF OBJECTS here, because the
@@ -43,7 +45,7 @@ DETECTOR_EOF
 #    ignored", both `stale-snapshot check skipped — …` notes) are delta objects too, never bare
 #    strings (detector prompt § deltas_since_pause object fields; cycle 3, bug 6). A shape this
 #    check accepts and the delete block refuses would give one input two prescribed outcomes.
-DETECTOR_JSON=$(cat {doc-directory}/.summaries/step-0a-resume-detector.json)
+DETECTOR_JSON=$(cat "{doc-directory}/.summaries/step-0a-resume-detector.json")
 printf '%s' "$DETECTOR_JSON" \
   | jq -e '.schema_version == 1 and (.recommended_step | type == "number")
            and (.blocking_issues | type == "array")
@@ -88,7 +90,14 @@ HALTs on every real run (cycle 4, bug 9):
 #    a variable the bind block set does not exist here. This block re-binds from the artifact
 #    the bind block persisted and HALTs only when that file is absent — which means the bind
 #    block did not run.
-DETECTOR_FILE={doc-directory}/.summaries/step-0a-resume-detector.json
+# Two more, each a case that used to share another's output (task.133):
+# 7. NAME THE EVIDENCE FAILURE: an unparsable snapshot, a parsed object with no directory, and
+#    another document's directory are three different defects — three HALT texts, not one
+#    "'absent'" for the first two (task.130 5c CR-3).
+# 8. NO SILENT LABEL: a concern that starts "stale-snapshot" but is neither the verdict nor a
+#    skip note is printed "unrecognised … kept" — the snapshot stays, and the operator sees why
+#    (task.130 gate 5 CR-5).
+DETECTOR_FILE="{doc-directory}/.summaries/step-0a-resume-detector.json"
 [ -s "$DETECTOR_FILE" ] || { echo "HALT: $DETECTOR_FILE is absent or empty — run the bind-and-validate block first; nothing deleted"; exit 1; }
 DETECTOR_JSON=$(cat "$DETECTOR_FILE")
 SNAPSHOT_PATH=.claude/state/develop-pipeline.last-halt.json
@@ -98,6 +107,12 @@ STALE_PATHS=$(printf '%s' "$DETECTOR_JSON" \
              | (.path | if type == "string" and length > 0 then . else error("stale-snapshot delta without a string path") end) ]
            | .[]' 2>&1) \
   || { echo "HALT: could not read stale-snapshot deltas from the detector output — $STALE_PATHS"; exit 1; }
+# A prefix match that is neither the verdict nor a skip note is a label nothing acts on: say so.
+printf '%s' "$DETECTOR_JSON" \
+  | jq -r '.deltas_since_pause[] | select(type == "object") | (.concern // "") | select(type == "string")
+           | select(startswith("stale-snapshot") and . != "stale-snapshot: PR merged"
+                    and (startswith("stale-snapshot check skipped") | not))' 2>/dev/null \
+  | while IFS= read -r c; do echo "unrecognised stale-snapshot label — kept: '$c'"; done
 canon() { local s; s=$(printf '%s' "$1" | sed -E 's#^\./##; s#/+$##'); (cd "$(dirname "$s")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$(basename "$s")") || printf '%s' "$s"; }
 # Pass 1 — every path must be THE snapshot path; nothing is removed until all are.
 while IFS= read -r p; do
@@ -109,9 +124,13 @@ done <<< "$STALE_PATHS"
 while IFS= read -r p; do
   [ -n "$p" ] || continue
   [ -f "$p" ] || { echo "stale snapshot $p already absent — nothing to delete"; continue; }
-  SNAP_DIR=$(jq -r '.task_or_story_directory // ""' "$p" 2>/dev/null)
-  [ -n "$SNAP_DIR" ] && [ "$(canon "$SNAP_DIR")" = "$(canon "{doc-directory}")" ] \
-    || { echo "HALT: $p is not a snapshot for {doc-directory} (task_or_story_directory: '${SNAP_DIR:-absent}') — the detector mislabelled it; nothing deleted"; exit 1; }
+  jq -e 'type == "object"' "$p" >/dev/null 2>&1 \
+    || { echo "HALT: $p is not a JSON object — its evidence cannot be read; the detector mislabelled it; nothing deleted"; exit 1; }
+  SNAP_DIR=$(jq -r '.task_or_story_directory // ""' "$p")
+  [ -n "$SNAP_DIR" ] \
+    || { echo "HALT: $p carries no task_or_story_directory — a legacy snapshot is no document's by evidence; the detector mislabelled it; nothing deleted"; exit 1; }
+  [ "$(canon "$SNAP_DIR")" = "$(canon "{doc-directory}")" ] \
+    || { echo "HALT: $p is not a snapshot for {doc-directory} (task_or_story_directory: '$SNAP_DIR') — the detector mislabelled it; nothing deleted"; exit 1; }
   SNAP_PR=$(jq -r '.pr_url // ""' "$p" 2>/dev/null)
   # An EMPTY pr_url is "no merge evidence" — and `gh pr view ""` would silently resolve the CURRENT
   # branch's PR instead of failing, so the guard comes BEFORE the call (cycle 4, bug 11).
@@ -134,7 +153,9 @@ The re-read is the point: a delete that is reported and not verified is the fail
 section replaces, one layer up. The label the block matches is the one the detector prompt
 defines for a **proven** merge; the two skip notes share the `stale-snapshot` prefix by design
 (one label per cause) and are never acted on — and even the verdict label is not acted on until
-the snapshot itself says the same thing.
+the snapshot itself says the same thing. Any **other** `stale-snapshot`-prefixed concern is not
+acted on either, but it is **printed** (`unrecognised stale-snapshot label — kept: '…'`): a label
+nothing recognises is a detector that drifted, and silence would hide it.
 
 ### Surface Results to User
 
