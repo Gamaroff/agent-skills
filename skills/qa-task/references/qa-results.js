@@ -100,11 +100,52 @@ const RE_LOG_HEADING = /^ {0,3}#{1,6}[ \t]+(?:\d+\.?[ \t]+)?Change Log\b/i;
 // the one corpus instance is a `---` separator directly under a paragraph inside a
 // QA section, which refusing would turn into a false stop.
 const RE_STRUCTURAL = [
-  /^ {0,3}<!-- (?:change-log|jira-sync-changelog|github-sync-changelog)-(?:start|end) -->/,
+  // Every marker change-log.js knows, from its own constants (gate 6 CR-7).
+  new RegExp(
+    `^ {0,3}(?:${[
+      CL_START,
+      CL_END,
+      ...LEGACY_MARKER_PAIRS.flatMap((p) => [p.start, p.end]),
+    ]
+      .map((m) => m.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|")})`,
+  ),
   /^ {0,3}#{1,2}(?:[ \t]|$)/,
   RE_LOG_HEADING,
   RE_HEADING,
 ];
+
+// Subsections another skill writes INTO this section, which a whole-section replace
+// must carry rather than drop. create-bug-report Step 5 (task mode) appends a
+// `### Bug Reports` list here; 11 tracked task documents carry one, and a replace
+// that dropped it lost every bug link on the next QA cycle (task.155 PR review 3,
+// CR-1). The list is closed on purpose: every other `###` in the section is QA's
+// own and is replaced whole — carrying all of them would preserve stale cycle
+// history, which is exactly what "replace whole" exists to remove.
+const CARRIED_SUBSECTIONS = ["Bug Reports"];
+
+// The carried subsections present in `removed` and absent from `body`, verbatim.
+// A subsection runs from its `###` heading to the next unprotected heading of
+// level <= 3, or the end of the removed span. When the new body renders its own
+// copy, the renderer has taken the subsection over and the old one is not carried.
+function carriedSubsections(removed, body) {
+  const out = [];
+  const rangesOld = protectedRanges(removed);
+  const rangesNew = protectedRanges(body);
+  for (const name of CARRIED_SUBSECTIONS) {
+    const re = new RegExp(`^###[ \\t]+${name}[ \\t]*$`, "m");
+    if (firstUnprotected(body, re, 0, rangesNew) !== -1) continue;
+    const at = firstUnprotected(removed, re, 0, rangesOld);
+    if (at === -1) continue;
+    const bodyAt = removed.indexOf("\n", at);
+    const next =
+      bodyAt === -1
+        ? -1
+        : firstUnprotected(removed, /^#{1,3}[ \t]/, bodyAt + 1, rangesOld);
+    out.push(removed.slice(at, next === -1 ? removed.length : next).trimEnd());
+  }
+  return out;
+}
 
 // Does the text a write would remove carry anything outside the section itself?
 // The first line is the section's own heading and is exempt.
@@ -358,19 +399,9 @@ function normaliseSection(section) {
   // Never write a section the next write would have to refuse: the structural guard
   // below is fence-blind, so a fenced `## Example` in the section is refused here too.
   if (removesStructure(body)) return null;
+  // The heading must itself be a section heading (`## QA Testing Resultsx` is not).
+  // A second H1/H2 in the body is already refused by removesStructure above.
   if (findQaResults(body).sections.length !== 1) return null;
-  const firstLineEnd = body.indexOf("\n");
-  if (
-    firstLineEnd !== -1 &&
-    firstUnprotected(
-      body,
-      RE_H1_H2,
-      firstLineEnd + 1,
-      protectedRanges(body),
-    ) !== -1
-  ) {
-    return null;
-  }
   return body;
 }
 
@@ -409,17 +440,24 @@ function upsertQaResults(content, section, { docType = "" } = {}) {
 
   if (sections.length === 1 && !sections[0].insideChangeLog) {
     const { start, end } = sections[0];
+    const carried = carriedSubsections(content.slice(start, end), body);
+    const written = [body, ...carried].join("\n\n");
     const rest = content.slice(end);
     const sep = rest === "" ? "\n" : rest.startsWith("\n") ? "\n" : "\n\n";
-    return checked(content.slice(0, start) + body + sep + rest, "replaced");
+    return checked(content.slice(0, start) + written + sep + rest, "replaced");
   }
 
   let base = content;
   let reason = "created";
+  let written = body;
   if (sections.length === 1) {
     // Inside the block: cut it out, then insert at the canonical position computed
     // on the post-removal text (the block start, which the removal did not move).
     const { start, end } = sections[0];
+    written = [
+      body,
+      ...carriedSubsections(content.slice(start, end), body),
+    ].join("\n\n");
     const before = content.slice(0, start).replace(/\n+$/, "\n");
     const after = content.slice(end).replace(/^\n+/, "");
     base =
@@ -428,7 +466,10 @@ function upsertQaResults(content, section, { docType = "" } = {}) {
         : `${before}\n${after}`;
     reason = "relocated";
   }
-  return checked(insertAt(base, canonicalOffset(base, docType), body), reason);
+  return checked(
+    insertAt(base, canonicalOffset(base, docType), written),
+    reason,
+  );
 }
 
 module.exports = { HEADING, RE_QA, findQaResults, upsertQaResults };

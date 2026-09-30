@@ -553,3 +553,56 @@ test("K2 REL-015: a numbered ## 12) Change Log directly above the marker block k
     /None \(cycle 1\)\.\n\n## 12\) Change Log\n\n<!-- change-log-start -->/,
   );
 });
+
+// ---------------------------------------------------------------------------
+// L — PR review 3 (task.155 5c): subsections another skill owns survive a replace
+// ---------------------------------------------------------------------------
+
+const bugList =
+  "### Bug Reports\n\n- [task.9.bug.1.x.md](./task.9.bug.1.x.md) - 🆕 New - Priority: High - 2026-09-30\n- [task.9.bug.2.y.md](./task.9.bug.2.y.md) - 🆕 New - Priority: Low - 2026-09-30";
+
+test("L1 CR-1: create-bug-report's ### Bug Reports list is carried through every replace", () => {
+  let out = markerDoc(`${section(1)}\n\n${bugList}\n\n`);
+  for (let n = 2; n <= 4; n++) {
+    const r = QR.upsertQaResults(out, section(n), { docType: "task" });
+    assert.equal(r.reason, "replaced");
+    out = r.content;
+  }
+  assert.equal(count(out, "### Bug Reports"), 1);
+  assert.equal(count(out, "task.9.bug.1.x.md"), 2); // link text + target, once
+  assert.equal(count(out, "task.9.bug.2.y.md"), 2);
+  assert.match(out, /None \(cycle 4\)\.\n\n### Bug Reports/);
+  assert.doesNotMatch(out, /cycle [123]\)/);
+});
+
+test("L2 a render that carries its own ### Bug Reports takes it over — no duplicate", () => {
+  const doc = markerDoc(`${section(1)}\n\n${bugList}\n\n`);
+  const owned = `${section(2)}\n\n### Bug Reports\n\n- [task.9.bug.1.x.md](./task.9.bug.1.x.md) - ✅ Closed`;
+  const r = QR.upsertQaResults(doc, owned, { docType: "task" });
+  assert.equal(count(r.content, "### Bug Reports"), 1);
+  assert.match(r.content, /✅ Closed/);
+  assert.doesNotMatch(r.content, /bug\.2\.y/);
+});
+
+test("L3 QA's own stale subsections are still replaced whole", () => {
+  const doc = markerDoc(
+    `${section(1)}\n\n### QA Fix Cycle 1 — old\n\nstale history\n\n`,
+  );
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.doesNotMatch(r.content, /stale history|QA Fix Cycle 1/);
+});
+
+test("L4 the Bug Reports list is carried on relocate too", () => {
+  const inside = LOG.replace(
+    "<!-- change-log-end -->",
+    `${section(1)}\n\n${bugList}\n\n<!-- change-log-end -->`,
+  );
+  const doc = `${FM}## Body\n\ntext\n\n${inside}\n## Progress Tracking\n`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "relocated");
+  assert.equal(count(r.content, "### Bug Reports"), 1);
+  assert.ok(
+    r.content.indexOf("### Bug Reports") <
+      r.content.indexOf("<!-- change-log-start -->"),
+  );
+});
