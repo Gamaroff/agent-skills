@@ -5,7 +5,7 @@ type: task
 description: "Give the work item's `## QA Testing Results` section a write engine beside change-log.js. It replaces the section whole, places it in one canonical position outside the change-log block, and refuses a document that already carries more than one. Wire qa-task and qa-story Step 12 to it, repair the one corrupted document in the corpus, and hold the invariant with a corpus test."
 tags: [qa-task, qa-story, change-log, engine, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-25
 updated: 2026-10-01
@@ -13,11 +13,12 @@ assignee:
 estimated_effort_hours: 16
 github_issue: 486
 pr_number: 537
+completed_date: 2026-10-01
 ---
 
 # Technical Task: QA Testing Results section — one write engine, one placement, refused when duplicated
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.155.review.1.qa-results-section-engine.md` implemented 2026-09-30
 
@@ -403,6 +404,30 @@ PR review 4's PC-1 (Deferred Work carried) and REL-026 (a render with its own ca
 - REL-029 (low, refuses): the refusal also catches QA-owned headings such as `### Bug Reports filed this cycle`, and the halt gives no hint.
 - REL-030 (low, deletes): a bold `**Deferred Work**` label inside the section is not carried.
 - REL-031 (low, cosmetic): two task.141 sentences in this document are stale, the qa-story indentation is off, and test N2 is misnamed.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.155.qa.10.qa-results-section-engine.md`
+**Gate File**: `task.155.gate.10.qa-results-section-engine.yml`
+**Gate Status**: ⚠️ CONCERNS — 90/100, no open entry (waivers and one explicit operator acceptance recorded under `## Deferred Work`)
+**QA Cycles**: 10 (budget 5 + operator grants 2, 1, 1, 1); 5 PR conformance reviews, final CONCERNS
+
+All applicable Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10/11 met; AC11 (observation #178 → actioned) happens at merge by design
+✅ **Tests:** 68 engine, wiring and corpus tests, every assertion mutation-proved; PR checks green on `149407c8`
+✅ **PR Review:** PR #537 — five independent conformance reviews, the last with no new deletion path
+✅ **Documentation:** CHANGELOG `[Unreleased]` (task 155); Step 12 in qa-task and qa-story
+✅ **Security Review:** PASS — internal boundary with a valid reason; fault injection and corpus runs lose nothing outside the section
+⚠️ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-01
+
+**Detailed Verification Log:** See `task.155.dod.1.qa-results-section-engine.md` for the complete verification evidence.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -422,6 +447,7 @@ PR review 4's PC-1 (Deferred Work carried) and REL-026 (a render with its own ca
 | 2026-10-01 |  | QA gate CONCERNS (80/100) cycle 8 — 1 MEDIUM (REL-020: a second Bug Reports list is dropped by the carry), 3 LOW | qa-task |
 | 2026-10-01 |  | QA gate CONCERNS (90/100) cycle 9 — 4 LOW (REL-024..REL-027); REL-020/021/022 closed, REL-023 partial | qa-task |
 | 2026-10-01 |  | QA gate CONCERNS (90/100) cycle 10 — 4 LOW (REL-028..REL-031); PC-1 and REL-026 verified fixed | qa-task |
+| 2026-10-01 | 1.2 | DoD verified — accepted (PR #537) | finalise |
 <!-- change-log-end -->
 
 ---
