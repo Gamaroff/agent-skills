@@ -1,0 +1,95 @@
+---
+type: implementation-report
+status: in-progress
+bug: 'bug.17'
+mode: 'general'
+started: '2026-09-30T10:29:09Z'
+---
+
+# Implementation Report — bug.17
+
+**Started:** 2026-09-30T10:29:09Z
+**Finished:** 2026-09-30T11:51:45Z
+**Final Status:** Completed
+**Branch model:** bugfix (base: develop, PR target: develop)
+**Severity / Priority:** Minor / Low
+**Lite mode:** on
+**Fix Iterations:** 1
+
+## Pipeline Progress
+
+| Step | Skill | Status | Notes | Subagent summary ref |
+|------|-------|--------|-------|----------------------|
+| 1 | create-branch | ✅ Done | Branch created at `8d5ba45e`; issue #529 created, work-started posted + board transitioned | |
+| 2 | review-bug | ✅ Done | READY TO FIX 10/10; 1 Important applied (Expected Behavior restated as refusal contract) | |
+| 3 | investigate-fix | ✅ Done | Reproduced (zsh NUL; also `\n` under both shells); control-char refusal in `choose_candidate()`; 10 regression cases, 9 red pre-fix; ci:fast + lint:shell green | |
+| 4 | create-pr | ✅ Done | PR #530: https://github.com/Gamaroff/agent-skills/pull/530 | |
+| 5–6 | verify-fix loop | ✅ Done | Cycle 1 PASS (lite: signals 1+2) | |
+| 7 | finalise-close | ✅ Done | Run 1 GAPS (security zero-guard) → operator override → `/finalise --bug` run 2 ACCEPTED (dod.2); CI reading 1 SUCCESS @ 521805a8, reading 2 SUCCESS @ fb026755; bug closed, registry row closed, #529 CLOSED | |
+| 8 | commit-changes | ✅ Done | Final report commit + push; Completion Checklist | |
+
+## Decisions Log
+
+- 2026-09-30T10:29:09Z — Bug resolved: docs/bugs/bug.17.zsh-nul-truncates-candidate-directory/bug.17.zsh-nul-truncates-candidate-directory.md (mode=general, prefix=bug.17). Resolved directly from the path develop-next's selector supplied; no Explore resolution needed.
+- 2026-09-30T10:29:09Z — Dispatched by /develop-next (item B17, source bug-registry); AUTONOMOUS RUN directive in force.
+- 2026-09-30T10:29:09Z — Phase 0b: no active lock. `.claude/state/develop-pipeline.last-halt.json` is for task.133 (PR #528, merged) — not this bug; left in place, fresh run.
+- 2026-09-30T10:29:09Z — Phase 0c: status=new, severity=Minor, priority=Low, no tracker issue in frontmatter. TRACKER=github VCS=github.
+- 2026-09-30T10:29:09Z — Lite mode: on — severity=Minor, priority=Low (applies to Step 5 only).
+- 2026-09-30T10:29:09Z — Q1 branch model: bugfix (auto-answered — bug is not a production regression).
+- 2026-09-30T10:29:09Z — Q2 base branch: develop (auto-answered, derived from Q1).
+- 2026-09-30T10:29:09Z — Q3 PR target: develop (auto-answered, derived from Q1).
+- 2026-09-30T10:30:34Z — Branch: `bugfix/bug.17.zsh-nul-truncates-candidate-directory` (base develop, pushed with upstream). Implementation report stashed before branch creation, restored after.
+- 2026-09-30T10:30:34Z — Tracker: ensure-bug-github-issue created #529 (labels bug, priority:low; `severity:Minor` not defined in repo — dropped, severity carried in body). Board priority P3. github_issue written back; Status History row added.
+- 2026-09-30T10:30:34Z — Signal Work Started: tracker-comment reason=posted; gh-stage work-started reason=transitioned.
+- 2026-09-30T10:31:34Z — review-bug invoked in validate-and-apply mode → READY TO FIX (10/10). Report: `bug.17.review.1.zsh-nul-truncates-candidate-directory.md`. Pre-pass run in-line (registry grep + live repro: zsh rc=0, bash rc=1), not as Explore subagents. Tracker comment reason=posted.
+- 2026-09-30T10:40:58Z — Step 3 fix summary:
+  - Root cause: `choose_candidate()` compared a lossy `$(jq -r …)` read of `task_or_story_directory` — zsh keeps a NUL (canon's `cd` truncates), both shells strip a trailing newline.
+  - Scope widened on evidence: `<doc>\n` was accepted under bash as well as zsh (probe rc 0/0); the same fix covers it.
+  - Fix: `jq -e` control-character test (U+0000–U+001F, U+007F) on the JSON value before the read; skipped by name, never chosen or consumed.
+  - Regression tests: `advance-pipeline-lock.test.sh` run_restore_scenarios — 4 suffix cases + NUL-claim-beside-matched-snapshot, bash and zsh (109/109). Mutation-proved (3 narrowing mutants + disable, all red).
+  - Files: `shared/resources/advance-pipeline-lock.{sh,test.sh}`, 12 bundled copies, `CHANGELOG.md`, bug file + registry row (`ready-for-qa`).
+- 2026-09-30T10:40:58Z — Root-cause localisation done in-line (the defect site was named by the report and confirmed by a live repro); no Explore subagent dispatched, so no waiting_on marker was set.
+- 2026-09-30T10:42:10Z — Step 4 SCOPE_PATHS: bug dir, CHANGELOG.md, docs/bugs, shared/resources, 12 skills/*/references. No out-of-scope untracked files held.
+- 2026-09-30T10:42:10Z — Commits: `4579f760` fix(advance-pipeline-lock) and `40894377` docs(bug.17). Leak check OK. PR #530 opened against develop, Closes #529. PR body written directly (small diff); the Explore summariser was not dispatched.
+- 2026-09-30T10:42:10Z — Post-PR state check: PR #530 state = OPEN, checked with `gh pr view`, not the poller subagent. Tracker in-review comment reason=posted. GitHub board: in-review → stage-disabled.
+- 2026-09-30T10:43:15Z — GitHub 529 — in-qa: stage-disabled. ready-for-merge: stage-disabled. qa-cycle-1 comment: posted.
+- 2026-09-30T10:43:15Z — Detector prompt (`pipeline-resume-detector-prompt.md` item 1) left unchanged: it already drops any candidate whose directory string differs and defers to `choose_candidate()` as the authority.
+- 2026-09-30T10:48:17Z — CI reading 1: SUCCESS @ `40894377f71c` over 5 checks (test, validate, shellcheck, link-check, branch policy).
+- 2026-09-30T10:48:17Z — DoD agents: fix-evidence PASS (independent scratch mutation: 100 passed / 9 failed); docs PASS; compliance N/A; security FAIL (medium) — `probe mode executed no candidates`.
+- 2026-09-30T10:48:17Z — Decision: GAPS. Step 8a not applicable (finding is medium; fix belongs in `security-probe.mjs`). task.133 cleared the same engine gap only by an explicit operator override; that approval was for task.133 and is not reused here without asking.
+- 2026-09-30T10:48:17Z — Gaps path: DoD `bug.17.dod.1.zsh-nul-truncates-candidate-directory.md` filled (gaps); Status History row `DoD incomplete — 1 gap(s)`; engine record `bug.17.dod.security.run.json` + by-hand record `bug.17.dod.security.by-hand-probe.md` saved; gaps PR comment posted (#530 issuecomment-5909659347); registry-tick → not-a-task.
+- 2026-09-30T11:51:45Z — Resumed after the halt: operator instruction "override it" (security zero-guard, bug.17 only). The lock was restored with `--restore` at step 7.
+- 2026-09-30T11:51:45Z — `/finalise --bug` run 2: `git diff 40894377..521805a8` touches only the bug directory, so dod.1's agent results stand on an unchanged code tree. Re-ran locally: advance-pipeline-lock.test.sh 109/109, grant-qa-cycles 46/46, bundle:check 0. CI reading 1: SUCCESS @ 521805a8 over 5 checks. Acceptance commit `fb026755` pushed; 6b assertions OK. CI reading 2: SUCCESS @ fb026755 over 5 checks.
+- 2026-09-30T11:51:45Z — Side-effects: canonical PR comment posted; tracker `done` comment posted; #529 closed (read back as CLOSED); board `done` → already. Issue document links re-pointed to `develop`.
+- 2026-09-30T11:51:45Z — GitHub rewrote the literal text `\u0000`/`\u001f` in the issue and PR bodies to caret notation (`\^@`, `\^_`), even when the JSON sent was correct. Both bodies were reworded to use NUL / U+001F. See § GitHub body mangling below.
+- 2026-09-30T11:51:45Z — Part B: Resolution Summary written; status `closed` in frontmatter and body; Status History `Closed` row; bug-registry row 17 → `closed`.
+
+## Issues Log
+
+## QA Iteration History
+
+### Verify Cycle 1 — 2026-09-30
+**Regression test**: pass (advance-pipeline-lock.test.sh 109/109, bash + zsh; 9/10 new cases red pre-fix)
+**Suite + lint**: pass (grant-qa-cycles.test.sh 46/46; detector-candidate-rule + who-restores-single-statement 12/12; shellcheck clean)
+**Code review**: skipped (lite mode) · Applied non-blocking: 0 · Declined: 0
+**Fast gate**: n/a
+**Verdict**: PASS
+**Action**: Proceeding to finalise
+
+### Finalise DoD Gaps — 2026-09-30
+
+1. **Security zero-guard (medium).** The probe engine has no entry form for a shell script taking a flag + positional (`advance-pipeline-lock.sh --restore [--which] <doc-dir>`): `shell-fn:` exits 97 on source, `cli:` is `.mjs`/`.js` only, `shell:` reaches only the numeric arm → `totals.executed: 0`. Same gap as task.133 dod.2 (obs #231). Supplementary §5.1 by-hand probe: 66/66 post-fix, 8 mismatches pre-fix. Resolution options: operator override on that evidence (task.133's path), or the obs #231 engine extension first.
+
+### GitHub body mangling — 2026-09-30
+
+GitHub stores the literal text `\u0000` in an issue or PR body as `\^@`, and `\u001f` as `\^_` (checked on the raw API JSON after a PATCH whose payload held the correct `\u0000`). #529's reproduction step and #530's summary were affected. Both were reworded to name NUL / U+001F in words. Not a blocker. Logged as an observation.
+
+## Completion Summary
+
+Fixed `choose_candidate()`'s provenance guard in `advance-pipeline-lock.sh`. It now refuses a candidate whose `task_or_story_directory` holds a control character, which it checks on the JSON value before the lossy shell read. That closes the reported zsh NUL case and two wider cases found during the fix: a trailing newline under both shells, and a NUL at the end under bash. Took 1 verify cycle (lite mode). `/finalise --bug` raised one gap, the security zero-guard, because the probe engine cannot call a flag + positional shell script (obs #231). The operator overrode it on a by-hand probe (66/66 post-fix, 8 mismatches pre-fix).
+
+## Completion
+
+**Branch:** `bugfix/bug.17.zsh-nul-truncates-candidate-directory`
+**PR:** https://github.com/Gamaroff/agent-skills/pull/530
+**DoD Summary:** `bug.17.dod.2.zsh-nul-truncates-candidate-directory.md` (ACCEPTED, security zero-guard overridden by operator); run 1 `bug.17.dod.1…` (GAPS — 1)

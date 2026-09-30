@@ -43,7 +43,7 @@
 | 14 | [PreCompact hook posts bare `gh issue comment` / `gh pr comment`, bypassing the comment contract and the access gate](bug.14.precompact-hook-bare-tracker-comment/bug.14.precompact-hook-bare-tracker-comment.md) | closed | Major | High | 2026-09-12 | pipeline hooks / tracker comments |
 | 15 | [`observation-log doctor`'s activation check is cwd-relative and false-negatives silently](bug.15.doctor-activation-check-cwd-relative/bug.15.doctor-activation-check-cwd-relative.md) | closed | Minor | Medium | 2026-09-12 | observation log |
 | 16 | [The `main` guard is a silent no-op when the script is reached through a symlink](bug.16.main-guard-silent-noop-under-symlink/bug.16.main-guard-silent-noop-under-symlink.md) | closed | Major | Medium | 2026-09-23 | CLI entry points (6 files, 5 skills) |
-| 17 | [Under zsh, `choose_candidate()` accepts a candidate directory with an embedded NUL](bug.17.zsh-nul-truncates-candidate-directory/bug.17.zsh-nul-truncates-candidate-directory.md) | new | Minor | Low | 2026-09-30 | pipeline lock (`advance-pipeline-lock.sh`) |
+| 17 | [Under zsh, `choose_candidate()` accepts a candidate directory with an embedded NUL](bug.17.zsh-nul-truncates-candidate-directory/bug.17.zsh-nul-truncates-candidate-directory.md) | closed | Minor | Low | 2026-09-30 | pipeline lock (`advance-pipeline-lock.sh`) |
 
 ---
 

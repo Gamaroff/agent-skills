@@ -46,7 +46,9 @@
 #        same-document snapshot is consumed with it); a string halt_step is
 #        stored as a number; a GNU-shaped `stat` (shimmed) still picks the newest
 #        candidate, and a non-numeric mtime read degrades to 0 with a warning; a
-#        snapshot's `waiting_on` is dropped by the restore.
+#        snapshot's `waiting_on` is dropped by the restore; a directory holding a
+#        control character (NUL, a trailing newline, U+001F, U+007F) is refused by
+#        name and never chosen or consumed — the shell read of it is lossy (bug.17).
 #   14.  No-lock split (task.124): `<n>` with no lock → exit 1 naming --restore
 #        (the silent exit 0 hid an inert Stop hook for a whole session, obs #123);
 #        `--skill <name>` and `--complete` with no lock keep exit 0 — the
@@ -621,6 +623,39 @@ run_restore_scenarios() {
     fail "[$SH] --restore --which with nothing usable" "rc=$RC which='$WHICH'"
   fi
   rm -f "$L" "$S"
+
+  # A directory holding a control character is refused before the compare (bug.17). The shell
+  # read of the directory is not a faithful copy of the JSON string: zsh keeps an embedded NUL
+  # and `cd` in canon() truncates at it, and BOTH shells strip a trailing newline in command
+  # substitution — so `<doc>\u0000x` (zsh) and `<doc>\n` (bash and zsh) each read back as `<doc>`
+  # and passed the provenance check for a string the candidate does not hold.
+  local CTRL
+  for CTRL in '\\u0000x' '\\n' '\\u001f' '\\u007f'; do
+    # shellcheck disable=SC2059 # CTRL is a literal JSON escape spliced into the format on purpose
+    printf "{\"task_or_story_directory\":\"%s${CTRL}\",\"current_step\":6}\n" "$R/doc" > "$L.pausing.6161"
+    WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --which "$R/doc" 2>/dev/null); RC=$?
+    OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC2=$?
+    if [ "$RC" -eq 1 ] && [ -z "$WHICH" ] && [ "$RC2" -eq 1 ] && [ ! -f "$L" ] && [ -f "$L.pausing.6161" ] \
+        && printf '%s' "$OUT" | grep -q "control character"; then
+      pass "[$SH] --restore: a directory with a control character (${CTRL#\\}) is refused by name — never chosen, nothing written, claim kept"
+    else
+      fail "[$SH] --restore: control-character directory (${CTRL#\\}) refused" "which rc=$RC stdout='$WHICH' restore rc=$RC2 lock=$([ -f "$L" ] && echo CREATED || echo absent) claim=$([ -f "$L.pausing.6161" ] && echo kept || echo CONSUMED) out=$OUT"
+    fi
+    rm -f "$L" "$L.pausing.6161"
+  done
+  # …and beside a genuine same-document snapshot, the NEWER control-character claim neither wins
+  # nor is consumed as a loser: it was never this document's candidate.
+  printf '{"task_or_story_directory":"%s","halt_step":4}\n' "$R/doc" > "$S"
+  touch -t 202601010000 "$S"
+  printf '{"task_or_story_directory":"%s\\u0000x","current_step":6}\n' "$R/doc" > "$L.pausing.6262"
+  WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --which "$R/doc" 2>/dev/null); RC=$?
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC2=$?
+  if [ "$RC" -eq 0 ] && [ "$WHICH" = "$S" ] && [ "$RC2" -eq 0 ] && [ "$(jq -r '.current_step' "$L")" = "4" ] && [ -f "$L.pausing.6262" ]; then
+    pass "[$SH] --restore: a newer NUL-directory claim loses to a matched snapshot and is not consumed"
+  else
+    fail "[$SH] --restore: NUL claim beside a matched snapshot" "which rc=$RC which='$WHICH' restore rc=$RC2 step=$(jq -r '.current_step' "$L" 2>/dev/null) claim=$([ -f "$L.pausing.6262" ] && echo kept || echo CONSUMED)"
+  fi
+  rm -f "$L" "$S" "$L".pausing.*
 
   # an orphaned .pausing.<pid> claim is a candidate; the newest candidate wins, and the
   # losing same-document snapshot is consumed with it (QA cycle 1, CR-8)
