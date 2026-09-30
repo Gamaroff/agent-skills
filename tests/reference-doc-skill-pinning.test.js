@@ -38,6 +38,9 @@
  *   - Non-skill spans in activation-phrases.md — `/develop-story`, the built-in
  *     `/security-review`, `handoff-verify.mjs`. They are skipped, not checked.
  *   - The skills' own README.md files, the third hand-written restatement.
+ *   - Cost via a destructured import. The cost tests patch module objects, so a
+ *     `const { execSync } = require("child_process")` taken before them would
+ *     escape the spy. Keep member access (`fs.readFileSync`) in this file.
  *
  * Run: node --test tests/reference-doc-skill-pinning.test.js
  */
@@ -141,18 +144,49 @@ function makeSkillMd() {
 }
 const skillMd = makeSkillMd();
 
-// Everything the live-corpus groups below do, in one pass: read both pages,
-// resolve every row and mention, look up every flag. The cost tests run this
-// under spies, so they measure the same code paths the assertions use.
+// The whole live-corpus check, in one function: read both pages, resolve every
+// row and mention, look up every flag, and collect each failure. The describe
+// blocks below assert on what this returns, and the cost tests run this same
+// call under spies — so the code that is checked and the code that is spied on
+// are one function, not two copies that can drift (task.142 QA cycle 2, CR-1).
 function resolveCorpus(lookup) {
   const rows = extractCommandRows(fs.readFileSync(COMMANDS, "utf8"));
   const named = extractActivationSkills(fs.readFileSync(PHRASES, "utf8"));
+  const missingCommands = [];
+  const undocumentedFlags = [];
+  let flagChecks = 0;
   for (const r of rows) {
-    const body = r.skill && lookup(r.skill);
-    if (body) for (const flag of r.flags) body.includes(flag);
+    if (r.skill === null) continue;
+    const body = lookup(r.skill);
+    if (!body) {
+      missingCommands.push(
+        `commands.md:${r.line}: ${r.cell} names /${r.skill}, but skills/${r.skill}/SKILL.md does not exist`,
+      );
+      continue;
+    }
+    for (const flag of r.flags) {
+      flagChecks += 1;
+      if (!body.includes(flag)) {
+        undocumentedFlags.push(
+          `commands.md:${r.line}: ${r.cell} advertises ${flag}, which skills/${r.skill}/SKILL.md never mentions`,
+        );
+      }
+    }
   }
-  for (const n of named) lookup(n.skill);
-  return { rows, named };
+  const missingNamed = named
+    .filter((n) => !lookup(n.skill))
+    .map(
+      (n) =>
+        `activation-phrases.md:${n.line}: names \`${n.skill}\`, but skills/${n.skill}/SKILL.md does not exist`,
+    );
+  return {
+    rows,
+    named,
+    missingCommands,
+    undocumentedFlags,
+    flagChecks,
+    missingNamed,
+  };
 }
 
 describe("extractors (fixtures, independent of the live corpus)", () => {
@@ -231,7 +265,8 @@ describe("extractors (fixtures, independent of the live corpus)", () => {
 });
 
 describe("commands.md names commands that exist", () => {
-  const rows = extractCommandRows(fs.readFileSync(COMMANDS, "utf8"));
+  const corpus = resolveCorpus(skillMd);
+  const { rows } = corpus;
 
   test("the extractor still finds the corpus", () => {
     // 80 rows, 76 of them slash commands naming 63 distinct skills, at 80f460bc
@@ -244,13 +279,7 @@ describe("commands.md names commands that exist", () => {
   });
 
   test("every row resolves to a skill", () => {
-    const missing = rows
-      .filter((r) => r.skill !== null && !skillMd(r.skill))
-      .map(
-        (r) =>
-          `commands.md:${r.line}: ${r.cell} names /${r.skill}, but skills/${r.skill}/SKILL.md does not exist`,
-      );
-    assert.deepEqual(missing, []);
+    assert.deepEqual(corpus.missingCommands, []);
   });
 
   test("NON_SKILL_ROWS is exactly the set of rows that name no command", () => {
@@ -272,31 +301,18 @@ describe("commands.md names commands that exist", () => {
   });
 
   test("every flag a row advertises is documented by that skill", () => {
-    let checked = 0;
-    const undocumented = [];
-    for (const r of rows) {
-      const body = r.skill && skillMd(r.skill);
-      if (!body) continue;
-      for (const flag of r.flags) {
-        checked += 1;
-        if (!body.includes(flag)) {
-          undocumented.push(
-            `commands.md:${r.line}: ${r.cell} advertises ${flag}, which skills/${r.skill}/SKILL.md never mentions`,
-          );
-        }
-      }
-    }
-    assert.deepEqual(undocumented, []);
+    assert.deepEqual(corpus.undocumentedFlags, []);
     // 20 at 80f460bc (2026-09-30).
     assert.ok(
-      checked >= 16,
-      `only ${checked} flag assertions ran — the flag extractor is probably broken, not the corpus`,
+      corpus.flagChecks >= 16,
+      `only ${corpus.flagChecks} flag assertions ran — the flag extractor is probably broken, not the corpus`,
     );
   });
 });
 
 describe("activation-phrases.md names skills that exist", () => {
-  const named = extractActivationSkills(fs.readFileSync(PHRASES, "utf8"));
+  const corpus = resolveCorpus(skillMd);
+  const { named } = corpus;
 
   test("the extractor still finds the corpus", () => {
     // 67 skill mentions naming 62 distinct skills, at 80f460bc (2026-09-30).
@@ -308,13 +324,7 @@ describe("activation-phrases.md names skills that exist", () => {
   });
 
   test("every named skill exists", () => {
-    const missing = named
-      .filter((n) => !skillMd(n.skill))
-      .map(
-        (n) =>
-          `activation-phrases.md:${n.line}: names \`${n.skill}\`, but skills/${n.skill}/SKILL.md does not exist`,
-      );
-    assert.deepEqual(missing, []);
+    assert.deepEqual(corpus.missingNamed, []);
   });
 });
 
@@ -322,11 +332,17 @@ describe("the guard's cost", () => {
   // Replace every named function on a module object with a recorder, run fn,
   // then restore. Call sites use member access (fs.readFileSync, not a
   // destructured copy), so a patched module object is what they reach.
+  // Returns how many spies were installed as well as the calls: a target that
+  // is missing or not a function would otherwise pass as "nothing was called"
+  // (QA cycle 2, CR-2). A promise from fn is refused, because the finally below
+  // would restore the originals before any of its work ran (CR-3).
   function withSpies(targets, fn) {
     const calls = [];
     const saved = [];
+    let requested = 0;
     for (const [label, obj, names] of targets) {
       for (const name of names) {
+        requested += 1;
         if (typeof obj[name] !== "function") continue;
         const orig = obj[name];
         saved.push([obj, name, orig]);
@@ -337,15 +353,20 @@ describe("the guard's cost", () => {
       }
     }
     try {
-      fn();
+      const result = fn();
+      if (result && typeof result.then === "function") {
+        throw new Error(
+          "withSpies: fn returned a promise — spies would be removed before its work ran",
+        );
+      }
     } finally {
       for (const [obj, name, orig] of saved) obj[name] = orig;
     }
-    return calls;
+    return { calls, installed: saved.length, requested };
   }
 
   test("resolving the whole corpus spawns no process and opens no connection", () => {
-    const calls = withSpies(
+    const spied = withSpies(
       [
         [
           "child_process",
@@ -367,8 +388,13 @@ describe("the guard's cost", () => {
       ],
       () => resolveCorpus(makeSkillMd()),
     );
+    assert.equal(
+      spied.installed,
+      spied.requested,
+      `only ${spied.installed} of ${spied.requested} spies installed — a missing target would read as "never called"`,
+    );
     assert.deepEqual(
-      calls.map((c) => c.fn),
+      spied.calls.map((c) => c.fn),
       [],
       "the guard must stay a pure file read — no spawn, no network",
     );
@@ -376,10 +402,15 @@ describe("the guard's cost", () => {
 
   test("each SKILL.md is read once per run, however many rows name it", () => {
     let corpus;
-    const calls = withSpies([["fs", fs, ["readFileSync"]]], () => {
+    const spied = withSpies([["fs", fs, ["readFileSync"]]], () => {
       corpus = resolveCorpus(makeSkillMd());
     });
-    const skillReads = calls
+    assert.equal(
+      spied.installed,
+      1,
+      "the fs.readFileSync spy was not installed",
+    );
+    const skillReads = spied.calls
       .map((c) => String(c.args[0]))
       .filter((p) => p.endsWith(`${path.sep}SKILL.md`));
     const distinct = new Set(skillReads);

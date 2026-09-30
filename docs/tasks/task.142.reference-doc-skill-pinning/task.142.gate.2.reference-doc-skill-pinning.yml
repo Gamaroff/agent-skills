@@ -1,0 +1,62 @@
+schema: 2
+task: 'task.142.reference-doc-skill-pinning'
+task_title: 'Pin the hand-written reference docs to the skills they describe'
+gate: CONCERNS
+status_reason: 'Re-review after the post-finalise-1 fix (two cost tests). Refute pass found the cost tests spy on resolveCorpus() while the live-corpus assertions do not call it, so the spied and the checked code paths differ (CR-1, medium/high).'
+reviewer: 'QA Engineer'
+head: '0b1cd008a88b40180d58e78f3d412600d92b8509'
+updated: '2026-09-30T17:10:54Z'
+
+top_issues:
+  - id: 'TASK-142-CR-1'
+    severity: medium
+    file: 'tests/reference-doc-skill-pinning.test.js'
+    finding: 'The cost tests spy on resolveCorpus(), but the commands.md and activation-phrases.md assertions repeat its lookups inline, so a spawn or extra read added to those test bodies is invisible to both cost tests.'
+    suggested_action: 'Have the live-corpus describe blocks assert on the results resolveCorpus returns, so the checked and the spied code are one function; add a test-body mutation to the proof.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 17
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Test-only change; boundary: false (unchanged from gate 1).'
+  performance:
+    status: PASS
+    notes: 'File ~170 ms; the new cost pins are the subject of CR-1, not a regression.'
+  reliability:
+    status: PASS
+    notes: 'withSpies restores in finally.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-1: a test whose comment claims it measures the assertions it does not call.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: route the live-corpus assertions through resolveCorpus().'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+  future:
+    - action: 'CR-2: assert withSpies installed every spy it was asked for, so a missing target cannot pass as zero calls.'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+    - action: 'CR-3: reject a thenable from fn in withSpies, and name the destructured-import blind spot in the header.'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+    - action: 'Gate 1 CR-1/CR-2 (substring flag match; unused activation flags field) remain open follow-ups.'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

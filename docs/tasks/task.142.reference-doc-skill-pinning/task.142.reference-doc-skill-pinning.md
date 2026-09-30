@@ -583,6 +583,12 @@ its file and line, not just the first.
 - Mutation-proven: memoisation removed → "read once" red; an `execSync` in the lookup → "no
   spawn" red; an `http.get` in the lookup → "no spawn" red. All restored; baseline green.
 - The wall-clock and obs #159 criteria moved to Deferred Work (see there).
+- QA cycle 2 (refute pass) found the cost tests spied on `resolveCorpus()` while the live assertions
+  repeated its lookups inline (CR-1), `withSpies` passed silently on a missing target (CR-2), and
+  would restore before async work ran (CR-3). Fixed: the live-corpus groups now assert on what
+  `resolveCorpus()` returns, `withSpies` reports and the tests assert the installed count, a promise
+  from `fn` is refused, and the header names the destructured-import blind spot. Mutation-proven:
+  a spawn in the flag loop, a misspelled spy target and an async `fn` each turn the no-spawn test red.
 
 ### Completion Date
 
