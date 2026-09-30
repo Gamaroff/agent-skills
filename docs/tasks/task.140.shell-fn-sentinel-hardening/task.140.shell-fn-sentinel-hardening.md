@@ -5,7 +5,7 @@ type: task
 description: "Close the seven limits task.136's QA cycle 3, PR review and finalise recorded with concrete, verified fixes: shadow `exit` during the source so a library-installed EXIT trap cannot displace the 97 sentinel; apply the `needs-fake-gh` decline to the `shell:` form too; widen `GH_COMMAND_WORD` and follow one level of top-level `source`; capture the source's status as a simple command so `set -e` libraries whose top-level precondition fails are declined; put the extensionless fake `gh` under both ShellCheck lanes; drop the dead `!isShellFn &&`; and decide the pre-existing `resolveEntry` symlink limit (realpath before containment, or a stated limit with a row)."
 tags: [security, probe, shell-fn, fake-gh, shellcheck, task-136-follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-09-22
 updated: 2026-09-30
@@ -14,11 +14,12 @@ estimated_effort_hours: 8
 risk_level: medium
 github_issue: 464
 pr_number: 527
+completed_date: 2026-09-30
 ---
 
 # Technical Task: Harden the `shell-fn:` sentinels and the fake-`gh` coverage
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.140.review.1.shell-fn-sentinel-hardening.md` implemented 2026-09-30
 **GitHub Issue**: [#464](https://github.com/Gamaroff/agent-skills/issues/464)
 
@@ -340,6 +341,32 @@ None.
 - [TASK-140-BUG-7](./task.140.bug.7.rule-overclaims-one-limit.md) is fixed and closed; all seven bugs are closed.
 - Two LOW precision points remain in rule §5's wording. The `gh` containment bypasses are pre-existing and stated as limits; closing them is follow-up work.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.140.qa.5.shell-fn-sentinel-hardening.md`
+**Gate File**: `task.140.gate.5.shell-fn-sentinel-hardening.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (5 QA cycles; 7 bugs raised, all closed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 7/7. SC5 (wall-clock) passes on re-measurement: on the base's 100 rows the head engine takes 59/62 s against the base engine's 65/61 s; the whole file's +13 s is the 15 rows this task added.
+✅ **Tests:** `security-probe.test.mjs` 115/115; `npm run ci:fast` 4610 pass, 0 fail
+✅ **PR Review:** PR #527. The 5c `/review-pr` returned CONCERNS; PC-2/3/4/5 are addressed, and CR-1/CR-2 are follow-ups.
+✅ **CI:** SUCCESS @ `55f6ba69` (test, link-check, shellcheck, validate, branch policy)
+✅ **Documentation:** rule §5, CHANGELOG [Unreleased] (task 140), bundled copies
+✅ **Security Review:** PASS, 69 probes executed; the one reproduced case (encoded-traversal) is pre-existing
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal tooling)
+
+**Deferred:** the pre-existing `gh` containment bypasses (library `PATH` prepend, `--fake-gh` bypass, a backgrounded call), stated as limits in rule §5 and to be closed in a follow-up task.
+
+**Task marked as ACCEPTED on:** 2026-09-30
+
+**Detailed Verification Log:** See `task.140.dod.1.shell-fn-sentinel-hardening.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -358,6 +385,7 @@ None.
 | 2026-09-30 |  | QA gate CONCERNS (80/100) — 1 finding (1 medium); 3 pre-existing containment bypasses to follow-up | qa-task |
 | 2026-09-30 |  | QA findings fixed — cycle 4: rule §5 states the three further trip-wire limits (PATH prepend, fake-gh bypass, backgrounded call) with a pinning row | qa-fix |
 | 2026-09-30 |  | QA gate PASS (100/100) — 2 findings (2 low) | qa-task |
+| 2026-09-30 | 1.2 | DoD passed — accepted (PR #527) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
