@@ -138,6 +138,7 @@ bash: advance-pipeline-lock: '.claude/state/develop-pipeline.lock.pausing.1' is 
 | 2026-09-30 | Ready for QA | develop-bug | Fix implemented + regression test |
 | 2026-09-30 | Ready for QA | develop-bug | Fix verified — bug scenario gone |
 | 2026-09-30 | Ready for QA | finalise | DoD incomplete — 1 gap(s) — bug.17.dod.1.zsh-nul-truncates-candidate-directory.md |
+| 2026-09-30 | Ready for QA | finalise | DoD verified — bug.17.dod.2.zsh-nul-truncates-candidate-directory.md (security zero-guard overridden by operator) |
 
 ---
 
