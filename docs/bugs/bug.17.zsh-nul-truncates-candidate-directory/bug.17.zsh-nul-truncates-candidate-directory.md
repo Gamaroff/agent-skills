@@ -115,6 +115,17 @@ bash: advance-pipeline-lock: '.claude/state/develop-pipeline.lock.pausing.1' is 
 2. Run the report's reproduction steps under zsh. Expect exit 1, empty stdout, and the stderr line naming the control character.
 3. Repeat step 2 with `task_or_story_directory` set to `<doc-dir>` followed by `\n`, under bash. Expect the same refusal. Before the fix this returned rc 0.
 
+#### QA Verification (Ready for QA → Closed/Reopened)
+
+**Date**: 2026-09-30
+**Verified by**: develop-bug
+
+**Verification Result**: ✅ Fixed
+
+**Notes**: The regression cases in `advance-pipeline-lock.test.sh` pass under bash and zsh (109/109); 9 of the 10 new cases failed before the fix. The affected suites are green: `grant-qa-cycles.test.sh` (46/46), which reads the same selection, and `detector-candidate-rule` plus `who-restores-single-statement` (12/12). Shellcheck is clean. Lite mode ran signals 1 and 2 only, with no diff code review. The reported failure no longer reproduces.
+
+**Decision**: Closed (finalised in Step 7)
+
 ---
 
 ## Status History
@@ -125,6 +136,8 @@ bash: advance-pipeline-lock: '.claude/state/develop-pipeline.lock.pausing.1' is 
 | 2026-09-30 | New | ensure-bug-github-issue | GitHub issue created (#529) |
 | 2026-09-30 | In Progress | develop-bug | Reproduced; investigation started |
 | 2026-09-30 | Ready for QA | develop-bug | Fix implemented + regression test |
+| 2026-09-30 | Ready for QA | develop-bug | Fix verified — bug scenario gone |
+| 2026-09-30 | Ready for QA | finalise | DoD incomplete — 1 gap(s) — bug.17.dod.1.zsh-nul-truncates-candidate-directory.md |
 
 ---
 
