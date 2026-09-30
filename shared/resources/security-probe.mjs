@@ -105,8 +105,10 @@
  * forced is why this form exists. `--entry shell-fn:<path>#<function>` keeps
  * everything the `shell:` arm has — the same materialisation, shells, timeout,
  * `compareExpected` and verdict — and changes only the command line: per case
- * per shell, `<shell> --norc -c 'source "$1" || exit 97; …; "$fn" "$@"'` with
- * the library, the function name and the case's input as ARGV, never a string.
+ * per shell, `<shell> --norc -c 'exit() { builtin exit 97; }; source "$1";
+ * src=$?; …; "$fn" "$@"'` with the library, the function name and the case's
+ * input as ARGV, never a string (`exit` shadowed and the status taken as a
+ * simple command during the source: task.140 — see SHELL_FN_BODY).
  * Exit 97 is reserved for "the source itself failed" and exit 98 for "the
  * function is not defined after sourcing", so a broken or misnamed library is
  * a NAMED decline (`entry-not-probeable`) rather than a silent `absent`; the
@@ -115,7 +117,9 @@
  * for this form — the input is argv, so it may carry a `/`. A
  * function that consults `gh` is answered by `--fake-gh <dir>`: the directory
  * is prepended to PATH with `FAKE_GH=1` in the env, so the fixture's `gh`
- * answers and a real `gh` — or the network — never does. What the function
+ * answers and a real `gh` — or the network — never does; a library or script
+ * that names `gh` (or sources, one level deep, a file that does) and was given
+ * no `--fake-gh` is declined `needs-fake-gh` under both shell forms. What the function
  * must print is NOT the sink corpus's `expected` (that describes a script
  * printing a gate number): the caller names a cases file with `--cases-file`.
  *
@@ -173,7 +177,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { isWithin, sandboxEnv, snapshotTree } from "./qa-execute-snippets.mjs";
@@ -371,7 +383,9 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
     };
   }
   const isShellFn = entry.startsWith(SHELL_FN_PREFIX);
-  const isShell = !isShellFn && entry.startsWith(SHELL_PREFIX);
+  // The two prefixes are disjoint (`shell:` vs `shell-fn:` differ at byte 5),
+  // so no guard against the other is needed (task.140, PR-review CR-3).
+  const isShell = entry.startsWith(SHELL_PREFIX);
   const isCli = entry.startsWith(CLI_PREFIX);
   let rawPath;
   let exportName = null;
@@ -426,10 +440,16 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
     exportName = entry.slice(hash + 1);
   }
 
-  const root = resolve(repoRoot);
-  const entryPath = isAbsolute(rawPath)
-    ? resolve(rawPath)
-    : resolve(root, rawPath);
+  // Containment is decided on REAL paths, both sides (task.140 — the lexical
+  // check carried as a limit since task.128 gate 1): a symlink inside the root
+  // that points outside it is refused here, before anything imports or spawns
+  // it, and a root reached through a symlink still contains its own files. A
+  // path that does not exist yet cannot be realpath'd and keeps its lexical
+  // form; it is then refused by the readable-file check before any spawn.
+  const root = realpathSafe(resolve(repoRoot));
+  const entryPath = realpathSafe(
+    isAbsolute(rawPath) ? resolve(rawPath) : resolve(root, rawPath),
+  );
 
   // The root itself is refused (a directory is not an entry); anything else must
   // lie beneath it. isWithin, not a bare startsWith(".."), so an entry under a
@@ -443,10 +463,6 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
       detail: `${entryPath} is outside ${root}`,
     };
   }
-  // A symlink pointing out of the tree resolves at import time, not here. Node
-  // gives us no cheap pre-import realpath guarantee for a path that may not
-  // exist yet, so this is stated as a limit in probe-boundary-rule.md rather
-  // than claimed as a defence.
   if (rel.split(sep).includes("node_modules")) {
     return {
       ok: false,
@@ -537,7 +553,100 @@ export function parseArgvTemplate(raw) {
  * matches too; that is a named decline the caller answers by passing the
  * fixture, not a wrong verdict.
  */
-const GH_COMMAND_WORD = /(^|[\s;|&(`$])gh(\s|$)/m;
+const GH_COMMAND_WORD = /(^|[\s;|&(`$"'\\])gh([\s;|&)>"']|$)/m;
+/**
+ * `gh` reached through a variable named `GH` (`"$GH" api …`, `${GH}`) — the one
+ * indirection a literal-word match cannot see (task.140, c3-CR-3). `$GH_TOKEN`
+ * and the like are other variables, not this one.
+ */
+const GH_VARIABLE = /\$\{?GH(?![A-Za-z0-9_])/;
+/**
+ * A top-level `source <p>` / `. <p>` — at the start of a line, or after `;`,
+ * `&&`, `||`, `|`, `then` or `do` (`[ -f x ] && source x`, `set -e; . x`:
+ * task.140 QA cycle 1, CR-3). Group 1 is the path as written.
+ */
+const SOURCE_LINE =
+  /(?:^|[;&|]|\b(?:then|do)\b)[ \t]*(?:source|\.)[ \t]+["']?([^"'\s;|&)]+)["']?/gm;
+/**
+ * The real path of `p`, or — when `p` does not exist — the real path of its
+ * deepest existing ancestor with the missing segments re-joined. So a missing
+ * leaf under a symlinked intermediate is contained by where the link really
+ * points, and a missing file under a symlinked root is still inside it
+ * (task.140 QA cycle 2, CR-5).
+ */
+function realpathSafe(p) {
+  const missing = [];
+  let cur = p;
+  for (;;) {
+    try {
+      return join(realpathSync(cur), ...missing);
+    } catch {
+      const parent = dirname(cur);
+      if (parent === cur) return p;
+      missing.unshift(basename(cur));
+      cur = parent;
+    }
+  }
+}
+/** The trip-wire's marker file, under the harness dir. */
+const GH_TRIPPED = "gh-tripped";
+/**
+ * The trip-wire gh: first on PATH when a shell-form run has no --fake-gh. It
+ * never answers — it records the call and exits 127 ("command not found").
+ * The marker path is written INTO the stub, not passed in the environment: a
+ * call under `env -i PATH="$PATH" gh` still reaches the stub, and an
+ * environment variable would be gone by then (task.140 QA cycle 3, BUG-6).
+ */
+function tripwireGh(markerPath) {
+  const quoted = `'${markerPath.replace(/'/g, `'\\''`)}'`;
+  return `#!/bin/sh\n: > ${quoted} 2>/dev/null\necho "security-probe: gh invoked without --fake-gh (trip-wire)" >&2\nexit 127\n`;
+}
+/** Per-process counter naming each spawn's source-completed marker. */
+let harnessSeq = 0;
+/**
+ * Does this library or script — or a file it sources at top level — name `gh`?
+ * ONE level, deliberately: the indirection this repository uses is a library
+ * that sources `gh-labels.sh`, never a chain. A sourced path is tried against
+ * the library's own directory, then the root (the repository's idiom,
+ * `source references/gh-labels.sh`, is cwd-relative); a path holding a `$` is
+ * not followable, and one outside the root is not ours to read.
+ */
+export function namesGh(entryPath, root) {
+  const read = (p) => {
+    try {
+      return readFileSync(p, "utf8");
+    } catch {
+      return null;
+    }
+  };
+  // The root is realpath'd HERE, not only by the caller: every candidate below is
+  // realpath'd, so a lexical root reached through a symlink would put every one
+  // of them "outside" and read as "names no gh" (task.140 QA cycle 1, CR-6).
+  root = realpathSafe(root);
+  const first = read(entryPath);
+  if (first === null) return false;
+  const texts = [first];
+  const seen = new Set([entryPath]);
+  for (const m of first.matchAll(SOURCE_LINE)) {
+    const raw = m[1];
+    if (raw.includes("$")) continue;
+    const candidates = isAbsolute(raw)
+      ? [raw]
+      : [resolve(dirname(entryPath), raw), resolve(root, raw)];
+    for (const c of candidates) {
+      const p = realpathSafe(c);
+      // isWithin, never a bare startsWith("..") — an in-tree `..name`
+      // directory is inside (task.158).
+      if (seen.has(p) || !isWithin(root, p)) continue;
+      const t = read(p);
+      if (t === null) continue;
+      seen.add(p);
+      texts.push(t);
+      break;
+    }
+  }
+  return texts.some((t) => GH_COMMAND_WORD.test(t) || GH_VARIABLE.test(t));
+}
 /** A name bash and zsh both accept as a function name — and nothing else. */
 const SHELL_FN_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 /** Reserved exits of the shell-fn one-liner: the source failed / the function is undefined. */
@@ -568,12 +677,40 @@ const noRcFlags = (shell) =>
  */
 const SHELL_FN_BODY =
   // An EXIT trap around the source: `source` runs the library in THIS shell,
-  // so a top-level `exit N` inside it ends the harness with N before `||`
-  // is reached — every case then mismatches and the verdict is a SCORED
-  // `absent` with a full count, the task.125 shape (task.136 QA cycle 2,
-  // BUG-2). The trap re-maps that exit to the source-failed sentinel and is
-  // disarmed the moment the source has returned normally.
-  `trap 'exit ${SHELL_FN_SOURCE_FAILED}' EXIT; source "$1" || exit ${SHELL_FN_SOURCE_FAILED}; trap - EXIT; ` +
+  // so a top-level `exit N` inside it ends the harness with N — every case
+  // then mismatches and the verdict is a SCORED `absent` with a full count,
+  // the task.125 shape (task.136 QA cycle 2, BUG-2). The trap re-maps that exit
+  // to the source-failed sentinel and is disarmed once the source returns.
+  //
+  // `exit` is also SHADOWED for the duration of the source: a library that
+  // installs its own `trap … EXIT` replaces ours, so a later `|| exit 1` guard
+  // ended the harness with 1. A function named `exit` intercepts the CALL,
+  // before any trap, and `builtin exit 97` is the sentinel; `unset -f exit`
+  // restores the builtin before the function runs (task.140, c3-CR-1). A
+  // library that defines its own `exit` function loses it — none here does.
+  //
+  // The source's status is taken as a SIMPLE COMMAND, not on the left of `||`:
+  // there both shells suspend errexit for everything the library runs at top
+  // level, so `set -e; false` was sourced to completion and scored where a
+  // consumer's own `source` would have aborted (task.140, PR-review CR-1). Now
+  // errexit ends the source, the trap maps it to 97, and the explicit test
+  // keeps the non-zero-last-command case. Verified bash 5.3 / 3.2, zsh 5.9.
+  //
+  // The DECISION, though, is a positive marker, not an exit code: once the
+  // source has returned 0 the body writes `$PROBE_SOURCED` (a file under the
+  // work dir, named per spawn by runShellCase), and the runner declines
+  // whenever it is absent. Every way the shell can die during the source then
+  // reads the same — an explicit exit, errexit, a replaced EXIT trap however it
+  // was installed (`trap … exit`, `builtin trap`, `command trap`, zsh's
+  // TRAPEXIT), `exec`. Filtering trap installations was an enumeration over
+  // shell syntax with no last entry (task.140 QA cycle 2, CR-1 / BUG-3); the
+  // shadowed `exit` and the EXIT trap stay only so the common case still names
+  // exit 97. A TRAPEXIT the library defined is unset so it cannot run at the
+  // harness's own exit — `|| :`, because zsh's `unset -f` of an undefined
+  // function returns 1, and under a library's `set -e` that ended the harness.
+  `exit() { builtin exit ${SHELL_FN_SOURCE_FAILED}; }; trap 'exit ${SHELL_FN_SOURCE_FAILED}' EXIT; ` +
+  `source "$1"; src=$?; trap - EXIT; unset -f exit; unset -f TRAPEXIT 2>/dev/null || :; ` +
+  `[ "$src" -eq 0 ] || exit ${SHELL_FN_SOURCE_FAILED}; : > "$PROBE_SOURCED" || exit ${SHELL_FN_SOURCE_FAILED}; ` +
   `shift; fn="$1"; shift; ` +
   `typeset -f "$fn" >/dev/null 2>&1 || exit ${SHELL_FN_NOT_DEFINED}; ` +
   // The function runs in a SUBSHELL: a function that calls `exit` would
@@ -908,8 +1045,13 @@ export function runProbeSpec({
     if (typeof fakeGh !== "string" || fakeGh.trim() === "") {
       return decline("bad-fake-gh", "--fake-gh must name a directory");
     }
-    const root = resolve(repoRoot);
-    fakeGhDir = isAbsolute(fakeGh) ? resolve(fakeGh) : resolve(root, fakeGh);
+    // Real paths, both sides — the same containment resolveEntry applies, so a
+    // symlink inside the root that points out of it is not a fixture this
+    // repository owns (task.140 QA cycle 1, CR-2).
+    const root = realpathSafe(resolve(repoRoot));
+    fakeGhDir = realpathSafe(
+      isAbsolute(fakeGh) ? resolve(fakeGh) : resolve(root, fakeGh),
+    );
     if (fakeGhDir === root || !isWithin(root, fakeGhDir)) {
       return decline("bad-fake-gh", `${fakeGhDir} is outside ${root}`);
     }
@@ -934,14 +1076,12 @@ export function runProbeSpec({
   // produces — with only `fake_gh: null` deep in the record to say "could not
   // look" rather than "nothing filters" (task.136 QA cycle 2, CR-2). Two
   // states, one value is the defect class this engine exists to remove.
-  if (resolved.kind === "shell-fn" && fakeGhDir === null) {
-    let libText = "";
-    try {
-      libText = readFileSync(resolved.entryPath, "utf8");
-    } catch {
-      libText = "";
-    }
-    if (GH_COMMAND_WORD.test(libText)) {
+  //
+  // EVERY shell form, not only shell-fn: a `shell:` script that names `gh` ran
+  // the host `gh` — host PATH, host keychain — and was scored (task.140,
+  // c3-CR-2). The detector reads the entry and one level of what it sources.
+  if (isShellForm && fakeGhDir === null) {
+    if (namesGh(resolved.entryPath, realpathSafe(resolve(repoRoot)))) {
       return decline(
         "needs-fake-gh",
         `${resolved.entryPath} names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
@@ -983,6 +1123,20 @@ export function runProbeSpec({
   const sandboxTmp = join(sandboxRoot, "tmp");
   mkdirSync(sandboxHome);
   mkdirSync(sandboxTmp);
+  // The harness's own files — source-completed markers and the trip-wire gh —
+  // live under the WORK dir, which the escape sentinel deliberately skips.
+  const harnessDir = join(workDir, ".probe-harness");
+  if (isShellForm) {
+    mkdirSync(join(harnessDir, "bin"), { recursive: true });
+    if (fakeGhDir === null) {
+      writeFileSync(
+        join(harnessDir, "bin", "gh"),
+        tripwireGh(join(harnessDir, GH_TRIPPED)),
+        { mode: 0o755 },
+      );
+    }
+  }
+  let ghTripped = false;
 
   const caseResults = [];
   const escapes = [];
@@ -1011,6 +1165,7 @@ export function runProbeSpec({
           entryPath: resolved.entryPath,
           fnName: resolved.fnName ?? null,
           fakeGhDir,
+          harnessDir,
           shells,
           sandboxRoot,
           sandboxHome,
@@ -1087,8 +1242,36 @@ export function runProbeSpec({
         detail: detail ?? null,
       });
     }
+    ghTripped = isShellForm && existsSync(join(harnessDir, GH_TRIPPED));
   } finally {
     rmSync(sandboxRoot, { recursive: true, force: true });
+  }
+
+  // The run reached `gh` with no fixture: the trip-wire answered instead of the
+  // host binary, and whatever the cases then did was shaped by a stub, so
+  // nothing is scored. This is the GUARANTEE the pre-spawn detector above only
+  // approximates — it sees every PATH-resolved spelling (`${GH_BIN:-gh}`, an
+  // assign-then-call variable, a wrapper however it sources gh-labels.sh) —
+  // while the stub stays first on PATH and the call happens inside the spawn.
+  // An absolute path, a library PATH prepend and a call backgrounded past the
+  // spawn all reach a real gh unrecorded: stated limits (probe-boundary-rule.md §5).
+  //
+  // The decline still carries what the runs OBSERVED — escapes, the cases, the
+  // shells — as entry-not-probeable does: nothing is scored, but a side effect
+  // seen during an unscored run is still a side effect (task.140 QA cycle 3,
+  // BUG-5; the rule is task.136 cycle 4, CR-3).
+  if (ghTripped) {
+    return {
+      ...decline(
+        "needs-fake-gh",
+        `${resolved.entryPath} invoked \`gh\` at run time with no --fake-gh — the trip-wire on PATH answered, so nothing was scored; pass --fake-gh <dir>`,
+      ),
+      cases: caseResults,
+      escapes,
+      shells: shells ?? null,
+      fakeGh: fakeGhDir,
+      args: base.args,
+    };
   }
 
   // An import or export failure is a property of the ENTRY, not of one case, so
@@ -1359,6 +1542,7 @@ function runShellCase(
     entryPath,
     fnName = null,
     fakeGhDir = null,
+    harnessDir,
     shells,
     sandboxRoot,
     sandboxHome,
@@ -1482,7 +1666,18 @@ function runShellCase(
       // FAKE_GH=1, so a stray invocation from any other context exits 2.
       env.PATH = `${fakeGhDir}:${env.PATH}`;
       env.FAKE_GH = "1";
+    } else {
+      // No fixture: the TRIP-WIRE gh is first on PATH instead. It records that it
+      // was called and exits 127, so a PATH-resolved gh never reaches the host
+      // binary, and runProbeSpec declines the whole run `needs-fake-gh` (task.140
+      // QA cycle 2, BUG-4). Its limits are stated in probe-boundary-rule.md §5.
+      env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
     }
+    // The source-completed marker, one per spawn, under the WORK dir — the
+    // sentinel skips it, so the marker is never read as an escape.
+    const sourcedMark =
+      fnName === null ? null : join(harnessDir, `sourced-${++harnessSeq}`);
+    if (sourcedMark !== null) env.PROBE_SOURCED = sourcedMark;
     const child = watchedSpawn(
       shell,
       argv,
@@ -1497,12 +1692,17 @@ function runShellCase(
       },
     );
 
+    const sourced = sourcedMark !== null && existsSync(sourcedMark);
+    if (sourcedMark !== null) rmSync(sourcedMark, { force: true });
     let outcome;
     let detail = null;
     if (neverRan(child)) {
       outcome = "errored";
       detail = child.signal ? `timed out after ${timeoutMs}ms` : "never ran";
-    } else if (fnName !== null && child.status === SHELL_FN_SOURCE_FAILED) {
+    } else if (
+      fnName !== null &&
+      (child.status === SHELL_FN_SOURCE_FAILED || !sourced)
+    ) {
       // The source itself failed — a syntax error, a `return` at top level,
       // an `exit` in the library (re-mapped by the EXIT trap around the
       // source — BUG-2). A property of the ENTRY, so every case
@@ -1510,7 +1710,7 @@ function runShellCase(
       // Without the reserved exit this read as N mismatches and scored
       // `absent` with a full count (task.136).
       outcome = "errored";
-      detail = `source "${entryPath}" failed (exit ${SHELL_FN_SOURCE_FAILED}): ${(child.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`;
+      detail = `source "${entryPath}" failed (exit ${child.status}): ${(child.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`;
     } else if (fnName !== null && child.status === SHELL_FN_NOT_DEFINED) {
       outcome = "errored";
       detail = `function "${fnName}" is not defined after sourcing "${entryPath}" (exit ${SHELL_FN_NOT_DEFINED})`;

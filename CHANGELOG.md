@@ -84,6 +84,36 @@ All notable changes to this project will be documented in this file. Format foll
   `doc-links.js` exports the one CommonJS `isWithin`, and a parity test holds it to the ESM one in
   `qa-execute-snippets.mjs`.
 
+### Fixed
+
+- **The `shell-fn:` sentinel and the fake-`gh` gate reach every library shape task.136's reviewers
+  constructed (task 140).** Seven limits recorded on task.136 (gate 3 `recommendations.future`,
+  PR review CR-1/CR-3, DoD SC5), closed as one unit in `security-probe.mjs`:
+  - A library that installs its own `trap … EXIT` before a `|| exit 1` guard, and a `set -e`
+    library whose top-level command fails, now decline `entry-not-probeable` (executed 0) instead
+    of scoring `absent` behind a full count. `SHELL_FN_BODY` shadows `exit` during the source and
+    takes the source's status as a simple command. The decline itself keys on a positive
+    source-completed marker, so every way the shell can die during the source — explicit exit,
+    errexit, a replaced EXIT trap however installed (`builtin trap`, zsh `TRAPEXIT`, …), `exec` —
+    reads the same. Verified bash 5.3 / 3.2 and zsh 5.9.
+  - `needs-fake-gh` applies to both shell forms: a `shell:` script that names `gh` no longer runs
+    the host `gh`. The detector widens its terminators (`gh;`, `gh>`, `(gh)`), matches a quoted or
+    backslashed `gh` and a variable named `GH` (`"$GH" api`), and follows one level of `source` /
+    `.` — at a line start or after `;`, `&&`, `||`, `then`, `do`; library directory, then root — so a
+    wrapper that sources `gh-labels.sh` is declined too. That text check is the fast path: with no
+    `--fake-gh` a **trip-wire `gh`** is first on `PATH`, so the host `gh` never runs and a run that
+    reached it is declined whatever the spelling. Its limits — an absolute path to a real `gh`, a
+    library that puts another directory ahead of it on `PATH`, and a `gh` call backgrounded past
+    the spawn — are stated in rule §5, and the first two are pinned by rows.
+  - `resolveEntry` and the `--fake-gh` check compare **real** paths, both sides: a symlink inside the
+    root that points out of it is refused (`outside-repo-root` / `bad-fake-gh`) before anything
+    imports or spawns it; a missing path is contained by its deepest existing ancestor. The limit carried since
+    task.128 gate 1 is closed, not restated.
+  - The extensionless fake `gh` is linted per PR: both ShellCheck lanes add tracked, extensionless
+    files under `tests/fixtures/` whose first line is a bash shebang (78 files, was 77), in one
+    byte-identical block that `evals/shared/tests/lint-lane-fixture-parity.test.mjs` compares.
+  - The dead `!isShellFn &&` clause is gone. Rule: `probe-boundary-rule.md` §5.
+
 ## [v0.52.0] - 2026-09-29
 
 ### Added

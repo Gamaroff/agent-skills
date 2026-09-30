@@ -36,6 +36,18 @@ FILES=()
 while IFS= read -r f; do
   FILES+=("$f")
 done < <(git ls-files '*.sh' | grep -v '^skills/[^/]*/references/')
+# BEGIN extensionless-fixtures (task.140) — byte-identical in scripts/lint-shell.sh
+# and .github/workflows/shellcheck.yml; lint-lane-fixture-parity.test.mjs compares them.
+# A tracked file under tests/fixtures/ with NO extension whose whole first line
+# is a bash shebang is an executable the tests put on PATH (the fake gh). The
+# '*.sh' selection above cannot see it. Builtin `read`, not `head`: the
+# absent-binary test runs this script on a PATH of bash, git, grep and sed only.
+while IFS= read -r f; do
+  first=
+  IFS= read -r first <"$f" || true
+  if [ "$first" = "#!/usr/bin/env bash" ]; then FILES+=("$f"); fi
+done < <(git ls-files 'tests/fixtures/*' | grep -vE '\.[A-Za-z0-9]+$')
+# END extensionless-fixtures
 
 echo "linting ${#FILES[@]} source shell scripts ($(shellcheck --version | sed -n 's/^version: //p'))"
 

@@ -1,0 +1,80 @@
+schema: 1
+task: 'task.140.shell-fn-sentinel-hardening'
+task_title: 'Harden the shell-fn: sentinels and the fake-gh coverage'
+gate: FAIL
+status_reason: 'Cycle 2 findings are fixed and closed, but the replacement trip-wire has a HIGH defect of its own: its decline discards the run escape evidence (TASK-140-BUG-5), and a gh call under env -i is not recorded (TASK-140-BUG-6).'
+reviewer: 'QA Engineer'
+updated: '2026-09-30T06:56:20Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The run-time needs-fake-gh decline spreads base, replacing the recorded escapes with [] and dropping shells and cases; a library that writes HOME in every case and reaches gh reports 0 escapes (the same library without gh reports 20) (TASK-140-BUG-5).'
+    suggested_action: 'Return escapes, shells, cases and fakeGh in the run-time decline as entry-not-probeable does; replace the vacuous escapes-equals-empty assertion with a row that writes HOME and reaches gh.'
+    suggested_owner: dev
+    bug_ref: 'task.140.bug.5.tripwire-decline-drops-escapes.md'
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The trip-wire stub reads its marker path from PROBE_GH_TRIPPED, so a call under env -i PATH=... reaches the stub but records nothing, and the run is scored (TASK-140-BUG-6).'
+    suggested_action: 'Bake the absolute marker path into the stub text at creation; add an env -i row.'
+    suggested_owner: dev
+    bug_ref: 'task.140.bug.6.tripwire-marker-lost-under-env-i.md'
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 112
+  phases_verified: '4/4'
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 21
+    notes: 'resolveEntry re-probed (21, real symlink present): unchanged — only the pre-existing encoded-traversal. FAIL for BUG-5: escape evidence is discarded on the trip-wire path. Green path (gh_labels_filter + fake gh) still engages 20/20; shell:qa-cycle.sh still engages 28.'
+  performance:
+    status: PASS
+    notes: 'TMPDIR=/tmp run of the shell rows 53/53.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-6.'
+  maintainability:
+    status: PASS
+    notes: 'Both cycle-2 mechanisms are the right shape; the defects are in their plumbing, not in the approach.'
+
+recommendations:
+  immediate:
+    - action: 'BUG-5: carry escapes/shells/cases/fakeGh in the run-time decline; non-vacuous row'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+    - action: 'BUG-6: marker path baked into the stub; env -i row'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-4 (medium confidence): a script that prepends a directory holding a real gh to PATH reaches it past the trip-wire; rule §5 says the absolute path is the one limit — state the prepend as a second limit with a pinning row, or strip gh-holding directories from the child PATH'
+      refs: ['shared/resources/probe-boundary-rule.md', 'shared/resources/security-probe.mjs']
+    - action: 'CR-3 (medium confidence, identical at base): --fake-gh accepts a fixture whose gh is a symlink to the host binary; lstat or realpath-contain the gh file itself'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-5 (low): zsh zshexit / zshexit_functions hooks are not unset beside TRAPEXIT'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried: prompt recipes silent on --fake-gh for shell: (gate 2 CR-4); .githooks/pre-commit unlinted; encoded-traversal literal filename'
+      refs: ['shared/resources/security-review-prompt.md', 'scripts/lint-shell.sh']
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 2
+  fix_date: '2026-09-30'
+  total_iterations: 2
+  verification_method: 'Committed rows at 8e739a7e green on bash + zsh and under TMPDIR=/tmp; mutants G1-G5 red them; defects reproduced by execution'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['BUG-5 and BUG-6 fixed and re-reviewed']

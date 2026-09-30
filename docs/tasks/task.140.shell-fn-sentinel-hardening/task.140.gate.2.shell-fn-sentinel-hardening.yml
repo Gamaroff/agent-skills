@@ -1,0 +1,85 @@
+schema: 1
+task: 'task.140.shell-fn-sentinel-hardening'
+task_title: 'Harden the shell-fn: sentinels and the fake-gh coverage'
+gate: CONCERNS
+status_reason: 'Cycle 1 findings all fixed and verified; the cycle-2 refute pass found that both patched mechanisms are open-ended enumerations over shell syntax (four trap-install shapes and six gh spellings still bypass them), which calls for replacing the mechanisms rather than widening them.'
+reviewer: 'QA Engineer'
+updated: '2026-09-30T06:34:41Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The trap shadow is bypassed by trap true exit (lowercase), builtin trap, command trap and a zsh TRAPEXIT function; after set -e; false such a library still ends the harness with 1 and is scored (TASK-140-BUG-3).'
+    suggested_action: 'Replace the mechanism: a positive source-completed marker written right after a successful source, and a runner that declines whenever it is absent; drop the trap shadow.'
+    suggested_owner: dev
+    bug_ref: 'task.140.bug.3.trap-shadow-bypassed.md'
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'namesGh misses an absolute gh path, a defaulted variable, an assign-then-call variable and gh<in, so a shell: script using one runs the host gh and is scored (TASK-140-BUG-4).'
+    suggested_action: 'Replace the guarantee: a trip-wire gh first on PATH when no --fake-gh is given, declining needs-fake-gh when it fires; keep the static detector as the pre-spawn path; state the absolute-path residual in rule §5 with a pinning row.'
+    suggested_owner: dev
+    bug_ref: 'task.140.bug.4.gh-detector-open-ended.md'
+  - id: 'CR-3'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'SOURCE_LINE does not follow a source after if, elif, else, an opening brace, !, an opening parenthesis, or written source -- x, so a wrapper around a gh library is not declined (TASK-140-BUG-4).'
+    suggested_action: 'Covered by the trip-wire in CR-2 at run time; widen SOURCE_LINE only as far as the pre-spawn fast path needs, with rows.'
+    suggested_owner: dev
+    bug_ref: 'task.140.bug.4.gh-detector-open-ended.md'
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 108
+  phases_verified: '4/4'
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 21
+    notes: 'resolveEntry re-probed (21 cases, real uploads/link-to-etc symlink during the run): unchanged from cycle 1 — symlink-escape refused, only the pre-existing encoded-traversal reproduced. CONCERNS for CR-2/CR-3: the host gh can still run from a shell: script that spells gh in a way the static detector does not read.'
+  performance:
+    status: PASS
+    notes: 'No change in shape; TMPDIR=/tmp run of the shell/symlink rows 30/30.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: four library shapes still displace the EXIT trap during the source.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Both cycle-1 fixes are enumerations over shell syntax; a third widening would be the narrowing-residue shape (qa-fix Step 2.6). Replacement mechanisms are named in the bug reports.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1 / TASK-140-BUG-3: positive source-completed marker; drop the trap shadow'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+    - action: 'CR-2, CR-3 / TASK-140-BUG-4: run-time gh trip-wire; absolute-path residual stated and pinned'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/probe-boundary-rule.md']
+  future:
+    - action: 'CR-4 (medium confidence, advisory): the prompts that document the shell: recipe do not say --fake-gh applies to it too; the decline detail names the flag, so the recipe self-corrects'
+      refs: ['shared/resources/security-review-prompt.md', 'shared/resources/finalise-dod-security-prompt.md', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'CR-5 (medium confidence, advisory): realpathSafe keeps a missing path lexical, so a missing file under a symlinked root reads as outside-repo-root; realpath the deepest existing ancestor (also closes the symlinked-intermediate-plus-missing-leaf residual)'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried from gate 1: CR-4 .githooks/pre-commit unlinted; encoded-traversal literal filename (pre-existing)'
+      refs: ['scripts/lint-shell.sh', 'shared/resources/security-probe.mjs']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 2
+  fix_date: '2026-09-30'
+  total_iterations: 1
+  verification_method: 'Committed rows at 9023813b green on bash + zsh, mutants F1-F5 red on their own rows, TMPDIR=/tmp variance run'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-3 and BUG-4 fixed by replacing the mechanisms, and re-reviewed']
