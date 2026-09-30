@@ -7,7 +7,10 @@
 //
 // For every `docs/**/*.gate.*.yml` with `schema: 2`:
 //   1. `head:` is present and a full 40-hex SHA
-//   2. `updated:` parses as a timestamp
+//   2. `updated:` is an ISO-8601 instant with a zone — `Z` or an explicit offset, the shape
+//      `date -u +%Y-%m-%dT%H:%M:%SZ` writes. A zone-less value parses as LOCAL time, so its verdict
+//      would depend on the machine's TZ (task.135 QA cycle 3, CR3-5); a date alone, or `1`, is not
+//      an instant at all
 //   3. when the head resolves in this checkout, `updated:` is not earlier than its author time
 //
 // What this test deliberately does NOT assert: that the head exists, or that it is an ancestor of
@@ -51,6 +54,10 @@ export function field(yml, key) {
     .trim();
 }
 
+/** The `date -u` shape, or an explicit offset; fractional seconds allowed. */
+const INSTANT =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
 function gitOk(cwd, ...args) {
   return spawnSync("git", args, { cwd, encoding: "utf8" }).status === 0;
 }
@@ -71,10 +78,10 @@ export function checkGate(yml, cwd) {
     return { problems, resolved: false };
   }
   const updated = field(yml, "updated");
-  const updatedAt = Date.parse(updated ?? "");
+  const updatedAt = INSTANT.test(updated ?? "") ? Date.parse(updated) : NaN;
   if (Number.isNaN(updatedAt)) {
     problems.push(
-      `updated: ${JSON.stringify(updated)} does not parse as a timestamp`,
+      `updated: ${JSON.stringify(updated)} is not an ISO-8601 instant with a zone (e.g. 2026-09-30T12:45:39Z)`,
     );
     return { problems, resolved: false };
   }
@@ -243,7 +250,7 @@ test("a schema-2 gate with no head: is red", () => {
 test("an updated: that does not parse is red", () => {
   const { dir, head } = scratch();
   const r = checkGate(gate([`head: '${head}'`, "updated: 'yesterday'"]), dir);
-  assert.match(r.problems[0], /does not parse/);
+  assert.match(r.problems[0], /not an ISO-8601 instant/);
 });
 
 test("a schema-1 gate is skipped, not judged", () => {
@@ -291,5 +298,21 @@ test("a head off the current branch (rebased locally) is still judged on author 
       .problems[0],
     /precedes its head's author time/,
     "the author-time rule still applies to a resolvable off-branch head",
+  );
+});
+
+test("a zone-less, date-only or bare-number updated: is red — its meaning would depend on TZ (CR3-5)", () => {
+  const { dir, head } = scratch();
+  for (const v of ["2026-09-20T11:20:00", "2026-09-20", "1"]) {
+    const r = checkGate(gate([`head: '${head}'`, `updated: '${v}'`]), dir);
+    assert.match(r.problems[0] ?? "", /not an ISO-8601 instant/, v);
+  }
+  assert.deepEqual(
+    checkGate(
+      gate([`head: '${head}'`, "updated: '2026-09-20T13:20:00+02:00'"]),
+      dir,
+    ),
+    { problems: [], resolved: true },
+    "an explicit offset is an instant",
   );
 });

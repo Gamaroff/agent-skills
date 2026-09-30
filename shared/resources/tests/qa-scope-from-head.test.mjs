@@ -131,6 +131,8 @@ function scratch({ head = "fix1", schema = 2 } = {}) {
   TMP.push(dir);
   git(dir, "init", "-q", "-b", "develop");
   commitFile(dir, "base.txt", "base\n", "base");
+  // The work item's own document, on the base: the trigger requires it to exist (CR3-1).
+  commitFile(dir, "docs/task.9.x.md", "status: ready-for-review\n", "the task");
   git(dir, "checkout", "-q", "-b", "feature");
   const fix1 = commitFile(dir, "skills/a.sh", "echo a\n", "fix 1");
   const headLine =
@@ -261,7 +263,11 @@ for (const sh of SHELLS) {
 
 test("E — the scope block is the same in the shared rule, qa-task and qa-story", () => {
   const canon = scopeBlock(RULE);
-  assert.ok(canon.includes('git diff --name-only "$LAST_GATE_HEAD"..HEAD'));
+  assert.ok(
+    canon.includes(
+      'git -c core.quotePath=false diff --name-only -z "$LAST_GATE_HEAD"..HEAD',
+    ),
+  );
   assert.ok(
     !/git log --since=/.test(canon.replace(/^#.*$/gm, "")),
     "no --since in executable lines",
@@ -560,4 +566,94 @@ for (const [skillFile, skill, docVar] of [
       assert.match(r.stdout, /SAFETY_REPROBE=true/);
     });
   }
+}
+
+// ── Cycle 3 (CR3-1, -2, -3, -6): inputs are validated, paths survive quoting ──
+
+for (const sh of SHELLS) {
+  test(`J1 [${sh}] — the trigger HALTs when TASK_FILE is not bound (CR3-1)`, () => {
+    const fx = passFixture();
+    const r = run(sh, fx.dir, triggerBlock(), {
+      LATEST_GATE: fx.gate,
+      TASK_FILE: undefined,
+    });
+    assert.equal(r.status, 1, r.stdout);
+    assert.match(r.stdout, /HALT: TASK_FILE \(''\) is not a file/);
+  });
+
+  test(`J2 [${sh}] — the trigger HALTs when the task file sits at the repository root (CR3-2)`, () => {
+    const fx = passFixture();
+    fs.writeFileSync(
+      path.join(fx.dir, "task.9.x.md"),
+      "status: ready-for-review\n",
+    );
+    const r = run(sh, fx.dir, triggerBlock(), {
+      LATEST_GATE: fx.gate,
+      TASK_FILE: "task.9.x.md",
+    });
+    assert.equal(r.status, 1, r.stdout);
+    assert.match(r.stdout, /is the repository root/);
+  });
+
+  for (const [skillFile, skill, docVar] of [
+    [QA_TASK, "qa-task", "TASK_FILE"],
+    [QA_STORY, "qa-story", "STORY_FILE"],
+  ]) {
+    test(`J3 [${sh}] ${skill} — the step-5 probe HALTs instead of saying false when ${docVar} is not bound (CR3-1)`, () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-scope-head-"));
+      TMP.push(dir);
+      git(dir, "init", "-q", "-b", "develop");
+      const r = run(
+        sh,
+        dir,
+        block(skillFile, /^SAFETY_REPROBE=false$/m) +
+          '\necho "SAFETY_REPROBE=$SAFETY_REPROBE"\n',
+        {
+          LATEST_GATE: undefined,
+          [docVar]: undefined,
+        },
+      );
+      assert.equal(r.status, 1, r.stdout);
+      assert.match(
+        r.stdout,
+        new RegExp(`HALT: ${docVar} \\(''\\) is not a file`),
+      );
+      assert.doesNotMatch(r.stdout, /SAFETY_REPROBE=false/);
+    });
+
+    test(`J4 [${sh}] ${skill} — the Step 3b fence HALTs when its work-item directory is not bound (CR3-3)`, () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-scope-head-"));
+      TMP.push(dir);
+      git(dir, "init", "-q", "-b", "develop");
+      const bin = path.join(dir, ".bin");
+      fs.mkdirSync(bin);
+      fs.writeFileSync(path.join(bin, "gh"), "#!/bin/sh\nexit 1\n", {
+        mode: 0o755,
+      });
+      const fence = block(skillFile, /^LAST_GATE_HEAD=\$\(grep -E '\^head:'/m);
+      const r = run(sh, dir, fence, {
+        PATH: `${bin}:${process.env.PATH}`,
+        TASK_DIR: undefined,
+        STORY_DIR: undefined,
+        LATEST_GATE: undefined,
+      });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(
+        r.stdout,
+        /HALT: (TASK|STORY)_DIR \(''\) is not a directory/,
+      );
+    });
+  }
+
+  test(`K [${sh}] — a non-ASCII path changed after the head stays in the scope (CR3-6)`, () => {
+    const fx = scratch();
+    commitFile(fx.dir, "skills/é.sh", "echo accented\n", "a non-ASCII path");
+    const r = runScope(sh, fx);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.patch,
+      /echo accented/,
+      "the file's change is in the patch, not dropped as a quoted name",
+    );
+  });
 }

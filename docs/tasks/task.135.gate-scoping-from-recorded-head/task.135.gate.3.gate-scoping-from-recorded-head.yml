@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.135.gate-scoping-from-recorded-head'
+task_title: 'Gate scoping from a recorded head, not a typed timestamp'
+gate: FAIL
+status_reason: 'Safety re-probe (clause 3): the unbound-input class recurs one level up — an unchecked $TASK_FILE / $TASK_DIR silently yields SAFETY_REPROBE=false and "." paths; plus a TZ-dependent timestamp rule and quoted-path loss in the scope list.'
+reviewer: 'QA Engineer'
+head: 'e451c70f3cc473f21b7b9e220176832b794eef49'        # git rev-parse HEAD when the review was performed
+updated: '2026-09-30T13:28:03Z'  # date -u at write time
+
+top_issues:
+  - id: 'CR3-1'
+    severity: high
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Phase 0 steps 2/3/5 derive TASK_DIR from an unchecked $TASK_FILE; unbound it becomes ".", no gate is found and the step-5 probe returns SAFETY_REPROBE=false, which then narrows cycle 3+ after a security FAIL. Same for STORY_FILE in qa-story.'
+    suggested_action: 'HALT when the work-item path is empty or not a file. Bug: task.135.bug.9.'
+    suggested_owner: dev
+  - id: 'CR3-2'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'TASK_DIR "." makes :(exclude). exclude the whole tree (CODE_MOVED always 0); DOC_MOVED reads 0 for a missing task file.'
+    suggested_action: 'Refuse a repo-root task dir; require the task file to exist. Bug: task.135.bug.10.'
+    suggested_owner: dev
+  - id: 'CR3-3'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Step 3b preamble reads an unchecked $TASK_DIR; unbound, PRIOR_GATES is 0 and every cycle takes the first-review branch. Same for STORY_DIR.'
+    suggested_action: 'HALT when the work-item directory is not a directory. Bug: task.135.bug.11.'
+    suggested_owner: dev
+  - id: 'CR3-5'
+    severity: medium
+    file: 'shared/resources/tests/gate-head-freshness.test.mjs'
+    finding: 'updated: accepts zone-less and date-only values, so the author-time verdict depends on the machine TZ.'
+    suggested_action: 'Require the date -u shape before Date.parse. Bug: task.135.bug.12.'
+    suggested_owner: dev
+  - id: 'CR3-6'
+    severity: medium
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'git diff --name-only C-quotes unusual paths; the quoted name matches nothing and silently leaves the scope.'
+    suggested_action: 'NUL-delimited read of git diff --name-only -z. Bug: task.135.bug.13.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 99
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2, 3]
+  ci: 'informational — not read this cycle'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'CR3-1 can still zero the safety carve-out through an unchecked input. boundary: false — the blocks decide on local git state and agent-bound paths, no external input; the reviewer probed inputs read-only by hand.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR3-2/3/6 silently change what is reviewed.'
+  maintainability:
+    status: PASS
+    notes: 'Blocks pinned by tests E/G; the unbound-input class is now named in the fix plan.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR3-1, CR3-2, CR3-3, CR3-5, CR3-6 (bugs 9–13).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'shared/resources/qa-re-review-scope.md', 'shared/resources/tests/gate-head-freshness.test.mjs']
+  future:
+    - action: 'CR3-4 (advisory): recompute clause 1 inside the scope block rather than trusting the bound SAFETY_REPROBE. CR3-7 (low): the scope reads committed history only — uncommitted fixes are not shown. CR3-8 (low): gate-writing prose still says the freshness test checks history. Pre-existing, not this branch: Step 3b mktemp template with a .diff suffix returns empty on BSD after first use (observation #181 — recurrence appended 2026-09-30).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

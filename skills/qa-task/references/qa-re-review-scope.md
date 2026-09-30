@@ -246,10 +246,12 @@ if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3
     # word-splits under bash and does NOT under zsh: there the whole newline-joined list is one
     # pathspec that matches nothing, git diff writes an empty patch, and the reviewer reviews
     # nothing while reporting clean (obs #76, #110 — task.110 cycle 3). The array form splits
-    # the same way in both shells.
+    # the same way in both shells. NUL-delimited, not line-delimited: without -z git C-quotes a
+    # non-ASCII, quote or backslash path ("sk\303\251.sh"), and the quoted name then matches
+    # nothing as a pathspec — the file silently leaves the scope (task.135 QA cycle 3, CR3-6).
     FILES=()
-    while IFS= read -r f; do [ -n "$f" ] && FILES+=("$f"); done \
-      < <(git diff --name-only "$LAST_GATE_HEAD"..HEAD)
+    while IFS= read -r -d '' f; do [ -n "$f" ] && FILES+=("$f"); done \
+      < <(git -c core.quotePath=false diff --name-only -z "$LAST_GATE_HEAD"..HEAD)
     if [ "${#FILES[@]}" -eq 0 ]; then
       echo "HALT: nothing changed since the head of gate $PRIOR_GATES (${LAST_GATE_HEAD:0:12}) — there is no fix to review; check the cycle order"; exit 1
     fi

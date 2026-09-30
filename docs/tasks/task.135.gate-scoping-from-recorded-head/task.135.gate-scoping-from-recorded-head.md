@@ -289,21 +289,22 @@ None.
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.135.qa.2.gate-scoping-from-recorded-head.md](./task.135.qa.2.gate-scoping-from-recorded-head.md)
-- **Gate File**: [task.135.gate.2.gate-scoping-from-recorded-head.yml](./task.135.gate.2.gate-scoping-from-recorded-head.yml)
+- **Full Report**: [task.135.qa.3.gate-scoping-from-recorded-head.md](./task.135.qa.3.gate-scoping-from-recorded-head.md)
+- **Gate File**: [task.135.gate.3.gate-scoping-from-recorded-head.yml](./task.135.gate.3.gate-scoping-from-recorded-head.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 92 (three suites) + develop-task / develop-story eval replays
+- **Tests Executed**: 99 (three suites); ci:fast 4675/4676 at e451c70f
 - **Phases Verified**: 3/3
-- **Critical Issues**: 2 HIGH, 2 MEDIUM promoted (CR2-1 … CR2-4); 5 LOW advisory
+- **Critical Issues**: 1 HIGH, 4 MEDIUM promoted (CR3-1, -2, -3, -5, -6); 1 MEDIUM advisory, 2 LOW
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR2-1: cycle 3+ narrows after a security FAIL — `$SAFETY_REPROBE` read from another shell ([bug 5](./task.135.bug.5.cycle-3-narrows-on-a-security-fail.md))
-- CR2-2: the freshness test breaks on develop-batch's rebase of open PRs ([bug 6](./task.135.bug.6.freshness-test-red-after-in-flight-rebase.md))
-- CR2-3: the Phase 0 trigger reads `$LATEST_GATE` from another shell ([bug 7](./task.135.bug.7.phase-0-trigger-reads-latest-gate-unbound.md))
-- CR2-4: excluding all of `docs/` hides documentation deliverables ([bug 8](./task.135.bug.8.code-moved-excludes-all-docs.md))
-- Cycle 1 bugs 1–4: fixed ([QA report 1](./task.135.qa.1.gate-scoping-from-recorded-head.md)); bug 1 partial → bug 6
+- CR3-1: an unchecked `$TASK_FILE` silently yields "no gate" and `SAFETY_REPROBE=false` ([bug 9](./task.135.bug.9.unbound-task-file-degrades-to-dot.md))
+- CR3-2: a task directory of `.` excludes the whole tree ([bug 10](./task.135.bug.10.task-dir-dot-excludes-whole-tree.md))
+- CR3-3: Step 3b reads an unchecked `$TASK_DIR` ([bug 11](./task.135.bug.11.step-3b-reads-task-dir-unbound.md))
+- CR3-5: zone-less `updated:` accepted ([bug 12](./task.135.bug.12.updated-accepts-zoneless-timestamps.md))
+- CR3-6: C-quoted paths drop out of scope ([bug 13](./task.135.bug.13.scope-drops-quoted-paths.md))
+- Earlier cycles: [QA 1](./task.135.qa.1.gate-scoping-from-recorded-head.md), [QA 2](./task.135.qa.2.gate-scoping-from-recorded-head.md) — bugs 1–8 closed
 
 ## Change Log
 
@@ -317,6 +318,7 @@ None.
 | 2026-09-30 |  | Implemented — 10 authored files (8 modified, 2 new tests), 21 new tests, 4 mutation proofs; bundled copies regenerated | develop |
 | 2026-09-30 |  | QA gate FAIL (60/100) — 1 high, 2 medium promoted, 1 medium advisory | qa-task |
 | 2026-09-30 |  | QA gate FAIL (40/100) — refute pass: 2 high, 2 medium promoted, 5 low | qa-task |
+| 2026-09-30 |  | QA gate FAIL (40/100) — safety re-probe: 1 high, 4 medium promoted, 3 advisory | qa-task |
 
 <!-- change-log-end -->
 

@@ -170,6 +170,9 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    ```bash
    # Bound in THIS shell: the step-1 block that resolved it is another shell, and an unbound read
    # here silently takes the no-gate branch (task.135 QA cycle 2 probe).
+   # Validate the input before deriving from it: unbound, dirname "" is ".", no gate is found, and
+   # every signal below silently reads "no prior gate" (task.135 QA cycle 3, CR3-1).
+   [ -f "$TASK_FILE" ] || { echo "HALT: TASK_FILE ('$TASK_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
    TASK_DIR=$(dirname "$TASK_FILE")
    [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate 2>/dev/null)
    if [ -n "$LATEST_GATE" ]; then
@@ -189,8 +192,14 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    # $TASK_FILE is this skill's input. $LATEST_GATE and $TASK_DIR are computed, and the step 1 block
    # that computed them is another shell — bind both here (task.135 QA cycle 2, CR2-3). qa-cycle.sh
    # refuses with no numbered gate: then GATE_HEAD is empty and both signals below read 1.
+   # Validate the input before deriving from it: unbound, dirname "" is ".", no gate is found, and
+   # every signal below silently reads "no prior gate" (task.135 QA cycle 3, CR3-1).
+   [ -f "$TASK_FILE" ] || { echo "HALT: TASK_FILE ('$TASK_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
    TASK_DIR=$(dirname "$TASK_FILE")
    [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate)
+   # ":(exclude)$TASK_DIR" below must exclude the task's directory, not the tree: a task file at the
+   # repository root would make it ":(exclude)." and CODE_MOVED always 0 (task.135 QA cycle 3, CR3-2).
+   [ -n "$(git -C "$TASK_DIR" rev-parse --show-prefix 2>/dev/null)" ] || { echo "HALT: the task directory ('$TASK_DIR') is the repository root — the trigger cannot tell the task's own files from the code"; exit 1; }
    # The commit the gate judged (its `head:`), never its typed `updated:` — a timestamp in the
    # future made `git log --since` hide every later commit from this check (task.135).
    GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
@@ -275,6 +284,9 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    ```bash
    # Bound in THIS shell: the step-1 block that resolved it is another shell, and an unbound read
    # here reads as "no gate" and leaves SAFETY_REPROBE=false — the carve-out could never fire (task.135 QA cycle 2 probe).
+   # Validate the input before deriving from it: unbound, dirname "" is ".", no gate is found, and
+   # every signal below silently reads "no prior gate" (task.135 QA cycle 3, CR3-1).
+   [ -f "$TASK_FILE" ] || { echo "HALT: TASK_FILE ('$TASK_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
    TASK_DIR=$(dirname "$TASK_FILE")
    [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate 2>/dev/null)
    # $LATEST_GATE is the prior gate file. Trigger clause 1, per the shared rule.
@@ -427,6 +439,9 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    BASE="origin/${BASE_REF:-develop}"
    DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
    # How many gates already exist? 0 = first review, 1 = cycle 2, 2+ = cycle 3 and later.
+   # $TASK_DIR is an input bound by the agent in this shell; unbound, find reads nothing, PRIOR_GATES is
+   # 0 and every cycle silently takes the first-review branch (task.135 QA cycle 3, CR3-3).
+   [ -d "$TASK_DIR" ] || { echo "HALT: TASK_DIR ('$TASK_DIR') is not a directory — bind the work item's directory in this shell"; exit 1; }
    PRIOR_GATES=$(find "$TASK_DIR" -maxdepth 1 -name "task.*.gate.*.yml" 2>/dev/null | wc -l | tr -d ' ')   # "0" with no gate — an `ls` glob left this EMPTY under zsh and the -ge below errored (obs #145)
    # The latest gate, bound in THIS shell — Phase 0 binds $LATEST_GATE in its own block, which is
    # another shell, so reading it here unbound made every cycle 3+ run unscoped (task.135 CR-2).
@@ -471,10 +486,12 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
        # word-splits under bash and does NOT under zsh: there the whole newline-joined list is one
        # pathspec that matches nothing, git diff writes an empty patch, and the reviewer reviews
        # nothing while reporting clean (obs #76, #110 — task.110 cycle 3). The array form splits
-       # the same way in both shells.
+       # the same way in both shells. NUL-delimited, not line-delimited: without -z git C-quotes a
+       # non-ASCII, quote or backslash path ("sk\303\251.sh"), and the quoted name then matches
+       # nothing as a pathspec — the file silently leaves the scope (task.135 QA cycle 3, CR3-6).
        FILES=()
-       while IFS= read -r f; do [ -n "$f" ] && FILES+=("$f"); done \
-         < <(git diff --name-only "$LAST_GATE_HEAD"..HEAD)
+       while IFS= read -r -d '' f; do [ -n "$f" ] && FILES+=("$f"); done \
+         < <(git -c core.quotePath=false diff --name-only -z "$LAST_GATE_HEAD"..HEAD)
        if [ "${#FILES[@]}" -eq 0 ]; then
          echo "HALT: nothing changed since the head of gate $PRIOR_GATES (${LAST_GATE_HEAD:0:12}) — there is no fix to review; check the cycle order"; exit 1
        fi
@@ -962,7 +979,9 @@ clock is the defect task.135 removed: on task.130 four gates carried local time 
 up to three hours in the future, and the next cycle's `git log --since` scope matched nothing.
 `head:` is the commit **reviewed**, not the commit the gate is committed in — the gate lands in a
 later commit. The repository's gate-head freshness test fails a `schema: 2` gate whose
-`head:` is missing, is not in the history, or postdates its `updated:`.
+`head:` is not a full SHA, whose `updated:` is not a `date -u` timestamp, or whose `updated:`
+precedes the head's author time when the head resolves. Existence and ancestry are checked by the
+Step 3b scope block at the next cycle and by the 5c conformance lens, while the branch is intact.
 
 **Gate YAML Schema:**
 

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-135-BUG-5
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute pass, CR2-1)
 **Date Found**: 2026-09-30
 
@@ -33,3 +33,4 @@ The narrowing branch never runs without a known `SAFETY_REPROBE`; an unset value
 |------|--------|------------|-------|
 | 2026-09-30 | New | QA Engineer | QA cycle 2 |
 | 2026-09-30 | Ready for QA | qa-fix | Fixed in QA cycle 2 |
+| 2026-09-30 | Closed | QA Engineer | Verified in QA cycle 3 — the fix holds; the same outcome is reachable through an unchecked input, bug 9 |
