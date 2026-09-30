@@ -376,27 +376,26 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 70/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.155.qa.2.qa-results-section-engine.md](./task.155.qa.2.qa-results-section-engine.md)
-- **Gate File**: [task.155.gate.2.qa-results-section-engine.yml](./task.155.gate.2.qa-results-section-engine.yml)
+- **Full Report**: [task.155.qa.3.qa-results-section-engine.md](./task.155.qa.3.qa-results-section-engine.md)
+- **Gate File**: [task.155.gate.3.qa-results-section-engine.yml](./task.155.gate.3.qa-results-section-engine.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 33 task tests; full `ci:fast` 4748 (4747 pass, 0 fail, 1 skipped); corpus run over 155 documents in a temp copy (all `replaced`)
+- **Tests Executed**: 39 task tests. Full `ci:fast` ran 4755 tests: 4753 pass, 1 load-sensitive timing failure that passes alone, 1 skipped. A corpus dry run over 155 documents in a temp copy returned all `replaced` and was byte-stable on a second write.
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 high, 2 medium, 1 low (in the gate)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 high, 0 medium, 2 low (in the gate)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle-1 fixes REL-001, REL-003, CR-3 and CR-4 hold. REL-002 holds for the canonical header, and each engine fix is mutation-proven.
-- REL-004 (medium, regression): a section after a finished change log that quotes a `| Date | Version |` table is reported `relocated`, and its stale tail is left behind.
-- REL-005 (medium): a section between a marker-less `## Change Log` and a legacy-header table (`| Date | Change |`) still deletes every row.
-- REL-006 (low): a table quoted inside a misplaced section is taken for the log's header.
+- REL-004, REL-005 and REL-006 are fixed. Each fix is mutation-proven by a committed G-test.
+- REL-007 (low; code-review CR-1, downgraded from medium): a misplaced section that quotes a Date table leaves a stale tail in the log. The corpus has 0 instances.
+- REL-008 (low; a regression from the REL-006 first→last change): a log with two Date tables loses the first under a misplaced section. The corpus has 0 instances.
 <!-- change-log-start -->
 ## Change Log
 
@@ -408,6 +407,7 @@ None.
 | 2026-09-30 |         | Implemented — 11 files (1 engine + 2 bundled copies, 3 test files, 2 skills, task.65 repair, CHANGELOG), 31 tests | develop |
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low); cycle 2 | qa-task |
+| 2026-09-30 |  | QA gate PASS (100/100) — 2 low findings (REL-007, REL-008); cycle 3 | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -437,3 +437,11 @@ None.
 - QA artifacts land in this directory: `task.155.qa.{N}.qa-results-section-engine.md`,
   `task.155.gate.{N}.qa-results-section-engine.yml`, bug reports `task.155.bug.{N}.{name}.md`.
 - Once the engine exists, this task's own QA cycles write their section through it (Phase 2 onward).
+
+## Deferred Work
+
+Carried from QA gate 3 (`task.155.gate.3.qa-results-section-engine.yml`, route 2b cosmetic-residue exit) to `recommendations.future`, closed in `top_issues[]`:
+
+- **REL-007** (LOW) — a misplaced section that itself quotes a Date-headed table can be cut at its own table (inside a marker block after the log rows, or under a table-less marker-less log). 0 of 155 tracked sections quote such a table.
+- **REL-008** (LOW) — a misplaced section before a log holding two Date-headed tables loses the first table's rows; a log header that is not Date-first is not recognised. 0 corpus logs have either shape.
+- CRLF seam preservation and two small cleanups (gate 3 `recommendations.future`).
