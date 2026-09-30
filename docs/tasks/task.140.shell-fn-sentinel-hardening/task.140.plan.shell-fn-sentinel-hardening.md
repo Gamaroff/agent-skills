@@ -32,8 +32,9 @@ test("shell entry: a script whose body names gh without --fake-gh is needs-fake-
   // expect reason needs-fake-gh, executed 0; with fakeGh: FAKE_GH it runs (fake answers) and is scored
 });
 test("shell-fn entry: gh reached as `gh;`, `gh>`, `\"$GH\" api` or through a one-level source is detected (c3-CR-3)", () => {
-  // four libs; each without fakeGh → needs-fake-gh; the sourcing lib: 'source "$(dirname "$0")/../../shared/resources/gh-labels.sh"' is NOT
-  // followable ($0 is the harness) — use a literal relative path: 'source ../../../shared/resources/gh-labels.sh' resolved against the lib's dir
+  // five libs; each without fakeGh → needs-fake-gh; the sourcing lib: 'source "$(dirname "$0")/../../shared/resources/gh-labels.sh"' is NOT
+  // followable ($0 is the harness) — use literal paths: 'source ../../../shared/resources/gh-labels.sh' (resolved against the lib's dir)
+  // AND 'source shared/resources/gh-labels.sh' (resolved against the root — the repository's own idiom is `source references/gh-labels.sh`, cwd-relative)
 });
 test("resolveEntry: a symlink inside the root that points outside it is refused (symlink limit closed)", () => {
   // mkdtemp under REPO_ROOT/tests/fixtures/shell-fn; symlinkSync("/etc", join(dir,"link")); resolveEntry(`shell-fn:${rel}/link/passwd#f`) → outside-repo-root
@@ -41,7 +42,7 @@ test("resolveEntry: a symlink inside the root that points outside it is refused 
 });
 ```
 
-Run: all five red (the fourth in four sub-assertions). 66 existing rows green.
+Run: all five red (the fourth in five sub-assertions). Every pre-existing row green — record the branch point's `grep -cE '^\s*test\(' shared/resources/tests/security-probe.test.mjs` in the implementation report.
 
 ### Phase 2: The body and the gates
 
@@ -76,9 +77,13 @@ function namesGh(entryPath, root) {
   const first = read(entryPath); if (first === null) return false; texts.push(first);
   for (const m of first.matchAll(SOURCE_LINE)) {                    // ONE level, deliberately
     const raw = m[1]; if (raw.includes("$")) continue;              // a variable path is not followable
-    const p = isAbsolute(raw) ? raw : resolve(dirname(entryPath), raw);
-    if (relative(root, p).startsWith("..") || seen.has(p)) continue; // outside the root: not ours to read
-    seen.add(p); const t = read(p); if (t !== null) texts.push(t);
+    // library's directory first, then the root (task §6 Phase 2; review 1 I1)
+    const cands = isAbsolute(raw) ? [raw] : [resolve(dirname(entryPath), raw), resolve(root, raw)];
+    for (const p of cands) {
+      if (!isWithin(root, p) || seen.has(p)) continue;              // isWithin, never startsWith("..") — task.158 (review 1 I2)
+      const t = read(p); if (t === null) continue;
+      seen.add(p); texts.push(t); break;
+    }
   }
   return texts.some((t) => GH_COMMAND_WORD.test(t));
 }
@@ -107,11 +112,11 @@ In **both** `scripts/lint-shell.sh` and `.github/workflows/shellcheck.yml`, afte
 # Executable fixtures with no extension: a tracked file under tests/fixtures/ whose
 # first line is a bash shebang (task.140 — the fake gh lived outside both lanes).
 while IFS= read -r f; do
-  [ "$(head -c 21 "$f")" = "#!/usr/bin/env bash" ] && FILES+=("$f")
+  [ "$(head -n 1 "$f")" = "#!/usr/bin/env bash" ] && FILES+=("$f")   # whole first line — `head -c 21` never matches the 19-byte string (review 1 C1)
 done < <(git ls-files 'tests/fixtures/*' | grep -vE '\.(sh|json|md|txt)$')
 ```
 
-(`mapfile` form in the workflow, to match its style.) Confirm `npm run lint:shell` prints `linting 75 source shell scripts` and stays `< 200`. Prove the lane sees the file: `cp tests/fixtures/fake-gh/gh /tmp/gh-bad; echo 'x=$1; echo $x' >> /tmp/gh-bad; shellcheck --severity=warning /tmp/gh-bad` → SC2086 — then, in a scratch worktree only, put the bad line into the tracked fixture and run `bash scripts/lint-shell.sh` → red; discard the worktree.
+(`mapfile` form in the workflow, to match its style.) Confirm `npm run lint:shell` prints the branch point's count plus exactly one (the fixture) and stays `< 200`. Prove the lane sees the file: `cp tests/fixtures/fake-gh/gh /tmp/gh-bad; echo 'x=$1; echo $x' >> /tmp/gh-bad; shellcheck --severity=warning /tmp/gh-bad` → SC2086 — then, in a scratch worktree only, put the bad line into the tracked fixture and run `bash scripts/lint-shell.sh` → red; discard the worktree.
 
 ### Phase 4: Rule, bundle, CHANGELOG
 
