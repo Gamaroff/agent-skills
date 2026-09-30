@@ -380,25 +380,25 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-01
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.155.qa.8.qa-results-section-engine.md](./task.155.qa.8.qa-results-section-engine.md)
-- **Gate File**: [task.155.gate.8.qa-results-section-engine.yml](./task.155.gate.8.qa-results-section-engine.yml)
+- **Full Report**: [task.155.qa.9.qa-results-section-engine.md](./task.155.qa.9.qa-results-section-engine.md)
+- **Gate File**: [task.155.gate.9.qa-results-section-engine.yml](./task.155.gate.9.qa-results-section-engine.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 51 engine tests, 8 wiring tests and the corpus test. Full `ci:fast` ran 4,776 tests: 4,774 pass, 1 skipped, and 1 load-timing failure that passes alone. The QA engine lost 0 lines outside the section in a 4-write corpus run over 1,989 documents, and 0 in fault injection over 155 sections and 12,001 positions. Every line of all 155 old spans was checked for content another skill owns.
+- **Tests Executed**: 57 engine tests, 8 wiring tests and the corpus test (66/66). Full `ci:fast` ran 4,781 tests: 4,780 pass, 0 fail, 1 skipped. The QA engine lost 0 lines outside the section in a 4-write corpus run over 1,990 documents, and the run was idempotent. Single-fault injection over 155 sections lost 0 lines. In a fence sweep over 12,493 positions, the only lines lost were task.117's and task.45's template comment at 5 two-fault positions; the gate-8 engine deleted that comment on every replace.
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The PR-review-3 carry keeps all 11 tracked Bug Reports lists verbatim, and CR-6/CR-7 changed no behaviour. Measured inside the span, four findings remain:
-- REL-020 (medium): only the first `### Bug Reports` is carried, so a second list is deleted while the write reports `replaced`.
-- REL-021 (low): non-list text after the list, such as stale QA fields, is carried forever.
-- REL-022 (low): a replace deletes task.117's template comment and `---` from a legacy span.
-- REL-023 (low): a near-miss heading, or a rendered takeover, drops the list with no signal.
+REL-020, REL-021 and REL-022 are closed, and REL-023 is partly closed. All 11 tracked Bug Reports lists are kept verbatim, and task.117's comment now survives. The new carry and peel code brings four low findings, none with a tracked instance on its trigger path:
+- REL-024 (low, duplicates): any trailing HTML comment is peeled as a separator, so a comment at the end of a render stacks one copy per cycle.
+- REL-025 (low, duplicates): a `#### Bug Reports` block carries QA's own later `####` text.
+- REL-026 (low, deletes and duplicates): a render with its own list drops old lines that have no link, and re-adds a multi-link line.
+- REL-027 (low, deletes): `**Bug Reports**`, `### Bug Report` and `### Bugs` still drop the list.
 <!-- change-log-start -->
 ## Change Log
 
@@ -416,6 +416,7 @@ The PR-review-3 carry keeps all 11 tracked Bug Reports lists verbatim, and CR-6/
 | 2026-09-30 |  | QA gate CONCERNS (80/100) — 3 findings (1 medium, 2 low), cycle 6 | qa-task |
 | 2026-09-30 |  | QA gate PASS (100/100) — 2 low findings (REL-018, REL-019); cycle 7 | qa-task |
 | 2026-10-01 |  | QA gate CONCERNS (80/100) cycle 8 — 1 MEDIUM (REL-020: a second Bug Reports list is dropped by the carry), 3 LOW | qa-task |
+| 2026-10-01 |  | QA gate CONCERNS (90/100) cycle 9 — 4 LOW (REL-024..REL-027); REL-020/021/022 closed, REL-023 partial | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -466,4 +467,5 @@ Carried from QA gates 3, 4 and 7 (route 2b cosmetic-residue exits) to each gate'
 - **`checked()` counts sections, not surroundings** — the post-write read-back confirms exactly one bounded section; it does not compare the text around it. What protects the surroundings is the structural guard on the removed text, which QA's fault injection and corpus runs exercise.
 - **PR review 3 CR-1 — fixed, not deferred**: a `### Bug Reports` list (`create-bug-report` Step 5 writes it inside this section; 11 tracked tasks carry one) is carried through every replace and relocate; a render that includes its own list takes it over. task.141's hand-written `### Deferred Work` inside its QA section is QA-owned text by this rule and is replaced whole.
 - **Gate 8 — REL-020…023, fixed in cycle 8's fix:** every `###`/`####` Bug Reports block (any case, any suffix) is carried whole — `####` groups, tables and bold labels included — up to the next `###`-or-higher heading or the first of QA's own template field lines; several blocks fold into one; a render that brings its own list keeps its entries and gains every old line naming a link it lacks; a trailing HTML comment block before the next section is a separator, not section content (task.117's template lead-in). Measured on the corpus: all 11 tracked bug lists keep every link, 0 comments lost, idempotent. **Residual (deferred):** a bold `**Bug Reports**` label with no heading is not recognised — 0 corpus instances; `create-bug-report` writes a heading.
+- **Gate 9 — waived under the operator's acceptance rule (2026-10-01)** and carried to gate 9 `recommendations.future`: **REL-024** (duplicates — any trailing HTML comment is peeled as a separator, so a render ending in one gains a copy per cycle), **REL-025** (duplicates — a `#### Bug Reports` block carries QA's later `####` subsections), both 0 corpus instances; **REL-026** (deletes link-less structure lines — `####` groups, `- None`, table headers — but only when a render brings its own Bug Reports list, which no Step 12 template does; no bug link is ever lost), **REL-027** (deletes a list under a non-standard label — `**Bug Reports**`, `### Bugs`, singular — which no writer produces; `create-bug-report` writes the exact heading), both 0 plausible instances. task.141's hand-written `### Deferred Work` inside its QA section (accepted task, 1 instance) is QA-owned by this engine's rule and would be replaced on a further QA write.
 

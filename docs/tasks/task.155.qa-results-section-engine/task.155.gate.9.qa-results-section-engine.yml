@@ -1,0 +1,125 @@
+schema: 2
+task: 'task.155.qa-results-section-engine'
+task_title: 'QA Testing Results section: one write engine, one placement, refused when duplicated'
+gate: CONCERNS
+status_reason: 'REL-020, REL-021 and REL-022 are closed, REL-023 is partly closed, all 11 tracked Bug Reports lists are kept, and nothing outside the span is lost. The new carry and peel code brings four low defects with 0 tracked instances on their trigger paths. Two of them delete content silently (REL-026, REL-027), so Reliability stays CONCERNS.'
+reviewer: 'QA Engineer'
+head: '18a0ec99e0012017f3e4689702d810293685ae64'
+updated: '2026-09-30T22:37:26Z'
+
+top_issues:
+  - id: 'REL-024'
+    severity: low
+    status: waived
+    resolution: 'waived by operator rule 2026-10-01 (duplicates, 0 corpus instances)'
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code review CR-1 (medium/high; promoted and re-rated low on evidence) and CR-4 (low/high). trimSeparator (line 248) treats any trailing HTML comment as a separator, not only a template lead-in before the log. A render ending in `<!-- qa-results-end -->` gains one copy per cycle (4 copies after 4 writes; not idempotent). An old section''s own trailing comment is left behind, stale. When the last line ends in `-->`, the scan walks back to an earlier unrelated comment line, and the content between them stays after the new section. Effect: duplicates, never deletes. Corpus: 0 of 156 tracked sections hold a comment line after the peel, 0 end in `-->`, and neither Step 12 template renders a comment. Regression from the gate-8 engine.'
+    suggested_action: 'Peel only a comment that directly precedes the change-log block or its heading, and only when the lines from `<!--` to `-->` form one comment. Add a replace-twice test with a trailing comment.'
+    suggested_owner: dev
+  - id: 'REL-025'
+    severity: low
+    status: waived
+    resolution: 'waived by operator rule 2026-10-01 (duplicates, 0 corpus instances)'
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code review CR-2 (medium/high; promoted and re-rated low). collectBlocks (line 149) ends a block only at a heading of level 1 to 3 or a template field line. So a `#### Bug Reports` block carries QA''s own later `####` subsections, such as stale `#### Recommendations` text, on every cycle. The REL-021 residue has the same effect: a non-template field line or paragraph after a list at the end of the section is carried. Effect: duplicates stale text, never deletes. Corpus: 0 tracked `#### Bug Reports` headings, and 0 of 11 tracked lists carry non-list text.'
+    suggested_action: 'End a carried block at the next heading at or above its own level, and at the end of the list.'
+    suggested_owner: dev
+  - id: 'REL-026'
+    severity: low
+    status: waived
+    resolution: 'waived by operator rule 2026-10-01 (deletes link-less structure lines only when a render brings its own Bug Reports list, which no Step 12 template does - 0 plausible instances)'
+    file: 'shared/resources/qa-results.js'
+    finding: 'Code review CR-3 (medium/medium) and CR-5 (cleanup). When the render brings its own `### Bug Reports`, mergeCarried (line 197) keeps only old lines that name a link the render lacks. Old lines with no link are dropped: `#### Open Bugs`, `- None`, a table header, bold group labels. A multi-link old line is re-added whole when any one of its links is missing, which duplicates an entry the render already has. Table rows are spliced under a bullet list. Effect: deletes structure and linkless lines and duplicates entries; no bug link is lost. Corpus: 0 on the path, because neither Step 12 template renders a Bug Reports list. With a rendered list, tasks 116, 42, 76 and 94 would lose 12 structure lines, and task.120''s two-link line would duplicate.'
+    suggested_action: 'Key an entry by its first link and carry the old block''s unmatched remainder whole, or state in both Step 12 notes that a render must not include a Bug Reports list.'
+    suggested_owner: dev
+  - id: 'REL-027'
+    severity: low
+    status: waived
+    resolution: 'waived by operator rule 2026-10-01 (deletes only under a non-standard label no writer produces - 0 corpus instances)'
+    file: 'shared/resources/qa-results.js'
+    finding: 'REL-023 residue. The heading pattern (line 138) matches `### Bug reports`, `#### Bug Reports` and `### Bug Reports (1)`. It does not match the bold `**Bug Reports**` label that gate 8 named, `### Bug Report` (singular) or `### Bugs`. In those three cases the list is dropped while the write reports `replaced` (probe). Effect: deletes. Corpus: 0 lists that create-bug-report wrote use these shapes (it writes the exact `### Bug Reports`). There is 1 QA-owned bold label, in task.83''s `### QA Reports`.'
+    suggested_action: 'Match a bold label and the singular form, or make the exact `### Bug Reports` heading a stated contract in create-bug-report Step 5.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 66
+  phases_verified: 4/4
+  ci: 'ci:fast locally @ 18a0ec99e001: 4,781 tests, 4,780 pass, 0 fail, 1 skipped (EXIT 0). qa-results engine, wiring and corpus: 66/66. bundle:check 129 skills, 0 problems; the qa-task and qa-story engine copies are byte-identical to the source apart from the header. validate qa-task and qa-story pass. PR CI not awaited (gated at /finalise).'
+  outside_span: 'QA engine alone, 1,990 tracked docs/**/*.md x 4 writes: 1,833 created then replaced 3 times, 155 replaced 4 times, 2 unplaceable (the known REL-011 pair). 0 lines lost outside the span, 0 multiple, 0 left inside a log, and a 5th identical write changed 0 docs. With upsertChangeLog rows between the writes: 0 probe rows lost, and 195 header lines migrated by change-log.js (the same count as the gate-8 engine).'
+  inside_span: 'All 11 tracked `### Bug Reports` lists are kept verbatim through 4 writes, with 1 heading each. The 20 bug links lost across 8 docs are all in QA''s own `### Key Findings` or `### QA Reports` (the gate-8 engine with a rendered list lost 84 links across 19 docs). Of the 2,926 replaced span lines grouped by subsection, all are QA-owned, with 0 comments. The exception is task.141''s `### Deferred Work`, written by the route-2b step: pre-existing, routed to future. task.117 and task.45 now keep their template comment.'
+  fault_injection: 'Stray fence, ~~~, 4-backtick and indented ```js after each of the 155 headings each gave 155 unbounded; an HTML comment and a stray tick each gave 155 replaced; 0 lines lost. Stray fence plus a closed ```bash block at each of 12,493 later positions: 510 replaced, 11,983 unbounded. The 35 lines lost are task.117''s and task.45''s 7-line template comment at 5 positions, where the block sits between the comment and the section or log. The comment is then span again, and the gate-8 engine deleted it on every replace.'
+  probes: 'REL-020 two lists: both links kept through 3 replaces, 1 heading. REL-021: template fields not carried; a non-template paragraph is (REL-025). REL-023: 4 near-miss forms carry; bold, singular and Bugs drop (REL-027). CR-1: 4 comment copies after 4 writes. CR-4: stale 10/100 left after the section. CR-2: stale #### text carried. CR-3: bug.1 appears twice.'
+  step_4b: 'Not applicable to the cycle-9 scope: no SKILL.md or shared/resources/*.md changed since gate 8, which ran it over both SKILL.md files with 0 findings.'
+  mutation_proofs: 'Isolated copy; live engine unchanged; baseline 57/57 before and after. Covered: fold removed (M1), field stop removed (M2), exact heading (M3), merge removed (L2), peel disabled (M4), stop widened to #### (M6). no-red-untested: fold dedupe removed (duplicates only).'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+bug_resolution:
+  previous_gate: 'task.155.gate.8.qa-results-section-engine.yml (CONCERNS 80)'
+  verified_fixed: ['REL-020', 'REL-021 (template fields; residue in REL-025)', 'REL-022 (residue in REL-024)']
+  partial: ['REL-023 (residue in REL-026, REL-027)']
+  deferred: ['REL-007', 'REL-008', 'REL-009', 'REL-018', 'REL-019', 'PC-1', 'CR-5 (gate 6)', 'CRLF seam preservation', 'setext H1/H2']
+  fix_commit: '709e450bebf31a4cef73d7e2f22ef5d54077f990'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'A pure string transform with no network, shell or file I/O. boundary: internal (unchanged): the inputs are a pipeline-written work item and a pipeline-rendered section, and no corpus sink models this section.'
+  performance:
+    status: PASS
+    notes: 'The 57 engine tests run in about 0.2 s; the corpus runs take seconds, and the 12,493-position sweep takes 11 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'Nothing outside the span is lost, and all 11 tracked lists are kept. Silent deletion paths remain inside the span, both off-template with 0 instances on the path: REL-026 (a rendered list drops old linkless lines) and REL-027 (near-miss headings). One stacking path remains (REL-024).'
+  maintainability:
+    status: PASS
+    notes: 'CARRIED_SUBSECTIONS is still a closed list, and every new branch has a mutation-proven test except the fold dedupe (cosmetic).'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'REL-024'
+      severity: low
+      finding: 'Code review CR-1 (medium/high; promoted and re-rated low on evidence) and CR-4 (low/high). trimSeparator (line 248) treats any trailing HTML comment as a separator, not only a template lead-in before the log. A render ending in `<!-- qa-results-end -->` gains one copy per cycle (4 copies after 4 writes; not idempotent). An old section''s own trailing comment is left behind, stale. When the last line ends in `-->`, the scan walks back to an earlier unrelated comment line, and the content between them stays after the new section. Effect: duplicates, never deletes. Corpus: 0 of 156 tracked sections hold a comment line after the peel, 0 end in `-->`, and neither Step 12 template renders a comment. Regression from the gate-8 engine.'
+      suggested_action: 'Peel only a comment that directly precedes the change-log block or its heading, and only when the lines from `<!--` to `-->` form one comment. Add a replace-twice test with a trailing comment.'
+      carried_from: 'top_issues (operator rule 2026-10-01, cycle 9)'
+    - id: 'REL-025'
+      severity: low
+      finding: 'Code review CR-2 (medium/high; promoted and re-rated low). collectBlocks (line 149) ends a block only at a heading of level 1 to 3 or a template field line. So a `#### Bug Reports` block carries QA''s own later `####` subsections, such as stale `#### Recommendations` text, on every cycle. The REL-021 residue has the same effect: a non-template field line or paragraph after a list at the end of the section is carried. Effect: duplicates stale text, never deletes. Corpus: 0 tracked `#### Bug Reports` headings, and 0 of 11 tracked lists carry non-list text.'
+      suggested_action: 'End a carried block at the next heading at or above its own level, and at the end of the list.'
+      carried_from: 'top_issues (operator rule 2026-10-01, cycle 9)'
+    - id: 'REL-026'
+      severity: low
+      finding: 'Code review CR-3 (medium/medium) and CR-5 (cleanup). When the render brings its own `### Bug Reports`, mergeCarried (line 197) keeps only old lines that name a link the render lacks. Old lines with no link are dropped: `#### Open Bugs`, `- None`, a table header, bold group labels. A multi-link old line is re-added whole when any one of its links is missing, which duplicates an entry the render already has. Table rows are spliced under a bullet list. Effect: deletes structure and linkless lines and duplicates entries; no bug link is lost. Corpus: 0 on the path, because neither Step 12 template renders a Bug Reports list. With a rendered list, tasks 116, 42, 76 and 94 would lose 12 structure lines, and task.120''s two-link line would duplicate.'
+      suggested_action: 'Key an entry by its first link and carry the old block''s unmatched remainder whole, or state in both Step 12 notes that a render must not include a Bug Reports list.'
+      carried_from: 'top_issues (operator rule 2026-10-01, cycle 9)'
+    - id: 'REL-027'
+      severity: low
+      finding: 'REL-023 residue. The heading pattern (line 138) matches `### Bug reports`, `#### Bug Reports` and `### Bug Reports (1)`. It does not match the bold `**Bug Reports**` label that gate 8 named, `### Bug Report` (singular) or `### Bugs`. In those three cases the list is dropped while the write reports `replaced` (probe). Effect: deletes. Corpus: 0 lists that create-bug-report wrote use these shapes (it writes the exact `### Bug Reports`). There is 1 QA-owned bold label, in task.83''s `### QA Reports`.'
+      suggested_action: 'Match a bold label and the singular form, or make the exact `### Bug Reports` heading a stated contract in create-bug-report Step 5.'
+      carried_from: 'top_issues (operator rule 2026-10-01, cycle 9)'
+    - action: 'REL-024: restrict the comment peel to a lead-in directly before the log; add a replace-twice test with a trailing comment'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+    - action: 'REL-025: end a carried block at a heading at or above its own level, and at the end of the list'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'REL-026: key merged entries by first link and carry the unmatched remainder whole, or forbid a rendered list in both Step 12 notes'
+      refs: ['shared/resources/qa-results.js', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'REL-027: match a bold label and the singular form, or make the exact heading a stated contract in create-bug-report Step 5'
+      refs: ['shared/resources/qa-results.js', 'skills/create-bug-report/SKILL.md']
+    - action: 'Pre-existing (5b): the route-2/2b step records Deferred Work "on the work item" with no position; task.141 placed it inside the QA section, where a later replace deletes it (1 tracked instance). Name a position outside the section.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'Carried: REL-007..010, REL-018, REL-019, PC-1, CR-5 (gate 6), CRLF seams, setext (see the task Deferred Work)'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/change-log.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['REL-024..REL-027 fixed, or recorded as known limits in Deferred Work']
