@@ -91,6 +91,8 @@ Three places read a gate file's `updated:` as if it were a clock: the re-review 
 
 ✅ `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md` — gate template (`schema: 2`, `head:`), gate write block, Step 3b scope (lead-in sentence, snippet, `Re-review scope:` recording line); `qa-task` Phase 0 trigger (`qa-story` has no clock-based Phase 0 trigger — its step 3 keys on gate status and issue count only)
 ✅ `skills/qa-gate/SKILL.md` — the same gate template (`schema: 1`, typed `updated:` at the template block): `schema: 2`, `head:`, clock-written `updated:` (review Q1 — the grep condition in Out of Scope is met)
+✅ `skills/qa-fix/SKILL.md` (in-place gate update text) and `skills/qa-fix/resources/qa-gate-template.yaml` — schema 2, re-bound `head:`/`updated:` (QA cycle 2, CR2-9)
+✅ 🆕 `shared/resources/tests/qa-scope-from-head.test.mjs` — the scope and trigger blocks executed under bash and zsh
 ✅ `evals/shared/tests/qa-re-review-scope-parity.test.mjs` — pins the old guard literally (`[ -n "$LAST_GATE_DATE" ]`) and the text `Re-review scope: since`; move both assertions onto the head form
 ✅ `shared/resources/qa-re-review-scope.md` — snippet + table + the `Re-review scope:` example line
 ✅ `shared/resources/pr-conformance-prompt.md` — a new gate row in the trail section (§ D's `updated:` row is about the work document and stays)
@@ -172,6 +174,8 @@ Three places read a gate file's `updated:` as if it were a clock: the re-review 
 ### Files to Modify (Tests)
 
 6. 🆕 `shared/resources/tests/gate-head-freshness.test.mjs`
+6a. 🆕 `shared/resources/tests/qa-scope-from-head.test.mjs`
+6b. ✅ `skills/qa-fix/SKILL.md`, `skills/qa-fix/resources/qa-gate-template.yaml` — schema 2 (CR2-9)
 7. ✅ `evals/shared/tests/qa-re-review-scope-parity.test.mjs` — guard literal and `Re-review scope:` assertion
 7a. ✅ `evals/develop-task/step-isolation/*` — replay gates are `schema: 1` and stay valid; change only an assertion that reads the template
 8. ✅ any test reading `schema: 1`
@@ -246,7 +250,7 @@ None.
 
 1. **A rewritten branch orphans a gate's head**
    - **Risk**: after a rebase, `head:` is not an ancestor of HEAD; the ancestor check HALTs every later cycle.
-   - **Probability**: Low (the pipeline never rebases) · **Impact**: Medium
+   - **Probability**: Low inside the QA loop (nothing rewrites a branch mid-loop); certain afterwards for `develop-batch` items (rebased before merge) and squash merges · **Impact**: Medium — which is why the freshness test holds only rewrite-proof rules and existence/ancestry are checked in the Step 3b block and at 5c (CR2-2)
    - **Mitigation**: the HALT names the cause and the remedy (run the cycle unscoped by deleting nothing — pass `SAFETY_REPROBE=true` semantics, or re-record the gate's head); document in the scope file.
 2. **Schema bump breaks an unknown reader**
    - **Mitigation**: Phase 1's grep across `shared/resources`, `evals`, `skills/*/scripts`; the freshness test's floor ensures at least one schema-2 gate is exercised by CI once the first ships.
@@ -317,6 +321,7 @@ None.
 | 2026-09-30 |  | QA gate FAIL (40/100) — safety re-probe: 1 high, 4 medium promoted, 3 advisory | qa-task |
 | 2026-09-30 |  | QA gate CONCERNS (90/100) — safety re-probe: no high, 2 advisory | qa-task |
 | 2026-09-30 |  | QA findings fixed — gate CONCERNS (90/100), 3 iterations, 13 bugs closed | qa-fix |
+| 2026-09-30 |  | Success criterion 3 amended in QA cycle 2 (CR2-2): the freshness test keeps only rewrite-proof rules; existence and ancestry move to the Step 3b block and the 5c trail row. Scope and Files Summary updated to the shipped diff (5c PC-1–3) | develop-task |
 
 <!-- change-log-end -->
 
