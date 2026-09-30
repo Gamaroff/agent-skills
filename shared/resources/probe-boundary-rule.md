@@ -274,8 +274,12 @@ takes it.
     `--fake-gh`, a **trip-wire `gh`** is first on `PATH`: it records the call and
     exits 127, so the host `gh` never runs, and a run that reached it is declined
     `needs-fake-gh` with nothing scored — whatever the spelling (`${GH_BIN:-gh}`,
-    `GH_CLI=gh; "$GH_CLI"`, a wrapper however it sources `gh-labels.sh`). A library
-    that mentions `gh` but never calls it is scored. **The one limit:** an
+    `GH_CLI=gh; "$GH_CLI"`, a wrapper however it sources `gh-labels.sh`), and
+    under `env -i PATH="$PATH"` too: the stub carries its marker path in its own
+    text, not in the environment. The decline still reports what the runs
+    observed — `escapes`, `cases`, `shells` — as `entry-not-probeable` does: an
+    unscored run's side effect is still a side effect (task.140 QA cycle 3). A
+    library that mentions `gh` but never calls it is scored. **The one limit:** an
     **absolute path** to a real `gh` bypasses `PATH` and runs; a row pins it
     (task.140 QA cycle 2). Otherwise: run bare, the real `gh` fails from the
     sandbox cwd, the function takes its read-failed passthrough, and the verdict

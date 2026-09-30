@@ -594,9 +594,14 @@ const GH_TRIPPED = "gh-tripped";
 /**
  * The trip-wire gh: first on PATH when a shell-form run has no --fake-gh. It
  * never answers — it records the call and exits 127 ("command not found").
+ * The marker path is written INTO the stub, not passed in the environment: a
+ * call under `env -i PATH="$PATH" gh` still reaches the stub, and an
+ * environment variable would be gone by then (task.140 QA cycle 3, BUG-6).
  */
-const TRIPWIRE_GH =
-  '#!/bin/sh\n: > "$PROBE_GH_TRIPPED" 2>/dev/null\necho "security-probe: gh invoked without --fake-gh (trip-wire)" >&2\nexit 127\n';
+function tripwireGh(markerPath) {
+  const quoted = `'${markerPath.replace(/'/g, `'\\''`)}'`;
+  return `#!/bin/sh\n: > ${quoted} 2>/dev/null\necho "security-probe: gh invoked without --fake-gh (trip-wire)" >&2\nexit 127\n`;
+}
 /** Per-process counter naming each spawn's source-completed marker. */
 let harnessSeq = 0;
 /**
@@ -1125,9 +1130,11 @@ export function runProbeSpec({
   if (isShellForm) {
     mkdirSync(join(harnessDir, "bin"), { recursive: true });
     if (fakeGhDir === null) {
-      writeFileSync(join(harnessDir, "bin", "gh"), TRIPWIRE_GH, {
-        mode: 0o755,
-      });
+      writeFileSync(
+        join(harnessDir, "bin", "gh"),
+        tripwireGh(join(harnessDir, GH_TRIPPED)),
+        { mode: 0o755 },
+      );
     }
   }
   let ghTripped = false;
@@ -1248,11 +1255,23 @@ export function runProbeSpec({
   // assign-then-call variable, a wrapper however it sources gh-labels.sh). An
   // absolute path to a real gh bypasses PATH and is a stated limit
   // (probe-boundary-rule.md §5).
+  //
+  // The decline still carries what the runs OBSERVED — escapes, the cases, the
+  // shells — as entry-not-probeable does: nothing is scored, but a side effect
+  // seen during an unscored run is still a side effect (task.140 QA cycle 3,
+  // BUG-5; the rule is task.136 cycle 4, CR-3).
   if (ghTripped) {
-    return decline(
-      "needs-fake-gh",
-      `${resolved.entryPath} invoked \`gh\` at run time with no --fake-gh — the trip-wire on PATH answered, so nothing was scored; pass --fake-gh <dir>`,
-    );
+    return {
+      ...decline(
+        "needs-fake-gh",
+        `${resolved.entryPath} invoked \`gh\` at run time with no --fake-gh — the trip-wire on PATH answered, so nothing was scored; pass --fake-gh <dir>`,
+      ),
+      cases: caseResults,
+      escapes,
+      shells: shells ?? null,
+      fakeGh: fakeGhDir,
+      args: base.args,
+    };
   }
 
   // An import or export failure is a property of the ENTRY, not of one case, so
@@ -1652,7 +1671,6 @@ function runShellCase(
       // was called and exits 127, so the host gh never runs, and runProbeSpec
       // declines the whole run `needs-fake-gh` (task.140 QA cycle 2, BUG-4).
       env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
-      env.PROBE_GH_TRIPPED = join(harnessDir, GH_TRIPPED);
     }
     // The source-completed marker, one per spawn, under the WORK dir — the
     // sentinel skips it, so the marker is never read as an escape.

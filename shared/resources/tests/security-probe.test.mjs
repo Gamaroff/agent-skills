@@ -2116,6 +2116,72 @@ test("shell entry forms: gh reached at RUN time without --fake-gh trips the wire
   }
 });
 
+test("shell entry forms: the trip-wire decline keeps what the runs observed — escapes, cases, shells (task.140 QA cycle 3, TASK-140-BUG-5)", () => {
+  // Writes $HOME (an escape: HOME is inside the sandbox root, outside the work
+  // dir) AND reaches gh. The decline must not replace the escapes with [].
+  const dir = t140Libs("gh-escape", {
+    "both.sh":
+      '#!/usr/bin/env bash\nf() { : > "$HOME/escaped"; X=gh; "$X" api x >/dev/null 2>&1; printf \'%s\\n\' "$1"; }\n',
+    "home-only.sh":
+      '#!/usr/bin/env bash\nf() { : > "$HOME/escaped"; printf \'%s\\n\' "$1"; }\n',
+  });
+  try {
+    const run = (lib) =>
+      runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(dir, lib))}#f`,
+        cases: LABEL_CASES,
+      });
+    const both = run("both.sh");
+    const homeOnly = run("home-only.sh");
+    assert.equal(both.reason, "needs-fake-gh", JSON.stringify(both.declined));
+    assert.equal(both.executed, 0, "nothing is scored");
+    assert.ok(
+      homeOnly.escapes.length > 0,
+      "control: the HOME write is an escape",
+    );
+    assert.equal(
+      both.escapes.length,
+      homeOnly.escapes.length,
+      "the decline reports the same escapes the unscored run observed",
+    );
+    assert.deepEqual(both.shells, probeShells());
+    assert.equal(both.cases.length, LABEL_CASES.length * probeShells().length);
+    assert.equal(both.fakeGh, null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell entry forms: gh called under env -i still trips the wire — the marker path is in the stub, not the environment (task.140 QA cycle 3, TASK-140-BUG-6)", () => {
+  const dir = t140Libs("gh-env-i", {
+    "envi.sh":
+      '#!/usr/bin/env bash\nf() { X=gh; env -i PATH="$PATH" "$X" api x >/dev/null 2>&1; printf \'%s\\n\' "$1"; }\n',
+    "envi-script.sh":
+      '#!/usr/bin/env bash\nX=gh\nenv -i PATH="$PATH" "$X" label list >/dev/null 2>&1\nprintf \'%s\\n\' "$1"\n',
+  });
+  try {
+    for (const [lib, form] of [
+      ["envi.sh", "shell-fn"],
+      ["envi-script.sh", "shell"],
+    ]) {
+      const rel = relative(REPO_ROOT, join(dir, lib));
+      const entry = form === "shell" ? `shell:${rel}` : `shell-fn:${rel}#f`;
+      const r = runProbeSpec({ sink: "filename", entry, cases: LABEL_CASES });
+      assert.equal(
+        r.reason,
+        "needs-fake-gh",
+        `${lib}: ${JSON.stringify(r.declined)}`,
+      );
+      assert.equal(r.executed, 0, lib);
+      // The RUN-TIME decline, not the static detector's: the trip-wire fired.
+      assert.match(r.declined[0].detail, /invoked .gh. at run time/, lib);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("shell entry forms: an ABSOLUTE path to a gh binary bypasses the trip-wire — a stated limit this row pins (task.140 QA cycle 2, probe-boundary-rule.md §5)", () => {
   const outside = mkdtempSync(join(tmpdir(), "t140-abs-gh-"));
   const dir = t140Libs("gh-abs", {});

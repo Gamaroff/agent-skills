@@ -5,7 +5,7 @@ type: task
 description: "Close the seven limits task.136's QA cycle 3, PR review and finalise recorded with concrete, verified fixes: shadow `exit` during the source so a library-installed EXIT trap cannot displace the 97 sentinel; apply the `needs-fake-gh` decline to the `shell:` form too; widen `GH_COMMAND_WORD` and follow one level of top-level `source`; capture the source's status as a simple command so `set -e` libraries whose top-level precondition fails are declined; put the extensionless fake `gh` under both ShellCheck lanes; drop the dead `!isShellFn &&`; and decide the pre-existing `resolveEntry` symlink limit (realpath before containment, or a stated limit with a row)."
 tags: [security, probe, shell-fn, fake-gh, shellcheck, task-136-follow-up]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: High
 created: 2026-09-22
 updated: 2026-09-30
@@ -17,7 +17,7 @@ github_issue: 464
 
 # Technical Task: Harden the `shell-fn:` sentinels and the fake-`gh` coverage
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.140.review.1.shell-fn-sentinel-hardening.md` implemented 2026-09-30
 **GitHub Issue**: [#464](https://github.com/Gamaroff/agent-skills/issues/464)
 
@@ -353,6 +353,7 @@ None.
 | 2026-09-30 |  | QA findings fixed — cycle 1: trap/errexit, fake-gh real paths, detector shapes; cycle 2: mechanisms replaced (source-completed marker, run-time gh trip-wire, ancestor realpath); 2 fix cycles, 7 rows, 10 mutants | qa-fix |
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (3 medium) + 2 advisory | qa-task |
 | 2026-09-30 |  | QA gate FAIL (60/100) — 2 findings (1 high, 1 medium) + 3 advisory | qa-task |
+| 2026-09-30 |  | QA findings fixed — cycle 3 (after an operator grant of 2 cycles): the trip-wire decline keeps escapes/cases/shells; the stub carries its marker path, so `env -i` is recorded; 2 rows, 2 mutants | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking
