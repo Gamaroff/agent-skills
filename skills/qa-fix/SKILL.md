@@ -1493,7 +1493,7 @@ You: "Update QA report and gate with bug resolutions for {task_id}"
 2. **Latest Quality Gate** (`docs/tasks/task.{id}.{name}/task.{id}.gate.{number}.{name}.yml`):
    - Updates `gate` field (CONCERNS → PASS)
    - Updates `status_reason` with fix summary
-   - Updates `updated` timestamp
+   - Re-binds `head:` (`git rev-parse HEAD`) and `updated:` (`date -u +%Y-%m-%dT%H:%M:%SZ`) — never typed
    - Adds `status: closed` and `fixed_date` to issues
    - Updates `quality_score`
    - Adds `bug_resolution` section

@@ -76,6 +76,12 @@ C. TRAIL (category: trail) — the evidence is missing, stale, or contradicts it
      (`git log -1 --format=%aI <head>`) — the gate claims to predate the tree it judged (task.130
      re-check PC-2; task.135). Compare as instants, not strings: `%aI` carries an offset and
      `updated:` a `Z`. A gate with no `head:` (`schema: 1`) is not a finding — it predates the field
+   - a `schema: 2` gate whose `head:` does not resolve in this checkout (`git cat-file -e <head>^{commit}`)
+     or is not an ancestor of the PR head (`git merge-base --is-ancestor <head> HEAD`) — the gate names
+     a commit this branch never contained. This lens runs inside the QA loop, before any
+     `develop-batch` rebase or squash merge rewrites the branch; the repository's gate-head freshness
+     test cannot check this, because after a rewrite a legitimate head is unreachable too (task.135
+     QA cycle 2, CR2-2)
    - a handover file exists with outstanding (unticked) actions
    - a co-located bug report that is still open
    - the work item's Change Log lost rows since the PR's base. The log is append-only, and a row that

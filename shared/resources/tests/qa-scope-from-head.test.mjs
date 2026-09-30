@@ -149,6 +149,12 @@ function scratch({ head = "fix1", schema = 2 } = {}) {
   return { dir, fix1, gate: path.join(dir, "docs", "task.9.gate.2.x.yml") };
 }
 
+/** A key passed as `undefined` is REMOVED from the child's environment — "unset", not "empty". */
+function withoutUnset(env) {
+  for (const k of Object.keys(env)) if (env[k] === undefined) delete env[k];
+  return env;
+}
+
 function run(shell, dir, script, env) {
   const argv =
     shell === "zsh"
@@ -157,7 +163,7 @@ function run(shell, dir, script, env) {
   const r = spawnSync(shell, argv, {
     cwd: dir,
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    env: withoutUnset({ ...process.env, ...env }),
   });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
@@ -274,9 +280,12 @@ test("E — the scope block is the same in the shared rule, qa-task and qa-story
 function runTrigger(shell, fx, taskFile) {
   const script =
     triggerBlock() + '\necho "CODE_MOVED=$CODE_MOVED DOC_MOVED=$DOC_MOVED"\n';
+  // TASK_FILE is repo-relative, as the skill's own argument is; the block derives TASK_DIR from it.
   const r = run(shell, fx.dir, script, {
     LATEST_GATE: fx.gate,
-    TASK_FILE: taskFile,
+    TASK_FILE: path.isAbsolute(taskFile)
+      ? path.relative(fx.dir, taskFile)
+      : taskFile,
   });
   fs.rmSync(fx.dir, { recursive: true, force: true });
   return r;
@@ -338,10 +347,12 @@ function passFixture() {
   TMP.push(dir);
   git(dir, "init", "-q", "-b", "develop");
   const head = commitFile(dir, "skills/a.sh", "echo a\n", "the reviewed tree");
-  fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-  const doc = path.join(dir, "docs", "task.9.x.md");
+  // The task's own directory — the one path the trigger excludes (CR2-4).
+  const taskDir = path.join(dir, "docs", "tasks", "t9");
+  fs.mkdirSync(taskDir, { recursive: true });
+  const doc = path.join(taskDir, "task.9.x.md");
   fs.writeFileSync(doc, "status: ready-for-review\n## QA Results\n");
-  const gate = path.join(dir, "docs", "task.9.gate.1.x.yml");
+  const gate = path.join(taskDir, "task.9.gate.1.x.yml");
   fs.writeFileSync(
     gate,
     `schema: 2\ngate: PASS\nhead: '${head}'\nupdated: '${FUTURE}'\ntop_issues: []\n`,
@@ -396,7 +407,7 @@ test("G — each skill's Step 3b fence binds LATEST_GATE with qa-cycle.sh before
     [QA_STORY, "qa-story", "STORY_DIR"],
   ]) {
     const code = block(f, /^LAST_GATE_HEAD=\$\(grep -E '\^head:'/m);
-    const bind = `[ -n "\${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/${skill}/references/qa-cycle.sh "$${dirVar}" --path gate 2>/dev/null)`;
+    const bind = `[ -n "\${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/${skill}/references/qa-cycle.sh "$${dirVar}" --path gate)`;
     const at = code.indexOf(bind);
     assert.ok(
       at >= 0,
@@ -408,3 +419,145 @@ test("G — each skill's Step 3b fence binds LATEST_GATE with qa-cycle.sh before
     );
   }
 });
+
+// ── CR2 — cycle 2's findings ──────────────────────────────────────────────────
+
+for (const sh of SHELLS) {
+  test(`H1 [${sh}] — cycle 3+ with SAFETY_REPROBE unset HALTs instead of narrowing (CR2-1)`, () => {
+    const fx = scratch();
+    const diff = path.join(fx.dir, "scope.diff");
+    const r = run(sh, fx.dir, scopeBlock(RULE), {
+      PRIOR_GATES: "2",
+      SAFETY_REPROBE: undefined,
+      LATEST_GATE: fx.gate,
+      BASE: "develop",
+      DIFF_FILE: diff,
+    });
+    assert.equal(r.status, 1, r.stdout);
+    assert.match(
+      r.stdout,
+      /HALT: SAFETY_REPROBE is '' — bind it in this shell/,
+    );
+    assert.ok(
+      !fs.existsSync(diff) || fs.readFileSync(diff, "utf8") === "",
+      "nothing scoped",
+    );
+  });
+
+  test(`H2 [${sh}] — cycle 3+ after a security FAIL (SAFETY_REPROBE=true) reviews the whole branch`, () => {
+    const fx = scratch();
+    const diff = path.join(fx.dir, "scope.diff");
+    const r = run(sh, fx.dir, scopeBlock(RULE), {
+      PRIOR_GATES: "2",
+      SAFETY_REPROBE: "true",
+      LATEST_GATE: fx.gate,
+      BASE: "develop",
+      DIFF_FILE: diff,
+    });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const patch = fs.readFileSync(diff, "utf8");
+    assert.match(
+      patch,
+      /skills\/a\.sh/,
+      "the commit the gate judged is back in scope",
+    );
+    assert.match(patch, /skills\/b\.sh/);
+  });
+
+  test(`F7 [${sh}] — a documentation deliverable outside the task directory re-reviews (CR2-4)`, () => {
+    const fx = passFixture();
+    commitFile(
+      fx.dir,
+      "docs/reference/guide.md",
+      "# guide\n",
+      "a docs deliverable",
+    );
+    const r = runTrigger(sh, fx, fx.doc);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /CODE_MOVED=1 DOC_MOVED=0/);
+  });
+
+  test(`F8 [${sh}] — an untracked file outside the task directory re-reviews (CR2-5)`, () => {
+    const fx = passFixture();
+    fs.mkdirSync(path.join(fx.dir, "tools"));
+    fs.writeFileSync(path.join(fx.dir, "tools", "new.sh"), "echo new\n");
+    const r = runTrigger(sh, fx, fx.doc);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /CODE_MOVED=1 DOC_MOVED=0/);
+  });
+
+  test(`F9 [${sh}] — with LATEST_GATE unset the trigger binds the gate itself, and a clean PASS skips (CR2-3)`, () => {
+    const fx = passFixture();
+    // The block addresses the helper as .agents/skills/qa-task/references/qa-cycle.sh from the
+    // repository root; give the scratch repo one, excluded so it is not an untracked change.
+    const helper = path.join(
+      fx.dir,
+      ".agents",
+      "skills",
+      "qa-task",
+      "references",
+    );
+    fs.mkdirSync(helper, { recursive: true });
+    fs.copyFileSync(
+      path.join(ROOT, "shared", "resources", "qa-cycle.sh"),
+      path.join(helper, "qa-cycle.sh"),
+    );
+    fs.appendFileSync(
+      path.join(fx.dir, ".git", "info", "exclude"),
+      ".agents/\n",
+    );
+    fx.gate = undefined;
+    const r = runTrigger(sh, fx, fx.doc);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(
+      r.stdout,
+      /CODE_MOVED=0 DOC_MOVED=0/,
+      "bound: the gate's head was read in this shell",
+    );
+  });
+}
+
+// ── I — Phase 0 step 5's probe binds its own gate (cycle-2 probe) ─────────────
+// Unbound in its own shell, the probe read "no gate" and left SAFETY_REPROBE=false, so the
+// safety carve-out that Step 3b now refuses to run without could never be true.
+
+for (const [skillFile, skill, docVar] of [
+  [QA_TASK, "qa-task", "TASK_FILE"],
+  [QA_STORY, "qa-story", "STORY_FILE"],
+]) {
+  for (const sh of SHELLS) {
+    test(`I [${sh}] ${skill} — the step-5 probe fires on a security FAIL with LATEST_GATE unset`, () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-scope-head-"));
+      TMP.push(dir);
+      git(dir, "init", "-q", "-b", "develop");
+      const workDir = path.join(dir, "docs", "tasks", "t9");
+      fs.mkdirSync(workDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(workDir, "task.9.x.md"),
+        "status: ready-for-review\n",
+      );
+      fs.writeFileSync(
+        path.join(workDir, "task.9.gate.1.x.yml"),
+        "schema: 2\ngate: FAIL\nnfr_validation:\n  security:\n    status: FAIL\n    evidence: measured\n  performance:\n    status: PASS\n",
+      );
+      const helper = path.join(dir, ".agents", "skills", skill, "references");
+      fs.mkdirSync(helper, { recursive: true });
+      fs.copyFileSync(
+        path.join(ROOT, "shared", "resources", "qa-cycle.sh"),
+        path.join(helper, "qa-cycle.sh"),
+      );
+      const probe = block(skillFile, /^SAFETY_REPROBE=false$/m);
+      const r = run(
+        sh,
+        dir,
+        probe + '\necho "SAFETY_REPROBE=$SAFETY_REPROBE"\n',
+        {
+          LATEST_GATE: undefined,
+          [docVar]: "docs/tasks/t9/task.9.x.md",
+        },
+      );
+      assert.equal(r.status, 0, r.stderr);
+      assert.match(r.stdout, /SAFETY_REPROBE=true/);
+    });
+  }
+}

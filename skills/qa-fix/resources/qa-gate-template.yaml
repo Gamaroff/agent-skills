@@ -5,13 +5,14 @@
 # Location: {qa_root}/gates/{epic}.{story}-{story_slug}.yml
 
 # Required fields
-schema: 1
+schema: 2
 story: "2.2" # Format: {epic}.{story}
 story_title: "Example Story Title"
 gate: "CONCERNS" # PASS|CONCERNS|FAIL|WAIVED
 status_reason: "Missing test coverage for AC2 and AC4, rate limiting needed"
 reviewer: "Quinn (Test Architect)"
-updated: "2025-01-12T15:30:00Z" # ISO 8601 timestamp
+head: "4f1c2e8b9a0d3c7e6b5a4f3e2d1c0b9a8f7e6d5c" # git rev-parse HEAD when the review was performed
+updated: "2025-01-12T15:30:00Z" # date -u +%Y-%m-%dT%H:%M:%SZ at write time — never typed
 
 # Waiver (only active when gate is WAIVED)
 waiver:

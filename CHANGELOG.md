@@ -85,12 +85,21 @@ All notable changes to this project will be documented in this file. Format foll
   - `qa-task` Phase 0's re-review trigger counts source commits since the head
     (`git rev-list --count`) and measures document edits from the commit that wrote the gate. A
     gate with no head always re-reviews.
-  - The 5c conformance lens gains a trail row: a gate whose `updated:` precedes its head's author
-    time. § D's `updated:` row, which is about the work document, is unchanged.
+  - The 5c conformance lens gains two trail rows: a gate whose `updated:` precedes its head's
+    author time, and a gate whose `head:` does not resolve or is not an ancestor of the PR head.
+    § D's `updated:` row, which is about the work document, is unchanged.
+  - The trigger counts every change outside the task's own directory — committed, uncommitted or
+    untracked — and the scope block refuses cycle 3+ when `SAFETY_REPROBE` is not bound in its
+    shell, so a security FAIL can never narrow the next cycle. Both blocks bind the latest gate
+    themselves: every fenced block is its own shell.
+  - `gate-head-freshness.test.mjs` holds only rules a branch rewrite cannot break — format, and
+    author time when the head resolves. `develop-batch` rebases open PRs and `mergeStrategy` allows
+    squash, so existence and ancestry are checked in the loop and at 5c instead.
   - Why: on task.130 four gates carried local time labelled `Z`, up to three hours in the future,
     so cycle 4's `--since` matched nothing, and gate 7 predated the commit it reviewed. New tests:
     `qa-scope-from-head.test.mjs` (the scope and trigger blocks executed under bash and zsh) and
-    `gate-head-freshness.test.mjs` (every schema-2 gate in `docs/`).
+    `gate-head-freshness.test.mjs` (every schema-2 gate in `docs/`). `qa-fix`'s gate template is
+    schema 2 too.
 
 - **`change-log.js#fencedRanges` detects fences in CRLF documents (task 131).** `(.*)$` could not
   match the `\r` a CRLF line keeps after `split("\n")`, so no fence was ever found: `report-lint`

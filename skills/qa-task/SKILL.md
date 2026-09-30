@@ -168,6 +168,10 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
 2. **If gate file exists, read and analyze:**
 
    ```bash
+   # Bound in THIS shell: the step-1 block that resolved it is another shell, and an unbound read
+   # here silently takes the no-gate branch (task.135 QA cycle 2 probe).
+   TASK_DIR=$(dirname "$TASK_FILE")
+   [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate 2>/dev/null)
    if [ -n "$LATEST_GATE" ]; then
      GATE_STATUS=$(grep '^gate:' "$LATEST_GATE" | awk '{print $(2)}')
      HAS_ISSUES=$(grep -c '^  - issue:' "$LATEST_GATE" 2>/dev/null || echo 0)
@@ -182,18 +186,26 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    branch can apply, establish that neither has moved since. Gather both freshness signals:
 
    ```bash
+   # $TASK_FILE is this skill's input. $LATEST_GATE and $TASK_DIR are computed, and the step 1 block
+   # that computed them is another shell — bind both here (task.135 QA cycle 2, CR2-3). qa-cycle.sh
+   # refuses with no numbered gate: then GATE_HEAD is empty and both signals below read 1.
+   TASK_DIR=$(dirname "$TASK_FILE")
+   [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate)
    # The commit the gate judged (its `head:`), never its typed `updated:` — a timestamp in the
    # future made `git log --since` hide every later commit from this check (task.135).
-   GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
+   GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
    DOC_STATUS=$(grep -E '^status:' "$TASK_FILE" | head -1 | awk '{print $(2)}')
    if [ -n "$GATE_HEAD" ]; then
-     # Commits since the commit the gate judged, on EVERY path except docs/ — the gate, the QA
-     # report and the task document live there and move on every cycle. A fixed list of source
-     # directories missed scripts/, tests/, package.json and a consumer's src/ (task.135 CR-3).
+     # Commits since the commit the gate judged, on EVERY path except this task's own directory —
+     # the gate, the QA report, the task document and the implementation report live there and move
+     # on every cycle. A fixed list of source directories missed scripts/, tests/ and a consumer's
+     # src/ (task.135 CR-3); excluding all of docs/ hid a documentation deliverable (CR2-4).
      # `|| echo 1` fails toward re-review when git cannot answer (a head this checkout lacks).
-     CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- . ':(exclude)docs' 2>/dev/null || echo 1)
-     # An uncommitted edit outside docs/ is movement too: the gate never read it.
-     git diff --quiet HEAD -- . ':(exclude)docs' 2>/dev/null || CODE_MOVED=$((CODE_MOVED + 1))
+     CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- . ":(exclude)$TASK_DIR" 2>/dev/null || echo 1)
+     # Uncommitted and untracked changes outside the task directory are movement too: the gate
+     # never read them (CR2-5).
+     git diff --quiet HEAD -- . ":(exclude)$TASK_DIR" 2>/dev/null || CODE_MOVED=$((CODE_MOVED + 1))
+     [ -z "$(git ls-files --others --exclude-standard -- . ":(exclude)$TASK_DIR" 2>/dev/null)" ] || CODE_MOVED=$((CODE_MOVED + 1))
      # The document is compared from the commit that last wrote the GATE, not from the head: a QA
      # cycle edits the task document itself (QA Results, Change Log) after the head it records, and
      # those edits land beside the gate. Measured from the head, every gate would read "document
@@ -215,7 +227,7 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    **Skip re-review (exit with success message) ONLY when ALL of:**
    - Gate status is `PASS`
    - AND `top_issues` list is empty
-   - AND `CODE_MOVED` is `0` — nothing outside `docs/` changed since the commit the gate judged, committed or not
+   - AND `CODE_MOVED` is `0` — nothing outside the task's own directory changed since the commit the gate judged: no commit, no uncommitted edit, no untracked file
    - AND `DOC_MOVED` is `0` — the task document has not been edited since the gate was committed
    - AND `DOC_STATUS` is not one of `in-progress` / `ready-for-development` / `planned` — a status
      that moved *backwards* from `accepted` means the work was reopened
@@ -226,7 +238,7 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    - Gate status is `CONCERNS`, `FAIL`, or `WAIVED`
    - OR `top_issues` has items (even if gate is PASS)
    - OR no gate file exists (first review)
-   - OR **anything outside `docs/` changed since the gate's head**, committed or not (`CODE_MOVED` > 0)
+   - OR **anything outside the task's directory changed since the gate's head** — committed, uncommitted or untracked (`CODE_MOVED` > 0)
    - OR **the document changed since the gate was committed** (`DOC_MOVED` = 1)
    - OR **the gate carries no `head:`** (schema 1) — both of the above read `1`
    - OR **the document was reopened** (status moved backwards from `accepted`)
@@ -261,7 +273,11 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    Evaluate `SAFETY_REPROBE` from the prior gate **now**, before Step 3b needs it:
 
    ```bash
-   # $LATEST_GATE is the prior gate file resolved above. Trigger clause 1, per the shared rule.
+   # Bound in THIS shell: the step-1 block that resolved it is another shell, and an unbound read
+   # here reads as "no gate" and leaves SAFETY_REPROBE=false — the carve-out could never fire (task.135 QA cycle 2 probe).
+   TASK_DIR=$(dirname "$TASK_FILE")
+   [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate 2>/dev/null)
+   # $LATEST_GATE is the prior gate file. Trigger clause 1, per the shared rule.
    # POSIX character classes only: `\s` is a GNU extension that BSD/mawk silently never match,
    # which fails the trigger CLOSED — the carve-out would never fire and nothing would say so.
    # LATEST_GATE is EMPTY on a first review. `awk 'prog' ""` passes no filename, falls back to
@@ -415,8 +431,9 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    # The latest gate, bound in THIS shell — Phase 0 binds $LATEST_GATE in its own block, which is
    # another shell, so reading it here unbound made every cycle 3+ run unscoped (task.135 CR-2).
    # Empty on a first review (qa-cycle.sh refuses with no numbered gate); the block below HALTs
-   # when two or more gates exist and none could be bound.
-   [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate 2>/dev/null)
+   # when two or more gates exist and none could be bound. stderr is kept: qa-cycle.sh names why
+   # it refused (two files claiming one cycle), which the HALT below cannot know (CR2-8).
+   [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate)
    # The commit the prior gate judged, read from its `head:` field ($LATEST_GATE set in Phase 0) —
    # never from its `updated:`. A typed timestamp in the future made `git log --since` match nothing,
    # one in the past widened the scope, and neither shows in the output (task.135). A schema-1 gate
@@ -426,6 +443,14 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    # $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
    # guard, not a second block in front of it — two places assigning $DIFF_FILE is how one of them
    # silently stops mattering.
+   # It is an INPUT to this block, bound by the agent in THIS shell — Phase 0's block is another shell,
+   # and clauses 2–3 are judgement calls no block can recompute. Unset, the guard below would read it as
+   # "not true" and narrow after a security FAIL, the exact case the carve-out exists for (task.135
+   # QA cycle 2, CR2-1). So cycle 3+ refuses to run without it.
+   [ "$PRIOR_GATES" -lt 2 ] || case "${SAFETY_REPROBE:-}" in
+     true|false) ;;
+     *) echo "HALT: SAFETY_REPROBE is '${SAFETY_REPROBE:-}' — bind it in this shell to the true|false Phase 0 step 5 resolved (clause 1 from the gate, clauses 2–3 by judgement)"; exit 1 ;;
+   esac
    if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since the last gate's head
      REFUTE_PASS=false
      if [ ! -f "$LATEST_GATE" ] || [ ! -r "$LATEST_GATE" ]; then

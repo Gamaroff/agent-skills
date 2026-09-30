@@ -5,29 +5,27 @@
 // a missing or invented head silently changes what gets reviewed. Its `updated:` used to be typed
 // by hand: on task.130 gate 7 read 12:58Z for a commit authored at 13:12Z.
 //
-// Every `docs/**/*.gate.*.yml` with `schema: 2` is held to the FORMAT rules:
+// For every `docs/**/*.gate.*.yml` with `schema: 2`:
 //   1. `head:` is present and a full 40-hex SHA
 //   2. `updated:` parses as a timestamp
-// A gate this branch adds or changes (against the merge-base with the base branch, plus anything
-// uncommitted) is also held to the HISTORY rules:
-//   3. the head exists in this checkout (`git cat-file -e`)
-//   4. it is an ancestor of HEAD — the branch that carries the gate
-//   5. `updated:` is not earlier than the head's author time
+//   3. when the head resolves in this checkout, `updated:` is not earlier than its author time
 //
-// Why the history rules are branch-scoped (task.135 QA cycle 1, CR-1): develop-batch rebases each
-// item onto the new tip before merging, and `developNext.mergeStrategy` accepts squash and rebase.
-// After either, a merged gate names a SHA that is no longer an ancestor of develop, and is absent
-// from a fresh clone once the branch is deleted. Judging it again on every later PR would turn the
-// suite red for good. A gate is judged against history while its branch is the one under review —
-// the only time the commit it names is guaranteed to be reachable.
+// What this test deliberately does NOT assert: that the head exists, or that it is an ancestor of
+// HEAD. Both are true while the gate's branch is under QA and false, legitimately, afterwards:
+// develop-batch rebases each open item onto the new tip before its quality gate and CI run, and
+// `developNext.mergeStrategy` accepts squash and rebase. A rewritten branch leaves every gate on it
+// naming a pre-rewrite SHA — not an ancestor locally, absent from a fresh CI clone. The first
+// design judged every gate against history (red on develop after any rewrite, task.135 QA cycle 1
+// CR-1); the second judged only the branch's own gates (still red on develop-batch's rebase of an
+// open PR, cycle 2 CR2-2). No corpus-wide rule can tell a rewritten head from an invented one once
+// the old commit is gone, so existence and ancestry are checked where history is still intact:
+// the Step 3b scope block HALTs on either at the next QA cycle, and the 5c conformance lens flags
+// either on the PR before it leaves the loop. This test holds only what a rewrite cannot break.
 //
-// The base is `$GATE_HEAD_BASE` or `origin/develop`. When it cannot be resolved — release.yml runs
-// `npm test` on a depth-1 tag checkout — the history rules are skipped and the test says so; the
-// format rules still run.
-//
-// Schema-1 gates predate the field and are counted and skipped — never backfilled. The schema-2 set
-// the walker finds is compared with an independent `git ls-files` enumeration, so a walker that
-// silently matches nothing cannot pass as "no schema-2 gates yet".
+// An unresolvable head is reported as a diagnostic, not a failure. Schema-1 gates predate the
+// field and are counted and skipped — never backfilled. The schema-2 set the walker finds is
+// compared with an independent `git ls-files` enumeration, so a walker that silently matches
+// nothing cannot pass as "no schema-2 gates yet".
 //
 // The rules are also run against scratch-repo fixtures, so each assertion is proven able to go red
 // without touching a real gate.
@@ -57,15 +55,12 @@ function gitOk(cwd, ...args) {
   return spawnSync("git", args, { cwd, encoding: "utf8" }).status === 0;
 }
 
-function gitOut(cwd, ...args) {
-  return execFileSync("git", args, { cwd, encoding: "utf8" });
-}
-
 /**
- * The problems with one gate, or [] when it is fresh. Returns null for a gate that is not schema 2
- * (it predates `head:` and is skipped, not judged). `history: false` applies the format rules only.
+ * Judge one gate. Returns null for a gate that is not schema 2 (it predates `head:` and is skipped,
+ * not judged); otherwise `{ problems, resolved }`, where `resolved` says whether the head was found
+ * in this checkout and so whether rule 3 could be applied.
  */
-export function checkGate(yml, cwd, { history = true } = {}) {
+export function checkGate(yml, cwd) {
   if (field(yml, "schema") !== "2") return null;
   const problems = [];
   const head = field(yml, "head");
@@ -73,7 +68,7 @@ export function checkGate(yml, cwd, { history = true } = {}) {
     problems.push(
       `head: missing or not a full 40-hex SHA (read ${JSON.stringify(head)})`,
     );
-    return problems;
+    return { problems, resolved: false };
   }
   const updated = field(yml, "updated");
   const updatedAt = Date.parse(updated ?? "");
@@ -81,17 +76,10 @@ export function checkGate(yml, cwd, { history = true } = {}) {
     problems.push(
       `updated: ${JSON.stringify(updated)} does not parse as a timestamp`,
     );
-    return problems;
+    return { problems, resolved: false };
   }
-  if (!history) return problems;
   if (!gitOk(cwd, "cat-file", "-e", `${head}^{commit}`)) {
-    problems.push(`head ${head} does not exist in this checkout`);
-    return problems;
-  }
-  if (!gitOk(cwd, "merge-base", "--is-ancestor", head, "HEAD")) {
-    problems.push(
-      `head ${head} is not an ancestor of HEAD — the gate names a commit off this branch`,
-    );
+    return { problems, resolved: false };
   }
   const authored = execFileSync("git", ["log", "-1", "--format=%aI", head], {
     cwd,
@@ -102,22 +90,7 @@ export function checkGate(yml, cwd, { history = true } = {}) {
       `updated: ${updated} precedes its head's author time ${authored} — the gate claims to predate the tree it judged`,
     );
   }
-  return problems;
-}
-
-/**
- * Repo-relative paths this branch adds or changes — the working tree against the merge-base with
- * `base`, plus untracked files — or null when `base` cannot be resolved (no history to judge by).
- */
-export function branchChangedPaths(cwd, base) {
-  if (!gitOk(cwd, "rev-parse", "--verify", "--quiet", `${base}^{commit}`))
-    return null;
-  const mb = gitOut(cwd, "merge-base", "HEAD", base).trim();
-  const lines = [
-    ...gitOut(cwd, "diff", "--name-only", mb).split("\n"),
-    ...gitOut(cwd, "ls-files", "--others", "--exclude-standard").split("\n"),
-  ];
-  return new Set(lines.filter(Boolean));
+  return { problems, resolved: true };
 }
 
 function gatesUnder(dir) {
@@ -134,67 +107,59 @@ function gatesUnder(dir) {
   return out.sort();
 }
 
-/**
- * Judge every gate path: format rules for every schema-2 gate, history rules only for those in
- * `onBranch` (a Set of repo-relative paths, or null for "no base — judge no history").
- */
-export function judgeCorpus(root, gates, onBranch) {
+/** Judge every gate path; `unresolved` lists schema-2 gates whose head this checkout lacks. */
+export function judgeCorpus(root, gates) {
   const schema2 = [];
+  const unresolved = [];
   let skipped = 0;
-  let historyChecked = 0;
   const failures = [];
   for (const g of gates) {
     const rel = path.relative(root, g);
-    const history = onBranch !== null && onBranch.has(rel);
-    const problems = checkGate(fs.readFileSync(g, "utf8"), root, { history });
-    if (problems === null) {
+    const r = checkGate(fs.readFileSync(g, "utf8"), root);
+    if (r === null) {
       skipped++;
       continue;
     }
     schema2.push(rel);
-    if (history) historyChecked++;
-    for (const p of problems) failures.push(`${rel}: ${p}`);
+    if (!r.resolved && r.problems.length === 0) unresolved.push(rel);
+    for (const p of r.problems) failures.push(`${rel}: ${p}`);
   }
-  return { schema2, skipped, historyChecked, failures };
+  return { schema2, unresolved, skipped, failures };
 }
 
 // ── The corpus ────────────────────────────────────────────────────────────────
 
 const SCHEMA_2 = /^schema:\s*['"]?2['"]?\s*(#.*)?$/m;
 
-test("every schema-2 gate under docs/ is well-formed, and every gate this branch touches is anchored in its history", (t) => {
+test("every schema-2 gate under docs/ is well-formed and does not predate the head it names", (t) => {
   const gates = gatesUnder(path.join(ROOT, "docs"));
   assert.ok(
     gates.length > 0,
     "found no gate files under docs/ — the walk is broken, not the corpus empty",
   );
-  const base = process.env.GATE_HEAD_BASE || "origin/develop";
-  const onBranch = branchChangedPaths(ROOT, base);
-  if (onBranch === null) {
+  const { schema2, unresolved, skipped, failures } = judgeCorpus(ROOT, gates);
+  t.diagnostic(
+    `${schema2.length} schema-2 gate(s), ${schema2.length - unresolved.length} with a resolvable head; ${skipped} schema-1 skipped`,
+  );
+  for (const u of unresolved) {
     t.diagnostic(
-      `${base} does not resolve — history rules skipped, format rules only`,
+      `${u}: head not in this checkout — rewritten branch or shallow clone; author time not checked`,
     );
   }
 
-  const { schema2, skipped, historyChecked, failures } = judgeCorpus(
-    ROOT,
-    gates,
-    onBranch,
-  );
-  t.diagnostic(
-    `${schema2.length} schema-2 gate(s), ${historyChecked} judged against history; ${skipped} schema-1 skipped`,
-  );
-
   // Independent enumeration (CR-8): git's own view of the gate files, not the walker's. A walker
   // regex that stopped matching would read the corpus as empty and pass on nothing.
-  const listed = gitOut(
-    ROOT,
-    "ls-files",
-    "--cached",
-    "--others",
-    "--exclude-standard",
-    "--",
-    ":(glob)docs/**/*.gate.*.yml",
+  const listed = execFileSync(
+    "git",
+    [
+      "ls-files",
+      "--cached",
+      "--others",
+      "--exclude-standard",
+      "--",
+      ":(glob)docs/**/*.gate.*.yml",
+    ],
+    { cwd: ROOT, encoding: "utf8" },
   )
     .split("\n")
     .filter(Boolean)
@@ -210,7 +175,7 @@ test("every schema-2 gate under docs/ is well-formed, and every gate this branch
   assert.deepEqual(
     failures,
     [],
-    `stale or unanchored gates:\n  ${failures.join("\n  ")}`,
+    `malformed or stale gates:\n  ${failures.join("\n  ")}`,
   );
 });
 
@@ -251,121 +216,48 @@ const gate = (lines) =>
 test("a gate stamped after its head's author time is fresh (offsets compared as instants)", () => {
   const { dir, head } = scratch();
   // 11:20Z is 13:20+02:00 — eight minutes after the head, though "11" < "13" as a string.
-  const p = checkGate(
+  const r = checkGate(
     gate([`head: '${head}'  # reviewed`, "updated: '2026-09-20T11:20:00Z'"]),
     dir,
   );
-  assert.deepEqual(p, []);
+  assert.deepEqual(r, { problems: [], resolved: true });
 });
 
 test("a gate whose updated: precedes its head's author time is red", () => {
   const { dir, head } = scratch();
   // 10:58Z is 12:58+02:00 — fourteen minutes before the head: task.130 gate 7's shape.
-  const p = checkGate(
+  const r = checkGate(
     gate([`head: '${head}'`, "updated: '2026-09-20T10:58:00Z'"]),
     dir,
   );
-  assert.equal(p.length, 1);
-  assert.match(p[0], /precedes its head's author time/);
+  assert.equal(r.problems.length, 1);
+  assert.match(r.problems[0], /precedes its head's author time/);
 });
 
 test("a schema-2 gate with no head: is red", () => {
   const { dir } = scratch();
-  const p = checkGate(gate(["updated: '2026-09-20T11:20:00Z'"]), dir);
-  assert.match(p[0], /head: missing/);
+  const r = checkGate(gate(["updated: '2026-09-20T11:20:00Z'"]), dir);
+  assert.match(r.problems[0], /head: missing/);
 });
 
-test("a head this checkout does not have is red", () => {
-  const { dir } = scratch();
-  const p = checkGate(
-    gate([`head: '${"a".repeat(40)}'`, "updated: '2026-09-20T11:20:00Z'"]),
-    dir,
-  );
-  assert.match(p[0], /does not exist in this checkout/);
-});
-
-test("a head off this branch is red", () => {
-  const { dir, git } = scratch();
-  git("checkout", "-q", "-b", "side");
-  fs.writeFileSync(path.join(dir, "b.txt"), "b\n");
-  git("add", "b.txt");
-  git("commit", "-q", "-m", "side");
-  const side = git("rev-parse", "HEAD");
-  git("checkout", "-q", "main");
-  const p = checkGate(
-    gate([`head: '${side}'`, "updated: '2026-09-20T11:20:00Z'"]),
-    dir,
-  );
-  assert.match(p[0], /not an ancestor of HEAD/);
+test("an updated: that does not parse is red", () => {
+  const { dir, head } = scratch();
+  const r = checkGate(gate([`head: '${head}'`, "updated: 'yesterday'"]), dir);
+  assert.match(r.problems[0], /does not parse/);
 });
 
 test("a schema-1 gate is skipped, not judged", () => {
   const { dir } = scratch();
-  const p = checkGate(
+  const r = checkGate(
     "schema: 1\ngate: PASS\nupdated: '2020-01-01T00:00:00Z'\n",
     dir,
   );
-  assert.equal(p, null);
+  assert.equal(r, null);
 });
 
-// ── Branch scoping (CR-1): a merged gate is not re-judged against history ─────
+// ── Rewrite-proof (CR-1, CR2-2): a rewritten branch does not turn the suite red ─
 
-test("a gate whose head is unreachable is still well-formed when history is not judged", () => {
-  const { dir } = scratch();
-  const p = checkGate(
-    gate([`head: '${"b".repeat(40)}'`, "updated: '2026-09-20T11:20:00Z'"]),
-    dir,
-    { history: false },
-  );
-  assert.deepEqual(p, []);
-});
-
-test("format rules still hold when history is not judged", () => {
-  const { dir } = scratch();
-  assert.match(
-    checkGate(gate(["updated: '2026-09-20T11:20:00Z'"]), dir, {
-      history: false,
-    })[0],
-    /head: missing/,
-  );
-  assert.match(
-    checkGate(
-      gate([`head: '${"b".repeat(40)}'`, "updated: 'yesterday'"]),
-      dir,
-      { history: false },
-    )[0],
-    /does not parse/,
-  );
-});
-
-test("branchChangedPaths: this branch's committed, modified and untracked gates — not the base's", () => {
-  const { dir, git } = scratch();
-  fs.mkdirSync(path.join(dir, "docs"));
-  fs.writeFileSync(path.join(dir, "docs", "t.gate.1.x.yml"), "schema: 2\n");
-  git("add", "-A");
-  git("commit", "-q", "-m", "merged earlier");
-  git("checkout", "-q", "-b", "feature");
-  fs.writeFileSync(path.join(dir, "docs", "t.gate.2.x.yml"), "schema: 2\n");
-  git("add", "-A");
-  git("commit", "-q", "-m", "this branch");
-  fs.writeFileSync(path.join(dir, "docs", "t.gate.3.x.yml"), "schema: 2\n");
-  const on = branchChangedPaths(dir, "main");
-  assert.ok(on.has("docs/t.gate.2.x.yml"), "committed on the branch");
-  assert.ok(on.has("docs/t.gate.3.x.yml"), "untracked on the branch");
-  assert.ok(!on.has("docs/t.gate.1.x.yml"), "already on the base");
-  fs.appendFileSync(path.join(dir, "docs", "t.gate.1.x.yml"), "gate: PASS\n");
-  assert.ok(
-    branchChangedPaths(dir, "main").has("docs/t.gate.1.x.yml"),
-    "a base gate edited in the working tree is judged",
-  );
-});
-
-test("branchChangedPaths returns null when the base does not resolve", () => {
-  const { dir } = scratch();
-  assert.equal(branchChangedPaths(dir, "origin/no-such-branch"), null);
-});
-
-test("judgeCorpus: an unreachable head fails only when its gate is on this branch", () => {
+test("a head this checkout lacks (rebased and force-pushed, or squash-merged) is unresolved, not red", () => {
   const { dir } = scratch();
   fs.mkdirSync(path.join(dir, "docs"));
   const g = path.join(dir, "docs", "t.gate.1.x.yml");
@@ -373,19 +265,31 @@ test("judgeCorpus: an unreachable head fails only when its gate is on this branc
     g,
     gate([`head: '${"b".repeat(40)}'`, "updated: '2026-09-20T11:20:00Z'"]),
   );
-  const merged = judgeCorpus(dir, [g], new Set());
+  const c = judgeCorpus(dir, [g]);
+  assert.deepEqual(c.failures, []);
+  assert.deepEqual(c.unresolved, ["docs/t.gate.1.x.yml"]);
+});
+
+test("a head off the current branch (rebased locally) is still judged on author time, not ancestry", () => {
+  const { dir, git } = scratch();
+  git("checkout", "-q", "-b", "side");
+  fs.writeFileSync(path.join(dir, "b.txt"), "b\n");
+  git("add", "b.txt");
+  git("commit", "-q", "-m", "side");
+  const side = git("rev-parse", "HEAD");
+  git("checkout", "-q", "main");
   assert.deepEqual(
-    merged.failures,
-    [],
-    "a merged gate is not re-judged against history",
+    checkGate(
+      gate([`head: '${side}'`, "updated: '2026-09-20T11:20:00Z'"]),
+      dir,
+    ),
+    { problems: [], resolved: true },
+    "not an ancestor of HEAD — and not a failure",
   );
-  assert.equal(merged.historyChecked, 0);
-  const onBranch = judgeCorpus(dir, [g], new Set(["docs/t.gate.1.x.yml"]));
-  assert.equal(onBranch.historyChecked, 1);
-  assert.match(onBranch.failures[0], /does not exist in this checkout/);
-  assert.deepEqual(
-    judgeCorpus(dir, [g], null).failures,
-    [],
-    "no base resolves → no history judged",
+  assert.match(
+    checkGate(gate([`head: '${side}'`, "updated: '2026-09-20T10:58:00Z'"]), dir)
+      .problems[0],
+    /precedes its head's author time/,
+    "the author-time rule still applies to a resolvable off-branch head",
   );
 });

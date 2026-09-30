@@ -1,0 +1,76 @@
+schema: 2
+task: 'task.135.gate-scoping-from-recorded-head'
+task_title: 'Gate scoping from a recorded head, not a typed timestamp'
+gate: FAIL
+status_reason: 'Refute pass: cycle 1 fixes combine into a safety regression (cycle 3+ narrows after a security FAIL) and the freshness test still breaks on develop-batch in-flight rebases; two MEDIUM sibling defects in the Phase 0 trigger.'
+reviewer: 'QA Engineer'
+head: '60b4ef6e8cfb8ac2117f593537ff769cdf6bef38'        # git rev-parse HEAD when the review was performed
+updated: '2026-09-30T13:06:46Z'  # date -u at write time
+
+top_issues:
+  - id: 'CR2-1'
+    severity: high
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'Step 3b reads $SAFETY_REPROBE, assigned only in the Phase 0 step 5 block (another shell). With cycle 1 binding LATEST_GATE, cycle 3+ now narrows after a security FAIL instead of re-probing unscoped. Same block in both skills.'
+    suggested_action: 'Refuse cycle 3+ when SAFETY_REPROBE is not true|false in this shell; executed test with it unset. Bug: task.135.bug.5.'
+    suggested_owner: dev
+  - id: 'CR2-2'
+    severity: high
+    file: 'shared/resources/tests/gate-head-freshness.test.mjs'
+    finding: 'develop-batch rebases open PRs (items 2+) before its quality gate and CI; their on-branch gates name pre-rebase heads, so the branch-scoped history rules still fail (not an ancestor locally, absent in CI).'
+    suggested_action: 'Keep only rewrite-proof invariants in the corpus test; check existence/ancestry in-loop and at 5c. Bug: task.135.bug.6.'
+    suggested_owner: dev
+  - id: 'CR2-3'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Phase 0 step 3 reads $LATEST_GATE unbound (set only in step 1''s block): the PASS-skip can never fire and the cause recorded is falsely schema 1.'
+    suggested_action: 'Bind LATEST_GATE at the top of the block with qa-cycle.sh; test with it absent. Bug: task.135.bug.7.'
+    suggested_owner: dev
+  - id: 'CR2-4'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'CODE_MOVED excludes all of docs/, so a documentation deliverable outside the work item changes without re-review.'
+    suggested_action: 'Exclude only the task directory; count untracked files outside it. Bug: task.135.bug.8.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 92
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2, 3]
+  ci: 'informational — PR #531 link-check/shellcheck/validate green, test in progress @ 60b4ef6e'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'CR2-1 disables the safety re-probe carve-out at cycle 3+. boundary: false — no function accepting external input (checkGate, judgeCorpus, branchChangedPaths are test helpers).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-2 would HALT develop-batch items; CR2-3 disables the PASS skip.'
+  maintainability:
+    status: PASS
+    notes: 'One pinned block; two executed suites.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1 to CR2-4 (bugs 5–8).'
+      refs: ['shared/resources/qa-re-review-scope.md', 'shared/resources/tests/gate-head-freshness.test.mjs', 'skills/qa-task/SKILL.md']
+  future:
+    - action: 'CR2-5 untracked files (with CR2-4); CR2-6 merge-base throw (moot if branch scoping goes); CR2-7 state the empty-list HALT precisely; CR2-8 keep qa-cycle.sh stderr; CR2-9 qa-fix gate-update text and qa-gate-template.yaml to schema 2.'
+      refs: ['skills/qa-fix/SKILL.md', 'skills/qa-fix/resources/qa-gate-template.yaml']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

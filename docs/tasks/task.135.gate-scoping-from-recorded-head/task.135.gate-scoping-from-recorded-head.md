@@ -29,7 +29,7 @@ Three places read a gate file's `updated:` as if it were a clock: the re-review 
 
 **Scope**: the gate template's frontmatter (`head:`), the two QA skills' gate writers and Phase 0 / Step 3b readers, `shared/resources/qa-re-review-scope.md` (the scope snippet and its table), the conformance prompt's consistency row, a gate-freshness test, bundled copies, CHANGELOG.
 
-**Key deliverables**: (1) every gate carries `head: <40-hex>` — the commit the review was performed against — written from `git rev-parse HEAD` at gate-write time; `updated:` is written from `date -u +%Y-%m-%dT%H:%M:%SZ` in the same block, never typed. (2) Cycle N+1's scope is `git diff "<gate N head>"..HEAD --name-only` (files) and `git diff "<gate N head>"..HEAD -- <files>` (patch) — no `--since`; the re-review trigger's "code moved since the gate" is `git rev-list --count <head>..HEAD -- <paths>`. (3) A test that reads every gate in `docs/` and fails when `head:` is absent, is not an ancestor of the branch that carries the gate, or when `updated:` is earlier than the head's author time. (4) The 5c conformance row compares `updated:` to the head's author time, not to sibling mtimes.
+**Key deliverables**: (1) every gate carries `head: <40-hex>` — the commit the review was performed against — written from `git rev-parse HEAD` at gate-write time; `updated:` is written from `date -u +%Y-%m-%dT%H:%M:%SZ` in the same block, never typed. (2) Cycle N+1's scope is `git diff "<gate N head>"..HEAD --name-only` (files) and `git diff "<gate N head>"..HEAD -- <files>` (patch) — no `--since`; the re-review trigger's "code moved since the gate" is `git rev-list --count <head>..HEAD -- <paths>`. (3) A test that reads every gate in `docs/` and fails when `head:` is absent or malformed, or when `updated:` is earlier than the head's author time (where the head resolves); existence and ancestry are enforced in the loop and at 5c, because a branch rewrite makes a legitimate head unreachable (amended in QA cycle 2, CR2-2). (4) The 5c conformance row compares `updated:` to the head's author time, not to sibling mtimes.
 
 **Expected outcome**: a gate says which commit it judged, and the next cycle's scope is derived from that fact; a typed timestamp can no longer widen a review to the whole branch or shrink it to nothing.
 
@@ -75,7 +75,7 @@ Three places read a gate file's `updated:` as if it were a clock: the re-review 
 - **Scope**: `LAST_GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" | …)`; `git cat-file -e "$LAST_GATE_HEAD^{commit}" || HALT "gate N names a head this checkout does not have"`; `git merge-base --is-ancestor "$LAST_GATE_HEAD" HEAD || HALT "gate N's head is not an ancestor of HEAD — the branch was rewritten"`; `FILES=$(git diff --name-only "$LAST_GATE_HEAD"..HEAD)`; the non-vacuity guard stays. The table row reads *"since gate N's `head:`"*. A `schema: 1` gate with no `head:` → the cycle runs **unscoped** and says so (`scope: unscoped — prior gate carries no head (schema 1)`), never `--since`.
 - **Re-review trigger**: `CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- apps packages shared skills …)`; the document-edited check becomes `git diff --quiet "$GATE_HEAD"..HEAD -- "$TASK_FILE"`.
 - **5c row** (new, trail section): *"a gate's `updated:` earlier than `git log -1 --format=%aI <head>` — the gate claims to predate the commit it judged"*. The existing § D row (the work document's `updated:` vs its sibling artifacts) is unchanged.
-- **Test** `shared/resources/tests/gate-head-freshness.test.mjs`: for every `*.gate.*.yml` under `docs/` with `schema: 2`: `head:` present and 40-hex; `git cat-file -e`; `git merge-base --is-ancestor <head> <branch tip>`; `updated:` ≥ the head's author time; plus a non-vacuity floor (≥ 1 schema-2 gate once the first ships; the corpus test skips schema-1 gates and counts them).
+- **Test** `shared/resources/tests/gate-head-freshness.test.mjs`: for every `*.gate.*.yml` under `docs/` with `schema: 2`: `head:` present and 40-hex; `git cat-file -e`; `git merge-base --is-ancestor <head> <branch tip>`; `updated:` ≥ the head's author time; plus a non-vacuity floor (≥ 1 schema-2 gate once the first ships; the corpus test skips schema-1 gates and counts them). **Amended in QA cycle 2 (CR2-2):** the corpus test keeps only the rules a branch rewrite cannot break — 40-hex `head:`, parseable `updated:`, and `updated:` ≥ author time when the head resolves. `develop-batch` rebases open PRs before their quality gate and CI, and `mergeStrategy` allows squash, so a legitimate head becomes unreachable; existence and ancestry are enforced by the Step 3b block at the next cycle and by a 5c conformance trail row, while the branch is intact.
 
 ### Important Clarifications
 
@@ -153,7 +153,7 @@ Three places read a gate file's `updated:` as if it were a clock: the re-review 
 **Risk**: Low
 **Files**: 🆕 `tests/gate-head-freshness.test.mjs`, `pr-conformance-prompt.md`
 
-- [x] Corpus test over `docs/**/*.gate.*.yml`: schema-2 gates carry a 40-hex `head:` that exists, is an ancestor of the branch tip, and whose author time ≤ `updated:`; schema-1 gates counted and skipped; non-vacuity floor
+- [x] Corpus test over `docs/**/*.gate.*.yml`: schema-2 gates carry a 40-hex `head:` that exists, is an ancestor of the branch tip, and whose author time ≤ `updated:`; schema-1 gates counted and skipped; non-vacuity floor — amended (CR2-2): existence/ancestry moved to the in-loop block and 5c; the corpus keeps format + author time when resolvable
 - [x] Mutation: a fixture gate with `updated:` before its head's author time → red; `head:` absent → red
 - [x] 5c: a new gate row in the trail section — a gate whose `updated:` precedes the author time of its `head:` (`git log -1 --format=%aI <head>`) claims to predate the tree it judged (task.130 re-check PC-2, filed as `trail`). § D's `updated:` row concerns the work document and is left unchanged
 
@@ -285,24 +285,25 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 60/100
+**Quality Score**: 40/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.135.qa.1.gate-scoping-from-recorded-head.md](./task.135.qa.1.gate-scoping-from-recorded-head.md)
-- **Gate File**: [task.135.gate.1.gate-scoping-from-recorded-head.yml](./task.135.gate.1.gate-scoping-from-recorded-head.yml)
+- **Full Report**: [task.135.qa.2.gate-scoping-from-recorded-head.md](./task.135.qa.2.gate-scoping-from-recorded-head.md)
+- **Gate File**: [task.135.gate.2.gate-scoping-from-recorded-head.yml](./task.135.gate.2.gate-scoping-from-recorded-head.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 79 (three suites) + develop-task / develop-story eval replays
+- **Tests Executed**: 92 (three suites) + develop-task / develop-story eval replays
 - **Phases Verified**: 3/3
-- **Critical Issues**: 1 HIGH, 2 MEDIUM promoted (CR-1–CR-3); 1 MEDIUM advisory (CR-4)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 2 HIGH, 2 MEDIUM promoted (CR2-1 … CR2-4); 5 LOW advisory
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR-1: the freshness test's history rules go red after a rebase or squash merge ([bug 1](./task.135.bug.1.freshness-test-red-after-rebase-or-squash.md))
-- CR-2: the Step 3b block reads `$LATEST_GATE` from another shell and always runs unscoped ([bug 2](./task.135.bug.2.step-3b-reads-latest-gate-from-another-shell.md))
-- CR-3: the Phase 0 trigger counts five directories only ([bug 3](./task.135.bug.3.code-moved-counts-only-five-directories.md))
-- CR-4 (advisory): uncommitted document edits are invisible to the trigger ([bug 4](./task.135.bug.4.doc-moved-ignores-uncommitted-edits.md))
+- CR2-1: cycle 3+ narrows after a security FAIL — `$SAFETY_REPROBE` read from another shell ([bug 5](./task.135.bug.5.cycle-3-narrows-on-a-security-fail.md))
+- CR2-2: the freshness test breaks on develop-batch's rebase of open PRs ([bug 6](./task.135.bug.6.freshness-test-red-after-in-flight-rebase.md))
+- CR2-3: the Phase 0 trigger reads `$LATEST_GATE` from another shell ([bug 7](./task.135.bug.7.phase-0-trigger-reads-latest-gate-unbound.md))
+- CR2-4: excluding all of `docs/` hides documentation deliverables ([bug 8](./task.135.bug.8.code-moved-excludes-all-docs.md))
+- Cycle 1 bugs 1–4: fixed ([QA report 1](./task.135.qa.1.gate-scoping-from-recorded-head.md)); bug 1 partial → bug 6
 
 ## Change Log
 
@@ -315,6 +316,7 @@ None.
 | 2026-09-30 |  | Status → ready-for-development | review-task |
 | 2026-09-30 |  | Implemented — 10 authored files (8 modified, 2 new tests), 21 new tests, 4 mutation proofs; bundled copies regenerated | develop |
 | 2026-09-30 |  | QA gate FAIL (60/100) — 1 high, 2 medium promoted, 1 medium advisory | qa-task |
+| 2026-09-30 |  | QA gate FAIL (40/100) — refute pass: 2 high, 2 medium promoted, 5 low | qa-task |
 
 <!-- change-log-end -->
 

@@ -45,16 +45,22 @@ commits cannot be typed wrong in a way `git` accepts silently (task.135).
   was rewritten), is a HALT that names the cause. Nothing rewrites a branch inside the QA loop, so
   this should not fire there; it can fire afterwards — `develop-batch` rebases each item onto the
   new tip before merging it, and `developNext.mergeStrategy` accepts `squash` and `rebase`. If it
-  fires mid-loop, re-record the gate's `head:` or run the cycle unscoped deliberately. (The same
-  fact is why the gate-head freshness test judges a gate against history only while its own branch
-  is under review.)
+  fires mid-loop, re-record the gate's `head:` or run the cycle unscoped deliberately. The same fact
+  is why the gate-head freshness test holds only rewrite-proof rules (format, and author time when
+  the head resolves): existence and ancestry are checked here, at the next cycle, and by the 5c
+  conformance lens, while the branch is still intact.
 - **The block reads `$LATEST_GATE`, and binds it itself.** Each skill's Step 3b preamble sets it
   with `qa-cycle.sh --path gate` in the same shell — Phase 0 binds it too, but every fenced block
   is its own shell. With two or more gates and no readable file bound, the block HALTs rather than
   report "schema 1" (task.135 QA cycle 1, CR-2).
-- **Nothing changed since the head** is a HALT too: on cycle 3+ it means no fix landed after the
-  gate, which is a sequencing error. In practice the list always holds the gate and QA report
-  themselves, which land in a commit after the head they record.
+- **Nothing changed since the head** is a HALT, and it is narrow: the gate and QA report land in a
+  commit after the head they record, so the list is empty only while the prior gate is still
+  uncommitted — a sequencing error. It does not detect a fix cycle that changed no code: a list of
+  bookkeeping files alone still scopes, and the develop loop's 5b no-code-change HALT is what
+  catches that case (task.135 QA cycle 2, CR2-7).
+- **`SAFETY_REPROBE` must be bound in the same shell.** The block HALTs on cycle 3+ when it is not
+  `true` or `false`: an unset value would read as "not true" and narrow after a security FAIL
+  (task.135 QA cycle 2, CR2-1).
 - The **patch** is still `git diff <base>...HEAD -- <files>` — the branch's cumulative change on
   those files, so the reviewer has context. Only the *file list* comes from `<head>..HEAD`.
 
@@ -212,6 +218,14 @@ LAST_GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E 
 # $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
 # guard, not a second block in front of it — two places assigning $DIFF_FILE is how one of them
 # silently stops mattering.
+# It is an INPUT to this block, bound by the agent in THIS shell — Phase 0's block is another shell,
+# and clauses 2–3 are judgement calls no block can recompute. Unset, the guard below would read it as
+# "not true" and narrow after a security FAIL, the exact case the carve-out exists for (task.135
+# QA cycle 2, CR2-1). So cycle 3+ refuses to run without it.
+[ "$PRIOR_GATES" -lt 2 ] || case "${SAFETY_REPROBE:-}" in
+  true|false) ;;
+  *) echo "HALT: SAFETY_REPROBE is '${SAFETY_REPROBE:-}' — bind it in this shell to the true|false Phase 0 step 5 resolved (clause 1 from the gate, clauses 2–3 by judgement)"; exit 1 ;;
+esac
 if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since the last gate's head
   REFUTE_PASS=false
   if [ ! -f "$LATEST_GATE" ] || [ ! -r "$LATEST_GATE" ]; then

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-135-BUG-2
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 1, code review CR-2)
 **Date Found**: 2026-09-30
 
@@ -43,3 +43,4 @@ Bind `LATEST_GATE` in each skill's Step 3b preamble with `qa-cycle.sh --path gat
 |------|--------|------------|-------|
 | 2026-09-30 | New | QA Engineer | QA cycle 1 |
 | 2026-09-30 | Ready for QA | qa-fix | Fixed in QA cycle 1 |
+| 2026-09-30 | Closed | QA Engineer | Verified in QA cycle 2 |

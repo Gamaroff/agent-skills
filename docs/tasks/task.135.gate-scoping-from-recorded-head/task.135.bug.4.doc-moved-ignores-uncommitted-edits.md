@@ -4,7 +4,7 @@
 **Bug ID**: TASK-135-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 1, code review CR-4 — advisory, medium confidence)
 **Date Found**: 2026-09-30
 
@@ -34,3 +34,4 @@ Compare the gate commit with the working tree: `git diff --quiet "$GATE_COMMIT" 
 |------|--------|------------|-------|
 | 2026-09-30 | New | QA Engineer | QA cycle 1 |
 | 2026-09-30 | Ready for QA | qa-fix | Fixed in QA cycle 1 |
+| 2026-09-30 | Closed | QA Engineer | Verified in QA cycle 2 |
