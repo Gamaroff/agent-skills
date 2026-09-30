@@ -13,6 +13,7 @@ assignee:
 estimated_effort_hours: 8
 risk_level: medium
 github_issue: 464
+pr_number: 527
 ---
 
 # Technical Task: Harden the `shell-fn:` sentinels and the fake-`gh` coverage
@@ -310,9 +311,10 @@ None.
 - The plan's red-lane proof used SC2086, which is **info**-tier; both lanes gate at `--severity=warning`, so it could never go red. SC2034 (warning) was used instead: the same bad fixture lints red with the new block and green without it.
 - The lane block uses builtin `read`, not `head`: `lint-shell-absent-binary.test.mjs` runs the script on a PATH of bash, git, grep and sed only.
 - The `../../../` relative-source path in the plan is one level short for a lib inside a `mkdtemp` directory; the row uses `../../../../`.
+- **Mechanisms replaced during QA (cycles 1–3).** The planned design (shadow `exit` during the source; static `GH_COMMAND_WORD` detection) is not the whole mechanism as shipped. The decision signal is a **per-spawn source-completed marker** under the work dir: a missing marker means the source did not complete. The guarantee for `gh` is a **run-time trip-wire `gh`** first on `PATH` when no `--fake-gh` is given. It carries its marker path in its own text, and the run is declined `needs-fake-gh` while keeping the escapes, cases and shells it observed. `--fake-gh` containment realpaths the **deepest existing ancestor**. The trip-wire's limits (an absolute path, a library `PATH` prepend, a `gh` call backgrounded past the spawn; all pre-existing at `origin/develop`) are stated in `probe-boundary-rule.md` §5 (PR review PC-5).
 - The file wall-clock "~30 s" had decayed: an untouched worktree at the branch point takes 63.0 s, this branch 63.1 s (`time command node --test shared/resources/tests/security-probe.test.mjs`) — within noise.
 
-**Testing results.** `security-probe.test.mjs` 105/105 (100 pre-existing + 5 new). Seven mutants, each red on its own row only (recorded in the implementation report). `lint-lane-fixture-parity.test.mjs` 2/2, two mutants red. `npm run lint:shell`: 78 source shell scripts (was 77), clean. task.136 green path: `engages`, executed 20, bash + zsh; without `--fake-gh` the same call now declines `needs-fake-gh`. `npm run ci:fast` exit 0; `bundle:check` 0.
+**Testing results.** At implementation (pre-QA): `security-probe.test.mjs` 105/105 (100 pre-existing + 5 new). **After QA cycles 1–4: 115/115**, with each qa-fix row mutation-proven (gates 1–5). Seven mutants, each red on its own row only (recorded in the implementation report). `lint-lane-fixture-parity.test.mjs` 2/2, two mutants red. `npm run lint:shell`: 78 source shell scripts (was 77), clean. task.136 green path: `engages`, executed 20, bash + zsh; without `--fake-gh` the same call now declines `needs-fake-gh`. `npm run ci:fast` exit 0; `bundle:check` 0.
 
 **Deferred work.** From gate 5, by route 2b (cosmetic residue): CR-1 and CR-2, two LOW wording points in rule §5 → `recommendations.future`. From gate 4: the `gh` containment bypasses (PATH prepend, `--fake-gh` bypass, backgrounded call; pre-existing at `origin/develop`) are stated as limits; closing them is follow-up work. The residual the rule names — a symlink that appears between the containment check and the readable-file check — is a race nothing here defends against, stated in `probe-boundary-rule.md` §5.
 
@@ -364,8 +366,8 @@ None.
 - [x] Phase 2: the body and the gates
 - [x] Phase 3: the lint lanes
 - [x] Phase 4: rule, bundle, CHANGELOG
-- [ ] QA: `task.140.qa.[N].shell-fn-sentinel-hardening.md`
-- [ ] Gate: `task.140.gate.[N].shell-fn-sentinel-hardening.yml`
+- [x] QA: `task.140.qa.5.shell-fn-sentinel-hardening.md` (5 cycles)
+- [x] Gate: `task.140.gate.5.shell-fn-sentinel-hardening.yml` (PASS 100)
 
 ## References
 
