@@ -1,0 +1,52 @@
+schema: 2
+task: 'task.142.reference-doc-skill-pinning'
+task_title: 'Pin the hand-written reference docs to the skills they describe'
+gate: PASS
+status_reason: 'All three phases verified, 15/15 tests and the full ci:fast suite green, every success criterion met or explicitly post-merge; two low advisory code-review findings (CR-1 prefix-match flag check, CR-2 unused activation flags field) recorded as follow-ups.'
+reviewer: 'QA Engineer'
+head: '45d685d02984f7f1218272f7fb833e1ff1e03243'
+updated: '2026-09-30T16:25:05Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 15
+  phases_verified: 3/3
+  ci: 'SUCCESS @ 45d685d0 (test, link-check, shellcheck, branch-policy)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Test-only change; reads two tracked docs and SKILL.md files, no spawn, no network, no user input. boundary: false — the extractors and SKILL_HEAD predicate classify repository documentation for test assertions and gate no action on external input.'
+  performance:
+    status: PASS
+    notes: 'File runs in ~170 ms; SKILL.md reads memoised per skill; no measurable effect on npm test wall-clock.'
+  reliability:
+    status: PASS
+    notes: 'Three floors turn an extractor that stops matching red; NON_SKILL_ROWS asserted exactly in both directions; failures list every offending row with file and line.'
+  maintainability:
+    status: PASS
+    notes: 'Header states what is and is not pinned; nine fixture tests pin the extractors independently of the corpus. CR-2 (unused flags field) is a clarity cleanup.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1: match flags with a trailing boundary (e.g. /--flag(?![a-z0-9-])/) instead of body.includes, and add a fixture where SKILL.md holds only a longer flag — a bare substring lets --read pass on --read-only.'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+    - action: 'CR-2: drop the unused activation flags field, or assert activation-phrases flags with a floor.'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

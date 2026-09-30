@@ -473,6 +473,30 @@ additions.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-30
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.142.qa.1.reference-doc-skill-pinning.md](./task.142.qa.1.reference-doc-skill-pinning.md)
+- **Gate File**: [task.142.gate.1.reference-doc-skill-pinning.yml](./task.142.gate.1.reference-doc-skill-pinning.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 15 (9 fixture, 6 live-corpus); full `ci:fast` suite 4712 pass / 0 fail
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues. Two low advisory findings: CR-1 (the flag check is a substring match, so `--read` would pass on `--read-only`) and CR-2 (an unused activation `flags` field).
+
 ## Implementation Notes
 
 ### Implementation Summary
@@ -535,6 +559,7 @@ its file and line, not just the first.
 | 2026-09-30 | 1.1     | Review 9/10 after fixes — resolver rule corrected (word-start `/name`, unescaped-pipe split), CommonJS, existing guards named, one real finding (`/session-handoff --read`) recorded for Phase 3, counts re-measured | review-task |
 | 2026-09-30 |         | Status → ready-for-development | review-task |
 | 2026-09-30 |         | Implemented — 1 new test file (15 tests), 1 reference-doc row fixed, CHANGELOG entry | develop |
+| 2026-09-30 |         | QA gate PASS (100/100) — 0 blocking, 2 low advisory findings | qa-task |
 
 <!-- change-log-end -->
 
