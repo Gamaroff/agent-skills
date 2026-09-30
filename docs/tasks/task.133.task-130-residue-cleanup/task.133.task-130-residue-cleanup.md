@@ -332,6 +332,40 @@ None (review 1 removed the writer-side throw, the one change every appender woul
 
 ### Key Findings
 All cycle 1–2 findings are fixed and verified, and all four bugs are closed. Cycle 3 raised three advisory findings, carried in the gate's `recommendations.future`. Gates 1–2's `updated:` timestamps had been composed and were corrected to their measured write times (obs #230).
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (document status unchanged: ready-for-review)
+
+### QA Gate Status
+
+**QA Report**: `task.133.qa.3.task-130-residue-cleanup.md`
+**Gate File**: `task.133.gate.3.task-130-residue-cleanup.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 90/100
+**Step 5c**: `task.133.pr-review.1.task-130-residue-cleanup.md`, CONCERNS (non-blocking)
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] SC-F4b: the `zsh -f` listing guard (`tests/detector-candidate-rule.test.mjs` C) registers its zsh arm only where zsh exists. CI's ubuntu-latest has none (run 36696439670 ran only `C [bash]`), and the bash arm cannot see the `nomatch` regression. Suggested fix: a `bash -O failglob` arm, which fails an unmatched glob as zsh does and runs per-PR.
+
+2. **Security Review:**
+   - [ ] Zero-guard: Step 1b fires on `choose_candidate()` (`shared/resources/advance-pipeline-lock.sh`). The probe engine declined `entry-not-probeable` (sourcing the script runs its top-level parse), so it executed 0 candidates (`task.133.dod.security.run.json`). Needed: a CLI-form probe of `--restore --which` with a cases file, a recorded §5.1 by-hand probe, or a documented human override. The diff changes only where a message prints.
+
+3. **Housekeeping:**
+   - [ ] Tick the Progress Tracking QA and Gate items.
+
+### Next Steps:
+
+- [ ] **BLOCKING**: SC-F4b per-PR arm
+- [ ] **BLOCKING**: execute `choose_candidate()` against hostile candidates, or record the override
+- [ ] Re-run `/finalise`
+
+**Estimated Effort:** Small–Medium (1–3 hours)
+
+**Gap Report Generated:** 2026-09-30
+
+**Detailed Verification Log:** See `task.133.dod.1.task-130-residue-cleanup.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -346,6 +380,7 @@ All cycle 1–2 findings are fixed and verified, and all four bugs are closed. C
 | 2026-09-30 |  | QA gate CONCERNS (70/100) — cycle 2 refute pass: 0 HIGH, 3 MEDIUM, 2 LOW; bug 1 verified closed | qa-task |
 | 2026-09-30 |  | QA findings fixed — cycle 2: QA-3 (rowsDropped reads every carried row; J5), QA-4 (in-place restore evaluation stated once; who-restores v), QA-5 (legacy-only blocks, never a fresh start; A2), QA-6 (git pinned to the C locale), QA-7 (non-literal count excludes the declaration); 1 iteration, 5 mutation proofs | qa-fix |
 | 2026-09-30 |  | QA gate PASS (90/100) — cycle 3: QA-3..QA-7 verified, bugs 2–4 closed; 3 advisory findings carried; gates 1–2 updated: corrected to measured write times | qa-task |
+| 2026-09-30 |  | DoD incomplete — 2 blocking gaps (SC-F4b zsh arm not run per-PR; security zero-guard on choose_candidate) + 1 housekeeping | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking

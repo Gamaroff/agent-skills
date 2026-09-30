@@ -1,0 +1,22 @@
+{
+  "sink": "filename",
+  "entry": "shell-fn:shared/resources/advance-pipeline-lock.sh#choose_candidate",
+  "name": null,
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "entry-not-probeable",
+  "executed": 0,
+  "passed": 0,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 1,
+  "escaped": 0,
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "ran_at": "2026-09-30T09:37:31.067Z"
+}
