@@ -53,6 +53,9 @@
 #     a snapshot with NO task_or_story_directory (the pre-task.123 shape) is REFUSED by --restore as
 #     `legacy-snapshot` and the grant relays that refusal; the operator restores it by hand with
 #     `advance-pipeline-lock.sh --restore --accept-legacy <doc-dir>` first, or deletes it (task.130);
+#     that restore stamps the rebuilt lock with <doc-dir> as passed, so every snapshot derived
+#     from it is a matched candidate and the grant needs no flag after it — a present
+#     task_or_story_directory is never overwritten;
 #                                                              → exit 1, nothing restored, nothing written
 #     (the check is --restore's; this script surfaces its stderr line)
 #   • jq missing                                               → exit 1 (this write cannot be skipped silently)
