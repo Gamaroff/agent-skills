@@ -190,7 +190,12 @@ takes it.
   **before importing**. `import()` runs the module's top level, so a post-hoc
   check would fire after arbitrary code had already executed. The check is on the
   *resolved* path, so `a/../../etc/x` is caught and a legitimate relative path
-  containing `..` is not refused for looking suspicious.
+  containing `..` is not refused for looking suspicious — and on the **real**
+  path, both sides: an existing entry and the root are passed through
+  `realpathSync` before the comparison, so a symlink inside the tree that points
+  out of it is refused `outside-repo-root` before anything imports or spawns it,
+  and a root reached through a symlink still contains its own files (task.140 —
+  the limit carried since task.128 gate 1, closed).
 - Runs each case in **its own child process**, so a hang, a throw or a
   `process.exit` is contained and attributable to one case rather than killing
   the run.
@@ -207,9 +212,10 @@ takes it.
 - **There is no OS-level sandbox.** The module under probe runs with full Node
   privileges — exactly as `qa-runnable-prose-detection.md` §3aa already says of
   the snippet path. The containment contains *the harness*, not the repository.
-- **A symlink that points out of the tree resolves at import time**, after the
-  path check. Node offers no cheap pre-import realpath guarantee for a path that
-  may not yet exist. This is a limit, not a defence.
+- **A path that does not exist yet cannot be realpath'd.** It keeps its lexical
+  form through the containment check and is then refused by the readable-file
+  check before any spawn; the residual is a symlink that appears between those
+  two checks, a race nothing here defends against.
 - **The engine reaches four entry forms, and "not importable" is not a decline.**
   `path#export` imports a JS module; `shell:path` runs a **shell script that
   takes one positional argument** — `bash <script> <fixture-dir>` per case, under
@@ -243,14 +249,21 @@ takes it.
     is the function's own contract (`tests/fixtures/shell-fn/gh-labels.cases.json`
     is the one for `gh_labels_filter`); keep `--sink filename` — it selects the
     materialised fixture directory the runner runs in.
-  - **A function whose body names `gh` is answered by a fixture, not the
-    network:** add `--fake-gh <dir>`, a directory holding an executable `gh`
+  - **A function or script whose body names `gh` is answered by a fixture, not
+    the network:** add `--fake-gh <dir>`, a directory holding an executable `gh`
     (this repository's is `tests/fixtures/fake-gh`; a consumer supplies its
     own). The engine prepends it to `PATH` with `FAKE_GH=1` in the env — the
     fixture refuses to run without that variable — validates it before anything
     spawns (`bad-fake-gh` otherwise), and records it as `fake_gh` on the run.
-    **A library whose text names `gh` and was given no `--fake-gh` is declined
-    `needs-fake-gh`, not scored**: run bare, the real `gh` fails from the
+    **A library or script whose text — or the text of a file it `source`s at top
+    level — names `gh`, and was given no `--fake-gh`, is declined
+    `needs-fake-gh`, not scored**, under **both** shell forms (task.140; the
+    `shell:` form ran the host `gh` before it). "Names" means `gh` as a command
+    word — followed by whitespace, `;`, `|`, `&`, `)`, `>` or end of line — or a
+    variable named `GH` (`"$GH" api`); a sourced path is tried against the
+    library's directory, then the root, one level deep, and is not followed when
+    it holds a `$` or lies outside the root. A mention in a comment matches too;
+    that is a decline the caller answers by passing the fixture. Otherwise: run bare, the real `gh` fails from the
     sandbox cwd, the function takes its read-failed passthrough, and the verdict
     would land on `absent` / `present-but-inert` — the values a missing control
     produces — with nothing but `fake_gh: null` to say "could not look". The
@@ -258,10 +271,17 @@ takes it.
 
   Exit 97 is reserved for "the source itself failed" and 98 for "the function
   is not defined after sourcing"; both fold into one `entry-not-probeable`
-  decline that names the library, never into a scored `absent`. An EXIT trap
-  is armed around the `source`, so a **top-level `exit` inside the library**
-  (a `|| exit 1` guard, say) is the same named decline rather than a scored
-  `absent` behind a full count. The function itself runs in a **subshell** with
+  decline that names the library, never into a scored `absent`. During the
+  `source` an EXIT trap is armed **and `exit` is shadowed by a function** that
+  calls `builtin exit 97`, so a **top-level `exit` inside the library** (a
+  `|| exit 1` guard, say) is the same named decline even when the library has
+  installed its own `trap … EXIT` first; the function is unset before the
+  function under probe runs, and a library that defines its own `exit` loses it
+  (none here does). The source's status is taken as a **simple command**, not on
+  the left of `||` — where both shells suspend errexit for everything the
+  library runs at top level — so a `set -e` library whose top-level command
+  fails is declined, as a consumer's own `source` would have aborted, rather
+  than sourced to completion and scored (task.140). The function itself runs in a **subshell** with
   the library's own errexit setting restored inside it, so a function that
   calls `exit` cannot end the harness, `set -e` in the library cannot skip the
   status capture — and its own 97 or 98 is re-mapped to 99 and *scored* as a

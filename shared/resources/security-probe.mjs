@@ -105,8 +105,10 @@
  * forced is why this form exists. `--entry shell-fn:<path>#<function>` keeps
  * everything the `shell:` arm has — the same materialisation, shells, timeout,
  * `compareExpected` and verdict — and changes only the command line: per case
- * per shell, `<shell> --norc -c 'source "$1" || exit 97; …; "$fn" "$@"'` with
- * the library, the function name and the case's input as ARGV, never a string.
+ * per shell, `<shell> --norc -c 'exit() { builtin exit 97; }; source "$1";
+ * src=$?; …; "$fn" "$@"'` with the library, the function name and the case's
+ * input as ARGV, never a string (`exit` shadowed and the status taken as a
+ * simple command during the source: task.140 — see SHELL_FN_BODY).
  * Exit 97 is reserved for "the source itself failed" and exit 98 for "the
  * function is not defined after sourcing", so a broken or misnamed library is
  * a NAMED decline (`entry-not-probeable`) rather than a silent `absent`; the
@@ -115,7 +117,9 @@
  * for this form — the input is argv, so it may carry a `/`. A
  * function that consults `gh` is answered by `--fake-gh <dir>`: the directory
  * is prepended to PATH with `FAKE_GH=1` in the env, so the fixture's `gh`
- * answers and a real `gh` — or the network — never does. What the function
+ * answers and a real `gh` — or the network — never does; a library or script
+ * that names `gh` (or sources, one level deep, a file that does) and was given
+ * no `--fake-gh` is declined `needs-fake-gh` under both shell forms. What the function
  * must print is NOT the sink corpus's `expected` (that describes a script
  * printing a gate number): the caller names a cases file with `--cases-file`.
  *
@@ -371,7 +375,9 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
     };
   }
   const isShellFn = entry.startsWith(SHELL_FN_PREFIX);
-  const isShell = !isShellFn && entry.startsWith(SHELL_PREFIX);
+  // The two prefixes are disjoint (`shell:` vs `shell-fn:` differ at byte 5),
+  // so no guard against the other is needed (task.140, PR-review CR-3).
+  const isShell = entry.startsWith(SHELL_PREFIX);
   const isCli = entry.startsWith(CLI_PREFIX);
   let rawPath;
   let exportName = null;
@@ -426,10 +432,16 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
     exportName = entry.slice(hash + 1);
   }
 
-  const root = resolve(repoRoot);
-  const entryPath = isAbsolute(rawPath)
-    ? resolve(rawPath)
-    : resolve(root, rawPath);
+  // Containment is decided on REAL paths, both sides (task.140 — the lexical
+  // check carried as a limit since task.128 gate 1): a symlink inside the root
+  // that points outside it is refused here, before anything imports or spawns
+  // it, and a root reached through a symlink still contains its own files. A
+  // path that does not exist yet cannot be realpath'd and keeps its lexical
+  // form; it is then refused by the readable-file check before any spawn.
+  const root = realpathSafe(resolve(repoRoot));
+  const entryPath = realpathSafe(
+    isAbsolute(rawPath) ? resolve(rawPath) : resolve(root, rawPath),
+  );
 
   // The root itself is refused (a directory is not an entry); anything else must
   // lie beneath it. isWithin, not a bare startsWith(".."), so an entry under a
@@ -443,10 +455,6 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
       detail: `${entryPath} is outside ${root}`,
     };
   }
-  // A symlink pointing out of the tree resolves at import time, not here. Node
-  // gives us no cheap pre-import realpath guarantee for a path that may not
-  // exist yet, so this is stated as a limit in probe-boundary-rule.md rather
-  // than claimed as a defence.
   if (rel.split(sep).includes("node_modules")) {
     return {
       ok: false,
@@ -537,7 +545,63 @@ export function parseArgvTemplate(raw) {
  * matches too; that is a named decline the caller answers by passing the
  * fixture, not a wrong verdict.
  */
-const GH_COMMAND_WORD = /(^|[\s;|&(`$])gh(\s|$)/m;
+const GH_COMMAND_WORD = /(^|[\s;|&(`$])gh([\s;|&)>]|$)/m;
+/**
+ * `gh` reached through a variable named `GH` (`"$GH" api …`, `${GH}`) — the one
+ * indirection a literal-word match cannot see (task.140, c3-CR-3). `$GH_TOKEN`
+ * and the like are other variables, not this one.
+ */
+const GH_VARIABLE = /\$\{?GH(?![A-Za-z0-9_])/;
+/** A top-level `source <p>` / `. <p>` line; group 1 is the path as written. */
+const SOURCE_LINE = /^[ \t]*(?:source|\.)[ \t]+["']?([^"'\s;|&]+)["']?/gm;
+/** `realpathSync` when the path exists, else the path unchanged. */
+function realpathSafe(p) {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
+}
+/**
+ * Does this library or script — or a file it sources at top level — name `gh`?
+ * ONE level, deliberately: the indirection this repository uses is a library
+ * that sources `gh-labels.sh`, never a chain. A sourced path is tried against
+ * the library's own directory, then the root (the repository's idiom,
+ * `source references/gh-labels.sh`, is cwd-relative); a path holding a `$` is
+ * not followable, and one outside the root is not ours to read.
+ */
+export function namesGh(entryPath, root) {
+  const read = (p) => {
+    try {
+      return readFileSync(p, "utf8");
+    } catch {
+      return null;
+    }
+  };
+  const first = read(entryPath);
+  if (first === null) return false;
+  const texts = [first];
+  const seen = new Set([entryPath]);
+  for (const m of first.matchAll(SOURCE_LINE)) {
+    const raw = m[1];
+    if (raw.includes("$")) continue;
+    const candidates = isAbsolute(raw)
+      ? [raw]
+      : [resolve(dirname(entryPath), raw), resolve(root, raw)];
+    for (const c of candidates) {
+      const p = realpathSafe(c);
+      // isWithin, never a bare startsWith("..") — an in-tree `..name`
+      // directory is inside (task.158).
+      if (seen.has(p) || !isWithin(root, p)) continue;
+      const t = read(p);
+      if (t === null) continue;
+      seen.add(p);
+      texts.push(t);
+      break;
+    }
+  }
+  return texts.some((t) => GH_COMMAND_WORD.test(t) || GH_VARIABLE.test(t));
+}
 /** A name bash and zsh both accept as a function name — and nothing else. */
 const SHELL_FN_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 /** Reserved exits of the shell-fn one-liner: the source failed / the function is undefined. */
@@ -568,12 +632,26 @@ const noRcFlags = (shell) =>
  */
 const SHELL_FN_BODY =
   // An EXIT trap around the source: `source` runs the library in THIS shell,
-  // so a top-level `exit N` inside it ends the harness with N before `||`
-  // is reached — every case then mismatches and the verdict is a SCORED
-  // `absent` with a full count, the task.125 shape (task.136 QA cycle 2,
-  // BUG-2). The trap re-maps that exit to the source-failed sentinel and is
-  // disarmed the moment the source has returned normally.
-  `trap 'exit ${SHELL_FN_SOURCE_FAILED}' EXIT; source "$1" || exit ${SHELL_FN_SOURCE_FAILED}; trap - EXIT; ` +
+  // so a top-level `exit N` inside it ends the harness with N — every case
+  // then mismatches and the verdict is a SCORED `absent` with a full count,
+  // the task.125 shape (task.136 QA cycle 2, BUG-2). The trap re-maps that exit
+  // to the source-failed sentinel and is disarmed once the source returns.
+  //
+  // `exit` is also SHADOWED for the duration of the source: a library that
+  // installs its own `trap … EXIT` replaces ours, so a later `|| exit 1` guard
+  // ended the harness with 1. A function named `exit` intercepts the CALL,
+  // before any trap, and `builtin exit 97` is the sentinel; `unset -f exit`
+  // restores the builtin before the function runs (task.140, c3-CR-1). A
+  // library that defines its own `exit` function loses it — none here does.
+  //
+  // The source's status is taken as a SIMPLE COMMAND, not on the left of `||`:
+  // there both shells suspend errexit for everything the library runs at top
+  // level, so `set -e; false` was sourced to completion and scored where a
+  // consumer's own `source` would have aborted (task.140, PR-review CR-1). Now
+  // errexit ends the source, the trap maps it to 97, and the explicit test
+  // keeps the non-zero-last-command case. Verified bash 5.3 / 3.2, zsh 5.9.
+  `exit() { builtin exit ${SHELL_FN_SOURCE_FAILED}; }; trap 'exit ${SHELL_FN_SOURCE_FAILED}' EXIT; ` +
+  `source "$1"; src=$?; trap - EXIT; unset -f exit; [ "$src" -eq 0 ] || exit ${SHELL_FN_SOURCE_FAILED}; ` +
   `shift; fn="$1"; shift; ` +
   `typeset -f "$fn" >/dev/null 2>&1 || exit ${SHELL_FN_NOT_DEFINED}; ` +
   // The function runs in a SUBSHELL: a function that calls `exit` would
@@ -934,14 +1012,12 @@ export function runProbeSpec({
   // produces — with only `fake_gh: null` deep in the record to say "could not
   // look" rather than "nothing filters" (task.136 QA cycle 2, CR-2). Two
   // states, one value is the defect class this engine exists to remove.
-  if (resolved.kind === "shell-fn" && fakeGhDir === null) {
-    let libText = "";
-    try {
-      libText = readFileSync(resolved.entryPath, "utf8");
-    } catch {
-      libText = "";
-    }
-    if (GH_COMMAND_WORD.test(libText)) {
+  //
+  // EVERY shell form, not only shell-fn: a `shell:` script that names `gh` ran
+  // the host `gh` — host PATH, host keychain — and was scored (task.140,
+  // c3-CR-2). The detector reads the entry and one level of what it sources.
+  if (isShellForm && fakeGhDir === null) {
+    if (namesGh(resolved.entryPath, realpathSafe(resolve(repoRoot)))) {
       return decline(
         "needs-fake-gh",
         `${resolved.entryPath} names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,

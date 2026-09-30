@@ -26,6 +26,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1705,6 +1706,185 @@ test("shell-fn entry: a library that names gh without --fake-gh is declined need
     cases: LABEL_CASES,
   });
   assert.equal(e.reason, "no-hostile-case-was-rejected");
+});
+
+// ── task.140: the sentinel and the fake-gh gate reach every library shape ───
+//
+// Seven limits task.136's QA cycle 3, PR review and finalise recorded as verified
+// and not fixed there. Each row below was red against the task.136 engine; each
+// change is mutation-proved by its own row (task.140 implementation report).
+
+/** Write each named library into a fresh temp dir inside the repo; returns the dir. */
+function t140Libs(tag, libs) {
+  const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, `.t140-${tag}-`));
+  for (const [name, text] of Object.entries(libs)) {
+    writeFileSync(join(dir, name), text, { mode: 0o644 });
+  }
+  return dir;
+}
+
+test("shell-fn entry: a library that installs its own EXIT trap before a guard is still a named decline (task.140, c3-CR-1)", () => {
+  // The library's trap REPLACES the harness's; the guard's `exit 1` then ends
+  // the harness with 1, every case mismatches, and the verdict was a scored
+  // absent. Shadowing `exit` intercepts the call before any trap fires.
+  const dir = t140Libs("own-trap", {
+    "own-trap.sh":
+      '#!/usr/bin/env bash\ntrap "true" EXIT\nf() { printf \'hi\\n\'; }\n[ -n "$NOPE" ] || exit 1\n',
+  });
+  try {
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, join(dir, "own-trap.sh"))}#f`,
+      cases: LABEL_CASES,
+      fakeGh: FAKE_GH,
+    });
+    assert.equal(r.verdict, "unverifiable", JSON.stringify(r.declined));
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(
+      r.executed,
+      0,
+      "a displaced guard is a source failure, not executions",
+    );
+    assert.match(r.declined[0].detail, /source .* failed \(exit 97\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: a set -e library whose top-level command fails is declined, not sourced to completion (task.140, PR-review CR-1)", () => {
+  // On the left of `||` both shells suspend errexit for everything the library
+  // runs at top level, so `set -e; false` was sourced to completion and SCORED —
+  // where a consumer's own `source` would have aborted.
+  const dir = t140Libs("errexit-src", {
+    "errexit-src.sh":
+      "#!/usr/bin/env bash\nset -e\nfalse\nf() { printf 'reached\\n'; }\n",
+  });
+  try {
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, join(dir, "errexit-src.sh"))}#f`,
+      cases: LABEL_CASES,
+      fakeGh: FAKE_GH,
+    });
+    assert.equal(r.verdict, "unverifiable", JSON.stringify(r.declined));
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.executed, 0);
+    assert.match(r.declined[0].detail, /source .* failed \(exit 97\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell entry: a script whose body names gh without --fake-gh is needs-fake-gh, same as the shell-fn form (task.140, c3-CR-2)", () => {
+  const dir = t140Libs("shell-gh", {
+    "names-gh.sh":
+      '#!/usr/bin/env bash\ngh label list >/dev/null 2>&1\nprintf "%s\\n" "$1"\n',
+  });
+  try {
+    const entry = `shell:${relative(REPO_ROOT, join(dir, "names-gh.sh"))}`;
+    const r = runProbeSpec({ sink: "filename", entry, cases: LABEL_CASES });
+    assert.equal(r.verdict, "unverifiable");
+    assert.equal(r.reason, "needs-fake-gh");
+    assert.equal(r.executed, 0, "the host gh must never run");
+    assert.match(r.declined[0].detail, /names `gh`.*--fake-gh/);
+    // Given the fixture, the same script runs and is scored.
+    const e = runProbeSpec({
+      sink: "filename",
+      entry,
+      cases: LABEL_CASES,
+      fakeGh: FAKE_GH,
+    });
+    assert.notEqual(e.reason, "needs-fake-gh");
+    assert.equal(e.executed, LABEL_CASES.length * probeShells().length);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('shell-fn entry: gh reached as gh;, gh>, (gh), "$GH" or through a one-level source is detected (task.140, c3-CR-3)', () => {
+  const dir = t140Libs("gh-shapes", {
+    "semi.sh": "#!/usr/bin/env bash\nf() { gh; printf '%s\\n' \"$1\"; }\n",
+    "redir.sh":
+      "#!/usr/bin/env bash\nf() { gh>/dev/null 2>&1; printf '%s\\n' \"$1\"; }\n",
+    "paren.sh":
+      "#!/usr/bin/env bash\nf() { (gh) || true; printf '%s\\n' \"$1\"; }\n",
+    "var.sh":
+      '#!/usr/bin/env bash\nGH=gh\nf() { "$GH" api x >/dev/null 2>&1; printf \'%s\\n\' "$1"; }\n',
+    // Resolved against the LIBRARY's directory (tests/fixtures/shell-fn/.t140-…/).
+    "src-rel.sh":
+      "#!/usr/bin/env bash\n# shellcheck source=/dev/null\nsource ../../../../shared/resources/gh-labels.sh\nf() { printf '%s\\n' \"$1\"; }\n",
+    // Resolved against the ROOT — the repository's own idiom is cwd-relative
+    // (`source references/gh-labels.sh`).
+    "src-root.sh":
+      "#!/usr/bin/env bash\n# shellcheck source=/dev/null\n. shared/resources/gh-labels.sh\nf() { printf '%s\\n' \"$1\"; }\n",
+  });
+  try {
+    for (const lib of [
+      "semi.sh",
+      "redir.sh",
+      "paren.sh",
+      "var.sh",
+      "src-rel.sh",
+      "src-root.sh",
+    ]) {
+      const r = runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(dir, lib))}#f`,
+        cases: LABEL_CASES,
+      });
+      assert.equal(r.reason, "needs-fake-gh", lib);
+      assert.equal(r.executed, 0, lib);
+    }
+    // Not over-matched: a variable that merely starts with GH, a word that
+    // merely contains gh, and a sourced file outside the root do not decline.
+    const clean = t140Libs("gh-clean", {
+      "clean.sh":
+        '#!/usr/bin/env bash\n# shellcheck source=/dev/null\nsource /etc/profile.does-not-exist\nf() { : "$GH_TOKEN" high; printf \'%s\\n\' "$1"; }\n',
+    });
+    try {
+      const r = runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(clean, "clean.sh"))}#f`,
+        cases: LABEL_CASES,
+      });
+      assert.notEqual(r.reason, "needs-fake-gh", JSON.stringify(r.declined));
+    } finally {
+      rmSync(clean, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("resolveEntry: a symlink inside the root that points outside it is refused outside-repo-root (task.140 — the task.128 limit closed)", () => {
+  const outside = mkdtempSync(join(tmpdir(), "t140-outside-"));
+  const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, ".t140-symlink-"));
+  try {
+    writeFileSync(join(outside, "f.sh"), "f() { :; }\n", { mode: 0o644 });
+    symlinkSync(outside, join(dir, "link"));
+    const rel = relative(REPO_ROOT, join(dir, "link", "f.sh"));
+    for (const e of [`shell-fn:${rel}#f`, `shell:${rel}`, `${rel}#f`]) {
+      const r = resolveEntry(e, REPO_ROOT);
+      assert.equal(r.ok, false, e);
+      assert.equal(r.reason, "outside-repo-root", e);
+    }
+    // Symmetric: a root reached THROUGH a symlink still contains its own files,
+    // and an in-tree symlink to an in-tree file still resolves.
+    const viaLink = join(outside, "root-link");
+    symlinkSync(REPO_ROOT, viaLink);
+    const ok = resolveEntry(FN_ENTRY, viaLink);
+    assert.equal(ok.ok, true, JSON.stringify(ok));
+    symlinkSync(join(REPO_ROOT, FN_LIB), join(dir, "lib-link.sh"));
+    const inTree = resolveEntry(
+      `shell-fn:${relative(REPO_ROOT, join(dir, "lib-link.sh"))}#gh_labels_filter`,
+      REPO_ROOT,
+    );
+    assert.equal(inTree.ok, true, JSON.stringify(inTree));
+    assert.equal(inTree.entryPath, join(REPO_ROOT, FN_LIB));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
 });
 
 test("shell-fn entry: expected.absent may name the case's own input — no per-case file is created for this form (CR-4)", () => {
