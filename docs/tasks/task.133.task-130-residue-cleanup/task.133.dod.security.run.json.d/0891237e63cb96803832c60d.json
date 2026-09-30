@@ -1,7 +1,7 @@
 {
   "sink": "filename",
-  "entry": "shell-fn:shared/resources/advance-pipeline-lock.sh#choose_candidate",
-  "name": null,
+  "entry": "cli:shared/resources/advance-pipeline-lock.sh",
+  "name": "advance-pipeline-lock --restore --which <doc-dir>",
   "call_site": null,
   "verdict": "unverifiable",
   "reason": "entry-not-probeable",
@@ -11,12 +11,13 @@
   "overblocked": 0,
   "declined": 1,
   "escaped": 0,
-  "shells": [
-    "bash",
-    "zsh"
-  ],
+  "shells": null,
   "fake_gh": null,
-  "argv": null,
+  "argv": [
+    "--restore",
+    "--which",
+    "{input}"
+  ],
   "args": null,
-  "ran_at": "2026-09-30T09:57:24.326Z"
+  "ran_at": "2026-09-30T09:57:30.237Z"
 }

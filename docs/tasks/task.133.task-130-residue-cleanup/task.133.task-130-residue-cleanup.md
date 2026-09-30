@@ -5,19 +5,21 @@ type: task
 description: "Close the advisory residue task.130 carried out of its QA loop and Step 5c review: make the no-overwrite lock scenario falsifiable, state the --accept-legacy stamp where the --restore contract is mirrored, replace test D's word-list regex with the exact-label floor, condition the five --restore citation clauses, give the detector prompt the legacy/provenance candidate rule, name the two silent cases in the delete block and every lint rc=2 cause, quote the doc-directory placeholder, silence the bystander-legacy advice on a successful restore, pin the detector's already-find-based candidate listing under zsh, and give change-log.js a cross-revision append-only check."
 tags: [pipeline, resume, tests, enumeration, change-log]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-20
 updated: 2026-09-30
 assignee:
 estimated_effort_hours: 8
 github_issue: 442
+pr_number: 528
+completed_date: 2026-09-30
 risk_level: low
 ---
 
 # Technical Task: Residue of task.130's seven QA cycles — eleven advisory findings, grouped by file
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.133.review.1.task-130-residue-cleanup.md` implemented 2026-09-30
 **GitHub Issue**: [#442](https://github.com/Gamaroff/agent-skills/issues/442)
 
@@ -332,7 +334,7 @@ None (review 1 removed the writer-side throw, the one change every appender woul
 
 ### Key Findings
 All cycle 1–2 findings are fixed and verified, and all four bugs are closed. Cycle 3 raised three advisory findings, carried in the gate's `recommendations.future`. Gates 1–2's `updated:` timestamps had been composed and were corrected to their measured write times (obs #230).
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
 
 **Status:** IN PROGRESS (document status unchanged: ready-for-review)
 
@@ -366,6 +368,28 @@ All cycle 1–2 findings are fixed and verified, and all four bugs are closed. C
 **Gap Report Generated:** 2026-09-30
 
 **Detailed Verification Log:** See `task.133.dod.1.task-130-residue-cleanup.md` for complete verification evidence and timestamps.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.133.qa.3.task-130-residue-cleanup.md`
+**Gate File**: `task.133.gate.3.task-130-residue-cleanup.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 90/100 (3 cycles; 4 bugs filed, 4 closed; 5c review CONCERNS, non-blocking)
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Acceptance Criteria:** 12/12. SC-F4b, the one open in run 1, is closed by the per-PR `C [bash-failglob]` arm, which is mutation-proved.
+✅ **Tests & CI:** CI 5/5 SUCCESS @ `c64a18cd` (test, shellcheck, validate, link-check, branch guard)
+✅ **Documentation:** CHANGELOG [Unreleased] Added + Fixed entries; skill/shared-resource docs updated and re-bundled
+✅ **Security Review:** ✅ PASS by recorded human override. The checklist is clean. The engine cannot reach `choose_candidate()` (a flag + positional shell script), so it is recorded as unverifiable, not as a probe count. The evidence is the per-PR tests and the §5.1 by-hand probe (`task.133.dod.security.by-hand-probe.md`). Its one low zsh-only finding predates this task and is filed as bug 17.
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal pipeline tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-30
+
+**Detailed Verification Log:** See `task.133.dod.2.task-130-residue-cleanup.md` for complete verification evidence, the override record, and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -381,6 +405,7 @@ All cycle 1–2 findings are fixed and verified, and all four bugs are closed. C
 | 2026-09-30 |  | QA findings fixed — cycle 2: QA-3 (rowsDropped reads every carried row; J5), QA-4 (in-place restore evaluation stated once; who-restores v), QA-5 (legacy-only blocks, never a fresh start; A2), QA-6 (git pinned to the C locale), QA-7 (non-literal count excludes the declaration); 1 iteration, 5 mutation proofs | qa-fix |
 | 2026-09-30 |  | QA gate PASS (90/100) — cycle 3: QA-3..QA-7 verified, bugs 2–4 closed; 3 advisory findings carried; gates 1–2 updated: corrected to measured write times | qa-task |
 | 2026-09-30 |  | DoD incomplete — 2 blocking gaps (SC-F4b zsh arm not run per-PR; security zero-guard on choose_candidate) + 1 housekeeping | finalise |
+| 2026-09-30 | 1.2 | DoD passed — accepted (PR #528); security zero-guard accepted by recorded human override (engine cannot reach choose_candidate); bug 17 filed | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
