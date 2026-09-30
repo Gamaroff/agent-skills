@@ -1856,6 +1856,37 @@ After review:
    [Brief summary of critical issues or concerns, or "No critical issues identified"]
    ```
 
+   **Write (a) through the engine — one call, never a hand edit.** Save the rendered section to
+   `.claude/state/qa-results-section.md`, then:
+
+   ```bash
+   # QA Testing Results writer (task 155) — replaces, relocates or creates the one section.
+   [ -f "$STORY_FILE" ] || { echo "HALT: STORY_FILE ('$STORY_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
+   case "$(basename "$STORY_FILE")" in task.*) QA_DOC_TYPE=task ;; *) QA_DOC_TYPE=story ;; esac
+   command node -e '
+     const fs = require("fs");
+     const QR = require("./.agents/skills/qa-story/references/qa-results.js");
+     const [file, sectionFile, docType] = process.argv.slice(1);
+     const r = QR.upsertQaResults(fs.readFileSync(file, "utf8"),
+                                  fs.readFileSync(sectionFile, "utf8"), { docType });
+     if (r.reason === "multiple" || r.reason === "bad-section") {
+       console.error(`HALT qa-results: ${r.reason}${r.count ? ` (${r.count} sections)` : ""} — ${file} not written.` +
+         (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." : ""));
+       process.exit(1);
+     }
+     fs.writeFileSync(file, r.content);
+     console.log(`qa-results: ${r.reason}`);
+   ' "$STORY_FILE" .claude/state/qa-results-section.md "$QA_DOC_TYPE"
+   ```
+
+   The engine is `references/qa-results.js`. It places a new section immediately before the
+   change-log block (else before `## Dev Agent Record` for a story, `## Progress Tracking` for a
+   task, else at the end), moves one it finds **inside** the change-log block out of it
+   (`relocated`), and **refuses** a document that already carries more than one (`multiple`) — it
+   never guesses which copy is current. On either refusal the step halts; a hand edit is not a
+   fallback. Write (a) **before** the Change Log row in (d). A hand-rolled
+   `slice(indexOf(…), indexOf("## Change Log"))` stacked four copies on task.145 (obs #178).
+
    b. **QA Completion Summary** section (if testing is complete):
 
    ```markdown

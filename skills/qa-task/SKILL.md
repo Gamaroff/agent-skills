@@ -1335,6 +1335,36 @@ Add (or replace) the QA Results section in the task document:
 {Brief summary, or "No critical issues identified"}
 ```
 
+**Write the section through the engine — one call, never a hand edit.** Save the rendered section
+to `.claude/state/qa-results-section.md`, then:
+
+```bash
+# QA Testing Results writer (task 155) — replaces, relocates or creates the one section.
+[ -f "$TASK_FILE" ] || { echo "HALT: TASK_FILE ('$TASK_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
+command node -e '
+  const fs = require("fs");
+  const QR = require("./.agents/skills/qa-task/references/qa-results.js");
+  const [file, sectionFile, docType] = process.argv.slice(1);
+  const r = QR.upsertQaResults(fs.readFileSync(file, "utf8"),
+                               fs.readFileSync(sectionFile, "utf8"), { docType });
+  if (r.reason === "multiple" || r.reason === "bad-section") {
+    console.error(`HALT qa-results: ${r.reason}${r.count ? ` (${r.count} sections)` : ""} — ${file} not written.` +
+      (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." : ""));
+    process.exit(1);
+  }
+  fs.writeFileSync(file, r.content);
+  console.log(`qa-results: ${r.reason}`);
+' "$TASK_FILE" .claude/state/qa-results-section.md task
+```
+
+The engine is `references/qa-results.js`. It places a new section immediately before the
+change-log block (else before `## Progress Tracking`, else at the end), moves one it finds
+**inside** the change-log block out of it (`relocated`), and **refuses** a document that already
+carries more than one (`multiple`) — it never guesses which copy is current. On either refusal the
+step halts; a hand edit is not a fallback. Write the section **before** the Change Log row below,
+so the change-log write sees a relocated section already outside its block. A hand-rolled
+`slice(indexOf(…), indexOf("## Change Log"))` stacked four copies on task.145 (obs #178).
+
 **Update task status based on gate decision** — the same rule `qa-story` states, and the only
 vocabulary the lifecycle admits:
 

@@ -1,0 +1,237 @@
+"use strict";
+
+// ---------------------------------------------------------------------------
+// qa-results.js — the work item's `## QA Testing Results` section, found and written
+// ---------------------------------------------------------------------------
+// qa-task Step 12 and qa-story Step 12 item 3 require this section to be REPLACED
+// WHOLE on every QA cycle. Until this module, nothing performed the replacement:
+// every run hand-wrote the edit, and a hand-written "replace" whose two boundaries
+// are found by two independent searches duplicates text instead of replacing it.
+// On task.145 (obs #178) cycle 1 inserted the section inside the change-log
+// markers; cycles 2–4 replaced
+//     slice(indexOf("## QA Testing Results"), indexOf("## Change Log"))
+// where the second index was already smaller than the first, so each "replace"
+// stacked another copy. task.65 carried three copies into the accepted tree.
+//
+// The invariant: a document carries AT MOST ONE section, and never inside the
+// change-log block. Every write returns a named `reason`:
+//
+//   replaced   one section, outside the change-log block → replaced in place, whole
+//   relocated  one section, inside the change-log block  → moved to the canonical position
+//   created    none                                       → inserted at the canonical position
+//   multiple   more than one                              → NOTHING written
+//   bad-section the new section is not one section        → NOTHING written
+//
+// `multiple` REFUSES rather than guesses. Which copy is current is a judgement
+// the engine cannot make (task.65's rule — keep the copy linking the highest gate —
+// is a human repair, stated in the halt message the callers print).
+//
+// Why this sits BESIDE change-log.js instead of inside it: the Change Log is
+// append-only history and this section is a snapshot replaced every cycle. One
+// function with two write rules is how one of them gets broken. What is shared is
+// the part that is hard — fence and inline-code protection, the frontmatter scope,
+// locating the change-log block — and that is imported, not re-derived: bug.13
+// took three cycles to get the fence handling right once.
+//
+// Two span rules the first design got wrong (task.155 review, C1/C2):
+//
+//   1. A heading counts when its text BEGINS "QA Testing Results". task.65's
+//      stacked copies are titled "## QA Testing Results — Cycle 2 (re-review)";
+//      an exact-line match counted that document as one section.
+//   2. A section ends at the EARLIEST of the next heading of level ≤ 2 and the
+//      change-log block start. The canonical position is directly before the
+//      block, so "next ≤ 2 heading" alone runs to `## Change Log` — inside the
+//      block — and a replace deletes `<!-- change-log-start -->`.
+//
+// Separators are not span: trailing blank lines and one thematic break (`---`)
+// directly before the terminator stay where they are on every write.
+
+const {
+  protectedRanges,
+  insideProtected,
+  bodyStart,
+  findChangeLog,
+  ANCHORS,
+} = require("./change-log.js");
+
+const HEADING = "## QA Testing Results";
+const RE_QA = /^## QA Testing Results\b[^\n]*$/gm;
+const RE_H1_H2 = /^#{1,2}[ \t]/gm;
+// The Change Log's own table header (document-change-log.md: Date | Version | …).
+const RE_LOG_HEADER = /^\|[ \t]*Date[ \t]*\|[ \t]*Version[ \t]*\|/m;
+// A thematic break line. Only counted as a separator when a blank line precedes it:
+// directly under a paragraph line, `---` is a setext H2 underline, not a break.
+const RE_BREAK =
+  /^[ \t]{0,3}(?:-[ \t]*){3,}$|^[ \t]{0,3}(?:\*[ \t]*){3,}$|^[ \t]{0,3}(?:_[ \t]*){3,}$/;
+
+const isBlank = (line) => /^[ \t]*\r?$/.test(line);
+
+// Pull a raw span end back over trailing blank lines and one separator break.
+// `rawEnd` is at a line start (a heading, a marker, or EOF). Returns the offset just
+// past the section's last content line (its newline included when it has one).
+function trimSeparator(content, start, rawEnd) {
+  const lines = content.slice(start, rawEnd).split("\n");
+  // A span that ends at a line start splits with a trailing "" — drop it.
+  if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
+  const popBlanks = () => {
+    while (lines.length > 1 && isBlank(lines[lines.length - 1])) lines.pop();
+  };
+  popBlanks();
+  const last = lines[lines.length - 1].replace(/\r$/, "");
+  if (
+    lines.length > 2 &&
+    RE_BREAK.test(last) &&
+    isBlank(lines[lines.length - 2])
+  ) {
+    lines.pop();
+    popBlanks();
+  }
+  const kept = lines.join("\n").length;
+  // Keep the last content line's newline inside the span when the text has one.
+  return content[start + kept] === "\n" ? start + kept + 1 : start + kept;
+}
+
+// Offset where the change-log block's END marker begins (markers only).
+function endMarkerStart(content, changeLog) {
+  return content.lastIndexOf("<!--", changeLog.end - 1);
+}
+
+/**
+ * Find every `## QA Testing Results` section in a document.
+ *
+ * @param {string} content
+ * @returns {{ sections: Array<{start:number,end:number,insideChangeLog:boolean,heading:string}>, changeLog: object|null }}
+ */
+function findQaResults(content) {
+  const ranges = protectedRanges(content);
+  const from = bodyStart(content);
+  const changeLog = findChangeLog(content);
+  const sections = [];
+
+  for (const m of content.matchAll(RE_QA)) {
+    if (m.index < from || insideProtected(ranges, m.index)) continue;
+    const start = m.index;
+    const insideChangeLog = !!(
+      changeLog &&
+      changeLog.hasMarkers &&
+      start > changeLog.start &&
+      start < changeLog.end
+    );
+
+    const candidates = [content.length];
+    const bodyOffset = start + m[0].length;
+    for (const hm of content.slice(bodyOffset).matchAll(RE_H1_H2)) {
+      const abs = bodyOffset + hm.index;
+      if (insideProtected(ranges, abs)) continue;
+      candidates.push(abs);
+      break;
+    }
+    if (changeLog) {
+      if (insideChangeLog) {
+        candidates.push(endMarkerStart(content, changeLog));
+        // A section written between `## Change Log` and its table must not carry the
+        // table away with it on relocate: the log's own header row ends the section.
+        const tbl = RE_LOG_HEADER.exec(content.slice(bodyOffset));
+        if (tbl) candidates.push(bodyOffset + tbl.index);
+      } else if (changeLog.start > start) candidates.push(changeLog.start);
+    }
+    const rawEnd = Math.min(...candidates);
+
+    sections.push({
+      start,
+      end: trimSeparator(content, start, rawEnd),
+      insideChangeLog,
+      heading: m[0].replace(/\r$/, ""),
+    });
+  }
+  return { sections, changeLog };
+}
+
+// The first unprotected match of a doc-type anchor, past the frontmatter.
+function anchorOffset(content, docType) {
+  const anchor = ANCHORS[docType];
+  if (!anchor) return -1;
+  const ranges = protectedRanges(content);
+  const from = bodyStart(content);
+  for (const m of content.matchAll(new RegExp(anchor.source, "gm"))) {
+    if (m.index >= from && !insideProtected(ranges, m.index)) return m.index;
+  }
+  return -1;
+}
+
+// Where a section goes when it is written fresh: before the change-log block, else
+// before the doc-type anchor, else at the end. Never "before the first ##".
+function canonicalOffset(content, docType) {
+  const changeLog = findChangeLog(content);
+  if (changeLog) return changeLog.start;
+  const anchor = anchorOffset(content, docType);
+  return anchor === -1 ? content.length : anchor;
+}
+
+// Splice `body` in at `pos` with exactly one blank line on each side.
+function insertAt(content, pos, body) {
+  const before = content.slice(0, pos).trimEnd();
+  const after = content.slice(pos).trimStart();
+  const head = before ? `${before}\n\n` : "";
+  return after ? `${head}${body}\n\n${after}` : `${head}${body}\n`;
+}
+
+// Normalise the caller's section: leading blank lines and trailing whitespace go;
+// it must then be exactly one section.
+function normaliseSection(section) {
+  if (typeof section !== "string") return null;
+  const body = section.replace(/^(?:[ \t]*\r?\n)+/, "").replace(/\s+$/, "");
+  if (!body.startsWith(HEADING)) return null;
+  if (findQaResults(body).sections.length !== 1) return null;
+  return body;
+}
+
+/**
+ * Write the `## QA Testing Results` section: replace, relocate or create it.
+ *
+ * @param {string} content            full document text
+ * @param {string} section            the rendered section, starting `## QA Testing Results`
+ * @param {object} [opts]
+ * @param {string} [opts.docType]     story | task | epic — picks the fallback anchor
+ * @returns {{ content: string, reason: string, count?: number }}
+ */
+function upsertQaResults(content, section, { docType = "" } = {}) {
+  const body = normaliseSection(section);
+  if (body === null) return { content, reason: "bad-section" };
+
+  const { sections } = findQaResults(content);
+  if (sections.length > 1) {
+    return { content, reason: "multiple", count: sections.length };
+  }
+
+  if (sections.length === 1 && !sections[0].insideChangeLog) {
+    const { start, end } = sections[0];
+    const rest = content.slice(end);
+    const sep = rest === "" ? "\n" : rest.startsWith("\n") ? "\n" : "\n\n";
+    return {
+      content: content.slice(0, start) + body + sep + rest,
+      reason: "replaced",
+    };
+  }
+
+  let base = content;
+  let reason = "created";
+  if (sections.length === 1) {
+    // Inside the block: cut it out, then insert at the canonical position computed
+    // on the post-removal text (the block start, which the removal did not move).
+    const { start, end } = sections[0];
+    const before = content.slice(0, start).replace(/\n+$/, "\n");
+    const after = content.slice(end).replace(/^\n+/, "");
+    base =
+      before.endsWith("\n\n") || !after
+        ? before + after
+        : `${before}\n${after}`;
+    reason = "relocated";
+  }
+  return {
+    content: insertAt(base, canonicalOffset(base, docType), body),
+    reason,
+  };
+}
+
+module.exports = { HEADING, RE_QA, findQaResults, upsertQaResults };
