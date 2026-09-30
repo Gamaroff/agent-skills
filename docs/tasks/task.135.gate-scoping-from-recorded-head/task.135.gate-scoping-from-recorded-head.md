@@ -5,19 +5,21 @@ type: task
 description: "Stop deriving the QA loop's re-review scope and the re-review trigger from a hand-written gate timestamp — on task.130 four gates were stamped in local time labelled Z (up to three hours in the future), so `git log --since` matched nothing and silently widened to the whole branch, and a later gate preceded the commit it reviewed. Gates record `head:` (the commit reviewed); cycle N+1 scopes `git diff <head>..HEAD`; `updated:` is written by the clock and checked against the head's author time."
 tags: [pipeline, qa-loop, qa-task, qa-story, scoping]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-20
 updated: 2026-09-30
 assignee:
 estimated_effort_hours: 4
 github_issue: 444
+pr_number: 531
+completed_date: 2026-09-30
 risk_level: medium
 ---
 
 # Technical Task: Gate scoping from a recorded head, not a typed timestamp
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.135.review.1.gate-scoping-from-recorded-head.md` implemented 2026-09-30
 **GitHub Issue**: [#444](https://github.com/Gamaroff/agent-skills/issues/444)
 
@@ -306,9 +308,31 @@ None.
 - Four QA cycles: 13 bugs filed and closed ([QA 1](./task.135.qa.1.gate-scoping-from-recorded-head.md), [QA 2](./task.135.qa.2.gate-scoping-from-recorded-head.md), [QA 3](./task.135.qa.3.gate-scoping-from-recorded-head.md))
 - Advisory: the Phase 0 trigger trusts a malformed `head:` (CR4-1); pathspec magic in the scope list (CR4-2)
 
-## Change Log
+## Definition of Done - PASSED ✅
 
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.135.qa.4.gate-scoping-from-recorded-head.md`
+**Gate File**: `task.135.gate.4.gate-scoping-from-recorded-head.yml`
+**Gate Status**: ⚠️ CONCERNS — no open entry (one advisory medium, carried to future)
+**Quality Score**: 90/100 · **QA cycles**: 4 · **5c PR review**: ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 7/7 traced to code and per-PR tests (criterion 3 as amended in QA cycle 2)
+✅ **Tests:** `qa-scope-from-head.test.mjs` and `gate-head-freshness.test.mjs` (executed under bash and zsh); 21 mutation proofs
+✅ **PR Review:** PR #531 — 5c `/review-pr` APPROVE; CI green on `8e7f6496`
+✅ **Documentation:** CHANGELOG [Unreleased] › Changed (schema 2 Breaking, with migration); shared scope resource and templates
+✅ **Security Review:** PASS — no secrets, no unsafe exec; boundary recorded `internal` with a valid reason
+⚠️ **Compliance Review:** NOT_APPLICABLE — QA pipeline tooling
+
+**Task marked as ACCEPTED on:** 2026-09-30
+
+**Detailed Verification Log:** See `task.135.dod.1.gate-scoping-from-recorded-head.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -322,7 +346,7 @@ None.
 | 2026-09-30 |  | QA gate CONCERNS (90/100) — safety re-probe: no high, 2 advisory | qa-task |
 | 2026-09-30 |  | QA findings fixed — gate CONCERNS (90/100), 3 iterations, 13 bugs closed | qa-fix |
 | 2026-09-30 |  | Success criterion 3 amended in QA cycle 2 (CR2-2): the freshness test keeps only rewrite-proof rules; existence and ancestry move to the Step 3b block and the 5c trail row. Scope and Files Summary updated to the shipped diff (5c PC-1–3) | develop-task |
-
+| 2026-09-30 | 1.2 | DoD passed — accepted (PR #531) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
