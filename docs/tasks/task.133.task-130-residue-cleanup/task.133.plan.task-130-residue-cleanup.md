@@ -8,6 +8,8 @@ task-ref: task.133.task-130-residue-cleanup.md
 # Implementation Plan: Residue of task.130's seven QA cycles
 
 > Requirements and success criteria: [task.133.task-130-residue-cleanup.md](task.133.task-130-residue-cleanup.md)
+>
+> **Review 1 (2026-09-30) changed three things below; where this plan and the task disagree, the task wins.** Phase 1 also fixes the header bullet at `advance-pipeline-lock.sh:70-72` ("an ABSENT directory … matches"). Phase 3's listing fence is already `find`-based (task.137) — it gets a test, not a rewrite. Phase 5 is a cross-revision append-only check, not a writer-side throw: `upsertChangeLog` keeps all six rows on the `fdba78d9~1` shape (executed), so the guard below could never fire.
 
 ## Overview
 
@@ -67,11 +69,7 @@ Tests (extend `run()`'s snapshot options): `snapshotRaw: '{not json'` → new te
 
 **Files to modify:** `shared/resources/pipeline-resume-detector-prompt.md` (Step 1 items 1 and 3; the listing fence); new `shared/resources/tests/detector-candidate-rule.test.mjs`
 
-**Exact changes:** Step 1 item 1 gains: *"A candidate with **no** `task_or_story_directory` is a pre-task.123 snapshot: drop it and file `{ "path": "<it>", "concern": "legacy snapshot (no task_or_story_directory) — restore deliberately with --restore --accept-legacy, or delete" }`."* Item 3: *"Among the remaining candidates a directory-matched `.pausing.*` claim outranks `last-halt.json` **regardless of mtime**; only among candidates of the same provenance does the newest win — the same ranking `advance-pipeline-lock.sh` `choose_candidate()` applies, which is the authority; if in doubt run `--restore --which <doc-dir>` and report what it names."* Listing fence:
-```bash
-find .claude/state -maxdepth 1 \( -name develop-pipeline.last-halt.json -o -name 'develop-pipeline.lock.pausing.*' \) -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null || true
-```
-Test: extract the fence by its comment anchor, run under `zsh -f` in a scratch dir with only `last-halt.json` present → stdout names it (today: `no matches found`, empty). Prose assertions anchored on two new HTML markers `<!-- candidate-rule: legacy -->` / `<!-- candidate-rule: provenance -->`, and the script's suite names `provenance-first ranking` and `legacy snapshot refused` scenarios (grep the `.test.sh` for the `pass` labels).
+**Exact changes:** Step 1 item 1 gains: *"A candidate with **no** `task_or_story_directory` is a pre-task.123 snapshot: drop it and file `{ "path": "<it>", "concern": "legacy snapshot (no task_or_story_directory) — restore deliberately with --restore --accept-legacy, or delete" }`."* Item 3: *"Among the remaining candidates a directory-matched `.pausing.*` claim outranks `last-halt.json` **regardless of mtime**; only among candidates of the same provenance does the newest win — the same ranking `advance-pipeline-lock.sh` `choose_candidate()` applies, which is the authority; if in doubt run `--restore --which <doc-dir>` and report what it names."* Listing fence: already `find .claude/state -maxdepth 1 \( -name "develop-pipeline.last-halt.json" -o -name "develop-pipeline.lock.pausing.*" \) -exec ls -t {} + 2>/dev/null || true` (`:81`, task.137) — leave it. Test: extract the fence, run under `zsh -f` and `bash --noprofile --norc` in a scratch dir with only `last-halt.json` present → stdout names it; mutation: the pre-task.137 `ls -t … .pausing.*` form → empty under zsh. Prose assertions anchored on two new HTML markers `<!-- candidate-rule: legacy -->` / `<!-- candidate-rule: provenance -->`, and the script's suite names `provenance-first ranking` and `legacy snapshot refused` scenarios (grep the `.test.sh` for the `pass` labels).
 
 ### Phase 4: Citations and messages
 
@@ -89,20 +87,24 @@ assert.deepEqual(tokens.filter(t => !allowed(t)), [], `${rel} names a stale-snap
 ```
 Mutations: `` `stale-snapshot*` `` → red; the sentence *"the two skip notes share the prefix"* (no backticked token) → green.
 
-### Phase 5: change-log shrink guard
+### Phase 5: change-log append-only check
 
-**Files to modify:** `shared/resources/change-log.js` (`upsertChangeLog`); `shared/resources/tests/change-log*.test.mjs`; `shared/resources/pr-conformance-prompt.md` § D
+**Files to modify:** `shared/resources/change-log.js`; `shared/resources/tests/change-log.test.mjs`; `shared/resources/pr-conformance-prompt.md` § C. TRAIL
 
 **Exact changes:**
 ```js
-class ChangeLogShrinkError extends Error { constructor(before, after) { super(`change log would shrink from ${before} to ${after} data rows — refusing to write; recover the rows (git show <good-commit>:<doc>) before appending`); this.before = before; this.after = after; } }
-// inside upsertChangeLog, after the block is located and before the rewrite:
-const before = countDataRows(blockBefore); const after = countDataRows(blockAfter);
-if (after < before) throw new ChangeLogShrinkError(before, after);
+// rows of prev's Change Log that next no longer carries — the reader the writer uses, both sides
+function rowsDropped(prevContent, nextContent) {
+  const key = (e) => fmtEntry(e).trim();
+  const next = new Set(extractEntries(nextContent).map(key));
+  return extractEntries(prevContent).map(key).filter((r) => !next.has(r));
+}
 ```
-`countDataRows` = lines inside the markers matching `/^\|\s*\d{4}-\d{2}-\d{2}\s*\|/` — the same predicate the rewrite uses to carry rows. Fixture: the block shape at `git show 3479b14a:docs/tasks/task.130.…/task.130.….md` (sections spliced between heading and table) — assert `throws(ChangeLogShrinkError)`; assert the count reported equals 6. Mutation: guard removed → the fixture "passes" with fewer rows. Export the error class for callers that want to catch it.
+(Confirm `extractEntries`' return shape before writing `key` — if it returns raw rows, compare trimmed rows; the point is one reader for both sides.) CLI: `--check-append-only --file <doc> --against <rev>` → `git show <rev>:<doc>` via `execFileSync` (no shell); absent at `<rev>` → `{reason:"new-document"}` exit 0; dropped → print each, `{reason:"rows-dropped", dropped:[…]}` exit 1; none → `{reason:"ok"}` exit 0.
 
-`pr-conformance-prompt.md` § D: *"the Change Log inside the markers has fewer data rows than `git show HEAD~1:<doc>` (or the merge-base copy) — a shrink is a trail defect"*.
+Fixture: the task.130 document at `fdba78d9~1` and at `fdba78d9`, trimmed to the Change Log block plus enough frontmatter to parse, committed as test fixtures — assert six dropped rows. Mutation: `rowsDropped` → `() => []` → red.
+
+`pr-conformance-prompt.md` § C. TRAIL: *"the Change Log lost rows since the base — run `change-log.js --check-append-only --file <doc> --against <merge-base>`; any dropped row is a trail defect"*.
 
 ## Key Patterns and References
 
@@ -113,4 +115,4 @@ if (after < before) throw new ChangeLogShrinkError(before, after);
 
 ## Testing Approach
 
-One commit per phase; before each commit: the phase's mutation proof (cp snapshot → mutate → predicted red → restore → baseline green), `npm run ci:fast`, the shell suites, `npm run bundle -- --check`, `npm run lint:shell`. Phase 5 additionally: run `upsertChangeLog` over every tracked document carrying `<!-- change-log-start -->` with a no-op row and assert none throws (a corpus non-vacuity check before the guard ships).
+One commit per phase; before each commit: the phase's mutation proof (cp snapshot → mutate → predicted red → restore → baseline green), `npm run ci:fast`, the shell suites, `npm run bundle -- --check`, `npm run lint:shell`. Phase 5 additionally: run `--check-append-only --against origin/develop` over every tracked document carrying `<!-- change-log-start -->` and record the count (a corpus non-vacuity check before the lens cites it).

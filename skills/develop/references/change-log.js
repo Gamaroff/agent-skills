@@ -82,6 +82,15 @@ const RE_ENTRY_ROW = /^\|\s*\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?\s*\|/;
 
 const isEntryRow = (line) => RE_ENTRY_ROW.test(line);
 
+// A table data row the parser does not recognise — not an entry row, not a separator, not a
+// header. The writer PRESERVES these (a `| Version | Date | … |` log has one in every row), so any
+// reader that has to see what the writer carries must use this predicate, not isEntryRow alone
+// (TASK-133-QA-3). One definition: upsertChangeLog and carriedRows both call it.
+const isUnparsedRow = (line) =>
+  !isEntryRow(line) &&
+  !/^\s*\|[\s\-:|]+\|\s*$/.test(line) &&
+  !/^\s*\|\s*(Date|Version|Description|Author|Change)\b/i.test(line);
+
 // ---------------------------------------------------------------------------
 // Scope guards — frontmatter and fenced code
 // ---------------------------------------------------------------------------
@@ -611,12 +620,7 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
     //
     // Header and separator lines are excluded because the regenerated block
     // supplies its own.
-    const unparsed = tableLines.filter(
-      (l) =>
-        !isEntryRow(l) &&
-        !/^\s*\|[\s\-:|]+\|\s*$/.test(l) &&
-        !/^\s*\|\s*(Date|Version|Description|Author|Change)\b/i.test(l),
-    );
+    const unparsed = tableLines.filter(isUnparsedRow);
     const migrated = found.legacyAuthor
       ? migrateLegacyEntries(existing, {
           legacyAuthor: found.legacyAuthor,
@@ -844,6 +848,71 @@ function checkUpdatedCoherence(content) {
 }
 
 // ---------------------------------------------------------------------------
+// Append-only across revisions (task.133; obs #137)
+// ---------------------------------------------------------------------------
+
+// A row's identity is its date and its description. Version and author are not part of it: a
+// legacy row migrated into the canonical four columns gains an author (and its date loses the
+// HH:MM) without being a different row, and the migration must not read as a loss.
+function entryKey(row) {
+  const cells = rowCells(migrateLegacyRow(row));
+  return `${(cells[0] || "").slice(0, 10)}\u0000${cells[2] || ""}`;
+}
+
+/**
+ * The rows of `prevContent`'s Change Log that `nextContent`'s no longer carries.
+ *
+ * The log is append-only, so a row that disappears between two revisions is a loss — whatever
+ * removed it. At fdba78d9 a hand repair of a corrupted block dropped six rows and two QA cycles
+ * read past it; the writer did not do it (`upsertChangeLog` keeps every row it can see), so the
+ * check has to compare two revisions rather than a write's input and output. Both sides are read
+ * with `carriedRows` — every row the writer carries, parsed or not, from every block it sweeps. Counted as a multiset: one of two
+ * identical rows removed is a loss, and a reorder is not.
+ *
+ * @returns {string[]} the dropped rows — as `prevContent` spelled them, except a row from a second
+ *   legacy block, which is reported in the canonical four-column form the writer would carry it in
+ */
+// Every row the writer carries through a rewrite: the chosen block's entry rows AND its preserved
+// unparsed rows (the same partition upsertChangeLog regenerates from), plus the entry rows of every
+// other block it would sweep in. extractEntries alone saw none of a Version-first log and none of a
+// second legacy block, so a lost row there read as "no row lost" (TASK-133-QA-3).
+function carriedRows(content) {
+  const text = String(content);
+  const found = findChangeLog(text);
+  if (!found) return [];
+  const own = splitCarriedLines(text, found).tableLines.filter(
+    (l) => isEntryRow(l) || isUnparsedRow(l),
+  );
+  const head = collapseOtherLegacyBlocks(
+    text.slice(0, found.start),
+    "",
+    found.legacyAuthor,
+  );
+  const tail = collapseOtherLegacyBlocks(
+    text.slice(found.end),
+    "",
+    found.legacyAuthor,
+  );
+  return [...own, ...head.entries, ...tail.entries];
+}
+
+function rowsDropped(prevContent, nextContent) {
+  const have = new Map();
+  for (const row of carriedRows(nextContent)) {
+    const k = entryKey(row);
+    have.set(k, (have.get(k) || 0) + 1);
+  }
+  const dropped = [];
+  for (const row of carriedRows(prevContent)) {
+    const k = entryKey(row);
+    const n = have.get(k) || 0;
+    if (n > 0) have.set(k, n - 1);
+    else dropped.push(row.trim());
+  }
+  return dropped;
+}
+
+// ---------------------------------------------------------------------------
 // Legacy row parsing
 // ---------------------------------------------------------------------------
 
@@ -910,6 +979,7 @@ module.exports = {
   bumpUpdated,
   // check
   checkUpdatedCoherence,
+  rowsDropped,
 };
 
 // ---------------------------------------------------------------------------
@@ -920,8 +990,42 @@ module.exports = {
 //     exit 0  ok / no-log / no-updated
 //     exit 1  stale-updated — the newest row is dated after `updated:`; apply
 //             bumpUpdated(content, <newest row date>) and re-run
-//     exit 2  usage — no --check-updated, no --file, or the file is unreadable
+//
+//   node change-log.js --check-append-only --file <doc> --against <rev> [--json]
+//     exit 0  ok (no row lost since <rev>) / new-document (the file is absent at <rev>)
+//     exit 1  rows-dropped — each row <rev> carried that the file no longer does is printed
+//
+//   exit 2 (both modes)  usage — no mode, no --file, an unreadable file, --against on the
+//                        wrong mode or missing, or a <rev> git cannot resolve
 // ---------------------------------------------------------------------------
+
+const USAGE =
+  "usage: change-log.js --check-updated --file <doc> [--json]\n       change-log.js --check-append-only --file <doc> --against <rev> [--json]";
+
+// The file's content at <rev>, read with git from the file's own directory so any checkout
+// layout works. null when the path does not exist at <rev>; throws on anything else (an unknown
+// revision must never read as a new document).
+function contentAt(file, rev) {
+  const path = require("path");
+  const { execFileSync } = require("child_process");
+  try {
+    return execFileSync("git", ["show", `${rev}:./${path.basename(file)}`], {
+      cwd: path.dirname(path.resolve(file)),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      maxBuffer: 64 * 1024 * 1024,
+      // The "absent at <rev>" test below reads git's stderr, and git translates it: under a German
+      // or French locale the English phrases never match and a new document would read as a
+      // usage error. Pin the C locale; LANGUAGE outranks LC_ALL for gettext, so clear it too
+      // (TASK-133-QA-6).
+      env: { ...process.env, LC_ALL: "C", LANGUAGE: "" },
+    });
+  } catch (e) {
+    const err = String(e.stderr || e.message);
+    if (/does not exist in|exists on disk, but not in/.test(err)) return null;
+    throw new Error(err.trim().split("\n")[0]);
+  }
+}
 
 function main(argv) {
   const json = argv.includes("--json");
@@ -932,35 +1036,84 @@ function main(argv) {
   const usage = (error) =>
     say(
       { reason: "usage", exitCode: 2, error },
-      `change-log: ${error}\nusage: change-log.js --check-updated --file <doc> [--json]`,
+      `change-log: ${error}\n${USAGE}`,
       json ? process.stdout : process.stderr,
     );
   let file = null;
-  let check = false;
+  let against = null;
+  let mode = null;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--json") continue;
-    if (a === "--check-updated") {
-      check = true;
+    if (a === "--check-updated" || a === "--check-append-only") {
+      if (mode && mode !== a) return usage("one mode per call");
+      mode = a;
       continue;
     }
-    if (a === "--file") {
+    if (a === "--file" || a === "--against") {
       const v = argv[i + 1];
       if (v === undefined || v.startsWith("--"))
-        return usage("--file needs an operand");
-      file = v;
+        return usage(`${a} needs an operand`);
+      if (a === "--file") file = v;
+      else against = v;
       i += 1;
       continue;
     }
     return usage(`unknown argument ${a}`);
   }
-  if (!check) return usage("--check-updated is the only mode");
+  if (!mode)
+    return usage("a mode is required: --check-updated or --check-append-only");
   if (!file) return usage("--file is required");
+  if (mode === "--check-updated" && against !== null)
+    return usage("--against belongs to --check-append-only");
+  if (mode === "--check-append-only" && against === null)
+    return usage("--check-append-only needs --against <rev>");
+  // An empty revision is not a base: `git show :./<doc>` reads the INDEX, which matches the working
+  // tree, so the check would report a clean log. That is exactly what an unresolvable base produces —
+  // `--against "$(git merge-base …)"` expands to "" — and "could not look" must never read as
+  // "found nothing" (TASK-133-QA-1).
+  if (mode === "--check-append-only" && !against.trim())
+    return usage(
+      "--against is empty — the base revision did not resolve; nothing was compared",
+    );
   let content;
   try {
     content = require("fs").readFileSync(file, "utf8");
   } catch (e) {
     return usage(`--file ${file}: ${e.message}`);
+  }
+  if (mode === "--check-append-only") {
+    let prev;
+    try {
+      prev = contentAt(file, against);
+    } catch (e) {
+      return usage(`--against ${against}: ${e.message}`);
+    }
+    if (prev === null)
+      return say(
+        { ok: true, reason: "new-document", file, against, exitCode: 0 },
+        `ok change-log: ${file} — absent at ${against}, nothing to compare`,
+      );
+    const dropped = rowsDropped(prev, content);
+    if (dropped.length === 0)
+      return say(
+        { ok: true, reason: "ok", file, against, exitCode: 0 },
+        `ok change-log: ${file} — no Change Log row lost since ${against}`,
+      );
+    return say(
+      {
+        ok: false,
+        reason: "rows-dropped",
+        file,
+        against,
+        dropped,
+        exitCode: 1,
+      },
+      [
+        `FAIL change-log: ${file} — ${dropped.length} row(s) present at ${against} are gone; recover them (git show ${against}:<doc>) — the log is append-only`,
+        ...dropped.map((r) => `  ${r}`),
+      ].join("\n"),
+    );
   }
   const r = checkUpdatedCoherence(content);
   const exitCode = r.ok ? 0 : 1;

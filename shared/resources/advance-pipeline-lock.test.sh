@@ -502,13 +502,40 @@ run_restore_scenarios() {
   fi
   rm -f "$L" "$S"
   # A candidate that already names a directory keeps its own under the flag — the stamp
-  # fills an absence, it never overwrites.
-  printf '{"task_or_story_directory":"%s","current_step":4}\n' "$R/doc" > "$S"
-  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --accept-legacy "$R/doc" >/dev/null 2>&1
-  if [ "$(jq -r '.task_or_story_directory' "$L")" = "$R/doc" ] && [ "$(jq -r '.current_step' "$L")" = "4" ]; then
-    pass "[$SH] --restore --accept-legacy: a matched candidate keeps its own directory"
+  # fills an absence, it never overwrites. The candidate's spelling (`./doc/`, read from $R)
+  # is canon-equal to the `$R/doc` passed but textually different, so an unconditional
+  # `.task_or_story_directory = $dir` turns this red; seeding `$R/doc` itself could not tell
+  # the fill from the overwrite (task.130 gate 7 QA-14; task.133).
+  ( cd "$R" && printf '{"task_or_story_directory":"./doc/","current_step":4}\n' > "$S" \
+      && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --accept-legacy "$R/doc" >/dev/null 2>&1 )
+  if [ -f "$L" ] && [ "$(jq -r '.task_or_story_directory' "$L")" = "./doc/" ] && [ "$(jq -r '.current_step' "$L")" = "4" ]; then
+    pass "[$SH] --restore --accept-legacy: a matched candidate keeps its own directory spelling"
   else
-    fail "[$SH] --restore --accept-legacy: no overwrite" "lock=$(jq -c . "$L")"
+    fail "[$SH] --restore --accept-legacy: no overwrite" "lock=$([ -f "$L" ] && jq -c . "$L" || echo absent)"
+  fi
+  rm -f "$L" "$S"
+
+  # A bystander legacy snapshot beside a matched claim: the restore succeeds from the claim, so
+  # the --accept-legacy advice is noise — it prints only when NOTHING restores (task.130 5c CR-2).
+  # The legacy snapshot is the NEWER file, so mtime alone would have preferred it.
+  printf '{"task_or_story_directory":"%s","current_step":6}\n' "$R/doc" > "$L.pausing.5151"
+  touch -t 202601010000 "$L.pausing.5151"
+  printf '{"current_step":2,"halt_step":2}\n' > "$S"
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r '.current_step' "$L")" = "6" ] && [ -f "$S" ] \
+      && ! printf '%s' "$OUT" | grep -q -- '--accept-legacy'; then
+    pass "[$SH] --restore: matched claim + bystander legacy snapshot → restored from the claim, no --accept-legacy advice, legacy kept"
+  else
+    fail "[$SH] --restore: quiet bystander advice" "rc=$RC lock=$([ -f "$L" ] && jq -c . "$L" || echo absent) snap=$([ -f "$S" ] && echo kept || echo gone) out=$OUT"
+  fi
+  rm -f "$L" "$S" "$L.pausing.5151"
+  # …and a legacy-only candidate set still names the flag, once, on the refusal.
+  printf '{"current_step":2,"halt_step":2}\n' > "$S"
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 1 ] && [ ! -f "$L" ] && [ "$(printf '%s\n' "$OUT" | grep -c -- '--accept-legacy')" -eq 1 ]; then
+    pass "[$SH] --restore: legacy-only → exit 1 and the --accept-legacy advice exactly once"
+  else
+    fail "[$SH] --restore: legacy-only advice" "rc=$RC out=$OUT"
   fi
   rm -f "$L" "$S"
 

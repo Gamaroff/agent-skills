@@ -2117,3 +2117,279 @@ test("I: the CLI exits 1 on stale-updated, 0 otherwise, 2 on usage — and requi
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// J — append-only across revisions (task.133; obs #137)
+//
+// At fdba78d9 a hand repair of task.130's corrupted Change Log block dropped six rows; two QA
+// cycles read the document and missed it. upsertChangeLog did not do it — run on the pre-repair
+// shape it keeps all six (J2 pins that) — so the check compares two revisions, not a write's
+// input and output. The fixtures are the two revisions' blocks, verbatim, as .txt so no Markdown
+// tool reformats or link-checks them.
+// ---------------------------------------------------------------------------
+
+const FX = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
+const readFx = (n) =>
+  require("node:fs").readFileSync(
+    join(FX, `change-log-append-only.task130-${n}.txt`),
+    "utf8",
+  );
+
+test("J1: rowsDropped names exactly the six rows fdba78d9 removed from task.130's log", () => {
+  const dropped = CL.rowsDropped(readFx("parent"), readFx("repair"));
+  assert.equal(dropped.length, 6, dropped.join("\n"));
+  assert.ok(dropped.every(CL.isEntryRow), "a dropped entry is not a row");
+  assert.ok(
+    dropped.some((r) => r.includes("Initial draft — follow-ups from task.124")),
+    "the 1.0 row is not among the dropped",
+  );
+});
+
+test("J2: the writer keeps every row — an append, even on the corrupted shape, drops none", () => {
+  const parent = readFx("parent");
+  const next = CL.upsertChangeLog(parent, ENTRY, { docType: "task" });
+  assert.deepEqual(CL.rowsDropped(parent, next), []);
+  assert.equal(CL.extractEntries(next).length, 7);
+});
+
+test("J3: a legacy-marker migration and a reorder are not losses", () => {
+  const legacy = [
+    "---",
+    "type: story",
+    "---",
+    "# S",
+    "",
+    "<!-- jira-sync-changelog-start -->",
+    "## Change Log",
+    "",
+    "| Date | Change |",
+    "|------|--------|",
+    "| 2026-04-28 09:40 | Initial Jira story created |",
+    "| 2026-04-29 10:00 | Status → in-progress |",
+    "<!-- jira-sync-changelog-end -->",
+    "",
+  ].join("\n");
+  const migrated = CL.upsertChangeLog(legacy, ENTRY, { docType: "story" });
+  assert.match(migrated, /change-log-start/);
+  assert.deepEqual(CL.rowsDropped(legacy, migrated), []);
+  const rows = CL.extractEntries(migrated);
+  const reordered = migrated
+    .replace(rows[0], "\u0000")
+    .replace(rows[1], rows[0])
+    .replace("\u0000", rows[1]);
+  assert.deepEqual(CL.rowsDropped(migrated, reordered), []);
+  // Multiset, not set: one of two identical rows removed IS a loss.
+  const twice = CL.upsertChangeLog(migrated, ENTRY, { docType: "story" });
+  assert.equal(CL.rowsDropped(twice, migrated).length, 1);
+});
+
+test("J4: --check-append-only compares the file with its copy at --against <rev>", () => {
+  const dir = mkdtempSync(join(tmpdir(), "change-log-append-only-"));
+  const git = (...a) =>
+    execFileSync("git", a, {
+      cwd: dir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  const run = (args) => {
+    try {
+      return {
+        code: 0,
+        out: execFileSync("node", [CL_CLI, ...args], {
+          cwd: dir,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+        }),
+      };
+    } catch (e) {
+      return { code: e.status, out: e.stdout };
+    }
+  };
+  try {
+    git("init", "-q");
+    git("config", "user.email", "t@example.com");
+    git("config", "user.name", "t");
+    writeFileSync(join(dir, "doc.md"), readFx("parent"));
+    git("add", "doc.md");
+    git("commit", "-q", "-m", "parent");
+    // appended — ok
+    writeFileSync(
+      join(dir, "doc.md"),
+      CL.upsertChangeLog(readFx("parent"), ENTRY, { docType: "task" }),
+    );
+    let r = run([
+      "--check-append-only",
+      "--file",
+      "doc.md",
+      "--against",
+      "HEAD",
+      "--json",
+    ]);
+    assert.equal(r.code, 0, r.out);
+    assert.equal(JSON.parse(r.out).reason, "ok");
+    // the fdba78d9 repair — six rows dropped
+    writeFileSync(join(dir, "doc.md"), readFx("repair"));
+    r = run([
+      "--check-append-only",
+      "--file",
+      "doc.md",
+      "--against",
+      "HEAD",
+      "--json",
+    ]);
+    assert.equal(r.code, 1, r.out);
+    const j = JSON.parse(r.out);
+    assert.equal(j.reason, "rows-dropped");
+    assert.equal(j.dropped.length, 6);
+    assert.match(
+      run(["--check-append-only", "--file", "doc.md", "--against", "HEAD"]).out,
+      /^FAIL change-log: .*6 row/m,
+    );
+    // absent at the revision — a new document, not a loss
+    writeFileSync(join(dir, "new.md"), readFx("repair"));
+    r = run([
+      "--check-append-only",
+      "--file",
+      "new.md",
+      "--against",
+      "HEAD",
+      "--json",
+    ]);
+    assert.equal(r.code, 0, r.out);
+    assert.equal(JSON.parse(r.out).reason, "new-document");
+    // …under a translated git too: "absent at <rev>" is not decided from English stderr, or a German
+    // or French locale turns a new document into usage exit 2 (TASK-133-QA-6).
+    for (const [LANGUAGE, LC_ALL] of [
+      ["de", "de_DE.UTF-8"],
+      ["fr", "fr_FR.UTF-8"],
+    ]) {
+      let out;
+      try {
+        out = execFileSync(
+          "node",
+          [
+            CL_CLI,
+            "--check-append-only",
+            "--file",
+            "new.md",
+            "--against",
+            "HEAD",
+            "--json",
+          ],
+          {
+            cwd: dir,
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+            env: { ...process.env, LANGUAGE, LC_ALL },
+          },
+        );
+      } catch (e) {
+        out = e.stdout;
+      }
+      assert.equal(
+        JSON.parse(out).reason,
+        "new-document",
+        `[${LANGUAGE}] ${out}`,
+      );
+    }
+    // an unknown revision is a usage error, never "new-document"
+    assert.equal(
+      run([
+        "--check-append-only",
+        "--file",
+        "doc.md",
+        "--against",
+        "no-such-rev",
+      ]).code,
+      2,
+    );
+    assert.equal(run(["--check-append-only", "--file", "doc.md"]).code, 2);
+    // An EMPTY revision is not "the index": `git show :./doc.md` reads the staged copy, so an
+    // unresolvable base — `--against "$(git merge-base …)"` expanding to "" — used to report ok /
+    // exit 0 (TASK-133-QA-1). Empty and whitespace-only are usage, never a clean log.
+    for (const rev of ["", "  "]) {
+      const u = run([
+        "--check-append-only",
+        "--file",
+        "doc.md",
+        "--against",
+        rev,
+        "--json",
+      ]);
+      assert.equal(u.code, 2, `--against '${rev}' → ${u.out}`);
+      assert.equal(JSON.parse(u.out).reason, "usage");
+    }
+    // --against belongs to --check-append-only only
+    assert.equal(
+      run(["--check-updated", "--file", "doc.md", "--against", "HEAD"]).code,
+      2,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("J5: rows the writer keeps but extractEntries skips are compared too (TASK-133-QA-3)", () => {
+  const mk = (rows, extra = []) =>
+    [
+      "---",
+      "type: task",
+      "---",
+      "# T",
+      "",
+      "<!-- change-log-start -->",
+      "## Change Log",
+      "",
+      "| Version | Date | Change | Author |",
+      "|---|---|---|---|",
+      ...rows,
+      "<!-- change-log-end -->",
+      "",
+      ...extra,
+    ].join("\n");
+  // A Version-first log: no row passes isEntryRow, yet upsertChangeLog preserves every one.
+  const prev = mk([
+    "| 1.0 | 2026-01-01 | first | a |",
+    "| 1.1 | 2026-01-02 | second | b |",
+  ]);
+  const next = mk(["| 1.0 | 2026-01-01 | first | a |"]);
+  assert.equal(
+    CL.extractEntries(prev).length,
+    0,
+    "premise: the reader sees none of them",
+  );
+  assert.ok(
+    CL.upsertChangeLog(prev, ENTRY, { docType: "task" }).includes(
+      "| 1.1 | 2026-01-02 | second | b |",
+    ),
+    "premise: the writer keeps them",
+  );
+  assert.deepEqual(CL.rowsDropped(prev, next), [
+    "| 1.1 | 2026-01-02 | second | b |",
+  ]);
+  assert.deepEqual(
+    CL.rowsDropped(prev, CL.upsertChangeLog(prev, ENTRY, { docType: "task" })),
+    [],
+  );
+  // A second, legacy block the writer would sweep in: its rows count as carried.
+  const legacy = [
+    "<!-- jira-sync-changelog-start -->",
+    "| Date | Change |",
+    "|------|--------|",
+    "| 2026-04-28 09:40 | Initial Jira story created |",
+    "<!-- jira-sync-changelog-end -->",
+  ];
+  const twoBlocks = mk(["| 1.0 | 2026-01-01 | first | a |"], legacy);
+  assert.deepEqual(
+    CL.rowsDropped(
+      twoBlocks,
+      CL.upsertChangeLog(twoBlocks, ENTRY, { docType: "story" }),
+    ),
+    [],
+  );
+  assert.deepEqual(
+    CL.rowsDropped(twoBlocks, mk(["| 1.0 | 2026-01-01 | first | a |"])),
+    // reported in the canonical form the writer would carry it in
+    ["| 2026-04-28 |  | Initial Jira story created | sync-jira |"],
+  );
+});
