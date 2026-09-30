@@ -255,14 +255,18 @@ takes it.
     (this repository's is `tests/fixtures/fake-gh`; a consumer supplies its
     own). The engine prepends it to `PATH` with `FAKE_GH=1` in the env — the
     fixture refuses to run without that variable — validates it before anything
-    spawns (`bad-fake-gh` otherwise), and records it as `fake_gh` on the run.
+    spawns (`bad-fake-gh` otherwise, decided on real paths like an entry's, so a
+    symlink inside the root that points out of it is refused), and records it as
+    `fake_gh` on the run.
     **A library or script whose text — or the text of a file it `source`s at top
     level — names `gh`, and was given no `--fake-gh`, is declined
     `needs-fake-gh`, not scored**, under **both** shell forms (task.140; the
     `shell:` form ran the host `gh` before it). "Names" means `gh` as a command
-    word — followed by whitespace, `;`, `|`, `&`, `)`, `>` or end of line — or a
-    variable named `GH` (`"$GH" api`); a sourced path is tried against the
-    library's directory, then the root, one level deep, and is not followed when
+    word — after whitespace, `;`, `|`, `&`, `(`, a backtick, `$`, a quote or a
+    backslash, and followed by whitespace, `;`, `|`, `&`, `)`, `>`, a quote or end of
+    line — or a variable named `GH` (`"$GH" api`); a `source` / `.` is followed at
+    the start of a line or after `;`, `&&`, `||`, `then` or `do`, its path tried
+    against the library's directory, then the root, one level deep, and is not followed when
     it holds a `$` or lies outside the root. A mention in a comment matches too;
     that is a decline the caller answers by passing the fixture. Otherwise: run bare, the real `gh` fails from the
     sandbox cwd, the function takes its read-failed passthrough, and the verdict
@@ -276,9 +280,12 @@ takes it.
   `source` an EXIT trap is armed **and `exit` is shadowed by a function** that
   calls `builtin exit 97`, so a **top-level `exit` inside the library** (a
   `|| exit 1` guard, say) is the same named decline even when the library has
-  installed its own `trap … EXIT` first; the function is unset before the
-  function under probe runs, and a library that defines its own `exit` loses it
-  (none here does). The source's status is taken as a **simple command**, not on
+  installed its own `trap … EXIT` first. `trap` is shadowed for the same span —
+  errexit ends the shell without calling `exit`, so the EXIT trap alone decides
+  the status there — and drops any installation naming `EXIT` / `0` / `SIGEXIT`
+  while passing every other trap to the builtin. Both functions are unset before
+  the function under probe runs; a library that defines its own `exit` or `trap`
+  loses it (none here does). The source's status is taken as a **simple command**, not on
   the left of `||` — where both shells suspend errexit for everything the
   library runs at top level — so a `set -e` library whose top-level command
   fails is declined, as a consumer's own `source` would have aborted, rather

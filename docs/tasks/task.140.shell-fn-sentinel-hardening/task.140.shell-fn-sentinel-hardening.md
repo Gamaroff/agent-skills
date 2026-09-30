@@ -316,6 +316,30 @@ None.
 
 **Deferred work.** None. The residual the rule names — a symlink that appears between the containment check and the readable-file check — is a race nothing here defends against, stated in `probe-boundary-rule.md` §5.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-30
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.140.qa.1.shell-fn-sentinel-hardening.md](./task.140.qa.1.shell-fn-sentinel-hardening.md)
+- **Gate File**: [task.140.gate.1.shell-fn-sentinel-hardening.yml](./task.140.gate.1.shell-fn-sentinel-hardening.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 121 (+19 consumer)
+- **Phases Verified**: 4/4 (1 with issues)
+- **Critical Issues**: 0 HIGH, 2 MEDIUM, 1 LOW
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- CR-1 / [TASK-140-BUG-1](./task.140.bug.1.library-trap-plus-errexit-scored.md): a library that installs its own EXIT trap and then fails under `set -e` is scored — a regression (97 → 1) for one ordering on bash 5 / zsh.
+- CR-2 / [TASK-140-BUG-2](./task.140.bug.2.fake-gh-containment-still-lexical.md): `--fake-gh` containment is still lexical.
+- CR-3 (low): quoted/backslashed `gh` and a non-line-initial `source` are not detected.
+- Fix cycle 1: all three fixed — bugs 1 and 2 **Ready for QA**; re-review pending.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -326,6 +350,8 @@ None.
 | 2026-09-30 | 1.1 | Review passed (9/10 after fixes) — fixed the plan's never-matching `head -c 21` shebang test (`head -n 1`), source-follow resolves library dir then root, `isWithin` containment, decayed row/lint counts replaced by their commands | review-task |
 | 2026-09-30 |  | Status → ready-for-development | review-task |
 | 2026-09-30 |  | Implemented — 8 files (engine, 2 test files, 2 lint lanes, rule, CHANGELOG, bundled copies), 7 new tests, 9 mutants | develop |
+| 2026-09-30 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-09-30 |  | QA findings fixed — CR-1 (trap shadow), CR-2 (fake-gh real paths), CR-3 (detector shapes), 1 fix cycle, 3 rows, 5 mutants | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

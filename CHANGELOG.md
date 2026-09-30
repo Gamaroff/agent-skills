@@ -92,13 +92,17 @@ All notable changes to this project will be documented in this file. Format foll
   - A library that installs its own `trap … EXIT` before a `|| exit 1` guard, and a `set -e`
     library whose top-level command fails, now decline `entry-not-probeable` (executed 0) instead
     of scoring `absent` behind a full count. `SHELL_FN_BODY` shadows `exit` during the source and
-    takes the source's status as a simple command; verified bash 5.3 / 3.2 and zsh 5.9.
+    takes the source's status as a simple command; `trap` is shadowed for the same span, so a
+    library that replaces the EXIT trap and then fails under `set -e` is declined too (QA cycle 1).
+    Verified bash 5.3 / 3.2 and zsh 5.9.
   - `needs-fake-gh` applies to both shell forms: a `shell:` script that names `gh` no longer runs
-    the host `gh`. The detector widens its terminators (`gh;`, `gh>`, `(gh)`), matches a variable
-    named `GH` (`"$GH" api`), and follows one level of top-level `source` / `.` — library directory,
-    then root — so a wrapper that sources `gh-labels.sh` is declined too.
-  - `resolveEntry` compares **real** paths, both sides: a symlink inside the root that points out of
-    it is refused `outside-repo-root` before anything imports or spawns it. The limit carried since
+    the host `gh`. The detector widens its terminators (`gh;`, `gh>`, `(gh)`), matches a quoted or
+    backslashed `gh` and a variable named `GH` (`"$GH" api`), and follows one level of `source` /
+    `.` — at a line start or after `;`, `&&`, `||`, `then`, `do`; library directory, then root — so a
+    wrapper that sources `gh-labels.sh` is declined too.
+  - `resolveEntry` and the `--fake-gh` check compare **real** paths, both sides: a symlink inside the
+    root that points out of it is refused (`outside-repo-root` / `bad-fake-gh`) before anything
+    imports or spawns it. The limit carried since
     task.128 gate 1 is closed, not restated.
   - The extensionless fake `gh` is linted per PR: both ShellCheck lanes add tracked, extensionless
     files under `tests/fixtures/` whose first line is a bash shebang (78 files, was 77), in one

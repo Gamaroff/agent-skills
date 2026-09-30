@@ -545,15 +545,20 @@ export function parseArgvTemplate(raw) {
  * matches too; that is a named decline the caller answers by passing the
  * fixture, not a wrong verdict.
  */
-const GH_COMMAND_WORD = /(^|[\s;|&(`$])gh([\s;|&)>]|$)/m;
+const GH_COMMAND_WORD = /(^|[\s;|&(`$"'\\])gh([\s;|&)>"']|$)/m;
 /**
  * `gh` reached through a variable named `GH` (`"$GH" api …`, `${GH}`) — the one
  * indirection a literal-word match cannot see (task.140, c3-CR-3). `$GH_TOKEN`
  * and the like are other variables, not this one.
  */
 const GH_VARIABLE = /\$\{?GH(?![A-Za-z0-9_])/;
-/** A top-level `source <p>` / `. <p>` line; group 1 is the path as written. */
-const SOURCE_LINE = /^[ \t]*(?:source|\.)[ \t]+["']?([^"'\s;|&]+)["']?/gm;
+/**
+ * A top-level `source <p>` / `. <p>` — at the start of a line, or after `;`,
+ * `&&`, `||`, `|`, `then` or `do` (`[ -f x ] && source x`, `set -e; . x`:
+ * task.140 QA cycle 1, CR-3). Group 1 is the path as written.
+ */
+const SOURCE_LINE =
+  /(?:^|[;&|]|\b(?:then|do)\b)[ \t]*(?:source|\.)[ \t]+["']?([^"'\s;|&)]+)["']?/gm;
 /** `realpathSync` when the path exists, else the path unchanged. */
 function realpathSafe(p) {
   try {
@@ -578,6 +583,10 @@ export function namesGh(entryPath, root) {
       return null;
     }
   };
+  // The root is realpath'd HERE, not only by the caller: every candidate below is
+  // realpath'd, so a lexical root reached through a symlink would put every one
+  // of them "outside" and read as "names no gh" (task.140 QA cycle 1, CR-6).
+  root = realpathSafe(root);
   const first = read(entryPath);
   if (first === null) return false;
   const texts = [first];
@@ -650,8 +659,17 @@ const SHELL_FN_BODY =
   // consumer's own `source` would have aborted (task.140, PR-review CR-1). Now
   // errexit ends the source, the trap maps it to 97, and the explicit test
   // keeps the non-zero-last-command case. Verified bash 5.3 / 3.2, zsh 5.9.
-  `exit() { builtin exit ${SHELL_FN_SOURCE_FAILED}; }; trap 'exit ${SHELL_FN_SOURCE_FAILED}' EXIT; ` +
-  `source "$1"; src=$?; trap - EXIT; unset -f exit; [ "$src" -eq 0 ] || exit ${SHELL_FN_SOURCE_FAILED}; ` +
+  //
+  // `trap` is shadowed too, because errexit ends the shell WITHOUT calling the
+  // `exit` function: the EXIT trap alone decides the status there, so a library
+  // that installed its own (`trap true EXIT; set -e; false`) was scored again.
+  // The shadow drops any installation naming EXIT / 0 / SIGEXIT and passes every
+  // other trap to the builtin; it is unset before the harness's own
+  // `trap - EXIT`, which it would otherwise swallow (task.140 QA cycle 1, CR-1).
+  `exit() { builtin exit ${SHELL_FN_SOURCE_FAILED}; }; ` +
+  `trap() { for __s in "$@"; do case "$__s" in EXIT|0|SIGEXIT) return 0;; esac; done; builtin trap "$@"; }; ` +
+  `builtin trap 'exit ${SHELL_FN_SOURCE_FAILED}' EXIT; ` +
+  `source "$1"; src=$?; unset -f trap; trap - EXIT; unset -f exit; [ "$src" -eq 0 ] || exit ${SHELL_FN_SOURCE_FAILED}; ` +
   `shift; fn="$1"; shift; ` +
   `typeset -f "$fn" >/dev/null 2>&1 || exit ${SHELL_FN_NOT_DEFINED}; ` +
   // The function runs in a SUBSHELL: a function that calls `exit` would
@@ -986,8 +1004,13 @@ export function runProbeSpec({
     if (typeof fakeGh !== "string" || fakeGh.trim() === "") {
       return decline("bad-fake-gh", "--fake-gh must name a directory");
     }
-    const root = resolve(repoRoot);
-    fakeGhDir = isAbsolute(fakeGh) ? resolve(fakeGh) : resolve(root, fakeGh);
+    // Real paths, both sides — the same containment resolveEntry applies, so a
+    // symlink inside the root that points out of it is not a fixture this
+    // repository owns (task.140 QA cycle 1, CR-2).
+    const root = realpathSafe(resolve(repoRoot));
+    fakeGhDir = realpathSafe(
+      isAbsolute(fakeGh) ? resolve(fakeGh) : resolve(root, fakeGh),
+    );
     if (fakeGhDir === root || !isWithin(root, fakeGhDir)) {
       return decline("bad-fake-gh", `${fakeGhDir} is outside ${root}`);
     }

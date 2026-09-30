@@ -25,12 +25,13 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
@@ -46,6 +47,7 @@ import {
   expectedProblem,
   isLaunchFailure,
   main,
+  namesGh,
   parseArgvTemplate,
   probeShells,
   readRecord,
@@ -1860,6 +1862,11 @@ test("resolveEntry: a symlink inside the root that points outside it is refused 
   const outside = mkdtempSync(join(tmpdir(), "t140-outside-"));
   const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, ".t140-symlink-"));
   try {
+    // The row proves nothing if TMPDIR lies inside the repo (QA cycle 1, CR-5).
+    assert.ok(
+      !(realpathSync(outside) + sep).startsWith(realpathSync(REPO_ROOT) + sep),
+      `${outside} must be outside ${REPO_ROOT} for this row to test anything — set TMPDIR elsewhere`,
+    );
     writeFileSync(join(outside, "f.sh"), "f() { :; }\n", { mode: 0o644 });
     symlinkSync(outside, join(dir, "link"));
     const rel = relative(REPO_ROOT, join(dir, "link", "f.sh"));
@@ -1884,6 +1891,129 @@ test("resolveEntry: a symlink inside the root that points outside it is refused 
   } finally {
     rmSync(dir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: a library that replaces the EXIT trap and then fails under set -e is declined, in both orderings (task.140 QA cycle 1, CR-1 / TASK-140-BUG-1)", () => {
+  // errexit ends the shell WITHOUT calling the shadowed exit, so the EXIT trap
+  // decides the status — and the library had replaced it. The second ordering
+  // was declined (97) by the task.136 body and scored (1) by task.140's first
+  // body on bash 5 and zsh: a regression this row pins.
+  const dir = t140Libs("trap-errexit", {
+    "before.sh":
+      "#!/usr/bin/env bash\ntrap true EXIT\nset -e\nfalse\nf() { printf 'hi\\n'; }\n",
+    "after.sh":
+      "#!/usr/bin/env bash\nf() { printf 'hi\\n'; }\ntrap true EXIT\nset -e\nfalse\n",
+  });
+  try {
+    for (const lib of ["before.sh", "after.sh"]) {
+      const r = runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(dir, lib))}#f`,
+        cases: LABEL_CASES,
+        fakeGh: FAKE_GH,
+      });
+      assert.equal(
+        r.reason,
+        "entry-not-probeable",
+        `${lib}: ${JSON.stringify(r.declined)}`,
+      );
+      assert.equal(r.executed, 0, lib);
+      assert.match(r.declined[0].detail, /source .* failed \(exit 97\)/, lib);
+    }
+    // A library's NON-EXIT trap still installs: only EXIT is the harness's.
+    const intTrap = t140Libs("int-trap", {
+      "int.sh":
+        "#!/usr/bin/env bash\ntrap 'printf int' INT\nf() { printf '%s\\n' \"$1\"; }\n",
+    });
+    try {
+      const r = runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(intTrap, "int.sh"))}#f`,
+        cases: LABEL_CASES,
+        fakeGh: FAKE_GH,
+      });
+      assert.equal(r.declined.length, 0, JSON.stringify(r.declined));
+      assert.equal(r.executed, LABEL_CASES.length * probeShells().length);
+    } finally {
+      rmSync(intTrap, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: --fake-gh containment is decided on real paths, like an entry's (task.140 QA cycle 1, CR-2 / TASK-140-BUG-2)", () => {
+  const outside = mkdtempSync(join(tmpdir(), "t140-fake-outside-"));
+  const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, ".t140-fakegh-"));
+  try {
+    assert.ok(
+      !(realpathSync(outside) + sep).startsWith(realpathSync(REPO_ROOT) + sep),
+    );
+    cpSync(join(REPO_ROOT, FAKE_GH, "gh"), join(outside, "gh"));
+    symlinkSync(outside, join(dir, "fake"));
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: FN_ENTRY,
+      cases: LABEL_CASES,
+      fakeGh: relative(REPO_ROOT, join(dir, "fake")),
+    });
+    assert.equal(r.reason, "bad-fake-gh", JSON.stringify(r.declined));
+    assert.equal(r.executed, 0);
+    assert.equal(r.cases.length, 0, "nothing may spawn");
+    // An in-tree symlink to the in-tree fixture is still a fixture.
+    symlinkSync(join(REPO_ROOT, FAKE_GH), join(dir, "in-tree"));
+    const ok = runProbeSpec({
+      sink: "filename",
+      entry: FN_ENTRY,
+      cases: LABEL_CASES,
+      fakeGh: relative(REPO_ROOT, join(dir, "in-tree")),
+    });
+    assert.equal(ok.verdict, "engages", JSON.stringify(ok.declined));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("namesGh: quoted or backslashed gh, a non-line-initial source, and a root reached through a symlink (task.140 QA cycle 1, CR-3 / CR-6)", () => {
+  const dir = t140Libs("gh-more", {
+    "dq.sh": 'f() { "gh" api x; }\n',
+    "sq.sh": "f() { 'gh' api x; }\n",
+    "bs.sh": "f() { \\gh api x; }\n",
+    "and.sh":
+      "[ -f shared/resources/gh-labels.sh ] && source shared/resources/gh-labels.sh\nf() { :; }\n",
+    "semi.sh": "set -e; . shared/resources/gh-labels.sh\nf() { :; }\n",
+    "then.sh":
+      "if true; then source shared/resources/gh-labels.sh; fi\nf() { :; }\n",
+    "clean.sh":
+      "f() { printf 'high ghost %s\\n' \"$1\"; }  # ends in gh-less words\n",
+  });
+  const viaLink = mkdtempSync(join(tmpdir(), "t140-rootlink-"));
+  try {
+    for (const lib of [
+      "dq.sh",
+      "sq.sh",
+      "bs.sh",
+      "and.sh",
+      "semi.sh",
+      "then.sh",
+    ]) {
+      assert.equal(namesGh(join(dir, lib), REPO_ROOT), true, lib);
+    }
+    assert.equal(namesGh(join(dir, "clean.sh"), REPO_ROOT), false, "clean.sh");
+    // CR-6: the export realpaths its own root, so a lexical root through a
+    // symlink still follows an in-tree source.
+    const link = join(viaLink, "root");
+    symlinkSync(REPO_ROOT, link);
+    assert.equal(
+      namesGh(realpathSync(join(dir, "semi.sh")), link),
+      true,
+      "root via symlink",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(viaLink, { recursive: true, force: true });
   }
 });
 
