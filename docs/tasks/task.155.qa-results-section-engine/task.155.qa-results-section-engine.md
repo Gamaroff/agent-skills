@@ -5,7 +5,7 @@ type: task
 description: "Give the work item's `## QA Testing Results` section a write engine beside change-log.js. It replaces the section whole, places it in one canonical position outside the change-log block, and refuses a document that already carries more than one. Wire qa-task and qa-story Step 12 to it, repair the one corrupted document in the corpus, and hold the invariant with a corpus test."
 tags: [qa-task, qa-story, change-log, engine, observation]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-09-25
 updated: 2026-09-30
@@ -17,7 +17,7 @@ pr_number: 537
 
 # Technical Task: QA Testing Results section — one write engine, one placement, refused when duplicated
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.155.review.1.qa-results-section-engine.md` implemented 2026-09-30
 
@@ -377,27 +377,27 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.155.qa.5.qa-results-section-engine.md](./task.155.qa.5.qa-results-section-engine.md)
-- **Gate File**: [task.155.gate.5.qa-results-section-engine.yml](./task.155.gate.5.qa-results-section-engine.yml)
+- **Full Report**: [task.155.qa.6.qa-results-section-engine.md](./task.155.qa.6.qa-results-section-engine.md)
+- **Gate File**: [task.155.gate.6.qa-results-section-engine.yml](./task.155.gate.6.qa-results-section-engine.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 46 engine and wiring tests. Full `ci:fast` ran 4762 tests: 4761 pass, 0 fail, 1 skipped. A corpus dry run over 1,842 documents in a temp copy lost no marker, dated row or heading, and 2 documents were refused `unplaceable`.
+- **Tests Executed**: 45 engine tests. Full `ci:fast` ran 4,771 tests: 4,768 pass, 1 skipped, and 2 load-timing failures that pass alone. A stray fence injected into all 155 tracked sections (7 variants, plus a closing block at 16,804 later positions) deleted nothing. A 4-write corpus run over 1,986 documents, with a Change Log row after each write, lost no line outside the section.
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1 high, 1 medium, 1 low (in the gate)
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR-1 (PR review 2) is only partly closed. Both of the reviewer's repros are refused. REL-011 is fixed (`unplaceable`).
-- REL-012 (high): a stray fence in the section that a later fenced block closes still deletes the Change Log and the sections between, reported as `replaced`. The read-back counts sections, not the text around them. Injected into the corpus, it deletes content from task.90 and task.96.
-- REL-013 (medium): a `## Change Log` heading directly above the marker block leaves the section between them. Layout only; 6 tracked tasks have this shape.
-- REL-014 (low): setext and indented headings are not span boundaries. 0 corpus sections are affected.
+REL-012, REL-013 and REL-014 are fixed. Three findings remain, none of which touches a tracked QA-written document:
+- REL-015 (medium): the guard's Change Log heading pattern is narrower than `change-log.js`, so a dotted-numbered `### 1.5 Change Log` can still be deleted or stranded.
+- REL-016 (low): a fenced `# comment` line in a section is refused.
+- REL-017 (low): the Step 12 prose still says `unbounded` means only an unclosed fence.
 <!-- change-log-start -->
 ## Change Log
 
@@ -412,6 +412,7 @@ None.
 | 2026-09-30 |  | QA gate PASS (100/100) — 2 low findings (REL-007, REL-008); cycle 3 | qa-task |
 | 2026-09-30 |  | QA gate PASS (100/100) — 3 low findings (REL-009, REL-010, REL-011); cycle 4 | qa-task |
 | 2026-09-30 |  | QA gate FAIL (60/100) — 3 findings (1 high REL-012, 1 medium REL-013, 1 low REL-014); cycle 5 | qa-task |
+| 2026-09-30 |  | QA gate CONCERNS (80/100) — 3 findings (1 medium, 2 low), cycle 6 | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -454,3 +455,5 @@ Carried from QA gates 3 and 4 (route 2b cosmetic-residue exits) to each gate's `
 - **REL-010** (LOW, gate 4, regression from `182367ee`) — in a marker-less document, a section that carries its own `### Change Log` subheading is taken for the log, so each replace keeps the old tail — the document grows without `multiple` ever firing, which is the guarantee this task exists for. Duplicates, never deletes; 0 corpus sections carry that subheading and neither Step 12 template renders one.
 - **REL-011** (LOW, gate 4) — an unclosed fence running to the end of a document made `created` append the section inside the fence, invisible to the next read, so copies stacked without `multiple`. **Fixed at PR review 2**: a write that does not read back as one section is now refused (`unplaceable`).
 - **REL-012 / REL-013 / REL-014** (QA gate 5) — **fixed in cycle 5's fix**, not deferred: a fence-blind structural guard refuses any replace or relocate whose removed text carries a change-log marker, an H1/H2 (column 0 or indented) or a Change Log heading, and a section is refused on write if the guard would refuse to replace it; a `## Change Log` heading directly above the marker block now stays with its block. **Deferred:** a setext H1/H2 after the section is not treated as structural — this repository never authors setext headings, and the one corpus instance (task.118) is a `---` separator under a paragraph inside a QA section, where refusing would be a false stop.
+- **REL-015** (QA gate 6) — **fixed in cycle 6's fix**: the guard and the REL-013 placement now also test `change-log.js`'s own `RE_HEADING` (numbered forms such as `### 1.5 Change Log`, `## 12) Change Log`), imported rather than restated.
+- **REL-016** (LOW, gate 6) — **accepted trade, refuses and never deletes**: the structural guard is fence-blind, so *any* fenced line that reads as an ATX H1/H2 — a fenced `## Example`, and also a bash or YAML `# comment` inside a fenced block — makes a new section `bad-section` and an existing one `unbounded`; Step 12 halts with the reason and nothing is written. 0 of 155 tracked sections contain a fence, and neither Step 12 template renders one.

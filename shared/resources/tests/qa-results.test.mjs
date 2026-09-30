@@ -530,3 +530,26 @@ test("J7 the guard catches a marker-less ### Change Log alone", () => {
   assert.equal(r.reason, "unbounded");
   assert.equal(r.content, doc);
 });
+
+// ---------------------------------------------------------------------------
+// K — QA cycle 6 (task.155 gate 6)
+// ---------------------------------------------------------------------------
+
+test("K1 REL-015: a numbered marker-less ### 1.5 Change Log is structure the guard protects", () => {
+  const log =
+    "### 1.5 Change Log\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n";
+  const doc = `${FM}## Body\n\n${section(1)}\n\n\`\`\`\nstray\n\n${log}\n\`\`\`bash\necho\n\`\`\`\n\n## Next\n\nkeep\n`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "story" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.content, doc);
+});
+
+test("K2 REL-015: a numbered ## 12) Change Log directly above the marker block keeps its place", () => {
+  const doc = `${FM}## Body\n\ntext\n\n## 12) Change Log\n\n<!-- change-log-start -->\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n\n<!-- change-log-end -->\n`;
+  const r = QR.upsertQaResults(doc, section(1), { docType: "task" });
+  assert.equal(r.reason, "created");
+  assert.match(
+    r.content,
+    /None \(cycle 1\)\.\n\n## 12\) Change Log\n\n<!-- change-log-start -->/,
+  );
+});

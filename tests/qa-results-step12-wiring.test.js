@@ -143,6 +143,11 @@ for (const { skill, fileVar, docName } of SKILLS) {
       const r = run(block, dir, fileVar, doc);
       assert.notEqual(r.status, 0);
       assert.match(r.stderr, /HALT qa-results: unbounded/);
+      assert.match(
+        r.stderr,
+        /cannot be bounded/,
+        "the halt names the repair (REL-017)",
+      );
       assert.equal(fs.readFileSync(doc, "utf8"), broken);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });

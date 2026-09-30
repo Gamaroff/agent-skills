@@ -1871,7 +1871,9 @@ After review:
                                   fs.readFileSync(sectionFile, "utf8"), { docType });
      if (!["replaced", "relocated", "created"].includes(r.reason)) {
        console.error(`HALT qa-results: ${r.reason}${r.count ? ` (${r.count} sections)` : ""} — ${file} not written.` +
-         (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." : ""));
+         (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." :
+       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 or a Change Log heading (a fenced `# comment` counts). Fix that section by hand, re-run." :
+       r.reason === "unplaceable" ? " The write would not read back as exactly one section (an unclosed fence near the insertion point?). Fix by hand, re-run." : ""));
        process.exit(1);
      }
      fs.writeFileSync(file, r.content);
@@ -1885,7 +1887,8 @@ After review:
    task, else at the end), moves one it finds **inside** the change-log block out of it
    (`relocated`), and **refuses** a document that already carries more than one (`multiple`) — it
    never guesses which copy is current. It also refuses a section it cannot bound (`unbounded`: an
-   unclosed fence) and a write that would not read back as one section (`unplaceable`). On any
+   unclosed fence, or removed text that carries a change-log marker, an H1/H2 or a Change Log
+   heading — scanned ignoring fences, so a fenced `# comment` counts) and a write that would not read back as one section (`unplaceable`). On any
    refusal the step halts; a hand edit is not a fallback. Write (a) **before** the Change Log row in (d). A hand-rolled
    `slice(indexOf(…), indexOf("## Change Log"))` stacked four copies on task.145 (obs #178).
 

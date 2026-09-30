@@ -62,6 +62,7 @@ const {
   CL_START,
   CL_END,
   LEGACY_MARKER_PAIRS,
+  RE_HEADING,
   fencedRanges,
   protectedRanges,
   insideProtected,
@@ -84,7 +85,10 @@ const RE_BREAK =
   /^[ \t]{0,3}(?:-[ \t]*){3,}$|^[ \t]{0,3}(?:\*[ \t]*){3,}$|^[ \t]{0,3}(?:_[ \t]*){3,}$/;
 
 // Any heading that names a change log, at any level (the marker-less H3 form is how
-// the story and epic templates emit it).
+// the story and epic templates emit it). This is the broad net; change-log.js's own
+// RE_HEADING — the grammar findChangeLog recognises, numbering such as `1.5` and
+// `12)` included — is checked beside it everywhere, never restated here (task.155
+// QA cycle 6, REL-015: a restated `\d+\.?` missed `### 1.5 Change Log`).
 const RE_LOG_HEADING = /^ {0,3}#{1,6}[ \t]+(?:\d+\.?[ \t]+)?Change Log\b/i;
 // What a replace or relocate may never remove, scanned in the removed text IGNORING
 // fences: a change-log marker, an ATX H1/H2 (column 0 or indented 1–3 spaces), or a
@@ -99,6 +103,7 @@ const RE_STRUCTURAL = [
   /^ {0,3}<!-- (?:change-log|jira-sync-changelog|github-sync-changelog)-(?:start|end) -->/,
   /^ {0,3}#{1,2}(?:[ \t]|$)/,
   RE_LOG_HEADING,
+  RE_HEADING,
 ];
 
 // Does the text a write would remove carry anything outside the section itself?
@@ -314,7 +319,8 @@ function canonicalOffset(content, docType) {
     if (changeLog.hasMarkers) {
       const above = content.slice(0, changeLog.start).replace(/\s+$/, "");
       const lineStart = above.lastIndexOf("\n") + 1;
-      if (RE_LOG_HEADING.test(above.slice(lineStart))) return lineStart;
+      const line = above.slice(lineStart);
+      if (RE_LOG_HEADING.test(line) || RE_HEADING.test(line)) return lineStart;
     }
     return changeLog.start;
   }
