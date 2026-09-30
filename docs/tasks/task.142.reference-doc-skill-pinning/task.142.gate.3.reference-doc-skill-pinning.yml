@@ -1,0 +1,62 @@
+schema: 2
+task: 'task.142.reference-doc-skill-pinning'
+task_title: 'Pin the hand-written reference docs to the skills they describe'
+gate: PASS
+status_reason: 'Cycle-2 findings verified fixed: live-corpus assertions and cost tests now share resolveCorpus(), withSpies asserts its installed count and refuses a promise. Scoped re-review found three low cleanups only; 17/17 tests, ci:fast 4714 pass / 0 fail.'
+reviewer: 'QA Engineer'
+head: 'e87c1b0192b76146bb44beb47d39f520dd91b324'
+updated: '2026-09-30T17:18:36Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-30'
+  total_iterations: 1
+  verification_method: 'Scoped diff review + 6 mutations (spawn in flag loop, misspelled spy target, async fn, memo removed, fake flag, deleted skill) + ci:fast'
+
+evidence:
+  tests_reviewed: 17
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Test-only change; boundary: false.'
+  performance:
+    status: PASS
+    notes: 'No spawn/network and memoised reads are now pinned by tests; file ~170 ms.'
+  reliability:
+    status: PASS
+    notes: 'Spies restore in finally; installed-count assertion rules out a vacuous pass.'
+  maintainability:
+    status: PASS
+    notes: 'One code path for checks and cost; blind spot named in the header.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Activation flags (e.g. "review-story --validate") are extracted but unchecked — check them against SKILL.md or drop the field (also gate 1 CR-2).'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+    - action: 'Distinguish an empty SKILL.md from a missing one in the failure message.'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+    - action: 'Compute the corpus once at module scope instead of once per describe block.'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+    - action: 'Gate 1 CR-1 — match flags with a trailing boundary, not a substring.'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

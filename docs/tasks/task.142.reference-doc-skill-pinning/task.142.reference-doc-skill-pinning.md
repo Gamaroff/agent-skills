@@ -481,19 +481,19 @@ additions.
 
 ### QA Report
 
-- **Full Report**: [task.142.qa.1.reference-doc-skill-pinning.md](./task.142.qa.1.reference-doc-skill-pinning.md)
-- **Gate File**: [task.142.gate.1.reference-doc-skill-pinning.yml](./task.142.gate.1.reference-doc-skill-pinning.yml)
+- **Full Report**: [task.142.qa.3.reference-doc-skill-pinning.md](./task.142.qa.3.reference-doc-skill-pinning.md)
+- **Gate File**: [task.142.gate.3.reference-doc-skill-pinning.yml](./task.142.gate.3.reference-doc-skill-pinning.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 15 (9 fixture, 6 live-corpus); full `ci:fast` suite 4712 pass / 0 fail
+- **Tests Executed**: 17 (9 fixture, 6 live-corpus, 2 cost); full `ci:fast` suite 4714 pass / 0 fail
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-No critical issues. Two low advisory findings: CR-1 (the flag check is a substring match, so `--read` would pass on `--read-only`) and CR-2 (an unused activation `flags` field).
+Three QA cycles. Cycle 2 (refute pass, after the re-scope) found the cost tests spied on code the live assertions did not run; fixed and mutation-proven in cycle 3. Advisory follow-ups: substring flag match, unchecked activation flags, empty-vs-missing `SKILL.md` message, corpus resolved twice.
 
 ## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
@@ -618,6 +618,9 @@ its file and line, not just the first.
 | 2026-09-30 |         | QA gate PASS (100/100) — 0 blocking, 2 low advisory findings | qa-task |
 | 2026-09-30 |         | DoD incomplete — 4 gaps identified | finalise |
 | 2026-09-30 | 1.2     | Success Criteria re-scoped after DoD gaps (user-approved): no-spawn and memoised-read criteria now pinned by two tests; wall-clock and obs #159 items moved to Deferred Work | Claude |
+| 2026-09-30 |         | QA gate CONCERNS (90/100) — 1 finding (cost tests spied on code the assertions did not run) | qa-task |
+| 2026-09-30 |         | QA findings fixed — gate PASS (100/100), 1 iteration | qa-fix |
+| 2026-09-30 |         | QA gate PASS (100/100) — 0 blocking, 3 low advisory findings | qa-task |
 
 <!-- change-log-end -->
 
