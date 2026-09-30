@@ -2269,6 +2269,21 @@ test("J4: --check-append-only compares the file with its copy at --against <rev>
       2,
     );
     assert.equal(run(["--check-append-only", "--file", "doc.md"]).code, 2);
+    // An EMPTY revision is not "the index": `git show :./doc.md` reads the staged copy, so an
+    // unresolvable base — `--against "$(git merge-base …)"` expanding to "" — used to report ok /
+    // exit 0 (TASK-133-QA-1). Empty and whitespace-only are usage, never a clean log.
+    for (const rev of ["", "  "]) {
+      const u = run([
+        "--check-append-only",
+        "--file",
+        "doc.md",
+        "--against",
+        rev,
+        "--json",
+      ]);
+      assert.equal(u.code, 2, `--against '${rev}' → ${u.out}`);
+      assert.equal(JSON.parse(u.out).reason, "usage");
+    }
     // --against belongs to --check-append-only only
     assert.equal(
       run(["--check-updated", "--file", "doc.md", "--against", "HEAD"]).code,

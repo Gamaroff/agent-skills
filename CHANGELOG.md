@@ -107,7 +107,7 @@ All notable changes to this project will be documented in this file. Format foll
     now falsifiable: it seeds `./doc/` against `$R/doc`.
   - Resume contract § Consume Output: an unparsable snapshot, a directory-less one and another
     document's are three named HALTs. An unrecognised `stale-snapshot`-prefixed label prints
-    `unrecognised … kept`. Every `{doc-directory}` substitution is quoted.
+    `unrecognised … kept`. Every `{doc-directory}` substitution in § Consume Output is quoted.
   - Detector prompt Step 1 states `choose_candidate()`'s legacy-refusal and provenance rules;
     `tests/detector-candidate-rule.test.mjs` pins them against the script and runs the listing
     under zsh.

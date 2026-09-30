@@ -304,6 +304,31 @@ None (review 1 removed the writer-side throw, the one change every appender woul
 - **Non-critical**: a HALT message wording; a test assertion tighter than intended.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-30
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.133.qa.1.task-130-residue-cleanup.md](./task.133.qa.1.task-130-residue-cleanup.md)
+- **Gate File**: [task.133.gate.1.task-130-residue-cleanup.yml](./task.133.gate.1.task-130-residue-cleanup.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 4629
+- **Phases Verified**: 5/5
+- **Critical Issues**: 1 (HIGH — [bug 1](./task.133.bug.1.check-append-only-empty-against-reads-index.md))
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Bug Reports
+
+- [Bug 1: `--check-append-only --against ""` reads the index](./task.133.bug.1.check-append-only-empty-against-reads-index.md) - ✅ Ready for QA - Priority: P1 (Fixed 2026-09-30)
+
+### Key Findings
+`--check-append-only --against ""` reads the index and reports a clean log (exit 0). An unresolvable merge-base therefore makes the new 5c TRAIL check fail open (TASK-133-QA-1, HIGH). Also one LOW: the bind-block comment claims wider quoting than the change delivers (TASK-133-QA-2).
 <!-- change-log-start -->
 ## Change Log
 
@@ -313,6 +338,8 @@ None (review 1 removed the writer-side throw, the one change every appender woul
 | 2026-09-30 | 1.1 | Review 1 (8/10, 1 critical / 4 important, all applied): Phase 5 rescoped from a writer-side shrink throw to a cross-revision append-only check (upsertChangeLog keeps all six rows on the fdba78d9~1 shape — executed; the loss was a hand edit); Phase 3 listing already find-based since task.137 — pinned by a test, not rewritten; Phase 1 adds the stale ":70-72 absent … matches" header bullet; Phase 4 covers five --restore sites and seven lint 2) arms with causes derived from usage(); Breaking Changes → none | review-task |
 | 2026-09-30 |  | Status → ready-for-development | review-task |
 | 2026-09-30 |  | Implemented — 5 phases, 5 commits; 13 source/doc files + 3 SKILL.md, 1 new suite + 5 extended (+13 tests), 2 fixtures; 15 mutation proofs; task.130 Deferred Work annotated | develop |
+| 2026-09-30 |  | QA gate FAIL (70/100) — 1 HIGH (empty --against reads the index and reports a clean log) + 1 LOW | qa-task |
+| 2026-09-30 |  | QA findings fixed — cycle 1: TASK-133-QA-1 (empty --against is usage, exit 2; J4 +2 cases, mutation-proven), TASK-133-QA-2 (quoting claim narrowed to § Consume Output, CHANGELOG too); 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

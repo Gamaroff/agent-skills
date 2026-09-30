@@ -1034,6 +1034,14 @@ function main(argv) {
     return usage("--against belongs to --check-append-only");
   if (mode === "--check-append-only" && against === null)
     return usage("--check-append-only needs --against <rev>");
+  // An empty revision is not a base: `git show :./<doc>` reads the INDEX, which matches the working
+  // tree, so the check would report a clean log. That is exactly what an unresolvable base produces —
+  // `--against "$(git merge-base …)"` expands to "" — and "could not look" must never read as
+  // "found nothing" (TASK-133-QA-1).
+  if (mode === "--check-append-only" && !against.trim())
+    return usage(
+      "--against is empty — the base revision did not resolve; nothing was compared",
+    );
   let content;
   try {
     content = require("fs").readFileSync(file, "utf8");

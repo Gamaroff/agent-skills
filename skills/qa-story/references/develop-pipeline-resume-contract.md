@@ -35,8 +35,10 @@ HALTs at its own guard (cycle 2, bug 5). **Bind once, here:**
 ```bash
 # 1. Persist the JSON the Explore dispatch RETURNED — verbatim, from the tool result, into the
 #    pipeline's summary directory. The quoted heredoc keeps the JSON's own quotes and $ intact.
-# Every {doc-directory} substitution is QUOTED — a document directory with a space splits
-# into two words otherwise (task.130 gate 5 CR-7; task.133).
+# Every {doc-directory} substitution in THIS section's two blocks is QUOTED — a document
+# directory with a space splits into two words otherwise (task.130 gate 5 CR-7; task.133).
+# The contract's other fences (the --restore command, the grant call) are not yet quoted;
+# quoting them is a recorded follow-up (task.133 gate 1 CR-2), not a claim made here.
 mkdir -p "{doc-directory}/.summaries"
 cat > "{doc-directory}/.summaries/step-0a-resume-detector.json" <<'DETECTOR_EOF'
 {the JSON object the detector returned, pasted verbatim}
