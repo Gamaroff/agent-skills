@@ -2,15 +2,15 @@
 id: task.166
 title: "[Task 166] Give measured non-functional criteria a defined path through review and finalise"
 type: task
-description: "Add a third test-free criterion kind — a measured criterion with a stated bound and a cited committed measurement — to finalise's DoD AC prompt, and have review-task flag a non-functional success criterion that states no bound, so a timing or size criterion is neither failed by rule nor passed by override (observation #206)."
+description: "Add a third test-free criterion kind — a measured criterion with a stated bound and a cited committed measurement — to finalise's DoD AC prompt, and have review-task flag a non-functional success criterion that states no bound, so a timing or size criterion is neither failed by rule nor passed by override (observation #206); and have review-task classify every success criterion the way finalise will, flagging a behaviour criterion with no planned test and a criterion that can only be met after merge (observation #222)."
 tags: [finalise, review-task, definition-of-done, success-criteria, observe-work]
 category: infrastructure
 status: planned
 priority: Medium
 created: 2026-09-28
-updated: 2026-09-28
+updated: 2026-09-30
 assignee:
-estimated_effort_hours: 4
+estimated_effort_hours: 6
 github_issue: 510
 ---
 
@@ -29,7 +29,8 @@ Finalise's AC traceability agent judges each success criterion by `shared/resour
 This task gives the measured criterion a defined path at both ends:
 
 - finalise's AC prompt gains a third kind with its own bar;
-- `review-task` flags a non-functional criterion that states no bound, at review time, where it can still be rewritten.
+- `review-task` flags a non-functional criterion that states no bound, at review time, where it can still be rewritten;
+- `review-task` classifies every success criterion by finalise's kinds, and flags the two shapes finalise fails by construction: a behaviour criterion that names no test to hold it, and a criterion that can only be met after merge (observation #222, folded in 2026-09-30).
 
 **Scope**:
 - `shared/resources/finalise-dod-ac-prompt.md` § Step 3 (the test-free kinds)
@@ -40,7 +41,8 @@ This task gives the measured criterion a defined path at both ends:
 
 1. The AC prompt names three test-free kinds. The third is a **measured criterion**: `PASS` requires a stated bound, and a measurement meeting it, cited from a committed artifact with the command that produced it. A criterion with no bound stays `FAIL`.
 2. `review-task` raises an **Important** finding for a non-functional success criterion that states no numeric bound, or no command to measure it by.
-3. Tests fail when either rule is removed or weakened.
+3. `review-task` raises an **Important** finding for a behaviour criterion that names no test planned to hold it, and for a success criterion that can only be satisfied after merge or acceptance, with the remedy for each (name the test, or move the item to Deferred Work).
+4. Tests fail when any of these rules is removed or weakened.
 
 ---
 
@@ -51,6 +53,8 @@ This task gives the measured criterion a defined path at both ends:
 1. **A satisfied criterion fails by rule.** On task.164, AC7 was met by measurement: 13–16s per run on an idle host (37–42s under load), and no production code changed. It still returned `FAIL`, because `finalise-dod-ac-prompt.md` § Step 3 says "A behaviour criterion never takes either path".
 2. **The only exits erode the rule.** The prompt itself records why overriding is wrong: "a check that is overridden on every run is not a check". Halting on satisfied work is wrong too. Asking the user worked once but is not a rule.
 3. **The criterion was unmeasurable as written, and nothing said so.** "No measurable change beyond …" names no bound. `/create-task` wrote it, and `/review-task` passed it, because its Step 6 check 4 asks only that a criterion "should be verifiable". The defect was introduced at authoring and first noticed at acceptance, two pipeline steps later.
+
+4. **The same shape halted two more tasks.** review-task passed success criteria that finalise then failed by construction: task.126 ("no measurable change to bundle time"), and task.142 on 2026-09-30 — three behaviour claims with no planned test ("no process spawn", "SKILL.md reads memoised", "no wall-clock change") and one post-merge item ("observation #159 marked actioned once this merges"), halting at `/finalise` after gate PASS 100 and 5c APPROVE (`task.142.dod.1.reference-doc-skill-pinning.md`). Observation #222 records both; the post-merge shape is not a measured criterion and needs its own rule.
 
 ### Benefits
 
@@ -81,6 +85,7 @@ This task gives the measured criterion a defined path at both ends:
     - `test_citation`: `"NOT_APPLICABLE: measured criterion"`, unless a test pins the bound, in which case the criterion is an ordinary behaviour criterion and takes the normal path.
     - `PASS` when the criterion states a bound, the cited measurement meets it, and the command is named. `FAIL` when the bound is missing ("no measurable change", "fast enough"), the measurement is uncited or uncommitted, or it misses the bound.
   - The closing sentence becomes "`test_runs_per_pr` is `null` on all three kinds … **A behaviour criterion never takes any of these paths.**" The measured kind must not become a back door for behaviour that could be tested.
+- `review-task` Step 6 check 4 also classifies each success criterion as finalise's AC prompt will — behaviour (needs a per-PR test), documentation, "no unit tests applicable", or measured — and raises **Important** for (a) a behaviour criterion whose text or phase names no test planned to hold it ("name the test, or re-scope it"), and (b) a criterion that can only be met after merge or acceptance, such as closing an observation or a tracker item on merge ("move it to Deferred Work — finalise runs before merge"). The worked examples are task.142's AC7/AC8 (behaviour) and AC16 (post-merge).
 - `review-task` Step 6 check 4 gains a rule: a non-functional success criterion (Performance, or any criterion bounding time, size, count or rate) must state a **numeric bound** and **how it is measured**. If either is missing, the finding is **Important** ("state the bound and the command, or replace it with a test that pins it"). The example is task.164's AC7 wording.
 - Tests:
   - `shared/resources/tests/finalise-dod-ac-kinds.test.mjs` pins the AC prompt: the section states the number of kinds, the number of bulleted kinds equals it, each kind has its `test_citation` string, the measured kind's `PASS` requires a bound and a cited command, and the closing sentence covers all kinds. It also checks that the bundled copy under `skills/finalise/references/` matches the source body.
@@ -140,7 +145,8 @@ Independent of task.165. It can land before or after it.
 **Files**: `skills/review-task/SKILL.md`
 
 - [ ] Step 6 check 4: add the bound-and-measurement rule with severity **Important**, the remedy ("state the bound and the command, or replace it with a test that pins it"), and task.164's AC7 as the worked example.
-- [ ] Add the finding to the Step 6 "Issues to Flag" list under **Important**.
+- [ ] Add the behaviour-without-test and post-merge rules (observation #222) to check 4, each with its remedy and task.142 as the worked example.
+- [ ] Add all three findings to the Step 6 "Issues to Flag" list under **Important**.
 
 ### Phase 3: Pin both rules
 
@@ -149,7 +155,7 @@ Independent of task.165. It can land before or after it.
 **Files**: `shared/resources/tests/finalise-dod-ac-kinds.test.mjs` (new), `tests/review-task-measured-criterion.test.js` (new)
 
 - [ ] AC prompt pin: the kind count stated in the heading sentence equals the number of top-level bulleted kinds under it (floor: 3). Each kind carries its `test_citation` string. The measured kind's bar names "bound" and "command". The closing sentence covers all kinds. The source body equals the bundled copy's body, minus the AUTO-GENERATED header.
-- [ ] review-task pin: check 4 contains the bound-and-measurement rule, and the rule's severity is Important.
+- [ ] review-task pin: check 4 contains the bound-and-measurement rule, the behaviour-without-test rule and the post-merge rule, each at severity Important.
 - [ ] Confirm `npm test` picks both files up via `shared/resources/tests/*.test.mjs` and `tests/*.test.js`, and grep `package.json` before assuming.
 
 ### Phase 4: Proof and gates
@@ -162,9 +168,10 @@ Independent of task.165. It can land before or after it.
   - drop "bound" from its `PASS` bar → AC pin red;
   - revert the closing sentence to "both kinds" → AC pin red;
   - delete the documentation kind's `test_citation` string → AC pin red (the obs #204 kind is now covered);
-  - drop review-task's bound rule, or change its severity → review-task pin red.
+  - drop review-task's bound rule, or change its severity → review-task pin red;
+  - drop the behaviour-without-test rule, or the post-merge rule → review-task pin red.
 - [ ] `npm run bundle`, `npm run ci:fast` with `.agents/skills` moved aside, `npm run bundle:check`, `npm run validate -- skills/finalise/ skills/review-task/`.
-- [ ] CHANGELOG `[Unreleased]` entry citing (task 166). On merge, set observation #206 to `actioned` through `observation-log.js set-status`.
+- [ ] CHANGELOG `[Unreleased]` entry citing (task 166).
 
 ---
 
@@ -227,6 +234,7 @@ Not applicable. The change is prompt prose and two text pins.
 - [ ] The prompt's closing sentence covers all three kinds, and says a criterion whose bound a per-PR test could assert is a behaviour criterion. Pinned (Phases 1, 3).
 - [ ] `review-task` Step 6 check 4 flags a non-functional criterion with no numeric bound or no stated measurement as Important. Pinned (Phases 2, 3).
 - [ ] The documentation kind added by obs #204 is covered by the new AC pin (Phase 3).
+- [ ] `review-task` Step 6 check 4 flags a behaviour criterion with no planned test, and a criterion met only after merge, each as Important. Pinned (Phases 2, 3).
 
 ### Performance
 
@@ -240,7 +248,6 @@ Not applicable. The change is prompt prose and two text pins.
 ### Migration
 
 - [ ] CHANGELOG `[Unreleased]` entry cites (task 166)
-- [ ] Observation #206 set to `actioned` on merge
 
 ---
 
@@ -295,6 +302,7 @@ None identified.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-28 | 1.0     | Initial draft | create-task |
+| 2026-09-30 | 1.1     | Folded in observation #222 (user-approved): review-task also flags behaviour criteria with no planned test and post-merge criteria; "observation #206 actioned on merge" moved out of Success Criteria into Notes (it can only be met after merge) | Claude |
 
 <!-- change-log-end -->
 
@@ -325,6 +333,7 @@ None identified.
 ## References
 
 - **Source**: observation #206, "Finalise AC prompt has no path for a measured non-functional criterion"; task.164 DoD (`docs/tasks/task.164.task-163-deferred-follow-ups/task.164.dod.1.task-163-deferred-follow-ups.md`, § Step 5, recorded deviation)
+- **Source**: observation #222, "review-task passes success criteria whose evidence form finalise's citation rule can never accept" (recurred on task.126 and task.142)
 - **Related**: observation #204 (`aece92db`: the documentation-criterion kind), `skills/finalise/SKILL.md` (Step 3b agent 1), `skills/review-task/SKILL.md` (Step 6 check 4; Step 3 check 10, outcome reachability)
 
 ---
@@ -332,6 +341,8 @@ None identified.
 ## Notes
 
 ### Important Reminders
+
+- **Post-merge (not a success criterion — finalise runs before merge):** set observations #206 and #222 to `actioned` through `observation-log.js set-status` once this merges.
 
 - Edit `shared/resources/finalise-dod-ac-prompt.md`, then run `npm run bundle`. Never edit the `skills/finalise/references/` copy.
 - New test files go under `shared/resources/tests/` and `tests/`, which `npm test` already globs. A new `skills/*/tests/` directory would run nowhere until it is added to `package.json`.

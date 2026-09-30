@@ -1,0 +1,386 @@
+---
+id: task.170
+title: "[Task 170] QA re-entry after a finalise DoD-gaps halt fixed by a code change"
+type: task
+description: "When a /finalise DoD-gaps HALT is fixed by changing code, the documented resume re-runs finalise at step 7 over a head no QA gate has read; give the resume contract a sanctioned, recorded 7 → 5 re-entry, the way grant-qa-cycles.sh sanctions re-entry after a loop-limit escalation (observation #235)."
+tags: [develop-task, develop-story, resume, pipeline-lock, qa-loop, observation]
+category: infrastructure
+status: planned
+priority: Medium
+created: 2026-09-30
+updated: 2026-09-30
+assignee:
+estimated_effort_hours: 8
+risk_level: medium
+github_issue: 536
+---
+
+# Technical Task: QA re-entry after a finalise DoD-gaps halt fixed by a code change
+
+**Status:** Planned
+
+**GitHub Issue**: [#536](https://github.com/Gamaroff/agent-skills/issues/536)
+
+---
+
+## 1. Overview
+
+A `/finalise` run that finds Definition of Done gaps HALTs the develop pipeline at Step 7, and the
+halt snapshot records `halt_step: 7`. When the gaps are closed by changing code, the documented
+resume restores the lock at step 7 and re-runs `/finalise` — which then accepts a head that no QA
+gate has read. The pipeline lock is monotonic, so there is no sanctioned way back to the QA loop.
+This task adds one, recorded and guarded, modelled on the existing loop-limit re-entry.
+
+**Scope**: the resume contract, one new lock writer script (sibling of `grant-qa-cycles.sh`), the
+Stop hook's reading of the re-entered lock, and finalise's gap-report next steps.
+
+**Key deliverables**:
+
+1. A named resume case — "DoD gaps fixed by a code change" — in `develop-pipeline-resume-contract.md`.
+2. A script that performs the 7 → 5 re-entry: validates the snapshot, confirms the code moved past
+   the newest gate's `head:`, restores the lock at step 5 / `qa_phase: 5a`, and records the re-entry.
+3. Tests that the re-entry fires only for that case and never silently no-ops.
+
+**Expected outcome**: a code change made after a finalise halt always passes through a QA gate
+before acceptance, by a path the pipeline documents rather than one an operator improvises.
+
+---
+
+## 2. Motivation
+
+### Current Problems
+
+1. **Resume re-finalises an ungated head.** On task.142 (2026-09-30), `/finalise` run 1 halted on
+   four un-passable criteria; the user approved a re-scope that added two tests. The documented
+   resume — `advance-pipeline-lock.sh --restore`, lock at step 7 — would have run finalise run 2 over
+   code no gate had read (task.142 implementation report, "Resume after Step 7 halt").
+2. **The improvised re-entry found a real defect.** The operator ran QA by hand ("run outside the
+   loop", lock left at 7); that cycle's refute pass found a medium defect in the fix
+   (`task.142.gate.2.reference-doc-skill-pinning.yml`, CR-1). The gate was worth running; nothing
+   required it.
+3. **The backward move is a silent no-op.** `advance-pipeline-lock.sh 5` on a step-7 lock exits 0
+   and changes nothing (`shared/resources/advance-pipeline-lock.sh`: *"Idempotent: already at or
+   past the target step"* — `if [ "$NEXT" -le "$CURRENT" ]; then exit 0`). An operator who tries the
+   obvious move gets no error and no re-entry.
+4. **The Stop hook fires during the improvised QA wait.** With the lock at 7 and no `waiting_on`
+   mark, the hook re-prompts for `/finalise` while the QA reviewer is still running (observed on
+   task.142).
+
+### Benefits
+
+1. Every code change after a finalise halt is gated before acceptance — by rule, not by discipline.
+2. The re-entry is recorded on the lock and in the report, so a reader can see why the QA loop ran
+   after Step 7.
+3. The lock stays monotonic for `advance-pipeline-lock.sh`; the one backward move has one writer
+   with its own guards (the task.123 argument for keeping two meanings off one field).
+
+---
+
+## 3. Technical Background
+
+### Current Architecture
+
+- `shared/resources/develop-pipeline-resume-contract.md` § "Restore the lock (both resume paths)"
+  decides who restores by `halt_reason`: `loop-limit|not-converging` → the grant path
+  (`grant-qa-cycles.sh`); **any other `halt_reason`** → `advance-pipeline-lock.sh --restore` at the
+  halted step. A finalise DoD-gaps halt takes the second bullet, so the lock comes back at 7.
+- `shared/resources/grant-qa-cycles.sh` — the one sanctioned re-entry writer today: reconstructs the
+  cycle count from the gates on disk, restores via `--restore`, and writes `extra_cycles_granted`,
+  `qa_max_cycles` and `qa_phase: 5a`. It re-enters at step 5 because a loop-limit halt already
+  records `halt_step` 5; it never moves the step backwards.
+- `shared/resources/advance-pipeline-lock.sh` — monotonic; `--restore` sets
+  `current_step = halt_step // current_step`; a numeric advance to a lower step exits 0 silently.
+- `shared/resources/develop-pipeline-on-stop.sh` — reads `current_step`, and `qa_phase` on a step-5
+  lock, to name the skill to re-prompt.
+- `skills/finalise/SKILL.md` § "Step 8: Report Gaps" — the gap report's Next Steps end with
+  "Re-run verification after fixes are implemented", which names no QA pass.
+- Existing mechanisms of the same kind (same-class inventory): `grant-qa-cycles.sh` (re-entry after
+  loop escalation) and `advance-pipeline-lock.sh --restore` (resume at the halted step). The new
+  writer **sits beside** both: it is the only case that needs a *lower* step than the halt, which
+  neither may do without giving `current_step` a second meaning.
+
+### Target Architecture
+
+- A new resume case in the contract: a halt snapshot with `halt_step: 7` whose DoD file reads
+  `GAPS IDENTIFIED`, **and** a tree that has moved past the newest gate's `head:` outside the work
+  item's own directory (the same `CODE_MOVED` measure `qa-task` Phase 0 uses) → **re-enter QA**.
+  Otherwise the existing bullet applies (finalise re-runs at 7 — correct when only documents moved).
+- A new script, `shared/resources/reenter-qa-after-finalise.sh` (sibling of `grant-qa-cycles.sh`):
+  refuses unless the snapshot is a step-7 halt for this document and code moved past the gate head;
+  otherwise restores the lock at `current_step: 5`, `qa_phase: 5a`, and writes
+  `qa_reentry: { from_step: 7, reason: "dod-gaps-code-fix", at, gate_head }`. It is the only writer
+  that may lower `current_step`, and only on this path.
+- The QA budget for the re-entered loop is reconstructed from disk exactly as the grant does, so a
+  re-entry does not reset the cycle count.
+- `finalise` Step 8's gap report names the rule: a gap closed by a code change re-enters QA before
+  finalise re-runs.
+
+### Important Clarifications
+
+- **A document-only fix does not re-enter QA.** Re-scoping a criterion changes no code; finalise
+  re-running at 7 is correct there, and the `CODE_MOVED` measure distinguishes the two.
+- **`advance-pipeline-lock.sh` stays monotonic.** This task does not teach it a backward move.
+
+---
+
+## 4. Scope
+
+### In Scope
+
+✅ The resume-contract case and its decision rule.
+✅ `reenter-qa-after-finalise.sh` and its test suite.
+✅ The Stop hook's naming for a re-entered lock (no change expected: step 5 + `qa_phase` already works — asserted).
+✅ finalise Step 8 gap-report Next Steps line.
+✅ Bundled copies regenerated (`npm run bundle`); CHANGELOG.
+
+### Out of Scope
+
+❌ `develop-bug` — its verify loop does not use the step-5 lock shape.
+❌ Any change to how finalise decides gaps.
+❌ Authoring-time prevention of un-passable criteria (obs #222 — folded into task.166).
+
+---
+
+## 5. Breaking Changes
+
+None — API stable. The lock gains one optional field (`qa_reentry`); every reader ignores unknown
+fields today (the halt snapshot is already a superset of the lock).
+
+---
+
+## 6. Implementation Plan
+
+> Detailed implementation guide:
+> [task.170.plan.qa-reentry-after-finalise-gaps.md](task.170.plan.qa-reentry-after-finalise-gaps.md)
+
+### Phase 1: The re-entry writer
+
+**Risk Level**: Medium
+
+**Files**: `shared/resources/reenter-qa-after-finalise.sh`, `shared/resources/reenter-qa-after-finalise.test.sh`, `package.json` (test glob)
+
+**Changes**:
+
+- [ ] Refuse (exit 1, named reason) unless: a halt snapshot exists for this document, `halt_step` is
+      7, the newest DoD file's Final Status is GAPS, and code moved past the newest gate's `head:`.
+- [ ] On pass: restore via `advance-pipeline-lock.sh --restore`, then lower `current_step` to 5, set
+      `qa_phase: 5a`, reconstruct `qa_max_cycles`, write `qa_reentry` — one atomic `mktemp` + `mv`.
+- [ ] Suite: each refusal reason; the happy path; that a document-only change is refused.
+
+**Dependencies**: none.
+
+### Phase 2: The resume contract and the step docs
+
+**Risk Level**: Low
+
+**Files**: `shared/resources/develop-pipeline-resume-contract.md`, `shared/resources/develop-pipeline-step-7-finalise.md`, `skills/finalise/SKILL.md`
+
+**Changes**:
+
+- [ ] Add the case to § "Restore the lock (both resume paths)" as a third bullet, with the decision rule.
+- [ ] Step 7 doc "If DoD Gaps Are Found": name the re-entry for a code fix.
+- [ ] finalise Step 8 Next Steps: the same rule in one line.
+- [ ] `npm run bundle`.
+
+**Dependencies**: Phase 1.
+
+### Phase 3: Guards
+
+**Risk Level**: Low
+
+**Files**: `evals/shared/tests/` (parity), `shared/resources/develop-pipeline-on-stop.test.sh`
+
+**Changes**:
+
+- [ ] Parity test: the contract names the script, and the script's refusal reasons match the contract's list.
+- [ ] Stop-hook test: a lock carrying `qa_reentry` at step 5 / `qa_phase: 5a` re-prompts `/qa-task`.
+- [ ] CHANGELOG `[Unreleased]`.
+
+**Dependencies**: Phases 1–2.
+
+---
+
+## 7. Files Summary
+
+### Files to Modify (Core Implementation)
+
+1. ✅ `shared/resources/reenter-qa-after-finalise.sh` — **new**.
+2. ✅ `shared/resources/develop-pipeline-resume-contract.md` — the new case.
+3. ✅ `shared/resources/develop-pipeline-step-7-finalise.md` — gaps path names the re-entry.
+4. ✅ `skills/finalise/SKILL.md` — Step 8 Next Steps line.
+
+### Files to Modify (Tests)
+
+5. ✅ `shared/resources/reenter-qa-after-finalise.test.sh` — **new**.
+6. ✅ `shared/resources/develop-pipeline-on-stop.test.sh` — re-entered lock case.
+7. ✅ `evals/shared/tests/` — a parity test (name set during implementation).
+
+### Files to Modify (Dependencies)
+
+8. ✅ `package.json` — add the new `.test.sh` to `npm test`.
+
+### Files to Modify (Documentation)
+
+9. ✅ `CHANGELOG.md` — `[Unreleased]`.
+10. ✅ Bundled `references/` copies — regenerated by `npm run bundle`, never hand-edited.
+
+### Files to Delete
+
+None.
+
+---
+
+## 8. Testing Strategy
+
+### Unit Tests
+
+**Scope**: `reenter-qa-after-finalise.sh` against fixture directories (a halt snapshot, a DoD file,
+gate files with `head:`, a git repo with and without code movement).
+
+**Actions**:
+
+- [ ] Refuses: no snapshot; snapshot for another document; `halt_step` ≠ 7; DoD not GAPS; no code moved.
+- [ ] Accepts: writes step 5, `qa_phase: 5a`, `qa_reentry`, and a reconstructed `qa_max_cycles`.
+- [ ] Never leaves a temp file behind on failure.
+
+**Command**: `bash shared/resources/reenter-qa-after-finalise.test.sh`
+
+### Integration Tests
+
+**Scope**: the Stop hook reading a re-entered lock; the parity between contract and script.
+
+**Command**: `npm test`
+
+### Performance Tests
+
+**Scope**: none — a lock write.
+
+### Consumer Tests
+
+**Scope**: bundled copies in `develop-task` and `develop-story` match their source (`npm run bundle:check`).
+
+---
+
+## 9. Success Criteria
+
+### Functional
+
+- [ ] A step-7 GAPS halt followed by a code change is re-entered at step 5 / `qa_phase: 5a` — held by the script's accept test.
+- [ ] A step-7 GAPS halt followed by a document-only change is refused, and finalise re-runs at 7 — held by the refuse test.
+- [ ] A snapshot for another document, or with `halt_step` ≠ 7, is refused — held by refusal tests.
+- [ ] The re-entered lock records `qa_reentry` with the gate head — held by the accept test.
+
+### Performance
+
+- [ ] The lock write is atomic (`mktemp` + `mv`) and leaves no temp file on failure — held by the failure-path test.
+
+### Code Quality
+
+- [ ] ShellCheck clean at `--severity=warning`; Prettier clean; `npm test` green with `.claude/skills` and `.agents/skills` moved aside.
+- [ ] `npm run bundle:check` green.
+- [ ] Each refusal reason mutation-proven.
+
+### Migration
+
+- [ ] `CHANGELOG.md` `[Unreleased]` records the new resume case.
+- [ ] No consumer migration — the lock gains one optional field.
+
+---
+
+## 10. Risk Assessment
+
+### High Risk Areas
+
+None.
+
+### Medium Risk Areas
+
+**1. A second writer lowering `current_step`**
+
+- **Risk**: the lock's monotonicity is the Stop hook's contract; a writer that lowers it could point
+  the hook behind the work.
+- **Probability**: Low — one writer, one guarded case.
+- **Impact**: Major if wrong — a mis-pointed hook re-runs finished steps.
+- **Mitigation**: the refusal list; `qa_reentry` recorded so the lowered step is explained; the
+  parity test pins the contract to the script.
+- **Rollback**: delete the script and the contract bullet; the old resume path is untouched.
+
+### Low Risk Areas
+
+**1. `CODE_MOVED` misreads a document-only change as code**
+
+- **Risk**: an edit outside the work-item directory that is only documentation triggers a QA cycle.
+- **Probability**: Low. **Impact**: Minor — one extra QA cycle, never a skipped one.
+- **Mitigation**: the measure fails toward re-review, which is the safe direction.
+
+---
+
+## 11. Rollback Plan
+
+### Immediate Rollback (< 1 hour)
+
+**Triggers**: the Stop hook or a resume misbehaves on a re-entered lock.
+
+**Steps**: revert the merge commit; `npm test`, `npm run bundle:check` green.
+
+### Partial Rollback (1-2 hours)
+
+**When to Use**: the script is sound but the contract wording misroutes a case.
+
+**Steps**: revert Phase 2's contract bullet; keep the script and its tests.
+
+### Forward Fix (< 4 hours)
+
+**When to Use**: a refusal reason too strict or too loose.
+
+### Rollback Triggers
+
+**Critical**: a resumed run re-executing finished steps. **Non-critical**: message wording, an extra QA cycle.
+
+---
+
+<!-- change-log-start -->
+
+## Change Log
+
+| Date       | Version | Description                                   | Author      |
+| ---------- | ------- | --------------------------------------------- | ----------- |
+| 2026-09-30 | 1.0     | Initial draft — cut from observation #235     | create-task |
+
+<!-- change-log-end -->
+
+---
+
+## Progress Tracking
+
+### Phase 1: The re-entry writer
+
+- [ ] Refusals
+- [ ] Atomic write
+- [ ] Suite
+
+### Phase 2: The resume contract and the step docs
+
+- [ ] Contract case
+- [ ] Step 7 doc + finalise Step 8
+- [ ] Bundle
+
+### Phase 3: Guards
+
+- [ ] Parity test
+- [ ] Stop-hook test
+- [ ] CHANGELOG
+
+---
+
+## References
+
+- Observation #235 — No sanctioned QA re-entry after a finalise DoD-gaps halt fixed by a code change — resume re-finalises an ungated head
+- **Worked example**: task.142 — `docs/tasks/task.142.reference-doc-skill-pinning/` (implementation report § "Resume after Step 7 halt"; gate 2 CR-1)
+- **Sibling mechanism**: `shared/resources/grant-qa-cycles.sh` (task.123)
+
+---
+
+## Notes
+
+- `command node`, never bare `node`; ShellCheck is required after any `.sh` edit.

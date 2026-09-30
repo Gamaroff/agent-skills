@@ -53,6 +53,24 @@ This task adds one bullet and edits two sentences in the finalise AC prompt, add
 
 In the Step 6 **Issues to Flag** list, add under **Important**: "a non-functional criterion with no numeric bound or no stated measurement".
 
+#### Folded in 2026-09-30: observation #222
+
+Add two more rules to the same check 4, each at **Important**, reusing finalise's kind vocabulary so
+review and acceptance classify a criterion the same way:
+
+- **Behaviour criterion with no planned test.** A criterion that requires code to *do* something when
+  run (finalise's own test: it cannot be stated as "file F says S"), and whose text or phase names no
+  test that will hold it. Remedy: "name the test that pins it, or re-scope the criterion". Worked
+  example: task.142's "no process spawn, no network call" and "SKILL.md reads memoised" — true by
+  inspection, failed at finalise for want of a test, then pinned by two spy-based tests.
+- **A criterion met only after merge.** Closing an observation, a tracker item or a registry row "on
+  merge", or anything else whose evidence cannot exist before the PR merges. Finalise runs before
+  merge, so it fails by construction. Remedy: "move it to Deferred Work or Notes". Worked example:
+  task.142's "observation #159 marked actioned once this merges" (and this task's own former
+  "observation #206 set to actioned on merge", moved to Notes on 2026-09-30).
+
+The review-task pin in Phase 3 asserts all three rules and their severity.
+
 ### Phase 3: Pin both rules
 
 **`shared/resources/tests/finalise-dod-ac-kinds.test.mjs`** (new). Use `readDoc` / `ROOT` from `./lib/executed-prose.mjs`.
