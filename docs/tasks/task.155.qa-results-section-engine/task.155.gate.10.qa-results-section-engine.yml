@@ -118,4 +118,4 @@ recommendations:
 deployment_readiness:
   staging: CONDITIONAL
   production: CONDITIONAL
-  conditions: ['Operator rule applied to REL-028..031 (orchestrator)']
+  conditions: ['REL-028/029 waived under the operator rule; REL-030 accepted by explicit operator decision (source fix in a follow-up task); REL-031 fixed post-gate']

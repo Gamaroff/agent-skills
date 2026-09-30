@@ -115,8 +115,10 @@ All notable changes to this project will be documented in this file. Format foll
   `### Bug Reports` (`create-bug-report`) and `### Deferred Work` (the develop pipelines' route-2/2b
   exit) — with `####` groups and tables, several blocks folded into one; a render that brings its own
   copy of either is refused. Every other subsection is QA's own and is replaced whole. A trailing HTML
-  comment block before the next section is kept as a separator. Known residuals (a list under a
-  non-standard label, duplicate comment peels) are recorded in the task's Deferred Work.
+  comment block before the next section is kept as a separator. Known residuals are recorded in the task's Deferred Work — among them
+  one accepted deletion path (a bold `**Deferred Work**` label written inside the section is not
+  carried; the fix is to pin that record outside the section, in a follow-up task), a list under a
+  non-standard label, and duplicate-only shapes (nested carried blocks, comment peels).
   **One visible change:** a new section lands immediately before the
   change-log block (else before `## Progress Tracking` / `## Dev Agent Record`), so a document that
   placed it elsewhere is unchanged until QA next *creates* one there — an existing single section is

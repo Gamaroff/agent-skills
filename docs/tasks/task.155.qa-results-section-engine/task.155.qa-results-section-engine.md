@@ -133,7 +133,11 @@ appears.
     | `relocated` | exactly one section, inside the change-log block | removed from the block and inserted at the canonical position |
     | `created` | none | inserted at the canonical position |
     | `multiple` | more than one | **none**: `content` is returned unchanged |
-    | `bad-section` | `section` does not start with `## QA Testing Results` | **none** |
+    | `bad-section` | `section` does not start with `## QA Testing Results`, or carries an unclosed fence, a structural line (change-log marker, H1/H2, Change Log heading — scanned ignoring fences) or a carried block (`### Bug Reports`, `### Deferred Work`) | **none** |
+    | `unbounded` | the existing section cannot be bounded safely — it opens an unclosed fence, or the text a write would remove carries a structural line | **none** |
+    | `unplaceable` | the write would not read back as exactly one bounded section | **none** |
+
+    *Added during QA (cycles 5–9, PR reviews 2–4): the last three rows, and carry-through — a `### Bug Reports` or `### Deferred Work` block another writer put inside the section is carried whole through every replace and relocate.*
 
   - **Canonical position**: immediately before the change-log block when the document has one (the
     marker block, or else a hand-written `## Change Log` heading, as `findChangeLog` reports it).
@@ -298,7 +302,7 @@ None.
 
 ### Functional
 
-- [x] `upsertQaResults` returns each of `replaced`, `relocated`, `created`, `multiple`, `bad-section` in the case § 3 names, and writes nothing on the last two
+- [x] `upsertQaResults` returns each of `replaced`, `relocated`, `created`, `multiple`, `bad-section` (and, since QA, `unbounded`, `unplaceable`) in the case § 3 names, and writes nothing on any refusal
 - [x] A fenced or inline-code `## QA Testing Results` is never found and never replaced
 - [x] qa-task and qa-story Step 12 write through the engine; the extracted Step 12 call, run against a fixture, leaves exactly one section
 - [x] The corpus guard passes on the tree after the task.65 repair and fails, naming the file, when a second copy is re-added
