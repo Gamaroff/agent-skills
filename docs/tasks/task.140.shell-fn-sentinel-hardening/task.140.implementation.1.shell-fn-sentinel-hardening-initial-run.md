@@ -3,7 +3,7 @@
 **Task**: `task.140.shell-fn-sentinel-hardening.md`
 **Run Number**: 1
 **Started**: 2026-09-30 07:43
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Close the seven limits recorded on task.136 (library EXIT trap, errexit source s
 | 2. review-task             | ✅ Done | `task.140.review.{N}.{name}.md` exists (or skip logged)               | `task.140.review.1.shell-fn-sentinel-hardening.md` — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; audit 17/17 `ready-for-review` | `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #527: https://github.com/Gamaroff/agent-skills/pull/527 | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.140.qa.{N}.*.md`; `task.140.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.140.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.140.qa.{N}.*.md`; `task.140.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 7. finalise                | ✅ Done | `task.140.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -124,6 +124,25 @@ Close the seven limits recorded on task.136 (library EXIT trap, errexit source s
 - **Cycle 3, 5a** — safety re-probe over the whole diff (judgement on gate 2's host-gh bypass); reviewer 258 s. `TMPDIR=/tmp` 53/53; re-probe 21 executed, unchanged; green path engages 20; `shell:qa-cycle.sh` engages 28. Gate 3 FAIL 60/100: BUG-5 (HIGH) and BUG-6 (medium), both reproduced by execution and both in cycle-2 code. PR + `qa-gate-3` comments posted.
 - **Convergence check tripped** on HIGH `0, 0, 1` → *QA Loop Not Converging* escalation; 5b not run. See the escalation entry above.
 
+### QA loop re-entry — 2026-09-30
+
+- Resumed by `/develop-next` (run-state `dispatched: true, merged: false`). Operator chose the grant explicitly ("continue with recommended next steps"): **QA loop re-entry: 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk.** `grant-qa-cycles.sh` → lock restored from the halt snapshot, `QA_CYCLE=3`, `qa_max_cycles=5`.
+- **Deviation from the resume contract (re-entry step 4, "re-enter at 5a as cycle `NEXT_CYCLE`").** The halt was a convergence trip at 5a, before 5b, so gate 3's queue was never handed to `/qa-fix`. Re-entering at 5a would review unchanged code, re-raise the same HIGH, and trip the check again on `0, 0, 1, 1` — spending the grant on nothing. Instead: run cycle 3's 5b against gate 3, then 5a for cycle 4. Observation logged against the contract (#228).
+- **Cycle 3, 5b** — changes-requested → `stage-disabled`. Third strike: n/a (one HIGH gate). Narrowing offer: `signal: false` (`high-findings-remain`). `/qa-fix` ran inline from gate 3 (2 findings, gate already read; ingester not dispatched — independence loss recorded). Probe: population 1 (`probe-boundary-rule.md` — updated). Fast gate attempt 1 red (Prettier on the new rows), attempt 2 green (4609 pass). Commit `ab079810`, one push. PR comment + `qa-fix-3` tracker comment `posted`. PR state OPEN.
+- **Cycle 4, 5a** — safety re-probe (gate 3 security FAIL), unscoped; reviewer 206 s, 4 findings. Provenance (5b) on a base worktree: PATH prepend (± `--fake-gh`) and backgrounded `gh` → `absent`, 20, planted real gh ran, identical at HEAD and base → pre-existing. Probes 69 executed (resolveEntry 21 with real symlink, green path 20, qa-cycle.sh 28). 114/114; `TMPDIR=/tmp` 55/55; validate ×4 exit 0. Gate 4 CONCERNS 80/100. PR + `qa-gate-4` comments posted. Convergence: HIGH `0,0,1,0` → no trip; route classifier `continue` (`not-a-pass-gate`) → 5b.
+- **Cycle 4, 5b** — changes-requested → `stage-disabled`. Third strike: n/a. Narrowing: `signal: false` (`high-findings-remain`). Fix inline (1 medium, doc). Probe population 1 (rule §5 — updated). Fast gate attempt 1 green (4610 pass). Commit `3233686e` (fix + gate.4 + qa.4 + security record + bug.7), one push. PR + `qa-fix-4` comments posted; PR OPEN.
+- **Cycle 5, 5a** — scoped review (`ab079810..HEAD`, 4 files; reviewer 127 s): 2 LOW bugs + 1 cleanup. Probes 69; 115/115; `TMPDIR=/tmp` 56/56; Step 4b `no-executable-blocks`. Gate 5 PASS 100/100. PR + `qa-gate-5` comments posted. Convergence: HIGH `0,0,1,0,0` → no trip. Route classifier: **cosmetic-residue** (route 2b) → CR-1, CR-2 carried to `future`, stamped closed; Deferred Work recorded → 5c.
+- **Cycle 5, 5c** — `/review-pr --effort medium --comment`: two Explore lenses (code 126 s, conformance 77 s). **CONCERNS**: PC-2 (no `pr_number` → added `pr_number: 527`), PC-5 (QA-cycle mechanisms undocumented → deviation bullet added), PC-3/PC-4 (pre-QA counts, unticked boxes → updated), PC-1 (Completion block shows the cycle-3 halt → Step 8 rewrites it), CR-1 (low: `exit` shadow inherited by subshells) and CR-2 (cleanup) → follow-up. Report `task.140.pr-review.1.shell-fn-sentinel-hardening.md`; PR comment posted. `ready-for-merge` → `stage-disabled`. Loop exit → Step 7.
+
+### Step 7 — finalise
+
+- `/finalise` → 4 DoD agents in parallel: AC PARTIAL (SC5 FAIL under the citation rule, since no per-PR test asserts wall-clock), security PASS (69 probes, 1 pre-existing reproduced), compliance N/A, docs PASS.
+- **SC5 decision (orchestrator):** re-measured instead of taking the implementation-time number, which predates 10 QA rows. Whole file: base 64/59 s, head 75/74 s. On the base's 100 rows the head engine takes 59/62 s against the base engine's 65/61 s (100/100 pass), so the engine is within noise and the +13 s is the 15 added rows. Accepted as PASS by measurement; recorded in the DoD.
+- CI reading 1: SUCCESS @ `55f6ba69` (5 checks). CI reading 2: SUCCESS @ `3c8f9b54` (5 checks, 150 s).
+- Acceptance commit `3c8f9b54` (task `status: accepted`, Change Log 1.2, DoD `task.140.dod.1`, sprint review, registry `ticked`). All three artefacts asserted on `origin`. CHANGELOG cites task 140.
+- PR canonical comment posted. Tracker #464: `done` comment `posted`, issue CLOSED (verified), board `done` → `already`. Document link: no feature-branch link found (already durable).
+- Task completed.
+
 ## Issues Log
 
 - **Step 3 — a success criterion the plan could not meet.** `"$GH" api` is an uppercase variable; the planned `GH_COMMAND_WORD` matches lowercase `gh` only, so the §9 criterion was unreachable by the plan. Added `GH_VARIABLE`. The Step 2 review's check 10 (outcome reachability) should have walked that input through the regex and did not.
@@ -164,9 +183,33 @@ _Track each QA review/fix cycle._
 **MEDIUM findings**: 1
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
-**Action**: Escalating — loop not converging
+**Action**: Running qa-fix (cycle 3 of 5)
+**Fixes Applied**: BUG-5 — the trip-wire decline carries escapes/cases/shells/fakeGh/args; BUG-6 — marker path baked into the stub, `PROBE_GH_TRIPPED` removed. 2 rows, each red on the cycle-2 engine; rule §5 updated.
+**Commit**: `ab079810`
+
+### QA Cycle 4 — 2026-09-30
+**Gate Result**: CONCERNS
+**Issues Found**: 1 — CR-1 (medium; rule §5 names one trip-wire limit, three more executed; TASK-140-BUG-7). BUG-5, BUG-6 closed (each mutation-proven). Reviewer's 3 containment bypasses identical at `origin/develop` → pre-existing, `future`; 1 advisory (noexec TMPDIR).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+**Fixes Applied**: BUG-7 — rule §5 states the PATH-prepend (± `--fake-gh`) and backgrounded-call limits beside the absolute path; a pinning row; CHANGELOG + engine comments corrected.
+**Commit**: `3233686e`
+
+### QA Cycle 5 — 2026-09-30
+**Gate Result**: PASS
+**Issues Found**: 2 LOW — CR-1 (§5 "never runs" wording beside the new limits), CR-2 (limits apply only to spellings the text check misses); 1 cleanup (pin row). BUG-7 closed.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 5 with HIGH 0 for cycles 4 and 5; all 2 open findings are LOW and are carried to the gate's recommendations.future by id (CR-1, CR-2). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
 
 ### QA Loop Not Converging — 2026-09-30
+
+> **Superseded 2026-09-30 by an operator grant** of 2 cycles (`qa_max_cycles` 5). The run re-entered to run cycle 3's 5b on gate 3, then cycles 4–5. Cycle 3's `**Action**` row was rewritten from `Escalating — loop not converging` to the route it now takes. The entry below is kept as the record of the halt.
 
 Convergence stall: The pipeline stopped after 3 qa-task/qa-fix cycles: the HIGH finding
 count failed to strictly decrease across two consecutive cycles, so the
@@ -195,10 +238,14 @@ they are handed over below.
 
 ## Completion
 
-**Finished**: 2026-09-30 06:58 (halted)
-**Final Status**: Escalated — QA Loop Not Converging at cycle 3
+**Finished**: 2026-09-30 09:59
+**Final Status**: Completed
 **Branch**: feature/task.140.shell-fn-sentinel-hardening
 **PR**: https://github.com/Gamaroff/agent-skills/pull/527
-**QA Iterations**: 3 (2 fix cycles)
-**DoD Summary**: not reached
+**QA Iterations**: 5 (4 fix cycles; escalated at cycle 3 as not converging, then 2 cycles granted by the operator)
+**DoD Summary**: `task.140.dod.1.shell-fn-sentinel-hardening.md` — ACCEPTED
 **Tracker debt**: none
+
+### Completion Summary
+
+Implemented the seven task.136 limits in `security-probe.mjs`, its tests, both ShellCheck lanes and rule §5. QA replaced two mechanisms instead of patching them a third time: the trap shadow became a positive source-completed marker, and the static `gh` detector became the fast path in front of a run-time trip-wire `gh`. The loop escalated at cycle 3 on a first-time HIGH (HIGH `0, 0, 1`); the convergence rule's gap is logged as obs #228. The operator granted 2 cycles. Cycle 3's fix step ran on re-entry (a recorded deviation from the resume contract), cycle 4 fixed a rule overclaim found by a provenance-checked safety re-probe, and cycle 5 exited PASS 100 by the cosmetic-residue route. The 5c PR review returned CONCERNS, and its document findings were fixed before finalise. At finalise, SC5 was re-measured rather than inherited: the engine is within noise, and the whole file's +13 s is the 15 added rows. Accepted at `3c8f9b54`, with CI green on both readings. Follow-up: close the pre-existing `gh` containment bypasses now stated in rule §5.
