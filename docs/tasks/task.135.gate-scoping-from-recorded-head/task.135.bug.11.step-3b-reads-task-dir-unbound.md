@@ -4,7 +4,7 @@
 **Bug ID**: TASK-135-BUG-11
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 3 safety re-probe, CR3-3)
 **Date Found**: 2026-09-30
 
@@ -30,3 +30,4 @@ HALT in the preamble when the work-item directory is not a directory; executed t
 |------|--------|------------|-------|
 | 2026-09-30 | New | QA Engineer | QA cycle 3 |
 | 2026-09-30 | Ready for QA | qa-fix | Fixed in QA cycle 3 |
+| 2026-09-30 | Closed | QA Engineer | Verified in QA cycle 4 |

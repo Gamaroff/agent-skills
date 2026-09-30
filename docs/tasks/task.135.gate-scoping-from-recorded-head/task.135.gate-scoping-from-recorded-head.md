@@ -282,29 +282,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-30
-**Quality Score**: 40/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.135.qa.3.gate-scoping-from-recorded-head.md](./task.135.qa.3.gate-scoping-from-recorded-head.md)
-- **Gate File**: [task.135.gate.3.gate-scoping-from-recorded-head.yml](./task.135.gate.3.gate-scoping-from-recorded-head.yml)
+- **Full Report**: [task.135.qa.4.gate-scoping-from-recorded-head.md](./task.135.qa.4.gate-scoping-from-recorded-head.md)
+- **Gate File**: [task.135.gate.4.gate-scoping-from-recorded-head.yml](./task.135.gate.4.gate-scoping-from-recorded-head.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 99 (three suites); ci:fast 4675/4676 at e451c70f
+- **Tests Executed**: 118 (three suites); ci:fast 4690/4692 (the load-sensitive test only, 13/13 alone)
 - **Phases Verified**: 3/3
-- **Critical Issues**: 1 HIGH, 4 MEDIUM promoted (CR3-1, -2, -3, -5, -6); 1 MEDIUM advisory, 2 LOW
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: none — `top_issues[]` empty; 1 MEDIUM and 1 LOW advisory carried to future
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR3-1: an unchecked `$TASK_FILE` silently yields "no gate" and `SAFETY_REPROBE=false` ([bug 9](./task.135.bug.9.unbound-task-file-degrades-to-dot.md))
-- CR3-2: a task directory of `.` excludes the whole tree ([bug 10](./task.135.bug.10.task-dir-dot-excludes-whole-tree.md))
-- CR3-3: Step 3b reads an unchecked `$TASK_DIR` ([bug 11](./task.135.bug.11.step-3b-reads-task-dir-unbound.md))
-- CR3-5: zone-less `updated:` accepted ([bug 12](./task.135.bug.12.updated-accepts-zoneless-timestamps.md))
-- CR3-6: C-quoted paths drop out of scope ([bug 13](./task.135.bug.13.scope-drops-quoted-paths.md))
-- Earlier cycles: [QA 1](./task.135.qa.1.gate-scoping-from-recorded-head.md), [QA 2](./task.135.qa.2.gate-scoping-from-recorded-head.md) — bugs 1–8 closed
+- Four QA cycles: 13 bugs filed and closed ([QA 1](./task.135.qa.1.gate-scoping-from-recorded-head.md), [QA 2](./task.135.qa.2.gate-scoping-from-recorded-head.md), [QA 3](./task.135.qa.3.gate-scoping-from-recorded-head.md))
+- Advisory: the Phase 0 trigger trusts a malformed `head:` (CR4-1); pathspec magic in the scope list (CR4-2)
 
 ## Change Log
 
@@ -319,6 +315,8 @@ None.
 | 2026-09-30 |  | QA gate FAIL (60/100) — 1 high, 2 medium promoted, 1 medium advisory | qa-task |
 | 2026-09-30 |  | QA gate FAIL (40/100) — refute pass: 2 high, 2 medium promoted, 5 low | qa-task |
 | 2026-09-30 |  | QA gate FAIL (40/100) — safety re-probe: 1 high, 4 medium promoted, 3 advisory | qa-task |
+| 2026-09-30 |  | QA gate CONCERNS (90/100) — safety re-probe: no high, 2 advisory | qa-task |
+| 2026-09-30 |  | QA findings fixed — gate CONCERNS (90/100), 3 iterations, 13 bugs closed | qa-fix |
 
 <!-- change-log-end -->
 

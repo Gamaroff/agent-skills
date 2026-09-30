@@ -4,7 +4,7 @@
 **Bug ID**: TASK-135-BUG-12
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 3 safety re-probe, CR3-5)
 **Date Found**: 2026-09-30
 
@@ -30,3 +30,4 @@ Require the `date -u` shape (with `Z` or an explicit offset) before `Date.parse`
 |------|--------|------------|-------|
 | 2026-09-30 | New | QA Engineer | QA cycle 3 |
 | 2026-09-30 | Ready for QA | qa-fix | Fixed in QA cycle 3 |
+| 2026-09-30 | Closed | QA Engineer | Verified in QA cycle 4 |
