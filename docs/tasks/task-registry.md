@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-09-29
-**Next Available Task Number:** **171**
+**Next Available Task Number:** **172**
 
 ## How to use
 
@@ -211,6 +211,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 168 | [Harden task.135's gate-head scoping](task.168.gate-head-scoping-hardening/task.168.gate-head-scoping-hardening.md) | planned | refactoring | Medium | 2026-09-30 | [#533](https://github.com/Gamaroff/agent-skills/issues/533) | task.135 · Follow-up to task.135 (gate.4 recommendations.future CR4-1, CR4-2, CR3-4, CR3-7; pr-review.1 CR-1, CR-2): trigger validates its head, literal pathspecs, one clause-1 script, uncommitted-fix HALT, qa-cycle.sh rc on rebind, field() trim order |
 | 169 | [Close the four advisory findings on the reference-doc pinning test](task.169.pinning-test-advisory-fixes/task.169.pinning-test-advisory-fixes.md) | planned | testing | Low | 2026-09-30 | [#535](https://github.com/Gamaroff/agent-skills/issues/535) | task.142 · Follow-up to task.142 (gate.1 CR-1/CR-2, gate.3 recommendations.future): word-boundary flag match, activation flags checked, empty vs missing SKILL.md, corpus resolved once |
 | 170 | [QA re-entry after a finalise DoD-gaps halt fixed by a code change](task.170.qa-reentry-after-finalise-gaps/task.170.qa-reentry-after-finalise-gaps.md) | planned | infrastructure | Medium | 2026-09-30 | [#536](https://github.com/Gamaroff/agent-skills/issues/536) | — Observation #235: a sanctioned, recorded 7 → 5 lock re-entry (sibling of grant-qa-cycles.sh) so a code fix after a finalise halt is gated before acceptance; worked example task.142 |
+| 171 | [Deferred Work placement and qa-results engine residuals](task.171.deferred-work-placement-and-qa-results-residuals/task.171.deferred-work-placement-and-qa-results-residuals.md) | planned | refactoring | Medium | 2026-10-01 | [#538](https://github.com/Gamaroff/agent-skills/issues/538) | task.155 · Follow-up named in task.155 § Deferred Work: loop-exit Deferred Work gets its own `## Deferred Work` H2 outside the QA section (REL-030 at source); qa-results.js residuals REL-007/008/024/025/027/028, setext, CRLF, CR-4/5, PR-review-5 CR-1/2/3; create-bug-report heading check (obs #240) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
