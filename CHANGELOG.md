@@ -6,6 +6,28 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/session-handoff` gains a `continue` mode: hand one piece of in-flight work to a fresh context
+  (task.156).** It writes a short continuation file — goal, a measured state table, the one next
+  step, what was done, decisions taken, approaches **ruled out**, the files that matter, open
+  questions — and prints a paste-ready prompt that makes the new session re-measure the file with
+  the existing, **unchanged** `handoff-verify.mjs` before trusting any of it.
+  - New `scripts/continuation.mjs` decides the path and builds the prompt, and writes nothing. On a
+    `feature/task.N.slug` branch whose directory exists the file goes beside the task as
+    `task.N.handoff.{k}.slug.md` (`{k}` parsed base 10); on `feature/story.E.S.slug` beside the story
+    under the PRD root (`--prd-root`, else `prd.prdShardedLocation`, else `docs/prd`); otherwise
+    `.agents/handoffs/{date}-{slug}.md`. The verifier is resolved — its own sibling first, then the
+    repo and user-level installs — and when none exists the prompt says to verify by hand rather than
+    dropping the step.
+  - New `assets/continuation.template.md`. Its figure forms were each run through the verifier: a
+    targeted test uses a `pass N` figure because `exit 0` confirms a pattern that matches no test,
+    and a clean tree is `git diff --quiet HEAD` → `exit 0` because a `clean` figure reads `stale`.
+  - `docs/standards/file-naming.md` registers the `handoff` artifact for tasks and stories. The
+    hard-coded artifact lists in finalise's `isWorkItemDocument` and tracker-reconcile's
+    `workItemDocFor` now exclude it, and a new guard in `tests/work-item-artifact-naming.test.js` calls
+    both readers with every segment the standard registers. It also found tracker-reconcile missing
+    `pr-review`, so a PR review report sorting first in its directory could take the Change Log row
+    meant for the task. Fixed.
+
 - **`/wireloom` turns an existing HTML screen into a wireframe (obs #245).** A new section, "Working
   from an existing UI", covers the case where the source of truth is a page rather than a brief.
   The agent transcribes the page and derives nothing. It drops decoration (`aria-hidden`, `alt=""`),

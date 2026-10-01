@@ -36,6 +36,7 @@ Canonical filename patterns used across the library. Skills enforce these patter
 | Review report | `story.{epic}.{story}.review.{n}.{name}.md` | `story.2.3.review.1.example.md` |
 | PR review report | `story.{epic}.{story}.pr-review.{n}.{name}.md` | `story.2.3.pr-review.1.example.md` |
 | Implementation report | `story.{epic}.{story}.implementation.{n}.{name}.md` | `story.2.3.implementation.1.add-footer-link.md` |
+| Continuation handoff | `story.{epic}.{story}.handoff.{n}.{name}.md` | `story.2.3.handoff.1.add-footer-link.md` |
 | Definition of Done | `story.{epic}.{story}.dod.{n}.{name}.md` | `story.2.3.dod.1.add-footer-link.md` |
 | Tracker handover | `story.{epic}.{story}.handover.{n}.{name}.{md,sh,json}` | `story.2.3.handover.1.add-footer-link.md` |
 
@@ -50,6 +51,7 @@ Canonical filename patterns used across the library. Skills enforce these patter
 | Review report | `task.{n}.review.{n}.{name}.md` | `task.29.review.1.subagent-triage.md` |
 | PR review report | `task.{n}.pr-review.{n}.{name}.md` | `task.29.pr-review.1.subagent-triage.md` |
 | Implementation report | `task.{n}.implementation.{n}.{name}.md` | `task.44.implementation.1.database-migration.md` |
+| Continuation handoff | `task.{n}.handoff.{n}.{name}.md` | `task.44.handoff.1.database-migration.md` |
 | Definition of Done | `task.{n}.dod.{n}.{name}.md` | `task.44.dod.1.database-migration.md` |
 | Tracker handover | `task.{n}.handover.{n}.{name}.{md,sh,json}` | `task.44.handover.1.database-migration.md` |
 

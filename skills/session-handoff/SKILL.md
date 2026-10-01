@@ -1,6 +1,6 @@
 ---
 name: session-handoff
-description: Write and re-read the project's session handoff — the "read this first if you are picking up work here" file at .agents/handoff.md. Write mode records project state in a fixed section order where every figure carries the command that produced it, keeping fast-decaying state apart from durable traps. Read mode RE-MEASURES every figure by re-running its command through a read-only whitelist and reports each line as confirmed / stale / unverifiable, so a reader never has to trust the date at the top. Use when starting work in a repo that has a handoff, when ending a session that should hand off, or when the user says "write a handoff", "refresh the handoff", "is the handoff still accurate?", or "what should I pick up".
+description: Three modes over measured handoff files. Write records project state in .agents/handoff.md, every figure with the command that produced it. Read RE-MEASURES a handoff through a read-only whitelist and reports each line confirmed / stale / unverifiable. Continue hands one piece of in-flight work to a fresh context — a continuation file beside the work item (next step, decisions, approaches ruled out) plus a paste-ready resume prompt that verifies it first. Use for "write a handoff", "is the handoff still accurate?", "what should I pick up", "hand off to a fresh session", "context is filling up", "continue this in a new context".
 ---
 
 # Session Handoff
@@ -26,6 +26,14 @@ exactly that job three times, and every failure was structural rather than autho
 
 Two ends fix this, and **the read end is what makes the write end worth doing**: a handoff whose
 figures are re-measured on arrival cannot mislead about the frontier, the tip, or the counters.
+
+## Modes
+
+| Mode | Writes | For |
+| --- | --- | --- |
+| [Read](#read--re-measure-before-trusting) | nothing | re-measuring any file in this format before trusting it |
+| [Write](#write--the-fixed-section-order) | `.agents/handoff.md` | **project** state, for whoever picks up the repo next |
+| [Continue](#continue--hand-in-flight-work-to-a-fresh-context) | one continuation file per handoff | **one piece of in-flight work**, for a fresh context to resume |
 
 ## Read — re-measure before trusting
 
@@ -184,6 +192,69 @@ the verifier never writes. Steps:
 5. **Prove it before committing**: run read mode on the file you just wrote. Every table row should
    be `confirmed`; `unverifiable` rows should each have a reason you accept (`timeout` on the full
    suite is fine — the reader can run it).
+
+## Continue — hand in-flight work to a fresh context
+
+Use it when the context is filling up, or a session is about to end mid-task. As a window fills,
+output degrades, and auto-compaction then replaces the detail with a summary the agent did not
+choose. What a summariser drops first — the approaches already ruled out and why each decision was
+taken — is what a restart most needs. Continue writes that down **deliberately, while the context
+is still good enough to choose well**, in the same measured format Read re-checks.
+
+It is not Write: `.agents/handoff.md` stays the one project-level file. A continuation file is state
+for **one** work item. Durable lessons go to `docs/contributing/traps.md` or the observation log,
+not here.
+
+1. **Resolve the path and the prompt — one call, never by hand:**
+
+   ```bash
+   command node .agents/skills/session-handoff/scripts/continuation.mjs --json
+   ```
+
+   Use `path` and `resumePrompt` exactly as given. The script writes nothing. On a
+   `feature/task.N.slug` branch whose `docs/tasks/task.N.slug/` exists the file goes there as
+   `task.N.handoff.{k}.slug.md`; on `feature/story.E.S.slug` it goes beside the story
+   (`story.E.S.handoff.{k}.slug.md`, the story found under the PRD root); anything else goes to
+   `.agents/handoffs/{YYYY-MM-DD}-{slug}.md` (`--slug` names it; create the directory if absent).
+   `reason: no-verifier` means no `handoff-verify.mjs` was found — the prompt then tells the reader
+   to re-measure by hand, and that step is never dropped.
+2. **Check for a develop pipeline.** If `.claude/state/develop-pipeline.lock` or
+   `.claude/state/develop-pipeline.last-halt.json` exists, keep the template's **Pipeline pointer**
+   section and name the file. Do **not** restate pipeline step state — it lives in the lock and the
+   implementation report, and a copy goes stale the moment the pipeline moves. Otherwise delete the
+   section.
+3. **Measure, then fill** [`assets/continuation.template.md`](assets/continuation.template.md) in
+   its order: goal and work item, the state table, then §1 Next step (**one** action and how to tell
+   it is done), §2 Done this session (short SHAs), §3 Decisions taken, §4 **Ruled out**, §5 Files that
+   matter (paths, never contents), §6 **Open questions**. §4 and §6 are never omitted — write `none`.
+   The template's comment gives the figure forms the verifier accepts; use them, do not invent
+   others. If a figure cannot be written in a form the verifier reads, drop the row — never change
+   the verifier to fit it.
+4. **Prove it with Read** on the new file:
+
+   ```bash
+   command node .agents/skills/session-handoff/scripts/handoff-verify.mjs <path> --json
+   ```
+
+   Fix or re-measure every `stale` row. Accept an `unverifiable` row only with a reason you would
+   give the reader (`timeout` on a targeted test in a large repo is one).
+5. **Hand over.** Print `resumePrompt` verbatim and say that the file is **not committed**. Committing
+   it is the caller's call — a mid-task file may belong in the work item's next commit — and it has
+   one consequence: committing moves HEAD, so the **Branch tip** row then reads `stale` by that
+   commit. A caller who commits re-measures the tip and re-runs step 4 afterwards.
+
+The next session pastes the prompt. It runs Read first, treats every `stale` or `unverifiable`
+figure as unknown, reads §4 before trying anything, and starts at §1.
+
+### Installing for every repository
+
+Continue is most useful in repositories that do not ship this skill. Install it at user level —
+copy or symlink the skill directory to `~/.agents/skills/session-handoff/` (agent-agnostic) or
+`~/.claude/skills/session-handoff/` (Claude Code). The verifier's path is **resolved**, not
+hard-coded, for that reason: `continuation.mjs` tries its own sibling `handoff-verify.mjs` first,
+then `<repo>/.agents/skills/…`, `~/.agents/skills/…` and `~/.claude/skills/…`, and emits a path
+inside the repository relative and any other absolute — so the prompt names a verifier that exists
+for the session that reads it.
 
 ## Discoverability
 
