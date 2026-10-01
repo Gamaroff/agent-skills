@@ -65,6 +65,15 @@ All notable changes to this project will be documented in this file. Format foll
     `retrospective.identities` was refused with exit 2 (the rule failed closed, but was lost for those
     consumers), and one over-count could hide a dropped row elsewhere. The check now covers the `ci` block
     only, whose rows count exactly; a document marker with a trailing comment is a marker.
+  - The DoD security gate closed four more, all in the engine since its first version. `checkCommand` now runs
+    as the leader of its own process group and the whole group is killed when it ends or times out (the timeout
+    used to kill only `sh -c`, leaving `npm run ci:fast && …` running and holding the caller's stderr open).
+    The check is not run over uncommitted code (`unverifiable`, which a poll re-asks); uncommitted
+    documentation is allowed, because `/finalise` reading 1 runs with its own DoD summary and report edits
+    uncommitted. The glob matcher is no longer a regular expression: `*a` repeated or `**/` repeated took
+    seconds to minutes against a non-matching path, and the new matcher costs tokens times path length
+    whatever the pattern, with the same answers as the old one on 20,000 differential cases. A changed path
+    with a `.`, `..` or empty segment (`docs/../src/a.js`) is never documentation.
 
 - **`/wireloom`: UI wireframes as text, rendered to SVG.** Adapted from
   [StardockCorp/Wireloom](https://github.com/StardockCorp/Wireloom) (MIT, © Brad Wardell). The

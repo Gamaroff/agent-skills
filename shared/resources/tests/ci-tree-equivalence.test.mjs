@@ -29,7 +29,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { neverRan, spawnBudget } from "../spawn-budget.mjs";
+import { loadSensitive, neverRan, spawnBudget } from "../spawn-budget.mjs";
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -2745,4 +2745,227 @@ test("CR6-3: a document marker with a trailing comment is a marker, not a row th
   assert.equal(eng.parseConfig(`${OPT_OUT}... # end\n`).enabled, false);
   // and a file of nothing but such a marker is "not configured", not "content that is no mapping"
   assert.equal(eng.parseConfig("--- # nothing here\n").enabled, true);
+});
+
+// ── DoD security gate, task.172: four findings in the engine since phase 2 ────────────────────────
+
+test("SEC-1: a checkCommand that times out leaves no child process running", async () => {
+  const pidFile = join(tmpdir(), `ci-tree-eq-pid-${process.pid}`);
+  const { dir, green } = greenThenDocs(1, {
+    config: `ci:\n  docsOnly:\n    checkTimeoutSeconds: 1\n    checkCommand: "sleep 30 & echo $! > ${pidFile}; wait"\n`,
+  });
+  const alive = (pid) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  let pid = 0;
+  try {
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: GREEN } }),
+      spawn: (cmd, args, opts) =>
+        spawnSync(cmd, args, { ...opts, stdio: "ignore" }),
+    });
+    assert.equal(JSON.parse(r.stdout).reason, "check-failed");
+    assert.match(JSON.parse(r.stdout).detail, /timed out/);
+    pid = Number(readFileSync(pidFile, "utf8").trim());
+    assert.ok(pid > 1, "the check recorded its child's pid");
+    // the group kill is synchronous; allow one tick for the kernel to reap
+    for (let i = 0; i < 20 && alive(pid); i += 1)
+      await new Promise((res) => setTimeout(res, 50));
+    assert.equal(
+      alive(pid),
+      false,
+      "the child of the timed-out check must be dead",
+    );
+  } finally {
+    if (pid > 1 && alive(pid)) process.kill(pid, "SIGKILL");
+    rmSync(pidFile, { force: true });
+    cleanup(dir);
+  }
+});
+
+// A reference implementation of the glob semantics, as a RegExp, for SMALL inputs only. The matcher
+// used to BE this (with a run-collapse guard) and was exponential on `*a` repeated; it is kept here
+// so a differential test can hold the replacement to the same answers.
+function refGlob(glob, path) {
+  let out = "^";
+  let i = 0;
+  while (i < glob.length) {
+    const c = glob[i];
+    if (c === "*") {
+      let run = 0;
+      while (glob[i + run] === "*") run++;
+      if (run > 2) i += run - 2;
+      if (glob[i + 1] === "*") {
+        if (glob[i + 2] === "/") {
+          out += "(?:.*/)?";
+          i += 3;
+          continue;
+        }
+        out += ".*";
+        i += 2;
+        continue;
+      }
+      out += "[^/]*";
+      i += 1;
+      continue;
+    }
+    out += c === "?" ? "[^/]" : c.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+    i += 1;
+  }
+  return new RegExp(`${out}$`).test(path);
+}
+
+test("SEC-2: the glob matcher is linear whatever the pattern, and agrees with the regex it replaced", () => {
+  const { globMatch, matchesAnyGlob } = require("../glob-match.js");
+  // the shapes that were exponential: a wildcard alternating with a literal, and repeated `**/`
+  for (const [name, glob, path] of [
+    ["*a x40", "*a".repeat(40), `${"a".repeat(40)}c`],
+    ["**/ x40", "**/".repeat(40), `${"a/".repeat(25)}b`],
+    ["*a**/? x30", "*a**/?*".repeat(30), `${"a/".repeat(100)}c`],
+  ]) {
+    const t0 = Date.now();
+    matchesAnyGlob(path, [glob]);
+    assert.ok(
+      Date.now() - t0 < 1000,
+      loadSensitive(`${name} must answer in well under a second`),
+    );
+  }
+  // differential: 20,000 deterministic small cases, including line terminators
+  let seed = 12345;
+  const rnd = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+  const pick = (a) => a[Math.floor(rnd() * a.length)];
+  const gAlpha = ["a", "b", "/", ".", "*", "**", "?", "**/", "a", "*"];
+  const pAlpha = ["a", "b", "/", ".", "\n", "\r"];
+  let trues = 0;
+  for (let i = 0; i < 20000; i += 1) {
+    let g = "";
+    for (let k = 1 + Math.floor(rnd() * 7); k > 0; k -= 1) g += pick(gAlpha);
+    let p = "";
+    for (let k = Math.floor(rnd() * 9); k > 0; k -= 1) p += pick(pAlpha);
+    const want = refGlob(g, p);
+    if (want) trues += 1;
+    assert.equal(
+      globMatch(g, p),
+      want,
+      `${JSON.stringify(g)} vs ${JSON.stringify(p)}`,
+    );
+  }
+  assert.ok(
+    trues > 500,
+    `non-vacuity: the sample must contain matches (${trues})`,
+  );
+  // the bounds: an oversized glob or path never matches, and never hangs
+  assert.equal(globMatch("a".repeat(2000), "a".repeat(2000)), false);
+  assert.equal(globMatch("**", "a".repeat(5000)), false);
+});
+
+test("SEC-3: checkCommand is not run over uncommitted code; uncommitted documentation is allowed", async () => {
+  const marker = join(tmpdir(), `ci-tree-eq-dirty-${process.pid}`);
+  const mk = () =>
+    greenThenDocs(1, {
+      config: `ci:\n  docsOnly:\n    checkCommand: "touch ${marker}"\n`,
+    });
+  rmSync(marker, { force: true });
+  const spawnReal = (cmd, args, opts) =>
+    spawnSync(cmd, args, { ...opts, stdio: "ignore" });
+  const code = mk();
+  try {
+    writeFileSync(
+      join(code.dir, "src", "a.ts"),
+      "export const a = 2; // uncommitted\n",
+    );
+    const r = await runEngine(
+      code.dir,
+      ["--head-rollup", "PENDING", "--json"],
+      {
+        exec: fakeExec({ checks: { [code.green]: GREEN } }),
+        spawn: spawnReal,
+      },
+    );
+    assert.equal(r.exitCode, 1);
+    assert.equal(JSON.parse(r.stdout).reason, "unverifiable");
+    assert.match(
+      JSON.parse(r.stdout).detail,
+      /uncommitted changes outside documentation \(src\/a\.ts\)/,
+    );
+    assert.equal(
+      existsSync(marker),
+      false,
+      "the check must not run over uncommitted code",
+    );
+  } finally {
+    cleanup(code.dir);
+  }
+  const untracked = mk();
+  try {
+    writeFileSync(join(untracked.dir, "scratch.js"), "1\n");
+    const r = await runEngine(
+      untracked.dir,
+      ["--head-rollup", "PENDING", "--json"],
+      {
+        exec: fakeExec({ checks: { [untracked.green]: GREEN } }),
+        spawn: spawnReal,
+      },
+    );
+    assert.equal(
+      JSON.parse(r.stdout).reason,
+      "unverifiable",
+      "an untracked code file counts",
+    );
+  } finally {
+    cleanup(untracked.dir);
+  }
+  const docs = mk();
+  try {
+    writeFileSync(join(docs.dir, "docs", "n0.md"), "# edited, uncommitted\n");
+    writeFileSync(join(docs.dir, "docs", "new.md"), "# untracked\n");
+    const r = await runEngine(
+      docs.dir,
+      ["--head-rollup", "PENDING", "--json"],
+      {
+        exec: fakeExec({ checks: { [docs.green]: GREEN } }),
+        spawn: spawnReal,
+      },
+    );
+    assert.equal(r.exitCode, 0, r.stdout + r.stderr);
+    assert.equal(
+      existsSync(marker),
+      true,
+      "documentation-only dirt does not stop the check",
+    );
+  } finally {
+    rmSync(marker, { force: true });
+    cleanup(docs.dir);
+  }
+});
+
+test("SEC-4: a path with a dot or empty segment is never documentation", () => {
+  const globs = ["docs/**", "**/*.md"];
+  for (const bad of [
+    "docs/../src/a.js",
+    "docs/./a.md",
+    "docs//a.md",
+    "docs/a/../../src/b.js",
+    "../docs/a.md",
+    "docs/a.md/",
+  ]) {
+    assert.equal(eng.isDocsPath(bad, globs), false, bad);
+  }
+  for (const ok of [
+    "docs/a.md",
+    "docs/a/b.md",
+    "README.md",
+    "docs/.hidden.md",
+    "docs/a..b.md",
+  ]) {
+    assert.equal(eng.isDocsPath(ok, globs), true, ok);
+  }
 });

@@ -122,10 +122,15 @@ const CONFIG_BASENAME = "skills-config.yaml";
  *    hand-typed gate values: it trims, strips a leading `/` and turns `\` into `/`. Git emits paths
  *    verbatim, so a file literally named `docs\evil.js` or ` docs/x.js` must not be normalised into
  *    `docs/**` (CR-4).
+ *  - It has a `.`, `..` or empty segment. `docs/../src/a.js` matches `docs/**` as a string yet names
+ *    `src/a.js`; git refuses to check such a name out, but a hand-built tree can carry one, and the
+ *    rule must not read it as documentation (DoD security gate).
  *  - It matches none of the patterns.
  */
 function isDocsPath(file, globs) {
   if (typeof file !== "string" || file === "") return false;
+  if (file.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))
+    return false;
   if (file.startsWith(GITLINK_PREFIX)) return false; // a submodule pointer: no pattern may accept it (CR3-8)
   if (file.split("/").pop() === CONFIG_BASENAME) return false;
   if (normalisePath(file) !== file) return false;
@@ -807,6 +812,51 @@ function parseArgs(argv) {
 }
 
 /**
+ * Signal every process left in the group `sh -c <checkCommand>` led. Best effort and silent: the
+ * group is usually already empty (ESRCH), a fake `spawn` in a test has no pid, and Windows has no
+ * process groups to signal.
+ */
+function killProcessGroup(pid) {
+  if (!Number.isInteger(pid) || pid <= 1 || process.platform === "win32")
+    return;
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    /* nothing left to kill, or not ours to kill */
+  }
+}
+
+/**
+ * Paths with uncommitted changes (staged, unstaged or untracked) that are NOT documentation per
+ * `patterns`, or `null` when git status cannot be read. A rename lists both names.
+ */
+function dirtyNonDocsPaths(exec, root, patterns) {
+  let out;
+  try {
+    out = String(
+      exec("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
+        ...EXEC_OPTS,
+        cwd: root,
+      }),
+    );
+  } catch {
+    return null;
+  }
+  const parts = out.split("\0");
+  const dirty = [];
+  for (let i = 0; i < parts.length; i++) {
+    const entry = parts[i];
+    if (entry.length < 4) continue;
+    dirty.push(entry.slice(3));
+    if (/[RC]/.test(entry.slice(0, 2))) {
+      i++; // a rename or copy is followed by its source path
+      if (parts[i]) dirty.push(parts[i]);
+    }
+  }
+  return dirty.filter((f) => !isDocsPath(f, patterns));
+}
+
+/**
  * Run the engine. Returns { exitCode, result }. Never throws: an unexpected failure is reported
  * as `unverifiable` with exit 1, because a throw that escaped to exit 0 would be a wrong "yes".
  */
@@ -885,15 +935,39 @@ async function run({
     }
 
     if (result.reason === REASONS.TREE_EQUIVALENT && cfg.checkCommand) {
+      // The check runs in the WORKING TREE, so it can only vouch for the commit judged when that
+      // tree holds that commit's code. Uncommitted code is refused (`unverifiable`, which a poll
+      // re-asks). Uncommitted documentation is allowed: /finalise reading 1 runs with its own DoD
+      // summary and report edits uncommitted, and a rule that refused those would never fire there.
+      // That is a stated residual, not a proof: an uncommitted edit to a doc the check reads could
+      // still colour a green.
+      const dirty = dirtyNonDocsPaths(exec, root, cfg.patterns);
+      if (dirty === null || dirty.length > 0) {
+        result = {
+          ...result,
+          reason: REASONS.UNVERIFIABLE,
+          detail:
+            dirty === null
+              ? "git status could not be read, so the working tree cannot be shown to hold the commit judged"
+              : `the working tree has uncommitted changes outside documentation (${dirty.slice(0, 5).join(", ")}${dirty.length > 5 ? `, … ${dirty.length} in all` : ""}); ci.docsOnly.checkCommand runs in the working tree and would judge them, not the commit`,
+        };
+      }
+    }
+    if (result.reason === REASONS.TREE_EQUIVALENT && cfg.checkCommand) {
       // The child's stdout goes to OUR stderr: --json promises a clean stdout for `jq`.
       // Bounded: the 6c poll runs this inside its decision loop, and a hung check would otherwise
       // stall the poll past its own MAX_WAIT without ever writing a result (CR2-7).
+      // `detached` makes `sh` the leader of its own process group, so the whole tree it starts can
+      // be signalled (below): the timeout kills only the `sh` pid, and `npm run ci:fast && …`
+      // leaves its children running, holding our stderr open (DoD security gate).
       const r = spawn("sh", ["-c", cfg.checkCommand], {
         cwd: root,
         stdio: ["ignore", 2, 2],
         timeout: cfg.checkTimeoutSeconds * 1000,
         killSignal: "SIGKILL",
+        detached: true,
       });
+      killProcessGroup(r && r.pid);
       const timedOut = Boolean(r.error && r.error.code === "ETIMEDOUT");
       const checkExit = typeof r.status === "number" ? r.status : 1;
       result = { ...result, checkExit };
