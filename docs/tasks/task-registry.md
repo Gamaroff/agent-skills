@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-09-29
-**Next Available Task Number:** **172**
+**Last Updated:** 2026-10-01
+**Next Available Task Number:** **175**
 
 ## How to use
 
@@ -212,6 +212,9 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 169 | [Close the four advisory findings on the reference-doc pinning test](task.169.pinning-test-advisory-fixes/task.169.pinning-test-advisory-fixes.md) | planned | testing | Low | 2026-09-30 | [#535](https://github.com/Gamaroff/agent-skills/issues/535) | task.142 · Follow-up to task.142 (gate.1 CR-1/CR-2, gate.3 recommendations.future): word-boundary flag match, activation flags checked, empty vs missing SKILL.md, corpus resolved once |
 | 170 | [QA re-entry after a finalise DoD-gaps halt fixed by a code change](task.170.qa-reentry-after-finalise-gaps/task.170.qa-reentry-after-finalise-gaps.md) | planned | infrastructure | Medium | 2026-09-30 | [#536](https://github.com/Gamaroff/agent-skills/issues/536) | — Observation #235: a sanctioned, recorded 7 → 5 lock re-entry (sibling of grant-qa-cycles.sh) so a code fix after a finalise halt is gated before acceptance; worked example task.142 |
 | 171 | [Deferred Work placement and qa-results engine residuals](task.171.deferred-work-placement-and-qa-results-residuals/task.171.deferred-work-placement-and-qa-results-residuals.md) | planned | refactoring | Medium | 2026-10-01 | [#538](https://github.com/Gamaroff/agent-skills/issues/538) | task.155 · Follow-up named in task.155 § Deferred Work: loop-exit Deferred Work gets its own `## Deferred Work` H2 outside the QA section (REL-030 at source); qa-results.js residuals REL-007/008/024/025/027/028, setext, CRLF, CR-4/5, PR-review-5 CR-1/2/3; create-bug-report heading check (obs #240) |
+| 172 | [One docs-only CI rule at every pipeline CI wait](task.172.ci-docs-only-tree-equivalence/task.172.ci-docs-only-tree-equivalence.md) | planned | infrastructure | High | 2026-10-01 | [#539](https://github.com/Gamaroff/agent-skills/issues/539) | — tinker-city hand-off (2026-09-30) change 1: shared engine; /finalise readings 1–2, /develop-next and /develop-batch Step 3 record SUCCESS (tree-equivalent to <sha>) on a docs-only delta over a green ancestor |
+| 173 | [Fold the 5c review and its doc-only fixes into the acceptance commit](task.173.fold-5c-review-into-acceptance-commit/task.173.fold-5c-review-into-acceptance-commit.md) | planned | refactoring | Medium | 2026-10-01 | [#540](https://github.com/Gamaroff/agent-skills/issues/540) | task.172 · tinker-city hand-off change 2: 5c report + doc-only CONCERNS fixes ride 6a; 8a and the PreCompact pause commit only their own paths |
+| 174 | [Publish the docs-only CI classifier as an optional consumer template](task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md) | planned | infrastructure | Low | 2026-10-01 | [#541](https://github.com/Gamaroff/agent-skills/issues/541) | — blocked on tinker-city task.127 (#982, another repository) merging and running on real CI; Phase 0 halts until then. Hand-off change 4 |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -229,6 +232,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 
 ## Notes
 
+- **Tasks 172–174 come from the tinker-city CI-time hand-off (story 46.5, PR #981, 2026-09-30)**: one shippable unit each. 172 ships the docs-only rule and moves the four pipeline CI waits onto it; it is usable alone. 173 depends on 172 for the docs set (`ci.docsOnly.patterns`); its Phase 1 (path-limited 8a and PreCompact commits) is independent and may land first. 174 depends on neither, but is blocked on **tinker-city** task.127 — another repository, so it is written as free text, not a `task.N` dependency (this registry's own task.127 is unrelated).
 - **Tasks 165–166 are the task.164 follow-ups (PR #508)** — one shippable unit each, independent of one another: 165 closes task.164's carried LOW items on the banner doc, its pins, the 4b meta-test and review-task/review-story lock cooperation, and depends on task.164 merging (it edits text task.164 introduced); 166 gives measured non-functional criteria a defined path through finalise's AC prompt and review-task (observation #206) and depends on nothing.
 - **Tasks 130–132 are the task.124 follow-ups (PR #436, merged 2026-09-20)** — one shippable unit each, independent of one another: 130 closes the resume residue (5c review CR-1..CR-5, gate-6 futures, the who-restores collapse of obs #132); 131 gives the security probe a markdown-structure sink, a fixed-argument entry form and a recorded `internal` decision; 132 adds the unbound-default reviewer check and its population test (obs #133). 131 shares `SINKS` with task.128 — land 128 first or rebase; 132 cites 130's `BASE_BRANCH` derivation rather than duplicating it, so 130 first is convenient but not required.
 - Task 6 has no tracker issue — pre-dates the tracker-on-creation requirement; backfill via `/sync-jira-task` or `gh issue create` if needed.
