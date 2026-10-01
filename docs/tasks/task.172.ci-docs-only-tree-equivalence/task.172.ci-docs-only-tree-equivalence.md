@@ -435,24 +435,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-01
-**Quality Score**: 50/100
-**Gate Decision**: FAIL
+**Quality Score**: 65/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.172.qa.2.ci-docs-only-tree-equivalence.md](./task.172.qa.2.ci-docs-only-tree-equivalence.md)
-- **Gate File**: [task.172.gate.2.ci-docs-only-tree-equivalence.yml](./task.172.gate.2.ci-docs-only-tree-equivalence.yml)
+- **Full Report**: [task.172.qa.3.ci-docs-only-tree-equivalence.md](./task.172.qa.3.ci-docs-only-tree-equivalence.md)
+- **Gate File**: [task.172.gate.3.ci-docs-only-tree-equivalence.yml](./task.172.gate.3.ci-docs-only-tree-equivalence.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 213 across the 7 affected suites
+- **Tests Executed**: 323 across 10 affected files
 - **Phases Verified**: 4/4
-- **Critical Issues**: 2 HIGH, 6 MEDIUM
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 7 MEDIUM, 1 LOW
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's findings are fixed. The refute pass found two more HIGH ways to read a head as verified when it is not (a red docs-only ancestor is walked past; an ancestor with a success plus skipped jobs reads green) and six MEDIUM gaps.
+Cycle 2's fixes are verified. No HIGH is open. Seven reproduced MEDIUM findings remain: configuration and JSON-record robustness, a Bitbucket credential-forwarding gap, and the ancestor partial-rollup window.
 
 <!-- change-log-start -->
 
@@ -468,6 +468,8 @@ Cycle 1's findings are fixed. The refute pass found two more HIGH ways to read a
 | 2026-10-01 |  | QA findings fixed — 3 findings (2 HIGH, 1 MEDIUM) plus 2 advisory, 1 iteration | qa-fix |
 | 2026-10-01 |  | QA gate FAIL (50/100) — 8 findings | qa-task |
 | 2026-10-01 |  | QA findings fixed — 8 findings (2 HIGH, 6 MEDIUM) plus 1 advisory, 1 iteration | qa-fix |
+| 2026-10-01 |  | QA gate CONCERNS (65/100) — 8 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 8 findings (7 MEDIUM, 1 LOW) plus 3 advisory, 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

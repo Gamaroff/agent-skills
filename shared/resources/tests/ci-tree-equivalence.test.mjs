@@ -18,9 +18,12 @@ import { createRequire } from "node:module";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -67,7 +70,13 @@ function commit(dir, files, msg = "c", { rm = [] } = {}) {
   return git(dir, "rev-parse", "HEAD");
 }
 
-const GREEN = [{ status: "completed", conclusion: "success" }];
+// Timestamps matter: an ancestor whose newest check is younger than ci.docsOnly.settleSeconds (default
+// 300 s) is still PENDING, and one with no timestamp cannot be shown to have settled (CR3-1). A long-ago
+// completion is a settled one.
+const LONG_AGO = "2020-01-01T00:00:00Z";
+const GREEN = [
+  { status: "completed", conclusion: "success", completed_at: LONG_AGO },
+];
 
 /**
  * An `exec` that answers `gh` from a table and everything else (git) for real. `checks[sha]` is a
@@ -409,6 +418,7 @@ test("readConfig: no file or no block gives the defaults", () => {
       patterns: [...eng.DEFAULT_PATTERNS],
       checkCommand: "",
       checkTimeoutSeconds: eng.DEFAULT_CHECK_TIMEOUT_SECONDS,
+      settleSeconds: eng.DEFAULT_SETTLE_SECONDS,
     });
     writeFileSync(
       join(dir, "skills-config.yaml"),
@@ -431,6 +441,7 @@ test("readConfig: a block list, enabled and checkCommand are read", () => {
       patterns: ["docs/**"],
       checkCommand: "npm run ci:fast",
       checkTimeoutSeconds: eng.DEFAULT_CHECK_TIMEOUT_SECONDS,
+      settleSeconds: eng.DEFAULT_SETTLE_SECONDS,
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -571,7 +582,7 @@ test("CLI: a commit status context is read as well as the check runs", async () 
     const ok = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
       exec: fakeExec({
         checks: { [green]: GREEN },
-        statuses: { [green]: [{ state: "success" }] },
+        statuses: { [green]: [{ state: "success", updated_at: LONG_AGO }] },
       }),
     });
     assert.equal(ok.exitCode, 0);
@@ -1272,6 +1283,434 @@ test("CR2-9: run from a subdirectory the engine still finds the repository's con
   }
 });
 
+// ── QA cycle 3 (safety re-probe): CR3-1 .. CR3-8 ─────────────────────────
+
+const iso = (msAgo) => new Date(Date.now() - msAgo).toISOString();
+
+test("CR3-1: an ancestor whose newest check completed inside the settle window is PENDING, not green", async () => {
+  const s = eng.settle;
+  const now = Date.parse("2026-10-01T12:00:00Z");
+  assert.equal(
+    s("SUCCESS", ["2026-10-01T11:59:30Z"], 300, now),
+    "PENDING",
+    "30 s old: still registering",
+  );
+  assert.equal(
+    s("SUCCESS", ["2026-10-01T11:50:00Z"], 300, now),
+    "SUCCESS",
+    "10 min old: settled",
+  );
+  assert.equal(
+    s("SUCCESS", ["2026-10-01T11:50:00Z", "2026-10-01T11:59:59Z"], 300, now),
+    "PENDING",
+    "the NEWEST stamp decides",
+  );
+  assert.equal(
+    s("SUCCESS", [], 300, now),
+    "PENDING",
+    "no timestamp: cannot be shown to have settled",
+  );
+  assert.equal(s("SUCCESS", ["not a date"], 300, now), "PENDING");
+  assert.equal(s("SUCCESS", [undefined], 300, now), "PENDING");
+  assert.equal(
+    s("SUCCESS", ["2026-10-01T11:59:59Z"], 0, now),
+    "SUCCESS",
+    "settleSeconds 0 turns the guard off",
+  );
+  assert.equal(
+    s("FAILURE", ["2026-10-01T11:59:59Z"], 300, now),
+    "FAILURE",
+    "only a SUCCESS is held back",
+  );
+});
+
+test("CR3-1: CLI — one fast lane completed a moment ago is not a green ancestor; a settled one is; the window is configurable", async () => {
+  const { dir, green } = greenThenDocs(2);
+  try {
+    const fresh = [
+      { status: "completed", conclusion: "success", completed_at: iso(10_000) },
+    ];
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: fresh } }),
+    });
+    assert.equal(r.exitCode, 1);
+    assert.equal(JSON.parse(r.stdout).reason, "no-green-ancestor");
+    const old = [
+      {
+        status: "completed",
+        conclusion: "success",
+        completed_at: iso(3_600_000),
+      },
+    ];
+    const ok = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: old } }),
+    });
+    assert.equal(ok.exitCode, 0);
+    const none = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({
+        checks: { [green]: [{ status: "completed", conclusion: "success" }] },
+      }),
+    });
+    assert.equal(
+      none.exitCode,
+      1,
+      "a success with no timestamp is not shown to have settled",
+    );
+  } finally {
+    cleanup(dir);
+  }
+  const off = greenThenDocs(1, {
+    config: "ci:\n  docsOnly:\n    settleSeconds: 0\n",
+  });
+  try {
+    const r = await runEngine(off.dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({
+        checks: {
+          [off.green]: [
+            {
+              status: "completed",
+              conclusion: "success",
+              completed_at: iso(1000),
+            },
+          ],
+        },
+      }),
+    });
+    assert.equal(r.exitCode, 0, "settleSeconds: 0 disables the guard");
+  } finally {
+    cleanup(off.dir);
+  }
+  for (const bad of ["-1", "2.5", "soon"]) {
+    const t = greenThenDocs(1, {
+      config: `ci:\n  docsOnly:\n    settleSeconds: ${bad}\n`,
+    });
+    try {
+      const r = await runEngine(t.dir, ["--head-rollup", "PENDING"], {
+        exec: fakeExec(),
+      });
+      assert.equal(r.exitCode, 2, bad);
+      assert.match(r.stderr, /settleSeconds/);
+    } finally {
+      cleanup(t.dir);
+    }
+  }
+});
+
+test("CR3-2: a YAML block scalar checkCommand is refused, not run as a redirection that exits 0", async () => {
+  for (const scalar of [">-", ">", "|", "|+", ">2-"]) {
+    const config = `ci:\n  docsOnly:\n    checkCommand: ${scalar}\n      npm run x && exit 1\n`;
+    const { dir, green } = greenThenDocs(1, { config });
+    try {
+      const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+        exec: fakeExec({ checks: { [green]: GREEN } }),
+      });
+      assert.equal(r.exitCode, 2, scalar);
+      assert.match(r.stderr, /block scalar/);
+      assert.equal(
+        existsSync(join(dir, "-")),
+        false,
+        "no stray file created by a redirection",
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+  const ok = greenThenDocs(1, {
+    config:
+      'ci:\n  docsOnly:\n    checkCommand: "echo a > /dev/null && true"\n',
+  });
+  try {
+    const r = await runEngine(ok.dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [ok.green]: GREEN } }),
+    });
+    assert.equal(r.exitCode, 0, "a one-line command containing > is fine");
+  } finally {
+    cleanup(ok.dir);
+  }
+});
+
+test("CR3-3: a ci block that is not a mapping, or a near-miss spelling, is a usage error — never the defaults", async () => {
+  for (const [config, needle] of [
+    ["ci: { docsOnly: { enabled: false } }\n", /ci must be a block mapping/],
+    ["ci: false\n", /ci must be a block mapping/],
+    ["ci: nope\n", /ci must be a block mapping/],
+    ["ci:\n  docs-only:\n    enabled: false\n", /docs-only/],
+    ["ci:\n  docs_only:\n    enabled: false\n", /docs_only/],
+    ["CI:\n  docsOnly:\n    enabled: false\n", /looks like ci/],
+    [
+      "ci:\n  docsOnly: { enabled: false }\n",
+      /ci\.docsOnly must be a block mapping/,
+    ],
+  ]) {
+    const { dir } = greenThenDocs(1, { config });
+    try {
+      const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+        exec: fakeExec(),
+      });
+      assert.equal(r.exitCode, 2, config);
+      assert.match(r.stderr, needle, config);
+    } finally {
+      cleanup(dir);
+    }
+  }
+  const empty = greenThenDocs(1, { config: "ci:\n" });
+  try {
+    const r = await runEngine(
+      empty.dir,
+      ["--head-rollup", "PENDING", "--json"],
+      {
+        exec: fakeExec({ checks: { [empty.green]: GREEN } }),
+      },
+    );
+    assert.equal(r.exitCode, 0, "an empty ci block is 'not configured'");
+  } finally {
+    cleanup(empty.dir);
+  }
+});
+
+test("CR3-4: the one-shot rollup reads in develop-next and develop-batch print their value", () => {
+  for (const skill of ["develop-next", "develop-batch"]) {
+    const text = waitSites.find((x) => x.skill === skill).text;
+    assert.match(
+      text,
+      /CI_ROLLUP=\$\(gh pr view[\s\S]*?echo "UNKNOWN"\)\n *# [^\n]*\n *echo "CI rollup: \$CI_ROLLUP"/,
+      `${skill}: the assignment is silent, so the next block cannot re-bind it`,
+    );
+  }
+});
+
+test("CR3-5: a Bitbucket next link is followed only on the Bitbucket API; the credential never leaves it", async () => {
+  const { dir } = bbRepo();
+  try {
+    const urls = [];
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      env: bbEnv,
+      fetchImpl: async (url) => {
+        urls.push(url);
+        return resp(200, {
+          values: [{ state: "SUCCESSFUL", updated_on: LONG_AGO }],
+          next: "https://evil.example/steal",
+        });
+      },
+    });
+    assert.deepEqual(
+      urls.filter((u) => !u.startsWith("https://api.bitbucket.org/2.0/")),
+      [],
+      "no request may go to another host with the Authorization header",
+    );
+    assert.equal(r.exitCode, 1);
+    assert.equal(JSON.parse(r.stdout).reason, "unverifiable");
+    const same = [];
+    const ok = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      env: bbEnv,
+      fetchImpl: async (url) => {
+        same.push(url);
+        return same.length === 1
+          ? resp(200, {
+              values: [{ state: "SUCCESSFUL", updated_on: LONG_AGO }],
+              next: "https://api.bitbucket.org/2.0/repositories/acme/repo/commit/x/statuses?page=2",
+            })
+          : resp(200, {
+              values: [{ state: "SUCCESSFUL", updated_on: LONG_AGO }],
+            });
+      },
+    });
+    assert.equal(
+      ok.exitCode,
+      0,
+      "a next link on the Bitbucket API is followed",
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR3-6: the configuration comes from the commit judged — an uncommitted edit that widens it is not consulted", async () => {
+  const dir = mkRepo({
+    config: 'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n',
+  });
+  try {
+    const green = commit(dir, { "src/a.js": "1\n" }, "code + narrow config");
+    commit(dir, { "src/b.js": "2 unreviewed\n" }, "code on top");
+    writeFileSync(
+      join(dir, "skills-config.yaml"),
+      'ci:\n  docsOnly:\n    patterns:\n      - "**"\n',
+    );
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: GREEN } }),
+    });
+    assert.equal(
+      r.exitCode,
+      1,
+      "the dirty widened config decided a committed delta",
+    );
+    assert.equal(JSON.parse(r.stdout).reason, "code-changed");
+    // and a config that exists only on disk (never committed) is 'not configured'
+    const bare = mkRepo();
+    try {
+      const g2 = commit(bare, { "src/a.js": "1\n" }, "code");
+      commit(bare, { "README.md": "r\n" }, "docs");
+      writeFileSync(
+        join(bare, "skills-config.yaml"),
+        "ci:\n  docsOnly:\n    enabled: false\n",
+      );
+      const r2 = await runEngine(bare, ["--head-rollup", "PENDING", "--json"], {
+        exec: fakeExec({ checks: { [g2]: GREEN } }),
+      });
+      assert.equal(
+        JSON.parse(r2.stdout).reason,
+        "tree-equivalent",
+        "an uncommitted config is not the rule's configuration",
+      );
+    } finally {
+      cleanup(bare);
+    }
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR3-7: a huge delta cannot truncate the --json record through a pipe, and the process drains before it exits", () => {
+  const dir = mkRepo();
+  const green = commit(dir, { "src/a.js": "1\n" }, "code");
+  const files = {};
+  for (let i = 0; i < 4000; i += 1)
+    files[`docs/section-${String(i).padStart(5, "0")}/page-${i}.md`] = "x\n";
+  commit(dir, files, "a very large docs-only commit");
+  const bin = fakeGhOnPath(green);
+  try {
+    const env = {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      VCS: "github",
+    };
+    // A shell pipeline so the child writes to a PIPE, the shape that truncated.
+    let r;
+    for (let attempt = 0; attempt <= CLI_BUDGET.retries; attempt += 1) {
+      r = spawnSync(
+        "sh",
+        [
+          "-c",
+          `"${process.execPath}" "${ENGINE_PATH}" --head-rollup PENDING --json | cat`,
+        ],
+        {
+          cwd: dir,
+          env,
+          encoding: "utf8",
+          maxBuffer: 64 * 1024 * 1024,
+          timeout: CLI_BUDGET.timeoutMs,
+        },
+      );
+      if (!neverRan(r)) break;
+    }
+    assert.ok(!neverRan(r), `the CLI never ran: ${r.error ?? r.signal}`);
+    const j = JSON.parse(r.stdout);
+    assert.equal(j.reason, "tree-equivalent");
+    assert.equal(j.changedCount, 4000, "the full count is kept");
+    assert.equal(
+      j.changed.length,
+      200,
+      "the listing is capped so the record stays small",
+    );
+    assert.ok(
+      r.stdout.length < 60_000,
+      `the record is ${r.stdout.length} bytes`,
+    );
+  } finally {
+    cleanup(dir);
+    cleanup(bin);
+  }
+  const src = readFileSync(ENGINE_PATH, "utf8");
+  assert.ok(
+    !/process\.exit\([^)]/.test(src),
+    "process.exit(code) with output pending is the truncation",
+  );
+});
+
+test("CR3-8: the gitlink marker is rejected before any pattern, so a broad `**` cannot accept a submodule bump", async () => {
+  assert.equal(eng.isDocsPath(":gitlink:docs/vendor", ["**"]), false);
+  assert.equal(eng.isDocsPath(":gitlink:docs/vendor", ["*"]), false);
+  const dir = mkRepo({
+    config: 'ci:\n  docsOnly:\n    patterns:\n      - "**"\n',
+  });
+  try {
+    const green = commit(dir, { "src/a.js": "x\n" }, "code + broad config");
+    git(
+      dir,
+      "update-index",
+      "--add",
+      "--cacheinfo",
+      `160000,${green},docs/vendor`,
+    );
+    git(dir, "commit", "-q", "-m", "bump a gitlink");
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: GREEN } }),
+    });
+    assert.equal(r.exitCode, 1);
+    assert.equal(JSON.parse(r.stdout).reason, "code-changed");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("review CR-10: the 6c poll turns the rule OFF when jq is missing, so a configured check is not re-run every 30 s", () => {
+  assert.match(
+    finalise,
+    /command -v jq >\/dev\/null 2>&1 \|\| \{[^\n]*ENGINE=""; \}/,
+  );
+  const { dir, green } = greenThenDocs(1);
+  try {
+    const head = git(dir, "rev-parse", "HEAD");
+    // A PATH with the tools the poll needs but NOT jq.
+    const bin = pollBin(head, green);
+    for (const tool of ["bash", "sh", "cut", "git", "cat", "dirname", "env"]) {
+      const found = spawnSync("sh", ["-c", `command -v ${tool}`], {
+        encoding: "utf8",
+      }).stdout.trim();
+      if (found) symlinkSync(found, join(bin, tool));
+    }
+    symlinkSync(process.execPath, join(bin, "node"));
+    const work = mkdtempSync(join(tmpdir(), "ci-tree-eq-nojq-"));
+    const script = join(work, "poll.sh");
+    const result = join(work, "result.txt");
+    const rollupFile = join(work, "rollup.txt");
+    writeFileSync(script, pollScript());
+    writeFileSync(rollupFile, "PENDING");
+    const log = join(work, "engine.log");
+    writeFileSync(log, "");
+    const shim = countingEngine(log);
+    try {
+      const r = spawnSync(
+        "bash",
+        [script, "42", head, "90", result, "3", shim],
+        {
+          cwd: dir,
+          env: { PATH: bin, VCS: "github", FAKE_ROLLUP_FILE: rollupFile },
+          encoding: "utf8",
+          timeout: CLI_BUDGET.timeoutMs,
+        },
+      );
+      assert.ok(!neverRan(r), `the poll never ran: ${r.error ?? r.signal}`);
+      assert.equal(
+        readFileSync(result, "utf8").trim(),
+        `PENDING ${head} 3 90s TREE_EQ=`,
+      );
+      assert.equal(
+        readFileSync(log, "utf8").split("\n").filter(Boolean).length,
+        0,
+        "the engine was never asked",
+      );
+      assert.match(r.stderr, /jq not found/);
+    } finally {
+      cleanup(work);
+      rmSync(shim, { force: true });
+      cleanup(bin);
+    }
+  } finally {
+    cleanup(dir);
+  }
+});
+
 // ── Bitbucket ────────────────────────────────────────────────────────────
 
 function bbRepo() {
@@ -1290,7 +1729,9 @@ test("Bitbucket: SUCCESSFUL statuses on the ancestor are tree-equivalent", async
       env: bbEnv,
       fetchImpl: async (url) => {
         urls.push(url);
-        return resp(200, { values: [{ state: "SUCCESSFUL" }] });
+        return resp(200, {
+          values: [{ state: "SUCCESSFUL", updated_on: LONG_AGO }],
+        });
       },
     });
     assert.equal(r.exitCode, 0, r.stdout);
@@ -1382,7 +1823,7 @@ function fakeGhOnPath(green) {
     gh,
     `#!/bin/sh
 case "$*" in
-  *"commits/${green}/check-runs"*) echo '{"status":"completed","conclusion":"success"}' ;;
+  *"commits/${green}/check-runs"*) echo '{"status":"completed","conclusion":"success","completed_at":"2020-01-01T00:00:00Z"}' ;;
   *) : ;;
 esac
 `,
@@ -1470,7 +1911,7 @@ test("process: invoked through a symlinked directory it still runs (the .agents/
 // token `statusCheckRollup`, which review-pr also mentions — as context for a reviewer, with no CI
 // wait — so a key on the token would be red at the wrong site (obs #135). The floor is 3.
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 
 const REPO = join(__dirname, "..", "..", "..");
 const REDUCTION = 'or . == "STARTUP_FAILURE"';
@@ -1554,7 +1995,7 @@ function pollBin(head, green) {
 case "$*" in
   *headRefOid*) echo "${head}" ;;
   *"statusCheckRollup | length"*) echo 3 ;;
-  *"commits/${green}/check-runs"*) echo '{"status":"completed","conclusion":"success"}' ;;
+  *"commits/${green}/check-runs"*) echo '{"status":"completed","conclusion":"success","completed_at":"2020-01-01T00:00:00Z"}' ;;
   *) : ;;
 esac
 `,
@@ -1801,6 +2242,8 @@ test("configuration.md documents all three ci.docsOnly keys, the **/*.md spellin
     "ci.docsOnly.enabled",
     "ci.docsOnly.patterns",
     "ci.docsOnly.checkCommand",
+    "ci.docsOnly.checkTimeoutSeconds",
+    "ci.docsOnly.settleSeconds",
   ]) {
     assert.ok(doc.includes(`| \`${key}\``), `${key} needs a key-reference row`);
   }

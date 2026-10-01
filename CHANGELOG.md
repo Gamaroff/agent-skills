@@ -39,6 +39,16 @@ All notable changes to this project will be documented in this file. Format foll
     the new `ci.docsOnly.checkTimeoutSeconds` (default 1500); the new prose blocks fail loudly on an unbound
     input (`${VAR:?}`, and `${VAR?}` for the Step 7 comment); an empty option value is a usage error; the
     repository root is resolved before the config is read.
+  - QA cycle 3 (safety re-probe) closed eight more: the configuration is read from the commit judged, not
+    the working tree, and is one strict schema (a `ci` that is not a block mapping, a near-miss key such as
+    `docs-only`, and a YAML block-scalar `checkCommand` are usage errors instead of silent defaults or a
+    vacuous check); an ancestor must have settled (new `ci.docsOnly.settleSeconds`, default 300) before its
+    green counts; a Bitbucket `next` link is followed only on the Bitbucket API, so the credential cannot
+    leave it; a large `--json` record is no longer truncated through a pipe (`process.exitCode`, and the
+    `changed` list is capped at 200 with a `changedCount`); the gitlink marker is rejected before any
+    pattern; the one-shot rollup reads in develop-next and develop-batch print their value; the 6c poll
+    turns the rule off when `jq` is missing. Accepted and documented: a nearer ancestor that is still
+    `PENDING` is walked past, and `checkCommand` runs in the foreground, so it must fit the tool timeout.
 
 - **`/wireloom`: UI wireframes as text, rendered to SVG.** Adapted from
   [StardockCorp/Wireloom](https://github.com/StardockCorp/Wireloom) (MIT, © Brad Wardell). The

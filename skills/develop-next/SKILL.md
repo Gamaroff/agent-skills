@@ -206,6 +206,8 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
                       or . == "IN_PROGRESS" or . == "WAITING") then "PENDING"
              elif any(. == "CANCELLED") then "CANCELLED"
              else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN")
+     # Print it: the docs-only block below is a separate fenced block (its own shell) and re-binds this value.
+     echo "CI rollup: $CI_ROLLUP"
      ```
 
      **A pending head over a docs-only tail is satisfied, not waited on (task.172).** If `CI_ROLLUP`

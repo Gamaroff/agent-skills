@@ -43,7 +43,9 @@
  *       patterns:                     # BLOCK list: the YAML subset reads an inline [..] as a string
  *         - "**\/*.md"                # `**\/*.md`, not `*.md`: `*` does not cross `/`
  *         - "docs/**"
- *       checkCommand: ""              # optional local check, run from the repo root
+ *       checkCommand: ""              # optional local check, run from the repo root (ONE line, no YAML block scalar)
+ *       checkTimeoutSeconds: 1500     # the check is killed after this long and the finding is check-failed
+ *       settleSeconds: 300            # an ancestor whose newest check is younger than this is still PENDING
  *
  * Depends on glob-match.js, yaml-subset.js and bb-auth.js and nothing else in shared/ — each
  * skill that bundles this file pays for those three, not for a QA or a PR-comment engine.
@@ -74,11 +76,15 @@ const REASONS = Object.freeze({
 const DEFAULT_PATTERNS = Object.freeze(["**/*.md", "docs/**"]);
 const MAX_ANCESTORS = 20;
 const DEFAULT_CHECK_TIMEOUT_SECONDS = 1500; // matches /finalise's FINALISE_CI_MAX_WAIT default
+const DEFAULT_SETTLE_SECONDS = 300;
+const GITLINK_PREFIX = ":gitlink:";
+const CHANGED_RECORD_CAP = 200; // entries of `changed` kept in the --json record
 const DOCS_ONLY_KEYS = Object.freeze([
   "enabled",
   "patterns",
   "checkCommand",
   "checkTimeoutSeconds",
+  "settleSeconds",
 ]);
 const BB_API = "https://api.bitbucket.org/2.0";
 const BB_MAX_PAGES = 5;
@@ -111,6 +117,7 @@ const CONFIG_BASENAME = "skills-config.yaml";
  */
 function isDocsPath(file, globs) {
   if (typeof file !== "string" || file === "") return false;
+  if (file.startsWith(GITLINK_PREFIX)) return false; // a submodule pointer: no pattern may accept it (CR3-8)
   if (file.split("/").pop() === CONFIG_BASENAME) return false;
   if (normalisePath(file) !== file) return false;
   return matchesAnyGlob(file, globs);
@@ -258,6 +265,25 @@ function reduceChecks({ checkRuns = [], statuses = [] }) {
   return states.includes("SKIPPED") ? "NONE" : "SUCCESS";
 }
 
+/**
+ * A green reading taken while the ancestor's lanes are still registering is not a decision: a push
+ * registers its fast lanes first, and a rollup that is SUCCESS across one completed check while the
+ * slow lanes have not appeared yet is the partial-rollup window /finalise's 6c poll guards for the
+ * head with a check-count floor (obs #87). An ancestor has no such floor, so it must have SETTLED:
+ * its newest completed check or status is at least `settleSeconds` old. A SUCCESS whose timestamps are
+ * missing cannot be shown to have settled, so it is PENDING (CR3-1, task.172 QA cycle 3).
+ * `settleSeconds: 0` turns the guard off.
+ */
+function settle(rollup, stamps, settleSeconds, now) {
+  if (rollup !== "SUCCESS" || !(settleSeconds > 0)) return rollup;
+  const times = (stamps || []).map((t) => Date.parse(t));
+  if (times.length === 0 || times.some((t) => Number.isNaN(t)))
+    return "PENDING";
+  return now - Math.max(...times) < settleSeconds * 1000
+    ? "PENDING"
+    : "SUCCESS";
+}
+
 /** Bitbucket commit statuses → the same vocabulary. Empty list is NONE, never green. */
 function reduceBitbucketStatuses(values) {
   if (!Array.isArray(values) || values.length === 0) return "NONE";
@@ -280,42 +306,59 @@ class UsageError extends Error {}
  * defaults, because a typo'd `patterns` that quietly widened to the default is a rule applied to
  * files its owner did not choose.
  */
-function readConfig(root) {
-  const cfg = {
+const normKey = (k) => String(k).toLowerCase().replace(/[-_]/g, "");
+
+function defaultConfig() {
+  return {
     enabled: true,
     patterns: [...DEFAULT_PATTERNS],
     checkCommand: "",
     checkTimeoutSeconds: DEFAULT_CHECK_TIMEOUT_SECONDS,
+    settleSeconds: DEFAULT_SETTLE_SECONDS,
   };
-  let text;
-  try {
-    text = fs.readFileSync(path.join(root, "skills-config.yaml"), "utf8");
-  } catch (e) {
-    if (e && e.code === "ENOENT") return cfg;
-    throw new UsageError(`skills-config.yaml could not be read: ${e.message}`);
+}
+
+/**
+ * The ONE place that defines what the configuration may contain. Everything it does not recognise
+ * is refused, because each silent fall back to the defaults across QA cycles 1 to 3 was a rule
+ * applied to files its owner did not choose: a misspelt key, a `ci:` written as a flow mapping (the
+ * YAML subset reads it as a string), a folded `checkCommand: >-` (read as the literal `>-`, which
+ * `sh -c` runs as a redirection that exits 0).
+ */
+function parseConfig(text) {
+  const cfg = defaultConfig();
+  const parsed = parseYamlSubset(text) || {};
+  for (const k of Object.keys(parsed)) {
+    if (k !== "ci" && normKey(k) === "ci") {
+      throw new UsageError(`${k} looks like ci; the key is exactly "ci"`);
+    }
   }
-  const ci = (parseYamlSubset(text) || {}).ci || {};
-  // `ci.docsonly:` would leave the rule ON for an owner who meant to configure it (CR2-4).
+  const ci = parsed.ci;
+  if (ci === undefined || ci === null) return cfg;
+  if (typeof ci !== "object" || Array.isArray(ci)) {
+    throw new UsageError(
+      "ci must be a block mapping (a flow mapping such as `ci: { docsOnly: {..} }` is read as a string by the YAML subset and would be ignored)",
+    );
+  }
   for (const k of Object.keys(ci)) {
-    if (k !== "docsOnly" && k.toLowerCase() === "docsonly") {
+    if (k !== "docsOnly" && normKey(k) === "docsonly") {
       throw new UsageError(
-        `ci.${k} looks like ci.docsOnly; the key is case-sensitive`,
+        `ci.${k} looks like ci.docsOnly; the key is exactly "docsOnly"`,
       );
     }
   }
   const block = ci.docsOnly;
   if (block === undefined || block === null) return cfg;
   if (typeof block !== "object" || Array.isArray(block)) {
-    throw new UsageError("ci.docsOnly must be a mapping");
+    throw new UsageError("ci.docsOnly must be a block mapping");
   }
-  // An unknown key is a typo with a consequence (`checkcommand:` drops the safety net, a misspelled
-  // `patterns:` widens to the default), so it is refused, not ignored (CR2-4, task.172 QA cycle 2).
   const unknown = Object.keys(block).filter((k) => !DOCS_ONLY_KEYS.includes(k));
   if (unknown.length > 0) {
     throw new UsageError(
       `ci.docsOnly has unknown key(s): ${unknown.join(", ")} (known: ${DOCS_ONLY_KEYS.join(", ")})`,
     );
   }
+  const posInt = (v, min) => Number.isInteger(v) && v >= min;
   if ("enabled" in block) {
     if (typeof block.enabled !== "boolean") {
       throw new UsageError("ci.docsOnly.enabled must be true or false");
@@ -333,21 +376,83 @@ function readConfig(root) {
     cfg.patterns = p;
   }
   if ("checkCommand" in block) {
-    if (typeof block.checkCommand !== "string") {
+    const c = block.checkCommand;
+    if (typeof c !== "string") {
       throw new UsageError("ci.docsOnly.checkCommand must be a string");
     }
-    cfg.checkCommand = block.checkCommand.trim();
+    if (/^[>|][+\-0-9]*$/.test(c.trim())) {
+      throw new UsageError(
+        "ci.docsOnly.checkCommand is a YAML block scalar, which the YAML subset reads as the literal " +
+          `"${c.trim()}" (a shell redirection that exits 0): write the command on one line`,
+      );
+    }
+    cfg.checkCommand = c.trim();
   }
   if ("checkTimeoutSeconds" in block) {
-    const t = block.checkTimeoutSeconds;
-    if (!Number.isInteger(t) || t <= 0) {
+    if (!posInt(block.checkTimeoutSeconds, 1)) {
       throw new UsageError(
         "ci.docsOnly.checkTimeoutSeconds must be a positive integer",
       );
     }
-    cfg.checkTimeoutSeconds = t;
+    cfg.checkTimeoutSeconds = block.checkTimeoutSeconds;
+  }
+  if ("settleSeconds" in block) {
+    if (!posInt(block.settleSeconds, 0)) {
+      throw new UsageError(
+        "ci.docsOnly.settleSeconds must be a non-negative integer",
+      );
+    }
+    cfg.settleSeconds = block.settleSeconds;
   }
   return cfg;
+}
+
+/** Read skills-config.yaml from a directory (tests, and a caller with no commit to name). */
+function readConfig(root) {
+  let text;
+  try {
+    text = fs.readFileSync(path.join(root, CONFIG_BASENAME), "utf8");
+  } catch (e) {
+    if (e && e.code === "ENOENT") return defaultConfig();
+    throw new UsageError(`${CONFIG_BASENAME} could not be read: ${e.message}`);
+  }
+  return parseConfig(text);
+}
+
+/**
+ * Read the configuration from the COMMIT BEING JUDGED, never from the working tree: an uncommitted
+ * edit that widened `patterns` would otherwise decide a committed delta (CR3-6, task.172 QA cycle 3).
+ * A commit without the file means "not configured" and gives the defaults.
+ */
+function readConfigAtCommit(exec, root, sha) {
+  let text;
+  try {
+    text = String(
+      exec("git", ["show", `${sha}:${CONFIG_BASENAME}`], {
+        ...EXEC_OPTS,
+        cwd: root,
+      }),
+    );
+  } catch (e) {
+    let listed;
+    try {
+      listed = String(
+        exec("git", ["ls-tree", "--name-only", sha, "--", CONFIG_BASENAME], {
+          ...EXEC_OPTS,
+          cwd: root,
+        }),
+      ).trim();
+    } catch (e2) {
+      throw new UsageError(
+        `${CONFIG_BASENAME} could not be read at ${sha}: ${e2.message}`,
+      );
+    }
+    if (listed === "") return defaultConfig();
+    throw new UsageError(
+      `${CONFIG_BASENAME} could not be read at ${sha}: ${e.message}`,
+    );
+  }
+  return parseConfig(text);
 }
 
 // ---------------------------------------------------------------------------
@@ -429,7 +534,7 @@ function diffNames(exec, cwd, sha, head) {
       if (file === undefined || file === "") return null;
       names.push(
         oldMode === "160000" || newMode === "160000"
-          ? `:gitlink:${file}`
+          ? `${GITLINK_PREFIX}${file}`
           : file,
       );
     }
@@ -440,7 +545,12 @@ function diffNames(exec, cwd, sha, head) {
 }
 
 /** GitHub: the commit's OWN checks, not "any successful run on the branch". */
-function githubRollup(exec, cwd, sha) {
+function githubRollup(
+  exec,
+  cwd,
+  sha,
+  { settleSeconds = 0, now = Date.now() } = {},
+) {
   try {
     const jsonLines = (args, jq) =>
       String(exec("gh", [...args, "--jq", jq], { ...EXEC_OPTS, cwd }))
@@ -449,20 +559,31 @@ function githubRollup(exec, cwd, sha) {
         .map((l) => JSON.parse(l));
     const checkRuns = jsonLines(
       ["api", `repos/{owner}/{repo}/commits/${sha}/check-runs`, "--paginate"],
-      ".check_runs[] | {status, conclusion}",
+      ".check_runs[] | {status, conclusion, completed_at}",
     );
     const statuses = jsonLines(
       ["api", `repos/{owner}/{repo}/commits/${sha}/status`, "--paginate"],
-      ".statuses[] | {state}",
+      ".statuses[] | {state, updated_at}",
     );
-    return reduceChecks({ checkRuns, statuses });
+    return settle(
+      reduceChecks({ checkRuns, statuses }),
+      [
+        ...checkRuns.map((r) => r.completed_at),
+        ...statuses.map((x) => x.updated_at),
+      ],
+      settleSeconds,
+      now,
+    );
   } catch {
     return "UNKNOWN";
   }
 }
 
 /** Bitbucket: /commit/{sha}/statuses. A 403 or any non-200 is UNKNOWN, never "no CI". */
-async function bitbucketRollup({ exec, cwd, env, fetchImpl }, sha) {
+async function bitbucketRollup(
+  { exec, cwd, env, fetchImpl, settleSeconds = 0, now = Date.now() },
+  sha,
+) {
   try {
     const auth = bbAuthHeader(env);
     if (auth.scheme === "none") return "UNKNOWN";
@@ -479,10 +600,19 @@ async function bitbucketRollup({ exec, cwd, env, fetchImpl }, sha) {
       if (!res || res.status !== 200) return "UNKNOWN";
       const body = await res.json();
       values.push(...(body.values || []));
-      url = body.next || "";
+      const next = body.next || "";
+      // The Authorization header goes wherever the URL points, so a `next` link is followed only
+      // when it stays on the Bitbucket API (CR3-5, task.172 QA cycle 3).
+      if (next && !next.startsWith(`${BB_API}/`)) return "UNKNOWN";
+      url = next;
     }
     if (url) return "UNKNOWN"; // more pages than we read: do not decide on a partial list
-    return reduceBitbucketStatuses(values);
+    return settle(
+      reduceBitbucketStatuses(values),
+      values.map((v) => v.updated_on),
+      settleSeconds,
+      now,
+    );
   } catch {
     return "UNKNOWN";
   }
@@ -553,18 +683,16 @@ async function run({
   stdout = process.stdout,
   stderr = process.stderr,
   spawn = spawnSync,
+  now = Date.now,
 } = {}) {
   let result;
   let exitCode;
   try {
     const args = parseArgs(argv);
     const root = path.resolve(args.workspaceRoot || repoRoot(exec, cwd));
-    const cfg = readConfig(root);
-    const head =
-      args.head ||
-      String(
-        exec("git", ["rev-parse", "HEAD"], { ...EXEC_OPTS, cwd: root }),
-      ).trim();
+    const head = args.head || "HEAD";
+    // The configuration is the one in the commit judged, not the working-tree file (CR3-6).
+    const cfg = readConfigAtCommit(exec, root, commitOf(exec, root, head));
 
     let ancestorShas = null;
     let listError = "";
@@ -589,10 +717,14 @@ async function run({
       }
     }
     const platform = args.platform || detectPlatform(exec, root, env);
+    const settleOpts = { settleSeconds: cfg.settleSeconds, now: now() };
     const rollupOf = (sha) =>
       platform === "bitbucket"
-        ? bitbucketRollup({ exec, cwd: root, env, fetchImpl }, sha)
-        : githubRollup(exec, root, sha);
+        ? bitbucketRollup(
+            { exec, cwd: root, env, fetchImpl, ...settleOpts },
+            sha,
+          )
+        : githubRollup(exec, root, sha, settleOpts);
 
     if (ancestorShas === null && listError) {
       result = {
@@ -641,8 +773,15 @@ async function run({
     }
     exitCode = exitCodeFor(result.reason);
     if (args.json) {
+      // `changed` is capped: a huge delta made the record larger than a pipe buffer (CR3-7).
       stdout.write(
-        `${JSON.stringify({ checkExit: null, pr: args.pr ?? null, ...result })}\n`,
+        `${JSON.stringify({
+          checkExit: null,
+          pr: args.pr ?? null,
+          ...result,
+          changed: result.changed.slice(0, CHANGED_RECORD_CAP),
+          changedCount: result.changed.length,
+        })}\n`,
       );
     } else if (result.reason === REASONS.TREE_EQUIVALENT) {
       stdout.write(
@@ -675,10 +814,16 @@ async function run({
 }
 
 if (require.main === module) {
+  // exitCode, not exit(): process.exit() right after a write to a pipe truncated a large --json record at
+  // the pipe buffer while exiting 0 (CR3-7, task.172 QA cycle 3).
   run()
-    .then((r) => process.exit(r.exitCode))
+    .then((r) => {
+      process.exitCode = r.exitCode;
+    })
     // run() does not reject; if it ever does, that is NOT a pass.
-    .catch(() => process.exit(1));
+    .catch(() => {
+      process.exitCode = 1;
+    });
 }
 
 module.exports = {
@@ -691,8 +836,12 @@ module.exports = {
   exitCodeFor,
   reduceChecks,
   reduceBitbucketStatuses,
+  parseConfig,
   readConfig,
+  readConfigAtCommit,
+  settle,
   DEFAULT_CHECK_TIMEOUT_SECONDS,
+  DEFAULT_SETTLE_SECONDS,
   parseArgs,
   listAncestors,
   diffNames,

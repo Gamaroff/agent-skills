@@ -903,11 +903,14 @@ The engine decides on four things and this step re-derives none of them: the hea
 `PENDING`/`NONE`; a first-parent ancestor has a green rollup **of its own checks**; every file changed
 since it matches `ci.docsOnly.patterns` (default `**/*.md`, `docs/**`), with a change to `skills-config.yaml`
 or to a submodule pointer never counting as docs; and `ci.docsOnly.checkCommand`, when configured, passes
-(bounded by `ci.docsOnly.checkTimeoutSeconds`). Three things make it stricter than this head reduction, on
+(bounded by `ci.docsOnly.checkTimeoutSeconds`). Four things make it stricter than this head reduction, on
 purpose: an ancestor with **any** skipped or neutral check is `NONE`, not green (a paths-filter job can
-succeed while its tests are skipped); a nearer docs-only ancestor that is **red** stops the walk instead of
-being walked past; and `--head` must be the checked-out `HEAD`, because the configuration and the local
-check apply to the working tree. `FAILURE`, `CANCELLED` and `UNKNOWN` heads never reach it. Switch the rule off
+succeed while its tests are skipped); an ancestor must have **settled**, its newest check at least
+`ci.docsOnly.settleSeconds` old (a push registers its fast lanes first, so a green read in the first minutes
+can be a partial rollup); a nearer docs-only ancestor that is **red** stops the walk instead of being walked
+past; and `--head` must be the checked-out `HEAD`, because the local check runs in the working tree. The
+configuration itself is read from the commit judged, never the working tree, and a malformed one is a usage
+error (exit 2), not the defaults. `FAILURE`, `CANCELLED` and `UNKNOWN` heads never reach it. Switch the rule off
 with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../docs/reference/configuration.md)).
 **A `SUCCESS` reached this way is never recorded as plain `SUCCESS`** — see the table.
 
@@ -1454,6 +1457,10 @@ standalone.
 # ENGINE is the path of ci-tree-equivalence.js; absent means the docs-only rule is off for this poll.
 PR_NUMBER=${1}; EXPECTED_HEAD=${2}; MAX_WAIT=${3}; RESULT=${4}; EXPECTED_CHECKS=${5:-0}; ENGINE=${6:-}
 TREE_EQ=""; TE_LATCHED=0
+# The docs-only arm parses the engine's JSON with jq. Without jq nothing could ever be latched and a
+# configured checkCommand would be re-run every 30 s for the whole wait, so the rule is OFF here and the
+# poll waits as before (QA cycle 3, review CR-10).
+command -v jq >/dev/null 2>&1 || { [ -z "$ENGINE" ] || echo "ci-tree-equivalence off: jq not found" >&2; ENGINE=""; }
 rollup() { : ...the Step 6 rollup query for this platform, verbatim — copy it, do not re-derive it...; }
 # The head CI was actually sampled on — read from the PR, never echoed back from the argument.
 # GitHub form shown; Bitbucket: the PR's .source.commit.hash. "unknown" on failure makes the
