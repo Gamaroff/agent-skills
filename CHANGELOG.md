@@ -18,7 +18,8 @@ All notable changes to this project will be documented in this file. Format foll
   - The ancestor must be green on its **own** checks (not "any run on the branch"); zero checks is
     never green; a `403` on Bitbucket is `unverifiable`; a rename out of code into docs counts as a
     code change; the walk is bounded at 20 first-parent commits.
-  - `ci.docsOnly.{enabled,patterns,checkCommand}` documented in `docs/reference/configuration.md`.
+  - `ci.docsOnly.{enabled,patterns,checkCommand,checkTimeoutSeconds,settleSeconds}` documented in
+    `docs/reference/configuration.md`.
     Write `patterns` as a block list and spell it `**/*.md`: the YAML subset reads an inline `[..]`
     as a string (rejected, exit 2), and `*.md` does not cross `/`. This repository narrows to
     `docs/**` with `checkCommand: npm run ci:fast && npm run eval:all`.
@@ -49,6 +50,11 @@ All notable changes to this project will be documented in this file. Format foll
     pattern; the one-shot rollup reads in develop-next and develop-batch print their value; the 6c poll
     turns the rule off when `jq` is missing. Accepted and documented: a nearer ancestor that is still
     `PENDING` is walked past, and `checkCommand` runs in the foreground, so it must fit the tool timeout.
+  - QA cycle 4 closed two more: `code-changed` is reported only when no nearer ancestor was walked past
+    undecided (otherwise `no-green-ancestor`, which the 6c poll re-asks; before, the settle window turned a
+    five-minute delay into a permanent loss of the rule for that poll); and a `skills-config.yaml` that has
+    content but parses to no mapping, or is committed as a symlink or submodule, is a usage error (exit 2)
+    instead of the defaults, so an opt-out held in a link's target is no longer ignored.
 
 - **`/wireloom`: UI wireframes as text, rendered to SVG.** Adapted from
   [StardockCorp/Wireloom](https://github.com/StardockCorp/Wireloom) (MIT, © Brad Wardell). The

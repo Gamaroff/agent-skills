@@ -1483,8 +1483,10 @@ STATE=$(rollup); CHECKS=$(checks)
 # still under (1) and (2), so it is never taken on a stale or foreign head. The engine exits 0 for
 # tree-equivalent and for nothing else. Once it has answered code-changed, check-failed or disabled
 # the answer cannot change (the head is pinned), so it is latched and not re-run every 30 s — a
-# configured checkCommand is a full local suite. no-green-ancestor / unverifiable can change (an
-# ancestor's run may finish), so those are asked again.
+# configured checkCommand is a full local suite. code-changed is only ever reported when no nearer
+# ancestor was left undecided, so it IS final; behind an undecided ancestor the engine says
+# no-green-ancestor instead. no-green-ancestor / unverifiable can change (an ancestor's run may
+# finish), so those are asked again.
 tree_equivalent() {
   [ -n "$ENGINE" ] && [ "$TE_LATCHED" -eq 0 ] || return 1
   local out sha

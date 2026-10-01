@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.172.ci-docs-only-tree-equivalence'
+task_title: 'One docs-only CI rule at every pipeline CI wait'
+gate: CONCERNS
+status_reason: 'Cycle 4 scoped review: cycle 3 fixes verified; no HIGH. Two reproduced MEDIUM findings (a not-final code-changed is latched by the 6c poll; a config blob that parses to nothing, such as a symlink, gets the defaults) and a documentation drift.'
+reviewer: 'QA Engineer'
+head: 'e8104ece3d4679f4f802efa6678e40645c0a140d'
+updated: '2026-10-01T11:42:16Z'
+
+top_issues:
+  - id: 'CR4-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The 6c poll latches code-changed, which the engine also returns after walking past a not-yet-green ancestor. The engine returns code-changed after walking past a nearer ancestor that was PENDING, NONE, CANCELLED or (since cycle 3) green but not yet settled. Reproduced: B (code, green 1 h ago), C (code, green 60 s ago), H (docs) gives code-changed, exit 1; the same repository with C 400 s old gives tree-equivalent, exit 0. The poll latches code-changed as final, so the settle window turns a five-minute delay into a permanent loss of the rule for that poll. Bug: task.172.bug.19.poll-latches-a-code-changed-that-is-not-final.md'
+    suggested_action: 'The engine reports code-changed only when no nearer ancestor was walked past undecided (so it is final for a pinned head); otherwise it reports no-green-ancestor naming the undecided ancestor and the code path, which the poll re-asks.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR4-2'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'A config blob that parses to no mapping, or is not a regular file, is treated as not configured. skills-config.yaml committed as a symlink (mode 120000) to a file holding `enabled: false`: git show returns the link text, the YAML subset yields nothing and the owner opt-out is ignored (reproduced, exit 0). `parseConfig("ci docsOnly\nenabled false")` and a top-level list also give the defaults. Empty file and unparseable file report one value. Bug: task.172.bug.20.config-blob-that-parses-to-nothing-gets-the-defaults.md'
+    suggested_action: 'parseConfig refuses text with significant lines that does not parse to a mapping; readConfigAtCommit refuses a blob that is not a regular file (modes 120000 and 160000).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 75
+
+evidence:
+  tests_reviewed: 81
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Scoped re-review of cycle 3 fixes; QA reproduced both findings by execution. No corpus sink models this predicate, so the evidence is reasoned plus reproductions.'
+  performance:
+    status: PASS
+    notes: 'Bounded at 20 ancestors.'
+  reliability:
+    status: CONCERNS
+    notes: 'The 6c poll can permanently lose the rule after a settle window (CR4-1).'
+  maintainability:
+    status: PASS
+    notes: 'One schema for the configuration; one engine.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR4-1 and CR4-2, each with a test that is red on revert.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'skills/finalise/SKILL.md']
+  future:
+    - action: 'Review cleanup (CR-3, low): the configuration.md section says four things but lists six; the engine header and CHANGELOG omit changedCount and two config keys; one test title says three keys. Fix the counts and lists.'
+      refs: ['docs/reference/configuration.md', 'shared/resources/ci-tree-equivalence.js', 'CHANGELOG.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['Fix CR4-1 and CR4-2']

@@ -30,9 +30,16 @@
  *   0  tree-equivalent
  *   1  every other answer: not-applicable, disabled, code-changed, no-green-ancestor,
  *      unverifiable, check-failed (and an unexpected throw, reported as unverifiable)
- *   2  usage error — including a malformed ci.docsOnly block, which never falls back silently
+ *   2  usage error — including a malformed ci.docsOnly block, a configuration that has content but
+ *      is no mapping, and a skills-config.yaml that is not a regular file (a symlink): none of them
+ *      falls back silently to the defaults
  *
- * `--json` prints { reason, greenSha, changed, checkExit, pr, detail, reads } and nothing else on stdout.
+ * `code-changed` is FINAL for a pinned head: it is reported only when no nearer ancestor was walked
+ * past undecided (PENDING, NONE, CANCELLED, or green but not yet settled). Otherwise the answer is
+ * `no-green-ancestor`, which a poll asks again.
+ *
+ * `--json` prints { reason, greenSha, changed, changedCount, checkExit, pr, detail, reads } and nothing
+ * else on stdout. `changed` is capped at 200 entries; `changedCount` is the real length.
  * `--pr` is recorded in that payload for the caller's log; no decision reads it.
  * The local check's own output goes to stderr for that reason.
  *
@@ -166,6 +173,10 @@ async function classifyTreeEquivalence({
   }
   const globs = Array.isArray(patterns) ? patterns : DEFAULT_PATTERNS;
   const list = Array.isArray(ancestors) ? ancestors : [];
+  // The nearest ancestor the walk went PAST because its checks were not decided (PENDING, NONE,
+  // CANCELLED, or green but not yet settled). Whatever the walk finds beyond it, the answer is not
+  // final: that ancestor's run may still turn green, and then the delta is only docs (CR4-1).
+  let undecided = null;
 
   for (const a of list) {
     reads.diffs += 1;
@@ -178,6 +189,14 @@ async function classifyTreeEquivalence({
     const code = changed.find((f) => !isDocsPath(f, globs));
     if (code !== undefined) {
       // Older ancestors only add to the diff, so the walk stops here.
+      if (undecided !== null) {
+        // Not final: `code-changed` is a claim a poll may latch for a pinned head, and a nearer
+        // ancestor that is still undecided can change it. Report the answer that is re-asked.
+        return done(REASONS.NO_GREEN_ANCESTOR, {
+          changed,
+          detail: `${undecided.sha} is not decided yet (${undecided.rollup}) and ${code} is not a docs path (changed since ${a.sha}); the answer can still change, so it is not code-changed`,
+        });
+      }
       return done(REASONS.CODE_CHANGED, {
         changed,
         detail: `${code} is not a docs path (changed since ${a.sha})`,
@@ -210,7 +229,8 @@ async function classifyTreeEquivalence({
       });
     }
     // PENDING / NONE / CANCELLED: not green and not red. An older green ancestor is still valid
-    // evidence for the same code tree, so keep walking.
+    // evidence for the same code tree, so keep walking — and remember that the answer is not final.
+    if (undecided === null) undecided = { sha: a.sha, rollup };
   }
   return done(REASONS.NO_GREEN_ANCESTOR, {
     detail: `no green ancestor within the first ${MAX_ANCESTORS} first-parent commits`,
@@ -318,6 +338,17 @@ function defaultConfig() {
   };
 }
 
+/** Is there any line that is not blank, a comment or a document marker? */
+function hasSignificantLine(text) {
+  return String(text)
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .some((l) => {
+      const t = l.trim();
+      return t !== "" && !t.startsWith("#") && t !== "---" && t !== "...";
+    });
+}
+
 /**
  * The ONE place that defines what the configuration may contain. Everything it does not recognise
  * is refused, because each silent fall back to the defaults across QA cycles 1 to 3 was a rule
@@ -328,6 +359,20 @@ function defaultConfig() {
 function parseConfig(text) {
   const cfg = defaultConfig();
   const parsed = parseYamlSubset(text) || {};
+  // Text with content that does not parse to a mapping is a configuration the engine cannot read,
+  // not an absent one: a top-level list, a line with no colon, or the one-line link text a symlinked
+  // file reads as. Only a file with no significant line at all is "not configured" (CR4-2).
+  if (
+    hasSignificantLine(text) &&
+    (parsed === null ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed) ||
+      Object.keys(parsed).length === 0)
+  ) {
+    throw new UsageError(
+      `${CONFIG_BASENAME} has content but it does not parse to a mapping (a top-level list, a line without a colon, or the link text of a symlink); the rule will not guess what it meant`,
+    );
+  }
   for (const k of Object.keys(parsed)) {
     if (k !== "ci" && normKey(k) === "ci") {
       throw new UsageError(`${k} looks like ci; the key is exactly "ci"`);
@@ -411,8 +456,13 @@ function parseConfig(text) {
 function readConfig(root) {
   let text;
   try {
-    text = fs.readFileSync(path.join(root, CONFIG_BASENAME), "utf8");
+    const p = path.join(root, CONFIG_BASENAME);
+    if (!fs.lstatSync(p).isFile()) {
+      throw new UsageError(`${CONFIG_BASENAME} is not a regular file`);
+    }
+    text = fs.readFileSync(p, "utf8");
   } catch (e) {
+    if (e instanceof UsageError) throw e;
     if (e && e.code === "ENOENT") return defaultConfig();
     throw new UsageError(`${CONFIG_BASENAME} could not be read: ${e.message}`);
   }
@@ -425,6 +475,29 @@ function readConfig(root) {
  * A commit without the file means "not configured" and gives the defaults.
  */
 function readConfigAtCommit(exec, root, sha) {
+  let entry;
+  try {
+    entry = String(
+      exec("git", ["ls-tree", sha, "--", CONFIG_BASENAME], {
+        ...EXEC_OPTS,
+        cwd: root,
+      }),
+    ).trim();
+  } catch (e) {
+    throw new UsageError(
+      `${CONFIG_BASENAME} could not be read at ${sha}: ${e.message}`,
+    );
+  }
+  if (entry === "") return defaultConfig();
+  // `<mode> <type> <sha>\t<path>`. A symlink (120000) or a submodule (160000) is not a file whose
+  // text is the configuration: `git show` would return the link target's NAME, the YAML subset would
+  // read nothing, and an owner opt-out held in the target would be ignored (CR4-2).
+  const mode = entry.split(/\s+/)[0];
+  if (mode !== "100644" && mode !== "100755") {
+    throw new UsageError(
+      `${CONFIG_BASENAME} at ${sha} is not a regular file (git mode ${mode}); commit the file itself, not a link to it`,
+    );
+  }
   let text;
   try {
     text = String(
@@ -434,20 +507,6 @@ function readConfigAtCommit(exec, root, sha) {
       }),
     );
   } catch (e) {
-    let listed;
-    try {
-      listed = String(
-        exec("git", ["ls-tree", "--name-only", sha, "--", CONFIG_BASENAME], {
-          ...EXEC_OPTS,
-          cwd: root,
-        }),
-      ).trim();
-    } catch (e2) {
-      throw new UsageError(
-        `${CONFIG_BASENAME} could not be read at ${sha}: ${e2.message}`,
-      );
-    }
-    if (listed === "") return defaultConfig();
     throw new UsageError(
       `${CONFIG_BASENAME} could not be read at ${sha}: ${e.message}`,
     );
@@ -837,6 +896,7 @@ module.exports = {
   reduceChecks,
   reduceBitbucketStatuses,
   parseConfig,
+  defaultConfig,
   readConfig,
   readConfigAtCommit,
   settle,

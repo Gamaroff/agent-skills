@@ -461,7 +461,8 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      > **Why a rebased head rarely qualifies here.** From the second merge on, the item is rebased on the
      > new base tip (step 1), and a rebased head has no CI run of its own. Its first-parent ancestors
      > reach the base tip, so the diff to any green ancestor includes the item's own changes: an item
-     > that touches code is `code-changed` and waits exactly as before, which is correct, because its
+     > that touches code is `code-changed` (or `no-green-ancestor`, when one of its own unrun commits
+     > stands between the head and the code) and waits exactly as before, which is correct, because its
      > code did change. An item that is documentation only, rebased over a green tip, qualifies.
 
      If a genuine wait is needed, **background it** — a poll loop written to a file, checked on a

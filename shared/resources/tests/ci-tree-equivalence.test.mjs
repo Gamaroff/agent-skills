@@ -517,8 +517,14 @@ test("CLI: a head that is SUCCESS or FAILURE is never tree-equivalent, whatever 
 test("CLI: a code path anywhere in the delta is code-changed and exits 1", async () => {
   const { dir, green } = greenThenDocs(1);
   try {
-    commit(dir, { "src/b.ts": "export const b = 2;\n" }, "more code");
-    commit(dir, { "docs/last.md": "# last\n" }, "docs on top");
+    // Code and docs in the SAME head commit: the delta from the first ancestor already holds the
+    // code, so no undecided ancestor stands between the head and it and the answer is final. (Code
+    // beneath a docs-only commit whose own CI has not run is NOT final — see CR4-1.)
+    commit(
+      dir,
+      { "src/b.ts": "export const b = 2;\n", "docs/last.md": "# last\n" },
+      "code and docs on top",
+    );
     const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
       exec: fakeExec({ checks: { [green]: GREEN } }),
     });
@@ -2233,7 +2239,7 @@ test("this repository's own skills-config.yaml override parses (a block list, no
   );
 });
 
-test("configuration.md documents all three ci.docsOnly keys, the **/*.md spelling and the block-list rule", () => {
+test("configuration.md documents all five ci.docsOnly keys, the **/*.md spelling and the block-list rule", () => {
   const doc = readFileSync(
     join(REPO, "docs", "reference", "configuration.md"),
     "utf8",
@@ -2357,5 +2363,176 @@ test("finalise Step 7 canonical comment: an UNSET CI_TREE_EQ / CI_TREE_EQ_2 abor
       0,
       `${sh}: set is fine`,
     );
+  }
+});
+
+// ── QA cycle 4: CR4-1, CR4-2 ─────────────────────────────────────────────
+
+test("CR4-1: code-changed is final only when no nearer ancestor was walked past undecided", async () => {
+  // C (docs-only delta to the head) has no result yet; B beneath it has code. If C turns green the
+  // head's delta is docs only, so reporting code-changed here would be a "no" that can still flip.
+  for (const undecided of ["PENDING", "NONE", "CANCELLED"]) {
+    const r = await eng.classifyTreeEquivalence({
+      headRollup: "PENDING",
+      ancestors: [
+        A("c1", ["docs/a.md"], undecided),
+        A("b1", ["docs/a.md", "src/c.ts"], "SUCCESS"),
+      ],
+      patterns: eng.DEFAULT_PATTERNS,
+      enabled: true,
+    });
+    assert.equal(r.reason, REASONS.NO_GREEN_ANCESTOR, undecided);
+    assert.match(r.detail, /c1/, "names the undecided ancestor");
+    assert.match(r.detail, /src\/c\.ts/, "names the code path");
+    assert.match(r.detail, /not decided/);
+  }
+  // the control: no undecided ancestor stands before the code, so the answer is final
+  const final = await eng.classifyTreeEquivalence({
+    headRollup: "PENDING",
+    ancestors: [A("b1", ["docs/a.md", "src/c.ts"], "SUCCESS")],
+    patterns: eng.DEFAULT_PATTERNS,
+    enabled: true,
+  });
+  assert.equal(final.reason, REASONS.CODE_CHANGED);
+});
+
+test("CR4-1: CLI — B (code, green long ago), C (code, green 60 s ago), H (docs) is not code-changed; 400 s later it is tree-equivalent", async () => {
+  const dir = mkRepo();
+  try {
+    const b = commit(dir, { "src/b.ts": "1\n" }, "B code");
+    const c = commit(dir, { "src/c.ts": "2\n" }, "C code");
+    commit(dir, { "docs/h.md": "# h\n" }, "H docs");
+    const at = (msAgo) => [
+      { status: "completed", conclusion: "success", completed_at: iso(msAgo) },
+    ];
+    const young = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [b]: GREEN, [c]: at(60_000) } }),
+    });
+    assert.equal(young.exitCode, 1);
+    assert.equal(
+      JSON.parse(young.stdout).reason,
+      "no-green-ancestor",
+      "a settle window is a delay, not a verdict",
+    );
+    const settled = await runEngine(
+      dir,
+      ["--head-rollup", "PENDING", "--json"],
+      {
+        exec: fakeExec({ checks: { [b]: GREEN, [c]: at(400_000) } }),
+      },
+    );
+    assert.equal(settled.exitCode, 0);
+    assert.equal(JSON.parse(settled.stdout).reason, "tree-equivalent");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR4-1: the 6c poll re-asks while a nearer ancestor is undecided — the answer is not latched", () => {
+  const dir = mkRepo();
+  try {
+    const green = commit(dir, { "src/b.ts": "1\n" }, "B code (green)");
+    commit(dir, { "src/c.ts": "2\n" }, "C code (no checks yet)");
+    commit(dir, { "docs/h.md": "# h\n" }, "H docs");
+    const head = git(dir, "rev-parse", "HEAD");
+    const r = runPoll({ dir, head, green, maxWait: 90 });
+    assert.equal(r.line, `PENDING ${head} 3 90s TREE_EQ=`, r.stderr);
+    assert.equal(
+      r.calls,
+      2,
+      "asked on every 30 s step until MAX_WAIT: C's run may still finish green",
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR4-2: text with content that does not parse to a mapping is refused, not read as 'not configured'", () => {
+  for (const bad of [
+    "ci docsOnly\nenabled false\n",
+    "- a\n- b\n",
+    "skills-config.yaml\n", // what a symlinked file reads as through git show
+    "\uFEFF- a\n",
+    "just a sentence",
+  ]) {
+    assert.throws(
+      () => eng.parseConfig(bad),
+      /does not parse to a mapping/,
+      JSON.stringify(bad),
+    );
+  }
+  // nothing significant is "not configured", and so is a mapping with other keys
+  for (const ok of [
+    "",
+    "\n\n",
+    "# a comment\n",
+    "---\n",
+    "# c\n---\n...\n",
+    "\uFEFF",
+    "other: 1\n",
+  ]) {
+    assert.deepEqual(
+      eng.parseConfig(ok),
+      eng.defaultConfig(),
+      JSON.stringify(ok),
+    );
+  }
+  assert.equal(
+    eng.parseConfig("\uFEFFci:\r\n  docsOnly:\r\n    enabled: false\r\n")
+      .enabled,
+    false,
+    "a BOM and CRLF still read",
+  );
+});
+
+test("CR4-2: a skills-config.yaml committed as a symlink is refused at the commit judged — the opt-out in its target is not ignored", async () => {
+  const dir = mkRepo();
+  try {
+    writeFileSync(
+      join(dir, "real.yaml"),
+      "ci:\n  docsOnly:\n    enabled: false\n",
+    );
+    symlinkSync("real.yaml", join(dir, "skills-config.yaml"));
+    const green = commit(dir, { "src/a.ts": "1\n" }, "code + symlinked config");
+    commit(dir, { "README.md": "r\n" }, "docs");
+    assert.equal(
+      git(dir, "ls-tree", "HEAD", "skills-config.yaml").split(/\s/)[0],
+      "120000",
+      "fixture: the config really is a symlink in the commit",
+    );
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: GREEN } }),
+    });
+    assert.equal(
+      r.exitCode,
+      2,
+      "refused, not defaulted to tree-equivalent (exit 0)",
+    );
+    assert.match(r.stderr, /not a regular file/);
+    // the working-tree reader refuses the same shape
+    assert.throws(() => eng.readConfig(dir), /not a regular file/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR4-2: a regular config file is still read at the commit judged (the mode check does not refuse the ordinary case)", async () => {
+  for (const mode of ["100644", "100755"]) {
+    const dir = mkRepo({ config: "ci:\n  docsOnly:\n    enabled: false\n" });
+    try {
+      if (mode === "100755") chmodSync(join(dir, "skills-config.yaml"), 0o755);
+      const green = commit(dir, { "src/a.ts": "1\n" }, "code");
+      commit(dir, { "README.md": "r\n" }, "docs");
+      assert.equal(
+        git(dir, "ls-tree", "HEAD", "skills-config.yaml").split(/\s/)[0],
+        mode,
+      );
+      const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+        exec: fakeExec({ checks: { [green]: GREEN } }),
+      });
+      assert.equal(JSON.parse(r.stdout).reason, "disabled", mode);
+    } finally {
+      cleanup(dir);
+    }
   }
 });

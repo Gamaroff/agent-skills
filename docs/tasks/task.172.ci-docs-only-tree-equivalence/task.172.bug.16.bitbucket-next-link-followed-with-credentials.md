@@ -10,7 +10,7 @@
 
 ## Description
 
-A `next` URL of https://evil.example/steal was fetched with the bearer token attached (reproduced with an injected fetch), and the walk went on to exit 0.
+A `next` URL of `https://evil.example/steal` was fetched with the bearer token attached (reproduced with an injected fetch), and the walk went on to exit 0.
 
 ## Expected Behavior
 
