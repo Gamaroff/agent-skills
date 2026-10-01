@@ -435,24 +435,30 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-01
-**Quality Score**: 75/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.172.qa.6.ci-docs-only-tree-equivalence.md](./task.172.qa.6.ci-docs-only-tree-equivalence.md)
-- **Gate File**: [task.172.gate.6.ci-docs-only-tree-equivalence.yml](./task.172.gate.6.ci-docs-only-tree-equivalence.yml)
+- **Full Report**: [task.172.qa.7.ci-docs-only-tree-equivalence.md](./task.172.qa.7.ci-docs-only-tree-equivalence.md)
+- **Gate File**: [task.172.gate.7.ci-docs-only-tree-equivalence.yml](./task.172.gate.7.ci-docs-only-tree-equivalence.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 90 engine tests, also under `TMPDIR=/tmp` (plus the cycle 5 fast gate: 4,903 of 4,906, load-sensitive file-time budgets)
+- **Tests Executed**: 93 engine tests, also under `TMPDIR=/tmp` (plus the cycle 6 fast gate: 4,906 of 4,909, load-sensitive file-time budgets)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 2 MEDIUM, 2 LOW
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0 HIGH, 0 MEDIUM, 1 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 5's three fixes are verified and mutation-proven. No HIGH is open. Two reproduced MEDIUM findings remain, both in the completeness check that fix added: its row count over-counts every list-of-maps element, so a valid documented `skills-config.yaml` (`developBatch.resources`, `retrospective.identities`) is refused with exit 2 (fails closed, and a regression against the cycle 4 engine), and the same over-count lets a dropped row pass when it offsets one.
+Cycle 6's fixes are verified and mutation-proven, and no HIGH or MEDIUM finding is open. One reproduced LOW remains, carried by the cosmetic-residue exit: a configuration whose `ci` key is quoted, or whose top-level keys are uniformly indented, was honoured by the cycle 5 engine and is now refused with exit 2 (fails closed).
+
+### Deferred Work
+
+- **Carried from gate 7 by the Cosmetic-residue exit (route 2b, cycle 7)**: CR7-1. One LOW finding (a quoted `ci` key or uniformly indented top-level keys are refused with exit 2; fails closed), moved to the gate's `recommendations.future` by id.
+- Recorded in gate 7's `recommendations.future`, not attributable to cycle 6: a `ci` block nested under another key, or with its `docsOnly` children dedented to column 0, reads as the defaults (valid YAML with a different meaning, identical in the cycle 5 engine); the second comment-stripping rule beside `yaml-subset.js`'s; the CANCELLED nearer ancestor that the 6c poll re-asks.
+- If a further gate finds another configuration-reading defect: replace the `ci` block reader with a dedicated strict one rather than a further spelling of the completeness check.
 
 <!-- change-log-start -->
 
@@ -475,6 +481,7 @@ Cycle 5's three fixes are verified and mutation-proven. No HIGH is open. Two rep
 | 2026-10-01 |  | QA gate CONCERNS (70/100) — 3 findings | qa-task |
 | 2026-10-01 |  | QA gate CONCERNS (75/100) — 2 findings | qa-task |
 | 2026-10-01 |  | QA findings fixed — 2 findings (2 MEDIUM) plus 3 advisory, 1 iteration | qa-fix |
+| 2026-10-01 |  | QA gate PASS (95/100) — 1 finding | qa-task |
 
 <!-- change-log-end -->
 
