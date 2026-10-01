@@ -27,6 +27,11 @@ All notable changes to this project will be documented in this file. Format foll
     `shared/resources/bb-auth.js` (from `pr-inline-comment.js`). Both keep their exports.
   - Residual, accepted: a workflow triggered only by docs paths (a link checker) never ran on a
     green ancestor that touched none of them, and `checkCommand` cannot reproduce URL reachability.
+  - QA cycle 1 closed three ways around the fail-closed property before release: a change to
+    `skills-config.yaml` in the delta is never docs (a commit could widen the patterns that judged its
+    own diff); an ancestor whose only checks were skipped is not green; a path a matcher would normalise
+    into `docs/**` (a backslash or leading-space name) is code. `/finalise`'s canonical PR comment
+    now carries the `(tree-equivalent to <sha>)` suffix on reading 2 as well as reading 1.
 
 - **The two hand-written reference pages are pinned to the skills they describe (task 142, obs #159).**
   - `tests/reference-doc-skill-pinning.test.js` fails when a `docs/reference/commands.md` row

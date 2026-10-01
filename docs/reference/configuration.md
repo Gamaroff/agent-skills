@@ -323,8 +323,8 @@ implementation report), so the code tree is identical to one CI already passed. 
 enough, and all four sites call it. A reading is satisfied when:
 
 1. the head's rollup is `PENDING` or `NONE` (a `FAILURE`, `CANCELLED` or `UNKNOWN` head never qualifies);
-2. a first-parent ancestor of the head (at most 20 back) has a green rollup of **its own checks**;
-3. every file changed between that ancestor and the head matches `ci.docsOnly.patterns`; and
+2. a first-parent ancestor of the head (at most 20 back) has a green rollup of **its own checks**. Checks that were skipped or neutral pass only beside at least one real success: an ancestor whose only checks were skipped is not green;
+3. every file changed between that ancestor and the head matches `ci.docsOnly.patterns`. A path in an unusual form (a backslash, a leading space or slash) and any `skills-config.yaml` in the delta are never docs, whatever the patterns say, so a commit cannot widen the rule that judges it; and
 4. `ci.docsOnly.checkCommand`, when set, exits 0.
 
 The site then records `SUCCESS (tree-equivalent to <sha12>)`, **never plain `SUCCESS`**, so the record

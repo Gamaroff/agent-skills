@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.172.ci-docs-only-tree-equivalence'
+task_title: 'One docs-only CI rule at every pipeline CI wait'
+gate: FAIL
+status_reason: 'Two HIGH fail-closed bypasses in the engine (config read from the head being judged; an all-skipped ancestor reads green) and one MEDIUM recording gap in the Step 7 comment. Tests, validation and snippet execution are otherwise green.'
+reviewer: 'QA Engineer'
+head: '5a1bd84008fc9767889d9816891f9e61927301ed'
+updated: '2026-10-01T09:40:40Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'readConfig reads skills-config.yaml from the head being judged, so a commit that changes code and widens ci.docsOnly.patterns makes its own code diff read as docs-only. Reproduced: exit 0 tree-equivalent over a code change. Bug: task.172.bug.1.config-read-from-head-tree.md'
+    suggested_action: 'Treat any change to skills-config.yaml in the ancestor..head diff as code-changed regardless of patterns; add a test.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: high
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'reduceChecks counts skipped/neutral as SUCCESS, so an ancestor whose only checks were skipped is a green ancestor. Reproduced by QA (reviewer confidence medium, raised to high by reproduction). Bug: task.172.bug.2.all-skipped-ancestor-reads-green.md'
+    suggested_action: 'An ancestor whose checks are all skipped/neutral is NONE; skipped/neutral still pass alongside at least one real success; test both.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The Step 7 canonical comment prints reading 1 with a CI_TREE_EQ expansion bound in another shell and reading 2 with no tree-equivalent suffix, so a tree-equivalent reading can be recorded as plain SUCCESS. Bug: task.172.bug.3.step7-comment-drops-tree-equivalent.md'
+    suggested_action: 'Add the CI_TREE_EQ_2 suffix to the reading 2 line, state both as re-bound inputs, extend finalise-publish-boundary.test.mjs to assert reading 2.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 51
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'The engine is an accept/reject boundary. security-probe.mjs was run (filename sink, matchesAnyGlob, 14 cases, record task.172.qa.1.ci-docs-only-tree-equivalence.security.run.json): verdict unverifiable, because no corpus sink models a docs-membership predicate (its legitimate controls are correctly rejected as not-docs). No hostile name was accepted. The hostile inputs that matter were enumerated by hand: rename out of code, config tamper (CR-1), all-skipped ancestor (CR-2), backslash/leading-space names (CR-4, low), FAILURE head, 403, null diff. Evidence is therefore reasoned plus QA reproductions, not measured.'
+  performance:
+    status: PASS
+    notes: 'At most 1 + docs-only-commits-on-top ancestor reads, bounded at 20 ancestors; CLI cases run in a few hundred ms.'
+  reliability:
+    status: PASS
+    notes: 'Every failure path (git, gh, Bitbucket 403, malformed config, throw) exits 1 or 2, never 0; 14 mutation proofs red.'
+  maintainability:
+    status: PASS
+    notes: '--pr is accepted but never read (CR-5, cleanup, advisory).'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2 and CR-3 and add a test for each.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'skills/finalise/SKILL.md']
+  future:
+    - action: 'CR-4 (low): match git paths verbatim so a backslash or leading-space file name is never normalised into docs/**.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+    - action: 'CR-5 (cleanup): --pr is parsed and documented but never read; drop it or echo it in the record.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

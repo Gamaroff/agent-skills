@@ -433,6 +433,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-01
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.172.qa.1.ci-docs-only-tree-equivalence.md](./task.172.qa.1.ci-docs-only-tree-equivalence.md)
+- **Gate File**: [task.172.gate.1.ci-docs-only-tree-equivalence.yml](./task.172.gate.1.ci-docs-only-tree-equivalence.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 51 new, 4833/4836 suite (two file-time budgets only)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 2 HIGH, 1 MEDIUM
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Two reproduced bypasses of the engine's fail-closed property (config read from the head being judged; an all-skipped ancestor reads green) and one recording gap in the Step 7 comment.
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -443,6 +464,8 @@ None.
 | 2026-10-01 | 1.1     | Review passed (9/10) — repository `checkCommand` widened to `ci:fast && eval:all`; path-filtered-workflow residual recorded | review-task |
 | 2026-10-01 |         | Status → ready-for-development | review-task |
 | 2026-10-01 |         | Implemented — 4 new + 10 modified files (and generated bundle copies), 51 new tests; yaml-subset forced a block-list config spelling | develop |
+| 2026-10-01 |  | QA gate FAIL (60/100) — 3 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 3 findings (2 HIGH, 1 MEDIUM) plus 2 advisory, 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

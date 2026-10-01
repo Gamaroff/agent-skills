@@ -158,13 +158,14 @@ test("both CI readings carry a head, and the second is the pushed acceptance hea
   );
   assert.match(
     step7,
-    // task.172: a docs-only reading appends `(tree-equivalent to <sha>)` between the state and the head.
-    /\*\*CI reading 1\*\*: \$\{CI_ROLLUP\}(?:\$\{CI_TREE_EQ:\+ \(tree-equivalent to \$\{CI_TREE_EQ\}\)\})? @/,
+    // task.172: a docs-only reading appends `(tree-equivalent to <sha>)` between the state and the head — REQUIRED on both
+    // readings (QA cycle 1, CR-3: an optional group let reading 2 drop it without a test going red).
+    /\*\*CI reading 1\*\*: \$\{CI_ROLLUP\}\$\{CI_TREE_EQ:\+ \(tree-equivalent to \$\{CI_TREE_EQ\}\)\} @/,
     "the PR canonical comment carries reading 1 with its head",
   );
   assert.match(
     step7,
-    /\*\*CI reading 2\*\*: \$\{CI_ROLLUP_2\} @/,
+    /\*\*CI reading 2\*\*: \$\{CI_ROLLUP_2\}\$\{CI_TREE_EQ_2:\+ \(tree-equivalent to \$\{CI_TREE_EQ_2\}\)\} @/,
     "the PR canonical comment carries reading 2 with its head",
   );
   // The PR head must be compared to the pushed head before reading CI on it — never gate one commit and read another.

@@ -898,8 +898,10 @@ esac
 
 The engine decides on four things and this step re-derives none of them: the head's rollup is
 `PENDING`/`NONE`; a first-parent ancestor has a green rollup **of its own checks**; every file changed
-since it matches `ci.docsOnly.patterns` (default `**/*.md`, `docs/**`); and `ci.docsOnly.checkCommand`,
-when configured, passes. `FAILURE`, `CANCELLED` and `UNKNOWN` heads never reach it. Switch the rule off
+since it matches `ci.docsOnly.patterns` (default `**/*.md`, `docs/**`), with a change to `skills-config.yaml`
+never counting as docs; and `ci.docsOnly.checkCommand`, when configured, passes. The ancestor read differs
+from this head reduction in one place: an ancestor whose checks were **all** skipped or neutral is `NONE`,
+not green, because it verified nothing. `FAILURE`, `CANCELLED` and `UNKNOWN` heads never reach it. Switch the rule off
 with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../docs/reference/configuration.md)).
 **A `SUCCESS` reached this way is never recorded as plain `SUCCESS`** — see the table.
 
@@ -1756,6 +1758,13 @@ POLLEOF
      CLOSING_LINE="All Definition of Done criteria verified. Story/task accepted."
    fi
 
+   # CI_TREE_EQ (reading 1, Step 6) and CI_TREE_EQ_2 (reading 2, 6c) are INPUTS to this block, bound
+   # by the agent from the readings it recorded, exactly like CI_ROLLUP and CI_ROLLUP_2 above: this
+   # block is its own shell and computes neither. Both are empty when the reading waited for the
+   # head's own CI, and a non-empty one is why the record below says "tree-equivalent to <sha>"
+   # rather than plain SUCCESS (task.172 QA cycle 1, CR-3). A SUCCESS that the docs-only rule
+   # satisfied and that is written here without its sha is the record this rule exists to prevent.
+
    # The plain-language lead. It goes BELOW the marker and above everything
    # else — see the warning under Step 6c. `done` is the same stage the tracker
    # comment uses; one vocabulary, not a second one for pull requests.
@@ -1773,7 +1782,7 @@ POLLEOF
    **Accepted**: $(date +%Y-%m-%d)
    **DoD Summary**: \`${DOD_PATH}\`
    **CI reading 1**: ${CI_ROLLUP}${CI_TREE_EQ:+ (tree-equivalent to ${CI_TREE_EQ})} @ \`${CI_HEAD_1:0:12}\` (acceptance decision)
-   **CI reading 2**: ${CI_ROLLUP_2} @ \`${CI_HEAD_2:0:12}\` (${HEAD_DESC})
+   **CI reading 2**: ${CI_ROLLUP_2}${CI_TREE_EQ_2:+ (tree-equivalent to ${CI_TREE_EQ_2})} @ \`${CI_HEAD_2:0:12}\` (${HEAD_DESC})
    $([ "$CYCLES" -gt 0 ] && echo "**QA Cycles**: ${CYCLES}" || true)
 
    ${CLOSING_LINE}"

@@ -31,7 +31,8 @@
  *      unverifiable, check-failed (and an unexpected throw, reported as unverifiable)
  *   2  usage error — including a malformed ci.docsOnly block, which never falls back silently
  *
- * `--json` prints { reason, greenSha, changed, checkExit, detail, reads } and nothing else on stdout.
+ * `--json` prints { reason, greenSha, changed, checkExit, pr, detail, reads } and nothing else on stdout.
+ * `--pr` is recorded in that payload for the caller's log; no decision reads it.
  * The local check's own output goes to stderr for that reason.
  *
  * Config (skills-config.yaml, every key optional):
@@ -53,7 +54,7 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync, spawnSync } = require("child_process");
 
-const { matchesAnyGlob } = require("./glob-match.js");
+const { matchesAnyGlob, normalisePath } = require("./glob-match.js");
 const { parseYamlSubset } = require("./yaml-subset.js");
 const { bbAuthHeader, bbSlug } = require("./bb-auth.js");
 
@@ -83,6 +84,29 @@ const USAGE =
 // ---------------------------------------------------------------------------
 
 const val = async (x) => (typeof x === "function" ? x() : x);
+
+/** The file this rule is configured in. Its basename, wherever it sits in the tree. */
+const CONFIG_BASENAME = "skills-config.yaml";
+
+/**
+ * Is a changed path documentation? Three things make it NOT, whatever `patterns` say:
+ *
+ *  - It is the rule's own configuration file. `readConfig` reads the head being judged, so a commit
+ *    that changed code and also widened `ci.docsOnly.patterns` (or set `checkCommand` to `true`)
+ *    would otherwise decide its own diff (CR-1, task.172 QA cycle 1). A change to the configuration
+ *    is never a docs change; the owner's committed config still applies to every other path.
+ *  - It is not already in the form the matcher compares against. `normalisePath` was written for
+ *    hand-typed gate values: it trims, strips a leading `/` and turns `\` into `/`. Git emits paths
+ *    verbatim, so a file literally named `docs\evil.js` or ` docs/x.js` must not be normalised into
+ *    `docs/**` (CR-4).
+ *  - It matches none of the patterns.
+ */
+function isDocsPath(file, globs) {
+  if (typeof file !== "string" || file === "") return false;
+  if (file.split("/").pop() === CONFIG_BASENAME) return false;
+  if (normalisePath(file) !== file) return false;
+  return matchesAnyGlob(file, globs);
+}
 
 /**
  * Pure apart from the thunks it is handed. `ancestors` is first-parent order, nearest first:
@@ -136,7 +160,7 @@ async function classifyTreeEquivalence({
         detail: `the diff ${a.sha}..head could not be computed`,
       });
     }
-    const code = changed.find((f) => !matchesAnyGlob(f, globs));
+    const code = changed.find((f) => !isDocsPath(f, globs));
     if (code !== undefined) {
       // Older ancestors only add to the diff, so the walk stops here.
       return done(REASONS.CODE_CHANGED, {
@@ -178,8 +202,8 @@ function exitCodeFor(reason) {
 
 /**
  * Reduce one commit's checks to NONE | FAILURE | PENDING | CANCELLED | SUCCESS.
- * A CheckRun is decided only at `completed`; skipped/neutral pass; zero checks is NONE and is
- * never green. Mirrors skills/finalise/SKILL.md Step 6 (and scripts/release-ci-verdict.mjs, which
+ * A CheckRun is decided only at `completed`; skipped/neutral pass only alongside a real success; zero
+ * checks, or only skipped/neutral ones, is NONE and is never green. Mirrors skills/finalise/SKILL.md Step 6 (and scripts/release-ci-verdict.mjs, which
  * is repo-only and so cannot be required from here).
  */
 function reduceChecks({ checkRuns = [], statuses = [] }) {
@@ -191,8 +215,8 @@ function reduceChecks({ checkRuns = [], statuses = [] }) {
       continue;
     }
     const c = String((r && r.conclusion) || "").toLowerCase();
-    if (c === "success" || c === "skipped" || c === "neutral")
-      states.push("SUCCESS");
+    if (c === "success") states.push("SUCCESS");
+    else if (c === "skipped" || c === "neutral") states.push("SKIPPED");
     else if (c === "cancelled") states.push("CANCELLED");
     else if (c === "") states.push("PENDING");
     else states.push("FAILURE"); // failure, timed_out, startup_failure, action_required, stale…
@@ -207,7 +231,11 @@ function reduceChecks({ checkRuns = [], statuses = [] }) {
   if (states.includes("FAILURE")) return "FAILURE";
   if (states.includes("PENDING")) return "PENDING";
   if (states.includes("CANCELLED")) return "CANCELLED";
-  return "SUCCESS";
+  // Skipped and neutral are not failures and pass ALONGSIDE a real success (a paths-filtered job that
+  // did not trigger is not a red). Alone they verified nothing: an ancestor whose only checks were
+  // skipped is `NONE`, never green, or a docs-only head could launder a code commit CI never ran
+  // (CR-2, task.172 QA cycle 1). The head's own reading in /finalise Step 6 is unchanged.
+  return states.includes("SUCCESS") ? "SUCCESS" : "NONE";
 }
 
 /** Bitbucket commit statuses → the same vocabulary. Empty list is NONE, never green. */
@@ -498,7 +526,9 @@ async function run({
     }
     exitCode = exitCodeFor(result.reason);
     if (args.json) {
-      stdout.write(`${JSON.stringify({ checkExit: null, ...result })}\n`);
+      stdout.write(
+        `${JSON.stringify({ checkExit: null, pr: args.pr ?? null, ...result })}\n`,
+      );
     } else if (result.reason === REASONS.TREE_EQUIVALENT) {
       stdout.write(
         `tree-equivalent to ${String(result.greenSha).slice(0, 12)} — ${result.detail}\n`,
@@ -542,6 +572,7 @@ module.exports = {
   MAX_ANCESTORS,
   USAGE,
   classifyTreeEquivalence,
+  isDocsPath,
   exitCodeFor,
   reduceChecks,
   reduceBitbucketStatuses,

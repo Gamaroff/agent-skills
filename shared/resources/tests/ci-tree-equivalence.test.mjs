@@ -305,10 +305,12 @@ test("the default patterns read as intended: **/*.md reaches nested markdown, `*
 
 // ── rollup reduction ─────────────────────────────────────────────────────
 
-test("reduceChecks: decided only at completed, skipped/neutral pass, zero is NONE, partial is not green", () => {
+test("reduceChecks: decided only at completed, skipped/neutral pass only beside a real success, zero is NONE, partial is not green", () => {
   const r = eng.reduceChecks;
   assert.equal(r({}), "NONE");
   assert.equal(r({ checkRuns: GREEN }), "SUCCESS");
+  // CR-2 (QA cycle 1): skipped/neutral are not failures and pass ALONGSIDE a real success, but alone
+  // they verified nothing, so an ancestor whose only checks were skipped is NONE, never green.
   assert.equal(
     r({
       checkRuns: [
@@ -316,7 +318,30 @@ test("reduceChecks: decided only at completed, skipped/neutral pass, zero is NON
         { status: "completed", conclusion: "neutral" },
       ],
     }),
+    "NONE",
+  );
+  assert.equal(
+    r({ checkRuns: [{ status: "completed", conclusion: "skipped" }] }),
+    "NONE",
+  );
+  assert.equal(
+    r({
+      checkRuns: [
+        { status: "completed", conclusion: "success" },
+        { status: "completed", conclusion: "skipped" },
+        { status: "completed", conclusion: "neutral" },
+      ],
+    }),
     "SUCCESS",
+    "a paths-filtered job that did not trigger must not turn a real success red",
+  );
+  assert.equal(
+    r({
+      checkRuns: [{ status: "completed", conclusion: "skipped" }],
+      statuses: [{ state: "success" }],
+    }),
+    "SUCCESS",
+    "a commit status that succeeded is a real success",
   );
   assert.equal(r({ checkRuns: [{ status: "in_progress" }] }), "PENDING");
   assert.equal(
@@ -787,6 +812,193 @@ test("CLI: a throw outside any handled read (HEAD cannot be resolved) exits 1 as
       );
       assert.match(r.stdout, /unverifiable/);
     }
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR-2: an ancestor whose only checks were skipped is not green; the walk ends no-green-ancestor", async () => {
+  const { dir, green } = greenThenDocs(2);
+  try {
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({
+        checks: { [green]: [{ status: "completed", conclusion: "skipped" }] },
+      }),
+    });
+    assert.equal(
+      r.exitCode,
+      1,
+      "a skipped-only ancestor launders a commit CI never ran",
+    );
+    assert.equal(JSON.parse(r.stdout).reason, "no-green-ancestor");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR-1: a head that changes code AND widens ci.docsOnly.patterns in the same delta is code-changed", async () => {
+  for (const widen of [
+    'ci:\n  docsOnly:\n    patterns:\n      - "**"\n',
+    'ci:\n  docsOnly:\n    checkCommand: "true"\n',
+    'ci:\n  docsOnly:\n    patterns:\n      - "**"\n    checkCommand: "true"\n',
+  ]) {
+    const dir = mkRepo();
+    try {
+      const green = commit(
+        dir,
+        { "src/a.js": "export const a = 1;\n" },
+        "code",
+      );
+      commit(
+        dir,
+        {
+          "src/a.js": "export const a = 2; // unreviewed\n",
+          "skills-config.yaml": widen,
+        },
+        "code + widen",
+      );
+      const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+        exec: fakeExec({ checks: { [green]: GREEN } }),
+      });
+      assert.equal(
+        r.exitCode,
+        1,
+        `the commit decided its own diff under config ${JSON.stringify(widen)}`,
+      );
+      assert.equal(JSON.parse(r.stdout).reason, "code-changed");
+      assert.match(
+        JSON.parse(r.stdout).detail,
+        /skills-config\.yaml|src\/a\.js/,
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
+test("CR-1: a config change is code even when it is the ONLY change, at any depth; the owner's committed config still applies elsewhere", async () => {
+  const dir = mkRepo();
+  try {
+    const green = commit(dir, { "src/a.js": "x\n" }, "code");
+    commit(
+      dir,
+      {
+        "skills-config.yaml": 'ci:\n  docsOnly:\n    patterns:\n      - "**"\n',
+      },
+      "config only",
+    );
+    const only = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: GREEN } }),
+    });
+    assert.equal(
+      only.exitCode,
+      1,
+      "changing the rule's own configuration is never a docs change",
+    );
+    const nested = mkRepo();
+    try {
+      const g2 = commit(nested, { "src/a.js": "x\n" }, "code");
+      commit(nested, { "pkg/skills-config.yaml": "ci: {}\n" }, "nested config");
+      const r2 = await runEngine(
+        nested,
+        ["--head-rollup", "PENDING", "--json"],
+        {
+          exec: fakeExec({ checks: { [g2]: GREEN } }),
+        },
+      );
+      assert.equal(
+        r2.exitCode,
+        1,
+        "a config file at any depth is not documentation",
+      );
+    } finally {
+      cleanup(nested);
+    }
+  } finally {
+    cleanup(dir);
+  }
+  // The trust boundary, stated as a test: a config the OWNER committed before the green commit is the
+  // owner's rule and applies; only a change in the delta being judged is distrusted.
+  const owned = mkRepo({
+    config: 'ci:\n  docsOnly:\n    patterns:\n      - "notes/**"\n',
+  });
+  try {
+    git(owned, "add", "-A");
+    const g3 = commit(owned, { "src/a.js": "x\n" }, "code + owner config");
+    commit(owned, { "notes/n.txt": "n\n" }, "a note");
+    const ok = await runEngine(owned, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [g3]: GREEN } }),
+    });
+    assert.equal(
+      ok.exitCode,
+      0,
+      "the owner's committed patterns apply to paths other than the config",
+    );
+  } finally {
+    cleanup(owned);
+  }
+});
+
+test("CR-4: a file whose NAME the matcher would normalise into docs/** is code, not documentation", async () => {
+  assert.equal(eng.isDocsPath("docs/a.md", eng.DEFAULT_PATTERNS), true);
+  assert.equal(eng.isDocsPath("docs/a.md", ["docs/**"]), true);
+  for (const evil of [
+    "docs\\evil.js",
+    " docs/x.js",
+    "/docs/x.js",
+    "docs/x.js ",
+    "./docs/x.js",
+  ]) {
+    assert.equal(
+      eng.isDocsPath(evil, ["docs/**"]),
+      false,
+      `${JSON.stringify(evil)} is normalised by the matcher into a docs path`,
+    );
+  }
+  const dir = mkRepo();
+  try {
+    const green = commit(dir, { "src/a.js": "x\n" }, "code");
+    commit(
+      dir,
+      { "docs\\evil.js": "process.exit(0)\n" },
+      "backslash name at the root",
+    );
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: GREEN } }),
+      env: {},
+    });
+    const j = JSON.parse(r.stdout);
+    assert.equal(r.exitCode, 1);
+    assert.equal(j.reason, "code-changed");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR-5: --pr is recorded in the JSON for the caller's log and no decision reads it", async () => {
+  const { dir, green } = greenThenDocs(1);
+  try {
+    const withPr = await runEngine(
+      dir,
+      ["--head-rollup", "PENDING", "--pr", "543", "--json"],
+      {
+        exec: fakeExec({ checks: { [green]: GREEN } }),
+      },
+    );
+    const without = await runEngine(
+      dir,
+      ["--head-rollup", "PENDING", "--json"],
+      {
+        exec: fakeExec({ checks: { [green]: GREEN } }),
+      },
+    );
+    assert.equal(JSON.parse(withPr.stdout).pr, "543");
+    assert.equal(JSON.parse(without.stdout).pr, null);
+    assert.equal(
+      withPr.exitCode,
+      without.exitCode,
+      "the PR number must not change the answer",
+    );
   } finally {
     cleanup(dir);
   }
