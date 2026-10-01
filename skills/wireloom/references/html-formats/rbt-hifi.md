@@ -103,7 +103,7 @@ Drop `rbt-svg` icons, with two exceptions where the icon is the only thing that 
 
 ## Worked example: `parent/app-family-settings.html`
 
-Caption: "Derived from `parent/app-family-settings.html`, 393 px phone".
+Caption: "Derived from `app-family-settings.html`, 393 px phone".
 
 What was dropped: the status bar, three cloud cutouts, the icon sprite, and the five `s5-listIco` row
 icons, which are all `aria-hidden`. The repeated title in `s5-onbTitle` and `s5-h1` is kept twice,

@@ -21,6 +21,16 @@ All notable changes to this project will be documented in this file. Format foll
   - Two new tests. Every profile's examples must parse. The profile table in `SKILL.md` and the
     directory must list the same files, so a profile can't exist without being loaded, or be listed
     without existing.
+  - **Every wireframe now ends up in a Markdown file.** A converted page gets
+    `<page>.wireframe.md` and `<page>.wireframe[.N].svg` beside it, made from
+    `assets/wireframe.template.md`. The document holds frontmatter (`type: wireframe`, `source`,
+    `source_sha256`, `profile`, `viewport`, `wireloom`), one section per state, and conversion notes:
+    what was dropped, the judgement calls, and anything the profile doesn't map yet. A brief with no
+    story or task to go in goes to `docs/wireframes/{slug}.wireframe.md`.
+  - New `wireloom.js status <page>` reports whether the page's document exists and was made from
+    the page as it is now. Its reasons are `new`, `fresh`, `stale` and `unrecorded`, all exit 0.
+    A re-run skips pages that are `fresh`. A document with no recorded hash is `unrecorded`, never
+    `fresh`, and only the frontmatter is read. It needs no renderer package.
 
 - **`/wireloom`: UI wireframes as text, rendered to SVG.** Adapted from
   [StardockCorp/Wireloom](https://github.com/StardockCorp/Wireloom) (MIT, © Brad Wardell). The

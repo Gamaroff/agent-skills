@@ -12,6 +12,7 @@
  *   wireloom.js render <file|-> --out <file.svg|dir/>   [--json] [--no-install]
  *                      [--theme default|dark] [--block N]
  *   wireloom.js ensure                                  [--json] [--no-install]
+ *   wireloom.js status <source.html>                    [--json]
  *
  * Input: a Markdown file holding one or more ```wireloom (or ~~~wireloom)
  * fences, or a raw Wireloom source whose first significant line is `window`.
@@ -24,6 +25,11 @@
  *   3. cache    ${XDG_CACHE_HOME:-~/.cache}/agent-skills/wireloom/<PINNED>
  *   4. install  `npm install` of the pinned version into that cache dir,
  *               unless --no-install or WIRELOOM_NO_INSTALL=1
+ *
+ * `status` answers "does this source file's wireframe document exist, and was
+ * it made from the source as it is now?" It needs no package. The document is
+ * <dir>/<stem>.wireframe.md beside the source, and its frontmatter
+ * `source_sha256:` records the SHA-256 of the source it was made from.
  *
  * Exit codes (same family as the repository's other engines):
  *   0  ok
@@ -39,6 +45,12 @@
  *   no-blocks     the input holds no ```wireloom fence and is not raw source
  *   unavailable   the package could not be resolved or installed
  *   usage         the invocation was wrong; always paired with exit 2
+ *
+ * `status` reasons, all exit 0 — each is an answer, not a failure:
+ *   new           no wireframe document beside the source yet
+ *   fresh         the document's source_sha256 matches the source
+ *   stale         it records a different hash: the source changed since
+ *   unrecorded    the document has no source_sha256, so freshness is unknown
  */
 
 "use strict";
@@ -47,6 +59,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { createRequire } = require("module");
+const crypto = require("crypto");
 const { execFileSync } = require("child_process");
 
 // The version references/grammar.md documents. Bump both together.
@@ -60,13 +73,13 @@ class UsageError extends Error {}
 
 const VALUE_FLAGS = new Set(["--out", "--theme", "--block"]);
 const BOOL_FLAGS = new Set(["--json", "--no-install"]);
-const COMMANDS = new Set(["check", "render", "ensure"]);
+const COMMANDS = new Set(["check", "render", "ensure", "status"]);
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;
   if (!command || !COMMANDS.has(command)) {
     throw new UsageError(
-      `expected a command: check | render | ensure (got ${command ? `"${command}"` : "nothing"})`,
+      `expected a command: check | render | ensure | status (got ${command ? `"${command}"` : "nothing"})`,
     );
   }
   const opts = { command, positional: [] };
@@ -95,7 +108,13 @@ function parseArgs(argv) {
   }
   opts.input = opts.positional[0];
 
-  if (command === "check" && (opts.out || opts.theme || opts.block)) {
+  if (command === "status" && opts.input === "-") {
+    throw new UsageError("status needs a source file path, not -");
+  }
+  if (
+    (command === "check" || command === "status") &&
+    (opts.out || opts.theme || opts.block)
+  ) {
     throw new UsageError("--out, --theme and --block apply to render only");
   }
   if (command === "render") {
@@ -355,7 +374,38 @@ function outputPaths(opts, selected, total) {
   return selected.map((b) => `${stem}.${b.index}.svg`);
 }
 
+/** The wireframe document that belongs beside a source file. */
+function wireframeDocPath(source) {
+  const stem = path.basename(source).replace(/\.[^.]+$/, "");
+  return path.join(path.dirname(source), `${stem}.wireframe.md`);
+}
+
+/** source_sha256 from a document's leading YAML frontmatter, or null. */
+function recordedHash(text) {
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(text);
+  if (!fm) return null;
+  const m = /^source_sha256:\s*["']?([0-9a-f]{64})["']?\s*$/m.exec(fm[1]);
+  return m ? m[1] : null;
+}
+
+function status(opts) {
+  if (!fs.existsSync(opts.input) || !fs.statSync(opts.input).isFile()) {
+    throw new UsageError(`cannot read ${opts.input}: no such file`);
+  }
+  const sha256 = crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(opts.input))
+    .digest("hex");
+  const doc = wireframeDocPath(opts.input);
+  const base = { exitCode: 0, source: opts.input, doc, sha256 };
+  if (!fs.existsSync(doc)) return { reason: "new", ...base };
+  const recorded = recordedHash(fs.readFileSync(doc, "utf8"));
+  if (!recorded) return { reason: "unrecorded", ...base, recorded };
+  return { reason: recorded === sha256 ? "fresh" : "stale", ...base, recorded };
+}
+
 async function run(opts) {
+  if (opts.command === "status") return status(opts);
   const pkg = resolveWireloom({ noInstall: opts["no-install"] });
   if (pkg.error)
     return { reason: "unavailable", exitCode: 1, error: pkg.error };
@@ -424,6 +474,11 @@ function human(result) {
       `wireloom ${result.package.version || "?"} (${result.package.from})`,
     );
   if (result.error) out.push(`${result.reason}: ${result.error}`);
+  if (result.sha256) {
+    out.push(`  source  ${result.source}`, `  doc     ${result.doc}`);
+    out.push(`  sha256  ${result.sha256}`);
+    if (result.recorded) out.push(`  recorded ${result.recorded}`);
+  }
   for (const b of result.blocks || []) {
     if (b.ok)
       out.push(
@@ -465,4 +520,10 @@ if (require.main === module) {
   main(process.argv.slice(2));
 }
 
-module.exports = { extractBlocks, parseArgs, PINNED_VERSION };
+module.exports = {
+  extractBlocks,
+  parseArgs,
+  recordedHash,
+  wireframeDocPath,
+  PINNED_VERSION,
+};
