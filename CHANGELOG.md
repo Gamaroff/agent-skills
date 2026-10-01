@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/wireloom` turns an existing HTML screen into a wireframe (obs #245).** A new section, "Working
+  from an existing UI", covers the case where the source of truth is a page rather than a brief.
+  The agent transcribes the page and derives nothing. It drops decoration (`aria-hidden`, `alt=""`),
+  copies text verbatim, draws one state per block (a hidden sheet or tab pane gets its own block
+  over the full base screen), and captions the source file and viewport width.
+  - **Wireloom does not wrap text: the window grows to its widest line.** So copy is split at about
+    42 characters, and a carousel is drawn as its first card plus "1 of N". Otherwise a 393 px phone
+    screen renders as a desktop-width window.
+  - Format knowledge lives in one profile per format under `references/html-formats/`. The first is
+    `rbt-hifi.md`, for the Rebirth hi-fi phone screens. It has a class-to-primitive table for the
+    `s5-*` vocabulary, a pill-to-`status` mapping read from the theme's colours, a sprite-to-named-icon
+    map, and two worked examples, one of them with a sheet.
+  - Two new tests. Every profile's examples must parse. The profile table in `SKILL.md` and the
+    directory must list the same files, so a profile can't exist without being loaded, or be listed
+    without existing.
+
 - **`/wireloom`: UI wireframes as text, rendered to SVG.** Adapted from
   [StardockCorp/Wireloom](https://github.com/StardockCorp/Wireloom) (MIT, © Brad Wardell). The
   skill writes a ```` ```wireloom ```` block, checks it, and embeds a co-located SVG beside the

@@ -350,6 +350,37 @@ test("every ```wireloom example in the grammar reference parses", () => {
   );
 });
 
+// ===========================================================================
+// HTML format profiles (SKILL.md § "Working from an existing UI")
+// ===========================================================================
+const FORMATS_DIR = path.join(SKILL_DIR, "references", "html-formats");
+const profiles = () =>
+  fs.readdirSync(FORMATS_DIR).filter((f) => f.endsWith(".md"));
+
+test("every HTML format profile carries a worked example, and every example parses", () => {
+  const found = profiles();
+  // Non-vacuity: an empty directory would pass the loop below on nothing.
+  assert.ok(found.length >= 1, "no profiles found");
+  for (const f of found) {
+    const { status, json } = runJson(["check", path.join(FORMATS_DIR, f)]);
+    assert.ok((json.blocks || []).length >= 1, `${f}: no wireloom blocks`);
+    const failed = json.blocks.filter((b) => !b.ok);
+    assert.deepEqual(failed, [], `${f}: blocks failed to parse`);
+    assert.equal(status, 0, f);
+  }
+});
+
+test("SKILL.md's profile table and references/html-formats/ list the same profiles", () => {
+  // Two enumerations of "which profiles exist" drift silently: a profile
+  // missing from the table is never loaded, and a row with no file sends the
+  // agent to a dead link.
+  const skill = fs.readFileSync(path.join(SKILL_DIR, "SKILL.md"), "utf8");
+  const linked = [
+    ...skill.matchAll(/\]\(references\/html-formats\/([^)#]+\.md)\)/g),
+  ].map((m) => m[1]);
+  assert.deepEqual([...new Set(linked)].sort(), profiles().sort());
+});
+
 test("the pinned version matches the grammar reference and the repo devDependency", () => {
   const grammar = fs.readFileSync(GRAMMAR, "utf8");
   assert.match(
