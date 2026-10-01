@@ -301,6 +301,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Reviewer times in the pipeline record are measured, not recalled (obs #230).** The §Subagents
+  table in `develop-pipeline-autonomous-defaults.md` asked for `dispatched HH:MM → returned HH:MM`
+  without saying how to read them, and task.133's QA reports carried composed times hours off the
+  real ones. Every time in that record now comes from `date -u` read in a tool call, a duration from
+  the completion notice's `duration_ms`, or is written `(not measured)`; `killed at N minutes` is the
+  difference of two measured readings. `qa-task` and `qa-story` point their Review Methodology
+  section at the rule. (Parts 1–2 of obs #230 — gate `updated:` from the clock — shipped in task 135.)
+
 - **The QA skills' Step 3b temp file works more than once on macOS (obs #181).** `qa-task` and
   `qa-story` bound `DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)`. BSD `mktemp` randomises
   only a trailing run of X's, so it created that literal file once and failed on every later run,

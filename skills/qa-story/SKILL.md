@@ -330,6 +330,10 @@ This review focuses on:
 - Validating test coverage for bug fixes
 ```
 
+**A reviewer time written here is measured, not recalled** — dispatch and return from `date -u`, a
+duration from the completion notice's `duration_ms`, or `(not measured)`. The rule:
+[`references/develop-pipeline-autonomous-defaults.md`](references/develop-pipeline-autonomous-defaults.md#subagents--unavailable-failed-slow) §Subagents (obs #230).
+
 **And record the scope decision as one line in Review Methodology**, per
 [`references/qa-re-review-scope.md`](references/qa-re-review-scope.md):
 
