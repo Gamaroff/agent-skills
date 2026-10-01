@@ -60,6 +60,11 @@ All notable changes to this project will be documented in this file. Format foll
     duplicated row, or a key under `ci` other than `docsOnly`, is exit 2 instead of a silently ignored
     opt-out); and the git mode check and the read are anchored to the same place, so
     `--workspace-root <subdirectory>` still sees a root opt-out.
+  - QA cycle 6 corrected the row-count check cycle 5 added: it counted the whole file and over-counted every
+    list-of-maps element, so a valid `skills-config.yaml` holding `developBatch.resources` or
+    `retrospective.identities` was refused with exit 2 (the rule failed closed, but was lost for those
+    consumers), and one over-count could hide a dropped row elsewhere. The check now covers the `ci` block
+    only, whose rows count exactly; a document marker with a trailing comment is a marker.
 
 - **`/wireloom`: UI wireframes as text, rendered to SVG.** Adapted from
   [StardockCorp/Wireloom](https://github.com/StardockCorp/Wireloom) (MIT, © Brad Wardell). The

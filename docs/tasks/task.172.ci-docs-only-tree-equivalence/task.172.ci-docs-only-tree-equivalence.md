@@ -438,21 +438,21 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-01
-**Quality Score**: 70/100
+**Quality Score**: 75/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.172.qa.5.ci-docs-only-tree-equivalence.md](./task.172.qa.5.ci-docs-only-tree-equivalence.md)
-- **Gate File**: [task.172.gate.5.ci-docs-only-tree-equivalence.yml](./task.172.gate.5.ci-docs-only-tree-equivalence.yml)
+- **Full Report**: [task.172.qa.6.ci-docs-only-tree-equivalence.md](./task.172.qa.6.ci-docs-only-tree-equivalence.md)
+- **Gate File**: [task.172.gate.6.ci-docs-only-tree-equivalence.yml](./task.172.gate.6.ci-docs-only-tree-equivalence.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 87 engine tests (plus the fast gate: 4,901 of 4,903) across 11 affected files
+- **Tests Executed**: 90 engine tests, also under `TMPDIR=/tmp` (plus the cycle 5 fast gate: 4,903 of 4,906, load-sensitive file-time budgets)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 3 MEDIUM, 1 LOW
+- **Critical Issues**: 0 HIGH, 2 MEDIUM, 2 LOW
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 4's fixes are verified. No HIGH is open. Three reproduced MEDIUM findings remain, all in how the configuration is read: a leading BOM defeats the parse when anything precedes `ci`, rows the parse does not consume are dropped silently, and the new mode check is anchored to the working directory while the read is anchored to the repository root.
+Cycle 5's three fixes are verified and mutation-proven. No HIGH is open. Two reproduced MEDIUM findings remain, both in the completeness check that fix added: its row count over-counts every list-of-maps element, so a valid documented `skills-config.yaml` (`developBatch.resources`, `retrospective.identities`) is refused with exit 2 (fails closed, and a regression against the cycle 4 engine), and the same over-count lets a dropped row pass when it offsets one.
 
 <!-- change-log-start -->
 
@@ -473,6 +473,8 @@ Cycle 4's fixes are verified. No HIGH is open. Three reproduced MEDIUM findings 
 | 2026-10-01 |  | QA gate CONCERNS (75/100) — 2 findings | qa-task |
 | 2026-10-01 |  | QA findings fixed — 2 findings (2 MEDIUM) plus 1 advisory, 1 iteration | qa-fix |
 | 2026-10-01 |  | QA gate CONCERNS (70/100) — 3 findings | qa-task |
+| 2026-10-01 |  | QA gate CONCERNS (75/100) — 2 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 2 findings (2 MEDIUM) plus 3 advisory, 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

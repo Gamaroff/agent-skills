@@ -2642,3 +2642,107 @@ test("CR5-3: the mode check and the read are anchored to the same place — --wo
     cleanup(dir);
   }
 });
+
+// ── QA cycle 6: CR6-1, CR6-2, CR6-3 ──────────────────────────────────────
+
+// The two documented shapes in docs/reference/configuration.md that hold a list of maps, verbatim.
+const DEVELOP_BATCH_RESOURCES = `developBatch: # optional — develop-batch parallel fan-out
+  maxParallel: 4
+  resources: # optional — named execution resources
+    - name: local
+      capacity: 1
+      testCommand: "npm test"
+    - name: build-box
+      capacity: 3
+      testCommand: "ssh build-box make test"
+      probe: # optional capacity probe
+        command: "curl -fsS --max-time 5 $PROBE_URL/health"
+        intervalSec: 60
+        timeoutSec: 10
+`;
+const RETRO_IDENTITIES = `retrospective:
+  location: docs/development/sprints
+  identities: # optional — enables per-person commit figures
+    - jira: Ada Lovelace # Jira display name
+      git: ada@example.com # git author email
+`;
+
+test("CR6-1: a list of maps elsewhere in the file does not make the engine refuse it", async () => {
+  for (const [name, section] of [
+    ["developBatch.resources", DEVELOP_BATCH_RESOURCES],
+    ["retrospective.identities", RETRO_IDENTITIES],
+    ["the minimum list of maps", "x:\n  - name: a\n    capacity: 1\n"],
+  ]) {
+    // no ci block: not configured, the defaults
+    assert.equal(eng.parseConfig(section).enabled, true, `${name}, no ci`);
+    // an opt-out before and after the section is read, not dropped
+    assert.equal(
+      eng.parseConfig(`${OPT_OUT}${section}`).enabled,
+      false,
+      `${name}, ci first`,
+    );
+    assert.equal(
+      eng.parseConfig(`${section}${OPT_OUT}`).enabled,
+      false,
+      `${name}, ci last`,
+    );
+  }
+  // through git: the engine answers on the opt-out instead of exiting 2 on the configuration
+  const dir = mkRepo({ config: `${DEVELOP_BATCH_RESOURCES}${OPT_OUT}` });
+  try {
+    const green = commit(dir, { "src/a.ts": "1\n" }, "code");
+    commit(dir, { "README.md": "r\n" }, "docs");
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: GREEN } }),
+    });
+    assert.equal(JSON.parse(r.stdout).reason, "disabled");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR6-2: a row the parse dropped is refused whatever else the file holds — no miscount elsewhere can offset it", () => {
+  const dup = (a, b) =>
+    `ci:\n  docsOnly:\n    enabled: ${a}\n    enabled: ${b}\n`;
+  // exactly ONE map element: the over-count the old check made is then exactly the one row a
+  // duplicate drops, which is the offset (two elements would not cancel)
+  const section = RETRO_IDENTITIES;
+  for (const [name, text] of [
+    [
+      "duplicate (true, false), list of maps before ci",
+      section + dup(true, false),
+    ],
+    [
+      "duplicate (false, true), list of maps before ci",
+      section + dup(false, true),
+    ],
+    [
+      "duplicate (true, false), list of maps after ci",
+      dup(true, false) + section,
+    ],
+    [
+      "duplicate (false, true), list of maps after ci",
+      dup(false, true) + section,
+    ],
+    [
+      "a first row indented deeper than ci, with a list of maps after it",
+      `  other: 1\n${OPT_OUT}${section}`,
+    ],
+  ]) {
+    assert.throws(
+      () => eng.parseConfig(text),
+      /under ci but the parse accounts for/,
+      name,
+    );
+  }
+});
+
+test("CR6-3: a document marker with a trailing comment is a marker, not a row the parse never reads", () => {
+  assert.equal(
+    eng.parseConfig(`--- # owner config\n${OPT_OUT}`).enabled,
+    false,
+  );
+  assert.equal(eng.parseConfig(`${OPT_OUT}... # end\n`).enabled, false);
+  // and a file of nothing but such a marker is "not configured", not "content that is no mapping"
+  assert.equal(eng.parseConfig("--- # nothing here\n").enabled, true);
+});

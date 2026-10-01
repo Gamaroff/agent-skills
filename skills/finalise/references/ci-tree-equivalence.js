@@ -31,8 +31,8 @@
  *   1  every other answer: not-applicable, disabled, code-changed, no-green-ancestor,
  *      unverifiable, check-failed (and an unexpected throw, reported as unverifiable)
  *   2  usage error — including a malformed ci.docsOnly block, a configuration that has content but
- *      is no mapping, a row of it the parse does not account for (mis-indented or duplicated), a key
- *      under ci other than docsOnly, and a skills-config.yaml that is not a regular file (a symlink):
+ *      is no mapping, a row of its ci block the parse does not account for (mis-indented or duplicated), a
+ *      key under ci other than docsOnly, and a skills-config.yaml that is not a regular file (a symlink):
  *      none of them falls back silently to the defaults
  *
  * `code-changed` is FINAL for a pinned head: it is reported only when no nearer ancestor was walked
@@ -340,25 +340,50 @@ function defaultConfig() {
   };
 }
 
-/** The lines that carry content: not blank, not a comment, not a document marker. */
+/**
+ * The lines that carry content: not blank, not a comment, not a document marker. A trailing comment
+ * is stripped before the test, as the YAML subset does, so `--- # note` is a marker and not a row
+ * the parse never consumes (CR6-3).
+ */
 function significantLines(text) {
   return String(text)
     .split(/\r?\n/)
     .filter((l) => {
-      const t = l.trim();
-      return t !== "" && !t.startsWith("#") && t !== "---" && t !== "...";
+      const t = l.replace(/(^|\s)#.*$/, "").trim();
+      return t !== "" && t !== "---" && t !== "...";
     });
 }
 
 /**
- * How many rows a parsed value accounts for: one per key, one per list element, recursively. The
- * YAML subset ends a block at a dedent without an error, so a row it never reached is simply absent
- * from the result; comparing this count with the significant lines is what notices (CR5-2).
+ * How many source rows belong to a top-level `ci:` key: the `ci:` row itself and every row up to the
+ * next row at column 0. Read from the text, not from the parse, so a row the parse dropped still
+ * counts. Only this block is held to account (CR6-1): it is the only part of the file this engine
+ * reads, and it holds nothing but mappings and lists of scalars, whose rows count exactly. Rows of
+ * other sections are other skills' business, in whatever shape the YAML subset supports (a list of
+ * maps, for one), and an engine that refused the file for them would lose the rule for a valid
+ * configuration.
+ */
+function ciBlockRows(text) {
+  let n = 0;
+  let inCi = false;
+  for (const l of significantLines(text)) {
+    if (/^\S/.test(l)) inCi = /^ci\s*:/.test(l);
+    if (inCi) n++;
+  }
+  return n;
+}
+
+/**
+ * How many source rows a parsed value accounts for: one per key, one per scalar list element,
+ * recursively. A list element that is a map shares its row with its first key (`- name: x`), so it
+ * adds its keys and nothing for the dash (CR6-1). The YAML subset ends a block at a dedent without an
+ * error, so a row it never reached is simply absent from the result; comparing this count with the
+ * source rows is what notices (CR5-2).
  */
 function consumedRows(v) {
   if (Array.isArray(v)) {
     return v.reduce(
-      (n, e) => n + 1 + (e && typeof e === "object" ? consumedRows(e) : 0),
+      (n, e) => n + (e && typeof e === "object" ? consumedRows(e) : 1),
       0,
     );
   }
@@ -398,14 +423,20 @@ function parseConfig(rawText) {
   // The specific diagnostics (a block scalar, an unknown key) are produced first so they name the
   // cause; the completeness check below is the net under all of them.
   const cfg = interpretConfig(parsed);
-  // The parse must account for EVERY significant row, or the file is refused. The subset ends a block
-  // at a dedent without an error, and a duplicate key collapses into one, so a row can vanish from the
-  // result with nothing said: an opt-out indented one level too deep or too shallow was ignored one
-  // spelling at a time across five QA cycles (CR5-2). This is the one check for that whole class.
-  const consumed = consumedRows(parsed);
-  if (consumed !== rows.length) {
+  // The parse must account for EVERY row of the `ci` block, or the file is refused. The subset ends a
+  // block at a dedent without an error, and a duplicate key collapses into one, so a row can vanish
+  // from the result with nothing said: an opt-out indented one level too deep or too shallow was
+  // ignored one spelling at a time across five QA cycles (CR5-2). This is the one check for that
+  // whole class, and it covers the `ci` block only: counted over the whole file it refused a valid
+  // configuration that holds a list of maps elsewhere, and one miscount there offset a dropped row
+  // here (CR6-1, CR6-2).
+  const ciRows = ciBlockRows(text);
+  const consumed = Object.prototype.hasOwnProperty.call(parsed, "ci")
+    ? 1 + consumedRows(parsed.ci)
+    : 0;
+  if (consumed !== ciRows) {
     throw new UsageError(
-      `${CONFIG_BASENAME} has ${rows.length} content row(s) but the parse accounts for ${consumed}: a row is mis-indented, duplicated or in a form the YAML subset does not read; the rule will not guess which`,
+      `${CONFIG_BASENAME} has ${ciRows} row(s) under ci but the parse accounts for ${consumed}: a row is mis-indented, duplicated or in a form the YAML subset does not read; the rule will not guess which`,
     );
   }
   return cfg;
