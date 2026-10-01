@@ -878,11 +878,47 @@ for attempt in 1 2 3 4 5; do
 done
 ```
 
+**A docs-only tail is not a reason to wait again (task.172).** If `CI_ROLLUP` is still `PENDING` or
+`NONE` once the re-sample loop has run, ask the tree-equivalence engine whether every file changed
+since a green first-parent ancestor is documentation. It exits **0 for `tree-equivalent` and for
+nothing else** — every other answer, including a failed read, exits 1 — so this `if` cannot round a
+"no" up to green:
+
+```bash
+# INPUTS, re-bound in THIS block (a fresh shell has none): the rollup read above and the PR number.
+# Unbound, the rule would be skipped silently and the wait would run as if it did not exist.
+: "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}" "${PR_NUMBER:?bind PR_NUMBER}"
+CI_TREE_EQ=""
+case "$CI_ROLLUP" in
+  PENDING|NONE)
+    if TE=$(command node .agents/skills/finalise/references/ci-tree-equivalence.js \
+              --head-rollup "$CI_ROLLUP" --head "$(git rev-parse HEAD)" --pr "$PR_NUMBER" --json); then
+      CI_TREE_EQ=$(printf '%s' "$TE" | jq -r '.greenSha[0:12] // empty')
+      [ -n "$CI_TREE_EQ" ] && CI_ROLLUP=SUCCESS    # an empty sha stays PENDING: fail closed
+    fi ;;
+esac
+```
+
+The engine decides on four things and this step re-derives none of them: the head's rollup is
+`PENDING`/`NONE`; a first-parent ancestor has a green rollup **of its own checks**; every file changed
+since it matches `ci.docsOnly.patterns` (default `**/*.md`, `docs/**`), with a change to `skills-config.yaml`
+or to a submodule pointer never counting as docs; and `ci.docsOnly.checkCommand`, when configured, passes
+(bounded by `ci.docsOnly.checkTimeoutSeconds`). Four things make it stricter than this head reduction, on
+purpose: an ancestor with **any** skipped or neutral check is `NONE`, not green (a paths-filter job can
+succeed while its tests are skipped); an ancestor must have **settled**, its newest check at least
+`ci.docsOnly.settleSeconds` old (a push registers its fast lanes first, so a green read in the first minutes
+can be a partial rollup); a nearer docs-only ancestor that is **red** stops the walk instead of being walked
+past; and `--head` must be the checked-out `HEAD`, because the local check runs in the working tree. The
+configuration itself is read from the commit judged, never the working tree, and a malformed one is a usage
+error (exit 2), not the defaults. `FAILURE`, `CANCELLED` and `UNKNOWN` heads never reach it. Switch the rule off
+with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../docs/reference/configuration.md)).
+**A `SUCCESS` reached this way is never recorded as plain `SUCCESS`** — see the table.
+
 | `CI_ROLLUP` | Decision                                                                                                                                                                                                                                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SUCCESS`   | Proceed — CI column passes                                                                                                                                                                                                                                                                              |
+| `SUCCESS`   | Proceed — CI column passes. When `CI_TREE_EQ` is set the head's own CI has **not** finished and the reading is satisfied by the docs-only rule above: record `CI reading 1: SUCCESS (tree-equivalent to {CI_TREE_EQ}) @ {CI_HEAD_1}`, never plain `SUCCESS`                                                                                                                                                                                                                                                                              |
 | `FAILURE`   | **Do NOT accept.** Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code." **One exception, and it is narrow:** a red on the docs link checker alone, reproduced by `doc-links.js` on the work item's own document and/or its co-located `.md` pipeline artifacts and nowhere else, is a Docs-section finding that Step 8a may fix and recheck once — see the clause under *When this step applies* there. Every other red is this row. |
-| `PENDING`   | **Do NOT accept.** Gap: "CI has not finished. Re-run `/finalise` once it completes." **Waiting is the correct action; assuming is not.**                                                                                                                                                                |
+| `PENDING`   | **Do NOT accept** — unless the tree-equivalence arm above returned `tree-equivalent` (then it is the `SUCCESS` row). Gap: "CI has not finished. Re-run `/finalise` once it completes." **Waiting is the correct action; assuming is not.**                                                                                                                                                                |
 | `CANCELLED` | **Undecided, not failed.** Almost always `cancel-in-progress` superseding a run. Re-sample; if it persists after the retries, check whether a newer commit has its own run and resolve against **that** head. Never record it as a red verdict.                                                         |
 | `NONE`      | **Undecided.** Re-sample first — an empty rollup is the normal state for the seconds between a push and its run registering. Only if it persists does it mean no checks are configured, and then record it explicitly in the DoD summary as _unverified by CI_ rather than treating absence as success. |
 | `UNKNOWN`   | Query failed. Treat as `PENDING` — never as success.                                                                                                                                                                                                                                                    |
@@ -894,8 +930,12 @@ done
 
 > **The failure mode this exists to stop** is a _pending_ rollup being read as "nothing wrong yet"
 > and rounded up to acceptance. `PENDING` and `FAILURE` are both non-acceptance; only `SUCCESS`
-> passes. If the rollup is green but the newest commit is docs-only on top of untested code, say so
-> in the DoD summary — a green on an ancestor commit is evidence about that commit, not this one.
+> passes. A green on an ancestor commit is evidence about that commit, not this one — except under
+> the one rule above: when every file changed since it is documentation, the engine says so and the
+> record reads `SUCCESS (tree-equivalent to {sha})`, which names the commit CI actually verified.
+> Outside that rule (a code path in the delta, an ancestor whose checks cannot be read, no green
+> ancestor) the head is still `PENDING`, and "docs-only on top of untested code" is said in the DoD
+> summary rather than rounded up.
 
 > **Verify the query, not just the table.** The first version of this gate had the table above
 > exactly right and still accepted on pending CI, because the _query_ silently never produced
@@ -910,7 +950,7 @@ done
 **Actions:**
 
 1. **Use the aggregated results** from Step 3c (`AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`) — do not re-read the running summary file for this step
-2. **Resolve `CI_ROLLUP`** using the command above, and record the raw per-job conclusions in the DoD running summary so the decision is auditable. **Record the head it was read on** in the same line — `CI_HEAD_1=$(git rev-parse HEAD)` — as `CI reading 1: {CI_ROLLUP} @ {CI_HEAD_1}`. This is the reading that gates the *decision*; it is structurally an ancestor of the commit that will carry the acceptance, and Step 7's publish boundary takes a second reading on that commit before anything leaves the repo (task.115, obs #40).
+2. **Resolve `CI_ROLLUP`** using the command above, and record the raw per-job conclusions in the DoD running summary so the decision is auditable. **Record the head it was read on** in the same line — `CI_HEAD_1=$(git rev-parse HEAD)` — as `CI reading 1: {CI_ROLLUP} @ {CI_HEAD_1}` — or, when the docs-only arm resolved it, `CI reading 1: SUCCESS (tree-equivalent to {CI_TREE_EQ}) @ {CI_HEAD_1}`. This is the reading that gates the *decision*; it is structurally an ancestor of the commit that will carry the acceptance, and Step 7's publish boundary takes a second reading on that commit before anything leaves the repo (task.115, obs #40).
 3. **Determine pass/fail** for each decision matrix column using the mapping above
 4. **Write the acceptance decision to the running summary:**
 
@@ -1006,7 +1046,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    **Final Status:** ✅ ACCEPTED
    **Completion Time:** {current-date-time}
    **Total Duration:** {duration}
-   **CI reading 1:** {CI_ROLLUP} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)
+   **CI reading 1:** {CI_ROLLUP}{ (tree-equivalent to `CI_TREE_EQ`) — only when the docs-only rule resolved it} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)
    **CI reading 2:** taken on the acceptance commit after this file is committed and pushed; recorded on the PR canonical summary comment and in the implementation report (Step 7 publish boundary)
 
    **Artifacts Generated:**
@@ -1412,9 +1452,15 @@ standalone.
    # bash swallows the nohup line below into the script, so the poll never starts.
    cat > "$POLL" <<'POLLEOF'
 #!/usr/bin/env bash
-# usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE> [EXPECTED_CHECKS]
-# Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <CHECKS> <WAITED>s".
-PR_NUMBER=${1}; EXPECTED_HEAD=${2}; MAX_WAIT=${3}; RESULT=${4}; EXPECTED_CHECKS=${5:-0}
+# usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE> [EXPECTED_CHECKS] [ENGINE]
+# Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <CHECKS> <WAITED>s TREE_EQ=<sha12 or empty>".
+# ENGINE is the path of ci-tree-equivalence.js; absent means the docs-only rule is off for this poll.
+PR_NUMBER=${1}; EXPECTED_HEAD=${2}; MAX_WAIT=${3}; RESULT=${4}; EXPECTED_CHECKS=${5:-0}; ENGINE=${6:-}
+TREE_EQ=""; TE_LATCHED=0
+# The docs-only arm parses the engine's JSON with jq. Without jq nothing could ever be latched and a
+# configured checkCommand would be re-run every 30 s for the whole wait, so the rule is OFF here and the
+# poll waits as before (QA cycle 3, review CR-10).
+command -v jq >/dev/null 2>&1 || { [ -z "$ENGINE" ] || echo "ci-tree-equivalence off: jq not found" >&2; ENGINE=""; }
 rollup() { : ...the Step 6 rollup query for this platform, verbatim — copy it, do not re-derive it...; }
 # The head CI was actually sampled on — read from the PR, never echoed back from the argument.
 # GitHub form shown; Bitbucket: the PR's .source.commit.hash. "unknown" on failure makes the
@@ -1433,12 +1479,35 @@ STATE=$(rollup); CHECKS=$(checks)
 #   (3) the check count is at least reading 1's count and unchanged since the previous sample —
 #       a rollup that is still growing is not decided, whatever its state says.
 # FAILURE is terminal under (1) and (2) only: a red on a partial rollup is still a red.
+# A PENDING/NONE head may also conclude as SUCCESS when the docs-only rule (task.172) holds —
+# still under (1) and (2), so it is never taken on a stale or foreign head. The engine exits 0 for
+# tree-equivalent and for nothing else. Once it has answered code-changed, check-failed or disabled
+# the answer cannot change (the head is pinned), so it is latched and not re-run every 30 s — a
+# configured checkCommand is a full local suite. code-changed is only ever reported when no nearer
+# ancestor was left undecided, so it IS final; behind an undecided ancestor the engine says
+# no-green-ancestor instead (a CANCELLED ancestor counts as undecided and is re-asked too: that
+# costs polling, never a wrong answer). no-green-ancestor / unverifiable can change (an ancestor's
+# run may finish), so those are asked again.
+tree_equivalent() {
+  [ -n "$ENGINE" ] && [ "$TE_LATCHED" -eq 0 ] || return 1
+  local out sha
+  if out=$(command node "$ENGINE" --head-rollup "$STATE" --head "$EXPECTED_HEAD" --pr "$PR_NUMBER" --json 2>/dev/null); then
+    sha=$(printf '%s' "$out" | jq -r '.greenSha[0:12] // empty')
+    [ -n "$sha" ] || return 1
+    TREE_EQ=$sha; return 0
+  fi
+  case "$(printf '%s' "$out" | jq -r '.reason // empty' 2>/dev/null)" in
+    code-changed|check-failed|disabled) TE_LATCHED=1 ;;
+  esac
+  return 1
+}
 decided() {
   [ "$WAITED" -gt 0 ] || return 1
   [ "$(sampled_head | cut -c1-12)" = "$(printf '%s' "$EXPECTED_HEAD" | cut -c1-12)" ] || return 1
   case "$STATE" in
     FAILURE) return 0 ;;
     SUCCESS) [ "$CHECKS" -ge "$EXPECTED_CHECKS" ] && [ "$CHECKS" -eq "$PREV_CHECKS" ] ;;
+    PENDING|NONE) if tree_equivalent; then STATE=SUCCESS; return 0; fi; return 1 ;;
     *) return 1 ;;
   esac
 }
@@ -1446,10 +1515,11 @@ while [ "$WAITED" -lt "$MAX_WAIT" ]; do
   decided && break
   sleep 30; WAITED=$((WAITED + 30)); PREV_CHECKS=$CHECKS; STATE=$(rollup); CHECKS=$(checks)
 done
-printf '%s %s %s %ss\n' "$STATE" "$(sampled_head)" "$CHECKS" "$WAITED" > "$RESULT"
+printf '%s %s %s %ss TREE_EQ=%s\n' "$STATE" "$(sampled_head)" "$CHECKS" "$WAITED" "$TREE_EQ" > "$RESULT"
 POLLEOF
    # CI_CHECKS_1 is the check count reading 1 was green over (Step 6 records it beside CI_ROLLUP).
    nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" "${FINALISE_CI_MAX_WAIT:-1500}" "$RESULT" "${CI_CHECKS_1:-0}" \
+     .agents/skills/finalise/references/ci-tree-equivalence.js \
      > .claude/state/finalise-ci-poll.log 2>&1 &
    echo $! > "$PIDFILE"
    echo "CI poll backgrounded (pid $(cat "$PIDFILE")) — read $RESULT on a later turn; absent means still polling"
@@ -1473,7 +1543,10 @@ POLLEOF
        echo "HALT: the CI poll is not running and wrote no result — see .claude/state/finalise-ci-poll.log"; exit 1
      fi
    else
-     read -r CI_ROLLUP_2 CI_HEAD_READ CI_CHECKS_2 WAITED < "$RESULT"
+     # Five names, not four: with four, `read` binds the rest of the line to the last name and
+     # WAITED becomes "60s TREE_EQ=…" (measured, task.172).
+     read -r CI_ROLLUP_2 CI_HEAD_READ CI_CHECKS_2 WAITED CI_TREE_EQ_FIELD < "$RESULT"
+     CI_TREE_EQ_2=${CI_TREE_EQ_FIELD#TREE_EQ=}
      # The wait is over — clear the mark before anything below can HALT (task.124).
      bash .agents/skills/finalise/references/set-waiting-on.sh --clear
      # CI_HEAD_READ is the head the poll SAMPLED from the PR, so this catches a push that landed
@@ -1483,13 +1556,13 @@ POLLEOF
      # Record what the reading was green OVER — a SUCCESS across 3 checks on a repo whose previous
      # head decided 9 is a partial rollup, and the poll's stop condition refuses it; say so here
      # too, so a reader of the log can see the count without re-deriving it.
-     echo "CI reading 2: $CI_ROLLUP_2 @ ${CI_HEAD_2:0:12} over $CI_CHECKS_2 checks after $WAITED"
+     echo "CI reading 2: $CI_ROLLUP_2${CI_TREE_EQ_2:+ (tree-equivalent to $CI_TREE_EQ_2)} @ ${CI_HEAD_2:0:12} over $CI_CHECKS_2 checks after $WAITED"
    fi
    ```
 
    | `CI_ROLLUP_2`                              | Action                                                                                                                                                                  |
    | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-   | `SUCCESS`                                  | Proceed to action 7. Record `CI reading 2: SUCCESS @ {CI_HEAD_2}`                                                                                                        |
+   | `SUCCESS`                                  | Proceed to action 7. Record `CI reading 2: SUCCESS @ {CI_HEAD_2}` — or, when `CI_TREE_EQ_2` is set, `CI reading 2: SUCCESS (tree-equivalent to {CI_TREE_EQ_2}) @ {CI_HEAD_2}`, never plain `SUCCESS`: the acceptance commit's own CI did not finish and the docs-only rule satisfied the reading |
    | `FAILURE`                                  | **HALT `ci-not-green-on-acceptance-head`.** The acceptance commit is pushed and `status: accepted` is on the branch — do **not** revert it; report the failing job(s) and stop before any side-effect. The human decides whether the red is the docs commit or the code |
    | `PENDING` / `NONE` / `CANCELLED` / `UNKNOWN` past `MAX_WAIT` | **HALT `ci-not-green-on-acceptance-head`** with the last sampled state. Waiting past the bound is a judgement for a human; assuming green is not a judgement at all |
 
@@ -1505,8 +1578,10 @@ POLLEOF
    > verified commit — on the PR canonical comment (action 7) and in the implementation report —
    > and the DoD summary carries reading 1 with a pointer. The orchestrator's Step 8 commit
    > (implementation report only, docs-only) is the residue this leaves unverified by a second
-   > reading; `develop-next` Step 3 re-verifies the final head (head-SHA equality, CI rollup, local
-   > `npm run ci`) before any merge it performs.
+   > reading. It is covered by the same docs-only rule at the merge step: `develop-next` Step 3
+   > re-verifies the final head (head-SHA equality, CI rollup, local `npm run ci`) before any merge
+   > it performs, and a `PENDING` head there is satisfied only by `tree-equivalent`, which names the
+   > green commit it rests on.
 
    Reading 2 cannot be written into the running summary without a further commit, so it is
    recorded in the implementation report's Decisions Log (`CI reading 1: … @ …; CI reading 2: … @
@@ -1704,6 +1779,18 @@ POLLEOF
    # comment uses; one vocabulary, not a second one for pull requests.
    LEAD=$(node references/stakeholder-summary-cli.js --stage done) || exit 1
 
+   # CI_TREE_EQ (reading 1, Step 6) and CI_TREE_EQ_2 (reading 2, 6c) are INPUTS to this block, bound
+   # by the agent from the readings it recorded, exactly like CI_ROLLUP and CI_ROLLUP_2 above: this
+   # block is its own shell and computes neither. Both are EMPTY when the reading waited for the
+   # head's own CI, and a non-empty one is why the record below says "tree-equivalent to <sha>"
+   # rather than plain SUCCESS (task.172 QA cycle 1, CR-3). A SUCCESS that the docs-only rule
+   # satisfied and that is written here without its sha is the record this rule exists to prevent,
+   # so an UNSET one aborts the block (`${VAR?}` fails on unset and accepts empty): bind it, empty
+   # when the reading waited, rather than let an unbound variable write plain SUCCESS (CR2-8).
+   # (No apostrophe inside the ${VAR?word} text: bash 3.2, the macOS default, mis-parses one.)
+   : "${CI_TREE_EQ?bind CI_TREE_EQ, empty when reading 1 waited for the head CI}" \
+     "${CI_TREE_EQ_2?bind CI_TREE_EQ_2, empty when reading 2 waited for the head CI}"
+
    BODY="$MARKER
    $LEAD
 
@@ -1715,8 +1802,8 @@ POLLEOF
    **Final Gate**: ${FINAL_GATE}
    **Accepted**: $(date +%Y-%m-%d)
    **DoD Summary**: \`${DOD_PATH}\`
-   **CI reading 1**: ${CI_ROLLUP} @ \`${CI_HEAD_1:0:12}\` (acceptance decision)
-   **CI reading 2**: ${CI_ROLLUP_2} @ \`${CI_HEAD_2:0:12}\` (${HEAD_DESC})
+   **CI reading 1**: ${CI_ROLLUP}${CI_TREE_EQ:+ (tree-equivalent to ${CI_TREE_EQ})} @ \`${CI_HEAD_1:0:12}\` (acceptance decision)
+   **CI reading 2**: ${CI_ROLLUP_2}${CI_TREE_EQ_2:+ (tree-equivalent to ${CI_TREE_EQ_2})} @ \`${CI_HEAD_2:0:12}\` (${HEAD_DESC})
    $([ "$CYCLES" -gt 0 ] && echo "**QA Cycles**: ${CYCLES}" || true)
 
    ${CLOSING_LINE}"

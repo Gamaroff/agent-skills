@@ -1,0 +1,24 @@
+{
+  "sink": "path",
+  "entry": "shared/resources/ci-tree-equivalence.js#isDocsPath",
+  "name": "isDocsPath-default-patterns",
+  "call_site": null,
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 23,
+  "passed": 22,
+  "reproduced": 1,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    [
+      "**/*.md",
+      "docs/**"
+    ]
+  ],
+  "ran_at": "2026-10-01T14:23:20.233Z"
+}

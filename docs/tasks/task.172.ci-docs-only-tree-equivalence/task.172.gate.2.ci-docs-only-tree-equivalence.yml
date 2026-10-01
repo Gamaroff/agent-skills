@@ -1,0 +1,107 @@
+schema: 2
+task: 'task.172.ci-docs-only-tree-equivalence'
+task_title: 'One docs-only CI rule at every pipeline CI wait'
+gate: FAIL
+status_reason: 'Cycle 2 refute pass and safety re-probe: two HIGH ways around the fail-closed property (a red docs ancestor is walked past; an ancestor with a paths-filter success plus skipped jobs reads green) and six MEDIUM gaps. Cycle 1 fixes verified.'
+reviewer: 'QA Engineer'
+head: '60d81fd3c22054544f8c45d955609b6a876e86bc'
+updated: '2026-10-01T10:12:58Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: high
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'A nearer red docs-only ancestor is walked past and an older green ancestor greens the head. A nearer ancestor that is FAILURE, with a docs-only delta to the head, is skipped and an older green ancestor makes the head tree-equivalent. Reproduced: code c1, code c2 (green), docs c3 (failing check), docs head c4 gives exit 0 tree-equivalent to c2. The red docs state is inherited by the head. Bug: task.172.bug.4.red-docs-ancestor-skipped.md'
+    suggested_action: 'Stop the walk with a non-green answer when an ancestor whose delta to the head is docs-only reads FAILURE. CANCELLED stays walkable (cancel-in-progress supersedes runs on every push).'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-2'
+    severity: high
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'An ancestor with one success and skipped jobs reads green (paths-filter shape). Cycle 1 fixed only the all-skipped case. An ancestor with a success check (a paths-filter "changes" job) plus skipped test jobs reduces to SUCCESS. Reproduced: [success, skipped] gives exit 0 tree-equivalent. A docs-only ancestor sitting on unverified code launders the head. Bug: task.172.bug.5.success-plus-skipped-ancestor-green.md'
+    suggested_action: 'An ancestor with any skipped or neutral check is not green evidence on its own; the walk continues to an older ancestor whose checks all succeeded. State the rule in configuration.md.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-3'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'checkCommand and the config run in the working tree, not at the head judged. With --head set to a commit other than the checked-out HEAD the engine still reads the working-tree config and runs checkCommand there. Reproduced: --head c2 while HEAD is c3 returns tree-equivalent, exit 0, and the check ran against c3. The 6c poll runs across turns and passes --head $EXPECTED_HEAD. Bug: task.172.bug.6.check-and-config-run-at-working-tree.md'
+    suggested_action: 'Return unverifiable when the resolved --head is not the checked-out HEAD of the workspace root.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-4'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Unknown or misspelled keys under ci.docsOnly are silently ignored. The readConfig docstring forbids silent fallback, but a misspelled key is one. Reproduced: `checkcommand: "false"` gives exit 0 with checkExit null, dropping the safety net this repository relies on. Bug: task.172.bug.7.unknown-config-keys-ignored.md'
+    suggested_action: 'Reject any key under ci.docsOnly that is not a known one with a usage error naming it.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-5'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'A submodule pointer under a docs pattern is classified as docs. A gitlink path under a docs pattern (docs/vendor) is docs by pattern but a pointer bump is code. Reproduced with a 160000 entry: tree-equivalent. diff.ignoreSubmodules=all would also hide it as an empty delta. Bug: task.172.bug.8.gitlink-under-docs-reads-docs.md'
+    suggested_action: 'Pass --ignore-submodules=none, and treat any path with mode 160000 as code.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-6'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'The combined-status read is not paginated. The check-runs read uses --paginate and the commit status read does not; GitHub returns 30 statuses per page, so a failing status beyond the 30th is dropped and an ancestor reads SUCCESS. Confirmed in the source (no --paginate on the /status call). Bug: task.172.bug.9.status-read-not-paginated.md'
+    suggested_action: 'Add --paginate to the status call.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-7'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'checkCommand has no timeout and stalls the 6c poll. spawnSync of checkCommand has no timeout and the 6c poll runs it inside decided(). A hung check stalls the poll past FINALISE_CI_MAX_WAIT and writes no result. Confirmed in the source. Bug: task.172.bug.10.check-command-has-no-timeout.md'
+    suggested_action: 'Add ci.docsOnly.checkTimeoutSeconds (default 1500) and map a timeout to check-failed.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-8'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The new prose blocks read variables bound in other blocks, silently. The arm blocks read CI_ROLLUP bound by the previous block, the Step 7 comment reads CI_TREE_EQ and CI_TREE_EQ_2 with no writer (unbound writes plain SUCCESS, the record the rule forbids), develop-next reads PR_HEAD from an earlier block, and an empty --head silently falls back to HEAD. Confirmed by reading. Bug: task.172.bug.11.unbound-inputs-in-the-new-prose-blocks.md'
+    suggested_action: 'Make each block fail loudly on an unbound input (${VAR?...} for the Step 7 comment, a guard in each arm), and reject an empty option value in the engine (usage error).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 57
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unscoped safety re-probe (SAFETY_REPROBE) by an independent reviewer, then QA reproduced CR2-1..CR2-5 with real git repos and an injected gh. No corpus sink models this predicate (cycle 1 ran security-probe on the path predicate: unverifiable), so the evidence is reasoned plus reproductions, not measured.'
+  performance:
+    status: PASS
+    notes: 'Bounded at 20 ancestors; no change this cycle.'
+  reliability:
+    status: CONCERNS
+    notes: 'checkCommand has no timeout (CR2-7); a status read can be truncated (CR2-6).'
+  maintainability:
+    status: PASS
+    notes: 'One engine, shared helpers.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1..CR2-8, each with a test that is red on revert.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'skills/finalise/SKILL.md', 'skills/develop-next/SKILL.md', 'skills/develop-batch/SKILL.md']
+  future:
+    - action: 'CR2-9 (low): resolve the repository root before reading the config.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

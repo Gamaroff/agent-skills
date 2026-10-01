@@ -412,7 +412,7 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      rather than re-deriving it:
 
      ```bash
-     gh pr view <PR#> --json statusCheckRollup \
+     CI_ROLLUP=$(gh pr view <PR#> --json statusCheckRollup \
        -q '[ .statusCheckRollup[]
              | (.status // "") as $st
              | (if   $st == ""          then (.state // "")
@@ -425,8 +425,45 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
              elif any(. == "PENDING" or . == "EXPECTED" or . == "QUEUED"
                       or . == "IN_PROGRESS" or . == "WAITING") then "PENDING"
              elif any(. == "CANCELLED") then "CANCELLED"
-             else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN"
+             else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN")
+     # Print it: the docs-only block below is a separate fenced block (its own shell) and re-binds this value.
+     echo "CI rollup: $CI_ROLLUP"
      ```
+
+     **A pending head over a docs-only tail is satisfied, not waited on (task.172).** If `CI_ROLLUP`
+     is `PENDING` or `NONE` (Bitbucket: an `INPROGRESS` or an empty status list), ask the
+     tree-equivalence engine **before** backgrounding any wait. It exits **0 for `tree-equivalent`
+     and for nothing else** — every other answer, including a failed read, exits 1:
+
+     ```bash
+     # INPUT, re-bound in THIS block (a fresh shell has none): the rollup read above. Run from the item's
+     # worktree: the engine judges the checked-out HEAD of its working directory and refuses any other.
+     : "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}"
+     CI_TREE_EQ=""
+     case "$CI_ROLLUP" in
+       PENDING|NONE)
+         if TE=$(command node .agents/skills/develop-batch/references/ci-tree-equivalence.js \
+                   --head-rollup "$CI_ROLLUP" --head "$(git rev-parse HEAD)" --pr <PR#> --json); then
+           CI_TREE_EQ=$(printf '%s' "$TE" | jq -r '.greenSha[0:12] // empty')
+           [ -n "$CI_TREE_EQ" ] && CI_ROLLUP=SUCCESS    # an empty sha stays PENDING: fail closed
+         fi ;;
+     esac
+     ```
+
+     When `CI_TREE_EQ` is set, the PR head's own CI has **not** finished and the reading is satisfied
+     because every file changed since a green first-parent ancestor is documentation (per
+     `ci.docsOnly.patterns`, and `ci.docsOnly.checkCommand` passed when one is configured). **Record it
+     as `CI: SUCCESS (tree-equivalent to {CI_TREE_EQ})` in the run report — never as plain `SUCCESS`**, so
+     the record names the commit CI actually verified. On any other answer the existing handling below
+     applies unchanged. `ci.docsOnly.enabled: false` restores a full wait
+     ([`docs/reference/configuration.md`](../../docs/reference/configuration.md)).
+
+     > **Why a rebased head rarely qualifies here.** From the second merge on, the item is rebased on the
+     > new base tip (step 1), and a rebased head has no CI run of its own. Its first-parent ancestors
+     > reach the base tip, so the diff to any green ancestor includes the item's own changes: an item
+     > that touches code is `code-changed` (or `no-green-ancestor`, when one of its own unrun commits
+     > stands between the head and the code) and waits exactly as before, which is correct, because its
+     > code did change. An item that is documentation only, rebased over a green tip, qualifies.
 
      If a genuine wait is needed, **background it** — a poll loop written to a file, checked on a
      later turn. Never a foreground call that can outlive the tool timeout.

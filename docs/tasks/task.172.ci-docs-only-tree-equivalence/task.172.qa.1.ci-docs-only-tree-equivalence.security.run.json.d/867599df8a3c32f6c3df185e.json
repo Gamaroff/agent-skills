@@ -1,0 +1,23 @@
+{
+  "sink": "filename",
+  "entry": "shared/resources/glob-match.js#matchesAnyGlob",
+  "name": "docs-path-predicate",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "rejects-every-input",
+  "executed": 14,
+  "passed": 9,
+  "reproduced": 0,
+  "overblocked": 5,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    [
+      "docs/**"
+    ]
+  ],
+  "ran_at": "2026-10-01T09:39:55.354Z"
+}
