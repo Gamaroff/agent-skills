@@ -6,6 +6,32 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/wireloom` turns an existing HTML screen into a wireframe (obs #245).** A new section, "Working
+  from an existing UI", covers the case where the source of truth is a page rather than a brief.
+  The agent transcribes the page and derives nothing. It drops decoration (`aria-hidden`, `alt=""`),
+  copies text verbatim, draws one state per block (a hidden sheet or tab pane gets its own block
+  over the full base screen), and captions the source file and viewport width.
+  - **Wireloom does not wrap text: the window grows to its widest line.** So copy is split at about
+    42 characters, and a carousel is drawn as its first card plus "1 of N". Otherwise a 393 px phone
+    screen renders as a desktop-width window.
+  - Format knowledge lives in one profile per format under `references/html-formats/`. The first is
+    `rbt-hifi.md`, for the Rebirth hi-fi phone screens. It has a class-to-primitive table for the
+    `s5-*` vocabulary, a pill-to-`status` mapping read from the theme's colours, a sprite-to-named-icon
+    map, and two worked examples, one of them with a sheet.
+  - Two new tests. Every profile's examples must parse. The profile table in `SKILL.md` and the
+    directory must list the same files, so a profile can't exist without being loaded, or be listed
+    without existing.
+  - **Every wireframe now ends up in a Markdown file.** A converted page gets
+    `<page>.wireframe.md` and `<page>.wireframe[.N].svg` beside it, made from
+    `assets/wireframe.template.md`. The document holds frontmatter (`type: wireframe`, `source`,
+    `source_sha256`, `profile`, `viewport`, `wireloom`), one section per state, and conversion notes:
+    what was dropped, the judgement calls, and anything the profile doesn't map yet. A brief with no
+    story or task to go in goes to `docs/wireframes/{slug}.wireframe.md`.
+  - New `wireloom.js status <page>` reports whether the page's document exists and was made from
+    the page as it is now. Its reasons are `new`, `fresh`, `stale` and `unrecorded`, all exit 0.
+    A re-run skips pages that are `fresh`. A document with no recorded hash is `unrecorded`, never
+    `fresh`, and only the frontmatter is read. It needs no renderer package.
+
 - **A docs-only tail no longer waits for a full CI run at the pipeline's four CI waits (task 172).**
   Behaviour change on upgrade, on by default: when a head's CI is still `PENDING` (or empty) and
   every file changed since a green first-parent ancestor is documentation, the reading is satisfied

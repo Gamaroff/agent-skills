@@ -1,6 +1,6 @@
 ---
 name: wireloom
-description: 'Author low-fidelity UI wireframes in the Wireloom DSL and render them to SVG. Use when the user asks to mock up, wireframe, sketch or draw the layout of a screen, dialog, settings page, form, dashboard, toolbar, split view or mobile list/detail flow, wants a low-fidelity or monochrome outline of a layout or a mobile prototype from a brief, asks "what would this look like?", or wants a mockup with callouts pointing at its parts. Also the wireframe step create-story and review-story call for UI stories. Writes a ```wireloom source block, checks it with the bundled renderer, and embeds a co-located SVG beside it so the picture shows on GitHub. Adapted from StardockCorp/Wireloom (MIT). Not for flowcharts, sequence, state or ER diagrams (mermaid-architect), or anything the user needs to click (write the real component).'
+description: 'Author low-fidelity UI wireframes in the Wireloom DSL and render them to SVG. Use when the user asks to mock up, wireframe, sketch or draw the layout of a screen, dialog, settings page, form, dashboard, toolbar, split view or mobile list/detail flow, wants a low-fidelity or monochrome outline of a layout or a mobile prototype from a brief, wants an existing HTML screen or hi-fi mockup turned into a wireframe, asks "what would this look like?", or wants a mockup with callouts pointing at its parts. Also the wireframe step create-story and review-story call for UI stories. Writes a ```wireloom source block, checks it with the bundled renderer, and embeds a co-located SVG beside it so the picture shows on GitHub. Adapted from StardockCorp/Wireloom (MIT). Not for flowcharts, sequence, state or ER diagrams (mermaid-architect), or anything the user needs to click (write the real component).'
 ---
 
 # Wireloom
@@ -48,6 +48,93 @@ user approves **before** any UI code is written, so it has to show their screen,
   touch target (at least 44 × 44 px) once built?
 - **Get the wireframe agreed before implementation.** When it goes into a story or task, the
   implementation work is a separate task that points back at it.
+
+## Working from an existing UI
+
+Sometimes the screen already exists, for example as a hi-fi HTML mockup, and the user wants its
+low-fidelity outline. The source of truth is then the page, not a brief, and the rules change with
+it: nothing is derived, everything is transcribed.
+
+**1. Check whether it has been done.** The output is one document beside the source (step 6). Ask
+the script whether it exists and was made from the page as it is now:
+
+```bash
+command node .agents/skills/wireloom/scripts/wireloom.js status path/to/screen.html
+```
+
+| `reason` | Do this |
+|---|---|
+| `new` | Convert the page |
+| `fresh` | Stop and report the existing document, unless the user asked for a redo. The page hasn't changed since it was made |
+| `stale` | The page changed. Convert it again, keeping the document's `created` date |
+| `unrecorded` | The document records no `source_sha256`, so nobody can tell. Convert it again |
+
+Keep the printed `sha256`: it goes into the document's frontmatter.
+
+**2. Pick the format profile.** A profile maps one format's markup to Wireloom primitives. Match the
+file against each profile's detection markers and load the one that fits before reading further:
+
+| Profile | Detect by | Load |
+|---|---|---|
+| Rebirth hi-fi phone screens | `<body class="phone rbt-theme …">` and `s5-*` classes | [`references/html-formats/rbt-hifi.md`](references/html-formats/rbt-hifi.md) |
+
+If no profile matches, use the rules below on their own, and say in the hand-over that no profile
+matched. A format you will convert more than once deserves its own profile: copy the shape of an
+existing one into `references/html-formats/` and add a row here.
+
+**3. Read the body, not the file.** Skip `<head>`, `<script>`, `<style>` and inline SVG sprite sheets.
+They are often most of the file and carry no layout. The profile names the format's own noise.
+
+**4. Apply these rules while transcribing:**
+
+- **Draw what the page shows, not what it implies.** Every element in the wireframe traces back to an
+  element on the page. Add nothing. Don't upgrade a static display into a different control: a
+  read-only "On" pill is a status, not a `toggle`. Borderline cases are the profile's call.
+- **Drop decoration.** Leave out anything marked `aria-hidden="true"` or `alt=""`, background art,
+  animation, and wrapper elements that hold no content of their own. Keep a meaningful image (an
+  avatar, a brand mark) as an `avatar` or `image` placeholder.
+- **Copy the text verbatim.** Use the page's own headings, labels and copy, never paraphrase or lorem
+  ipsum. The one change allowed is a line break (next rule).
+- **Keep it phone-width.** Wireloom does not wrap text: the window grows to its widest line. A
+  long `text` line, or a `row` of several cards, turns a phone screen into a wide desktop one. Split
+  copy longer than about 42 characters across consecutive `text` lines at word boundaries, and show
+  a horizontal carousel as its first card plus a `text "1 of N" muted`.
+- **One state per wireframe.** Draw the default visible state. Anything hidden until a tap (a sheet,
+  a modal, an inactive tab pane) is a further block: the full base screen again, plus the overlay or
+  the other pane. A `sheet` is clipped to its window's height, so it needs the whole base screen
+  underneath it.
+- **Use an untitled `window:` when the page has a top bar.** `window "Title":` draws its own title
+  band. Put the title where the page has it (in the `navbar`, or as a large `text`).
+- **Caption the source.** The sentence above the first picture names the source file and its viewport
+  width, which `<meta name="viewport">` gives you. For example: "Derived from
+  `app-family-settings.html`, 393 px phone".
+
+**5. Check it against the page before handing it over.** Each visible element is either in the
+wireframe or was dropped under a rule above, and nothing in the wireframe is missing from the page.
+The process below still applies in full: load the grammar before writing a line, then `check` and
+`render`.
+
+**6. Write the wireframe document beside the source.** For `screen.html` the outputs are:
+
+| File | Holds |
+|---|---|
+| `screen.wireframe.md` | The document, made from [`assets/wireframe.template.md`](assets/wireframe.template.md) |
+| `screen.wireframe.svg` | The picture, for a page with one state |
+| `screen.wireframe.1.svg`, `.2.svg`, … | One picture per block, in block order, for a page with hidden states |
+
+The document has frontmatter, then a caption, then one section per state: `## Default` first, then a
+`## Sheet: …` or `## Tab: …` for each hidden state. Each section embeds its picture with the
+source folded under it. The document ends with `## Conversion notes`. The frontmatter carries:
+
+- `source`: the source file name.
+- `source_sha256`: the hash from step 1, so the next `status` can tell whether the page has
+  changed.
+- `profile`, `viewport` and `wireloom`: the profile, the viewport width and the renderer version.
+
+The conversion notes say what was dropped and why, every judgement call the profile left open, and
+every class or element the profile has no row for. The unmapped list is how a profile grows: add a
+row for each of them before the next conversion. Render the document's blocks with
+`render screen.wireframe.md --out screen.wireframe.svg`, then hand over the document's path.
 
 ## Process
 
@@ -106,8 +193,13 @@ window "Settings":
 </details>
 ````
 
-**In a chat reply** with no document to write into, the fenced block on its own is the answer. Still
-run it through `check` (pipe it to `-`) before showing it.
+**6. Where the wireframe lives.** Every wireframe ends up in a Markdown file:
+
+| Started from | The file |
+|---|---|
+| An existing page | `<page>.wireframe.md` beside the page ([Working from an existing UI](#working-from-an-existing-ui), step 6) |
+| A story, task, PRD or spec | That document. The wireframe goes in its UI section, with the SVG beside it |
+| A brief with no document to go in | `docs/wireframes/{slug}.wireframe.md`, made from [`assets/wireframe.template.md`](assets/wireframe.template.md). Drop the `source`, `source_sha256`, `profile` and `viewport` fields and the conversion notes. Replace them with a `## Brief` section that quotes the brief |
 
 ## The renderer: `npm install wireloom`
 
@@ -140,6 +232,10 @@ so an older copy may reject newer primitives.
 | `no-blocks` | 1 | No ```` ```wireloom ```` fence, and the input is not raw source | Check you passed the right file |
 | `unavailable` | 1 | The package could not be found or installed; `error` says why | Report it. Do not hand over an unchecked block as if it had been checked |
 | `usage` | 2 | The invocation was wrong | Fix the command |
+
+`status <page>` needs no package. Its answers all exit 0, because each one is an answer, not a
+failure: `new`, `fresh`, `stale` and `unrecorded`. What each one means is in
+[Working from an existing UI](#working-from-an-existing-ui), step 1.
 
 ## Delegating to a subagent
 

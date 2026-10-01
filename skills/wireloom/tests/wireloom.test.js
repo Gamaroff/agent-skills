@@ -14,6 +14,7 @@ const os = require("os");
 const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("crypto");
 const { spawnSync } = require("child_process");
 
 const SKILL_DIR = path.join(__dirname, "..");
@@ -305,6 +306,90 @@ test("the project's own node_modules wins over the cache", () => {
 });
 
 // ===========================================================================
+// status — is the page's wireframe document there, and made from this page?
+// ===========================================================================
+const sha256 = (text) => crypto.createHash("sha256").update(text).digest("hex");
+const wireframeDoc = (hash) =>
+  [
+    "---",
+    "type: wireframe",
+    ...(hash ? [`source_sha256: ${hash}`] : []),
+    "---",
+    "# x",
+    "",
+  ].join("\n");
+
+function statusOf(dir, extraEnv) {
+  return runJson(["status", "screen.html"], { cwd: dir, env: extraEnv });
+}
+
+test("status: no document beside the page is new, and names where it would go", () => {
+  const dir = tmpdir();
+  fs.writeFileSync(path.join(dir, "screen.html"), "<p>a</p>");
+  const { status, json } = statusOf(dir);
+  assert.equal(status, 0);
+  assert.equal(json.reason, "new");
+  assert.equal(json.doc, path.join("screen.wireframe.md"));
+  assert.equal(json.sha256, sha256("<p>a</p>"));
+});
+
+test("status: a document recording the page's hash is fresh", () => {
+  const dir = tmpdir();
+  fs.writeFileSync(path.join(dir, "screen.html"), "<p>a</p>");
+  fs.writeFileSync(
+    path.join(dir, "screen.wireframe.md"),
+    wireframeDoc(sha256("<p>a</p>")),
+  );
+  const { status, json } = statusOf(dir);
+  assert.equal(status, 0);
+  assert.equal(json.reason, "fresh");
+});
+
+test("status: a page edited after its document was made is stale", () => {
+  const dir = tmpdir();
+  fs.writeFileSync(path.join(dir, "screen.html"), "<p>b</p>");
+  fs.writeFileSync(
+    path.join(dir, "screen.wireframe.md"),
+    wireframeDoc(sha256("<p>a</p>")),
+  );
+  const { status, json } = statusOf(dir);
+  assert.equal(status, 0);
+  assert.equal(json.reason, "stale");
+  assert.equal(json.recorded, sha256("<p>a</p>"));
+  assert.equal(json.sha256, sha256("<p>b</p>"));
+});
+
+test("status: a document with no source_sha256 is unrecorded, never fresh", () => {
+  // Without a recorded hash nobody can tell; reading that as fresh would skip
+  // a page that may have changed.
+  const dir = tmpdir();
+  fs.writeFileSync(path.join(dir, "screen.html"), "<p>a</p>");
+  fs.writeFileSync(path.join(dir, "screen.wireframe.md"), wireframeDoc(null));
+  const { json } = statusOf(dir);
+  assert.equal(json.reason, "unrecorded");
+});
+
+test("status: a source_sha256 outside the frontmatter does not count", () => {
+  const dir = tmpdir();
+  fs.writeFileSync(path.join(dir, "screen.html"), "<p>a</p>");
+  fs.writeFileSync(
+    path.join(dir, "screen.wireframe.md"),
+    wireframeDoc(null) + `source_sha256: ${sha256("<p>a</p>")}\n`,
+  );
+  assert.equal(statusOf(dir).json.reason, "unrecorded");
+});
+
+test("status needs no renderer package", () => {
+  const dir = tmpdir();
+  fs.writeFileSync(path.join(dir, "screen.html"), "<p>a</p>");
+  const { status, json } = statusOf(dir, {
+    WIRELOOM_MODULE: path.join(dir, "nowhere"),
+  });
+  assert.equal(status, 0);
+  assert.equal(json.reason, "new");
+});
+
+// ===========================================================================
 // Usage
 // ===========================================================================
 for (const [label, args] of [
@@ -317,6 +402,10 @@ for (const [label, args] of [
   ["--out on check", ["check", "-", "--out", "x.svg"]],
   ["--out not .svg", ["render", "-", "--out", "x.png"]],
   ["missing file", ["check", "nope.md"]],
+  ["status with no input", ["status"]],
+  ["status from stdin", ["status", "-"]],
+  ["status of a missing file", ["status", "nope.html"]],
+  ["--out on status", ["status", "a.html", "--out", "x.svg"]],
 ]) {
   test(`usage: ${label} exits 2 with reason usage`, () => {
     const { status, json } = runJson(args, { input: GOOD });
@@ -348,6 +437,48 @@ test("every ```wireloom example in the grammar reference parses", () => {
     json.blocks.length >= 30,
     `only ${json.blocks.length} blocks found`,
   );
+});
+
+// ===========================================================================
+// HTML format profiles (SKILL.md § "Working from an existing UI")
+// ===========================================================================
+const FORMATS_DIR = path.join(SKILL_DIR, "references", "html-formats");
+const profiles = () =>
+  fs.readdirSync(FORMATS_DIR).filter((f) => f.endsWith(".md"));
+
+test("every HTML format profile carries a worked example, and every example parses", () => {
+  const found = profiles();
+  // Non-vacuity: an empty directory would pass the loop below on nothing.
+  assert.ok(found.length >= 1, "no profiles found");
+  for (const f of found) {
+    const { status, json } = runJson(["check", path.join(FORMATS_DIR, f)]);
+    assert.ok((json.blocks || []).length >= 1, `${f}: no wireloom blocks`);
+    const failed = json.blocks.filter((b) => !b.ok);
+    assert.deepEqual(failed, [], `${f}: blocks failed to parse`);
+    assert.equal(status, 0, f);
+  }
+});
+
+test("SKILL.md's profile table and references/html-formats/ list the same profiles", () => {
+  // Two enumerations of "which profiles exist" drift silently: a profile
+  // missing from the table is never loaded, and a row with no file sends the
+  // agent to a dead link.
+  const skill = fs.readFileSync(path.join(SKILL_DIR, "SKILL.md"), "utf8");
+  const linked = [
+    ...skill.matchAll(/\]\(references\/html-formats\/([^)#]+\.md)\)/g),
+  ].map((m) => m[1]);
+  assert.deepEqual([...new Set(linked)].sort(), profiles().sort());
+});
+
+test("the wireframe document template is a typed document whose example block parses", () => {
+  const template = path.join(SKILL_DIR, "assets", "wireframe.template.md");
+  const text = fs.readFileSync(template, "utf8");
+  // OKF's one hard requirement, and the field status reads.
+  assert.match(text, /^---\n[\s\S]*?^type: wireframe$[\s\S]*?^---$/m);
+  assert.match(text, /^source_sha256: /m);
+  const { status, json } = runJson(["check", template]);
+  assert.equal(json.blocks.length, 1);
+  assert.equal(status, 0);
 });
 
 test("the pinned version matches the grammar reference and the repo devDependency", () => {
