@@ -6,6 +6,28 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A docs-only tail no longer waits for a full CI run at the pipeline's four CI waits (task 172).**
+  Behaviour change on upgrade, on by default: when a head's CI is still `PENDING` (or empty) and
+  every file changed since a green first-parent ancestor is documentation, the reading is satisfied
+  and recorded as `SUCCESS (tree-equivalent to <sha12>)`, never plain `SUCCESS`. Opt out with
+  `ci.docsOnly.enabled: false`; narrow `ci.docsOnly.patterns` or set `ci.docsOnly.checkCommand` if
+  your markdown is executable or a docs-path workflow can go red.
+  - One engine, `shared/resources/ci-tree-equivalence.js`, called at `/finalise` readings 1 and 2
+    (the 6c poll gains an optional `TREE_EQ=` field), `/develop-next` Step 3 and `/develop-batch`
+    Step 3. It exits 0 for `tree-equivalent` and for nothing else, so no "no" can round up to green.
+  - The ancestor must be green on its **own** checks (not "any run on the branch"); zero checks is
+    never green; a `403` on Bitbucket is `unverifiable`; a rename out of code into docs counts as a
+    code change; the walk is bounded at 20 first-parent commits.
+  - `ci.docsOnly.{enabled,patterns,checkCommand}` documented in `docs/reference/configuration.md`.
+    Write `patterns` as a block list and spell it `**/*.md`: the YAML subset reads an inline `[..]`
+    as a string (rejected, exit 2), and `*.md` does not cross `/`. This repository narrows to
+    `docs/**` with `checkCommand: npm run ci:fast && npm run eval:all`.
+  - Two helpers moved out so the engine does not bundle a QA or a PR-comment module into three more
+    skills: `shared/resources/glob-match.js` (from `qa-diminishing-returns.js`) and
+    `shared/resources/bb-auth.js` (from `pr-inline-comment.js`). Both keep their exports.
+  - Residual, accepted: a workflow triggered only by docs paths (a link checker) never ran on a
+    green ancestor that touched none of them, and `checkCommand` cannot reproduce URL reachability.
+
 - **The two hand-written reference pages are pinned to the skills they describe (task 142, obs #159).**
   - `tests/reference-doc-skill-pinning.test.js` fails when a `docs/reference/commands.md` row
     names a slash command with no `skills/<name>/SKILL.md`, when a row's first cell advertises a

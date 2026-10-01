@@ -5,7 +5,7 @@ type: task
 description: "A shared engine decides when a pending CI reading is satisfied because every file changed since a green ancestor is docs. /finalise readings 1 and 2, /develop-next Step 3 and /develop-batch Step 3 all call it and record SUCCESS (tree-equivalent to <sha>), never plain SUCCESS."
 tags: [finalise, develop-next, develop-batch, ci, engine, performance, consumer-handoff]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-10-01
 updated: 2026-10-01
@@ -16,7 +16,9 @@ github_issue: 539
 
 # Technical Task: One docs-only CI rule at every pipeline CI wait
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.172.review.1.ci-docs-only-tree-equivalence.md` implemented 2026-10-01
 
 **GitHub Issue**: [#539](https://github.com/Gamaroff/agent-skills/issues/539)
 
@@ -201,7 +203,10 @@ repository-root markdown.
 **This repository overrides the default.** Here a `SKILL.md` or a `shared/resources/*.md` is
 executable prose that tests read. Tests also read `docs/`: for example
 `shared/resources/tests/card-preflight-corpus.test.mjs` scans `docs/tasks/`. So this repository's own
-`skills-config.yaml` sets `patterns: ["docs/**"]` and `checkCommand: "npm run ci:fast"`. The
+`skills-config.yaml` sets `patterns: ["docs/**"]` and `checkCommand: "npm run ci:fast && npm run eval:all"`.
+`eval:all` is in the command because it holds `evals/shared/tests/task-registry-drift.test.mjs`, which a
+docs-only edit to a task document or the registry can fail, and `ci:fast` does not run it (measured
+2026-10-01: `npm run eval:all` takes about 5 s). The
 consumer default stays as the operator chose it.
 
 ### Same-class mechanism inventory (obs #103)
@@ -255,31 +260,31 @@ is docs-only over a green ancestor stops waiting for CI at the four sites. The o
 
 ### Phase 1: glob-match primitive (Risk: Low)
 
-- [ ] Move `globToRegExp`, `normalisePath` and `matchesAnyGlob` verbatim into `shared/resources/glob-match.js`
-- [ ] `qa-diminishing-returns.js` requires it, and its export list is unchanged
-- [ ] `qa-diminishing-returns.test.mjs` and `qa-loop-route.test.mjs` stay green with no edit
+- [x] Move `globToRegExp`, `normalisePath` and `matchesAnyGlob` verbatim into `shared/resources/glob-match.js`
+- [x] `qa-diminishing-returns.js` requires it, and its export list is unchanged
+- [x] `qa-diminishing-returns.test.mjs` and `qa-loop-route.test.mjs` stay green with no edit
 
 ### Phase 2: the engine (Risk: Medium)
 
-- [ ] Pure `classifyTreeEquivalence` plus the CLI (`--head-rollup`, `--head`, `--pr`, `--json`, `--workspace-root`)
-- [ ] Config read via `yaml-subset.js`: `ci.docsOnly.enabled` (default `true`), `patterns` (default `["**/*.md","docs/**"]`), `checkCommand` (default unset)
-- [ ] GitHub and Bitbucket ancestor reads. Any read failure is `unverifiable`
-- [ ] Exit `0` only for `tree-equivalent`
+- [x] Pure `classifyTreeEquivalence` plus the CLI (`--head-rollup`, `--head`, `--pr`, `--json`, `--workspace-root`)
+- [x] Config read via `yaml-subset.js`: `ci.docsOnly.enabled` (default `true`), `patterns` (default `["**/*.md","docs/**"]`), `checkCommand` (default unset)
+- [x] GitHub and Bitbucket ancestor reads. Any read failure is `unverifiable`
+- [x] Exit `0` only for `tree-equivalent`
 
 ### Phase 3: migrate the four sites (Risk: Medium)
 
 Depends on Phase 2.
 
-- [ ] `/finalise` Step 6: a tree-equivalence arm after the re-sample loop, a `tree-equivalent` row in the decision table, and `CI reading 1: SUCCESS (tree-equivalent to <sha>) @ <head>`
-- [ ] `/finalise` 6c: the `decided()` arm, the optional `TREE_EQ=` result field, and its later-turn print
-- [ ] Revise the `:897` and `:1507` notes to point at the rule instead of naming the gap
-- [ ] `/develop-next` Step 3 and `/develop-batch` Step 3: the arm in "CI checks", with the recorded form in the run report
+- [x] `/finalise` Step 6: a tree-equivalence arm after the re-sample loop, a `tree-equivalent` row in the decision table, and `CI reading 1: SUCCESS (tree-equivalent to <sha>) @ <head>`
+- [x] `/finalise` 6c: the `decided()` arm, the optional `TREE_EQ=` result field, and its later-turn print
+- [x] Revise the `:897` and `:1507` notes to point at the rule instead of naming the gap
+- [x] `/develop-next` Step 3 and `/develop-batch` Step 3: the arm in "CI checks", with the recorded form in the run report
 
 ### Phase 4: config, docs and this repository (Risk: Low)
 
-- [ ] `docs/reference/configuration.md`: the schema block and three key-reference rows
-- [ ] This repository's `skills-config.yaml`: `patterns: ["docs/**"]`, `checkCommand: "npm run ci:fast"`, with the reason as a comment
-- [ ] `npm run bundle`, `npm run generate-catalog` if a description changed, and CHANGELOG
+- [x] `docs/reference/configuration.md`: the schema block and three key-reference rows, including the rule that `checkCommand` should reproduce every check a workflow path-filtered to the docs patterns runs
+- [x] This repository's `skills-config.yaml`: `patterns: ["docs/**"]`, `checkCommand: "npm run ci:fast && npm run eval:all"`, with the reason as a comment
+- [x] `npm run bundle`, `npm run generate-catalog` if a description changed, and CHANGELOG
 
 ---
 
@@ -371,9 +376,15 @@ None.
 1. **A docs-only commit that turns CI red is let through.** This repository's doc-link checker and
    corpus tests are both examples.
    - Probability: Medium. Impact: High (a red merge).
-   - Mitigation: `checkCommand`. This repository sets `npm run ci:fast`. `/develop-next` Step 3 still
+   - Mitigation: `checkCommand`. This repository sets `npm run ci:fast && npm run eval:all`. `/develop-next` Step 3 still
      runs `<qualityGateCommand>` locally regardless. The record says `tree-equivalent`, so a later red
      is traceable to its cause.
+   - Residual, accepted and documented: `.github/workflows/docs-link-check.yml` runs only on pushes that
+     touch `docs/**/*.md`, `README.md`, `AGENTS.md` or `CONTRIBUTING.md`, and checks external URLs with
+     `markdown-link-check`. A green ancestor that touched none of those never ran it, and no local
+     `checkCommand` reproduces URL reachability. A docs-only commit can therefore turn that one workflow
+     red after the pipeline recorded `tree-equivalent`. `configuration.md` states the rule for a consumer:
+     `checkCommand` should reproduce every check that a workflow path-filtered to the docs patterns runs.
    - Rollback: `ci.docsOnly.enabled: false`.
 
 ### Medium Risk Areas
@@ -429,6 +440,9 @@ None.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-10-01 | 1.0     | Initial draft | create-task |
+| 2026-10-01 | 1.1     | Review passed (9/10) — repository `checkCommand` widened to `ci:fast && eval:all`; path-filtered-workflow residual recorded | review-task |
+| 2026-10-01 |         | Status → ready-for-development | review-task |
+| 2026-10-01 |         | Implemented — 4 new + 10 modified files (and generated bundle copies), 51 new tests; yaml-subset forced a block-list config spelling | develop |
 
 <!-- change-log-end -->
 
@@ -436,10 +450,10 @@ None.
 
 ## Progress Tracking
 
-- [ ] Phase 1: glob-match primitive
-- [ ] Phase 2: the engine
-- [ ] Phase 3: migrate the four sites
-- [ ] Phase 4: config, docs and this repository
+- [x] Phase 1: glob-match primitive
+- [x] Phase 2: the engine
+- [x] Phase 3: migrate the four sites
+- [x] Phase 4: config, docs and this repository
 
 ---
 
@@ -460,4 +474,4 @@ None.
 - QA artifacts land in this directory: `task.172.qa.{N}.ci-docs-only-tree-equivalence.md`,
   `task.172.gate.{N}.ci-docs-only-tree-equivalence.yml`, bug reports `task.172.bug.{N}.{name}.md`.
 - This task's own `/finalise` run is the first to exercise the rule in this repository, under the
-  `docs/**` + `npm run ci:fast` override. Record what it did in the implementation report.
+  `docs/**` + `npm run ci:fast && npm run eval:all` override. Record what it did in the implementation report.

@@ -146,7 +146,9 @@ Add this to the `configuration.md` schema block, after `qa:`:
 ci: # optional — the docs-only rule at the pipeline's CI waits (task.172)
   docsOnly:
     enabled: true                       # false restores a full CI wait everywhere
-    patterns: ["**/*.md", "docs/**"]    # `**/*.md`, not `*.md`: `*` does not cross `/`
+    patterns:                           # BLOCK list: the YAML subset reads an inline [..] as a string
+      - "**/*.md"                       # `**/*.md`, not `*.md`: `*` does not cross `/`
+      - "docs/**"
     checkCommand: ""                    # optional local check run on a tree-equivalent head
 ```
 
@@ -157,8 +159,9 @@ ci:
   docsOnly:
     # SKILL.md and shared/resources/*.md are executable prose here, and tests read docs/
     # (card-preflight-corpus scans docs/tasks/), so the consumer default is too wide.
-    patterns: ["docs/**"]
-    checkCommand: "npm run ci:fast"
+    patterns:
+      - "docs/**"
+    checkCommand: "npm run ci:fast && npm run eval:all"
 ```
 
 ## Key Patterns and References

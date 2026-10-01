@@ -41,3 +41,14 @@ qa: # the QA loop's diminishing-returns exit — schema: docs/reference/configur
     - "tests/**"
     - "skills/*/tests/**"
     - "shared/resources/tests/**"
+
+ci: # the docs-only rule at the pipeline's CI waits — schema: docs/reference/configuration.md
+  docsOnly:
+    # SKILL.md and shared/resources/*.md are executable prose in THIS repository, and tests read
+    # docs/ (card-preflight-corpus scans docs/tasks/), so the consumer default (**/*.md) is too
+    # wide here. Block list on purpose: the YAML subset reads an inline [..] as a string.
+    patterns:
+      - "docs/**"
+    # ci:fast does not run the eval tier, which holds task-registry-drift (a docs-only edit to a
+    # task document can fail it). Measured 2026-10-01: eval:all takes about 5 s.
+    checkCommand: "npm run ci:fast && npm run eval:all"

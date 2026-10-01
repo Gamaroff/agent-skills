@@ -192,7 +192,7 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      rather than re-deriving it:
 
      ```bash
-     gh pr view "$PR_ID" --json statusCheckRollup \
+     CI_ROLLUP=$(gh pr view "$PR_ID" --json statusCheckRollup \
        -q '[ .statusCheckRollup[]
              | (.status // "") as $st
              | (if   $st == ""          then (.state // "")
@@ -205,8 +205,33 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
              elif any(. == "PENDING" or . == "EXPECTED" or . == "QUEUED"
                       or . == "IN_PROGRESS" or . == "WAITING") then "PENDING"
              elif any(. == "CANCELLED") then "CANCELLED"
-             else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN"
+             else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN")
      ```
+
+     **A pending head over a docs-only tail is satisfied, not waited on (task.172).** If `CI_ROLLUP`
+     is `PENDING` or `NONE` (Bitbucket: an `INPROGRESS` or an empty status list), ask the
+     tree-equivalence engine **before** backgrounding any wait. It exits **0 for `tree-equivalent`
+     and for nothing else** — every other answer, including a failed read, exits 1:
+
+     ```bash
+     CI_TREE_EQ=""
+     case "$CI_ROLLUP" in
+       PENDING|NONE)
+         if TE=$(command node .agents/skills/develop-next/references/ci-tree-equivalence.js \
+                   --head-rollup "$CI_ROLLUP" --head "$PR_HEAD" --pr "$PR_ID" --json); then
+           CI_TREE_EQ=$(printf '%s' "$TE" | jq -r '.greenSha[0:12] // empty')
+           [ -n "$CI_TREE_EQ" ] && CI_ROLLUP=SUCCESS    # an empty sha stays PENDING: fail closed
+         fi ;;
+     esac
+     ```
+
+     When `CI_TREE_EQ` is set, the PR head's own CI has **not** finished and the reading is satisfied
+     because every file changed since a green first-parent ancestor is documentation (per
+     `ci.docsOnly.patterns`, and `ci.docsOnly.checkCommand` passed when one is configured). **Record it
+     as `CI: SUCCESS (tree-equivalent to {CI_TREE_EQ})` in the run report — never as plain `SUCCESS`**, so
+     the record names the commit CI actually verified. On any other answer the existing handling below
+     applies unchanged. `ci.docsOnly.enabled: false` restores a full wait
+     ([`docs/reference/configuration.md`](../../docs/reference/configuration.md)).
 
      If a genuine wait is needed, **background it** — a poll loop written to a file, checked on a
      later turn. Never a foreground call that can outlive the tool timeout.

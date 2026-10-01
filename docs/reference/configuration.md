@@ -118,6 +118,18 @@ qa: # optional — the QA loop's diminishing-returns exit
     - "**/*.test.*"
     - "tests/**"
 
+ci: # optional — the docs-only rule at the pipeline's CI waits (task.172)
+  docsOnly:
+    enabled: true # false restores a full CI wait at every site, byte for byte
+    # BLOCK list, not an inline [..]: the YAML subset reads an inline list as a string and the
+    # engine rejects it (exit 2) rather than guess. `**/*.md`, not `*.md`: `*` does not cross `/`.
+    patterns:
+      - "**/*.md"
+      - "docs/**"
+    # Optional local check, run from the repo root after a docs-only finding. A non-zero exit
+    # means the rule does not apply and the wait proceeds as before. Unset = no local check.
+    checkCommand: ""
+
 subagents: # optional — how long a pipeline waits on a dispatched subagent
   # Minutes a dispatch site (the QA diff reviewer, the pre-develop surface map,
   # the review pre-pass, the qa-fix ingester) waits before stopping the agent
@@ -242,6 +254,9 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `develop.fastGateCommand`                        | shell command                   | `npm run ci:fast` (suggested — set it explicitly) | Fast gate the develop loop, each qa-fix cycle, and each `develop-bug` verify cycle run before committing. Deliberately **excludes** the slow tier: paying it per iteration is what makes the correct fix feel expensive enough to be reverted. Should be the project's cheap CI-equivalent — formatting plus the hermetic suite. **The fallback is a suggestion, not a working default**: a project that defines no `ci:fast` script would previously discover that mid-iteration, so the develop loop now checks the named script resolves *before* its first iteration and HALTs naming this key. |
 | `subagents.wallClockMinutes`                     | positive integer (minutes)      | `10`                                             | Wall-clock budget per subagent dispatch. Every dispatch site in the develop pipelines waits against it, then stops the agent and performs the pass inline, recording the independence loss and `killed at N minutes` (never `stalled`). Output-file size is not a liveness signal — see the **Subagents** section of [autonomous defaults](../../shared/resources/develop-pipeline-autonomous-defaults.md). |
 | `qa.testArtifactGlobs`                           | list of globs                   | `[]`                                             | Which paths the QA loop's **Diminishing-returns exit** treats as test machinery rather than product behaviour. Each glob is matched against a gate finding's `file:`, read as a repo-relative path; `**` crosses directories and `*` does not, so matching is on whole segments rather than substrings. The exit fires only when **every** `top_issues[]` entry in the latest gate matches — a finding with no `file:`, or one no glob covers, fails the condition, because the exit is opt-in on positive evidence and never on absence. **The `[]` default is the fail-safe**: it matches nothing, the exit never fires, and the loop behaves exactly as it does today. See [Diminishing-returns exit](../../shared/resources/develop-pipeline-step-5-6-qa-loop.md). |
+| `ci.docsOnly.enabled`                            | boolean                         | `true`                                           | Whether the docs-only rule applies at `/finalise` readings 1 and 2, `/develop-next` Step 3 and `/develop-batch` Step 3. `false` restores a full CI wait at every one of them. A value that is not `true` or `false` is a usage error (exit 2), never a silent default. See [The docs-only CI rule](#the-docs-only-ci-rule). |
+| `ci.docsOnly.patterns`                           | block list of globs             | `["**/*.md", "docs/**"]`                         | Which changed paths count as documentation. **Spell it `**/*.md`, not `*.md`:** `*` does not cross `/`, so the literal `*.md` matches only repository-root markdown (measured on the shared matcher). Write it as a **block list**; an inline `[..]` is read as a string and rejected with exit 2. A path matching none of the globs is code, and the walk stops with `code-changed`. |
+| `ci.docsOnly.checkCommand`                       | shell command                   | unset                                            | A local check run from the repo root once a head is found docs-only over a green ancestor. Non-zero exits make the finding `check-failed` and the site waits as before. Unset, the rule applies on the patterns alone. **Set it to reproduce every check that a workflow path-filtered to your docs patterns would have run**: a green ancestor that never touched those paths never ran that workflow. |
 | `developNext.roadmapPath`                        | path                            | `docs/development/project-completion-roadmap.md` | Completion roadmap parsed by `develop-next`'s deterministic selector (`select-next.mjs`).                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `developNext.baseBranch`                         | branch name                     | `develop`                                        | Branch `develop-next` syncs before selection, merges completed epics into, and commits roadmap ticks to.                                                                                                                                                                                                                                                                                                                                                                                  |
 | `developNext.qualityGateCommand`                 | shell command                   | `npm run ci`                                     | Local merge gate `develop-next` and `develop-batch` run on every branch before merging (the whole gate for projects without PR CI). **Expected to be the project's full CI-equivalent** — everything the CI job runs, in one command — so that a local green predicts a CI green. Defaulted to `npm test` until 2026-09-01, which was quietly weaker than the CI it was meant to predict; an explicit value here still wins. |
@@ -297,6 +312,41 @@ Three things about the key are worth stating plainly, because each is a decision
 - **Matching is on whole path segments.** `**` crosses directories, `*` does not, and neither matches a substring — `src/latest-price.ts` is production code, whatever letters it contains.
 
 A consumer whose test layout is unusual and matches nothing simply never takes the exit. That is a cost in time, not in correctness.
+
+## The docs-only CI rule
+
+The develop pipelines wait for a full CI run at three points after the code is final: `/finalise`
+reading 1, `/finalise` reading 2, and the merge step of `/develop-next` and `/develop-batch`. The
+commits those waits sit on are usually documentation only (a review fix, the acceptance commit, the
+implementation report), so the code tree is identical to one CI already passed. One engine,
+[`ci-tree-equivalence.js`](../../shared/resources/ci-tree-equivalence.js), decides when that is
+enough, and all four sites call it. A reading is satisfied when:
+
+1. the head's rollup is `PENDING` or `NONE` (a `FAILURE`, `CANCELLED` or `UNKNOWN` head never qualifies);
+2. a first-parent ancestor of the head (at most 20 back) has a green rollup of **its own checks**;
+3. every file changed between that ancestor and the head matches `ci.docsOnly.patterns`; and
+4. `ci.docsOnly.checkCommand`, when set, exits 0.
+
+The site then records `SUCCESS (tree-equivalent to <sha12>)`, **never plain `SUCCESS`**, so the record
+names the commit CI actually verified. The engine exits `0` for that answer and for no other: every
+"no" (`not-applicable`, `disabled`, `code-changed`, `no-green-ancestor`, `unverifiable`,
+`check-failed`) exits `1`, so a shell `if` cannot round it up to green, and the site waits exactly as it
+did before.
+
+Four things worth knowing:
+
+- **It is on by default.** A consumer whose tail commit is docs-only over a green ancestor stops waiting
+  at those sites on upgrade. Set `ci.docsOnly.enabled: false` to restore the full wait.
+- **Executable markdown is not documentation.** In a repository where `SKILL.md` files or `docs/` are
+  read by tests, narrow `patterns`, or set `checkCommand`, or both. This repository sets
+  `patterns: ["docs/**"]` and `checkCommand: "npm run ci:fast && npm run eval:all"` (`eval:all` is the
+  tier `ci:fast` does not run, and it holds the task-registry drift test a docs-only edit can fail).
+- **`checkCommand` cannot reproduce everything.** A workflow triggered only by docs paths (a link
+  checker, for instance) never ran on a green ancestor that touched none of them, and a local command
+  rarely reproduces external-URL reachability. That residual is accepted; `enabled: false` is the
+  rollback.
+- **A rebased `/develop-batch` head with code does not qualify.** Its diff to any green ancestor
+  includes the item's own changes, so it waits as before.
 
 ## Stakeholder sign-off
 
