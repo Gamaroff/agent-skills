@@ -305,12 +305,13 @@ test("the default patterns read as intended: **/*.md reaches nested markdown, `*
 
 // ── rollup reduction ─────────────────────────────────────────────────────
 
-test("reduceChecks: decided only at completed, skipped/neutral pass only beside a real success, zero is NONE, partial is not green", () => {
+test("reduceChecks: decided only at completed, any skipped or neutral check is NONE, zero is NONE, partial is not green", () => {
   const r = eng.reduceChecks;
   assert.equal(r({}), "NONE");
   assert.equal(r({ checkRuns: GREEN }), "SUCCESS");
-  // CR-2 (QA cycle 1): skipped/neutral are not failures and pass ALONGSIDE a real success, but alone
-  // they verified nothing, so an ancestor whose only checks were skipped is NONE, never green.
+  // CR-2 (QA cycle 1) and CR2-2 (cycle 2): for an ANCESTOR, which is the whole evidence, green means every
+  // check ran and succeeded. ANY skipped or neutral check makes it NONE: a paths-filter "changes" job
+  // can succeed while the test jobs are skipped, and that is not verification.
   assert.equal(
     r({
       checkRuns: [
@@ -329,19 +330,27 @@ test("reduceChecks: decided only at completed, skipped/neutral pass only beside 
       checkRuns: [
         { status: "completed", conclusion: "success" },
         { status: "completed", conclusion: "skipped" },
-        { status: "completed", conclusion: "neutral" },
+      ],
+    }),
+    "NONE",
+    "a success beside a skipped job is the paths-filter shape: not evidence on its own",
+  );
+  assert.equal(
+    r({
+      checkRuns: [
+        { status: "completed", conclusion: "success" },
+        { status: "completed", conclusion: "success" },
       ],
     }),
     "SUCCESS",
-    "a paths-filtered job that did not trigger must not turn a real success red",
   );
   assert.equal(
     r({
       checkRuns: [{ status: "completed", conclusion: "skipped" }],
       statuses: [{ state: "success" }],
     }),
-    "SUCCESS",
-    "a commit status that succeeded is a real success",
+    "NONE",
+    "a skipped check run still disqualifies, whatever else succeeded",
   );
   assert.equal(r({ checkRuns: [{ status: "in_progress" }] }), "PENDING");
   assert.equal(
@@ -399,6 +408,7 @@ test("readConfig: no file or no block gives the defaults", () => {
       enabled: true,
       patterns: [...eng.DEFAULT_PATTERNS],
       checkCommand: "",
+      checkTimeoutSeconds: eng.DEFAULT_CHECK_TIMEOUT_SECONDS,
     });
     writeFileSync(
       join(dir, "skills-config.yaml"),
@@ -420,6 +430,7 @@ test("readConfig: a block list, enabled and checkCommand are read", () => {
       enabled: false,
       patterns: ["docs/**"],
       checkCommand: "npm run ci:fast",
+      checkTimeoutSeconds: eng.DEFAULT_CHECK_TIMEOUT_SECONDS,
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -1004,6 +1015,263 @@ test("CR-5: --pr is recorded in the JSON for the caller's log and no decision re
   }
 });
 
+// ── QA cycle 2 (refute pass): CR2-1 .. CR2-9 ─────────────────────────────
+
+test("CR2-1: a red docs-only ancestor stops the walk; the head inherits its red", async () => {
+  const red = await eng.classifyTreeEquivalence({
+    headRollup: "PENDING",
+    ancestors: [A("r1", DOCS, "FAILURE"), A("g1", DOCS, "SUCCESS")],
+    patterns: eng.DEFAULT_PATTERNS,
+    enabled: true,
+  });
+  assert.equal(red.reason, REASONS.NO_GREEN_ANCESTOR);
+  assert.match(red.detail, /r1 is red/);
+  assert.equal(red.greenSha, null, "an older green commit must not be named");
+  // CANCELLED is walked past: cancel-in-progress cancels the run of every superseded push.
+  const cancelled = await eng.classifyTreeEquivalence({
+    headRollup: "PENDING",
+    ancestors: [A("c1", DOCS, "CANCELLED"), A("g1", DOCS, "SUCCESS")],
+    patterns: eng.DEFAULT_PATTERNS,
+    enabled: true,
+  });
+  assert.equal(cancelled.reason, REASONS.TREE_EQUIVALENT);
+  assert.equal(cancelled.greenSha, "g1");
+});
+
+test("CR2-1: CLI — code c1, green code c2, RED docs c3, docs head c4 is not tree-equivalent", async () => {
+  const dir = mkRepo();
+  try {
+    commit(dir, { "src/a.js": "1\n" }, "c1");
+    const c2 = commit(dir, { "src/a.js": "2\n" }, "c2");
+    const c3 = commit(dir, { "docs/a.md": "x\n" }, "c3 docs, CI red");
+    commit(dir, { "docs/b.md": "y\n" }, "c4 docs head");
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({
+        checks: {
+          [c2]: GREEN,
+          [c3]: [{ status: "completed", conclusion: "failure" }],
+        },
+      }),
+    });
+    assert.equal(r.exitCode, 1);
+    assert.equal(JSON.parse(r.stdout).reason, "no-green-ancestor");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR2-2: a success beside skipped jobs (the paths-filter shape) is not a green ancestor; an older fully green one still is", async () => {
+  const SKIPPED_MIX = [
+    ...GREEN,
+    { status: "completed", conclusion: "skipped" },
+  ];
+  const { dir, green } = greenThenDocs(2);
+  try {
+    const only = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: SKIPPED_MIX } }),
+    });
+    assert.equal(only.exitCode, 1);
+    assert.equal(JSON.parse(only.stdout).reason, "no-green-ancestor");
+  } finally {
+    cleanup(dir);
+  }
+  const r = await eng.classifyTreeEquivalence({
+    headRollup: "PENDING",
+    ancestors: [
+      A("mix", DOCS, eng.reduceChecks({ checkRuns: SKIPPED_MIX })),
+      A("full", DOCS, eng.reduceChecks({ checkRuns: [...GREEN, ...GREEN] })),
+    ],
+    patterns: eng.DEFAULT_PATTERNS,
+    enabled: true,
+  });
+  assert.equal(r.reason, REASONS.TREE_EQUIVALENT);
+  assert.equal(
+    r.greenSha,
+    "full",
+    "the walk continues past the skipped-mix ancestor to the fully green one",
+  );
+});
+
+test("CR2-3: a --head that is not the checked-out HEAD is unverifiable and runs no check", async () => {
+  const { dir, green } = greenThenDocs(2, {
+    config: 'ci:\n  docsOnly:\n    checkCommand: "true"\n',
+  });
+  try {
+    const earlier = git(dir, "rev-parse", "HEAD~1");
+    let ran = false;
+    const r = await runEngine(
+      dir,
+      ["--head-rollup", "PENDING", "--head", earlier, "--json"],
+      {
+        exec: fakeExec({ checks: { [green]: GREEN } }),
+        spawn: () => {
+          ran = true;
+          return { status: 0 };
+        },
+      },
+    );
+    assert.equal(r.exitCode, 1);
+    assert.equal(JSON.parse(r.stdout).reason, "unverifiable");
+    assert.match(JSON.parse(r.stdout).detail, /not the checked-out HEAD/);
+    assert.equal(
+      ran,
+      false,
+      "the local check must not run against another tree",
+    );
+    const same = await runEngine(
+      dir,
+      [
+        "--head-rollup",
+        "PENDING",
+        "--head",
+        git(dir, "rev-parse", "HEAD"),
+        "--json",
+      ],
+      {
+        exec: fakeExec({ checks: { [green]: GREEN } }),
+        spawn: () => ({ status: 0 }),
+      },
+    );
+    assert.equal(
+      same.exitCode,
+      0,
+      "the checked-out HEAD, spelled as a full sha, is accepted",
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR2-4: an unknown or case-mangled ci.docsOnly key is a usage error naming it", async () => {
+  for (const [config, needle] of [
+    ['ci:\n  docsOnly:\n    checkcommand: "false"\n', /checkcommand/],
+    ["ci:\n  docsOnly:\n    pattern:\n      - 'x'\n", /pattern/],
+    ["ci:\n  docsonly:\n    enabled: false\n", /docsonly/],
+  ]) {
+    const { dir } = greenThenDocs(1, { config });
+    try {
+      const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+        exec: fakeExec(),
+      });
+      assert.equal(r.exitCode, 2, config);
+      assert.match(r.stderr, needle);
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
+test("CR2-5: a submodule pointer under a docs pattern is code, and diff.ignoreSubmodules cannot hide it", async () => {
+  for (const hide of [false, true]) {
+    const dir = mkRepo();
+    try {
+      const green = commit(dir, { "src/a.js": "x\n" }, "code");
+      if (hide) git(dir, "config", "diff.ignoreSubmodules", "all");
+      git(
+        dir,
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        `160000,${green},docs/vendor`,
+      );
+      git(dir, "commit", "-q", "-m", "bump a gitlink under docs/");
+      const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+        exec: fakeExec({ checks: { [green]: GREEN } }),
+      });
+      assert.equal(r.exitCode, 1, `ignoreSubmodules hidden=${hide}`);
+      assert.equal(JSON.parse(r.stdout).reason, "code-changed");
+      assert.match(JSON.parse(r.stdout).detail, /gitlink/);
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
+test("CR2-6: both GitHub reads paginate — a failing status beyond the first page cannot be missed", async () => {
+  const { dir, green } = greenThenDocs(1);
+  try {
+    const log = [];
+    await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: GREEN }, log }),
+    });
+    const calls = log.filter((l) => l.includes(green));
+    assert.equal(calls.length, 2, "one check-runs read and one status read");
+    for (const c of calls) assert.match(c, /--paginate/, c);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR2-7: a checkCommand that hangs is killed at ci.docsOnly.checkTimeoutSeconds and is check-failed", async () => {
+  const { dir, green } = greenThenDocs(1, {
+    config:
+      'ci:\n  docsOnly:\n    checkCommand: "sleep 20"\n    checkTimeoutSeconds: 1\n',
+  });
+  try {
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: GREEN } }),
+    });
+    // The bound is proven by the finding below (a check that was not killed would end tree-equivalent),
+    // not by a wall-clock threshold, which would be load-sensitive.
+    assert.equal(r.exitCode, 1);
+    const j = JSON.parse(r.stdout);
+    assert.equal(j.reason, "check-failed");
+    assert.match(j.detail, /timed out after 1s/);
+  } finally {
+    cleanup(dir);
+  }
+  for (const bad of ["0", "-3", "1.5", "soon"]) {
+    const t = greenThenDocs(1, {
+      config: `ci:\n  docsOnly:\n    checkTimeoutSeconds: ${bad}\n`,
+    });
+    try {
+      const r = await runEngine(t.dir, ["--head-rollup", "PENDING"], {
+        exec: fakeExec(),
+      });
+      assert.equal(r.exitCode, 2, bad);
+      assert.match(r.stderr, /checkTimeoutSeconds/);
+    } finally {
+      cleanup(t.dir);
+    }
+  }
+});
+
+test("CR2-8: an empty option value (an unbound shell variable) is a usage error, never a silent default", async () => {
+  const { dir } = greenThenDocs(1);
+  try {
+    for (const argv of [
+      ["--head-rollup", "PENDING", "--head", ""],
+      ["--head-rollup", ""],
+      ["--head-rollup", "PENDING", "--pr", ""],
+    ]) {
+      const r = await runEngine(dir, argv, { exec: fakeExec() });
+      assert.equal(r.exitCode, 2, JSON.stringify(argv));
+      assert.match(r.stderr, /non-empty value/);
+    }
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR2-9: run from a subdirectory the engine still finds the repository's config", async () => {
+  const { dir, green } = greenThenDocs(1, {
+    config: "ci:\n  docsOnly:\n    enabled: false\n",
+  });
+  try {
+    const sub = join(dir, "src");
+    const r = await runEngine(sub, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: GREEN } }),
+    });
+    assert.equal(
+      JSON.parse(r.stdout).reason,
+      "disabled",
+      "the root config applies, not the defaults",
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
 // ── Bitbucket ────────────────────────────────────────────────────────────
 
 function bbRepo() {
@@ -1539,4 +1807,112 @@ test("configuration.md documents all three ci.docsOnly keys, the **/*.md spellin
   assert.match(doc, /\*\*Spell it `\*\*\/\*\.md`, not `\*\.md`:\*\*/);
   assert.match(doc, /block list/);
   assert.ok(doc.includes("## The docs-only CI rule"));
+});
+
+// ── CR2-8: the new prose blocks fail loudly on an unbound input ───────────
+//
+// Every fenced block is its own shell, so an input bound by an earlier block is gone. An unbound
+// CI_ROLLUP silently skipped the rule, an unbound PR_HEAD reached `--head ""`, and an unbound
+// CI_TREE_EQ in the Step 7 comment wrote plain SUCCESS, the record the rule forbids. A grep over the
+// source text cannot see an unbound variable, so these RUN the extracted blocks.
+
+import { dedent } from "./_dedent.mjs";
+
+function armBlock(text) {
+  const blocks = [...text.matchAll(/```bash\n([\s\S]*?)\n *```/g)].map(
+    (m) => m[1],
+  );
+  const hit = blocks.find(
+    (b) => b.includes("CI_ROLLUP:?") && b.includes("ci-tree-equivalence.js"),
+  );
+  assert.ok(
+    hit,
+    "the PENDING/NONE arm block (with its input guard) was not found",
+  );
+  return dedent(hit);
+}
+
+const shellsAvailable = ["bash", "zsh"].filter(
+  (sh) => spawnSync(sh, ["-c", "exit 0"]).status === 0,
+);
+
+for (const { skill, text } of waitSites) {
+  test(`${skill}: the arm block aborts, naming the variable, when its input is unbound — bash and zsh`, () => {
+    const block = armBlock(text).replace(/<PR#>/g, "7");
+    assert.match(block, /CI_ROLLUP:\?/);
+    assert.ok(shellsAvailable.includes("bash"), "bash is required");
+    for (const sh of shellsAvailable) {
+      const run = (env) =>
+        spawnSync(sh, ["-c", block], {
+          env: { PATH: process.env.PATH, ...env },
+          encoding: "utf8",
+          timeout: CLI_BUDGET.timeoutMs,
+        });
+      const unbound = run({});
+      assert.notEqual(
+        unbound.status,
+        0,
+        `${sh}: an unbound CI_ROLLUP must not be a quiet skip`,
+      );
+      assert.match(
+        unbound.stderr,
+        /CI_ROLLUP/,
+        `${sh}: the message names the variable`,
+      );
+      const bound = run({
+        CI_ROLLUP: "SUCCESS",
+        PR_HEAD: "abc",
+        PR_ID: "7",
+        PR_NUMBER: "7",
+      });
+      assert.equal(
+        bound.status,
+        0,
+        `${sh}: bound inputs run clean (the engine is absent, so the rule says no): ${bound.stderr}`,
+      );
+    }
+  });
+}
+
+test('develop-next\'s arm also refuses an unbound PR_HEAD, so `--head ""` is unreachable', () => {
+  const next = waitSites.find((s) => s.skill === "develop-next");
+  const block = armBlock(next.text);
+  const r = spawnSync("bash", ["-c", block], {
+    env: { PATH: process.env.PATH, CI_ROLLUP: "NONE", PR_ID: "7" },
+    encoding: "utf8",
+  });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /PR_HEAD/);
+});
+
+test("finalise Step 7 canonical comment: an UNSET CI_TREE_EQ / CI_TREE_EQ_2 aborts, an EMPTY one passes", () => {
+  const f = waitSites.find((s) => s.skill === "finalise").text;
+  const m = /( *: "\$\{CI_TREE_EQ\?[^\n]*\\\n *"\$\{CI_TREE_EQ_2\?[^\n]*)/.exec(
+    f,
+  );
+  assert.ok(m, "the Step 7 unset-guard was not found");
+  const guard = dedent(m[1]);
+  for (const sh of shellsAvailable) {
+    const run = (env) =>
+      spawnSync(sh, ["-c", guard], {
+        env: { PATH: process.env.PATH, ...env },
+        encoding: "utf8",
+      });
+    assert.notEqual(run({}).status, 0, `${sh}: both unset`);
+    assert.match(
+      run({ CI_TREE_EQ: "" }).stderr,
+      /CI_TREE_EQ_2/,
+      `${sh}: only reading 2 unset`,
+    );
+    assert.equal(
+      run({ CI_TREE_EQ: "", CI_TREE_EQ_2: "" }).status,
+      0,
+      `${sh}: empty means the reading waited`,
+    );
+    assert.equal(
+      run({ CI_TREE_EQ: "0123456789ab", CI_TREE_EQ_2: "" }).status,
+      0,
+      `${sh}: set is fine`,
+    );
+  }
 });

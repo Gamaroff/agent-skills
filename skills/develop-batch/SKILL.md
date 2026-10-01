@@ -434,6 +434,9 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      and for nothing else** — every other answer, including a failed read, exits 1:
 
      ```bash
+     # INPUT, re-bound in THIS block (a fresh shell has none): the rollup read above. Run from the item's
+     # worktree: the engine judges the checked-out HEAD of its working directory and refuses any other.
+     : "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}"
      CI_TREE_EQ=""
      case "$CI_ROLLUP" in
        PENDING|NONE)

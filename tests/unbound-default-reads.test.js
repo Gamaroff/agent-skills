@@ -49,6 +49,33 @@ const INPUTS = new Map([
     "skills/finalise/SKILL.md#FINALISE_CI_MAX_WAIT",
     "environment knob (CI wait ceiling), documented beside the read",
   ],
+  // task.172 (QA cycle 2, CR2-8): the docs-only arm blocks fail LOUDLY on an unbound input, so each
+  // `${NAME:?}` below is the guard itself. Every fenced block is its own shell: these are re-bound by the
+  // agent in the block that reads them, from the rollup read / PR metadata the step records.
+  [
+    "skills/finalise/SKILL.md#CI_ROLLUP",
+    "re-bound input of the docs-only arm (the Step 6 rollup read); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/finalise/SKILL.md#PR_NUMBER",
+    "re-bound input of the docs-only arm (the PR number); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/develop-next/SKILL.md#CI_ROLLUP",
+    "re-bound input of the docs-only arm (the one-shot rollup read); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/develop-next/SKILL.md#PR_HEAD",
+    're-bound input of the docs-only arm (the PR head); the `:?` stops `--head ""` reaching the engine',
+  ],
+  [
+    "skills/develop-next/SKILL.md#PR_ID",
+    "re-bound input of the docs-only arm (the PR id); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/develop-batch/SKILL.md#CI_ROLLUP",
+    "re-bound input of the docs-only arm (the one-shot rollup read); the `:?` is the loud-failure guard",
+  ],
   [
     "skills/review-pr/SKILL.md#TARGET",
     "the Skill's positional argument, bound by the invocation",

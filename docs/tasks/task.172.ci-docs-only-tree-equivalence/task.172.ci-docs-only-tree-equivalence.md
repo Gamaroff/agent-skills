@@ -438,21 +438,21 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-01
-**Quality Score**: 60/100
+**Quality Score**: 50/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.172.qa.1.ci-docs-only-tree-equivalence.md](./task.172.qa.1.ci-docs-only-tree-equivalence.md)
-- **Gate File**: [task.172.gate.1.ci-docs-only-tree-equivalence.yml](./task.172.gate.1.ci-docs-only-tree-equivalence.yml)
+- **Full Report**: [task.172.qa.2.ci-docs-only-tree-equivalence.md](./task.172.qa.2.ci-docs-only-tree-equivalence.md)
+- **Gate File**: [task.172.gate.2.ci-docs-only-tree-equivalence.yml](./task.172.gate.2.ci-docs-only-tree-equivalence.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 51 new, 4833/4836 suite (two file-time budgets only)
+- **Tests Executed**: 213 across the 7 affected suites
 - **Phases Verified**: 4/4
-- **Critical Issues**: 2 HIGH, 1 MEDIUM
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 2 HIGH, 6 MEDIUM
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Two reproduced bypasses of the engine's fail-closed property (config read from the head being judged; an all-skipped ancestor reads green) and one recording gap in the Step 7 comment.
+Cycle 1's findings are fixed. The refute pass found two more HIGH ways to read a head as verified when it is not (a red docs-only ancestor is walked past; an ancestor with a success plus skipped jobs reads green) and six MEDIUM gaps.
 
 <!-- change-log-start -->
 
@@ -466,6 +466,8 @@ Two reproduced bypasses of the engine's fail-closed property (config read from t
 | 2026-10-01 |         | Implemented — 4 new + 10 modified files (and generated bundle copies), 51 new tests; yaml-subset forced a block-list config spelling | develop |
 | 2026-10-01 |  | QA gate FAIL (60/100) — 3 findings | qa-task |
 | 2026-10-01 |  | QA findings fixed — 3 findings (2 HIGH, 1 MEDIUM) plus 2 advisory, 1 iteration | qa-fix |
+| 2026-10-01 |  | QA gate FAIL (50/100) — 8 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 8 findings (2 HIGH, 6 MEDIUM) plus 1 advisory, 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

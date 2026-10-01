@@ -214,6 +214,9 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      and for nothing else** — every other answer, including a failed read, exits 1:
 
      ```bash
+     # INPUTS, re-bound in THIS block (a fresh shell has none): the rollup read above, the PR head and the
+     # PR id. Unbound, the rule would be skipped silently, or `--head ""` would judge another commit.
+     : "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}" "${PR_HEAD:?bind PR_HEAD}" "${PR_ID:?bind PR_ID}"
      CI_TREE_EQ=""
      case "$CI_ROLLUP" in
        PENDING|NONE)

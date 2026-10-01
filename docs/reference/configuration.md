@@ -129,6 +129,7 @@ ci: # optional — the docs-only rule at the pipeline's CI waits (task.172)
     # Optional local check, run from the repo root after a docs-only finding. A non-zero exit
     # means the rule does not apply and the wait proceeds as before. Unset = no local check.
     checkCommand: ""
+    checkTimeoutSeconds: 1500 # the check is killed after this long and the finding is check-failed
 
 subagents: # optional — how long a pipeline waits on a dispatched subagent
   # Minutes a dispatch site (the QA diff reviewer, the pre-develop surface map,
@@ -257,6 +258,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `ci.docsOnly.enabled`                            | boolean                         | `true`                                           | Whether the docs-only rule applies at `/finalise` readings 1 and 2, `/develop-next` Step 3 and `/develop-batch` Step 3. `false` restores a full CI wait at every one of them. A value that is not `true` or `false` is a usage error (exit 2), never a silent default. See [The docs-only CI rule](#the-docs-only-ci-rule). |
 | `ci.docsOnly.patterns`                           | block list of globs             | `["**/*.md", "docs/**"]`                         | Which changed paths count as documentation. **Spell it `**/*.md`, not `*.md`:** `*` does not cross `/`, so the literal `*.md` matches only repository-root markdown (measured on the shared matcher). Write it as a **block list**; an inline `[..]` is read as a string and rejected with exit 2. A path matching none of the globs is code, and the walk stops with `code-changed`. |
 | `ci.docsOnly.checkCommand`                       | shell command                   | unset                                            | A local check run from the repo root once a head is found docs-only over a green ancestor. Non-zero exits make the finding `check-failed` and the site waits as before. Unset, the rule applies on the patterns alone. **Set it to reproduce every check that a workflow path-filtered to your docs patterns would have run**: a green ancestor that never touched those paths never ran that workflow. |
+| `ci.docsOnly.checkTimeoutSeconds`                 | positive integer (seconds)      | `1500`                                           | How long `checkCommand` may run before it is killed and the finding is `check-failed`. The `/finalise` 6c poll runs the check inside its decision loop, so an unbounded check would stall the poll past its own wait bound without writing a result. The default matches `FINALISE_CI_MAX_WAIT`. |
 | `developNext.roadmapPath`                        | path                            | `docs/development/project-completion-roadmap.md` | Completion roadmap parsed by `develop-next`'s deterministic selector (`select-next.mjs`).                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `developNext.baseBranch`                         | branch name                     | `develop`                                        | Branch `develop-next` syncs before selection, merges completed epics into, and commits roadmap ticks to.                                                                                                                                                                                                                                                                                                                                                                                  |
 | `developNext.qualityGateCommand`                 | shell command                   | `npm run ci`                                     | Local merge gate `develop-next` and `develop-batch` run on every branch before merging (the whole gate for projects without PR CI). **Expected to be the project's full CI-equivalent** — everything the CI job runs, in one command — so that a local green predicts a CI green. Defaulted to `npm test` until 2026-09-01, which was quietly weaker than the CI it was meant to predict; an explicit value here still wins. |
@@ -323,8 +325,8 @@ implementation report), so the code tree is identical to one CI already passed. 
 enough, and all four sites call it. A reading is satisfied when:
 
 1. the head's rollup is `PENDING` or `NONE` (a `FAILURE`, `CANCELLED` or `UNKNOWN` head never qualifies);
-2. a first-parent ancestor of the head (at most 20 back) has a green rollup of **its own checks**. Checks that were skipped or neutral pass only beside at least one real success: an ancestor whose only checks were skipped is not green;
-3. every file changed between that ancestor and the head matches `ci.docsOnly.patterns`. A path in an unusual form (a backslash, a leading space or slash) and any `skills-config.yaml` in the delta are never docs, whatever the patterns say, so a commit cannot widen the rule that judges it; and
+2. a first-parent ancestor of the head (at most 20 back) has a green rollup of **its own checks**: every check ran and succeeded. **Any skipped or neutral check makes the ancestor not green** (a paths-filter job can succeed while its tests are skipped), and a nearer docs-only ancestor that is **red** stops the walk rather than being walked past (a cancelled one is walked past: cancel-in-progress cancels every superseded push);
+3. every file changed between that ancestor and the head matches `ci.docsOnly.patterns`. A path in an unusual form (a backslash, a leading space or slash), a `skills-config.yaml` anywhere in the delta, and a submodule pointer are never docs, whatever the patterns say, so a commit cannot widen the rule that judges it; and
 4. `ci.docsOnly.checkCommand`, when set, exits 0.
 
 The site then records `SUCCESS (tree-equivalent to <sha12>)`, **never plain `SUCCESS`**, so the record
@@ -345,6 +347,7 @@ Four things worth knowing:
   checker, for instance) never ran on a green ancestor that touched none of them, and a local command
   rarely reproduces external-URL reachability. That residual is accepted; `enabled: false` is the
   rollback.
+- **The configuration is strict.** An unknown key under `ci.docsOnly` (or `ci.docsonly` in the wrong case) is a usage error that names it, because a typo such as `checkcommand` would silently drop the safety net. `--head` must be the checked-out `HEAD` of the repository: the configuration is read, and `checkCommand` run, in the working tree, so any other head is refused as `unverifiable`.
 - **A rebased `/develop-batch` head with code does not qualify.** Its diff to any green ancestor
   includes the item's own changes, so it waits as before.
 

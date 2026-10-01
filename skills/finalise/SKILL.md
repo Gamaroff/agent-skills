@@ -885,6 +885,9 @@ nothing else** — every other answer, including a failed read, exits 1 — so t
 "no" up to green:
 
 ```bash
+# INPUTS, re-bound in THIS block (a fresh shell has none): the rollup read above and the PR number.
+# Unbound, the rule would be skipped silently and the wait would run as if it did not exist.
+: "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}" "${PR_NUMBER:?bind PR_NUMBER}"
 CI_TREE_EQ=""
 case "$CI_ROLLUP" in
   PENDING|NONE)
@@ -899,9 +902,12 @@ esac
 The engine decides on four things and this step re-derives none of them: the head's rollup is
 `PENDING`/`NONE`; a first-parent ancestor has a green rollup **of its own checks**; every file changed
 since it matches `ci.docsOnly.patterns` (default `**/*.md`, `docs/**`), with a change to `skills-config.yaml`
-never counting as docs; and `ci.docsOnly.checkCommand`, when configured, passes. The ancestor read differs
-from this head reduction in one place: an ancestor whose checks were **all** skipped or neutral is `NONE`,
-not green, because it verified nothing. `FAILURE`, `CANCELLED` and `UNKNOWN` heads never reach it. Switch the rule off
+or to a submodule pointer never counting as docs; and `ci.docsOnly.checkCommand`, when configured, passes
+(bounded by `ci.docsOnly.checkTimeoutSeconds`). Three things make it stricter than this head reduction, on
+purpose: an ancestor with **any** skipped or neutral check is `NONE`, not green (a paths-filter job can
+succeed while its tests are skipped); a nearer docs-only ancestor that is **red** stops the walk instead of
+being walked past; and `--head` must be the checked-out `HEAD`, because the configuration and the local
+check apply to the working tree. `FAILURE`, `CANCELLED` and `UNKNOWN` heads never reach it. Switch the rule off
 with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../docs/reference/configuration.md)).
 **A `SUCCESS` reached this way is never recorded as plain `SUCCESS`** — see the table.
 
@@ -1758,17 +1764,22 @@ POLLEOF
      CLOSING_LINE="All Definition of Done criteria verified. Story/task accepted."
    fi
 
-   # CI_TREE_EQ (reading 1, Step 6) and CI_TREE_EQ_2 (reading 2, 6c) are INPUTS to this block, bound
-   # by the agent from the readings it recorded, exactly like CI_ROLLUP and CI_ROLLUP_2 above: this
-   # block is its own shell and computes neither. Both are empty when the reading waited for the
-   # head's own CI, and a non-empty one is why the record below says "tree-equivalent to <sha>"
-   # rather than plain SUCCESS (task.172 QA cycle 1, CR-3). A SUCCESS that the docs-only rule
-   # satisfied and that is written here without its sha is the record this rule exists to prevent.
-
    # The plain-language lead. It goes BELOW the marker and above everything
    # else — see the warning under Step 6c. `done` is the same stage the tracker
    # comment uses; one vocabulary, not a second one for pull requests.
    LEAD=$(node references/stakeholder-summary-cli.js --stage done) || exit 1
+
+   # CI_TREE_EQ (reading 1, Step 6) and CI_TREE_EQ_2 (reading 2, 6c) are INPUTS to this block, bound
+   # by the agent from the readings it recorded, exactly like CI_ROLLUP and CI_ROLLUP_2 above: this
+   # block is its own shell and computes neither. Both are EMPTY when the reading waited for the
+   # head's own CI, and a non-empty one is why the record below says "tree-equivalent to <sha>"
+   # rather than plain SUCCESS (task.172 QA cycle 1, CR-3). A SUCCESS that the docs-only rule
+   # satisfied and that is written here without its sha is the record this rule exists to prevent,
+   # so an UNSET one aborts the block (`${VAR?}` fails on unset and accepts empty): bind it, empty
+   # when the reading waited, rather than let an unbound variable write plain SUCCESS (CR2-8).
+   # (No apostrophe inside the ${VAR?word} text: bash 3.2, the macOS default, mis-parses one.)
+   : "${CI_TREE_EQ?bind CI_TREE_EQ, empty when reading 1 waited for the head CI}" \
+     "${CI_TREE_EQ_2?bind CI_TREE_EQ_2, empty when reading 2 waited for the head CI}"
 
    BODY="$MARKER
    $LEAD

@@ -32,6 +32,13 @@ All notable changes to this project will be documented in this file. Format foll
     own diff); an ancestor whose only checks were skipped is not green; a path a matcher would normalise
     into `docs/**` (a backslash or leading-space name) is code. `/finalise`'s canonical PR comment
     now carries the `(tree-equivalent to <sha>)` suffix on reading 2 as well as reading 1.
+  - QA cycle 2 (refute pass) closed eight more: a nearer red docs-only ancestor now stops the walk; an
+    ancestor with any skipped or neutral check is not green; `--head` must be the checked-out `HEAD`;
+    unknown `ci.docsOnly` keys are a usage error; a submodule pointer is code and
+    `diff.ignoreSubmodules` cannot hide it; the commit-status read paginates; `checkCommand` is bounded by
+    the new `ci.docsOnly.checkTimeoutSeconds` (default 1500); the new prose blocks fail loudly on an unbound
+    input (`${VAR:?}`, and `${VAR?}` for the Step 7 comment); an empty option value is a usage error; the
+    repository root is resolved before the config is read.
 
 - **The two hand-written reference pages are pinned to the skills they describe (task 142, obs #159).**
   - `tests/reference-doc-skill-pinning.test.js` fails when a `docs/reference/commands.md` row

@@ -72,6 +72,13 @@ const REASONS = Object.freeze({
 // only repository-root markdown (measured, task.172).
 const DEFAULT_PATTERNS = Object.freeze(["**/*.md", "docs/**"]);
 const MAX_ANCESTORS = 20;
+const DEFAULT_CHECK_TIMEOUT_SECONDS = 1500; // matches /finalise's FINALISE_CI_MAX_WAIT default
+const DOCS_ONLY_KEYS = Object.freeze([
+  "enabled",
+  "patterns",
+  "checkCommand",
+  "checkTimeoutSeconds",
+]);
 const BB_API = "https://api.bitbucket.org/2.0";
 const BB_MAX_PAGES = 5;
 
@@ -183,7 +190,18 @@ async function classifyTreeEquivalence({
         detail: `the checks of ${a.sha} could not be read`,
       });
     }
-    // PENDING / NONE / FAILURE / CANCELLED: not green. An older green ancestor is still valid
+    if (rollup === "FAILURE") {
+      // The delta from this ancestor to the head is docs only, so the head inherits whatever this
+      // commit's CI found red (a link checker, a test that reads docs/). Walking past it to an older
+      // green commit would green a head on a state CI has already rejected (CR2-1, task.172 QA
+      // cycle 2). CANCELLED is different and is walked past: cancel-in-progress cancels the run of
+      // every superseded push, so a cancelled ancestor says nothing about the content.
+      return done(REASONS.NO_GREEN_ANCESTOR, {
+        changed,
+        detail: `${a.sha} is red (FAILURE) and the head differs from it only by docs, so the head inherits that red; not walking past it to an older green commit`,
+      });
+    }
+    // PENDING / NONE / CANCELLED: not green and not red. An older green ancestor is still valid
     // evidence for the same code tree, so keep walking.
   }
   return done(REASONS.NO_GREEN_ANCESTOR, {
@@ -202,9 +220,12 @@ function exitCodeFor(reason) {
 
 /**
  * Reduce one commit's checks to NONE | FAILURE | PENDING | CANCELLED | SUCCESS.
- * A CheckRun is decided only at `completed`; skipped/neutral pass only alongside a real success; zero
- * checks, or only skipped/neutral ones, is NONE and is never green. Mirrors skills/finalise/SKILL.md Step 6 (and scripts/release-ci-verdict.mjs, which
- * is repo-only and so cannot be required from here).
+ * A CheckRun is decided only at `completed`. For an ANCESTOR, which is the whole evidence, green means
+ * every check ran and succeeded: zero checks, or ANY skipped or neutral check, is NONE and never green.
+ * This is stricter than the head reduction in skills/finalise/SKILL.md Step 6 (where a skipped job is
+ * not a red), on purpose: a paths-filtered workflow whose "changes" job succeeds while its test jobs
+ * are skipped would otherwise let a docs-only ancestor sitting on unverified code green a head
+ * (CR2-2, task.172 QA cycle 2). Narrowing the claim here beats guessing which skips are vacuous.
  */
 function reduceChecks({ checkRuns = [], statuses = [] }) {
   const states = [];
@@ -231,11 +252,9 @@ function reduceChecks({ checkRuns = [], statuses = [] }) {
   if (states.includes("FAILURE")) return "FAILURE";
   if (states.includes("PENDING")) return "PENDING";
   if (states.includes("CANCELLED")) return "CANCELLED";
-  // Skipped and neutral are not failures and pass ALONGSIDE a real success (a paths-filtered job that
-  // did not trigger is not a red). Alone they verified nothing: an ancestor whose only checks were
-  // skipped is `NONE`, never green, or a docs-only head could launder a code commit CI never ran
-  // (CR-2, task.172 QA cycle 1). The head's own reading in /finalise Step 6 is unchanged.
-  return states.includes("SUCCESS") ? "SUCCESS" : "NONE";
+  // Only successes: green. Any skipped/neutral check: not evidence (see above). The head's own
+  // reading in /finalise Step 6 is unchanged.
+  return states.includes("SKIPPED") ? "NONE" : "SUCCESS";
 }
 
 /** Bitbucket commit statuses → the same vocabulary. Empty list is NONE, never green. */
@@ -265,6 +284,7 @@ function readConfig(root) {
     enabled: true,
     patterns: [...DEFAULT_PATTERNS],
     checkCommand: "",
+    checkTimeoutSeconds: DEFAULT_CHECK_TIMEOUT_SECONDS,
   };
   let text;
   try {
@@ -273,10 +293,27 @@ function readConfig(root) {
     if (e && e.code === "ENOENT") return cfg;
     throw new UsageError(`skills-config.yaml could not be read: ${e.message}`);
   }
-  const block = ((parseYamlSubset(text) || {}).ci || {}).docsOnly;
+  const ci = (parseYamlSubset(text) || {}).ci || {};
+  // `ci.docsonly:` would leave the rule ON for an owner who meant to configure it (CR2-4).
+  for (const k of Object.keys(ci)) {
+    if (k !== "docsOnly" && k.toLowerCase() === "docsonly") {
+      throw new UsageError(
+        `ci.${k} looks like ci.docsOnly; the key is case-sensitive`,
+      );
+    }
+  }
+  const block = ci.docsOnly;
   if (block === undefined || block === null) return cfg;
   if (typeof block !== "object" || Array.isArray(block)) {
     throw new UsageError("ci.docsOnly must be a mapping");
+  }
+  // An unknown key is a typo with a consequence (`checkcommand:` drops the safety net, a misspelled
+  // `patterns:` widens to the default), so it is refused, not ignored (CR2-4, task.172 QA cycle 2).
+  const unknown = Object.keys(block).filter((k) => !DOCS_ONLY_KEYS.includes(k));
+  if (unknown.length > 0) {
+    throw new UsageError(
+      `ci.docsOnly has unknown key(s): ${unknown.join(", ")} (known: ${DOCS_ONLY_KEYS.join(", ")})`,
+    );
   }
   if ("enabled" in block) {
     if (typeof block.enabled !== "boolean") {
@@ -300,6 +337,15 @@ function readConfig(root) {
     }
     cfg.checkCommand = block.checkCommand.trim();
   }
+  if ("checkTimeoutSeconds" in block) {
+    const t = block.checkTimeoutSeconds;
+    if (!Number.isInteger(t) || t <= 0) {
+      throw new UsageError(
+        "ci.docsOnly.checkTimeoutSeconds must be a positive integer",
+      );
+    }
+    cfg.checkTimeoutSeconds = t;
+  }
   return cfg;
 }
 
@@ -308,6 +354,28 @@ function readConfig(root) {
 // ---------------------------------------------------------------------------
 
 const EXEC_OPTS = { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] };
+
+/** The repository root of `cwd`, or `cwd` itself outside a repository. */
+function repoRoot(exec, cwd) {
+  try {
+    const top = String(
+      exec("git", ["rev-parse", "--show-toplevel"], { ...EXEC_OPTS, cwd }),
+    ).trim();
+    return top || cwd;
+  } catch {
+    return cwd;
+  }
+}
+
+/** The full commit a revision names; throws when it names none. */
+function commitOf(exec, cwd, rev) {
+  return String(
+    exec("git", ["rev-parse", "--verify", `${rev}^{commit}`], {
+      ...EXEC_OPTS,
+      cwd,
+    }),
+  ).trim();
+}
 
 /** First-parent ancestors of `head`, nearest first, at most MAX_ANCESTORS. Throws on failure. */
 function listAncestors(exec, cwd, head) {
@@ -326,18 +394,45 @@ function listAncestors(exec, cwd, head) {
 }
 
 /**
- * Paths changed between `sha` and `head`, or null when git cannot say. `--no-renames` is
- * load-bearing: with rename detection a `src/a.ts` → `docs/a.md` move lists only the new name,
- * which reads as docs-only while it deleted code. `-z` keeps odd file names intact.
+ * Paths changed between `sha` and `head`, or null when git cannot say. Three flags are load-bearing:
+ * `--no-renames` (with rename detection a `src/a.ts` → `docs/a.md` move lists only the new name, which
+ * reads as docs-only while it deleted code), `-z` (odd file names stay intact) and
+ * `--ignore-submodules=none` (a `diff.ignoreSubmodules=all` in the repository config would otherwise
+ * report a pointer bump as an empty delta). A gitlink (mode 160000) is a submodule pointer, which is
+ * code whatever directory it sits in, so it is returned as `:gitlink:<path>`, which no docs pattern
+ * matches (CR2-5, task.172 QA cycle 2).
  */
 function diffNames(exec, cwd, sha, head) {
   try {
     const out = exec(
       "git",
-      ["diff", "--name-only", "--no-renames", "-z", sha, head],
+      [
+        "diff",
+        "--raw",
+        "--no-renames",
+        "--ignore-submodules=none",
+        "-z",
+        sha,
+        head,
+      ],
       { ...EXEC_OPTS, cwd },
     );
-    return String(out).split("\0").filter(Boolean);
+    const tokens = String(out).split("\0");
+    const names = [];
+    for (let i = 0; i < tokens.length; i += 1) {
+      const meta = tokens[i];
+      if (!meta.startsWith(":")) continue;
+      const [oldMode, newMode] = meta.slice(1).split(" ");
+      const file = tokens[i + 1];
+      i += 1;
+      if (file === undefined || file === "") return null;
+      names.push(
+        oldMode === "160000" || newMode === "160000"
+          ? `:gitlink:${file}`
+          : file,
+      );
+    }
+    return names;
   } catch {
     return null;
   }
@@ -356,7 +451,7 @@ function githubRollup(exec, cwd, sha) {
       ".check_runs[] | {status, conclusion}",
     );
     const statuses = jsonLines(
-      ["api", `repos/{owner}/{repo}/commits/${sha}/status`],
+      ["api", `repos/{owner}/{repo}/commits/${sha}/status`, "--paginate"],
       ".statuses[] | {state}",
     );
     return reduceChecks({ checkRuns, statuses });
@@ -423,8 +518,10 @@ function parseArgs(argv) {
     if (a === "--json") out.json = true;
     else if (takes.has(a)) {
       const v = argv[i + 1];
-      if (v === undefined || v.startsWith("--")) {
-        throw new UsageError(`${a} needs a value`);
+      if (v === undefined || v === "" || v.startsWith("--")) {
+        // An empty value is an unbound shell variable, and `--head ""` used to fall back to HEAD
+        // silently (CR2-8, task.172 QA cycle 2).
+        throw new UsageError(`${a} needs a non-empty value`);
       }
       out[a.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = v;
       i += 1;
@@ -460,7 +557,7 @@ async function run({
   let exitCode;
   try {
     const args = parseArgs(argv);
-    const root = path.resolve(args.workspaceRoot || cwd);
+    const root = path.resolve(args.workspaceRoot || repoRoot(exec, cwd));
     const cfg = readConfig(root);
     const head =
       args.head ||
@@ -470,14 +567,24 @@ async function run({
 
     let ancestorShas = null;
     let listError = "";
-    if (
+    const candidate =
       cfg.enabled &&
-      ["PENDING", "NONE"].includes(args.headRollup.toUpperCase())
-    ) {
-      try {
-        ancestorShas = listAncestors(exec, root, head);
-      } catch (e) {
-        listError = e && e.message ? e.message : "git rev-list failed";
+      ["PENDING", "NONE"].includes(args.headRollup.toUpperCase());
+    if (candidate) {
+      // The configuration is read, and checkCommand is run, in the working tree. They are only
+      // meaningful for the commit that is checked out there, so a --head that is anything else (a
+      // poll that outlived a checkout, a caller in the wrong directory) is refused rather than
+      // judged against another tree (CR2-3, task.172 QA cycle 2).
+      const want = commitOf(exec, root, head);
+      const have = commitOf(exec, root, "HEAD");
+      if (want !== have) {
+        listError = `--head ${head} (${want.slice(0, 12)}) is not the checked-out HEAD (${have.slice(0, 12)}); the configuration and the local check apply to the working tree`;
+      } else {
+        try {
+          ancestorShas = listAncestors(exec, root, head);
+        } catch (e) {
+          listError = e && e.message ? e.message : "git rev-list failed";
+        }
       }
     }
     const platform = args.platform || detectPlatform(exec, root, env);
@@ -491,7 +598,7 @@ async function run({
         reason: REASONS.UNVERIFIABLE,
         greenSha: null,
         changed: [],
-        detail: `the ancestors of ${head} could not be listed: ${listError}`,
+        detail: `the ancestors of ${head} could not be judged: ${listError}`,
         reads: { diffs: 0, rollups: 0 },
       };
     } else {
@@ -510,17 +617,24 @@ async function run({
 
     if (result.reason === REASONS.TREE_EQUIVALENT && cfg.checkCommand) {
       // The child's stdout goes to OUR stderr: --json promises a clean stdout for `jq`.
+      // Bounded: the 6c poll runs this inside its decision loop, and a hung check would otherwise
+      // stall the poll past its own MAX_WAIT without ever writing a result (CR2-7).
       const r = spawn("sh", ["-c", cfg.checkCommand], {
         cwd: root,
         stdio: ["ignore", 2, 2],
+        timeout: cfg.checkTimeoutSeconds * 1000,
+        killSignal: "SIGKILL",
       });
+      const timedOut = Boolean(r.error && r.error.code === "ETIMEDOUT");
       const checkExit = typeof r.status === "number" ? r.status : 1;
       result = { ...result, checkExit };
-      if (checkExit !== 0) {
+      if (timedOut || checkExit !== 0) {
         result = {
           ...result,
           reason: REASONS.CHECK_FAILED,
-          detail: `ci.docsOnly.checkCommand exited ${checkExit}`,
+          detail: timedOut
+            ? `ci.docsOnly.checkCommand timed out after ${cfg.checkTimeoutSeconds}s`
+            : `ci.docsOnly.checkCommand exited ${checkExit}`,
         };
       }
     }
@@ -577,6 +691,7 @@ module.exports = {
   reduceChecks,
   reduceBitbucketStatuses,
   readConfig,
+  DEFAULT_CHECK_TIMEOUT_SECONDS,
   parseArgs,
   listAncestors,
   diffNames,
