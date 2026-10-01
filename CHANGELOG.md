@@ -55,6 +55,11 @@ All notable changes to this project will be documented in this file. Format foll
     five-minute delay into a permanent loss of the rule for that poll); and a `skills-config.yaml` that has
     content but parses to no mapping, or is committed as a symlink or submodule, is a usage error (exit 2)
     instead of the defaults, so an opt-out held in a link's target is no longer ignored.
+  - QA cycle 5 closed three more, all in reading `skills-config.yaml`: a leading BOM no longer defeats the
+    parse when a key precedes `ci`; the parse must now account for every content row (a mis-indented or
+    duplicated row, or a key under `ci` other than `docsOnly`, is exit 2 instead of a silently ignored
+    opt-out); and the git mode check and the read are anchored to the same place, so
+    `--workspace-root <subdirectory>` still sees a root opt-out.
 
 - **`/wireloom`: UI wireframes as text, rendered to SVG.** Adapted from
   [StardockCorp/Wireloom](https://github.com/StardockCorp/Wireloom) (MIT, © Brad Wardell). The

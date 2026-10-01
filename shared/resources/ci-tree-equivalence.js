@@ -30,12 +30,14 @@
  *   1  every other answer: not-applicable, disabled, code-changed, no-green-ancestor,
  *      unverifiable, check-failed (and an unexpected throw, reported as unverifiable)
  *   2  usage error — including a malformed ci.docsOnly block, a configuration that has content but
- *      is no mapping, and a skills-config.yaml that is not a regular file (a symlink): none of them
- *      falls back silently to the defaults
+ *      is no mapping, a row of it the parse does not account for (mis-indented or duplicated), a key
+ *      under ci other than docsOnly, and a skills-config.yaml that is not a regular file (a symlink):
+ *      none of them falls back silently to the defaults
  *
  * `code-changed` is FINAL for a pinned head: it is reported only when no nearer ancestor was walked
  * past undecided (PENDING, NONE, CANCELLED, or green but not yet settled). Otherwise the answer is
- * `no-green-ancestor`, which a poll asks again.
+ * `no-green-ancestor`, which a poll asks again (a CANCELLED ancestor is re-asked too: it costs
+ * polling, never a wrong answer).
  *
  * `--json` prints { reason, greenSha, changed, changedCount, checkExit, pr, detail, reads } and nothing
  * else on stdout. `changed` is capped at 200 entries; `changedCount` is the real length.
@@ -337,15 +339,32 @@ function defaultConfig() {
   };
 }
 
-/** Is there any line that is not blank, a comment or a document marker? */
-function hasSignificantLine(text) {
+/** The lines that carry content: not blank, not a comment, not a document marker. */
+function significantLines(text) {
   return String(text)
-    .replace(/^\uFEFF/, "")
     .split(/\r?\n/)
-    .some((l) => {
+    .filter((l) => {
       const t = l.trim();
       return t !== "" && !t.startsWith("#") && t !== "---" && t !== "...";
     });
+}
+
+/**
+ * How many rows a parsed value accounts for: one per key, one per list element, recursively. The
+ * YAML subset ends a block at a dedent without an error, so a row it never reached is simply absent
+ * from the result; comparing this count with the significant lines is what notices (CR5-2).
+ */
+function consumedRows(v) {
+  if (Array.isArray(v)) {
+    return v.reduce(
+      (n, e) => n + 1 + (e && typeof e === "object" ? consumedRows(e) : 0),
+      0,
+    );
+  }
+  if (v && typeof v === "object") {
+    return Object.keys(v).reduce((n, k) => n + 1 + consumedRows(v[k]), 0);
+  }
+  return 0;
 }
 
 /**
@@ -355,14 +374,17 @@ function hasSignificantLine(text) {
  * YAML subset reads it as a string), a folded `checkCommand: >-` (read as the literal `>-`, which
  * `sh -c` runs as a redirection that exits 0).
  */
-function parseConfig(text) {
-  const cfg = defaultConfig();
+function parseConfig(rawText) {
+  // One BOM strip for everything below: the parser counts a BOM as a column of indent on the first
+  // row, so `ci:` at column 0 after a BOM'd first key was never read (CR5-1).
+  const text = String(rawText).replace(/^\uFEFF/, "");
   const parsed = parseYamlSubset(text) || {};
   // Text with content that does not parse to a mapping is a configuration the engine cannot read,
   // not an absent one: a top-level list, a line with no colon, or the one-line link text a symlinked
   // file reads as. Only a file with no significant line at all is "not configured" (CR4-2).
+  const rows = significantLines(text);
   if (
-    hasSignificantLine(text) &&
+    rows.length > 0 &&
     (parsed === null ||
       typeof parsed !== "object" ||
       Array.isArray(parsed) ||
@@ -372,6 +394,25 @@ function parseConfig(text) {
       `${CONFIG_BASENAME} has content but it does not parse to a mapping (a top-level list, a line without a colon, or the link text of a symlink); the rule will not guess what it meant`,
     );
   }
+  // The specific diagnostics (a block scalar, an unknown key) are produced first so they name the
+  // cause; the completeness check below is the net under all of them.
+  const cfg = interpretConfig(parsed);
+  // The parse must account for EVERY significant row, or the file is refused. The subset ends a block
+  // at a dedent without an error, and a duplicate key collapses into one, so a row can vanish from the
+  // result with nothing said: an opt-out indented one level too deep or too shallow was ignored one
+  // spelling at a time across five QA cycles (CR5-2). This is the one check for that whole class.
+  const consumed = consumedRows(parsed);
+  if (consumed !== rows.length) {
+    throw new UsageError(
+      `${CONFIG_BASENAME} has ${rows.length} content row(s) but the parse accounts for ${consumed}: a row is mis-indented, duplicated or in a form the YAML subset does not read; the rule will not guess which`,
+    );
+  }
+  return cfg;
+}
+
+/** Interpret a parsed top-level mapping as the ci.docsOnly configuration. */
+function interpretConfig(parsed) {
+  const cfg = defaultConfig();
   for (const k of Object.keys(parsed)) {
     if (k !== "ci" && normKey(k) === "ci") {
       throw new UsageError(`${k} looks like ci; the key is exactly "ci"`);
@@ -388,6 +429,11 @@ function parseConfig(text) {
     if (k !== "docsOnly" && normKey(k) === "docsonly") {
       throw new UsageError(
         `ci.${k} looks like ci.docsOnly; the key is exactly "docsOnly"`,
+      );
+    }
+    if (k !== "docsOnly") {
+      throw new UsageError(
+        `ci has an unknown key "${k}" (the only key is docsOnly; a key written beside docsOnly instead of under it is ignored by the rule)`,
       );
     }
   }
@@ -477,7 +523,7 @@ function readConfigAtCommit(exec, root, sha) {
   let entry;
   try {
     entry = String(
-      exec("git", ["ls-tree", sha, "--", CONFIG_BASENAME], {
+      exec("git", ["ls-tree", "--full-tree", sha, "--", CONFIG_BASENAME], {
         ...EXEC_OPTS,
         cwd: root,
       }),

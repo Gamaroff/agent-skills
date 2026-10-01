@@ -2536,3 +2536,109 @@ test("CR4-2: a regular config file is still read at the commit judged (the mode 
     }
   }
 });
+
+// ── QA cycle 5: CR5-1, CR5-2, CR5-3 ──────────────────────────────────────
+
+const OPT_OUT = "ci:\n  docsOnly:\n    enabled: false\n";
+
+test("CR5-1: a leading BOM does not defeat the parse when a key or a document marker precedes ci", async () => {
+  for (const [name, text] of [
+    ["BOM then another key", `﻿version: 2\n${OPT_OUT}`],
+    ["BOM then a document marker", `﻿---\n${OPT_OUT}`],
+    ["BOM then a comment and a key", `﻿# owner config\nversion: 2\n${OPT_OUT}`],
+    [
+      "BOM, CRLF, another key",
+      `﻿version: 2\r\nci:\r\n  docsOnly:\r\n    enabled: false\r\n`,
+    ],
+  ]) {
+    assert.equal(eng.parseConfig(text).enabled, false, name);
+  }
+  // and through git, at the commit judged: the opt-out in a BOM'd file with a key before ci holds
+  const dir = mkRepo({ config: `﻿version: 2\n${OPT_OUT}` });
+  try {
+    const green = commit(dir, { "src/a.ts": "1\n" }, "code");
+    commit(dir, { "README.md": "r\n" }, "docs");
+    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+      exec: fakeExec({ checks: { [green]: GREEN } }),
+    });
+    assert.equal(JSON.parse(r.stdout).reason, "disabled");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("CR5-2: a row the parse does not consume is refused — the parse must account for every significant row", () => {
+  const refused = [
+    [
+      "enabled written beside docsOnly instead of under it",
+      "ci:\n  docsOnly:\n  enabled: false\n",
+      /unknown key "enabled"/,
+    ],
+    [
+      "a first row indented deeper than a later ci row",
+      `  other: 1\n${OPT_OUT}`,
+      /accounts for/,
+    ],
+    [
+      "a duplicated key collapses into one",
+      "ci:\n  docsOnly:\n    enabled: true\n    enabled: false\n",
+      /accounts for/,
+    ],
+    [
+      "a row dedented out of its block",
+      "ci:\n    docsOnly:\n  enabled: false\n",
+      /accounts for|unknown key/,
+    ],
+  ];
+  for (const [name, text, why] of refused) {
+    assert.throws(() => eng.parseConfig(text), why, name);
+  }
+  // the specific diagnostic still wins over the general net
+  assert.throws(
+    () =>
+      eng.parseConfig(
+        "ci:\n  docsOnly:\n    checkCommand: >-\n      npm run x\n",
+      ),
+    /block scalar/,
+  );
+  // ordinary configurations are not refused: comments, other keys, a block list, blank lines, CRLF
+  const ordinary = [
+    '# owner\n\nother: 1\nnested:\n  a: b\nci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - "**/*.md"\n    enabled: true # on\n',
+    "---\nci:\n  docsOnly:\n    settleSeconds: 0\n",
+    "ci:\r\n  docsOnly:\r\n    enabled: false\r\n",
+    "unrelated: true",
+  ];
+  for (const text of ordinary) {
+    assert.doesNotThrow(
+      () => eng.parseConfig(text),
+      JSON.stringify(text).slice(0, 60),
+    );
+  }
+});
+
+test("CR5-3: the mode check and the read are anchored to the same place — --workspace-root on a subdirectory still sees a root opt-out", async () => {
+  const dir = mkRepo({ config: OPT_OUT });
+  try {
+    const green = commit(dir, { "sub/a.ts": "1\n" }, "code");
+    commit(dir, { "README.md": "r\n" }, "docs");
+    const sub = join(dir, "sub");
+    const r = await runEngine(
+      dir,
+      ["--head-rollup", "PENDING", "--workspace-root", sub, "--json"],
+      { exec: fakeExec({ checks: { [green]: GREEN } }) },
+    );
+    assert.equal(
+      JSON.parse(r.stdout).reason,
+      "disabled",
+      "the root configuration must be read when the workspace root is a subdirectory",
+    );
+    const direct = eng.readConfigAtCommit(
+      (c, a, o) => execFileSync(c, a, o),
+      sub,
+      git(dir, "rev-parse", "HEAD"),
+    );
+    assert.equal(direct.enabled, false);
+  } finally {
+    cleanup(dir);
+  }
+});

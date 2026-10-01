@@ -438,21 +438,21 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-01
-**Quality Score**: 75/100
+**Quality Score**: 70/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.172.qa.4.ci-docs-only-tree-equivalence.md](./task.172.qa.4.ci-docs-only-tree-equivalence.md)
-- **Gate File**: [task.172.gate.4.ci-docs-only-tree-equivalence.yml](./task.172.gate.4.ci-docs-only-tree-equivalence.yml)
+- **Full Report**: [task.172.qa.5.ci-docs-only-tree-equivalence.md](./task.172.qa.5.ci-docs-only-tree-equivalence.md)
+- **Gate File**: [task.172.gate.5.ci-docs-only-tree-equivalence.yml](./task.172.gate.5.ci-docs-only-tree-equivalence.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 364 across 11 affected files
+- **Tests Executed**: 87 engine tests (plus the fast gate: 4,901 of 4,903) across 11 affected files
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 2 MEDIUM, 1 LOW
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 3 MEDIUM, 1 LOW
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 3's fixes are verified. No HIGH is open. Two reproduced MEDIUM findings remain: the 6c poll latches a `code-changed` answer that is not final, and a configuration blob that parses to nothing (a symlink) gets the defaults.
+Cycle 4's fixes are verified. No HIGH is open. Three reproduced MEDIUM findings remain, all in how the configuration is read: a leading BOM defeats the parse when anything precedes `ci`, rows the parse does not consume are dropped silently, and the new mode check is anchored to the working directory while the read is anchored to the repository root.
 
 <!-- change-log-start -->
 
@@ -471,6 +471,8 @@ Cycle 3's fixes are verified. No HIGH is open. Two reproduced MEDIUM findings re
 | 2026-10-01 |  | QA gate CONCERNS (65/100) — 8 findings | qa-task |
 | 2026-10-01 |  | QA findings fixed — 8 findings (7 MEDIUM, 1 LOW) plus 3 advisory, 1 iteration | qa-fix |
 | 2026-10-01 |  | QA gate CONCERNS (75/100) — 2 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 2 findings (2 MEDIUM) plus 1 advisory, 1 iteration | qa-fix |
+| 2026-10-01 |  | QA gate CONCERNS (70/100) — 3 findings | qa-task |
 
 <!-- change-log-end -->
 

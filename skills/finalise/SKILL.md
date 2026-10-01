@@ -1485,8 +1485,9 @@ STATE=$(rollup); CHECKS=$(checks)
 # the answer cannot change (the head is pinned), so it is latched and not re-run every 30 s — a
 # configured checkCommand is a full local suite. code-changed is only ever reported when no nearer
 # ancestor was left undecided, so it IS final; behind an undecided ancestor the engine says
-# no-green-ancestor instead. no-green-ancestor / unverifiable can change (an ancestor's run may
-# finish), so those are asked again.
+# no-green-ancestor instead (a CANCELLED ancestor counts as undecided and is re-asked too: that
+# costs polling, never a wrong answer). no-green-ancestor / unverifiable can change (an ancestor's
+# run may finish), so those are asked again.
 tree_equivalent() {
   [ -n "$ENGINE" ] && [ "$TE_LATCHED" -eq 0 ] || return 1
   local out sha
