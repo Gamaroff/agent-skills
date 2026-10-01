@@ -205,7 +205,7 @@ Full categorised index below.
 | `find-skills` | Helps users discover and install agent skills when they ask questions like "how do I do X", "find a skill for X", "is there a… |
 | `generate-ui-prompt` | Generate masterful, comprehensive prompts for AI-driven frontend development tools (v0, Lovable, etc.). Use when creating UI generation prompts that need to be optimized for code… |
 | `observe-work` | Observes the working session for skill-improvement signals — corrections you make, gaps no skill covers, rules the agent violates — and writes each one as… |
-| `session-handoff` | Write and re-read the project's session handoff — the "read this first if you are picking up work here" file at .agents/handoff.md. Write mode records… |
+| `session-handoff` | Three modes over measured handoff files. Write records project state in .agents/handoff.md, every figure with the command that produced it. Read RE-MEASURES a handoff through… |
 
 ## User Experience
 

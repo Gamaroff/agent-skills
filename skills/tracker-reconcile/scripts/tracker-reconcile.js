@@ -157,7 +157,9 @@ function workItemDocFor(sidecarPath) {
     .filter(
       (f) =>
         f.endsWith(".md") &&
-        !/\.(qa|gate|bug|implementation|review|dod|handover|plan)\./.test(f),
+        !/\.(qa|gate|bug|implementation|review|dod|handover|handoff|plan|pr-review)\./.test(
+          f,
+        ),
     );
   return candidates.length ? path.join(dir, candidates[0]) : null;
 }

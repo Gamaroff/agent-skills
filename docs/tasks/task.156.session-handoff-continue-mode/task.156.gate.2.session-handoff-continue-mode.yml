@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.156.session-handoff-continue-mode'
+task_title: 'session-handoff continue mode: a continuation file a fresh context resumes from'
+gate: PASS
+status_reason: 'CR-1 from gate 1 is fixed and verified in three install layouts under bash and zsh. The cycle-2 refute pass raised four bugs and one cleanup, none at high confidence, so all are advisory and recorded for follow-up.'
+reviewer: 'QA Engineer'
+head: '3953e3b01cd4aab36087defaaa2639a5147e560f'
+updated: '2026-10-01T19:51:05Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 14
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+  ci: 'not read — gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 22
+    notes: 'isWorkItemDocument re-probed this cycle: engages, 22 executed, 0 reproduced, 0 over-blocked (task.156.qa.2.security.run.json).'
+  performance:
+    status: PASS
+    notes: 'continuation.mjs 0.11 s; verifier unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Not-installed layout exits 1 naming all three locations; no-verifier path keeps manual verification.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory findings recorded below.'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-10-01'
+  total_iterations: 1
+  verification_method: 'Step-1 block executed under bash and zsh: in-repo, user-level only, not installed'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Refute CR-1 (medium/medium): shell-quote the verifier and file paths in buildResumePrompt; test a path with a space.'
+      refs: ['skills/session-handoff/scripts/continuation.mjs', 'skills/session-handoff/tests/continuation.test.js']
+    - action: 'Refute CR-2 (medium/medium): §6 relies on readdir order; make it order-independent (artifact-only directory expects null) or sort inside workItemDocFor.'
+      refs: ['tests/work-item-artifact-naming.test.js', 'skills/tracker-reconcile/scripts/tracker-reconcile.js']
+    - action: 'Refute CR-3 (low/medium): an absolute verifier path stored in a committed continuation file is machine-specific; say so or re-resolve on read.'
+      refs: ['skills/session-handoff/scripts/continuation.mjs']
+    - action: 'Refute CR-4 (low/low): add .claude/skills and anchor repo-level entries at the toplevel in the step-1 search.'
+      refs: ['skills/session-handoff/SKILL.md']
+    - action: 'Refute CR-5 (cleanup): show --slug in the step-1 block or drop the sentence.'
+      refs: ['skills/session-handoff/SKILL.md']
+    - action: 'Gate-1 CR-2 (pre-existing): register risk/test-design and exclude them in tracker-reconcile.'
+      refs: ['skills/tracker-reconcile/scripts/tracker-reconcile.js', 'docs/standards/file-naming.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
