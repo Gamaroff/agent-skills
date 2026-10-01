@@ -35,7 +35,7 @@ First run of the full develop-task pipeline for task.172: one shared docs-only C
 | 2. review-task             | ✅ Done    | `task.172.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 9/10; 0 critical, 2 important (both fixed); status → Ready for Development; `task.172.review.1.*.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 4 phases; engine + 4 call sites + config; 51 new tests, 14 mutation proofs red | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #543: https://github.com/Gamaroff/agent-skills/pull/543 | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.172.qa.{N}.*.md`; `task.172.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles, HIGH 0 since cycle 3; loop limit reached on gate.5 (CONCERNS, 3 MEDIUM fixed in `e5547550` but ungated); route 2c declined (medium-not-falling) | —                    |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.172.qa.{N}.*.md`; `task.172.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (5, plus 1 granted on resume), HIGH 0 since cycle 3; loop limit reached again on gate.6 (CONCERNS, 2 MEDIUM fixed in `7074282a` but ungated); route 2c declined (medium-not-falling: 2, 3, 2) | —                    |
 | 7. finalise                | ⏳ Pending | `task.172.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -95,6 +95,9 @@ First run of the full develop-task pipeline for task.172: one shared docs-only C
 - QA Cycle 5 maintainability note: five cycles have closed configuration-parse fallbacks one spelling at a time (cycle 1 CR-1, cycle 3 CR3-3, cycle 4 CR4-2, now CR5-1 and CR5-2). Not a third strike (the strike is HIGH-only and none is open) and the narrowing-residue offer is `false` (`medium-files-differ` is not the signal here; the MEDIUMs share one file but cycle 4's did not), so nothing is forced. The structural move is offered to qa-fix as a recommendation in the gate: one completeness check (the parse must account for every significant row or refuse) rather than a sixth spelling.
 - QA Cycle 5 5b close-out: fix commit `e5547550` pushed once; qa-fix-5 comments posted to PR 543 and issue 539; post-fix PR state OPEN. Fast gate 4,903 of 4,906; the only failures are the file-time budgets of `test-clean-checkout` and `bundle-missing-source` (27 s and 39 s against 10 s at load 21). Counter reads QA_MAX_CYCLES (5): not returning to 5a. Route 2c (gate-the-last-fix half-cycle) asked with `budgetSpent: true`: `continue`, reason `medium-not-falling` (MEDIUM reads 7, 2, 3 over cycles 3–5; HIGH 0 on the last gate, last Action is `Running qa-fix`, so only the strictly-falling-MEDIUM condition failed). Escalating through Loop limit. Cycle 5's fix is therefore **not gated**: nothing has re-read `e5547550`.
 - Hosted CI on PR 543 at the cycle-3 head: `link-check` FAILURE (fixed in the uncommitted bug-16 edit above), `test`, `validate`, `shellcheck` SUCCESS. Per the loop's rule no cycle waits on CI; CI green is read once at `/finalise`.
+- QA Cycle 6 5b close-out: changes-requested stage `stage-disabled`; narrowing-residue offer `true` (`narrowing-residue`: CR5-1, CR5-2, CR5-3, CR6-1, CR6-2 all name `ci-tree-equivalence.js`), passed to `/qa-fix`, which chose the structural move **scope the claim**; qa-fix run via the Skill, no Explore pre-fix mapping or findings ingester (Explore subagents hung 3x earlier; the gate was read directly). Fast gate (`npm run ci:fast`, one attempt, 4,909 tests): 4,906 pass; the only failures are the two load-sensitive file-time budgets `tests/bundle-missing-source.test.js` and `tests/test-clean-checkout.test.js` (15.0 s and 15.6 s in the gate against 10 s); re-run alone the first passes and the second takes 11.3 s, the same two files and the same cause as cycle 5. Fix commit `7074282a` pushed once; qa-fix-6 comments posted to PR 543 and issue 539; post-fix PR state OPEN, head `7074282a`. **Route 2c (gate-the-last-fix) asked with `budgetSpent: true`: `continue`, `medium-not-falling` (MEDIUM 2, 3, 2 over cycles 4 to 6).** No half-cycle; Loop Escalation with the *Loop limit* trigger. The grant of one more cycle therefore ended, like the original budget, one gate short of the last fix: `7074282a` is ungated.
+- Step 5a cycle 6 (the granted cycle): default scoped re-review (files changed since gate 5's head `f3887635`, an ancestor of HEAD; no refute pass; no safety re-probe: gate 5 security CONCERNS, `reasoned`, no HIGH open). The reviewer patch was the fix commit's own 290-line delta rather than the 7,681-line whole-branch patch of the same 15 paths (almost all cycles 1 to 4); QA also read the delta itself. QA found CR6-1 by executing the new completeness check against the documented `developBatch.resources` shape before the one independent Explore reviewer returned (73 s, did not hang); the reviewer reproduced it, rated it high where QA rates it MEDIUM (it fails closed: the three callers read any non-zero exit as not tree-equivalent), and added CR6-2 and a LOW. All three cycle 5 fixes re-proven by mutation here (BOM strip, row-count refusal, `--full-tree`: each turns its test red). 90 engine tests pass, also under `TMPDIR=/tmp`. Convergence check: HIGH sequence 2, 2, 0, 0, 0, 0 does not trip. Route classifier: `continue` (`not-a-pass-gate`; route 2 declined `product-defect-signal`). Gate 6: CONCERNS 75/100, bugs 24 and 25, PR and issue comments posted. Counter reads 6 = `QA_MAX_CYCLES`: 5b's step 7 sends this to Loop Escalation, where route 2c is asked first; MEDIUM over cycles 4 to 6 reads 2, 3, 2, not strictly falling, so the engine will decline it.
+- **Resume after QA loop escalation (2026-10-01, new session):** operator invoked `/develop-task … Resume at 5a with 1 more cycle` (grant `k=1`, no prompt needed: the grant was stated in the invocation). `grant-qa-cycles.sh` restored the lock from `last-halt.json` and wrote `QA_CYCLE=5 extra_cycles_granted=1 qa_max_cycles=6`, `qa_phase: 5a`. Gates on disk 1-5, `### QA Cycle` entries 5: no cycle ran outside the loop, nothing back-filled. Cycle 6 is the gate over `e5547550`, the three MEDIUM fixes no gate has read.
 
 ---
 
@@ -169,6 +172,17 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: CR5-1 one BOM strip in `parseConfig`; CR5-2 the parse must account for every content row or the file is exit 2, and a key under `ci` other than `docsOnly` is refused (one completeness check instead of another spelling); CR5-3 `git ls-tree --full-tree` so the mode check and the read share one anchor; LOW CANCELLED re-ask documented. 4 mutation proofs red; 3 new tests.
 **Commit**: `e5547550`
 
+### QA Cycle 6 — 2026-10-01
+**Gate Result**: CONCERNS
+**Issues Found**: 2 in the gate (CR6-1 and CR6-2 MEDIUM), 2 LOW advisory (marker with a trailing comment; a second row tokenizer)
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: CR6-1 and CR6-2 with one structural move (qa-fix Step 2.6, scope the claim): the completeness check holds the `ci` block to account and nothing else (`ciBlockRows` against `1 + consumedRows(parsed.ci)`), so a list of maps elsewhere neither refuses the file nor offsets a dropped row; a map element in a list stops counting a row for its dash; a marker with a trailing comment is a marker (review LOW). 3 new tests; reverting the three edits turns CR6-1 and CR6-2 red.
+**Commit**: `7074282a`
+
 ### QA Loop Limit Reached — 2026-10-01
 
 The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
@@ -197,13 +211,41 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 
 ---
 
+### QA Loop Limit Reached — 2026-10-01 (after the granted cycle 6)
+
+The pipeline completed 6 qa-task/qa-fix cycles (5, plus one granted on resume) without a clean PASS.
+
+**Final gate status**: CONCERNS (gate.6, quality 75/100; HIGH 0)
+**HIGH findings per cycle**: 2, 2, 0, 0, 0, 0 — fell to zero at cycle 3 and stayed there
+**MEDIUM findings per cycle**: 1, 6, 7, 2, 3, 2
+**Remaining issues** (from gate.6; the fixes for both are committed in `7074282a` but not re-reviewed, and the three LOW/cleanup items are in the gate's `recommendations.future`):
+- CR6-1 MEDIUM `shared/resources/ci-tree-equivalence.js` — the completeness check's row count over-counted every list-of-maps element, so a valid documented `skills-config.yaml` was refused with exit 2 (fixed, ungated)
+- CR6-2 MEDIUM `shared/resources/ci-tree-equivalence.js` — the same over-count let a dropped row pass when it offset one (fixed, ungated)
+
+**What was attempted per cycle**:
+- Cycle 1: config file in the delta is never docs; all-skipped ancestor is NONE; Step 7 reading-2 suffix; non-normal path names are code; `--pr` echoed
+- Cycle 2: red docs ancestor stops the walk; skipped or neutral check disqualifies an ancestor; `--head` must be the checked-out `HEAD`; unknown keys refused; gitlinks are code; status paginates; `checkTimeoutSeconds`; unbound-input guards; repo root first
+- Cycle 3: ancestor settle window; block-scalar `checkCommand` refused; `ci` must be a block mapping; rollup read prints its value; Bitbucket next link stays on the API; config read from the commit judged; `process.exitCode`; gitlink marker first
+- Cycle 4: `code-changed` only when no nearer ancestor was undecided; config that parses to nothing or a symlinked config refused; doc-count cleanup
+- Cycle 5: BOM strip; the parse must account for every content row of the file (the structural move, which turned out inexact); `--full-tree`; CANCELLED re-ask documented
+- Cycle 6 (granted): gate 6 verified cycle 5's three fixes (each mutation-proven by QA) and found the two defects in the cycle-5 completeness check; fix scoped that check to the `ci` block, whose rows count exactly, and fixed the marker LOW
+
+**Likely root cause**: not a stall: HIGH has been 0 since cycle 3. Six cycles on one mechanism, reading `skills-config.yaml` through a lenient YAML subset: cycle 5 replaced the per-spelling guards with a whole-file count, which was itself a spelling (a count that over-counted one shape), and cycle 6 narrowed it to the part of the file the engine reads. Each fix has introduced the next cycle's finding, so the sequence MEDIUM 2, 3, 2 is a loop that has not yet shown it ends. Route 2c declined (`medium-not-falling`), so the head `7074282a` has had no gate of its own.
+
+**Recommended next steps**:
+1. Re-run `/develop-task` and choose "Resume at 5a with 1 more cycle": one gate over `7074282a`, which is the evidence this loop is owed again. If it reads PASS or CONCERNS with no open entry it exits through 5c.
+2. Or accept the current state and run `/finalise` by hand: both MEDIUMs are fixed in the head and held by tests that go red on revert, but not independently re-read, so say so in the DoD.
+3. If a further gate finds another configuration-reading defect, stop patching: replace the reader for the `ci` block with a dedicated strict one (a few rows: mappings, scalars, a list of scalars) rather than a third spelling of the completeness check.
+
+---
+
 ## Completion
 
 **Finished**: {populated at end}
 **Final Status**: Escalated
 **Branch**: feature/task.172.ci-docs-only-tree-equivalence
 **PR**: https://github.com/Gamaroff/agent-skills/pull/543
-**QA Iterations**: 5 (gate.1 FAIL, gate.2 FAIL, gate.3 CONCERNS, gate.4 CONCERNS, gate.5 CONCERNS)
+**QA Iterations**: 6 (gate.1 FAIL, gate.2 FAIL, gate.3 CONCERNS, gate.4 CONCERNS, gate.5 CONCERNS, gate.6 CONCERNS)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
 
