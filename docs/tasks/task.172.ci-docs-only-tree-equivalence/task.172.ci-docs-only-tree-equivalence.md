@@ -5,18 +5,20 @@ type: task
 description: "A shared engine decides when a pending CI reading is satisfied because every file changed since a green ancestor is docs. /finalise readings 1 and 2, /develop-next Step 3 and /develop-batch Step 3 all call it and record SUCCESS (tree-equivalent to <sha>), never plain SUCCESS."
 tags: [finalise, develop-next, develop-batch, ci, engine, performance, consumer-handoff]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-10-01
 updated: 2026-10-01
 assignee:
 estimated_effort_hours: 16
 github_issue: 539
+completed_date: 2026-10-01
+pr_number: 543
 ---
 
 # Technical Task: One docs-only CI rule at every pipeline CI wait
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.172.review.1.ci-docs-only-tree-equivalence.md` implemented 2026-10-01
 
@@ -502,13 +504,34 @@ The four security findings from `/finalise` run 1 are fixed and mutation-proven.
 
 **Gap Report Generated:** 2026-10-01
 **Detailed Verification Log:** See `task.172.dod.1.ci-docs-only-tree-equivalence.md` for the evidence and citations.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.172.qa.8.ci-docs-only-tree-equivalence.md`
+**Gate File**: `task.172.gate.8.ci-docs-only-tree-equivalence.yml`
+**Gate Status**: ✅ PASS (95/100), through the Cosmetic-residue exit; the Step 5c PR review read ⚠️ CONCERNS twice, with no high finding
+
+All Definition of Done criteria have been verified (run 2; run 1 stopped on five gaps and is kept as history above):
+
+✅ **Acceptance Criteria:** 12 of 12 (Code Quality "every test written for a defect is mutation-proved" passes as narrowed by the operator, with stated notes)
+✅ **Tests:** 97 engine tests in `shared/resources/tests/ci-tree-equivalence.test.mjs`, in the per-PR lane
+✅ **Documentation:** CHANGELOG and `configuration.md` match the engine on five keys and six behaviours
+✅ **Security Review:** PASS; the four run-1 findings re-verified by execution; probes 74 executed, 0 reproduced
+✅ **Compliance Review:** not applicable
+✅ **CI:** reading 1 SUCCESS on `55444bd4`; reading 2 on the acceptance commit is recorded on the PR canonical comment
+
+**Detailed Verification Log:** See `task.172.dod.2.ci-docs-only-tree-equivalence.md` for the evidence and citations.
+
+**Task marked as ACCEPTED on:** 2026-10-01
 
 <!-- change-log-start -->
-
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-01 | 1.0     | Initial draft | create-task |
 | 2026-10-01 | 1.1     | Review passed (9/10) — repository `checkCommand` widened to `ci:fast && eval:all`; path-filtered-workflow residual recorded | review-task |
 | 2026-10-01 |         | Status → ready-for-development | review-task |
@@ -530,7 +553,7 @@ The four security findings from `/finalise` run 1 are fixed and mutation-proven.
 | 2026-10-01 |  | DoD security findings fixed — 4 findings (2 MEDIUM, 2 LOW), bugs 26 and 27, commit 1cde0528 | develop |
 | 2026-10-01 |  | Scope amendments recorded after finalise run 1 (five config keys, files added during QA and the DoD gate); CodeQuality-1 narrowed by the operator from every new test to every fix-driven test | develop |
 | 2026-10-01 |  | QA gate PASS (95/100) — 1 finding | qa-task |
-
+| 2026-10-01 | 1.2 | DoD passed — accepted (PR #543) | finalise |
 <!-- change-log-end -->
 
 ---
