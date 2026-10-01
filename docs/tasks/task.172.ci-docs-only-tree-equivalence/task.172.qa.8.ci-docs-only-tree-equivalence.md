@@ -100,9 +100,10 @@ Boundary rule: `isDocsPath`, `globMatch` and `dirtyNonDocsPaths` are validators 
 mutation-proven: remove the group kill → SEC-1 → covered
 mutation-proven: disable the dirty-code refusal → SEC-3 → covered
 mutation-proven: remove the dot-segment rule → SEC-4 → covered
+mutation-proven: put the old RegExp matcher back (the fix cycle's mutant, run against the same committed code) → SEC-2 → covered (red after 304 s of exponential matching; recorded here from that run, not repeated this cycle)
 mutation-proven: ignore the rename/copy source path in the `git status -z` parse → no test red → no-red-untested
 mutation-proven: treat an unreadable `git status` as clean → no test red → no-red-untested
-The last two are the reviewer's CR-2, confirmed. The matcher's proof (the old RegExp back → `SEC-2` red) was run in the fix cycle against the same code and is not repeated here. All mutants were applied from a `cp` snapshot that was restored and compared byte for byte afterwards.
+The last two are the reviewer's CR-2, confirmed. All mutants were applied from a `cp` snapshot that was restored and compared byte for byte afterwards.
 
 ---
 

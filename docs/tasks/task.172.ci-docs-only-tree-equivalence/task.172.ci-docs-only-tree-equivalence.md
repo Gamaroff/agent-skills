@@ -464,14 +464,15 @@ The four security findings from `/finalise` run 1 are fixed and mutation-proven.
 
 ### Deferred Work
 
+- **Carried from the Step 5c PR reviews (not gating):** `skills/finalise/SKILL.md` CR-2 (`CI_CHECKS_1` is counted from the rollup read before the docs-only arm, so a tree-equivalent reading 1 hands the 6c poll the unfinished head's check count as its floor) and CR-3 (the Step 8a retake record has no tree-equivalent clause); CR-5 (the poll discards the engine's stderr and does not latch exit 2); CR-6 (dead entries in `tests/unbound-default-reads.test.js`). Second review also reported: a host kill of the engine orphans the detached check (the foreground arms leave the host's tool timeout unstated), the develop-next Bitbucket arm binds no `CI_ROLLUP`, the engine's network reads have no timeout, this repository's `checkCommand` runs no docs link check, and `readConfig` has no production caller.
 - **Carried from gate 8 by the Cosmetic-residue exit (route 2b, cycle 8)**: CR8-1. One LOW finding (a check detached into its own session no longer receives an interrupt sent to the engine's process group), moved to the gate's `recommendations.future` by id. Also recorded there, not gating: the rename/copy and unreadable-`git status` branches of the dirty-tree rule have no test.
 - **Carried from gate 7 by the Cosmetic-residue exit (route 2b, cycle 7)**: CR7-1. One LOW finding (a quoted `ci` key or uniformly indented top-level keys are refused with exit 2; fails closed), moved to the gate's `recommendations.future` by id.
 - Recorded in gate 7's `recommendations.future`, not attributable to cycle 6: a `ci` block nested under another key, or with its `docsOnly` children dedented to column 0, reads as the defaults (valid YAML with a different meaning, identical in the cycle 5 engine); the second comment-stripping rule beside `yaml-subset.js`'s; the CANCELLED nearer ancestor that the 6c poll re-asks.
 - If a further gate finds another configuration-reading defect: replace the `ci` block reader with a dedicated strict one rather than a further spelling of the completeness check.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS (not accepted)
+**Status:** SUPERSEDED. This is the record of `/finalise` run 1 and is kept as history, not as live state: its four security gaps were closed by commit `1cde0528` (bugs 26 and 27, gate 8 PASS), CodeQuality-1 was narrowed by the operator and the scope amendments were made (see the Change Log), so `/finalise` run 2 verifies afresh and writes `dod.2`.
 
 ### QA Gate Status
 
@@ -521,10 +522,12 @@ The four security findings from `/finalise` run 1 are fixed and mutation-proven.
 | 2026-10-01 |  | QA gate CONCERNS (75/100) — 2 findings | qa-task |
 | 2026-10-01 |  | QA findings fixed — 2 findings (2 MEDIUM) plus 1 advisory, 1 iteration | qa-fix |
 | 2026-10-01 |  | QA gate CONCERNS (70/100) — 3 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 3 findings (3 MEDIUM) plus 1 advisory, 1 iteration | qa-fix |
 | 2026-10-01 |  | QA gate CONCERNS (75/100) — 2 findings | qa-task |
 | 2026-10-01 |  | QA findings fixed — 2 findings (2 MEDIUM) plus 3 advisory, 1 iteration | qa-fix |
 | 2026-10-01 |  | QA gate PASS (95/100) — 1 finding | qa-task |
 | 2026-10-01 |  | DoD incomplete — 5 gaps identified | finalise |
+| 2026-10-01 |  | DoD security findings fixed — 4 findings (2 MEDIUM, 2 LOW), bugs 26 and 27, commit 1cde0528 | develop |
 | 2026-10-01 |  | Scope amendments recorded after finalise run 1 (five config keys, files added during QA and the DoD gate); CodeQuality-1 narrowed by the operator from every new test to every fix-driven test | develop |
 | 2026-10-01 |  | QA gate PASS (95/100) — 1 finding | qa-task |
 
