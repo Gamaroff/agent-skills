@@ -44,7 +44,8 @@
     "ensure-epic-jira-issue",
     "ensure-story-github-issue",
     "ensure-story-jira-issue",
-    "mermaid-architect"
+    "mermaid-architect",
+    "wireloom"
   ],
   "create-task": [
     "ensure-task-github-issue",
@@ -143,7 +144,6 @@
   "loop-supervisor": [
     "develop-next"
   ],
-  "markdown-wireframe": [],
   "mermaid-architect": [],
   "navigation-pattern-validator": [],
   "nestjs-debug": [],
@@ -192,7 +192,8 @@
     "ensure-epic-jira-issue",
     "ensure-story-github-issue",
     "ensure-story-jira-issue",
-    "mermaid-architect"
+    "mermaid-architect",
+    "wireloom"
   ],
   "review-task": [
     "create-branch",
@@ -222,5 +223,6 @@
   "testing-setup-shared": [],
   "tracker-reconcile": [],
   "use-railway": [],
-  "ux-expert": []
+  "ux-expert": [],
+  "wireloom": []
 }
