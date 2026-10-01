@@ -82,7 +82,18 @@ test("extracts backtick and tilde fences with the line their source starts on", 
 });
 
 test("a ```wireloom shown inside another fence is an example, not a block", () => {
-  const doc = ["````markdown", "```wireloom", "window:", "  nonsense", "```", "````", "", "```wireloom", GOOD, "```"].join("\n");
+  const doc = [
+    "````markdown",
+    "```wireloom",
+    "window:",
+    "  nonsense",
+    "```",
+    "````",
+    "",
+    "```wireloom",
+    GOOD,
+    "```",
+  ].join("\n");
   const blocks = extractBlocks(doc);
   assert.equal(blocks.length, 1);
   assert.equal(blocks[0].line, 9);
@@ -96,7 +107,10 @@ test("an unclosed wireloom fence runs to the end of the document", () => {
 
 test("a fenceless file whose first significant line is window is raw source", () => {
   const blocks = extractBlocks("# a comment\n\n" + GOOD);
-  assert.deepEqual(blocks.map((b) => b.line), [1]);
+  assert.deepEqual(
+    blocks.map((b) => b.line),
+    [1],
+  );
 });
 
 test("prose with no fence is not raw source", () => {
@@ -145,7 +159,9 @@ test("human-readable failure goes to stderr with the file line", () => {
 // render
 // ===========================================================================
 test("render writes one SVG to an explicit .svg path", () => {
-  const { status, json, dir } = runJson(["render", "-", "--out", "out/x.svg"], { input: GOOD });
+  const { status, json, dir } = runJson(["render", "-", "--out", "out/x.svg"], {
+    input: GOOD,
+  });
   assert.equal(status, 0);
   const svg = fs.readFileSync(path.join(dir, "out", "x.svg"), "utf8");
   assert.match(svg, /^<svg[\s>]/);
@@ -155,36 +171,67 @@ test("render writes one SVG to an explicit .svg path", () => {
 
 test("render of a multi-block file numbers the SVGs, and --block picks one", () => {
   const dir = tmpdir();
-  const doc = ["```wireloom", GOOD, "```", "```wireloom", 'window "B":\n  text "two"', "```"].join("\n");
+  const doc = [
+    "```wireloom",
+    GOOD,
+    "```",
+    "```wireloom",
+    'window "B":\n  text "two"',
+    "```",
+  ].join("\n");
   fs.writeFileSync(path.join(dir, "doc.md"), doc);
 
-  assert.equal(run(["render", "doc.md", "--out", "doc.wireframe.svg"], { cwd: dir }).status, 0);
+  assert.equal(
+    run(["render", "doc.md", "--out", "doc.wireframe.svg"], { cwd: dir })
+      .status,
+    0,
+  );
   assert.ok(fs.existsSync(path.join(dir, "doc.wireframe.1.svg")));
-  assert.match(fs.readFileSync(path.join(dir, "doc.wireframe.2.svg"), "utf8"), /two/);
+  assert.match(
+    fs.readFileSync(path.join(dir, "doc.wireframe.2.svg"), "utf8"),
+    /two/,
+  );
 
-  assert.equal(run(["render", "doc.md", "--block", "2", "--out", "only.svg"], { cwd: dir }).status, 0);
+  assert.equal(
+    run(["render", "doc.md", "--block", "2", "--out", "only.svg"], { cwd: dir })
+      .status,
+    0,
+  );
   assert.match(fs.readFileSync(path.join(dir, "only.svg"), "utf8"), /two/);
 });
 
 test("render into a directory names the SVG after the input", () => {
   const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, "screen.md"), "```wireloom\n" + GOOD + "```\n");
-  assert.equal(run(["render", "screen.md", "--out", "svgs/"], { cwd: dir }).status, 0);
+  fs.writeFileSync(
+    path.join(dir, "screen.md"),
+    "```wireloom\n" + GOOD + "```\n",
+  );
+  assert.equal(
+    run(["render", "screen.md", "--out", "svgs/"], { cwd: dir }).status,
+    0,
+  );
   assert.ok(fs.existsSync(path.join(dir, "svgs", "screen.svg")));
 });
 
 test("render writes nothing when any block fails to parse", () => {
   const dir = tmpdir();
   fs.writeFileSync(path.join(dir, "doc.md"), DOC);
-  const { status, json } = runJson(["render", "doc.md", "--out", "doc.svg"], { cwd: dir });
+  const { status, json } = runJson(["render", "doc.md", "--out", "doc.svg"], {
+    cwd: dir,
+  });
   assert.equal(status, 1);
   assert.equal(json.reason, "parse-error");
-  assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith(".svg")), []);
+  assert.deepEqual(
+    fs.readdirSync(dir).filter((f) => f.endsWith(".svg")),
+    [],
+  );
 });
 
 test("--theme dark renders a different SVG from the default", () => {
   const light = run(["render", "-", "--out", "l.svg"], { input: GOOD });
-  const dark = run(["render", "-", "--out", "d.svg", "--theme", "dark"], { input: GOOD });
+  const dark = run(["render", "-", "--out", "d.svg", "--theme", "dark"], {
+    input: GOOD,
+  });
   assert.equal(light.status, 0);
   assert.equal(dark.status, 0);
   assert.notEqual(
@@ -197,30 +244,50 @@ test("--theme dark renders a different SVG from the default", () => {
 // Package resolution
 // ===========================================================================
 test("a WIRELOOM_MODULE that resolves nowhere is unavailable, exit 1", () => {
-  const { status, json } = runJson(["ensure"], { env: { WIRELOOM_MODULE: "/nonexistent/wireloom" } });
+  const { status, json } = runJson(["ensure"], {
+    env: { WIRELOOM_MODULE: "/nonexistent/wireloom" },
+  });
   assert.equal(status, 1);
   assert.equal(json.reason, "unavailable");
 });
 
 test("with no package anywhere and --no-install, ensure is unavailable and names the cache", () => {
-  const { status, json, dir } = runJson(["ensure", "--no-install"], { env: { WIRELOOM_MODULE: "" } });
+  const { status, json, dir } = runJson(["ensure", "--no-install"], {
+    env: { WIRELOOM_MODULE: "" },
+  });
   assert.equal(status, 1);
   assert.equal(json.reason, "unavailable");
-  assert.ok(json.error.includes(path.join(dir, "cache", "agent-skills", "wireloom", PINNED_VERSION)));
+  assert.ok(
+    json.error.includes(
+      path.join(dir, "cache", "agent-skills", "wireloom", PINNED_VERSION),
+    ),
+  );
 });
 
 test("WIRELOOM_NO_INSTALL=1 disables the install step like --no-install", () => {
-  const { status, json } = runJson(["ensure"], { env: { WIRELOOM_MODULE: "", WIRELOOM_NO_INSTALL: "1" } });
+  const { status, json } = runJson(["ensure"], {
+    env: { WIRELOOM_MODULE: "", WIRELOOM_NO_INSTALL: "1" },
+  });
   assert.equal(status, 1);
   assert.equal(json.reason, "unavailable");
 });
 
 test("a copy in the cache directory is found without installing", () => {
   const dir = tmpdir();
-  const cacheModules = path.join(dir, "cache", "agent-skills", "wireloom", PINNED_VERSION, "node_modules");
+  const cacheModules = path.join(
+    dir,
+    "cache",
+    "agent-skills",
+    "wireloom",
+    PINNED_VERSION,
+    "node_modules",
+  );
   fs.mkdirSync(cacheModules, { recursive: true });
   fs.symlinkSync(WIRELOOM, path.join(cacheModules, "wireloom"), "dir");
-  const { status, json } = runJson(["ensure", "--no-install"], { cwd: dir, env: { WIRELOOM_MODULE: "" } });
+  const { status, json } = runJson(["ensure", "--no-install"], {
+    cwd: dir,
+    env: { WIRELOOM_MODULE: "" },
+  });
   assert.equal(status, 0);
   assert.equal(json.package.from, "cache");
 });
@@ -229,7 +296,10 @@ test("the project's own node_modules wins over the cache", () => {
   const dir = tmpdir();
   fs.mkdirSync(path.join(dir, "node_modules"));
   fs.symlinkSync(WIRELOOM, path.join(dir, "node_modules", "wireloom"), "dir");
-  const { status, json } = runJson(["ensure", "--no-install"], { cwd: dir, env: { WIRELOOM_MODULE: "" } });
+  const { status, json } = runJson(["ensure", "--no-install"], {
+    cwd: dir,
+    env: { WIRELOOM_MODULE: "" },
+  });
   assert.equal(status, 0);
   assert.equal(json.package.from, "project");
 });
@@ -256,7 +326,10 @@ for (const [label, args] of [
 }
 
 test("usage: --block beyond the block count exits 2", () => {
-  const { status, json } = runJson(["render", "-", "--out", "x.svg", "--block", "3"], { input: GOOD });
+  const { status, json } = runJson(
+    ["render", "-", "--out", "x.svg", "--block", "3"],
+    { input: GOOD },
+  );
   assert.equal(status, 2);
   assert.equal(json.reason, "usage");
 });
@@ -271,12 +344,20 @@ test("every ```wireloom example in the grammar reference parses", () => {
   assert.equal(status, 0);
   // Non-vacuity: the reference carries dozens of examples; an extractor that
   // stopped matching would otherwise pass on nothing.
-  assert.ok(json.blocks.length >= 30, `only ${json.blocks.length} blocks found`);
+  assert.ok(
+    json.blocks.length >= 30,
+    `only ${json.blocks.length} blocks found`,
+  );
 });
 
 test("the pinned version matches the grammar reference and the repo devDependency", () => {
   const grammar = fs.readFileSync(GRAMMAR, "utf8");
-  assert.match(grammar.split("\n")[0], new RegExp(`v${PINNED_VERSION.replace(/\./g, "\\.")}\\b`));
-  const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8"));
+  assert.match(
+    grammar.split("\n")[0],
+    new RegExp(`v${PINNED_VERSION.replace(/\./g, "\\.")}\\b`),
+  );
+  const pkg = JSON.parse(
+    fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8"),
+  );
   assert.equal(pkg.devDependencies.wireloom, PINNED_VERSION);
 });

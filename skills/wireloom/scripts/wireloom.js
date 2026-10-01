@@ -89,7 +89,9 @@ function parseArgs(argv) {
     return opts;
   }
   if (opts.positional.length !== 1) {
-    throw new UsageError(`${command} needs exactly one input: a file path or -`);
+    throw new UsageError(
+      `${command} needs exactly one input: a file path or -`,
+    );
   }
   opts.input = opts.positional[0];
 
@@ -99,11 +101,15 @@ function parseArgs(argv) {
   if (command === "render") {
     if (!opts.out) throw new UsageError("render needs --out <file.svg|dir/>");
     if (opts.theme && !["default", "dark"].includes(opts.theme)) {
-      throw new UsageError(`--theme must be default or dark (got "${opts.theme}")`);
+      throw new UsageError(
+        `--theme must be default or dark (got "${opts.theme}")`,
+      );
     }
     if (opts.block !== undefined) {
       if (!/^[1-9]\d*$/.test(opts.block)) {
-        throw new UsageError(`--block must be a positive integer (got "${opts.block}")`);
+        throw new UsageError(
+          `--block must be a positive integer (got "${opts.block}")`,
+        );
       }
       opts.block = Number(opts.block);
     }
@@ -139,9 +145,17 @@ function extractBlocks(text) {
       continue;
     }
     const close = /^ {0,3}(`{3,}|~{3,})\s*$/.exec(line);
-    if (close && close[1][0] === open.fence[0] && close[1].length >= open.fence.length) {
+    if (
+      close &&
+      close[1][0] === open.fence[0] &&
+      close[1].length >= open.fence.length
+    ) {
       if (open.body) {
-        blocks.push({ index: blocks.length + 1, line: open.line, source: open.body.join("\n") + "\n" });
+        blocks.push({
+          index: blocks.length + 1,
+          line: open.line,
+          source: open.body.join("\n") + "\n",
+        });
       }
       open = null;
       continue;
@@ -150,16 +164,27 @@ function extractBlocks(text) {
   }
   // An unclosed fence runs to the end of the document, as CommonMark has it.
   if (open && open.body) {
-    blocks.push({ index: blocks.length + 1, line: open.line, source: open.body.join("\n") + "\n" });
+    blocks.push({
+      index: blocks.length + 1,
+      line: open.line,
+      source: open.body.join("\n") + "\n",
+    });
   }
 
   if (blocks.length) return blocks;
 
-  const firstSignificant = lines.find((l) => l.trim() && !l.trim().startsWith("#"));
+  const firstSignificant = lines.find(
+    (l) => l.trim() && !l.trim().startsWith("#"),
+  );
   // A window header — `window:`, `window "Title":`, optionally with attributes —
   // not merely a line whose first word is "window".
-  if (firstSignificant && /^window(\s+("[^"]*"|\S+))*\s*:\s*$/.test(firstSignificant)) {
-    return [{ index: 1, line: 1, source: text.endsWith("\n") ? text : text + "\n" }];
+  if (
+    firstSignificant &&
+    /^window(\s+("[^"]*"|\S+))*\s*:\s*$/.test(firstSignificant)
+  ) {
+    return [
+      { index: 1, line: 1, source: text.endsWith("\n") ? text : text + "\n" },
+    ];
   }
   return [];
 }
@@ -194,8 +219,14 @@ function versionOf(entry) {
 function load(entry, from) {
   const mod = require(entry);
   const api = mod && typeof mod.parse === "function" ? mod : mod && mod.default;
-  if (!api || typeof api.parse !== "function" || typeof api.render !== "function") {
-    throw new Error(`${entry} does not export parse/render — not the wireloom package`);
+  if (
+    !api ||
+    typeof api.parse !== "function" ||
+    typeof api.render !== "function"
+  ) {
+    throw new Error(
+      `${entry} does not export parse/render — not the wireloom package`,
+    );
   }
   return { api, from, entry, version: versionOf(entry) };
 }
@@ -214,7 +245,9 @@ function resolveWireloom({ noInstall }) {
     const abs = path.resolve(override);
     const entry = tryResolve(abs, process.cwd());
     if (!entry) {
-      return { error: `WIRELOOM_MODULE=${override} does not resolve to a module` };
+      return {
+        error: `WIRELOOM_MODULE=${override} does not resolve to a module`,
+      };
     }
     return load(entry, "env");
   }
@@ -253,10 +286,15 @@ function resolveWireloom({ noInstall }) {
     );
   } catch (err) {
     const stderr = err.stderr ? String(err.stderr).trim() : err.message;
-    return { error: `npm install wireloom@${PINNED_VERSION} into ${cache} failed: ${stderr}` };
+    return {
+      error: `npm install wireloom@${PINNED_VERSION} into ${cache} failed: ${stderr}`,
+    };
   }
   const installed = tryResolve("wireloom", cache);
-  if (!installed) return { error: `npm install reported success but ${cache} has no wireloom` };
+  if (!installed)
+    return {
+      error: `npm install reported success but ${cache} has no wireloom`,
+    };
   return load(installed, "installed");
 }
 
@@ -266,7 +304,8 @@ function resolveWireloom({ noInstall }) {
 
 function readInput(input) {
   if (input === "-") return fs.readFileSync(0, "utf8");
-  if (!fs.existsSync(input)) throw new UsageError(`cannot read ${input}: no such file`);
+  if (!fs.existsSync(input))
+    throw new UsageError(`cannot read ${input}: no such file`);
   return fs.readFileSync(input, "utf8");
 }
 
@@ -292,17 +331,25 @@ function parseBlocks(api, blocks) {
 
 function outputPaths(opts, selected, total) {
   const out = opts.out;
-  const isDir = out.endsWith("/") || out.endsWith(path.sep) ||
+  const isDir =
+    out.endsWith("/") ||
+    out.endsWith(path.sep) ||
     (fs.existsSync(out) && fs.statSync(out).isDirectory());
 
   if (isDir) {
-    if (opts.input === "-") throw new UsageError("rendering stdin needs --out <file.svg>, not a directory");
+    if (opts.input === "-")
+      throw new UsageError(
+        "rendering stdin needs --out <file.svg>, not a directory",
+      );
     const stem = path.basename(opts.input).replace(/\.[^.]+$/, "");
     return selected.map((b) =>
       path.join(out, total === 1 ? `${stem}.svg` : `${stem}.${b.index}.svg`),
     );
   }
-  if (!out.endsWith(".svg")) throw new UsageError(`--out must end in .svg or name a directory (got "${out}")`);
+  if (!out.endsWith(".svg"))
+    throw new UsageError(
+      `--out must end in .svg or name a directory (got "${out}")`,
+    );
   if (selected.length === 1) return [out];
   const stem = out.slice(0, -".svg".length);
   return selected.map((b) => `${stem}.${b.index}.svg`);
@@ -310,7 +357,8 @@ function outputPaths(opts, selected, total) {
 
 async function run(opts) {
   const pkg = resolveWireloom({ noInstall: opts["no-install"] });
-  if (pkg.error) return { reason: "unavailable", exitCode: 1, error: pkg.error };
+  if (pkg.error)
+    return { reason: "unavailable", exitCode: 1, error: pkg.error };
   const meta = { package: { from: pkg.from, version: pkg.version } };
 
   if (opts.command === "ensure") {
@@ -323,7 +371,8 @@ async function run(opts) {
       reason: "no-blocks",
       exitCode: 1,
       ...meta,
-      error: "no ```wireloom fence found, and the input is not raw source starting with `window`",
+      error:
+        "no ```wireloom fence found, and the input is not raw source starting with `window`",
     };
   }
 
@@ -331,7 +380,9 @@ async function run(opts) {
   if (opts.command === "render" && opts.block !== undefined) {
     selected = blocks.filter((b) => b.index === opts.block);
     if (!selected.length) {
-      throw new UsageError(`--block ${opts.block} out of range: the input has ${blocks.length} block(s)`);
+      throw new UsageError(
+        `--block ${opts.block} out of range: the input has ${blocks.length} block(s)`,
+      );
     }
   }
 
@@ -350,7 +401,11 @@ async function run(opts) {
   for (let i = 0; i < selected.length; i++) {
     const b = selected[i];
     const options = opts.theme ? { theme: opts.theme } : undefined;
-    const { svg } = await pkg.api.render(`wireloom-${b.index}`, b.source, options);
+    const { svg } = await pkg.api.render(
+      `wireloom-${b.index}`,
+      b.source,
+      options,
+    );
     fs.mkdirSync(path.dirname(path.resolve(paths[i])), { recursive: true });
     fs.writeFileSync(paths[i], svg);
     written.push({ index: b.index, line: b.line, ok: true, file: paths[i] });
@@ -364,11 +419,20 @@ async function run(opts) {
 
 function human(result) {
   const out = [];
-  if (result.package) out.push(`wireloom ${result.package.version || "?"} (${result.package.from})`);
+  if (result.package)
+    out.push(
+      `wireloom ${result.package.version || "?"} (${result.package.from})`,
+    );
   if (result.error) out.push(`${result.reason}: ${result.error}`);
   for (const b of result.blocks || []) {
-    if (b.ok) out.push(`  block ${b.index} (line ${b.line}): ok${b.file ? ` → ${b.file}` : ""}`);
-    else out.push(`  block ${b.index}: line ${b.error.line}, col ${b.error.column}: ${b.error.message}`);
+    if (b.ok)
+      out.push(
+        `  block ${b.index} (line ${b.line}): ok${b.file ? ` → ${b.file}` : ""}`,
+      );
+    else
+      out.push(
+        `  block ${b.index}: line ${b.error.line}, col ${b.error.column}: ${b.error.message}`,
+      );
   }
   if (!result.error) out.push(result.reason);
   return out.join("\n");
@@ -388,7 +452,10 @@ async function main(argv) {
   // --json always goes to stdout so a caller capturing it sees every reason;
   // human-readable failures go to stderr.
   if (json) process.stdout.write(JSON.stringify(result, null, 2) + "\n");
-  else (result.exitCode === 0 ? process.stdout : process.stderr).write(human(result) + "\n");
+  else
+    (result.exitCode === 0 ? process.stdout : process.stderr).write(
+      human(result) + "\n",
+    );
   // Set the code and let the event loop drain stdout: process.exit() after an
   // async write truncates a piped payload.
   process.exitCode = result.exitCode;
