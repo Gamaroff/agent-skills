@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.172.ci-docs-only-tree-equivalence'
+task_title: 'One docs-only CI rule at every pipeline CI wait'
+gate: PASS
+status_reason: 'Cycle 8 scoped review of the DoD security-gate fix commit (1cde0528): all four security findings are fixed and each fix is mutation-proven (re-run by this cycle), 97 engine tests and the 4,910-test fast gate pass, no HIGH and no MEDIUM. One reproduced LOW remains: detaching the check into its own session means an interrupt sent to the engine process group no longer reaches it.'
+reviewer: 'QA Engineer'
+head: '1cde05281721999ac89dda80dab65c259c9a7f8d'
+updated: '2026-10-01T15:30:01Z'
+
+top_issues:
+  - id: 'CR8-1'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'checkCommand is spawned detached so its whole process group can be killed when it ends or times out, but a detached child is in its own session, so a SIGINT sent to the engine process group (Ctrl-C, a host killing the group) no longer reaches it: reproduced with a real spawnSync, where a foreground sleep in the check survived the group SIGINT in detached mode and died in the same-group mode. The group kill only runs after spawnSync returns, and spawnSync blocks the event loop, so a JS signal handler cannot run during the wait. The engine own check timeout fires first in normal use (570 s against a 600 s tool limit); the residual is an interrupt or an external kill during the wait.'
+    suggested_action: 'Document the residual in configuration.md, or run the check through an async spawn with SIGINT/SIGTERM handlers that call killProcessGroup (the injected spawn is synchronous today, so that is a wider change).'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 97
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'The DoD security gate findings are closed: the check no longer leaks children on a timeout, is refused over uncommitted code, the glob matcher cannot backtrack (400,000 differential cases against the old matcher, 0 differences, run by the reviewer and during development), and a path with a dot or empty segment is never documentation. No corpus sink models these predicates; the DoD gate probed isDocsPath with agent-authored cases (37 executed).'
+  performance:
+    status: PASS
+    notes: 'The matcher is now tokens times path length; worst-case timings under the 1,024 and 4,096 caps are 20-30 ms (reviewer). One extra git status per check run.'
+  reliability:
+    status: PASS
+    notes: 'CR8-1 is the interrupt path only. An unreadable git status and uncommitted code both fail closed (unverifiable, exit 1), and the 6c poll re-asks unverifiable.'
+  maintainability:
+    status: PASS
+    notes: 'The matcher replaced a regex plus its guards with a small walk that has no spelling left to find; the dirty-tree rule trades strictness for letting /finalise reading 1 run, and says so in configuration.md.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR8-1 (low, reproduced): the interrupt-path residual of the detached check. Document it in configuration.md, or move the check to an async spawn with signal handlers.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'docs/reference/configuration.md']
+      carried_from: 'top_issues (route 2b, cycle 8)'
+    - action: 'Review CR-2 (cleanup, low, confirmed by mutation): SEC-3 never exercises the rename/copy source-path parse of git status -z or the git-status-unreadable branch; ignoring either leaves every test green. Add a case where a code file is renamed into docs/ and one where exec throws for git status, both expecting unverifiable.'
+      refs: ['shared/resources/tests/ci-tree-equivalence.test.mjs', 'shared/resources/ci-tree-equivalence.js']
+    - action: 'Carried from gate 7: the quoted or uniformly indented ci key is refused (CR7-1); a ci block nested under another key reads as the defaults; a second comment-stripping rule beside yaml-subset.js; the CANCELLED ancestor re-asked for the whole 6c poll.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+    - action: 'Carried from the PR review (5c): CR-2 CI_CHECKS_1 counted before the docs-only arm; CR-3 the 8a retake record has no tree-equivalent clause; CR-5 the poll discards the engine stderr and does not latch exit 2; CR-6 dead entries in tests/unbound-default-reads.test.js.'
+      refs: ['skills/finalise/SKILL.md', 'tests/unbound-default-reads.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

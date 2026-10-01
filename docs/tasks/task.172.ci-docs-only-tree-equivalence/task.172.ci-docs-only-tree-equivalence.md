@@ -228,7 +228,7 @@ consumer default stays as the operator chose it.
 - ✅ `shared/resources/ci-tree-equivalence.js` and `shared/resources/tests/ci-tree-equivalence.test.mjs`
 - ✅ `shared/resources/glob-match.js`, with `qa-diminishing-returns.js` re-pointed at it
 - ✅ The four call sites, plus the two notes that name the gap (`skills/finalise/SKILL.md:897`, `:1507`)
-- ✅ `ci.docsOnly.{enabled, patterns, checkCommand}` in `docs/reference/configuration.md` (schema + key reference)
+- ✅ `ci.docsOnly.{enabled, patterns, checkCommand, checkTimeoutSeconds, settleSeconds}` in `docs/reference/configuration.md` (schema + key reference). The last two were added in QA cycles 2 and 3 (a bounded check; an ancestor settle window)
 - ✅ This repository's `skills-config.yaml` override
 - ✅ GitHub and Bitbucket ancestor reads
 - ✅ `npm run bundle`, CHANGELOG `[Unreleased]`
@@ -282,7 +282,7 @@ Depends on Phase 2.
 
 ### Phase 4: config, docs and this repository (Risk: Low)
 
-- [x] `docs/reference/configuration.md`: the schema block and three key-reference rows, including the rule that `checkCommand` should reproduce every check a workflow path-filtered to the docs patterns runs
+- [x] `docs/reference/configuration.md`: the schema block and the key-reference rows (five, see § 4), including the rule that `checkCommand` should reproduce every check a workflow path-filtered to the docs patterns runs
 - [x] This repository's `skills-config.yaml`: `patterns: ["docs/**"]`, `checkCommand: "npm run ci:fast && npm run eval:all"`, with the reason as a comment
 - [x] `npm run bundle`, `npm run generate-catalog` if a description changed, and CHANGELOG
 
@@ -305,6 +305,14 @@ Depends on Phase 2.
 8. `docs/reference/configuration.md`: `ci.docsOnly`
 9. `skills-config.yaml`: this repository's override
 10. `CHANGELOG.md`: `[Unreleased]`
+
+### Added or modified during QA and the DoD gate (not in the original plan)
+
+- `shared/resources/bb-auth.js` (new): the Bitbucket auth header, moved out of `pr-inline-comment.js` because requiring that file would have pulled about 1,500 lines into three skills; `shared/resources/pr-inline-comment.js` re-exports it
+- `shared/resources/tests/_dedent.mjs` (new): a test helper for the extracted prose blocks
+- `tests/unbound-default-reads.test.js`, `evals/shared/tests/qa-narrowing-offer-wiring.test.mjs`, `evals/shared/tests/finalise-publish-boundary.test.mjs`: edited to cover the new blocks
+- `docs/contributing/traps.md`: lists the engine's test file as load-sensitive (a wall-clock assertion added at the DoD security gate)
+- `shared/resources/glob-match.js`: after the move, rewritten as a token-walk matcher (no RegExp), because the RegExp compile was exponential on repeated wildcards (DoD security gate, bug 27)
 
 ### Generated (`npm run bundle`, never edited by hand)
 
@@ -358,14 +366,14 @@ None.
 
 ### Code Quality
 
-- [ ] Every new test is mutation-proved red on revert
+- [ ] Every test written for a defect found by QA, the PR review or the DoD security gate is mutation-proved red on revert (the QA reports' `mutation-proven:` lines record each). _Narrowed on 2026-10-01 after `/finalise` run 1, by the operator, from "every new test": the 51 tests written with the first implementation carry 14 proofs, and a per-test ledger for the rest was judged not worth its cost._
 - [ ] `npm run ci` green; `npm run validate -- skills/finalise/`, `skills/develop-next/`, `skills/develop-batch/` pass
 - [ ] `npm run bundle:check` clean, with no `UNREACHED` copy
 
 ### Migration
 
 - [ ] CHANGELOG `[Unreleased]` names the behaviour change and the opt-out
-- [ ] `configuration.md` documents all three keys with their defaults and the `**/*.md` spelling note
+- [ ] `configuration.md` documents all five keys (`enabled`, `patterns`, `checkCommand`, `checkTimeoutSeconds`, `settleSeconds`) with their defaults and the `**/*.md` spelling note
 
 ---
 
@@ -442,20 +450,21 @@ None.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.172.qa.7.ci-docs-only-tree-equivalence.md](./task.172.qa.7.ci-docs-only-tree-equivalence.md)
-- **Gate File**: [task.172.gate.7.ci-docs-only-tree-equivalence.yml](./task.172.gate.7.ci-docs-only-tree-equivalence.yml)
+- **Full Report**: [task.172.qa.8.ci-docs-only-tree-equivalence.md](./task.172.qa.8.ci-docs-only-tree-equivalence.md)
+- **Gate File**: [task.172.gate.8.ci-docs-only-tree-equivalence.yml](./task.172.gate.8.ci-docs-only-tree-equivalence.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 93 engine tests, also under `TMPDIR=/tmp` (plus the cycle 6 fast gate: 4,906 of 4,909, load-sensitive file-time budgets)
+- **Tests Executed**: 97 engine tests (plus the fast gate on the fix commit: 4,910 of 4,911)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0 HIGH, 0 MEDIUM, 1 LOW
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 6's fixes are verified and mutation-proven, and no HIGH or MEDIUM finding is open. One reproduced LOW remains, carried by the cosmetic-residue exit: a configuration whose `ci` key is quoted, or whose top-level keys are uniformly indented, was honoured by the cycle 5 engine and is now refused with exit 2 (fails closed).
+The four security findings from `/finalise` run 1 are fixed and mutation-proven. No HIGH or MEDIUM finding is open. One reproduced LOW remains, carried by the cosmetic-residue exit: a check detached into its own session no longer receives an interrupt sent to the engine's process group.
 
 ### Deferred Work
 
+- **Carried from gate 8 by the Cosmetic-residue exit (route 2b, cycle 8)**: CR8-1. One LOW finding (a check detached into its own session no longer receives an interrupt sent to the engine's process group), moved to the gate's `recommendations.future` by id. Also recorded there, not gating: the rename/copy and unreadable-`git status` branches of the dirty-tree rule have no test.
 - **Carried from gate 7 by the Cosmetic-residue exit (route 2b, cycle 7)**: CR7-1. One LOW finding (a quoted `ci` key or uniformly indented top-level keys are refused with exit 2; fails closed), moved to the gate's `recommendations.future` by id.
 - Recorded in gate 7's `recommendations.future`, not attributable to cycle 6: a `ci` block nested under another key, or with its `docsOnly` children dedented to column 0, reads as the defaults (valid YAML with a different meaning, identical in the cycle 5 engine); the second comment-stripping rule beside `yaml-subset.js`'s; the CANCELLED nearer ancestor that the 6c poll re-asks.
 - If a further gate finds another configuration-reading defect: replace the `ci` block reader with a dedicated strict one rather than a further spelling of the completeness check.
@@ -516,6 +525,8 @@ Cycle 6's fixes are verified and mutation-proven, and no HIGH or MEDIUM finding 
 | 2026-10-01 |  | QA findings fixed — 2 findings (2 MEDIUM) plus 3 advisory, 1 iteration | qa-fix |
 | 2026-10-01 |  | QA gate PASS (95/100) — 1 finding | qa-task |
 | 2026-10-01 |  | DoD incomplete — 5 gaps identified | finalise |
+| 2026-10-01 |  | Scope amendments recorded after finalise run 1 (five config keys, files added during QA and the DoD gate); CodeQuality-1 narrowed by the operator from every new test to every fix-driven test | develop |
+| 2026-10-01 |  | QA gate PASS (95/100) — 1 finding | qa-task |
 
 <!-- change-log-end -->
 
