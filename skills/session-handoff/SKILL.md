@@ -208,10 +208,17 @@ not here.
 1. **Resolve the path and the prompt — one call, never by hand:**
 
    ```bash
-   command node .agents/skills/session-handoff/scripts/continuation.mjs --json
+   # From the repository root. The skill may be installed in the repository or at user level —
+   # Continue is most useful where it is not in the repository — so take the first that exists.
+   CONT=""
+   for d in .agents/skills ~/.agents/skills ~/.claude/skills; do
+     [ -f "$d/session-handoff/scripts/continuation.mjs" ] && { CONT="$d/session-handoff/scripts/continuation.mjs"; break; }
+   done
+   [ -n "$CONT" ] || { echo "session-handoff is not installed in .agents/skills, ~/.agents/skills or ~/.claude/skills"; exit 1; }
+   command node "$CONT" --json
    ```
 
-   Use `path` and `resumePrompt` exactly as given. The script writes nothing. On a
+   Use `path`, `verifier` and `resumePrompt` exactly as given. The script writes nothing. On a
    `feature/task.N.slug` branch whose `docs/tasks/task.N.slug/` exists the file goes there as
    `task.N.handoff.{k}.slug.md`; on `feature/story.E.S.slug` it goes beside the story
    (`story.E.S.handoff.{k}.slug.md`, the story found under the PRD root); anything else goes to
@@ -233,10 +240,13 @@ not here.
 4. **Prove it with Read** on the new file:
 
    ```bash
-   command node .agents/skills/session-handoff/scripts/handoff-verify.mjs <path> --json
+   # {verifier} and {path} are the two values step 1's JSON returned — the verifier is resolved
+   # there, never assumed to be under .agents/skills.
+   command node "{verifier}" "{path}" --json
    ```
 
-   Fix or re-measure every `stale` row. Accept an `unverifiable` row only with a reason you would
+   When step 1 answered `reason: no-verifier` there is no verifier to run: re-run each command in
+   the state table by hand and compare it with its figure. Fix or re-measure every `stale` row. Accept an `unverifiable` row only with a reason you would
    give the reader (`timeout` on a targeted test in a large repo is one).
 5. **Hand over.** Print `resumePrompt` verbatim and say that the file is **not committed**. Committing
    it is the caller's call — a mid-task file may belong in the work item's next commit — and it has

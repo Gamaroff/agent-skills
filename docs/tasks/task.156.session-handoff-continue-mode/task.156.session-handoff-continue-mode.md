@@ -508,6 +508,27 @@ None identified. The change is additive and touches no existing mode.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-01
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.156.qa.1.session-handoff-continue-mode.md](./task.156.qa.1.session-handoff-continue-mode.md)
+- **Gate File**: [task.156.gate.1.session-handoff-continue-mode.yml](./task.156.gate.1.session-handoff-continue-mode.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 14 new (13 continuation + 1 artifact-segment guard); 38 handoff-verify regression
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+CR-1 (medium): the Continue procedure hard-codes the repo-local `.agents/skills/…` path, so it fails in a repository that does not ship the skill. CR-2 is pre-existing and routed to a follow-up.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -517,6 +538,8 @@ None identified. The change is additive and touches no existing mode.
 | 2026-10-01 | 1.1     | Review passed (8/10) — 5 Important fixes applied: PRD root source, `pass N` test figure, uncommitted-files forms, tip row stales on commit, sibling verifier first | review-task |
 | 2026-10-01 |         | Status → ready-for-development | review-task |
 | 2026-10-01 |         | Implemented — 3 new files, 7 modified; 14 tests (13 + 1 artifact-segment guard) | develop |
+| 2026-10-01 |  | QA gate CONCERNS (90/100) — 1 finding (CR-1) | qa-task |
+| 2026-10-01 |  | QA findings fixed — CR-1 (Continue runs from a user-level install), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -537,6 +560,12 @@ figure form in the template was chosen by running it through `handoff-verify.mjs
 index-10 case red; dropping the task-dir check turns the absent-dir case red; removing `handoff` from
 finalise's list, or `pr-review` from tracker-reconcile's, turns §6 red. `continuation.mjs` runs in
 0.11 s on this repository (`time`).
+
+**QA fix cycle 1 (CR-1)**: Continue step 1 now finds `continuation.mjs` in `.agents/skills`, then
+`~/.agents/skills`, then `~/.claude/skills`, and step 4 runs the `verifier` step 1 returned rather than
+a hard-coded path. Run under bash and zsh in three layouts: skill in the repository, user-level only
+(`HOME` pointed at a `~/.claude/skills` install, verifier emitted absolute), and not installed (exit 1
+with the three locations named).
 
 **Completion Date**: 2026-10-01
 
