@@ -5,18 +5,20 @@ type: task
 description: "Add a `continue` write mode to session-handoff that writes a focused continuation file (goal, re-measurable state, next step, decisions, ruled-out approaches, file paths) co-located with the active work item, and prints a paste-ready resume prompt that runs the existing verifier first, so work can move to a fresh context without carrying the old one."
 tags: [session-handoff, context, handoff, continuation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-25
-updated: 2026-10-01
+updated: 2026-10-02
 assignee:
 estimated_effort_hours: 16
 github_issue: 490
+completed_date: 2026-10-02
+pr_number: 548
 ---
 
 # Technical Task: session-handoff continue mode — a continuation file a fresh context resumes from
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.156.review.1.session-handoff-continue-mode.md` implemented 2026-10-01
 
@@ -528,12 +530,11 @@ None identified. The change is additive and touches no existing mode.
 
 ### Key Findings
 Gate 1's CR-1 is fixed and verified in three install layouts. The cycle-2 refute pass raised five advisory findings (none high-confidence), recorded in the gate's `recommendations.future`.
-
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-25 | 1.0     | Initial draft | create-task |
 | 2026-10-01 | 1.1     | Review passed (8/10) — 5 Important fixes applied: PRD root source, `pass N` test figure, uncommitted-files forms, tip row stales on commit, sibling verifier first | review-task |
 | 2026-10-01 |         | Status → ready-for-development | review-task |
@@ -541,8 +542,35 @@ Gate 1's CR-1 is fixed and verified in three install layouts. The cycle-2 refute
 | 2026-10-01 |  | QA gate CONCERNS (90/100) — 1 finding (CR-1) | qa-task |
 | 2026-10-01 |  | QA findings fixed — CR-1 (Continue runs from a user-level install), 1 iteration | qa-fix |
 | 2026-10-01 |  | QA gate PASS (100/100) — 0 gated findings, 5 advisory | qa-task |
+| 2026-10-02 | 1.2 | DoD verified — accepted (PR #548) | finalise |
 <!-- change-log-end -->
 
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.156.qa.2.session-handoff-continue-mode.md`
+**Gate File**: `task.156.gate.2.session-handoff-continue-mode.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (2 QA cycles; gate 1 CONCERNS 90 → fixed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 5/5 functional, plus performance (0.11 s), code quality and migration
+✅ **Tests:** 13 continuation tests + the §6 artifact-segment guard; `handoff-verify.test.js` 38/38 unchanged
+✅ **PR Review:** PR #548; Step 5c `/review-pr` CONCERNS (advisory medium/medium findings, routed to follow-up)
+✅ **Documentation:** SKILL.md Continue section, template, `file-naming.md` rows, catalog, CHANGELOG
+✅ **Security Review:** PASS — `isWorkItemDocument` probe engages, 22 executed, 0 reproduced
+✅ **Compliance Review:** not applicable (internal tooling)
+✅ **CI:** SUCCESS on `8e4ff546` (5 checks)
+
+**Task marked as ACCEPTED on:** 2026-10-02
+
+**Detailed Verification Log:** See `task.156.dod.1.session-handoff-continue-mode.md` for complete verification evidence and timestamps.
 ---
 
 ## Development Record
@@ -627,7 +655,7 @@ pre-existing class, not introduced here.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to the implementation plan (`/develop-task`)
