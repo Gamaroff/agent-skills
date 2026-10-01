@@ -6,6 +6,75 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A docs-only tail no longer waits for a full CI run at the pipeline's four CI waits (task 172).**
+  Behaviour change on upgrade, on by default: when a head's CI is still `PENDING` (or empty) and
+  every file changed since a green first-parent ancestor is documentation, the reading is satisfied
+  and recorded as `SUCCESS (tree-equivalent to <sha12>)`, never plain `SUCCESS`. Opt out with
+  `ci.docsOnly.enabled: false`; narrow `ci.docsOnly.patterns` or set `ci.docsOnly.checkCommand` if
+  your markdown is executable or a docs-path workflow can go red.
+  - One engine, `shared/resources/ci-tree-equivalence.js`, called at `/finalise` readings 1 and 2
+    (the 6c poll gains an optional `TREE_EQ=` field), `/develop-next` Step 3 and `/develop-batch`
+    Step 3. It exits 0 for `tree-equivalent` and for nothing else, so no "no" can round up to green.
+  - The ancestor must be green on its **own** checks (not "any run on the branch"); zero checks is
+    never green; a `403` on Bitbucket is `unverifiable`; a rename out of code into docs counts as a
+    code change; the walk is bounded at 20 first-parent commits.
+  - `ci.docsOnly.{enabled,patterns,checkCommand,checkTimeoutSeconds,settleSeconds}` documented in
+    `docs/reference/configuration.md`.
+    Write `patterns` as a block list and spell it `**/*.md`: the YAML subset reads an inline `[..]`
+    as a string (rejected, exit 2), and `*.md` does not cross `/`. This repository narrows to
+    `docs/**` with `checkCommand: npm run ci:fast && npm run eval:all`.
+  - Two helpers moved out so the engine does not bundle a QA or a PR-comment module into three more
+    skills: `shared/resources/glob-match.js` (from `qa-diminishing-returns.js`) and
+    `shared/resources/bb-auth.js` (from `pr-inline-comment.js`). Both keep their exports.
+  - Residual, accepted: a workflow triggered only by docs paths (a link checker) never ran on a
+    green ancestor that touched none of them, and `checkCommand` cannot reproduce URL reachability.
+  - QA cycle 1 closed three ways around the fail-closed property before release: a change to
+    `skills-config.yaml` in the delta is never docs (a commit could widen the patterns that judged its
+    own diff); an ancestor whose only checks were skipped is not green; a path a matcher would normalise
+    into `docs/**` (a backslash or leading-space name) is code. `/finalise`'s canonical PR comment
+    now carries the `(tree-equivalent to <sha>)` suffix on reading 2 as well as reading 1.
+  - QA cycle 2 (refute pass) closed eight more: a nearer red docs-only ancestor now stops the walk; an
+    ancestor with any skipped or neutral check is not green; `--head` must be the checked-out `HEAD`;
+    unknown `ci.docsOnly` keys are a usage error; a submodule pointer is code and
+    `diff.ignoreSubmodules` cannot hide it; the commit-status read paginates; `checkCommand` is bounded by
+    the new `ci.docsOnly.checkTimeoutSeconds` (default 1500); the new prose blocks fail loudly on an unbound
+    input (`${VAR:?}`, and `${VAR?}` for the Step 7 comment); an empty option value is a usage error; the
+    repository root is resolved before the config is read.
+  - QA cycle 3 (safety re-probe) closed eight more: the configuration is read from the commit judged, not
+    the working tree, and is one strict schema (a `ci` that is not a block mapping, a near-miss key such as
+    `docs-only`, and a YAML block-scalar `checkCommand` are usage errors instead of silent defaults or a
+    vacuous check); an ancestor must have settled (new `ci.docsOnly.settleSeconds`, default 300) before its
+    green counts; a Bitbucket `next` link is followed only on the Bitbucket API, so the credential cannot
+    leave it; a large `--json` record is no longer truncated through a pipe (`process.exitCode`, and the
+    `changed` list is capped at 200 with a `changedCount`); the gitlink marker is rejected before any
+    pattern; the one-shot rollup reads in develop-next and develop-batch print their value; the 6c poll
+    turns the rule off when `jq` is missing. Accepted and documented: a nearer ancestor that is still
+    `PENDING` is walked past, and `checkCommand` runs in the foreground, so it must fit the tool timeout.
+  - QA cycle 4 closed two more: `code-changed` is reported only when no nearer ancestor was walked past
+    undecided (otherwise `no-green-ancestor`, which the 6c poll re-asks; before, the settle window turned a
+    five-minute delay into a permanent loss of the rule for that poll); and a `skills-config.yaml` that has
+    content but parses to no mapping, or is committed as a symlink or submodule, is a usage error (exit 2)
+    instead of the defaults, so an opt-out held in a link's target is no longer ignored.
+  - QA cycle 5 closed three more, all in reading `skills-config.yaml`: a leading BOM no longer defeats the
+    parse when a key precedes `ci`; the parse must now account for every content row (a mis-indented or
+    duplicated row, or a key under `ci` other than `docsOnly`, is exit 2 instead of a silently ignored
+    opt-out); and the git mode check and the read are anchored to the same place, so
+    `--workspace-root <subdirectory>` still sees a root opt-out.
+  - QA cycle 6 corrected the row-count check cycle 5 added: it counted the whole file and over-counted every
+    list-of-maps element, so a valid `skills-config.yaml` holding `developBatch.resources` or
+    `retrospective.identities` was refused with exit 2 (the rule failed closed, but was lost for those
+    consumers), and one over-count could hide a dropped row elsewhere. The check now covers the `ci` block
+    only, whose rows count exactly; a document marker with a trailing comment is a marker.
+  - The DoD security gate closed four more, all in the engine since its first version. `checkCommand` now runs
+    as the leader of its own process group and the whole group is killed when it ends or times out (the timeout
+    used to kill only `sh -c`, leaving `npm run ci:fast && …` running and holding the caller's stderr open).
+    The check is not run over uncommitted code (`unverifiable`, which a poll re-asks); uncommitted
+    documentation is allowed, because `/finalise` reading 1 runs with its own DoD summary and report edits
+    uncommitted. The glob matcher is no longer a regular expression: `*a` repeated or `**/` repeated took
+    seconds to minutes against a non-matching path, and the new matcher costs tokens times path length
+    whatever the pattern, with the same answers as the old one on 20,000 differential cases. A changed path
+    with a `.`, `..` or empty segment (`docs/../src/a.js`) is never documentation.
+
 - **`/wireloom`: UI wireframes as text, rendered to SVG.** Adapted from
   [StardockCorp/Wireloom](https://github.com/StardockCorp/Wireloom) (MIT, © Brad Wardell). The
   skill writes a ```` ```wireloom ```` block, checks it, and embeds a co-located SVG beside the

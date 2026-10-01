@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "shared/resources/glob-match.js#matchesAnyGlob",
+      "name": "matchesAnyGlob-default-patterns",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 14,
+      "passed": 14,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        [
+          "**/*.md",
+          "docs/**"
+        ]
+      ],
+      "ran_at": "2026-10-01T14:23:22.382Z"
+    },
+    {
+      "sink": "path",
+      "entry": "shared/resources/ci-tree-equivalence.js#isDocsPath",
+      "name": "isDocsPath-default-patterns",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 23,
+      "passed": 22,
+      "reproduced": 1,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        [
+          "**/*.md",
+          "docs/**"
+        ]
+      ],
+      "ran_at": "2026-10-01T14:23:20.233Z"
+    }
+  ],
+  "totals": {
+    "executed": 37,
+    "reproduced": 1
+  },
+  "updated_at": "2026-10-01T14:23:22.382Z"
+}

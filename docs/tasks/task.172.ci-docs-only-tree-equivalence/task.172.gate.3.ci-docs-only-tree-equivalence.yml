@@ -1,0 +1,107 @@
+schema: 2
+task: 'task.172.ci-docs-only-tree-equivalence'
+task_title: 'One docs-only CI rule at every pipeline CI wait'
+gate: CONCERNS
+status_reason: 'Cycle 3 safety re-probe: no HIGH open. Seven MEDIUM and one LOW, all reproduced: config and JSON-record robustness, a Bitbucket credential-forwarding gap, and the ancestor partial-rollup window. The reviewer rated three of them high; QA rated them medium and says why in each finding. Cycle 2 fixes verified.'
+reviewer: 'QA Engineer'
+head: '1c7a7e68add173bf9bd4b85acc9e4be8a8e052df'
+updated: '2026-10-01T11:01:57Z'
+
+top_issues:
+  - id: 'CR3-1'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'An ancestor read while its check lanes are still registering reads green. A just-pushed ancestor whose one fast lane has completed while the slow lanes have not yet registered reduces to SUCCESS (reproduced with one completed check-run dated now). This is the obs #87 partial-rollup window, guarded for the head by CI_CHECKS_1 but not for the ancestor. Reviewer rated it high; QA rates it medium: every call site reads an ancestor whose own CI the pipeline already waited on, so the window is minutes after a push, not a state any call site reaches. Bug: task.172.bug.12.ancestor-partial-rollup-reads-green.md'
+    suggested_action: 'Treat an ancestor whose newest completed check or status is younger than ci.docsOnly.settleSeconds (default 300) as PENDING.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-2'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'A YAML block scalar checkCommand is read as the literal ">-" and passes vacuously. The YAML subset reads `checkCommand: >-` (folded scalar) as the string ">-" and drops the indented rows; `sh -c ">-"` is a bare redirection that exits 0, so the configured check is skipped and a stray file named "-" is created. Reproduced. Reviewer rated high; QA rates medium (needs an owner config in a shape the docs do not show; same class as CR2-4). Bug: task.172.bug.13.yaml-block-scalar-check-command-runs-nothing.md'
+    suggested_action: 'Refuse a checkCommand that starts with a YAML block-scalar indicator (> or |) as a usage error that says to write it on one line.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-3'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'A ci block that is not a mapping, or a near-miss key spelling, silently runs the rule with defaults. `ci: { docsOnly: { enabled: false } }`, `ci: false`, `ci.docs-only` and `ci.docs_only` are all ignored and the rule runs ON with `**/*.md`; an owner who opted out is overridden. Reproduced for four shapes. Reviewer rated high; QA rates medium (same class as CR2-4). Bug: task.172.bug.14.ci-block-not-a-mapping-falls-back-to-defaults.md'
+    suggested_action: 'A ci value that is not a mapping is a usage error; a key under ci or at top level that normalises to docsonly or ci (case, - and _ ignored) but is not exactly docsOnly or ci is a usage error.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-4'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The one-shot rollup read now assigns CI_ROLLUP silently, so the next block cannot re-bind it. In develop-next and develop-batch the read became `CI_ROLLUP=$(...)`, printing nothing; the next fenced block reads `${CI_ROLLUP:?}` with no writer in that block, so the agent never sees the value it must bind. It also breaks the claim that enabled:false restores the old wait byte for byte. Bug: task.172.bug.15.one-shot-rollup-read-became-silent.md'
+    suggested_action: 'Echo the value after the assignment in both blocks.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-5'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'The Bitbucket pagination follows a next link to any host with the Authorization header. A `next` URL of https://evil.example/steal was fetched with the bearer token attached (reproduced with an injected fetch), and the walk went on to exit 0. Bug: task.172.bug.16.bitbucket-next-link-followed-with-credentials.md'
+    suggested_action: 'Follow a next link only when it begins with the Bitbucket API base; otherwise the read is UNKNOWN.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-6'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'The configuration is read from the working-tree file, not the commit judged. An uncommitted edit that widens ci.docsOnly.patterns to ** makes a committed src/b.js change read as docs (reproduced). CR2-3 pins the commit to HEAD but not the dirty tree. Bug: task.172.bug.17.config-read-from-dirty-working-tree.md'
+    suggested_action: 'Read skills-config.yaml from the judged commit with git show; the file in the working tree is not consulted.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-7'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'A large --json payload is truncated when the process exits with output unflushed. process.exit runs right after a stdout.write to a pipe, so a 4000-file docs delta produced 131072 bytes instead of the full document (reproduced), jq fails and the rule silently never fires. Bug: task.172.bug.18.stdout-truncated-by-process-exit.md'
+    suggested_action: 'Set process.exitCode instead of calling process.exit, and cap the changed array in the JSON record.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-8'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'The gitlink marker is a path prefix that a broad docs pattern matches. A gitlink bump returns :gitlink:docs/vendor, which a `**` pattern accepts, so it reads as docs despite the documented rule (reproduced).'
+    suggested_action: 'isDocsPath rejects the gitlink marker before any pattern is consulted.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 65
+
+evidence:
+  tests_reviewed: 71
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unscoped safety re-probe by an independent reviewer; QA reproduced CR3-1 to CR3-3 and CR3-5 to CR3-8 by execution. No HIGH is open. No corpus sink models this predicate, so the evidence is reasoned plus reproductions, not measured.'
+  performance:
+    status: PASS
+    notes: 'Bounded at 20 ancestors.'
+  reliability:
+    status: CONCERNS
+    notes: 'The JSON record can be truncated on a large delta (CR3-7).'
+  maintainability:
+    status: PASS
+    notes: 'One engine, shared helpers.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR3-1 to CR3-8, each with a test that is red on revert.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'skills/develop-next/SKILL.md', 'skills/develop-batch/SKILL.md']
+  future:
+    - action: 'Advisory, from the review: a nearer ancestor that is still PENDING is walked past (document as an accepted residual next to the link-checker one); a missing jq in the 6c poll never latches (guard it); the arm blocks run the engine in the foreground, so state the checkCommand bound against the tool timeout.'
+      refs: ['skills/finalise/SKILL.md', 'docs/reference/configuration.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['Fix CR3-1 to CR3-8']

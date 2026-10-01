@@ -5,18 +5,22 @@ type: task
 description: "A shared engine decides when a pending CI reading is satisfied because every file changed since a green ancestor is docs. /finalise readings 1 and 2, /develop-next Step 3 and /develop-batch Step 3 all call it and record SUCCESS (tree-equivalent to <sha>), never plain SUCCESS."
 tags: [finalise, develop-next, develop-batch, ci, engine, performance, consumer-handoff]
 category: infrastructure
-status: planned
+status: accepted
 priority: High
 created: 2026-10-01
 updated: 2026-10-01
 assignee:
 estimated_effort_hours: 16
 github_issue: 539
+completed_date: 2026-10-01
+pr_number: 543
 ---
 
 # Technical Task: One docs-only CI rule at every pipeline CI wait
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.172.review.1.ci-docs-only-tree-equivalence.md` implemented 2026-10-01
 
 **GitHub Issue**: [#539](https://github.com/Gamaroff/agent-skills/issues/539)
 
@@ -201,7 +205,10 @@ repository-root markdown.
 **This repository overrides the default.** Here a `SKILL.md` or a `shared/resources/*.md` is
 executable prose that tests read. Tests also read `docs/`: for example
 `shared/resources/tests/card-preflight-corpus.test.mjs` scans `docs/tasks/`. So this repository's own
-`skills-config.yaml` sets `patterns: ["docs/**"]` and `checkCommand: "npm run ci:fast"`. The
+`skills-config.yaml` sets `patterns: ["docs/**"]` and `checkCommand: "npm run ci:fast && npm run eval:all"`.
+`eval:all` is in the command because it holds `evals/shared/tests/task-registry-drift.test.mjs`, which a
+docs-only edit to a task document or the registry can fail, and `ci:fast` does not run it (measured
+2026-10-01: `npm run eval:all` takes about 5 s). The
 consumer default stays as the operator chose it.
 
 ### Same-class mechanism inventory (obs #103)
@@ -223,7 +230,7 @@ consumer default stays as the operator chose it.
 - ✅ `shared/resources/ci-tree-equivalence.js` and `shared/resources/tests/ci-tree-equivalence.test.mjs`
 - ✅ `shared/resources/glob-match.js`, with `qa-diminishing-returns.js` re-pointed at it
 - ✅ The four call sites, plus the two notes that name the gap (`skills/finalise/SKILL.md:897`, `:1507`)
-- ✅ `ci.docsOnly.{enabled, patterns, checkCommand}` in `docs/reference/configuration.md` (schema + key reference)
+- ✅ `ci.docsOnly.{enabled, patterns, checkCommand, checkTimeoutSeconds, settleSeconds}` in `docs/reference/configuration.md` (schema + key reference). The last two were added in QA cycles 2 and 3 (a bounded check; an ancestor settle window)
 - ✅ This repository's `skills-config.yaml` override
 - ✅ GitHub and Bitbucket ancestor reads
 - ✅ `npm run bundle`, CHANGELOG `[Unreleased]`
@@ -255,31 +262,31 @@ is docs-only over a green ancestor stops waiting for CI at the four sites. The o
 
 ### Phase 1: glob-match primitive (Risk: Low)
 
-- [ ] Move `globToRegExp`, `normalisePath` and `matchesAnyGlob` verbatim into `shared/resources/glob-match.js`
-- [ ] `qa-diminishing-returns.js` requires it, and its export list is unchanged
-- [ ] `qa-diminishing-returns.test.mjs` and `qa-loop-route.test.mjs` stay green with no edit
+- [x] Move `globToRegExp`, `normalisePath` and `matchesAnyGlob` verbatim into `shared/resources/glob-match.js`
+- [x] `qa-diminishing-returns.js` requires it, and its export list is unchanged
+- [x] `qa-diminishing-returns.test.mjs` and `qa-loop-route.test.mjs` stay green with no edit
 
 ### Phase 2: the engine (Risk: Medium)
 
-- [ ] Pure `classifyTreeEquivalence` plus the CLI (`--head-rollup`, `--head`, `--pr`, `--json`, `--workspace-root`)
-- [ ] Config read via `yaml-subset.js`: `ci.docsOnly.enabled` (default `true`), `patterns` (default `["**/*.md","docs/**"]`), `checkCommand` (default unset)
-- [ ] GitHub and Bitbucket ancestor reads. Any read failure is `unverifiable`
-- [ ] Exit `0` only for `tree-equivalent`
+- [x] Pure `classifyTreeEquivalence` plus the CLI (`--head-rollup`, `--head`, `--pr`, `--json`, `--workspace-root`)
+- [x] Config read via `yaml-subset.js`: `ci.docsOnly.enabled` (default `true`), `patterns` (default `["**/*.md","docs/**"]`), `checkCommand` (default unset)
+- [x] GitHub and Bitbucket ancestor reads. Any read failure is `unverifiable`
+- [x] Exit `0` only for `tree-equivalent`
 
 ### Phase 3: migrate the four sites (Risk: Medium)
 
 Depends on Phase 2.
 
-- [ ] `/finalise` Step 6: a tree-equivalence arm after the re-sample loop, a `tree-equivalent` row in the decision table, and `CI reading 1: SUCCESS (tree-equivalent to <sha>) @ <head>`
-- [ ] `/finalise` 6c: the `decided()` arm, the optional `TREE_EQ=` result field, and its later-turn print
-- [ ] Revise the `:897` and `:1507` notes to point at the rule instead of naming the gap
-- [ ] `/develop-next` Step 3 and `/develop-batch` Step 3: the arm in "CI checks", with the recorded form in the run report
+- [x] `/finalise` Step 6: a tree-equivalence arm after the re-sample loop, a `tree-equivalent` row in the decision table, and `CI reading 1: SUCCESS (tree-equivalent to <sha>) @ <head>`
+- [x] `/finalise` 6c: the `decided()` arm, the optional `TREE_EQ=` result field, and its later-turn print
+- [x] Revise the `:897` and `:1507` notes to point at the rule instead of naming the gap
+- [x] `/develop-next` Step 3 and `/develop-batch` Step 3: the arm in "CI checks", with the recorded form in the run report
 
 ### Phase 4: config, docs and this repository (Risk: Low)
 
-- [ ] `docs/reference/configuration.md`: the schema block and three key-reference rows
-- [ ] This repository's `skills-config.yaml`: `patterns: ["docs/**"]`, `checkCommand: "npm run ci:fast"`, with the reason as a comment
-- [ ] `npm run bundle`, `npm run generate-catalog` if a description changed, and CHANGELOG
+- [x] `docs/reference/configuration.md`: the schema block and the key-reference rows (five, see § 4), including the rule that `checkCommand` should reproduce every check a workflow path-filtered to the docs patterns runs
+- [x] This repository's `skills-config.yaml`: `patterns: ["docs/**"]`, `checkCommand: "npm run ci:fast && npm run eval:all"`, with the reason as a comment
+- [x] `npm run bundle`, `npm run generate-catalog` if a description changed, and CHANGELOG
 
 ---
 
@@ -300,6 +307,14 @@ Depends on Phase 2.
 8. `docs/reference/configuration.md`: `ci.docsOnly`
 9. `skills-config.yaml`: this repository's override
 10. `CHANGELOG.md`: `[Unreleased]`
+
+### Added or modified during QA and the DoD gate (not in the original plan)
+
+- `shared/resources/bb-auth.js` (new): the Bitbucket auth header, moved out of `pr-inline-comment.js` because requiring that file would have pulled about 1,500 lines into three skills; `shared/resources/pr-inline-comment.js` re-exports it
+- `shared/resources/tests/_dedent.mjs` (new): a test helper for the extracted prose blocks
+- `tests/unbound-default-reads.test.js`, `evals/shared/tests/qa-narrowing-offer-wiring.test.mjs`, `evals/shared/tests/finalise-publish-boundary.test.mjs`: edited to cover the new blocks
+- `docs/contributing/traps.md`: lists the engine's test file as load-sensitive (a wall-clock assertion added at the DoD security gate)
+- `shared/resources/glob-match.js`: after the move, rewritten as a token-walk matcher (no RegExp), because the RegExp compile was exponential on repeated wildcards (DoD security gate, bug 27)
 
 ### Generated (`npm run bundle`, never edited by hand)
 
@@ -353,14 +368,14 @@ None.
 
 ### Code Quality
 
-- [ ] Every new test is mutation-proved red on revert
+- [ ] Every test written for a defect found by QA, the PR review or the DoD security gate is mutation-proved red on revert (the QA reports' `mutation-proven:` lines record each). _Narrowed on 2026-10-01 after `/finalise` run 1, by the operator, from "every new test": the 51 tests written with the first implementation carry 14 proofs, and a per-test ledger for the rest was judged not worth its cost._
 - [ ] `npm run ci` green; `npm run validate -- skills/finalise/`, `skills/develop-next/`, `skills/develop-batch/` pass
 - [ ] `npm run bundle:check` clean, with no `UNREACHED` copy
 
 ### Migration
 
 - [ ] CHANGELOG `[Unreleased]` names the behaviour change and the opt-out
-- [ ] `configuration.md` documents all three keys with their defaults and the `**/*.md` spelling note
+- [ ] `configuration.md` documents all five keys (`enabled`, `patterns`, `checkCommand`, `checkTimeoutSeconds`, `settleSeconds`) with their defaults and the `**/*.md` spelling note
 
 ---
 
@@ -371,9 +386,15 @@ None.
 1. **A docs-only commit that turns CI red is let through.** This repository's doc-link checker and
    corpus tests are both examples.
    - Probability: Medium. Impact: High (a red merge).
-   - Mitigation: `checkCommand`. This repository sets `npm run ci:fast`. `/develop-next` Step 3 still
+   - Mitigation: `checkCommand`. This repository sets `npm run ci:fast && npm run eval:all`. `/develop-next` Step 3 still
      runs `<qualityGateCommand>` locally regardless. The record says `tree-equivalent`, so a later red
      is traceable to its cause.
+   - Residual, accepted and documented: `.github/workflows/docs-link-check.yml` runs only on pushes that
+     touch `docs/**/*.md`, `README.md`, `AGENTS.md` or `CONTRIBUTING.md`, and checks external URLs with
+     `markdown-link-check`. A green ancestor that touched none of those never ran it, and no local
+     `checkCommand` reproduces URL reachability. A docs-only commit can therefore turn that one workflow
+     red after the pipeline recorded `tree-equivalent`. `configuration.md` states the rule for a consumer:
+     `checkCommand` should reproduce every check that a workflow path-filtered to the docs patterns runs.
    - Rollback: `ci.docsOnly.enabled: false`.
 
 ### Medium Risk Areas
@@ -422,24 +443,127 @@ None.
 
 ---
 
-<!-- change-log-start -->
+## QA Testing Results
 
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-01
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.172.qa.8.ci-docs-only-tree-equivalence.md](./task.172.qa.8.ci-docs-only-tree-equivalence.md)
+- **Gate File**: [task.172.gate.8.ci-docs-only-tree-equivalence.yml](./task.172.gate.8.ci-docs-only-tree-equivalence.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 97 engine tests (plus the fast gate on the fix commit: 4,910 of 4,911)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 0 MEDIUM, 1 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+The four security findings from `/finalise` run 1 are fixed and mutation-proven. No HIGH or MEDIUM finding is open. One reproduced LOW remains, carried by the cosmetic-residue exit: a check detached into its own session no longer receives an interrupt sent to the engine's process group.
+
+### Deferred Work
+
+- **Carried from the Step 5c PR reviews (not gating):** `skills/finalise/SKILL.md` CR-2 (`CI_CHECKS_1` is counted from the rollup read before the docs-only arm, so a tree-equivalent reading 1 hands the 6c poll the unfinished head's check count as its floor) and CR-3 (the Step 8a retake record has no tree-equivalent clause); CR-5 (the poll discards the engine's stderr and does not latch exit 2); CR-6 (dead entries in `tests/unbound-default-reads.test.js`). Second review also reported: a host kill of the engine orphans the detached check (the foreground arms leave the host's tool timeout unstated), the develop-next Bitbucket arm binds no `CI_ROLLUP`, the engine's network reads have no timeout, this repository's `checkCommand` runs no docs link check, and `readConfig` has no production caller.
+- **Carried from gate 8 by the Cosmetic-residue exit (route 2b, cycle 8)**: CR8-1. One LOW finding (a check detached into its own session no longer receives an interrupt sent to the engine's process group), moved to the gate's `recommendations.future` by id. Also recorded there, not gating: the rename/copy and unreadable-`git status` branches of the dirty-tree rule have no test.
+- **Carried from gate 7 by the Cosmetic-residue exit (route 2b, cycle 7)**: CR7-1. One LOW finding (a quoted `ci` key or uniformly indented top-level keys are refused with exit 2; fails closed), moved to the gate's `recommendations.future` by id.
+- Recorded in gate 7's `recommendations.future`, not attributable to cycle 6: a `ci` block nested under another key, or with its `docsOnly` children dedented to column 0, reads as the defaults (valid YAML with a different meaning, identical in the cycle 5 engine); the second comment-stripping rule beside `yaml-subset.js`'s; the CANCELLED nearer ancestor that the 6c poll re-asks.
+- If a further gate finds another configuration-reading defect: replace the `ci` block reader with a dedicated strict one rather than a further spelling of the completeness check.
+
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
+
+**Status:** SUPERSEDED. This is the record of `/finalise` run 1 and is kept as history, not as live state: its four security gaps were closed by commit `1cde0528` (bugs 26 and 27, gate 8 PASS), CodeQuality-1 was narrowed by the operator and the scope amendments were made (see the Change Log), so `/finalise` run 2 verifies afresh and writes `dod.2`.
+
+### QA Gate Status
+
+**QA Report**: `task.172.qa.7.ci-docs-only-tree-equivalence.md`
+**Gate File**: `task.172.gate.7.ci-docs-only-tree-equivalence.yml`
+**Gate Status**: ✅ PASS (95/100), through the Cosmetic-residue exit; the Step 5c PR review read ⚠️ CONCERNS (no high finding)
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] CodeQuality-1, "every new test is mutation-proved red on revert", is evidenced per fix, not per test (93 tests, no per-test ledger)
+
+2. **Security Review:**
+   - [ ] **MEDIUM** the `checkCommand` timeout kills only `sh -c`, so a check's child processes keep running (`shared/resources/ci-tree-equivalence.js:890`)
+   - [ ] **MEDIUM** the glob matcher is exponential on repeated `*a` / `**/` patterns taken from the head commit's config (`shared/resources/glob-match.js:54`)
+   - [ ] LOW `checkCommand` can run against a dirty working tree (`shared/resources/ci-tree-equivalence.js:855`)
+   - [ ] LOW `isDocsPath` accepts `docs/../src/a.js` (`shared/resources/ci-tree-equivalence.js:126`)
+
+### Next Steps:
+
+- [ ] Fix the two MEDIUM security findings and the two LOW ones, each with a test that goes red on revert
+- [ ] Record a per-test mutation proof, or narrow CodeQuality-1 to "every fix-driven test" (a work-item edit)
+- [ ] Update "three keys" to five (Files Summary, Phase 4, Success Criteria) and list the files the Files Summary omits
+- [ ] Re-run `/qa-task` over the fixes, then `/finalise`
+
+**Estimated Effort:** Medium (3-5 hours)
+
+**Gap Report Generated:** 2026-10-01
+**Detailed Verification Log:** See `task.172.dod.1.ci-docs-only-tree-equivalence.md` for the evidence and citations.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.172.qa.8.ci-docs-only-tree-equivalence.md`
+**Gate File**: `task.172.gate.8.ci-docs-only-tree-equivalence.yml`
+**Gate Status**: ✅ PASS (95/100), through the Cosmetic-residue exit; the Step 5c PR review read ⚠️ CONCERNS twice, with no high finding
+
+All Definition of Done criteria have been verified (run 2; run 1 stopped on five gaps and is kept as history above):
+
+✅ **Acceptance Criteria:** 12 of 12 (Code Quality "every test written for a defect is mutation-proved" passes as narrowed by the operator, with stated notes)
+✅ **Tests:** 97 engine tests in `shared/resources/tests/ci-tree-equivalence.test.mjs`, in the per-PR lane
+✅ **Documentation:** CHANGELOG and `configuration.md` match the engine on five keys and six behaviours
+✅ **Security Review:** PASS; the four run-1 findings re-verified by execution; probes 74 executed, 0 reproduced
+✅ **Compliance Review:** not applicable
+✅ **CI:** reading 1 SUCCESS on `55444bd4`; reading 2 on the acceptance commit is recorded on the PR canonical comment
+
+**Detailed Verification Log:** See `task.172.dod.2.ci-docs-only-tree-equivalence.md` for the evidence and citations.
+
+**Task marked as ACCEPTED on:** 2026-10-01
+
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-01 | 1.0     | Initial draft | create-task |
-
+| 2026-10-01 | 1.1     | Review passed (9/10) — repository `checkCommand` widened to `ci:fast && eval:all`; path-filtered-workflow residual recorded | review-task |
+| 2026-10-01 |         | Status → ready-for-development | review-task |
+| 2026-10-01 |         | Implemented — 4 new + 10 modified files (and generated bundle copies), 51 new tests; yaml-subset forced a block-list config spelling | develop |
+| 2026-10-01 |  | QA gate FAIL (60/100) — 3 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 3 findings (2 HIGH, 1 MEDIUM) plus 2 advisory, 1 iteration | qa-fix |
+| 2026-10-01 |  | QA gate FAIL (50/100) — 8 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 8 findings (2 HIGH, 6 MEDIUM) plus 1 advisory, 1 iteration | qa-fix |
+| 2026-10-01 |  | QA gate CONCERNS (65/100) — 8 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 8 findings (7 MEDIUM, 1 LOW) plus 3 advisory, 1 iteration | qa-fix |
+| 2026-10-01 |  | QA gate CONCERNS (75/100) — 2 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 2 findings (2 MEDIUM) plus 1 advisory, 1 iteration | qa-fix |
+| 2026-10-01 |  | QA gate CONCERNS (70/100) — 3 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 3 findings (3 MEDIUM) plus 1 advisory, 1 iteration | qa-fix |
+| 2026-10-01 |  | QA gate CONCERNS (75/100) — 2 findings | qa-task |
+| 2026-10-01 |  | QA findings fixed — 2 findings (2 MEDIUM) plus 3 advisory, 1 iteration | qa-fix |
+| 2026-10-01 |  | QA gate PASS (95/100) — 1 finding | qa-task |
+| 2026-10-01 |  | DoD incomplete — 5 gaps identified | finalise |
+| 2026-10-01 |  | DoD security findings fixed — 4 findings (2 MEDIUM, 2 LOW), bugs 26 and 27, commit 1cde0528 | develop |
+| 2026-10-01 |  | Scope amendments recorded after finalise run 1 (five config keys, files added during QA and the DoD gate); CodeQuality-1 narrowed by the operator from every new test to every fix-driven test | develop |
+| 2026-10-01 |  | QA gate PASS (95/100) — 1 finding | qa-task |
+| 2026-10-01 | 1.2 | DoD passed — accepted (PR #543) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: glob-match primitive
-- [ ] Phase 2: the engine
-- [ ] Phase 3: migrate the four sites
-- [ ] Phase 4: config, docs and this repository
+- [x] Phase 1: glob-match primitive
+- [x] Phase 2: the engine
+- [x] Phase 3: migrate the four sites
+- [x] Phase 4: config, docs and this repository
 
 ---
 
@@ -460,4 +584,4 @@ None.
 - QA artifacts land in this directory: `task.172.qa.{N}.ci-docs-only-tree-equivalence.md`,
   `task.172.gate.{N}.ci-docs-only-tree-equivalence.yml`, bug reports `task.172.bug.{N}.{name}.md`.
 - This task's own `/finalise` run is the first to exercise the rule in this repository, under the
-  `docs/**` + `npm run ci:fast` override. Record what it did in the implementation report.
+  `docs/**` + `npm run ci:fast && npm run eval:all` override. Record what it did in the implementation report.

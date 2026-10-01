@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.172.ci-docs-only-tree-equivalence'
+task_title: 'One docs-only CI rule at every pipeline CI wait'
+gate: CONCERNS
+status_reason: 'Cycle 5 scoped review: cycle 4 fixes verified (both reproduced findings fixed, mutation-proven); no HIGH. Three reproduced MEDIUM findings, all in reading skills-config.yaml: a leading BOM defeats the parse when anything precedes ci, rows the parse does not consume are dropped silently, and the new mode check is anchored to the working directory while the read is anchored to the repository root.'
+reviewer: 'QA Engineer'
+head: 'f3887635d5a9a118446992d7f35866158d94edde'
+updated: '2026-10-01T12:48:54Z'
+
+top_issues:
+  - id: 'CR5-1'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'A UTF-8 BOM defeats the configuration parse whenever anything precedes the ci key. The YAML subset counts the BOM as one column of indent on the first row, so ci at column 0 ends the mapping and is never read. Reproduced: BOM, then version: 2, then ci with docsOnly.enabled false, gives enabled true; the same file without the BOM gives false. A BOM followed by a --- marker is refused as does not parse to a mapping (fails closed, rejects an ordinary file). The cycle 4 BOM test puts ci first, which hides it. Bug: task.172.bug.21.bom-defeats-the-config-parse.md'
+    suggested_action: 'Strip a leading U+FEFF once in parseConfig before the significance check and the parser; test a BOM with another key before ci, and a BOM with a --- marker.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR5-2'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Rows the parse does not consume are dropped silently. The subset ends a block at a dedent without an error. Reproduced: enabled indented to sit beside docsOnly (a key directly under ci) gives enabled true; a first row indented deeper than a later ci row drops ci. Each is an opt-out the owner wrote and the engine ignores; this is the class cycles 1 to 4 closed one spelling at a time. Bug: task.172.bug.22.unconsumed-config-rows-are-dropped.md'
+    suggested_action: 'Fail closed on the class: refuse any key under ci other than docsOnly, and refuse a configuration whose parsed structure does not account for every significant row.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR5-3'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'The cycle 4 mode check runs git ls-tree relative to the working directory while the unchanged git show read is relative to the repository root. With --workspace-root set to a subdirectory the ls-tree finds nothing and the defaults apply, so a root configuration holding enabled false is not seen (reproduced; before cycle 4 the read used the root). Latent: no skill passes --workspace-root, but the option is in the usage text. A regression introduced by the previous cycle fix. Bug: task.172.bug.23.config-ls-tree-anchored-to-cwd.md'
+    suggested_action: 'Anchor both reads to the same place (run them with the repository top level as the working directory, or --full-name with a :/ pathspec); test --workspace-root on a subdirectory with the config at the root.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 87
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Scoped re-review of cycle 4 fixes; QA reproduced all three findings by execution. Each is an owner opt-out the engine can ignore (fail-open on the configuration). No corpus sink models this predicate, so the evidence is reasoned plus reproductions.'
+  performance:
+    status: PASS
+    notes: 'Bounded at 20 ancestors; one extra git ls-tree per run.'
+  reliability:
+    status: PASS
+    notes: 'Cycle 4 CR4-1 is fixed: code-changed is reported only when no nearer ancestor was left undecided, and the 6c poll re-asks otherwise (real-poll test).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Five cycles have closed configuration-parse fallbacks one spelling at a time. CR5-2 asks for the structural move: the parse must account for every significant row or refuse.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR5-1, CR5-2 and CR5-3, each with a test that is red on revert. For CR5-2 prefer one completeness check over another spelling.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+  future:
+    - action: 'Review cleanup (CR-5, low): a CANCELLED nearer ancestor is counted as undecided, but a cancel-in-progress run never turns green, so code found beyond one is re-asked for the whole poll instead of latching. Treat CANCELLED as final, or say in the 6c comment that it is re-asked; update the header and configuration.md list either way.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'skills/finalise/SKILL.md', 'docs/reference/configuration.md']
