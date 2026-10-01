@@ -1,7 +1,7 @@
 ---
 name: review-story
 description: 'Story review with two modes. Interactive mode (default): asks clarifying questions to resolve ambiguities, conflicts, and missing information — use when story has unclear requirements or you need user input. Validate mode (--validate flag or "is this story ready?"): automated non-interactive GO/NO-GO gate with 1–10 readiness score — use for pre-implementation gates, batch validation across multiple stories, CI pipelines, or quick sanity checks without user interaction.'
-invokes: [create-branch, ensure-epic-github-issue, ensure-epic-jira-issue, ensure-story-github-issue, ensure-story-jira-issue, mermaid-architect]
+invokes: [create-branch, ensure-epic-github-issue, ensure-epic-jira-issue, ensure-story-github-issue, ensure-story-jira-issue, mermaid-architect, wireloom]
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
@@ -1253,7 +1253,7 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 
 ---
 
-### Step 6.6: Wireframe Verification (via `markdown-wireframe`)
+### Step 6.6: Wireframe Verification (via `wireloom`)
 
 **Purpose**: Check if the story document describes a user interface (UI) or visual components that could be drawn up in a wireframe. If so, verify if a wireframe is already embedded directly in the story document. If not, recommend adding one.
 
@@ -1267,6 +1267,7 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 2. **Verify Existing Wireframes**:
    - Check if there is an existing wireframe section embedded directly in the story document (e.g. under a `## Visual Layout / Wireframe` subheading in Dev Notes).
    - Check if the story's Dev Notes or tasks reference this embedded wireframe.
+   - If an embedded ```` ```wireloom ```` block exists, run `wireloom`'s `check` on the story file. A block that fails to parse is an **Important** finding, since its SVG cannot be re-rendered. A legacy text/YAML outline counts as present; offer to redraw it in Wireloom but do not flag it.
 
 3. **Determine Wireframe Opportunity**:
    - If UI is detected but no embedded wireframe is present, flag this as an **Optional** issue (or **Important** if the UI is complex/bespoke).
@@ -1428,11 +1429,11 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 
 ```yaml
 questions:
-  - question: "This story describes a user interface (UI) or visual components, but does not have a wireframe embedded. Would you like to embed a wireframe directly in this story using the `markdown-wireframe` skill?"
+  - question: "This story describes a user interface (UI) or visual components, but does not have a wireframe embedded. Would you like to embed a wireframe directly in this story using the `wireloom` skill?"
     header: "UI Wireframe"
     options:
       - label: "Yes — Add wireframe (Recommended)"
-        description: "Invoke the markdown-wireframe skill to generate a text/YAML wireframe, embed it directly in the story's Dev Notes section, and add a task to Stitch it."
+        description: "Invoke the wireloom skill to draw the wireframe, embed the rendered SVG and its source in the story's Dev Notes, and add a task to implement the UI it shows."
       - label: "No — Skip wireframe"
         description: "Proceed without wireframes."
 
@@ -2121,8 +2122,8 @@ Before executing any tool calls to apply changes to the story file or review mar
 4. Clean Exit: Wipe the backup file, skip all automatic text adjustments, log the specific error, and surface a graceful recovery prompt: "⚠️ Automated edit failed at fix [issue title] due to a patch conflict. Rolling back all partial edits. Please resolve this section manually."
 
    - Work through each issue in priority order (critical first, then important if selected)
-   - **UI Wireframe Insertion**: If the user selected to add a wireframe during the Unified Question Point, generate the wireframe using the `markdown-wireframe` skill instructions, embed it directly into the story's Dev Notes under a `## Visual Layout / Wireframe` subheading, and append the Stitch task:
-     `- [ ] Stitch and implement low-fidelity wireframe using Stitch (see Dev Notes visual layout)` to the Tasks / Subtasks section.
+   - **UI Wireframe Insertion**: If the user selected to add a wireframe during the Unified Question Point, draw it with the `wireloom` skill (its **Working from a brief** section, with the story's acceptance criteria as the brief), embed the rendered SVG and its source in the story's Dev Notes under a `## Visual Layout / Wireframe` subheading, and append the implementation task:
+     `- [ ] Implement the UI to match the wireframe (see Dev Notes › Visual Layout / Wireframe)` to the Tasks / Subtasks section.
    - For each fix: use the Edit tool to apply the change to the story document
    - After each fix, briefly state what was changed: `✅ Fixed: [issue title]`
    - If a fix requires information the agent doesn't have (e.g., user must decide the value), skip it and note: `⏭ Skipped: [issue title] — requires your input`
@@ -2566,7 +2567,7 @@ EOF
 **Calls**:
 
 - `mermaid-architect` — validates any embedded Mermaid diagrams (Step 6.5) and recommends a diagram if absent
-- `markdown-wireframe` — checks for UI/wireframe opportunities (Step 6.6) and generates wireframes for UI-focused stories
+- `wireloom` — checks for UI/wireframe opportunities (Step 6.6), validates embedded wireframes, and draws wireframes for UI-focused stories
 
 **Outputs used by**:
 

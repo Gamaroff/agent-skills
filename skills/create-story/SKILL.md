@@ -1,7 +1,7 @@
 ---
 name: create-story
 description: Primary workflow for creating the next logical story in a development sequence. Implements a rigorous 10-step process to identify, extract, and document story requirements with complete technical context and anti-hallucination safeguards.
-invokes: [ensure-epic-github-issue, ensure-epic-jira-issue, ensure-story-github-issue, ensure-story-jira-issue, mermaid-architect]
+invokes: [ensure-epic-github-issue, ensure-epic-jira-issue, ensure-story-github-issue, ensure-story-jira-issue, mermaid-architect, wireloom]
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
@@ -684,7 +684,7 @@ After Dev Notes are populated and the implementation plan exists, decide whether
 3. Paste the returned Mermaid block (with YAML metadata header) into Dev Notes under a "## Flow" or "## Sequence" subheading. Append the 2-sentence "Architectural assumptions" summary directly below the block.
 4. Accept `no diagram justified — {reason}` without pushing back.
 
-### 5.4.6 Check for UI/Wireframe Opportunity (conditional, via `markdown-wireframe`)
+### 5.4.6 Check for UI/Wireframe Opportunity (conditional, via `wireloom`)
 
 After Dev Notes, plan, and diagrams are considered, check to see if the story document describes a user interface (UI) or visual components that could be drawn up in a wireframe.
 
@@ -697,17 +697,16 @@ After Dev Notes, plan, and diagrams are considered, check to see if the story do
 
 1. **If detection rule matches**, prompt the user using `AskUserQuestion`:
    - **Header**: `Wireframe`
-   - **Question**: "This story describes a user interface (UI) that can be visualized as a wireframe. Would you like to add a wireframe for this story using the `markdown-wireframe` skill?"
+   - **Question**: "This story describes a user interface (UI) that can be visualized as a wireframe. Would you like to add a wireframe for this story using the `wireloom` skill?"
    - **Options**:
-     - `Yes — Add wireframe (Recommended)`: Create a low-fidelity text/YAML wireframe.
+     - `Yes — Add wireframe (Recommended)`: Draw a low-fidelity Wireloom wireframe and render it to SVG.
      - `No — Skip wireframe`: Do not add wireframes.
 
 2. **If the user chooses Yes**:
-   - Invoke the `markdown-wireframe` skill (read its instructions if you haven't already).
-   - Deconstruct the UI requirements into a text/YAML structural map (as shown in `markdown-wireframe`'s `wireframe-examples.md`).
-   - Embed the generated text/YAML wireframe directly into the story document under the **Dev Notes** section under a `## Visual Layout / Wireframe` subheading.
-   - Add a task/subtask to the story's **Tasks / Subtasks** section to Stitch/implement the wireframe:
-     - `- [ ] Stitch and implement low-fidelity wireframe using Stitch (see Dev Notes visual layout)`
+   - Invoke the `wireloom` skill (read its instructions if you haven't already) and follow its **Working from a brief** section, with the story's acceptance criteria as the brief.
+   - Embed the wireframe in the story document under the **Dev Notes** section, under a `## Visual Layout / Wireframe` subheading: the rendered SVG (written next to the story file) followed by its ```` ```wireloom ```` source, exactly as `wireloom`'s Process step 5 lays out. Run its `check` until it reports `ok` before saving.
+   - Add a task/subtask to the story's **Tasks / Subtasks** section to implement the UI it shows:
+     - `- [ ] Implement the UI to match the wireframe (see Dev Notes › Visual Layout / Wireframe)`
 
 ### 5.5 Add Testing Guidance
 
@@ -965,7 +964,7 @@ For Simple Stories:
 - `execute-checklist` - For story validation
 - `documentation-standards-validator` - Validates story file naming, directory structure, and YAML frontmatter after creation
 - `mermaid-architect` - Generates a sequence diagram (API interaction) or state diagram (stateful UI) for the story when a diagram materially clarifies the spec
-- `markdown-wireframe` - For generating low-fidelity, mobile-focused outline wireframes for stories that contain UI/UX elements
+- `wireloom` - For drawing low-fidelity wireframes (Wireloom source + rendered SVG) for stories that contain UI/UX elements
 
 **Outputs used by**:
 

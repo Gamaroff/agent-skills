@@ -137,7 +137,6 @@ const PARTIAL_AT_ADOPTION = new Set([
   "execute-checklist",
   "jira-epic-creator",
   "loop-supervisor",
-  "markdown-wireframe",
   "mermaid-architect",
   "pm-checklist",
 ]);

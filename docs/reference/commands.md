@@ -43,6 +43,7 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/create-bug-report` | Record a structured bug — story, task, or general (cross-cutting, numbered from the global bug registry) | [Bug Fix Runbook](../runbooks/bug-fix.md), [Bug documents](../standards/bug-documents.md) |
 | `/create-issue` | Create a tracker issue + matching local work-item doc (GitHub / Bitbucket / Jira, auto-detected) | [`create-issue`](../../skills/create-issue/SKILL.md) |
 | `/create-architecture-doc` | Author a project architecture doc | [`create-architecture-doc`](../../skills/create-architecture-doc/SKILL.md) |
+| `/wireloom` | Mock up a UI as a ```` ```wireloom ```` block, check it, and embed a rendered SVG beside it (the renderer auto-installs into a user cache, never the project) | [`wireloom`](../../skills/wireloom/SKILL.md), [grammar](../../skills/wireloom/references/grammar.md) |
 
 ## Review
 

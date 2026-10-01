@@ -40,6 +40,31 @@ All notable changes to this project will be documented in this file. Format foll
     input (`${VAR:?}`, and `${VAR?}` for the Step 7 comment); an empty option value is a usage error; the
     repository root is resolved before the config is read.
 
+- **`/wireloom`: UI wireframes as text, rendered to SVG.** Adapted from
+  [StardockCorp/Wireloom](https://github.com/StardockCorp/Wireloom) (MIT, © Brad Wardell). The
+  skill writes a ```` ```wireloom ```` block, checks it, and embeds a co-located SVG beside the
+  source, because GitHub cannot render the fenced block.
+  - `skills/wireloom/scripts/wireloom.js` is the CLI the npm package lacks. `check` reports parse
+    errors at the **document's** line numbers. `render` writes one SVG per block, and writes
+    nothing if any block fails. `ensure` finds the package in this order: `WIRELOOM_MODULE`, the
+    project's `node_modules`, then a user cache. If all three miss, it runs a one-off
+    `npm install wireloom@0.7.0` into that cache. It never changes the consumer's `package.json`.
+  - `references/grammar.md` is upstream's `AGENTS.md` brought up to v0.7.0. Upstream stops at
+    v0.5.2. Four of upstream's examples did not parse and are fixed here; two of them were
+    "canonical" mobile patterns that combine `navbar` with `header`, which the parser rejects. A
+    test parses every example, with a floor on how many it must find.
+  - `wireloom@0.7.0` is a pinned devDependency, so the suite runs hermetically.
+  - **`markdown-wireframe` is folded in and removed.** Its brief-driven guidance survives as
+    `wireloom`'s "Working from a brief" section: derive the layout from the brief, stay
+    low-fidelity, use mobile structure, check against the brief, and agree the wireframe before
+    implementation. Its Stitch code-generation stage is dropped; it never named a Stitch tool. The
+    YAML outline it produced is replaced by a validated Wireloom block and a rendered SVG.
+  - `create-story` §5.4.6 and `review-story` §6.6 now call `wireloom` and declare it in
+    `invokes:`. Before, they called `markdown-wireframe` without declaring it, so a profile install
+    could ship them without it. The story task they add is "Implement the UI to match the
+    wireframe", no longer the Stitch task. `review-story` also runs `check` on any embedded
+    ```` ```wireloom ```` block. It still accepts an existing YAML outline as a wireframe.
+
 - **The two hand-written reference pages are pinned to the skills they describe (task 142, obs #159).**
   - `tests/reference-doc-skill-pinning.test.js` fails when a `docs/reference/commands.md` row
     names a slash command with no `skills/<name>/SKILL.md`, when a row's first cell advertises a
