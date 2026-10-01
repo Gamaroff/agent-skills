@@ -1081,7 +1081,7 @@ Create QA report co-located with the task document:
 
 **QA Report Structure:**
 
-```markdown
+````markdown
 # QA Report: Task {ID} - {Title}
 
 **Task**: [Link to task document](./task.{id}.{name}.md)
@@ -1288,7 +1288,7 @@ Statements: X% | Branches: Y% | Functions: Z% | Lines: W%
 **QA Report**: co-located at `task.{id}.qa.{number}.{name}.md`
 **Gate File**: co-located at `task.{id}.gate.{number}.{name}.yml`
 **Next Steps**: {fixes / deployment / follow-up}
-```
+````
 
 **Check the report's links before leaving this step.** CI's `docs-link-check` reads every changed
 `docs/**/*.md` — a QA report as much as the document beside it — and a quoted finding that contains a
