@@ -301,6 +301,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`qa-task`'s QA report template is one fenced block again.** Its outer fence used three backticks
+  and contained three-backtick blocks, so the first inner block closed it: the template's second half
+  read as live markdown (the link checker flagged its `./task.{id}.bug.{N}.{name}.md` placeholder), and
+  the executed-prose engine took the template's `{Commands used}` placeholder for a runnable bash block
+  while misreading the real "check the report's links" block after it. The outer fence is now four
+  backticks.
+
 - **Reviewer times in the pipeline record are measured, not recalled (obs #230).** The §Subagents
   table in `develop-pipeline-autonomous-defaults.md` asked for `dispatched HH:MM → returned HH:MM`
   without saying how to read them, and task.133's QA reports carried composed times hours off the
