@@ -460,6 +460,39 @@ Cycle 6's fixes are verified and mutation-proven, and no HIGH or MEDIUM finding 
 - Recorded in gate 7's `recommendations.future`, not attributable to cycle 6: a `ci` block nested under another key, or with its `docsOnly` children dedented to column 0, reads as the defaults (valid YAML with a different meaning, identical in the cycle 5 engine); the second comment-stripping rule beside `yaml-subset.js`'s; the CANCELLED nearer ancestor that the 6c poll re-asks.
 - If a further gate finds another configuration-reading defect: replace the `ci` block reader with a dedicated strict one rather than a further spelling of the completeness check.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (not accepted)
+
+### QA Gate Status
+
+**QA Report**: `task.172.qa.7.ci-docs-only-tree-equivalence.md`
+**Gate File**: `task.172.gate.7.ci-docs-only-tree-equivalence.yml`
+**Gate Status**: ✅ PASS (95/100), through the Cosmetic-residue exit; the Step 5c PR review read ⚠️ CONCERNS (no high finding)
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] CodeQuality-1, "every new test is mutation-proved red on revert", is evidenced per fix, not per test (93 tests, no per-test ledger)
+
+2. **Security Review:**
+   - [ ] **MEDIUM** the `checkCommand` timeout kills only `sh -c`, so a check's child processes keep running (`shared/resources/ci-tree-equivalence.js:890`)
+   - [ ] **MEDIUM** the glob matcher is exponential on repeated `*a` / `**/` patterns taken from the head commit's config (`shared/resources/glob-match.js:54`)
+   - [ ] LOW `checkCommand` can run against a dirty working tree (`shared/resources/ci-tree-equivalence.js:855`)
+   - [ ] LOW `isDocsPath` accepts `docs/../src/a.js` (`shared/resources/ci-tree-equivalence.js:126`)
+
+### Next Steps:
+
+- [ ] Fix the two MEDIUM security findings and the two LOW ones, each with a test that goes red on revert
+- [ ] Record a per-test mutation proof, or narrow CodeQuality-1 to "every fix-driven test" (a work-item edit)
+- [ ] Update "three keys" to five (Files Summary, Phase 4, Success Criteria) and list the files the Files Summary omits
+- [ ] Re-run `/qa-task` over the fixes, then `/finalise`
+
+**Estimated Effort:** Medium (3-5 hours)
+
+**Gap Report Generated:** 2026-10-01
+**Detailed Verification Log:** See `task.172.dod.1.ci-docs-only-tree-equivalence.md` for the evidence and citations.
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -482,6 +515,7 @@ Cycle 6's fixes are verified and mutation-proven, and no HIGH or MEDIUM finding 
 | 2026-10-01 |  | QA gate CONCERNS (75/100) — 2 findings | qa-task |
 | 2026-10-01 |  | QA findings fixed — 2 findings (2 MEDIUM) plus 3 advisory, 1 iteration | qa-fix |
 | 2026-10-01 |  | QA gate PASS (95/100) — 1 finding | qa-task |
+| 2026-10-01 |  | DoD incomplete — 5 gaps identified | finalise |
 
 <!-- change-log-end -->
 
