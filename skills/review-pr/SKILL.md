@@ -62,7 +62,10 @@ PLATFORM="$VCS"
 
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 if [ "$PLATFORM" = "bitbucket" ]; then
-  BB_PATH=$(echo "$REMOTE_URL" | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+  # owner/repo = the remote's last two path segments — one expression, identical in Step 0,
+  # Step 0b's repo_of and the rungs 3–4 block (a test holds them equal). It reads an altssh
+  # remote (ssh://git@altssh.bitbucket.org:443/ws/repo.git) as ws/repo, not workspace 443.
+  BB_PATH=$(printf '%s\n' "$REMOTE_URL" | sed -E 's#/+$##; s#\.git$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#')
   BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
   BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
   BB_API="https://api.bitbucket.org/2.0"
@@ -121,14 +124,16 @@ EOF
 # pair, so the check would pass silently. ssh.github.com / altssh.bitbucket.org are
 # the platforms' port-443 SSH hosts, the same platform as the web host.
 norm_host() { printf '%s\n' "${1}" | sed -E 's#^[A-Za-z+]+://##; s#^[^@/]*@##; s#[:/].*$##; s#^(www|api)\.##; s#^ssh\.github\.com$#github.com#; s#^altssh\.bitbucket\.org$#bitbucket.org#' | tr '[:upper:]' '[:lower:]'; }
-repo_of()   { printf '%s\n' "${1}" | sed -E 's#\.git$##; s#/+$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#' | tr '[:upper:]' '[:lower:]'; }
+repo_of()   { printf '%s\n' "${1}" | sed -E 's#/+$##; s#\.git$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#' | tr '[:upper:]' '[:lower:]'; }
 lc()        { printf '%s' "${1}" | tr '[:upper:]' '[:lower:]'; }
 REMOTE_HOST=$(norm_host "$REMOTE_URL")
 REMOTE_REPO=$(repo_of "$REMOTE_URL")
 # JIRA_URL is not bound by the resolver, which reads .env only to choose TRACKER — so
 # read it from the environment, else from .env, the same two places the resolver looks.
 JIRA_URL_SEEN="$JIRA_URL"
-[ -n "$JIRA_URL_SEEN" ] || JIRA_URL_SEEN=$(sed -nE "s/^JIRA_URL=[\"']?([^\"']*)[\"']?[[:space:]]*$/\1/p" "$(git rev-parse --show-toplevel 2>/dev/null)/.env" 2>/dev/null | head -1)
+# .env by the resolver's rules: optional `export`, CR stripped, trimmed, one quote pair, last wins.
+[ -n "$JIRA_URL_SEEN" ] || JIRA_URL_SEEN=$(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?JIRA_URL=//p' "$(git rev-parse --show-toplevel 2>/dev/null)/.env" 2>/dev/null \
+  | tr -d '\r' | tail -1 | sed -E "s/^[[:space:]]+//; s/[[:space:]]+$//; s/^[\"'](.*)[\"']$/\1/")
 case "$KIND" in
   pr)
     if [ -n "$TARGET_HOST" ]; then                     # a bare number has no host to check
@@ -137,7 +142,7 @@ case "$KIND" in
           if [ "$(norm_host "$TARGET_HOST")" != "$REMOTE_HOST" ]; then
             echo "HALT: PR URL host $TARGET_HOST does not match this repo's remote $REMOTE_HOST ($REMOTE_URL)"; exit 1
           fi
-          if [ -n "$TARGET_REPO" ] && [ "$(lc "$TARGET_REPO")" != "$REMOTE_REPO" ]; then
+          if [ -n "$TARGET_REPO" ] && [ "$(repo_of "$TARGET_REPO")" != "$REMOTE_REPO" ]; then
             echo "HALT: PR URL is for $TARGET_REPO, but this repo is $REMOTE_REPO ($REMOTE_URL)"; exit 1
           fi ;;
         "")
@@ -148,7 +153,7 @@ case "$KIND" in
           # but its owner/repo still reads correctly, so a repo mismatch still halts.
           [ "$(norm_host "$TARGET_HOST")" = "$REMOTE_HOST" ] \
             || echo "⚠️ remote host $REMOTE_HOST is not a known platform host (an SSH alias?) — PR URL host $TARGET_HOST not compared"
-          if [ -n "$TARGET_REPO" ] && [ "$(lc "$TARGET_REPO")" != "$REMOTE_REPO" ]; then
+          if [ -n "$TARGET_REPO" ] && [ "$(repo_of "$TARGET_REPO")" != "$REMOTE_REPO" ]; then
             echo "HALT: PR URL is for $TARGET_REPO, but this repo is $REMOTE_REPO ($REMOTE_URL)"; exit 1
           fi ;;
       esac
@@ -168,8 +173,11 @@ case "$KIND" in
           if [ "$(norm_host "$TARGET_HOST")" != "$REMOTE_HOST" ]; then
             echo "HALT: issue URL host $TARGET_HOST does not match this repo's remote $REMOTE_HOST ($REMOTE_URL)"; exit 1
           fi ;;
+        "") echo "⚠️ no origin remote — issue URL host and repo not checked" ;;
+        *)  [ "$(norm_host "$TARGET_HOST")" = "$REMOTE_HOST" ] \
+              || echo "⚠️ remote host $REMOTE_HOST is not github.com (an SSH alias or GHE?) — issue URL host $TARGET_HOST not compared" ;;
       esac
-      if [ -n "$REMOTE_REPO" ] && [ "$(lc "$TARGET_REPO")" != "$REMOTE_REPO" ]; then
+      if [ -n "$REMOTE_REPO" ] && [ "$(repo_of "$TARGET_REPO")" != "$REMOTE_REPO" ]; then
         echo "HALT: issue URL is for $TARGET_REPO, but this repo is $REMOTE_REPO ($REMOTE_URL)"; exit 1
       fi
     fi ;;
@@ -258,9 +266,8 @@ case "$KIND" in
 esac
 if [ "$VCS" = "bitbucket" ]; then
   REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
-  # The last two path segments, so an altssh remote (ssh://git@altssh.bitbucket.org:443/ws/repo.git)
-  # reads as ws/repo rather than taking the port for the workspace.
-  BB_PATH=$(printf '%s\n' "$REMOTE_URL" | sed -E 's#\.git$##; s#/+$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#')
+  # The same owner/repo expression as Step 0 and repo_of.
+  BB_PATH=$(printf '%s\n' "$REMOTE_URL" | sed -E 's#/+$##; s#\.git$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#')
   BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
   BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
   BB_API="https://api.bitbucket.org/2.0"
@@ -404,7 +411,10 @@ Rung 1 handles `task.{N}.*`, `story.{E}.{S}.*`, `epic.{N}.*` and `bug.{N}.*`. Ru
 
 **Rung 4 must match both shapes.** A Bitbucket PR description carries `PROJ-123`, never `#{N}`; matching only the GitHub shape makes this rung dead on exactly the Bitbucket + Jira combination the skill exists to support.
 
-**Exclusion filter** — find the work item, not its artifacts. Exclude any filename containing:
+**Exclusion filter** — find the work item, not its artifacts. The rule is stated once, in
+[§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup),
+and every rung here applies it: a file named after its own directory (`{stem}/{stem}.md`) is the
+work item; otherwise a basename carrying any of these kind segments is an artifact:
 
 ```
 .qa.  .gate.  .bug.  .implementation.  .review.  .dod.  .plan.  .handover.  .pr-review.  .request.

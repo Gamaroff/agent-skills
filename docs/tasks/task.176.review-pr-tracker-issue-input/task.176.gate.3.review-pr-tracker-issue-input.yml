@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.176.review-pr-tracker-issue-input'
+task_title: '/review-pr accepts a Jira card or GitHub issue and resolves it to its PR'
+gate: CONCERNS
+status_reason: 'All gate-2 findings fixed (HIGH back to 0). Two reproducible defects remain from cycle 2''s edits: Step 0 still parses an altssh Bitbucket remote with the old host-anchored sed, and the .env JIRA_URL read misses export/CRLF forms the resolver accepts.'
+reviewer: 'QA Engineer'
+head: '41252c36fec2d2237774d0177661b0a37be3cdae'
+updated: '2026-10-02T19:51:44Z'
+
+top_issues:
+  - id: 'CR3-1'
+    severity: medium
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'Step 0 still derives BB_WORKSPACE/BB_REPO with s|.*bitbucket\.org[:/]||, which reads ssh://git@altssh.bitbucket.org:443/ws/repo.git as 443/ws/repo; the auth probe then 404s and HALTs before Step 0b, so the altssh support cycle 2 added to norm_host and the rungs block is unreachable.'
+    suggested_action: 'Use the one last-two-segments parse at every BB_PATH= site in SKILL.md and test that all copies agree on the altssh shape.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-3'
+    severity: low
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'JIRA_URL_SEEN''s .env sed accepts only a bare JIRA_URL= line (first wins); the resolver also accepts an export prefix, strips CR and takes the last line, so an export-form .env warns "JIRA_URL is not set" and a CRLF .env warns "differs" on a matching host.'
+    suggested_action: 'Parse .env with the resolver''s rules: optional export prefix, strip CR and one quote pair, trim, last assignment wins.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 175
+  phases_verified: 4/4
+  ci: 'not read for this gate'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No change to the parser''s refusal surface this cycle beyond positional Bitbucket paths; cycle-2 hand probe stands (28 inputs × bash/zsh, nothing executed).'
+  performance:
+    status: PASS
+    notes: 'Card resolution gated on kind=jira|github-issue.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR3-1 makes a supported remote shape halt; CR3-2 (advisory) — legacy unnumbered artifacts carrying a key would make §0a halt as ambiguous.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory CR3-6/CR3-7: the remote-to-repo normaliser is copied, and Step 2''s filter restates §0a in older words.'
+
+bug_resolution:
+  previous_gate: 2
+  fixed: ['CR2-1', 'CR2-2', 'CR2-3', 'CR2-7', 'CR2-4', 'CR2-5', 'CR2-6', 'CR2-8', 'CR2-9']
+  fix_commit: '41252c3'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR3-1 and CR3-3 (gate queue).'
+      refs: ['skills/review-pr/SKILL.md']
+  future:
+    - action: 'Advisory, medium confidence — fix alongside: CR3-2 (cycle 2''s numbered-kind exclusion lets unnumbered legacy artifacts through: task.N.review.YYYY-MM-DD.md, slug-form reviews, *.dod.security.*), CR3-4 (repo_of strips .git before a trailing slash; TARGET_REPO only lowercased), CR3-5 (issue arm silent when origin is not github.com or missing).'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md', 'skills/review-pr/SKILL.md']
+    - action: 'Cleanups: CR3-6 (one remote-to-repo expression across blocks), CR3-7 (Step 2 filter should cite §0a).'
+      refs: ['skills/review-pr/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR3-1 fixed']

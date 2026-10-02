@@ -1720,3 +1720,143 @@ for (const shell of SHELLS) {
     );
   });
 }
+
+// ---------------------------------------------------------------------------
+// task.176 QA cycle 3 — the fixes, executed.
+// ---------------------------------------------------------------------------
+// One remote → owner/repo expression, identical at every site (CR3-1, CR3-6). Every fenced block is
+// its own shell, so it is repeated; this test is what keeps the copies one rule.
+test("every remote → owner/repo parse in SKILL.md uses one expression", () => {
+  const sites = [
+    ...SKILL.matchAll(
+      /(?:BB_PATH=\$\(printf '%s\\n' "\$REMOTE_URL"|repo_of\(\)\s+\{ printf '%s\\n' "\$\{1\}") \| (sed -E '[^']*')/g,
+    ),
+  ].map((m) => m[1]);
+  assert.equal(
+    sites.length,
+    3,
+    "Step 0, Step 0b repo_of and the rungs 3–4 block",
+  );
+  assert.equal(
+    new Set(sites).size,
+    1,
+    `one expression, not ${new Set(sites).size}: ${[...new Set(sites)].join(" | ")}`,
+  );
+  assert.doesNotMatch(
+    SKILL,
+    /bitbucket\\\.org\[:\/\]\|\|/,
+    "the old host-anchored parse is gone",
+  );
+});
+
+for (const shell of SHELLS) {
+  test(`remote → owner/repo (${shell}): every remote shape reads as owner/repo (CR3-1, CR3-4)`, () => {
+    const expr = SKILL.match(
+      /repo_of\(\)\s+\{ printf '%s\\n' "\$\{1\}" \| (sed -E '[^']*')/,
+    )[1];
+    for (const [remote, want] of [
+      ["ssh://git@altssh.bitbucket.org:443/ws/repo.git", "ws/repo"],
+      ["git@bitbucket.org:ws/repo.git", "ws/repo"],
+      ["https://user@bitbucket.org/ws/repo.git", "ws/repo"],
+      ["https://github.com/O/R.git/", "O/R"],
+      ["https://github.com/o/r", "o/r"],
+      ["git@github-work:o/r.git", "o/r"],
+      ["ssh://git@ssh.github.com:443/o/r.git", "o/r"],
+    ]) {
+      const r = runScript(shell, `printf '%s\\n' "$R" | ${expr}`, {
+        env: { ...process.env, R: remote },
+      });
+      assert.equal(r.stdout.trim(), want, `${remote} → ${r.stdout.trim()}`);
+    }
+  });
+
+  test(`Step 0b (${shell}): a PR URL with .git or a trailing slash in its repo matches its own remote (CR3-4)`, () => {
+    const r = step0b(shell, {
+      TARGET: "https://github.com/O/R.git/pull/1",
+      REMOTE_URL: "https://github.com/o/r.git/",
+    });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /BOUND kind=pr pr=1 /);
+  });
+
+  test(`Step 0b (${shell}): an export-form or CRLF .env is read like the resolver reads it (CR3-3)`, () => {
+    for (const body of [
+      "export JIRA_URL=https://acme.atlassian.net\n",
+      "JIRA_URL=old\r\nJIRA_URL='https://acme.atlassian.net'\r\n",
+    ]) {
+      const { dir, bin } = consumerRepo("git@github.com:o/r.git");
+      fs.writeFileSync(path.join(dir, ".env"), body);
+      const r = runScript(shell, step0bBlock(), {
+        cwd: dir,
+        env: blockEnv(bin, {
+          TARGET: "https://acme.atlassian.net/browse/RAPP-702",
+        }),
+      });
+      assert.equal(r.status, 0, r.stderr);
+      assert.doesNotMatch(
+        r.stdout,
+        /⚠️/,
+        `${JSON.stringify(body)}: the matching host neither "differs" nor "not set"`,
+      );
+    }
+  });
+
+  test(`Step 0b (${shell}): the issue arm says when it could not compare (CR3-5)`, () => {
+    let r = step0b(shell, {
+      TARGET: "https://github.com/o/r/issues/3",
+      REMOTE_URL: "git@github-work:o/r.git",
+    });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /⚠️ remote host github-work is not github\.com .* issue URL host github\.com not compared/,
+    );
+    r = step0b(shell, { TARGET: "https://github.com/o/r/issues/3" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /⚠️ no origin remote — issue URL host and repo not checked/,
+    );
+  });
+
+  test(`§0a lookup (${shell}): an unnumbered legacy artifact carrying the key is still excluded (CR3-2)`, () => {
+    const dir = lookupFixture();
+    for (const name of [
+      "task.101.review.2026-05-06.md",
+      "task.101.thing.review.2026-05-06.md",
+      "task.101.review.thing.md",
+      "task.101.dod.security.by-hand-probe.md",
+    ]) {
+      fs.writeFileSync(
+        path.join(dir, "docs/tasks/task.101.thing", name),
+        "---\njira_key: 'RAPP-702'\n---\n",
+      );
+    }
+    const r = runScript(
+      shell,
+      `${lookupBlock()}\necho "STATUS=$DOC_STATUS PATH=$LOCAL_PATH"\n`,
+      {
+        cwd: dir,
+        env: { ...process.env, KEY_FIELD: "jira_key", KEY_VALUE: "RAPP-702" },
+      },
+    );
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /^STATUS=found PATH=docs\/tasks\/task\.101\.thing\/task\.101\.thing\.md$/m,
+    );
+  });
+}
+
+test("Step 2's exclusion filter cites the §0a rule instead of restating it (CR3-7)", () => {
+  const step2 = section("### Step 2 — Resolve the work item", "### Step 3 —");
+  const filter = step2.slice(step2.indexOf("**Exclusion filter**"));
+  assert.match(
+    filter,
+    /The rule is stated once, in\s+\[§0a Key → document lookup\]\(references\/develop-pipeline-step-0-resolve-and-prepare\.md#key--document-lookup\)/,
+  );
+  assert.match(
+    filter,
+    /named after its own directory \(`\{stem\}\/\{stem\}\.md`\)/,
+  );
+});

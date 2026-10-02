@@ -107,18 +107,24 @@ The one lookup from a tracker key to its work-item document. `develop-story`, `d
 # Anchored at both ends, so RAPP-70 does not match RAPP-702 and issue 5 does not match 55.
 # Quote-tolerant: jira_key is written quoted ('RAPP-702' or "RAPP-702") in most consumer docs.
 # Recursive grep, not a docs/**/ glob — ** needs globstar in bash and matches one level without it.
-# The exclusion list keeps the work item and drops its artifacts, which carry the same key —
-# the dotted kinds, and finalise's sprint-review summary, which has no dotted kind to match.
+# Which file is the work item: one named after its own directory ({stem}/{stem}.md) is kept
+# whatever its slug says (task.5.request/task.5.request.md); any other file whose BASENAME carries
+# an artifact kind segment — numbered, dated or slug-form (task.12.review.2026-05-06.md) — or is
+# finalise's sprint-review summary is dropped, because artifacts copy the item's key. Only the
+# basename is read, so a directory such as epic.4.qa.tools/ excludes nothing.
 # An empty KEY_VALUE would match every blank key field, so both inputs must be bound.
 : "${KEY_FIELD:?bind KEY_FIELD (jira_key or github_issue)}" "${KEY_VALUE:?bind KEY_VALUE (the key or issue number)}"
 # A missing or unreadable docs/ (the wrong cwd) is its own HALT, never "no document has this key".
 [ -d docs ] && [ -r docs ] || { DOC_STATUS=unreadable; echo "HALT: docs/ not found or unreadable in $(pwd) — run from the repository root"; exit 1; }
-# Kinds are matched on the BASENAME and, except .plan., only with their number — so a work item
-# whose slug is a kind word (task.5.request.md) or that sits under a directory such as
-# epic.4.qa.tools/ is kept.
 DOC_MATCHES=$(grep -rlE "^${KEY_FIELD}:[[:space:]]*['\"]?${KEY_VALUE}['\"]?[[:space:]]*$" docs/ 2>/dev/null \
-  | grep -vE '(^|/)[^/]*\.((qa|gate|bug|implementation|review|pr-review|dod|handover|request)\.[0-9]+|plan)\.[^/]*$' \
-  | grep -vE '(^|/)[^/]*sprint-review-summary\.md$' \
+  | while IFS= read -r f; do
+      b=${f##*/}; d=${f%/*}; d=${d##*/}
+      [ "$b" = "$d.md" ] && { printf '%s\n' "$f"; continue; }
+      case "$b" in
+        *.qa.*|*.gate.*|*.bug.*|*.implementation.*|*.review.*|*.pr-review.*|*.dod.*|*.plan.*|*.handover.*|*.request.*|*sprint-review-summary.md) ;;
+        *) printf '%s\n' "$f" ;;
+      esac
+    done \
   | sort)
 DOC_COUNT=$(printf '%s' "$DOC_MATCHES" | grep -c .)
 case "$DOC_COUNT" in
