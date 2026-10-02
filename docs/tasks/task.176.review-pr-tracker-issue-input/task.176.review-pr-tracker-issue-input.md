@@ -116,9 +116,10 @@ bundled copies; docs that list the accepted `target` forms.
   1. work item doc by `jira_key:` / `github_issue:` frontmatter — the corrected shared §0a lookup
      (anchored, quote-tolerant, recursive, no `**` glob, full exclusion list incl. `.request.`);
   2. the doc's `pr_number:`;
-  3. a PR whose source branch contains the doc's stem — Bitbucket
-     `q=source.branch.name ~ "<STEM>"`; GitHub `gh pr list --state all --limit 100 --json
-     number,headRefName,state`, filtered on `headRefName` containing `STEM` (`--head` is an exact match);
+  3. a PR whose source branch is the doc's stem or ends in `/STEM` — Bitbucket
+     `q=source.branch.name ~ "<STEM>"` then the same anchored filter; GitHub `gh pr list --state all
+     --limit 1000 --json number,headRefName,state`, filtered on `headRefName == STEM` or ending in
+     `/STEM` (`--head` is an exact match; a substring match would let `task.10.x` claim `task.10.x-two`);
   4. a PR whose title or description names the key (Jira) or that closes the issue
      (`gh issue view N --json closedByPullRequestsReferences`, **GitHub VCS only**);
   5. `kind=jira` and still nothing → retry the input **as a branch** (a branch may be named
@@ -435,6 +436,10 @@ message wording.
 - **Pre-existing, found in QA cycle 4**: CR4-1 — review-pr Step 2 rung 2's `pr_number` grep (and
   rung 1's `-name` fallback) apply no artifact filter; `bug.3.dod.1.*.md` carries `pr_number: 290`
   while bug.3's own document does not. Route both through the §0a rule.
+- **From the Step 5c PR review (`task.176.pr-review.1`, CONCERNS)**: CR-1 — `/review-pr` should treat a
+  missing `docs/` as "no document" (continue to rung 4 / code-only) instead of inheriting the §0a
+  lookup's HALT, which the develop pipelines keep; CR-2 — accept a scheme-less platform URL
+  (`github.com/o/r/pull/12`) instead of reading it as a branch.
 
 ---
 
