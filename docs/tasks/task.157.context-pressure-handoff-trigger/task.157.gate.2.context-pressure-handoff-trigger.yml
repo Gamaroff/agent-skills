@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.157.context-pressure-handoff-trigger'
+task_title: '[Task 157] Context-pressure trigger: recommend a continuation handoff before the context fills'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes verified (CR-1, CR-3, CR-4 closed; tests and mutations hold). The refute pass found one medium and two low high-confidence bugs in the installer outcome reporting, wrapper-path matching and the new mode-keeping write.'
+reviewer: 'QA Engineer'
+head: 'd10cb5ba1f2667a88af50a9809870265991017ae'
+updated: '2026-10-02T07:58:03Z'
+
+top_issues:
+  - id: 'TASK-157-QA2-CR-1'
+    severity: medium
+    file: 'shared/resources/context-pressure.mjs'
+    finding: 'An uninstall that finds a wrap it cannot parse (and no hook) reports "not installed — no change" and the installer prints "unchanged" and exits 0: "nothing to do" and "a wrap is left that you must remove by hand" share one outcome.'
+    suggested_action: 'Give needs-manual-fix its own outcome: a distinct settings exit code mapped to a non-zero installer exit with a message, and no "not installed / already installed" note when it fires.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-157-QA2-CR-2'
+    severity: low
+    file: 'shared/resources/context-pressure.mjs'
+    finding: 'unwrapCommand takes the first indexOf of the wrapper filename, so a wrapper directory whose path contains that name produces a wrap its own uninstall cannot parse.'
+    suggested_action: 'Anchor the wrapper match to a path-segment boundary followed by a closing quote or whitespace/end.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-157-QA2-CR-3'
+    severity: low
+    file: 'shared/resources/context-pressure-install.sh'
+    finding: 'The cycle-1 mode-keeping write copies a read-only (0444) mode onto the temp before writing it, so install now fails with a bare "Permission denied" after overwriting the .bak.'
+    suggested_action: 'Write the content first, then apply the original mode; print an installer message on failure.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 38
+  phases_verified: 16/16
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    notes: 'validSessionId re-probed on the fixed tree: engages, 20 executed, 0 reproduced.'
+  performance:
+    status: PASS
+    notes: 'No hot-path change this cycle (check/record untouched except writeAtomic cleanup).'
+  reliability:
+    status: PASS
+    notes: 'Contract and wrapper tests hold; open findings are installer reporting/edge cases in top_issues.'
+  maintainability:
+    status: PASS
+    notes: 'Each cycle-1 fix carries a mutation-proven test.'
+
+bug_resolution:
+  closed_from_gate_1: ['TASK-157-CR-1', 'TASK-157-CR-3', 'TASK-157-CR-4']
+  fix_commit: 'd10cb5ba'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA2-CR-1, CR-2, CR-3 with tests.'
+      refs: ['shared/resources/context-pressure.mjs', 'shared/resources/context-pressure-install.sh']
+  future:
+    - action: 'QA2-CR-4: anchor isHookIdentity to a path-segment boundary (another tool named my-context-pressure.mjs is treated as ours).'
+      refs: ['shared/resources/context-pressure.mjs']
+    - action: 'QA2-CR-5: header understates the record/check race (a duplicate note is possible); QA2-CR-6 SKILL.md dangling clause; QA2-CR-7 redundant mv hop.'
+      refs: ['shared/resources/context-pressure.mjs', 'skills/session-handoff/SKILL.md', 'shared/resources/context-pressure-install.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-157-QA2-CR-1 fixed']

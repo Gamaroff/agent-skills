@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.157.context-pressure-handoff-trigger'
+task_title: '[Task 157] Context-pressure trigger: recommend a continuation handoff before the context fills'
+gate: CONCERNS
+status_reason: 'All 16 phases delivered, 31 tests green, probe engages. Code review raised one medium and two low high-confidence correctness bugs in the installer settings transform (stale wrapper path on re-install, empty containers not round-tripped, malformed hooks shapes mis-handled).'
+reviewer: 'QA Engineer'
+head: '736260748b1d30b313fc318301fdf9a3f2e35c38'
+updated: '2026-10-02T07:43:28Z'
+
+top_issues:
+  - id: 'TASK-157-CR-1'
+    severity: medium
+    file: 'shared/resources/context-pressure.mjs'
+    finding: 'Re-installing from a new location moves the hook to the new engine path but leaves a status line already wrapped by an older wrapper path untouched, so deleting the old checkout blanks the status line.'
+    suggested_action: 'When the existing wrap names a different wrapper path and its original is parseable, re-wrap the recovered original with the current wrapper; add a test that reinstalls over an /old/place wrap.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-157-CR-3'
+    severity: low
+    file: 'shared/resources/context-pressure.mjs'
+    finding: 'Uninstall turns {"hooks":{}} and {"hooks":{"UserPromptSubmit":[]}} into {}: stripHooks deletes containers it emptied even when install did not create them.'
+    suggested_action: 'Delete UserPromptSubmit / hooks only when removing our entry is what emptied them; round-trip tests for both empty-container inputs.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-157-CR-4'
+    severity: low
+    file: 'shared/resources/context-pressure.mjs'
+    finding: 'Malformed hooks shapes are mis-handled: hooks: [] reports "hook: added" but writes nothing, a string UserPromptSubmit is spread into characters, an object-valued one throws and exits 1 with no message.'
+    suggested_action: 'Refuse with exit 1 and a message unless hooks is a plain object and UserPromptSubmit is an array or absent.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 31
+  phases_verified: 16/16
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    notes: 'validSessionId probed with a session-id corpus (4 legitimate, 16 hostile incl. traversal, NUL, newline, unicode slash): engages, 0 reproduced. No network, no secrets; settings written atomically with .bak.'
+  performance:
+    status: PASS
+    notes: 'check p95 113 ms (< 150); wrapper overhead +16-21 ms (< 50), measured over 20 runs at load average ~150.'
+  reliability:
+    status: PASS
+    notes: 'Every record/check path exits 0 (contract test); wrapper byte identity with broken engine and with no node on PATH; installer refuses malformed JSON untouched. Open findings are in the installer transform, tracked in top_issues.'
+  maintainability:
+    status: PASS
+    notes: 'Settings edits are a pure tested function; one state format owner; three named guards mutation-proven.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-157-CR-1, CR-3, CR-4 in applySettings/stripHooks with tests.'
+      refs: ['shared/resources/context-pressure.mjs', 'shared/resources/tests/context-pressure-install.test.mjs']
+  future:
+    - action: 'CR-2: SKILL.md install check should say two prompts (no reading exists before the first response).'
+      refs: ['skills/session-handoff/SKILL.md']
+    - action: 'CR-5: confirm which shell Claude Code runs statusLine.command with; document that the wrapped original runs under sh -c.'
+      refs: ['shared/resources/context-pressure.mjs']
+    - action: 'CR-6: preserve the settings file mode across the mv; CR-7: make the tr assertion non-trivial; CR-8: unlink a failed tmp write.'
+      refs: ['shared/resources/context-pressure-install.sh', 'shared/resources/tests/context-pressure-install.test.mjs', 'shared/resources/context-pressure.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-157-CR-1 fixed']

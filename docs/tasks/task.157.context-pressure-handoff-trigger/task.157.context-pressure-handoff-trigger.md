@@ -5,10 +5,12 @@ type: task
 description: "Record the status line's measured context usage per session and add a UserPromptSubmit hook that, above a soft and a firm threshold, tells the agent to recommend a session-handoff continuation at the next natural boundary. Ship it with an idempotent user-level installer so it works in every repo. The trigger is a measurement, never the model's self-assessment."
 tags: [session-handoff, context, hooks, statusline, claude-code]
 category: infrastructure
-status: planned
+status: accepted
+completed_date: 2026-10-02
+pr_number: 549
 priority: Medium
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-10-02
 assignee:
 estimated_effort_hours: 16
 github_issue: 491
@@ -16,7 +18,9 @@ github_issue: 491
 
 # Technical Task: Context-pressure trigger — recommend a continuation handoff before the context fills
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.157.review.1.context-pressure-handoff-trigger.md` implemented 2026-10-02
 
 **GitHub Issue**: [#491](https://github.com/Gamaroff/agent-skills/issues/491)
 
@@ -143,13 +147,26 @@ sequenceDiagram
     steps, as the recommended option, and offer to write it before starting any new phase."*
 - **`context-pressure-statusline.sh -- <original command…>`**: read stdin once, pipe it to
   `record` in the background and never wait on or fail because of it, then `exec` the original
-  command with the same bytes on stdin. With no original command it prints nothing.
+  command with the same bytes on stdin. With no original command it prints nothing. The installer
+  always passes the original as `sh -c '<original, single-quote-escaped>'`, so the wrapper runs
+  `"$@"` verbatim and the user's string — which may hold `;`, `&&` or a redirection — is never
+  re-parsed by the outer shell as part of the wrapper's own command line.
 - **`context-pressure-install.sh [--settings f] [--dry-run] [--uninstall]`**, defaulting to
   `~/.claude/settings.json`. It adds the `UserPromptSubmit` hook (`command node <engine> check`) and
-  wraps the existing `statusLine.command` as `…/context-pressure-statusline.sh -- <original>`. It
+  wraps the existing `statusLine.command` as `…/context-pressure-statusline.sh -- sh -c '<original>'`
+  (the original single-quote-escaped by the installer, which is what makes unwrapping exact). It
   deduplicates by identity (the engine or wrapper path under any spelling), writes atomically with a
   `.bak`, and never wraps twice. `--uninstall` removes the hook and unwraps back to the exact original
   command.
+- **As delivered** (decided during development and QA; see the implementation report): the JSON edits
+  live in the engine as a third sub-command, `context-pressure.mjs settings`, backed by a pure
+  `applySettings()` whose outcome is one of `changed` (exit 0), `unchanged` (3) or `needs-manual` (4 —
+  a wrap it did not write, or a `statusLine` with no command; the installer prints `ACTION NEEDED` and
+  exits 1). The hook and the wrap are recognised by parsing the command into POSIX shell words
+  (`shellWords()`: quotes, `$'…'`, comments, line continuation) — the exact inverse of the installer's
+  own quoting — rather than by substring or regex, and the wrap is written as
+  `sh '<wrapper>' -- sh -c '<original>'`. The installer keeps the settings file's mode and replaces the
+  `.bak` atomically.
 
 ### Important Clarifications
 
@@ -209,10 +226,10 @@ None. Everything is opt-in through the installer, and uninstall restores the exa
 - `shared/resources/tests/context-pressure.test.mjs` (new)
 
 **Changes**:
-- [ ] Pure `decide(state, now, env)` → `{ emit: null | text, nextState }` covering bands, freshness, hysteresis and repeat
-- [ ] `record` with session-id validation, atomic write, preservation of `check`-owned fields, pruning
-- [ ] `check` that emits `{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":…}}` or nothing
-- [ ] Every error path → exit 0, no stdout (stderr allowed but kept terse); emit via `process.exitCode`, never `process.exit()`
+- [x] Pure `decide(state, now, env)` → `{ emit: null | text, nextState }` covering bands, freshness, hysteresis and repeat
+- [x] `record` with session-id validation, atomic write, preservation of `check`-owned fields, pruning
+- [x] `check` that emits `{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":…}}` or nothing
+- [x] Every error path → exit 0, no stdout (stderr allowed but kept terse); emit via `process.exitCode`, never `process.exit()`
 
 **Dependencies**: task.156 merged (the injected text names its mode)
 
@@ -227,9 +244,9 @@ None. Everything is opt-in through the installer, and uninstall restores the exa
 - `shared/resources/tests/context-pressure-statusline.test.mjs` (new)
 
 **Changes**:
-- [ ] Read stdin once and pass the same bytes to `record` (background, output discarded) and to the original command
-- [ ] `exec` the original after `--`, so its exit code and stdout are the wrapper's own
-- [ ] A missing `node` or engine still runs the original
+- [x] Read stdin once and pass the same bytes to `record` (background, output discarded) and to the original command
+- [x] `exec` the original after `--`, so its exit code and stdout are the wrapper's own
+- [x] A missing `node` or engine still runs the original
 
 **Dependencies**: Phase 1
 
@@ -244,11 +261,12 @@ None. Everything is opt-in through the installer, and uninstall restores the exa
 - `shared/resources/tests/context-pressure-install.test.mjs` (new)
 
 **Changes**:
-- [ ] Install: add the hook and wrap `statusLine`, deduplicating by identity (pattern from `develop-pipeline-install-hooks.sh`)
-- [ ] Idempotent: a second run is byte-identical; never double-wraps
-- [ ] `--uninstall`: remove the hook and unwrap to the exact original; a no-op when not installed
-- [ ] `--dry-run` prints the diff and writes nothing; `--settings` targets another file
-- [ ] Atomic write plus `.bak`; malformed JSON → refuse with exit 1, file untouched
+- [x] Install: add the hook and wrap `statusLine` as `<wrapper> -- sh -c '<original>'`, deduplicating by identity (pattern from `develop-pipeline-install-hooks.sh`)
+- [x] Touch `statusLine.command` only: sibling keys (`padding`, `refreshInterval`, …) survive install and uninstall unchanged
+- [x] Idempotent: a second run is byte-identical; never double-wraps
+- [x] `--uninstall`: remove the hook and unwrap to the exact original; a no-op when not installed
+- [x] `--dry-run` prints the diff and writes nothing; `--settings` targets another file
+- [x] Atomic write plus `.bak`; malformed JSON → refuse with exit 1, file untouched
 
 **Dependencies**: Phases 1–2
 
@@ -264,9 +282,9 @@ None. Everything is opt-in through the installer, and uninstall restores the exa
 - `CHANGELOG.md`
 
 **Changes**:
-- [ ] `## Context-pressure trigger (Claude Code)` section citing all three `shared/resources/` files
-- [ ] `npm run bundle`, then `bundle -- --check` reports 0 problems
-- [ ] CHANGELOG `[Unreleased]` entry
+- [x] `## Context-pressure trigger (Claude Code)` section citing all three `shared/resources/` files
+- [x] `npm run bundle`, then `bundle -- --check` reports 0 problems
+- [x] CHANGELOG `[Unreleased]` entry
 
 **Dependencies**: Phases 1–3
 
@@ -308,11 +326,11 @@ None.
 **Scope**: `decide()` and the session-id guard.
 
 **Actions**:
-- [ ] 59% → nothing. 60% → soft once. 61% on the next prompt → nothing (hysteresis). 75% → firm. Then firm again only after `REPEAT` prompts
-- [ ] Stale reading (`at` older than max age) → nothing, even at 95%
-- [ ] Missing, empty or corrupt state → nothing, exit 0
-- [ ] Session ids `../x`, `a/b`, empty, 200 chars → `record` writes nothing outside the state dir (assert that the dir listing is unchanged)
-- [ ] Env overrides (`SOFT`, `FIRM`, `MAX_AGE_MIN`, `REPEAT`); invalid values fall back to defaults
+- [x] 59% → nothing. 60% → soft once. 61% on the next prompt → nothing (hysteresis). 75% → firm. Then firm again only after `REPEAT` prompts
+- [x] Stale reading (`at` older than max age) → nothing, even at 95%
+- [x] Missing, empty or corrupt state → nothing, exit 0
+- [x] Session ids `../x`, `a/b`, empty, 200 chars → `record` writes nothing outside the state dir (assert that the dir listing is unchanged)
+- [x] Env overrides (`SOFT`, `FIRM`, `MAX_AGE_MIN`, `REPEAT`); invalid values fall back to defaults
 
 **Command**: `command node --test shared/resources/tests/context-pressure.test.mjs`
 
@@ -323,11 +341,11 @@ None.
 **Scope**: real processes, a temp state dir, and temp settings.
 
 **Actions**:
-- [ ] Pipe a status line JSON through the wrapper around a stub command that echoes stdin and exits 3: stub output is byte-identical, the wrapper exits 3, and the state file holds the percentage
-- [ ] Wrapper with the engine path broken: the original still runs and its output is unchanged
-- [ ] Hook end to end: `record` 80%, then `check` with the same session id prints parseable JSON whose `additionalContext` names `session-handoff` and contains `80%`
-- [ ] Installer against a temp settings file holding an existing `statusLine` and unrelated hooks: install, install again (byte-identical), uninstall (byte-identical to the original apart from formatting, compared as parsed JSON)
-- [ ] Installer against malformed JSON: exit 1, file unchanged
+- [x] Pipe a status line JSON through the wrapper around a stub command that echoes stdin and exits 3: stub output is byte-identical, the wrapper exits 3, and the state file holds the percentage
+- [x] Wrapper with the engine path broken: the original still runs and its output is unchanged
+- [x] Hook end to end: `record` 80%, then `check` with the same session id prints parseable JSON whose `additionalContext` names `session-handoff` and contains `80%`
+- [x] Installer against a temp settings file holding an existing `statusLine` (with a sibling `padding` key and an original command containing a shell metacharacter) and unrelated hooks: install, install again (byte-identical), uninstall (byte-identical to the original apart from formatting, compared as parsed JSON)
+- [x] Installer against malformed JSON: exit 1, file unchanged
 
 **Command**: `command node --test shared/resources/tests/context-pressure*.test.mjs`
 
@@ -338,8 +356,8 @@ None.
 **Scope**: the hook I/O contract.
 
 **Actions**:
-- [ ] `check` stdout is empty or exactly one JSON object with `hookSpecificOutput.hookEventName === "UserPromptSubmit"`
-- [ ] `check` exits 0 on every input the tests throw at it, and never exits 2
+- [x] `check` stdout is empty or exactly one JSON object with `hookSpecificOutput.hookEventName === "UserPromptSubmit"`
+- [x] `check` exits 0 on every input the tests throw at it, and never exits 2
 
 ---
 
@@ -360,8 +378,8 @@ implementation report, not asserted in CI (the load-sensitive-test rule).
 **Scope**: a real user-level install on this machine.
 
 **Actions**:
-- [ ] Run the installer with `--dry-run` against `~/.claude/settings.json`, review, install, then confirm the status line still renders and a prompt past 60% (or with `CONTEXT_PRESSURE_SOFT=1`) produces the note
-- [ ] Uninstall restores the original `statusLine.command`
+- [x] *(against a copy of `~/.claude/settings.json` — the live file is the user's to change; see the implementation report)* Run the installer with `--dry-run` against `~/.claude/settings.json`, review, install, then confirm the status line still renders and a prompt past 60% (or with `CONTEXT_PRESSURE_SOFT=1`) produces the note
+- [x] Uninstall restores the original `statusLine.command` (copy round-trip equal as parsed JSON)
 
 ---
 
@@ -369,29 +387,29 @@ implementation report, not asserted in CI (the load-sensitive-test rule).
 
 ### Functional
 
-- [ ] `check` emits a soft note once when a fresh reading first reaches `SOFT`, and a firm note on reaching `FIRM`, repeated every `REPEAT` prompts (Phase 1 `decide`)
-- [ ] `check` emits nothing for a stale, missing or corrupt reading, and exits 0 on every tested input (Phase 1)
-- [ ] The wrapper's stdout and exit code equal the original command's for the same stdin (Phase 2)
-- [ ] Install then uninstall leaves `settings.json` equal to the original as parsed JSON; a second install changes nothing (Phase 3)
-- [ ] An invalid `session_id` never writes outside the state dir (Phase 1)
+- [x] `check` emits a soft note once when a fresh reading first reaches `SOFT`, and a firm note on reaching `FIRM`, repeated every `REPEAT` prompts (Phase 1 `decide`)
+- [x] `check` emits nothing for a stale, missing or corrupt reading, and exits 0 on every tested input (Phase 1)
+- [x] The wrapper's stdout and exit code equal the original command's for the same stdin (Phase 2)
+- [x] Install then uninstall leaves `settings.json` equal to the original as parsed JSON; a second install changes nothing (Phase 3)
+- [x] An invalid `session_id` never writes outside the state dir (Phase 1)
 
 ### Performance
 
-- [ ] `check` p95 < 150 ms, measured and recorded
-- [ ] Status line overhead < 50 ms, measured and recorded
+- [x] `check` p95 < 150 ms, measured and recorded
+- [x] Status line overhead < 50 ms, measured and recorded
 
 ### Code Quality
 
-- [ ] `command npm test` passes, with the new suites counted in the run
-- [ ] `npm run bundle -- --check`: 0 problems, no `UNREACHED`
-- [ ] `bash scripts/lint-shell.sh` clean on both `.sh` files
-- [ ] Every new test mutation-proven: remove hysteresis, remove the freshness check, and drop the identity dedupe, and a named test goes red for each
+- [x] `command npm test` passes, with the new suites counted in the run
+- [x] `npm run bundle -- --check`: 0 problems, no `UNREACHED`
+- [x] `bash scripts/lint-shell.sh` clean on both `.sh` files
+- [x] Every new test mutation-proven: remove hysteresis, remove the freshness check, and drop the identity dedupe, and a named test goes red for each
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry
-- [ ] `session-handoff/SKILL.md` documents install, uninstall, env knobs and silence semantics
-- [ ] Manual install verified on this machine (Consumer Tests)
+- [x] CHANGELOG `[Unreleased]` entry
+- [x] `session-handoff/SKILL.md` documents install, uninstall, env knobs and silence semantics
+- [x] Manual install verified on this machine (Consumer Tests) — on a copy of the real settings; the live install is left to the user
 
 ---
 
@@ -492,12 +510,67 @@ implementation report, not asserted in CI (the load-sensitive-test rule).
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-02
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.157.qa.5.context-pressure-handoff-trigger.md](./task.157.qa.5.context-pressure-handoff-trigger.md)
+- **Gate File**: [task.157.gate.5.context-pressure-handoff-trigger.yml](./task.157.gate.5.context-pressure-handoff-trigger.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 51
+- **Phases Verified**: 16/16
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No gating issues after five cycles. One low, medium-confidence advisory remains as a future recommendation ($'…' byte escapes in hand-written commands).
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.157.qa.5.context-pressure-handoff-trigger.md` (5 cycles)
+**Gate File**: `task.157.gate.5.context-pressure-handoff-trigger.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR conformance review**: ✅ APPROVE — `task.157.pr-review.1.context-pressure-handoff-trigger.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 14/14 traced — 11 with code and per-PR tests, 2 documentation, 2 performance recorded (`check` p95 113 ms; wrapper +16–21 ms)
+✅ **Tests:** 51 context-pressure tests (`shared/resources/tests/context-pressure*.test.mjs`), every QA fix mutation-proven
+✅ **PR:** #549 — CI reading 1 SUCCESS @ `08ae59cca684` (link-check, shellcheck, test, validate, branch-policy)
+✅ **Documentation:** `skills/session-handoff/SKILL.md` § Context-pressure trigger; `CHANGELOG.md` `[Unreleased]`
+✅ **Security Review:** PASS — `validSessionId` probed, 20 executed, 0 reproduced; no secrets, network, PII or dependency changes
+⚠️ **Compliance Review:** NOT_APPLICABLE — local developer tooling
+
+**Task marked as ACCEPTED on:** 2026-10-02
+
+**Detailed Verification Log:** See `task.157.dod.1.context-pressure-handoff-trigger.md` for complete verification evidence and timestamps.
+
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-25 | 1.0     | Initial draft | create-task |
+| 2026-10-02 | 1.1     | Review passed (9/10) — aligned the status-line wrap to the plan's `sh -c '<original>'` quoting; statusLine sibling keys preserved; bare-filename citation note | review-task |
+| 2026-10-02 |         | Status → ready-for-development | review-task |
+| 2026-10-02 |         | Implemented — 9 files (3 engine/scripts, 3 test suites, SKILL section, 3 bundled copies, CHANGELOG), 31 tests | develop |
+| 2026-10-02 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
+| 2026-10-02 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
+| 2026-10-02 |         | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
+| 2026-10-02 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
+| 2026-10-02 |         | QA findings fixed — gates 1–4: 11 gated + 12 advisory; settings outcomes consolidated; hook/wrap identity is a POSIX shell-word parse (comments, $'…', continuation); 4 iterations | qa-fix |
+| 2026-10-02 |         | QA gate PASS (100/100) — 0 gating findings, 1 advisory | qa-task |
+| 2026-10-02 | 1.2 | DoD verified — accepted (PR #549) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -505,17 +578,17 @@ implementation report, not asserted in CI (the load-sensitive-test rule).
 ## Progress Tracking
 
 ### Phase 1: Engine
-- [ ] `decide()` + tests
-- [ ] `record` / `check` CLI + contract tests
+- [x] `decide()` + tests
+- [x] `record` / `check` CLI + contract tests
 
 ### Phase 2: Status line wrapper
-- [ ] Wrapper + byte-identity tests
+- [x] Wrapper + byte-identity tests
 
 ### Phase 3: Installer
-- [ ] Install / uninstall / dry-run + tests
+- [x] Install / uninstall / dry-run + tests
 
 ### Phase 4: Docs, bundle, changelog
-- [ ] SKILL section, bundle, CHANGELOG
+- [x] SKILL section, bundle, CHANGELOG
 
 ---
 
@@ -536,6 +609,8 @@ implementation report, not asserted in CI (the load-sensitive-test rule).
   function `node` would print nvm help into the hook's stdout, which Claude Code would inject as
   context.
 - The hook is **silent on failure** by design. Do not add a fallback that guesses a percentage.
+- Inside `shared/resources/`, cite a sibling by bare filename (`see context-pressure.mjs`), never as
+  a `shared/resources/…` literal: there it is a bundling instruction, not a reference.
 
 ### Known Issues
 
@@ -551,13 +626,9 @@ implementation report, not asserted in CI (the load-sensitive-test rule).
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
-1. Land task.156 first
-2. Implement according to the implementation plan (`/develop-task`)
-3. Hand off to QA when complete
-4. QA will create:
-   - QA Report: `task.157.qa.[n].[name].md`
-   - Bug Reports (if needed): `task.157.bug.[N].[name].md`
-   - Quality Gate: `task.157.gate.[n].[name].yml` (co-located in task directory)
+1. `/finalise` (DoD) and merge PR #549 — QA gate 5 PASS (100/100), PR review APPROVE
+2. Install on a machine where it is wanted: `sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh --dry-run`, then without `--dry-run`
+3. Follow-ups recorded but not in scope: `$'…'` byte escapes in hand-written commands (QA5-CR-1); freshness measured against activity rather than wall-clock after a long idle pause (PR review CR-1)

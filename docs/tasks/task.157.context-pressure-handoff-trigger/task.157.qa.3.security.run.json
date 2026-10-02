@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "shared/resources/context-pressure.mjs#validSessionId",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 20,
+      "passed": 20,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "ran_at": "2026-10-02T08:14:17.611Z"
+    }
+  ],
+  "totals": {
+    "executed": 20,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-02T08:14:17.611Z"
+}

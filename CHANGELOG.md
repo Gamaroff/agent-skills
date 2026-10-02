@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **Context-pressure trigger: recommend a continuation handoff before the context fills
+  (task.157).** The model cannot see its own context usage; Claude Code gives it only to the status
+  line. A status-line wrapper now records `context_window.used_percentage` per session, and a
+  `UserPromptSubmit` hook turns a fresh reading into one short note: past 60% recommend
+  `session-handoff` continue mode at the next natural boundary, past 75% recommend it now (repeated
+  every 5 prompts). Opt-in, user-level, every repository:
+  `sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh` (`--dry-run`,
+  `--uninstall`, `--settings`).
+  - The installer dedupes by identity, never wraps twice, keeps sibling `statusLine` keys, writes
+    atomically with a `.bak`, refuses malformed JSON untouched, and unwraps to the exact original.
+  - Every hook and recorder path exits 0 and prints nothing on failure: a stale, missing or corrupt
+    reading produces no note rather than a guessed one. Thresholds and freshness are env-tunable
+    (`CONTEXT_PRESSURE_SOFT`, `_FIRM`, `_REPEAT`, `_MAX_AGE_MIN`, `_STATE_DIR`).
+  - Engine `shared/resources/context-pressure.mjs`, wrapper `context-pressure-statusline.sh`,
+    installer `context-pressure-install.sh`; bundled into `session-handoff`.
+
 - **`/session-handoff` gains a `continue` mode: hand one piece of in-flight work to a fresh context
   (task.156).** It writes a short continuation file — goal, a measured state table, the one next
   step, what was done, decisions taken, approaches **ruled out**, the files that matter, open
