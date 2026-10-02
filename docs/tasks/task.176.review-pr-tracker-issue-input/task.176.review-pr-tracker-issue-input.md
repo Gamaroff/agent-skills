@@ -5,7 +5,9 @@ type: task
 description: "/review-pr only takes a PR number, a PR URL or a branch. Teach it to start from the work item instead — a Jira key or URL, or a GitHub issue — and resolve that to the PR it should review, so the existing PR-vs-requirements report can be produced from the card a person is actually holding."
 tags: [review-pr, input-resolution, jira, github, bitbucket]
 category: infrastructure
-status: ready-for-review
+status: accepted
+completed_date: 2026-10-02
+pr_number: 554
 priority: Medium
 created: 2026-10-02
 updated: 2026-10-02
@@ -17,7 +19,7 @@ github_issue: 553
 
 # Technical Task: /review-pr accepts a Jira card or GitHub issue and resolves it to its PR
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.176.review.1.review-pr-tracker-issue-input.md` implemented 2026-10-02
 **GitHub Issue**: [#553](https://github.com/Gamaroff/agent-skills/issues/553)
 
@@ -464,12 +466,38 @@ message wording.
 ### Key Findings
 All gate-3 findings fixed. No HIGH or MEDIUM finding; one low `.env` inline-comment edge open (CR4-2). One advisory finding (rung 2's `pr_number` grep has no artifact filter) is pre-existing and routed to future work.
 
-<!-- change-log-start -->
+## Definition of Done - PASSED ✅
 
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.176.qa.4.review-pr-tracker-issue-input.md`
+**Gate File**: `task.176.gate.4.review-pr-tracker-issue-input.yml`
+**Gate Status**: ✅ PASS (cycle 4 of 4 — CONCERNS 90 → FAIL 70 → CONCERNS 90 → PASS 100)
+**Quality Score**: 100/100
+**Step 5c PR review**: `task.176.pr-review.1.review-pr-tracker-issue-input.md` — CONCERNS, non-blocking
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11/11 traced to code and per-PR tests (7 functional, 1 performance, 2 code quality, 1 migration)
+✅ **Tests:** `skills/review-pr/tests/review-pr.test.js` — 52 → 188 tests, bash + zsh; every QA fix mutation-proven
+✅ **PR Review:** PR #554 — four QA cycles and the Step 5c `/review-pr` conformance review
+✅ **Documentation:** CHANGELOG [Unreleased] (incl. the stricter §0a lookup), SKILL.md Arguments table, bundle fresh
+✅ **Security Review:** checklist PASS; the parser boundary is now executed by the probe engine (`shell-fn:`, 32 probes, held) — reached through finalise Step 8a (`a7484bb`)
+✅ **Compliance Review:** not applicable — internal skills-library change
+✅ **CI:** SUCCESS on `a7484bbf1fbc`
+
+**Task marked as ACCEPTED on:** 2026-10-02
+
+**Detailed Verification Log:** See `task.176.dod.1.review-pr-tracker-issue-input.md` for complete verification evidence and timestamps.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                        | Author |
-| ---------- | ------- | ------------------------------------------------------------------ | ------ |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-02 | 1.0     | Initial draft — cut from a request to start /review-pr from a card | Claude |
 | 2026-10-02 | 1.1     | Phase 0 done: queries verified; four findings folded into Phase 2  | Claude |
 | 2026-10-02 | 1.2     | Review 1 (7/10, needs revision): 9 important fixes applied — host-first parse, per-kind host check, epic check moved out of parser, shared §0a lookup fixed, parser tests in review-pr.test.js, testable criteria; GitHub issue #553 linked | review-task |
@@ -482,7 +510,7 @@ All gate-3 findings fixed. No HIGH or MEDIUM finding; one low `.env` inline-comm
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
 | 2026-10-02 |         | QA findings fixed — gate 3 CONCERNS: 2 queued + 5 advisory (CR3-2/4/5/6/7) fixed, iteration 3 | qa-fix |
 | 2026-10-02 |         | QA gate PASS (100/100) — 1 finding (1 low) | qa-task |
-
+| 2026-10-02 | 1.3 | DoD passed — accepted (PR #554) | finalise |
 <!-- change-log-end -->
 
 ---
