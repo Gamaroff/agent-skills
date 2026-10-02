@@ -430,29 +430,34 @@ message wording.
   filename `{kind}.{N}.{slug}.md` whose parent directory is the same stem) over a growing exclusion
   list there.
 - **Consumer runs after release**: the four live `/review-pr` runs in Testing Strategy › Consumer Tests.
+- **Carried from QA gate 4 (route 2b, cosmetic residue)**: CR4-2 — a `.env` line with a trailing
+  `# comment` defeats `/review-pr` Step 0b's quote strip, so a correct Jira host warns "differs".
+- **Pre-existing, found in QA cycle 4**: CR4-1 — review-pr Step 2 rung 2's `pr_number` grep (and
+  rung 1's `-name` fallback) apply no artifact filter; `bug.3.dod.1.*.md` carries `pr_number: 290`
+  while bug.3's own document does not. Route both through the §0a rule.
 
 ---
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-02
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.176.qa.3.review-pr-tracker-issue-input.md](./task.176.qa.3.review-pr-tracker-issue-input.md)
-- **Gate File**: [task.176.gate.3.review-pr-tracker-issue-input.yml](./task.176.gate.3.review-pr-tracker-issue-input.yml)
+- **Full Report**: [task.176.qa.4.review-pr-tracker-issue-input.md](./task.176.qa.4.review-pr-tracker-issue-input.md)
+- **Gate File**: [task.176.gate.4.review-pr-tracker-issue-input.yml](./task.176.gate.4.review-pr-tracker-issue-input.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 175
+- **Tests Executed**: 187
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All gate-2 findings fixed; HIGH back to 0. Step 0 still parses an altssh Bitbucket remote the old way (medium), and the `.env` JIRA_URL read misses `export`/CRLF (low).
+All gate-3 findings fixed. No HIGH or MEDIUM finding; one low `.env` inline-comment edge open (CR4-2). One advisory finding (rung 2's `pr_number` grep has no artifact filter) is pre-existing and routed to future work.
 
 <!-- change-log-start -->
 
@@ -471,6 +476,7 @@ All gate-2 findings fixed; HIGH back to 0. Step 0 still parses an altssh Bitbuck
 | 2026-10-02 |         | QA findings fixed — gate 2 FAIL: 4 queued + 5 advisory (CR2-4/5/6/8/9) fixed, iteration 2 | qa-fix |
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
 | 2026-10-02 |         | QA findings fixed — gate 3 CONCERNS: 2 queued + 5 advisory (CR3-2/4/5/6/7) fixed, iteration 3 | qa-fix |
+| 2026-10-02 |         | QA gate PASS (100/100) — 1 finding (1 low) | qa-task |
 
 <!-- change-log-end -->
 
