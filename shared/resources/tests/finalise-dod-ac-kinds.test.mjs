@@ -26,9 +26,9 @@ const WORDS = { two: 2, three: 3, four: 4, five: 5, six: 6 };
 const HEAD =
   /\*\*(\w+) kinds of criterion may carry `test_citation: "NOT_APPLICABLE: …"`, and only these (\w+):\*\*/;
 const CLOSING = "`test_runs_per_pr` is `null`";
-// A count word, then at most one qualifier ("`NOT_APPLICABLE`", "test-free"), then "kinds".
+// A count word or digits, then up to three qualifiers ("`NOT_APPLICABLE`", "test-free"), then "kinds".
 const COUNT_OF_KINDS =
-  /\b(two|three|four|five|six|both) (?:[\w`-]+ )?kinds\b/gi;
+  /\b(two|three|four|five|six|seven|eight|nine|ten|\d+|both)(?: [\w`-]+){0,3} kinds\b/gi;
 
 function kindsSection(doc) {
   const head = doc.match(HEAD);

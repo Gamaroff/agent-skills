@@ -1,0 +1,95 @@
+schema: 2
+task: 'task.166.measured-non-functional-criteria'
+task_title: 'Give measured non-functional criteria a defined path through review and finalise'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes hold in the rule they edited, but not everywhere the rule is restated: the Issues to Flag line, its pin and the CHANGELOG still carry the pre-CR-2 bound wording (CR2-1, high confidence); the bound rule still flags an unbounded criterion a planned test holds (CR2-2); the CHANGELOG and SC 1 still say an unbounded criterion is always FAIL (CR2-3).'
+reviewer: 'QA Engineer'
+head: '6b89fef3ded13f18a49d9b620acdb0c1f57ca2e9'
+updated: '2026-10-02T11:06:54Z'
+
+top_issues:
+  - id: 'TASK-166-CR2-1'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The CR-2 fix changed only the check 4 rule. The Step 6 Issues to Flag line still says Important for "no numeric bound or no stated measurement", the test pins that wording verbatim, and CHANGELOG.md and task SC 3 say "no numeric bound or measuring command" — all still flag a bound a planned per-PR test asserts.'
+    suggested_action: 'Reword every statement of the rule (Issues to Flag line, its pin, CHANGELOG, task SC 3) to "no planned test, and no numeric bound with a measuring command"; list each site in the fix summary.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR2-2'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'CR-6 sends an unbounded criterion down the behaviour path, where a test passes it; the bound rule still raises Important for "Missing the bound" whether or not a test is planned, so it flags a criterion finalise would pass.'
+    suggested_action: 'State the rule as: a non-functional criterion is held by a planned per-PR test, or by a numeric bound plus measuring command; neither → Important. Pin the missing-bound case.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR2-3'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'CHANGELOG ("an unbounded criterion stays FAIL") and task SC 1 ("An unbounded criterion is FAIL") claim an unconditional FAIL; the prompt as shipped fails an unbounded criterion only when no per-PR test holds it.'
+    suggested_action: 'Reword both to "an unbounded criterion is not a measured criterion, and fails unless a per-PR test holds it".'
+    suggested_owner: dev
+  - id: 'TASK-166-CR2-4'
+    severity: low
+    file: 'tests/review-task-measured-criterion.test.js'
+    finding: 'The kind-label match normalises the two sides differently (labels keep backticks; asProse strips them) and uses a bare includes(), so a code-formatted kind never matches and an embedded word ("unmeasured criterion") does.'
+    suggested_action: 'Normalise the label with asProse, strip a leading A/An, match on word boundaries.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR2-5'
+    severity: low
+    file: 'tests/review-task-measured-criterion.test.js'
+    finding: 'The count-word regex misses digits and more than one qualifier ("the 3 test-free kinds", "three such test-free kinds") and refuses "both kinds of evidence".'
+    suggested_action: 'Accept digits and up to three qualifiers; drop "both" from the review-task check.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR2-6'
+    severity: low
+    file: 'tests/review-task-measured-criterion.test.js'
+    finding: 'The test header comment says "one of three test-free kinds" — the unpinned count CR-1 removed from check 4.'
+    suggested_action: 'Name the list without a number.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 10
+  phases_verified: 4/4
+  ci: 'pending @ 6b89fef3ded1 (link-check, validate, shellcheck pass; test pending) — informational'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered (boundary: false) — prompt prose and read-only text pins.'
+  performance:
+    status: PASS
+    notes: 'Pins run in ~0.3s each.'
+  reliability:
+    status: PASS
+    notes: 'Pins fail closed on missing headings and sections.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The bound rule is stated at five sites (check 4 rule, Issues to Flag, its pin, CHANGELOG, task SC) and cycle 1 updated one.'
+
+bug_resolution:
+  previous_gate: 'gate.1 (CONCERNS 80)'
+  fixed: ['TASK-166-CR-1', 'TASK-166-CR-4', 'TASK-166-CR-5', 'TASK-166-CR-6']
+  partial: ['TASK-166-CR-2']
+
+recommendations:
+  immediate:
+    - action: 'Sweep every statement of the bound rule and of the unbounded-criterion outcome; consolidate the rule so review and finalise agree.'
+      refs: ['skills/review-task/SKILL.md', 'CHANGELOG.md', 'tests/review-task-measured-criterion.test.js']
+  future:
+    - action: 'CR-3 (gate 1, low confidence): make "whether a per-PR test could assert that bound" concrete.'
+      refs: ['shared/resources/finalise-dod-ac-prompt.md']
+    - action: 'Pre-existing: review-task SKILL.md Step 4b zero-blocks-executed (identical on origin/develop).'
+      refs: ['skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR2-1, CR2-2, CR2-3 resolved']

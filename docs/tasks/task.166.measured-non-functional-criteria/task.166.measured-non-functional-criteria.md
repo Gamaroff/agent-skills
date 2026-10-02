@@ -41,8 +41,8 @@ This task gives the measured criterion a defined path at both ends:
 
 **Key deliverables**:
 
-1. The AC prompt names three test-free kinds. The third is a **measured criterion**: `PASS` requires a stated bound, and a measurement meeting it, cited from a committed artifact with the command that produced it. A criterion with no bound stays `FAIL`.
-2. `review-task` raises an **Important** finding for a non-functional success criterion that states no numeric bound, or no command to measure it by.
+1. The AC prompt names three test-free kinds. The third is a **measured criterion**: `PASS` requires a stated bound, and a measurement meeting it, cited from a committed artifact with the command that produced it. A criterion with no bound is not a measured criterion, and fails unless a per-PR test holds it.
+2. `review-task` raises an **Important** finding for a non-functional success criterion held by neither a planned per-PR test nor a numeric bound with its measuring command.
 3. `review-task` raises an **Important** finding for a behaviour criterion that names no test planned to hold it, and for a success criterion that can only be satisfied after merge or acceptance, with the remedy for each (name the test, or move the item to Deferred Work).
 4. Tests fail when any of these rules is removed or weakened.
 
@@ -89,7 +89,7 @@ This task gives the measured criterion a defined path at both ends:
   - The closing sentence becomes "`test_runs_per_pr` is `null` on all three kinds … **A behaviour criterion never takes any of these paths.**" The measured kind must not become a back door for behaviour that could be tested.
   - The Execution rule (§ Step 5: "The two `NOT_APPLICABLE` kinds in Step 3 carry `null` here …") restates the count. It drops the count ("The `NOT_APPLICABLE` kinds in Step 3 …"), so the heading sentence is the file's one count of the kinds (review 1).
 - `review-task` Step 6 check 4 also classifies each success criterion as finalise's AC prompt will — behaviour (needs a per-PR test), documentation, "no unit tests applicable", or measured — and raises **Important** for (a) a behaviour criterion whose text or phase names no test planned to hold it ("name the test, or re-scope it"), and (b) a criterion that can only be met after merge or acceptance, such as closing an observation or a tracker item on merge ("move it to Deferred Work — finalise runs before merge"). The worked examples are task.142's AC7/AC8 (behaviour) and AC16 (post-merge).
-- `review-task` Step 6 check 4 gains a rule: a non-functional success criterion (Performance, or any criterion bounding time, size, count or rate) must state a **numeric bound** and **how it is measured**. If either is missing, the finding is **Important** ("state the bound and the command, or replace it with a test that pins it"). The example is task.164's AC7 wording.
+- `review-task` Step 6 check 4 gains a rule: a non-functional success criterion (Performance, or any criterion bounding time, size, count or rate) must be held by a planned per-PR test, or state a **numeric bound** and **how it is measured**. A criterion held by neither a planned per-PR test nor a numeric bound with its measuring command is **Important** ("name the test that pins it, or state the bound and the command"). The example is task.164's AC7 wording.
 - Tests:
   - `shared/resources/tests/finalise-dod-ac-kinds.test.mjs` pins the AC prompt: the section states the number of kinds, the number of bulleted kinds equals it, each kind has its `test_citation` string, the measured kind's `PASS` requires a bound and a cited command, and the closing sentence covers all kinds. It also checks that the bundled copy under `skills/finalise/references/` matches the source body.
   - `tests/review-task-measured-criterion.test.js` pins the review-task rules: check 4 carries the bound-and-measurement rule, the behaviour-without-test rule and the post-merge rule, each at severity Important.
@@ -122,7 +122,7 @@ This task gives the measured criterion a defined path at both ends:
 
 ## 5. Breaking Changes
 
-None to any interface. One behaviour change: a finalise run with a bounded, measured, cited non-functional criterion now returns `PASS` for it instead of `FAIL`. A run with an unbounded criterion still returns `FAIL`, and `review-task` now flags that criterion earlier.
+None to any interface. One behaviour change: a finalise run with a bounded, measured, cited non-functional criterion now returns `PASS` for it instead of `FAIL`. A run with an unbounded criterion still returns `FAIL` unless a per-PR test holds it, and `review-task` now flags an untested unbounded criterion earlier.
 
 ---
 
@@ -237,9 +237,9 @@ Not applicable. The change is prompt prose and two text pins.
 
 ### Functional
 
-- [x] `finalise-dod-ac-prompt.md` § Step 3 names three test-free kinds. The measured kind's `PASS` requires a stated bound, a measurement meeting it, and the command that produced it, cited from a committed artifact. An unbounded criterion is `FAIL`. Pinned (Phases 1, 3).
+- [x] `finalise-dod-ac-prompt.md` § Step 3 names three test-free kinds. The measured kind's `PASS` requires a stated bound, a measurement meeting it, and the command that produced it, cited from a committed artifact. An unbounded criterion is not a measured criterion, and fails unless a per-PR test holds it. Pinned (Phases 1, 3).
 - [x] The prompt's closing sentence covers all three kinds, and says a criterion whose bound a per-PR test could assert is a behaviour criterion. Pinned (Phases 1, 3).
-- [x] `review-task` Step 6 check 4 flags a non-functional criterion with no numeric bound or no stated measurement as Important. Pinned (Phases 2, 3).
+- [x] `review-task` Step 6 check 4 flags a non-functional criterion held by neither a planned per-PR test nor a numeric bound with its measuring command as Important. Pinned (Phases 2, 3).
 - [x] The documentation kind added by obs #204 is covered by the new AC pin (Phase 3).
 - [x] `review-task` Step 6 check 4 flags a behaviour criterion with no planned test, and a criterion met only after merge, each as Important. Pinned (Phases 2, 3).
 
@@ -309,24 +309,24 @@ None identified.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-02
-**Quality Score**: 80/100
+**Quality Score**: 70/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.166.qa.1.measured-non-functional-criteria.md](./task.166.qa.1.measured-non-functional-criteria.md)
-- **Gate File**: [task.166.gate.1.measured-non-functional-criteria.yml](./task.166.gate.1.measured-non-functional-criteria.yml)
+- **Full Report**: [task.166.qa.2.measured-non-functional-criteria.md](./task.166.qa.2.measured-non-functional-criteria.md)
+- **Gate File**: [task.166.gate.2.measured-non-functional-criteria.yml](./task.166.gate.2.measured-non-functional-criteria.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 9
+- **Tests Executed**: 10
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
 
-Two medium findings in review-task Step 6 check 4: it restates the kind count where no test reaches it (CR-1), and its bound rule flags a bound pinned by a planned test, which finalise would pass (CR-2). Three low cleanups (CR-4, CR-5, CR-6).
+Cycle 1's fixes hold where they were made, but the bound rule and the unbounded-criterion outcome are still stated the old way at other sites: the Issues to Flag line and its pin, the CHANGELOG, and success criteria 1 and 3 (CR2-1, CR2-3). The bound rule also still flags an unbounded criterion that a planned test holds (CR2-2). Three low test findings.
 
 ## Change Log
 
@@ -338,7 +338,8 @@ Two medium findings in review-task Step 6 check 4: it restates the kind count wh
 | 2026-10-02 |         | Status → ready-for-development | review-task |
 | 2026-10-02 |         | Implemented — 6 files (AC prompt, review-task check 4, 2 new pin tests, CHANGELOG, 1 new bundled copy); 9 tests, 14 mutations red | develop |
 | 2026-10-02 |         | QA gate CONCERNS (80/100) — 2 medium, 3 low findings | qa-task |
-| 2026-10-02 |         | QA findings fixed — gate 1: CR-1 (check 4 names the kinds, counts none; pinned to the AC prompt list), CR-2 (bound rule accepts a planned per-PR test), CR-4/5/6; 1 iteration | qa-fix |
+| 2026-10-02 |         | QA findings fixed — gate 1: CR-1 (check 4 names the kinds, counts none), CR-2, CR-4/5/6; gate 2: one bound rule (held by a planned test, or by a bound + its measuring command) swept across every site that states it, unbounded outcome corrected in CHANGELOG and SC 1, test normalisation and count regex; 2 iterations | qa-fix |
+| 2026-10-02 |         | QA gate CONCERNS (70/100) — 3 medium, 3 low findings | qa-task |
 
 <!-- change-log-end -->
 

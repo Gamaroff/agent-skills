@@ -1118,13 +1118,13 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      them. A criterion
      that fits no kind fails at acceptance by construction, two steps after the one edit that would
      have fixed it. Three shapes reach that point, and each is **Important** here:
-   - **A non-functional criterion states its bound and how it is measured** (obs #206). A criterion
-     in the Performance subsection, or any criterion that bounds a time, size, count or rate, names a
-     **numeric bound** and either **the command that measures it** or the per-PR test that asserts
-     it. A bound a per-PR test asserts is a behaviour criterion, which finalise passes on that test,
-     so it needs no command. Missing the bound, or missing both the command and a planned test →
-     **Important**: "state the bound and the command, or replace the criterion with a test that pins
-     it". Worked example:
+   - **A non-functional criterion is held by a planned test or by a measured bound** (obs #206). A
+     criterion in the Performance subsection, or any criterion that bounds a time, size, count or
+     rate, needs one of two things: the per-PR test planned to assert it, or a **numeric bound** with
+     **the command that measures it**. Finalise passes the first as a behaviour criterion, on its
+     test, and the second as a measured criterion, on its committed measurement — so a tested
+     criterion needs no bound and no command. A criterion held by neither a planned per-PR test nor a numeric bound with its measuring command → **Important**: "name the test
+     that pins it, or state the bound and the command". Worked example:
      task.164's AC7, "No measurable change beyond the new 4b test's three runs", which states no
      bound.
    - **A behaviour criterion names the test that holds it** (obs #222). A criterion that needs code
@@ -1152,7 +1152,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 **Issues to Flag**:
 
 - **Critical**: Major inconsistencies, missing critical tests, task too large (recommend splitting)
-- **Important**: Incomplete rollback plan, vague success criteria, task complexity high; a non-functional criterion with no numeric bound or no stated measurement; a behaviour criterion with no planned test; a criterion that can only be met after merge (check 4)
+- **Important**: Incomplete rollback plan, vague success criteria, task complexity high; a non-functional criterion held by neither a planned per-PR test nor a numeric bound with its measuring command; a behaviour criterion with no planned test; a criterion that can only be met after merge (check 4)
 - **Optional**: Additional helpful tests or criteria, potential optimization for parallel development
 
 **Output**: Consistency and completeness report

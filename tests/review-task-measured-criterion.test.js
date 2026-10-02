@@ -3,11 +3,11 @@
 /**
  * review-task flags the success criteria finalise fails by construction (task 166; obs #206, #222).
  *
- * Finalise's AC agent passes a criterion without a per-PR test only when it is one of three
- * test-free kinds (finalise-dod-ac-prompt.md Step 3). Three shapes fit no kind and so fail at
+ * Finalise's AC agent passes a criterion without a per-PR test only when it is one of the test-free
+ * kinds finalise-dod-ac-prompt.md Step 3 lists. Three shapes fit no kind and so fail at
  * acceptance, two pipeline steps after the review that could have caught them with one edit:
  *
- * - a non-functional criterion with no numeric bound or no measuring command (task.164 AC7);
+ * - a non-functional criterion held by neither a planned per-PR test nor a numeric bound with its measuring command (task.164 AC7);
  * - a behaviour criterion that names no test planned to hold it (task.142 AC7/AC8);
  * - a criterion that can only be met after merge, when finalise runs before it (task.142 AC16).
  *
@@ -48,15 +48,16 @@ function check4() {
 const RULES = [
   {
     name: "bound-and-measurement rule (obs #206)",
-    first: /A non-functional criterion states its bound/,
+    first:
+      /A non-functional criterion is held by a planned test or by a measured bound/,
     holds: [
-      "numeric bound",
-      "the command that measures it",
-      // A bound a planned per-PR test asserts is a behaviour criterion finalise passes — the rule
-      // must not flag it for want of a command (QA cycle 1, CR-2).
-      "or the per-PR test that asserts it",
-      "missing both the command and a planned test",
-      "state the bound and the command",
+      "the per-PR test planned to assert it",
+      "numeric bound with the command that measures it",
+      // A tested criterion is a behaviour criterion finalise passes on its test — neither the bound
+      // nor the command is asked of it (QA cycle 1 CR-2; cycle 2 CR2-2).
+      "a tested criterion needs no bound and no command",
+      "held by neither a planned per-PR test nor a numeric bound with its measuring command",
+      "name the test that pins it, or state the bound and the command",
     ],
   },
   {
@@ -108,8 +109,15 @@ function acKinds() {
   const end = doc.indexOf("`test_runs_per_pr` is `null`", head);
   assert.notEqual(end, -1, `${AC}: no closing sentence after the kinds`);
   return [...doc.slice(head, end).matchAll(/^- \*\*([^*]+)\*\*/gm)].map((m) =>
-    // "No unit tests applicable." → no unit tests applicable; A measured criterion. → measured criterion
-    m[1].replace(/[".]/g, "").replace(/^A /, "").trim().toLowerCase(),
+    // Through the same asProse as the check-4 text, so backticks and emphasis are stripped on both
+    // sides (QA cycle 2, CR2-4): "No unit tests applicable." → no unit tests applicable;
+    // A measured criterion. → measured criterion.
+    asProse(m[1])
+      .replace(/["]/g, "")
+      .replace(/\.$/, "")
+      .replace(/^an? /i, "")
+      .trim()
+      .toLowerCase(),
   );
 }
 
@@ -125,14 +133,18 @@ test("check 4 names every test-free kind the AC prompt lists, and counts none of
   );
   assert.ok(item, `${SKILL}: check 4 has no "Classify each criterion" item`);
   const prose = asProse(item).toLowerCase();
+  // A whole-phrase match, so "unmeasured criterion" does not stand in for "measured criterion".
+  const named = (k) =>
+    new RegExp(
+      `(^|[^\\w-])${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\w-])`,
+    ).test(prose);
   for (const k of kinds)
-    assert.ok(
-      prose.includes(k),
-      `${SKILL}: check 4 does not name the "${k}" kind`,
-    );
+    assert.ok(named(k), `${SKILL}: check 4 does not name the "${k}" kind`);
   const counts = [
     ...asProse(check4().join("\n")).matchAll(
-      /\b(two|three|four|five|six|both) (?:[\w`-]+ )?kinds\b/gi,
+      // A count word or digits, then up to three qualifiers, then "kinds" (QA cycle 2, CR2-5).
+      // Not "both": "both kinds of evidence" is a legitimate sentence about a test and a measurement.
+      /\b(two|three|four|five|six|seven|eight|nine|ten|\d+)(?: [\w`-]+){0,3} kinds\b/gi,
     ),
   ];
   assert.deepEqual(
@@ -147,7 +159,7 @@ test("Step 6 Issues to Flag names all three findings under Important", () => {
   const line = step6.find((l) => l.startsWith("- **Important**:"));
   assert.ok(line, `${SKILL}: Step 6 Issues to Flag has no Important line`);
   for (const f of [
-    "a non-functional criterion with no numeric bound or no stated measurement",
+    "a non-functional criterion held by neither a planned per-PR test nor a numeric bound with its measuring command",
     "a behaviour criterion with no planned test",
     "a criterion that can only be met after merge",
   ])

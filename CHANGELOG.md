@@ -252,10 +252,10 @@ All notable changes to this project will be documented in this file. Format foll
   so a runtime, size or count bound failed by rule even when the measurement met it (task.164 AC7).
   `finalise-dod-ac-prompt.md` § Step 3 now names a third kind, the **measured criterion**: `PASS`
   needs a stated bound, a measurement meeting it, and the command that produced it, cited from a
-  committed artifact; an unbounded criterion stays `FAIL`, and a bound a per-PR test could assert is
-  a behaviour criterion. The Execution rule no longer restates the count. `review-task` Step 6
+  committed artifact; an unbounded criterion is not a measured criterion, and fails unless a per-PR
+  test holds it; and a bound a per-PR test could assert is a behaviour criterion. The Execution rule no longer restates the count. `review-task` Step 6
   check 4 classifies each success criterion the way finalise will and raises **Important** for a
-  non-functional criterion with no numeric bound or measuring command, a behaviour criterion with no
+  non-functional criterion held by neither a planned per-PR test nor a numeric bound with its measuring command, a behaviour criterion with no
   planned test, and a criterion that can only be met after merge. Pinned by
   `shared/resources/tests/finalise-dod-ac-kinds.test.mjs` (which also covers obs #204's untested
   documentation kind and both bundled copies) and `tests/review-task-measured-criterion.test.js`.
