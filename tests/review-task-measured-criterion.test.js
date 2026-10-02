@@ -7,7 +7,7 @@
  * kinds finalise-dod-ac-prompt.md Step 3 lists. Three shapes fit no kind and so fail at
  * acceptance, two pipeline steps after the review that could have caught them with one edit:
  *
- * - a non-functional criterion held by neither a planned per-PR test nor a numeric bound with its measuring command (task.164 AC7);
+ * - a non-functional criterion held by neither a planned test nor a measured bound (task.164 AC7);
  * - a behaviour criterion that names no test planned to hold it (task.142 AC7/AC8);
  * - a criterion that can only be met after merge, when finalise runs before it (task.142 AC16).
  *
@@ -23,6 +23,7 @@ const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const { sectionOf, citingItemOf, asProse } = require("./lib/markdown-section");
+const { countsOfKinds, FIXTURES } = require("./lib/count-of-kinds");
 
 const SKILL = "skills/review-task/SKILL.md";
 const STEP_6 = "### Step 6: Consistency and Completeness Review";
@@ -51,17 +52,17 @@ const RULES = [
     first:
       /A non-functional criterion is held by a planned test or by a measured bound/,
     holds: [
-      "the per-PR test planned to assert it",
       "numeric bound with the command that measures it",
-      // A tested criterion is a behaviour criterion finalise passes on its test — neither the bound
-      // nor the command is asked of it (QA cycle 1 CR-2; cycle 2 CR2-2).
-      "a tested criterion needs no bound and no command",
-      "held by neither a planned per-PR test nor a numeric bound with its measuring command",
-      "name the test that pins it, or state the bound and the command",
-      // The measured branch only for a bound no test could assert, as finalise routes it (cycle 3, CR3-1).
-      "a bound a per-PR test could assert needs that test",
-      // One owner per criterion: the behaviour rule does not also fire on it (cycle 3, CR3-7).
-      "This rule alone judges a non-functional criterion",
+      // The trigger carries the split itself (cycle 4, CR4-1): a command never holds a bound a test
+      // could assert.
+      "A bound a per-PR test could assert is held only by that planned per-PR test",
+      "a measuring command does not hold it",
+      "A bound no per-PR test could assert",
+      "A criterion held neither way",
+      // Exceptions (CR4-4, CR4-5).
+      "the post-merge rule still does",
+      'is finalise\'s "no unit tests applicable" kind, not a criterion this rule flags',
+      "name the test that pins it, or — for a bound no per-PR test could assert — state the bound and the command",
     ],
   },
   {
@@ -148,18 +149,8 @@ test("check 4 names every test-free kind the AC prompt lists, and counts none of
     ).test(prose);
   for (const k of kinds)
     assert.ok(named(k), `${SKILL}: check 4 does not name the "${k}" kind`);
-  const counts = [
-    ...asProse(check4().join("\n")).matchAll(
-      // A count word or digits, then up to three qualifiers, then "kinds" (QA cycle 2, CR2-5).
-      // Not "both": "both kinds of evidence" is a legitimate sentence about a test and a measurement.
-      /(?<!Step )\b(two|three|four|five|six|seven|eight|nine|ten|\d+)(?: [\w`-]+){0,3} kinds\b(?! of (?!criterion))/gi,
-    ),
-  ];
-  assert.deepEqual(
-    counts.map((m) => m[0]),
-    [],
-    `${SKILL}: check 4 counts the kinds`,
-  );
+  const counts = countsOfKinds(check4().join("\n"));
+  assert.deepEqual(counts, [], `${SKILL}: check 4 counts the kinds`);
 });
 
 test("Step 6 Issues to Flag names all three findings under Important", () => {
@@ -167,7 +158,7 @@ test("Step 6 Issues to Flag names all three findings under Important", () => {
   const line = step6.find((l) => l.startsWith("- **Important**:"));
   assert.ok(line, `${SKILL}: Step 6 Issues to Flag has no Important line`);
   for (const f of [
-    "a non-functional criterion held by neither a planned per-PR test nor a numeric bound with its measuring command",
+    "a non-functional criterion held neither way the bound rule names",
     "a behaviour criterion with no planned test",
     "a criterion that can only be met after merge",
   ])
@@ -177,21 +168,17 @@ test("Step 6 Issues to Flag names all three findings under Important", () => {
     );
 });
 
-test("check 4's count pattern refuses a restated count and allows the sentences check 4 needs", () => {
-  const re =
-    /(?<!Step )\b(two|three|four|five|six|seven|eight|nine|ten|\d+)(?: [\w`-]+){0,3} kinds\b(?! of (?!criterion))/gi;
-  const hits = (t) => [...t.matchAll(re)].length;
-  for (const t of [
-    "one of three test-free kinds",
-    "the 3 test-free kinds",
-    "three such test-free kinds",
-  ])
-    assert.equal(hits(t), 1, `should refuse: ${t}`);
-  for (const t of [
-    "the test-free kinds that Step 3 lists",
-    "the Step 3 test-free kinds",
-    "both kinds of evidence",
-    "two kinds of evidence",
-  ])
-    assert.equal(hits(t), 0, `should allow: ${t}`);
+test("the shared count-of-kinds pattern matches a restated count and nothing else", () => {
+  for (const t of FIXTURES.match)
+    assert.equal(
+      countsOfKinds(t).length,
+      1,
+      `should match: ${JSON.stringify(t)}`,
+    );
+  for (const t of FIXTURES.noMatch)
+    assert.equal(
+      countsOfKinds(t).length,
+      0,
+      `should not match: ${JSON.stringify(t)}`,
+    );
 });

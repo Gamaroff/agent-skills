@@ -1120,14 +1120,19 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      have fixed it. Three shapes reach that point, and each is **Important** here:
    - **A non-functional criterion is held by a planned test or by a measured bound** (obs #206). A
      criterion in the Performance subsection, or any criterion that bounds a time, size, count or
-     rate, needs one of two things: the per-PR test planned to assert it, or a **numeric bound** with
-     **the command that measures it**. Finalise passes the first as a behaviour criterion, on its
-     test, and the second as a measured criterion, on its committed measurement — so a tested
-     criterion needs no bound and no command. The measured branch is for a bound **no per-PR test
-     could assert** (wall-clock runtime, CI duration): a bound a per-PR test could assert needs that
-     test, because finalise treats it as a behaviour criterion and fails it without one. This rule
-     alone judges a non-functional criterion; the behaviour rule below covers the rest. A criterion held by neither a planned per-PR test nor a numeric bound with its measuring command → **Important**: "name the test
-     that pins it, or state the bound and the command". Worked example:
+     rate, is held one of two ways, and which way depends on its bound:
+     - **A bound a per-PR test could assert** is held only by **that planned per-PR test**.
+       Finalise treats it as a behaviour criterion and fails it without one — a measuring command
+       does not hold it.
+     - **A bound no per-PR test could assert** (wall-clock runtime, CI duration) is held by a
+       **measured bound**: a **numeric bound** with **the command that measures it**, which finalise
+       passes as a measured criterion on its committed measurement.
+
+     A criterion held neither way → **Important**: "name the test that pins it, or — for a bound no
+     per-PR test could assert — state the bound and the command". An explicit "not applicable" line
+     that gives its reason is finalise's "no unit tests applicable" kind, not a criterion this rule
+     flags. The behaviour rule below does not also judge a non-functional criterion; the post-merge
+     rule still does. Worked example:
      task.164's AC7, "No measurable change beyond the new 4b test's three runs", which states no
      bound.
    - **A behaviour criterion names the test that holds it** (obs #222). A criterion — other than a
@@ -1155,7 +1160,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 **Issues to Flag**:
 
 - **Critical**: Major inconsistencies, missing critical tests, task too large (recommend splitting)
-- **Important**: Incomplete rollback plan, vague success criteria, task complexity high; a non-functional criterion held by neither a planned per-PR test nor a numeric bound with its measuring command; a behaviour criterion with no planned test; a criterion that can only be met after merge (check 4)
+- **Important**: Incomplete rollback plan, vague success criteria, task complexity high; a non-functional criterion held neither way the bound rule names; a behaviour criterion with no planned test; a criterion that can only be met after merge (check 4)
 - **Optional**: Additional helpful tests or criteria, potential optimization for parallel development
 
 **Output**: Consistency and completeness report

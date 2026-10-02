@@ -15,7 +15,13 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { readDoc } from "./lib/executed-prose.mjs";
+
+// One count pattern for both pins (QA cycle 4, CR4-6): tests/lib/count-of-kinds.js.
+const { countsOfKinds } = createRequire(import.meta.url)(
+  "../../../tests/lib/count-of-kinds.js",
+);
 
 const SRC = "shared/resources/finalise-dod-ac-prompt.md";
 const COPIES = [
@@ -26,27 +32,6 @@ const WORDS = { two: 2, three: 3, four: 4, five: 5, six: 6 };
 const HEAD =
   /\*\*(\w+) kinds of criterion may carry `test_citation: "NOT_APPLICABLE: …"`, and only these (\w+):\*\*/;
 const CLOSING = "`test_runs_per_pr` is `null`";
-// A count word or digits, then up to three qualifiers ("`NOT_APPLICABLE`", "test-free"), then "kinds".
-const COUNT_OF_KINDS =
-  /(?<!Step )\b(two|three|four|five|six|seven|eight|nine|ten|\d+|both)(?: [\w`-]+){0,3} kinds\b(?! of (?!criterion))/gi;
-// Not a section reference ("Step 3 test-free kinds") and not "kinds of <anything but criterion>"
-// ("two kinds of evidence") — QA cycle 3, CR3-5. The fixtures below hold both directions.
-const COUNT_FIXTURES = {
-  match: [
-    "The two `NOT_APPLICABLE` kinds",
-    "the 3 test-free kinds",
-    "Three kinds of criterion",
-    "on all three kinds",
-  ],
-  noMatch: [
-    "the Step 3 test-free kinds",
-    "two kinds of evidence",
-    "the kinds Step 3 lists",
-  ],
-};
-// Prose as a reader sees it: emphasis and code formatting stripped, whitespace collapsed, so a count
-// wrapped across lines or written in backticks is still a count (QA cycle 3, CR3-6).
-const asProse = (s) => s.replace(/\*\*|`/g, "").replace(/\s+/g, " ");
 
 function kindsSection(doc) {
   const head = doc.match(HEAD);
@@ -137,14 +122,12 @@ test("no sentence restates the count of kinds with a different number", () => {
   // The heading's own count, and the closing sentence's "all <count> kinds", use the heading's word.
   // Any other count word — "The two `NOT_APPLICABLE` kinds", "both kinds" — is a second definition
   // that has drifted from the first.
-  const counts = [...asProse(doc).matchAll(COUNT_OF_KINDS)];
+  const counts = countsOfKinds(doc);
   assert.ok(
     counts.length >= 2,
     `${SRC}: expected the heading and closing counts, found ${counts.length}`,
   );
-  const drifted = counts
-    .map((m) => m[0])
-    .filter((c) => !c.toLowerCase().startsWith(`${word} `));
+  const drifted = counts.filter((c) => !c.toLowerCase().startsWith(`${word} `));
   assert.deepEqual(
     drifted,
     [],
@@ -160,12 +143,4 @@ test("every bundled copy matches its source", () => {
       strip(readDoc(SRC)),
       `${copy} drifted from ${SRC}`,
     );
-});
-
-test("the count-of-kinds pattern matches a restated count and nothing else", () => {
-  const hits = (t) => [...t.matchAll(COUNT_OF_KINDS)].length;
-  for (const t of COUNT_FIXTURES.match)
-    assert.equal(hits(t), 1, `should match: ${t}`);
-  for (const t of COUNT_FIXTURES.noMatch)
-    assert.equal(hits(t), 0, `should not match: ${t}`);
 });
