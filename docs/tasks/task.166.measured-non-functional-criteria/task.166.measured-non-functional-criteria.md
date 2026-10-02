@@ -306,16 +306,16 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-02
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.166.qa.5.measured-non-functional-criteria.md](./task.166.qa.5.measured-non-functional-criteria.md)
-- **Gate File**: [task.166.gate.5.measured-non-functional-criteria.yml](./task.166.gate.5.measured-non-functional-criteria.yml)
+- **Full Report**: [task.166.qa.6.measured-non-functional-criteria.md](./task.166.qa.6.measured-non-functional-criteria.md)
+- **Gate File**: [task.166.gate.6.measured-non-functional-criteria.yml](./task.166.gate.6.measured-non-functional-criteria.yml)
 
 ### Test Coverage Summary
 
@@ -326,7 +326,7 @@ None identified.
 
 ### Key Findings
 
-The bound rule is stated once and cited elsewhere. One medium regression: a non-functional criterion with no numeric bound but a planned per-PR test reads as unheld in review, while finalise passes it on its test (CR5-1). Four low findings.
+No review-vs-finalise disagreement across every criterion shape probed. Four low, advisory findings are named in the gate's recommendations for a follow-up.
 
 ## Change Log
 
@@ -343,6 +343,7 @@ The bound rule is stated once and cited elsewhere. One medium regression: a non-
 | 2026-10-02 |         | QA gate CONCERNS (80/100) — 2 medium, 6 low findings | qa-task |
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 1 medium, 4 low findings | qa-task |
 | 2026-10-02 |         | QA findings fixed — gates 1–5: check 4 names the test-free kinds and counts none; the bound rule stated once in check 4 (a test-assertable bound held only by its planned test, an untestable bound by a numeric bound + measuring command, an unbounded criterion by its planned test; citable N/A lines exempt; post-merge rule still applies) and cited at every other site; unbounded outcome as shipped; one shared count-of-kinds pattern and normaliser; 5 iterations | qa-fix |
+| 2026-10-02 |         | QA gate PASS (100/100) — 0 gating findings, 4 advisory (gate-the-last-fix half-cycle) | qa-task |
 
 <!-- change-log-end -->
 
