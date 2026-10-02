@@ -113,12 +113,13 @@ fail() { echo "context-pressure-install: $1 — $settings not changed" >&2; clea
 if [ "$created" = 0 ]; then
   # Keep the file's own mode: mktemp makes $out 0600, and moving it in would silently change a
   # 0644 settings file (QA cycle 1 CR-6). The mode is applied AFTER the content is written, so a
-  # read-only (0444) file still installs (QA cycle 2 CR-3), and before the .bak is touched, so a
-  # failure leaves the previous .bak intact.
+  # read-only (0444) file still installs (QA cycle 2 CR-3). The new .bak is copied to a temp file
+  # and moved over the old one, so a failed copy leaves the previous .bak intact (QA cycle 3 CR-3).
   perm=$(command node -e 'process.stdout.write((require("fs").statSync(process.argv[1]).mode & 0o7777).toString(8))' "$settings") \
     || fail "cannot read the mode of $settings"
   chmod "$perm" "$out" || fail "cannot apply mode $perm"
-  rm -f "$settings.bak" && cp -p "$settings" "$settings.bak" || fail "cannot write $settings.bak"
+  bak=$(mktemp "$dir/.cp-settings-bak.XXXXXX") || fail "cannot create a temp file in $dir"
+  { cp -p "$settings" "$bak" && mv -f "$bak" "$settings.bak"; } || { rm -f "$bak"; fail "cannot write $settings.bak"; }
 fi
 mv -f "$out" "$settings" || fail "cannot move the new settings into place"
 [ "$created" = 1 ] && rm -f "$src"

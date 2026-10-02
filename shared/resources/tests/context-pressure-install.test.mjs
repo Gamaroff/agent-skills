@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   applySettings,
+  shellWords,
   shq,
   unshq,
   unwrapCommand,
@@ -433,4 +434,126 @@ test("a read-only settings file installs and uninstalls, keeping 0444; a read-on
   assert.equal(r.status, 0, r.stderr);
   assert.equal(fs.statSync(f).mode & 0o777, 0o444);
   assert.deepEqual(read(f), ORIGINAL);
+});
+
+test("shellWords reads back every quoting form shq writes, and refuses an unclosed quote", () => {
+  for (const s of ["", "a", "it's", "a'b\"c$d\\e", "x y", "o'brien/ctx"]) {
+    assert.deepEqual(shellWords(`cmd ${shq(s)} tail`), ["cmd", s, "tail"]);
+  }
+  assert.deepEqual(shellWords(`a "b \\"c\\" $d" e\\ f`), [
+    "a",
+    'b "c" $d',
+    "e f",
+  ]);
+  assert.equal(shellWords("a 'b"), null);
+  assert.equal(shellWords('a "b'), null);
+});
+
+test("a wrapper path with an apostrophe round-trips: install twice is stable, uninstall restores (QA cycle 3 CR-1)", () => {
+  const wrapper = "/Users/o'brien/skills/context-pressure-statusline.sh";
+  const engine = "/Users/o'brien/skills/context-pressure.mjs";
+  const input = { statusLine: { type: "command", command: "echo hi" } };
+  const a = applySettings(input, "install", { engine, wrapper });
+  assert.equal(a.outcome, "changed");
+  const b = applySettings(a.settings, "install", { engine, wrapper });
+  assert.equal(b.outcome, "unchanged", b.notes.join("; "));
+  assert.equal(ours(b.settings).length, 1);
+  const c = applySettings(a.settings, "uninstall");
+  assert.equal(c.outcome, "changed");
+  assert.deepEqual(c.settings, input);
+});
+
+test("the real installer, run from a directory whose path has an apostrophe, round-trips and its wrap renders", () => {
+  const dir = path.join(tmpdir(), "o'brien");
+  fs.mkdirSync(dir);
+  for (const n of [
+    "context-pressure.mjs",
+    "context-pressure-statusline.sh",
+    "context-pressure-install.sh",
+  ]) {
+    fs.copyFileSync(path.join(HERE, "..", n), path.join(dir, n));
+  }
+  const f = settingsFile(ORIGINAL);
+  const run = (...a) =>
+    spawnSync(
+      "sh",
+      [path.join(dir, "context-pressure-install.sh"), "--settings", f, ...a],
+      { encoding: "utf8" },
+    );
+  assert.equal(run().status, 0);
+  const bytes = fs.readFileSync(f);
+  assert.match(run().stdout, /unchanged/);
+  assert.deepEqual(fs.readFileSync(f), bytes);
+  const r = spawnSync("sh", ["-c", read(f).statusLine.command], {
+    input: "{}",
+    encoding: "utf8",
+    env: { ...process.env, CONTEXT_PRESSURE_STATE_DIR: path.join(dir, "s") },
+  });
+  assert.equal(r.stdout, "it's 42 Apples\n");
+  assert.equal(run("--uninstall").status, 0);
+  assert.deepEqual(read(f), ORIGINAL);
+});
+
+test("identity pairs: other spellings that must match, and look-alikes that must not (QA cycle 3 CR-2)", () => {
+  const same = [
+    "/bin/sh '/p/context-pressure-statusline.sh' -- sh -c 'echo hi'",
+    "bash /p/context-pressure-statusline.sh -- sh -c 'echo hi'",
+    "\"/p q/context-pressure-statusline.sh\" -- sh -c 'echo hi'",
+    "sh 'C:\\p\\context-pressure-statusline.sh' -- sh -c 'echo hi'",
+  ];
+  for (const c of same)
+    assert.deepEqual(
+      unwrapCommand(c),
+      { wrapped: true, original: "echo hi" },
+      c,
+    );
+  const differ = [
+    "echo context-pressure-statusline.sh",
+    "sh /p/my-context-pressure-statusline.sh",
+    "sh /p/context-pressure-statusline.sh.d/run.sh",
+    "cat x | sh /p/context-pressure-statusline.sh",
+  ];
+  for (const c of differ) assert.equal(unwrapCommand(c).wrapped, false, c);
+  const hooks = (c) => ({
+    hooks: { UserPromptSubmit: [{ hooks: [{ type: "command", command: c }] }] },
+  });
+  for (const c of [
+    'command node "/p/context-pressure.mjs" check',
+    "node /p/context-pressure.mjs check",
+    "node 'C:\\p\\context-pressure.mjs' check" /* unquoted, a shell itself reads C:\\p\\x as C:px */,
+  ]) {
+    assert.equal(applySettings(hooks(c), "uninstall").outcome, "changed", c);
+  }
+  for (const c of [
+    "node /p/my-context-pressure.mjs check",
+    "node /p/context-pressure.mjs checkpoint",
+    "node /p/context-pressure.mjs record",
+  ]) {
+    assert.equal(applySettings(hooks(c), "uninstall").outcome, "unchanged", c);
+  }
+});
+
+test("a failed .bak copy leaves the previous .bak intact (QA cycle 3 CR-3)", () => {
+  const f = settingsFile(ORIGINAL);
+  fs.writeFileSync(`${f}.bak`, "previous backup");
+  // A cp that always fails, first on PATH: the .bak copy is the installer's only cp.
+  const shim = path.join(tmpdir(), "shim");
+  fs.mkdirSync(shim);
+  fs.writeFileSync(
+    path.join(shim, "cp"),
+    "#!/bin/sh\necho 'cp: simulated failure' >&2\nexit 1\n",
+    { mode: 0o755 },
+  );
+  const r = spawnSync("sh", [INSTALLER, "--settings", f], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: `${shim}:${process.env.PATH}` },
+  });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /cannot write .*\.bak/);
+  assert.equal(fs.readFileSync(`${f}.bak`, "utf8"), "previous backup");
+  assert.deepEqual(read(f), ORIGINAL, "settings untouched");
+  assert.deepEqual(fs.readdirSync(path.dirname(f)).sort(), [
+    "settings.json",
+    "settings.json.bak",
+  ]);
 });

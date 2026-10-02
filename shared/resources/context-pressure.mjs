@@ -315,20 +315,70 @@ export function wrapCommand(wrapper, original) {
     : `sh ${shq(wrapper)} -- sh -c ${shq(original)}`;
 }
 
-// The engine / wrapper filename as a whole path segment: preceded by the start, a separator, a quote
-// or whitespace, and followed by a closing quote, whitespace or the end. A substring test claimed
-// another tool's `my-context-pressure.mjs` as ours, and matched a directory that merely contains the
-// wrapper's name (QA cycle 2 CR-2, CR-4).
-const HOOK_RE = /(?:^|[\s'"/])context-pressure\.mjs['"]?\s+check(?:\s|$)/;
-// The wrap is recognised only in program position — the command STARTS with the wrapper (optionally
-// run by sh/bash/zsh), quoted or bare. A whole-segment match anywhere else claimed a user's original
-// that merely mentions the name as already wrapped.
-const WRAP_RE =
-  /^\s*(?:(?:ba|z)?sh\s+)?(?:'[^']*\/context-pressure-statusline\.sh'|"[^"]*\/context-pressure-statusline\.sh"|(?:\S*\/)?context-pressure-statusline\.sh)(?=\s|$)/;
-/(?:^|[\s'"/])context-pressure-statusline\.sh(?=['"]?(?:\s|$))/g;
+/**
+ * Split a command string into shell words: whitespace separates; '…' is literal; "…" honours
+ * \" \\ \$ \` escapes; a backslash outside quotes escapes the next character. Adjacent pieces join
+ * into one word, so shq's '\'' sequence reads back as one apostrophe. Expansions are NOT performed —
+ * a word is what the shell would pass before expanding it. null when a quote never closes.
+ *
+ * The hook and the status-line wrap are recognised from these words, never from a regex over the
+ * raw string: three QA cycles each found a form the last regex missed (a directory containing the
+ * name, another tool's my-context-pressure.mjs, an apostrophe in the path). The words are the exact
+ * inverse of what this installer writes, so every form it writes round-trips (QA cycle 3 CR-1).
+ */
+export function shellWords(str) {
+  const words = [];
+  let w = null;
+  let i = 0;
+  while (i < str.length) {
+    const c = str[i];
+    if (/\s/.test(c)) {
+      if (w !== null) (words.push(w), (w = null));
+      i++;
+    } else if (c === "'") {
+      const j = str.indexOf("'", i + 1);
+      if (j < 0) return null;
+      w = (w ?? "") + str.slice(i + 1, j);
+      i = j + 1;
+    } else if (c === '"') {
+      let j = i + 1;
+      let piece = "";
+      for (; j < str.length && str[j] !== '"'; j++) {
+        if (
+          str[j] === "\\" &&
+          j + 1 < str.length &&
+          '"\\$`\n'.includes(str[j + 1])
+        )
+          piece += str[++j];
+        else piece += str[j];
+      }
+      if (j >= str.length) return null;
+      w = (w ?? "") + piece;
+      i = j + 1;
+    } else if (c === "\\" && i + 1 < str.length) {
+      w = (w ?? "") + str[i + 1];
+      i += 2;
+    } else {
+      w = (w ?? "") + c;
+      i++;
+    }
+  }
+  if (w !== null) words.push(w);
+  return words;
+}
 
+const HOOK_NAME = "context-pressure.mjs";
+const WRAP_NAME = "context-pressure-statusline.sh";
+const SHELLS = new Set(["sh", "bash", "zsh", "dash"]);
+const basename = (p) => p.split(/[\\/]/).pop();
+
+/** Ours when some word is a path whose last segment is the engine, followed by the word `check`. */
 function isHookIdentity(h) {
-  return h && typeof h.command === "string" && HOOK_RE.test(h.command);
+  if (!h || typeof h.command !== "string") return false;
+  const w = shellWords(h.command);
+  return (
+    !!w && w.some((x, i) => basename(x) === HOOK_NAME && w[i + 1] === "check")
+  );
 }
 
 /** Remove every spelling of our hook from UserPromptSubmit. Mutates `s`; returns entries removed. */
@@ -369,16 +419,26 @@ function stripHooks(s) {
  */
 export function unwrapCommand(cmd) {
   if (typeof cmd !== "string") return { wrapped: false };
-  const hit = WRAP_RE.exec(cmd);
-  if (!hit) return { wrapped: false };
-  const at = hit.index + hit[0].length;
-  const rest = cmd.slice(at).replace(/^['"]/, "");
-  if (rest.trim() === "") return { wrapped: true, original: undefined };
-  const m = /^\s+--\s+sh -c (.+)$/s.exec(rest);
-  const original = m ? unshq(m[1]) : null;
-  return original === null
-    ? { wrapped: true, unparseable: true }
-    : { wrapped: true, original };
+  const w = shellWords(cmd);
+  if (!w) {
+    // Unbalanced quotes: ours if it names the wrapper at all, and then nobody can unwrap it safely.
+    return cmd.includes(WRAP_NAME)
+      ? { wrapped: true, unparseable: true }
+      : { wrapped: false };
+  }
+  // The wrapper in program position, optionally run by a shell (any path to it: /bin/sh too).
+  const at = w.length && SHELLS.has(basename(w[0])) ? 1 : 0;
+  if (!w[at] || basename(w[at]) !== WRAP_NAME) return { wrapped: false };
+  const rest = w.slice(at + 1);
+  if (rest.length === 0) return { wrapped: true, original: undefined };
+  if (
+    rest.length === 4 &&
+    rest[0] === "--" &&
+    rest[1] === "sh" &&
+    rest[2] === "-c"
+  )
+    return { wrapped: true, original: rest[3] };
+  return { wrapped: true, unparseable: true };
 }
 
 /**

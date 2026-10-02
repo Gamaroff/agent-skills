@@ -508,17 +508,17 @@ implementation report, not asserted in CI (the load-sensitive-test rule).
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.157.qa.2.context-pressure-handoff-trigger.md](./task.157.qa.2.context-pressure-handoff-trigger.md)
-- **Gate File**: [task.157.gate.2.context-pressure-handoff-trigger.yml](./task.157.gate.2.context-pressure-handoff-trigger.yml)
+- **Full Report**: [task.157.qa.3.context-pressure-handoff-trigger.md](./task.157.qa.3.context-pressure-handoff-trigger.md)
+- **Gate File**: [task.157.gate.3.context-pressure-handoff-trigger.yml](./task.157.gate.3.context-pressure-handoff-trigger.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 38
+- **Tests Executed**: 43
 - **Phases Verified**: 16/16
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Gate 1 findings fixed. Cycle-2 refute pass: one medium and two low installer bugs (TASK-157-QA2-CR-1, CR-2, CR-3).
+Gate 2 findings fixed. Cycle 3: the anchored wrap regex misses the installer's own output for an apostrophe path (QA3-CR-1, medium); the .bak is removed before its replacement is copied (QA3-CR-3, low).
 
 <!-- change-log-start -->
 ## Change Log
@@ -531,7 +531,8 @@ Gate 1 findings fixed. Cycle-2 refute pass: one medium and two low installer bug
 | 2026-10-02 |         | Implemented — 9 files (3 engine/scripts, 3 test suites, SKILL section, 3 bundled copies, CHANGELOG), 31 tests | develop |
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
-| 2026-10-02 |         | QA findings fixed — gate 1: CR-1, CR-3, CR-4 (+5 advisory); gate 2: QA2-CR-1…CR-4 (+3 advisory); settings outcomes consolidated; 2 iterations | qa-fix |
+| 2026-10-02 |         | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
+| 2026-10-02 |         | QA findings fixed — gates 1–3: 8 gated + 10 advisory; settings outcomes consolidated; hook/wrap identity replaced by a shell-word parse; 3 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---
