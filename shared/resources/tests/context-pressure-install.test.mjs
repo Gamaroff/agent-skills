@@ -360,3 +360,77 @@ test("the settings file keeps its own mode across install and uninstall (QA cycl
     "settings.json.bak",
   ]);
 });
+
+test("a wrap this installer cannot parse is ACTION NEEDED: exit 1, file untouched, no 'not installed' claim (QA cycle 2 CR-1)", () => {
+  const f = settingsFile({
+    statusLine: {
+      type: "command",
+      command: "sh '/p/context-pressure-statusline.sh' -- garbled",
+    },
+  });
+  const before = fs.readFileSync(f);
+  const r = install(f, "--uninstall");
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /ACTION NEEDED — statusLine: wrapped in a form/);
+  assert.doesNotMatch(r.stdout + r.stderr, /not installed|unchanged$/m);
+  assert.deepEqual(fs.readFileSync(f), before);
+});
+
+test("a statusLine with no command still gets the hook, then exits 1 with ACTION NEEDED (QA cycle 2 CR-1)", () => {
+  const f = settingsFile({ statusLine: { type: "command" } });
+  const r = install(f);
+  assert.equal(r.status, 1);
+  assert.match(
+    r.stderr,
+    /ACTION NEEDED — statusLine: present but has no command/,
+  );
+  assert.equal(ours(read(f)).length, 1, "the hook was written");
+  assert.deepEqual(read(f).statusLine, { type: "command" });
+});
+
+test("a wrapper directory that contains the wrapper's own name round-trips (QA cycle 2 CR-2)", () => {
+  const wrapper =
+    "/x/context-pressure-statusline.sh.d/context-pressure-statusline.sh";
+  const engine = "/x/context-pressure.mjs.d/context-pressure.mjs";
+  const original = "echo context-pressure-statusline.sh in the original";
+  const input = { statusLine: { type: "command", command: original } };
+  const a = applySettings(input, "install", { engine, wrapper });
+  assert.equal(a.outcome, "changed");
+  assert.equal(unwrapCommand(a.settings.statusLine.command).original, original);
+  const b = applySettings(a.settings, "install", { engine, wrapper });
+  assert.equal(b.outcome, "unchanged");
+  const c = applySettings(a.settings, "uninstall");
+  assert.equal(c.outcome, "changed");
+  assert.deepEqual(c.settings, input);
+});
+
+test("another tool's hook whose filename merely ends in context-pressure.mjs is not ours (QA cycle 2 CR-4)", () => {
+  const other = {
+    type: "command",
+    command: "node ~/bin/my-context-pressure.mjs check",
+  };
+  const input = { hooks: { UserPromptSubmit: [{ hooks: [other] }] } };
+  const a = applySettings(input, "install", {
+    engine: "/e/context-pressure.mjs",
+    wrapper: "/e/context-pressure-statusline.sh",
+  });
+  assert.deepEqual(a.settings.hooks.UserPromptSubmit[0].hooks, [other]);
+  assert.equal(a.settings.hooks.UserPromptSubmit.length, 2);
+  const u = applySettings(a.settings, "uninstall");
+  assert.deepEqual(u.settings.hooks, input.hooks);
+  assert.equal(applySettings(input, "uninstall").outcome, "unchanged");
+});
+
+test("a read-only settings file installs and uninstalls, keeping 0444; a read-only .bak is replaced (QA cycle 2 CR-3)", () => {
+  const f = settingsFile(ORIGINAL);
+  fs.chmodSync(f, 0o444);
+  let r = install(f);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fs.statSync(f).mode & 0o777, 0o444);
+  assert.equal(ours(read(f)).length, 1);
+  fs.chmodSync(`${f}.bak`, 0o444);
+  r = install(f, "--uninstall");
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fs.statSync(f).mode & 0o777, 0o444);
+  assert.deepEqual(read(f), ORIGINAL);
+});

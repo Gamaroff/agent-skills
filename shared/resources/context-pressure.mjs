@@ -18,8 +18,9 @@
  *   `record` owns pct/at/window and keeps the rest; `check` owns band/prompts/emittedAtPrompt.
  *
  * The record/check race is accepted, not locked. The status line and the hook can run at the same
- * moment; each write is tmp + rename, so a file is never torn, and the worst case is one lost
- * prompt count or one lost percentage until the next refresh. A lock is the wrong fix: a lock that
+ * moment; each write is tmp + rename, so a file is never torn. The worst case is a lost prompt
+ * count, a lost percentage until the next refresh, or — when `record`'s read-modify-write straddles
+ * a `check` write — a reverted band, which repeats one note on the next prompt. A lock is the wrong fix: a lock that
  * cannot be taken would hang the hook, and the hook runs on every prompt in every repository.
  *
  * Silence is the failure mode, by design. `record` and `check` exit 0 on every input and print
@@ -35,8 +36,12 @@
  *   CONTEXT_PRESSURE_REPEAT        5   in the firm band, repeat the note every N prompts
  *   CONTEXT_PRESSURE_STATE_DIR         default ${XDG_STATE_HOME:-~/.local/state}/agent-skills/context-pressure
  *
- * `settings` exit codes: 0 changed (written to --out), 3 already in the requested state (nothing
- * written), 1 the settings file is not a JSON object, 2 usage.
+ * `settings` outcomes, defined once in applySettings and mapped to exit codes in settingsCli:
+ *   0 changed       — written to --out
+ *   3 unchanged     — already in the requested state; nothing written
+ *   4 needs-manual  — something this transform will not touch needs a person (an unparseable wrap,
+ *                     a statusLine with no command); --out is written only if something else changed
+ *   1 refused (the file is not a JSON object, or its hooks shape cannot be edited), 2 usage.
  *
  * Emits with `process.exitCode = n; return` — never `process.exit()`, which can truncate piped
  * stdout (the select-next.mjs trap).
@@ -274,9 +279,6 @@ export function check(
 
 // ── settings.json transforms (used by context-pressure-install.sh) ──────────────────────────────
 
-const HOOK_ID = "context-pressure.mjs";
-const WRAP_ID = "context-pressure-statusline.sh";
-
 /** Single-quote a string for sh. Reversible by `unshq`. */
 export function shq(s) {
   return `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -313,13 +315,20 @@ export function wrapCommand(wrapper, original) {
     : `sh ${shq(wrapper)} -- sh -c ${shq(original)}`;
 }
 
+// The engine / wrapper filename as a whole path segment: preceded by the start, a separator, a quote
+// or whitespace, and followed by a closing quote, whitespace or the end. A substring test claimed
+// another tool's `my-context-pressure.mjs` as ours, and matched a directory that merely contains the
+// wrapper's name (QA cycle 2 CR-2, CR-4).
+const HOOK_RE = /(?:^|[\s'"/])context-pressure\.mjs['"]?\s+check(?:\s|$)/;
+// The wrap is recognised only in program position — the command STARTS with the wrapper (optionally
+// run by sh/bash/zsh), quoted or bare. A whole-segment match anywhere else claimed a user's original
+// that merely mentions the name as already wrapped.
+const WRAP_RE =
+  /^\s*(?:(?:ba|z)?sh\s+)?(?:'[^']*\/context-pressure-statusline\.sh'|"[^"]*\/context-pressure-statusline\.sh"|(?:\S*\/)?context-pressure-statusline\.sh)(?=\s|$)/;
+/(?:^|[\s'"/])context-pressure-statusline\.sh(?=['"]?(?:\s|$))/g;
+
 function isHookIdentity(h) {
-  return (
-    h &&
-    typeof h.command === "string" &&
-    h.command.includes(HOOK_ID) &&
-    /\bcheck\b/.test(h.command)
-  );
+  return h && typeof h.command === "string" && HOOK_RE.test(h.command);
 }
 
 /** Remove every spelling of our hook from UserPromptSubmit. Mutates `s`; returns entries removed. */
@@ -359,9 +368,10 @@ function stripHooks(s) {
  * { wrapped: false } | { wrapped: true, original: string|undefined } | { wrapped: true, unparseable: true }
  */
 export function unwrapCommand(cmd) {
-  if (typeof cmd !== "string" || !cmd.includes(WRAP_ID))
-    return { wrapped: false };
-  const at = cmd.indexOf(WRAP_ID) + WRAP_ID.length;
+  if (typeof cmd !== "string") return { wrapped: false };
+  const hit = WRAP_RE.exec(cmd);
+  if (!hit) return { wrapped: false };
+  const at = hit.index + hit[0].length;
   const rest = cmd.slice(at).replace(/^['"]/, "");
   if (rest.trim() === "") return { wrapped: true, original: undefined };
   const m = /^\s+--\s+sh -c (.+)$/s.exec(rest);
@@ -372,7 +382,7 @@ export function unwrapCommand(cmd) {
 }
 
 /**
- * Pure. Returns { settings, changed, notes[] }. `settings` is a deep copy; the input is untouched.
+ * Pure. Returns { settings, changed, outcome, notes[] }; outcome is changed | unchanged | needs-manual. `settings` is a deep copy; the input is untouched.
  */
 export class SettingsShapeError extends Error {}
 
@@ -393,6 +403,7 @@ export function applySettings(input, mode, { engine, wrapper } = {}) {
   const s = JSON.parse(JSON.stringify(input));
   assertEditableShape(s);
   const notes = [];
+  const manual = []; // things this transform will not touch and a person must
   let changed = false;
 
   if (mode === "install") {
@@ -427,14 +438,14 @@ export function applySettings(input, mode, { engine, wrapper } = {}) {
       typeof sl !== "object" ||
       typeof sl.command !== "string"
     ) {
-      notes.push(
-        "statusLine: present but has no command string — left unchanged; the hook will stay silent until a reading exists",
+      manual.push(
+        "statusLine: present but has no command string — left unchanged; give it a command and re-run, or the hook has no reading to act on",
       );
     } else if (unwrapCommand(sl.command).wrapped) {
       const u = unwrapCommand(sl.command);
       const want = wrapCommand(wrapper, u.original);
       if (u.unparseable) {
-        notes.push(
+        manual.push(
           "statusLine: wrapped in a form this installer did not write — left unchanged, check it by hand",
         );
       } else if (sl.command === want) {
@@ -460,7 +471,7 @@ export function applySettings(input, mode, { engine, wrapper } = {}) {
     if (sl && typeof sl === "object") {
       const u = unwrapCommand(sl.command);
       if (u.unparseable) {
-        notes.push(
+        manual.push(
           "statusLine: wrapped in a form this installer did not write — left unchanged, unwrap it by hand",
         );
       } else if (u.wrapped && u.original === undefined) {
@@ -476,13 +487,21 @@ export function applySettings(input, mode, { engine, wrapper } = {}) {
   } else {
     throw new Error(`unknown mode ${mode}`);
   }
-  if (!changed)
+  // One outcome, from one place. A needs-manual result never also claims "already installed" or
+  // "not installed": that pairing is what let an uninstall leave a wrap behind and exit 0 (QA cycle 2 CR-1).
+  const outcome = manual.length
+    ? "needs-manual"
+    : changed
+      ? "changed"
+      : "unchanged";
+  if (outcome === "unchanged")
     notes.push(
       mode === "install"
         ? "already installed — no change"
         : "not installed — no change",
     );
-  return { settings: s, changed, notes };
+  for (const m of manual) notes.push(`ACTION NEEDED — ${m}`);
+  return { settings: s, changed, outcome, notes };
 }
 
 function settingsCli(args) {
@@ -536,7 +555,7 @@ function settingsCli(args) {
   if (r.changed)
     fs.writeFileSync(opt.out, JSON.stringify(r.settings, null, 2) + "\n");
   return {
-    code: r.changed ? 0 : 3,
+    code: { changed: 0, unchanged: 3, "needs-manual": 4 }[r.outcome],
     err: r.notes.map((n) => `  ${n}`).join("\n"),
   };
 }

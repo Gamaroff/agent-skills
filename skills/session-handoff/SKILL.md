@@ -293,12 +293,14 @@ sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh
 ```
 
 It adds the hook (`timeout` 5s) and wraps the existing `statusLine.command` as
-`sh '<dir>/context-pressure-statusline.sh' -- sh -c '<your original>'`, touching nothing else —
-your original then runs under `sh -c`, so one written in bash-only syntax should call its script
-(`bash ~/.claude/statusline.sh`) rather than inline it — 
-`padding` and other `statusLine` keys stay. With no status line it adds the recorder alone, which
-prints nothing. A second run changes nothing; a run from a different directory re-points the hook
-and the wrap at itself. It writes atomically and keeps a `.bak`. The paths it
+`sh '<dir>/context-pressure-statusline.sh' -- sh -c '<your original>'`, touching nothing else:
+`padding` and other `statusLine` keys stay, and so does the file's mode. Your original then runs
+under `sh -c`, so one written in bash-only syntax should call its script
+(`bash ~/.claude/statusline.sh`) rather than inline it. With no status line it adds the recorder
+alone, which prints nothing. A second run changes nothing; a run from a different directory
+re-points the hook and the wrap at itself. It writes atomically and keeps a `.bak`. Anything it will
+not touch — a wrap it did not write, a `statusLine` with no command — is printed as
+`ACTION NEEDED` and the installer exits 1, so "nothing to do" and "needs you" never look alike. The paths it
 writes are the directory the installer ran from: run it from the installed skill, not from a
 repository checkout, or the hook dies with the checkout. Restart the Claude Code session afterwards.
 

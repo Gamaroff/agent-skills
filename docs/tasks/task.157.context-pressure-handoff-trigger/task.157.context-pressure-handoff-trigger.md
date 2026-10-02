@@ -508,17 +508,17 @@ implementation report, not asserted in CI (the load-sensitive-test rule).
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.157.qa.1.context-pressure-handoff-trigger.md](./task.157.qa.1.context-pressure-handoff-trigger.md)
-- **Gate File**: [task.157.gate.1.context-pressure-handoff-trigger.yml](./task.157.gate.1.context-pressure-handoff-trigger.yml)
+- **Full Report**: [task.157.qa.2.context-pressure-handoff-trigger.md](./task.157.qa.2.context-pressure-handoff-trigger.md)
+- **Gate File**: [task.157.gate.2.context-pressure-handoff-trigger.yml](./task.157.gate.2.context-pressure-handoff-trigger.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 31
+- **Tests Executed**: 38
 - **Phases Verified**: 16/16
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One medium and two low high-confidence installer bugs (TASK-157-CR-1, CR-3, CR-4) in the settings transform; everything else passes.
+Gate 1 findings fixed. Cycle-2 refute pass: one medium and two low installer bugs (TASK-157-QA2-CR-1, CR-2, CR-3).
 
 <!-- change-log-start -->
 ## Change Log
@@ -530,7 +530,8 @@ One medium and two low high-confidence installer bugs (TASK-157-CR-1, CR-3, CR-4
 | 2026-10-02 |         | Status → ready-for-development | review-task |
 | 2026-10-02 |         | Implemented — 9 files (3 engine/scripts, 3 test suites, SKILL section, 3 bundled copies, CHANGELOG), 31 tests | develop |
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
-| 2026-10-02 |         | QA findings fixed — CR-1, CR-3, CR-4 (gated) + CR-2, CR-5, CR-6, CR-7, CR-8 (advisory), 1 iteration | qa-fix |
+| 2026-10-02 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
+| 2026-10-02 |         | QA findings fixed — gate 1: CR-1, CR-3, CR-4 (+5 advisory); gate 2: QA2-CR-1…CR-4 (+3 advisory); settings outcomes consolidated; 2 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---

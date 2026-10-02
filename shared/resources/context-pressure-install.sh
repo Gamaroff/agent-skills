@@ -24,7 +24,8 @@
 # A settings file that is not a JSON object is refused with exit 1 and left untouched. The JSON
 # edits live in context-pressure.mjs (`settings` subcommand), so there is no jq dependency.
 #
-# Exit: 0 ok (changed or already in the requested state), 1 refused or failed, 2 usage.
+# Exit: 0 ok (changed or already in the requested state), 1 refused, failed, or manual action
+# needed (an ACTION NEEDED line says what), 2 usage.
 
 set -u
 
@@ -84,9 +85,18 @@ command node "$engine" settings --mode "$mode" --file "$src" --out "$out" \
   --engine "$engine" --wrapper "$wrapper"
 rc=$?
 
+# Outcomes are defined once, in context-pressure.mjs (`settings`): 0 changed, 3 unchanged,
+# 4 needs-manual (written only if something else changed), 1 refused, 2 usage.
+manual=0
 case $rc in
   0) ;;
   3) cleanup; echo "context-pressure-install: $settings unchanged"; exit 0 ;;
+  4) manual=1
+     if [ ! -s "$out" ]; then
+       cleanup
+       echo "context-pressure-install: $settings left unchanged — manual action needed (see ACTION NEEDED above)" >&2
+       exit 1
+     fi ;;
   *) cleanup; exit 1 ;;
 esac
 
@@ -94,20 +104,28 @@ if [ "$dry" = 1 ]; then
   diff -u "$src" "$out"
   cleanup
   echo "context-pressure-install: dry run — nothing written"
+  [ "$manual" = 1 ] && { echo "context-pressure-install: manual action needed (see ACTION NEEDED above)" >&2; exit 1; }
   exit 0
 fi
 
+fail() { echo "context-pressure-install: $1 — $settings not changed" >&2; cleanup; exit 1; }
+
 if [ "$created" = 0 ]; then
-  cp -p "$settings" "$settings.bak" || { cleanup; exit 1; }
   # Keep the file's own mode: mktemp makes $out 0600, and moving it in would silently change a
-  # 0644 settings file (QA cycle 1 CR-6). A `cp -p` of the original carries the mode; the new
-  # content is then written into that copy, which still lands in place with one mv.
-  keep=$(mktemp "$dir/.cp-settings-keep.XXXXXX") || { cleanup; exit 1; }
-  { cp -p "$settings" "$keep" && cat "$out" > "$keep"; } || { rm -f "$keep"; cleanup; exit 1; }
-  mv -f "$keep" "$out" || { rm -f "$keep"; cleanup; exit 1; }
+  # 0644 settings file (QA cycle 1 CR-6). The mode is applied AFTER the content is written, so a
+  # read-only (0444) file still installs (QA cycle 2 CR-3), and before the .bak is touched, so a
+  # failure leaves the previous .bak intact.
+  perm=$(command node -e 'process.stdout.write((require("fs").statSync(process.argv[1]).mode & 0o7777).toString(8))' "$settings") \
+    || fail "cannot read the mode of $settings"
+  chmod "$perm" "$out" || fail "cannot apply mode $perm"
+  rm -f "$settings.bak" && cp -p "$settings" "$settings.bak" || fail "cannot write $settings.bak"
 fi
-mv -f "$out" "$settings" || { cleanup; exit 1; }
+mv -f "$out" "$settings" || fail "cannot move the new settings into place"
 [ "$created" = 1 ] && rm -f "$src"
 echo "context-pressure-install: $mode written to $settings"
 [ "$created" = 0 ] && echo "  previous version saved as $settings.bak"
+if [ "$manual" = 1 ]; then
+  echo "context-pressure-install: written, but manual action is still needed (see ACTION NEEDED above)" >&2
+  exit 1
+fi
 exit 0
