@@ -1,0 +1,84 @@
+schema: 2
+task: 'task.166.measured-non-functional-criteria'
+task_title: 'Give measured non-functional criteria a defined path through review and finalise'
+gate: CONCERNS
+status_reason: 'All 4 phases delivered, 9/9 tests green, 17 mutations red (14 dev + 3 QA). Two medium findings in review-task check 4: it restates the kind count unpinned (CR-1), and its bound rule flags a count bound that names a planned test, which finalise would pass (CR-2).'
+reviewer: 'QA Engineer'
+head: 'dfeb7310052821ecab2f96fb78e32b481e4f36ba'
+updated: '2026-10-02T10:48:28Z'
+
+top_issues:
+  - id: 'TASK-166-CR-1'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'Check 4 restates the count ("one of three test-free kinds") and lists the kinds by name; no test ties it to finalise-dod-ac-prompt.md, and the one-count regex would not match "three test-free kinds" — the second-count drift this task removed from the AC prompt returns in another file.'
+    suggested_action: 'Refer to finalise Step 3 kinds without a count word, or extend a pin to review-task SKILL.md that accepts an adjective between the count word and "kinds".'
+    suggested_owner: dev
+  - id: 'TASK-166-CR-2'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The bound-and-measurement rule fires on any criterion bounding a time, size, count or rate that lacks a measuring command, but finalise routes a bound a per-PR test could assert to the behaviour path, where a planned test suffices — so review flags a criterion finalise would pass, contradicting "classify each criterion the way finalise will".'
+    suggested_action: 'Carve out a bound that names a planned per-PR test; fire only when the criterion has neither bound+command nor a planned test.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR-4'
+    severity: low
+    file: 'shared/resources/tests/finalise-dod-ac-kinds.test.mjs'
+    finding: 'The closing-sentence test hardcodes /on all three kinds/ while the other tests derive the count from the heading, so a correctly worded fourth kind fails it for the wrong reason.'
+    suggested_action: 'Build the assertion from the heading count word.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR-5'
+    severity: low
+    file: 'shared/resources/tests/finalise-dod-ac-kinds.test.mjs'
+    finding: 'The measured-kind slice runs to the end of the kinds section, so a kind added after it could supply the required phrases.'
+    suggested_action: 'End the slice at the next top-level "- **" bullet.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR-6'
+    severity: low
+    file: 'shared/resources/finalise-dod-ac-prompt.md'
+    finding: 'The measured kind is defined as a bound stated as a number, yet its FAIL clause covers a criterion that states no bound, which by that definition is not a measured criterion.'
+    suggested_action: 'Say a criterion with no numeric bound is not a measured criterion and takes the behaviour path, where it fails without a test.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 9
+  phases_verified: 4/4
+  ci: 'pending @ dfeb73100528 (link-check, validate, shellcheck pass; test pending) — informational'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered (boundary: false) — prompt prose and two read-only text pins; no input handling, no I/O beyond reading repo files.'
+  performance:
+    status: PASS
+    notes: 'Measured: finalise-dod-ac-kinds.test.mjs 0.31s, review-task-measured-criterion.test.js 0.25s (bound < 1s, time node --test).'
+  reliability:
+    status: PASS
+    notes: 'Rollback is a revert + npm run bundle; tests fail closed on a missing heading/section (non-vacuity floors).'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-1: a second, unpinned statement of the kind count in review-task check 4.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and CR-2 in review-task Step 6 check 4; pin the fix.'
+      refs: ['skills/review-task/SKILL.md', 'tests/review-task-measured-criterion.test.js']
+  future:
+    - action: 'CR-3 (low confidence): make "whether a per-PR test could assert that bound" concrete (e.g. environment- or suite-dependent values are measured; deterministic in-repo assertions are behaviour).'
+      refs: ['shared/resources/finalise-dod-ac-prompt.md']
+    - action: 'Pre-existing (identical on origin/develop; diff adds no fences): review-task SKILL.md Step 4b reports zero-blocks-executed (1 placeholder, 16 mutating); with --bind INPUT the line-95 block exits 1 by design in an empty temp copy.'
+      refs: ['skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 resolved']

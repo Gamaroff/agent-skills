@@ -1112,14 +1112,19 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - **Classify each criterion the way finalise will.** Finalise's AC agent
      ([`references/finalise-dod-ac-prompt.md`](references/finalise-dod-ac-prompt.md#step-3-check-each-acceptance-criterion)
      Step 3) sorts every criterion into a behaviour criterion, which needs a per-PR test, or one of
-     three test-free kinds: "no unit tests applicable", a documentation criterion ("file F says S"),
-     or a measured criterion (a stated bound, met by a committed, cited measurement). A criterion
+     the test-free kinds that Step 3 lists: "no unit tests applicable", a documentation criterion
+     ("file F says S"), or a measured criterion (a stated bound, met by a committed, cited
+     measurement). Step 3 owns that list and its count; this check names the kinds and never counts
+     them. A criterion
      that fits no kind fails at acceptance by construction, two steps after the one edit that would
      have fixed it. Three shapes reach that point, and each is **Important** here:
    - **A non-functional criterion states its bound and how it is measured** (obs #206). A criterion
      in the Performance subsection, or any criterion that bounds a time, size, count or rate, names a
-     **numeric bound** and **the command that measures it**. Missing either → **Important**: "state
-     the bound and the command, or replace the criterion with a test that pins it". Worked example:
+     **numeric bound** and either **the command that measures it** or the per-PR test that asserts
+     it. A bound a per-PR test asserts is a behaviour criterion, which finalise passes on that test,
+     so it needs no command. Missing the bound, or missing both the command and a planned test →
+     **Important**: "state the bound and the command, or replace the criterion with a test that pins
+     it". Worked example:
      task.164's AC7, "No measurable change beyond the new 4b test's three runs", which states no
      bound.
    - **A behaviour criterion names the test that holds it** (obs #222). A criterion that needs code

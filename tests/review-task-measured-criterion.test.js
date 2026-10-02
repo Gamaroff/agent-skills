@@ -52,6 +52,10 @@ const RULES = [
     holds: [
       "numeric bound",
       "the command that measures it",
+      // A bound a planned per-PR test asserts is a behaviour criterion finalise passes — the rule
+      // must not flag it for want of a command (QA cycle 1, CR-2).
+      "or the per-PR test that asserts it",
+      "missing both the command and a planned test",
       "state the bound and the command",
     ],
   },
@@ -90,6 +94,53 @@ for (const rule of RULES) {
     );
   });
 }
+
+// The AC prompt owns the list of test-free kinds and its count (QA cycle 1, CR-1). Check 4 names
+// every kind the prompt bullets, so a kind added there reds this test until review-task names it,
+// and check 4 states no count of its own, so there is no second number to drift.
+const AC = "shared/resources/finalise-dod-ac-prompt.md";
+function acKinds() {
+  const doc = readFileSync(join(__dirname, "..", AC), "utf8");
+  const head = doc.search(
+    /\*\*\w+ kinds of criterion may carry `test_citation/,
+  );
+  assert.notEqual(head, -1, `${AC}: no test-free kinds heading sentence`);
+  const end = doc.indexOf("`test_runs_per_pr` is `null`", head);
+  assert.notEqual(end, -1, `${AC}: no closing sentence after the kinds`);
+  return [...doc.slice(head, end).matchAll(/^- \*\*([^*]+)\*\*/gm)].map((m) =>
+    // "No unit tests applicable." → no unit tests applicable; A measured criterion. → measured criterion
+    m[1].replace(/[".]/g, "").replace(/^A /, "").trim().toLowerCase(),
+  );
+}
+
+test("check 4 names every test-free kind the AC prompt lists, and counts none of them", () => {
+  const kinds = acKinds();
+  assert.ok(
+    kinds.length >= 3,
+    `${AC}: expected at least three bulleted kinds, found ${kinds}`,
+  );
+  const item = citingItemOf(
+    check4(),
+    /Classify each criterion the way finalise will/,
+  );
+  assert.ok(item, `${SKILL}: check 4 has no "Classify each criterion" item`);
+  const prose = asProse(item).toLowerCase();
+  for (const k of kinds)
+    assert.ok(
+      prose.includes(k),
+      `${SKILL}: check 4 does not name the "${k}" kind`,
+    );
+  const counts = [
+    ...asProse(check4().join("\n")).matchAll(
+      /\b(two|three|four|five|six|both) (?:[\w`-]+ )?kinds\b/gi,
+    ),
+  ];
+  assert.deepEqual(
+    counts.map((m) => m[0]),
+    [],
+    `${SKILL}: check 4 counts the kinds`,
+  );
+});
 
 test("Step 6 Issues to Flag names all three findings under Important", () => {
   const step6 = sectionOf(text, STEP_6);

@@ -304,6 +304,30 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-02
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.166.qa.1.measured-non-functional-criteria.md](./task.166.qa.1.measured-non-functional-criteria.md)
+- **Gate File**: [task.166.gate.1.measured-non-functional-criteria.yml](./task.166.gate.1.measured-non-functional-criteria.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 9
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+Two medium findings in review-task Step 6 check 4: it restates the kind count where no test reaches it (CR-1), and its bound rule flags a bound pinned by a planned test, which finalise would pass (CR-2). Three low cleanups (CR-4, CR-5, CR-6).
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -313,6 +337,8 @@ None identified.
 | 2026-10-02 | 1.2     | Review passed (9/10) — applied 2 Important fixes: the Execution rule's kind count brought into Phase 1 and pinned; the review-task pin and mutations cover the #222 rules; In Scope's post-merge line aligned with Notes | review-task |
 | 2026-10-02 |         | Status → ready-for-development | review-task |
 | 2026-10-02 |         | Implemented — 6 files (AC prompt, review-task check 4, 2 new pin tests, CHANGELOG, 1 new bundled copy); 9 tests, 14 mutations red | develop |
+| 2026-10-02 |         | QA gate CONCERNS (80/100) — 2 medium, 3 low findings | qa-task |
+| 2026-10-02 |         | QA findings fixed — gate 1: CR-1 (check 4 names the kinds, counts none; pinned to the AC prompt list), CR-2 (bound rule accepts a planned per-PR test), CR-4/5/6; 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

@@ -26,6 +26,9 @@ const WORDS = { two: 2, three: 3, four: 4, five: 5, six: 6 };
 const HEAD =
   /\*\*(\w+) kinds of criterion may carry `test_citation: "NOT_APPLICABLE: …"`, and only these (\w+):\*\*/;
 const CLOSING = "`test_runs_per_pr` is `null`";
+// A count word, then at most one qualifier ("`NOT_APPLICABLE`", "test-free"), then "kinds".
+const COUNT_OF_KINDS =
+  /\b(two|three|four|five|six|both) (?:[\w`-]+ )?kinds\b/gi;
 
 function kindsSection(doc) {
   const head = doc.match(HEAD);
@@ -72,12 +75,17 @@ test("the measured kind's PASS needs a stated bound, a committed measurement and
   const { section } = kindsSection(readDoc(SRC));
   const at = section.indexOf("- **A measured criterion.**");
   assert.notEqual(at, -1, `${SRC}: no measured-criterion kind`);
-  const measured = section.slice(at);
+  // Up to the next top-level kind bullet, or the section end: a kind added after this one must not
+  // supply the phrases this kind's bar needs (QA cycle 1, CR-5).
+  const next = section.indexOf("\n- **", at + 1);
+  const measured = section.slice(at, next === -1 ? undefined : next);
   for (const w of [
     "`PASS` when the criterion states a bound",
     "the command is named",
     "**committed** artifact",
-    "`FAIL` when the criterion states no bound",
+    "`FAIL` when the measurement is uncited or uncommitted, or when it misses the bound",
+    "states no numeric bound",
+    "is not a measured criterion: it takes the behaviour path",
     "if one could, it is a behaviour criterion",
   ])
     assert.ok(
@@ -87,8 +95,14 @@ test("the measured kind's PASS needs a stated bound, a committed measurement and
 });
 
 test("the closing sentence reaches every kind and routes a testable bound to the behaviour path", () => {
-  const { closing } = kindsSection(readDoc(SRC));
-  assert.match(closing, /on all three kinds/);
+  const { head, closing } = kindsSection(readDoc(SRC));
+  // The heading's own count word, not a literal — a correctly worded added kind must not red this
+  // test for the wrong reason (QA cycle 1, CR-4).
+  const word = head[1].toLowerCase();
+  assert.ok(
+    closing.includes(`on all ${word} kinds`),
+    `${SRC}: closing sentence does not say "on all ${word} kinds"`,
+  );
   assert.match(closing, /never takes any of these paths/);
   assert.match(
     closing,
@@ -102,11 +116,7 @@ test("no sentence restates the count of kinds with a different number", () => {
   // The heading's own count, and the closing sentence's "all <count> kinds", use the heading's word.
   // Any other count word — "The two `NOT_APPLICABLE` kinds", "both kinds" — is a second definition
   // that has drifted from the first.
-  const counts = [
-    ...doc.matchAll(
-      /\b(two|three|four|five|six|both) (?:`NOT_APPLICABLE` )?kinds\b/gi,
-    ),
-  ];
+  const counts = [...doc.matchAll(COUNT_OF_KINDS)];
   assert.ok(
     counts.length >= 2,
     `${SRC}: expected the heading and closing counts, found ${counts.length}`,
