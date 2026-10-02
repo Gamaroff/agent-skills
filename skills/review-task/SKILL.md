@@ -1123,12 +1123,15 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      rate, needs one of two things: the per-PR test planned to assert it, or a **numeric bound** with
      **the command that measures it**. Finalise passes the first as a behaviour criterion, on its
      test, and the second as a measured criterion, on its committed measurement — so a tested
-     criterion needs no bound and no command. A criterion held by neither a planned per-PR test nor a numeric bound with its measuring command → **Important**: "name the test
+     criterion needs no bound and no command. The measured branch is for a bound **no per-PR test
+     could assert** (wall-clock runtime, CI duration): a bound a per-PR test could assert needs that
+     test, because finalise treats it as a behaviour criterion and fails it without one. This rule
+     alone judges a non-functional criterion; the behaviour rule below covers the rest. A criterion held by neither a planned per-PR test nor a numeric bound with its measuring command → **Important**: "name the test
      that pins it, or state the bound and the command". Worked example:
      task.164's AC7, "No measurable change beyond the new 4b test's three runs", which states no
      bound.
-   - **A behaviour criterion names the test that holds it** (obs #222). A criterion that needs code
-     to *do* something when run — it cannot be stated as "file F says S" — and whose text or phase
+   - **A behaviour criterion names the test that holds it** (obs #222). A criterion — other than a
+     non-functional one, which the rule above judges — that needs code to *do* something when run — it cannot be stated as "file F says S" — and whose text or phase
      names no test planned to hold it has **no planned test**. → **Important**: "name the test that
      pins it, or re-scope the criterion". Worked example: task.142's "no process spawn, no network
      call" and "SKILL.md reads memoised", true by inspection and failed at finalise for want of a

@@ -58,12 +58,20 @@ const RULES = [
       "a tested criterion needs no bound and no command",
       "held by neither a planned per-PR test nor a numeric bound with its measuring command",
       "name the test that pins it, or state the bound and the command",
+      // The measured branch only for a bound no test could assert, as finalise routes it (cycle 3, CR3-1).
+      "a bound a per-PR test could assert needs that test",
+      // One owner per criterion: the behaviour rule does not also fire on it (cycle 3, CR3-7).
+      "This rule alone judges a non-functional criterion",
     ],
   },
   {
     name: "behaviour-without-test rule (obs #222)",
     first: /A behaviour criterion names the test/,
-    holds: ["no planned test", "name the test that pins it"],
+    holds: [
+      "no planned test",
+      "name the test that pins it",
+      "other than a non-functional one, which the rule above judges",
+    ],
   },
   {
     name: "post-merge rule (obs #222)",
@@ -144,7 +152,7 @@ test("check 4 names every test-free kind the AC prompt lists, and counts none of
     ...asProse(check4().join("\n")).matchAll(
       // A count word or digits, then up to three qualifiers, then "kinds" (QA cycle 2, CR2-5).
       // Not "both": "both kinds of evidence" is a legitimate sentence about a test and a measurement.
-      /\b(two|three|four|five|six|seven|eight|nine|ten|\d+)(?: [\w`-]+){0,3} kinds\b/gi,
+      /(?<!Step )\b(two|three|four|five|six|seven|eight|nine|ten|\d+)(?: [\w`-]+){0,3} kinds\b(?! of (?!criterion))/gi,
     ),
   ];
   assert.deepEqual(
@@ -167,4 +175,23 @@ test("Step 6 Issues to Flag names all three findings under Important", () => {
       line.includes(f),
       `Issues to Flag (Important) does not name: ${f}`,
     );
+});
+
+test("check 4's count pattern refuses a restated count and allows the sentences check 4 needs", () => {
+  const re =
+    /(?<!Step )\b(two|three|four|five|six|seven|eight|nine|ten|\d+)(?: [\w`-]+){0,3} kinds\b(?! of (?!criterion))/gi;
+  const hits = (t) => [...t.matchAll(re)].length;
+  for (const t of [
+    "one of three test-free kinds",
+    "the 3 test-free kinds",
+    "three such test-free kinds",
+  ])
+    assert.equal(hits(t), 1, `should refuse: ${t}`);
+  for (const t of [
+    "the test-free kinds that Step 3 lists",
+    "the Step 3 test-free kinds",
+    "both kinds of evidence",
+    "two kinds of evidence",
+  ])
+    assert.equal(hits(t), 0, `should allow: ${t}`);
 });

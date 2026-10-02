@@ -1,0 +1,99 @@
+schema: 2
+task: 'task.166.measured-non-functional-criteria'
+task_title: 'Give measured non-functional criteria a defined path through review and finalise'
+gate: CONCERNS
+status_reason: 'Cycle 2 consolidated the bound rule wording, but its measured branch accepts any bound with a command, while finalise sends a test-assertable bound to the behaviour path (CR3-1); the task doc still states the old unbounded outcome and remedy at five sites (CR3-2, CR3-3). HIGH 0 for the third consecutive gate.'
+reviewer: 'QA Engineer'
+head: '467351c0ec5a92b05be418e4beafaa8756360bd9'
+updated: '2026-10-02T11:40:31Z'
+
+top_issues:
+  - id: 'TASK-166-CR3-1'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The bound rule says a numeric bound with its measuring command passes as a measured criterion, but finalise-dod-ac-prompt.md Step 3 routes a bound a per-PR test could assert to the behaviour path, where it fails without a test — review passes what finalise fails.'
+    suggested_action: 'Narrow the measured branch to a bound no per-PR test could assert, plus its command; say a test-assertable bound needs its planned test; pin the phrase.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR3-2'
+    severity: medium
+    file: 'docs/tasks/task.166.measured-non-functional-criteria/task.166.measured-non-functional-criteria.md'
+    finding: 'Target Architecture (line 88) still gives the measured bar as "FAIL when the bound is missing", the old unconditional outcome, contradicting the shipped prompt and the task''s own deliverable 1, § 5 and SC 1.'
+    suggested_action: 'Reword to match the prompt: FAIL when the measurement is uncited, uncommitted or misses the bound; an unbounded criterion is not a measured criterion and fails unless a per-PR test holds it.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR3-3'
+    severity: medium
+    file: 'docs/tasks/task.166.measured-non-functional-criteria/task.166.measured-non-functional-criteria.md'
+    finding: 'The task doc still states the old rule at lines 5, 34, 152 and 232: "states no bound" flags every unbounded criterion, and line 152 quotes a remedy that did not ship.'
+    suggested_action: 'Reword each to the shipped rule and remedy; enumerate with grep -nE "states no bound|replace it with a test|bound is missing".'
+    suggested_owner: dev
+  - id: 'TASK-166-CR3-4'
+    severity: low
+    file: 'shared/resources/tests/finalise-dod-ac-kinds.test.mjs'
+    finding: 'SC 1 claims the unbounded outcome and "a measurement meeting it" are pinned; the measured-kind phrase list pins neither "fails there without a test" nor "the cited measurement meets it".'
+    suggested_action: 'Add both phrases and matching mutations.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR3-5'
+    severity: low
+    file: 'tests/review-task-measured-criterion.test.js'
+    finding: 'The count regex (here and COUNT_OF_KINDS) matches "the Step 3 test-free kinds" (a section reference) and "two kinds of evidence".'
+    suggested_action: 'Exclude a digit preceded by "Step " and "kinds of" followed by anything but "criterion"; add should-not-match fixtures.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR3-6'
+    severity: low
+    file: 'shared/resources/tests/finalise-dod-ac-kinds.test.mjs'
+    finding: 'The AC-prompt count check matches the raw document, so a count wrapped across lines or in code formatting is missed.'
+    suggested_action: 'Normalise whitespace, backticks and emphasis before matching.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR3-7'
+    severity: low
+    file: 'skills/review-task/SKILL.md'
+    finding: 'An untested unbounded runtime criterion fits both the bound rule and the behaviour-without-test rule, drawing two Important findings with no stated owner.'
+    suggested_action: 'Say a non-functional criterion is judged by the bound rule only.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 10
+  phases_verified: 4/4
+  ci: 'Test success @ 6b89fef3 (hosted); in progress @ 467351c0ec5a — informational'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'Pins run in ~0.3s each.'
+  reliability:
+    status: PASS
+    notes: 'Pins fail closed on missing headings and sections.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Rule restatements in the task doc keep drifting from the shipped rule.'
+
+bug_resolution:
+  previous_gate: 'gate.2 (CONCERNS 70)'
+  fixed: ['TASK-166-CR2-1', 'TASK-166-CR2-2', 'TASK-166-CR2-4', 'TASK-166-CR2-5', 'TASK-166-CR2-6']
+  partial: ['TASK-166-CR2-3']
+
+recommendations:
+  immediate:
+    - action: 'Align the bound rule''s measured branch with finalise; sweep the task doc.'
+      refs: ['skills/review-task/SKILL.md', 'docs/tasks/task.166.measured-non-functional-criteria/task.166.measured-non-functional-criteria.md']
+  future:
+    - action: 'Gate 1 CR-3 (low confidence): make "whether a per-PR test could assert that bound" concrete.'
+      refs: ['shared/resources/finalise-dod-ac-prompt.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR3-1, CR3-2, CR3-3 resolved']

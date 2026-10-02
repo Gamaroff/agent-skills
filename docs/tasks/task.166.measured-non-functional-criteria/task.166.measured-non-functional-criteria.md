@@ -2,7 +2,7 @@
 id: task.166
 title: "[Task 166] Give measured non-functional criteria a defined path through review and finalise"
 type: task
-description: "Add a third test-free criterion kind — a measured criterion with a stated bound and a cited committed measurement — to finalise's DoD AC prompt, and have review-task flag a non-functional success criterion that states no bound, so a timing or size criterion is neither failed by rule nor passed by override (observation #206); and have review-task classify every success criterion the way finalise will, flagging a behaviour criterion with no planned test and a criterion that can only be met after merge (observation #222)."
+description: "Add a third test-free criterion kind — a measured criterion with a stated bound and a cited committed measurement — to finalise's DoD AC prompt, and have review-task flag a non-functional success criterion held by neither a planned per-PR test nor a numeric bound with its measuring command, so a timing or size criterion is neither failed by rule nor passed by override (observation #206); and have review-task classify every success criterion the way finalise will, flagging a behaviour criterion with no planned test and a criterion that can only be met after merge (observation #222)."
 tags: [finalise, review-task, definition-of-done, success-criteria, observe-work]
 category: infrastructure
 status: ready-for-review
@@ -31,7 +31,7 @@ Finalise's AC traceability agent judges each success criterion by `shared/resour
 This task gives the measured criterion a defined path at both ends:
 
 - finalise's AC prompt gains a third kind with its own bar;
-- `review-task` flags a non-functional criterion that states no bound, at review time, where it can still be rewritten;
+- `review-task` flags a non-functional criterion held by neither a planned per-PR test nor a numeric bound with its measuring command, at review time, where it can still be rewritten;
 - `review-task` classifies every success criterion by finalise's kinds, and flags the two shapes finalise fails by construction: a behaviour criterion that names no test to hold it, and a criterion that can only be met after merge (observation #222, folded in 2026-09-30).
 
 **Scope**:
@@ -85,7 +85,7 @@ This task gives the measured criterion a defined path at both ends:
   - **A measured criterion.** A non-functional bound (runtime, size, count, rate) whose natural evidence is a measurement, not a per-PR test.
     - `code_citation`: the committed artifact line that records the measurement and the command that produced it, typically the implementation report or a QA report.
     - `test_citation`: `"NOT_APPLICABLE: measured criterion"`, unless a test pins the bound, in which case the criterion is an ordinary behaviour criterion and takes the normal path.
-    - `PASS` when the criterion states a bound, the cited measurement meets it, and the command is named. `FAIL` when the bound is missing ("no measurable change", "fast enough"), the measurement is uncited or uncommitted, or it misses the bound.
+    - `PASS` when the criterion states a bound, the cited measurement meets it, and the command is named. `FAIL` when the measurement is uncited or uncommitted, or it misses the bound. A criterion with no bound ("no measurable change", "fast enough") is not a measured criterion, and fails unless a per-PR test holds it.
   - The closing sentence becomes "`test_runs_per_pr` is `null` on all three kinds … **A behaviour criterion never takes any of these paths.**" The measured kind must not become a back door for behaviour that could be tested.
   - The Execution rule (§ Step 5: "The two `NOT_APPLICABLE` kinds in Step 3 carry `null` here …") restates the count. It drops the count ("The `NOT_APPLICABLE` kinds in Step 3 …"), so the heading sentence is the file's one count of the kinds (review 1).
 - `review-task` Step 6 check 4 also classifies each success criterion as finalise's AC prompt will — behaviour (needs a per-PR test), documentation, "no unit tests applicable", or measured — and raises **Important** for (a) a behaviour criterion whose text or phase names no test planned to hold it ("name the test, or re-scope it"), and (b) a criterion that can only be met after merge or acceptance, such as closing an observation or a tracker item on merge ("move it to Deferred Work — finalise runs before merge"). The worked examples are task.142's AC7/AC8 (behaviour) and AC16 (post-merge).
@@ -149,7 +149,7 @@ Independent of task.165. It can land before or after it.
 
 **Files**: `skills/review-task/SKILL.md`
 
-- [x] Step 6 check 4: add the bound-and-measurement rule with severity **Important**, the remedy ("state the bound and the command, or replace it with a test that pins it"), and task.164's AC7 as the worked example.
+- [x] Step 6 check 4: add the bound-and-measurement rule with severity **Important**, the remedy ("name the test that pins it, or state the bound and the command"), and task.164's AC7 as the worked example.
 - [x] Add the behaviour-without-test and post-merge rules (observation #222) to check 4, each with its remedy and task.142 as the worked example.
 - [x] Add all three findings to the Step 6 "Issues to Flag" list under **Important**.
 
@@ -229,7 +229,7 @@ Not applicable. The change is prompt prose and two text pins.
 ### Consumer Tests
 
 - `/finalise` on a work item with a bounded, measured, cited criterion: the AC agent returns `PASS` with `test_citation: "NOT_APPLICABLE: measured criterion"`. This is observed on the next such run and recorded as evidence. It is not a committed test, because the agent's reading cannot be asserted from a unit test.
-- `/review-task` on a task whose Performance criterion states no bound returns an Important finding.
+- `/review-task` on a task whose Performance criterion is held by neither a planned per-PR test nor a numeric bound with its measuring command returns an Important finding.
 
 ---
 
@@ -314,8 +314,8 @@ None identified.
 
 ### QA Report
 
-- **Full Report**: [task.166.qa.2.measured-non-functional-criteria.md](./task.166.qa.2.measured-non-functional-criteria.md)
-- **Gate File**: [task.166.gate.2.measured-non-functional-criteria.yml](./task.166.gate.2.measured-non-functional-criteria.yml)
+- **Full Report**: [task.166.qa.3.measured-non-functional-criteria.md](./task.166.qa.3.measured-non-functional-criteria.md)
+- **Gate File**: [task.166.gate.3.measured-non-functional-criteria.yml](./task.166.gate.3.measured-non-functional-criteria.yml)
 
 ### Test Coverage Summary
 
@@ -326,7 +326,7 @@ None identified.
 
 ### Key Findings
 
-Cycle 1's fixes hold where they were made, but the bound rule and the unbounded-criterion outcome are still stated the old way at other sites: the Issues to Flag line and its pin, the CHANGELOG, and success criteria 1 and 3 (CR2-1, CR2-3). The bound rule also still flags an unbounded criterion that a planned test holds (CR2-2). Three low test findings.
+The bound rule's measured branch accepts a bound that finalise would send to the behaviour path (CR3-1), and the task document still states the old unbounded outcome and remedy at five sites (CR3-2, CR3-3). Four low test and wording findings.
 
 ## Change Log
 
@@ -338,8 +338,9 @@ Cycle 1's fixes hold where they were made, but the bound rule and the unbounded-
 | 2026-10-02 |         | Status → ready-for-development | review-task |
 | 2026-10-02 |         | Implemented — 6 files (AC prompt, review-task check 4, 2 new pin tests, CHANGELOG, 1 new bundled copy); 9 tests, 14 mutations red | develop |
 | 2026-10-02 |         | QA gate CONCERNS (80/100) — 2 medium, 3 low findings | qa-task |
-| 2026-10-02 |         | QA findings fixed — gate 1: CR-1 (check 4 names the kinds, counts none), CR-2, CR-4/5/6; gate 2: one bound rule (held by a planned test, or by a bound + its measuring command) swept across every site that states it, unbounded outcome corrected in CHANGELOG and SC 1, test normalisation and count regex; 2 iterations | qa-fix |
+| 2026-10-02 |         | QA findings fixed — gate 1: check 4 names the kinds, counts none (CR-1), CR-2, CR-4/5/6; gate 2: one bound-rule wording at every site, unbounded outcome as shipped, test normalisation; gate 3: measured branch only for a bound no per-PR test could assert, one rule owns each criterion, task-doc restatements swept, count pattern fixtures; 3 iterations | qa-fix |
 | 2026-10-02 |         | QA gate CONCERNS (70/100) — 3 medium, 3 low findings | qa-task |
+| 2026-10-02 |         | QA gate CONCERNS (70/100) — 3 medium, 4 low findings | qa-task |
 
 <!-- change-log-end -->
 
