@@ -109,8 +109,12 @@ bundled copies; docs that list the accepted `target` forms.
 - **GitHub PR URLs and Bitbucket PR numbers already work** — only the host check is new for them.
 - **Bitbucket's own issue tracker is out of scope.** The skill's tracker axis knows `jira` and
   `github` only.
-- **Verified here:** `gh` 2.94.0 exposes `closedByPullRequestsReferences` on `gh issue view --json`.
-  **Not yet verified:** the Bitbucket `q=` filter for "PRs mentioning a key" — Phase 0.
+- **Verified (Phase 0, 2026-10-02):** the Bitbucket `q=` filters on `title`, `description` and
+  `source.branch.name` work; `gh issue view --json closedByPullRequestsReferences` returns only PRs
+  with a closing keyword. Findings and exact queries: the plan file, Phase 0.
+- **Key matches are candidates, not answers.** One Jira card matched 3 merged PRs by title and 5 by
+  description, so "several" is the common case and the doc's own `pr_number:` / branch stem outrank
+  any key search.
 
 ---
 
@@ -146,7 +150,7 @@ forms were previously read as branch names and could only halt.
 > Detailed implementation guide:
 > [task.176.plan.review-pr-tracker-issue-input.md](task.176.plan.review-pr-tracker-issue-input.md)
 
-### Phase 0: Verify the one unverified call
+### Phase 0: Verify the unverified calls — done 2026-10-02
 
 **Risk Level**: Low
 
@@ -154,12 +158,11 @@ forms were previously read as branch names and could only halt.
 
 **Changes**:
 
-- [ ] Prove the Bitbucket PR search for a Jira key in the title or description — filter field, quoting,
+- [x] Prove the Bitbucket PR search for a Jira key in the title or description — filter field, quoting,
       pagination — against a real repo. Record the exact query.
-- [ ] Confirm what `closedByPullRequestsReferences` returns for an issue closed by a merged PR.
+- [x] Confirm what `closedByPullRequestsReferences` returns for an issue closed by a merged PR.
 
-**Dependencies**: none. **If the Bitbucket query cannot be made to work, halt and re-scope** — do not
-ship rung 4 on a query that has not run.
+**Dependencies**: none. Outcome: both calls work; four findings changed Phase 2 (below).
 
 ### Phase 1: The parser
 
@@ -185,6 +188,10 @@ ship rung 4 on a query that has not run.
 **Changes**:
 
 - [ ] Step 0b calls the parser; the Arguments table gains the new forms.
+- [ ] The card → doc grep is quote-tolerant (`jira_key` is quoted in every observed doc).
+- [ ] Step 2's exclusion filter gains `.request.`, so a key lookup resolves to one work item.
+- [ ] Key matches on a PR are listed as candidates; an auto-pick requires the doc's `pr_number:` or
+      branch stem, never a title or description match alone.
 - [ ] Step 1 gains the card → PR resolution and the selection rules.
 - [ ] Step 2 takes the pre-resolved doc and records the new `resolved_via` values.
 - [ ] Tests pin each documented route and selection rule, and that no write to a tracker appears.
@@ -267,6 +274,9 @@ None — one extra read per run.
 - [ ] Each selection outcome (one, several, merged, none, epic) behaves as documented.
 - [ ] A PR URL for the other platform halts naming both hosts.
 - [ ] Every previously accepted `target` form resolves exactly as before.
+- [ ] A card whose key appears in several PRs (e.g. a task with a docs PR, a reconcile PR and the work
+      PR) is never auto-resolved from the key match alone.
+- [ ] The card → doc lookup returns one document for a card that also has a `.request.` artifact.
 
 ### Performance
 
@@ -291,10 +301,9 @@ None.
 
 ### Medium Risk Areas
 
-- **Card → PR guesses wrong.** A key mentioned in another PR's description matches. Mitigation: the
-  rung order puts the doc's own `pr_number:` first; every route is named in `resolved_via`; several
-  matches are listed, never auto-picked.
-- **Bitbucket query unproven.** Mitigation: Phase 0 gates the work.
+- **Card → PR guesses wrong.** Observed, not hypothetical: one card matched 3 PRs by title and 5 by
+  description. Mitigation: the rung order puts the doc's own `pr_number:` and branch stem first; a
+  title/description match alone is never auto-picked; every route is named in `resolved_via`.
 
 ### Low Risk Areas
 
@@ -334,6 +343,7 @@ message wording.
 | Date       | Version | Description                                                        | Author |
 | ---------- | ------- | ------------------------------------------------------------------ | ------ |
 | 2026-10-02 | 1.0     | Initial draft — cut from a request to start /review-pr from a card | Claude |
+| 2026-10-02 | 1.1     | Phase 0 done: queries verified; four findings folded into Phase 2  | Claude |
 
 <!-- change-log-end -->
 
@@ -341,10 +351,10 @@ message wording.
 
 ## Progress Tracking
 
-### Phase 0: Verify the one unverified call
+### Phase 0: Verify the unverified calls
 
-- [ ] Bitbucket key search
-- [ ] `closedByPullRequestsReferences` behaviour
+- [x] Bitbucket key search
+- [x] `closedByPullRequestsReferences` behaviour
 
 ### Phase 1: The parser
 

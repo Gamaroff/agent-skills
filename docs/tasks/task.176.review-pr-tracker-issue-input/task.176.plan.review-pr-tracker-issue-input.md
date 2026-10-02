@@ -18,16 +18,42 @@ updated: 2026-10-02
 Keep the network out of the parser and the parser out of the prose. A pure script decides *what the
 user gave us*; the skill decides *which PR that means*. Everything after Step 1 is untouched.
 
-## Phase 0: Verify the one unverified call
+## Phase 0: Verify the unverified calls — DONE 2026-10-02
 
-Record the working query here, with its output, before Phase 2 is written.
+Run read-only against `mediastream_ag/rebirth-wallet` (Bitbucket, card RAPP-702) and
+`Gamaroff/agent-skills` (GitHub). Status codes read, never list lengths.
 
-- Bitbucket: `GET /2.0/repositories/{ws}/{repo}/pullrequests` with a `q=` filter on `title` /
-  `description` containing the key (`~` operator), `state` unfiltered so merged PRs are found, and
-  `pagelen`/`next` handled — the existing marker scan already pages, copy its loop. Check status codes,
-  never list length: Bitbucket answers a bad credential on a private repo with 404.
-- GitHub: `gh issue view N --json closedByPullRequestsReferences` — shape verified empty-array on
-  `gh` 2.94.0; confirm the populated shape on an issue closed by a merged PR.
+**Bitbucket — the query works.** `GET /2.0/repositories/{ws}/{repo}/pullrequests` answered 200 for:
+
+| Intent | `q=` (URL-encoded) |
+|---|---|
+| title names the key | `title ~ "RAPP-702"` |
+| description names the key | `description ~ "RAPP-702"` |
+| source branch contains the doc stem | `source.branch.name ~ "task.101"` |
+
+Pass `state=OPEN&state=MERGED&state=DECLINED` explicitly (merged PRs are a supported target), and
+`fields=values.id,values.title,values.state,values.source.branch.name,size,next` to keep the payload
+small. `next` is the paging cursor; the existing marker scan's loop is the one to copy.
+
+**GitHub — the field works, with a limit.** `gh issue view N --json closedByPullRequestsReferences`
+returned `[{number: 549, …}]` for issue 491 (PR 549 says `Closes #491`) and `[]` for open issues with no
+PR. It lists only PRs that use a **closing keyword**, so it cannot be the only rung.
+
+**Four findings that change the design** (each is now in the task's Phase 2):
+
+1. **"Several PRs" is the normal case, not the edge.** RAPP-702 matched 3 merged PRs by title and 5 by
+   description, including two docs-only PRs (a tracker reconcile, a card sync). The key search is a
+   *candidate list*, never an answer. The doc's own `pr_number:` and branch stem must outrank it, and
+   an auto-pick from key matches alone is not acceptable.
+2. **`pr_number:` is often absent.** task.101 (RAPP-702) is `ready-for-review` with no `pr_number`.
+   Rung 2 will frequently miss; rung 3 (branch stem) is the working route there.
+3. **`jira_key` is always quoted in frontmatter.** 358 docs single-quoted, 444 double-quoted, **0
+   unquoted** (rebirth-wallet). The pattern `^jira_key:[[:space:]]*KEY[[:space:]]*$` matches nothing.
+   Use `^jira_key:[[:space:]]*['"]?KEY['"]?[[:space:]]*$`. Check `github_issue:` the same way before
+   assuming it is a bare integer.
+4. **The Step 2 exclusion filter is missing `.request.`.** `task.101.request.1.*.md` carries the same
+   `jira_key`, so a key lookup returns two files. Without the filter the work item is ambiguous; with
+   `.request.` added it is unique. This is an existing gap the new lookup exposes — fix it here.
 
 ## Phase 1: The parser
 
@@ -52,9 +78,10 @@ trap; no multi-glob `ls`).
 ## Phase 2: Resolution in the skill
 
 1. **Host check** — `host` vs `git remote get-url origin`; mismatch → HALT naming both.
-2. **Card → doc** — anchored, recursive grep for `^jira_key:[[:space:]]*KEY[[:space:]]*$` or
-   `^github_issue:[[:space:]]*N[[:space:]]*$` under `docs/`; apply Step 2's exclusion filter so the
-   document is found, not its artifacts. No doc → continue to PR search by key alone, and expect the
+2. **Card → doc** — anchored, recursive, **quote-tolerant** grep:
+   `^jira_key:[[:space:]]*['"]?KEY['"]?[[:space:]]*$` (and the `github_issue:` equivalent) under
+   `docs/`; apply Step 2's exclusion filter — **with `.request.` added** — so the document is found,
+   not its artifacts. No doc → continue to PR search by key alone, and expect the
    later review to be code-only.
 3. **Doc → PR** in the order in the task's Target Architecture; first hit wins; record the rung.
 4. **Select** — count open PRs among the hits.
