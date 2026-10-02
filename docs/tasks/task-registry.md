@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-01
-**Next Available Task Number:** **177**
+**Next Available Task Number:** **179**
 
 ## How to use
 
@@ -217,6 +217,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 174 | [Publish the docs-only CI classifier as an optional consumer template](task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md) | planned | infrastructure | Low | 2026-10-01 | [#541](https://github.com/Gamaroff/agent-skills/issues/541) | — blocked on tinker-city task.127 (#982, another repository) merging and running on real CI; Phase 0 halts until then. Hand-off change 4 |
 | 175 | [Resolve finalise's PR number from the branch, not the task body](task.175.finalise-pr-number-from-branch/task.175.finalise-pr-number-from-branch.md) | planned | infrastructure | Medium | 2026-10-02 | [#551](https://github.com/Gamaroff/agent-skills/issues/551) | — Observation #184 (recurred task.147, task.166): finalise Step 3a takes the first body `PR #N`; resolver reads caller → branch → lock → frontmatter → confirmed body |
 | 176 | [/review-pr accepts a Jira card or GitHub issue and resolves it to its PR](task.176.review-pr-tracker-issue-input/task.176.review-pr-tracker-issue-input.md) | accepted | infrastructure | Medium | 2026-10-02 | [#553](https://github.com/Gamaroff/agent-skills/issues/553) | — Start /review-pr from a Jira key/URL, GitHub issue or `#N`; card → doc → PR resolution with selection rules; PR-URL host check. Phase 0 done: key search verified; a key match is a candidate list, never an auto-pick. · PR #554 merged |
+| 177 | [/review-pr resolution edge cases](task.177.review-pr-resolution-edge-cases/task.177.review-pr-resolution-edge-cases.md) | planned | refactoring | Medium | 2026-10-02 | [#555](https://github.com/Gamaroff/agent-skills/issues/555) | — task.176 follow-ups 1–4: `.env` inline comment, docs-less repo fallback, scheme-less platform URLs, Step 2 rung 2 artifact filter |
+| 178 | [review-task and review-story cite the §0a key lookup](task.178.review-skills-cite-key-lookup/task.178.review-skills-cite-key-lookup.md) | planned | refactoring | Medium | 2026-10-02 | [#556](https://github.com/Gamaroff/agent-skills/issues/556) | — task.176 follow-up 5: replace 3 restated `grep -rl "jira_key: …"` lookups with §0a citations, plus a guard test |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -234,6 +236,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 
 ## Notes
 
+- **Tasks 177–178 are the task.176 follow-ups (PR #554)** — one shippable unit each, independent of one another: 177 closes four `/review-pr` resolution edge cases (`.env` inline comment, docs-less repo, scheme-less URLs, rung 2 artifact filter); 178 makes review-task and review-story cite the shared §0a key lookup and adds a guard test. They touch different skills and may land in either order.
 - **Tasks 172–174 come from the tinker-city CI-time hand-off (story 46.5, PR #981, 2026-09-30)**: one shippable unit each. 172 ships the docs-only rule and moves the four pipeline CI waits onto it; it is usable alone. 173 depends on 172 for the docs set (`ci.docsOnly.patterns`); its Phase 1 (path-limited 8a and PreCompact commits) is independent and may land first. 174 depends on neither, but is blocked on **tinker-city** task.127 — another repository, so it is written as free text, not a `task.N` dependency (this registry's own task.127 is unrelated).
 - **Tasks 165–166 are the task.164 follow-ups (PR #508)** — one shippable unit each, independent of one another: 165 closes task.164's carried LOW items on the banner doc, its pins, the 4b meta-test and review-task/review-story lock cooperation, and depends on task.164 merging (it edits text task.164 introduced); 166 gives measured non-functional criteria a defined path through finalise's AC prompt and review-task (observation #206) and depends on nothing.
 - **Tasks 130–132 are the task.124 follow-ups (PR #436, merged 2026-09-20)** — one shippable unit each, independent of one another: 130 closes the resume residue (5c review CR-1..CR-5, gate-6 futures, the who-restores collapse of obs #132); 131 gives the security probe a markdown-structure sink, a fixed-argument entry form and a recorded `internal` decision; 132 adds the unbound-default reviewer check and its population test (obs #133). 131 shares `SINKS` with task.128 — land 128 first or rebase; 132 cites 130's `BASE_BRANCH` derivation rather than duplicating it, so 130 first is convenient but not required.
