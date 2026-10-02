@@ -6,6 +6,33 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/review-pr` starts from the work item: a Jira key or URL, or a GitHub issue (task.176).**
+  `target` now also accepts `RAPP-702`, a Jira `/browse/` URL, a board URL carrying
+  `?selectedIssue=`, a Jira Cloud `…/issues/KEY` URL, a GitHub `/issues/N` URL and `#N`, and
+  resolves the card to its PR: the work-item document, its `pr_number:`, a PR on its branch stem,
+  then a key search or closing PR, then (for a Jira key) the input as a branch. `resolved_via` names
+  the route. A key match in a PR title or description is only ever a candidate — it is listed, never
+  auto-picked. An epic key halts ("pass a story or task key"); several PRs ask, or halt with the list
+  when non-interactive.
+  - New pure parser `skills/review-pr/scripts/parse-target.sh`, tested under bash and zsh. The
+    host picks the platform before any path arm, so Jira Cloud's `/issues/KEY` is never read as a
+    GitHub issue; a github.com path is read by position, so an owner or repo named `pull` or `issues`
+    parses; `…/pull/12/files` now binds PR 12 (it bound `files`); a malformed URL, or a target
+    holding a control character (a newline would forge an output line), is refused with a reason
+    instead of being treated as a branch name.
+  - Per-kind host check: a PR URL for another host than the git remote — or, on github.com and
+    bitbucket.org, another `owner/repo` — halts, naming both; a remote whose host is an SSH alias only
+    warns about the host but still halts on another `owner/repo`; a Jira URL on another host than
+    `JIRA_URL` (environment or `.env`) warns, and says so when `JIRA_URL` is unset; a GitHub issue URL
+    for another host or repo than origin halts.
+  - **Stricter key → document lookup in the develop pipelines.** `develop-pipeline-step-0-resolve-and-prepare.md`
+    §0a now has one shared lookup — anchored, quote-tolerant, excluding `.request.`, finalise's
+    `sprint-review-summary.md` and every other artifact kind, and halting (exit 1) on several matches. It replaces a prefix grep that resolved
+    `RAPP-70` to `RAPP-702`'s document and matched no quoted `jira_key`. A `/develop-story` or
+    `/develop-task` run that only resolved by prefix now halts with "No local document found";
+    pass the file path or fix the key. Also fixes §0a's GitHub-issue URL extraction, which used a
+    lookbehind `grep -E` does not support and so always fell back to "the last number in the input".
+
 - **Context-pressure trigger: recommend a continuation handoff before the context fills
   (task.157).** The model cannot see its own context usage; Claude Code gives it only to the status
   line. A status-line wrapper now records `context_window.used_percentage` per session, and a

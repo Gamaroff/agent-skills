@@ -5,18 +5,23 @@ type: task
 description: "/review-pr only takes a PR number, a PR URL or a branch. Teach it to start from the work item instead — a Jira key or URL, or a GitHub issue — and resolve that to the PR it should review, so the existing PR-vs-requirements report can be produced from the card a person is actually holding."
 tags: [review-pr, input-resolution, jira, github, bitbucket]
 category: infrastructure
-status: planned
+status: accepted
+completed_date: 2026-10-02
+pr_number: 554
 priority: Medium
 created: 2026-10-02
 updated: 2026-10-02
 assignee: TBD
-estimated_effort_hours: 10
+estimated_effort_hours: 12
 risk_level: low
+github_issue: 553
 ---
 
 # Technical Task: /review-pr accepts a Jira card or GitHub issue and resolves it to its PR
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.176.review.1.review-pr-tracker-issue-input.md` implemented 2026-10-02
+**GitHub Issue**: [#553](https://github.com/Gamaroff/agent-skills/issues/553)
 
 ---
 
@@ -79,6 +84,17 @@ bundled copies; docs that list the accepted `target` forms.
 - Step 2 resolves the *work item* from the PR by a first-hit cascade: branch stem, `pr_number:`
   frontmatter, gate `pr:`, tracker issue in the PR body, Explore, none. Rung 4 already greps
   `jira_key:` / `github_issue:` frontmatter — the lookup this task needs, run in the other direction.
+- **Same-class mechanism — the existing key → doc lookup.** Rung 4 delegates to
+  `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` §0a (lines 27/70 Jira, 29/72
+  GitHub): `grep -rl "jira_key: ${JIRA_KEY}"` and `grep -rl "github_issue: {N}"`. Both are
+  **unanchored** (`RAPP-70` also matches `RAPP-702`; `github_issue: 5` matches `55`), **quote-intolerant**
+  (`jira_key` is quoted in every observed consumer doc), and exclude only three artifact kinds. This
+  task **replaces** that lookup with the corrected one and has review-pr **cite** it — it does not add
+  a second lookup beside it. The same grep is restated in `skills/review-task/SKILL.md:99,134` and
+  `skills/review-story/SKILL.md:189`; those are deferred (see Deferred Work).
+- Step 0b's PR-URL arm takes `${TARGET##*/}`, so `https://github.com/o/r/pull/12/files` binds
+  `PR=files` today (measured under bash and zsh). The parser fixes this; it is a repair, not a change
+  to a working form.
 - `VCS` and `TRACKER` are separate axes (`references/resolve-platform.sh`); a repo can host code on
   Bitbucket and track work in Jira, or on Bitbucket with GitHub issues.
 
@@ -87,25 +103,46 @@ bundled copies; docs that list the accepted `target` forms.
 - **Parse** (pure, offline): a small script turns `target` into key=value lines — `kind`
   (`pr` | `branch` | `jira` | `github-issue`), `pr`, `branch`, `jira_key`, `issue_num`, `host`. Pure
   so it is unit-testable; the skill's tests today pin prose, which cannot prove a URL form parses.
-- **Platform by shape, not by `TRACKER`**: `ABC-12` is Jira; `#12` and `/issues/N` are GitHub. A URL's
-  host decides the platform for a URL, and a mismatch with the repo's remote halts with both named.
+  The parser never decides a key's issue type — a story key and an epic key have the same shape — so
+  it refuses only **malformed** input.
+- **Platform by host first, then by shape**: for a URL, the **host** decides the platform
+  (`github.com` → GitHub; a Jira host → Jira; a Bitbucket host → Bitbucket) *before* any path arm is
+  tried — Jira Cloud's issue view `…/projects/RAPP/issues/RAPP-702` contains `/issues/` and must not
+  reach a GitHub-issue arm. The key or number is then extracted with an anchored pattern, and any
+  `?query` or `#fragment` is stripped. A bare `ABC-12` is Jira; `#12` is a GitHub issue.
+- **Host check, per kind** (never "every URL vs the git remote", which would halt every Jira URL):
+  - PR URL → host vs `git remote get-url origin`; mismatch → HALT naming both.
+  - Jira URL → host vs `JIRA_URL`; mismatch → warn, naming both, and continue with the key.
+  - GitHub issue URL → `owner/repo` vs the GitHub tracker repo; mismatch → HALT naming both.
 - **Resolve card → doc → PR**, in preference order:
-  1. work item doc by `jira_key:` / `github_issue:` frontmatter (anchored, recursive, no `**` glob);
+  1. work item doc by `jira_key:` / `github_issue:` frontmatter — the corrected shared §0a lookup
+     (anchored, quote-tolerant, recursive, no `**` glob, full exclusion list incl. `.request.`);
   2. the doc's `pr_number:`;
-  3. a PR whose source branch contains the doc's stem;
+  3. a PR whose source branch is the doc's stem or ends in `/STEM` — Bitbucket
+     `q=source.branch.name ~ "<STEM>"` then the same anchored filter; GitHub `gh pr list --state all
+     --limit 1000 --json number,headRefName,state`, filtered on `headRefName == STEM` or ending in
+     `/STEM` (`--head` is an exact match; a substring match would let `task.10.x` claim `task.10.x-two`);
   4. a PR whose title or description names the key (Jira) or that closes the issue
-     (`gh issue view N --json closedByPullRequestsReferences`, GitHub);
-  5. none → HALT naming what was tried.
+     (`gh issue view N --json closedByPullRequestsReferences`, **GitHub VCS only**);
+  5. `kind=jira` and still nothing → retry the input **as a branch** (a branch may be named
+     `RAPP-702`), recording `resolved_via: jira key → branch fallback`;
+  6. none → HALT naming every rung tried.
+- **GitHub issue with `VCS=bitbucket`**: rungs 1–3 only. Rung 4 is skipped, and a HALT names it as
+  GitHub-only.
 - **Selection**: exactly one open PR → use it. Several → list them and ask (interactive) or halt with
   the list (non-interactive). Merged PRs are allowed — the diff fallback already supports them. Zero
-  → HALT. An **epic** key resolves to many PRs → HALT: "pass a story or task key".
+  → HALT. **Epic** → HALT: "pass a story or task key". An epic is detected after rung 1, when the
+  resolved doc is an `epic.*` file or carries `type: epic`, or — with no doc — from the Step 3b
+  `issuetype`.
 - Step 2 receives the doc already resolved; its `resolved_via` gains the card routes.
 
 ### Important Clarifications
 
 - **A bare number stays a PR number.** The develop pipelines and existing users rely on it. On GitHub,
-  if `gh pr view N` fails because `N` is an issue, retry as an issue and say so in `resolved_via`.
-  `#N` is an issue.
+  if `gh pr view N` fails, run `gh issue view N`: the PR error for an issue number is identical to the
+  one for a missing number (`GraphQL: Could not resolve to a PullRequest…`, verified on #551 and
+  #9999), so only the issue call tells them apart. If it is an issue, resolve as one and say so in
+  `resolved_via`. `#N` is an issue.
 - **GitHub PR URLs and Bitbucket PR numbers already work** — only the host check is new for them.
 - **Bitbucket's own issue tracker is out of scope.** The skill's tracker axis knows `jira` and
   `github` only.
@@ -126,6 +163,8 @@ bundled copies; docs that list the accepted `target` forms.
 ✅ Card → doc → PR resolution and its selection rules, on GitHub and Bitbucket.
 ✅ The URL-host check.
 ✅ The pure parser and its offline tests; the SKILL.md prose and the tests that pin it.
+✅ The shared §0a key → doc lookup in `develop-pipeline-step-0-resolve-and-prepare.md`, corrected and
+   cited by review-pr.
 ✅ Bundled copies regenerated (`npm run bundle`); CHANGELOG; docs listing `target` forms.
 
 ### Out of Scope
@@ -135,13 +174,21 @@ bundled copies; docs that list the accepted `target` forms.
 ❌ Any change to the diff, the two lenses, the verdict table or the report template.
 ❌ Any change to how the develop pipelines call `/review-pr` at Step 5c.
 ❌ Writing anything to Jira or GitHub — resolution is read-only.
+❌ The same lookup restated in `skills/review-task/SKILL.md:99,134` and `skills/review-story/SKILL.md:189`
+   (see Deferred Work).
 
 ---
 
 ## 5. Breaking Changes
 
 None — API stable. Every form accepted today parses to the same `PR` / `BRANCH` it does now; the new
-forms were previously read as branch names and could only halt.
+forms were previously read as branch names and could only halt. Two edges, both handled:
+
+- A branch literally named like a Jira key (`RAPP-702`) now parses as `kind=jira`. If no doc or PR
+  resolves for the key, it is retried as a branch (rung 5), so it still reviews that branch's PR.
+- The corrected §0a lookup stops matching by prefix. A develop run that used to resolve `RAPP-70` to
+  `RAPP-702`'s document now halts with "no local document". That is the correct outcome, but a
+  pipeline user can see it, so CHANGELOG says so.
 
 ---
 
@@ -168,14 +215,20 @@ forms were previously read as branch names and could only halt.
 
 **Risk Level**: Low
 
-**Files**: `skills/review-pr/scripts/parse-target.sh`, `skills/review-pr/tests/parse-target.test.sh`
+**Files**: `skills/review-pr/scripts/parse-target.sh`, `skills/review-pr/tests/review-pr.test.js`
 
 **Changes**:
 
-- [ ] Parse every accepted form, old and new, to the key=value contract.
-- [ ] Refuse an epic-shaped or malformed key with a named reason, never a silent branch fallthrough.
-- [ ] Suite: one case per form; the board URL's `selectedIssue`; a PR URL on the wrong host; a bare
-      number stays `kind=pr`.
+- [x] Parse every accepted form, old and new, to the key=value contract — host first, then an
+      anchored key/number pattern, with `?query` / `#fragment` stripped.
+- [x] Refuse malformed input (a URL with no key or number) with a named reason, never a silent branch
+      fallthrough. No issue-type judgement — epics are Phase 2's job.
+- [x] Cases in `review-pr.test.js`, spawning the script under **both `bash` and `zsh`** (the suite is
+      already in the `npm test` glob, so no `package.json` edit): one case per form; the board URL's
+      `selectedIssue`; Jira Cloud `…/projects/RAPP/issues/RAPP-702` → `kind=jira`;
+      `/browse/RAPP-702?focusedCommentId=1` → `jira_key=RAPP-702`; `…/pull/12/files` → `pr=12`; a bare
+      number stays `kind=pr`; a bare key → `kind=jira`; garbage → named refusal.
+- [x] `shellcheck --severity=warning skills/review-pr/scripts/parse-target.sh` clean.
 
 **Dependencies**: Phase 0.
 
@@ -183,18 +236,29 @@ forms were previously read as branch names and could only halt.
 
 **Risk Level**: Medium
 
-**Files**: `skills/review-pr/SKILL.md`, `skills/review-pr/tests/review-pr.test.js`
+**Files**: `skills/review-pr/SKILL.md`, `skills/review-pr/tests/review-pr.test.js`,
+`shared/resources/develop-pipeline-step-0-resolve-and-prepare.md`
 
 **Changes**:
 
-- [ ] Step 0b calls the parser; the Arguments table gains the new forms.
-- [ ] The card → doc grep is quote-tolerant (`jira_key` is quoted in every observed doc).
-- [ ] Step 2's exclusion filter gains `.request.`, so a key lookup resolves to one work item.
-- [ ] Key matches on a PR are listed as candidates; an auto-pick requires the doc's `pr_number:` or
+- [x] Step 0b calls the parser; the Arguments table gains the new forms.
+- [x] **Fix §0a** (lines 27/70 Jira, 29/72 GitHub): anchored and quote-tolerant —
+      `^jira_key:[[:space:]]*['"]?KEY['"]?[[:space:]]*$` and the `github_issue:` equivalent — with the
+      full Step 2 exclusion list. review-pr's card → doc step and Step 2 rung 4 **cite** §0a instead of
+      restating a grep.
+- [x] Step 2's exclusion filter (and §0a's) gains `.request.`, so a key lookup resolves to one work item.
+- [x] Host check per kind: PR URL vs the git remote (HALT); Jira URL vs `JIRA_URL` (warn); GitHub issue
+      URL vs the tracker repo (HALT).
+- [x] Key matches on a PR are listed as candidates; an auto-pick requires the doc's `pr_number:` or
       branch stem, never a title or description match alone.
-- [ ] Step 1 gains the card → PR resolution and the selection rules.
-- [ ] Step 2 takes the pre-resolved doc and records the new `resolved_via` values.
-- [ ] Tests pin each documented route and selection rule, and that no write to a tracker appears.
+- [x] Step 1 gains the card → PR resolution (rungs 1–6, including the GitHub rung-3 command), the
+      `VCS=bitbucket` GitHub-issue rule (rungs 1–3 only), the branch fallback for `kind=jira`, and the
+      selection rules.
+- [x] Epic detection after rung 1 (`epic.*` doc or `type: epic`; else Step 3b `issuetype`) → HALT.
+- [x] Step 2 takes the pre-resolved doc and records the new `resolved_via` values.
+- [x] Tests pin each documented route and selection rule; that no write to a tracker appears; that
+      card resolution is gated on `kind=jira|github-issue`, so the `kind=pr` arm goes straight to
+      Step 1; and that §0a's lookup is anchored (a `RAPP-70` lookup does not match a `RAPP-702` doc).
 
 **Dependencies**: Phase 1.
 
@@ -202,13 +266,16 @@ forms were previously read as branch names and could only halt.
 
 **Risk Level**: Low
 
-**Files**: `skills/review-pr/references/*`, `docs/` pages naming `/review-pr` targets, `CHANGELOG.md`
+**Files**: `skills/review-pr/references/*`, the bundled copies of `develop-pipeline-step-0-resolve-and-prepare.md`
+(every skill whose `references/` carries it), `CHANGELOG.md`
 
 **Changes**:
 
-- [ ] `npm run bundle`, then `npm run bundle:check` green.
-- [ ] Update every doc that lists the accepted `target` forms (find with `grep -rn 'review-pr' docs/`).
-- [ ] CHANGELOG `[Unreleased]`.
+- [x] `npm run bundle`, then `npm run bundle:check` green.
+- [x] Docs: at review time `grep -rn 'review-pr' docs/` found **no** page listing `target` forms
+      (`docs/reference/invocation.md:89,98` names Step 5c only), so the SKILL.md Arguments table is the
+      one list. If the SKILL.md description gains a card trigger, run `npm run generate-catalog`.
+- [x] CHANGELOG `[Unreleased]`, including the stricter §0a lookup (see Breaking Changes).
 
 **Dependencies**: Phase 2.
 
@@ -219,6 +286,7 @@ forms were previously read as branch names and could only halt.
 ### Files to Modify (Core Implementation)
 
 - `skills/review-pr/SKILL.md` — Steps 0b, 1, 2; Arguments table.
+- `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` — §0a key → doc lookup (lines 27, 29, 70, 72).
 
 ### Files to Create
 
@@ -226,12 +294,15 @@ forms were previously read as branch names and could only halt.
 
 ### Files to Modify (Tests)
 
-- `skills/review-pr/tests/review-pr.test.js` — pin the new routes and selection rules.
-- `skills/review-pr/tests/parse-target.test.sh` — new, offline.
+- `skills/review-pr/tests/review-pr.test.js` — parser cases (bash and zsh), the new routes, the selection rules, and §0a's anchoring.
 
 ### Files to Modify (Documentation)
 
-- `CHANGELOG.md`; any `docs/` page listing `/review-pr` target forms.
+- `CHANGELOG.md`. No `docs/` page lists `/review-pr` target forms (checked at review); `docs/reference/skill-catalog.md` only if the description changes.
+
+### Generated (do not hand-edit)
+
+- `skills/*/references/develop-pipeline-step-0-resolve-and-prepare.md` and review-pr's `references/` — via `npm run bundle`.
 
 ### Files to Delete
 
@@ -243,25 +314,31 @@ None.
 
 ### Unit Tests
 
-- Parser: every form to its key=value output, including the board URL, `#N`, a bare key, a bare
-  number, a wrong-host PR URL, an epic-shaped key, and garbage.
+- Parser (in `review-pr.test.js`, each case run under `bash` and `zsh`): every form to its key=value
+  output, including the board URL, `#N`, a bare key, a bare number, Jira Cloud `…/issues/RAPP-702`,
+  `/browse/KEY?query`, `…/pull/12/files`, a PR URL reporting its `host`, and garbage (named refusal).
 
 ### Integration Tests
 
 - Prose pins in `review-pr.test.js`: Step 0b names the parser; each resolution route and each
   selection outcome is documented; resolution performs no tracker write; the existing assertions
-  (anchored greps, no `**` globs, bash/zsh parity) still hold for the new snippets.
-- **Mutation check**: break the board-URL arm and the host check in turn and confirm *that* named
-  case goes red — a green suite is not evidence.
+  (anchored greps, no `**` globs, bash/zsh parity) still hold for the new snippets; the card-resolution
+  block is gated on `kind=jira|github-issue`; the `kind=jira` branch fallback and the
+  `VCS=bitbucket` GitHub-issue rule are stated; §0a's lookup is anchored and quote-tolerant (a
+  `RAPP-70` lookup does not match a fixture doc carrying `jira_key: 'RAPP-702'`).
+- **Mutation check**: break the board-URL arm, the host-first ordering (Jira `/issues/KEY`), and §0a's
+  anchor in turn, and confirm *that* named case goes red — a green suite is not evidence.
 
 ### Performance Tests
 
-None — one extra read per run.
+None — one extra read per run. The "no extra call for a PR target" bound is held by the gating
+prose pin above.
 
-### Consumer Tests
+### Consumer Tests (post-release — not an acceptance gate)
 
-- With the release installed: `/review-pr` on a real Jira key whose card has one open PR; one with a
-  merged PR; one with no PR (halts); an epic key (halts). Record in the implementation report.
+- After the release is installed: `/review-pr` on a real Jira key whose card has one open PR; one with a
+  merged PR; one with no PR (halts); an epic key (halts). These need the merged release, so they are
+  Deferred Work, not success criteria.
 
 ---
 
@@ -269,18 +346,26 @@ None — one extra read per run.
 
 ### Functional
 
-- [ ] `/review-pr <Jira key | /browse/ URL | board URL | GitHub issue URL | #N>` reaches Step 3 on the
-      right PR and writes the same report a PR-number run would.
-- [ ] Each selection outcome (one, several, merged, none, epic) behaves as documented.
-- [ ] A PR URL for the other platform halts naming both hosts.
-- [ ] Every previously accepted `target` form resolves exactly as before.
+- [ ] Every new form — Jira key, `/browse/` URL (with or without a query), board URL, Jira Cloud
+      `/issues/KEY` URL, GitHub issue URL, `#N` — parses to its documented `kind` and value (parser
+      cases, bash and zsh), and SKILL.md routes each `kind` to the named card → PR rungs (prose pin).
+- [ ] SKILL.md states each selection outcome — one, several (ask / halt with list), merged, none,
+      epic — and each has a prose pin in `review-pr.test.js`.
+- [ ] SKILL.md halts on a PR URL whose host differs from the git remote, naming both, and only warns
+      on a Jira URL host that differs from `JIRA_URL` (prose pins).
+- [ ] Every previously accepted `target` form parses to the same `PR` / `BRANCH` as before (parser
+      cases), except `…/pull/N/files`, which now yields `pr=N` instead of `files`.
+- [ ] A Jira-key-shaped input that resolves no doc and no PR is retried as a branch (prose pin).
 - [ ] A card whose key appears in several PRs (e.g. a task with a docs PR, a reconcile PR and the work
-      PR) is never auto-resolved from the key match alone.
-- [ ] The card → doc lookup returns one document for a card that also has a `.request.` artifact.
+      PR) is never auto-resolved from the key match alone (prose pin).
+- [ ] The §0a card → doc lookup is anchored, quote-tolerant and excludes `.request.`: a fixture with a
+      work item, its `.request.` artifact and a `RAPP-702` neighbour returns exactly one document for
+      its key (test in `review-pr.test.js`).
 
 ### Performance
 
-- [ ] No extra network call when `target` is already a PR number or URL.
+- [ ] No extra network call when `target` is already a PR number or URL — held by the
+      `review-pr.test.js` pin that card resolution is gated on `kind=jira|github-issue`.
 
 ### Code Quality
 
@@ -304,6 +389,10 @@ None.
 - **Card → PR guesses wrong.** Observed, not hypothetical: one card matched 3 PRs by title and 5 by
   description. Mitigation: the rung order puts the doc's own `pr_number:` and branch stem first; a
   title/description match alone is never auto-picked; every route is named in `resolved_via`.
+
+- **Stricter §0a lookup changes develop-pipeline resolution.** A doc found only by prefix match now
+  halts. Mitigation: correct by construction; named in CHANGELOG; the halt message already says what
+  to do.
 
 ### Low Risk Areas
 
@@ -336,15 +425,92 @@ message wording.
 
 ---
 
-<!-- change-log-start -->
+## Deferred Work
 
+- **Restated key lookups**: `skills/review-task/SKILL.md:99,134` and `skills/review-story/SKILL.md:189`
+  carry the same unanchored, quote-intolerant `grep -rl "jira_key: …"` / `"github_issue: …"`. A
+  follow-up task makes them cite the corrected §0a lookup. Consider a positive work-item filter (a
+  filename `{kind}.{N}.{slug}.md` whose parent directory is the same stem) over a growing exclusion
+  list there.
+- **Consumer runs after release**: the four live `/review-pr` runs in Testing Strategy › Consumer Tests.
+- **Carried from QA gate 4 (route 2b, cosmetic residue)**: CR4-2 — a `.env` line with a trailing
+  `# comment` defeats `/review-pr` Step 0b's quote strip, so a correct Jira host warns "differs".
+- **Pre-existing, found in QA cycle 4**: CR4-1 — review-pr Step 2 rung 2's `pr_number` grep (and
+  rung 1's `-name` fallback) apply no artifact filter; `bug.3.dod.1.*.md` carries `pr_number: 290`
+  while bug.3's own document does not. Route both through the §0a rule.
+- **From the Step 5c PR review (`task.176.pr-review.1`, CONCERNS)**: CR-1 — `/review-pr` should treat a
+  missing `docs/` as "no document" (continue to rung 4 / code-only) instead of inheriting the §0a
+  lookup's HALT, which the develop pipelines keep; CR-2 — accept a scheme-less platform URL
+  (`github.com/o/r/pull/12`) instead of reading it as a branch.
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-02
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.176.qa.4.review-pr-tracker-issue-input.md](./task.176.qa.4.review-pr-tracker-issue-input.md)
+- **Gate File**: [task.176.gate.4.review-pr-tracker-issue-input.yml](./task.176.gate.4.review-pr-tracker-issue-input.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 187
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+All gate-3 findings fixed. No HIGH or MEDIUM finding; one low `.env` inline-comment edge open (CR4-2). One advisory finding (rung 2's `pr_number` grep has no artifact filter) is pre-existing and routed to future work.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.176.qa.4.review-pr-tracker-issue-input.md`
+**Gate File**: `task.176.gate.4.review-pr-tracker-issue-input.yml`
+**Gate Status**: ✅ PASS (cycle 4 of 4 — CONCERNS 90 → FAIL 70 → CONCERNS 90 → PASS 100)
+**Quality Score**: 100/100
+**Step 5c PR review**: `task.176.pr-review.1.review-pr-tracker-issue-input.md` — CONCERNS, non-blocking
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11/11 traced to code and per-PR tests (7 functional, 1 performance, 2 code quality, 1 migration)
+✅ **Tests:** `skills/review-pr/tests/review-pr.test.js` — 52 → 188 tests, bash + zsh; every QA fix mutation-proven
+✅ **PR Review:** PR #554 — four QA cycles and the Step 5c `/review-pr` conformance review
+✅ **Documentation:** CHANGELOG [Unreleased] (incl. the stricter §0a lookup), SKILL.md Arguments table, bundle fresh
+✅ **Security Review:** checklist PASS; the parser boundary is now executed by the probe engine (`shell-fn:`, 32 probes, held) — reached through finalise Step 8a (`a7484bb`)
+✅ **Compliance Review:** not applicable — internal skills-library change
+✅ **CI:** SUCCESS on `a7484bbf1fbc`
+
+**Task marked as ACCEPTED on:** 2026-10-02
+
+**Detailed Verification Log:** See `task.176.dod.1.review-pr-tracker-issue-input.md` for complete verification evidence and timestamps.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                        | Author |
-| ---------- | ------- | ------------------------------------------------------------------ | ------ |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-02 | 1.0     | Initial draft — cut from a request to start /review-pr from a card | Claude |
 | 2026-10-02 | 1.1     | Phase 0 done: queries verified; four findings folded into Phase 2  | Claude |
-
+| 2026-10-02 | 1.2     | Review 1 (7/10, needs revision): 9 important fixes applied — host-first parse, per-kind host check, epic check moved out of parser, shared §0a lookup fixed, parser tests in review-pr.test.js, testable criteria; GitHub issue #553 linked | review-task |
+| 2026-10-02 |         | Status → ready-for-development | review-task |
+| 2026-10-02 |         | Implemented — 9 files (parser, SKILL.md Steps 0b/1/2, shared §0a lookup + 4 bundled copies, CHANGELOG), 80 new tests (52 → 132 in review-pr.test.js) | develop |
+| 2026-10-02 |         | QA gate CONCERNS (90/100) — 5 findings (4 medium, 1 low) | qa-task |
+| 2026-10-02 |         | QA findings fixed — gate 1 CONCERNS: 5 queued + 5 advisory (CR-4/5/6/7/9) fixed, 1 iteration | qa-fix |
+| 2026-10-02 |         | QA gate FAIL (70/100) — 4 findings (1 high, 2 medium, 1 low) | qa-task |
+| 2026-10-02 |         | QA findings fixed — gate 2 FAIL: 4 queued + 5 advisory (CR2-4/5/6/8/9) fixed, iteration 2 | qa-fix |
+| 2026-10-02 |         | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
+| 2026-10-02 |         | QA findings fixed — gate 3 CONCERNS: 2 queued + 5 advisory (CR3-2/4/5/6/7) fixed, iteration 3 | qa-fix |
+| 2026-10-02 |         | QA gate PASS (100/100) — 1 finding (1 low) | qa-task |
+| 2026-10-02 | 1.3 | DoD passed — accepted (PR #554) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -358,19 +524,19 @@ message wording.
 
 ### Phase 1: The parser
 
-- [ ] Parser
-- [ ] Suite
+- [x] Parser
+- [x] Suite
 
 ### Phase 2: Resolution in the skill
 
-- [ ] Steps 0b, 1, 2
-- [ ] Prose pins and mutation check
+- [x] Steps 0b, 1, 2
+- [x] Prose pins and mutation check
 
 ### Phase 3: Bundle, docs, changelog
 
-- [ ] Bundle
-- [ ] Docs
-- [ ] CHANGELOG
+- [x] Bundle
+- [x] Docs
+- [x] CHANGELOG
 
 ---
 

@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.176.review-pr-tracker-issue-input'
+task_title: '/review-pr accepts a Jira card or GitHub issue and resolves it to its PR'
+gate: PASS
+status_reason: 'All gate-3 findings fixed; no HIGH or MEDIUM finding this cycle. One low-severity .env parse edge (an inline # comment defeats the quote strip) stays open; NFRs pass.'
+reviewer: 'QA Engineer'
+head: 'ebb9c60f7eeb9be172cf18f1ec881f9589ba9678'
+updated: '2026-10-02T20:14:37Z'
+
+top_issues:
+  - id: 'CR4-2'
+    severity: low
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'A .env line with a trailing comment, JIRA_URL="https://acme.atlassian.net" # prod, keeps the comment after the sed, so the quote-pair strip misses, norm_host reduces it to "https and a correct Jira host warns "differs".'
+    suggested_action: 'Strip an unquoted trailing # comment before trim and quote-pair steps (or take the value inside the first quote pair); add the inline-comment form to the .env test.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 187
+  phases_verified: 4/4
+  ci: 'not read for this gate'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No change to the parser this cycle; cycle-2 hand probe stands (28 inputs x bash/zsh, nothing executed).'
+  performance:
+    status: PASS
+    notes: 'Card resolution gated on kind=jira|github-issue.'
+  reliability:
+    status: PASS
+    notes: 'Reviewer classified every keyed file under docs/: 180 kept as same-named-dir work items, 11 dropped as artifacts, 0 duplicate keys after filtering; 174/174 github_issue lookups resolve to one doc.'
+  maintainability:
+    status: PASS
+    notes: 'One owner/repo expression; §0a rule stated once and cited.'
+
+bug_resolution:
+  previous_gate: 3
+  fixed: ['CR3-1', 'CR3-3', 'CR3-2', 'CR3-4', 'CR3-5', 'CR3-6', 'CR3-7']
+  fix_commit: 'ebb9c60'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'CR4-2'
+      action: 'Strip an unquoted trailing # comment before trim and quote-pair steps (or take the value inside the first quote pair); add the inline-comment form to the .env test.'
+      finding: 'A .env line with a trailing comment, JIRA_URL="https://acme.atlassian.net" # prod, keeps the comment after the sed, so the quote-pair strip misses and a correct Jira host warns "differs".'
+      carried_from: top_issues (route 2b, cycle 4)
+      refs: ['skills/review-pr/SKILL.md']
+    - action: 'Pre-existing (Step 2 rung 2 unchanged by this branch): the pr_number grep has no artifact filter, and docs/bugs/bug.3…/bug.3.dod.1.*.md carries pr_number 290 while bug.3''s own doc does not — pipe rung 1''s -name fallback and rung 2 through the §0a filter (CR4-1).'
+      refs: ['skills/review-pr/SKILL.md']
+    - action: 'Advisory: §0a now drops a work item that is not in a same-named directory and whose basename holds a kind word (no such layout in docs/ today) — state the trade-off or add a kind-anchored keep (CR4-3); the one-expression test counts only sites written in the canonical form (CR4-4).'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md', 'skills/review-pr/tests/review-pr.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
