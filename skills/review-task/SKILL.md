@@ -1109,6 +1109,30 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - Each criterion should be verifiable
    - Should cover functional, performance, quality aspects
    - Should align with stated benefits
+   - **Classify each criterion the way finalise will.** Finalise's AC agent
+     ([`references/finalise-dod-ac-prompt.md`](references/finalise-dod-ac-prompt.md#step-3-check-each-acceptance-criterion)
+     Step 3) sorts every criterion into a behaviour criterion, which needs a per-PR test, or one of
+     three test-free kinds: "no unit tests applicable", a documentation criterion ("file F says S"),
+     or a measured criterion (a stated bound, met by a committed, cited measurement). A criterion
+     that fits no kind fails at acceptance by construction, two steps after the one edit that would
+     have fixed it. Three shapes reach that point, and each is **Important** here:
+   - **A non-functional criterion states its bound and how it is measured** (obs #206). A criterion
+     in the Performance subsection, or any criterion that bounds a time, size, count or rate, names a
+     **numeric bound** and **the command that measures it**. Missing either → **Important**: "state
+     the bound and the command, or replace the criterion with a test that pins it". Worked example:
+     task.164's AC7, "No measurable change beyond the new 4b test's three runs", which states no
+     bound.
+   - **A behaviour criterion names the test that holds it** (obs #222). A criterion that needs code
+     to *do* something when run — it cannot be stated as "file F says S" — and whose text or phase
+     names no test planned to hold it has **no planned test**. → **Important**: "name the test that
+     pins it, or re-scope the criterion". Worked example: task.142's "no process spawn, no network
+     call" and "SKILL.md reads memoised", true by inspection and failed at finalise for want of a
+     test.
+   - **A criterion can be met before merge** (obs #222). Closing an observation, a tracker item or a
+     registry row "on merge", or anything else whose evidence cannot exist until the PR merges, can
+     only be satisfied **after merge** — and finalise runs before merge. → **Important**: "move it to
+     Deferred Work or Notes". Worked example: task.142's "observation #159 marked actioned once this
+     merges".
 
 5. **Scope and Complexity Analysis**:
    - Count total implementation phases (>8 phases may indicate oversized task)
@@ -1123,7 +1147,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 **Issues to Flag**:
 
 - **Critical**: Major inconsistencies, missing critical tests, task too large (recommend splitting)
-- **Important**: Incomplete rollback plan, vague success criteria, task complexity high
+- **Important**: Incomplete rollback plan, vague success criteria, task complexity high; a non-functional criterion with no numeric bound or no stated measurement; a behaviour criterion with no planned test; a criterion that can only be met after merge (check 4)
 - **Optional**: Additional helpful tests or criteria, potential optimization for parallel development
 
 **Output**: Consistency and completeness report

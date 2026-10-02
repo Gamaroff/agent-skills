@@ -247,6 +247,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **A measured non-functional criterion has a defined path through review and finalise (task 166,
+  obs #206, obs #222).** finalise's AC prompt let two kinds of criterion pass without a per-PR test,
+  so a runtime, size or count bound failed by rule even when the measurement met it (task.164 AC7).
+  `finalise-dod-ac-prompt.md` § Step 3 now names a third kind, the **measured criterion**: `PASS`
+  needs a stated bound, a measurement meeting it, and the command that produced it, cited from a
+  committed artifact; an unbounded criterion stays `FAIL`, and a bound a per-PR test could assert is
+  a behaviour criterion. The Execution rule no longer restates the count. `review-task` Step 6
+  check 4 classifies each success criterion the way finalise will and raises **Important** for a
+  non-functional criterion with no numeric bound or measuring command, a behaviour criterion with no
+  planned test, and a criterion that can only be met after merge. Pinned by
+  `shared/resources/tests/finalise-dod-ac-kinds.test.mjs` (which also covers obs #204's untested
+  documentation kind and both bundled copies) and `tests/review-task-measured-criterion.test.js`.
+
 - **The QA Testing Results section has one writer, one place, and refuses to stack (task 155, obs #178).**
   `qa-task` Step 12 and `qa-story` Step 12 item 3 said "replace the section whole" and named no tool,
   so every run hand-wrote the edit — and a hand-written replace whose two boundaries come from two
