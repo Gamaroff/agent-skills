@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-10-01
-**Next Available Task Number:** **175**
+**Last Updated:** 2026-10-02
+**Next Available Task Number:** **176**
 
 ## How to use
 
@@ -215,6 +215,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 172 | [One docs-only CI rule at every pipeline CI wait](task.172.ci-docs-only-tree-equivalence/task.172.ci-docs-only-tree-equivalence.md) | accepted | infrastructure | High | 2026-10-01 | [#539](https://github.com/Gamaroff/agent-skills/issues/539) | — tinker-city hand-off (2026-09-30) change 1: shared engine; /finalise readings 1–2, /develop-next and /develop-batch Step 3 record SUCCESS (tree-equivalent to <sha>) on a docs-only delta over a green ancestor |
 | 173 | [Fold the 5c review and its doc-only fixes into the acceptance commit](task.173.fold-5c-review-into-acceptance-commit/task.173.fold-5c-review-into-acceptance-commit.md) | planned | refactoring | Medium | 2026-10-01 | [#540](https://github.com/Gamaroff/agent-skills/issues/540) | task.172 · tinker-city hand-off change 2: 5c report + doc-only CONCERNS fixes ride 6a; 8a and the PreCompact pause commit only their own paths |
 | 174 | [Publish the docs-only CI classifier as an optional consumer template](task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md) | planned | infrastructure | Low | 2026-10-01 | [#541](https://github.com/Gamaroff/agent-skills/issues/541) | — blocked on tinker-city task.127 (#982, another repository) merging and running on real CI; Phase 0 halts until then. Hand-off change 4 |
+| 175 | [/review-pr accepts a Jira card or GitHub issue and resolves it to its PR](task.175.review-pr-tracker-issue-input/task.175.review-pr-tracker-issue-input.md) | planned | infrastructure | Medium | 2026-10-02 | — | — Start /review-pr from a Jira key/URL, GitHub issue or `#N`; card → doc → PR resolution with selection rules; PR-URL host check. Phase 0 must prove the Bitbucket key search first. |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
