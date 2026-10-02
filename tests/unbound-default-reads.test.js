@@ -80,6 +80,21 @@ const INPUTS = new Map([
     "skills/review-pr/SKILL.md#TARGET",
     "the Skill's positional argument, bound by the invocation",
   ],
+  // task.176 (QA cycle 1, CR-2/CR-4): the rungs 3–4 block is its own shell and re-binds KIND from
+  // Step 0b's printed line; the `:?` is the loud-failure guard.
+  [
+    "skills/review-pr/SKILL.md#KIND",
+    "re-bound input of the rungs 3–4 block (Step 0b's printed line); the `:?` is the loud-failure guard",
+  ],
+  // task.176 (QA cycle 1, CR-7): the §0a lookup's two inputs, bound by each call site.
+  [
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md#KEY_FIELD",
+    "input of the §0a Key → document lookup, bound by each call site; the `:?` is the loud-failure guard",
+  ],
+  [
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md#KEY_VALUE",
+    "input of the §0a Key → document lookup, bound by each call site; an empty value would match every blank key",
+  ],
   [
     "shared/resources/develop-pipeline-step-8-commit.md#IMPLEMENTATION_REPORT",
     "passed by the orchestrator as an env var (finalise Step 6a states the same contract)",

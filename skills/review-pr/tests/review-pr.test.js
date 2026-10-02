@@ -764,12 +764,12 @@ const PARSER_CASES = [
   ["123", { kind: "pr", pr: "123" }],
   [
     "https://github.com/o/r/pull/12",
-    { kind: "pr", pr: "12", host: "github.com" },
+    { kind: "pr", pr: "12", host: "github.com", repo: "o/r" },
   ],
   // Before task.176 this bound PR=files: Step 0b took ${TARGET##*/}.
   [
     "https://github.com/o/r/pull/12/files",
-    { kind: "pr", pr: "12", host: "github.com" },
+    { kind: "pr", pr: "12", host: "github.com", repo: "o/r" },
   ],
   [
     "https://bitbucket.org/ws/repo/pull-requests/7",
@@ -781,7 +781,7 @@ const PARSER_CASES = [
   ],
   [
     "https://ghe.corp.example/o/r/pull/44",
-    { kind: "pr", pr: "44", host: "ghe.corp.example" },
+    { kind: "pr", pr: "44", host: "ghe.corp.example", repo: "o/r" },
   ],
   ["feature/task.1.thing", { kind: "branch", branch: "feature/task.1.thing" }],
   ["RAPP-702", { kind: "jira", jira_key: "RAPP-702" }],
@@ -815,6 +815,20 @@ const PARSER_CASES = [
     "https://github.com/o/r/issues/536#issuecomment-1",
     { kind: "github-issue", issue_num: "536", host: "github.com", repo: "o/r" },
   ],
+  // Positional GitHub paths (QA cycle 1, CR-8): an owner or repo named `issues` / `pull` is not the marker.
+  [
+    "https://github.com/org/issues/issues/5",
+    {
+      kind: "github-issue",
+      issue_num: "5",
+      host: "github.com",
+      repo: "org/issues",
+    },
+  ],
+  [
+    "https://github.com/o/pull/pull/3",
+    { kind: "pr", pr: "3", host: "github.com", repo: "o/pull" },
+  ],
 ];
 
 for (const shell of SHELLS) {
@@ -832,6 +846,10 @@ for (const shell of SHELLS) {
     ["https://github.com/o/r/tree/main", "url-no-target"],
     ["https://acme.atlassian.net/wiki/spaces/X", "url-no-target"],
     ["#abc", "bad-issue-ref"],
+    // QA cycle 1, QA-1: output is one key=value per line, so a newline would forge a line.
+    ["RAPP-1\nkind=pr", "control-character"],
+    ["x\npr=5", "control-character"],
+    ["feature/a\tb", "control-character"],
   ]) {
     test(`parser (${shell}): malformed ${input} is refused with a named reason, never a branch`, () => {
       const out = parseTarget(shell, input);
@@ -861,14 +879,54 @@ test("the parser is executable and declared in Step 0b", () => {
 // ---------------------------------------------------------------------------
 // task.176 — Step 0b's own blocks, executed: binding and the per-kind host check.
 // ---------------------------------------------------------------------------
-function step0b(shell, env, { ghRepo } = {}) {
-  const [parse, host] = bashBlocks(
+// A consumer-shaped repository: Step 0b binds REMOTE_URL itself from `git remote get-url origin`,
+// so the fixture is a git repo whose origin is the remote under test.
+function consumerRepo(remote) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-repo-"));
+  spawnSync("git", ["init", "-q", dir]);
+  if (remote) spawnSync("git", ["-C", dir, "remote", "add", "origin", remote]);
+  const bin = path.join(dir, ".bin");
+  fs.mkdirSync(bin);
+  return { dir, bin };
+}
+
+// The environment a block runs in: the host's, minus the platform variables a developer's shell may
+// carry, plus the case's own. A stray JIRA_URL would make every fixture a Jira repository.
+function blockEnv(bin, env) {
+  const base = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+  for (const k of [
+    "JIRA_URL",
+    "TRACKER",
+    "VCS",
+    "SKILLS_CONFIG_FILE",
+    "AGENT_SKILLS_ACCESS_TRACKER",
+    "AGENT_SKILLS_ACCESS_VCS",
+  ])
+    delete base[k];
+  return { ...base, ...env };
+}
+
+// Step 0b is ONE block (task.176 QA cycle 1, CR-3): run it exactly as delivered, only re-pointing the
+// two relative paths at this skill's files.
+function step0bBlock() {
+  const blocks = bashBlocks(
     section("### Step 0b — Parse `target`", "### Step 1 — Resolve the PR"),
   );
-  assert.ok(parse && host, "Step 0b has a parse block and a host-check block");
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-0b-"));
-  const bin = path.join(dir, "bin");
-  fs.mkdirSync(bin);
+  assert.equal(
+    blocks.length,
+    1,
+    "Step 0b is one fenced block — parse and host check share a shell",
+  );
+  return blocks[0]
+    .replace(
+      "source references/resolve-platform.sh",
+      `source "${path.join(ROOT, "references", "resolve-platform.sh")}"`,
+    )
+    .replace(".agents/skills/review-pr/scripts/parse-target.sh", PARSER);
+}
+
+function step0b(shell, { REMOTE_URL, ...env }, { ghRepo } = {}) {
+  const { dir, bin } = consumerRepo(REMOTE_URL);
   // Stub gh for the GitHub-issue arm's tracker-repo read; never the real CLI.
   fs.writeFileSync(
     path.join(bin, "gh"),
@@ -876,14 +934,9 @@ function step0b(shell, env, { ghRepo } = {}) {
     { mode: 0o755 },
   );
   const script =
-    parse.replace(".agents/skills/review-pr/scripts/parse-target.sh", PARSER) +
-    "\n" +
-    host +
+    step0bBlock() +
     '\necho "BOUND kind=$KIND pr=$PR branch=$BRANCH key=$JIRA_KEY issue=$ISSUE_NUM"\n';
-  return runScript(shell, script, {
-    cwd: ROOT,
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, ...env },
-  });
+  return runScript(shell, script, { cwd: dir, env: blockEnv(bin, env) });
 }
 
 for (const shell of SHELLS) {
@@ -1113,14 +1166,11 @@ test("an epic key HALTs: detected after rung 1 from the doc, else from the card'
 
 test("a key match alone is never auto-resolved, not even a single one", () => {
   const a = STEP1A();
+  assert.match(a, /Rung 4's key matches are \*\*candidates, never answers\*\*/);
+  assert.match(a, /match is \*\*never auto-picked\*\*, not even a single one/);
   assert.match(
     a,
-    /\*\*Rung 4 — key matches are candidates, never answers\.\*\*/,
-  );
-  assert.match(a, /is \*\*never auto-picked\*\*, not even a single one/);
-  assert.match(
-    a,
-    /An auto-pick requires the doc's `pr_number:` or branch stem/,
+    /An auto-pick requires the doc's `pr_number:`\s+or branch stem/,
   );
 });
 
@@ -1224,6 +1274,16 @@ function lookupFixture() {
     "docs/tasks/task.101.thing/task.101.pr-review.1.thing.md",
     "---\njira_key: 'RAPP-702'\n---\n",
   );
+  // finalise writes this beside every accepted item with the item's key, and it has no dotted kind
+  // segment (QA cycle 1, CR-1: 125 of them in this repo made every finalised item halt as ambiguous).
+  put(
+    "docs/tasks/task.101.thing/sprint-review-summary.md",
+    "---\njira_key: 'RAPP-702'\ngithub_issue: 55\n---\n",
+  );
+  put(
+    "docs/tasks/task.101.thing/task.101.sprint-review-summary.md",
+    "---\njira_key: 'RAPP-702'\n---\n",
+  );
   // A neighbour whose key extends this one, and an issue number that this one prefixes.
   put(
     "docs/tasks/task.102.other/task.102.other.md",
@@ -1233,15 +1293,17 @@ function lookupFixture() {
 }
 
 for (const shell of SHELLS) {
-  const run = (dir, field, value) => {
-    const r = runScript(
+  const runRaw = (dir, field, value) =>
+    runScript(
       shell,
-      `${lookupBlock()}\necho "COUNT=$DOC_COUNT PATH=$LOCAL_PATH"\n`,
+      `${lookupBlock()}\necho "STATUS=$DOC_STATUS COUNT=$DOC_COUNT PATH=$LOCAL_PATH"\n`,
       {
         cwd: dir,
         env: { ...process.env, KEY_FIELD: field, KEY_VALUE: value },
       },
     );
+  const run = (dir, field, value) => {
+    const r = runRaw(dir, field, value);
     assert.equal(r.status, 0, r.stderr);
     return r.stdout;
   };
@@ -1282,9 +1344,31 @@ for (const shell of SHELLS) {
       path.join(dir, "docs/tasks/task.103.dup/task.103.dup.md"),
       "---\njira_key: RAPP-702\n---\n",
     );
-    const out = run(dir, "jira_key", "RAPP-702");
-    assert.match(out, /HALT: jira_key RAPP-702 matches 2 documents:/);
-    assert.match(out, /COUNT=2 PATH=$/m);
+    const r = runRaw(dir, "jira_key", "RAPP-702");
+    // Exit 1, never the not-found value (QA cycle 1, CR-5): callers branch on an empty LOCAL_PATH.
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /HALT: jira_key RAPP-702 matches 2 documents:/);
+    assert.doesNotMatch(
+      r.stdout,
+      /COUNT=/,
+      "the block stops; nothing after it runs",
+    );
+  });
+
+  test(`§0a lookup (${shell}): an unbound KEY_VALUE fails loudly instead of matching blank keys`, () => {
+    const dir = lookupFixture();
+    fs.writeFileSync(
+      path.join(dir, "docs/tasks/task.102.other/task.102.blank.md"),
+      "---\njira_key: ''\n---\n",
+    );
+    const r = runRaw(dir, "jira_key", "");
+    assert.notEqual(
+      r.status,
+      0,
+      "an empty KEY_VALUE stops the block (QA cycle 1, CR-7)",
+    );
+    assert.doesNotMatch(r.stdout, /PATH=docs/);
+    assert.match(r.stderr, /KEY_VALUE/);
   });
 }
 
@@ -1314,3 +1398,179 @@ test("§0a's four call sites cite the lookup instead of carrying their own grep"
     "no PCRE lookbehind under grep -E",
   );
 });
+
+// ---------------------------------------------------------------------------
+// task.176 QA cycle 1 — the fixes, executed.
+// ---------------------------------------------------------------------------
+for (const shell of SHELLS) {
+  test(`Step 0b (${shell}): a GitHub PR URL for another repo on the same host HALTs (CR-9)`, () => {
+    const r = step0b(shell, {
+      TARGET: "https://github.com/other/repo/pull/12",
+      REMOTE_URL: "git@github.com:o/r.git",
+    });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /HALT: PR URL is for other\/repo, but this repo is o\/r/,
+    );
+  });
+
+  test(`Step 0b (${shell}): an SSH-alias remote only warns — its host cannot prove a mismatch (CR-6)`, () => {
+    for (const remote of [
+      "git@github-work:o/r.git",
+      "ssh://git@ssh.github.com:443/o/r.git",
+    ]) {
+      const r = step0b(shell, {
+        TARGET: "https://github.com/o/r/pull/12",
+        REMOTE_URL: remote,
+      });
+      assert.equal(r.status, 0, `${remote}: ${r.stdout}${r.stderr}`);
+      assert.match(r.stdout, /BOUND kind=pr pr=12 /);
+    }
+    const alias = step0b(shell, {
+      TARGET: "https://github.com/o/r/pull/12",
+      REMOTE_URL: "git@github-work:o/r.git",
+    });
+    assert.match(
+      alias.stdout,
+      /⚠️ remote host github-work is not a known platform host/,
+    );
+  });
+
+  test(`Step 0b (${shell}): the block prints its bound values for the next block to re-bind`, () => {
+    const r = step0b(shell, {
+      TARGET: "RAPP-702",
+      REMOTE_URL: "git@github.com:o/r.git",
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(
+      r.stdout,
+      /^KIND=jira PR= BRANCH=\S* JIRA_KEY=RAPP-702 ISSUE_NUM=$/m,
+    );
+  });
+}
+
+// Rungs 3–4 are one self-contained block (CR-2, CR-4): run it as delivered with a stub gh.
+function rungsBlock() {
+  const blocks = bashBlocks(STEP1A());
+  const b = blocks.find((x) => x.includes("bb_pr_search()"));
+  assert.ok(b, "the rungs 3–4 block defines bb_pr_search");
+  return b
+    .replace(
+      "source references/resolve-platform.sh",
+      `source "${path.join(ROOT, "references", "resolve-platform.sh")}"`,
+    )
+    .replace(
+      "source references/bitbucket-auth.sh",
+      `source "${path.join(ROOT, "references", "bitbucket-auth.sh")}"`,
+    );
+}
+
+test("bb_pr_search is defined in the same block as every call to it (CR-2)", () => {
+  const blocks = bashBlocks(STEP1A());
+  const callers = blocks.filter((b) => /bb_pr_search "/.test(b));
+  assert.ok(callers.length > 0, "bb_pr_search is called");
+  for (const b of callers)
+    assert.match(
+      b,
+      /bb_pr_search\(\) \{/,
+      "a block that calls bb_pr_search defines it",
+    );
+  const calls = (rungsBlock().match(/bb_pr_search "/g) || []).length;
+  assert.equal(calls, 2, "rung 3 and rung 4 both call it from the one block");
+});
+
+for (const shell of SHELLS) {
+  const runRungs = (env, ghScript) => {
+    const { dir, bin } = consumerRepo("git@github.com:o/r.git");
+    fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\n${ghScript}\n`, {
+      mode: 0o755,
+    });
+    return runScript(shell, rungsBlock(), {
+      cwd: dir,
+      env: blockEnv(bin, env),
+    });
+  };
+
+  test(`rungs 3–4 (${shell}): the branch stem binds STEM itself and finds the PR on that branch (CR-4)`, () => {
+    const list = JSON.stringify([
+      { number: 7, headRefName: "feature/task.101.thing", state: "OPEN" },
+      { number: 8, headRefName: "feature/task.101.thing-two", state: "OPEN" },
+      { number: 9, headRefName: "feature/task.1010.thing", state: "MERGED" },
+    ]);
+    const r = runRungs(
+      {
+        KIND: "jira",
+        JIRA_KEY: "RAPP-702",
+        ISSUE_NUM: "",
+        DOC_FILE: "docs/tasks/task.101.thing/task.101.thing.md",
+      },
+      `echo '${list}'`,
+    );
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^RUNG=branch stem$/m);
+    assert.match(r.stdout, /"number":7/);
+    assert.doesNotMatch(
+      r.stdout,
+      /"number":(8|9)/,
+      "anchored on the last segment, not a substring",
+    );
+  });
+
+  test(`rungs 3–4 (${shell}): a failed search HALTs instead of reading as zero candidates (CR-2)`, () => {
+    const r = runRungs(
+      {
+        KIND: "jira",
+        JIRA_KEY: "RAPP-702",
+        ISSUE_NUM: "",
+        DOC_FILE: "docs/tasks/task.101.thing/task.101.thing.md",
+      },
+      "echo 'gh: network down' >&2; exit 1",
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /HALT: gh pr list failed/);
+    assert.doesNotMatch(r.stdout, /RUNG=/);
+  });
+
+  test(`rungs 3–4 (${shell}): no document → rung 4 key search, recorded as candidates`, () => {
+    const hits = JSON.stringify([
+      {
+        number: 3,
+        title: "RAPP-702 docs",
+        state: "MERGED",
+        headRefName: "docs/x",
+      },
+    ]);
+    const r = runRungs(
+      { KIND: "jira", JIRA_KEY: "RAPP-702", ISSUE_NUM: "", DOC_FILE: "" },
+      `echo '${hits}'`,
+    );
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /^RUNG=key search$/m);
+    assert.match(r.stdout, /"number":3/);
+  });
+
+  test(`rungs 3–4 (${shell}): an unbound KIND fails loudly`, () => {
+    const r = runRungs({ JIRA_KEY: "RAPP-702", DOC_FILE: "" }, "echo '[]'");
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /KIND/);
+  });
+}
+
+// Every fenced bash block parses under bash AND zsh. An apostrophe inside a `${NAME:?…}` word within
+// double quotes is accepted by zsh and is an unterminated quote to bash (task.176 QA cycle 1): the
+// whole block then fails to run, which an assertion on its text never notices.
+for (const shell of SHELLS) {
+  test(`every SKILL.md bash block parses under ${shell} -n`, () => {
+    const blocks = bashBlocks(SKILL);
+    assert.ok(blocks.length > 10, "bash blocks found");
+    const bad = [];
+    blocks.forEach((b, i) => {
+      const r = spawnSync(shell, shArgv(shell, ["-n", "-c", b]), {
+        encoding: "utf8",
+      });
+      if (r.status !== 0) bad.push(`block ${i + 1}: ${r.stderr.trim()}`);
+    });
+    assert.deepEqual(bad, []);
+  });
+}

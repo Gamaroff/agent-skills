@@ -91,11 +91,16 @@ The parsing is a pure, offline script —
 it under bash and zsh. Prose cannot prove a URL parses; a script can.
 
 ```bash
+# One block, one shell: the host check below reads what the parse binds, so the two
+# cannot be split — a host check run in a shell of its own sees KIND="" and passes
+# every target silently.
+source references/resolve-platform.sh || exit 1          # TRACKER, VCS
+REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 BRANCH=$(git branch --show-current)
 PR="" KIND="" JIRA_KEY="" ISSUE_NUM="" TARGET_HOST="" TARGET_REPO=""
-# A refusal (malformed URL, `#abc`) exits 2 with its reason on stderr — HALT and show it.
-# A URL never falls through to the branch arm: that is how a pasted Jira link used to
-# become "no pull request found for https://…".
+# A refusal (malformed URL, `#abc`, a control character) exits 2 with its reason on
+# stderr — HALT and show it. A URL never falls through to the branch arm: that is how
+# a pasted Jira link used to become "no pull request found for https://…".
 PARSED=$(bash .agents/skills/review-pr/scripts/parse-target.sh "${TARGET:-}") || exit 1
 while IFS='=' read -r k v; do
   case "$k" in
@@ -110,6 +115,51 @@ while IFS='=' read -r k v; do
 done <<EOF
 $PARSED
 EOF
+
+# Host check, per kind. `#` delimiters: the www/api alternation needs `|`, and a
+# `|`-delimited sed fails to parse, prints nothing, and makes both sides "" — an equal
+# pair, so the check would pass silently. ssh.github.com / altssh.bitbucket.org are
+# the platforms' port-443 SSH hosts, the same platform as the web host.
+norm_host() { printf '%s\n' "${1}" | sed -E 's#^[A-Za-z+]+://##; s#^[^@/]*@##; s#[:/].*$##; s#^(www|api)\.##; s#^ssh\.github\.com$#github.com#; s#^altssh\.bitbucket\.org$#bitbucket.org#' | tr '[:upper:]' '[:lower:]'; }
+repo_of()   { printf '%s\n' "${1}" | sed -E 's#\.git$##; s#/+$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#' | tr '[:upper:]' '[:lower:]'; }
+lc()        { printf '%s' "${1}" | tr '[:upper:]' '[:lower:]'; }
+REMOTE_HOST=$(norm_host "$REMOTE_URL")
+case "$KIND" in
+  pr)
+    if [ -n "$TARGET_HOST" ]; then                     # a bare number has no host to check
+      case "$REMOTE_HOST" in
+        github.com|bitbucket.org)
+          if [ "$(norm_host "$TARGET_HOST")" != "$REMOTE_HOST" ]; then
+            echo "HALT: PR URL host $TARGET_HOST does not match this repo's remote $REMOTE_HOST ($REMOTE_URL)"; exit 1
+          fi
+          if [ -n "$TARGET_REPO" ] && [ "$(lc "$TARGET_REPO")" != "$(repo_of "$REMOTE_URL")" ]; then
+            echo "HALT: PR URL is for $TARGET_REPO, but this repo is $(repo_of "$REMOTE_URL") ($REMOTE_URL)"; exit 1
+          fi ;;
+        "")
+          echo "⚠️ no origin remote — PR URL host not checked" ;;
+        *)
+          # An SSH alias (git@github-work:o/r.git) or a self-hosted server: the remote's
+          # host is not a name this check can compare, so it cannot prove a mismatch.
+          [ "$(norm_host "$TARGET_HOST")" = "$REMOTE_HOST" ] \
+            || echo "⚠️ remote host $REMOTE_HOST is not a known platform host (an SSH alias?) — PR URL host $TARGET_HOST not compared" ;;
+      esac
+    fi ;;
+  jira)
+    if [ -n "$TARGET_HOST" ] && [ -n "$JIRA_URL" ] && [ "$(norm_host "$TARGET_HOST")" != "$(norm_host "$JIRA_URL")" ]; then
+      echo "⚠️ Jira URL host $TARGET_HOST differs from JIRA_URL $(norm_host "$JIRA_URL") — continuing with key $JIRA_KEY"
+    fi ;;
+  github-issue)
+    if [ -n "$TARGET_REPO" ] && [ "$TRACKER" = "github" ]; then
+      TRACKER_REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
+      if [ -n "$TRACKER_REPO" ] && [ "$(lc "$TARGET_REPO")" != "$(lc "$TRACKER_REPO")" ]; then
+        echo "HALT: issue URL is for $TARGET_REPO, but this repo's GitHub tracker is $TRACKER_REPO"; exit 1
+      fi
+    fi ;;
+esac
+
+# The bound values, printed so the steps below re-bind them: every fenced block is
+# its own shell, and a value computed here does not exist in the next one.
+printf 'KIND=%s PR=%s BRANCH=%s JIRA_KEY=%s ISSUE_NUM=%s\n' "$KIND" "$PR" "$BRANCH" "$JIRA_KEY" "$ISSUE_NUM"
 ```
 
 | `KIND` | From | Next |
@@ -131,36 +181,11 @@ it as an issue on GitHub only when `gh pr view` fails and `gh issue view` succee
 #### Host check, per kind
 
 Never "every URL against the git remote" — that would halt every Jira URL, which is never hosted where
-the code is.
-
-```bash
-# `#` delimiters: the www/api alternation needs `|`, and a `|`-delimited sed fails to parse,
-# prints nothing, and turns both sides into "" — an equal pair, so the check passes silently.
-norm_host() { printf '%s\n' "${1}" | sed -E 's#^[A-Za-z+]+://##; s#^[^@/]*@##; s#[:/].*$##; s#^(www|api)\.##' | tr '[:upper:]' '[:lower:]'; }
-REMOTE_HOST=$(norm_host "$REMOTE_URL")
-case "$KIND" in
-  pr)
-    if [ -n "$TARGET_HOST" ] && [ -n "$REMOTE_HOST" ] && [ "$(norm_host "$TARGET_HOST")" != "$REMOTE_HOST" ]; then
-      echo "HALT: PR URL host $TARGET_HOST does not match this repo's remote $REMOTE_HOST ($REMOTE_URL)"; exit 1
-    fi ;;
-  jira)
-    if [ -n "$TARGET_HOST" ] && [ -n "$JIRA_URL" ] && [ "$(norm_host "$TARGET_HOST")" != "$(norm_host "$JIRA_URL")" ]; then
-      echo "⚠️ Jira URL host $TARGET_HOST differs from JIRA_URL $(norm_host "$JIRA_URL") — continuing with key $JIRA_KEY"
-    fi ;;
-  github-issue)
-    if [ -n "$TARGET_REPO" ] && [ "$TRACKER" = "github" ]; then
-      TRACKER_REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
-      LC() { printf '%s' "${1}" | tr '[:upper:]' '[:lower:]'; }
-      if [ -n "$TRACKER_REPO" ] && [ "$(LC "$TARGET_REPO")" != "$(LC "$TRACKER_REPO")" ]; then
-        echo "HALT: issue URL is for $TARGET_REPO, but this repo's GitHub tracker is $TRACKER_REPO"; exit 1
-      fi
-    fi ;;
-esac
-```
+the code is. The check is the second half of the block above.
 
 | Kind | Compared against | On mismatch |
 | --- | --- | --- |
-| PR URL | the host of `git remote get-url origin` | **HALT**, naming both — a GitHub PR URL pasted into a Bitbucket checkout used to be looked up on Bitbucket |
+| PR URL | the host of `git remote get-url origin`, and on github.com / bitbucket.org its `owner/repo` | **HALT**, naming both — a GitHub PR URL pasted into a Bitbucket checkout used to be looked up on Bitbucket, and `github.com/other/repo/pull/12` would review this repo's #12. A remote whose host is an SSH alias or a self-hosted server only **warns**: its name cannot prove a mismatch |
 | Jira URL | the host of `JIRA_URL` | **warn**, naming both, and continue with the key — the key is what resolves |
 | GitHub issue URL | `owner/repo` of the GitHub tracker | **HALT**, naming both |
 
@@ -177,59 +202,101 @@ A first-hit-wins ladder. Record the rung as `resolved_via` (`jira key → <rung>
 
 | # | Rung | Mechanism |
 | --- | --- | --- |
-| 1 | **work item doc** | [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) with `KEY_FIELD=jira_key KEY_VALUE=$JIRA_KEY`, or `KEY_FIELD=github_issue KEY_VALUE=$ISSUE_NUM` → `DOC_FILE`. Cited, not restated: one anchored, quote-tolerant lookup serves the develop pipelines and this skill |
+| 1 | **work item doc** | [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) with `KEY_FIELD=jira_key KEY_VALUE=$JIRA_KEY`, or `KEY_FIELD=github_issue KEY_VALUE=$ISSUE_NUM`; it binds `LOCAL_PATH`, and `DOC_FILE=$LOCAL_PATH` hands it on. Cited, not restated: one anchored, quote-tolerant lookup serves the develop pipelines and this skill |
 | 2 | doc's `pr_number:` | `sed -nE "s/^pr_number:[[:space:]]*['\"]?([0-9]+)['\"]?[[:space:]]*$/\1/p" "$DOC_FILE"` → `PR` |
-| 3 | **branch stem** | `STEM=$(basename "$DOC_FILE" .md)`; a PR whose source branch is `STEM` or ends in `/STEM` — see the commands below |
+| 3 | **branch stem** | `STEM=$(basename "$DOC_FILE" .md)`; a PR whose source branch is `STEM` or ends in `/STEM` — the rungs 3–4 block below |
 | 4 | key / closing PR | Jira: a PR whose title or description names `JIRA_KEY` — **candidates only**. GitHub issue: `gh issue view "$ISSUE_NUM" --json closedByPullRequestsReferences` — **`VCS=github` only** |
 | 5 | branch fallback | `KIND=jira` and still nothing → `BRANCH="$JIRA_KEY"`, Step 1b; `resolved_via: jira key → branch fallback` (a branch may be named `RAPP-702`) |
 | 6 | none | **HALT** naming every rung tried: `"No pull request found for {target}: tried work item doc, pr_number, branch stem, key search, branch fallback."` |
 
 **Rung 1 — no doc, or an epic.** No document → skip rungs 2–3 and continue at rung 4; the review that
-follows may be code-only (Step 2, rung 6). The §0a lookup's own HALT on several matching documents is
+follows may be code-only (Step 2, rung 6). The §0a lookup's own HALT on several matching documents (it exits 1) is
 honoured, never overridden with `head -1`. **Epic** → **HALT**: `"{key} is an epic — pass a story or
 task key."` An epic is detected after rung 1: the resolved doc's filename starts `epic.` or its
 frontmatter carries `type: epic`; with no doc and `TRACKER=jira`, the Step 3b call's
 `fields.issuetype.name` reads `Epic`. Reviewing every PR of an epic is out of scope.
 
-**Rung 3 — branch stem.** `gh pr list --head` is an exact match and the source branch carries a
-prefix (`feature/`, `bugfix/`), so filter client-side, anchored on the last segment:
+**Rungs 3 and 4 run as one block.** `gh pr list --head` is an exact match and the source branch
+carries a prefix (`feature/`, `bugfix/`), so rung 3 filters client-side, anchored on the last
+segment. Rung 4's key matches are **candidates, never answers**: one Jira card matched 3 merged PRs by
+title and 5 by description, two of them docs-only (a tracker reconcile, a card sync). A title or
+description match is **never auto-picked**, not even a single one: list the candidates and ask
+(interactive), or halt with the list (non-interactive). An auto-pick requires the doc's `pr_number:`
+or branch stem.
+
+The block is self-contained because every fenced block is its own shell: `bb_pr_search` is defined
+where both rungs call it, and the inputs are re-bound at its top — `KIND`, `JIRA_KEY` and
+`ISSUE_NUM` from Step 0b's printed line, `DOC_FILE` from rung 1 (empty when no document resolved).
+A failed request is a HALT, never an empty result: "no candidates" must mean the search ran.
 
 ```bash
-# GitHub (VCS=github). --limit 1000, not 100: an older work item's PR must not drop off a short page.
-gh pr list --state all --limit 1000 --json number,headRefName,state |
-  jq -c --arg s "$STEM" '.[] | select(.headRefName == $s or (.headRefName | endswith("/" + $s)))
-                         | {number, state, branch: .headRefName}'
+source references/resolve-platform.sh || exit 1          # VCS
+: "${KIND:?re-bind KIND from the line Step 0b printed}"
+if [ "$VCS" = "bitbucket" ]; then
+  REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+  BB_PATH=$(echo "$REMOTE_URL" | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+  BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
+  BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
+  BB_API="https://api.bitbucket.org/2.0"
+  source references/bitbucket-auth.sh || exit 1
+fi
 
-# Bitbucket (VCS=bitbucket). Every page, every state — merged PRs are a supported target.
+# Every page, every state — merged PRs are a supported target.
 bb_pr_search() {   # ${1} = an unencoded q= expression
-  BB_Q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "${1}")
+  BB_Q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "${1}") || return 1
   BB_URL="${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests?q=${BB_Q}&state=OPEN&state=MERGED&state=DECLINED&pagelen=50&fields=values.id,values.title,values.state,values.source.branch.name,next"
   while [ -n "$BB_URL" ]; do
     BB_PAGE=$(curl -sf "${BB_CURL_AUTH[@]}" "$BB_URL") || return 1
-    printf '%s\n' "$BB_PAGE" | jq -c '.values[] | {number: .id, title, state, branch: .source.branch.name}'
-    BB_URL=$(printf '%s\n' "$BB_PAGE" | jq -r '.next // empty')
+    printf '%s\n' "$BB_PAGE" | jq -c '.values[] | {number: .id, title, state, branch: .source.branch.name}' || return 1
+    BB_URL=$(printf '%s\n' "$BB_PAGE" | jq -r '.next // empty') || return 1
   done
 }
-bb_pr_search "source.branch.name ~ \"$STEM\"" |
-  jq -c --arg s "$STEM" 'select(.branch == $s or (.branch | endswith("/" + $s)))'
-```
 
-**Rung 4 — key matches are candidates, never answers.** One Jira card matched 3 merged PRs by title and
-5 by description, two of them docs-only (a tracker reconcile, a card sync). A title or description match
-is **never auto-picked**, not even a single one: list the candidates and ask (interactive), or halt with
-the list (non-interactive). An auto-pick requires the doc's `pr_number:` or branch stem. The searches:
+CANDIDATES="" RUNG=""
+# Rung 3 — branch stem, only when rung 1 resolved a document.
+if [ -n "$DOC_FILE" ]; then
+  STEM=$(basename "$DOC_FILE" .md)
+  if [ "$VCS" = "github" ]; then
+    # --limit 1000, not 100: an older work item's PR must not drop off a short page.
+    ALL=$(gh pr list --state all --limit 1000 --json number,headRefName,state) || { echo "HALT: gh pr list failed"; exit 1; }
+    CANDIDATES=$(printf '%s\n' "$ALL" | jq -c --arg s "$STEM" '.[] | select(.headRefName == $s or (.headRefName | endswith("/" + $s)))
+                         | {number, state, branch: .headRefName}') || exit 1
+  else
+    HITS=$(bb_pr_search "source.branch.name ~ \"$STEM\"") || { echo "HALT: Bitbucket PR search failed"; exit 1; }
+    CANDIDATES=$(printf '%s\n' "$HITS" | jq -c --arg s "$STEM" 'select(.branch == $s or (.branch | endswith("/" + $s)))') || exit 1
+  fi
+  [ -z "$CANDIDATES" ] || RUNG="branch stem"
+fi
 
-```bash
-# Jira key, GitHub VCS
-gh pr list --state all --limit 100 --search "$JIRA_KEY in:title,body" --json number,title,state,headRefName
-# Jira key, Bitbucket VCS
-bb_pr_search "title ~ \"$JIRA_KEY\" OR description ~ \"$JIRA_KEY\""
-# GitHub issue, GitHub VCS only — lists only PRs that use a closing keyword (`Closes #N`)
-gh issue view "$ISSUE_NUM" --json closedByPullRequestsReferences -q '.closedByPullRequestsReferences[] | {number}'
+# Rung 4 — key search (candidates only) or closing PR (GitHub VCS only).
+if [ -z "$CANDIDATES" ]; then
+  case "$KIND:$VCS" in
+    jira:github)
+      ALL=$(gh pr list --state all --limit 100 --search "$JIRA_KEY in:title,body" --json number,title,state,headRefName) \
+        || { echo "HALT: gh pr list --search failed"; exit 1; }
+      CANDIDATES=$(printf '%s\n' "$ALL" | jq -c '.[] | {number, state, title, branch: .headRefName}') || exit 1
+      RUNG="key search" ;;
+    jira:bitbucket)
+      CANDIDATES=$(bb_pr_search "title ~ \"$JIRA_KEY\" OR description ~ \"$JIRA_KEY\"") \
+        || { echo "HALT: Bitbucket PR search failed"; exit 1; }
+      RUNG="key search" ;;
+    github-issue:github)
+      # Lists only PRs that use a closing keyword (`Closes #N`).
+      REFS=$(gh issue view "$ISSUE_NUM" --json closedByPullRequestsReferences) || { echo "HALT: gh issue view failed"; exit 1; }
+      CANDIDATES=$(printf '%s\n' "$REFS" | jq -c '.closedByPullRequestsReferences[] | {number, url}') || exit 1
+      RUNG="closing PR" ;;
+    github-issue:bitbucket)
+      RUNG="closing PR skipped — GitHub-only" ;;
+  esac
+fi
+
+printf 'RUNG=%s\n' "${RUNG:-none}"
+[ -z "$CANDIDATES" ] || printf '%s\n' "$CANDIDATES"
 ```
 
 A closing reference is a link the PR's author declared, not a text match, so it goes through the
-selection rules below like rungs 2–3.
+selection rules below like rungs 2–3. It carries no state: one reference → use it; several → the
+**several** row.
 
 **GitHub issue with `VCS=bitbucket`: rungs 1–3 only.** Rung 4's `closedByPullRequestsReferences` is a
 GitHub PR field; a Bitbucket repo has no such link. Skip it, and when nothing resolves, the HALT names
@@ -315,9 +382,11 @@ Rung 1 handles `task.{N}.*`, `story.{E}.{S}.*`, `epic.{N}.*` and `bug.{N}.*`. Ru
 
 ```
 .qa.  .gate.  .bug.  .implementation.  .review.  .dod.  .plan.  .handover.  .pr-review.  .request.
+sprint-review-summary.md
 ```
 
-`.request.` is there because a `{kind}.{N}.request.{n}.*.md` carries the same `jira_key` as its work
+`sprint-review-summary.md` is matched by name, since it has no dotted kind segment; `/finalise`
+writes it beside every accepted work item with the item's key. `.request.` is there because a `{kind}.{N}.request.{n}.*.md` carries the same `jira_key` as its work
 item, so without it a key lookup returns two files and the work item is ambiguous.
 
 Story documents are **not** in `docs/stories/`. They nest under `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/`. Glob across `docs/`; never assume one root.

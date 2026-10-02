@@ -1,0 +1,89 @@
+schema: 2
+task: 'task.176.review-pr-tracker-issue-input'
+task_title: '/review-pr accepts a Jira card or GitHub issue and resolves it to its PR'
+gate: CONCERNS
+status_reason: 'Parser, routing and the shared §0a lookup are delivered and tested under bash and zsh, but the code review found four reproducible defects (a finalised item now halts as ambiguous, two cross-block shell bindings that fail silently, a newline-forgeable parser output) plus one low.'
+reviewer: 'QA Engineer'
+head: 'f3162293ec274d5ee38cf2f9f768976d3eca024a'
+updated: '2026-10-02T18:59:07Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md'
+    finding: 'The §0a lookup exclusion list misses finalise''s sprint-review-summary.md (no dotted kind segment), which carries the work item''s key; github_issue 185 returns two docs (task.37), so every finalised item now HALTs as ambiguous.'
+    suggested_action: 'Exclude sprint-review-summary.md by basename in §0a and in review-pr Step 2''s filter; add a keyed sprint-review-summary.md sibling to the §0a fixture.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'Rung 4''s Bitbucket key search calls bb_pr_search, defined only in rung 3''s fenced block; each block is its own shell, so the call is command-not-found, prints nothing, and reads as zero candidates.'
+    suggested_action: 'Define bb_pr_search in every block that calls it (or one block holding all its callers), and make a missing function or curl failure halt rather than yield empty output.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'The Step 0b host-check block reads KIND, TARGET_HOST, TARGET_REPO, JIRA_KEY, REMOTE_URL and TRACKER without binding any of them; run as its own shell, KIND is empty, no arm matches, and every host check passes silently. The test joins both blocks and injects REMOTE_URL/TRACKER, so it cannot see this.'
+    suggested_action: 'Merge parse and host check into one block that binds REMOTE_URL itself; guard required reads with ${NAME:?}; test the block as delivered.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-1'
+    severity: medium
+    file: 'skills/review-pr/scripts/parse-target.sh'
+    finding: 'A target containing a newline forges extra key=value lines: $''RAPP-1\nkind=pr'' prints kind=jira then kind=pr, and Step 0b''s last-wins read binds KIND=pr (reproduced under bash and zsh, hand probe).'
+    suggested_action: 'Refuse a target containing a control character (newline, CR, tab) with a named reason; add parser cases.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-8'
+    severity: low
+    file: 'skills/review-pr/scripts/parse-target.sh'
+    finding: 'seg_after takes the first /pull/ or /issues/ segment, so an owner or repo named issues or pull (https://github.com/org/issues/issues/5) is refused, and repo_before would report the wrong owner/repo.'
+    suggested_action: 'Parse github.com paths positionally as /owner/repo/(pull|issues)/N, or take the marker''s last occurrence.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 132
+  phases_verified: 4/4
+  ci: 'not read for this gate'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'parse-target.sh is a boundary but no engine entry form reaches a one-string script (shell: passes a fixture dir), so it was hand-probed per probe-boundary-rule §5.1: 30 hostile inputs across bash and zsh, no command executed; the newline forgery is QA-1. Resolution is read-only.'
+  performance:
+    status: PASS
+    notes: 'Card resolution is gated on kind=jira|github-issue; a PR target makes no extra call.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-2, CR-3 and CR-4 are silent failures across fenced-block shells; CR-5 gives an ambiguous key the not-found value.'
+  maintainability:
+    status: PASS
+    notes: 'One shared lookup replaces four restated greps; parser is pure and tested.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2, CR-3 and QA-1 (gate queue).'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md', 'skills/review-pr/SKILL.md', 'skills/review-pr/scripts/parse-target.sh']
+  future:
+    - action: 'Advisory, medium confidence — fix alongside the queue where cheap: CR-4 (rung 3 STEM and Bitbucket vars unbound in its block; DOC_FILE vs LOCAL_PATH hand-off), CR-5 (several-matches case shares LOCAL_PATH="" with not-found), CR-7 (guard KEY_FIELD/KEY_VALUE with :?).'
+      refs: ['skills/review-pr/SKILL.md', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'Advisory: CR-6 (SSH host alias / ssh.github.com remote makes a correct PR URL HALT — warn instead when the remote host is not a known platform), CR-9 (PR URL check compares host only, not owner/repo).'
+      refs: ['skills/review-pr/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2, CR-3, QA-1 fixed']

@@ -108,19 +108,27 @@ The one lookup from a tracker key to its work-item document. `develop-story`, `d
 # Anchored at both ends, so RAPP-70 does not match RAPP-702 and issue 5 does not match 55.
 # Quote-tolerant: jira_key is written quoted ('RAPP-702' or "RAPP-702") in most consumer docs.
 # Recursive grep, not a docs/**/ glob — ** needs globstar in bash and matches one level without it.
-# The exclusion list keeps the work item and drops its artifacts, which carry the same key.
+# The exclusion list keeps the work item and drops its artifacts, which carry the same key —
+# the dotted kinds, and finalise's sprint-review summary, which has no dotted kind to match.
+# An empty KEY_VALUE would match every blank key field, so both inputs must be bound.
+: "${KEY_FIELD:?bind KEY_FIELD (jira_key or github_issue)}" "${KEY_VALUE:?bind KEY_VALUE (the key or issue number)}"
 DOC_MATCHES=$(grep -rlE "^${KEY_FIELD}:[[:space:]]*['\"]?${KEY_VALUE}['\"]?[[:space:]]*$" docs/ 2>/dev/null \
   | grep -vE '\.(qa|gate|bug|implementation|review|pr-review|dod|plan|handover|request)\.' \
+  | grep -vE '(^|/)[^/]*sprint-review-summary\.md$' \
   | sort)
 DOC_COUNT=$(printf '%s' "$DOC_MATCHES" | grep -c .)
 case "$DOC_COUNT" in
-  0) LOCAL_PATH="" ;;                                 # not found — the caller HALTs or falls back
-  1) LOCAL_PATH="$DOC_MATCHES" ;;
-  *) LOCAL_PATH=""; echo "HALT: ${KEY_FIELD} ${KEY_VALUE} matches ${DOC_COUNT} documents:"; echo "$DOC_MATCHES" ;;
+  0) LOCAL_PATH=""; DOC_STATUS=none ;;              # not found — the caller HALTs or falls back
+  1) LOCAL_PATH="$DOC_MATCHES"; DOC_STATUS=found ;;
+  *) LOCAL_PATH=""; DOC_STATUS=ambiguous
+     echo "HALT: ${KEY_FIELD} ${KEY_VALUE} matches ${DOC_COUNT} documents:"; echo "$DOC_MATCHES"
+     exit 1 ;;                                         # never the not-found value: callers branch on it
 esac
 ```
 
-**Several matches is a HALT, never `head -1`.** Two work items carrying one key is a data error a
+**Several matches is a HALT, never `head -1` — and it exits 1.** It must not share "not found"'s
+`LOCAL_PATH=""`: a caller that branches on an empty path would print the wrong HALT, or fall through
+to its next route as if the key named nothing. Two work items carrying one key is a data error a
 human must settle; picking the first anchors the whole run on whichever file `grep` happened to list
 first. The previous form of this lookup was a bare `grep -rl "jira_key: ${JIRA_KEY}"` — a prefix
 match that resolved `RAPP-70` to `RAPP-702`'s document, matched no quoted key at all, and excluded

@@ -16,13 +16,16 @@ All notable changes to this project will be documented in this file. Format foll
   when non-interactive.
   - New pure parser `skills/review-pr/scripts/parse-target.sh`, tested under bash and zsh. The
     host picks the platform before any path arm, so Jira Cloud's `/issues/KEY` is never read as a
-    GitHub issue; `…/pull/12/files` now binds PR 12 (it bound `files`); a malformed URL is refused
-    with a reason instead of being treated as a branch name.
-  - Per-kind host check: a PR URL for another host than the git remote halts, naming both; a Jira
-    URL on another host than `JIRA_URL` warns; a GitHub issue URL for another repo halts.
+    GitHub issue; a github.com path is read by position, so an owner or repo named `pull` or `issues`
+    parses; `…/pull/12/files` now binds PR 12 (it bound `files`); a malformed URL, or a target
+    holding a control character (a newline would forge an output line), is refused with a reason
+    instead of being treated as a branch name.
+  - Per-kind host check: a PR URL for another host than the git remote — or, on github.com and
+    bitbucket.org, another `owner/repo` — halts, naming both; a remote whose host is an SSH alias only
+    warns; a Jira URL on another host than `JIRA_URL` warns; a GitHub issue URL for another repo halts.
   - **Stricter key → document lookup in the develop pipelines.** `develop-pipeline-step-0-resolve-and-prepare.md`
-    §0a now has one shared lookup — anchored, quote-tolerant, excluding `.request.` and every other
-    artifact kind, and halting on several matches. It replaces a prefix grep that resolved
+    §0a now has one shared lookup — anchored, quote-tolerant, excluding `.request.`, finalise's
+    `sprint-review-summary.md` and every other artifact kind, and halting (exit 1) on several matches. It replaces a prefix grep that resolved
     `RAPP-70` to `RAPP-702`'s document and matched no quoted `jira_key`. A `/develop-story` or
     `/develop-task` run that only resolved by prefix now halts with "No local document found";
     pass the file path or fix the key. Also fixes §0a's GitHub-issue URL extraction, which used a
