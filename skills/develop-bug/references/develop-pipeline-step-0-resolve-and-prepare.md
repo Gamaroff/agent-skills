@@ -112,8 +112,13 @@ The one lookup from a tracker key to its work-item document. `develop-story`, `d
 # the dotted kinds, and finalise's sprint-review summary, which has no dotted kind to match.
 # An empty KEY_VALUE would match every blank key field, so both inputs must be bound.
 : "${KEY_FIELD:?bind KEY_FIELD (jira_key or github_issue)}" "${KEY_VALUE:?bind KEY_VALUE (the key or issue number)}"
+# A missing or unreadable docs/ (the wrong cwd) is its own HALT, never "no document has this key".
+[ -d docs ] && [ -r docs ] || { DOC_STATUS=unreadable; echo "HALT: docs/ not found or unreadable in $(pwd) — run from the repository root"; exit 1; }
+# Kinds are matched on the BASENAME and, except .plan., only with their number — so a work item
+# whose slug is a kind word (task.5.request.md) or that sits under a directory such as
+# epic.4.qa.tools/ is kept.
 DOC_MATCHES=$(grep -rlE "^${KEY_FIELD}:[[:space:]]*['\"]?${KEY_VALUE}['\"]?[[:space:]]*$" docs/ 2>/dev/null \
-  | grep -vE '\.(qa|gate|bug|implementation|review|pr-review|dod|plan|handover|request)\.' \
+  | grep -vE '(^|/)[^/]*\.((qa|gate|bug|implementation|review|pr-review|dod|handover|request)\.[0-9]+|plan)\.[^/]*$' \
   | grep -vE '(^|/)[^/]*sprint-review-summary\.md$' \
   | sort)
 DOC_COUNT=$(printf '%s' "$DOC_MATCHES" | grep -c .)

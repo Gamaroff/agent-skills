@@ -20,8 +20,10 @@
 #   never reach the GitHub-issue arm.
 # - Anchored extraction. The key or number is the whole path segment after its
 #   marker, and `?query` / `#fragment` are stripped first — `…/pull/12/files` is PR 12.
-#   A GitHub path is read by position, /OWNER/REPO/(pull|issues)/N, so an owner or a
-#   repository named `pull` or `issues` cannot be mistaken for the marker.
+#   A GitHub path is read by position, /OWNER/REPO/(pull|issues)/N, and so is a
+#   bitbucket.org one, /WS/REPO/pull-requests/N or /2.0/repositories/WS/REPO/pullrequests/N,
+#   so an owner or a repository named like a marker cannot be mistaken for it, and the
+#   repository is reported for the skill to compare.
 # - No control characters. Output is one key=value per line, so a newline in the
 #   target would forge a line (`RAPP-1<LF>kind=pr`); such a target is refused.
 # - `host` is reported, never judged. The skill compares it per kind.
@@ -101,6 +103,25 @@ emit_github_path() {
   esac
 }
 
+# bitbucket.org's two path shapes, read by position.
+emit_bitbucket_path() {
+  _p="${1#/}"
+  case "$_p" in
+    2.0/repositories/*) _p="${_p#2.0/repositories/}"; _want=pullrequests ;;
+    *) _want=pull-requests ;;
+  esac
+  case "$_p" in
+    */*/*/*) ;;
+    *) return 1 ;;
+  esac
+  _ws="${_p%%/*}"; _p="${_p#*/}"
+  _name="${_p%%/*}"; _p="${_p#*/}"
+  _kind="${_p%%/*}"; _p="${_p#*/}"
+  _n="${_p%%/*}"
+  [ -n "$_ws" ] && [ -n "$_name" ] && [ "$_kind" = "$_want" ] && is_num "$_n" || return 1
+  printf 'kind=pr\npr=%s\nhost=%s\nrepo=%s/%s\n' "$_n" "$HOST" "$_ws" "$_name"
+}
+
 emit_pr_from_path() {
   for _m in pull pull-requests pullrequests; do
     _n=$(seg_after "$_m" "$1")
@@ -170,7 +191,7 @@ case "$TARGET" in
         emit_github_path "$URLPATH" && exit 0
         ;;
       bitbucket.org | www.bitbucket.org | api.bitbucket.org)
-        emit_pr_from_path "$URLPATH" && exit 0
+        emit_bitbucket_path "$URLPATH" && exit 0
         ;;
       *.atlassian.net)
         emit_jira_from_url "$URLPATH" && exit 0

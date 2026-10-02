@@ -1,0 +1,87 @@
+schema: 2
+task: 'task.176.review-pr-tracker-issue-input'
+task_title: '/review-pr accepts a Jira card or GitHub issue and resolves it to its PR'
+gate: FAIL
+status_reason: 'Cycle 1 closed all ten gate-1 findings, but the cycle-2 refute pass found that Bitbucket PR URLs never carry repo=, so the owner/repo HALT the docs claim for bitbucket.org never fires (HIGH), plus two medium clashes between cycle-1 fixes.'
+reviewer: 'QA Engineer'
+head: '4583942c1e4ed777c7ea4e5ad0de4162427411e6'
+updated: '2026-10-02T19:26:52Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: high
+    file: 'skills/review-pr/scripts/parse-target.sh'
+    finding: 'The bitbucket.org arm calls emit_pr_from_path, which never emits repo=: https://bitbucket.org/other/repo/pull-requests/12 gives kind=pr pr=12 host=bitbucket.org. Step 0b''s owner/repo check never runs on Bitbucket, so a PR URL for another repo reviews this repo''s #12 — contrary to the CHANGELOG and the SKILL.md host-check table.'
+    suggested_action: 'Read bitbucket.org web (/WS/REPO/pull-requests/N) and API (/2.0/repositories/WS/REPO/pullrequests/N) paths by position and emit repo=WS/REPO; add a halting test.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-2'
+    severity: medium
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'The SSH-alias / self-hosted arm of the Step 0b host check compares only the host and skips the owner/repo check, although repo_of reads git@github-work:o/r.git correctly; github.com/other/repo/pull/12 against an alias remote only warns and then reviews o/r#12.'
+    suggested_action: 'In the *) arm still HALT when TARGET_REPO is set and differs from repo_of(REMOTE_URL); keep warn-only for the host comparison.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-3'
+    severity: medium
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'The rungs 3–4 block claims to re-bind KIND, JIRA_KEY, ISSUE_NUM and DOC_FILE but guards only KIND; an unbound DOC_FILE reads as "no document" and silently skips rung 3, and an unbound JIRA_KEY searches " in:title,body" and lists unrelated PRs.'
+    suggested_action: 'Guard JIRA_KEY when KIND=jira and ISSUE_NUM when KIND=github-issue with :?; require DOC_FILE to be explicitly bound (empty means no document) with ${DOC_FILE?}.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-7'
+    severity: low
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'The Jira host warning reads a bare $JIRA_URL that resolve-platform.sh never binds (it reads .env only to set TRACKER), so in an .env-only setup the check is silently dead.'
+    suggested_action: 'Bind JIRA_URL in the block from the environment or .env, or say the host was not checked when it is unset.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 175
+  phases_verified: 4/4
+  ci: 'not read for this gate'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'parse-target.sh hand-probed per probe-boundary-rule §5.1 (no engine entry form fits a one-string script): 28 hostile inputs × bash/zsh, no command executed, LF/CR/DEL refused. CR2-1 is a wrong-target defect, not an injection.'
+  performance:
+    status: PASS
+    notes: 'Card resolution still gated on kind=jira|github-issue.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-3 and CR2-7: unbound reads that fail silently; CR2-6 (advisory): an unreadable docs/ reads as "no document".'
+  maintainability:
+    status: PASS
+    notes: 'Self-contained blocks; bash -n / zsh -n guard added in cycle 1.'
+
+bug_resolution:
+  previous_gate: 1
+  fixed: ['CR-1', 'CR-2', 'CR-3', 'QA-1', 'CR-8', 'CR-4', 'CR-5', 'CR-6', 'CR-7', 'CR-9']
+  fix_commit: '4583942'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1, CR2-2, CR2-3, CR2-7 (gate queue).'
+      refs: ['skills/review-pr/scripts/parse-target.sh', 'skills/review-pr/SKILL.md']
+  future:
+    - action: 'Advisory, medium confidence — fix alongside where cheap: CR2-4 (GitHub-issue check gated on TRACKER not VCS, ignores host, passes when gh repo view fails), CR2-8 (Step 0b printed line omits TARGET_HOST, so Step 1b cannot tell a bare number), CR2-9 (rungs block copies the host-anchored Bitbucket sed that misreads altssh :443 remotes).'
+      refs: ['skills/review-pr/SKILL.md']
+    - action: 'Advisory: CR2-5 (§0a exclusion matches a kind word anywhere in the path — task.5.request.md, epic.4.qa.tools/), CR2-6 (unreadable docs/ reads as DOC_STATUS=none).'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR2-1 fixed']

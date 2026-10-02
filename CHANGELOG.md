@@ -22,7 +22,9 @@ All notable changes to this project will be documented in this file. Format foll
     instead of being treated as a branch name.
   - Per-kind host check: a PR URL for another host than the git remote — or, on github.com and
     bitbucket.org, another `owner/repo` — halts, naming both; a remote whose host is an SSH alias only
-    warns; a Jira URL on another host than `JIRA_URL` warns; a GitHub issue URL for another repo halts.
+    warns about the host but still halts on another `owner/repo`; a Jira URL on another host than
+    `JIRA_URL` (environment or `.env`) warns, and says so when `JIRA_URL` is unset; a GitHub issue URL
+    for another host or repo than origin halts.
   - **Stricter key → document lookup in the develop pipelines.** `develop-pipeline-step-0-resolve-and-prepare.md`
     §0a now has one shared lookup — anchored, quote-tolerant, excluding `.request.`, finalise's
     `sprint-review-summary.md` and every other artifact kind, and halting (exit 1) on several matches. It replaces a prefix grep that resolved

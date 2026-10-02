@@ -435,24 +435,24 @@ message wording.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-02
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.176.qa.1.review-pr-tracker-issue-input.md](./task.176.qa.1.review-pr-tracker-issue-input.md)
-- **Gate File**: [task.176.gate.1.review-pr-tracker-issue-input.yml](./task.176.gate.1.review-pr-tracker-issue-input.yml)
+- **Full Report**: [task.176.qa.2.review-pr-tracker-issue-input.md](./task.176.qa.2.review-pr-tracker-issue-input.md)
+- **Gate File**: [task.176.gate.2.review-pr-tracker-issue-input.yml](./task.176.gate.2.review-pr-tracker-issue-input.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 132
+- **Tests Executed**: 175
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
+- **Critical Issues**: 1
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Four medium defects in new code: the §0a lookup halts on every finalised item (`sprint-review-summary.md` carries the key), two fenced blocks in review-pr Steps 0b/1a read variables another block binds, and a newline in `target` forges parser output. One low (owner/repo named `issues`/`pull`).
+All ten gate-1 findings fixed. The cycle-2 refute pass found that Bitbucket PR URLs carry no `repo=`, so the documented owner/repo HALT never fires on bitbucket.org (HIGH), plus two medium clashes between cycle-1 fixes (alias arm skips the repo check; rungs 3–4 inputs unguarded) and one low (`JIRA_URL` unbound).
 
 <!-- change-log-start -->
 
@@ -467,6 +467,8 @@ Four medium defects in new code: the §0a lookup halts on every finalised item (
 | 2026-10-02 |         | Implemented — 9 files (parser, SKILL.md Steps 0b/1/2, shared §0a lookup + 4 bundled copies, CHANGELOG), 80 new tests (52 → 132 in review-pr.test.js) | develop |
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 5 findings (4 medium, 1 low) | qa-task |
 | 2026-10-02 |         | QA findings fixed — gate 1 CONCERNS: 5 queued + 5 advisory (CR-4/5/6/7/9) fixed, 1 iteration | qa-fix |
+| 2026-10-02 |         | QA gate FAIL (70/100) — 4 findings (1 high, 2 medium, 1 low) | qa-task |
+| 2026-10-02 |         | QA findings fixed — gate 2 FAIL: 4 queued + 5 advisory (CR2-4/5/6/8/9) fixed, iteration 2 | qa-fix |
 
 <!-- change-log-end -->
 

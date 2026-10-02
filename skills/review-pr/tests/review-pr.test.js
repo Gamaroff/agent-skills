@@ -238,7 +238,12 @@ test("the Bitbucket web PR URL form is recognised", () => {
     "https://bitbucket.org/ws/repo/pull-requests/7",
   );
   assert.equal(out.status, 0, out.stderr);
-  assert.deepEqual(out.fields, { kind: "pr", pr: "7", host: "bitbucket.org" });
+  assert.deepEqual(out.fields, {
+    kind: "pr",
+    pr: "7",
+    host: "bitbucket.org",
+    repo: "ws/repo",
+  });
 });
 
 test("a branch target reaches the PR resolver instead of resolving the current branch", () => {
@@ -773,11 +778,11 @@ const PARSER_CASES = [
   ],
   [
     "https://bitbucket.org/ws/repo/pull-requests/7",
-    { kind: "pr", pr: "7", host: "bitbucket.org" },
+    { kind: "pr", pr: "7", host: "bitbucket.org", repo: "ws/repo" },
   ],
   [
     "https://api.bitbucket.org/2.0/repositories/ws/repo/pullrequests/9",
-    { kind: "pr", pr: "9", host: "api.bitbucket.org" },
+    { kind: "pr", pr: "9", host: "api.bitbucket.org", repo: "ws/repo" },
   ],
   [
     "https://ghe.corp.example/o/r/pull/44",
@@ -1019,7 +1024,7 @@ for (const shell of SHELLS) {
     assert.equal(r.status, 1);
     assert.match(
       r.stdout,
-      /HALT: issue URL is for other\/repo, but this repo's GitHub tracker is o\/r/,
+      /HALT: issue URL is for other\/repo, but this repo is o\/r/,
     );
   });
 
@@ -1445,7 +1450,7 @@ for (const shell of SHELLS) {
     assert.equal(r.status, 0, r.stderr);
     assert.match(
       r.stdout,
-      /^KIND=jira PR= BRANCH=\S* JIRA_KEY=RAPP-702 ISSUE_NUM=$/m,
+      /^KIND=jira PR= BRANCH=\S* JIRA_KEY=RAPP-702 ISSUE_NUM= TARGET_HOST= TARGET_REPO=$/m,
     );
   });
 }
@@ -1572,5 +1577,146 @@ for (const shell of SHELLS) {
       if (r.status !== 0) bad.push(`block ${i + 1}: ${r.stderr.trim()}`);
     });
     assert.deepEqual(bad, []);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// task.176 QA cycle 2 — the fixes, executed.
+// ---------------------------------------------------------------------------
+for (const shell of SHELLS) {
+  test(`Step 0b (${shell}): a Bitbucket PR URL for another repo HALTs (CR2-1)`, () => {
+    const r = step0b(shell, {
+      TARGET: "https://bitbucket.org/other/repo/pull-requests/12",
+      REMOTE_URL: "git@bitbucket.org:ws/repo.git",
+    });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /HALT: PR URL is for other\/repo, but this repo is ws\/repo/,
+    );
+    const same = step0b(shell, {
+      TARGET: "https://bitbucket.org/ws/repo/pull-requests/12",
+      REMOTE_URL: "git@bitbucket.org:ws/repo.git",
+    });
+    assert.equal(same.status, 0, same.stdout + same.stderr);
+  });
+
+  test(`Step 0b (${shell}): an SSH-alias remote still HALTs on a different owner/repo (CR2-2)`, () => {
+    const r = step0b(shell, {
+      TARGET: "https://github.com/other/repo/pull/12",
+      REMOTE_URL: "git@github-work:o/r.git",
+    });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /HALT: PR URL is for other\/repo, but this repo is o\/r/,
+    );
+  });
+
+  test(`Step 0b (${shell}): JIRA_URL is read from .env, and its absence is said, not skipped (CR2-7)`, () => {
+    // .env only: the resolver reads it to choose TRACKER and never binds JIRA_URL.
+    const { dir, bin } = consumerRepo("git@github.com:o/r.git");
+    fs.writeFileSync(
+      path.join(dir, ".env"),
+      'JIRA_URL="https://acme.atlassian.net"\n',
+    );
+    const script = step0bBlock();
+    const env = blockEnv(bin, {
+      TARGET: "https://other.atlassian.net/browse/RAPP-702",
+    });
+    let r = runScript(shell, script, { cwd: dir, env });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(
+      r.stdout,
+      /⚠️ Jira URL host other\.atlassian\.net differs from JIRA_URL acme\.atlassian\.net/,
+    );
+    fs.rmSync(path.join(dir, ".env"));
+    r = runScript(shell, script, { cwd: dir, env });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(
+      r.stdout,
+      /⚠️ JIRA_URL is not set \(environment or \.env\) — Jira URL host other\.atlassian\.net not checked/,
+    );
+  });
+
+  test(`Step 0b (${shell}): a GitHub issue URL on another host HALTs even with a matching owner/repo (CR2-4)`, () => {
+    const r = step0b(shell, {
+      TARGET: "https://ghe.corp.example/o/r/issues/3",
+      REMOTE_URL: "git@github.com:o/r.git",
+    });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /HALT: issue URL host ghe\.corp\.example does not match this repo's remote github\.com/,
+    );
+  });
+
+  test(`rungs 3–4 (${shell}): an unset DOC_FILE or JIRA_KEY fails loudly instead of skipping a rung (CR2-3)`, () => {
+    const { dir, bin } = consumerRepo("git@github.com:o/r.git");
+    fs.writeFileSync(path.join(bin, "gh"), "#!/bin/sh\necho '[]'\n", {
+      mode: 0o755,
+    });
+    let r = runScript(shell, rungsBlock(), {
+      cwd: dir,
+      env: blockEnv(bin, { KIND: "jira", JIRA_KEY: "RAPP-702" }),
+    });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /DOC_FILE/);
+    r = runScript(shell, rungsBlock(), {
+      cwd: dir,
+      env: blockEnv(bin, { KIND: "jira", DOC_FILE: "" }),
+    });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /JIRA_KEY/);
+    r = runScript(shell, rungsBlock(), {
+      cwd: dir,
+      env: blockEnv(bin, { KIND: "github-issue", DOC_FILE: "" }),
+    });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /ISSUE_NUM/);
+  });
+
+  test(`§0a lookup (${shell}): a missing docs/ HALTs as its own case, not as "no document" (CR2-6)`, () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-nodocs-"));
+    const r = runScript(shell, `${lookupBlock()}\necho "AFTER"\n`, {
+      cwd: dir,
+      env: { ...process.env, KEY_FIELD: "jira_key", KEY_VALUE: "RAPP-702" },
+    });
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /HALT: docs\/ not found or unreadable/);
+    assert.doesNotMatch(r.stdout, /AFTER/);
+  });
+
+  test(`§0a lookup (${shell}): a slug that is a kind word, or a kind-like directory, is kept (CR2-5)`, () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-kindword-"));
+    const put = (rel, body) => {
+      fs.mkdirSync(path.join(dir, path.dirname(rel)), { recursive: true });
+      fs.writeFileSync(path.join(dir, rel), body);
+    };
+    put(
+      "docs/tasks/task.5.request/task.5.request.md",
+      "---\njira_key: 'KW-5'\n---\n",
+    );
+    put(
+      "docs/tasks/task.5.request/task.5.request.1.request.md",
+      "---\njira_key: 'KW-5'\n---\n",
+    );
+    put(
+      "docs/prd/x/epics/epic.4.qa.tools/stories/story.4.1.y/story.4.1.y.md",
+      "---\njira_key: 'KW-41'\n---\n",
+    );
+    const run1 = (k) =>
+      runScript(shell, `${lookupBlock()}\necho "PATH=$LOCAL_PATH"\n`, {
+        cwd: dir,
+        env: { ...process.env, KEY_FIELD: "jira_key", KEY_VALUE: k },
+      }).stdout;
+    assert.match(
+      run1("KW-5"),
+      /^PATH=docs\/tasks\/task\.5\.request\/task\.5\.request\.md$/m,
+    );
+    assert.match(
+      run1("KW-41"),
+      /^PATH=docs\/prd\/x\/epics\/epic\.4\.qa\.tools\/stories\/story\.4\.1\.y\/story\.4\.1\.y\.md$/m,
+    );
   });
 }

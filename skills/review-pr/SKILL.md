@@ -124,6 +124,11 @@ norm_host() { printf '%s\n' "${1}" | sed -E 's#^[A-Za-z+]+://##; s#^[^@/]*@##; s
 repo_of()   { printf '%s\n' "${1}" | sed -E 's#\.git$##; s#/+$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#' | tr '[:upper:]' '[:lower:]'; }
 lc()        { printf '%s' "${1}" | tr '[:upper:]' '[:lower:]'; }
 REMOTE_HOST=$(norm_host "$REMOTE_URL")
+REMOTE_REPO=$(repo_of "$REMOTE_URL")
+# JIRA_URL is not bound by the resolver, which reads .env only to choose TRACKER — so
+# read it from the environment, else from .env, the same two places the resolver looks.
+JIRA_URL_SEEN="$JIRA_URL"
+[ -n "$JIRA_URL_SEEN" ] || JIRA_URL_SEEN=$(sed -nE "s/^JIRA_URL=[\"']?([^\"']*)[\"']?[[:space:]]*$/\1/p" "$(git rev-parse --show-toplevel 2>/dev/null)/.env" 2>/dev/null | head -1)
 case "$KIND" in
   pr)
     if [ -n "$TARGET_HOST" ]; then                     # a bare number has no host to check
@@ -132,34 +137,48 @@ case "$KIND" in
           if [ "$(norm_host "$TARGET_HOST")" != "$REMOTE_HOST" ]; then
             echo "HALT: PR URL host $TARGET_HOST does not match this repo's remote $REMOTE_HOST ($REMOTE_URL)"; exit 1
           fi
-          if [ -n "$TARGET_REPO" ] && [ "$(lc "$TARGET_REPO")" != "$(repo_of "$REMOTE_URL")" ]; then
-            echo "HALT: PR URL is for $TARGET_REPO, but this repo is $(repo_of "$REMOTE_URL") ($REMOTE_URL)"; exit 1
+          if [ -n "$TARGET_REPO" ] && [ "$(lc "$TARGET_REPO")" != "$REMOTE_REPO" ]; then
+            echo "HALT: PR URL is for $TARGET_REPO, but this repo is $REMOTE_REPO ($REMOTE_URL)"; exit 1
           fi ;;
         "")
           echo "⚠️ no origin remote — PR URL host not checked" ;;
         *)
           # An SSH alias (git@github-work:o/r.git) or a self-hosted server: the remote's
-          # host is not a name this check can compare, so it cannot prove a mismatch.
+          # HOST is not a name this check can compare, so it cannot prove a host mismatch —
+          # but its owner/repo still reads correctly, so a repo mismatch still halts.
           [ "$(norm_host "$TARGET_HOST")" = "$REMOTE_HOST" ] \
-            || echo "⚠️ remote host $REMOTE_HOST is not a known platform host (an SSH alias?) — PR URL host $TARGET_HOST not compared" ;;
+            || echo "⚠️ remote host $REMOTE_HOST is not a known platform host (an SSH alias?) — PR URL host $TARGET_HOST not compared"
+          if [ -n "$TARGET_REPO" ] && [ "$(lc "$TARGET_REPO")" != "$REMOTE_REPO" ]; then
+            echo "HALT: PR URL is for $TARGET_REPO, but this repo is $REMOTE_REPO ($REMOTE_URL)"; exit 1
+          fi ;;
       esac
     fi ;;
   jira)
-    if [ -n "$TARGET_HOST" ] && [ -n "$JIRA_URL" ] && [ "$(norm_host "$TARGET_HOST")" != "$(norm_host "$JIRA_URL")" ]; then
-      echo "⚠️ Jira URL host $TARGET_HOST differs from JIRA_URL $(norm_host "$JIRA_URL") — continuing with key $JIRA_KEY"
+    if [ -n "$TARGET_HOST" ] && [ -z "$JIRA_URL_SEEN" ]; then
+      echo "⚠️ JIRA_URL is not set (environment or .env) — Jira URL host $TARGET_HOST not checked"
+    elif [ -n "$TARGET_HOST" ] && [ "$(norm_host "$TARGET_HOST")" != "$(norm_host "$JIRA_URL_SEEN")" ]; then
+      echo "⚠️ Jira URL host $TARGET_HOST differs from JIRA_URL $(norm_host "$JIRA_URL_SEEN") — continuing with key $JIRA_KEY"
     fi ;;
   github-issue)
-    if [ -n "$TARGET_REPO" ] && [ "$TRACKER" = "github" ]; then
-      TRACKER_REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
-      if [ -n "$TRACKER_REPO" ] && [ "$(lc "$TARGET_REPO")" != "$(lc "$TRACKER_REPO")" ]; then
-        echo "HALT: issue URL is for $TARGET_REPO, but this repo's GitHub tracker is $TRACKER_REPO"; exit 1
+    # Gated on VCS, not TRACKER: what reads this issue is `gh` against origin (rung 4),
+    # so origin's host and owner/repo are what it must match.
+    if [ -n "$TARGET_REPO" ] && [ "$VCS" = "github" ]; then
+      case "$REMOTE_HOST" in
+        github.com)
+          if [ "$(norm_host "$TARGET_HOST")" != "$REMOTE_HOST" ]; then
+            echo "HALT: issue URL host $TARGET_HOST does not match this repo's remote $REMOTE_HOST ($REMOTE_URL)"; exit 1
+          fi ;;
+      esac
+      if [ -n "$REMOTE_REPO" ] && [ "$(lc "$TARGET_REPO")" != "$REMOTE_REPO" ]; then
+        echo "HALT: issue URL is for $TARGET_REPO, but this repo is $REMOTE_REPO ($REMOTE_URL)"; exit 1
       fi
     fi ;;
 esac
 
 # The bound values, printed so the steps below re-bind them: every fenced block is
 # its own shell, and a value computed here does not exist in the next one.
-printf 'KIND=%s PR=%s BRANCH=%s JIRA_KEY=%s ISSUE_NUM=%s\n' "$KIND" "$PR" "$BRANCH" "$JIRA_KEY" "$ISSUE_NUM"
+printf 'KIND=%s PR=%s BRANCH=%s JIRA_KEY=%s ISSUE_NUM=%s TARGET_HOST=%s TARGET_REPO=%s\n' \
+  "$KIND" "$PR" "$BRANCH" "$JIRA_KEY" "$ISSUE_NUM" "$TARGET_HOST" "$TARGET_REPO"
 ```
 
 | `KIND` | From | Next |
@@ -185,9 +204,9 @@ the code is. The check is the second half of the block above.
 
 | Kind | Compared against | On mismatch |
 | --- | --- | --- |
-| PR URL | the host of `git remote get-url origin`, and on github.com / bitbucket.org its `owner/repo` | **HALT**, naming both — a GitHub PR URL pasted into a Bitbucket checkout used to be looked up on Bitbucket, and `github.com/other/repo/pull/12` would review this repo's #12. A remote whose host is an SSH alias or a self-hosted server only **warns**: its name cannot prove a mismatch |
-| Jira URL | the host of `JIRA_URL` | **warn**, naming both, and continue with the key — the key is what resolves |
-| GitHub issue URL | `owner/repo` of the GitHub tracker | **HALT**, naming both |
+| PR URL | the host of `git remote get-url origin`, and its `owner/repo` | **HALT**, naming both — a GitHub PR URL pasted into a Bitbucket checkout used to be looked up on Bitbucket, and `github.com/other/repo/pull/12` would review this repo's #12. A remote whose **host** is an SSH alias or a self-hosted server only **warns** about the host — its name cannot prove a mismatch — but a different `owner/repo` still halts |
+| Jira URL | the host of `JIRA_URL`, from the environment or `.env` | **warn**, naming both, and continue with the key — the key is what resolves. With no `JIRA_URL` at all it says the host was **not checked** |
+| GitHub issue URL | when `VCS=github`: origin's host (on github.com) and `owner/repo` — rung 4 reads the issue with `gh` against origin | **HALT**, naming both |
 
 ### Step 1 — Resolve the PR
 
@@ -232,9 +251,16 @@ A failed request is a HALT, never an empty result: "no candidates" must mean the
 ```bash
 source references/resolve-platform.sh || exit 1          # VCS
 : "${KIND:?re-bind KIND from the line Step 0b printed}"
+: "${DOC_FILE?bind DOC_FILE from rung 1 — empty when no document resolved, never left unset}"
+case "$KIND" in
+  jira)         : "${JIRA_KEY:?re-bind JIRA_KEY from the line Step 0b printed}" ;;
+  github-issue) : "${ISSUE_NUM:?re-bind ISSUE_NUM from the line Step 0b printed}" ;;
+esac
 if [ "$VCS" = "bitbucket" ]; then
   REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
-  BB_PATH=$(echo "$REMOTE_URL" | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+  # The last two path segments, so an altssh remote (ssh://git@altssh.bitbucket.org:443/ws/repo.git)
+  # reads as ws/repo rather than taking the port for the workspace.
+  BB_PATH=$(printf '%s\n' "$REMOTE_URL" | sed -E 's#\.git$##; s#/+$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#')
   BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
   BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
   BB_API="https://api.bitbucket.org/2.0"
