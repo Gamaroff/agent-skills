@@ -32,6 +32,12 @@
 #
 # Must behave identically under bash and zsh: every expansion is quoted, no arrays,
 # no variable-held glob patterns, no `[[ ]]`.
+#
+# Executed, it parses its one argument. Sourced, it only defines `parse_target`, so the
+# security probe engine's `shell-fn:` form can call the decision with each candidate as
+# argv — a script whose one argument is a string is a form no other entry reaches, and
+# an unreachable boundary is one nothing measures (task.176 finalise, zero-guard).
+# `parse_target` exits on a refusal, so a sourcing caller runs it in a subshell.
 
 KEY_RE='^[A-Z][A-Z0-9]+-[0-9]+$'
 
@@ -155,6 +161,7 @@ emit_issue_from_path() {
   return 1
 }
 
+parse_target() {
 [ "$#" -le 1 ] || refuse usage "expected one argument, got $#"
 
 TARGET="${1:-}"
@@ -224,3 +231,13 @@ elif is_key "$TARGET"; then
 else
   printf 'kind=branch\nbranch=%s\n' "$TARGET"
 fi
+}
+
+# Run only when executed. Sourced from zsh, ZSH_EVAL_CONTEXT names the file context;
+# sourced from bash, BASH_SOURCE[0] is this file while $0 is the caller.
+# An `if`, not `[ … ] && …`: sourced, the false test would be the file's last status and
+# `source` would report failure to a caller that did nothing wrong.
+case "${ZSH_EVAL_CONTEXT:-}" in
+  *:file*) ;;
+  *) if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then parse_target "$@"; fi ;;
+esac

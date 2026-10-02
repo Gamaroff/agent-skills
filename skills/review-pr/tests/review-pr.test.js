@@ -1860,3 +1860,187 @@ test("Step 2's exclusion filter cites the §0a rule instead of restating it (CR3
     /named after its own directory \(`\{stem\}\/\{stem\}\.md`\)/,
   );
 });
+
+// ---------------------------------------------------------------------------
+// task.176 finalise — the parser is a boundary (it refuses malformed input), so the security
+// probe engine must be able to EXECUTE it. A script whose one argument is a string fits no
+// engine entry form (`shell:` passes a fixture directory), and the DoD security agent recorded
+// probes_executed: 0. Sourced, the script defines `parse_target`; the engine's `shell-fn:` form
+// calls it with each case as argv, under bash and zsh. These cases are the parser's own contract.
+// ---------------------------------------------------------------------------
+const PROBE_ENGINE = path.join(
+  ROOT,
+  "..",
+  "..",
+  "shared",
+  "resources",
+  "security-probe.mjs",
+);
+const kv = (o) =>
+  Object.entries(o)
+    .map(([k, v]) => `${k}=${v}\n`)
+    .join("");
+const PARSER_PROBE_CASES = [
+  // hostile — refused, or carried as inert text that never runs
+  [
+    "pt.cmd-subst",
+    "$(touch PWNED)",
+    "hostile",
+    {
+      stdout: kv({ kind: "branch", branch: "$(touch PWNED)" }),
+      exit: 0,
+      absent: ["PWNED"],
+    },
+  ],
+  [
+    "pt.backtick",
+    "`touch PWNED2`",
+    "hostile",
+    {
+      stdout: kv({ kind: "branch", branch: "`touch PWNED2`" }),
+      exit: 0,
+      absent: ["PWNED2"],
+    },
+  ],
+  [
+    "pt.semicolon",
+    "a;touch PWNED3",
+    "hostile",
+    {
+      stdout: kv({ kind: "branch", branch: "a;touch PWNED3" }),
+      exit: 0,
+      absent: ["PWNED3"],
+    },
+  ],
+  ["pt.newline-forge", "RAPP-1\nkind=pr", "hostile", { stdout: "", exit: 2 }],
+  ["pt.cr-forge", "x\rpr=5", "hostile", { stdout: "", exit: 2 }],
+  ["pt.tab", "feature/a\tb", "hostile", { stdout: "", exit: 2 }],
+  ["pt.issue-ref-tail", "#12;rm", "hostile", { stdout: "", exit: 2 }],
+  [
+    "pt.url-no-target",
+    "https://example.com/foo",
+    "hostile",
+    { stdout: "", exit: 2 },
+  ],
+  [
+    "pt.pr-url-subst",
+    "https://github.com/o/r/pull/12$(id)",
+    "hostile",
+    { stdout: "", exit: 2 },
+  ],
+  // The parser REPORTS a foreign or lookalike host rather than judging it; Step 0b halts on it.
+  [
+    "pt.lookalike-host",
+    "https://github.com.evil.com/o/r/pull/3",
+    "hostile",
+    {
+      stdout: kv({
+        kind: "pr",
+        pr: "3",
+        host: "github.com.evil.com",
+        repo: "o/r",
+      }),
+      exit: 0,
+    },
+  ],
+  // legitimate — every accepted form still parses
+  [
+    "pt.legit-github-pr",
+    "https://github.com/o/r/pull/12",
+    "legitimate",
+    {
+      stdout: kv({ kind: "pr", pr: "12", host: "github.com", repo: "o/r" }),
+      exit: 0,
+    },
+  ],
+  [
+    "pt.legit-bitbucket-pr",
+    "https://bitbucket.org/ws/repo/pull-requests/7",
+    "legitimate",
+    {
+      stdout: kv({
+        kind: "pr",
+        pr: "7",
+        host: "bitbucket.org",
+        repo: "ws/repo",
+      }),
+      exit: 0,
+    },
+  ],
+  [
+    "pt.legit-jira-browse",
+    "https://acme.atlassian.net/browse/RAPP-702",
+    "legitimate",
+    {
+      stdout: kv({
+        kind: "jira",
+        jira_key: "RAPP-702",
+        host: "acme.atlassian.net",
+      }),
+      exit: 0,
+    },
+  ],
+  [
+    "pt.legit-issue-ref",
+    "#536",
+    "legitimate",
+    { stdout: kv({ kind: "github-issue", issue_num: "536" }), exit: 0 },
+  ],
+  [
+    "pt.legit-number",
+    "281",
+    "legitimate",
+    { stdout: kv({ kind: "pr", pr: "281" }), exit: 0 },
+  ],
+  [
+    "pt.legit-branch",
+    "feature/task.1.thing",
+    "legitimate",
+    { stdout: kv({ kind: "branch", branch: "feature/task.1.thing" }), exit: 0 },
+  ],
+].map(([id, input, direction, expected]) => ({
+  id,
+  input,
+  direction,
+  why: "parse-target.sh contract",
+  expected,
+}));
+
+test("the parser is reachable by the security probe engine and its boundary holds (shell-fn:)", () => {
+  assert.ok(fs.existsSync(PROBE_ENGINE), "security-probe.mjs present");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-probe-"));
+  const casesFile = path.join(dir, "parse-target.cases.json");
+  fs.writeFileSync(casesFile, JSON.stringify(PARSER_PROBE_CASES, null, 2));
+  const repoRoot = path.join(ROOT, "..", "..");
+  const r = spawnSync(
+    process.execPath,
+    [
+      PROBE_ENGINE,
+      "--sink",
+      "filename",
+      "--entry",
+      "shell-fn:skills/review-pr/scripts/parse-target.sh#parse_target",
+      "--cases-file",
+      casesFile,
+      "--repo-root",
+      repoRoot,
+      "--record",
+      path.join(dir, "run.json"),
+      "--json",
+    ],
+    { encoding: "utf8", cwd: repoRoot },
+  );
+  const out = JSON.parse(r.stdout);
+  assert.equal(
+    out.verdict,
+    "engages",
+    `verdict ${out.verdict}: ${out.reason} ${JSON.stringify(out.declined)}`,
+  );
+  assert.equal(
+    out.executed,
+    PARSER_PROBE_CASES.length * out.shells.length,
+    "every case ran in every shell",
+  );
+  assert.deepEqual(out.reproduced, [], "no hostile case accepted");
+  assert.deepEqual(out.overblocked, [], "no legitimate form refused");
+});
