@@ -118,6 +118,11 @@ if [ "$created" = 0 ]; then
   perm=$(command node -e 'process.stdout.write((require("fs").statSync(process.argv[1]).mode & 0o7777).toString(8))' "$settings") \
     || fail "cannot read the mode of $settings"
   chmod "$perm" "$out" || fail "cannot apply mode $perm"
+  # A .bak that exists but is not a regular file (a directory, a socket) would swallow the backup
+  # inside it while this script reported it saved (QA cycle 4 CR-3).
+  if [ -e "$settings.bak" ] && [ ! -f "$settings.bak" ]; then
+    fail "$settings.bak exists and is not a regular file — move it aside and re-run"
+  fi
   bak=$(mktemp "$dir/.cp-settings-bak.XXXXXX") || fail "cannot create a temp file in $dir"
   { cp -p "$settings" "$bak" && mv -f "$bak" "$settings.bak"; } || { rm -f "$bak"; fail "cannot write $settings.bak"; }
 fi

@@ -508,17 +508,17 @@ implementation report, not asserted in CI (the load-sensitive-test rule).
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.157.qa.3.context-pressure-handoff-trigger.md](./task.157.qa.3.context-pressure-handoff-trigger.md)
-- **Gate File**: [task.157.gate.3.context-pressure-handoff-trigger.yml](./task.157.gate.3.context-pressure-handoff-trigger.yml)
+- **Full Report**: [task.157.qa.4.context-pressure-handoff-trigger.md](./task.157.qa.4.context-pressure-handoff-trigger.md)
+- **Gate File**: [task.157.gate.4.context-pressure-handoff-trigger.yml](./task.157.gate.4.context-pressure-handoff-trigger.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 43
+- **Tests Executed**: 48
 - **Phases Verified**: 16/16
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Gate 2 findings fixed. Cycle 3: the anchored wrap regex misses the installer's own output for an apostrophe path (QA3-CR-1, medium); the .bak is removed before its replacement is copied (QA3-CR-3, low).
+Gate 3 findings fixed; every installer-written form round-trips. Cycle 4: hand-written `#` comments / `$'…'` strings are not tokenized (QA4-CR-1, medium; CR-2, low) and a directory `.bak` is not refused (QA4-CR-3, low).
 
 <!-- change-log-start -->
 ## Change Log
@@ -532,7 +532,8 @@ Gate 2 findings fixed. Cycle 3: the anchored wrap regex misses the installer's o
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
-| 2026-10-02 |         | QA findings fixed — gates 1–3: 8 gated + 10 advisory; settings outcomes consolidated; hook/wrap identity replaced by a shell-word parse; 3 iterations | qa-fix |
+| 2026-10-02 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
+| 2026-10-02 |         | QA findings fixed — gates 1–4: 11 gated + 12 advisory; settings outcomes consolidated; hook/wrap identity is a POSIX shell-word parse (comments, $'…', continuation); 4 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---

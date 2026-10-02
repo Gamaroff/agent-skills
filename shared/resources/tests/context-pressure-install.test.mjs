@@ -17,7 +17,6 @@ import {
   applySettings,
   shellWords,
   shq,
-  unshq,
   unwrapCommand,
 } from "../context-pressure.mjs";
 
@@ -238,9 +237,9 @@ test("usage errors exit 2", () => {
   assert.equal(spawnSync("sh", [INSTALLER, "--settings"]).status, 2);
 });
 
-test("shq/unshq round-trip and unwrapCommand refuses a form it did not write", () => {
+test("shq round-trips through shellWords and unwrapCommand refuses a form it did not write", () => {
   for (const s of ["", "a", "it's", "''", `a'b"c$d\\e`, "x\ny"])
-    assert.equal(unshq(shq(s)), s);
+    assert.deepEqual(shellWords(shq(s)), [s]);
   assert.deepEqual(unwrapCommand("echo plain"), { wrapped: false });
   assert.deepEqual(
     unwrapCommand(
@@ -552,6 +551,64 @@ test("a failed .bak copy leaves the previous .bak intact (QA cycle 3 CR-3)", () 
   assert.match(r.stderr, /cannot write .*\.bak/);
   assert.equal(fs.readFileSync(`${f}.bak`, "utf8"), "previous backup");
   assert.deepEqual(read(f), ORIGINAL, "settings untouched");
+  assert.deepEqual(fs.readdirSync(path.dirname(f)).sort(), [
+    "settings.json",
+    "settings.json.bak",
+  ]);
+});
+
+test("shellWords models comments, $'…', POSIX separators and line continuation (QA cycle 4 CR-1, CR-5)", () => {
+  assert.deepEqual(shellWords("a b # don't c"), ["a", "b"]);
+  assert.deepEqual(shellWords("a#b c"), ["a#b", "c"]);
+  assert.deepEqual(shellWords("a '#b' # x\nc"), ["a", "#b", "c"]);
+  assert.deepEqual(shellWords("echo $'it\\'s\\tx\\x41'"), ["echo", "it's\txA"]);
+  assert.deepEqual(shellWords("a\u00a0b c"), ["a\u00a0b", "c"]);
+  assert.deepEqual(shellWords('a\\\nb "c\\\nd"'), ["ab", "cd"]);
+  assert.equal(shellWords("echo $'unclosed"), null);
+});
+
+test("hand-written forms: a commented hook is ours; a commented status line is not a wrap (QA cycle 4 CR-1, CR-2)", () => {
+  const hooks = (c) => ({
+    hooks: { UserPromptSubmit: [{ hooks: [{ type: "command", command: c }] }] },
+  });
+  for (const c of [
+    "node /x/context-pressure.mjs check # don't remove",
+    "node $'/x/context-pressure.mjs' check",
+  ]) {
+    assert.equal(applySettings(hooks(c), "uninstall").outcome, "changed", c);
+    const a = applySettings(hooks(c), "install", {
+      engine: "/e/context-pressure.mjs",
+      wrapper: "/e/context-pressure-statusline.sh",
+    });
+    assert.equal(ours(a.settings).length, 1, `install dedupes ${c}`);
+  }
+  const sl = "my-status # don't use context-pressure-statusline.sh";
+  assert.equal(unwrapCommand(sl).wrapped, false);
+  const r = applySettings(
+    { statusLine: { type: "command", command: sl } },
+    "install",
+    {
+      engine: "/e/context-pressure.mjs",
+      wrapper: "/e/context-pressure-statusline.sh",
+    },
+  );
+  assert.equal(r.outcome, "changed");
+  assert.equal(unwrapCommand(r.settings.statusLine.command).original, sl);
+});
+
+test("a .bak path that is not a regular file is refused before anything is written (QA cycle 4 CR-3)", () => {
+  const f = settingsFile(ORIGINAL);
+  fs.mkdirSync(`${f}.bak`);
+  const before = fs.readFileSync(f);
+  const r = install(f);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /not a regular file/);
+  assert.deepEqual(fs.readFileSync(f), before);
+  assert.deepEqual(
+    fs.readdirSync(`${f}.bak`),
+    [],
+    "nothing moved into the directory",
+  );
   assert.deepEqual(fs.readdirSync(path.dirname(f)).sort(), [
     "settings.json",
     "settings.json.bak",

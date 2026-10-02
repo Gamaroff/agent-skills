@@ -279,30 +279,9 @@ export function check(
 
 // ── settings.json transforms (used by context-pressure-install.sh) ──────────────────────────────
 
-/** Single-quote a string for sh. Reversible by `unshq`. */
+/** Single-quote a string for sh. `shellWords` reads it back as exactly one word. */
 export function shq(s) {
   return `'${String(s).replace(/'/g, `'\\''`)}'`;
-}
-
-/** Inverse of shq for a string shq produced (concatenated '…' and \' pieces). null if not one. */
-export function unshq(s) {
-  let out = "";
-  let i = 0;
-  if (!s.length) return null;
-  while (i < s.length) {
-    if (s[i] === "'") {
-      const j = s.indexOf("'", i + 1);
-      if (j < 0) return null;
-      out += s.slice(i + 1, j);
-      i = j + 1;
-    } else if (s[i] === "\\" && s[i + 1] === "'") {
-      out += "'";
-      i += 2;
-    } else {
-      return null;
-    }
-  }
-  return out;
 }
 
 export function hookCommand(engine) {
@@ -319,7 +298,10 @@ export function wrapCommand(wrapper, original) {
  * Split a command string into shell words: whitespace separates; '…' is literal; "…" honours
  * \" \\ \$ \` escapes; a backslash outside quotes escapes the next character. Adjacent pieces join
  * into one word, so shq's '\'' sequence reads back as one apostrophe. Expansions are NOT performed —
- * a word is what the shell would pass before expanding it. null when a quote never closes.
+ * a word is what the shell would pass before expanding it. Also modelled: # comments, bash $'…',
+ * POSIX field separators (space, tab, newline) and backslash-newline continuation. null when a quote
+ * never closes — and a null is never guessed around: a hook it hides is not ours (never deleted),
+ * a status line it hides that names the wrapper is needs-manual.
  *
  * The hook and the status-line wrap are recognised from these words, never from a regex over the
  * raw string: three QA cycles each found a form the last regex missed (a directory containing the
@@ -330,36 +312,84 @@ export function shellWords(str) {
   const words = [];
   let w = null;
   let i = 0;
+  const add = (piece) => (w = (w ?? "") + piece);
   while (i < str.length) {
     const c = str[i];
-    if (/\s/.test(c)) {
+    if (c === " " || c === "\t" || c === "\n") {
+      // POSIX field separators only: an NBSP or U+2028 is part of a word, as it is to sh.
       if (w !== null) (words.push(w), (w = null));
       i++;
+    } else if (c === "#" && w === null) {
+      // A comment: an unquoted # that starts a word runs to the end of the line.
+      const nl = str.indexOf("\n", i);
+      i = nl < 0 ? str.length : nl;
     } else if (c === "'") {
       const j = str.indexOf("'", i + 1);
       if (j < 0) return null;
-      w = (w ?? "") + str.slice(i + 1, j);
+      add(str.slice(i + 1, j));
+      i = j + 1;
+    } else if (c === "$" && str[i + 1] === "'") {
+      // bash/zsh $'…': ANSI-C escapes. A shell without it would read a different word — the
+      // forms this installer writes never use it, so reading it the bash way is the useful choice.
+      let j = i + 2;
+      let piece = "";
+      const SIMPLE = {
+        n: "\n",
+        t: "\t",
+        r: "\r",
+        a: "\x07",
+        b: "\b",
+        e: "\x1b",
+        E: "\x1b",
+        f: "\f",
+        v: "\v",
+        "\\": "\\",
+        "'": "'",
+        '"': '"',
+        "?": "?",
+      };
+      for (; j < str.length && str[j] !== "'"; j++) {
+        if (str[j] !== "\\" || j + 1 >= str.length) {
+          piece += str[j];
+          continue;
+        }
+        const e = str[++j];
+        if (e in SIMPLE) piece += SIMPLE[e];
+        else if (e === "x" && /^[0-9A-Fa-f]{1,2}/.test(str.slice(j + 1))) {
+          const hex = /^[0-9A-Fa-f]{1,2}/.exec(str.slice(j + 1))[0];
+          piece += String.fromCharCode(parseInt(hex, 16));
+          j += hex.length;
+        } else if (/[0-7]/.test(e)) {
+          const oct = /^[0-7]{1,3}/.exec(str.slice(j))[0];
+          piece += String.fromCharCode(parseInt(oct, 8));
+          j += oct.length - 1;
+        } else piece += "\\" + e;
+      }
+      if (j >= str.length) return null;
+      add(piece);
       i = j + 1;
     } else if (c === '"') {
       let j = i + 1;
       let piece = "";
       for (; j < str.length && str[j] !== '"'; j++) {
-        if (
+        if (str[j] === "\\" && str[j + 1] === "\n")
+          j++; // line continuation: removed
+        else if (
           str[j] === "\\" &&
           j + 1 < str.length &&
-          '"\\$`\n'.includes(str[j + 1])
+          '"\\$`'.includes(str[j + 1])
         )
           piece += str[++j];
         else piece += str[j];
       }
       if (j >= str.length) return null;
-      w = (w ?? "") + piece;
+      add(piece);
       i = j + 1;
     } else if (c === "\\" && i + 1 < str.length) {
-      w = (w ?? "") + str[i + 1];
+      if (str[i + 1] !== "\n") add(str[i + 1]); // backslash-newline is a line continuation
       i += 2;
     } else {
-      w = (w ?? "") + c;
+      add(c);
       i++;
     }
   }
