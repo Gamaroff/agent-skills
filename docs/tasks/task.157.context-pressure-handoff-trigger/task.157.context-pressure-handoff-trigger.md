@@ -5,7 +5,9 @@ type: task
 description: "Record the status line's measured context usage per session and add a UserPromptSubmit hook that, above a soft and a firm threshold, tells the agent to recommend a session-handoff continuation at the next natural boundary. Ship it with an idempotent user-level installer so it works in every repo. The trigger is a measurement, never the model's self-assessment."
 tags: [session-handoff, context, hooks, statusline, claude-code]
 category: infrastructure
-status: ready-for-review
+status: accepted
+completed_date: 2026-10-02
+pr_number: 549
 priority: Medium
 created: 2026-09-25
 updated: 2026-10-02
@@ -16,7 +18,7 @@ github_issue: 491
 
 # Technical Task: Context-pressure trigger — recommend a continuation handoff before the context fills
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.157.review.1.context-pressure-handoff-trigger.md` implemented 2026-10-02
 
@@ -156,6 +158,15 @@ sequenceDiagram
   deduplicates by identity (the engine or wrapper path under any spelling), writes atomically with a
   `.bak`, and never wraps twice. `--uninstall` removes the hook and unwraps back to the exact original
   command.
+- **As delivered** (decided during development and QA; see the implementation report): the JSON edits
+  live in the engine as a third sub-command, `context-pressure.mjs settings`, backed by a pure
+  `applySettings()` whose outcome is one of `changed` (exit 0), `unchanged` (3) or `needs-manual` (4 —
+  a wrap it did not write, or a `statusLine` with no command; the installer prints `ACTION NEEDED` and
+  exits 1). The hook and the wrap are recognised by parsing the command into POSIX shell words
+  (`shellWords()`: quotes, `$'…'`, comments, line continuation) — the exact inverse of the installer's
+  own quoting — rather than by substring or regex, and the wrap is written as
+  `sh '<wrapper>' -- sh -c '<original>'`. The installer keeps the settings file's mode and replaces the
+  `.bak` atomically.
 
 ### Important Clarifications
 
@@ -519,12 +530,36 @@ implementation report, not asserted in CI (the load-sensitive-test rule).
 
 ### Key Findings
 No gating issues after five cycles. One low, medium-confidence advisory remains as a future recommendation ($'…' byte escapes in hand-written commands).
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.157.qa.5.context-pressure-handoff-trigger.md` (5 cycles)
+**Gate File**: `task.157.gate.5.context-pressure-handoff-trigger.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR conformance review**: ✅ APPROVE — `task.157.pr-review.1.context-pressure-handoff-trigger.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 14/14 traced — 11 with code and per-PR tests, 2 documentation, 2 performance recorded (`check` p95 113 ms; wrapper +16–21 ms)
+✅ **Tests:** 51 context-pressure tests (`shared/resources/tests/context-pressure*.test.mjs`), every QA fix mutation-proven
+✅ **PR:** #549 — CI reading 1 SUCCESS @ `08ae59cca684` (link-check, shellcheck, test, validate, branch-policy)
+✅ **Documentation:** `skills/session-handoff/SKILL.md` § Context-pressure trigger; `CHANGELOG.md` `[Unreleased]`
+✅ **Security Review:** PASS — `validSessionId` probed, 20 executed, 0 reproduced; no secrets, network, PII or dependency changes
+⚠️ **Compliance Review:** NOT_APPLICABLE — local developer tooling
+
+**Task marked as ACCEPTED on:** 2026-10-02
+
+**Detailed Verification Log:** See `task.157.dod.1.context-pressure-handoff-trigger.md` for complete verification evidence and timestamps.
 
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-25 | 1.0     | Initial draft | create-task |
 | 2026-10-02 | 1.1     | Review passed (9/10) — aligned the status-line wrap to the plan's `sh -c '<original>'` quoting; statusLine sibling keys preserved; bare-filename citation note | review-task |
 | 2026-10-02 |         | Status → ready-for-development | review-task |
@@ -535,6 +570,7 @@ No gating issues after five cycles. One low, medium-confidence advisory remains 
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
 | 2026-10-02 |         | QA findings fixed — gates 1–4: 11 gated + 12 advisory; settings outcomes consolidated; hook/wrap identity is a POSIX shell-word parse (comments, $'…', continuation); 4 iterations | qa-fix |
 | 2026-10-02 |         | QA gate PASS (100/100) — 0 gating findings, 1 advisory | qa-task |
+| 2026-10-02 | 1.2 | DoD verified — accepted (PR #549) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -590,13 +626,9 @@ No gating issues after five cycles. One low, medium-confidence advisory remains 
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
-1. Land task.156 first
-2. Implement according to the implementation plan (`/develop-task`)
-3. Hand off to QA when complete
-4. QA will create:
-   - QA Report: `task.157.qa.[n].[name].md`
-   - Bug Reports (if needed): `task.157.bug.[N].[name].md`
-   - Quality Gate: `task.157.gate.[n].[name].yml` (co-located in task directory)
+1. `/finalise` (DoD) and merge PR #549 — QA gate 5 PASS (100/100), PR review APPROVE
+2. Install on a machine where it is wanted: `sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh --dry-run`, then without `--dry-run`
+3. Follow-ups recorded but not in scope: `$'…'` byte escapes in hand-written commands (QA5-CR-1); freshness measured against activity rather than wall-clock after a long idle pause (PR review CR-1)
