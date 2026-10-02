@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-01
-**Next Available Task Number:** **176**
+**Next Available Task Number:** **177**
 
 ## How to use
 
@@ -216,6 +216,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 173 | [Fold the 5c review and its doc-only fixes into the acceptance commit](task.173.fold-5c-review-into-acceptance-commit/task.173.fold-5c-review-into-acceptance-commit.md) | planned | refactoring | Medium | 2026-10-01 | [#540](https://github.com/Gamaroff/agent-skills/issues/540) | task.172 · tinker-city hand-off change 2: 5c report + doc-only CONCERNS fixes ride 6a; 8a and the PreCompact pause commit only their own paths |
 | 174 | [Publish the docs-only CI classifier as an optional consumer template](task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md) | planned | infrastructure | Low | 2026-10-01 | [#541](https://github.com/Gamaroff/agent-skills/issues/541) | — blocked on tinker-city task.127 (#982, another repository) merging and running on real CI; Phase 0 halts until then. Hand-off change 4 |
 | 175 | [Resolve finalise's PR number from the branch, not the task body](task.175.finalise-pr-number-from-branch/task.175.finalise-pr-number-from-branch.md) | planned | infrastructure | Medium | 2026-10-02 | [#551](https://github.com/Gamaroff/agent-skills/issues/551) | — Observation #184 (recurred task.147, task.166): finalise Step 3a takes the first body `PR #N`; resolver reads caller → branch → lock → frontmatter → confirmed body |
+| 176 | [/review-pr accepts a Jira card or GitHub issue and resolves it to its PR](task.176.review-pr-tracker-issue-input/task.176.review-pr-tracker-issue-input.md) | planned | infrastructure | Medium | 2026-10-02 | — | — Start /review-pr from a Jira key/URL, GitHub issue or `#N`; card → doc → PR resolution with selection rules; PR-URL host check. Phase 0 done: key search verified; a key match is a candidate list, never an auto-pick. |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
