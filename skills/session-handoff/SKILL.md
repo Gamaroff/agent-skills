@@ -266,6 +266,65 @@ then `<repo>/.agents/skills/…`, `~/.agents/skills/…` and `~/.claude/skills/�
 inside the repository relative and any other absolute — so the prompt names a verifier that exists
 for the session that reads it.
 
+## Context-pressure trigger (Claude Code)
+
+The model cannot see how full its context is, so "hand off when the context is getting full" asks
+for a self-assessment — and a self-assessment is least reliable exactly when the context is under
+load. This trigger makes the recommendation **mechanical**: Claude Code's status line already
+receives `context_window.used_percentage`, a recorder saves it per session, and a
+`UserPromptSubmit` hook reads it on every prompt. Past about **60%** the agent is told to recommend
+Continue mode in its closing next steps at the next natural boundary; past about **75%** it is told
+to recommend it firmly, now, before starting any new phase. The hook only changes what the agent
+recommends — it never blocks a prompt and never forces a handoff.
+
+Three files, one per job:
+
+| File | Job |
+| --- | --- |
+| `references/context-pressure.mjs` | the engine: `record`, `check`, and the installer's `settings` edits; the only code that reads or writes the state |
+| `references/context-pressure-statusline.sh` | status-line wrapper: records, then runs your own status line with the same stdin — its output and exit code are unchanged |
+| `references/context-pressure-install.sh` | user-level installer and uninstaller |
+
+**Install** (user level, so it works in every repository; `--settings <file>` targets another file):
+
+```bash
+sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh --dry-run   # review the diff
+sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh
+```
+
+It adds the hook (`timeout` 5s) and wraps the existing `statusLine.command` as
+`sh '<dir>/context-pressure-statusline.sh' -- sh -c '<your original>'`, touching nothing else —
+`padding` and other `statusLine` keys stay. With no status line it adds the recorder alone, which
+prints nothing. A second run changes nothing. It writes atomically and keeps a `.bak`. The paths it
+writes are the directory the installer ran from: run it from the installed skill, not from a
+repository checkout, or the hook dies with the checkout. Restart the Claude Code session afterwards.
+
+**Uninstall** removes the hook and unwraps to the exact original command:
+
+```bash
+sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh --uninstall
+```
+
+**Knobs** (environment, read by the hook; an invalid value falls back to the default):
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `CONTEXT_PRESSURE_SOFT` | 60 | percent at which the soft note fires, once, on entering the band |
+| `CONTEXT_PRESSURE_FIRM` | 75 | percent at which the firm note fires (raised to `SOFT` if set below it) |
+| `CONTEXT_PRESSURE_REPEAT` | 5 | in the firm band, repeat the note every N prompts |
+| `CONTEXT_PRESSURE_MAX_AGE_MIN` | 15 | a reading older than this is ignored |
+| `CONTEXT_PRESSURE_STATE_DIR` | `${XDG_STATE_HOME:-~/.local/state}/agent-skills/context-pressure` | one small file per session, pruned after 7 days |
+
+**Silence is the failure mode, on purpose.** No note means one of: below the threshold, a stale
+reading, no reading yet, or a broken install — and these are indistinguishable from inside the
+session, by design: a wrong number is worse than none, and a broken hook must cost a missed
+reminder, never a blocked prompt. To check an install, start a session with
+`CONTEXT_PRESSURE_SOFT=1` and send one prompt; the note should appear.
+
+**Claude Code only.** Other agents have no status-line feed; Continue mode still works by hand
+there. The status line's refresh cadence is undocumented, so a reading can lag a turn — the
+freshness window bounds how old an acted-on figure can be.
+
 ## Discoverability
 
 The handoff must be linked from the always-loaded agent file (`AGENTS.md` / `CLAUDE.md`), and that
