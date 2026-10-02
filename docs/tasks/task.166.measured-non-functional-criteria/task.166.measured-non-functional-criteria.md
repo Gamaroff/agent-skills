@@ -5,10 +5,10 @@ type: task
 description: "Add a third test-free criterion kind — a measured criterion with a stated bound and a cited committed measurement — to finalise's DoD AC prompt, and have review-task flag a non-functional success criterion that states no bound, so a timing or size criterion is neither failed by rule nor passed by override (observation #206); and have review-task classify every success criterion the way finalise will, flagging a behaviour criterion with no planned test and a criterion that can only be met after merge (observation #222)."
 tags: [finalise, review-task, definition-of-done, success-criteria, observe-work]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-09-28
-updated: 2026-09-30
+updated: 2026-10-02
 assignee:
 estimated_effort_hours: 6
 github_issue: 510
@@ -16,7 +16,9 @@ github_issue: 510
 
 # Technical Task: Give measured non-functional criteria a defined path through review and finalise
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.166.review.1.measured-non-functional-criteria.md` implemented 2026-10-02
 
 **GitHub Issue**: [#510](https://github.com/Gamaroff/agent-skills/issues/510)
 
@@ -85,11 +87,12 @@ This task gives the measured criterion a defined path at both ends:
     - `test_citation`: `"NOT_APPLICABLE: measured criterion"`, unless a test pins the bound, in which case the criterion is an ordinary behaviour criterion and takes the normal path.
     - `PASS` when the criterion states a bound, the cited measurement meets it, and the command is named. `FAIL` when the bound is missing ("no measurable change", "fast enough"), the measurement is uncited or uncommitted, or it misses the bound.
   - The closing sentence becomes "`test_runs_per_pr` is `null` on all three kinds … **A behaviour criterion never takes any of these paths.**" The measured kind must not become a back door for behaviour that could be tested.
+  - The Execution rule (§ Step 5: "The two `NOT_APPLICABLE` kinds in Step 3 carry `null` here …") restates the count. It drops the count ("The `NOT_APPLICABLE` kinds in Step 3 …"), so the heading sentence is the file's one count of the kinds (review 1).
 - `review-task` Step 6 check 4 also classifies each success criterion as finalise's AC prompt will — behaviour (needs a per-PR test), documentation, "no unit tests applicable", or measured — and raises **Important** for (a) a behaviour criterion whose text or phase names no test planned to hold it ("name the test, or re-scope it"), and (b) a criterion that can only be met after merge or acceptance, such as closing an observation or a tracker item on merge ("move it to Deferred Work — finalise runs before merge"). The worked examples are task.142's AC7/AC8 (behaviour) and AC16 (post-merge).
 - `review-task` Step 6 check 4 gains a rule: a non-functional success criterion (Performance, or any criterion bounding time, size, count or rate) must state a **numeric bound** and **how it is measured**. If either is missing, the finding is **Important** ("state the bound and the command, or replace it with a test that pins it"). The example is task.164's AC7 wording.
 - Tests:
   - `shared/resources/tests/finalise-dod-ac-kinds.test.mjs` pins the AC prompt: the section states the number of kinds, the number of bulleted kinds equals it, each kind has its `test_citation` string, the measured kind's `PASS` requires a bound and a cited command, and the closing sentence covers all kinds. It also checks that the bundled copy under `skills/finalise/references/` matches the source body.
-  - `tests/review-task-measured-criterion.test.js` pins the review-task rule: check 4 names the bound and measurement requirement and its severity is Important.
+  - `tests/review-task-measured-criterion.test.js` pins the review-task rules: check 4 carries the bound-and-measurement rule, the behaviour-without-test rule and the post-merge rule, each at severity Important.
 
 ### Important Clarifications
 
@@ -106,7 +109,8 @@ This task gives the measured criterion a defined path at both ends:
 ✅ `skills/review-task/SKILL.md`: Step 6 check 4 bound-and-measurement rule, severity Important
 ✅ `shared/resources/tests/finalise-dod-ac-kinds.test.mjs` (new): pins the AC prompt's kinds, including the obs #204 documentation kind that shipped untested
 ✅ `tests/review-task-measured-criterion.test.js` (new): pins the review-task rule
-✅ Bundled copy regenerated; CHANGELOG `[Unreleased]` entry citing (task 166); observation #206 marked actioned on merge
+✅ Bundled copy regenerated; CHANGELOG `[Unreleased]` entry citing (task 166)
+✅ Post-merge, not a success criterion: observations #206 and #222 marked actioned (see Notes)
 
 ### Out of Scope
 
@@ -134,9 +138,10 @@ Independent of task.165. It can land before or after it.
 
 **Files**: `shared/resources/finalise-dod-ac-prompt.md`
 
-- [ ] Change "Two kinds … only these two" to "Three kinds … only these three".
-- [ ] Add the **measured criterion** bullet: what qualifies (a non-functional bound whose natural evidence is a measurement), its `code_citation` (the committed artifact line with the command), its `test_citation` string, and its `PASS` / `FAIL` bar.
-- [ ] Extend the closing sentence to "all three kinds" / "any of these paths", and add one line: a criterion whose bound a per-PR test could assert is a behaviour criterion, not a measured one.
+- [x] Change "Two kinds … only these two" to "Three kinds … only these three".
+- [x] Add the **measured criterion** bullet: what qualifies (a non-functional bound whose natural evidence is a measurement), its `code_citation` (the committed artifact line with the command), its `test_citation` string, and its `PASS` / `FAIL` bar.
+- [x] Extend the closing sentence to "all three kinds" / "any of these paths", and add one line: a criterion whose bound a per-PR test could assert is a behaviour criterion, not a measured one.
+- [x] Drop the count from the Execution rule's "The two `NOT_APPLICABLE` kinds in Step 3" (§ Step 5), so the heading sentence is the only count of the kinds in the file.
 
 ### Phase 2: review-task flags an unbounded non-functional criterion
 
@@ -144,9 +149,9 @@ Independent of task.165. It can land before or after it.
 
 **Files**: `skills/review-task/SKILL.md`
 
-- [ ] Step 6 check 4: add the bound-and-measurement rule with severity **Important**, the remedy ("state the bound and the command, or replace it with a test that pins it"), and task.164's AC7 as the worked example.
-- [ ] Add the behaviour-without-test and post-merge rules (observation #222) to check 4, each with its remedy and task.142 as the worked example.
-- [ ] Add all three findings to the Step 6 "Issues to Flag" list under **Important**.
+- [x] Step 6 check 4: add the bound-and-measurement rule with severity **Important**, the remedy ("state the bound and the command, or replace it with a test that pins it"), and task.164's AC7 as the worked example.
+- [x] Add the behaviour-without-test and post-merge rules (observation #222) to check 4, each with its remedy and task.142 as the worked example.
+- [x] Add all three findings to the Step 6 "Issues to Flag" list under **Important**.
 
 ### Phase 3: Pin both rules
 
@@ -154,24 +159,25 @@ Independent of task.165. It can land before or after it.
 
 **Files**: `shared/resources/tests/finalise-dod-ac-kinds.test.mjs` (new), `tests/review-task-measured-criterion.test.js` (new)
 
-- [ ] AC prompt pin: the kind count stated in the heading sentence equals the number of top-level bulleted kinds under it (floor: 3). Each kind carries its `test_citation` string. The measured kind's bar names "bound" and "command". The closing sentence covers all kinds. The source body equals the bundled copy's body, minus the AUTO-GENERATED header.
-- [ ] review-task pin: check 4 contains the bound-and-measurement rule, the behaviour-without-test rule and the post-merge rule, each at severity Important.
-- [ ] Confirm `npm test` picks both files up via `shared/resources/tests/*.test.mjs` and `tests/*.test.js`, and grep `package.json` before assuming.
+- [x] AC prompt pin: the kind count stated in the heading sentence equals the number of top-level bulleted kinds under it (floor: 3). Each kind carries its `test_citation` string. The measured kind's bar names "bound" and "command". The closing sentence covers all kinds. No other sentence in the file states a count of `NOT_APPLICABLE` kinds. The source body equals the bundled copy's body, minus the AUTO-GENERATED header.
+- [x] review-task pin: check 4 contains the bound-and-measurement rule, the behaviour-without-test rule and the post-merge rule, each at severity Important.
+- [x] Confirm `npm test` picks both files up via `shared/resources/tests/*.test.mjs` and `tests/*.test.js`, and grep `package.json` before assuming.
 
 ### Phase 4: Proof and gates
 
 **Risk**: Low.
 
-- [ ] Mutation-prove under bash, with `cp` snapshots and `cmp`-checked restore:
+- [x] Mutation-prove under bash, with `cp` snapshots and `cmp`-checked restore:
   - revert "three" to "two" in the heading → AC pin red;
   - drop the measured-criterion bullet → AC pin red;
   - drop "bound" from its `PASS` bar → AC pin red;
   - revert the closing sentence to "both kinds" → AC pin red;
+  - restore "The two `NOT_APPLICABLE` kinds" in the Execution rule → AC pin red;
   - delete the documentation kind's `test_citation` string → AC pin red (the obs #204 kind is now covered);
   - drop review-task's bound rule, or change its severity → review-task pin red;
   - drop the behaviour-without-test rule, or the post-merge rule → review-task pin red.
-- [ ] `npm run bundle`, `npm run ci:fast` with `.agents/skills` moved aside, `npm run bundle:check`, `npm run validate -- skills/finalise/ skills/review-task/`.
-- [ ] CHANGELOG `[Unreleased]` entry citing (task 166).
+- [x] `npm run bundle`, `npm run ci:fast` with `.agents/skills` moved aside, `npm run bundle:check`, `npm run validate -- skills/finalise/ skills/review-task/`.
+- [x] CHANGELOG `[Unreleased]` entry citing (task 166).
 
 ---
 
@@ -195,6 +201,7 @@ None.
 
 5. ✅ `CHANGELOG.md`: `[Unreleased]` entry
 6. ✅ `skills/finalise/references/finalise-dod-ac-prompt.md`: regenerated by `npm run bundle` (never edited by hand)
+7. ✅ `skills/review-task/references/finalise-dod-ac-prompt.md` (new): bundled by `npm run bundle` because check 4 now cites the AC prompt's Step 3 (a citation bundles that file alone)
 
 ### Files to Delete
 
@@ -230,24 +237,24 @@ Not applicable. The change is prompt prose and two text pins.
 
 ### Functional
 
-- [ ] `finalise-dod-ac-prompt.md` § Step 3 names three test-free kinds. The measured kind's `PASS` requires a stated bound, a measurement meeting it, and the command that produced it, cited from a committed artifact. An unbounded criterion is `FAIL`. Pinned (Phases 1, 3).
-- [ ] The prompt's closing sentence covers all three kinds, and says a criterion whose bound a per-PR test could assert is a behaviour criterion. Pinned (Phases 1, 3).
-- [ ] `review-task` Step 6 check 4 flags a non-functional criterion with no numeric bound or no stated measurement as Important. Pinned (Phases 2, 3).
-- [ ] The documentation kind added by obs #204 is covered by the new AC pin (Phase 3).
-- [ ] `review-task` Step 6 check 4 flags a behaviour criterion with no planned test, and a criterion met only after merge, each as Important. Pinned (Phases 2, 3).
+- [x] `finalise-dod-ac-prompt.md` § Step 3 names three test-free kinds. The measured kind's `PASS` requires a stated bound, a measurement meeting it, and the command that produced it, cited from a committed artifact. An unbounded criterion is `FAIL`. Pinned (Phases 1, 3).
+- [x] The prompt's closing sentence covers all three kinds, and says a criterion whose bound a per-PR test could assert is a behaviour criterion. Pinned (Phases 1, 3).
+- [x] `review-task` Step 6 check 4 flags a non-functional criterion with no numeric bound or no stated measurement as Important. Pinned (Phases 2, 3).
+- [x] The documentation kind added by obs #204 is covered by the new AC pin (Phase 3).
+- [x] `review-task` Step 6 check 4 flags a behaviour criterion with no planned test, and a criterion met only after merge, each as Important. Pinned (Phases 2, 3).
 
 ### Performance
 
-- [ ] Not applicable: no runtime code changes. The two new test files each finish in under 1s, measured with `time node --test <file>` and recorded in the implementation report.
+- [x] Not applicable: no runtime code changes. The two new test files each finish in under 1s, measured with `time node --test <file>` and recorded in the implementation report.
 
 ### Code Quality
 
-- [ ] `npm run ci:fast` passes with `.agents/skills` moved aside; `bundle:check` and `npm run validate -- skills/finalise/ skills/review-task/` pass
-- [ ] Each Phase 4 mutation goes red under bash, with restore checked by `cmp`
+- [x] `npm run ci:fast` passes with `.agents/skills` moved aside; `bundle:check` and `npm run validate -- skills/finalise/ skills/review-task/` pass
+- [x] Each Phase 4 mutation goes red under bash, with restore checked by `cmp`
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry cites (task 166)
+- [x] CHANGELOG `[Unreleased]` entry cites (task 166)
 
 ---
 
@@ -303,6 +310,9 @@ None identified.
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-28 | 1.0     | Initial draft | create-task |
 | 2026-09-30 | 1.1     | Folded in observation #222 (user-approved): review-task also flags behaviour criteria with no planned test and post-merge criteria; "observation #206 actioned on merge" moved out of Success Criteria into Notes (it can only be met after merge) | Claude |
+| 2026-10-02 | 1.2     | Review passed (9/10) — applied 2 Important fixes: the Execution rule's kind count brought into Phase 1 and pinned; the review-task pin and mutations cover the #222 rules; In Scope's post-merge line aligned with Notes | review-task |
+| 2026-10-02 |         | Status → ready-for-development | review-task |
+| 2026-10-02 |         | Implemented — 6 files (AC prompt, review-task check 4, 2 new pin tests, CHANGELOG, 1 new bundled copy); 9 tests, 14 mutations red | develop |
 
 <!-- change-log-end -->
 
@@ -312,21 +322,21 @@ None identified.
 
 ### Phase 1: finalise's AC prompt defines the measured criterion
 
-- [ ] Three kinds; measured-criterion bullet; closing sentence
+- [x] Three kinds; measured-criterion bullet; closing sentence
 
 ### Phase 2: review-task flags an unbounded non-functional criterion
 
-- [ ] Check 4 rule; Issues to Flag entry
+- [x] Check 4 rule; Issues to Flag entry
 
 ### Phase 3: Pin both rules
 
-- [ ] AC prompt pin (including the documentation kind and the bundled copy)
-- [ ] review-task pin
+- [x] AC prompt pin (including the documentation kind and the bundled copy)
+- [x] review-task pin
 
 ### Phase 4: Proof and gates
 
-- [ ] Mutation proofs
-- [ ] Gates, CHANGELOG, observation #206 actioned
+- [x] Mutation proofs
+- [x] Gates, CHANGELOG (observations #206 and #222 are set to actioned after merge — see Notes)
 
 ---
 
@@ -340,6 +350,10 @@ None identified.
 
 ## Notes
 
+### Deferred Work
+
+- None in scope. The post-merge observation updates below are not deferred work: they cannot happen before the PR merges.
+
 ### Important Reminders
 
 - **Post-merge (not a success criterion — finalise runs before merge):** set observations #206 and #222 to `actioned` through `observation-log.js set-status` once this merges.
@@ -349,7 +363,7 @@ None identified.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 
