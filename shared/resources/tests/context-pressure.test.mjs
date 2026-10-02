@@ -339,3 +339,29 @@ test("contract: check exits 0 on every input, never 2, and prints nothing or exa
       args.join(" "),
     );
 });
+
+test("a failed state write leaves no .tmp behind; prune removes an old stray .tmp (QA cycle 1 CR-8)", () => {
+  const dir = path.join(tmpdir(), "s");
+  fs.mkdirSync(path.join(dir, "blocked.json"), { recursive: true }); // rename onto a directory fails
+  const env = { CONTEXT_PRESSURE_STATE_DIR: dir };
+  assert.equal(
+    record(
+      JSON.stringify({
+        session_id: "blocked",
+        context_window: { used_percentage: 70 },
+      }),
+      { env },
+    ),
+    false,
+  );
+  assert.deepEqual(
+    fs.readdirSync(dir).filter((n) => n.endsWith(".tmp")),
+    [],
+  );
+  const stray = path.join(dir, "old.json.123.tmp");
+  fs.writeFileSync(stray, "{");
+  const t = (NOW - 8 * 86400000) / 1000;
+  fs.utimesSync(stray, t, t);
+  prune(dir, NOW);
+  assert.equal(fs.existsSync(stray), false);
+});

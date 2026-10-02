@@ -98,7 +98,15 @@ if [ "$dry" = 1 ]; then
   exit 0
 fi
 
-[ "$created" = 0 ] && { cp -p "$settings" "$settings.bak" || { cleanup; exit 1; }; }
+if [ "$created" = 0 ]; then
+  cp -p "$settings" "$settings.bak" || { cleanup; exit 1; }
+  # Keep the file's own mode: mktemp makes $out 0600, and moving it in would silently change a
+  # 0644 settings file (QA cycle 1 CR-6). A `cp -p` of the original carries the mode; the new
+  # content is then written into that copy, which still lands in place with one mv.
+  keep=$(mktemp "$dir/.cp-settings-keep.XXXXXX") || { cleanup; exit 1; }
+  { cp -p "$settings" "$keep" && cat "$out" > "$keep"; } || { rm -f "$keep"; cleanup; exit 1; }
+  mv -f "$keep" "$out" || { rm -f "$keep"; cleanup; exit 1; }
+fi
 mv -f "$out" "$settings" || { cleanup; exit 1; }
 [ "$created" = 1 ] && rm -f "$src"
 echo "context-pressure-install: $mode written to $settings"

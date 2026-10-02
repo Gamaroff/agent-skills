@@ -167,8 +167,17 @@ function readJson(file) {
 
 function writeAtomic(file, obj) {
   const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(obj) + "\n", { mode: 0o600 });
-  fs.renameSync(tmp, file);
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(obj) + "\n", { mode: 0o600 });
+    fs.renameSync(tmp, file);
+  } catch (e) {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      /* never created */
+    }
+    throw e;
+  }
 }
 
 /** At most once an hour, delete state files untouched for `days`. */
@@ -180,7 +189,7 @@ export function prune(dir, nowMs = Date.now(), days = DEFAULTS.pruneDays) {
     /* no marker yet: prune now */
   }
   for (const name of fs.readdirSync(dir)) {
-    if (!/\.json$/.test(name)) continue;
+    if (!/\.json$|\.tmp$/.test(name)) continue; // a .tmp is a write that died mid-rename
     const f = path.join(dir, name);
     try {
       if (nowMs - fs.statSync(f).mtimeMs > days * 86400000) fs.unlinkSync(f);
@@ -333,8 +342,12 @@ function stripHooks(s) {
     if (hooks.length)
       kept.push(hooks.length === g.hooks.length ? g : { ...g, hooks });
   }
+  if (!removed.length) return removed; // nothing of ours: leave every container exactly as found
   if (kept.length) s.hooks.UserPromptSubmit = kept;
   else {
+    // Our removal emptied it. An empty container the user had BEFORE install is indistinguishable
+    // from one install created, and settings.json has no field to record which; dropping it is the
+    // equivalent setting either way (accepted residual, task.157 QA cycle 1 CR-3).
     delete s.hooks.UserPromptSubmit;
     if (!Object.keys(s.hooks).length) delete s.hooks;
   }
@@ -361,8 +374,24 @@ export function unwrapCommand(cmd) {
 /**
  * Pure. Returns { settings, changed, notes[] }. `settings` is a deep copy; the input is untouched.
  */
+export class SettingsShapeError extends Error {}
+
+/** Refuse a hooks shape this transform cannot edit without losing or mangling data. */
+function assertEditableShape(s) {
+  const h = s.hooks;
+  if (h === undefined) return;
+  if (!h || typeof h !== "object" || Array.isArray(h)) {
+    throw new SettingsShapeError("`hooks` is not a JSON object");
+  }
+  const ups = h.UserPromptSubmit;
+  if (ups !== undefined && !Array.isArray(ups)) {
+    throw new SettingsShapeError("`hooks.UserPromptSubmit` is not an array");
+  }
+}
+
 export function applySettings(input, mode, { engine, wrapper } = {}) {
   const s = JSON.parse(JSON.stringify(input));
+  assertEditableShape(s);
   const notes = [];
   let changed = false;
 
@@ -402,7 +431,21 @@ export function applySettings(input, mode, { engine, wrapper } = {}) {
         "statusLine: present but has no command string — left unchanged; the hook will stay silent until a reading exists",
       );
     } else if (unwrapCommand(sl.command).wrapped) {
-      notes.push("statusLine: already wrapped — unchanged");
+      const u = unwrapCommand(sl.command);
+      const want = wrapCommand(wrapper, u.original);
+      if (u.unparseable) {
+        notes.push(
+          "statusLine: wrapped in a form this installer did not write — left unchanged, check it by hand",
+        );
+      } else if (sl.command === want) {
+        notes.push("statusLine: already wrapped — unchanged");
+      } else {
+        // Wrapped by another copy of the wrapper (an earlier install from another directory): point
+        // it at this one, or deleting that directory blanks the status line (QA cycle 1 CR-1).
+        s.statusLine = { ...sl, command: want };
+        changed = true;
+        notes.push("statusLine: re-pointed an existing wrap at this wrapper");
+      }
     } else {
       s.statusLine = { ...sl, command: wrapCommand(wrapper, sl.command) };
       changed = true;
@@ -480,7 +523,16 @@ function settingsCli(args) {
       err: `context-pressure settings: ${opt.file} is not a JSON object — nothing changed`,
     };
   }
-  const r = applySettings(parsed, opt.mode, opt);
+  let r;
+  try {
+    r = applySettings(parsed, opt.mode, opt);
+  } catch (e) {
+    if (!(e instanceof SettingsShapeError)) throw e;
+    return {
+      code: 1,
+      err: `context-pressure settings: ${opt.file}: ${e.message} — nothing changed; fix it by hand and re-run`,
+    };
+  }
   if (r.changed)
     fs.writeFileSync(opt.out, JSON.stringify(r.settings, null, 2) + "\n");
   return {
@@ -528,7 +580,13 @@ async function main(argv) {
 }
 
 if (isInvokedDirectly()) {
-  main(process.argv.slice(2)).catch(() => {
-    process.exitCode = process.argv[2] === "settings" ? 1 : 0;
+  main(process.argv.slice(2)).catch((e) => {
+    // record/check stay silent and exit 0 on anything; settings says why it refused.
+    if (process.argv[2] === "settings") {
+      process.stderr.write(
+        `context-pressure settings: ${e && e.message} — nothing changed\n`,
+      );
+      process.exitCode = 1;
+    } else process.exitCode = 0;
   });
 }

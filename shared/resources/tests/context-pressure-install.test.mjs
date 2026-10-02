@@ -30,7 +30,7 @@ function tmpdir() {
   return d;
 }
 
-const ORIGINAL_STATUS = `cat >/dev/null; echo "it's $((40+2))" | tr a A`;
+const ORIGINAL_STATUS = `cat >/dev/null; echo "it's $((40+2)) apples" | tr a A`;
 const ORIGINAL = {
   model: "opus",
   statusLine: { type: "command", command: ORIGINAL_STATUS, padding: 2 },
@@ -123,7 +123,11 @@ test("the installed status line command still renders the original's output", ()
   });
   assert.equal(r.status, 0);
   assert.equal(r.stdout, direct.stdout);
-  assert.equal(r.stdout, "it's 42\n".replace("a", "A"));
+  assert.equal(
+    r.stdout,
+    "it's 42 Apples\n",
+    "the original's own transformation survives the wrap",
+  );
 });
 
 test("identity dedupe: other spellings of the hook collapse to one; a wrapped status line is never wrapped twice", () => {
@@ -254,4 +258,105 @@ test("shq/unshq round-trip and unwrapCommand refuses a form it did not write", (
   );
   assert.equal(r.changed, false);
   assert.match(r.notes.join(" "), /by hand/);
+});
+
+test("re-install from another directory re-points an existing wrap; the original survives; uninstall restores it (QA cycle 1 CR-1)", () => {
+  const original = `cat >/dev/null; echo "x'y"`;
+  const f = settingsFile({
+    statusLine: {
+      type: "command",
+      command: `sh '/old/place/context-pressure-statusline.sh' -- sh -c ${shq(original)}`,
+      padding: 1,
+    },
+  });
+  const r = install(f);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stderr, /re-pointed/);
+  const s = read(f);
+  assert.doesNotMatch(s.statusLine.command, /\/old\/place\//);
+  assert.equal(unwrapCommand(s.statusLine.command).original, original);
+  assert.equal(s.statusLine.padding, 1);
+  assert.equal(install(f).status, 0);
+  assert.match(install(f).stdout, /unchanged/, "re-pointed wrap is stable");
+  install(f, "--uninstall");
+  assert.equal(read(f).statusLine.command, original);
+});
+
+test("uninstall leaves containers it did not empty exactly as found (QA cycle 1 CR-3)", () => {
+  for (const obj of [
+    { hooks: { UserPromptSubmit: [] } },
+    { hooks: {} },
+    { hooks: { UserPromptSubmit: [{ hooks: [] }] } },
+  ]) {
+    const f = settingsFile(obj);
+    const before = fs.readFileSync(f);
+    const r = install(f, "--uninstall");
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /unchanged/, JSON.stringify(obj));
+    assert.deepEqual(fs.readFileSync(f), before, JSON.stringify(obj));
+  }
+});
+
+test("an empty container survives an uninstall that does write (the status line is unwrapped) (QA cycle 1 CR-3)", () => {
+  const original = "echo hi";
+  const f = settingsFile({
+    hooks: { UserPromptSubmit: [] },
+    statusLine: {
+      type: "command",
+      command: `sh '/p/context-pressure-statusline.sh' -- sh -c ${shq(original)}`,
+    },
+  });
+  assert.equal(install(f, "--uninstall").status, 0);
+  assert.deepEqual(read(f), {
+    hooks: { UserPromptSubmit: [] },
+    statusLine: { type: "command", command: original },
+  });
+});
+
+test("accepted residual: an empty container present before install is dropped by uninstall (equivalent settings)", () => {
+  const f = settingsFile({ model: "m", hooks: {} });
+  install(f);
+  install(f, "--uninstall");
+  assert.deepEqual(read(f), { model: "m" });
+});
+
+test("a hooks shape the transform cannot edit is refused with exit 1, a message, and no change (QA cycle 1 CR-4)", () => {
+  for (const hooks of [
+    [],
+    "x",
+    null,
+    { UserPromptSubmit: "ab" },
+    { UserPromptSubmit: { a: 1 } },
+  ]) {
+    const f = settingsFile({ hooks });
+    const before = fs.readFileSync(f);
+    for (const mode of [[], ["--uninstall"]]) {
+      const r = install(f, ...mode);
+      assert.equal(r.status, 1, `${JSON.stringify(hooks)} ${mode}`);
+      assert.match(
+        r.stderr,
+        /hooks.*nothing changed/,
+        `${JSON.stringify(hooks)} ${mode}`,
+      );
+      assert.deepEqual(fs.readFileSync(f), before);
+    }
+    assert.deepEqual(
+      fs.readdirSync(path.dirname(f)),
+      ["settings.json"],
+      "no temp or .bak left behind",
+    );
+  }
+});
+
+test("the settings file keeps its own mode across install and uninstall (QA cycle 1 CR-6)", () => {
+  const f = settingsFile(ORIGINAL);
+  fs.chmodSync(f, 0o644);
+  install(f);
+  assert.equal(fs.statSync(f).mode & 0o777, 0o644);
+  install(f, "--uninstall");
+  assert.equal(fs.statSync(f).mode & 0o777, 0o644);
+  assert.deepEqual(fs.readdirSync(path.dirname(f)).sort(), [
+    "settings.json",
+    "settings.json.bak",
+  ]);
 });

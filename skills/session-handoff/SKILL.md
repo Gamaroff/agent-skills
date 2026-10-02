@@ -294,8 +294,11 @@ sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh
 
 It adds the hook (`timeout` 5s) and wraps the existing `statusLine.command` as
 `sh '<dir>/context-pressure-statusline.sh' -- sh -c '<your original>'`, touching nothing else —
+your original then runs under `sh -c`, so one written in bash-only syntax should call its script
+(`bash ~/.claude/statusline.sh`) rather than inline it — 
 `padding` and other `statusLine` keys stay. With no status line it adds the recorder alone, which
-prints nothing. A second run changes nothing. It writes atomically and keeps a `.bak`. The paths it
+prints nothing. A second run changes nothing; a run from a different directory re-points the hook
+and the wrap at itself. It writes atomically and keeps a `.bak`. The paths it
 writes are the directory the installer ran from: run it from the installed skill, not from a
 repository checkout, or the hook dies with the checkout. Restart the Claude Code session afterwards.
 
@@ -319,7 +322,9 @@ sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh --uni
 reading, no reading yet, or a broken install — and these are indistinguishable from inside the
 session, by design: a wrong number is worse than none, and a broken hook must cost a missed
 reminder, never a blocked prompt. To check an install, start a session with
-`CONTEXT_PRESSURE_SOFT=1` and send one prompt; the note should appear.
+`CONTEXT_PRESSURE_SOFT=1` and send **two** prompts: no reading exists until the first response has
+refreshed the status line, so the note appears on the second. A file named after the session id in
+the state directory is the other sign that recording works.
 
 **Claude Code only.** Other agents have no status-line feed; Continue mode still works by hand
 there. The status line's refresh cadence is undocumented, so a reading can lag a turn — the
