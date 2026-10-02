@@ -19,6 +19,45 @@ const ROOT = path.join(__dirname, "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
 const SKILL = read("SKILL.md");
+const { spawnSync } = require("child_process");
+const os = require("os");
+
+// ---------------------------------------------------------------------------
+// Shell helpers (task.176). zsh is the macOS default, so every snippet and the parser run under
+// both shells where zsh exists. No rc files: zsh reads ~/.zshenv even under `-c`.
+// ---------------------------------------------------------------------------
+const hasZsh = spawnSync("zsh", ["-c", "true"]).status === 0;
+const SHELLS = hasZsh ? ["bash", "zsh"] : ["bash"];
+const PARSER = path.join(ROOT, "scripts", "parse-target.sh");
+const shArgv = (shell, rest) =>
+  shell === "zsh" ? ["-f", ...rest] : ["--noprofile", "--norc", ...rest];
+
+function parseTarget(shell, target) {
+  const args = target === undefined ? [PARSER] : [PARSER, target];
+  const r = spawnSync(shell, shArgv(shell, args), { encoding: "utf8" });
+  const fields = {};
+  for (const line of r.stdout.split("\n").filter(Boolean)) {
+    const i = line.indexOf("=");
+    fields[line.slice(0, i)] = line.slice(i + 1);
+  }
+  return { status: r.status, stdout: r.stdout, stderr: r.stderr, fields };
+}
+
+function runScript(shell, script, opts = {}) {
+  return spawnSync(shell, shArgv(shell, ["-c", script]), {
+    encoding: "utf8",
+    ...opts,
+  });
+}
+
+const section = (from, to) => {
+  const a = SKILL.indexOf(from);
+  const b = SKILL.indexOf(to, a + 1);
+  assert.ok(a > -1 && b > a, `section ${from} … ${to} found`);
+  return SKILL.slice(a, b);
+};
+const bashBlocks = (text) =>
+  [...text.matchAll(/```bash\n([\s\S]*?)```/g)].map((m) => m[1]);
 const CONFORMANCE = read("references/pr-conformance-prompt.md");
 
 // ---------------------------------------------------------------------------
@@ -132,8 +171,10 @@ test("rung 4 matches a Jira key as well as a GitHub issue ref", () => {
   assert.match(SKILL, /never `#\{N\}`/);
 });
 
-test("the exclusion filter names all nine artifact segments", () => {
-  const filter = SKILL.match(/\.qa\.[\s\S]{0,200}?\.pr-review\./)[0];
+test("the exclusion filter names all ten artifact segments", () => {
+  // task.176: `.request.` carries the work item's own jira_key, so without it a key lookup
+  // returns two files and the work item is ambiguous.
+  const filter = SKILL.match(/\.qa\.[\s\S]{0,200}?\.request\./)[0];
   for (const seg of [
     ".qa.",
     ".gate.",
@@ -144,6 +185,7 @@ test("the exclusion filter names all nine artifact segments", () => {
     ".plan.",
     ".handover.",
     ".pr-review.",
+    ".request.",
   ]) {
     assert.ok(filter.includes(seg), `exclusion segment ${seg} present`);
   }
@@ -189,8 +231,14 @@ test("no shell snippet depends on bash-only glob behaviour", () => {
 
 test("the Bitbucket web PR URL form is recognised", () => {
   // CR-2: the arm matched only the API path `pullrequests`, so a pasted Bitbucket web URL
-  // (`/pull-requests/N`) fell through to the branch arm.
-  assert.match(SKILL, /\*:\/\/\*\/pull-requests\/\*/);
+  // (`/pull-requests/N`) fell through to the branch arm. Since task.176 the parser owns the
+  // arm, so the guard runs it instead of grepping for a case pattern.
+  const out = parseTarget(
+    "bash",
+    "https://bitbucket.org/ws/repo/pull-requests/7",
+  );
+  assert.equal(out.status, 0, out.stderr);
+  assert.deepEqual(out.fields, { kind: "pr", pr: "7", host: "bitbucket.org" });
 });
 
 test("a branch target reaches the PR resolver instead of resolving the current branch", () => {
@@ -569,7 +617,7 @@ test("the skill situates itself against its siblings", () => {
 // these blocks as `mutating` (they redirect to a file). Executing the extracted
 // program against a schema-shaped fixture is the only check that can see it.
 // ---------------------------------------------------------------------------
-const { spawnSync } = require("child_process");
+// (spawnSync is required once, at the top of the file.)
 
 const FINDINGS_FIXTURE = JSON.stringify({
   code_review: {
@@ -704,4 +752,565 @@ test("the inline-comment jq snippet executes against a schema-shaped fixture", (
         "and a null body makes pr-inline-comment.js exit 2",
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// task.176 — the target parser. Run it; a prose pin cannot prove a URL parses.
+// ---------------------------------------------------------------------------
+const PARSER_CASES = [
+  // [input, expected fields]
+  [undefined, { kind: "pr-for-current-branch" }],
+  ["", { kind: "pr-for-current-branch" }],
+  ["123", { kind: "pr", pr: "123" }],
+  [
+    "https://github.com/o/r/pull/12",
+    { kind: "pr", pr: "12", host: "github.com" },
+  ],
+  // Before task.176 this bound PR=files: Step 0b took ${TARGET##*/}.
+  [
+    "https://github.com/o/r/pull/12/files",
+    { kind: "pr", pr: "12", host: "github.com" },
+  ],
+  [
+    "https://bitbucket.org/ws/repo/pull-requests/7",
+    { kind: "pr", pr: "7", host: "bitbucket.org" },
+  ],
+  [
+    "https://api.bitbucket.org/2.0/repositories/ws/repo/pullrequests/9",
+    { kind: "pr", pr: "9", host: "api.bitbucket.org" },
+  ],
+  [
+    "https://ghe.corp.example/o/r/pull/44",
+    { kind: "pr", pr: "44", host: "ghe.corp.example" },
+  ],
+  ["feature/task.1.thing", { kind: "branch", branch: "feature/task.1.thing" }],
+  ["RAPP-702", { kind: "jira", jira_key: "RAPP-702" }],
+  [
+    "https://acme.atlassian.net/browse/RAPP-702",
+    { kind: "jira", jira_key: "RAPP-702", host: "acme.atlassian.net" },
+  ],
+  [
+    "https://acme.atlassian.net/browse/RAPP-702?focusedCommentId=1",
+    { kind: "jira", jira_key: "RAPP-702", host: "acme.atlassian.net" },
+  ],
+  [
+    "https://acme.atlassian.net/jira/software/c/projects/RAPP/boards/407?selectedIssue=RAPP-702",
+    { kind: "jira", jira_key: "RAPP-702", host: "acme.atlassian.net" },
+  ],
+  // Host first: Jira Cloud's issue view contains /issues/ and must not reach the GitHub arm.
+  [
+    "https://acme.atlassian.net/jira/software/c/projects/RAPP/issues/RAPP-702",
+    { kind: "jira", jira_key: "RAPP-702", host: "acme.atlassian.net" },
+  ],
+  [
+    "https://jira.corp.example/browse/AB-1",
+    { kind: "jira", jira_key: "AB-1", host: "jira.corp.example" },
+  ],
+  ["#536", { kind: "github-issue", issue_num: "536" }],
+  [
+    "https://github.com/o/r/issues/536",
+    { kind: "github-issue", issue_num: "536", host: "github.com", repo: "o/r" },
+  ],
+  [
+    "https://github.com/o/r/issues/536#issuecomment-1",
+    { kind: "github-issue", issue_num: "536", host: "github.com", repo: "o/r" },
+  ],
+];
+
+for (const shell of SHELLS) {
+  for (const [input, expected] of PARSER_CASES) {
+    test(`parser (${shell}): ${JSON.stringify(input)} → kind=${expected.kind}`, () => {
+      const out = parseTarget(shell, input);
+      assert.equal(out.status, 0, out.stderr);
+      assert.deepEqual(out.fields, expected);
+      assert.ok(out.stdout.startsWith("kind="), "kind is the first line");
+    });
+  }
+
+  for (const [input, reason] of [
+    ["https://example.com/foo", "url-no-target"],
+    ["https://github.com/o/r/tree/main", "url-no-target"],
+    ["https://acme.atlassian.net/wiki/spaces/X", "url-no-target"],
+    ["#abc", "bad-issue-ref"],
+  ]) {
+    test(`parser (${shell}): malformed ${input} is refused with a named reason, never a branch`, () => {
+      const out = parseTarget(shell, input);
+      assert.equal(out.status, 2);
+      assert.equal(
+        out.stdout,
+        "",
+        "nothing on stdout — no kind=branch fallthrough",
+      );
+      assert.match(out.stderr, new RegExp(`refused \\(${reason}\\)`));
+    });
+  }
+}
+
+test("the parser is executable and declared in Step 0b", () => {
+  assert.ok(fs.statSync(PARSER).mode & 0o111, "parse-target.sh is executable");
+  const s0b = section(
+    "### Step 0b — Parse `target`",
+    "### Step 1 — Resolve the PR",
+  );
+  assert.match(
+    s0b,
+    /bash \.agents\/skills\/review-pr\/scripts\/parse-target\.sh "\$\{TARGET:-\}"\) \|\| exit 1/,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// task.176 — Step 0b's own blocks, executed: binding and the per-kind host check.
+// ---------------------------------------------------------------------------
+function step0b(shell, env, { ghRepo } = {}) {
+  const [parse, host] = bashBlocks(
+    section("### Step 0b — Parse `target`", "### Step 1 — Resolve the PR"),
+  );
+  assert.ok(parse && host, "Step 0b has a parse block and a host-check block");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-0b-"));
+  const bin = path.join(dir, "bin");
+  fs.mkdirSync(bin);
+  // Stub gh for the GitHub-issue arm's tracker-repo read; never the real CLI.
+  fs.writeFileSync(
+    path.join(bin, "gh"),
+    `#!/bin/sh\necho "${ghRepo || ""}"\n`,
+    { mode: 0o755 },
+  );
+  const script =
+    parse.replace(".agents/skills/review-pr/scripts/parse-target.sh", PARSER) +
+    "\n" +
+    host +
+    '\necho "BOUND kind=$KIND pr=$PR branch=$BRANCH key=$JIRA_KEY issue=$ISSUE_NUM"\n';
+  return runScript(shell, script, {
+    cwd: ROOT,
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, ...env },
+  });
+}
+
+for (const shell of SHELLS) {
+  test(`Step 0b (${shell}): a Jira URL binds KIND=jira and the key`, () => {
+    const r = step0b(shell, {
+      TARGET: "https://acme.atlassian.net/browse/RAPP-702",
+      REMOTE_URL: "git@bitbucket.org:ws/repo.git",
+      TRACKER: "jira",
+      JIRA_URL: "https://acme.atlassian.net",
+    });
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.match(
+      r.stdout,
+      /BOUND kind=jira pr= branch=\S* key=RAPP-702 issue=/,
+    );
+    assert.doesNotMatch(r.stdout, /⚠️/, "same Jira host — no warning");
+  });
+
+  test(`Step 0b (${shell}): a PR URL for another host than the remote HALTs, naming both`, () => {
+    const r = step0b(shell, {
+      TARGET: "https://github.com/o/r/pull/12",
+      REMOTE_URL: "https://user@bitbucket.org/ws/repo.git",
+      TRACKER: "jira",
+    });
+    assert.equal(r.status, 1);
+    assert.match(
+      r.stdout,
+      /HALT: PR URL host github\.com does not match this repo's remote bitbucket\.org/,
+    );
+  });
+
+  test(`Step 0b (${shell}): a PR URL on the remote's host passes (www./api. and ssh forms normalised)`, () => {
+    for (const [target, remote] of [
+      ["https://github.com/o/r/pull/12", "git@github.com:o/r.git"],
+      ["https://www.github.com/o/r/pull/12", "https://github.com/o/r"],
+      [
+        "https://api.bitbucket.org/2.0/repositories/w/r/pullrequests/5",
+        "git@bitbucket.org:w/r.git",
+      ],
+    ]) {
+      const r = step0b(shell, {
+        TARGET: target,
+        REMOTE_URL: remote,
+        TRACKER: "github",
+      });
+      assert.equal(
+        r.status,
+        0,
+        `${target} vs ${remote}: ${r.stdout}${r.stderr}`,
+      );
+      assert.match(r.stdout, /BOUND kind=pr pr=\d+/);
+    }
+  });
+
+  test(`Step 0b (${shell}): a Jira URL on another host only warns, and continues with the key`, () => {
+    const r = step0b(shell, {
+      TARGET: "https://other.atlassian.net/browse/RAPP-702",
+      REMOTE_URL: "git@github.com:o/r.git",
+      TRACKER: "jira",
+      JIRA_URL: "https://acme.atlassian.net",
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(
+      r.stdout,
+      /⚠️ Jira URL host other\.atlassian\.net differs from JIRA_URL acme\.atlassian\.net/,
+    );
+    assert.match(r.stdout, /key=RAPP-702/);
+  });
+
+  test(`Step 0b (${shell}): a GitHub issue URL for another repo HALTs, naming both`, () => {
+    const r = step0b(
+      shell,
+      {
+        TARGET: "https://github.com/other/repo/issues/3",
+        REMOTE_URL: "git@github.com:o/r.git",
+        TRACKER: "github",
+      },
+      { ghRepo: "o/r" },
+    );
+    assert.equal(r.status, 1);
+    assert.match(
+      r.stdout,
+      /HALT: issue URL is for other\/repo, but this repo's GitHub tracker is o\/r/,
+    );
+  });
+
+  test(`Step 0b (${shell}): a bare number and a branch bind exactly as before task.176`, () => {
+    let r = step0b(shell, {
+      TARGET: "281",
+      REMOTE_URL: "git@github.com:o/r.git",
+      TRACKER: "github",
+    });
+    assert.match(r.stdout, /BOUND kind=pr pr=281 /);
+    r = step0b(shell, {
+      TARGET: "feature/x",
+      REMOTE_URL: "git@github.com:o/r.git",
+      TRACKER: "github",
+    });
+    assert.match(r.stdout, /BOUND kind=branch pr= branch=feature\/x /);
+  });
+
+  test(`Step 0b (${shell}): a malformed URL stops the run instead of becoming a branch`, () => {
+    const r = step0b(shell, {
+      TARGET: "https://example.com/nothing",
+      REMOTE_URL: "git@github.com:o/r.git",
+      TRACKER: "github",
+    });
+    assert.equal(r.status, 1);
+    assert.doesNotMatch(r.stdout, /BOUND/);
+    assert.match(r.stderr, /refused \(url-no-target\)/);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// task.176 — Step 1a: card → PR resolution (prose pins; each fails if its sentence goes).
+// ---------------------------------------------------------------------------
+const STEP1A = () =>
+  section("#### Step 1a — Card → PR", "#### Step 1b — Resolve the PR");
+
+test("card resolution is gated on KIND=jira|github-issue, so a PR target costs no extra call", () => {
+  assert.match(
+    SKILL,
+    /#### Step 1a — Card → PR \(only when `KIND` is `jira` or `github-issue`\)/,
+  );
+  assert.match(
+    STEP1A(),
+    /\*\*Gated on `KIND=jira\|github-issue`\.\*\* `KIND=pr`, `branch` and `pr-for-current-branch` go straight\nto Step 1b/,
+  );
+  const s0b = section(
+    "### Step 0b — Parse `target`",
+    "### Step 1 — Resolve the PR",
+  );
+  assert.match(s0b, /\| `pr` \|[^\n]*\| Step 1b \|/);
+  assert.match(s0b, /\| `jira` \|[^\n]*\| Step 1a \|/);
+  assert.match(s0b, /\| `github-issue` \|[^\n]*\| Step 1a \|/);
+});
+
+test("every card → PR rung is documented in order", () => {
+  const rows = STEP1A()
+    .split("\n")
+    .filter((l) => /^\| \d \|/.test(l));
+  const names = rows.map((r) => r.split("|")[2].trim());
+  assert.deepEqual(names, [
+    "**work item doc**",
+    "doc's `pr_number:`",
+    "**branch stem**",
+    "key / closing PR",
+    "branch fallback",
+    "none",
+  ]);
+  assert.match(
+    rows[1],
+    /\^pr_number:\[\[:space:\]\]\*\['\\"\]\?/,
+    "rung 2 is anchored and quote-tolerant",
+  );
+  for (const r of rows)
+    assert.doesNotMatch(r, /docs\/\*\*\//, "no ** glob in a rung");
+});
+
+test("rung 1 cites the shared §0a lookup rather than restating a grep", () => {
+  const rows = STEP1A()
+    .split("\n")
+    .filter((l) => /^\| 1 \|/.test(l));
+  assert.match(
+    rows[0],
+    /\(references\/develop-pipeline-step-0-resolve-and-prepare\.md#key--document-lookup\)/,
+  );
+  assert.doesNotMatch(
+    STEP1A(),
+    /grep -rl[E]? "\^?jira_key/,
+    "no restated jira_key grep in Step 1a",
+  );
+  const step2 = section("### Step 2 — Resolve the work item", "### Step 3 —");
+  assert.match(
+    step2,
+    /develop-pipeline-step-0-resolve-and-prepare\.md#key--document-lookup/,
+  );
+});
+
+test("the GitHub rung-3 command filters headRefName on the stem (--head is exact)", () => {
+  const blocks = bashBlocks(STEP1A()).join("\n");
+  assert.match(
+    blocks,
+    /gh pr list --state all --limit \d+ --json number,headRefName,state/,
+  );
+  assert.match(
+    blocks,
+    /select\(\.headRefName == \$s or \(\.headRefName \| endswith\("\/" \+ \$s\)\)\)/,
+  );
+  assert.match(
+    blocks,
+    /source\.branch\.name ~ /,
+    "Bitbucket branch-stem query",
+  );
+  assert.match(
+    blocks,
+    /state=OPEN&state=MERGED&state=DECLINED/,
+    "Bitbucket searches every state",
+  );
+  assert.match(blocks, /jq -r '\.next \/\/ empty'/, "Bitbucket search pages");
+});
+
+test("each selection outcome is stated: one, merged, several (ask / halt with list), zero", () => {
+  const a = STEP1A();
+  assert.match(a, /\| exactly one open PR \| use it \|/);
+  assert.match(a, /\*\*merged PRs are allowed\*\*/);
+  assert.match(
+    a,
+    /\*\*several\*\*: list them[^|]*ask \(interactive\), or \*\*halt with the list\*\* \(non-interactive/,
+  );
+  assert.match(a, /\| zero \| next rung \|/);
+  assert.match(a, /\| 6 \| none \| \*\*HALT\*\* naming every rung tried/);
+});
+
+test("an epic key HALTs: detected after rung 1 from the doc, else from the card's issuetype", () => {
+  const a = STEP1A();
+  assert.match(
+    a,
+    /\*\*Epic\*\* → \*\*HALT\*\*: `"\{key\} is an epic — pass a story or\ntask key\."`/,
+  );
+  assert.match(
+    a,
+    /filename starts `epic\.` or its\nfrontmatter carries `type: epic`/,
+  );
+  assert.match(a, /`fields\.issuetype\.name` reads `Epic`/);
+});
+
+test("a key match alone is never auto-resolved, not even a single one", () => {
+  const a = STEP1A();
+  assert.match(
+    a,
+    /\*\*Rung 4 — key matches are candidates, never answers\.\*\*/,
+  );
+  assert.match(a, /is \*\*never auto-picked\*\*, not even a single one/);
+  assert.match(
+    a,
+    /An auto-pick requires the doc's `pr_number:` or branch stem/,
+  );
+});
+
+test("a Jira-key-shaped input that resolves nothing is retried as a branch", () => {
+  assert.match(
+    STEP1A(),
+    /\| 5 \| branch fallback \| `KIND=jira` and still nothing → `BRANCH="\$JIRA_KEY"`, Step 1b; `resolved_via: jira key → branch fallback`/,
+  );
+});
+
+test("a GitHub issue on a Bitbucket repo uses rungs 1–3 and names rung 4 as GitHub-only", () => {
+  const a = STEP1A();
+  assert.match(
+    a,
+    /\*\*GitHub issue with `VCS=bitbucket`: rungs 1–3 only\.\*\*/,
+  );
+  assert.match(a, /\*\*skipped — GitHub-only\*\*/);
+  assert.match(
+    a,
+    /closedByPullRequestsReferences` — \*\*`VCS=github` only\*\*/,
+  );
+});
+
+test("card resolution writes nothing to a tracker", () => {
+  const a = STEP1A();
+  assert.match(a, /\*\*Resolution is read-only\*\*/);
+  for (const write of [
+    /-X\s*(POST|PUT|PATCH|DELETE)/,
+    /--request\s*(POST|PUT|PATCH|DELETE)/,
+    /gh issue (comment|edit|close|reopen)/,
+    /gh pr (comment|edit|close|merge|review)/,
+    /gh api [^\n]*-f /,
+    /transitionJiraIssue|addCommentToJiraIssue|editJiraIssue/,
+    /tracker-comment\.js|jira-stage\.js|gh-stage\.js/,
+  ]) {
+    assert.doesNotMatch(a, write, `no tracker write (${write}) in Step 1a`);
+  }
+});
+
+test("a bare number that is an issue is told apart by gh issue view, on GitHub only", () => {
+  const b = section(
+    "#### Step 1b — Resolve the PR",
+    "### Step 2 — Resolve the work item",
+  );
+  assert.match(b, /\*\*A bare number that is an issue \(GitHub only\)\.\*\*/);
+  assert.match(b, /run `gh issue view "\$PR" --json number`/);
+  assert.match(b, /`resolved_via: github issue \(bare number\) → <rung>`/);
+});
+
+test("Step 2 takes the pre-resolved doc and records the card routes in resolved_via", () => {
+  const step2 = section("### Step 2 — Resolve the work item", "### Step 3 —");
+  assert.match(
+    step2,
+    /\*\*When Step 1a resolved the document, this cascade is skipped\.\*\*/,
+  );
+  for (const via of [
+    "jira key → pr_number",
+    "jira key → branch stem",
+    "jira key → branch fallback",
+    "github issue → closing PR",
+  ]) {
+    assert.ok(step2.includes(`\`${via}\``), `resolved_via value ${via}`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// task.176 — the shared §0a key → document lookup, run against a fixture in the copy this
+// skill ships. Anchored (RAPP-70 ≠ RAPP-702), quote-tolerant, excludes .request.
+// ---------------------------------------------------------------------------
+const STEP0 = read("references/develop-pipeline-step-0-resolve-and-prepare.md");
+
+function lookupBlock() {
+  const i = STEP0.indexOf("### Key → document lookup");
+  assert.ok(i > -1, "§0a carries a Key → document lookup section");
+  const m = STEP0.slice(i).match(/```bash\n([\s\S]*?)```/);
+  assert.ok(m, "the lookup section has a bash block");
+  return m[1];
+}
+
+function lookupFixture() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-0a-"));
+  const put = (rel, body) => {
+    fs.mkdirSync(path.join(dir, path.dirname(rel)), { recursive: true });
+    fs.writeFileSync(path.join(dir, rel), body);
+  };
+  // The work item, quoted the way consumer docs quote it.
+  put(
+    "docs/tasks/task.101.thing/task.101.thing.md",
+    "---\njira_key: 'RAPP-702'\ngithub_issue: 55\n---\n",
+  );
+  // Its artifacts carry the same key.
+  put(
+    "docs/tasks/task.101.thing/task.101.request.1.thing.md",
+    '---\njira_key: "RAPP-702"\n---\n',
+  );
+  put(
+    "docs/tasks/task.101.thing/task.101.review.1.thing.md",
+    "---\njira_key: 'RAPP-702'\n---\n",
+  );
+  put(
+    "docs/tasks/task.101.thing/task.101.pr-review.1.thing.md",
+    "---\njira_key: 'RAPP-702'\n---\n",
+  );
+  // A neighbour whose key extends this one, and an issue number that this one prefixes.
+  put(
+    "docs/tasks/task.102.other/task.102.other.md",
+    "---\njira_key: RAPP-7020\ngithub_issue: 5\n---\n",
+  );
+  return dir;
+}
+
+for (const shell of SHELLS) {
+  const run = (dir, field, value) => {
+    const r = runScript(
+      shell,
+      `${lookupBlock()}\necho "COUNT=$DOC_COUNT PATH=$LOCAL_PATH"\n`,
+      {
+        cwd: dir,
+        env: { ...process.env, KEY_FIELD: field, KEY_VALUE: value },
+      },
+    );
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout;
+  };
+
+  test(`§0a lookup (${shell}): a quoted key with a .request. sibling and a longer neighbour returns exactly one doc`, () => {
+    const out = run(lookupFixture(), "jira_key", "RAPP-702");
+    assert.match(
+      out,
+      /COUNT=1 PATH=docs\/tasks\/task\.101\.thing\/task\.101\.thing\.md$/m,
+    );
+  });
+
+  test(`§0a lookup (${shell}): RAPP-70 does not prefix-match RAPP-702`, () => {
+    assert.match(
+      run(lookupFixture(), "jira_key", "RAPP-70"),
+      /COUNT=0 PATH=$/m,
+    );
+  });
+
+  test(`§0a lookup (${shell}): github_issue 5 does not match 55, and 55 finds its doc`, () => {
+    const dir = lookupFixture();
+    assert.match(
+      run(dir, "github_issue", "5"),
+      /PATH=docs\/tasks\/task\.102\.other\/task\.102\.other\.md$/m,
+    );
+    assert.match(
+      run(dir, "github_issue", "55"),
+      /PATH=docs\/tasks\/task\.101\.thing\/task\.101\.thing\.md$/m,
+    );
+  });
+
+  test(`§0a lookup (${shell}): two work items with one key HALT with the list, never head -1`, () => {
+    const dir = lookupFixture();
+    fs.mkdirSync(path.join(dir, "docs/tasks/task.103.dup"), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(dir, "docs/tasks/task.103.dup/task.103.dup.md"),
+      "---\njira_key: RAPP-702\n---\n",
+    );
+    const out = run(dir, "jira_key", "RAPP-702");
+    assert.match(out, /HALT: jira_key RAPP-702 matches 2 documents:/);
+    assert.match(out, /COUNT=2 PATH=$/m);
+  });
+}
+
+test("§0a's four call sites cite the lookup instead of carrying their own grep", () => {
+  const a0 = STEP0.slice(
+    STEP0.indexOf("## 0a."),
+    STEP0.indexOf("### Key → document lookup"),
+  );
+  assert.doesNotMatch(
+    a0,
+    /grep -rl "jira_key: /,
+    "the unanchored jira_key grep is gone",
+  );
+  assert.doesNotMatch(
+    a0,
+    /grep -rl "github_issue: /,
+    "the unanchored github_issue grep is gone",
+  );
+  assert.equal(
+    (a0.match(/\[§ Key → document lookup\]\(#key--document-lookup\)/g) || [])
+      .length,
+    4,
+  );
+  assert.doesNotMatch(
+    a0,
+    /grep -oE '\(\?<=/,
+    "no PCRE lookbehind under grep -E",
+  );
 });
