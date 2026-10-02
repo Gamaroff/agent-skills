@@ -5,7 +5,7 @@ type: task
 description: "/review-pr only takes a PR number, a PR URL or a branch. Teach it to start from the work item instead — a Jira key or URL, or a GitHub issue — and resolve that to the PR it should review, so the existing PR-vs-requirements report can be produced from the card a person is actually holding."
 tags: [review-pr, input-resolution, jira, github, bitbucket]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-10-02
 updated: 2026-10-02
@@ -17,7 +17,7 @@ github_issue: 553
 
 # Technical Task: /review-pr accepts a Jira card or GitHub issue and resolves it to its PR
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.176.review.1.review-pr-tracker-issue-input.md` implemented 2026-10-02
 **GitHub Issue**: [#553](https://github.com/Gamaroff/agent-skills/issues/553)
 
@@ -216,16 +216,16 @@ forms were previously read as branch names and could only halt. Two edges, both 
 
 **Changes**:
 
-- [ ] Parse every accepted form, old and new, to the key=value contract — host first, then an
+- [x] Parse every accepted form, old and new, to the key=value contract — host first, then an
       anchored key/number pattern, with `?query` / `#fragment` stripped.
-- [ ] Refuse malformed input (a URL with no key or number) with a named reason, never a silent branch
+- [x] Refuse malformed input (a URL with no key or number) with a named reason, never a silent branch
       fallthrough. No issue-type judgement — epics are Phase 2's job.
-- [ ] Cases in `review-pr.test.js`, spawning the script under **both `bash` and `zsh`** (the suite is
+- [x] Cases in `review-pr.test.js`, spawning the script under **both `bash` and `zsh`** (the suite is
       already in the `npm test` glob, so no `package.json` edit): one case per form; the board URL's
       `selectedIssue`; Jira Cloud `…/projects/RAPP/issues/RAPP-702` → `kind=jira`;
       `/browse/RAPP-702?focusedCommentId=1` → `jira_key=RAPP-702`; `…/pull/12/files` → `pr=12`; a bare
       number stays `kind=pr`; a bare key → `kind=jira`; garbage → named refusal.
-- [ ] `shellcheck --severity=warning skills/review-pr/scripts/parse-target.sh` clean.
+- [x] `shellcheck --severity=warning skills/review-pr/scripts/parse-target.sh` clean.
 
 **Dependencies**: Phase 0.
 
@@ -238,22 +238,22 @@ forms were previously read as branch names and could only halt. Two edges, both 
 
 **Changes**:
 
-- [ ] Step 0b calls the parser; the Arguments table gains the new forms.
-- [ ] **Fix §0a** (lines 27/70 Jira, 29/72 GitHub): anchored and quote-tolerant —
+- [x] Step 0b calls the parser; the Arguments table gains the new forms.
+- [x] **Fix §0a** (lines 27/70 Jira, 29/72 GitHub): anchored and quote-tolerant —
       `^jira_key:[[:space:]]*['"]?KEY['"]?[[:space:]]*$` and the `github_issue:` equivalent — with the
       full Step 2 exclusion list. review-pr's card → doc step and Step 2 rung 4 **cite** §0a instead of
       restating a grep.
-- [ ] Step 2's exclusion filter (and §0a's) gains `.request.`, so a key lookup resolves to one work item.
-- [ ] Host check per kind: PR URL vs the git remote (HALT); Jira URL vs `JIRA_URL` (warn); GitHub issue
+- [x] Step 2's exclusion filter (and §0a's) gains `.request.`, so a key lookup resolves to one work item.
+- [x] Host check per kind: PR URL vs the git remote (HALT); Jira URL vs `JIRA_URL` (warn); GitHub issue
       URL vs the tracker repo (HALT).
-- [ ] Key matches on a PR are listed as candidates; an auto-pick requires the doc's `pr_number:` or
+- [x] Key matches on a PR are listed as candidates; an auto-pick requires the doc's `pr_number:` or
       branch stem, never a title or description match alone.
-- [ ] Step 1 gains the card → PR resolution (rungs 1–6, including the GitHub rung-3 command), the
+- [x] Step 1 gains the card → PR resolution (rungs 1–6, including the GitHub rung-3 command), the
       `VCS=bitbucket` GitHub-issue rule (rungs 1–3 only), the branch fallback for `kind=jira`, and the
       selection rules.
-- [ ] Epic detection after rung 1 (`epic.*` doc or `type: epic`; else Step 3b `issuetype`) → HALT.
-- [ ] Step 2 takes the pre-resolved doc and records the new `resolved_via` values.
-- [ ] Tests pin each documented route and selection rule; that no write to a tracker appears; that
+- [x] Epic detection after rung 1 (`epic.*` doc or `type: epic`; else Step 3b `issuetype`) → HALT.
+- [x] Step 2 takes the pre-resolved doc and records the new `resolved_via` values.
+- [x] Tests pin each documented route and selection rule; that no write to a tracker appears; that
       card resolution is gated on `kind=jira|github-issue`, so the `kind=pr` arm goes straight to
       Step 1; and that §0a's lookup is anchored (a `RAPP-70` lookup does not match a `RAPP-702` doc).
 
@@ -268,11 +268,11 @@ forms were previously read as branch names and could only halt. Two edges, both 
 
 **Changes**:
 
-- [ ] `npm run bundle`, then `npm run bundle:check` green.
-- [ ] Docs: at review time `grep -rn 'review-pr' docs/` found **no** page listing `target` forms
+- [x] `npm run bundle`, then `npm run bundle:check` green.
+- [x] Docs: at review time `grep -rn 'review-pr' docs/` found **no** page listing `target` forms
       (`docs/reference/invocation.md:89,98` names Step 5c only), so the SKILL.md Arguments table is the
       one list. If the SKILL.md description gains a card trigger, run `npm run generate-catalog`.
-- [ ] CHANGELOG `[Unreleased]`, including the stricter §0a lookup (see Breaking Changes).
+- [x] CHANGELOG `[Unreleased]`, including the stricter §0a lookup (see Breaking Changes).
 
 **Dependencies**: Phase 2.
 
@@ -443,6 +443,7 @@ message wording.
 | 2026-10-02 | 1.1     | Phase 0 done: queries verified; four findings folded into Phase 2  | Claude |
 | 2026-10-02 | 1.2     | Review 1 (7/10, needs revision): 9 important fixes applied — host-first parse, per-kind host check, epic check moved out of parser, shared §0a lookup fixed, parser tests in review-pr.test.js, testable criteria; GitHub issue #553 linked | review-task |
 | 2026-10-02 |         | Status → ready-for-development | review-task |
+| 2026-10-02 |         | Implemented — 9 files (parser, SKILL.md Steps 0b/1/2, shared §0a lookup + 4 bundled copies, CHANGELOG), 80 new tests (52 → 132 in review-pr.test.js) | develop |
 
 <!-- change-log-end -->
 
@@ -457,19 +458,19 @@ message wording.
 
 ### Phase 1: The parser
 
-- [ ] Parser
-- [ ] Suite
+- [x] Parser
+- [x] Suite
 
 ### Phase 2: Resolution in the skill
 
-- [ ] Steps 0b, 1, 2
-- [ ] Prose pins and mutation check
+- [x] Steps 0b, 1, 2
+- [x] Prose pins and mutation check
 
 ### Phase 3: Bundle, docs, changelog
 
-- [ ] Bundle
-- [ ] Docs
-- [ ] CHANGELOG
+- [x] Bundle
+- [x] Docs
+- [x] CHANGELOG
 
 ---
 

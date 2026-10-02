@@ -34,7 +34,7 @@ Teach `/review-pr` to start from a Jira key/URL or GitHub issue and resolve it t
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- |
 | 1. create-branch           | ✅ Done    | Branch `feature/task.{id}.*` exists in git                             | Existing branch reused at `e8ed79a9`; pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | Skipped — already reviewed (review.1) | —                    |
-| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + map); 2 iterations of the fast gate — iter 1: 3 real failures fixed; iter 2: 5079 pass, 0 fail. Audit 18/18 | `.summaries/step-3-test-triage-1.json`, `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
@@ -61,9 +61,28 @@ Teach `/review-pr` to start from a Jira key/URL or GitHub issue and resolve it t
 - Tracker: work-started comment `posted`; GitHub board: work-started → transitioned Todo → In Progress (verified). Priority already P2 (set at review), so the unset-only default was not needed.
 - review-task skipped — task status is `Ready for Development` and review report exists at `docs/tasks/task.176.review-pr-tracker-issue-input/task.176.review.1.review-pr-tracker-issue-input.md`. Skip notice posted to #553 (stage review).
 
+### Step 3 — Develop
+
+- Pre-develop surface map: 20 files identified in skills/review-pr, shared/resources (step-0 §0a), shared/resources/tests (bash/zsh idiom), 4 bundled step-0 copies. Explore subagent ran (~81 s).
+- Plan file found: docs/tasks/task.176.review-pr-tracker-issue-input/task.176.plan.review-pr-tracker-issue-input.md — included as implementation context.
+- Step 3 inline — /develop not invoked: plan file + surface map both recorded; the plan names every rung, the parser contract and the four findings.
+- Always-load files read: coding-standards.md (shellcheck required after .sh edits; cite shared resources by path).
+- Parser: `skills/review-pr/scripts/parse-target.sh` — pure, no env reads (`JIRA_URL` is judged by the skill, not the parser); known hosts (github.com, bitbucket.org, *.atlassian.net) decide first, unknown hosts fall back to disjoint shape arms so GHE / Bitbucket Server / self-hosted Jira PR URLs keep parsing as before.
+- Rung 3 filter anchored on the branch's last segment (`== STEM` or ends `/STEM`), stricter than the plan's "contains" — a stem that prefixes a longer slug must not match. GitHub `--limit 1000`, not the plan's 100, so an older work item's PR does not drop off a short page.
+- Closing references (`closedByPullRequestsReferences`) go through the selection rules; title/description key matches are always confirmed, even a single one.
+- §0a: one shared "Key → document lookup" block; the four call sites link it; several matches HALT instead of `head -1`. Also fixed §0a's GitHub-issue URL extraction (`grep -oE '(?<=/issues/)…'` — PCRE lookbehind, never matched under -E). Small, same block, logged in CHANGELOG.
+- review-pr Step 2 keeps its bare (dependency) link to the step-0 doc and adds a fragment citation — converting the bare link to a citation would shrink review-pr's closure and is out of scope.
+- Description gains a card trigger (148 words, ≤150). `generate-catalog` produced no diff.
+- Fast gate iter 1 (`npm run ci:fast`): 5076 pass, 3 fail — all real, all in SKILL.md: untracked `scripts/parse-target.sh` (bundled-links), bare `$1` in fenced bash (positional-params guard), new `${JIRA_URL:-}` read with no writer (unbound-default guard). Fixed: script staged, `${1}`, plain `$JIRA_URL`. Iter 2: 5079 pass, 0 fail.
+- Loop audit: `ready-for-review`, 18/18 Implementation Plan checkboxes. Development completion comment posted to github issue 553.
+- Mutation checks (all red, then restored green): board-URL arm, host-first ordering, §0a anchor, `.request.` exclusion, the host-check sed delimiter.
+
 ---
 
 ## Issues Log
+
+- Step 3: the first draft of the host check used `|` as the sed delimiter **and** as the www/api alternation. sed failed to parse, both sides normalised to "", the pair compared equal and the HALT never fired — fail-open. Caught by running the Step 0b block under bash and zsh; fixed with `#` delimiters and an empty-side guard; held by a mutation.
+- Step 3: `ci:fast` ran past the 600 s Bash timeout and was moved to the background.
 
 _Problems encountered and how they were resolved or escalated._
 
