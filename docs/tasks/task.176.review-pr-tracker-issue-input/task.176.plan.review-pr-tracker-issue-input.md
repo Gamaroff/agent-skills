@@ -68,22 +68,33 @@ with a named reason on stderr.
 | `RAPP-702` | `kind=jira` `jira_key=RAPP-702` |
 | `…/browse/RAPP-702` | `kind=jira` `jira_key=RAPP-702` `host=<host>` |
 | `…/boards/407?selectedIssue=RAPP-702` | `kind=jira` `jira_key=RAPP-702` `host=<host>` |
-| `#536`, `…/issues/536` | `kind=github-issue` `issue_num=536` |
+| `…/jira/software/c/projects/RAPP/issues/RAPP-702` | `kind=jira` `jira_key=RAPP-702` `host=<host>` |
+| `#536`, `https://github.com/o/r/issues/536` | `kind=github-issue` `issue_num=536` (`host`, `repo` for a URL) |
 | anything else non-numeric | `kind=branch` `branch=<target>` |
 
-Rules: the key pattern is `[A-Z][A-Z0-9]+-[0-9]+`, anchored; a URL's `host` is reported, not judged —
-the skill compares it to the remote. Must behave identically under bash and zsh (the repo's existing
-trap; no multi-glob `ls`).
+Rules: **host first** — a URL's host picks the platform before any path arm (Jira Cloud's `/issues/KEY`
+must not reach the GitHub-issue arm); then an anchored pattern extracts the key (`[A-Z][A-Z0-9]+-[0-9]+`)
+or number, and `?query` / `#fragment` are stripped (`…/pull/12/files` → `pr=12`; today it binds
+`files`). A URL's `host` is reported, not judged — the skill judges it per kind. The parser never
+judges issue type (an epic key looks like any other); it refuses only malformed input. Must behave
+identically under bash and zsh (the repo's existing trap; no multi-glob `ls`). Cases live in
+`skills/review-pr/tests/review-pr.test.js`, spawning the script under both shells — a `.test.sh` would
+need hand-wiring into `package.json`'s `test` and is not used.
 
 ## Phase 2: Resolution in the skill
 
-1. **Host check** — `host` vs `git remote get-url origin`; mismatch → HALT naming both.
-2. **Card → doc** — anchored, recursive, **quote-tolerant** grep:
-   `^jira_key:[[:space:]]*['"]?KEY['"]?[[:space:]]*$` (and the `github_issue:` equivalent) under
-   `docs/`; apply Step 2's exclusion filter — **with `.request.` added** — so the document is found,
-   not its artifacts. No doc → continue to PR search by key alone, and expect the
-   later review to be code-only.
-3. **Doc → PR** in the order in the task's Target Architecture; first hit wins; record the rung.
+1. **Host check, per kind** — PR URL `host` vs `git remote get-url origin` → HALT naming both; Jira URL
+   `host` vs `JIRA_URL` → warn and continue; GitHub issue URL `owner/repo` vs the tracker repo → HALT.
+2. **Card → doc** — fix the shared lookup in `develop-pipeline-step-0-resolve-and-prepare.md` §0a
+   (lines 27/70, 29/72 — today unanchored and quote-intolerant) to an anchored, recursive,
+   **quote-tolerant** grep: `^jira_key:[[:space:]]*['"]?KEY['"]?[[:space:]]*$` (and the `github_issue:`
+   equivalent) under `docs/`, with Step 2's exclusion filter — **`.request.` added**. review-pr cites
+   §0a; it does not restate the grep. No doc → continue to PR search by key alone, and expect the
+   later review to be code-only. A doc that is `epic.*` or `type: epic` → HALT "pass a story or task key".
+3. **Doc → PR** in the order in the task's Target Architecture; first hit wins; record the rung. GitHub
+   rung 3: `gh pr list --state all --limit 100 --json number,headRefName,state`, filter `headRefName`
+   containing `STEM` (`--head` is exact). Rung 4's closing-PR call is GitHub-VCS only; with
+   `VCS=bitbucket` a GitHub issue uses rungs 1–3. `kind=jira` with nothing found → retry as a branch.
 4. **Select** — count open PRs among the hits.
 5. Hand `PR_NUMBER` and the pre-resolved doc to Step 1/2 with a `resolved_via` of
    `jira key → <rung>` or `github issue → <rung>`.
@@ -96,9 +107,10 @@ Tests pin prose, so each rule above needs a case that fails if the sentence is r
 bundled, so check `bundle:check` does not report the new script as `UNREACHED` — cite it from
 SKILL.md.
 
-## Open decisions
+## Decisions (closed at review 1, 2026-10-02)
 
-- **Non-interactive "several PRs"**: halt with the list (proposed) vs. pick the newest open. Halt is
-  proposed because a wrong pick yields a confident review of the wrong change.
-- **Parser as a script vs. inline shell**: script proposed so the forms are testable; revisit if the
-  repo's convention is against `skills/*/scripts/` for a prose-only skill.
+- **Non-interactive "several PRs"**: halt with the list — a wrong pick yields a confident review of
+  the wrong change.
+- **Parser as a script**: yes, tested from `review-pr.test.js` under bash and zsh.
+- **Existing §0a lookup**: fixed and shared, not duplicated; its restatements in review-task and
+  review-story are deferred to a follow-up task.
