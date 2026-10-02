@@ -1,9 +1,9 @@
 ---
-id: task.175.plan
+id: task.176.plan
 title: "Implementation Plan: /review-pr accepts a Jira card or GitHub issue and resolves it to its PR"
 type: plan
-description: "Code-level guide for task 175: the pure target parser, the card-to-PR resolution order and selection rules, and the host check."
-task-ref: task.175.review-pr-tracker-issue-input.md
+description: "Code-level guide for task 176: the pure target parser, the card-to-PR resolution order and selection rules, and the host check."
+task-ref: task.176.review-pr-tracker-issue-input.md
 created: 2026-10-02
 updated: 2026-10-02
 ---
@@ -11,7 +11,7 @@ updated: 2026-10-02
 # Implementation Plan: /review-pr accepts a Jira card or GitHub issue and resolves it to its PR
 
 > Requirements and success criteria:
-> [task.175.review-pr-tracker-issue-input.md](task.175.review-pr-tracker-issue-input.md)
+> [task.176.review-pr-tracker-issue-input.md](task.176.review-pr-tracker-issue-input.md)
 
 ## Overview
 

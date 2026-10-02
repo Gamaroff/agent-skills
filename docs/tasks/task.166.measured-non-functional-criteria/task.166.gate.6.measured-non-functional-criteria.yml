@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.166.measured-non-functional-criteria'
+task_title: 'Give measured non-functional criteria a defined path through review and finalise'
+gate: PASS
+status_reason: 'Gate-the-last-fix half-cycle on a547da36: CR5-1..5 fixed; the reviewer found no review-vs-finalise disagreement across every criterion shape probed. Four low, advisory findings (no high-confidence bug) are routed to recommendations.future.'
+reviewer: 'QA Engineer'
+head: 'a547da3654f44d0412e9074c765b60a47b42618b'
+updated: '2026-10-02T12:44:29Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 11
+  phases_verified: 4/4
+  ci: 'Test success @ 2b9c16ed (hosted); pending @ a547da3654f4 — informational'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'Each pin runs well under 1s; measurement recorded in the implementation report.'
+  reliability:
+    status: PASS
+    notes: 'Pins fail closed; shared helper resolves from any cwd.'
+  maintainability:
+    status: PASS
+    notes: 'The bound rule is stated once in check 4 and cited elsewhere.'
+
+bug_resolution:
+  previous_gate: 'gate.5 (CONCERNS 90)'
+  fixed: ['TASK-166-CR5-1', 'TASK-166-CR5-2', 'TASK-166-CR5-3', 'TASK-166-CR5-4', 'TASK-166-CR5-5']
+  partial: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR6-1 (low, advisory): the bound rule''s worked example should say AC7 "states no bound and names no test", not only "states no bound".'
+      refs: ['skills/review-task/SKILL.md']
+    - action: 'CR6-2 (low, advisory): narrow the N/A exemption to an explicit "no unit tests apply" line, with finalise''s "hard to test is not no unit tests applicable" caveat beside it.'
+      refs: ['skills/review-task/SKILL.md']
+    - action: 'CR6-3 (low, advisory): the task doc Phase 2 item quotes the remedy without its "for a bound no per-PR test could assert" qualifier.'
+      refs: ['docs/tasks/task.166.measured-non-functional-criteria/task.166.measured-non-functional-criteria.md']
+    - action: 'CR6-4 (cleanup): count-of-kinds misses parenthesised/curly-quoted qualifiers and U+2011; no current text hits them.'
+      refs: ['tests/lib/count-of-kinds.js']
+    - action: 'Gate 1 CR-3: make "whether a per-PR test could assert that bound" concrete in finalise-dod-ac-prompt.md.'
+      refs: ['shared/resources/finalise-dod-ac-prompt.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

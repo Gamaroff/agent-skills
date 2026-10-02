@@ -1,6 +1,6 @@
 ---
-id: task.175
-title: "[Task 175] /review-pr accepts a Jira card or GitHub issue and resolves it to its PR"
+id: task.176
+title: "[Task 176] /review-pr accepts a Jira card or GitHub issue and resolves it to its PR"
 type: task
 description: "/review-pr only takes a PR number, a PR URL or a branch. Teach it to start from the work item instead — a Jira key or URL, or a GitHub issue — and resolve that to the PR it should review, so the existing PR-vs-requirements report can be produced from the card a person is actually holding."
 tags: [review-pr, input-resolution, jira, github, bitbucket]
@@ -144,7 +144,7 @@ forms were previously read as branch names and could only halt.
 ## 6. Implementation Plan
 
 > Detailed implementation guide:
-> [task.175.plan.review-pr-tracker-issue-input.md](task.175.plan.review-pr-tracker-issue-input.md)
+> [task.176.plan.review-pr-tracker-issue-input.md](task.176.plan.review-pr-tracker-issue-input.md)
 
 ### Phase 0: Verify the one unverified call
 
