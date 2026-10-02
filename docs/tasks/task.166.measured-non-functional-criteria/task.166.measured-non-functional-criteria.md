@@ -5,18 +5,20 @@ type: task
 description: "Add a third test-free criterion kind — a measured criterion with a stated bound and a cited committed measurement — to finalise's DoD AC prompt, and have review-task flag a non-functional success criterion not held by a planned test or by a measured bound (the bound rule in `review-task` Step 6 check 4), so a timing or size criterion is neither failed by rule nor passed by override (observation #206); and have review-task classify every success criterion the way finalise will, flagging a behaviour criterion with no planned test and a criterion that can only be met after merge (observation #222)."
 tags: [finalise, review-task, definition-of-done, success-criteria, observe-work]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-28
 updated: 2026-10-02
 assignee:
 estimated_effort_hours: 6
 github_issue: 510
+completed_date: 2026-10-02
+pr_number: 550
 ---
 
 # Technical Task: Give measured non-functional criteria a defined path through review and finalise
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.166.review.1.measured-non-functional-criteria.md` implemented 2026-10-02
 
@@ -192,6 +194,7 @@ Independent of task.165. It can land before or after it.
 
 3. ✅ `shared/resources/tests/finalise-dod-ac-kinds.test.mjs` (new)
 4. ✅ `tests/review-task-measured-criterion.test.js` (new)
+4a. ✅ `tests/lib/count-of-kinds.js` (new): the one count-of-kinds pattern and normaliser both pins use, with fixtures in both directions (added in QA cycle 4)
 
 ### Files to Modify (Dependencies)
 
@@ -327,11 +330,35 @@ None identified.
 ### Key Findings
 
 No review-vs-finalise disagreement across every criterion shape probed. Four low, advisory findings are named in the gate's recommendations for a follow-up.
+<!-- change-log-start -->
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.166.qa.6.measured-non-functional-criteria.md`
+**Gate File**: `task.166.gate.6.measured-non-functional-criteria.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (gate-the-last-fix half-cycle after 5 budgeted cycles)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 9/9 — seven held by per-PR pins and CI lanes; the Performance criterion as a measured criterion (< 1s, `time node --test`, committed measurement); the CHANGELOG criterion as a documentation criterion
+✅ **PR Review:** PR #550; Step 5c review CONCERNS (one medium design follow-up, non-blocking)
+✅ **CI:** reading 1 SUCCESS @ `a96bbff9`
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites (task 166); source prompt and bundled copies agree
+✅ **Security Review:** PASS — no boundary delivered
+✅ **Compliance Review:** not applicable
+
+**Task marked as ACCEPTED on:** 2026-10-02
+
+**Detailed Verification Log:** See `task.166.dod.1.measured-non-functional-criteria.md` for complete verification evidence and timestamps.
 
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-28 | 1.0     | Initial draft | create-task |
 | 2026-09-30 | 1.1     | Folded in observation #222 (user-approved): review-task also flags behaviour criteria with no planned test and post-merge criteria; "observation #206 actioned on merge" moved out of Success Criteria into Notes (it can only be met after merge) | Claude |
 | 2026-10-02 | 1.2     | Review passed (9/10) — applied 2 Important fixes: the Execution rule's kind count brought into Phase 1 and pinned; the review-task pin and mutations cover the #222 rules; In Scope's post-merge line aligned with Notes | review-task |
@@ -344,6 +371,8 @@ No review-vs-finalise disagreement across every criterion shape probed. Four low
 | 2026-10-02 |         | QA gate CONCERNS (90/100) — 1 medium, 4 low findings | qa-task |
 | 2026-10-02 |         | QA findings fixed — gates 1–5: check 4 names the test-free kinds and counts none; the bound rule stated once in check 4 (a test-assertable bound held only by its planned test, an untestable bound by a numeric bound + measuring command, an unbounded criterion by its planned test; citable N/A lines exempt; post-merge rule still applies) and cited at every other site; unbounded outcome as shipped; one shared count-of-kinds pattern and normaliser; 5 iterations | qa-fix |
 | 2026-10-02 |         | QA gate PASS (100/100) — 0 gating findings, 4 advisory (gate-the-last-fix half-cycle) | qa-task |
+| 2026-10-02 |         | Files Summary: add `tests/lib/count-of-kinds.js` (PR review 1, PC-3) | develop-task |
+| 2026-10-02 | 1.3 | DoD passed — accepted (PR #550) | finalise |
 
 <!-- change-log-end -->
 
@@ -394,7 +423,7 @@ No review-vs-finalise disagreement across every criterion shape probed. Four low
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 
