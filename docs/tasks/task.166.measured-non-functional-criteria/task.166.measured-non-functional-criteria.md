@@ -309,24 +309,24 @@ None identified.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-02
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.166.qa.4.measured-non-functional-criteria.md](./task.166.qa.4.measured-non-functional-criteria.md)
-- **Gate File**: [task.166.gate.4.measured-non-functional-criteria.yml](./task.166.gate.4.measured-non-functional-criteria.yml)
+- **Full Report**: [task.166.qa.5.measured-non-functional-criteria.md](./task.166.qa.5.measured-non-functional-criteria.md)
+- **Gate File**: [task.166.gate.5.measured-non-functional-criteria.yml](./task.166.gate.5.measured-non-functional-criteria.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 12
+- **Tests Executed**: 11
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-The bound rule's trigger phrase never carried the cycle-3 restriction, so review still passes a test-assertable bound with a command that finalise fails (CR4-1); the phrase is restated at about ten sites (CR4-2). Six low test and wording findings.
+The bound rule is stated once and cited elsewhere. One medium regression: a non-functional criterion with no numeric bound but a planned per-PR test reads as unheld in review, while finalise passes it on its test (CR5-1). Four low findings.
 
 ## Change Log
 
@@ -341,7 +341,8 @@ The bound rule's trigger phrase never carried the cycle-3 restriction, so review
 | 2026-10-02 |         | QA gate CONCERNS (70/100) — 3 medium, 3 low findings | qa-task |
 | 2026-10-02 |         | QA gate CONCERNS (70/100) — 3 medium, 4 low findings | qa-task |
 | 2026-10-02 |         | QA gate CONCERNS (80/100) — 2 medium, 6 low findings | qa-task |
-| 2026-10-02 |         | QA findings fixed — gates 1–4: check 4 names the test-free kinds and counts none; the bound rule stated once in check 4 (a test-assertable bound is held only by its planned test, an untestable bound by a numeric bound + measuring command; N/A lines exempt; post-merge rule still applies) and cited everywhere else; unbounded outcome as shipped; one shared count-of-kinds pattern; 4 iterations | qa-fix |
+| 2026-10-02 |         | QA gate CONCERNS (90/100) — 1 medium, 4 low findings | qa-task |
+| 2026-10-02 |         | QA findings fixed — gates 1–5: check 4 names the test-free kinds and counts none; the bound rule stated once in check 4 (a test-assertable bound held only by its planned test, an untestable bound by a numeric bound + measuring command, an unbounded criterion by its planned test; citable N/A lines exempt; post-merge rule still applies) and cited at every other site; unbounded outcome as shipped; one shared count-of-kinds pattern and normaliser; 5 iterations | qa-fix |
 
 <!-- change-log-end -->
 

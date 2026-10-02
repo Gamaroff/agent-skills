@@ -7,7 +7,7 @@
  * kinds finalise-dod-ac-prompt.md Step 3 lists. Three shapes fit no kind and so fail at
  * acceptance, two pipeline steps after the review that could have caught them with one edit:
  *
- * - a non-functional criterion held by neither a planned test nor a measured bound (task.164 AC7);
+ * - a non-functional criterion held by neither a planned test nor a measured bound (the bound rule in review-task Step 6 check 4) (task.164 AC7);
  * - a behaviour criterion that names no test planned to hold it (task.142 AC7/AC8);
  * - a criterion that can only be met after merge, when finalise runs before it (task.142 AC16).
  *
@@ -22,8 +22,13 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
-const { sectionOf, citingItemOf, asProse } = require("./lib/markdown-section");
-const { countsOfKinds, FIXTURES } = require("./lib/count-of-kinds");
+const { sectionOf, citingItemOf } = require("./lib/markdown-section");
+// One normaliser for every phrase this file reads, the same one the count pin uses (QA cycle 5, CR5-4).
+const {
+  prose: asProse,
+  countsOfKinds,
+  FIXTURES,
+} = require("./lib/count-of-kinds");
 
 const SKILL = "skills/review-task/SKILL.md";
 const STEP_6 = "### Step 6: Consistency and Completeness Review";
@@ -59,9 +64,12 @@ const RULES = [
       "a measuring command does not hold it",
       "A bound no per-PR test could assert",
       "A criterion held neither way",
+      // An unbounded criterion is held by its planned test, as finalise's behaviour path holds it
+      // (cycle 1 CR-2, restored after the cycle-4 rewrite dropped it — cycle 5, CR5-1).
+      "A criterion that states no numeric bound is held by its planned per-PR test",
       // Exceptions (CR4-4, CR4-5).
       "the post-merge rule still does",
-      'is finalise\'s "no unit tests applicable" kind, not a criterion this rule flags',
+      'line the AC agent can cite is finalise\'s "no unit tests applicable" kind, not a criterion this rule flags',
       "name the test that pins it, or — for a bound no per-PR test could assert — state the bound and the command",
     ],
   },

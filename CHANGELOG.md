@@ -255,7 +255,7 @@ All notable changes to this project will be documented in this file. Format foll
   committed artifact; an unbounded criterion is not a measured criterion, and fails unless a per-PR
   test holds it; and a bound a per-PR test could assert is a behaviour criterion. The Execution rule no longer restates the count. `review-task` Step 6
   check 4 classifies each success criterion the way finalise will and raises **Important** for a
-  non-functional criterion held by neither a planned test nor a measured bound, a behaviour criterion with no
+  non-functional criterion held by neither a planned test nor a measured bound (the bound rule in `review-task` Step 6 check 4), a behaviour criterion with no
   planned test, and a criterion that can only be met after merge. Pinned by
   `shared/resources/tests/finalise-dod-ac-kinds.test.mjs` (which also covers obs #204's untested
   documentation kind and both bundled copies) and `tests/review-task-measured-criterion.test.js`.

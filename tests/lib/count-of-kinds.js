@@ -12,7 +12,7 @@
  *   criteria" and "kinds of test-free criterion" ARE counts (cycle 4, CR4-3).
  */
 const COUNT_OF_KINDS =
-  /(?<!Step )\b(two|three|four|five|six|seven|eight|nine|ten|\d+|both)(?: [\w-]+){0,3} kinds\b(?! of (?!(?:[\w-]+ ){0,2}criteri(?:on|a)\b))/gi;
+  /(?<!Step )\b(two|three|four|five|six|seven|eight|nine|ten|\d+|both)(?: [\w"'“”-]+){0,3} kinds\b(?! of (?!(?:[\w"'“”-]+ )?criteri(?:on|a)(?![\w-])))/gi;
 
 /**
  * Text as a reader sees it, for counting only: code formatting and emphasis (`**`, `*`, `__`, `_`)
@@ -21,14 +21,18 @@ const COUNT_OF_KINDS =
  * an identifier such as test_citation is left alone.
  */
 function prose(text) {
-  return text
-    .replace(/`/g, "")
-    .replace(/\*{1,2}(?=\S)([^*\n]+?)(?<=\S)\*{1,2}/g, "$1")
-    .replace(
-      /(^|[\s(])_{1,2}(?=\S)([^_\n]+?)(?<=\S)_{1,2}(?=[\s.,;:)!?]|$)/gm,
-      "$1$2",
-    )
-    .replace(/\s+/g, " ");
+  return (
+    text
+      .replace(/`/g, "")
+      // Whitespace first, so emphasis wrapped across lines is stripped like any other (cycle 5, CR5-3).
+      .replace(/\s+/g, " ")
+      .replace(/\*{1,2}(?=\S)([^*\n]+?)(?<=\S)\*{1,2}/g, "$1")
+      .replace(
+        /(^|[\s("'“])_{1,2}(?=\S)([^_\n]+?)(?<=\S)_{1,2}(?=[\s.,;:)!?"'”]|$)/gm,
+        "$1$2",
+      )
+      .replace(/\s+/g, " ")
+  );
 }
 
 /** Every count of kinds the text states, as matched. */
@@ -50,6 +54,9 @@ const FIXTURES = {
     "*two* kinds",
     "_two_ kinds",
     "three\nkinds",
+    "*three\ntest-free* kinds",
+    'the two "test-free" kinds',
+    '"_two_ kinds"',
   ],
   noMatch: [
     "the Step 3 test-free kinds",
@@ -57,6 +64,8 @@ const FIXTURES = {
     "both kinds of evidence",
     "the test-free kinds that Step 3 lists",
     "test_citation kinds",
+    "two kinds of evidence per criterion",
+    "two kinds of criterion-free evidence",
   ],
 };
 

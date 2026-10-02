@@ -1127,10 +1127,12 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      - **A bound no per-PR test could assert** (wall-clock runtime, CI duration) is held by a
        **measured bound**: a **numeric bound** with **the command that measures it**, which finalise
        passes as a measured criterion on its committed measurement.
+     - **A criterion that states no numeric bound** is held by its planned per-PR test: finalise
+       sends it down the behaviour path and passes it on that test.
 
      A criterion held neither way → **Important**: "name the test that pins it, or — for a bound no
      per-PR test could assert — state the bound and the command". An explicit "not applicable" line
-     that gives its reason is finalise's "no unit tests applicable" kind, not a criterion this rule
+     the AC agent can cite is finalise's "no unit tests applicable" kind, not a criterion this rule
      flags. The behaviour rule below does not also judge a non-functional criterion; the post-merge
      rule still does. Worked example:
      task.164's AC7, "No measurable change beyond the new 4b test's three runs", which states no
