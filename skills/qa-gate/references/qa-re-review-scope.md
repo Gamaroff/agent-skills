@@ -62,7 +62,20 @@ commits cannot be typed wrong in a way `git` accepts silently (task.135).
   `true` or `false`: an unset value would read as "not true" and narrow after a security FAIL
   (task.135 QA cycle 2, CR2-1).
 - The **patch** is still `git diff <base>...HEAD -- <files>` — the branch's cumulative change on
-  those files, so the reviewer has context. Only the *file list* comes from `<head>..HEAD`.
+  those files, so the reviewer has context. Only the *file list* comes from `<head>..HEAD`. The file
+  names are passed with `--literal-pathspecs`: a name beginning with `:` is otherwise pathspec magic
+  and leaves the scope (task.168 CR4-2).
+- **An uncommitted change to a tracked file outside the work item is a HALT** on every re-review
+  (`PRIOR_GATES >= 1`, every arm). The scope reads committed history, so a fix still in the working
+  tree would be reviewed as absent; commit it first (task.168 CR3-7). The work item's own directory
+  (bound as `$WORK_ITEM_DIR`) is excluded — the implementation report's deferred updates sit there. An
+  **untracked** file outside it only warns, naming the paths: the develop pipeline's Step 4 restores
+  held out-of-scope files into the tree for the whole QA loop, so one is the normal state of a healthy
+  branch (QA cycle 1, CR-1). `.claude/state/`, the pipeline's own scratch, is excluded from both, tracked
+  or not (QA cycle 2, CR-2).
+- **Clause 1 of `SAFETY_REPROBE` is recomputed** in each Step 3b preamble from the gate it just bound,
+  and a computed `true` overrides a bound `false`. A bound `true` (clauses 2–3) still stands
+  (task.168 CR3-4).
 
 ## The carve-out: `SAFETY_REPROBE`
 
@@ -98,68 +111,31 @@ fix cycle changes the behaviour of code its own diff never touched.
 
 ### Clause 1 — the mechanical probe
 
-Clauses 2 and 3 are judgement calls. Clause 1 is not, so it is written once, here, and both skills
-carry this exact snippet:
+Clauses 2 and 3 are judgement calls. Clause 1 is not, so it is written once — in the bundled script
+`qa-safety-clause1.sh`, which carries the awk probe and prints `true` or `false` — and both skills
+carry this exact call. Until task.168 the probe itself was this fenced block, copied into both skills,
+and a block cannot be called from another block: Step 3b could only trust the value an agent bound.
 
 ```bash
-# $LATEST_GATE is the prior gate file. Reads the nfr_validation.security block
-# once and reports "<status> <evidence>", or "absent" when there is no such
-# block. Both of clause 1's halves are decided from that one scan.
+# $LATEST_GATE is the prior gate file. Clause 1 has ONE definition, the bundled
+# qa-safety-clause1.sh, which prints true or false (task.168 CR3-4). Each QA skill
+# calls its own bundled copy; Step 3b recomputes it rather than trust a bound value.
 SAFETY_REPROBE=false
 if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
-  SECURITY_AXIS=$(awk '
-    # Three transit constraints govern every line below — no whole-record
-    # variable, no apostrophe, no GNU-only escape. See "Transit constraints"
-    # in the shared rule for why each one fails silently. Each has a test.
-    !f && /^[[:space:]]*security:[[:space:]]*$/ {
-      n = length; sub(/^[[:space:]]*/, ""); ind = n - length; f = 1; next
-    }
-    f {
-      # A key at or left of the indent of security: ends the block, so keys
-      # belonging to a later NFR axis can never be read as this one.
-      n = length; sub(/^[[:space:]]*/, ""); lead = n - length
-      if (length > 0 && lead <= ind) exit
-      if (st == "" && /^status:/) {
-        st = (/[[:space:]]FAIL[[:space:]]*$/) ? "FAIL" : "OK"
-      }
-      if (ev == "" && /^evidence:/) {
-        ev = "unverified"
-        if (/evidence:[^[:alpha:]]*measured/) ev = "measured"
-        else if (/evidence:[^[:alpha:]]*reasoned/) ev = "reasoned"
-      }
-    }
-    END {
-      if (!f) { print "absent"; exit }
-      printf "%s %s\n", (st == "" ? "OK" : st), (ev == "" ? "unverified" : ev)
-    }
-  ' "$LATEST_GATE" </dev/null)
-  case "$SECURITY_AXIS" in
-    absent)                     : ;;
-    *FAIL*)                     SAFETY_REPROBE=true ;;
-    *unverified*)               SAFETY_REPROBE=true ;;
-    "OK measured"|"OK reasoned") : ;;
-    # The branches above are EXHAUSTIVE over what the program can emit, so
-    # reaching here means the reader produced something it cannot produce —
-    # in practice the EMPTY string, from an awk that died, is missing, or had
-    # its program corrupted in transit. That is a claim about the instrument,
-    # not about the gate, so it fires: nothing has established the axis is
-    # fine. `absent` is a deliberate answer; empty is not an answer at all.
-    #
-    # The clean readings must be listed BEFORE this. Leaving them to the
-    # catch-all makes every passing gate fire — which is what happened when
-    # this branch was first added.
-    *)                          SAFETY_REPROBE=true ;;
-  esac
+  SAFETY_REPROBE=$(bash .agents/skills/{qa-task|qa-story}/references/qa-safety-clause1.sh "$LATEST_GATE") || exit 1
 fi
 ```
 
-### Transit constraints — three characters that break this snippet silently
+### Transit constraints — three characters that break the probe silently
 
-This probe is not stored as a script and executed. It ships as **prose an agent copies and runs**,
-and it is triplicated: once here, once in each QA skill. Three characters cannot appear in it, each
-for a different reason, and **all three fail quietly rather than loudly**. Each has its own test in
-`evals/shared/tests/qa-re-review-scope-parity.test.mjs`, because the two that were introduced during
-task.82 were both introduced by someone who had just read a comment warning against them.
+The probe's awk program lives in `qa-safety-clause1.sh`, single-quoted. Until task.168 it shipped as
+**prose an agent copied and ran**, triplicated — once here, once in each QA skill — and the program
+moved into the script byte-for-byte, so it still obeys the three constraints that prose transit
+imposed. Three characters cannot appear in it, each for a different reason, and **all three fail
+quietly rather than loudly**. Each has its own test in
+`evals/shared/tests/qa-re-review-scope-parity.test.mjs`, which reads the script, because the two that
+were introduced during task.82 were both introduced by someone who had just read a comment warning
+against them.
 
 | Must not appear | Why | Use instead |
 | --- | --- | --- |
@@ -167,10 +143,11 @@ task.82 were both introduced by someone who had just read a comment warning agai
 | An apostrophe — **including inside a comment** | The program is single-quoted by its caller, so one apostrophe closes the quote early and every fixture fails at once | reword. This is the one that fails loudly, and it is still cheaper to prevent |
 | `\s`, `\d`, `\w` | GNU extensions. BSD awk and mawk neither match nor error on them, so the probe returns empty and the carve-out never fires on any platform where the pipeline happens to run | POSIX classes — `[[:space:]]`, `[[:digit:]]`, `[[:alpha:]]` |
 
-**If a fourth constraint appears, stop copying this and extract it to a script both skills invoke.**
-Three is the agreed limit. The reason it is prose at all is that the parity test can then assert
-both skills carry it *verbatim*, which is what keeps two separately-maintained QA skills resolving
-the same gate identically — but that argument gets weaker with every line added.
+**This extraction was this paragraph's prediction, made for a different reason.** It said a fourth
+constraint would move the probe into a script both skills invoke; what moved it (task.168) was that
+Step 3b needed clause 1 recomputed from its own shell, and a fenced block cannot be called. One
+definition now keeps the two QA skills resolving the same gate identically; the parity test asserts
+both skills *call* the script, and keeps the constraint tests on its text.
 
 > **POSIX character classes only.** `\s` is a GNU extension. BSD awk and mawk do not match it and
 > do not error — the probe returns empty, `SAFETY_REPROBE` stays `false`, and the carve-out never
@@ -226,6 +203,28 @@ LAST_GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E 
   true|false) ;;
   *) echo "HALT: SAFETY_REPROBE is '${SAFETY_REPROBE:-}' — bind it in this shell to the true|false Phase 0 step 5 resolved (clause 1 from the gate, clauses 2–3 by judgement)"; exit 1 ;;
 esac
+# Every re-review arm reads committed history — the scoped arm's file list from <head>..HEAD, and
+# every arm's patch from BASE...HEAD — while Phase 0's trigger counts an uncommitted change as
+# movement. A fix still in the working tree would trigger this re-review and then be reviewed as
+# absent, on cycle 2, on the safety re-probe and on a schema-1 gate as much as on the scoped arm
+# (task.168 CR3-7; QA cycle 1, CR-2). $WORK_ITEM_DIR is bound by the caller's preamble and is
+# excluded because the pipeline's own bookkeeping sits uncommitted there when this block runs: the
+# implementation report's updates, deferred to Step 8 (QA cycle 2, CR-4). Unbound, or the
+# repository root, the exclusion below would exclude nothing or everything — refuse both.
+if [ "$PRIOR_GATES" -ge 1 ]; then
+  [ -n "${WORK_ITEM_DIR:-}" ] && [ -n "$(git -C "$WORK_ITEM_DIR" rev-parse --show-prefix 2>/dev/null)" ] \
+    || { echo "HALT: WORK_ITEM_DIR ('${WORK_ITEM_DIR:-}') is not a work-item directory below the repository root — bind it in this shell"; exit 1; }
+  # TRACKED changes HALT. Untracked files only warn: the develop pipeline's Step 4 holds out-of-scope
+  # untracked files aside for the PR commit and restores them into the tree for the whole QA loop,
+  # so an untracked file outside the work item is the normal state of a healthy branch, not a fix
+  # left uncommitted (QA cycle 1, CR-1). .claude/state is the pipeline's own scratch — excluded from
+  # both lists: a consumer that tracks .claude/ has the lock rewritten by set-qa-phase.sh just before
+  # this block runs, and that is not a fix (QA cycle 2, CR-2).
+  DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
+  [ -z "$DIRTY" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):"; printf '%s\n' "$DIRTY"; exit 1; }
+  UNTRACKED=$(git ls-files --others --exclude-standard -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
+  [ -z "$UNTRACKED" ] || { echo "warning: untracked files outside the work item are not in this review — commit any that belong to the fix:"; printf '%s\n' "$UNTRACKED" | sed 's/^/  /'; }
+fi
 if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since the last gate's head
   REFUTE_PASS=false
   if [ ! -f "$LATEST_GATE" ] || [ ! -r "$LATEST_GATE" ]; then
@@ -255,7 +254,10 @@ if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3
     if [ "${#FILES[@]}" -eq 0 ]; then
       echo "HALT: nothing changed since the head of gate $PRIOR_GATES (${LAST_GATE_HEAD:0:12}) — there is no fix to review; check the cycle order"; exit 1
     fi
-    git diff "$BASE...HEAD" -- "${FILES[@]}" > "$DIFF_FILE"
+    # --literal-pathspecs: FILES are file names, not pathspecs. Without it a name beginning with
+    # `:` is pathspec magic (`:README.md` matches README.md, `:!x` excludes x) and the file silently
+    # leaves the scope (task.168 CR4-2) — the pathspec half of what -z fixed for quoting above.
+    git --literal-pathspecs diff "$BASE...HEAD" -- "${FILES[@]}" > "$DIFF_FILE"
     # Non-vacuity: files changed but the scoped patch is empty ⇒ the scoping is wrong, not the
     # code clean. Refuse to dispatch on nothing.
     if [ ! -s "$DIFF_FILE" ]; then

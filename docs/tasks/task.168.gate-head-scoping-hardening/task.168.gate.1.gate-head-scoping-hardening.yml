@@ -1,0 +1,85 @@
+schema: 2
+task: 'task.168.gate-head-scoping-hardening'
+task_title: "[Task 168] Harden task.135's gate-head scoping"
+gate: CONCERNS
+status_reason: 'All six fixes land with executed tests and red mutation proofs, but the new uncommitted-fix HALT fires on untracked files the develop pipeline itself restores (CR-1), and covers only the cycle-3+ scoped arm while the success criterion is unqualified (CR-2).'
+reviewer: 'QA Engineer'
+head: '764154ab019357dd6975a6c4406d4399d4b52aeb'        # git rev-parse HEAD when the review was performed
+updated: '2026-10-03T15:23:30Z'
+
+top_issues:
+  - id: 'T168-QA1-CR-1'
+    severity: medium
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'The uncommitted-fix HALT counts every untracked file outside WORK_ITEM_DIR and .claude/state, but develop-pipeline Step 4 restores held out-of-scope untracked files into the tree for the whole QA loop, so a cycle-3+ re-review of a healthy pipeline branch HALTs — contradicting the task Breaking Changes claim that a pipeline run never reaches it.'
+    suggested_action: 'HALT on tracked changes only (git status --porcelain --untracked-files=no) and print untracked paths outside the work item as a warning; add a fixture with an unrelated untracked file outside the work item that must not HALT. Same edit in both Step 3b fences.'
+    suggested_owner: dev
+    status: open
+  - id: 'T168-QA1-CR-2'
+    severity: medium
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'The uncommitted-fix check runs only on the scoped cycle-3+ arm; cycle 2, the safety re-probe arm and the schema-1 unscoped arm also build the patch from committed history, so a fix still in the working tree is reviewed as absent there — the success criterion "Step 3b HALTs when a change outside the work item is uncommitted" is unqualified by arm.'
+    suggested_action: 'Move the check above the arm selection so it applies whenever PRIOR_GATES >= 1 (re-reviews), keep WORK_ITEM_DIR validation with it, and add a cycle-2 fixture with an uncommitted fix that HALTs.'
+    suggested_owner: dev
+    status: open
+  - id: 'T168-QA1-CR-3'
+    severity: low
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'The two-call rebind in Phase 0 steps 2 and 5 (both skills) discards stderr on the first qa-cycle.sh call, so gate files that carry no cycle number read silently as a first review with SAFETY_REPROBE=false, while the comment says stderr is kept.'
+    suggested_action: 'Keep stderr on the first qa-cycle.sh call in the step-2 and step-5 rebinds (both skills), so the helper names unnumbered gate files.'
+    suggested_owner: dev
+    status: open
+  - id: 'T168-QA1-CR-4'
+    severity: low
+    file: 'evals/shared/tests/qa-re-review-scope-parity.test.mjs'
+    finding: 'The ">= 2 calls" assertion counts the script path anywhere in each SKILL.md, prose included, so it would pass with the Step 3b call removed and the path still mentioned in a comment.'
+    suggested_action: 'Assert the call inside the extracted Phase 0 step 5 fence and the extracted Step 3b fence separately.'
+    suggested_owner: dev
+    status: open
+  - id: 'T168-QA1-CR-5'
+    severity: low
+    file: 'shared/resources/tests/gate-head-freshness.test.mjs'
+    finding: 'The field()/sed agreement test runs a hard-coded copy of the head-reading sed, so it keeps passing if the shipped sed in the QA skills or the shared scope block changes.'
+    suggested_action: 'Extract the sed expression from the shipped GATE_HEAD line (qa-task Phase 0 step 3) and the LAST_GATE_HEAD line (shared rule), fail when either cannot be found, and run both.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 81
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+  ci: 'not read this cycle — gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — shared/resources/qa-safety-clause1.sh reads only a QA gate file the pipeline writes; no corpus sink models gate YAML. Behaviour executed by 16 script tests + 58 parity tests (replay gates, broken awk, held-open stdin).'
+  performance:
+    status: PASS
+    notes: 'One git status and one script call per cycle; ci:fast 5,243 tests unchanged in wall time class.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a false HALT on a healthy pipeline branch at cycle 3+; CR-2: the uncommitted-fix guard misses three arms.'
+  maintainability:
+    status: PASS
+    notes: 'Clause 1 now has one definition; scope block byte-identical in three copies (test E).'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and CR-2 (uncommitted-fix HALT: tracked-only, and before arm selection)'
+      refs: ['shared/resources/qa-re-review-scope.md', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed and re-reviewed']

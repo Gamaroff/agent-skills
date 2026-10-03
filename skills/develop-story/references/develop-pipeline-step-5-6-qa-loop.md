@@ -1082,13 +1082,20 @@ After fixes are applied:
    cycle runs the key has already been proven to name a real script. The slow tier stays out of this
    cycle by design; it runs once at `develop-next`'s merge gate.
 
-   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit — a
+   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit yet — a
    red tree is exactly what the cycle machinery is for. Triage per the step-3 pattern, feed the
    finding back into this cycle's fixes, and re-run the gate.
 
    **Bound this retry at 2 attempts.** After a second red gate in the same cycle, stop retrying:
-   commit nothing, record the failing output in the QA Iteration History, and let the cycle end so
-   the next QA review writes a gate. That is what actually reaches the convergence check and
+   **commit the attempt without pushing** — `fix(task.{id}): qa-fix cycle {N} — fast gate red, not
+   pushed` (or `fix(story.{epic}.{story}): …`), carrying this cycle's gate and QA report as step
+   0-stage staged them, with the implementation report still excluded per step 1 — record the
+   failing output in the QA Iteration History, and let the cycle end so the next QA review writes a
+   gate. Skip step 3's push: the next push — the next cycle's, or the one before its 5c — carries
+   this commit after the next review has read it and its fix cycle has run. **Commit it; do not leave it in the
+   working tree.** The next review's Step 3b reads committed history and HALTs on an uncommitted
+   tracked change outside the work item (task.168 QA cycle 2, CR-1), so a red attempt left
+   uncommitted is a review that never writes its gate. That is what actually reaches the convergence check and
    MAX_ITER — both of which count *cycles*, so an unbounded inner re-run would never reach either.
    An earlier revision of this block claimed "the MAX_ITER cap still bounds the loop"; it does not
    bound this retry, and a stated guarantee that is not real is worse than an unstated one.
