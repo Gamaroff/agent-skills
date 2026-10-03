@@ -51,11 +51,14 @@
 #          does: max(highest gate via qa-cycle.sh, `### QA Cycle` entries in the report); 2 is
 #          the grant prompt's recommended k; an existing higher budget is kept, never lowered,
 #        qa_reentry = {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head, report_entries}.
-#      report_entries — the number of `### QA Cycle` headings in the report at re-entry — is what
-#      the resume contract's re-entry precedence keys on: while the report holds no more headings than
-#      that, its last entry's verdict predates the re-entry. A COUNT, because the re-entered cycle is
-#      guaranteed to add one heading whatever its number (entries are gate-numbered, and the report can
-#      run ahead of or behind the gates — task.170 QA cycle 4, CR-3).
+#      report_entries — the number of `### QA Cycle` headings the report holds at re-entry ONCE THE
+#      RESUME HAS BACK-FILLED it, i.e. max(highest gate, headings), the same BASE the budget uses — is
+#      what the resume contract's re-entry precedence keys on: while the report holds no more headings
+#      than that, its last entry's verdict predates the re-entry. A COUNT, because the re-entered cycle
+#      is guaranteed to add one heading whatever its number (entries are gate-numbered — task.170 QA
+#      cycle 4, CR-3); the BACK-FILLED count, because the resume's reconstruction adds a heading for
+#      every gate without one, and a raw count let that back-fill clear the rule before any re-entered
+#      cycle ran (QA cycle 5, CR-1).
 #      A failed write after the restore KEEPS the restored step-7 lock: the snapshot is consumed,
 #      so the lock is the run's only state, and a lock at 7 is a resumable one (the grant's
 #      undo_restore rule). No temp file is left behind on any path.
@@ -209,7 +212,7 @@ if ! jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1; then
 fi
 TMP=$(mktemp "$(dirname "$LOCK")/.reenter-qa.XXXXXX") || { keep_restored; exit 1; }
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-if ! jq --argjson base "$BASE" --argjson entries "$DONE" --arg now "$NOW" --arg head "$GATE_HEAD" '
+if ! jq --argjson base "$BASE" --argjson entries "$BASE" --arg now "$NOW" --arg head "$GATE_HEAD" '
        .current_step = 5
        | .qa_phase = "5a"
        | .qa_max_cycles = ([((.qa_max_cycles // 5) | tonumber? // 5), ($base + 2)] | max)

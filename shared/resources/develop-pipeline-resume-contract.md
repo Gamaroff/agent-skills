@@ -443,15 +443,20 @@ A `gate.yml` written manually (without running the QA skill) does NOT satisfy St
 > left the loop through Loop Escalation has no cycle to re-enter whatever its last verdict was
 > (a loop-limit-via-review entry carries a real `REQUEST CHANGES` *and* the escalation Action —
 > task.123 QA cycle 4, CR-3). **Second precedence — a QA re-entry after a finalise DoD-gaps halt
-> (task.170):** when the lock or halt snapshot carries `qa_reentry` and the report holds no more
+> (task.170):** when the lock or halt snapshot carries `qa_reentry` and the report — counted after
+> the reconstruction below back-fills an entry for every gate without one — holds no more
 > `### QA Cycle` headings than `qa_reentry.report_entries`, its last entry's terminal `APPROVE` /
-> `CONCERNS` is the run that halted at Step 7 — no re-entered cycle has written its own entry yet. Do
-> not go to Step 7: re-enter at **5a**; the cycle number comes from the gates on disk, as on any
-> resume (a gate the in-flight cycle already wrote is its own, and 5a overwrites it). It keys on a
+> `CONCERNS` is the run that halted at Step 7 — no re-entered cycle has written a gate or an entry
+> yet. Do not go to Step 7: re-enter at **5a**; the cycle number comes from the gates on disk, as on
+> any resume. A gate the re-entered cycle wrote before it could write its entry is no exception to
+> anything: the reconstruction back-fills its entry, the count passes `report_entries`, and the run
+> continues from that gate, which did read the re-entered head (QA cycle 5, CR-2). It keys on a
 > **count of report headings**: 5a writes the entry only after it reads the gate, so a rule keyed on
 > the gate cleared one step early (task.170 QA cycle 3, CR-1), and entries are gate-numbered while
 > the report can run ahead of or behind the gates, so a rule keyed on an entry number could fail to
-> clear (QA cycle 4, CR-3); the re-entered cycle always adds exactly one heading. It clears itself
+> clear (QA cycle 4, CR-3); and on the **back-filled** count, because `report_entries` is recorded as
+> `max(highest gate, headings)` — the count the back-fill produces — so the back-fill alone cannot
+> pass it (QA cycle 5, CR-1). The re-entered cycle always adds exactly one gate and one heading. It clears itself
 > once that heading exists, so it never fires on a later cycle. This paragraph is the rule's one
 > statement; the 5–6 artifact rows cite it.
 > Only when neither precedence applies does the PR Review row select a row below. Exactly one row
@@ -643,7 +648,7 @@ then writes, in one `mktemp` + `mv`: `current_step: 5`, `qa_phase: 5a`,
 (**Re-entry after a QA loop escalation**, step 3), `2` being the grant prompt's recommended `k` — and
 `qa_reentry: {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head, report_entries}`, which explains a
 lowered step to a later reader and gives the **Second precedence** its `report_entries` (the report's
-`### QA Cycle` heading count at re-entry — the script therefore requires the report). A write that fails after the restore keeps the restored step-7 lock
+`### QA Cycle` heading count at re-entry, as the back-fill leaves it: `max(highest gate, headings)` — the script therefore requires the report). A write that fails after the restore keeps the restored step-7 lock
 (the snapshot is gone, and a lock at 7 is resumable). The loop then runs from 5a, numbered from the gates;
 5c's APPROVE advances the lock `5 → 7` as on any run, and `/finalise` re-runs over a gated head.
 The Stop hook needs nothing new: a step-5 lock at `qa_phase: 5a` already names `/qa-task` /

@@ -403,23 +403,22 @@ parity test.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-03
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.170.qa.4.qa-reentry-after-finalise-gaps.md](./task.170.qa.4.qa-reentry-after-finalise-gaps.md)
-- **Gate File**: [task.170.gate.4.qa-reentry-after-finalise-gaps.yml](./task.170.gate.4.qa-reentry-after-finalise-gaps.yml)
+- **Full Report**: [task.170.qa.5.qa-reentry-after-finalise-gaps.md](./task.170.qa.5.qa-reentry-after-finalise-gaps.md)
+- **Gate File**: [task.170.gate.5.qa-reentry-after-finalise-gaps.yml](./task.170.gate.5.qa-reentry-after-finalise-gaps.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 98
+- **Tests Executed**: 105
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR-1, CR-2 (medium): the refusal routes disagree across contract, script and SKILL.md — [task.170.bug.6](./task.170.bug.6.refusal-routes-disagree.md).
-- CR-3 (low): `base_cycle` counts headings while entries are gate-numbered — [task.170.bug.5](./task.170.bug.5.reentry-precedence-clears-before-entry.md) reopened.
-- CR-5 (low): CHANGELOG and suite header describe the cycle-1 measure.
+- CR-1 (medium): `report_entries` is a raw heading count, but the resume back-fills headings for gates without entries — [task.170.bug.5](./task.170.bug.5.reentry-precedence-clears-before-entry.md) reopened.
+- Cycle 4's routes verified; [bug.6](./task.170.bug.6.refusal-routes-disagree.md) closed.
 
 <!-- change-log-start -->
 
@@ -435,6 +434,7 @@ parity test.
 | 2026-10-03 |         | QA gate FAIL (70/100) — 3 findings (1 high, 1 medium, 1 low) | qa-task |
 | 2026-10-03 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 | 2026-10-03 |         | QA gate CONCERNS (80/100) — 4 findings (2 medium, 2 low) | qa-task |
+| 2026-10-03 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 
 <!-- change-log-end -->
 

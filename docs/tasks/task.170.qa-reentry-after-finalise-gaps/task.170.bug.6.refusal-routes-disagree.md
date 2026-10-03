@@ -4,7 +4,7 @@
 **Bug ID**: TASK-170-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 4 review, CR-1 and CR-2)
 **Date Found**: 2026-10-03
 
@@ -44,3 +44,4 @@ refusal of their own. Add the document-only-plus-untracked case.
 | ---------- | ------------ | ---------- | ------------------------------ |
 | 2026-10-03 | New          | QA         | Found in QA cycle 4            |
 | 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 4        |
+| 2026-10-03 | Closed       | QA         | Verified in QA cycle 5         |

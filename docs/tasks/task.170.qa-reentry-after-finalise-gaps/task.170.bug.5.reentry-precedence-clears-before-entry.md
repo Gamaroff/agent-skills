@@ -51,6 +51,18 @@ State it once and have the two 5–6 rows cite it.
 
 **Testing**: suite cases for report at, ahead of and behind the gates (report_entries 2, 3, 1); recording the gate base instead of the count turns the "behind" case red; parity test names report_entries.
 
+### Iteration 3
+
+#### Re-Investigation (Reopened → Ready for QA)
+
+**Date**: 2026-10-03
+
+**QA Reopening Reason**: a raw heading count let the resume's back-fill (one heading per gate without an entry) clear the precedence before any re-entered cycle ran.
+
+**Revised Approach**: record `report_entries` as the back-filled count, `max(highest gate, headings)` — the same BASE the budget uses — and state in the precedence that the report is counted after the back-fill; an in-flight gate is back-filled and continued from (CR-2 wording).
+
+**Testing**: the "behind" case now expects 2 (1 heading, gate.2); recording the raw count turns it red.
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes                          |
@@ -59,3 +71,5 @@ State it once and have the two 5–6 rows cite it.
 | 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 3        |
 | 2026-10-03 | Reopened     | QA         | QA cycle 4: base_cycle counts headings but entries are gate-numbered (CR-3) |
 | 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 4        |
+| 2026-10-03 | Reopened     | QA         | QA cycle 5: a raw heading count clears early once the resume back-fills a gate without an entry (CR-1) |
+| 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 5        |

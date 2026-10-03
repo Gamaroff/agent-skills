@@ -233,11 +233,14 @@ WANT_MAX=5; accept "committed fix (report_entries recorded)"
 [ "$(jq -r '.qa_reentry.report_entries' "$L")" = "2" ] && pass "qa_reentry.report_entries is the report's heading count (2)" || fail "report_entries" "$(jq -c .qa_reentry "$L")"
 # A COUNT, whichever way the report and the gates disagree (QA cycle 4, CR-3): ahead (3 headings, gate.2)
 # and behind (1 heading, gate.2) both record the headings as written, not the gate number.
-for pair in "ahead:3" "behind:1"; do
+# The BACK-FILLED count (QA cycle 5, CR-1): behind (1 heading, gate.2) records 2 — the resume will
+# back-fill entry 2, and a raw count of 1 would let that back-fill clear the precedence.
+for pair in "ahead:3:3" "behind:1:2"; do
   mkrepo "entries-${pair%%:*}"; codefix
-  : > "$R/r.md"; for i in $(seq 1 "${pair##*:}"); do echo "### QA Cycle $i" >> "$R/r.md"; done
+  heads=${pair#*:}; heads=${heads%%:*}; want=${pair##*:}
+  : > "$R/r.md"; for i in $(seq 1 "$heads"); do echo "### QA Cycle $i" >> "$R/r.md"; done
   run r.md >/dev/null 2>&1
-  [ "$(jq -r '.qa_reentry.report_entries' "$L" 2>/dev/null)" = "${pair##*:}" ] && pass "report ${pair%%:*} of the gates → report_entries ${pair##*:}" || fail "report_entries ${pair%%:*}" "$(cat "$L" 2>/dev/null)"
+  [ "$(jq -r '.qa_reentry.report_entries' "$L" 2>/dev/null)" = "$want" ] && pass "report ${pair%%:*} of the gates ($heads headings, gate.2) → report_entries $want (the back-filled count)" || fail "report_entries ${pair%%:*}" "$(cat "$L" 2>/dev/null)"
 done
 
 # ── CR-2: .claude/state is not movement ──────────────────────────────────────
