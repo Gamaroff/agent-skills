@@ -36,7 +36,7 @@ else
 fi
 ```
 
-**Rebinds** — `qa-task/SKILL.md` Phase 0 steps 2 (`:177`) and 5 (`:291`); `qa-story/SKILL.md` steps 2 (`:254`) and 5 (`:495`). Replace the one-line `[ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(… --path gate 2>/dev/null)` with Step 1's two-call pattern (copy it from `qa-task/SKILL.md` Phase 0 step 1, do not re-derive it):
+**Rebinds** — `qa-task/SKILL.md` Phase 0 steps 2 (`:177`) and 5 (`:291`); `qa-story/SKILL.md` steps 2 (`:254`) and 5 (`:499`). Replace the one-line `[ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(… --path gate 2>/dev/null)` with Step 1's two-call pattern (copy it from `qa-task/SKILL.md` Phase 0 step 1, do not re-derive it):
 
 ```bash
 if [ -z "${LATEST_GATE:-}" ]; then
@@ -106,7 +106,9 @@ and, inside the cycle-3+ arm before `LAST_GATE_HEAD` is used:
 # The scope reads committed history; a fix still in the working tree would be reviewed as absent
 # (task.168 CR3-7). $WORK_ITEM_DIR is bound by the caller's preamble — the QA cycle writes its own
 # report and gate there before this block runs.
-DIRTY=$(git status --porcelain -- . ":(exclude)$WORK_ITEM_DIR")
+# .claude/state is excluded too: the develop pipeline writes untracked files there and a consumer's
+# .gitignore need not cover them (task.168 review.1 I1).
+DIRTY=$(git status --porcelain -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
 [ -z "$DIRTY" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review:"; printf '%s\n' "$DIRTY"; exit 1; }
 ```
 
@@ -122,14 +124,14 @@ return m[1]
   .trim();
 ```
 
-Tests: `skills/:colon.sh` changed after the head stays in the patch (bash + zsh); an uncommitted edit to `skills/b.sh` HALTs; `field()` on `head: '<sha>'  ` returns the SHA, and on `head: '<sha>'  # c` too.
+Tests: a root-level `:colon.sh` changed after the head stays in the patch (bash + zsh) — at the root, because only a pathspec that *begins* with `:` is magic; an uncommitted edit to `skills/b.sh` HALTs; an untracked `.claude/state/develop-pipeline.lock` alone does not; `field()` on `head: '<sha>'  ` returns the SHA, and on `head: '<sha>'  # c` too.
 
 ## Key Patterns and References
 
 - `qa-scope-from-head.test.mjs` — `block()` + `dedent()` extraction, `withoutUnset()` for unset inputs, the stub-`gh` fence run (J4), the helper copy (F9).
 - `qa-cycle.sh` — the one-definition precedent, and the two-call pattern in `qa-task/SKILL.md` Phase 0 step 1.
 - `qa-re-review-scope.md` § "Transit constraints" — why the awk move must be byte-for-byte.
-- **Bundling closure** (`skills/create-skill/SKILL.md` § "Cite or depend"): `qa-re-review-scope.md` is bundled into eight skills (`review-code`, `review-pr`, `review-security`, `develop-*` …). A script invoked from its clause-1 block is a dependency of every one of them, not only `qa-task`/`qa-story`. Decide deliberately — either accept the eight copies (check `npm run bundle` closure deltas) or have the shared block name the script in the `{qa-task|qa-story}` invocation form so only the two QA skills bundle it. `bundle:check` reports an unreached copy as `UNREACHED`.
+- **Bundling closure** (`skills/create-skill/SKILL.md` § "Cite or depend"): `qa-re-review-scope.md` is bundled into eight skills (`review-code`, `review-pr`, `review-security`, `develop-*` …). A script invoked from its clause-1 block is a dependency of every one of them, not only `qa-task`/`qa-story`. **Decided at develop: the `{qa-task|qa-story}` invocation form** — only the two QA skills bundle the script (review.1 Q3 had accepted eight copies; see the task's § 3). `bundle:check` reports an unreached copy as `UNREACHED`.
 
 ## Testing Approach
 
