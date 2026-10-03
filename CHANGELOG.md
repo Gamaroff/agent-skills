@@ -13,12 +13,15 @@ All notable changes to this project will be documented in this file. Format foll
   `develop-pipeline-resume-contract.md` (**Re-entry after a finalise DoD-gaps halt**) and its one
   writer, `reenter-qa-after-finalise.sh` (bundled into `develop-task` and `develop-story`), re-enter
   the QA loop at step 5 / `qa_phase: 5a` when the newest DoD file reads `❌ GAPS` and code moved past
-  the newest gate's `head:` — measured with `qa-task` Phase 0's full measure, so uncommitted and
-  untracked changes count. A document-only fix is refused and resumes at 7 as before. The script
-  refuses before any write (seven named reasons, held equal to the contract's list by
+  the newest gate's `head:` — measured as committed history, which is what the re-entered review
+  reads. A document-only fix is refused and resumes at 7 as before; an uncommitted tracked fix is
+  refused as `uncommitted-fix` (commit and re-run, never step 7); untracked files are named, never
+  counted. The script refuses before any write (eight named reasons, each with its route stated once
+  in the contract and held equal to the script by
   `evals/shared/tests/reenter-qa-refusals-parity.test.mjs`), sets
-  `qa_max_cycles = max(existing, base + 2)`, and records `qa_reentry` on the lock — the one optional
-  new field. `advance-pipeline-lock.sh` stays monotonic. Both `SKILL.md` Phase 0b blocks offer
+  `qa_max_cycles = max(existing, base + 2)` (an absent budget counts as the loop's 5), and records
+  `qa_reentry` on the lock — the one optional new field, whose `report_entries` lets a resume tell
+  the halted run's APPROVE from the re-entered cycle's. `advance-pipeline-lock.sh` stays monotonic. Both `SKILL.md` Phase 0b blocks offer
   "Re-enter QA at 5a"; finalise's gap report and the step-7 halt message name the rule. No consumer
   migration.
 

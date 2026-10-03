@@ -39,9 +39,23 @@ State it once and have the two 5–6 rows cite it.
 
 **Testing**: parity 4/4 (precedence names base_cycle, not gate_head; rows cite it and restate no key; schema names base_cycle; script writes it); suite case pins base_cycle = 2. Reverting the contract key to the gate head → parity red; dropping base_cycle from the write → suite red.
 
+### Iteration 2
+
+#### Re-Investigation (Reopened → Ready for QA)
+
+**Date**: 2026-10-03
+
+**QA Reopening Reason**: `base_cycle` was max(gate, heading count) while 5a numbers entries by gate cycle — with the report ahead of the gates the re-entered entry never exceeded it.
+
+**Revised Approach**: key on a COUNT the re-entered cycle is guaranteed to advance — `qa_reentry.report_entries`, the report's `### QA Cycle` heading count at re-entry (the report is now a required argument). The precedence fires while the report holds no more headings than that, and takes the cycle number from the gates as on any resume.
+
+**Testing**: suite cases for report at, ahead of and behind the gates (report_entries 2, 3, 1); recording the gate base instead of the count turns the "behind" case red; parity test names report_entries.
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes                          |
 | ---------- | ------------ | ---------- | ------------------------------ |
 | 2026-10-03 | New          | QA         | Found in QA cycle 3            |
 | 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 3        |
+| 2026-10-03 | Reopened     | QA         | QA cycle 4: base_cycle counts headings but entries are gate-numbered (CR-3) |
+| 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 4        |

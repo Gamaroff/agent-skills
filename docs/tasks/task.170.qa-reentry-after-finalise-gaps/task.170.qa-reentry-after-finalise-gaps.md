@@ -107,9 +107,9 @@ before acceptance, by a path the pipeline documents rather than one an operator 
   `GAPS IDENTIFIED`, **and** a tree that has moved past the newest gate's `head:` outside the work
   item's own directory, measured as **committed history** — what the re-entered review reads
   (commits since the head; a `head:` that is absent, not 40-hex, not a commit or not an ancestor of
-  `HEAD` counts as moved). Uncommitted tracked work, and untracked files when nothing is committed,
-  are refused (`uncommitted-fix` — commit and re-run), never sent to `/finalise`; untracked files
-  beside a committed fix are the files Step 4 restored and are listed, not counted (QA cycles 1–3
+  `HEAD` counts as moved). Uncommitted tracked work is refused (`uncommitted-fix` — commit and
+  re-run), never sent to `/finalise`; untracked files are named on every outcome and never counted,
+  since nothing can tell Step 4's restored held-aside files from a new fix file (QA cycles 1–4
   refined this from review 1's "the full qa-task Phase 0 measure": the re-entered cycle is always a
   re-review, and qa-task Step 3b HALTs on an uncommitted tracked change) → **re-enter QA**.
   Otherwise the existing bullet applies (finalise re-runs at 7 — correct when only documents moved).
@@ -290,8 +290,8 @@ gate files with `head:`, a git repo with and without code movement).
 
 - [x] A step-7 GAPS halt followed by a code change is re-entered at step 5 / `qa_phase: 5a` — held by the script's accept test.
 - [x] A step-7 GAPS halt followed by a document-only change is refused — held by the refuse test; finalise then re-runs at 7 through the existing, unchanged `--restore` bullet.
-- [x] Uncommitted work outside the work-item directory is refused (`uncommitted-fix`), never accepted and never sent to finalise — an uncommitted tracked change always, untracked files when nothing is committed — held by the uncommitted / untracked refusal cases; untracked files beside a committed fix are listed, not counted — held by the held-aside accept case.
-- [x] A resume after the re-entry, before the re-entered cycle writes its `### QA Cycle` entry, re-enters at 5a rather than Step 7 — held by the contract's single-statement **Second precedence** (keyed on `qa_reentry.base_cycle`) and its parity test.
+- [x] An uncommitted tracked change outside the work-item directory is refused (`uncommitted-fix`), never accepted and never routed to finalise — held by the two uncommitted refusal cases and the parity test's route check; untracked files are named and never counted — held by the untracked-only, document-only-plus-untracked and held-aside cases.
+- [x] A resume after the re-entry, before the re-entered cycle writes its `### QA Cycle` entry, re-enters at 5a rather than Step 7 — held by the contract's single-statement **Second precedence** (keyed on the heading count `qa_reentry.report_entries`), the suite's report_entries cases (report at, ahead of and behind the gates) and the parity test.
 - [x] A snapshot for another document, or with `halt_step` ≠ 7, is refused — held by refusal tests.
 - [x] The re-entered lock records `qa_reentry` with the gate head — held by the accept test.
 - [x] A lock at step 5 / `qa_phase: 5a` carrying `qa_reentry` makes the Stop hook name `/qa-task` — held by the new case in `develop-pipeline-on-stop.test.sh`.
@@ -403,22 +403,23 @@ parity test.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-03
-**Quality Score**: 90/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.170.qa.3.qa-reentry-after-finalise-gaps.md](./task.170.qa.3.qa-reentry-after-finalise-gaps.md)
-- **Gate File**: [task.170.gate.3.qa-reentry-after-finalise-gaps.yml](./task.170.gate.3.qa-reentry-after-finalise-gaps.yml)
+- **Full Report**: [task.170.qa.4.qa-reentry-after-finalise-gaps.md](./task.170.qa.4.qa-reentry-after-finalise-gaps.md)
+- **Gate File**: [task.170.gate.4.qa-reentry-after-finalise-gaps.yml](./task.170.gate.4.qa-reentry-after-finalise-gaps.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 93
+- **Tests Executed**: 98
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-- CR-1 (medium): the re-entry precedence clears when gate N+1 is written, one step before entry N+1 exists — [task.170.bug.5](./task.170.bug.5.reentry-precedence-clears-before-entry.md).
-- Cycle 2 fixes verified; [bug.3](./task.170.bug.3.resume-after-reentry-reads-stale-approve.md) and [bug.4](./task.170.bug.4.parallel-story-stem-unmatched.md) closed.
+- CR-1, CR-2 (medium): the refusal routes disagree across contract, script and SKILL.md — [task.170.bug.6](./task.170.bug.6.refusal-routes-disagree.md).
+- CR-3 (low): `base_cycle` counts headings while entries are gate-numbered — [task.170.bug.5](./task.170.bug.5.reentry-precedence-clears-before-entry.md) reopened.
+- CR-5 (low): CHANGELOG and suite header describe the cycle-1 measure.
 
 <!-- change-log-start -->
 
@@ -433,6 +434,7 @@ parity test.
 | 2026-10-03 |         | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-10-03 |         | QA gate FAIL (70/100) — 3 findings (1 high, 1 medium, 1 low) | qa-task |
 | 2026-10-03 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
+| 2026-10-03 |         | QA gate CONCERNS (80/100) — 4 findings (2 medium, 2 low) | qa-task |
 
 <!-- change-log-end -->
 

@@ -19,12 +19,16 @@
 #                             item's stem, so a co-located bug's DoD is never read as its verdict
 #        dod-not-gaps         the newest DoD file's Final Status is not ❌ GAPS
 #        no-gate              qa-cycle.sh found no single current gate
-#        uncommitted-fix      a tracked change outside <doc-dir> is uncommitted, or the only
-#                             movement is untracked files: the re-entered review reads committed
-#                             history (qa-task Step 3b HALTs on the first), so commit the fix and
-#                             re-run — never resume at 7 over it
-#        no-code-moved        no commit outside <doc-dir> since the gate's head and nothing
-#                             uncommitted: a document-only fix, for which /finalise at 7 is correct
+#        uncommitted-fix      a TRACKED change outside <doc-dir> is uncommitted: the re-entered
+#                             review reads committed history (qa-task Step 3b HALTs on it), so
+#                             commit the fix and re-run — never resume at 7 over it
+#        no-code-moved        no commit outside <doc-dir> since the gate's head: a document-only
+#                             fix, for which /finalise at 7 is correct. Untracked files outside
+#                             <doc-dir> are NAMED in the message, never a refusal of their own —
+#                             Step 4 restores the files it held aside, so the measure cannot tell
+#                             one of those from a new fix file; the operator, who can, decides
+#      Each reason's route (resume at 7 / commit and re-run) is stated once, in the resume
+#      contract's refusal list.
 #      The reasons are printed as `reenter-qa: refused (<reason>) — …`. The resume contract
 #      lists the same set; evals/shared/tests/reenter-qa-refusals-parity.test.mjs holds the two
 #      equal.
@@ -33,10 +37,10 @@
 #      the gate's `head:` outside <doc-dir>; a head that is absent, not 40-hex, not a commit or not an
 #      ancestor of HEAD counts as moved. Uncommitted work is not movement — it is refused
 #      (uncommitted-fix), because it can neither be reviewed nor safely left for /finalise. Untracked
-#      files are the normal state after Step 4 restores the files it held aside, so with committed
-#      movement they are only listed; with none, they are refused as possibly the fix (task.170 QA
-#      cycle 3, CR-2/CR-4). .claude/state, the pipeline's scratch, is never counted. It never fails
-#      toward "nothing moved" over work the review has not read.
+#      files are never counted and never refused: after Step 4 restores the files it held aside an
+#      untracked file is the normal state of a branch, and no measure here can tell one of those from
+#      a new fix file — so they are named on every outcome, and the operator decides (task.170 QA
+#      cycle 4, CR-2). .claude/state, the pipeline's scratch, is never counted.
 #   3. RESTORES through `advance-pipeline-lock.sh --restore <doc-dir>` (the one restore path,
 #      which consumes the snapshot) and then, in ONE atomic write (mktemp + mv beside the lock):
 #        current_step = 5, qa_phase = "5a",
@@ -45,16 +49,21 @@
 #          have used (task.170 QA cycle 2, CR-4); base reconstructed as grant-qa-cycles.sh
 #          does: max(highest gate via qa-cycle.sh, `### QA Cycle` entries in the report); 2 is
 #          the grant prompt's recommended k; an existing higher budget is kept, never lowered,
-#        qa_reentry = {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head, base_cycle}.
-#      base_cycle is what the resume contract's re-entry precedence keys on: while the report's
-#      highest `### QA Cycle` entry is at or below it, that entry's verdict predates the re-entry
-#      (task.170 QA cycle 3, CR-1).
+#        qa_reentry = {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head, report_entries}.
+#      report_entries — the number of `### QA Cycle` headings in the report at re-entry — is what
+#      the resume contract's re-entry precedence keys on: while the report holds no more headings than
+#      that, its last entry's verdict predates the re-entry. A COUNT, because the re-entered cycle is
+#      guaranteed to add one heading whatever its number (entries are gate-numbered, and the report can
+#      run ahead of or behind the gates — task.170 QA cycle 4, CR-3).
 #      A failed write after the restore KEEPS the restored step-7 lock: the snapshot is consumed,
 #      so the lock is the run's only state, and a lock at 7 is a resumable one (the grant's
 #      undo_restore rule). No temp file is left behind on any path.
 #
 # Usage:
-#   bash .agents/skills/{develop-story|develop-task}/references/reenter-qa-after-finalise.sh <doc-dir> [<implementation-report>]
+#   bash .agents/skills/{develop-story|develop-task}/references/reenter-qa-after-finalise.sh <doc-dir> <implementation-report>
+#
+# The report is REQUIRED: report_entries is read from it, and without it the resume precedence would
+# have nothing to key on.
 #
 # Run from the repository root — the movement measure's pathspecs are relative to it, and a
 # <doc-dir> that IS the root is refused (its exclusion would hide every change).
@@ -75,7 +84,7 @@ QA_CYCLE_SH="$HERE/qa-cycle.sh"
 NEWEST_SH="$HERE/newest-numbered.sh"
 
 usage() {
-  echo "Usage: reenter-qa-after-finalise.sh <doc-dir> [<implementation-report>]   (run from the repository root)" >&2
+  echo "Usage: reenter-qa-after-finalise.sh <doc-dir> <implementation-report>   (run from the repository root)" >&2
   exit 2
 }
 refuse() { # $1 = reason, $2 = detail
@@ -88,7 +97,8 @@ REPORT="${2:-}"
 [ $# -le 2 ] || usage
 [ -n "$DOC_DIR" ] && [ -d "$DOC_DIR" ] || usage
 DOC_DIR="${DOC_DIR%/}"
-if [ -n "$REPORT" ] && [ ! -f "$REPORT" ]; then
+[ -n "$REPORT" ] || usage
+if [ ! -f "$REPORT" ]; then
   echo "reenter-qa: implementation report '$REPORT' not found" >&2
   usage
 fi
@@ -165,25 +175,21 @@ else
   MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- . ":(exclude)$DOC_DIR" 2>/dev/null || echo 1)
   WHY_MOVED="$MOVED commit(s) outside '$DOC_DIR' since the gate's head ${GATE_HEAD:0:12}"
 fi
-# Untracked files: with committed movement they are listed, not counted (Step 4 restores the files it
-# held aside, so an untracked file is the normal state of a healthy branch); with none, one of them may
-# be the fix, so the re-entry is refused rather than sent to /finalise (task.170 QA cycle 3, CR-2).
-if [ -n "$UNTRACKED" ]; then
-  if [ "$MOVED" -gt 0 ] 2>/dev/null; then
-    echo "reenter-qa: untracked files outside '$DOC_DIR' are not in the re-entered review — commit any that belong to the fix: $(printf '%s' "$UNTRACKED" | tr '\n' ' ')" >&2
-  else
-    refuse uncommitted-fix "no commit outside '$DOC_DIR' since the gate's head, but untracked files exist there — if one is the fix, commit it and re-run; if none is (files Step 4 held aside), the fix is document-only and the run resumes at step 7: $(printf '%s' "$UNTRACKED" | tr '\n' ' ')"
-  fi
-fi
-[ "$MOVED" -gt 0 ] 2>/dev/null || refuse no-code-moved "nothing outside '$DOC_DIR' moved since the gate's head ${GATE_HEAD:0:12} — a document-only fix; resume at step 7 with advance-pipeline-lock.sh --restore and re-run /finalise"
+# Untracked files are named, never counted and never refused (task.170 QA cycle 4, CR-2): Step 4
+# restores the files it held aside, so an untracked file is the normal state of a branch, and nothing
+# here can tell one of those from a new fix file. Naming them on both outcomes hands that one
+# judgement to the operator, who can make it, instead of a rule that is wrong in one direction.
+UNTRACKED_NOTE=""
+[ -z "$UNTRACKED" ] || UNTRACKED_NOTE=" Untracked files outside '$DOC_DIR' (not read by any review — if one is part of the fix, commit it and run this script again): $(printf '%s' "$UNTRACKED" | tr '\n' ' ')"
+[ "$MOVED" -gt 0 ] 2>/dev/null || refuse no-code-moved "nothing outside '$DOC_DIR' was committed since the gate's head ${GATE_HEAD:0:12} — a document-only fix; resume at step 7 with advance-pipeline-lock.sh --restore and re-run /finalise.$UNTRACKED_NOTE"
+[ -z "$UNTRACKED_NOTE" ] || echo "reenter-qa:$UNTRACKED_NOTE" >&2
 
 # ── 3. Budget base, as grant-qa-cycles.sh reconstructs it ────────────────────
 # max(highest gate — BASE, read above — , `### QA Cycle` entries in the report).
-if [ -n "$REPORT" ]; then
-  # `|| true`, not `|| echo 0`: grep -c prints 0 AND exits 1 on no match.
-  DONE=$(grep -c '^### QA Cycle' "$REPORT" 2>/dev/null || true)
-  [ "${DONE:-0}" -gt "$BASE" ] 2>/dev/null && BASE="$DONE"
-fi
+# `|| true`, not `|| echo 0`: grep -c prints 0 AND exits 1 on no match.
+DONE=$(grep -c '^### QA Cycle' "$REPORT" 2>/dev/null || true)
+DONE=${DONE:-0}
+[ "$DONE" -gt "$BASE" ] 2>/dev/null && BASE="$DONE"
 
 # ── 4. Restore, then lower — one atomic write ────────────────────────────────
 if ! RESTORE_OUT=$(bash "$ADVANCE" --restore "$DOC_DIR" 2>&1); then
@@ -202,11 +208,11 @@ if ! jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1; then
 fi
 TMP=$(mktemp "$(dirname "$LOCK")/.reenter-qa.XXXXXX") || { keep_restored; exit 1; }
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-if ! jq --argjson base "$BASE" --arg now "$NOW" --arg head "$GATE_HEAD" '
+if ! jq --argjson base "$BASE" --argjson entries "$DONE" --arg now "$NOW" --arg head "$GATE_HEAD" '
        .current_step = 5
        | .qa_phase = "5a"
        | .qa_max_cycles = ([((.qa_max_cycles // 5) | tonumber? // 5), ($base + 2)] | max)
-       | .qa_reentry = {from_step: 7, reason: "dod-gaps-code-fix", at: $now, gate_head: $head, base_cycle: $base}' \
+       | .qa_reentry = {from_step: 7, reason: "dod-gaps-code-fix", at: $now, gate_head: $head, report_entries: $entries}' \
      "$LOCK" > "$TMP"; then
   rm -f "$TMP"
   keep_restored

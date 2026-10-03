@@ -97,7 +97,8 @@ test("both orchestrators and the contract invoke the script by its bundled path"
 // task.170 QA cycle 2 CR-1, cycle 3 CR-1: after a re-entry the implementation report's last QA Cycle
 // entry still carries the APPROVE of the run that halted at Step 7, and the resume contract treats that
 // row as the source of truth. The precedence that overrides it is stated ONCE, keyed on the report
-// (qa_reentry.base_cycle) — a rule keyed on the gate cleared one step before 5a wrote the entry — and
+// (qa_reentry.report_entries, a heading COUNT) — a rule keyed on the gate cleared one step early, one keyed
+// on an entry number could fail to clear (entries are gate-numbered) — and
 // both 5–6 artifact rows cite it rather than restating it.
 test("the resume contract's 5c readings ignore a terminal verdict that predates a QA re-entry", () => {
   const text = read(CONTRACT);
@@ -110,13 +111,13 @@ test("the resume contract's 5c readings ignore a terminal verdict that predates 
   );
   for (const needle of [
     "`qa_reentry`",
-    "`qa_reentry.base_cycle`",
+    "`qa_reentry.report_entries`",
     "**5a**",
-    "cycle `N+1`",
+    "from the gates on disk",
     "one statement",
   ]) {
     assert.ok(
-      precedence[0].includes(needle),
+      precedence[0].replace(/\n>\s*/g, " ").includes(needle),
       `the precedence must name ${needle}`,
     );
   }
@@ -139,7 +140,7 @@ test("the resume contract's 5c readings ignore a terminal verdict that predates 
     );
     assert.doesNotMatch(
       row,
-      /base_cycle|gate_head/,
+      /report_entries|gate_head|base_cycle/,
       "a row restating the rule's key is a second statement of it",
     );
   }
@@ -151,12 +152,44 @@ test("the resume contract's 5c readings ignore a terminal verdict that predates 
   );
   assert.match(
     schema,
-    /`qa_reentry`[^\n]*base_cycle/,
-    "the lock schema row must name base_cycle",
+    /`qa_reentry`[^\n]*report_entries/,
+    "the lock schema row must name report_entries",
   );
   assert.match(
     read(SCRIPT),
-    /base_cycle: \$base/,
-    "the script must record base_cycle in qa_reentry",
+    /report_entries: \$entries/,
+    "the script must record report_entries in qa_reentry",
   );
+});
+
+// task.170 QA cycle 4, CR-1/CR-2: each refusal's ROUTE is stated once, in the contract's list. The
+// halt-7 bullet once sent every refused re-entry to step 7 — uncommitted-fix included — while the
+// list, the script and SKILL.md said never.
+test("every refusal carries its route, and uncommitted-fix never routes to step 7", () => {
+  const text = read(CONTRACT);
+  const list = text.match(
+    /<!-- reenter-qa-refusals: start -->([\s\S]*?)<!-- reenter-qa-refusals: end -->/,
+  )[1];
+  const lines = list.split("\n").filter((l) => /^- `/.test(l));
+  assert.ok(lines.length >= FLOOR, "refusal lines found");
+  for (const l of lines)
+    assert.match(l, /\*\*Route:\*\*/, `no route: ${l.slice(0, 60)}`);
+  const uncommitted = lines.find((l) => l.startsWith("- `uncommitted-fix`"));
+  assert.match(
+    uncommitted,
+    /\*\*never\*\* step 7/,
+    "uncommitted-fix must never route to step 7",
+  );
+  assert.doesNotMatch(
+    text,
+    /like a declined or otherwise refused re-entry, takes the next/,
+    "the halt-7 bullet must not route every refusal to step 7",
+  );
+  for (const skill of ["develop-task", "develop-story"]) {
+    assert.match(
+      read(`skills/${skill}/SKILL.md`),
+      /refusal list — follow it/,
+      `${skill} must cite the contract's routes`,
+    );
+  }
 });

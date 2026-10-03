@@ -200,11 +200,12 @@ Step 7 halt, on what the fix changed** (task.170):
   `**Final Status:** ❌ GAPS` → **do not restore here.** Phase 0b offers **"Re-enter QA at 5a"**
   (Recommended) beside the halt's own options, and on accept runs `reenter-qa-after-finalise.sh`,
   which restores and lowers the lock in one call (**Re-entry after a finalise DoD-gaps halt**,
-  below). **Whether code moved is the script's to measure, not the reader's to judge** — an
-  uncommitted or untracked change is easy to miss by eye, and a missed one would re-run `/finalise`
-  over an ungated head. When nothing moved (a document-only fix) the script refuses with
-  `no-code-moved`, and that case, like a declined or otherwise refused re-entry, takes the next
-  bullet: `/finalise` re-runs at 7, which is correct when no code changed (task.170).
+  below). **Whether code moved is the script's to measure, not the reader's to judge** — a committed
+  change outside the work item is easy to miss by eye, and a missed one would re-run `/finalise`
+  over an ungated head. **What follows a refusal is its route in the refusal list below** — the one
+  statement of it: a declined offer, or a refusal routed to step 7 (`no-code-moved` among them),
+  takes the next bullet; `uncommitted-fix` is routed back to the operator and never to step 7
+  (task.170).
 - any other `halt_reason`, or a PreCompact `pause_reason`, or **any `develop-bug` snapshot** → run
   `advance-pipeline-lock.sh --restore {doc-directory}` **here**, before Phase 0b, on the
   re-invocation path exactly as the in-session continuation does (QA cycle 2, CR-2; the step-0
@@ -442,14 +443,17 @@ A `gate.yml` written manually (without running the QA skill) does NOT satisfy St
 > left the loop through Loop Escalation has no cycle to re-enter whatever its last verdict was
 > (a loop-limit-via-review entry carries a real `REQUEST CHANGES` *and* the escalation Action —
 > task.123 QA cycle 4, CR-3). **Second precedence — a QA re-entry after a finalise DoD-gaps halt
-> (task.170):** when the lock or halt snapshot carries `qa_reentry` and the highest `### QA Cycle {N}`
-> entry has `N` at or below `qa_reentry.base_cycle`, that entry's terminal `APPROVE` / `CONCERNS` is
-> the run that halted at Step 7 — no re-entered cycle has written its own entry yet. Do not go to
-> Step 7: set the counter to `N` and re-enter at **5a** as cycle `N+1` (a gate `N+1` already on disk
-> is the in-flight cycle's, and 5a overwrites it). It keys on the **report**, not on a gate: 5a writes
-> the entry only after it reads the gate, so a rule keyed on the gate cleared one step early
-> (task.170 QA cycle 3, CR-1). It clears itself once the re-entered cycle's entry exists, so it never
-> fires on a later cycle. This paragraph is the rule's one statement; the 5–6 artifact rows cite it.
+> (task.170):** when the lock or halt snapshot carries `qa_reentry` and the report holds no more
+> `### QA Cycle` headings than `qa_reentry.report_entries`, its last entry's terminal `APPROVE` /
+> `CONCERNS` is the run that halted at Step 7 — no re-entered cycle has written its own entry yet. Do
+> not go to Step 7: re-enter at **5a**; the cycle number comes from the gates on disk, as on any
+> resume (a gate the in-flight cycle already wrote is its own, and 5a overwrites it). It keys on a
+> **count of report headings**: 5a writes the entry only after it reads the gate, so a rule keyed on
+> the gate cleared one step early (task.170 QA cycle 3, CR-1), and entries are gate-numbered while
+> the report can run ahead of or behind the gates, so a rule keyed on an entry number could fail to
+> clear (QA cycle 4, CR-3); the re-entered cycle always adds exactly one heading. It clears itself
+> once that heading exists, so it never fires on a later cycle. This paragraph is the rule's one
+> statement; the 5–6 artifact rows cite it.
 > Only when neither precedence applies does the PR Review row select a row below. Exactly one row
 > matches any entry.
 >
@@ -612,21 +616,23 @@ It is the **only** writer that may lower `current_step`, and only from 7 to 5. E
 `reenter-qa: refused (<reason>)`) with exactly these reasons:
 
 <!-- reenter-qa-refusals: start -->
-- `lock-present` — a live lock exists; the run is already resumed.
-- `no-snapshot` — `advance-pipeline-lock.sh --restore --which` chose no candidate for this document.
-- `not-a-finalise-halt` — the snapshot's `halt_step` is not 7 (compared as text: the HALT snippet writes it with `jq --arg`).
-- `no-dod` — no `{stem}.dod.{N}.*.md` beside the document, keyed on the work item's own stem — read from the DoD files whose stem the directory name continues, never from a bug's — so a co-located bug's DoD is never read as its verdict.
-- `dod-not-gaps` — the newest DoD file does not read `**Final Status:** ❌ GAPS`.
-- `no-gate` — `qa-cycle.sh` found no single current gate.
-- `uncommitted-fix` — a tracked change outside the work item's directory is uncommitted, or the only movement is untracked files: commit the fix and re-run the script — never resume at 7 over it.
-- `no-code-moved` — no commit outside the work item's directory since the gate's `head:` and nothing uncommitted: a document-only fix.
+Each reason carries its **route** — this list is that route's one statement; the halt-7 bullet above
+and both SKILL.md Phase 0b paragraphs cite it.
+
+- `lock-present` — a live lock exists; the run is already resumed. **Route:** continue the live run.
+- `no-snapshot` — `advance-pipeline-lock.sh --restore --which` chose no candidate for this document. **Route:** the resume's other paths (nothing to re-enter from).
+- `not-a-finalise-halt` — the snapshot's `halt_step` is not 7 (compared as text: the HALT snippet writes it with `jq --arg`). **Route:** the next bullet (an ordinary restore).
+- `no-dod` — no `{stem}.dod.{N}.*.md` beside the document, keyed on the work item's own stem — read from the DoD files whose stem the directory name continues, never from a bug's — so a co-located bug's DoD is never read as its verdict. **Route:** the next bullet.
+- `dod-not-gaps` — the newest DoD file does not read `**Final Status:** ❌ GAPS`. **Route:** the next bullet.
+- `no-gate` — `qa-cycle.sh` found no single current gate. **Route:** the next bullet; resolve the gate files first if the refusal names an ambiguity.
+- `uncommitted-fix` — a **tracked** change outside the work item's directory is uncommitted. **Route:** back to the operator — commit the fix and run the script again; **never** step 7, which would accept a head no review has read.
+- `no-code-moved` — no commit outside the work item's directory since the gate's `head:`: a document-only fix. **Route:** the next bullet — `/finalise` re-runs at 7. Untracked files outside the directory are named in this refusal, never a reason of their own: after Step 4 restores the files it held aside, nothing can tell one of those from a new fix file, so the operator who can decides — commit any that belong to the fix and run the script again.
 <!-- reenter-qa-refusals: end -->
 
 **Movement is measured as committed history**, because that is what the re-entered review reads
 (`qa-task` Step 3b scopes from commits and HALTs on an uncommitted tracked change): commits since the
-gate's `head:` outside the directory. Uncommitted tracked work is refused (`uncommitted-fix`), and so
-are untracked files when nothing is committed — one of them may be the fix; beside a committed fix they
-are the files Step 4 restored, and are listed rather than counted. `.claude/state`, the pipeline's own
+gate's `head:` outside the directory. Uncommitted tracked work is refused (`uncommitted-fix`); untracked
+files are named on every outcome and never counted (above). `.claude/state`, the pipeline's own
 scratch, is never counted; a `head:` that is absent, not
 40-hex, not a commit or not an ancestor of `HEAD` counts as moved. It fails toward one extra QA
 cycle, never toward an ungated head.
@@ -635,9 +641,10 @@ On accept it restores through `advance-pipeline-lock.sh --restore` (which consum
 then writes, in one `mktemp` + `mv`: `current_step: 5`, `qa_phase: 5a`,
 `qa_max_cycles = max(existing, base + 2)` — `base` reconstructed as the grant reconstructs it
 (**Re-entry after a QA loop escalation**, step 3), `2` being the grant prompt's recommended `k` — and
-`qa_reentry: {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head, base_cycle}`, which explains a
-lowered step to a later reader and gives the **Second precedence** its `base_cycle`. A write that fails after the restore keeps the restored step-7 lock
-(the snapshot is gone, and a lock at 7 is resumable). The loop then runs from 5a as cycle `base + 1`;
+`qa_reentry: {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head, report_entries}`, which explains a
+lowered step to a later reader and gives the **Second precedence** its `report_entries` (the report's
+`### QA Cycle` heading count at re-entry — the script therefore requires the report). A write that fails after the restore keeps the restored step-7 lock
+(the snapshot is gone, and a lock at 7 is resumable). The loop then runs from 5a, numbered from the gates;
 5c's APPROVE advances the lock `5 → 7` as on any run, and `/finalise` re-runs over a gated head.
 The Stop hook needs nothing new: a step-5 lock at `qa_phase: 5a` already names `/qa-task` /
 `/qa-story`. `develop-bug` has no re-entry — its verify loop does not use the step-5 lock shape.

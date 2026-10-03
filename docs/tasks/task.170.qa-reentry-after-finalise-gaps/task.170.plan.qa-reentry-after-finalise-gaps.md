@@ -43,9 +43,9 @@ git diff --quiet HEAD -- . ":(exclude)$DOC_DIR" || CODE_MOVED=$((CODE_MOVED + 1)
 [ "$CODE_MOVED" -gt 0 ]                                     || refuse no-code-moved
 ```
 
-> **Superseded in QA cycles 1–3** (the shipped script is the evidence): the DoD stem is read from the
-> DoD files, not parsed; movement is committed history only, with an uncommitted fix refused as
-> `uncommitted-fix`; `qa_reentry` also records `base_cycle`, which the resume contract's re-entry
+> **Superseded in QA cycles 1–4** (the shipped script is the evidence): the DoD stem is read from the
+> DoD files, not parsed; movement is committed history only, with an uncommitted tracked fix refused as
+> `uncommitted-fix` and untracked files named, never counted; `qa_reentry` also records `report_entries`, which the resume contract's re-entry
 > precedence keys on.
 
 Then: `advance-pipeline-lock.sh --restore "$DOC_DIR"`, and one `jq` over the restored lock:

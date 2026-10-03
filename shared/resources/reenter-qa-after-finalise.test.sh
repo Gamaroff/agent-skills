@@ -7,7 +7,8 @@
 # gate whose `head:` is a real commit, a DoD file, and a halt snapshot — and runs the script from
 # that repository's root, which is where the pipeline runs it. Pins:
 #   • every refusal reason, and that a refusal writes nothing and consumes nothing
-#   • a document-only fix is refused; committed, uncommitted and untracked code all count as moved
+#   • a document-only fix is refused; only COMMITTED code counts as moved — an uncommitted tracked fix is
+#     refused (uncommitted-fix), untracked files are named and never counted
 #   • a gate head that cannot vouch for the tree (none, not 40-hex, not an ancestor) counts as moved
 #   • the accept path: step 5, qa_phase 5a, qa_max_cycles = max(existing, base + 2), qa_reentry
 #   • no temp file is left beside the lock, on success or failure
@@ -34,6 +35,8 @@ mkrepo() {
   printf '.claude/\n' > "$R/.gitignore"
   echo one > "$R/src/code.sh"
   echo "# task" > "$R/$DOC/task.42.example.md"
+  # The implementation report lives in the work item's directory, as the pipeline's does.
+  printf '# report\n### QA Cycle 1\n### QA Cycle 2\n' > "$R/$DOC/report.md"
   git -C "$R" add -A; git -C "$R" commit -qm code
   local head; head=$(git -C "$R" rev-parse HEAD)
   case "${2:-sha}" in
@@ -49,8 +52,8 @@ mkrepo() {
 codefix() { # a committed code change outside the work item — the movement the re-entry measures
   echo two > "$R/src/code.sh"; git -C "$R" commit -qam "code fix"
 }
-run() { # extra args → script; runs from the repo root
-  (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" "$@")
+run() { # [report] → script; the report defaults to the fixture's report.md (two QA Cycle entries)
+  (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" "${1:-$DOC/report.md}")
 }
 leftovers() { find "$R/.claude/state" -name '.reenter-qa.*' -o -name '.advance-pipeline-lock.*' 2>/dev/null | grep -c . ; }
 
@@ -136,7 +139,13 @@ expect_refusal "an uncommitted change beside a committed fix is still refused" u
 # Untracked files: alone they may be the fix → refused; beside a committed fix they are the files
 # Step 4 restored → listed, not counted (QA cycle 3, CR-2).
 mkrepo untracked; echo new > "$R/src/new-fix.sh"
-expect_refusal "untracked files with no committed movement are refused (they may be the fix)" uncommitted-fix
+expect_refusal "untracked files alone are not movement (named, never refused on)" no-code-moved
+rm -f "$L"; ERR=$(run 2>&1 >/dev/null)
+printf '%s' "$ERR" | grep -q 'new-fix.sh' && pass "the no-code-moved refusal names the untracked file for the operator" || fail "untracked named on refusal" "err=$ERR"
+# QA cycle 4 CR-2: a document-only fix beside a held-aside untracked file reaches no-code-moved.
+mkrepo docs-plus-untracked; echo held > "$R/src/held-aside.sh"
+echo "re-scoped criterion" >> "$R/$DOC/task.42.example.md"; git -C "$R" commit -qam "doc fix"
+expect_refusal "a document-only fix beside a held-aside untracked file is no-code-moved, not uncommitted-fix" no-code-moved
 mkrepo untracked-held; codefix; echo held > "$R/src/held-aside.sh"
 WANT_MAX=5; accept "a committed fix beside an untracked held-aside file re-enters"
 mkrepo untracked-warn; codefix; echo held > "$R/src/held-aside.sh"
@@ -220,8 +229,16 @@ DOC=$SAVED_DOC
 
 # ── QA cycle 3 CR-1: qa_reentry records the base cycle the resume precedence keys on ──
 mkrepo base-cycle; codefix
-WANT_MAX=5; accept "committed fix (base_cycle recorded)"
-[ "$(jq -r '.qa_reentry.base_cycle' "$L")" = "2" ] && pass "qa_reentry.base_cycle is the reconstructed base (gate.2 → 2)" || fail "base_cycle" "$(jq -c .qa_reentry "$L")"
+WANT_MAX=5; accept "committed fix (report_entries recorded)"
+[ "$(jq -r '.qa_reentry.report_entries' "$L")" = "2" ] && pass "qa_reentry.report_entries is the report's heading count (2)" || fail "report_entries" "$(jq -c .qa_reentry "$L")"
+# A COUNT, whichever way the report and the gates disagree (QA cycle 4, CR-3): ahead (3 headings, gate.2)
+# and behind (1 heading, gate.2) both record the headings as written, not the gate number.
+for pair in "ahead:3" "behind:1"; do
+  mkrepo "entries-${pair%%:*}"; codefix
+  : > "$R/r.md"; for i in $(seq 1 "${pair##*:}"); do echo "### QA Cycle $i" >> "$R/r.md"; done
+  run r.md >/dev/null 2>&1
+  [ "$(jq -r '.qa_reentry.report_entries' "$L" 2>/dev/null)" = "${pair##*:}" ] && pass "report ${pair%%:*} of the gates → report_entries ${pair##*:}" || fail "report_entries ${pair%%:*}" "$(cat "$L" 2>/dev/null)"
+done
 
 # ── CR-2: .claude/state is not movement ──────────────────────────────────────
 # In a repo that does not gitignore .claude/, the halt snapshot this script consumes is an untracked
@@ -270,7 +287,7 @@ for a in "\$@"; do case "\$a" in *qa_reentry*) exit 3 ;; esac; done
 exec "$REAL_JQ" "\$@"
 EOF
 chmod +x "$STUB/jq"
-ERR=$(cd "$R" && PATH="$STUB:$PATH" PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" 2>&1 >/dev/null); RC=$?
+ERR=$(cd "$R" && PATH="$STUB:$PATH" PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" "$DOC/report.md" 2>&1 >/dev/null); RC=$?
 if [ "$RC" -eq 1 ] && [ "$(jq -r '.current_step' "$L" 2>/dev/null)" = "7" ] && [ "$(jq -r 'has("qa_reentry")' "$L")" = "false" ] \
    && [ "$(leftovers)" -eq 0 ] && printf '%s' "$ERR" | grep -q "is kept"; then
   pass "a failed re-entry write keeps the restored step-7 lock and leaves no temp file"
@@ -281,14 +298,15 @@ fi
 # ── Usage ────────────────────────────────────────────────────────────────────
 mkrepo usage
 (cd "$R" && bash "$SCRIPT" >/dev/null 2>&1); [ $? -eq 2 ] && pass "no <doc-dir> → exit 2" || fail "usage" "no doc-dir did not exit 2"
-(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" . >/dev/null 2>&1); [ $? -eq 2 ] && pass "<doc-dir> at the repository root → exit 2" || fail "root doc-dir" "did not exit 2"
+(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" >/dev/null 2>&1); [ $? -eq 2 ] && pass "no implementation report → exit 2 (report_entries has no source)" || fail "report required" "missing report did not exit 2"
+(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" . "$DOC/report.md" >/dev/null 2>&1); [ $? -eq 2 ] && pass "<doc-dir> at the repository root → exit 2" || fail "root doc-dir" "did not exit 2"
 [ -f "$S" ] && pass "usage errors consume nothing" || fail "usage consumed" "snapshot gone"
 mkdir -p "$R/docs/notes"
-(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" docs/notes >/dev/null 2>&1); RC=$?
+(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" docs/notes "$DOC/report.md" >/dev/null 2>&1); RC=$?
 # docs/notes carries no snapshot of its own, so it is refused before the stem check is reached;
 # point the snapshot at it to reach the stem check.
 jq '.task_or_story_directory = "docs/notes"' "$S" > "$S.n" && mv "$S.n" "$S"
-(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" docs/notes >/dev/null 2>&1); RC2=$?
+(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" docs/notes "$DOC/report.md" >/dev/null 2>&1); RC2=$?
 [ "$RC" -eq 1 ] && [ "$RC2" -eq 1 ] && pass "a directory no DoD stem continues → refused (no-dod), never guessed" || fail "non-work-item dir" "rc=$RC rc2=$RC2"
 
 echo ""
