@@ -92,6 +92,7 @@ Task.135 (PR #531, merged `ea88e5a7`) made QA gates record the commit they judge
 ✅ 🆕 `shared/resources/qa-safety-clause1.sh` — clause 1, one definition
 ✅ `shared/resources/tests/gate-head-freshness.test.mjs`, `shared/resources/tests/qa-scope-from-head.test.mjs`, 🆕 `shared/resources/tests/qa-safety-clause1.test.mjs`
 ✅ `evals/shared/tests/qa-re-review-scope-parity.test.mjs` — `extractProbe()` and the transit-constraint tests onto the script
+✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — §5b step 0a bounded fast-gate retry commits its red attempt without pushing (added at QA cycle 2, CR-1: the new HALT would otherwise strand the next review)
 ✅ `npm run bundle`; CHANGELOG
 
 ### Out of Scope
@@ -151,6 +152,7 @@ None — API stable. The scope block gains a HALT on a re-review when a tracked 
 2. ✅ `skills/qa-story/SKILL.md` — Phase 0 steps 2, 5; Step 3b preamble
 3. ✅ `shared/resources/qa-re-review-scope.md` — clause-1 block, scope block
 4. 🆕 `shared/resources/qa-safety-clause1.sh` — clause 1
+4a. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — §5b step 0a red-exit commit (QA cycle 2, CR-1)
 
 ### Files to Modify (Tests)
 
@@ -292,6 +294,12 @@ Carried by the QA loop's Cosmetic-residue exit (route 2b, cycle 3) — recorded 
 - **T168-QA3-CR-1** — Phase 0 trigger still counts a tracked `.claude/state` change as movement; apply the exclusion there or document it.
 - **T168-QA3-CR-2** — name the bounded-retry red exit as a second zero-push case at every push-budget statement in `develop-pipeline-step-5-6-qa-loop.md`.
 - **T168-QA3-CR-3** — give L15 a remote-tracking ref so it distinguishes local HEAD from a pushed branch.
+
+From the Step 5c PR review ([pr-review.1](./task.168.pr-review.1.gate-head-scoping-hardening.md), verdict APPROVE, all LOW):
+
+- **PR-review CR-1** — the red-exit commit should name what happens when a pre-commit hook refuses it.
+- **PR-review CR-2** — the uncommitted-fix guard's `git status` / `git ls-files` exit status is unchecked; compare `show-toplevel` for `WORK_ITEM_DIR`.
+- **PR-review CR-3** — `qa-gate-security-evidence.md` still places the clause-1 probe in the shared rule.
 
 ## Change Log
 
