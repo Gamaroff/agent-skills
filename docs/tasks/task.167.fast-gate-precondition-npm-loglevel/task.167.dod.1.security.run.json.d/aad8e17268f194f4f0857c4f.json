@@ -1,0 +1,19 @@
+{
+  "sink": "filename",
+  "entry": ".claude/state/t167-probe-wrapper.mjs#preconditionAdmits",
+  "name": "fast-gate-precondition",
+  "call_site": "shared/resources/develop-pipeline-step-3-develop-loop.md:209",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 13,
+  "passed": 13,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "ran_at": "2026-10-03T10:21:43.840Z"
+}

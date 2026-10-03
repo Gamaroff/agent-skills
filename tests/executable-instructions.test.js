@@ -81,6 +81,30 @@ function isFdRedirect(script, content, endIndex) {
   return /^\d+$/.test(script) && content[endIndex] === ">";
 }
 
+/**
+ * The script a `npm run` names, read past any leading npm flags — or null for a
+ * bare `npm run` that names none.
+ *
+ * `afterRun` is the index just past the literal `npm run`. Flags are npm's, not
+ * script names: `npm run --loglevel=notice 2>/dev/null` lists the project's
+ * scripts (task 167 needs that flag in the fast-gate precondition), and
+ * `npm run -s test` runs `test`. Reading `--loglevel` or `-s` as a script would
+ * be the same false claim as reading `2` from `2>/dev/null`, and the same two
+ * workarounds would be worse than fixing the instrument.
+ *
+ * Narrow in the same way: only tokens that BEGIN with `-` are skipped, and the
+ * first token after them is still checked. So a real script placed after a flag
+ * is seen, and nothing a script could be named is skipped (a script name does
+ * not start with `-`). `end` is the index just past the script name, for
+ * isFdRedirect.
+ */
+function npmRunScript(content, afterRun) {
+  const m = /^(?:[ \t]+-[^\s`'"]*)*[ \t]+([a-z0-9:_][a-z0-9:_-]*)/.exec(
+    content.slice(afterRun, afterRun + 200),
+  );
+  return m ? { script: m[1], end: afterRun + m[0].length } : null;
+}
+
 /** Illustrative paths — teaching syntax, not naming a shipped file. */
 function isIllustrative(p) {
   return (
@@ -318,6 +342,31 @@ test("an fd redirect on a bare `npm run` is not read as a script name", () => {
   );
 });
 
+test("npm flags after `npm run` are skipped, not read as a script name", () => {
+  // Both directions, as above: a flag is not a script, but a script after a
+  // flag is still a script, and a bare `npm run` with flags names nothing.
+  const at = (s) => npmRunScript(s, "npm run".length);
+  assert.equal(at("npm run --loglevel=notice 2>/dev/null").script, "2");
+  assert.equal(
+    isFdRedirect(
+      "2",
+      "npm run --loglevel=notice 2>/dev/null",
+      at("npm run --loglevel=notice 2>/dev/null").end,
+    ),
+    true,
+    "a flagged bare listing still ends in an fd redirect, not a script",
+  );
+  assert.equal(at("npm run -s test").script, "test");
+  assert.equal(at("npm run -s --silent ci:fast").script, "ci:fast");
+  assert.equal(
+    at("`npm run -s` upstream"),
+    null,
+    "a flag then a backtick names no script",
+  );
+  assert.equal(at("npm run ci:fast").script, "ci:fast", "no flag: unchanged");
+  assert.equal(at("npm run"), null, "a bare `npm run` names nothing");
+});
+
 test("every `npm run` instruction is either ours or a classified consumer script", () => {
   const pkg = JSON.parse(
     fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf-8"),
@@ -327,11 +376,13 @@ test("every `npm run` instruction is either ours or a classified consumer script
 
   for (const doc of DOCS) {
     const content = fs.readFileSync(doc, "utf-8");
-    const re = /npm run ([a-z0-9:_-]+)/g;
+    const re = /npm run\b/g;
     let m;
     while ((m = re.exec(content)) !== null) {
-      const script = m[1];
-      if (isFdRedirect(script, content, m.index + m[0].length)) continue;
+      const named = npmRunScript(content, m.index + m[0].length);
+      if (!named) continue;
+      const { script, end } = named;
+      if (isFdRedirect(script, content, end)) continue;
       if (ours.has(script) || CONSUMER_PROVIDED_NPM_SCRIPTS.has(script))
         continue;
       failures.push(`${path.relative(REPO_ROOT, doc)} → \`npm run ${script}\``);

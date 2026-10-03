@@ -203,9 +203,11 @@ Pattern below, which runs on every pass.
 FAST_GATE_COMMAND="<fastGateCommand>"
 
 # `npm run` with no arguments lists the scripts the project actually defines,
-# one per line, indented by two spaces.
+# one per line, indented by two spaces. npm prints that listing as log output, so
+# `loglevel=silent` (an .npmrc, or `npm run -s` upstream) hides it; the flag pins
+# the level so a defined script is never reported missing (task 167, obs #213).
 GATE_SCRIPT=$(printf '%s' "$FAST_GATE_COMMAND" | sed -nE 's/^npm run ([A-Za-z0-9:_-]+).*/\1/p')
-if [ -n "$GATE_SCRIPT" ] && ! npm run 2>/dev/null | grep -qE "^[[:space:]]+${GATE_SCRIPT}$"; then
+if [ -n "$GATE_SCRIPT" ] && ! npm run --loglevel=notice 2>/dev/null | grep -qE "^[[:space:]]+${GATE_SCRIPT}$"; then
   echo "HALT: develop.fastGateCommand runs '${GATE_SCRIPT}', which this project does not define."
   echo "      Set develop.fastGateCommand in skills-config.yaml to this project's cheap CI-equivalent."
   exit 1

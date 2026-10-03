@@ -88,20 +88,24 @@ const snippet = bashBlockUnder(
  * under fork pressure. That is not the same as a child that ran and exited
  * non-zero, and conflating them is how a loaded box reports a behavioural
  * divergence that never happened (bug.2). This suite is the repo's heaviest
- * spawn profile — 26 children, each running `npm run` — so it is exactly the
+ * spawn profile — 12 children per shell plus 2, so 26 where zsh is present, each
+ * running `npm run` — so it is exactly the
  * shape that inflates ~6x under load.
  *
  * `spawnSync` returns `status: null` in that case. Letting null reach the
  * equality assertions below would fail with "a project defining ci:fast must
  * not be halted", which is a claim about the check that nothing established.
  */
-function runCheck({ shell, gateCommand, scripts }) {
+function runCheck({ shell, gateCommand, scripts, env, npmrc }) {
   const dir = mkdtempSync(join(tmpdir(), "fast-gate-"));
   try {
     writeFileSync(
       join(dir, "package.json"),
       JSON.stringify({ name: "fixture", version: "1.0.0", scripts }),
     );
+    // A project-level .npmrc lives beside package.json, inside the fixture, and
+    // is removed with it.
+    if (npmrc !== undefined) writeFileSync(join(dir, ".npmrc"), npmrc);
     // A replacer FUNCTION, not a replacement string: `$&`, `$'` and `` $` `` are
     // special in the latter, so a gate command containing one would be silently
     // mangled into something other than what this test claims to run.
@@ -113,6 +117,9 @@ function runCheck({ shell, gateCommand, scripts }) {
         cwd: dir,
         encoding: "utf-8",
         timeout: SPAWN_TIMEOUT_MS,
+        // Merged over the caller's environment, never replacing it: the child
+        // still needs PATH to find npm. Absent `env` keeps the inherited one.
+        ...(env ? { env: { ...process.env, ...env } } : {}),
       });
       if (!neverRan(r)) break;
     }
@@ -143,6 +150,10 @@ function runCheck({ shell, gateCommand, scripts }) {
 const SHELLS = zshAvailable() ? ["bash", "zsh"] : ["bash"];
 const WITH_FAST = { "ci:fast": "echo fast", build: "echo build" };
 const WITHOUT_FAST = { test: "echo test", build: "echo build" };
+// npm treats the `npm run` script listing as log output, so a silent log level
+// hides it. `npm run -s` exports this to every child; obs #213 found the false
+// HALT that way.
+const SILENT = { npm_config_loglevel: "silent" };
 
 // ---------------------------------------------------------------------------
 
@@ -308,6 +319,51 @@ for (const shell of SHELLS) {
         `"${gateCommand || "(empty)"}" must be skipped, not halted`,
       );
     }
+  });
+
+  test(`[${shell}] under npm_config_loglevel=silent a defined script does not HALT`, () => {
+    const { code, out } = runCheck({
+      shell,
+      gateCommand: "npm run ci:fast",
+      scripts: WITH_FAST,
+      env: SILENT,
+    });
+    assert.equal(
+      code,
+      0,
+      `a silent log level hid the script listing (obs #213):\n${out}`,
+    );
+  });
+
+  test(`[${shell}] under npm_config_loglevel=silent a missing script still HALTs`, () => {
+    // The flag must restore the listing, not stop the check reading it: a missing
+    // script stays missing under a silent level.
+    const { code, out } = runCheck({
+      shell,
+      gateCommand: "npm run ci:fast",
+      scripts: WITHOUT_FAST,
+      env: SILENT,
+    });
+    assert.equal(code, 1, "a project without the named script must HALT");
+    assert.match(
+      out,
+      /develop\.fastGateCommand/,
+      "message must name the config key",
+    );
+  });
+
+  test(`[${shell}] a project .npmrc with loglevel=silent does not HALT a defined script`, () => {
+    const { code, out } = runCheck({
+      shell,
+      gateCommand: "npm run ci:fast",
+      scripts: WITH_FAST,
+      npmrc: "loglevel=silent\n",
+    });
+    assert.equal(
+      code,
+      0,
+      `a project .npmrc set loglevel=silent and hid the script listing:\n${out}`,
+    );
   });
 }
 
