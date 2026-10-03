@@ -394,6 +394,29 @@ parity test.
 
 **Deferred work**: none.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-03
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.170.qa.1.qa-reentry-after-finalise-gaps.md](./task.170.qa.1.qa-reentry-after-finalise-gaps.md)
+- **Gate File**: [task.170.gate.1.qa-reentry-after-finalise-gaps.yml](./task.170.gate.1.qa-reentry-after-finalise-gaps.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 77
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- CR-1 (medium): the DoD lookup is directory-wide and reads a co-located bug's DoD as the task's verdict — [task.170.bug.1](./task.170.bug.1.dod-lookup-reads-colocated-bug-dod.md).
+- QA-1 (medium): hostile gate `head:` values are not pinned by the committed suite — [task.170.bug.2](./task.170.bug.2.hostile-gate-head-unprobed.md).
+- CR-3 (low): `qa_phase` writers under-listed in the lock schema.
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -404,6 +427,7 @@ parity test.
 | 2026-10-03 | 1.1     | Review 1 (8/10, 0 critical / 4 important): full qa-task CODE_MOVED measure (uncommitted, untracked, invalid head); budget max(existing, base + 2); refusals via --restore --which before any write, failed lowering keeps the lock; criteria for the parity and Stop-hook tests | review-task |
 | 2026-10-03 |         | Status → ready-for-development                | review-task |
 | 2026-10-03 |         | Implemented — 9 source files (2 new scripts, 1 new parity test), 30 new test cases | develop |
+| 2026-10-03 |         | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
 
 <!-- change-log-end -->
 

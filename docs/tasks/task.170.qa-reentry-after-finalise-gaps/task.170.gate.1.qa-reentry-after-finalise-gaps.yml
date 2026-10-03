@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.170.qa-reentry-after-finalise-gaps'
+task_title: '[Task 170] QA re-entry after a finalise DoD-gaps halt fixed by a code change'
+gate: CONCERNS
+status_reason: 'All 13 success criteria met and 25/25 suite green, but the DoD lookup reads a co-located bug DoD as the task verdict (medium, reproduced) and the hostile gate-head inputs are not pinned by the committed suite (medium); one low doc-drift finding.'
+reviewer: 'QA Engineer'
+head: 'b0e2bf10a0fc83a1156b8bd4c89c599428892fc7'
+updated: '2026-10-03T18:58:29Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/reenter-qa-after-finalise.sh'
+    finding: 'DoD lookup `-name *.dod.*.md` is directory-wide; a co-located bug DoD with a higher number (task.42.bug.3.dod.2) is read as the task verdict, refusing dod-not-gaps (reproduced). See task.170.bug.1.'
+    suggested_action: 'Key the lookup on the work-item stem as finalise does (exclude *.bug.*); add a suite case with a higher-numbered co-located bug DoD.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-1'
+    severity: medium
+    file: 'shared/resources/reenter-qa-after-finalise.test.sh'
+    finding: 'The gate head: is the one untrusted input and its hostile values (command substitution, option-shaped, symbolic, 40-hex non-commit) are not in the committed suite; QA executed 8 by hand, all safe. See task.170.bug.2.'
+    suggested_action: 'Add a table-driven hostile-head case group asserting no PWNED* file and a step-5 lock.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/develop-pipeline-pause.md'
+    finding: 'The qa_phase row still says "One writer: set-qa-phase.sh" (and set-qa-phase.sh:9 "the ONLY writer"), but grant-qa-cycles.sh and now reenter-qa-after-finalise.sh write it too.'
+    suggested_action: 'List all three qa_phase writers in the pause.md row and the set-qa-phase.sh header.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 77
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+  ci: 'not read — no cycle waits on CI'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: true. The probe engine ran (filename sink, shell: entry, 28 executed) against the qa-cycle.sh stdout contract, which this script does not have — every case a contract mismatch, so the run is not evidence; the path sink is entry-not-probeable for a shell entry. QA executed 8 hostile gate heads by hand: no substitution ran, all failed toward re-review. Not engine-measured, hence reasoned; QA-1 asks for the cases to be committed.'
+  performance:
+    status: PASS
+    notes: 'A handful of git calls and one jq write per resume.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a co-located bug DoD can make the re-entry refuse and resume at 7 over an ungated head.'
+  maintainability:
+    status: PASS
+    notes: 'Sibling-shaped to grant-qa-cycles.sh; parity test pins the refusal list; CR-3 is doc drift only.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (stem-keyed DoD lookup) and QA-1 (hostile-head suite cases).'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh', 'shared/resources/reenter-qa-after-finalise.test.sh']
+  future:
+    - action: 'CR-2 (advisory, medium confidence): exclude .claude/state from the uncommitted/untracked halves of the movement measure — in a repo that does not gitignore .claude/ the consumed snapshot is untracked and no-code-moved cannot fire (fails toward re-review). qa-task Phase 0 has the same shape.'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and QA-1 fixed']

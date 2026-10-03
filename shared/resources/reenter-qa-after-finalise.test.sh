@@ -158,6 +158,56 @@ mkrepo numeric; echo two > "$R/src/code.sh"
 jq '.halt_step = 7' "$S" > "$S.n" && mv "$S.n" "$S"
 WANT_MAX=5; accept "a numeric halt_step 7 is accepted as well as the string"
 
+# ── CR-1: the DoD lookup is keyed on the work item's stem, not the directory ──
+# A co-located bug writes {bug-prefix}.dod.{N}.*.md beside the task's own DoD. A higher-numbered
+# bug DoD must never be read as the task's verdict, in either direction.
+mkrepo bugdod-accepted; echo two > "$R/src/code.sh"
+printf '**Final Status:** ✅ ACCEPTED\n' > "$R/$DOC/task.42.bug.3.dod.2.x.md"
+WANT_MAX=5; accept "a higher-numbered co-located bug DoD (ACCEPTED) is not the task's verdict — task GAPS re-enters"
+mkrepo bugdod-gaps; echo two > "$R/src/code.sh"
+printf '**Final Status:** ✅ ACCEPTED\n' > "$R/$DOC/task.42.dod.1.example.md"
+printf '**Final Status:** ❌ GAPS IDENTIFIED - NOT ACCEPTED\n' > "$R/$DOC/task.42.bug.3.dod.4.x.md"
+expect_refusal "a co-located bug DoD at GAPS does not stand in for an accepted task DoD" dod-not-gaps
+mkrepo taskprefix; echo two > "$R/src/code.sh"
+printf '**Final Status:** ✅ ACCEPTED\n' > "$R/$DOC/task.420.dod.9.other.md"
+WANT_MAX=5; accept "another work item's stem sharing the prefix (task.420) is not read as task.42's DoD"
+
+# ── CR-2: .claude/state is not movement ──────────────────────────────────────
+# In a repo that does not gitignore .claude/, the halt snapshot this script consumes is an untracked
+# file. Counted as movement, it would make no-code-moved unreachable.
+mkrepo noignore
+git -C "$R" rm -q --cached .gitignore; rm -f "$R/.gitignore"; git -C "$R" commit -qm "no gitignore"
+mkrepo_gate_head=$(git -C "$R" rev-parse HEAD)
+sed -i.bak -E "s/^head: .*/head: $mkrepo_gate_head/" "$R/$DOC/task.42.gate.2.example.yml" && rm -f "$R/$DOC/task.42.gate.2.example.yml.bak"
+git -C "$R" commit -qam "gate re-recorded at the no-gitignore head"
+echo "doc-only" >> "$R/$DOC/task.42.example.md"
+expect_refusal "an untracked .claude/state snapshot (no .gitignore) is not code movement" no-code-moved
+
+# ── QA-1: hostile gate head: values never execute and fail toward re-review ──
+# The gate's head: is the one value this script reads but does not write. Each must be refused as a
+# revision (counted as moved, so the re-entry fires), and none may run a substitution.
+hostile_head() { # $1 = label, $2 = the head value written verbatim
+  mkrepo "hostile-$1" HEAD
+  { printf 'schema: 2\nhead: '; printf '%s' "$2"; printf '\ngate: PASS\n'; } > "$R/$DOC/task.42.gate.2.example.yml"
+  git -C "$R" commit -qam "hostile head"
+  local out rc pwned
+  out=$(run 2>&1); rc=$?
+  pwned=$(find "$T" -name 'PWNED*' 2>/dev/null | grep -c .)
+  if [ "$rc" -eq 0 ] && [ "$pwned" -eq 0 ] && [ "$(jq -r '.current_step' "$L" 2>/dev/null)" = "5" ]; then
+    pass "hostile head $1 → never executed, counted as moved, re-entered at 5"
+  else
+    fail "hostile head $1" "rc=$rc pwned=$pwned lock=$(cat "$L" 2>/dev/null) out=$out"
+  fi
+}
+hostile_head cmdsub '$(touch PWNED1)'
+hostile_head backtick '`touch PWNED2`'
+hostile_head semicolon 'x; touch PWNED3'
+hostile_head quoted-cmdsub '"$(touch PWNED4)"'
+hostile_head option-all '--all'
+hostile_head option-n '-n'
+hostile_head symbolic-relative 'HEAD~0'
+hostile_head hex-not-a-commit 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+
 # ── A failed write keeps the restored lock and leaves no temp file ───────────
 mkrepo writefail; echo two > "$R/src/code.sh"
 STUB="$T/stubbin"; mkdir -p "$STUB"
@@ -182,6 +232,13 @@ mkrepo usage
 (cd "$R" && bash "$SCRIPT" >/dev/null 2>&1); [ $? -eq 2 ] && pass "no <doc-dir> → exit 2" || fail "usage" "no doc-dir did not exit 2"
 (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" . >/dev/null 2>&1); [ $? -eq 2 ] && pass "<doc-dir> at the repository root → exit 2" || fail "root doc-dir" "did not exit 2"
 [ -f "$S" ] && pass "usage errors consume nothing" || fail "usage consumed" "snapshot gone"
+mkdir -p "$R/docs/notes"
+(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" docs/notes >/dev/null 2>&1); RC=$?
+# docs/notes carries no snapshot of its own, so it is refused before the stem check is reached;
+# point the snapshot at it to reach the stem check.
+jq '.task_or_story_directory = "docs/notes"' "$S" > "$S.n" && mv "$S.n" "$S"
+(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" docs/notes >/dev/null 2>&1); RC2=$?
+[ "$RC" -eq 1 ] && [ "$RC2" -eq 2 ] && pass "a directory with no task./story. stem → exit 2 (no DoD lookup can be keyed)" || fail "non-work-item dir" "rc=$RC rc2=$RC2"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
