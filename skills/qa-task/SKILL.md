@@ -239,7 +239,10 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
      # `|| echo 1` fails toward re-review when git cannot answer (a head this checkout lacks).
      CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- . ":(exclude)$TASK_DIR" 2>/dev/null || echo 1)
      # Uncommitted and untracked changes outside the task directory are movement too: the gate
-     # never read them (CR2-5).
+     # never read them (CR2-5). An untracked file counts here even though Step 3b only WARNS on one
+     # (a held file the develop pipeline restored is the normal state of a healthy branch): the
+     # trigger cannot tell a restored file from a new fix file, so it fails toward re-review and the
+     # cost is one cycle (task.168 QA cycle 2, CR-3).
      git diff --quiet HEAD -- . ":(exclude)$TASK_DIR" 2>/dev/null || CODE_MOVED=$((CODE_MOVED + 1))
      [ -z "$(git ls-files --others --exclude-standard -- . ":(exclude)$TASK_DIR" 2>/dev/null)" ] || CODE_MOVED=$((CODE_MOVED + 1))
      # The document is compared from the commit that last wrote the GATE, not from the head: a QA
@@ -450,8 +453,8 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    # when two or more gates exist and none could be bound. stderr is kept: qa-cycle.sh names why
    # it refused (two files claiming one cycle), which the HALT below cannot know (CR2-8).
    [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate)
-   # The work item's own directory, which the shared block's uncommitted-fix HALT excludes: this QA
-   # cycle writes its report and gate there before the block runs (task.168 CR3-7).
+   # The work item's own directory, which the shared block's uncommitted-fix HALT excludes: the
+   # implementation report's updates sit uncommitted there until Step 8 (task.168 CR3-7; QA cycle 2, CR-4).
    WORK_ITEM_DIR="$TASK_DIR"
    # Clause 1 is mechanical: recompute it from the gate bound above rather than trust the value bound
    # for it (task.168 CR3-4). A computed true overrides a bound false; a bound true (clauses 2–3,
@@ -483,17 +486,20 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    # every arm's patch from BASE...HEAD — while Phase 0's trigger counts an uncommitted change as
    # movement. A fix still in the working tree would trigger this re-review and then be reviewed as
    # absent, on cycle 2, on the safety re-probe and on a schema-1 gate as much as on the scoped arm
-   # (task.168 CR3-7; QA cycle 1, CR-2). $WORK_ITEM_DIR is bound by the caller's preamble: the QA
-   # cycle writes its own report and gate there before this block runs. Unbound, or the repository
-   # root, the exclusion below would exclude nothing or everything — refuse both.
+   # (task.168 CR3-7; QA cycle 1, CR-2). $WORK_ITEM_DIR is bound by the caller's preamble and is
+   # excluded because the pipeline's own bookkeeping sits uncommitted there when this block runs: the
+   # implementation report's updates, deferred to Step 8 (QA cycle 2, CR-4). Unbound, or the
+   # repository root, the exclusion below would exclude nothing or everything — refuse both.
    if [ "$PRIOR_GATES" -ge 1 ]; then
      [ -n "${WORK_ITEM_DIR:-}" ] && [ -n "$(git -C "$WORK_ITEM_DIR" rev-parse --show-prefix 2>/dev/null)" ] \
        || { echo "HALT: WORK_ITEM_DIR ('${WORK_ITEM_DIR:-}') is not a work-item directory below the repository root — bind it in this shell"; exit 1; }
      # TRACKED changes HALT. Untracked files only warn: the develop pipeline's Step 4 holds out-of-scope
      # untracked files aside for the PR commit and restores them into the tree for the whole QA loop,
      # so an untracked file outside the work item is the normal state of a healthy branch, not a fix
-     # left uncommitted (QA cycle 1, CR-1). .claude/state is the pipeline's own scratch — never named.
-     DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR")
+     # left uncommitted (QA cycle 1, CR-1). .claude/state is the pipeline's own scratch — excluded from
+     # both lists: a consumer that tracks .claude/ has the lock rewritten by set-qa-phase.sh just before
+     # this block runs, and that is not a fix (QA cycle 2, CR-2).
+     DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
      [ -z "$DIRTY" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):"; printf '%s\n' "$DIRTY"; exit 1; }
      UNTRACKED=$(git ls-files --others --exclude-standard -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
      [ -z "$UNTRACKED" ] || { echo "warning: untracked files outside the work item are not in this review — commit any that belong to the fix:"; printf '%s\n' "$UNTRACKED" | sed 's/^/  /'; }

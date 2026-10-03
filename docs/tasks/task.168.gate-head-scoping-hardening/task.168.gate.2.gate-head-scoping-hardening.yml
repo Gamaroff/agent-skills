@@ -1,0 +1,85 @@
+schema: 2
+task: 'task.168.gate-head-scoping-hardening'
+task_title: "[Task 168] Harden task.135's gate-head scoping"
+gate: CONCERNS
+status_reason: 'All five cycle-1 findings are fixed and mutation-proven. The refute pass found that the uncommitted-fix HALT, now on every re-review arm, collides with the QA loop red-fast-gate path that commits nothing before the next review (CR-1, high-confidence bug, promoted).'
+reviewer: 'QA Engineer'
+head: 'deb5e7727be49b1153b734a4b73bf68bb20ff702'        # git rev-parse HEAD when the review was performed
+updated: '2026-10-03T15:49:51Z'
+
+top_issues:
+  - id: 'T168-QA2-CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'After a second red fast gate, 5b step 0a commits nothing and lets the cycle end so the next QA review writes a gate; that review now HALTs on the uncommitted qa-fix edits (tracked, outside the work item) and never writes the gate the convergence check and MAX_ITER count — and task § 5 claims a pipeline run never reaches the HALT.'
+    suggested_action: 'Reconcile: on the bounded-retry exit, 5b commits the red attempt WITHOUT pushing (the REQUEST CHANGES path precedent), so the next review reads it as committed history; the next push carries it. Correct the task Breaking Changes sentence; pin the step-doc wording with a test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T168-QA2-CR-2'
+    severity: low
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'The tracked-change check does not exclude .claude/state, so in a consumer that tracks .claude/ the pipeline lock (rewritten by set-qa-phase.sh before Step 3b) HALTs every re-review, while the prose says .claude/state is never named.'
+    suggested_action: 'Add the .claude/state exclusion to the tracked check too, and extend L5 with a tracked, modified .claude/state file.'
+    suggested_owner: dev
+    status: open
+  - id: 'T168-QA2-CR-3'
+    severity: low
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Phase 0 step 3 still counts an untracked file outside the task directory as movement, which Step 3b now calls the normal state of a healthy pipeline branch, so a clean PASS gate on such a branch can never take the skip branch — undocumented.'
+    suggested_action: 'State in the trigger that it deliberately fails toward re-review on an untracked file (it cannot tell a restored held file from a new fix file), costing one re-review.'
+    suggested_owner: dev
+    status: open
+  - id: 'T168-QA2-CR-4'
+    severity: low
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'The comment justifying the WORK_ITEM_DIR exclusion says this QA cycle writes its report and gate there before the block runs, but both are written after Step 3b (Steps 10–11); the real occupants are the deferred implementation-report updates and the task document.'
+    suggested_action: 'Reword the comment in the shared block and both preambles to name what actually sits uncommitted there when Step 3b runs.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 173
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+  ci: 'not read this cycle — gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — qa-safety-clause1.sh reads only a pipeline-written gate file; no corpus sink models gate YAML (unchanged since gate 1).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: the HALT strands the red-fast-gate path of the QA loop.'
+  maintainability:
+    status: PASS
+    notes: 'Test fidelity improved (per-fence call assertion, shipped-sed agreement).'
+
+recommendations:
+  immediate:
+    - action: 'Fix T168-QA2-CR-1 (red-gate path commits without pushing)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+  future: []
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 0
+  fix_date: '2026-10-03'
+  total_iterations: 1
+  verification_method: 'L10–L14 (bash + zsh), parity and freshness suites; mutation proofs red for CR-1..CR-5'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T168-QA2-CR-1 fixed and re-reviewed']

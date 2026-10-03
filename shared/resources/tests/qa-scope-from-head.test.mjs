@@ -785,6 +785,17 @@ for (const sh of SHELLS) {
       path.join(fx.dir, ".claude", "state", "develop-pipeline.lock"),
       "{}\n",
     );
+    // A consumer that TRACKS .claude/: set-qa-phase.sh rewrites the lock just before Step 3b runs.
+    fs.writeFileSync(
+      path.join(fx.dir, ".claude", "state", "tracked.json"),
+      "{}\n",
+    );
+    git(fx.dir, "add", "-f", ".claude/state/tracked.json");
+    git(fx.dir, "commit", "-q", "-m", "a consumer that tracks .claude/");
+    fs.writeFileSync(
+      path.join(fx.dir, ".claude", "state", "tracked.json"),
+      '{"qa_phase":"5a"}\n',
+    );
     const r = runScope(sh, fx);
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /Re-review scope: files changed since gate 2/);
@@ -843,6 +854,25 @@ for (const sh of SHELLS) {
     const r = runScope(sh, fx, { PRIOR_GATES: "0", WORK_ITEM_DIR: undefined });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.doesNotMatch(r.stdout, /HALT/);
+  });
+
+  test(`L15 [${sh}] — a red qa-fix attempt committed but not pushed is reviewed, not HALTed (QA cycle 2, CR-1)`, () => {
+    // The QA loop's bounded-retry exit commits the red attempt WITHOUT pushing, so the next review
+    // reads it from committed history; the whole-branch patch is BASE...HEAD of the local branch.
+    const fx = scratch();
+    commitFile(
+      fx.dir,
+      "skills/c.sh",
+      "echo red attempt\n",
+      "fix: qa-fix cycle 1 — fast gate red, not pushed",
+    );
+    const r = runScope(sh, fx, { PRIOR_GATES: "1" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.patch,
+      /echo red attempt/,
+      "the unpushed attempt is in the reviewed patch",
+    );
   });
 
   test(`L6 [${sh}] — a re-review refuses an unbound or root work-item directory (CR3-7)`, () => {

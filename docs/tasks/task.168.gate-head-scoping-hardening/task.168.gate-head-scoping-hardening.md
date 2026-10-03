@@ -75,7 +75,7 @@ Task.135 (PR #531, merged `ea88e5a7`) made QA gates record the commit they judge
 ### Important Clarifications
 
 - **Same-class mechanism inventory** (review-task check 6): the trigger already has one failure-direction mechanism (`|| echo 1`), which the head validation **extends**; the scope block already validates the head (`cat-file -e`, `merge-base`) and the new dirty-tree HALT **sits beside** those checks because it guards a different input (the working tree, not the gate). The clause-1 script **replaces** the three fenced copies of the probe.
-- The dirty-tree HALT excludes the work-item directory because a QA cycle writes its own report and gate there before Step 3b runs. It HALTs on **tracked** changes only: develop-pipeline Step 4 holds out-of-scope untracked files aside for the PR commit and restores them into the tree for the whole QA loop, so an untracked file outside the work item is the normal state of a healthy branch — it is named in a warning instead, with `.claude/state/` (the pipeline's own scratch) left out of the warning (review.1 I1; QA cycle 1, CR-1). It runs on every re-review arm, not only the scoped one (QA cycle 1, CR-2).
+- The dirty-tree HALT excludes the work-item directory because the pipeline's own bookkeeping sits uncommitted there when Step 3b runs — the implementation report's updates, deferred to Step 8 (QA cycle 2, CR-4). It also excludes `.claude/state/` from both the tracked check and the warning (QA cycle 2, CR-2). It HALTs on **tracked** changes only: develop-pipeline Step 4 holds out-of-scope untracked files aside for the PR commit and restores them into the tree for the whole QA loop, so an untracked file outside the work item is the normal state of a healthy branch — it is named in a warning instead, with `.claude/state/` (the pipeline's own scratch) left out of the warning (review.1 I1; QA cycle 1, CR-1). It runs on every re-review arm, not only the scoped one (QA cycle 1, CR-2).
 - `qa-task` Phase 0 step 3 carries a third `qa-cycle.sh --path gate` rebind (`skills/qa-task/SKILL.md:199`). It is **left as is**: it already keeps stderr, and a refusal there leaves `GATE_HEAD` empty, which sets `CODE_MOVED=1` — it already fails toward re-review (review.1 Q2).
 - **Bundling closure**: `qa-re-review-scope.md` is bundled into eight skills. The shared rule's clause-1 block calls the script as `.agents/skills/{qa-task|qa-story}/references/qa-safety-clause1.sh` — the invocation spelling the bundler follows only into the skills it names — so the script ships in `qa-task` and `qa-story` alone, the two skills that run it. The parity test points that path at the shared source to execute the block. (Review.1 Q3 accepted eight copies on the premise that a placeholder path could not be executed; develop found the test can resolve it, so the narrower closure was taken.)
 - `extractProbe()` must still find exactly one block in the shared rule; the transit-constraint tests move from the block's text to the script's text.
@@ -104,7 +104,7 @@ Task.135 (PR #531, merged `ea88e5a7`) made QA gates record the commit they judge
 
 ## 5. Breaking Changes
 
-None — API stable. The scope block gains a HALT (uncommitted change outside the work item) on a state that previously reviewed the wrong code; a develop-pipeline run always commits a fix before re-review, so it does not reach it.
+None — API stable. The scope block gains a HALT on a re-review when a tracked file outside the work item is uncommitted — a state that previously reviewed the wrong code. A develop-pipeline run commits every fix before the next review: a passing fix in its `fix(...)` commit, and — since QA cycle 2, CR-1 — a fix whose fast gate stayed red after two attempts in an unpushed commit (`develop-pipeline-step-5-6-qa-loop.md` §5b step 0a), so it does not reach the HALT.
 
 ---
 
@@ -269,21 +269,21 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-03
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.168.qa.1.gate-head-scoping-hardening.md](./task.168.qa.1.gate-head-scoping-hardening.md)
-- **Gate File**: [task.168.gate.1.gate-head-scoping-hardening.yml](./task.168.gate.1.gate-head-scoping-hardening.yml)
+- **Full Report**: [task.168.qa.2.gate-head-scoping-hardening.md](./task.168.qa.2.gate-head-scoping-hardening.md)
+- **Gate File**: [task.168.gate.2.gate-head-scoping-hardening.yml](./task.168.gate.2.gate-head-scoping-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 81 (qa-scope-from-head L1–L9 24, qa-safety-clause1 16, parity 58 incl., field 1) — suites 91/0 under TMPDIR=/tmp
+- **Tests Executed**: 173 across the four affected suites (bash + zsh; `TMPDIR=/tmp` variance)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Two medium findings on the new uncommitted-fix HALT: it fires on untracked files develop-pipeline Step 4 restores into the tree (T168-QA1-CR-1), and it guards only the cycle-3+ scoped arm (T168-QA1-CR-2). Three low: stderr discarded on the first rebind call, a call-count assertion that counts prose, and a `field()` agreement test that runs a copied sed.
+Cycle-1 findings all fixed. One medium: the uncommitted-fix HALT, now on every re-review arm, strands the QA loop's red-fast-gate path, which commits nothing before the next review (T168-QA2-CR-1). Three low.
 
 ## Change Log
 
@@ -296,6 +296,7 @@ Two medium findings on the new uncommitted-fix HALT: it fires on untracked files
 | 2026-10-03 |  | Status → ready-for-development | review-task |
 | 2026-10-03 |  | Implemented — 19 files, 41 tests | develop |
 | 2026-10-03 |  | QA gate CONCERNS (80/100) — 5 findings (2 medium, 3 low) | qa-task |
+| 2026-10-03 |  | QA gate CONCERNS (90/100) — 4 findings (1 medium, 3 low); cycle-1 findings fixed | qa-task |
 
 <!-- change-log-end -->
 

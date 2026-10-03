@@ -1322,3 +1322,29 @@ test("`absent` and an empty reading are distinct branches in the case", () => {
     "the catch-all must set the trigger, not fall through silently",
   );
 });
+
+test("the QA loop's red-fast-gate exit commits its attempt — the next review HALTs on an uncommitted one (task.168 QA cycle 2, CR-1)", () => {
+  // Step 3b's uncommitted-fix HALT (every re-review arm) and the loop's bounded fast-gate retry are
+  // two contracts that must agree: a retry exit that left qa-fix's edits in the working tree made
+  // the next review HALT instead of writing the gate the convergence check counts. The executed
+  // half — an unpushed commit is reviewed, an uncommitted edit HALTs — is L15 and L11 in
+  // qa-scope-from-head.test.mjs; this pins the instruction an agent reads.
+  const doc = readFileSync(
+    join(
+      repoRoot,
+      "shared",
+      "resources",
+      "develop-pipeline-step-5-6-qa-loop.md",
+    ),
+    "utf-8",
+  );
+  const at = doc.indexOf("**Bound this retry at 2 attempts.**");
+  assert.ok(at !== -1, "the bounded-retry paragraph must exist");
+  const para = doc.slice(at, doc.indexOf("\n\n", at));
+  assert.match(para, /commit the attempt without pushing/i);
+  assert.doesNotMatch(
+    para,
+    /commit nothing/i,
+    "a retry exit that commits nothing strands the next review on Step 3b's uncommitted-fix HALT",
+  );
+});

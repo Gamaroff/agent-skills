@@ -400,7 +400,9 @@ All notable changes to this project will be documented in this file. Format foll
     work item's own directory (`$WORK_ITEM_DIR`, bound by each preamble) now HALTs, naming the paths;
     an untracked file only warns, because develop-pipeline Step 4 restores held out-of-scope files
     into the tree for the whole QA loop. Gate files that carry no cycle number now HALT Phase 0 steps
-    2 and 5 instead of reading as a first review.
+    2 and 5 instead of reading as a first review. The develop QA loop's bounded fast-gate retry now commits its red
+    attempt without pushing (it used to commit nothing), so the next review reads that attempt from
+    committed history instead of HALTing on it.
   - **A `qa-cycle.sh` refusal is a HALT, not "no gate" (5c CR-1).** Phase 0 steps 2 and 5 rebound
     `LATEST_GATE` with `--path gate 2>/dev/null` and ignored the exit status, so two files claiming
     one cycle read as a first review and step 5 reported `SAFETY_REPROBE=false`. Both now use step
