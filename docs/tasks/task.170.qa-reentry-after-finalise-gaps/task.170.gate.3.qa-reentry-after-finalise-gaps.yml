@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.170.qa-reentry-after-finalise-gaps'
+task_title: '[Task 170] QA re-entry after a finalise DoD-gaps halt fixed by a code change'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes verified (40/40, parity 4/4), but the re-entry precedence keys on the gate head and so switches off when gate N+1 is written, one step before entry N+1 exists (medium, high confidence). Four advisory findings on the movement measure and the stem.'
+reviewer: 'QA Engineer'
+head: '4da0cee9b76feab7a6b7954b763ac00b54f34eb2'
+updated: '2026-10-03T19:36:44Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The second precedence keys on qa_reentry.gate_head equalling the newest gate head, which stops matching when /qa-task writes gate N+1 — before 5a writes entry N+1 — so a resume in that window reads the pre-re-entry APPROVE and goes to Step 7. See task.170.bug.5.'
+    suggested_action: 'Record base_cycle in qa_reentry and key the precedence on the highest QA Cycle entry being at or below it; state it once and cite it from both 5–6 rows; add a test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 93
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+  ci: 'not read — no cycle waits on CI'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged since cycle 2; hostile heads committed (8 cases).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 narrows the cycle-2 window but does not close it.'
+  maintainability:
+    status: PASS
+    notes: 'CR-5 schema wording is cleanup.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (key the precedence on the report, not the gate head).'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/reenter-qa-after-finalise.sh']
+  future:
+    - action: 'CR-2 / CR-4 (advisory): untracked files outside the work item are the normal state after Step 4 restores held files, and an uncommitted tracked fix makes the re-entered 5a halt at qa-task Step 3b — measure committed movement, refuse an uncommitted fix with its own reason, and do not count untracked files as movement.'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh']
+    - action: 'CR-3 (advisory): the stem regex returns story.309.2 for a four-part sub-story directory (story.309.2.3A).'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh']
+    - action: 'CR-5 (cleanup): the lock schema names one qa_reentry reader; the two 5–6 rows also read it.'
+      refs: ['shared/resources/develop-pipeline-pause.md']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-10-03'
+  total_iterations: 2
+  verification_method: 'Suite 40/40; parity 4/4; cycle-2 mutations red'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

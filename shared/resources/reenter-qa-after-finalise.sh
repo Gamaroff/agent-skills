@@ -19,16 +19,24 @@
 #                             item's stem, so a co-located bug's DoD is never read as its verdict
 #        dod-not-gaps         the newest DoD file's Final Status is not ❌ GAPS
 #        no-gate              qa-cycle.sh found no single current gate
-#        no-code-moved        nothing outside <doc-dir> moved past the gate's head: a
-#                             document-only fix, for which /finalise re-running at 7 is correct
+#        uncommitted-fix      a tracked change outside <doc-dir> is uncommitted, or the only
+#                             movement is untracked files: the re-entered review reads committed
+#                             history (qa-task Step 3b HALTs on the first), so commit the fix and
+#                             re-run — never resume at 7 over it
+#        no-code-moved        no commit outside <doc-dir> since the gate's head and nothing
+#                             uncommitted: a document-only fix, for which /finalise at 7 is correct
 #      The reasons are printed as `reenter-qa: refused (<reason>) — …`. The resume contract
 #      lists the same set; evals/shared/tests/reenter-qa-refusals-parity.test.mjs holds the two
 #      equal.
-#   2. MEASURES code movement with the qa-task Phase 0 measure, plus one exclusion: commits since the
-#      gate's `head:` outside <doc-dir>, PLUS uncommitted and untracked changes outside it (and
-#      outside .claude/state, the pipeline's own scratch, where the consumed snapshot lives); a
-#      head that is absent, not 40-hex, not a commit or not an ancestor of HEAD counts as moved.
-#      It fails toward re-review — one extra QA cycle — never toward "nothing moved".
+#   2. MEASURES code movement as COMMITTED history, because that is what the re-entered review reads
+#      (qa-task Step 3b scopes from commits and HALTs on an uncommitted tracked change): commits since
+#      the gate's `head:` outside <doc-dir>; a head that is absent, not 40-hex, not a commit or not an
+#      ancestor of HEAD counts as moved. Uncommitted work is not movement — it is refused
+#      (uncommitted-fix), because it can neither be reviewed nor safely left for /finalise. Untracked
+#      files are the normal state after Step 4 restores the files it held aside, so with committed
+#      movement they are only listed; with none, they are refused as possibly the fix (task.170 QA
+#      cycle 3, CR-2/CR-4). .claude/state, the pipeline's scratch, is never counted. It never fails
+#      toward "nothing moved" over work the review has not read.
 #   3. RESTORES through `advance-pipeline-lock.sh --restore <doc-dir>` (the one restore path,
 #      which consumes the snapshot) and then, in ONE atomic write (mktemp + mv beside the lock):
 #        current_step = 5, qa_phase = "5a",
@@ -37,7 +45,10 @@
 #          have used (task.170 QA cycle 2, CR-4); base reconstructed as grant-qa-cycles.sh
 #          does: max(highest gate via qa-cycle.sh, `### QA Cycle` entries in the report); 2 is
 #          the grant prompt's recommended k; an existing higher budget is kept, never lowered,
-#        qa_reentry = {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head}.
+#        qa_reentry = {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head, base_cycle}.
+#      base_cycle is what the resume contract's re-entry precedence keys on: while the report's
+#      highest `### QA Cycle` entry is at or below it, that entry's verdict predates the re-entry
+#      (task.170 QA cycle 3, CR-1).
 #      A failed write after the restore KEEPS the restored step-7 lock: the snapshot is consumed,
 #      so the lock is the run's only state, and a lock at 7 is a resumable one (the grant's
 #      undo_restore rule). No temp file is left behind on any path.
@@ -111,12 +122,17 @@ source "$NEWEST_SH" || { echo "reenter-qa: could not source newest-numbered.sh" 
 # Keyed on the work item's own STEM, never the directory: a co-located bug writes its own
 # {bug-prefix}.dod.{N}.*.md beside the parent's, and a directory-wide pattern read a higher-numbered
 # bug DoD as the task's verdict (task.170 QA cycle 1, CR-1 — the same reason finalise keys its own
-# lookup on the stem, TASK-125-BUG-8). The stem is the directory's task.{id} or story.{epic}.{story}
-# prefix — the story number may carry create-parallel-stories' hybrid suffix (story.305.1-1) and a
-# sub-story letter (story.309.2.3A) (task.170 QA cycle 2, CR-2); a directory carrying neither shape
-# cannot be a develop-task / develop-story work item.
-STEM=$(basename "$DOC_DIR" | sed -nE 's/^(task\.[0-9]+|story\.[0-9]+\.[0-9]+(-[0-9]+)?[A-Za-z]?)(\..*)?$/\1/p')
-[ -n "$STEM" ] || { echo "reenter-qa: '$DOC_DIR' is not a task.{id}.* or story.{epic}.{story}.* work-item directory" >&2; usage; }
+# lookup on the stem, TASK-125-BUG-8). The stem is READ from the DoD files themselves rather than
+# parsed from the directory name: a regex over the name has to know every numbering shape — a
+# parallel story.305.1-1, a sub-story story.309.2.3A — and cycles 2 and 3 each found one it missed.
+# A DoD's stem is the text before its first .dod.; it is the work item's when the directory name
+# continues it with a "." — so task.42 never matches task.420.*, and a co-located bug's stem
+# (task.42.bug.3) is never one the parent's directory name continues. The longest such stem wins.
+STEM=$(find "$DOC_DIR" -maxdepth 1 -type f -name '*.dod.*.md' 2>/dev/null | while IFS= read -r f; do
+  b=${f##*/}; p=${b%%.dod.*}
+  case "$(basename "$DOC_DIR")." in "$p".*) printf '%s\n' "$p" ;; esac
+done | awk '{ print length, $0 }' | sort -rn | head -1 | cut -d' ' -f2-)
+[ -n "$STEM" ] || refuse no-dod "no DoD file in '$DOC_DIR' whose stem the directory name continues (bug DoDs excluded) — a step-7 halt with no DoD file is not a DoD-gaps halt"
 DOD=$(newest_numbered "$DOC_DIR" dod -name "${STEM}.dod.*.md")
 [ -n "$DOD" ] && [ -f "$DOD" ] || refuse no-dod "no ${STEM}.dod.{N}.*.md in '$DOC_DIR' — a step-7 halt with no DoD file is not a DoD-gaps halt"
 grep -q '^\*\*Final Status:\*\* ❌ GAPS' "$DOD" || refuse dod-not-gaps "the newest DoD file '$DOD' does not carry **Final Status:** ❌ GAPS"
@@ -132,7 +148,12 @@ BASE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" 2>/dev/null) || BASE=""
 case "$BASE" in ''|*[!0-9]*) BASE="" ;; esac
 [ -n "$GATE" ] && [ -f "$GATE" ] && [ -n "$BASE" ] || refuse no-gate "qa-cycle.sh found no single current gate in '$DOC_DIR'"
 
-# ── 2. The qa-task Phase 0 movement measure, all of it ───────────────────────
+# ── 2. Movement, measured as committed history ───────────────────────────────
+# Uncommitted tracked work outside the work item is refused first, whatever else moved: the
+# re-entered review cannot read it (qa-task Step 3b HALTs on it), and /finalise must not run over it.
+DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$DOC_DIR" ":(exclude).claude/state" 2>/dev/null)
+[ -z "$DIRTY" ] || refuse uncommitted-fix "uncommitted changes outside '$DOC_DIR' — commit the fix, then re-run this script (the re-entered review reads committed history; do NOT resume at step 7 over them): $(printf '%s' "$DIRTY" | tr '\n' ' ')"
+UNTRACKED=$(git ls-files --others --exclude-standard -- . ":(exclude)$DOC_DIR" ":(exclude).claude/state" 2>/dev/null)
 GATE_HEAD=$(grep -E '^head:' "$GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
 if [ -z "$GATE_HEAD" ]; then
   MOVED=1; WHY_MOVED="the gate carries no head: (schema 1) — it cannot vouch for the present tree"
@@ -142,12 +163,17 @@ elif ! { printf '%s' "$GATE_HEAD" | grep -qE '^[0-9a-f]{40}$' \
   MOVED=1; WHY_MOVED="the gate head '$GATE_HEAD' is not a 40-hex commit on this branch"
 else
   MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- . ":(exclude)$DOC_DIR" 2>/dev/null || echo 1)
-  # .claude/state is the pipeline's own scratch — the halt snapshot this script consumes lives there,
-  # so in a repo that does not gitignore .claude/ it would always count as movement and the
-  # no-code-moved refusal could never fire (task.170 QA cycle 1, CR-2; qa-task Step 3b excludes it too).
-  git diff --quiet HEAD -- . ":(exclude)$DOC_DIR" ":(exclude).claude/state" 2>/dev/null || MOVED=$((MOVED + 1))
-  [ -z "$(git ls-files --others --exclude-standard -- . ":(exclude)$DOC_DIR" ":(exclude).claude/state" 2>/dev/null)" ] || MOVED=$((MOVED + 1))
-  WHY_MOVED="$MOVED change(s) outside '$DOC_DIR' since the gate's head ${GATE_HEAD:0:12}"
+  WHY_MOVED="$MOVED commit(s) outside '$DOC_DIR' since the gate's head ${GATE_HEAD:0:12}"
+fi
+# Untracked files: with committed movement they are listed, not counted (Step 4 restores the files it
+# held aside, so an untracked file is the normal state of a healthy branch); with none, one of them may
+# be the fix, so the re-entry is refused rather than sent to /finalise (task.170 QA cycle 3, CR-2).
+if [ -n "$UNTRACKED" ]; then
+  if [ "$MOVED" -gt 0 ] 2>/dev/null; then
+    echo "reenter-qa: untracked files outside '$DOC_DIR' are not in the re-entered review — commit any that belong to the fix: $(printf '%s' "$UNTRACKED" | tr '\n' ' ')" >&2
+  else
+    refuse uncommitted-fix "no commit outside '$DOC_DIR' since the gate's head, but untracked files exist there — if one is the fix, commit it and re-run; if none is (files Step 4 held aside), the fix is document-only and the run resumes at step 7: $(printf '%s' "$UNTRACKED" | tr '\n' ' ')"
+  fi
 fi
 [ "$MOVED" -gt 0 ] 2>/dev/null || refuse no-code-moved "nothing outside '$DOC_DIR' moved since the gate's head ${GATE_HEAD:0:12} — a document-only fix; resume at step 7 with advance-pipeline-lock.sh --restore and re-run /finalise"
 
@@ -180,7 +206,7 @@ if ! jq --argjson base "$BASE" --arg now "$NOW" --arg head "$GATE_HEAD" '
        .current_step = 5
        | .qa_phase = "5a"
        | .qa_max_cycles = ([((.qa_max_cycles // 5) | tonumber? // 5), ($base + 2)] | max)
-       | .qa_reentry = {from_step: 7, reason: "dod-gaps-code-fix", at: $now, gate_head: $head}' \
+       | .qa_reentry = {from_step: 7, reason: "dod-gaps-code-fix", at: $now, gate_head: $head, base_cycle: $base}' \
      "$LOCK" > "$TMP"; then
   rm -f "$TMP"
   keep_restored

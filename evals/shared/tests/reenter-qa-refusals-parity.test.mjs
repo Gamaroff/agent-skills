@@ -94,14 +94,15 @@ test("both orchestrators and the contract invoke the script by its bundled path"
   }
 });
 
-// task.170 QA cycle 2, CR-1: after a re-entry the implementation report's last QA Cycle entry still
-// carries the APPROVE of the run that halted at Step 7, and the resume contract treats that row as the
-// source of truth. Every place the contract reads it must carry the qa_reentry precedence, or a pause
-// before the re-entered cycle writes its entry resumes at Step 7 over an ungated head.
+// task.170 QA cycle 2 CR-1, cycle 3 CR-1: after a re-entry the implementation report's last QA Cycle
+// entry still carries the APPROVE of the run that halted at Step 7, and the resume contract treats that
+// row as the source of truth. The precedence that overrides it is stated ONCE, keyed on the report
+// (qa_reentry.base_cycle) — a rule keyed on the gate cleared one step before 5a wrote the entry — and
+// both 5–6 artifact rows cite it rather than restating it.
 test("the resume contract's 5c readings ignore a terminal verdict that predates a QA re-entry", () => {
   const text = read(CONTRACT);
   const precedence = text.match(
-    /\*\*Second precedence — a QA re-entry[\s\S]*?Exactly one row matches any\s*>?\s*entry\./,
+    /\*\*Second precedence — a QA re-entry[\s\S]*?Exactly one row\s*>?\s*matches any entry\./,
   );
   assert.ok(
     precedence,
@@ -109,15 +110,21 @@ test("the resume contract's 5c readings ignore a terminal verdict that predates 
   );
   for (const needle of [
     "`qa_reentry`",
-    "`gate_head`",
+    "`qa_reentry.base_cycle`",
     "**5a**",
     "cycle `N+1`",
+    "one statement",
   ]) {
     assert.ok(
       precedence[0].includes(needle),
       `the precedence must name ${needle}`,
     );
   }
+  assert.doesNotMatch(
+    precedence[0],
+    /gate_head` equals/,
+    "the precedence must not key on the gate head (it clears one step early)",
+  );
   const rows = text.split("\n").filter((l) => /^\| 5–6\. qa loop \|/.test(l));
   assert.equal(
     rows.length,
@@ -127,13 +134,29 @@ test("the resume contract's 5c readings ignore a terminal verdict that predates 
   for (const row of rows) {
     assert.match(
       row,
-      /`qa_reentry`[\s\S]*`gate_head`[\s\S]*\*\*not\*\* complete/,
-      "each 5–6 row must refuse a pre-re-entry verdict",
+      /\*\*Second precedence\*\*[\s\S]*`qa_reentry`[\s\S]*\*\*not\*\* complete/,
+      "each 5–6 row must cite the precedence",
+    );
+    assert.doesNotMatch(
+      row,
+      /base_cycle|gate_head/,
+      "a row restating the rule's key is a second statement of it",
     );
   }
+  const schema = read("shared/resources/develop-pipeline-pause.md");
   assert.doesNotMatch(
-    read("shared/resources/develop-pipeline-pause.md"),
+    schema,
     /No reader branches on it/,
     "the lock schema must not say qa_reentry has no reader",
+  );
+  assert.match(
+    schema,
+    /`qa_reentry`[^\n]*base_cycle/,
+    "the lock schema row must name base_cycle",
+  );
+  assert.match(
+    read(SCRIPT),
+    /base_cycle: \$base/,
+    "the script must record base_cycle in qa_reentry",
   );
 });

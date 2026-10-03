@@ -398,7 +398,7 @@ For ✅ steps whose `Subagent summary ref` column points to a `.summaries/step-<
 | 1. create-branch | Branch exists in git | `git branch --list "feature/story.{epic}.{story}.*"` returns the branch |
 | 3. develop | All tasks complete | Story file `Status:` field reads `Ready for Review` |
 | 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | **Both** `story.{epic}.{story}.qa.{N}.*.md` **and** `story.{epic}.{story}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional — the 5c check reads the implementation report, not the filesystem**: when the latest gate **reached 5c** — read mechanically from the same entry this check already opens: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` (5a writes it on every one of §5c's five accepting routes; do not re-derive the set from the gate's token or queue) — that entry's `**PR Review**` row must hold a **terminal verdict** — `APPROVE` or `CONCERNS`. Any other value (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`, blank, or a missing row) means 5c did not clear, and Step 5–6 is **not** complete. A mid-loop resume on a gate that routed to 5b (its entry's `**Action**` row reads `Running qa-fix`) legitimately has no terminal verdict. **A terminal verdict that predates a QA re-entry does not count**: when the lock or halt snapshot carries `qa_reentry` and its `gate_head` equals the newest gate's `head:`, no cycle has run since `reenter-qa-after-finalise.sh` lowered the lock, so the APPROVE / CONCERNS on that entry is the run that halted at Step 7 — Step 5–6 is **not** complete (task.170; see the precedence below). | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then the 5c check, which is a **read of the implementation report** performed by the resume detector, not a shell command: take the last `### QA Cycle` entry and read its `**PR Review**` row. |
+| 5–6. qa loop | **Both** `story.{epic}.{story}.qa.{N}.*.md` **and** `story.{epic}.{story}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional — the 5c check reads the implementation report, not the filesystem**: when the latest gate **reached 5c** — read mechanically from the same entry this check already opens: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` (5a writes it on every one of §5c's five accepting routes; do not re-derive the set from the gate's token or queue) — that entry's `**PR Review**` row must hold a **terminal verdict** — `APPROVE` or `CONCERNS`. Any other value (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`, blank, or a missing row) means 5c did not clear, and Step 5–6 is **not** complete. A mid-loop resume on a gate that routed to 5b (its entry's `**Action**` row reads `Running qa-fix`) legitimately has no terminal verdict. **A terminal verdict that predates a QA re-entry does not count** — the **Second precedence** under QA Cycle Count Reconstruction decides when (`qa_reentry`); while it applies, Step 5–6 is **not** complete (task.170). | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then the 5c check, which is a **read of the implementation report** performed by the resume detector, not a shell command: take the last `### QA Cycle` entry and read its `**PR Review**` row. |
 | 7. finalise | **All three**: `story.{epic}.{story}.dod.{N}.*.md` exists **and** story `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {story-directory}/story.*.dod.*.md` AND `grep -iE "^status:\s*accepted" {story-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "accepted"` |
 
 ### develop-task artifact table
@@ -408,7 +408,7 @@ For ✅ steps whose `Subagent summary ref` column points to a `.summaries/step-<
 | 1. create-branch | Branch exists in git | `git branch --list "feature/task.{id}.*"` returns the branch |
 | 3. develop | All phases complete | Task file `Status:` field reads `Ready for Review` |
 | 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional — the 5c check reads the implementation report, not the filesystem**: when the latest gate **reached 5c** — read mechanically from the same entry this check already opens: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` (5a writes it on every one of §5c's five accepting routes; do not re-derive the set from the gate's token or queue) — that entry's `**PR Review**` row must hold a **terminal verdict** — `APPROVE` or `CONCERNS`. Any other value (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`, blank, or a missing row) means 5c did not clear, and Step 5–6 is **not** complete. A mid-loop resume on a gate that routed to 5b (its entry's `**Action**` row reads `Running qa-fix`) legitimately has no terminal verdict. **A terminal verdict that predates a QA re-entry does not count**: when the lock or halt snapshot carries `qa_reentry` and its `gate_head` equals the newest gate's `head:`, no cycle has run since `reenter-qa-after-finalise.sh` lowered the lock, so the APPROVE / CONCERNS on that entry is the run that halted at Step 7 — Step 5–6 is **not** complete (task.170; see the precedence below). | `ls {task-directory}/task.*.qa.*.md` AND `ls {task-directory}/task.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then the 5c check, which is a **read of the implementation report** performed by the resume detector, not a shell command: take the last `### QA Cycle` entry and read its `**PR Review**` row. |
+| 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional — the 5c check reads the implementation report, not the filesystem**: when the latest gate **reached 5c** — read mechanically from the same entry this check already opens: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` (5a writes it on every one of §5c's five accepting routes; do not re-derive the set from the gate's token or queue) — that entry's `**PR Review**` row must hold a **terminal verdict** — `APPROVE` or `CONCERNS`. Any other value (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`, blank, or a missing row) means 5c did not clear, and Step 5–6 is **not** complete. A mid-loop resume on a gate that routed to 5b (its entry's `**Action**` row reads `Running qa-fix`) legitimately has no terminal verdict. **A terminal verdict that predates a QA re-entry does not count** — the **Second precedence** under QA Cycle Count Reconstruction decides when (`qa_reentry`); while it applies, Step 5–6 is **not** complete (task.170). | `ls {task-directory}/task.*.qa.*.md` AND `ls {task-directory}/task.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then the 5c check, which is a **read of the implementation report** performed by the resume detector, not a shell command: take the last `### QA Cycle` entry and read its `**PR Review**` row. |
 | 7. finalise | **All three**: `task.{id}.dod.{N}.*.md` exists **and** task `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {task-directory}/task.{id}.dod.*.md` AND `grep -iE "^status:\s*accepted" {task-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "accepted"` |
 
 ## Plan Freshness (Step 3 Prerequisite)
@@ -443,13 +443,16 @@ A `gate.yml` written manually (without running the QA skill) does NOT satisfy St
 > left the loop through Loop Escalation has no cycle to re-enter whatever its last verdict was
 > (a loop-limit-via-review entry carries a real `REQUEST CHANGES` *and* the escalation Action —
 > task.123 QA cycle 4, CR-3). **Second precedence — a QA re-entry after a finalise DoD-gaps halt
-> (task.170):** when the lock or halt snapshot carries `qa_reentry` and its `gate_head` equals the
-> newest gate's `head:`, the entry's terminal `APPROVE` / `CONCERNS` predates the re-entry — it is
-> the run that halted at Step 7, read before any re-entered cycle wrote its own entry. Do not go to
-> Step 7: set the counter to `N` and re-enter at **5a** as cycle `N+1`. The rule clears itself — the
-> re-entered cycle's gate records a new `head:` — so it never fires on a later cycle. Only when
-> neither precedence applies does the PR Review row select a row below. Exactly one row matches any
-> entry.
+> (task.170):** when the lock or halt snapshot carries `qa_reentry` and the highest `### QA Cycle {N}`
+> entry has `N` at or below `qa_reentry.base_cycle`, that entry's terminal `APPROVE` / `CONCERNS` is
+> the run that halted at Step 7 — no re-entered cycle has written its own entry yet. Do not go to
+> Step 7: set the counter to `N` and re-enter at **5a** as cycle `N+1` (a gate `N+1` already on disk
+> is the in-flight cycle's, and 5a overwrites it). It keys on the **report**, not on a gate: 5a writes
+> the entry only after it reads the gate, so a rule keyed on the gate cleared one step early
+> (task.170 QA cycle 3, CR-1). It clears itself once the re-entered cycle's entry exists, so it never
+> fires on a later cycle. This paragraph is the rule's one statement; the 5–6 artifact rows cite it.
+> Only when neither precedence applies does the PR Review row select a row below. Exactly one row
+> matches any entry.
 >
 > | `**PR Review**` reads | Resume action |
 > | --- | --- |
@@ -613,15 +616,19 @@ It is the **only** writer that may lower `current_step`, and only from 7 to 5. E
 - `lock-present` — a live lock exists; the run is already resumed.
 - `no-snapshot` — `advance-pipeline-lock.sh --restore --which` chose no candidate for this document.
 - `not-a-finalise-halt` — the snapshot's `halt_step` is not 7 (compared as text: the HALT snippet writes it with `jq --arg`).
-- `no-dod` — no `{stem}.dod.{N}.*.md` beside the document, keyed on the work item's own stem (`task.{id}` / `story.{epic}.{story}`, a parallel `-N` suffix included) so a co-located bug's DoD is never read as its verdict.
+- `no-dod` — no `{stem}.dod.{N}.*.md` beside the document, keyed on the work item's own stem — read from the DoD files whose stem the directory name continues, never from a bug's — so a co-located bug's DoD is never read as its verdict.
 - `dod-not-gaps` — the newest DoD file does not read `**Final Status:** ❌ GAPS`.
 - `no-gate` — `qa-cycle.sh` found no single current gate.
-- `no-code-moved` — nothing outside the work item's directory moved past the gate's `head:`.
+- `uncommitted-fix` — a tracked change outside the work item's directory is uncommitted, or the only movement is untracked files: commit the fix and re-run the script — never resume at 7 over it.
+- `no-code-moved` — no commit outside the work item's directory since the gate's `head:` and nothing uncommitted: a document-only fix.
 <!-- reenter-qa-refusals: end -->
 
-**The movement measure is `qa-task` Phase 0's, with one exclusion**: commits since the gate's `head:`
-outside the directory, plus uncommitted and untracked changes outside it and outside `.claude/state` —
-the pipeline's own scratch, where the snapshot this script consumes lives; a `head:` that is absent, not
+**Movement is measured as committed history**, because that is what the re-entered review reads
+(`qa-task` Step 3b scopes from commits and HALTs on an uncommitted tracked change): commits since the
+gate's `head:` outside the directory. Uncommitted tracked work is refused (`uncommitted-fix`), and so
+are untracked files when nothing is committed — one of them may be the fix; beside a committed fix they
+are the files Step 4 restored, and are listed rather than counted. `.claude/state`, the pipeline's own
+scratch, is never counted; a `head:` that is absent, not
 40-hex, not a commit or not an ancestor of `HEAD` counts as moved. It fails toward one extra QA
 cycle, never toward an ungated head.
 
@@ -629,8 +636,8 @@ On accept it restores through `advance-pipeline-lock.sh --restore` (which consum
 then writes, in one `mktemp` + `mv`: `current_step: 5`, `qa_phase: 5a`,
 `qa_max_cycles = max(existing, base + 2)` — `base` reconstructed as the grant reconstructs it
 (**Re-entry after a QA loop escalation**, step 3), `2` being the grant prompt's recommended `k` — and
-`qa_reentry: {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head}`, which is what explains a
-lowered step to a later reader. A write that fails after the restore keeps the restored step-7 lock
+`qa_reentry: {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head, base_cycle}`, which explains a
+lowered step to a later reader and gives the **Second precedence** its `base_cycle`. A write that fails after the restore keeps the restored step-7 lock
 (the snapshot is gone, and a lock at 7 is resumable). The loop then runs from 5a as cycle `base + 1`;
 5c's APPROVE advances the lock `5 → 7` as on any run, and `/finalise` re-runs over a gated head.
 The Stop hook needs nothing new: a step-5 lock at `qa_phase: 5a` already names `/qa-task` /

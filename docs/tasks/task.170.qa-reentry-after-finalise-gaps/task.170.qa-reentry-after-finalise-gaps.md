@@ -5,7 +5,7 @@ type: task
 description: "When a /finalise DoD-gaps HALT is fixed by changing code, the documented resume re-runs finalise at step 7 over a head no QA gate has read; give the resume contract a sanctioned, recorded 7 → 5 re-entry, the way grant-qa-cycles.sh sanctions re-entry after a loop-limit escalation (observation #235)."
 tags: [develop-task, develop-story, resume, pipeline-lock, qa-loop, observation]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-09-30
 updated: 2026-10-03
@@ -17,7 +17,7 @@ github_issue: 536
 
 # Technical Task: QA re-entry after a finalise DoD-gaps halt fixed by a code change
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.170.review.1.qa-reentry-after-finalise-gaps.md` implemented 2026-10-03
 
@@ -105,10 +105,13 @@ before acceptance, by a path the pipeline documents rather than one an operator 
 
 - A new resume case in the contract: a halt snapshot with `halt_step: 7` whose DoD file reads
   `GAPS IDENTIFIED`, **and** a tree that has moved past the newest gate's `head:` outside the work
-  item's own directory (the same `CODE_MOVED` measure `qa-task` Phase 0 uses — all of it: commits
-  since the head, **plus** uncommitted and untracked changes outside the directory, and a `head:`
-  that is absent, not 40-hex, not a commit or not an ancestor of `HEAD` counts as moved; the
-  measure fails toward re-review, never toward "nothing moved") → **re-enter QA**.
+  item's own directory, measured as **committed history** — what the re-entered review reads
+  (commits since the head; a `head:` that is absent, not 40-hex, not a commit or not an ancestor of
+  `HEAD` counts as moved). Uncommitted tracked work, and untracked files when nothing is committed,
+  are refused (`uncommitted-fix` — commit and re-run), never sent to `/finalise`; untracked files
+  beside a committed fix are the files Step 4 restored and are listed, not counted (QA cycles 1–3
+  refined this from review 1's "the full qa-task Phase 0 measure": the re-entered cycle is always a
+  re-review, and qa-task Step 3b HALTs on an uncommitted tracked change) → **re-enter QA**.
   Otherwise the existing bullet applies (finalise re-runs at 7 — correct when only documents moved).
 - A new script, `shared/resources/reenter-qa-after-finalise.sh` (sibling of `grant-qa-cycles.sh`):
   refuses unless the snapshot is a step-7 halt for this document and code moved past the gate head.
@@ -287,7 +290,8 @@ gate files with `head:`, a git repo with and without code movement).
 
 - [x] A step-7 GAPS halt followed by a code change is re-entered at step 5 / `qa_phase: 5a` — held by the script's accept test.
 - [x] A step-7 GAPS halt followed by a document-only change is refused — held by the refuse test; finalise then re-runs at 7 through the existing, unchanged `--restore` bullet.
-- [x] An uncommitted or untracked code change outside the work-item directory counts as moved — held by the accept test's uncommitted-change case.
+- [x] Uncommitted work outside the work-item directory is refused (`uncommitted-fix`), never accepted and never sent to finalise — an uncommitted tracked change always, untracked files when nothing is committed — held by the uncommitted / untracked refusal cases; untracked files beside a committed fix are listed, not counted — held by the held-aside accept case.
+- [x] A resume after the re-entry, before the re-entered cycle writes its `### QA Cycle` entry, re-enters at 5a rather than Step 7 — held by the contract's single-statement **Second precedence** (keyed on `qa_reentry.base_cycle`) and its parity test.
 - [x] A snapshot for another document, or with `halt_step` ≠ 7, is refused — held by refusal tests.
 - [x] The re-entered lock records `qa_reentry` with the gate head — held by the accept test.
 - [x] A lock at step 5 / `qa_phase: 5a` carrying `qa_reentry` makes the Stop hook name `/qa-task` — held by the new case in `develop-pipeline-on-stop.test.sh`.
@@ -396,27 +400,25 @@ parity test.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-03
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.170.qa.2.qa-reentry-after-finalise-gaps.md](./task.170.qa.2.qa-reentry-after-finalise-gaps.md)
-- **Gate File**: [task.170.gate.2.qa-reentry-after-finalise-gaps.yml](./task.170.gate.2.qa-reentry-after-finalise-gaps.yml)
+- **Full Report**: [task.170.qa.3.qa-reentry-after-finalise-gaps.md](./task.170.qa.3.qa-reentry-after-finalise-gaps.md)
+- **Gate File**: [task.170.gate.3.qa-reentry-after-finalise-gaps.yml](./task.170.gate.3.qa-reentry-after-finalise-gaps.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 89
+- **Tests Executed**: 93
 - **Phases Verified**: 3/3
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR-1 (high): a resume after the re-entry reads the original run's APPROVE and goes to Step 7 — [task.170.bug.3](./task.170.bug.3.resume-after-reentry-reads-stale-approve.md).
-- CR-2 (medium): the stem regex misses parallel-story directories — [task.170.bug.4](./task.170.bug.4.parallel-story-stem-unmatched.md).
-- CR-4 (low): an absent budget is read as 0, not the loop's 5.
-- Cycle 1's fixes verified; [bug.1](./task.170.bug.1.dod-lookup-reads-colocated-bug-dod.md) and [bug.2](./task.170.bug.2.hostile-gate-head-unprobed.md) closed.
+- CR-1 (medium): the re-entry precedence clears when gate N+1 is written, one step before entry N+1 exists — [task.170.bug.5](./task.170.bug.5.reentry-precedence-clears-before-entry.md).
+- Cycle 2 fixes verified; [bug.3](./task.170.bug.3.resume-after-reentry-reads-stale-approve.md) and [bug.4](./task.170.bug.4.parallel-story-stem-unmatched.md) closed.
 
 <!-- change-log-start -->
 
@@ -430,6 +432,7 @@ parity test.
 | 2026-10-03 |         | Implemented — 9 source files (2 new scripts, 1 new parity test), 30 new test cases | develop |
 | 2026-10-03 |         | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-10-03 |         | QA gate FAIL (70/100) — 3 findings (1 high, 1 medium, 1 low) | qa-task |
+| 2026-10-03 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 
 <!-- change-log-end -->
 

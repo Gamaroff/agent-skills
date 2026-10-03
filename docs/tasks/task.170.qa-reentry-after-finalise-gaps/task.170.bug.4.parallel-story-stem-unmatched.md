@@ -4,7 +4,7 @@
 **Bug ID**: TASK-170-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute review, CR-2)
 **Date Found**: 2026-10-03
 
@@ -47,3 +47,4 @@ Accept an optional `-N` parallel suffix (and the sub-story letter); add a suite 
 | ---------- | ------------ | ---------- | ------------------------------ |
 | 2026-10-03 | New          | QA         | Found in QA cycle 2            |
 | 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 2        |
+| 2026-10-03 | Closed       | QA         | Verified in QA cycle 3         |

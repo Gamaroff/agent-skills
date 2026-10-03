@@ -4,7 +4,7 @@
 **Bug ID**: TASK-170-BUG-3
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute review, CR-1; verified against the resume contract)
 **Date Found**: 2026-10-03
 
@@ -63,3 +63,4 @@ on it" from the lock schema; pin the rule with a test.
 | ---------- | ------------ | ---------- | ------------------------------ |
 | 2026-10-03 | New          | QA         | Found in QA cycle 2            |
 | 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 2        |
+| 2026-10-03 | Closed       | QA         | Verified in QA cycle 3         |
