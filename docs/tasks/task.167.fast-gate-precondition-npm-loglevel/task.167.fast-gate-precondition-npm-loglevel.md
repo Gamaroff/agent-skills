@@ -5,18 +5,20 @@ type: task
 description: "The develop loop's fast-gate precondition reads `npm run`'s script listing, which `loglevel=silent` suppresses, so a consumer whose `.npmrc` sets it, or any run under `npm run -s`, is halted with 'does not define' for a script it does define. Pass `--loglevel=notice` to that one `npm run` and add silent-environment cases to the precondition's test."
 tags: [develop-task, develop-story, develop-bug, testing, observation]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-29
 updated: 2026-10-03
 assignee:
 estimated_effort_hours: 2
 github_issue: 514
+completed_date: 2026-10-03
+pr_number: 559
 ---
 
 # Technical Task: Fast-gate precondition — no false HALT under npm loglevel=silent
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.167.review.1.fast-gate-precondition-npm-loglevel.md` implemented 2026-10-03
 
@@ -383,16 +385,43 @@ None. The post-merge action in Notes (observation #213 → `actioned`) is not de
 
 No critical issues identified. Two low-severity, advisory test-robustness points (CR-1, CR-2) are recorded as future work in the gate.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.167.qa.1.fast-gate-precondition-npm-loglevel.md`
+**Gate File**: `task.167.gate.1.fast-gate-precondition-npm-loglevel.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (Step 5c)**: ✅ APPROVE (`task.167.pr-review.1.fast-gate-precondition-npm-loglevel.md`)
+
+All Definition of Done criteria are verified:
+
+✅ **Success Criteria:** 8/8 met (AC1–AC5 with per-PR tests in bash and zsh; AC6 and AC8 are documentation criteria)
+✅ **Tests:** `fast-gate-precondition.test.mjs` passes 18/18 and `executable-instructions.test.js` 5/5; `ci:fast` 5201 pass / 0 fail
+✅ **PR:** #559; CI SUCCESS @ `f7c809e50c66` over 5 checks
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed; shared step-3 doc plus 3 regenerated copies
+✅ **Security Review:** PASS. The boundary probe executed 13 candidates and reproduced 0, verdict `engages` (`task.167.dod.1.security.run.json`)
+⚠️ **Compliance Review:** NOT_APPLICABLE (developer tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-03
+
+**Detailed Verification Log:** See `task.167.dod.1.fast-gate-precondition-npm-loglevel.md` for the complete verification evidence and timestamps.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                              | Author      |
-| ---------- | ------- | ---------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-29 | 1.0     | Initial draft — cut from observation #213 | create-task |
 | 2026-10-03 | 1.1     | Review passed (9/10) — post-merge obs #213 criterion moved to Notes | review-task |
 | 2026-10-03 |         | Status → ready-for-development | review-task |
 | 2026-10-03 |         | Implemented — 7 files, 7 tests (3 per shell + 1 extractor) | develop |
 | 2026-10-03 |         | QA gate PASS (100/100) — 0 blocking, 2 advisory findings | qa-task |
+| 2026-10-03 | 1.2 | DoD passed — accepted (PR #559) | finalise |
 <!-- change-log-end -->
 
 ---
