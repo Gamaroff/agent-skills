@@ -868,6 +868,21 @@ const PARSER_CASES = [
     "release/v1.2/x/pull/3",
     { kind: "branch", branch: "release/v1.2/x/pull/3" },
   ],
+  // QA cycle 1, CR-3: a version-shaped first segment is not a host — its last label is not two or
+  // more letters. These were branches before task.177 and must stay branches.
+  ["v1.2/x/pull/3", { kind: "branch", branch: "v1.2/x/pull/3" }],
+  ["v2.0/browse/x", { kind: "branch", branch: "v2.0/browse/x" }],
+  ["5.x/fix/issues/12", { kind: "branch", branch: "5.x/fix/issues/12" }],
+  // QA cycle 1, CR-2: only the FIRST segment is read as a host, known platform hosts included.
+  [
+    "feature/foo.atlassian.net/x",
+    { kind: "branch", branch: "feature/foo.atlassian.net/x" },
+  ],
+  // A self-hosted Jira with a TLD-shaped host still parses.
+  [
+    "jira.corp.example/browse/AB-1",
+    { kind: "jira", jira_key: "AB-1", host: "jira.corp.example" },
+  ],
 ];
 
 for (const shell of SHELLS) {
@@ -2148,6 +2163,10 @@ for (const shell of SHELLS) {
       'JIRA_URL="https://acme.atlassian.net" # prod',
       "JIRA_URL='https://acme.atlassian.net' # prod",
       "export JIRA_URL=https://acme.atlassian.net   # prod",
+      // QA cycle 1, CR-1: a space after = must not set sed's t flag before the quote tests.
+      "JIRA_URL= https://acme.atlassian.net # prod",
+      "JIRA_URL= https://acme.atlassian.net   ",
+      'JIRA_URL=   "https://acme.atlassian.net" # prod',
     ]) {
       const { dir, bin } = consumerRepo("git@bitbucket.org:ws/repo.git");
       fs.writeFileSync(path.join(dir, ".env"), `${line}\r\n`);
@@ -2204,7 +2223,11 @@ for (const shell of SHELLS) {
   test(`docs guard (${shell}): with docs/ present it hands over to §0a`, () => {
     const { dir } = consumerRepo("git@github.com:o/r.git");
     fs.mkdirSync(path.join(dir, "docs"));
-    const r = runScript(shell, docsGuardBlock(), { cwd: dir });
+    // QA cycle 1, CR-5: an inherited DOC_FILE must not leak into the guard's output.
+    const r = runScript(shell, docsGuardBlock(), {
+      cwd: dir,
+      env: { ...process.env, DOC_FILE: "stale/inherited.md" },
+    });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /^DOCS=present DOC_FILE=$/m);
   });

@@ -327,9 +327,15 @@ None.
 
 - **Phase 1 — parser.** `parse-target.sh` gains one `case` before classification: a target with no
   `://` whose first segment is `github.com`, `www.github.com`, `bitbucket.org`, `www.bitbucket.org`,
-  `api.bitbucket.org` or `*.atlassian.net` is re-parsed as `https://<target>`. Any other target that
-  matches a PR / issue / browse marker pattern is re-parsed only when its **first** segment holds a dot.
-  `www.bitbucket.org` was added beyond the task's list because the URL arm already accepts it.
+  `api.bitbucket.org` or `*.atlassian.net` is re-parsed as `https://<target>`. Any other first
+  segment is re-parsed only when it is host-shaped (a dot, and a last label of two or more letters) and
+  a PR / issue / browse marker follows it. `www.bitbucket.org` was added beyond the task's list
+  because the URL arm already accepts it.
+  - **QA cycle 1 tightened this beyond § 3's clarification.** That clarification accepted that
+    `v1.2/x/pull/3` would parse as a URL. Gate 1 found `v2.0/browse/x` and `5.x/fix/issues/12`
+    misread the same way (CR-3) and `feature/foo.atlassian.net/x` refused (CR-2). With the TLD-shape
+    rule all four stay branches. `jdoe.dev/fix/issues/12` still parses as a URL, because `dev` is a
+    real TLD and no rule can tell it from a host.
 - **Phase 2 — skill prose.** Step 0b's `.env` value parse takes the inside of the first quote pair
   (each `t` its own `-e`, for BSD sed), else strips an unquoted ` #…` tail. Step 1a gains a fenced
   **docs guard** block (`DOCS=absent DOC_FILE=""` with no `docs/` at the repository root, never
@@ -358,6 +364,29 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-03
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.177.qa.1.review-pr-resolution-edge-cases.md](./task.177.qa.1.review-pr-resolution-edge-cases.md)
+- **Gate File**: [task.177.gate.1.review-pr-resolution-edge-cases.yml](./task.177.gate.1.review-pr-resolution-edge-cases.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 227
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- CR-1 (medium): a `.env` value with a leading space keeps its comment and trailing spaces — sed's `t` flag is set by the leading trim.
+- CR-3 (medium): a version-shaped first segment (`v2.0/browse/x`, `5.x/fix/issues/12`) is read as a host.
+- CR-2 (low): `*.atlassian.net/*` crosses `/`, so `feature/foo.atlassian.net/x` is refused.
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -368,6 +397,7 @@ None.
 | 2026-10-03 | 1.1     | Review 1 (7/10 → 9/10): portable `.env` sed, corrected misread-branch example, docs guard as a fenced block, rung 2 reuses §0a with `pr_number` | review-task |
 | 2026-10-03 |         | Status → ready-for-development | review-task |
 | 2026-10-03 |         | Implemented — 4 files, 19 tests | develop |
+| 2026-10-03 |         | QA gate CONCERNS (80/100) — 3 findings | qa-task |
 
 <!-- change-log-end -->
 

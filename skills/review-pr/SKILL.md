@@ -135,9 +135,11 @@ JIRA_URL_SEEN="$JIRA_URL"
 # one is the inside of its first quote pair, an unquoted one loses a ` #…` comment tail, both trimmed.
 # Without that, `JIRA_URL="https://acme.atlassian.net" # prod` kept its comment and warned falsely.
 # Each `t` is its own -e: BSD sed reads `…; t; …` as a label named by the rest of the script.
-[ -n "$JIRA_URL_SEEN" ] || JIRA_URL_SEEN=$(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?JIRA_URL=//p' "$(git rev-parse --show-toplevel 2>/dev/null)/.env" 2>/dev/null \
+# The space after `=` is stripped by the FIRST sed, never the second: any earlier `s` that matches
+# sets the flag `t` tests, and the first `t` would then skip the comment strip and the trim.
+[ -n "$JIRA_URL_SEEN" ] || JIRA_URL_SEEN=$(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?JIRA_URL=[[:space:]]*//p' "$(git rev-parse --show-toplevel 2>/dev/null)/.env" 2>/dev/null \
   | tr -d '\r' | tail -1 \
-  | sed -E -e 's/^[[:space:]]+//' -e "s/^\"([^\"]*)\".*\$/\1/" -e t -e "s/^'([^']*)'.*\$/\1/" -e t \
+  | sed -E -e "s/^\"([^\"]*)\".*\$/\1/" -e t -e "s/^'([^']*)'.*\$/\1/" -e t \
         -e 's/[[:space:]]+#.*$//' -e 's/[[:space:]]+$//')
 case "$KIND" in
   pr)
@@ -258,11 +260,11 @@ code-only review. §0a itself is unchanged.
 # No docs/ at the repository root → no document, and §0a is not called at all.
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || ROOT=$(pwd)
 if [ -d "$ROOT/docs" ]; then
-  DOCS=present    # → run §0a now (from the root), then DOC_FILE="$LOCAL_PATH"
+  DOCS=present DOC_FILE=""    # → run §0a now (from the root), then DOC_FILE="$LOCAL_PATH"
 else
   DOCS=absent DOC_FILE=""
 fi
-printf 'DOCS=%s DOC_FILE=%s\n' "$DOCS" "${DOC_FILE:-}"
+printf 'DOCS=%s DOC_FILE=%s\n' "$DOCS" "$DOC_FILE"
 ```
 
 `DOCS=present` → run §0a with this rung's `KEY_FIELD` / `KEY_VALUE` and bind `DOC_FILE=$LOCAL_PATH`.

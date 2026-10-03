@@ -382,9 +382,10 @@ All notable changes to this project will be documented in this file. Format foll
 - **`/review-pr` resolves four targets it used to get wrong (task 177).**
   - A URL pasted without its scheme (`github.com/o/r/pull/12`, `acme.atlassian.net/browse/RAPP-702`,
     `bitbucket.org/ws/r/pull-requests/7`) parses as its `https://` form instead of becoming a branch
-    name. A known platform host is enough; any other dotted host needs a PR, issue or browse marker,
-    with the dot in the first segment, so `release/v1.2/x/pull/3` stays a branch.
-  - `JIRA_URL="https://acme.atlassian.net" # prod` in `.env` no longer warns that a Jira URL on that
+    name. Only the first segment is read as a host. A known platform host is enough; any other needs a
+    PR, issue or browse marker after it and a last label of two or more letters, so version-shaped
+    branches (`v2.0/browse/x`, `5.x/fix/issues/12`, `release/v1.2/x/pull/3`) stay branches.
+  - `JIRA_URL="https://acme.atlassian.net" # prod` (or `JIRA_URL= https://… # prod`) in `.env` no longer warns that a Jira URL on that
     same host "differs from JIRA_URL": Step 0b now takes the inside of the first quote pair, or strips
     an unquoted ` #…` comment.
   - A repository with no `docs/` can be reviewed from a card. A new Step 1a docs guard binds
