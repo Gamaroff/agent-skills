@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-10-01
-**Next Available Task Number:** **180**
+**Last Updated:** 2026-10-03
+**Next Available Task Number:** **181**
 
 ## How to use
 
@@ -220,6 +220,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 177 | [/review-pr resolution edge cases](task.177.review-pr-resolution-edge-cases/task.177.review-pr-resolution-edge-cases.md) | accepted | refactoring | Medium | 2026-10-02 | [#555](https://github.com/Gamaroff/agent-skills/issues/555) | — task.176 follow-ups 1–4: `.env` inline comment, docs-less repo fallback, scheme-less platform URLs, Step 2 rung 2 artifact filter · PR #557 merged |
 | 178 | [review-task and review-story cite the §0a key lookup](task.178.review-skills-cite-key-lookup/task.178.review-skills-cite-key-lookup.md) | planned | refactoring | Medium | 2026-10-02 | [#556](https://github.com/Gamaroff/agent-skills/issues/556) | — task.176 follow-up 5: replace 3 restated `grep -rl "jira_key: …"` lookups with §0a citations, plus a guard test |
 | 179 | [/review-pr resolution follow-ups](task.179.review-pr-resolution-follow-ups/task.179.review-pr-resolution-follow-ups.md) | planned | refactoring | Low | 2026-10-03 | [#558](https://github.com/Gamaroff/agent-skills/issues/558) | — task.177 follow-ups: one host reading for both parser arms (CR-1), known-host scheme-less prose (CR-2), comment-only `.env` value (CR3-1), stale test comments and title (CR3-2, CR3-4), §0a KEY_FIELD contract (CR3-3) |
+| 180 | [security-probe: a fence: entry form for a fenced bash block in a step doc](task.180.probe-engine-fence-entry-form/task.180.probe-engine-fence-entry-form.md) | planned | infrastructure | Medium | 2026-10-03 | [#560](https://github.com/Gamaroff/agent-skills/issues/560) | — cut from obs #261: `fence:<doc>#<heading>` + `--slot` + optional per-case `fixture`, so a fenced-block boundary is probed by the engine instead of a hand-written wrapper (task.159, task.167) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
