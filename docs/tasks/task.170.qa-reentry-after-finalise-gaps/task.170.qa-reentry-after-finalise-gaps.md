@@ -372,21 +372,28 @@ None.
 
 **Approach**: `reenter-qa-after-finalise.sh` copies `grant-qa-cycles.sh`'s shape — refuse first, restore
 through the one `--restore` path, write atomically — and adds the one thing the grant never does:
-lower `current_step` 7 → 5. All seven refusals run before any write; the document match uses
-`--restore --which`, the restore's own selection. The movement measure is `qa-task` Phase 0's in
-full. The contract gains a third bullet in § "Restore the lock (both resume paths)" (inside the
+lower `current_step` 7 → 5. All eight refusals (`lock-present`, `no-snapshot`, `not-a-finalise-halt`,
+`no-dod`, `dod-not-gaps`, `no-gate`, `uncommitted-fix`, `no-code-moved`) run before any write; the
+document match uses `--restore --which`, the restore's own selection. The movement measure is
+**committed history** since the newest gate's `head:` (QA cycles 1–4 narrowed it from review 1's
+"`qa-task` Phase 0 in full"): uncommitted tracked work is refused as `uncommitted-fix`, and untracked
+files are named but never counted. `qa_reentry.report_entries` records the back-filled count,
+`max(highest gate, headings)` (QA cycle 5). The contract gains a third bullet in § "Restore the lock (both resume paths)" (inside the
 `who-restores` marker, so the single-statement test still holds) and a section, **Re-entry after a
 finalise DoD-gaps halt**, whose refusal list sits between `reenter-qa-refusals` markers for the
 parity test.
 
 **Testing results**:
 
-- `bash shared/resources/reenter-qa-after-finalise.test.sh` — 25 passed, 0 failed (throwaway git
-  repos per case; every refusal, document-only refusal, committed / uncommitted / untracked / no-head
-  / non-40-hex / non-ancestor movement, budget rules, numeric and string `halt_step`, failed write).
+- `bash shared/resources/reenter-qa-after-finalise.test.sh` — 52 passed, 0 failed at QA cycle 6
+  (25 at first implementation; throwaway git repos per case; every refusal, document-only refusal,
+  committed / uncommitted / untracked / no-head / non-40-hex / non-ancestor movement, hostile gate
+  heads, budget rules, numeric and string `halt_step`, `report_entries` ahead/behind, failed write).
 - `bash shared/resources/develop-pipeline-on-stop.test.sh` — 49 passed (2 new `qa_reentry` cases).
-- `command node --test evals/shared/tests/reenter-qa-refusals-parity.test.mjs` — 3 passed.
-- Mutation proof: each of the seven refusals, the uncommitted / untracked / ancestor halves of the
+- `command node --test evals/shared/tests/reenter-qa-refusals-parity.test.mjs` — 5 passed at QA cycle 6 (3 at first
+  implementation).
+- Mutation proof (first implementation; each QA cycle mutation-proved its own fixes): each of the
+  seven then-existing refusals, the uncommitted / untracked / ancestor halves of the
   measure, the never-lower rule and the keep-the-lock rule were removed one at a time — every one
   turned the suite red (1–7 failures each). The Stop-hook case went red (2) with the 5a arm pointed
   at `/finalise`; the parity test went red with a reason dropped from the contract (1) and renamed
@@ -424,6 +431,34 @@ parity test.
 
 - CR-1 (gate 6, low) — carried to the gate's `recommendations.future` by the cosmetic-residue exit (route 2b, cycle 6): scope the resume contract's in-flight-gate sentence to a report not ahead of the gates.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.170.qa.6.qa-reentry-after-finalise-gaps.md`
+**Gate File**: `task.170.gate.6.qa-reentry-after-finalise-gaps.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Security Review:**
+   - [ ] `shared/resources/reenter-qa-after-finalise.sh:146` does not parse under macOS `/bin/bash` 3.2 (an unparenthesised case pattern inside `$(...)`); the suite under `/bin/bash` 3.2.57 fails 42/52. Fails closed, but the re-entry is unusable on a stock macOS shell.
+   - [ ] Probe zero-guard: `probes_executed: 0` — the probe engine cannot reach a two-positional shell script.
+
+### Next Steps:
+
+- [ ] **BLOCKING**: change the case pattern to `("$p".*)`, re-bundle, and add a guard that parses the script with `/bin/bash -n` where that shell is 3.x; commit. The resume re-enters QA at 5a for this code fix.
+- [ ] **BLOCKING**: operator decision on the zero-guard — record it as "unverified by the engine" (task.130 precedent) or extend the engine to multi-argument shell entries.
+
+**Estimated Effort:** Small — one-line fix, a parse guard, one QA cycle, one decision.
+
+**Gap Report Generated:** 2026-10-03
+
+**Detailed Verification Log:** See `task.170.dod.1.qa-reentry-after-finalise-gaps.md` for complete verification evidence and timestamps.
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -440,6 +475,7 @@ parity test.
 | 2026-10-03 |         | QA gate CONCERNS (80/100) — 4 findings (2 medium, 2 low) | qa-task |
 | 2026-10-03 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 | 2026-10-03 |         | QA gate PASS (100/100) — 1 finding (1 low) | qa-task |
+| 2026-10-03 |         | DoD incomplete — 2 gaps identified (security: bash 3.2 parse, probe zero-guard) | finalise |
 
 <!-- change-log-end -->
 

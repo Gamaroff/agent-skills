@@ -3,7 +3,7 @@
 **Task**: `task.170.qa-reentry-after-finalise-gaps.md`
 **Run Number**: 1
 **Started**: 2026-10-03 18:30
-**Status**: Escalated
+**Status**: Halted — DoD gaps
 
 ---
 
@@ -35,8 +35,8 @@ Add a sanctioned, recorded 7 → 5 QA re-entry (`reenter-qa-after-finalise.sh`) 
 | 2. review-task             | ✅ Done    | `task.170.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 0 critical / 4 important applied; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (iteration 1); audit 12/12, `ready-for-review` | `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #563: https://github.com/Gamaroff/agent-skills/pull/563 | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.170.qa.{N}.*.md`; `task.170.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.170.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.170.qa.{N}.*.md`; `task.170.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (re-entry +2 granted); gate 6 PASS 100 (route 2b); PR review APPROVE — task.170.pr-review.1 | —                    |
+| 7. finalise                | ❌ Failed  | `task.170.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps (dod.1): security — bash 3.2 parse (low), probe zero-guard (medium); AC 14/14, docs PASS | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -99,6 +99,16 @@ Add a sanctioned, recorded 7 → 5 QA re-entry (`reenter-qa-after-finalise.sh`) 
 - QA Cycle 1 — qa-fix inline findings (1b path: the findings were already in context from 5a; no ingester dispatched — independence loss accepted, the gate is the source). CR-2 (advisory) fixed too: cheap, fails toward re-review either way.
 - Post-fix PR state: OPEN (gh pr view).
 
+### Resume — QA loop re-entry — 2026-10-03
+
+- Re-invoked by `/develop-next` (run-state `dispatched: true, merged: false`); halt snapshot `halt_reason: loop-limit`, `halt_step: 5`.
+- Phase 0b resume prompt pre-answered by the operator ("use more cycles when resuming"): **Resume at 5a with 2 more cycles** (recommended k = 2) — no prompt.
+- Phase 0a detector run inline (no Explore subagent): no lock, halt snapshot for this directory, PR #563 OPEN at local HEAD `d0617e34`, clean tree — no blocking issues, no stale snapshot.
+- QA loop re-entry: 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk (5 gates, 5 `### QA Cycle` entries). `grant-qa-cycles.sh`: QA_CYCLE=5 extra_cycles_granted=2 qa_max_cycles=7; lock restored from the halt snapshot.
+- QA cycle 6 (2026-10-03): gate 6 PASS 100; route classifier → cosmetic-residue exit (route 2b), CR-1 (low) carried to `recommendations.future` and Deferred Work; gate + report committed `ecb1ce80` and pushed. Traceability matrix reused from cycle 1 (no new criteria).
+- Step 5c: `/review-pr --effort medium --comment` → **APPROVE** (4 low findings) — `task.170.pr-review.1.qa-reentry-after-finalise-gaps.md`; PR comment posted. `ready-for-merge`: stage-disabled.
+- PC-1 fixed before Step 7 (document-only): the task's Implementation Summary now names the eight shipped refusals, the committed-history measure and the current suite counts (52 / 5), so `/finalise` reads current evidence. CR-1 (parity-test and hooks-doc population), CR-2, CR-3 left as low follow-ups.
+
 ---
 
 ## Issues Log
@@ -132,6 +142,17 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 
 - QA cycle 1 read-back hit a transient `.git/index.lock` (another git process); retry succeeded.
 - Step 3 fast gate: `tests/test-clean-checkout.test.js` timing flake (10500 ms vs 10000 ms budget) — re-run alone green; not a defect of this change.
+
+### Finalise DoD Gaps — 2026-10-03
+
+`/finalise` (dod.1) did not accept: AC 14/14, Docs PASS, Compliance N/A, CI reading 1 SUCCESS @ `ecb1ce806be5`, but **Security FAIL** on two findings:
+
+1. **Low, reproduced by execution** — `shared/resources/reenter-qa-after-finalise.sh:146` does not parse under macOS `/bin/bash` 3.2.57 (`syntax error near unexpected token ';;'` — unparenthesised case pattern inside `$(...)`); suite under `/bin/bash` 3.2: 10 passed / 42 failed. Fails closed (exit 2 before any write; collides with the usage code). Both bundled copies are identical. Fix: `("$p".*)`.
+2. **Medium, zero-guard** — `probes_executed: 0`: the probe engine cannot reach a two-positional shell script (`path` / `shell-exec` → entry-not-probeable; `filename` ran 28 cases that all stopped at usage). task.130 took the same zero-guard and was accepted only on an operator decision.
+
+Step 8a (fix-and-recheck) refused by `finalise-fix-and-recheck.mjs`: `inside-files-summary` (bundled copies), `mutation-proved`, `no-other-finding-open` (finding 2). Gap report in the task body and `task.170.dod.1.qa-reentry-after-finalise-gaps.md`; PR comment posted.
+
+**Resume path:** fix finding 1 and commit → Phase 0b offers "Re-enter QA at 5a" (`reenter-qa-after-finalise.sh`, this task's own mechanism) → one QA cycle → 5c → `/finalise`. Finding 2 needs the operator's decision before `/finalise` can accept.
 
 ---
 
@@ -195,14 +216,24 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: CR-1 `report_entries` = back-filled count `max(highest gate, headings)`; CR-2 precedence wording (in-flight gate back-filled, not overwritten). Suite 52/52, parity 17/17; raw-count mutation red. Fast gate green.
 **Commit**: `66b822cd` (pushed with `9915dd93`)
 
+### QA Cycle 6 — 2026-10-03
+**Gate Result**: PASS
+**Issues Found**: 1 — CR-1 (low, QA-calibrated from medium) the in-flight-gate sentence is false when the report runs ahead of the gates (fails safe). Advisory CR-2 (low confidence), CR-3 (cleanup).
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — `task.170.pr-review.1.qa-reentry-after-finalise-gaps.md` (4 low: PC-1 stale Implementation Summary; CR-1 parity-test/hook-doc population; CR-2, CR-3 cleanups)
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 6 with HIGH 0 for cycles 5 and 6; all 1 open findings are LOW and are carried to the gate's recommendations.future by id (CR-1). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+**Verification**: cycle-5 fix verified — suite 52/52, parity 11/11, ci:fast 5264 pass / 0 fail (symlink aside); raw-count mutation reds "report_entries behind". Bug 5 closed.
+
 ---
 
 ## Completion
 
-**Finished**: 2026-10-03 (halted — QA loop limit)
-**Final Status**: Escalated
+**Finished**: 2026-10-03 (halted — finalise DoD gaps, after a granted QA re-entry: 6 cycles, gate 6 PASS, PR review APPROVE)
+**Final Status**: Halted — DoD gaps
 **Branch**: feature/task.170.qa-reentry-after-finalise-gaps
 **PR**: https://github.com/Gamaroff/agent-skills/pull/563
-**QA Iterations**: 5 (loop limit; gate-the-last-fix declined: medium-not-falling)
-**DoD Summary**: {populated after Step 7}
+**QA Iterations**: 6 (5 to the loop limit; +2 granted on resume; exited at cycle 6 via route 2b → 5c APPROVE)
+**DoD Summary**: `task.170.dod.1.qa-reentry-after-finalise-gaps.md` — ❌ GAPS (2)
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
