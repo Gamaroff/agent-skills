@@ -5,10 +5,10 @@ type: task
 description: "Close four edge cases task.176 left in /review-pr's target resolution: a .env JIRA_URL with a trailing comment, a repository with no docs/, a scheme-less platform URL, and Step 2 rung 2 matching an artifact's pr_number."
 tags: [review-pr, input-resolution, follow-up]
 category: refactoring
-status: planned
+status: ready-for-development
 priority: Medium
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 assignee:
 estimated_effort_hours: 8
 github_issue: 555
@@ -16,7 +16,8 @@ github_issue: 555
 
 # Technical Task: /review-pr resolution edge cases
 
-**Status:** Planned
+**Status:** Ready for Development
+**Review**: ✅ All review recommendations from `task.177.review.1.review-pr-resolution-edge-cases.md` implemented 2026-10-03
 **GitHub Issue**: [#555](https://github.com/Gamaroff/agent-skills/issues/555)
 
 ---
@@ -82,7 +83,7 @@ is known.
   lookup HALTs (exit 1, `DOC_STATUS=unreadable`) when `docs/` is missing. That is right for the develop
   pipelines, which cannot proceed without a document, and wrong for `/review-pr`, which can.
 - **Parser** — `parse-target.sh` classifies by `case "$TARGET" in *://*)` (URL), `'#'*)` (issue ref),
-  then number, Jira key, else branch (`parse-target.sh:227-233`).
+  then number, Jira key, else branch (`parse-target.sh:173-233`; the `*://*` arm is at `:178`).
 - **Step 2 rung 2** — a bare grep (`SKILL.md:397`). Rung 1's fallback, `find docs -type f -name "${STEM}.md"`,
   matches only an exact work-item filename, so it does not have this problem.
 - **The work-item rule** — §0a keeps a file named after its own directory (`{stem}/{stem}.md`) and
@@ -94,19 +95,27 @@ is known.
 - `.env` read: when the value starts with a quote, take the text inside the first quote pair. Otherwise
   strip an unquoted ` #…` tail. Then trim.
 - `/review-pr` checks for `docs/` at the repository root (`git rev-parse --show-toplevel`) **before**
-  calling §0a. A missing `docs/` means "no document": Step 1a continues at rung 4 and Step 2 continues
-  at rung 5/6. §0a itself is unchanged, so the develop pipelines still halt.
+  calling §0a, in **one fenced bash block** (the docs guard) so a test can extract and run it. A
+  missing `docs/` means "no document": the block binds `DOC_FILE=""` without calling §0a; otherwise it
+  runs §0a and binds `DOC_FILE=$LOCAL_PATH`. Step 1a rung 1 runs it and continues at rung 4 when
+  `DOC_FILE` is empty; Step 2 skips rungs 1–4 and continues at rung 5/6. §0a itself is unchanged, so
+  the develop pipelines still halt.
 - Parser: a target with no scheme whose first path segment is a known platform host (`github.com`,
   `www.github.com`, `bitbucket.org`, `api.bitbucket.org`, `*.atlassian.net`) is re-parsed as
   `https://<target>`. A dotted host followed by a recognised marker (`/pull/N`, `/pull-requests/N`,
   `/pullrequests/N`, `/issues/`, `/browse/`) is re-parsed the same way. Anything else stays a branch.
-- Step 2 rung 2: the grep's hits go through the §0a work-item rule, cited, not restated.
+- Step 2 rung 2 **is** the §0a Key → document lookup run with `KEY_FIELD=pr_number KEY_VALUE=$PR_NUMBER`
+  — the work-item rule is reused, not restated. Measured on the live tree: `pr_number 290` →
+  `DOC_STATUS=none` (the bare grep returns the bug.3 DoD), `pr_number 554` → `found` (task.176's own
+  document). It runs after the docs guard, since §0a HALTs on a missing `docs/`.
 
 ### Important Clarifications
 
-- A branch named like a dotted host plus a marker (`v1.2/pull/3`) would now parse as a URL. No branch in
-  this repository's history has that shape (`git branch -a`). The task's tests carry real branch names
-  (`feature/task.1.x`, `release/v1.2`) that must stay branches.
+- A branch whose **first** segment holds a dot, followed by two or more segments and a marker
+  (`v1.2/x/pull/3`), would now parse as a URL. `v1.2/pull/3` and `release/v1.2/pull/3` stay branches —
+  every marker pattern needs `host/x/…`, and `release` holds no dot (measured under bash and zsh). No
+  branch in this repository's history has the misread shape (`git branch -a`). The task's tests carry
+  real branch names (`feature/task.1.x`, `release/v1.2`, `v1.2/pull/3`) that must stay branches.
 - The parser's refusal of a malformed URL is unchanged. A re-parsed scheme-less URL with no target is
   refused exactly as its `https://` form is.
 
@@ -134,6 +143,10 @@ is known.
 
 None — API stable. Every target that parses today parses the same way, except that a scheme-less
 platform URL now parses as its URL instead of as a branch. Before this task, that input could only halt.
+
+One resolver behaviour tightens: Step 2 rung 2 reuses §0a, so two work items carrying the same
+`pr_number` now HALT as ambiguous (listing both) instead of the rung returning several files. A wrong
+pick would anchor the whole review on the wrong work item.
 
 ---
 
@@ -163,11 +176,14 @@ platform URL now parses as its URL instead of as a branch. Before this task, tha
 **Files**: `skills/review-pr/SKILL.md`, `skills/review-pr/tests/review-pr.test.js`
 
 - [ ] Step 0b: inline-comment handling for `JIRA_URL_SEEN`.
-- [ ] Step 1a rung 1 and Step 2 rung 4: a missing `docs/` at the repository root means "no document".
-- [ ] Step 2 rung 2: filter the grep's hits through the §0a work-item rule (cite it).
-- [ ] Tests: the Step 0b block with a commented `.env` (no warning on the matching host); a docs-less
-      consumer repo reaches rung 4 instead of halting; a fixture where only a DoD carries the `pr_number`
-      resolves no artifact.
+- [ ] Step 1a: a fenced **docs guard** block — a missing `docs/` at the repository root binds
+      `DOC_FILE=""` and skips §0a; otherwise it runs §0a. Step 1a rung 1 and Step 2 (rungs 1–4) cite it.
+- [ ] Step 2 rung 2: the §0a lookup with `KEY_FIELD=pr_number KEY_VALUE=$PR_NUMBER` (cite it).
+- [ ] Tests: the Step 0b block with a commented `.env` (no warning on the matching host); the docs
+      guard block, extracted and run in a docs-less consumer repo, binds `DOC_FILE=""` and exits 0, and
+      the rungs 3–4 block then reports `RUNG=key search`; `lookupBlock()` with `KEY_FIELD=pr_number`
+      against a fixture where only a DoD carries the `pr_number` returns `DOC_STATUS=none`, and one
+      where two work items share it HALTs as ambiguous.
 
 **Dependencies**: Phase 1 (shared test file).
 
@@ -239,11 +255,13 @@ None beyond the suite.
 - [ ] `JIRA_URL="https://acme.atlassian.net" # prod` in `.env` produces no warning for a Jira URL on
       `acme.atlassian.net` (executed Step 0b test, bash and zsh).
 - [ ] In a repository with no `docs/`, `/review-pr RAPP-702` continues past rung 1 instead of halting
-      (executed Step 1a test), while §0a still halts when called directly (existing test).
+      (the docs guard block, extracted and executed), while §0a still halts when called directly
+      (existing test, `review-pr.test.js` CR2-6).
 - [ ] `github.com/o/r/pull/12`, `acme.atlassian.net/browse/RAPP-702` and
       `bitbucket.org/ws/r/pull-requests/7` parse as their `https://` forms do, and the listed real
       branch names still parse as branches (parser cases, bash and zsh).
-- [ ] Step 2 rung 2 never returns a file the §0a rule classes as an artifact (fixture test).
+- [ ] Step 2 rung 2 never returns a file the §0a rule classes as an artifact (`lookupBlock()` with
+      `KEY_FIELD=pr_number`, fixture test, bash and zsh).
 
 ### Performance
 
@@ -308,6 +326,8 @@ None.
 | Date       | Version | Description                                              | Author      |
 | ---------- | ------- | -------------------------------------------------------- | ----------- |
 | 2026-10-02 | 1.0     | Initial draft — task.176 Deferred Work items 1–4         | create-task |
+| 2026-10-03 | 1.1     | Review 1 (7/10 → 9/10): portable `.env` sed, corrected misread-branch example, docs guard as a fenced block, rung 2 reuses §0a with `pr_number` | review-task |
+| 2026-10-03 |         | Status → ready-for-development | review-task |
 
 <!-- change-log-end -->
 
