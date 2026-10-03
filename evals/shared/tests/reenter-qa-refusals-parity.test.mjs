@@ -93,3 +93,47 @@ test("both orchestrators and the contract invoke the script by its bundled path"
     );
   }
 });
+
+// task.170 QA cycle 2, CR-1: after a re-entry the implementation report's last QA Cycle entry still
+// carries the APPROVE of the run that halted at Step 7, and the resume contract treats that row as the
+// source of truth. Every place the contract reads it must carry the qa_reentry precedence, or a pause
+// before the re-entered cycle writes its entry resumes at Step 7 over an ungated head.
+test("the resume contract's 5c readings ignore a terminal verdict that predates a QA re-entry", () => {
+  const text = read(CONTRACT);
+  const precedence = text.match(
+    /\*\*Second precedence — a QA re-entry[\s\S]*?Exactly one row matches any\s*>?\s*entry\./,
+  );
+  assert.ok(
+    precedence,
+    "the 5c sub-state paragraph must carry the QA re-entry precedence",
+  );
+  for (const needle of [
+    "`qa_reentry`",
+    "`gate_head`",
+    "**5a**",
+    "cycle `N+1`",
+  ]) {
+    assert.ok(
+      precedence[0].includes(needle),
+      `the precedence must name ${needle}`,
+    );
+  }
+  const rows = text.split("\n").filter((l) => /^\| 5–6\. qa loop \|/.test(l));
+  assert.equal(
+    rows.length,
+    2,
+    "one 5–6 artifact row per pipeline (story, task)",
+  );
+  for (const row of rows) {
+    assert.match(
+      row,
+      /`qa_reentry`[\s\S]*`gate_head`[\s\S]*\*\*not\*\* complete/,
+      "each 5–6 row must refuse a pre-re-entry verdict",
+    );
+  }
+  assert.doesNotMatch(
+    read("shared/resources/develop-pipeline-pause.md"),
+    /No reader branches on it/,
+    "the lock schema must not say qa_reentry has no reader",
+  );
+});

@@ -24,7 +24,7 @@
 #      The reasons are printed as `reenter-qa: refused (<reason>) — …`. The resume contract
 #      lists the same set; evals/shared/tests/reenter-qa-refusals-parity.test.mjs holds the two
 #      equal.
-#   2. MEASURES code movement with the qa-task Phase 0 measure, all of it: commits since the
+#   2. MEASURES code movement with the qa-task Phase 0 measure, plus one exclusion: commits since the
 #      gate's `head:` outside <doc-dir>, PLUS uncommitted and untracked changes outside it (and
 #      outside .claude/state, the pipeline's own scratch, where the consumed snapshot lives); a
 #      head that is absent, not 40-hex, not a commit or not an ancestor of HEAD counts as moved.
@@ -32,7 +32,9 @@
 #   3. RESTORES through `advance-pipeline-lock.sh --restore <doc-dir>` (the one restore path,
 #      which consumes the snapshot) and then, in ONE atomic write (mktemp + mv beside the lock):
 #        current_step = 5, qa_phase = "5a",
-#        qa_max_cycles = max(existing, base + 2) — base reconstructed as grant-qa-cycles.sh
+#        qa_max_cycles = max(existing, base + 2) — an absent budget counts as the loop's default 5
+#          (its `.qa_max_cycles // 5` read), so a re-entry never lowers the budget the loop would
+#          have used (task.170 QA cycle 2, CR-4); base reconstructed as grant-qa-cycles.sh
 #          does: max(highest gate via qa-cycle.sh, `### QA Cycle` entries in the report); 2 is
 #          the grant prompt's recommended k; an existing higher budget is kept, never lowered,
 #        qa_reentry = {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head}.
@@ -110,14 +112,21 @@ source "$NEWEST_SH" || { echo "reenter-qa: could not source newest-numbered.sh" 
 # {bug-prefix}.dod.{N}.*.md beside the parent's, and a directory-wide pattern read a higher-numbered
 # bug DoD as the task's verdict (task.170 QA cycle 1, CR-1 — the same reason finalise keys its own
 # lookup on the stem, TASK-125-BUG-8). The stem is the directory's task.{id} or story.{epic}.{story}
-# prefix; a directory carrying neither cannot be a develop-task / develop-story work item.
-STEM=$(basename "$DOC_DIR" | sed -nE 's/^(task\.[0-9]+|story\.[0-9]+\.[0-9]+[A-Za-z]?)(\..*)?$/\1/p')
+# prefix — the story number may carry create-parallel-stories' hybrid suffix (story.305.1-1) and a
+# sub-story letter (story.309.2.3A) (task.170 QA cycle 2, CR-2); a directory carrying neither shape
+# cannot be a develop-task / develop-story work item.
+STEM=$(basename "$DOC_DIR" | sed -nE 's/^(task\.[0-9]+|story\.[0-9]+\.[0-9]+(-[0-9]+)?[A-Za-z]?)(\..*)?$/\1/p')
 [ -n "$STEM" ] || { echo "reenter-qa: '$DOC_DIR' is not a task.{id}.* or story.{epic}.{story}.* work-item directory" >&2; usage; }
 DOD=$(newest_numbered "$DOC_DIR" dod -name "${STEM}.dod.*.md")
 [ -n "$DOD" ] && [ -f "$DOD" ] || refuse no-dod "no ${STEM}.dod.{N}.*.md in '$DOC_DIR' — a step-7 halt with no DoD file is not a DoD-gaps halt"
 grep -q '^\*\*Final Status:\*\* ❌ GAPS' "$DOD" || refuse dod-not-gaps "the newest DoD file '$DOD' does not carry **Final Status:** ❌ GAPS"
 
 # The gate and its cycle number come from the ONE definition, qa-cycle.sh, and are refused together.
+# Deliberately NOT stem-keyed like the DoD above: qa-cycle.sh is the selection the QA loop itself,
+# grant-qa-cycles.sh and the resume contract use, and the re-entered loop continues from the cycle
+# it names — a second gate key here would let this script and the loop disagree about the base
+# (task.170 QA cycle 2, CR-6; tests/qa-cycle.test.js forbids another gate derivation in a helper).
+# A co-located bug gate that makes the cycle ambiguous is refused by qa-cycle.sh, never guessed.
 GATE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" --path gate 2>/dev/null) || GATE=""
 BASE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" 2>/dev/null) || BASE=""
 case "$BASE" in ''|*[!0-9]*) BASE="" ;; esac
@@ -155,6 +164,11 @@ if ! RESTORE_OUT=$(bash "$ADVANCE" --restore "$DOC_DIR" 2>&1); then
   printf '%s\n' "$RESTORE_OUT" | sed 's/^advance-pipeline-lock:/reenter-qa:/' >&2
   exit 1
 fi
+# --restore exits 0 for "lock present — nothing to restore" as well as for a real restore. A lock that
+# appeared after the lock-present refusal above is not one this script restored, and lowering it would
+# rewrite another run's lock (task.170 QA cycle 2, CR-5): only a real restore proceeds.
+printf '%s\n' "$RESTORE_OUT" | grep -q 'lock restored from' \
+  || refuse lock-present "a lock appeared at '$LOCK' before the restore ran — it is not this re-entry's; nothing written"
 keep_restored() { echo "reenter-qa: the lock restored at step 7 is kept (its snapshot was consumed); the re-entry was NOT written — the run resumes at step 7" >&2; }
 if ! jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1; then
   echo "reenter-qa: the restored lock is not a JSON object — refusing to write" >&2
@@ -165,7 +179,7 @@ NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 if ! jq --argjson base "$BASE" --arg now "$NOW" --arg head "$GATE_HEAD" '
        .current_step = 5
        | .qa_phase = "5a"
-       | .qa_max_cycles = ([((.qa_max_cycles // 0) | tonumber? // 0), ($base + 2)] | max)
+       | .qa_max_cycles = ([((.qa_max_cycles // 5) | tonumber? // 5), ($base + 2)] | max)
        | .qa_reentry = {from_step: 7, reason: "dod-gaps-code-fix", at: $now, gate_head: $head}' \
      "$LOCK" > "$TMP"; then
   rm -f "$TMP"

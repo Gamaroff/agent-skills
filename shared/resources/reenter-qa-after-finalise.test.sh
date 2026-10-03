@@ -132,7 +132,13 @@ WANT_MAX=5; accept "untracked code file counts as moved"
 
 mkrepo budget; echo two > "$R/src/code.sh"
 jq 'del(.qa_max_cycles)' "$S" > "$S.n" && mv "$S.n" "$S"
-WANT_MAX=4; accept "no prior budget → base 2 + 2 = 4"
+WANT_MAX=5; accept "no prior budget → the loop's default 5 is kept (base 2 + 2 = 4 would lower it)"
+
+mkrepo budget-high; echo two > "$R/src/code.sh"
+jq 'del(.qa_max_cycles)' "$S" > "$S.n" && mv "$S.n" "$S"
+: > "$R/$DOC/task.42.gate.3.example.yml"; cp "$R/$DOC/task.42.gate.2.example.yml" "$R/$DOC/task.42.gate.4.example.yml"
+git -C "$R" add -A; git -C "$R" commit -qm "gates 3-4"
+WANT_MAX=6; accept "no prior budget, base 4 → 4 + 2 = 6 (above the default)"
 
 mkrepo report; echo two > "$R/src/code.sh"
 jq 'del(.qa_max_cycles)' "$S" > "$S.n" && mv "$S.n" "$S"
@@ -171,6 +177,15 @@ expect_refusal "a co-located bug DoD at GAPS does not stand in for an accepted t
 mkrepo taskprefix; echo two > "$R/src/code.sh"
 printf '**Final Status:** ✅ ACCEPTED\n' > "$R/$DOC/task.420.dod.9.other.md"
 WANT_MAX=5; accept "another work item's stem sharing the prefix (task.420) is not read as task.42's DoD"
+
+# ── QA cycle 2 CR-2: a parallel-story directory has a stem ───────────────────
+# create-parallel-stories numbers stories story.{epic}.{n}-{m}; the stem keeps the suffix.
+SAVED_DOC=$DOC; DOC=docs/stories/story.305.1-1.example-feature
+mkrepo parallel-story; echo two > "$R/src/code.sh"
+for f in "$R/$DOC"/task.42.*; do mv "$f" "$R/$DOC/story.305.1-1.${f##*/task.42.}"; done
+git -C "$R" add -A; git -C "$R" commit -qm "story names"
+WANT_MAX=5; accept "a hybrid-numbered parallel story (story.305.1-1) re-enters"
+DOC=$SAVED_DOC
 
 # ── CR-2: .claude/state is not movement ──────────────────────────────────────
 # In a repo that does not gitignore .claude/, the halt snapshot this script consumes is an untracked

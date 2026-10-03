@@ -4,7 +4,7 @@
 **Bug ID**: TASK-170-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 1 boundary probe)
 **Date Found**: 2026-10-03
 
@@ -61,3 +61,4 @@ asserting no `PWNED*` file exists and the lock reaches step 5.
 | ---------- | ------------ | ---------- | ------------------------------ |
 | 2026-10-03 | New          | QA         | Found in QA cycle 1            |
 | 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 1        |
+| 2026-10-03 | Closed       | QA         | Verified in QA cycle 2         |

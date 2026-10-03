@@ -5,7 +5,7 @@ type: task
 description: "When a /finalise DoD-gaps HALT is fixed by changing code, the documented resume re-runs finalise at step 7 over a head no QA gate has read; give the resume contract a sanctioned, recorded 7 → 5 re-entry, the way grant-qa-cycles.sh sanctions re-entry after a loop-limit escalation (observation #235)."
 tags: [develop-task, develop-story, resume, pipeline-lock, qa-loop, observation]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-09-30
 updated: 2026-10-03
@@ -17,7 +17,7 @@ github_issue: 536
 
 # Technical Task: QA re-entry after a finalise DoD-gaps halt fixed by a code change
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.170.review.1.qa-reentry-after-finalise-gaps.md` implemented 2026-10-03
 
@@ -396,26 +396,27 @@ parity test.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-03
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.170.qa.1.qa-reentry-after-finalise-gaps.md](./task.170.qa.1.qa-reentry-after-finalise-gaps.md)
-- **Gate File**: [task.170.gate.1.qa-reentry-after-finalise-gaps.yml](./task.170.gate.1.qa-reentry-after-finalise-gaps.yml)
+- **Full Report**: [task.170.qa.2.qa-reentry-after-finalise-gaps.md](./task.170.qa.2.qa-reentry-after-finalise-gaps.md)
+- **Gate File**: [task.170.gate.2.qa-reentry-after-finalise-gaps.yml](./task.170.gate.2.qa-reentry-after-finalise-gaps.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 77
+- **Tests Executed**: 89
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
 
 ### Key Findings
-- CR-1 (medium): the DoD lookup is directory-wide and reads a co-located bug's DoD as the task's verdict — [task.170.bug.1](./task.170.bug.1.dod-lookup-reads-colocated-bug-dod.md).
-- QA-1 (medium): hostile gate `head:` values are not pinned by the committed suite — [task.170.bug.2](./task.170.bug.2.hostile-gate-head-unprobed.md).
-- CR-3 (low): `qa_phase` writers under-listed in the lock schema.
+- CR-1 (high): a resume after the re-entry reads the original run's APPROVE and goes to Step 7 — [task.170.bug.3](./task.170.bug.3.resume-after-reentry-reads-stale-approve.md).
+- CR-2 (medium): the stem regex misses parallel-story directories — [task.170.bug.4](./task.170.bug.4.parallel-story-stem-unmatched.md).
+- CR-4 (low): an absent budget is read as 0, not the loop's 5.
+- Cycle 1's fixes verified; [bug.1](./task.170.bug.1.dod-lookup-reads-colocated-bug-dod.md) and [bug.2](./task.170.bug.2.hostile-gate-head-unprobed.md) closed.
 
 <!-- change-log-start -->
 
@@ -428,6 +429,7 @@ parity test.
 | 2026-10-03 |         | Status → ready-for-development                | review-task |
 | 2026-10-03 |         | Implemented — 9 source files (2 new scripts, 1 new parity test), 30 new test cases | develop |
 | 2026-10-03 |         | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-10-03 |         | QA gate FAIL (70/100) — 3 findings (1 high, 1 medium, 1 low) | qa-task |
 
 <!-- change-log-end -->
 

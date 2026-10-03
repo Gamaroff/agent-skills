@@ -4,7 +4,7 @@
 **Bug ID**: TASK-170-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 1 diff code review, CR-1)
 **Date Found**: 2026-10-03
 
@@ -66,3 +66,4 @@ a higher-numbered co-located bug DoD.
 | ---------- | ------------ | ---------- | ------------------------------ |
 | 2026-10-03 | New          | QA         | Found in QA cycle 1            |
 | 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 1        |
+| 2026-10-03 | Closed       | QA         | Verified in QA cycle 2         |
