@@ -5,19 +5,21 @@ type: task
 description: "Close the six advisory follow-ups task.135 left: validate a gate's head before the re-review trigger counts from it, pass the scope list as literal paths, recompute safety clause 1 in Step 3b from one bundled script, refuse to scope past an uncommitted fix, read qa-cycle.sh's refusal instead of discarding it, and make the freshness test's field reader agree with the shell's."
 tags: [qa-loop, qa-task, qa-story, scoping, follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-30
 updated: 2026-10-03
 assignee:
 estimated_effort_hours: 4
 risk_level: low
+completed_date: 2026-10-03
+pr_number: 562
 github_issue: 533
 ---
 
 # Technical Task: Harden task.135's gate-head scoping
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.168.review.1.gate-head-scoping-hardening.md` implemented 2026-10-03
 **GitHub Issue**: [#533](https://github.com/Gamaroff/agent-skills/issues/533)
 
@@ -301,9 +303,30 @@ From the Step 5c PR review ([pr-review.1](./task.168.pr-review.1.gate-head-scopi
 - **PR-review CR-2** — the uncommitted-fix guard's `git status` / `git ls-files` exit status is unchecked; compare `show-toplevel` for `WORK_ITEM_DIR`.
 - **PR-review CR-3** — `qa-gate-security-evidence.md` still places the clause-1 probe in the shared rule.
 
-## Change Log
+## Definition of Done - PASSED ✅
 
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.168.qa.3.gate-head-scoping-hardening.md`
+**Gate File**: `task.168.gate.3.gate-head-scoping-hardening.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (3 QA cycles; Step 5c PR review APPROVE)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 9/9 met — each traced to code and a per-PR test (L1–L15, the clause-1 script suite, the parity and freshness suites)
+✅ **Tests & PR:** PR #562; CI green over 5 checks; mutation proofs recorded for every fix
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed; shared rule, both QA skills and the QA loop doc updated; bundled copies regenerated
+✅ **Security Review:** PASS — `boundary: internal` recorded with its reason (gate-file input; no corpus sink models gate YAML)
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal QA-loop tooling
+
+**Task marked as ACCEPTED on:** 2026-10-03
+
+**Detailed Verification Log:** See `task.168.dod.1.gate-head-scoping-hardening.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -315,7 +338,7 @@ From the Step 5c PR review ([pr-review.1](./task.168.pr-review.1.gate-head-scopi
 | 2026-10-03 |  | QA gate CONCERNS (90/100) — 4 findings (1 medium, 3 low); cycle-1 findings fixed | qa-task |
 | 2026-10-03 |  | QA gate PASS (100/100) — 3 LOW carried to Deferred Work (route 2b); cycle-2 findings fixed | qa-task |
 | 2026-10-03 |  | QA findings fixed — gate PASS (100/100), 2 iterations | qa-fix |
-
+| 2026-10-03 | 1.2 | DoD passed — accepted (PR #562) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
