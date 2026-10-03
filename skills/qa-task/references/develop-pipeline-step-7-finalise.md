@@ -77,7 +77,14 @@ Then HALT:
 ```
 ⚠️ Finalise identified Definition of Done gaps.
 Review the implementation report at {path} and address the gaps before re-running /finalise.
+A gap closed by changing code re-enters QA at 5a before /finalise re-runs — the resume offers it.
 ```
+
+**A gap closed by a code change is gated before acceptance.** On the resume, a halt at 7 whose fix
+changed code outside the work item's directory re-enters the QA loop at 5a through
+`reenter-qa-after-finalise.sh` rather than re-running `/finalise` over a head no gate has read; a
+document-only fix (a re-scoped criterion) resumes at 7. The rule and the script's refusals are the
+resume contract's **Re-entry after a finalise DoD-gaps halt** (task.170).
 
 ---
 

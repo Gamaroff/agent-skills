@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.170.qa-reentry-after-finalise-gaps'
+task_title: '[Task 170] QA re-entry after a finalise DoD-gaps halt fixed by a code change'
+gate: PASS
+status_reason: 'Cycle 5 fix holds: report_entries is the back-filled count max(highest gate, headings), suite 52/52, parity 11/11, fast gate green, and reverting the fix reds the "report behind" case. One low finding: the in-flight-gate sentence is false when the report runs ahead of the gates, where the resume re-runs one cycle over the same head (fails safe — never an ungated finalise).'
+reviewer: 'QA Engineer'
+head: 'd0617e342e1fd0b7c1df2fc6d9389623da98515f'
+updated: '2026-10-03T20:53:07Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: low
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The Second precedence says a gate the re-entered cycle wrote before its entry is back-filled so the count passes report_entries; with the report AHEAD of the gates (3 headings, gate.2 → report_entries 3) a stale "### QA Cycle 3" heading already exists, the back-fill adds nothing, the precedence holds, and the resume opens cycle 4 over the same head. Reviewer rated medium/medium; QA traced it and calibrates low: the failure direction is one extra QA cycle, never a Step 7 over an ungated head, and report-ahead is itself the anomaly the reconstruction already logs.'
+    suggested_action: 'Scope the in-flight-gate sentence to a report not ahead of the gates, and name what the resume does in the report-ahead case (re-runs the cycle); or record the highest gate at re-entry and treat a higher gate as clearing.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5327
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+  ci: 'not read — no cycle waits on CI'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Delta changes the recorded report_entries value only; the refusal predicate is unchanged since cycle 1 (boundary: true, hand-executed hostile heads; engine corpus does not fit the script contract).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'CR-1 fails safe (extra cycle). Back-filled count closes cycle 5 CR-1.'
+  maintainability:
+    status: PASS
+    notes: 'CR-3 (cleanup): stale test comment at reenter-qa-after-finalise.test.sh:234.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: CR-1
+      action: 'The in-flight-gate sentence is false when the report runs ahead of the gates (no back-fill, the resume re-runs one cycle over the same head; fails safe). Scope the sentence to a report not ahead of the gates and name the report-ahead behaviour, or key clearing on the highest gate at re-entry.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+      carried_from: top_issues (route 2b, cycle 6)
+    - action: 'CR-2 (advisory, low confidence): report_entries equals the back-fill result only for contiguous gate/heading numbering; a duplicated or gapped heading set back-fills past it. Traced: the back-filled last entry carries PR Review "not reached", so no Step 7 follows — not harmful today.'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh']
+    - action: 'CR-3 (cleanup): rewrite the stale two-line comment above the ahead/behind loop.'
+      refs: ['shared/resources/reenter-qa-after-finalise.test.sh']
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-10-03'
+  total_iterations: 5
+  verification_method: 'Suite 52/52; parity 11/11; fast gate 5264 pass / 0 fail; report_entries mutation red'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.170.qa-reentry-after-finalise-gaps'
+task_title: '[Task 170] QA re-entry after a finalise DoD-gaps halt fixed by a code change'
+gate: CONCERNS
+status_reason: 'Cycle 4 routes hold (callers pass the report, routes agree across contract and SKILL.md, 52/52, parity 5/5). The report_entries key is a raw heading count, but the resume back-fills a heading for every gate without an entry, so when the report is behind the gates the precedence clears before the re-entered cycle runs (medium, QA-verified); the precedence''s in-flight-gate parenthetical is false (advisory).'
+reviewer: 'QA Engineer'
+head: '9915dd9376a735f30f7820752095ee62359f9295'
+updated: '2026-10-03T20:25:21Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/reenter-qa-after-finalise.sh'
+    finding: 'report_entries records the raw QA Cycle heading count; the resume''s reconstruction back-fills a heading for every gate without one, so with the report behind the gates (an operator QA run after the halt — task.142''s shape) the count grows past report_entries before any re-entered cycle runs, and the run re-enters at 5c on the back-filled pre-fix gate. Reviewer rated high/medium; QA verified the back-fill rule (contract § QA Cycle Count Reconstruction examples) and calibrates medium: it needs a report behind the gates plus an interruption in the window, and the wrong route lands at 5c, where /review-pr still reads the diff. See task.170.bug.5 (reopened).'
+    suggested_action: 'Record the back-filled count, max(highest gate, headings) — the script''s BASE; say so in the contract and schema; change the behind case to expect 2.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 105
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+  ci: 'not read — no cycle waits on CI'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1.'
+  maintainability:
+    status: PASS
+    notes: 'CR-2 wording is advisory.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (key on the back-filled count).'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh', 'shared/resources/develop-pipeline-resume-contract.md']
+  future:
+    - action: 'CR-2 (advisory, medium confidence): the precedence says an in-flight gate N+1 is overwritten by 5a; the gate-derived resume instead back-fills it and continues from it. Reword to what the resume does.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 1
+  fix_date: '2026-10-03'
+  total_iterations: 4
+  verification_method: 'Suite 52/52; parity 5/5; cycle-4 mutations red'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

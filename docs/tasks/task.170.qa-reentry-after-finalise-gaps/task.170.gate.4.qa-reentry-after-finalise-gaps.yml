@@ -1,0 +1,87 @@
+schema: 2
+task: 'task.170.qa-reentry-after-finalise-gaps'
+task_title: '[Task 170] QA re-entry after a finalise DoD-gaps halt fixed by a code change'
+gate: CONCERNS
+status_reason: 'No HIGH. Cycle 3 fixes hold (47/47), but the refusal routes disagree across the contract, script and SKILL.md (two mediums), base_cycle counts headings while entries are gate-numbered (low), and two documents were left describing the old measure (low).'
+reviewer: 'QA Engineer'
+head: 'eef60e4518b3a4870af1f18723c7e68a43ea1249'
+updated: '2026-10-03T19:58:56Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The halt-7 bullet sends a refused re-entry — uncommitted-fix included — to /finalise at 7, contradicting the refusal list, the script header and both SKILL.md paragraphs. See task.170.bug.6.'
+    suggested_action: 'Route only no-code-moved and a declined offer to step 7; uncommitted-fix returns to the operator.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/reenter-qa-after-finalise.sh'
+    finding: 'Untracked-only movement is refused as uncommitted-fix, so a document-only fix beside Step 4''s restored held-aside files can never reach no-code-moved, and the script''s message contradicts the contract. See task.170.bug.6.'
+    suggested_action: 'List untracked files, never refuse on them; uncommitted-fix is tracked changes only; add a document-only-plus-untracked case.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/reenter-qa-after-finalise.sh'
+    finding: 'base_cycle is max(highest gate, heading COUNT) while 5a numbers entries by gate cycle; with the report ahead the re-entered entry never exceeds base_cycle and the precedence never clears. See task.170.bug.5 (reopened).'
+    suggested_action: 'Record the heading count at re-entry and key the precedence on the count growing; take the cycle number from the gates as on any resume; test both directions.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'CHANGELOG.md'
+    finding: 'The CHANGELOG entry and the suite header still describe the cycle-1 measure (uncommitted and untracked count as moved) and seven reasons.'
+    suggested_action: 'Update both to the committed-history measure and the eight reasons.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 98
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+  ci: 'not read — no cycle waits on CI'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged; hostile heads committed.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1/CR-2 route an operator inconsistently; CR-3 can leave the precedence firing after the re-entered cycle.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-5 stale prose.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2, CR-3, CR-5.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/reenter-qa-after-finalise.sh', 'CHANGELOG.md']
+  future:
+    - action: 'CR-4 (advisory, medium confidence): the stem identity accepts a parent story''s stem when a parent DoD sits inside a sub-story directory with no DoD of its own. A parent''s DoD lives in the parent''s directory, so the state needs a misplaced file; a full-name identity was measured and rejected (8 of 206 tracked DoD files use a shortened name).'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh']
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 2
+  fix_date: '2026-10-03'
+  total_iterations: 3
+  verification_method: 'Suite 47/47; parity 4/4; cycle-3 mutations red'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2 fixed']
