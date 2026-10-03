@@ -379,6 +379,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The develop loop's fast-gate precondition no longer HALTs a correct project under a silent npm
+  log level (task 167, obs #213).** It read the script listing `npm run` prints, which npm treats as
+  log output, so `loglevel=silent` hid it. That happened through a project `.npmrc`, or through
+  `npm run -s`, which exports `npm_config_loglevel=silent` to every child. The project was then halted
+  with "does not define" for a script it defines. The listing call now passes `--loglevel=notice`,
+  which overrides both. `evals/shared/tests/fast-gate-precondition.test.mjs` gains three cases per
+  shell: silent env with the script defined (no HALT), silent env without it (still HALTs), and a
+  silent `.npmrc` with it defined (no HALT). `runCheck` takes optional `env` and `npmrc`.
+  `tests/executable-instructions.test.js` now reads past npm flags after `npm run` (`npmRunScript`),
+  so the new flag is not mistaken for a script name.
 - **`/review-pr` resolves four targets it used to get wrong (task 177).**
   - A URL pasted without its scheme (`github.com/o/r/pull/12`, `acme.atlassian.net/browse/RAPP-702`,
     `bitbucket.org/ws/r/pull-requests/7`) parses as its `https://` form instead of becoming a branch
