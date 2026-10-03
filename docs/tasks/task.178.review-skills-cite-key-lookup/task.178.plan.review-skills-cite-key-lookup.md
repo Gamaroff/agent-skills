@@ -24,7 +24,7 @@ and state the `KEY_FIELD` / `KEY_VALUE` to bind.
 **review-task/SKILL.md, Step 2 (around line 99).** Replace the `LOCAL_PATH=$(grep -rl …)` pipeline with
 prose plus a short block:
 
-- Run [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup)
+- Run `[§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup)`
   with `KEY_FIELD=jira_key KEY_VALUE=$JIRA_KEY`. It binds `LOCAL_PATH`, and it halts (exit 1) on several
   matches.
 - Then keep the task-only check on its result:
