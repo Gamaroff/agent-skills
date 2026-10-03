@@ -400,25 +400,29 @@ parity test.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-03
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.170.qa.5.qa-reentry-after-finalise-gaps.md](./task.170.qa.5.qa-reentry-after-finalise-gaps.md)
-- **Gate File**: [task.170.gate.5.qa-reentry-after-finalise-gaps.yml](./task.170.gate.5.qa-reentry-after-finalise-gaps.yml)
+- **Full Report**: [task.170.qa.6.qa-reentry-after-finalise-gaps.md](./task.170.qa.6.qa-reentry-after-finalise-gaps.md)
+- **Gate File**: [task.170.gate.6.qa-reentry-after-finalise-gaps.yml](./task.170.gate.6.qa-reentry-after-finalise-gaps.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 105
+- **Tests Executed**: 5327
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- CR-1 (medium): `report_entries` is a raw heading count, but the resume back-fills headings for gates without entries — [task.170.bug.5](./task.170.bug.5.reentry-precedence-clears-before-entry.md) reopened.
-- Cycle 4's routes verified; [bug.6](./task.170.bug.6.refusal-routes-disagree.md) closed.
+- Cycle 5's fix verified and mutation-proven; [task.170.bug.5](./task.170.bug.5.reentry-precedence-clears-before-entry.md) closed.
+- CR-1 (low): the in-flight-gate sentence is false when the report runs ahead of the gates — fails safe (one extra cycle).
+
+### Deferred Work
+
+- CR-1 (gate 6, low) — carried to the gate's `recommendations.future` by the cosmetic-residue exit (route 2b, cycle 6): scope the resume contract's in-flight-gate sentence to a report not ahead of the gates.
 
 <!-- change-log-start -->
 
@@ -435,6 +439,7 @@ parity test.
 | 2026-10-03 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 | 2026-10-03 |         | QA gate CONCERNS (80/100) — 4 findings (2 medium, 2 low) | qa-task |
 | 2026-10-03 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
+| 2026-10-03 |         | QA gate PASS (100/100) — 1 finding (1 low) | qa-task |
 
 <!-- change-log-end -->
 

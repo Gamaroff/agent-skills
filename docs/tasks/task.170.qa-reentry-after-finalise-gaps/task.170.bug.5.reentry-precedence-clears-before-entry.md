@@ -4,7 +4,7 @@
 **Bug ID**: TASK-170-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 3 review, CR-1)
 **Date Found**: 2026-10-03
 
@@ -73,3 +73,4 @@ State it once and have the two 5–6 rows cite it.
 | 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 4        |
 | 2026-10-03 | Reopened     | QA         | QA cycle 5: a raw heading count clears early once the resume back-fills a gate without an entry (CR-1) |
 | 2026-10-03 | Ready for QA | qa-fix     | Fixed in qa-fix cycle 5        |
+| 2026-10-03 | Closed       | QA         | Verified in QA cycle 6: back-filled count recorded; raw-count mutation reds the behind case |
