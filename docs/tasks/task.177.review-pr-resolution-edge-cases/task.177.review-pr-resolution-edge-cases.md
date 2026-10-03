@@ -5,18 +5,20 @@ type: task
 description: "Close four edge cases task.176 left in /review-pr's target resolution: a .env JIRA_URL with a trailing comment, a repository with no docs/, a scheme-less platform URL, and Step 2 rung 2 matching an artifact's pr_number."
 tags: [review-pr, input-resolution, follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-02
 updated: 2026-10-03
 assignee:
 estimated_effort_hours: 8
 github_issue: 555
+pr_number: 557
+completed_date: 2026-10-03
 ---
 
 # Technical Task: /review-pr resolution edge cases
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.177.review.1.review-pr-resolution-edge-cases.md` implemented 2026-10-03
 **GitHub Issue**: [#555](https://github.com/Gamaroff/agent-skills/issues/555)
 
@@ -386,12 +388,42 @@ None.
 ### Key Findings
 No critical issues identified. Three QA cycles: gate 1 CONCERNS (3), gate 2 CONCERNS (2), gate 3 PASS. Four advisory items are carried as future recommendations; one of them (CR3-1, a `.env` value that is only a comment) predates this task.
 
-<!-- change-log-start -->
+## Definition of Done - PASSED ✅
 
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.177.qa.3.review-pr-resolution-edge-cases.md` (cycles 1–3)
+**Gate File**: `task.177.gate.3.review-pr-resolution-edge-cases.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR review (Step 5c)**: ✅ APPROVE — `task.177.pr-review.1.review-pr-resolution-edge-cases.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 8/8 met, each traced to code and a per-PR test lane
+✅ **Tests:** `review-pr.test.js` 247/247 under bash and zsh; every fix mutation-proven
+✅ **PR:** #557; CI `test`, `link-check`, `shellcheck`, `validate` green
+✅ **Documentation:** CHANGELOG [Unreleased] › Fixed (task 177); `skills/review-pr/SKILL.md`
+✅ **Security Review:** PASS. The boundary `parse_target` was probed: 62 executed, 0 reproduced
+⚠️ **Compliance Review:** NOT_APPLICABLE (developer tooling)
+
+**Accepted deviations:** (1) § 3's "dotted host followed by a recognised marker" rule was dropped in
+QA cycle 2. Scheme-less re-parse covers known platform hosts only, and self-hosted URLs keep their
+`https://`. (2) The PR also fixes a dead link in task.178's plan (`57abb8c4`) that had kept
+develop's CI red since `4f284c8b`.
+
+**Task marked as ACCEPTED on:** 2026-10-03
+
+**Detailed Verification Log:** See `task.177.dod.1.review-pr-resolution-edge-cases.md` for complete verification evidence and timestamps.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                              | Author      |
-| ---------- | ------- | -------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-02 | 1.0     | Initial draft — task.176 Deferred Work items 1–4         | create-task |
 | 2026-10-03 | 1.1     | Review 1 (7/10 → 9/10): portable `.env` sed, corrected misread-branch example, docs guard as a fenced block, rung 2 reuses §0a with `pr_number` | review-task |
 | 2026-10-03 |         | Status → ready-for-development | review-task |
@@ -400,7 +432,7 @@ No critical issues identified. Three QA cycles: gate 1 CONCERNS (3), gate 2 CONC
 | 2026-10-03 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-03 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-10-03 |         | QA findings fixed — gate PASS (100/100), 2 iterations | qa-fix |
-
+| 2026-10-03 | 1.2 | DoD passed — accepted (PR #557) | finalise |
 <!-- change-log-end -->
 
 ---
