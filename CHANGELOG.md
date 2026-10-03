@@ -382,9 +382,9 @@ All notable changes to this project will be documented in this file. Format foll
 - **`/review-pr` resolves four targets it used to get wrong (task 177).**
   - A URL pasted without its scheme (`github.com/o/r/pull/12`, `acme.atlassian.net/browse/RAPP-702`,
     `bitbucket.org/ws/r/pull-requests/7`) parses as its `https://` form instead of becoming a branch
-    name. Only the first segment is read as a host. A known platform host is enough; any other needs a
-    PR, issue or browse marker after it and a last label of two or more letters, so version-shaped
-    branches (`v2.0/browse/x`, `5.x/fix/issues/12`, `release/v1.2/x/pull/3`) stay branches.
+    name. Only a known platform host in the first segment counts (port stripped, case folded). A
+    self-hosted URL keeps its `https://`: any guess at an unknown dotted segment reads a real branch
+    convention as a host (`v2.0/browse/x`, `jane.doe/fix/issues/123`), so those stay branches.
   - `JIRA_URL="https://acme.atlassian.net" # prod` (or `JIRA_URL= https://… # prod`) in `.env` no longer warns that a Jira URL on that
     same host "differs from JIRA_URL": Step 0b now takes the inside of the first quote pair, or strips
     an unquoted ` #…` comment.

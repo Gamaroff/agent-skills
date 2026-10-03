@@ -853,9 +853,29 @@ const PARSER_CASES = [
     "bitbucket.org/ws/r/pull-requests/7",
     { kind: "pr", pr: "7", host: "bitbucket.org", repo: "ws/r" },
   ],
+  // QA cycle 2, CR2-2: the port is stripped and the case folded before the known-host match.
+  [
+    "acme.atlassian.net:443/jira/software/projects/AB/boards/1?selectedIssue=AB-2",
+    { kind: "jira", jira_key: "AB-2", host: "acme.atlassian.net" },
+  ],
+  [
+    "GitHub.com/o/r/pull/5",
+    { kind: "pr", pr: "5", host: "github.com", repo: "o/r" },
+  ],
+  // QA cycle 2, CR2-1: only known platform hosts are re-parsed. A self-hosted URL keeps its
+  // scheme, because any guess at an unknown dotted segment reads a real branch convention as a host.
   [
     "ghe.corp.example/o/r/pull/44",
-    { kind: "pr", pr: "44", host: "ghe.corp.example", repo: "o/r" },
+    { kind: "branch", branch: "ghe.corp.example/o/r/pull/44" },
+  ],
+  [
+    "jane.doe/fix/issues/123",
+    { kind: "branch", branch: "jane.doe/fix/issues/123" },
+  ],
+  ["user.name/wip/pull/3", { kind: "branch", branch: "user.name/wip/pull/3" }],
+  [
+    "jane.doe/fix/issues/42-login-crash",
+    { kind: "branch", branch: "jane.doe/fix/issues/42-login-crash" },
   ],
   // Real branch names stay branches: no known host, and no dotted FIRST segment before a marker.
   ["feature/task.1.x", { kind: "branch", branch: "feature/task.1.x" }],
@@ -878,10 +898,9 @@ const PARSER_CASES = [
     "feature/foo.atlassian.net/x",
     { kind: "branch", branch: "feature/foo.atlassian.net/x" },
   ],
-  // A self-hosted Jira with a TLD-shaped host still parses.
   [
     "jira.corp.example/browse/AB-1",
-    { kind: "jira", jira_key: "AB-1", host: "jira.corp.example" },
+    { kind: "branch", branch: "jira.corp.example/browse/AB-1" },
   ],
 ];
 

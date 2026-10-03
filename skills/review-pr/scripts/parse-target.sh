@@ -172,29 +172,17 @@ esac
 
 # A URL pasted without its scheme: re-parse it as https://<target>, or it falls to
 # the final branch arm and the run ends in "no pull request found for github.com/…".
-# Only the FIRST segment is ever read as a host, so feature/foo.atlassian.net/x stays a
-# branch. A known platform host is enough. Any other host needs a recognised marker after
-# it and a last label of two or more letters (a TLD's shape), so a version-shaped segment
-# stays a branch: v2.0/browse/x, 5.x/fix/issues/12, release/v1.2/x/pull/3.
+# Only the FIRST segment is read as a host, and only a known platform host counts (its
+# port stripped, case folded), so feature/foo.atlassian.net/x stays a branch. A self-hosted
+# URL keeps its scheme: any rule that guesses at an unknown dotted segment reads some real
+# branch-naming convention as a host — v2.0/browse/x, jane.doe/fix/issues/123 (task.177 QA).
 case "$TARGET" in
   *://*) ;;
   ?*/*)
-    _host="${TARGET%%/*}"
-    _rest="${TARGET#*/}"
-    _tld="${_host%%:*}"
-    _tld="${_tld##*.}"
-    case "$_host" in
-      github.com | www.github.com | bitbucket.org | www.bitbucket.org | api.bitbucket.org | *?.atlassian.net)
+    _host=$(printf '%s' "${TARGET%%/*}" | tr '[:upper:]' '[:lower:]')
+    case "${_host%%:*}" in
+      github.com | www.github.com | bitbucket.org | www.bitbucket.org | api.bitbucket.org | ?*.atlassian.net)
         TARGET="https://$TARGET" ;;
-      *?.*)
-        case "$_tld" in
-          '' | ? | *[!A-Za-z]*) ;;
-          *)
-            case "$_rest" in
-              */pull/[0-9]* | */pull-requests/[0-9]* | */pullrequests/[0-9]* | */issues/* | browse/* | */browse/*)
-                TARGET="https://$TARGET" ;;
-            esac ;;
-        esac ;;
     esac ;;
 esac
 

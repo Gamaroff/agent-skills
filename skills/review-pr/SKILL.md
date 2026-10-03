@@ -132,7 +132,8 @@ REMOTE_REPO=$(repo_of "$REMOTE_URL")
 # read it from the environment, else from .env, the same two places the resolver looks.
 JIRA_URL_SEEN="$JIRA_URL"
 # .env by the resolver's rules: optional `export`, CR stripped, last wins. Then the value: a quoted
-# one is the inside of its first quote pair, an unquoted one loses a ` #…` comment tail, both trimmed.
+# one is the inside of its first quote pair, verbatim; an unquoted one loses a ` #…` comment tail and
+# trailing space.
 # Without that, `JIRA_URL="https://acme.atlassian.net" # prod` kept its comment and warned falsely.
 # Each `t` is its own -e: BSD sed reads `…; t; …` as a label named by the rest of the script.
 # The space after `=` is stripped by the FIRST sed, never the second: any earlier `s` that matches
@@ -268,6 +269,8 @@ printf 'DOCS=%s DOC_FILE=%s\n' "$DOCS" "$DOC_FILE"
 ```
 
 `DOCS=present` → run §0a with this rung's `KEY_FIELD` / `KEY_VALUE` and bind `DOC_FILE=$LOCAL_PATH`.
+§0a reads `docs/` relative to the working directory, so run it from the repository root the guard
+checked; from a subdirectory it HALTs with its own "run from the repository root" message.
 `DOCS=absent` → `DOC_FILE` is already `""`: continue at rung 4, as for any rung 1 that finds no
 document. In Step 2 it skips rungs 1–4, which all read `docs/`, and continues at rung 5/6.
 
