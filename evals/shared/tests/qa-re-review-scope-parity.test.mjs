@@ -379,6 +379,41 @@ function clause1() {
 }
 
 /**
+ * Clause 1's ONE definition since task.168 (CR3-4): the awk probe left this fenced block for a
+ * bundled script, so Step 3b can recompute it from its own shell. The block above now only CALLS
+ * the script, by the invocation spelling the bundler follows into qa-task and qa-story.
+ *
+ * The text tests below (transit constraints, the empty-vs-absent branches, the stdin guard) read
+ * the SCRIPT, which is where the program lives. The replay tests execute the BLOCK, with its
+ * invocation path pointed at the shared source — so they exercise the call and the probe together,
+ * and a block that stopped calling the script (or called it wrongly) fails them.
+ */
+const SCRIPT_PATH = join(
+  repoRoot,
+  "shared",
+  "resources",
+  "qa-safety-clause1.sh",
+);
+const SCRIPT_CALL =
+  ".agents/skills/{qa-task|qa-story}/references/qa-safety-clause1.sh";
+function scriptText() {
+  assert.ok(
+    existsSync(SCRIPT_PATH),
+    "shared/resources/qa-safety-clause1.sh must exist",
+  );
+  return readFileSync(SCRIPT_PATH, "utf-8");
+}
+function runnable() {
+  const block = clause1();
+  assert.equal(
+    block.split(SCRIPT_CALL).length - 1,
+    1,
+    `the shared clause-1 block must call the script exactly once as ${SCRIPT_CALL}`,
+  );
+  return block.split(SCRIPT_CALL).join(`"${SCRIPT_PATH}"`);
+}
+
+/**
  * Compare on content, not layout. The skills nest the block inside a numbered
  * list so every line carries three extra spaces; the shared rule has it at
  * column 0. Comments around the probe are also allowed to differ — each site
@@ -393,15 +428,17 @@ function normalise(text) {
     .join("\n");
 }
 
-test("both skills carry the clause-1 probe verbatim from the shared rule", () => {
+test("both skills carry the clause-1 call verbatim from the shared rule", () => {
   const body = normalise(clause1());
   assert.ok(
     normalise(ruleText()).includes(body),
     "shared rule must hold the canonical probe",
   );
   for (const [name, text] of skillText) {
+    // Each skill calls its OWN bundled copy; otherwise the call is the shared rule's, verbatim.
+    const own = body.split("{qa-task|qa-story}").join(name);
     assert.ok(
-      normalise(text).includes(body),
+      normalise(text).includes(own),
       `${name} must carry the canonical clause-1 probe verbatim — a paraphrase is where ` +
         `the two copies start disagreeing again`,
     );
@@ -410,7 +447,7 @@ test("both skills carry the clause-1 probe verbatim from the shared rule", () =>
 
 test("the clause-1 probe uses no GNU-only regex escapes", () => {
   assert.ok(
-    !/\\s|\\d|\\w/.test(clause1()),
+    !/\\s|\\d|\\w/.test(scriptText()),
     "the probe must use POSIX classes only — \\s fails closed and silently on BSD awk/mawk",
   );
 });
@@ -444,7 +481,7 @@ function runClause1WithGatePath(path) {
     "bash",
     [
       "-c",
-      `exec 0< <(sleep ${HOLD_STDIN_SECONDS} 2>/dev/null)\n${clause1()}\nprintf '%s' "$SAFETY_REPROBE"`,
+      `exec 0< <(sleep ${HOLD_STDIN_SECONDS} 2>/dev/null)\n${runnable()}\nprintf '%s' "$SAFETY_REPROBE"`,
     ],
     {
       env: { ...process.env, LATEST_GATE: path },
@@ -461,7 +498,7 @@ function runClause1(yaml) {
   try {
     return execFileSync(
       "bash",
-      ["-c", `${clause1()}\nprintf '%s' "$SAFETY_REPROBE"`],
+      ["-c", `${runnable()}\nprintf '%s' "$SAFETY_REPROBE"`],
       {
         env: { ...process.env, LATEST_GATE: file },
         encoding: "utf-8",
@@ -611,8 +648,13 @@ test("clause-1 guards the read before invoking awk", () => {
     /\[ -n "\$LATEST_GATE" \] && \[ -r "\$LATEST_GATE" \]/,
     "the probe must test that LATEST_GATE is set and readable before running awk",
   );
+  assert.match(
+    scriptText(),
+    /\[ -n "\$LATEST_GATE" \] && \[ -f "\$LATEST_GATE" \] && \[ -r "\$LATEST_GATE" \]/,
+    "the script must test that its gate is set, a file and readable before running awk",
+  );
   assert.ok(
-    clause1().includes("</dev/null"),
+    scriptText().includes("</dev/null"),
     "the probe must close stdin so awk's read-stdin fallback is unreachable even " +
       "if the guard is later removed",
   );
@@ -1068,14 +1110,16 @@ test("readSecurityEvidence ignores the gate's TOP-LEVEL evidence: block", () => 
 });
 
 /* ---------------------------------------------------------------------------
- * 10. The probe ships as PROSE AN AGENT COPIES AND RUNS, and two characters can
+ * 10. The probe shipped as PROSE AN AGENT COPIES AND RUNS, and two characters can
  * corrupt it in transit. Both of these were real defects in the task.82 change
- * set, found during QA, and both fail silently rather than loudly.
+ * set, found during QA, and both fail silently rather than loudly. Since task.168
+ * the program lives in qa-safety-clause1.sh, moved byte-for-byte; these tests read
+ * the script, and its program still honours every transit constraint.
  * ------------------------------------------------------------------------- */
 
 /** The awk program only — between `awk '` and the closing quote before the file arg. */
 function awkProgram() {
-  const m = /awk '\n([\s\S]*?)\n\s*' "\$LATEST_GATE"/.exec(clause1());
+  const m = /awk '\n([\s\S]*?)\n\s*' "\$LATEST_GATE"/.exec(scriptText());
   assert.ok(
     m,
     "clause 1 must invoke awk with a single-quoted multi-line program",
@@ -1116,21 +1160,31 @@ test("the awk program contains no apostrophe", () => {
   );
 });
 
-test("both skills carry the same two properties", () => {
-  // The verbatim-mirroring test above compares the probe body, but it strips
-  // comments before comparing — so a comment-only corruption in one skill would
-  // not surface there. Check each skill's own text directly.
+test("both skills call the clause-1 script and carry no copy of its probe", () => {
+  // Before task.168 each skill carried the awk program itself, and this test checked each copy for
+  // the two transit hazards. One definition now lives in the script (read by the tests above); what
+  // must hold in each skill is that it CALLS its bundled copy — in Phase 0 step 5 and again in the
+  // Step 3b preamble — and that no second copy of the program survives to drift from it.
   for (const [name, text] of skillText) {
-    const m = /awk '\n([\s\S]*?)\n\s*' "\$LATEST_GATE"/.exec(text);
-    assert.ok(m, `${name} must carry the single-quoted awk program`);
-    assert.equal(
-      [...m[1].matchAll(/\$0/g)].length,
-      0,
-      `${name}: the awk program names the whole-record variable`,
+    const call = `.agents/skills/${name}/references/qa-safety-clause1.sh`;
+    assert.ok(
+      text.split(call).length - 1 >= 2,
+      `${name} must call ${call} in Phase 0 step 5 and in the Step 3b preamble`,
     );
     assert.ok(
-      !m[1].includes("'"),
-      `${name}: the awk program contains an apostrophe`,
+      !/SECURITY_AXIS=\$\(awk/.test(text),
+      `${name} still carries an inline copy of the clause-1 awk probe — the script is its one definition`,
+    );
+    const bundled = join(
+      repoRoot,
+      "skills",
+      name,
+      "references",
+      "qa-safety-clause1.sh",
+    );
+    assert.ok(
+      existsSync(bundled),
+      `${name} must bundle qa-safety-clause1.sh (npm run bundle)`,
     );
   }
 });
@@ -1160,7 +1214,7 @@ function runClause1WithBrokenAwk(yaml) {
   try {
     return execFileSync(
       "bash",
-      ["-c", `${clause1()}\nprintf '%s' "$SAFETY_REPROBE"`],
+      ["-c", `${runnable()}\nprintf '%s' "$SAFETY_REPROBE"`],
       {
         env: {
           ...process.env,
@@ -1231,7 +1285,7 @@ test("a broken reader fires even on a gate that would otherwise be clean", () =>
 
 test("`absent` and an empty reading are distinct branches in the case", () => {
   // Structural, so the distinction cannot be tidied away into one wildcard.
-  const probe = clause1();
+  const probe = scriptText();
   assert.match(
     probe,
     /absent\)\s*:\s*;;/,

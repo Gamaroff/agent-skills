@@ -379,6 +379,33 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The QA loop's re-review trigger, cycle-3+ scope and safety carve-out fail toward review on
+  malformed input (task.168).** Six follow-ups task.135 left advisory, each with an executed test
+  under bash and zsh and a mutation proof:
+  - **The trigger validates the gate's head (CR4-1).** `qa-task` Phase 0 step 3 counted
+    `git rev-list <head>..HEAD`, so a hand-typed `head: HEAD`, or a head ahead of the checkout,
+    counted 0 on every run and a PASS gate skipped review whatever landed after it. A head that is
+    not a 40-hex commit and an ancestor of `HEAD` now re-reviews, and says why.
+  - **File names are literal in the scoped patch (CR4-2).** The cycle-3+ diff passed its file list
+    as pathspecs, so a root-level file named `:x` was pathspec magic and left the scope. It now runs
+    `git --literal-pathspecs diff`.
+  - **Clause 1 of `SAFETY_REPROBE` has one definition (CR3-4).** The awk probe moved byte-for-byte
+    into the bundled `qa-safety-clause1.sh` (`qa-task`, `qa-story`), called by Phase 0 step 5 and
+    again by each Step 3b preamble, where a computed `true` now overrides a bound `false`. Before,
+    Step 3b trusted the value an agent had typed, and narrowed after a security FAIL when it was
+    `false`.
+  - **An uncommitted fix HALTs the scoped arm (CR3-7).** The scope reads committed history, so a fix
+    still in the working tree was triggered for and then reviewed as absent. The HALT names the
+    paths; the work item's own directory (`$WORK_ITEM_DIR`, bound by each preamble) and
+    `.claude/state/` — the develop pipeline's scratch, untracked in a consumer that does not ignore
+    it — are excluded.
+  - **A `qa-cycle.sh` refusal is a HALT, not "no gate" (5c CR-1).** Phase 0 steps 2 and 5 rebound
+    `LATEST_GATE` with `--path gate 2>/dev/null` and ignored the exit status, so two files claiming
+    one cycle read as a first review and step 5 reported `SAFETY_REPROBE=false`. Both now use step
+    1's two-call pattern and keep the helper's stderr.
+  - **The freshness test reads `head:` as the shell does (5c CR-2).** `field()` stripped quotes
+    before trimming, so `head: 'abc'  ` read `abc'` there and `abc` in the QA blocks.
+
 - **The develop loop's fast-gate precondition no longer HALTs a correct project under a silent npm
   log level (task 167, obs #213).** It read the script listing `npm run` prints, which npm treats as
   log output, so `loglevel=silent` hid it. That happened through a project `.npmrc`, or through

@@ -44,12 +44,17 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..", "..");
 
-/** Top-level `key: value` from a gate's YAML, quotes and a trailing `# comment` stripped. */
+/**
+ * Top-level `key: value` from a gate's YAML, quotes and a trailing `# comment` stripped.
+ * Trim BEFORE unquoting, as the QA blocks' sed does: stripping the quotes first left
+ * `head: 'abc'  ` reading `abc'` here and `abc` in the shell (task.168, 5c CR-2).
+ */
 export function field(yml, key) {
   const m = new RegExp(`^${key}:[ \\t]*(.*)$`, "m").exec(yml);
   if (!m) return null;
   return m[1]
     .replace(/\s+#.*$/, "")
+    .trim()
     .replace(/^['"]|['"]$/g, "")
     .trim();
 }
@@ -315,4 +320,29 @@ test("a zone-less, date-only or bare-number updated: is red — its meaning woul
     { problems: [], resolved: true },
     "an explicit offset is an instant",
   );
+});
+
+test("field() reads a quoted head with trailing spaces exactly as the QA blocks' sed does (task.168, 5c CR-2)", () => {
+  // The shell reader, verbatim from qa-task Phase 0 step 3 and the shared scope block: strip the
+  // key, a trailing comment, every quote, trailing space. The two readers of `head:` must agree, or
+  // a gate the QA blocks accept fails this corpus test.
+  const SED = `s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['"]//g; s/[[:space:]]*$//`;
+  const sha = "0123456789abcdef0123456789abcdef01234567";
+  for (const line of [
+    `head: '${sha}'  `,
+    `head: "${sha}"\t`,
+    `head: '${sha}'  # git rev-parse HEAD`,
+    `head: ${sha}`,
+  ]) {
+    const shell = execFileSync("sed", ["-E", SED], {
+      input: `${line}\n`,
+      encoding: "utf8",
+    }).trim();
+    assert.equal(shell, sha, `the shell reads ${JSON.stringify(line)}`);
+    assert.equal(
+      field(`${line}\n`, "head"),
+      shell,
+      `field() agrees on ${JSON.stringify(line)}`,
+    );
+  }
 });

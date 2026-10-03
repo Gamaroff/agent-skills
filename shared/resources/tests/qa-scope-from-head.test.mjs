@@ -24,6 +24,11 @@
 //       counts (CR-4)
 //   G — two gates exist but $LATEST_GATE is unbound in this shell → HALT, never "schema 1"; and
 //       each skill's Step 3b preamble binds it with qa-cycle.sh (CR-2)
+//   L — task.168: the trigger re-reviews on a head it cannot vouch for (CR4-1); a `:`-named file
+//       stays in the scoped patch (CR4-2); Step 3b recomputes clause 1 and runs whole-branch after
+//       a security FAIL even with SAFETY_REPROBE=false bound (CR3-4); an uncommitted fix outside
+//       the work item HALTs, .claude/state does not (CR3-7); Phase 0 steps 2 and 5 HALT on a
+//       qa-cycle.sh refusal instead of reading "no gate" (5c CR-1)
 
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
@@ -157,6 +162,22 @@ function withoutUnset(env) {
   return env;
 }
 
+/**
+ * The scratch repo's bundled helpers, at the path the blocks address them by from the repository
+ * root — excluded, so they are not an untracked change.
+ */
+function installHelpers(dir, skill) {
+  const refs = path.join(dir, ".agents", "skills", skill, "references");
+  fs.mkdirSync(refs, { recursive: true });
+  for (const f of ["qa-cycle.sh", "qa-safety-clause1.sh"]) {
+    fs.copyFileSync(
+      path.join(ROOT, "shared", "resources", f),
+      path.join(refs, f),
+    );
+  }
+  fs.appendFileSync(path.join(dir, ".git", "info", "exclude"), ".agents/\n");
+}
+
 function run(shell, dir, script, env) {
   const argv =
     shell === "zsh"
@@ -170,14 +191,22 @@ function run(shell, dir, script, env) {
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
-function runScope(shell, fx) {
-  const diff = path.join(fx.dir, "scope.diff");
+function runScope(shell, fx, env = {}) {
+  // Outside the repository: inside it, the patch file is itself an untracked change and the
+  // uncommitted-fix HALT (task.168 CR3-7) fires on it. The skills write it under $TMPDIR too.
+  const diff = path.join(
+    fs.mkdtempSync(path.join(os.tmpdir(), "qa-scope-diff-")),
+    "scope.diff",
+  );
+  TMP.push(path.dirname(diff));
   const r = run(shell, fx.dir, scopeBlock(RULE), {
     PRIOR_GATES: "2",
     SAFETY_REPROBE: "false",
     LATEST_GATE: fx.gate,
     BASE: "develop",
     DIFF_FILE: diff,
+    WORK_ITEM_DIR: "docs",
+    ...env,
   });
   const patch = fs.existsSync(diff) ? fs.readFileSync(diff, "utf8") : "";
   fs.rmSync(fx.dir, { recursive: true, force: true });
@@ -348,11 +377,17 @@ for (const sh of SHELLS) {
 
 // ── F4/F5 — the trigger's coverage (CR-3, CR-4) ───────────────────────────────
 
-function passFixture() {
+function passFixture({ head: headOverride } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-trigger-"));
   TMP.push(dir);
   git(dir, "init", "-q", "-b", "develop");
-  const head = commitFile(dir, "skills/a.sh", "echo a\n", "the reviewed tree");
+  const reviewed = commitFile(
+    dir,
+    "skills/a.sh",
+    "echo a\n",
+    "the reviewed tree",
+  );
+  const head = headOverride ?? reviewed;
   // The task's own directory — the one path the trigger excludes (CR2-4).
   const taskDir = path.join(dir, "docs", "tasks", "t9");
   fs.mkdirSync(taskDir, { recursive: true });
@@ -546,12 +581,7 @@ for (const [skillFile, skill, docVar] of [
         path.join(workDir, "task.9.gate.1.x.yml"),
         "schema: 2\ngate: FAIL\nnfr_validation:\n  security:\n    status: FAIL\n    evidence: measured\n  performance:\n    status: PASS\n",
       );
-      const helper = path.join(dir, ".agents", "skills", skill, "references");
-      fs.mkdirSync(helper, { recursive: true });
-      fs.copyFileSync(
-        path.join(ROOT, "shared", "resources", "qa-cycle.sh"),
-        path.join(helper, "qa-cycle.sh"),
-      );
+      installHelpers(dir, skill);
       const probe = block(skillFile, /^SAFETY_REPROBE=false$/m);
       const r = run(
         sh,
@@ -656,4 +686,225 @@ for (const sh of SHELLS) {
       "the file's change is in the patch, not dropped as a quoted name",
     );
   });
+}
+
+// ── L — task.168: the six task.135 follow-ups ─────────────────────────────────
+
+/** The Step 3b fence of `skillFile`, whole — preamble and the shared scope block. */
+function step3bFence(skillFile) {
+  return block(skillFile, /^LAST_GATE_HEAD=\$\(grep -E '\^head:'/m);
+}
+
+/** The Phase 0 step 2 fence of `skillFile` — the one that reports the existing review. */
+function step2Fence(skillFile) {
+  return block(skillFile, /Found existing QA review/);
+}
+
+const SECURITY_FAIL =
+  "nfr_validation:\n  security:\n    status: FAIL\n    evidence: measured\n";
+
+for (const sh of SHELLS) {
+  test(`L1 [${sh}] — a gate whose head is \`HEAD\` re-reviews, never "nothing moved" (CR4-1)`, () => {
+    // rev-list HEAD..HEAD counts 0: without the format check a PASS gate skipped review forever.
+    const fx = passFixture({ head: "HEAD" });
+    const r = runTrigger(sh, fx, fx.doc);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(
+      r.stdout,
+      /gate head 'HEAD' is not a 40-hex commit on this branch/,
+    );
+    assert.match(r.stdout, /CODE_MOVED=1 DOC_MOVED=1/);
+  });
+
+  test(`L2 [${sh}] — a head that is not an ancestor of HEAD re-reviews (CR4-1)`, () => {
+    // A commit AHEAD of the checkout — a gate written on a branch that was later rewritten or
+    // reset. Every commit reachable from HEAD is reachable from it, so rev-list counted 0.
+    const fx = passFixture();
+    git(fx.dir, "checkout", "-q", "-b", "ahead");
+    const ahead = commitFile(
+      fx.dir,
+      "skills/z.sh",
+      "echo z\n",
+      "not on this branch",
+    );
+    git(fx.dir, "checkout", "-q", "develop");
+    fs.writeFileSync(
+      fx.gate,
+      fs
+        .readFileSync(fx.gate, "utf8")
+        .replace(/^head: .*$/m, `head: '${ahead}'`),
+    );
+    git(fx.dir, "add", "-A");
+    git(fx.dir, "commit", "-q", "--amend", "--no-edit");
+    const r = runTrigger(sh, fx, fx.doc);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /is not a 40-hex commit on this branch/);
+    assert.match(r.stdout, /CODE_MOVED=1 DOC_MOVED=1/);
+  });
+
+  test(`L3 [${sh}] — a file whose name begins with \`:\` stays in the scoped patch (CR4-2)`, () => {
+    // At the repository ROOT: only a pathspec that BEGINS with `:` is magic, and the file list is
+    // root-relative, so `skills/:colon.sh` was never at risk. `:colon.sh` as a pathspec is the short
+    // magic form with no signature — it matches `colon.sh`, and this file left the scope.
+    const fx = scratch();
+    // `git add -A`, not commitFile's `git add <name>`: the fixture's own add would read it as magic.
+    fs.writeFileSync(path.join(fx.dir, ":colon.sh"), "echo colon\n");
+    git(fx.dir, "add", "-A");
+    git(fx.dir, "commit", "-q", "-m", "a magic-looking name");
+    const r = runScope(sh, fx);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.patch,
+      /echo colon/,
+      "the file is a name, not pathspec magic — its change is in the patch",
+    );
+  });
+
+  test(`L4 [${sh}] — an uncommitted change outside the work item HALTs the scoped arm (CR3-7)`, () => {
+    const fx = scratch();
+    fs.appendFileSync(
+      path.join(fx.dir, "skills", "b.sh"),
+      "echo uncommitted fix\n",
+    );
+    const r = runScope(sh, fx);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /HALT: uncommitted changes outside the work item/);
+    assert.match(r.stdout, /skills\/b\.sh/, "the HALT names the path");
+    assert.equal(r.patch, "", "nothing is dispatched");
+  });
+
+  test(`L5 [${sh}] — the work item's own files and .claude/state do not HALT (CR3-7)`, () => {
+    // The QA cycle writes its report beside the gate; the develop pipeline writes its lock under
+    // .claude/state, untracked wherever a consumer's .gitignore does not cover it.
+    const fx = scratch();
+    fs.writeFileSync(path.join(fx.dir, "docs", "task.9.qa.3.x.md"), "report\n");
+    fs.mkdirSync(path.join(fx.dir, ".claude", "state"), { recursive: true });
+    fs.writeFileSync(
+      path.join(fx.dir, ".claude", "state", "develop-pipeline.lock"),
+      "{}\n",
+    );
+    const r = runScope(sh, fx);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /Re-review scope: files changed since gate 2/);
+  });
+
+  test(`L6 [${sh}] — the scoped arm refuses an unbound or root work-item directory (CR3-7)`, () => {
+    for (const bad of [undefined, "."]) {
+      const fx = scratch();
+      const r = runScope(sh, fx, { WORK_ITEM_DIR: bad });
+      assert.equal(r.status, 1, `${bad}: ${r.stdout}${r.stderr}`);
+      assert.match(
+        r.stdout,
+        /HALT: WORK_ITEM_DIR \(.*\) is not a work-item directory/,
+      );
+    }
+  });
+}
+
+for (const [skillFile, skill, dirVar, docVar, prefix] of [
+  [QA_TASK, "qa-task", "TASK_DIR", "TASK_FILE", "task.9"],
+  [QA_STORY, "qa-story", "STORY_DIR", "STORY_FILE", "story.9.1"],
+]) {
+  /** A work item whose directory holds two files claiming cycle 2 — qa-cycle.sh refuses them. */
+  function twoGatesOneCycle() {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-scope-head-"));
+    TMP.push(dir);
+    git(dir, "init", "-q", "-b", "develop");
+    const work = path.join(dir, "docs", "w");
+    fs.mkdirSync(work, { recursive: true });
+    fs.writeFileSync(
+      path.join(work, `${prefix}.x.md`),
+      "status: ready-for-review\n",
+    );
+    for (const n of ["2.a", "2.b"]) {
+      fs.writeFileSync(
+        path.join(work, `${prefix}.gate.${n}.yml`),
+        `gate: FAIL\n${SECURITY_FAIL}`,
+      );
+    }
+    installHelpers(dir, skill);
+    return { dir, doc: `docs/w/${prefix}.x.md` };
+  }
+
+  for (const sh of SHELLS) {
+    test(`L7 [${sh}] ${skill} — step 5 HALTs on a qa-cycle.sh refusal instead of saying false (5c CR-1)`, () => {
+      const fx = twoGatesOneCycle();
+      const r = run(
+        sh,
+        fx.dir,
+        block(skillFile, /^SAFETY_REPROBE=false$/m) +
+          '\necho "SAFETY_REPROBE=$SAFETY_REPROBE"\n',
+        { LATEST_GATE: undefined, [docVar]: fx.doc },
+      );
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /HALT: qa-cycle\.sh refused cycle 2/);
+      assert.match(
+        r.stderr,
+        /2 gate files claim cycle 2/,
+        "the helper's own reason is kept",
+      );
+      assert.doesNotMatch(r.stdout, /SAFETY_REPROBE=false/);
+    });
+
+    test(`L8 [${sh}] ${skill} — step 2 HALTs on a qa-cycle.sh refusal instead of reading "no gate" (5c CR-1)`, () => {
+      const fx = twoGatesOneCycle();
+      const r = run(sh, fx.dir, step2Fence(skillFile), {
+        LATEST_GATE: undefined,
+        [docVar]: fx.doc,
+      });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /HALT: qa-cycle\.sh refused cycle 2/);
+    });
+
+    test(`L9 [${sh}] ${skill} — Step 3b runs whole-branch after a security FAIL with SAFETY_REPROBE=false bound (CR3-4)`, () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-scope-head-"));
+      TMP.push(dir);
+      git(dir, "init", "-q", "-b", "develop");
+      commitFile(dir, "base.txt", "base\n", "base");
+      git(dir, "update-ref", "refs/remotes/origin/develop", "develop");
+      git(dir, "checkout", "-q", "-b", "feature");
+      const fix1 = commitFile(dir, "skills/a.sh", "echo early\n", "fix 1");
+      const work = path.join(dir, "docs", "w");
+      fs.mkdirSync(work, { recursive: true });
+      fs.writeFileSync(
+        path.join(work, `${prefix}.gate.1.x.yml`),
+        `schema: 2\ngate: CONCERNS\nhead: '${fix1}'\n`,
+      );
+      const fix2 = commitFile(dir, "skills/b.sh", "echo b\n", "fix 2 + gate 1");
+      // Gate 2 judged fix 2 and failed security. Cycle 3's scoped arm would read only c.sh.
+      fs.writeFileSync(
+        path.join(work, `${prefix}.gate.2.x.yml`),
+        `schema: 2\ngate: FAIL\nhead: '${fix2}'\n${SECURITY_FAIL}`,
+      );
+      commitFile(dir, "skills/c.sh", "echo c\n", "fix 3 + gate 2");
+      installHelpers(dir, skill);
+      const bin = path.join(dir, ".bin");
+      fs.mkdirSync(bin);
+      fs.writeFileSync(path.join(bin, "gh"), "#!/bin/sh\nexit 1\n", {
+        mode: 0o755,
+      });
+      fs.appendFileSync(path.join(dir, ".git", "info", "exclude"), ".bin/\n");
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "qa-scope-3b-"));
+      TMP.push(tmp);
+      const r = run(sh, dir, step3bFence(skillFile), {
+        PATH: `${bin}:${process.env.PATH}`,
+        TMPDIR: tmp,
+        [dirVar]: "docs/w",
+        LATEST_GATE: undefined,
+        SAFETY_REPROBE: "false",
+      });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      const [diffName] = fs
+        .readdirSync(tmp)
+        .filter((f) => f.startsWith("qa-code-review."));
+      assert.ok(diffName, "the fence wrote its patch under $TMPDIR");
+      const patch = fs.readFileSync(path.join(tmp, diffName), "utf8");
+      assert.match(
+        patch,
+        /echo early/,
+        "whole-branch: clause 1 recomputed from gate 2 overrides the bound false",
+      );
+      assert.doesNotMatch(r.stdout, /Re-review scope: files changed since/);
+    });
+  }
 }
