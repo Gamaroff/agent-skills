@@ -131,9 +131,14 @@ REMOTE_REPO=$(repo_of "$REMOTE_URL")
 # JIRA_URL is not bound by the resolver, which reads .env only to choose TRACKER — so
 # read it from the environment, else from .env, the same two places the resolver looks.
 JIRA_URL_SEEN="$JIRA_URL"
-# .env by the resolver's rules: optional `export`, CR stripped, trimmed, one quote pair, last wins.
+# .env by the resolver's rules: optional `export`, CR stripped, last wins. Then the value: a quoted
+# one is the inside of its first quote pair, an unquoted one loses a ` #…` comment tail, both trimmed.
+# Without that, `JIRA_URL="https://acme.atlassian.net" # prod` kept its comment and warned falsely.
+# Each `t` is its own -e: BSD sed reads `…; t; …` as a label named by the rest of the script.
 [ -n "$JIRA_URL_SEEN" ] || JIRA_URL_SEEN=$(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?JIRA_URL=//p' "$(git rev-parse --show-toplevel 2>/dev/null)/.env" 2>/dev/null \
-  | tr -d '\r' | tail -1 | sed -E "s/^[[:space:]]+//; s/[[:space:]]+$//; s/^[\"'](.*)[\"']$/\1/")
+  | tr -d '\r' | tail -1 \
+  | sed -E -e 's/^[[:space:]]+//' -e "s/^\"([^\"]*)\".*\$/\1/" -e t -e "s/^'([^']*)'.*\$/\1/" -e t \
+        -e 's/[[:space:]]+#.*$//' -e 's/[[:space:]]+$//')
 case "$KIND" in
   pr)
     if [ -n "$TARGET_HOST" ]; then                     # a bare number has no host to check
@@ -229,7 +234,7 @@ A first-hit-wins ladder. Record the rung as `resolved_via` (`jira key → <rung>
 
 | # | Rung | Mechanism |
 | --- | --- | --- |
-| 1 | **work item doc** | [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) with `KEY_FIELD=jira_key KEY_VALUE=$JIRA_KEY`, or `KEY_FIELD=github_issue KEY_VALUE=$ISSUE_NUM`; it binds `LOCAL_PATH`, and `DOC_FILE=$LOCAL_PATH` hands it on. Cited, not restated: one anchored, quote-tolerant lookup serves the develop pipelines and this skill |
+| 1 | **work item doc** | The **docs guard** below first — no `docs/` binds `DOC_FILE=""` and skips §0a. Otherwise [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) with `KEY_FIELD=jira_key KEY_VALUE=$JIRA_KEY`, or `KEY_FIELD=github_issue KEY_VALUE=$ISSUE_NUM`; it binds `LOCAL_PATH`, and `DOC_FILE=$LOCAL_PATH` hands it on. Cited, not restated: one anchored, quote-tolerant lookup serves the develop pipelines and this skill |
 | 2 | doc's `pr_number:` | `sed -nE "s/^pr_number:[[:space:]]*['\"]?([0-9]+)['\"]?[[:space:]]*$/\1/p" "$DOC_FILE"` → `PR` |
 | 3 | **branch stem** | `STEM=$(basename "$DOC_FILE" .md)`; a PR whose source branch is `STEM` or ends in `/STEM` — the rungs 3–4 block below |
 | 4 | key / closing PR | Jira: a PR whose title or description names `JIRA_KEY` — **candidates only**. GitHub issue: `gh issue view "$ISSUE_NUM" --json closedByPullRequestsReferences` — **`VCS=github` only** |
@@ -242,6 +247,27 @@ honoured, never overridden with `head -1`. **Epic** → **HALT**: `"{key} is an 
 task key."` An epic is detected after rung 1: the resolved doc's filename starts `epic.` or its
 frontmatter carries `type: epic`; with no doc and `TRACKER=jira`, the Step 3b call's
 `fields.issuetype.name` reads `Epic`. Reviewing every PR of an epic is out of scope.
+
+**The docs guard — run it before §0a, here and in Step 2.** §0a HALTs on a missing `docs/`, which
+is right for the develop pipelines (they cannot proceed without a document) and wrong here: a
+repository that keeps no `docs/` has no document, and this skill can still review its PR. Without
+the guard a card review in such a repository halted at rung 1 and never reached rung 4 or the
+code-only review. §0a itself is unchanged.
+
+```bash
+# No docs/ at the repository root → no document, and §0a is not called at all.
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || ROOT=$(pwd)
+if [ -d "$ROOT/docs" ]; then
+  DOCS=present    # → run §0a now (from the root), then DOC_FILE="$LOCAL_PATH"
+else
+  DOCS=absent DOC_FILE=""
+fi
+printf 'DOCS=%s DOC_FILE=%s\n' "$DOCS" "${DOC_FILE:-}"
+```
+
+`DOCS=present` → run §0a with this rung's `KEY_FIELD` / `KEY_VALUE` and bind `DOC_FILE=$LOCAL_PATH`.
+`DOCS=absent` → `DOC_FILE` is already `""`: continue at rung 4, as for any rung 1 that finds no
+document. In Step 2 it skips rungs 1–4, which all read `docs/`, and continues at rung 5/6.
 
 **Rungs 3 and 4 run as one block.** `gh pr list --head` is an exact match and the source branch
 carries a prefix (`feature/`, `bugfix/`), so rung 3 filters client-side, anchored on the last
@@ -391,10 +417,13 @@ A first-hit-wins cascade. Record which rung matched as `resolved_via` and print 
 `github issue → branch stem`, `github issue → closing PR`. When Step 1a found a PR but no document
 (rung 4 or 5), run the cascade from that PR as usual.
 
+Run the **docs guard** (Step 1a) before the cascade. `DOCS=absent` skips rungs 1–4, which all read
+`docs/`, and continues at rung 5/6.
+
 | # | Rung | Mechanism |
 | --- | --- | --- |
 | 1 | **branch stem** | strip `feature/` \| `bugfix/` \| `hotfix/` → `STEM` → `find docs -type f -path "*/${STEM}/${STEM}.md"`, else `find docs -type f -name "${STEM}.md"` |
-| 2 | `pr_number` | `grep -rlE "^pr_number:[[:space:]]*${PR_NUMBER}[[:space:]]*$" docs/` |
+| 2 | `pr_number` | [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) with `KEY_FIELD=pr_number KEY_VALUE=$PR_NUMBER` → `DOC_FILE=$LOCAL_PATH` |
 | 3 | gate `pr:` | `grep -rl --include='*.gate.*.yml' -- "$PR_URL" docs/` → its sibling work item |
 | 4 | tracker issue | PR body `#{N}` **or** `[A-Z]+-[0-9]+` → `github_issue:` / `jira_key:` frontmatter grep |
 | 5 | Explore | bounded read-only subagent fallback |
@@ -405,9 +434,9 @@ A first-hit-wins cascade. Record which rung matched as `resolved_via` and print 
 > silently. And an unanchored `pr_number: ${PR_NUMBER}` is a prefix match: reviewing PR 28 would resolve
 > to a document whose frontmatter reads `pr_number: 281`, anchoring the entire review on the wrong work
 > item. Both fail quietly, which is the worst shape for a resolver whose job is to be right about
-> *which document this is*.
+> *which document this is*. Rung 2 gets its anchoring from §0a, below.
 
-Rung 1 handles `task.{N}.*`, `story.{E}.{S}.*`, `epic.{N}.*` and `bug.{N}.*`. Rungs 4–5 reuse the cascade already documented in [`references/develop-pipeline-step-0-resolve-and-prepare.md`](references/develop-pipeline-step-0-resolve-and-prepare.md) § 0a — do not reinvent it. Rung 4's frontmatter grep **is** [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup), run with the key or number the PR body names: anchored, quote-tolerant, and a HALT on several matches.
+Rung 1 handles `task.{N}.*`, `story.{E}.{S}.*`, `epic.{N}.*` and `bug.{N}.*`. Rungs 4–5 reuse the cascade already documented in [`references/develop-pipeline-step-0-resolve-and-prepare.md`](references/develop-pipeline-step-0-resolve-and-prepare.md) § 0a — do not reinvent it. Rungs 2 and 4 **are** [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) — rung 2 with `KEY_FIELD=pr_number`, rung 4 with the key or number the PR body names: anchored, quote-tolerant, the work-item rule applied, and a HALT on several matches. Rung 2 was a bare `grep` before task.177, so a review of PR 290 anchored on `bug.3.dod.1…md`, the one file carrying `pr_number: 290` — a DoD summary, not the bug.
 
 **Rung 4 must match both shapes.** A Bitbucket PR description carries `PROJ-123`, never `#{N}`; matching only the GitHub shape makes this rung dead on exactly the Bitbucket + Jira combination the skill exists to support.
 

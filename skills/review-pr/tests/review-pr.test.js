@@ -207,9 +207,15 @@ test("resolution greps are anchored and recursive (no ** globs, no prefix matche
   assert.doesNotMatch(rows, /docs\/\*\*\//, "no ** glob may survive in a rung");
   assert.match(rows, /grep -rl --include='\*\.gate\.\*\.yml'/);
   assert.match(rows, /find docs -type f/);
-  // CR-1: an unanchored pr_number grep makes PR 28 resolve to pr_number: 281.
-  assert.match(rows, /\^pr_number:/);
-  assert.match(rows, /\[\[:space:\]\]\*\$/);
+  // CR-1: an unanchored pr_number grep makes PR 28 resolve to pr_number: 281. Since task.177 rung 2
+  // is the §0a lookup, whose anchoring the "rung 2 (§0a, pr_number)" tests below execute.
+  assert.match(rows, /\| 2 \| `pr_number` \| \[§0a Key → document lookup\]/);
+  assert.match(rows, /KEY_FIELD=pr_number KEY_VALUE=\$PR_NUMBER/);
+  assert.doesNotMatch(
+    rows,
+    /grep -rlE "\^pr_number:/,
+    "no bare pr_number grep survives in a rung",
+  );
 });
 
 test("no shell snippet depends on bash-only glob behaviour", () => {
@@ -834,6 +840,34 @@ const PARSER_CASES = [
     "https://github.com/o/pull/pull/3",
     { kind: "pr", pr: "3", host: "github.com", repo: "o/pull" },
   ],
+  // Scheme-less URLs (task.177): re-parsed as https://<target>, never a branch.
+  [
+    "github.com/o/r/pull/12",
+    { kind: "pr", pr: "12", host: "github.com", repo: "o/r" },
+  ],
+  [
+    "acme.atlassian.net/browse/RAPP-702",
+    { kind: "jira", jira_key: "RAPP-702", host: "acme.atlassian.net" },
+  ],
+  [
+    "bitbucket.org/ws/r/pull-requests/7",
+    { kind: "pr", pr: "7", host: "bitbucket.org", repo: "ws/r" },
+  ],
+  [
+    "ghe.corp.example/o/r/pull/44",
+    { kind: "pr", pr: "44", host: "ghe.corp.example", repo: "o/r" },
+  ],
+  // Real branch names stay branches: no known host, and no dotted FIRST segment before a marker.
+  ["feature/task.1.x", { kind: "branch", branch: "feature/task.1.x" }],
+  ["release/v1.2", { kind: "branch", branch: "release/v1.2" }],
+  ["hotfix/v1.2.1", { kind: "branch", branch: "hotfix/v1.2.1" }],
+  ["v1.2/pull/3", { kind: "branch", branch: "v1.2/pull/3" }],
+  ["release/v1.2/pull/3", { kind: "branch", branch: "release/v1.2/pull/3" }],
+  // Matches a marker pattern, but the dot is not in the first segment — the inner guard keeps it a branch.
+  [
+    "release/v1.2/x/pull/3",
+    { kind: "branch", branch: "release/v1.2/x/pull/3" },
+  ],
 ];
 
 for (const shell of SHELLS) {
@@ -849,6 +883,8 @@ for (const shell of SHELLS) {
   for (const [input, reason] of [
     ["https://example.com/foo", "url-no-target"],
     ["https://github.com/o/r/tree/main", "url-no-target"],
+    // task.177: a scheme-less URL with no target is refused exactly as its https:// form is.
+    ["github.com/o/r/tree/main", "url-no-target"],
     ["https://acme.atlassian.net/wiki/spaces/X", "url-no-target"],
     ["#abc", "bad-issue-ref"],
     // QA cycle 1, QA-1: output is one key=value per line, so a newline would forge a line.
@@ -1980,6 +2016,38 @@ const PARSER_PROBE_CASES = [
       exit: 0,
     },
   ],
+  // task.177: scheme-less platform URLs parse as their https:// forms.
+  [
+    "pt.legit-schemeless-github-pr",
+    "github.com/o/r/pull/12",
+    "legitimate",
+    {
+      stdout: kv({ kind: "pr", pr: "12", host: "github.com", repo: "o/r" }),
+      exit: 0,
+    },
+  ],
+  [
+    "pt.legit-schemeless-jira-browse",
+    "acme.atlassian.net/browse/RAPP-702",
+    "legitimate",
+    {
+      stdout: kv({
+        kind: "jira",
+        jira_key: "RAPP-702",
+        host: "acme.atlassian.net",
+      }),
+      exit: 0,
+    },
+  ],
+  [
+    "pt.legit-schemeless-bitbucket-pr",
+    "bitbucket.org/ws/r/pull-requests/7",
+    "legitimate",
+    {
+      stdout: kv({ kind: "pr", pr: "7", host: "bitbucket.org", repo: "ws/r" }),
+      exit: 0,
+    },
+  ],
   [
     "pt.legit-issue-ref",
     "#536",
@@ -2044,3 +2112,177 @@ test("the parser is reachable by the security probe engine and its boundary hold
   assert.deepEqual(out.reproduced, [], "no hostile case accepted");
   assert.deepEqual(out.overblocked, [], "no legitimate form refused");
 });
+
+// ---------------------------------------------------------------------------
+// task.177 — resolution edge cases: a commented .env, a docs-less repository, and rung 2's
+// work-item filter. (Scheme-less URLs are in PARSER_CASES above.)
+// ---------------------------------------------------------------------------
+
+// The docs guard is one fenced block in Step 1a, identified by the variable it binds.
+function docsGuardBlock() {
+  const blocks = bashBlocks(STEP1A()).filter((b) => b.includes("DOCS=absent"));
+  assert.equal(
+    blocks.length,
+    1,
+    "Step 1a carries exactly one docs guard block",
+  );
+  return blocks[0];
+}
+
+test("Step 1a rung 1 and Step 2 both run the docs guard before §0a", () => {
+  const rows = STEP1A()
+    .split("\n")
+    .filter((l) => /^\| 1 \|/.test(l));
+  assert.match(rows.join("\n"), /\*\*docs guard\*\*/);
+  const step2 = section("### Step 2 — Resolve the work item", "### Step 3 —");
+  assert.match(
+    step2,
+    /Run the \*\*docs guard\*\* \(Step 1a\) before the cascade/,
+  );
+  assert.match(step2, /`DOCS=absent` skips rungs 1–4/);
+});
+
+for (const shell of SHELLS) {
+  test(`Step 0b (${shell}): an inline-commented .env JIRA_URL on the same host does not warn`, () => {
+    for (const line of [
+      'JIRA_URL="https://acme.atlassian.net" # prod',
+      "JIRA_URL='https://acme.atlassian.net' # prod",
+      "export JIRA_URL=https://acme.atlassian.net   # prod",
+    ]) {
+      const { dir, bin } = consumerRepo("git@bitbucket.org:ws/repo.git");
+      fs.writeFileSync(path.join(dir, ".env"), `${line}\r\n`);
+      fs.writeFileSync(path.join(bin, "gh"), "#!/bin/sh\n", { mode: 0o755 });
+      const r = runScript(
+        shell,
+        step0bBlock() + '\necho "BOUND key=$JIRA_KEY"\n',
+        {
+          cwd: dir,
+          env: blockEnv(bin, {
+            TARGET: "https://acme.atlassian.net/browse/RAPP-702",
+            TRACKER: "jira",
+          }),
+        },
+      );
+      assert.equal(r.status, 0, `${line}: ${r.stdout}${r.stderr}`);
+      assert.match(r.stdout, /BOUND key=RAPP-702/);
+      assert.doesNotMatch(r.stdout, /⚠️/, `${line}: same host — no warning`);
+    }
+  });
+
+  test(`Step 0b (${shell}): a commented .env JIRA_URL on ANOTHER host still warns (non-vacuity)`, () => {
+    const { dir, bin } = consumerRepo("git@bitbucket.org:ws/repo.git");
+    fs.writeFileSync(
+      path.join(dir, ".env"),
+      'JIRA_URL="https://other.atlassian.net" # prod\n',
+    );
+    fs.writeFileSync(path.join(bin, "gh"), "#!/bin/sh\n", { mode: 0o755 });
+    const r = runScript(shell, step0bBlock(), {
+      cwd: dir,
+      env: blockEnv(bin, {
+        TARGET: "https://acme.atlassian.net/browse/RAPP-702",
+        TRACKER: "jira",
+      }),
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(
+      r.stdout,
+      /⚠️ Jira URL host acme\.atlassian\.net differs from JIRA_URL other\.atlassian\.net/,
+    );
+  });
+
+  test(`docs guard (${shell}): a repository with no docs/ binds DOC_FILE="" and does not halt`, () => {
+    const { dir } = consumerRepo("git@github.com:o/r.git");
+    const sub = path.join(dir, "src");
+    fs.mkdirSync(sub);
+    // Run from a subdirectory: the guard looks at the repository root, not the cwd.
+    const r = runScript(shell, docsGuardBlock(), { cwd: sub });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^DOCS=absent DOC_FILE=$/m);
+    assert.doesNotMatch(r.stdout, /HALT/);
+  });
+
+  test(`docs guard (${shell}): with docs/ present it hands over to §0a`, () => {
+    const { dir } = consumerRepo("git@github.com:o/r.git");
+    fs.mkdirSync(path.join(dir, "docs"));
+    const r = runScript(shell, docsGuardBlock(), { cwd: dir });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^DOCS=present DOC_FILE=$/m);
+  });
+
+  test(`docs guard (${shell}): a docs-less card review reaches rung 4 key search`, () => {
+    const { dir, bin } = consumerRepo("git@github.com:o/r.git");
+    const guard = runScript(shell, docsGuardBlock(), { cwd: dir });
+    assert.equal(guard.status, 0, guard.stdout + guard.stderr);
+    const docFile = guard.stdout.match(/DOC_FILE=(.*)$/m)[1];
+    const hits = JSON.stringify([
+      { number: 3, title: "RAPP-702 fix", state: "OPEN", headRefName: "x" },
+    ]);
+    fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\necho '${hits}'\n`, {
+      mode: 0o755,
+    });
+    const r = runScript(shell, rungsBlock(), {
+      cwd: dir,
+      env: blockEnv(bin, {
+        KIND: "jira",
+        JIRA_KEY: "RAPP-702",
+        ISSUE_NUM: "",
+        DOC_FILE: docFile,
+      }),
+    });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^RUNG=key search$/m);
+  });
+
+  // Rung 2 is §0a with KEY_FIELD=pr_number: the work-item rule applies, as it does for keys.
+  const prNumberFixture = (files) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-prnum-"));
+    for (const [rel, body] of Object.entries(files)) {
+      fs.mkdirSync(path.join(dir, path.dirname(rel)), { recursive: true });
+      fs.writeFileSync(path.join(dir, rel), body);
+    }
+    return dir;
+  };
+  const rung2 = (dir, value) =>
+    runScript(
+      shell,
+      `${lookupBlock()}\necho "STATUS=$DOC_STATUS PATH=$LOCAL_PATH"\n`,
+      {
+        cwd: dir,
+        env: { ...process.env, KEY_FIELD: "pr_number", KEY_VALUE: value },
+      },
+    );
+
+  test(`rung 2 (§0a, pr_number, ${shell}): a DoD carrying the pr_number is not the work item`, () => {
+    const dir = prNumberFixture({
+      "docs/bugs/bug.3.x/bug.3.x.md": "# bug 3, no frontmatter\n",
+      "docs/bugs/bug.3.x/bug.3.dod.1.x.md": "---\npr_number: 290\n---\n",
+    });
+    const r = rung2(dir, "290");
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^STATUS=none PATH=$/m);
+  });
+
+  test(`rung 2 (§0a, pr_number, ${shell}): the work item resolves, anchored (28 ≠ 281)`, () => {
+    const dir = prNumberFixture({
+      "docs/tasks/task.1.a/task.1.a.md": "---\npr_number: 281\n---\n",
+      "docs/tasks/task.2.b/task.2.b.md": "---\npr_number: '28'\n---\n",
+      "docs/tasks/task.2.b/task.2.dod.1.b.md": "---\npr_number: 28\n---\n",
+    });
+    const r = rung2(dir, "28");
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /^STATUS=found PATH=docs\/tasks\/task\.2\.b\/task\.2\.b\.md$/m,
+    );
+  });
+
+  test(`rung 2 (§0a, pr_number, ${shell}): two work items sharing a pr_number HALT as ambiguous`, () => {
+    const dir = prNumberFixture({
+      "docs/tasks/task.1.a/task.1.a.md": "---\npr_number: 7\n---\n",
+      "docs/tasks/task.2.b/task.2.b.md": "---\npr_number: 7\n---\n",
+    });
+    const r = rung2(dir, "7");
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /HALT: pr_number 7 matches 2 documents/);
+  });
+}

@@ -379,6 +379,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/review-pr` resolves four targets it used to get wrong (task 177).**
+  - A URL pasted without its scheme (`github.com/o/r/pull/12`, `acme.atlassian.net/browse/RAPP-702`,
+    `bitbucket.org/ws/r/pull-requests/7`) parses as its `https://` form instead of becoming a branch
+    name. A known platform host is enough; any other dotted host needs a PR, issue or browse marker,
+    with the dot in the first segment, so `release/v1.2/x/pull/3` stays a branch.
+  - `JIRA_URL="https://acme.atlassian.net" # prod` in `.env` no longer warns that a Jira URL on that
+    same host "differs from JIRA_URL": Step 0b now takes the inside of the first quote pair, or strips
+    an unquoted ` #…` comment.
+  - A repository with no `docs/` can be reviewed from a card. A new Step 1a docs guard binds
+    `DOC_FILE=""` and skips the §0a lookup, whose HALT on a missing `docs/` still applies to the
+    develop pipelines. Rung 1 continues at rung 4; Step 2 continues at rung 5/6.
+  - Step 2 rung 2 is the §0a lookup with `KEY_FIELD=pr_number`, so it resolves the work item, not an
+    artifact. A review of PR 290 used to anchor on `bug.3.dod.1…md`. Two work items sharing a
+    `pr_number` now HALT as ambiguous instead of the rung returning several files.
+
 - **`qa-task`'s QA report template is one fenced block again.** Its outer fence used three backticks
   and contained three-backtick blocks, so the first inner block closed it: the template's second half
   read as live markdown (the link checker flagged its `./task.{id}.bug.{N}.{name}.md` placeholder), and

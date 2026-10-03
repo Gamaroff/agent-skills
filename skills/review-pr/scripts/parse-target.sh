@@ -170,6 +170,18 @@ case "$TARGET" in
   *[[:cntrl:]]*) refuse control-character "the target contains a control character (newline, tab, …)" ;;
 esac
 
+# A URL pasted without its scheme: re-parse it as https://<target>, or it falls to
+# the final branch arm and the run ends in "no pull request found for github.com/…".
+# A known platform host is enough. Any other dotted host needs a recognised marker,
+# and only when the FIRST segment holds the dot — release/v1.2/pull/3 stays a branch.
+case "$TARGET" in
+  *://*) ;;
+  github.com/* | www.github.com/* | bitbucket.org/* | www.bitbucket.org/* | api.bitbucket.org/* | *.atlassian.net/*)
+    TARGET="https://$TARGET" ;;
+  *.*/*/pull/[0-9]* | *.*/*/pull-requests/[0-9]* | *.*/*/pullrequests/[0-9]* | *.*/*/issues/* | *.*/browse/*)
+    case "${TARGET%%/*}" in *.*) TARGET="https://$TARGET" ;; esac ;;
+esac
+
 case "$TARGET" in
   '')
     printf 'kind=pr-for-current-branch\n'
