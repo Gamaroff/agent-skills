@@ -262,28 +262,36 @@ None.
 - Mutation proofs (each reverted the fix and the named test went red): M1 head validation removed → L1/L2 red; M2 `--literal-pathspecs` dropped → L3 red; M3 clause-1 OR dropped → L9 red (qa-task and qa-story separately); M4 dirty-tree HALT disabled → L4 red; M5 step-5 one-liner with `2>/dev/null` restored → L7 red; M6 old `field()` order → field test red. M2 first survived: the plan's fixture `skills/:colon.sh` is not magic (only a pathspec that *begins* with `:` is); the fixture moved to the repository root.
 - `npm run ci:fast`: 5,243 tests, 0 failures. `npm run eval:develop-task` 13/13, `npm run eval:develop-story` 68/68. `npm run bundle:check` clean; `shellcheck --severity=warning` clean on the new script; `quick_validate.py` clean on `qa-task` and `qa-story`.
 
-**Deferred Work**: none.
+**Deferred Work**: three LOW items carried by the QA loop's Cosmetic-residue exit — listed under QA Testing Results › Deferred Work.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-03
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.168.qa.2.gate-head-scoping-hardening.md](./task.168.qa.2.gate-head-scoping-hardening.md)
-- **Gate File**: [task.168.gate.2.gate-head-scoping-hardening.yml](./task.168.gate.2.gate-head-scoping-hardening.yml)
+- **Full Report**: [task.168.qa.3.gate-head-scoping-hardening.md](./task.168.qa.3.gate-head-scoping-hardening.md)
+- **Gate File**: [task.168.gate.3.gate-head-scoping-hardening.yml](./task.168.gate.3.gate-head-scoping-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 173 across the four affected suites (bash + zsh; `TMPDIR=/tmp` variance)
+- **Tests Executed**: 176 across the four affected suites (bash + zsh; `TMPDIR=/tmp` variance)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle-1 findings all fixed. One medium: the uncommitted-fix HALT, now on every re-review arm, strands the QA loop's red-fast-gate path, which commits nothing before the next review (T168-QA2-CR-1). Three low.
+Three QA cycles. Every medium and low finding from cycles 1–2 fixed and mutation-proven. Cycle 3 raised three LOW items, carried by the loop's Cosmetic-residue exit (route 2b) — see Deferred Work.
+
+### Deferred Work
+
+Carried by the QA loop's Cosmetic-residue exit (route 2b, cycle 3) — recorded in [gate 3](./task.168.gate.3.gate-head-scoping-hardening.yml) `recommendations.future`:
+
+- **T168-QA3-CR-1** — Phase 0 trigger still counts a tracked `.claude/state` change as movement; apply the exclusion there or document it.
+- **T168-QA3-CR-2** — name the bounded-retry red exit as a second zero-push case at every push-budget statement in `develop-pipeline-step-5-6-qa-loop.md`.
+- **T168-QA3-CR-3** — give L15 a remote-tracking ref so it distinguishes local HEAD from a pushed branch.
 
 ## Change Log
 
@@ -297,6 +305,8 @@ Cycle-1 findings all fixed. One medium: the uncommitted-fix HALT, now on every r
 | 2026-10-03 |  | Implemented — 19 files, 41 tests | develop |
 | 2026-10-03 |  | QA gate CONCERNS (80/100) — 5 findings (2 medium, 3 low) | qa-task |
 | 2026-10-03 |  | QA gate CONCERNS (90/100) — 4 findings (1 medium, 3 low); cycle-1 findings fixed | qa-task |
+| 2026-10-03 |  | QA gate PASS (100/100) — 3 LOW carried to Deferred Work (route 2b); cycle-2 findings fixed | qa-task |
+| 2026-10-03 |  | QA findings fixed — gate PASS (100/100), 2 iterations | qa-fix |
 
 <!-- change-log-end -->
 
