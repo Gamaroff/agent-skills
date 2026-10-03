@@ -323,26 +323,45 @@ test("a zone-less, date-only or bare-number updated: is red — its meaning woul
 });
 
 test("field() reads a quoted head with trailing spaces exactly as the QA blocks' sed does (task.168, 5c CR-2)", () => {
-  // The shell reader, verbatim from qa-task Phase 0 step 3 and the shared scope block: strip the
-  // key, a trailing comment, every quote, trailing space. The two readers of `head:` must agree, or
-  // a gate the QA blocks accept fails this corpus test.
-  const SED = `s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['"]//g; s/[[:space:]]*$//`;
-  const sha = "0123456789abcdef0123456789abcdef01234567";
-  for (const line of [
-    `head: '${sha}'  `,
-    `head: "${sha}"\t`,
-    `head: '${sha}'  # git rev-parse HEAD`,
-    `head: ${sha}`,
-  ]) {
-    const shell = execFileSync("sed", ["-E", SED], {
-      input: `${line}\n`,
-      encoding: "utf8",
-    }).trim();
-    assert.equal(shell, sha, `the shell reads ${JSON.stringify(line)}`);
-    assert.equal(
-      field(`${line}\n`, "head"),
-      shell,
-      `field() agrees on ${JSON.stringify(line)}`,
+  // The shell readers are taken FROM THE SHIPPED TEXT — qa-task's Phase 0 GATE_HEAD line and the
+  // shared rule's LAST_GATE_HEAD line — never copied here: a copy would keep passing after the
+  // shipped sed changed, which is the drift this test exists to catch (QA cycle 1, CR-5).
+  const shipped = [
+    [path.join(ROOT, "skills", "qa-task", "SKILL.md"), "GATE_HEAD"],
+    [
+      path.join(ROOT, "shared", "resources", "qa-re-review-scope.md"),
+      "LAST_GATE_HEAD",
+    ],
+  ].map(([file, name]) => {
+    const m = new RegExp(
+      `^\\s*${name}=\\$\\(grep -E '\\^head:'.*\\| sed -E "(.*)"\\)\\s*$`,
+      "m",
+    ).exec(fs.readFileSync(file, "utf8"));
+    assert.ok(
+      m,
+      `${path.relative(ROOT, file)}: the ${name}= sed reader must be found`,
     );
+    // The expression is double-quoted in the shell: \" is a quote there, nothing else is escaped.
+    return [`${path.relative(ROOT, file)} ${name}`, m[1].replace(/\\"/g, '"')];
+  });
+  const sha = "0123456789abcdef0123456789abcdef01234567";
+  for (const [where, expr] of shipped) {
+    for (const line of [
+      `head: '${sha}'  `,
+      `head: "${sha}"\t`,
+      `head: '${sha}'  # git rev-parse HEAD`,
+      `head: ${sha}`,
+    ]) {
+      const shell = execFileSync("sed", ["-E", expr], {
+        input: `${line}\n`,
+        encoding: "utf8",
+      }).replace(/\n$/, ""); // only the newline: a .trim() here hid a sed that kept trailing spaces
+      assert.equal(shell, sha, `${where} reads ${JSON.stringify(line)}`);
+      assert.equal(
+        field(`${line}\n`, "head"),
+        shell,
+        `field() agrees with ${where} on ${JSON.stringify(line)}`,
+      );
+    }
   }
 });

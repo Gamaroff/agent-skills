@@ -67,7 +67,7 @@ Task.135 (PR #531, merged `ea88e5a7`) made QA gates record the commit they judge
 ### Target Architecture
 
 - **Trigger**: before counting, `GATE_HEAD` must match `^[0-9a-f]{40}$`, resolve (`git cat-file -e "$GATE_HEAD^{commit}"`) and be an ancestor of `HEAD`; any failure sets `CODE_MOVED=1` and prints why. Same failure direction as the existing `|| echo 1`.
-- **Scope block**: `git --literal-pathspecs diff "$BASE...HEAD" -- "${FILES[@]}"`; and, before scoping, a HALT when `git status --porcelain` shows a tracked or untracked change outside the work-item directory and outside `.claude/state/` ("commit the fix before re-review — the scope reads committed history"). The work-item directory reaches the shared block as `$WORK_ITEM_DIR`, bound in each skill's preamble (`$TASK_DIR` / `$STORY_DIR`).
+- **Scope block**: `git --literal-pathspecs diff "$BASE...HEAD" -- "${FILES[@]}"`; and, before scoping, a HALT on every re-review arm (`PRIOR_GATES >= 1`) when a tracked file outside the work-item directory is modified (an untracked file outside it only warns — QA cycle 1, CR-1/CR-2) ("commit the fix before re-review — the scope reads committed history"). The work-item directory reaches the shared block as `$WORK_ITEM_DIR`, bound in each skill's preamble (`$TASK_DIR` / `$STORY_DIR`).
 - **Clause 1**: 🆕 `shared/resources/qa-safety-clause1.sh <gate-file>` prints `true` or `false` (exit 0), exit 2 on usage; the awk program moves into it unchanged. The shared rule's clause-1 block becomes `SAFETY_REPROBE=false` + a call to the script (still the single block `extractProbe()` finds). Step 3b's preamble calls the same script on its own `$LATEST_GATE` and ORs the result into the bound value: `true` from the script can never be overridden by a bound `false`; a bound `true` (clauses 2–3) still stands.
 - **Helper rebinds**: the two-call pattern Phase 0 step 1 already uses. `qa-cycle.sh <dir>` first: empty with rc 1 → no gate (first review); rc ≥ 2 → HALT (broken invocation). A cycle number → `qa-cycle.sh <dir> --path gate` must exit 0; rc 1 there is a refusal (`qa-cycle.sh` exits 1 both for "no file" and for "two files claim one cycle", so only the first call can tell them apart) → HALT naming the helper's stderr line. Stderr is kept.
 - **`field()`**: trim, then strip one pair of surrounding quotes, then trim — the sed's order.
@@ -75,7 +75,7 @@ Task.135 (PR #531, merged `ea88e5a7`) made QA gates record the commit they judge
 ### Important Clarifications
 
 - **Same-class mechanism inventory** (review-task check 6): the trigger already has one failure-direction mechanism (`|| echo 1`), which the head validation **extends**; the scope block already validates the head (`cat-file -e`, `merge-base`) and the new dirty-tree HALT **sits beside** those checks because it guards a different input (the working tree, not the gate). The clause-1 script **replaces** the three fenced copies of the probe.
-- The dirty-tree HALT excludes the work-item directory because a QA cycle writes its own report and gate there before Step 3b runs. It also excludes `.claude/state/`: the develop pipeline writes its lock, comment bodies and test logs there, and `scripts/setup-consumer.sh` does not add that directory to a consumer's `.gitignore` — without the exclusion every cycle-3+ re-review in such a repo HALTs on a healthy branch (review.1 I1).
+- The dirty-tree HALT excludes the work-item directory because a QA cycle writes its own report and gate there before Step 3b runs. It HALTs on **tracked** changes only: develop-pipeline Step 4 holds out-of-scope untracked files aside for the PR commit and restores them into the tree for the whole QA loop, so an untracked file outside the work item is the normal state of a healthy branch — it is named in a warning instead, with `.claude/state/` (the pipeline's own scratch) left out of the warning (review.1 I1; QA cycle 1, CR-1). It runs on every re-review arm, not only the scoped one (QA cycle 1, CR-2).
 - `qa-task` Phase 0 step 3 carries a third `qa-cycle.sh --path gate` rebind (`skills/qa-task/SKILL.md:199`). It is **left as is**: it already keeps stderr, and a refusal there leaves `GATE_HEAD` empty, which sets `CODE_MOVED=1` — it already fails toward re-review (review.1 Q2).
 - **Bundling closure**: `qa-re-review-scope.md` is bundled into eight skills. The shared rule's clause-1 block calls the script as `.agents/skills/{qa-task|qa-story}/references/qa-safety-clause1.sh` — the invocation spelling the bundler follows only into the skills it names — so the script ships in `qa-task` and `qa-story` alone, the two skills that run it. The parity test points that path at the shared source to execute the block. (Review.1 Q3 accepted eight copies on the premise that a placeholder path could not be executed; develop found the test can resolve it, so the narrower closure was taken.)
 - `extractProbe()` must still find exactly one block in the shared rule; the transit-constraint tests move from the block's text to the script's text.
@@ -264,6 +264,27 @@ None.
 
 **Deferred Work**: none.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-03
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.168.qa.1.gate-head-scoping-hardening.md](./task.168.qa.1.gate-head-scoping-hardening.md)
+- **Gate File**: [task.168.gate.1.gate-head-scoping-hardening.yml](./task.168.gate.1.gate-head-scoping-hardening.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 81 (qa-scope-from-head L1–L9 24, qa-safety-clause1 16, parity 58 incl., field 1) — suites 91/0 under TMPDIR=/tmp
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Two medium findings on the new uncommitted-fix HALT: it fires on untracked files develop-pipeline Step 4 restores into the tree (T168-QA1-CR-1), and it guards only the cycle-3+ scoped arm (T168-QA1-CR-2). Three low: stderr discarded on the first rebind call, a call-count assertion that counts prose, and a `field()` agreement test that runs a copied sed.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -274,6 +295,7 @@ None.
 | 2026-10-03 | 1.1 | Review passed (9/10) — dirty-tree HALT also excludes `.claude/state`; four line anchors corrected; step-3 rebind exclusion and bundling-closure decision recorded; ShellCheck named | review-task |
 | 2026-10-03 |  | Status → ready-for-development | review-task |
 | 2026-10-03 |  | Implemented — 19 files, 41 tests | develop |
+| 2026-10-03 |  | QA gate CONCERNS (80/100) — 5 findings (2 medium, 3 low) | qa-task |
 
 <!-- change-log-end -->
 

@@ -494,6 +494,8 @@ for (const sh of SHELLS) {
       LATEST_GATE: fx.gate,
       BASE: "develop",
       DIFF_FILE: diff,
+      // Every re-review arm validates the work-item directory since task.168 QA cycle 1 (CR-2).
+      WORK_ITEM_DIR: "docs",
     });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     const patch = fs.readFileSync(diff, "utf8");
@@ -786,9 +788,64 @@ for (const sh of SHELLS) {
     const r = runScope(sh, fx);
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /Re-review scope: files changed since gate 2/);
+    assert.doesNotMatch(
+      r.stdout,
+      /\.claude\/state|task\.9\.qa\.3/,
+      "neither the pipeline's scratch nor the work item's own report is named in the warning",
+    );
   });
 
-  test(`L6 [${sh}] — the scoped arm refuses an unbound or root work-item directory (CR3-7)`, () => {
+  test(`L10 [${sh}] — an untracked file outside the work item warns and does not HALT (QA cycle 1, CR-1)`, () => {
+    // develop-pipeline Step 4 holds out-of-scope untracked files aside for the PR commit and
+    // restores them for the whole QA loop: one is the normal state of a healthy pipeline branch.
+    const fx = scratch();
+    fs.writeFileSync(
+      path.join(fx.dir, "notes.txt"),
+      "someone else's scratch\n",
+    );
+    const r = runScope(sh, fx);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /warning: untracked files outside the work item[\s\S]*notes\.txt/,
+    );
+    assert.match(r.stdout, /Re-review scope: files changed since gate 2/);
+  });
+
+  test(`L11 [${sh}] — an uncommitted fix HALTs on every re-review arm, not only the scoped one (QA cycle 1, CR-2)`, () => {
+    // Cycle 2 (one prior gate), the safety re-probe, and a schema-1 gate all read committed history.
+    for (const [what, env, schema] of [
+      ["cycle 2", { PRIOR_GATES: "1" }, 2],
+      ["safety re-probe", { SAFETY_REPROBE: "true" }, 2],
+      ["schema-1 gate", {}, 1],
+    ]) {
+      const fx = scratch({ schema });
+      fs.appendFileSync(
+        path.join(fx.dir, "skills", "b.sh"),
+        "echo uncommitted fix\n",
+      );
+      const r = runScope(sh, fx, env);
+      assert.equal(r.status, 1, `${what}: ${r.stdout}${r.stderr}`);
+      assert.match(
+        r.stdout,
+        /HALT: uncommitted changes outside the work item/,
+        what,
+      );
+      assert.equal(r.patch, "", `${what}: nothing is dispatched`);
+    }
+  });
+
+  test(`L12 [${sh}] — a first review does not run the uncommitted-fix check`, () => {
+    // No prior gate: there is no trigger movement to disagree with, and Step 3b's first review is
+    // the develop pipeline's first QA pass. The check is a re-review guard (PRIOR_GATES >= 1).
+    const fx = scratch();
+    fs.appendFileSync(path.join(fx.dir, "skills", "b.sh"), "echo local edit\n");
+    const r = runScope(sh, fx, { PRIOR_GATES: "0", WORK_ITEM_DIR: undefined });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /HALT/);
+  });
+
+  test(`L6 [${sh}] — a re-review refuses an unbound or root work-item directory (CR3-7)`, () => {
     for (const bad of [undefined, "."]) {
       const fx = scratch();
       const r = runScope(sh, fx, { WORK_ITEM_DIR: bad });
@@ -854,6 +911,81 @@ for (const [skillFile, skill, dirVar, docVar, prefix] of [
       });
       assert.equal(r.status, 1, r.stdout + r.stderr);
       assert.match(r.stdout, /HALT: qa-cycle\.sh refused cycle 2/);
+    });
+
+    test(`L13 [${sh}] ${skill} — step 5 HALTs on gate files with no cycle number instead of reading a first review (QA cycle 1, CR-3)`, () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-scope-head-"));
+      TMP.push(dir);
+      git(dir, "init", "-q", "-b", "develop");
+      const work = path.join(dir, "docs", "w");
+      fs.mkdirSync(work, { recursive: true });
+      fs.writeFileSync(
+        path.join(work, `${prefix}.x.md`),
+        "status: ready-for-review\n",
+      );
+      fs.writeFileSync(
+        path.join(work, `${prefix}.gate.final.yml`),
+        `gate: FAIL\n${SECURITY_FAIL}`,
+      );
+      installHelpers(dir, skill);
+      for (const fence of [
+        block(skillFile, /^SAFETY_REPROBE=false$/m),
+        step2Fence(skillFile),
+      ]) {
+        const r = run(
+          sh,
+          dir,
+          fence + '\necho "SAFETY_REPROBE=$SAFETY_REPROBE"\n',
+          {
+            LATEST_GATE: undefined,
+            [docVar]: `docs/w/${prefix}.x.md`,
+          },
+        );
+        assert.equal(r.status, 1, r.stdout + r.stderr);
+        assert.match(
+          r.stdout,
+          /carry no cycle number/,
+          "the helper's own reason is printed",
+        );
+        assert.match(
+          r.stdout,
+          /HALT: qa-cycle\.sh could not derive the QA cycle/,
+        );
+        assert.doesNotMatch(r.stdout, /SAFETY_REPROBE=false/);
+      }
+    });
+
+    test(`L14 [${sh}] ${skill} — a first review (no gate file at all) passes steps 2 and 5 quietly (QA cycle 1, CR-3)`, () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-scope-head-"));
+      TMP.push(dir);
+      git(dir, "init", "-q", "-b", "develop");
+      const work = path.join(dir, "docs", "w");
+      fs.mkdirSync(work, { recursive: true });
+      fs.writeFileSync(
+        path.join(work, `${prefix}.x.md`),
+        "status: ready-for-review\n",
+      );
+      installHelpers(dir, skill);
+      for (const fence of [
+        block(skillFile, /^SAFETY_REPROBE=false$/m),
+        step2Fence(skillFile),
+      ]) {
+        const r = run(
+          sh,
+          dir,
+          fence + '\necho "SAFETY_REPROBE=${SAFETY_REPROBE:-unset}"\n',
+          {
+            LATEST_GATE: undefined,
+            [docVar]: `docs/w/${prefix}.x.md`,
+          },
+        );
+        assert.equal(r.status, 0, r.stdout + r.stderr);
+        assert.doesNotMatch(
+          r.stdout + r.stderr,
+          /HALT|⚠️/,
+          "a first review prints no refusal",
+        );
+      }
     });
 
     test(`L9 [${sh}] ${skill} — Step 3b runs whole-branch after a security FAIL with SAFETY_REPROBE=false bound (CR3-4)`, () => {

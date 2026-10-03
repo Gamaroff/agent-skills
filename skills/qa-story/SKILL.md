@@ -251,15 +251,23 @@ After finding the story file and validating PR exists:
    # every signal below silently reads "no prior gate" (task.135 QA cycle 3, CR3-1).
    [ -f "$STORY_FILE" ] || { echo "HALT: STORY_FILE ('$STORY_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
    STORY_DIR=$(dirname "$STORY_FILE")
-   # The two-call pattern step 1 uses (task.168, 5c CR-1). qa-cycle.sh exits 1 both for "no gate"
-   # and for "two files claim one cycle", so only the cycle call can tell them apart: an empty cycle
-   # is a first review, a refusal of the cycle it named is a HALT. stderr is kept — it names why.
+   # The two-call pattern step 1 uses (task.168, 5c CR-1). qa-cycle.sh exits 1 for "no gate file",
+   # for "gate files with no cycle number" and, under --path, for "two files claim one cycle"; only
+   # the first is a first review. Its own reason tells them apart, so it is read rather than dropped:
+   # the one refusal that means "first review" is let through, every other refusal is a HALT that
+   # prints the helper's line (QA cycle 1, CR-3). The selection itself stays the helper's — no glob
+   # here duplicates it (task.158).
    if [ -z "${LATEST_GATE:-}" ]; then
-     GATE_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR" 2>/dev/null); rc=$?
+     GATE_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR" 2>&1); rc=$?
      [ "$rc" -le 1 ] || { echo "HALT: qa-cycle.sh not runnable (rc=$rc) — check the bundled path"; exit 1; }
-     if [ -n "$GATE_CYCLE" ]; then
+     if [ "$rc" -eq 0 ]; then
        LATEST_GATE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR" --path gate); rc=$?
        [ "$rc" -eq 0 ] || { echo "HALT: qa-cycle.sh refused cycle $GATE_CYCLE (see its line above) — resolve the gate files, then re-run"; exit 1; }
+     else
+       case "$GATE_CYCLE" in
+         *"no gate file in"*) : ;;   # a first review — nothing to bind
+         *) printf '%s\n' "$GATE_CYCLE"; echo "HALT: qa-cycle.sh could not derive the QA cycle (see its line above) — resolve the gate files, then re-run"; exit 1 ;;
+       esac
      fi
    fi
    if [ -n "$LATEST_GATE" ]; then
@@ -506,15 +514,23 @@ Perform a comprehensive test architecture review with quality assessment. This a
    # every signal below silently reads "no prior gate" (task.135 QA cycle 3, CR3-1).
    [ -f "$STORY_FILE" ] || { echo "HALT: STORY_FILE ('$STORY_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
    STORY_DIR=$(dirname "$STORY_FILE")
-   # The two-call pattern step 1 uses (task.168, 5c CR-1). qa-cycle.sh exits 1 both for "no gate"
-   # and for "two files claim one cycle", so only the cycle call can tell them apart: an empty cycle
-   # is a first review, a refusal of the cycle it named is a HALT. stderr is kept — it names why.
+   # The two-call pattern step 1 uses (task.168, 5c CR-1). qa-cycle.sh exits 1 for "no gate file",
+   # for "gate files with no cycle number" and, under --path, for "two files claim one cycle"; only
+   # the first is a first review. Its own reason tells them apart, so it is read rather than dropped:
+   # the one refusal that means "first review" is let through, every other refusal is a HALT that
+   # prints the helper's line (QA cycle 1, CR-3). The selection itself stays the helper's — no glob
+   # here duplicates it (task.158).
    if [ -z "${LATEST_GATE:-}" ]; then
-     GATE_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR" 2>/dev/null); rc=$?
+     GATE_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR" 2>&1); rc=$?
      [ "$rc" -le 1 ] || { echo "HALT: qa-cycle.sh not runnable (rc=$rc) — check the bundled path"; exit 1; }
-     if [ -n "$GATE_CYCLE" ]; then
+     if [ "$rc" -eq 0 ]; then
        LATEST_GATE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR" --path gate); rc=$?
        [ "$rc" -eq 0 ] || { echo "HALT: qa-cycle.sh refused cycle $GATE_CYCLE (see its line above) — resolve the gate files, then re-run"; exit 1; }
+     else
+       case "$GATE_CYCLE" in
+         *"no gate file in"*) : ;;   # a first review — nothing to bind
+         *) printf '%s\n' "$GATE_CYCLE"; echo "HALT: qa-cycle.sh could not derive the QA cycle (see its line above) — resolve the gate files, then re-run"; exit 1 ;;
+       esac
      fi
    fi
    # $LATEST_GATE is the prior gate file. Trigger clause 1, per the shared rule — whose one
@@ -928,6 +944,25 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
      true|false) ;;
      *) echo "HALT: SAFETY_REPROBE is '${SAFETY_REPROBE:-}' — bind it in this shell to the true|false Phase 0 step 5 resolved (clause 1 from the gate, clauses 2–3 by judgement)"; exit 1 ;;
    esac
+   # Every re-review arm reads committed history — the scoped arm's file list from <head>..HEAD, and
+   # every arm's patch from BASE...HEAD — while Phase 0's trigger counts an uncommitted change as
+   # movement. A fix still in the working tree would trigger this re-review and then be reviewed as
+   # absent, on cycle 2, on the safety re-probe and on a schema-1 gate as much as on the scoped arm
+   # (task.168 CR3-7; QA cycle 1, CR-2). $WORK_ITEM_DIR is bound by the caller's preamble: the QA
+   # cycle writes its own report and gate there before this block runs. Unbound, or the repository
+   # root, the exclusion below would exclude nothing or everything — refuse both.
+   if [ "$PRIOR_GATES" -ge 1 ]; then
+     [ -n "${WORK_ITEM_DIR:-}" ] && [ -n "$(git -C "$WORK_ITEM_DIR" rev-parse --show-prefix 2>/dev/null)" ] \
+       || { echo "HALT: WORK_ITEM_DIR ('${WORK_ITEM_DIR:-}') is not a work-item directory below the repository root — bind it in this shell"; exit 1; }
+     # TRACKED changes HALT. Untracked files only warn: the develop pipeline's Step 4 holds out-of-scope
+     # untracked files aside for the PR commit and restores them into the tree for the whole QA loop,
+     # so an untracked file outside the work item is the normal state of a healthy branch, not a fix
+     # left uncommitted (QA cycle 1, CR-1). .claude/state is the pipeline's own scratch — never named.
+     DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR")
+     [ -z "$DIRTY" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):"; printf '%s\n' "$DIRTY"; exit 1; }
+     UNTRACKED=$(git ls-files --others --exclude-standard -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
+     [ -z "$UNTRACKED" ] || { echo "warning: untracked files outside the work item are not in this review — commit any that belong to the fix:"; printf '%s\n' "$UNTRACKED" | sed 's/^/  /'; }
+   fi
    if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since the last gate's head
      REFUTE_PASS=false
      if [ ! -f "$LATEST_GATE" ] || [ ! -r "$LATEST_GATE" ]; then
@@ -940,17 +975,6 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
        echo "Re-review scope: unscoped — prior gate carries no head: (schema 1)"
        git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
      else
-       # The scope reads committed history — the file list from <head>..HEAD, the patch from
-       # BASE...HEAD — while Phase 0's trigger counts an uncommitted change as movement. A fix still in
-       # the working tree would trigger this re-review and then be reviewed as absent (task.168 CR3-7).
-       # $WORK_ITEM_DIR is bound by the caller's preamble: the QA cycle writes its own report and gate
-       # there before this block runs. .claude/state is the develop pipeline's own scratch (its lock,
-       # comment bodies, test logs), untracked in a consumer whose .gitignore does not cover it. Unbound,
-       # or the repository root, the exclusion below would exclude nothing or everything — refuse both.
-       [ -n "${WORK_ITEM_DIR:-}" ] && [ -n "$(git -C "$WORK_ITEM_DIR" rev-parse --show-prefix 2>/dev/null)" ] \
-         || { echo "HALT: WORK_ITEM_DIR ('${WORK_ITEM_DIR:-}') is not a work-item directory below the repository root — bind it in this shell"; exit 1; }
-       DIRTY=$(git status --porcelain -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
-       [ -z "$DIRTY" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):"; printf '%s\n' "$DIRTY"; exit 1; }
        git cat-file -e "${LAST_GATE_HEAD}^{commit}" 2>/dev/null \
          || { echo "HALT: gate $PRIOR_GATES names head $LAST_GATE_HEAD, which this checkout does not have — fetch it, or run this cycle unscoped deliberately"; exit 1; }
        git merge-base --is-ancestor "$LAST_GATE_HEAD" HEAD \

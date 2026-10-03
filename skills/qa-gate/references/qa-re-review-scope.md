@@ -65,11 +65,13 @@ commits cannot be typed wrong in a way `git` accepts silently (task.135).
   those files, so the reviewer has context. Only the *file list* comes from `<head>..HEAD`. The file
   names are passed with `--literal-pathspecs`: a name beginning with `:` is otherwise pathspec magic
   and leaves the scope (task.168 CR4-2).
-- **An uncommitted change outside the work item is a HALT** on the scoped arm. The scope reads
-  committed history, so a fix still in the working tree would be reviewed as absent; commit it first
-  (task.168 CR3-7). The work item's own directory (bound as `$WORK_ITEM_DIR`) and `.claude/state/` are
-  excluded — the QA cycle writes its report and gate into the first, the develop pipeline its lock and
-  scratch files into the second.
+- **An uncommitted change to a tracked file outside the work item is a HALT** on every re-review
+  (`PRIOR_GATES >= 1`, every arm). The scope reads committed history, so a fix still in the working
+  tree would be reviewed as absent; commit it first (task.168 CR3-7). The work item's own directory
+  (bound as `$WORK_ITEM_DIR`) is excluded — the QA cycle writes its report and gate there. An
+  **untracked** file outside it only warns, naming the paths: the develop pipeline's Step 4 restores
+  held out-of-scope files into the tree for the whole QA loop, so one is the normal state of a healthy
+  branch (QA cycle 1, CR-1). `.claude/state/`, the pipeline's own scratch, is never named.
 - **Clause 1 of `SAFETY_REPROBE` is recomputed** in each Step 3b preamble from the gate it just bound,
   and a computed `true` overrides a bound `false`. A bound `true` (clauses 2–3) still stands
   (task.168 CR3-4).
@@ -200,6 +202,25 @@ LAST_GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E 
   true|false) ;;
   *) echo "HALT: SAFETY_REPROBE is '${SAFETY_REPROBE:-}' — bind it in this shell to the true|false Phase 0 step 5 resolved (clause 1 from the gate, clauses 2–3 by judgement)"; exit 1 ;;
 esac
+# Every re-review arm reads committed history — the scoped arm's file list from <head>..HEAD, and
+# every arm's patch from BASE...HEAD — while Phase 0's trigger counts an uncommitted change as
+# movement. A fix still in the working tree would trigger this re-review and then be reviewed as
+# absent, on cycle 2, on the safety re-probe and on a schema-1 gate as much as on the scoped arm
+# (task.168 CR3-7; QA cycle 1, CR-2). $WORK_ITEM_DIR is bound by the caller's preamble: the QA
+# cycle writes its own report and gate there before this block runs. Unbound, or the repository
+# root, the exclusion below would exclude nothing or everything — refuse both.
+if [ "$PRIOR_GATES" -ge 1 ]; then
+  [ -n "${WORK_ITEM_DIR:-}" ] && [ -n "$(git -C "$WORK_ITEM_DIR" rev-parse --show-prefix 2>/dev/null)" ] \
+    || { echo "HALT: WORK_ITEM_DIR ('${WORK_ITEM_DIR:-}') is not a work-item directory below the repository root — bind it in this shell"; exit 1; }
+  # TRACKED changes HALT. Untracked files only warn: the develop pipeline's Step 4 holds out-of-scope
+  # untracked files aside for the PR commit and restores them into the tree for the whole QA loop,
+  # so an untracked file outside the work item is the normal state of a healthy branch, not a fix
+  # left uncommitted (QA cycle 1, CR-1). .claude/state is the pipeline's own scratch — never named.
+  DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR")
+  [ -z "$DIRTY" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):"; printf '%s\n' "$DIRTY"; exit 1; }
+  UNTRACKED=$(git ls-files --others --exclude-standard -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
+  [ -z "$UNTRACKED" ] || { echo "warning: untracked files outside the work item are not in this review — commit any that belong to the fix:"; printf '%s\n' "$UNTRACKED" | sed 's/^/  /'; }
+fi
 if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since the last gate's head
   REFUTE_PASS=false
   if [ ! -f "$LATEST_GATE" ] || [ ! -r "$LATEST_GATE" ]; then
@@ -212,17 +233,6 @@ if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3
     echo "Re-review scope: unscoped — prior gate carries no head: (schema 1)"
     git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
   else
-    # The scope reads committed history — the file list from <head>..HEAD, the patch from
-    # BASE...HEAD — while Phase 0's trigger counts an uncommitted change as movement. A fix still in
-    # the working tree would trigger this re-review and then be reviewed as absent (task.168 CR3-7).
-    # $WORK_ITEM_DIR is bound by the caller's preamble: the QA cycle writes its own report and gate
-    # there before this block runs. .claude/state is the develop pipeline's own scratch (its lock,
-    # comment bodies, test logs), untracked in a consumer whose .gitignore does not cover it. Unbound,
-    # or the repository root, the exclusion below would exclude nothing or everything — refuse both.
-    [ -n "${WORK_ITEM_DIR:-}" ] && [ -n "$(git -C "$WORK_ITEM_DIR" rev-parse --show-prefix 2>/dev/null)" ] \
-      || { echo "HALT: WORK_ITEM_DIR ('${WORK_ITEM_DIR:-}') is not a work-item directory below the repository root — bind it in this shell"; exit 1; }
-    DIRTY=$(git status --porcelain -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
-    [ -z "$DIRTY" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):"; printf '%s\n' "$DIRTY"; exit 1; }
     git cat-file -e "${LAST_GATE_HEAD}^{commit}" 2>/dev/null \
       || { echo "HALT: gate $PRIOR_GATES names head $LAST_GATE_HEAD, which this checkout does not have — fetch it, or run this cycle unscoped deliberately"; exit 1; }
     git merge-base --is-ancestor "$LAST_GATE_HEAD" HEAD \

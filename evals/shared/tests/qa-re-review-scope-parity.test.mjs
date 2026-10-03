@@ -197,15 +197,19 @@ for (const [name, text] of skillText) {
   });
 
   test(`${name} assigns DIFF_FILE in exactly one conditional`, () => {
-    // Counting the guard keyword is the cheap proxy for "one block, not two".
     // A second full-diff block inserted ahead of this one would need its own
-    // PRIOR_GATES test to know which cycle it is on.
-    const guards = text.split('if [ "$PRIOR_GATES"').length - 1;
+    // PRIOR_GATES test to know which cycle it is on. Count the PRIOR_GATES
+    // conditionals whose body WRITES $DIFF_FILE — not every PRIOR_GATES `if`:
+    // task.168's re-review guard (`-ge 1`, the uncommitted-fix HALT) branches on
+    // the cycle and writes no patch, and a keyword count read it as a second
+    // assigning block. A body runs from its `if` to the next PRIOR_GATES `if`.
+    const parts = text.split('if [ "$PRIOR_GATES"').slice(1);
+    const assigning = parts.filter((p) => /> "\$DIFF_FILE"/.test(p)).length;
     assert.equal(
-      guards,
+      assigning,
       1,
-      `${name} has ${guards} PRIOR_GATES conditionals; a second block assigning DIFF_FILE ` +
-        `would silently override the first`,
+      `${name} has ${assigning} PRIOR_GATES conditionals that write DIFF_FILE; a second ` +
+        `block assigning DIFF_FILE would silently override the first`,
     );
   });
 
@@ -1164,13 +1168,34 @@ test("both skills call the clause-1 script and carry no copy of its probe", () =
   // Before task.168 each skill carried the awk program itself, and this test checked each copy for
   // the two transit hazards. One definition now lives in the script (read by the tests above); what
   // must hold in each skill is that it CALLS its bundled copy — in Phase 0 step 5 and again in the
-  // Step 3b preamble — and that no second copy of the program survives to drift from it.
+  // Step 3b preamble — and that no second copy of the program survives to drift from it. The call
+  // is asserted INSIDE each fence, not anywhere in the file: a path named in prose or a comment
+  // would satisfy a whole-file count with the call itself removed (QA cycle 1, CR-4).
+  const fences = (text) =>
+    [...text.matchAll(/```bash\n([\s\S]*?)```/g)].map((m) => m[1]);
   for (const [name, text] of skillText) {
-    const call = `.agents/skills/${name}/references/qa-safety-clause1.sh`;
-    assert.ok(
-      text.split(call).length - 1 >= 2,
-      `${name} must call ${call} in Phase 0 step 5 and in the Step 3b preamble`,
+    const call = `bash .agents/skills/${name}/references/qa-safety-clause1.sh "$LATEST_GATE"`;
+    const step5 = fences(text).filter((f) =>
+      /^\s*SAFETY_REPROBE=false$/m.test(f),
     );
+    const step3b = fences(text).filter((f) =>
+      /^\s*LAST_GATE_HEAD=\$\(grep -E '\^head:'/m.test(f),
+    );
+    assert.equal(step5.length, 1, `${name}: exactly one Phase 0 step 5 fence`);
+    assert.equal(step3b.length, 1, `${name}: exactly one Step 3b fence`);
+    for (const [where, fence] of [
+      ["Phase 0 step 5", step5[0]],
+      ["Step 3b", step3b[0]],
+    ]) {
+      const live = fence
+        .split("\n")
+        .filter((l) => !/^\s*#/.test(l))
+        .join("\n");
+      assert.ok(
+        live.includes(call),
+        `${name}: the ${where} fence must call ${call} on a non-comment line`,
+      );
+    }
     assert.ok(
       !/SECURITY_AXIS=\$\(awk/.test(text),
       `${name} still carries an inline copy of the clause-1 awk probe — the script is its one definition`,

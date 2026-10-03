@@ -394,11 +394,13 @@ All notable changes to this project will be documented in this file. Format foll
     again by each Step 3b preamble, where a computed `true` now overrides a bound `false`. Before,
     Step 3b trusted the value an agent had typed, and narrowed after a security FAIL when it was
     `false`.
-  - **An uncommitted fix HALTs the scoped arm (CR3-7).** The scope reads committed history, so a fix
-    still in the working tree was triggered for and then reviewed as absent. The HALT names the
-    paths; the work item's own directory (`$WORK_ITEM_DIR`, bound by each preamble) and
-    `.claude/state/` — the develop pipeline's scratch, untracked in a consumer that does not ignore
-    it — are excluded.
+  - **An uncommitted fix HALTs every re-review arm (CR3-7).** The scope reads committed history, so a
+    fix still in the working tree was triggered for and then reviewed as absent — on the scoped
+    cycle-3+ arm, cycle 2, the safety re-probe and a schema-1 gate alike. A tracked change outside the
+    work item's own directory (`$WORK_ITEM_DIR`, bound by each preamble) now HALTs, naming the paths;
+    an untracked file only warns, because develop-pipeline Step 4 restores held out-of-scope files
+    into the tree for the whole QA loop. Gate files that carry no cycle number now HALT Phase 0 steps
+    2 and 5 instead of reading as a first review.
   - **A `qa-cycle.sh` refusal is a HALT, not "no gate" (5c CR-1).** Phase 0 steps 2 and 5 rebound
     `LATEST_GATE` with `--path gate 2>/dev/null` and ignored the exit status, so two files claiming
     one cycle read as a first review and step 5 reported `SAFETY_REPROBE=false`. Both now use step
