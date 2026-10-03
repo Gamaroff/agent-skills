@@ -359,6 +359,30 @@ None. The post-merge action in Notes (observation #213 → `actioned`) is not de
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-03
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.167.qa.1.fast-gate-precondition-npm-loglevel.md](./task.167.qa.1.fast-gate-precondition-npm-loglevel.md)
+- **Gate File**: [task.167.gate.1.fast-gate-precondition-npm-loglevel.yml](./task.167.gate.1.fast-gate-precondition-npm-loglevel.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 23 targeted (18 precondition + 5 extractor), and 5201 in `ci:fast`
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. Two low-severity, advisory test-robustness points (CR-1, CR-2) are recorded as future work in the gate.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -368,6 +392,7 @@ None. The post-merge action in Notes (observation #213 → `actioned`) is not de
 | 2026-10-03 | 1.1     | Review passed (9/10) — post-merge obs #213 criterion moved to Notes | review-task |
 | 2026-10-03 |         | Status → ready-for-development | review-task |
 | 2026-10-03 |         | Implemented — 7 files, 7 tests (3 per shell + 1 extractor) | develop |
+| 2026-10-03 |         | QA gate PASS (100/100) — 0 blocking, 2 advisory findings | qa-task |
 <!-- change-log-end -->
 
 ---
