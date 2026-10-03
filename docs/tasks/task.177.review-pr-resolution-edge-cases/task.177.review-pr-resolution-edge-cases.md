@@ -5,7 +5,7 @@ type: task
 description: "Close four edge cases task.176 left in /review-pr's target resolution: a .env JIRA_URL with a trailing comment, a repository with no docs/, a scheme-less platform URL, and Step 2 rung 2 matching an artifact's pr_number."
 tags: [review-pr, input-resolution, follow-up]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-10-02
 updated: 2026-10-03
@@ -16,7 +16,7 @@ github_issue: 555
 
 # Technical Task: /review-pr resolution edge cases
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.177.review.1.review-pr-resolution-edge-cases.md` implemented 2026-10-03
 **GitHub Issue**: [#555](https://github.com/Gamaroff/agent-skills/issues/555)
 
@@ -160,12 +160,12 @@ pick would anchor the whole review on the wrong work item.
 
 **Files**: `skills/review-pr/scripts/parse-target.sh`, `skills/review-pr/tests/review-pr.test.js`
 
-- [ ] Re-parse a scheme-less target whose first segment is a known platform host, or a dotted host
+- [x] Re-parse a scheme-less target whose first segment is a known platform host, or a dotted host
       followed by a recognised marker, as `https://<target>`.
-- [ ] Parser cases under bash and zsh: `github.com/o/r/pull/12` → `kind=pr`, `acme.atlassian.net/browse/RAPP-702`
+- [x] Parser cases under bash and zsh: `github.com/o/r/pull/12` → `kind=pr`, `acme.atlassian.net/browse/RAPP-702`
       → `kind=jira`, `bitbucket.org/ws/r/pull-requests/7` → `kind=pr`. Real branch names
       (`feature/task.1.x`, `release/v1.2`, `hotfix/v1.2.1`) stay `kind=branch`.
-- [ ] Add the scheme-less forms to the `shell-fn:` probe cases.
+- [x] Add the scheme-less forms to the `shell-fn:` probe cases.
 
 **Dependencies**: none.
 
@@ -175,11 +175,11 @@ pick would anchor the whole review on the wrong work item.
 
 **Files**: `skills/review-pr/SKILL.md`, `skills/review-pr/tests/review-pr.test.js`
 
-- [ ] Step 0b: inline-comment handling for `JIRA_URL_SEEN`.
-- [ ] Step 1a: a fenced **docs guard** block — a missing `docs/` at the repository root binds
+- [x] Step 0b: inline-comment handling for `JIRA_URL_SEEN`.
+- [x] Step 1a: a fenced **docs guard** block — a missing `docs/` at the repository root binds
       `DOC_FILE=""` and skips §0a; otherwise it runs §0a. Step 1a rung 1 and Step 2 (rungs 1–4) cite it.
-- [ ] Step 2 rung 2: the §0a lookup with `KEY_FIELD=pr_number KEY_VALUE=$PR_NUMBER` (cite it).
-- [ ] Tests: the Step 0b block with a commented `.env` (no warning on the matching host); the docs
+- [x] Step 2 rung 2: the §0a lookup with `KEY_FIELD=pr_number KEY_VALUE=$PR_NUMBER` (cite it).
+- [x] Tests: the Step 0b block with a commented `.env` (no warning on the matching host); the docs
       guard block, extracted and run in a docs-less consumer repo, binds `DOC_FILE=""` and exits 0, and
       the rungs 3–4 block then reports `RUNG=key search`; `lookupBlock()` with `KEY_FIELD=pr_number`
       against a fixture where only a DoD carries the `pr_number` returns `DOC_STATUS=none`, and one
@@ -193,8 +193,8 @@ pick would anchor the whole review on the wrong work item.
 
 **Files**: `CHANGELOG.md`
 
-- [ ] `npm run bundle:check` green (no shared source changes are expected).
-- [ ] CHANGELOG `[Unreleased]` entry citing (task 177).
+- [x] `npm run bundle:check` green (no shared source changes are expected).
+- [x] CHANGELOG `[Unreleased]` entry citing (task 177).
 
 **Dependencies**: Phase 2.
 
@@ -252,30 +252,30 @@ None beyond the suite.
 
 ### Functional
 
-- [ ] `JIRA_URL="https://acme.atlassian.net" # prod` in `.env` produces no warning for a Jira URL on
+- [x] `JIRA_URL="https://acme.atlassian.net" # prod` in `.env` produces no warning for a Jira URL on
       `acme.atlassian.net` (executed Step 0b test, bash and zsh).
-- [ ] In a repository with no `docs/`, `/review-pr RAPP-702` continues past rung 1 instead of halting
+- [x] In a repository with no `docs/`, `/review-pr RAPP-702` continues past rung 1 instead of halting
       (the docs guard block, extracted and executed), while §0a still halts when called directly
       (existing test, `review-pr.test.js` CR2-6).
-- [ ] `github.com/o/r/pull/12`, `acme.atlassian.net/browse/RAPP-702` and
+- [x] `github.com/o/r/pull/12`, `acme.atlassian.net/browse/RAPP-702` and
       `bitbucket.org/ws/r/pull-requests/7` parse as their `https://` forms do, and the listed real
       branch names still parse as branches (parser cases, bash and zsh).
-- [ ] Step 2 rung 2 never returns a file the §0a rule classes as an artifact (`lookupBlock()` with
+- [x] Step 2 rung 2 never returns a file the §0a rule classes as an artifact (`lookupBlock()` with
       `KEY_FIELD=pr_number`, fixture test, bash and zsh).
 
 ### Performance
 
-- [ ] No extra network call for a PR target (the existing gating pin still holds).
+- [x] No extra network call for a PR target (the existing gating pin still holds).
 
 ### Code Quality
 
-- [ ] `review-pr.test.js` green; the mutation check reds each named case.
-- [ ] `shellcheck --severity=warning skills/review-pr/scripts/parse-target.sh` clean; `npm run bundle:check`
+- [x] `review-pr.test.js` green; the mutation check reds each named case.
+- [x] `shellcheck --severity=warning skills/review-pr/scripts/parse-target.sh` clean; `npm run bundle:check`
       and the full suite green.
 
 ### Migration
 
-- [ ] None — no consumer action beyond `setup-consumer.sh --update`.
+- [x] None — no consumer action beyond `setup-consumer.sh --update`.
 
 ---
 
@@ -319,6 +319,45 @@ None.
 
 ---
 
+## Implementation Summary
+
+**Completed**: 2026-10-03 (`/develop-task` run 1, Step 3 implemented inline from the plan file).
+
+### Approach
+
+- **Phase 1 — parser.** `parse-target.sh` gains one `case` before classification: a target with no
+  `://` whose first segment is `github.com`, `www.github.com`, `bitbucket.org`, `www.bitbucket.org`,
+  `api.bitbucket.org` or `*.atlassian.net` is re-parsed as `https://<target>`. Any other target that
+  matches a PR / issue / browse marker pattern is re-parsed only when its **first** segment holds a dot.
+  `www.bitbucket.org` was added beyond the task's list because the URL arm already accepts it.
+- **Phase 2 — skill prose.** Step 0b's `.env` value parse takes the inside of the first quote pair
+  (each `t` its own `-e`, for BSD sed), else strips an unquoted ` #…` tail. Step 1a gains a fenced
+  **docs guard** block (`DOCS=absent DOC_FILE=""` with no `docs/` at the repository root, never
+  calling §0a; `DOCS=present` hands over to §0a). Rung 1's row and Step 2 cite it; Step 2 skips rungs
+  1–4 on `DOCS=absent`. Step 2 rung 2 is now the §0a lookup with `KEY_FIELD=pr_number`.
+- **Phase 3.** CHANGELOG `[Unreleased]` › Fixed entry. No shared source changed, so no bundle churn.
+
+### Testing Results
+
+- `skills/review-pr/tests/review-pr.test.js`: 227/227 passing (was 208 before the task's tests), bash
+  and zsh. New cases: 10 parser cases (scheme-less URLs, real branch names incl.
+  `release/v1.2/x/pull/3`), a scheme-less malformed URL, 3 probe cases, commented-`.env` Step 0b runs
+  (same host: no warning; other host: still warns), the docs guard (absent from a subdirectory,
+  present, docs-less → rung 4 `RUNG=key search`), and rung 2 via §0a (`.dod.` only → `none`;
+  anchored 28 ≠ 281; shared `pr_number` → ambiguous HALT).
+- **Mutation check** — each fix reverted, its tests red: parser arm (11 red), the first-segment guard
+  (2 red), the `.env` parse (4 red), the docs guard replaced by a bare §0a (4 red), rung 2 back to a
+  bare grep (1 red).
+- `shellcheck --severity=warning skills/review-pr/scripts/parse-target.sh` clean;
+  `npm run bundle:check` green; `npm run ci:fast` — see the implementation report.
+- Live tree: `pr_number 290` → `DOC_STATUS=none`, `554` → `found` (task.176).
+
+### Deferred Work
+
+None.
+
+---
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -328,6 +367,7 @@ None.
 | 2026-10-02 | 1.0     | Initial draft — task.176 Deferred Work items 1–4         | create-task |
 | 2026-10-03 | 1.1     | Review 1 (7/10 → 9/10): portable `.env` sed, corrected misread-branch example, docs guard as a fenced block, rung 2 reuses §0a with `pr_number` | review-task |
 | 2026-10-03 |         | Status → ready-for-development | review-task |
+| 2026-10-03 |         | Implemented — 4 files, 19 tests | develop |
 
 <!-- change-log-end -->
 
@@ -337,20 +377,20 @@ None.
 
 ### Phase 1: Parser — scheme-less URLs
 
-- [ ] Parser arm
-- [ ] Tests
+- [x] Parser arm
+- [x] Tests
 
 ### Phase 2: Skill prose
 
-- [ ] `.env`
-- [ ] Docs-less fallback
-- [ ] Rung 2 filter
-- [ ] Tests
+- [x] `.env`
+- [x] Docs-less fallback
+- [x] Rung 2 filter
+- [x] Tests
 
 ### Phase 3: Bundle, CHANGELOG
 
-- [ ] Bundle check
-- [ ] CHANGELOG
+- [x] Bundle check
+- [x] CHANGELOG
 
 ---
 

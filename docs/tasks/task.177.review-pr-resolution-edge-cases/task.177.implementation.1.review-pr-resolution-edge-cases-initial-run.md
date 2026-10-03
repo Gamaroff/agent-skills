@@ -33,7 +33,7 @@ Close four `/review-pr` target-resolution edge cases left by task.176: commented
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- |
 | 1. create-branch           | ✅ Done    | Branch `feature/task.{id}.*` exists in git                             | Pre-existing branch at `4f284c8b` (develop tip); resumed per Phase 0b | —                    |
 | 2. review-task             | ⏭️ Skipped | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | Gate: `Ready for Development` + review.1 exists (freshness `fresh`) → skip | —                    |
-| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline from plan, 1 iteration; 3/3 phases; review-pr.test.js 227/227; fast gate 5173/5175 → 1 pre-existing failure fixed (see Issues Log) | —                    |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
@@ -58,11 +58,25 @@ Close four `/review-pr` target-resolution edge cases left by task.176: commented
 - Lock written at `current_step: 2` after the Step 1 tail.
 - Step 2 skipped: status `Ready for Development` with review report `task.177.review.1.review-pr-resolution-edge-cases.md` present (freshness engine: `fresh`, task 2026-10-03 / report 2026-10-03). The uncommitted review edits are committed with this report.
 
+### Step 3 — develop
+
+- Pre-develop surface map: 4 files identified in skills/review-pr (`scripts/parse-target.sh`, `SKILL.md` Step 0b/1a/2, `tests/review-pr.test.js`, `CHANGELOG.md`) — mapped inline, no Explore dispatch (the plan names every file and hunk; Explore subagents have hung in this repo). Independence loss: none material — the map is a list of files the plan already names.
+- Plan file found: docs/tasks/task.177.review-pr-resolution-edge-cases/task.177.plan.review-pr-resolution-edge-cases.md — included as implementation context for /develop.
+- Step 3 inline — /develop not invoked: plan names every hunk; both inline preconditions (plan file + surface map) recorded above.
+- Fast gate precondition: `develop.fastGateCommand` unset → `npm run ci:fast` (defined) — passed.
+- Docs guard design: the guard binds `DOCS=present|absent` and `DOC_FILE`; on `present` the agent runs §0a next (cited, not extracted/eval'd). Chosen over eval'ing §0a's fence from the bundled reference — simpler, and the docs-less branch (the one the fix is about) is fully executable.
+- Added `www.bitbucket.org` to the scheme-less host list (the URL arm already accepts it); added `release/v1.2/x/pull/3` as a test so the first-segment-dot guard is held (it went unexercised by the plan's cases).
+- Mutation check: parser arm (11 red), first-segment guard (2), `.env` parse (4), docs guard → bare §0a (4), rung 2 → bare grep (1).
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+- **Step 3 — fast gate red on a pre-existing failure.** `npm run ci:fast`: 5175 tests, 1 fail — `doc-links.test.mjs` corpus check: `task.178.plan…md` links `references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup`, a skill-relative path that does not resolve from a task directory. Introduced by `4f284c8b` (task.177/178 creation); develop's own CI (Test, Docs link check) is red on it. Fixed on this branch by quoting the link as code (it is the literal link text task.178 will insert into a SKILL.md); `doc-links.test.mjs` 24/24. Out of task scope, but this PR's CI would otherwise be red.
+- **Step 3 — `npx` is an nvm shell function here** and failed (`_nvm_load: command not found`); used `./node_modules/.bin/prettier` instead. Same class as the `node` memory note.
+- Step 3 loop audit run inline (no Explore): status `ready-for-review`, 9/9 Implementation Plan checkboxes ticked, 0 open. Develop-complete comment on #555: `posted`.
 
 ---
 
