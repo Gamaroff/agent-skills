@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "shell-fn:skills/review-pr/scripts/parse-target.sh#parse_target",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 22,
+      "passed": 22,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "ran_at": "2026-10-03T06:29:36.139Z"
+    }
+  ],
+  "totals": {
+    "executed": 22,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-03T06:29:36.139Z"
+}

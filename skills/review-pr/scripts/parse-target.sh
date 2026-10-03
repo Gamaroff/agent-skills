@@ -170,6 +170,22 @@ case "$TARGET" in
   *[[:cntrl:]]*) refuse control-character "the target contains a control character (newline, tab, …)" ;;
 esac
 
+# A URL pasted without its scheme: re-parse it as https://<target>, or it falls to
+# the final branch arm and the run ends in "no pull request found for github.com/…".
+# Only the FIRST segment is read as a host, and only a known platform host counts (its
+# port stripped, case folded), so feature/foo.atlassian.net/x stays a branch. A self-hosted
+# URL keeps its scheme: any rule that guesses at an unknown dotted segment reads some real
+# branch-naming convention as a host — v2.0/browse/x, jane.doe/fix/issues/123 (task.177 QA).
+case "$TARGET" in
+  *://*) ;;
+  ?*/*)
+    _host=$(printf '%s' "${TARGET%%/*}" | tr '[:upper:]' '[:lower:]')
+    case "${_host%%:*}" in
+      github.com | www.github.com | bitbucket.org | www.bitbucket.org | api.bitbucket.org | ?*.atlassian.net)
+        TARGET="https://$TARGET" ;;
+    esac ;;
+esac
+
 case "$TARGET" in
   '')
     printf 'kind=pr-for-current-branch\n'

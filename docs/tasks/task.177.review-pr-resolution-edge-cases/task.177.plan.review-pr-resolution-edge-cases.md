@@ -5,7 +5,7 @@ type: plan
 description: "Code-level guide for task 177: scheme-less URLs in parse-target.sh, the .env inline comment, the docs-less fallback, and the rung-2 work-item filter."
 task-ref: task.177.review-pr-resolution-edge-cases.md
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # Implementation Plan: /review-pr resolution edge cases
@@ -35,8 +35,10 @@ case "$TARGET" in
 esac
 ```
 
-Check that the first-segment rule keeps `release/v1.2/pull/3`, should one exist, a branch: its first
-segment is `release`, which holds no dot. Keep every expansion quoted and add no arrays — the
+The first-segment rule keeps `release/v1.2/pull/3` a branch (its first segment, `release`, holds no
+dot), and `v1.2/pull/3` stays a branch because every marker pattern needs `host/x/…`. What the arm
+does misread is a dotted first segment plus two or more segments and a marker (`v1.2/x/pull/3`) —
+measured under bash and zsh at review 1. Keep every expansion quoted and add no arrays — the
 script's bash/zsh rule.
 
 Tests (in `review-pr.test.js`, extending `PARSER_CASES` and the malformed list):
@@ -44,7 +46,7 @@ Tests (in `review-pr.test.js`, extending `PARSER_CASES` and the malformed list):
 - `github.com/o/r/pull/12` → `{kind: pr, pr: 12, host: github.com, repo: o/r}`
 - `acme.atlassian.net/browse/RAPP-702` → `{kind: jira, jira_key: RAPP-702, host: acme.atlassian.net}`
 - `bitbucket.org/ws/r/pull-requests/7` → `{kind: pr, pr: 7, host: bitbucket.org, repo: ws/r}`
-- stays a branch: `feature/task.1.x`, `release/v1.2`, `hotfix/v1.2.1`
+- stays a branch: `feature/task.1.x`, `release/v1.2`, `hotfix/v1.2.1`, `v1.2/pull/3`, `release/v1.2/pull/3`
 - `github.com/o/r/tree/main` → refused `url-no-target`, the same as its `https://` form
 
 Add the three scheme-less URLs to `PARSER_PROBE_CASES` as legitimate cases.
@@ -57,30 +59,53 @@ the inside of the first quote pair when the value opens with a quote, and otherw
 
 ```sh
 | tr -d '\r' | tail -1 \
-| sed -E "s/^[[:space:]]+//; s/^\"([^\"]*)\".*$/\1/; t; s/^'([^']*)'.*$/\1/; t; s/[[:space:]]+#.*$//; s/[[:space:]]+$//")
+| sed -E -e 's/^[[:space:]]+//' -e "s/^\"([^\"]*)\".*\$/\1/" -e t -e "s/^'([^']*)'.*\$/\1/" -e t \
+        -e 's/[[:space:]]+#.*$//' -e 's/[[:space:]]+$//')
 ```
 
-`t` branches past the remaining expressions once a quote pair has matched. Verify the `t` behaviour
-under BSD sed (macOS) as well as GNU sed. If they differ, use two steps instead.
+A bare `t` branches to the end of the script once a quote pair has matched. **Each `t` must be its
+own `-e`**: written as `…; t; …` inside one script, BSD sed (macOS) reads the rest of the line as a
+label name and fails with `undefined label` (measured at review 1). Verified under BSD sed:
+`"…" # prod`, `'…' # prod`, `… # prod`, `"…"` and padded `"…"` all yield the bare URL;
+`https://a.net#frag` keeps its `#frag` (no space before `#`); `"https://a.net#x" # c` → `https://a.net#x`.
 
-**Docs-less fallback.** In Step 1a rung 1's table cell and in Step 2 rung 4, add before the §0a citation:
+**Docs-less fallback — a fenced docs guard block.** Prose alone cannot be executed, so a test could
+not hold it. Add one bash block to Step 1a, which rung 1's table cell and Step 2 cite:
 
-> When `docs/` does not exist at the repository root (`[ -d "$(git rev-parse --show-toplevel)/docs" ]`),
-> there is no document: bind `DOC_FILE=""` and continue at rung 4 (Step 1a) or rung 5 (Step 2). Do
-> not call the §0a lookup — its HALT is for the develop pipelines, which cannot proceed without a
-> document.
+```bash
+# No docs/ at the repository root → no document. §0a's HALT on a missing docs/ is for the develop
+# pipelines, which cannot proceed without one; /review-pr can (Step 2 rung 6, code-only).
+if [ -d "$(git rev-parse --show-toplevel)/docs" ]; then
+  # … §0a Key → document lookup, cited (KEY_FIELD / KEY_VALUE bound by the caller) …
+  DOC_FILE="$LOCAL_PATH"
+else
+  DOC_FILE=""
+fi
+printf 'DOC_FILE=%s\n' "$DOC_FILE"
+```
 
-**Rung 2 filter.** Rewrite the rung 2 cell as the grep piped through the §0a rule, citing it: keep a hit
-named after its own directory; otherwise drop a basename carrying a kind segment. Do not restate the
-kind list — Step 2's "Exclusion filter" paragraph already cites §0a.
+How the block reaches §0a (source the bundled reference, or an instruction to run §0a's block at
+that point) is the implementer's call; the constraint is that the docs-less branch is executable and
+calls no §0a. Step 1a continues at rung 4 when `DOC_FILE` is empty. Step 2 skips rungs 1–4 when
+`docs/` is missing and continues at rung 5/6.
+
+**Rung 2 = §0a.** Rewrite the rung 2 cell as the §0a Key → document lookup with
+`KEY_FIELD=pr_number KEY_VALUE=$PR_NUMBER`, cited. §0a's grep is generic in the field, anchored and
+quote-tolerant, and carries the work-item filter — so nothing is restated. Measured at review 1 on the
+live tree: `290` → `DOC_STATUS=none`, `554` → `found` (task.176). §0a HALTs when several documents
+match; that is now rung 2's behaviour for a shared `pr_number` (recorded in the task's Breaking
+Changes). Rung 2 runs after the docs guard.
 
 Tests:
 
 - Step 0b block in a consumer repo whose `.env` is `JIRA_URL="https://acme.atlassian.net" # prod`, with
   target `https://acme.atlassian.net/browse/RAPP-702`: exit 0 and no `⚠️` line.
-- A docs-less consumer repo, target `RAPP-702`: the Step 1a rung-1 decision binds `DOC_FILE=""`, and the
-  rungs 3–4 block (stub `gh`) reports `RUNG=key search`.
-- A fixture where only `bug.3.dod.1.x.md` carries `pr_number: 290`: the rung 2 command returns nothing.
+- A docs-less consumer repo, target `RAPP-702`: the docs guard block (extracted by a helper shaped
+  like `lookupBlock()`) exits 0 and prints `DOC_FILE=`, and the rungs 3–4 block (stub `gh`) reports
+  `RUNG=key search`. Mutation: replace the guard with a bare §0a call → the test goes red.
+- `lookupBlock()` with `KEY_FIELD=pr_number KEY_VALUE=290` against a fixture where only
+  `bug.3.dod.1.x.md` carries `pr_number: 290` → `DOC_STATUS=none`; two work items sharing a
+  `pr_number` → exit 1, `HALT: … matches 2 documents`.
 
 ## Phase 3
 
