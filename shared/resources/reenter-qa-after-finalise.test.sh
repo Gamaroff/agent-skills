@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+# reenter-qa-after-finalise.test.sh — regression tests for reenter-qa-after-finalise.sh (task.170)
+#
+# Usage: bash shared/resources/reenter-qa-after-finalise.test.sh
+#
+# Each case builds a throwaway git repository in a temp directory — a work-item directory with a
+# gate whose `head:` is a real commit, a DoD file, and a halt snapshot — and runs the script from
+# that repository's root, which is where the pipeline runs it. Pins:
+#   • every refusal reason, and that a refusal writes nothing and consumes nothing
+#   • a document-only fix is refused; committed, uncommitted and untracked code all count as moved
+#   • a gate head that cannot vouch for the tree (none, not 40-hex, not an ancestor) counts as moved
+#   • the accept path: step 5, qa_phase 5a, qa_max_cycles = max(existing, base + 2), qa_reentry
+#   • no temp file is left beside the lock, on success or failure
+
+PASS=0
+FAIL=0
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/reenter-qa-after-finalise.sh"
+
+pass() { echo "  PASS  $1"; PASS=$((PASS + 1)); }
+fail() { echo "  FAIL  $1"; echo "        $2"; FAIL=$((FAIL + 1)); }
+
+T=$(mktemp -d)
+trap 'rm -rf "$T"' EXIT
+DOC=docs/tasks/task.42.example
+
+# mkrepo NAME [GATE_HEAD_MODE] — a repo with one code commit, a gate whose head is that commit,
+# a GAPS DoD file and a step-7 halt snapshot for $DOC. GATE_HEAD_MODE: sha (default) | none | HEAD.
+# Sets R (repo root), L (lock), S (snapshot).
+mkrepo() {
+  R="$T/$1"; L="$R/.claude/state/lock.json"; S="$R/.claude/state/last-halt.json"
+  mkdir -p "$R/$DOC" "$R/src" "$R/.claude/state"
+  git -C "$R" init -q
+  git -C "$R" config user.email t@t; git -C "$R" config user.name t; git -C "$R" config commit.gpgsign false
+  printf '.claude/\n' > "$R/.gitignore"
+  echo one > "$R/src/code.sh"
+  echo "# task" > "$R/$DOC/task.42.example.md"
+  git -C "$R" add -A; git -C "$R" commit -qm code
+  local head; head=$(git -C "$R" rev-parse HEAD)
+  case "${2:-sha}" in
+    sha)  printf 'schema: 2\nhead: %s\ngate: PASS\n' "$head" ;;
+    none) printf 'schema: 1\ngate: PASS\n' ;;
+    HEAD) printf 'schema: 2\nhead: HEAD\ngate: PASS\n' ;;
+  esac > "$R/$DOC/task.42.gate.2.example.yml"
+  : > "$R/$DOC/task.42.gate.1.example.yml"
+  printf '# DoD\n\n## Verification Complete\n\n**Final Status:** ❌ GAPS IDENTIFIED - NOT ACCEPTED\n' > "$R/$DOC/task.42.dod.1.example.md"
+  git -C "$R" add -A; git -C "$R" commit -qm "gate + dod"
+  printf '{"skill":"develop-task","current_step":7,"task_or_story_directory":"%s","branch":"feature/x","qa_max_cycles":5,"halted_at":"2026-10-01T00:00:00Z","halt_reason":"finalise DoD gaps","halt_step":"7"}\n' "$DOC" > "$S"
+}
+run() { # extra args → script; runs from the repo root
+  (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" "$@")
+}
+leftovers() { find "$R/.claude/state" -name '.reenter-qa.*' -o -name '.advance-pipeline-lock.*' 2>/dev/null | grep -c . ; }
+
+# expect_refusal NAME REASON — runs the script, expects exit 1 naming REASON, no lock written,
+# the snapshot (if any) still on disk, and no temp file.
+expect_refusal() {
+  local name="$1" reason="$2" snap_before err rc
+  snap_before=$([ -f "$S" ] && cat "$S")
+  err=$(run 2>&1 >/dev/null); rc=$?
+  if [ "$rc" -ne 1 ]; then fail "$name" "rc=$rc (want 1) err=$err"; return; fi
+  if ! printf '%s' "$err" | grep -q "refused ($reason)"; then fail "$name" "reason not named ($reason): $err"; return; fi
+  if [ -n "$snap_before" ] && [ "$(cat "$S" 2>/dev/null)" != "$snap_before" ]; then fail "$name" "snapshot consumed or changed by a refusal"; return; fi
+  if [ "$reason" != lock-present ] && [ -f "$L" ]; then fail "$name" "a refusal wrote a lock: $(cat "$L")"; return; fi
+  if [ "$(leftovers)" -ne 0 ]; then fail "$name" "temp file left behind"; return; fi
+  pass "$name → refused ($reason), nothing written, nothing consumed"
+}
+
+echo "reenter-qa-after-finalise.sh"
+
+# ── Refusals ─────────────────────────────────────────────────────────────────
+mkrepo no-snap; rm -f "$S"; echo two > "$R/src/code.sh"
+expect_refusal "no halt snapshot" no-snapshot
+
+mkrepo other-doc; echo two > "$R/src/code.sh"
+jq '.task_or_story_directory = "docs/tasks/task.99.other"' "$S" > "$S.n" && mv "$S.n" "$S"; mkdir -p "$R/docs/tasks/task.99.other"
+expect_refusal "snapshot for another document" no-snapshot
+
+mkrepo step5; echo two > "$R/src/code.sh"
+jq '.halt_step = "5" | .halt_reason = "loop-limit"' "$S" > "$S.n" && mv "$S.n" "$S"
+expect_refusal "halt_step 5 (a loop-limit halt)" not-a-finalise-halt
+
+mkrepo pause; echo two > "$R/src/code.sh"
+jq 'del(.halt_step, .halted_at, .halt_reason) | .paused_at = "x" | .pause_reason = "precompact"' "$S" > "$S.n" && mv "$S.n" "$S"
+expect_refusal "a PreCompact pause at step 7 (no halt_step)" not-a-finalise-halt
+
+mkrepo nodod; echo two > "$R/src/code.sh"; rm -f "$R/$DOC"/*.dod.*
+expect_refusal "no DoD file" no-dod
+
+mkrepo accepted; echo two > "$R/src/code.sh"
+printf '**Final Status:** ✅ ACCEPTED\n' > "$R/$DOC/task.42.dod.2.example.md"
+expect_refusal "newest DoD file accepted (dod.2 outranks dod.1's GAPS)" dod-not-gaps
+
+mkrepo nogate; echo two > "$R/src/code.sh"; rm -f "$R/$DOC"/*.gate.*
+expect_refusal "no gate" no-gate
+
+mkrepo docs-only
+echo "re-scoped criterion" >> "$R/$DOC/task.42.example.md"; git -C "$R" commit -qam "doc fix"
+echo "uncommitted doc edit" >> "$R/$DOC/task.42.example.md"
+expect_refusal "document-only fix (committed + uncommitted, inside the work-item directory)" no-code-moved
+
+mkrepo live-lock; echo two > "$R/src/code.sh"; printf '{"current_step":7}\n' > "$L"
+expect_refusal "a live lock" lock-present
+[ "$(jq -c . "$L")" = '{"current_step":7}' ] && pass "lock-present leaves the live lock untouched" || fail "live lock untouched" "$(cat "$L")"
+
+# ── Accept ───────────────────────────────────────────────────────────────────
+# accept NAME [report-arg] — expects exit 0 and the full re-entry shape; WANT_MAX is the budget.
+accept() {
+  local name="$1"; shift
+  local out rc
+  out=$(run "$@" 2>/dev/null); rc=$?
+  if [ "$rc" -ne 0 ] || [ ! -f "$L" ]; then fail "$name" "rc=$rc lock=$([ -f "$L" ] && echo yes || echo no) out=$out err=$(run "$@" 2>&1 >/dev/null)"; return; fi
+  local got; got=$(jq -c '{s: .current_step, p: .qa_phase, m: .qa_max_cycles, r: .qa_reentry.reason, f: .qa_reentry.from_step, h: (.qa_reentry.gate_head|length), at: (.qa_reentry.at|test("^[0-9]{4}-")), halt: (has("halt_step") or has("halt_reason") or has("halted_at"))}' "$L")
+  local want="{\"s\":5,\"p\":\"5a\",\"m\":$WANT_MAX,\"r\":\"dod-gaps-code-fix\",\"f\":7,\"h\":$WANT_HEADLEN,\"at\":true,\"halt\":false}"
+  if [ "$got" != "$want" ]; then fail "$name" "lock $got, want $want"; return; fi
+  if [ -f "$S" ]; then fail "$name" "snapshot not consumed by the restore"; return; fi
+  if [ "$(leftovers)" -ne 0 ]; then fail "$name" "temp file left behind"; return; fi
+  if ! printf '%s' "$out" | grep -q "qa_max_cycles=$WANT_MAX"; then fail "$name" "stdout does not report the budget: $out"; return; fi
+  pass "$name → step 5 / 5a, qa_max_cycles $WANT_MAX, qa_reentry recorded, snapshot consumed"
+}
+WANT_HEADLEN=40
+
+mkrepo committed; echo two > "$R/src/code.sh"; git -C "$R" commit -qam "code fix"
+WANT_MAX=5; accept "committed code fix (existing budget 5 > base 2 + 2 is kept)"
+[ "$(jq -r '.qa_reentry.gate_head' "$L")" = "$(git -C "$R" rev-parse HEAD~2)" ] && pass "qa_reentry.gate_head is the gate's head" || fail "gate_head recorded" "$(jq -c .qa_reentry "$L")"
+[ "$(jq -r '.branch' "$L")" = "feature/x" ] && pass "pipeline fields carried over from the snapshot" || fail "fields carried" "$(cat "$L")"
+
+mkrepo uncommitted; echo two > "$R/src/code.sh"
+WANT_MAX=5; accept "uncommitted code fix counts as moved"
+
+mkrepo untracked; echo new > "$R/src/new-fix.sh"
+WANT_MAX=5; accept "untracked code file counts as moved"
+
+mkrepo budget; echo two > "$R/src/code.sh"
+jq 'del(.qa_max_cycles)' "$S" > "$S.n" && mv "$S.n" "$S"
+WANT_MAX=4; accept "no prior budget → base 2 + 2 = 4"
+
+mkrepo report; echo two > "$R/src/code.sh"
+jq 'del(.qa_max_cycles)' "$S" > "$S.n" && mv "$S.n" "$S"
+printf '# r\n### QA Cycle 1\n### QA Cycle 2\n### QA Cycle 3\n' > "$R/report.md"
+WANT_MAX=5; accept "report ahead of the gates → base is the report's 3, + 2 = 5" report.md
+
+mkrepo nohead none
+WANT_MAX=5; WANT_HEADLEN=0; accept "a gate with no head: (schema 1) counts as moved even with no change"
+mkrepo symbolic HEAD
+WANT_MAX=5; WANT_HEADLEN=4; accept "a gate head that is not 40-hex counts as moved even with no change"
+WANT_HEADLEN=40
+
+# A head that is a real commit but not an ancestor of HEAD (an off-branch commit) cannot vouch for
+# this tree: counted as moved, with no change on the branch (task.168 CR4-1's case).
+mkrepo offbranch
+git -C "$R" checkout -qb side; echo side > "$R/src/side.sh"; git -C "$R" add -A; git -C "$R" commit -qm side
+SIDE=$(git -C "$R" rev-parse HEAD); git -C "$R" checkout -q -
+sed -i.bak -E "s/^head: .*/head: $SIDE/" "$R/$DOC/task.42.gate.2.example.yml" && rm -f "$R/$DOC/task.42.gate.2.example.yml.bak"
+git -C "$R" commit -qam "gate re-recorded"
+WANT_MAX=5; accept "a gate head that is not an ancestor of HEAD counts as moved even with no code change"
+
+mkrepo numeric; echo two > "$R/src/code.sh"
+jq '.halt_step = 7' "$S" > "$S.n" && mv "$S.n" "$S"
+WANT_MAX=5; accept "a numeric halt_step 7 is accepted as well as the string"
+
+# ── A failed write keeps the restored lock and leaves no temp file ───────────
+mkrepo writefail; echo two > "$R/src/code.sh"
+STUB="$T/stubbin"; mkdir -p "$STUB"
+REAL_JQ=$(command -v jq)
+# A jq that fails only on the re-entry write (the filter that names qa_reentry).
+cat > "$STUB/jq" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in *qa_reentry*) exit 3 ;; esac; done
+exec "$REAL_JQ" "\$@"
+EOF
+chmod +x "$STUB/jq"
+ERR=$(cd "$R" && PATH="$STUB:$PATH" PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" 2>&1 >/dev/null); RC=$?
+if [ "$RC" -eq 1 ] && [ "$(jq -r '.current_step' "$L" 2>/dev/null)" = "7" ] && [ "$(jq -r 'has("qa_reentry")' "$L")" = "false" ] \
+   && [ "$(leftovers)" -eq 0 ] && printf '%s' "$ERR" | grep -q "is kept"; then
+  pass "a failed re-entry write keeps the restored step-7 lock and leaves no temp file"
+else
+  fail "failed write" "rc=$RC lock=$(cat "$L" 2>/dev/null) leftovers=$(leftovers) err=$ERR"
+fi
+
+# ── Usage ────────────────────────────────────────────────────────────────────
+mkrepo usage
+(cd "$R" && bash "$SCRIPT" >/dev/null 2>&1); [ $? -eq 2 ] && pass "no <doc-dir> → exit 2" || fail "usage" "no doc-dir did not exit 2"
+(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" . >/dev/null 2>&1); [ $? -eq 2 ] && pass "<doc-dir> at the repository root → exit 2" || fail "root doc-dir" "did not exit 2"
+[ -f "$S" ] && pass "usage errors consume nothing" || fail "usage consumed" "snapshot gone"
+
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

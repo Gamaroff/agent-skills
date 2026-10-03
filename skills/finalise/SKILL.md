@@ -2277,6 +2277,7 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    **Next Steps:**
 
    - Address blocking issues listed above
+   - A gap closed by changing code re-enters QA before this verification re-runs; a document-only fix re-runs it directly
    - Re-run verification after fixes are implemented
    ```
 

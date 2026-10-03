@@ -34,6 +34,8 @@
 #                                            wait on stderr; cleared: re-prompt; older
 #                                            than budget_minutes (a crashed step): re-prompt;
 #                                            malformed since / budget: re-prompt (fail loud)
+#  12. qa_reentry (task.170)               → a lock lowered 7 → 5 by reenter-qa-after-finalise.sh
+#                                            names /qa-task (/qa-story), never /finalise
 
 PASS=0
 FAIL=0
@@ -376,6 +378,26 @@ d="$TMPDIR_TEST/waiting-qa"
 mklock "$d" "{\"skill\":\"develop-story\",\"current_step\":5,\"qa_phase\":\"5c\",\"report_path\":\"r.md\",\"waiting_on\":{\"kind\":\"agent\",\"label\":\"review-pr lenses\",\"since\":\"$NOW_ISO\",\"budget_minutes\":1}}"
 OUT=$(run_hook "$d")
 [ -z "$OUT" ] && pass "waiting_on inside the QA loop (5c) → allow; qa_phase does not override the wait" || fail "wait inside QA loop" "stdout=$(echo "$OUT" | head -c 80)"
+
+# ── 12. qa_reentry (task.170) ────────────────────────────────────────────────
+# reenter-qa-after-finalise.sh lowers a step-7 lock to 5 / qa_phase 5a and records qa_reentry.
+# The hook must read it as any step-5 lock: name the QA review, never the /finalise the halt was
+# at — a hook that keyed on qa_reentry.from_step would send the run back to an ungated finalise.
+for skill in develop-task develop-story; do
+  want=/qa-task; [ "$skill" = develop-story ] && want=/qa-story
+  d="$TMPDIR_TEST/qa-reentry-$skill"
+  mklock "$d" "{\"skill\":\"$skill\",\"current_step\":5,\"qa_phase\":\"5a\",\"report_path\":\"r.md\",\"qa_max_cycles\":4,\"qa_reentry\":{\"from_step\":7,\"reason\":\"dod-gaps-code-fix\",\"at\":\"2026-10-03T00:00:00Z\",\"gate_head\":\"0123456789abcdef0123456789abcdef01234567\"}}"
+  R=$(reason_of "$(run_hook "$d")")
+  if [ -z "$R" ]; then
+    fail "qa_reentry lock ($skill)" "hook allowed stop; expected a block"
+  elif ! echo "$R" | grep -q -- "invoke $want"; then
+    fail "qa_reentry lock ($skill)" "did not name '$want'. Got: $(echo "$R" | head -1)"
+  elif echo "$R" | grep -q -- "invoke /finalise"; then
+    fail "qa_reentry lock ($skill)" "named /finalise — the step the re-entry left"
+  else
+    pass "qa_reentry lock at 5 / 5a ($skill) → $want, never /finalise"
+  fi
+done
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""

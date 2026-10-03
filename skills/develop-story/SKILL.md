@@ -328,6 +328,14 @@ If a situation arises that is not in the shared defaults table and the stakes ar
 
   Then run the loop with `QA_MAX_CYCLES` = the lock's `qa_max_cycles` — the reconstructed count plus the grant, **never `5 + k`**: gates written since the original budget (a half-cycle's `gate.6`, an operator's cycle) would otherwise be counted against the grant, and a second grant could never extend past the first. Do not inline the `jq`: a `$QA_CYCLE` bound in another fenced block does not exist in this one, and the lock the write targets does not exist after a HALT until the script restores it (task.123 QA cycle 2). The field names are `extra_cycles_granted` and `qa_max_cycles` everywhere they appear — lock, snapshot, writer script, step-5-6 doc, resume contract, this file — and `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails on another spelling. Log the grant in the Decisions Log: "QA loop re-entry: {k} extra cycles granted; {m} cycle(s) run outside the loop back-filled from disk." A declined grant — or one the script refuses with exit 1 (surface its stderr line) — restores no lock and runs no cycle: the run returns to the halt message's own three options, per the resume contract's re-entry step 4.
 
+  **Re-entry after a finalise DoD-gaps halt fixed by a code change** (task.170): when the snapshot's `halt_step` is 7, the newest DoD file reads `❌ GAPS` and the fix changed code outside the work item's directory, Phase 0b adds **"Re-enter QA at 5a"** (Recommended) to the halt's own options — a resume at 7 would accept a head no gate has read. On accept, **one call**; the script measures the movement itself and refuses (exit 1, `reenter-qa: refused (<reason>)` — surface it) a document-only fix, which resumes at 7 as before:
+
+  ```bash
+  bash .agents/skills/develop-story/references/reenter-qa-after-finalise.sh {story-directory} {implementation-report-path}
+  ```
+
+  It lowers the lock to step 5 / `qa_phase: 5a`, sets `qa_max_cycles` and records `qa_reentry`; the loop then runs from 5a. Which snapshot takes which path, the refusal list and the budget rule are the resume contract's **Re-entry after a finalise DoD-gaps halt**. Log in the Decisions Log: "QA re-entry after finalise DoD gaps: {script's stdout line}."
+
 - **Signal `blocked` on a terminal HALT** (when `TRACKER=jira` and `TRACKER_ISSUE` is set). After the snapshot above, before surfacing the HALT:
 
   ```bash

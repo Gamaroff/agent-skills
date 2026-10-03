@@ -5,7 +5,7 @@ type: plan
 description: "Code-level guide for task 170: the reenter-qa-after-finalise.sh writer, its refusal list, the resume-contract bullet and the guards."
 task-ref: task.170.qa-reentry-after-finalise-gaps.md
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-03
 ---
 
 # Implementation Plan: QA re-entry after a finalise DoD-gaps halt fixed by a code change
@@ -26,14 +26,20 @@ every refusal check has passed.
 ```bash
 SNAP=.claude/state/develop-pipeline.last-halt.json
 # refusals, in order — each prints "reenter-qa: <reason>" and exits 1
-[ -f "$SNAP" ]                                              || refuse no-snapshot
-# document match: reuse advance-pipeline-lock.sh's canonicalised directory check
-[ "$(jq -r '.halt_step' "$SNAP")" = "7" ]                   || refuse not-a-finalise-halt
+# document match through the restore's OWN selection, before any write (review 1, I4):
+CAND=$(bash advance-pipeline-lock.sh --restore --which "$DOC_DIR") || refuse no-snapshot / other-document
+# halt_step is a string ("7") — the HALT snippet writes it with jq --arg (review 1, O4)
+[ "$(jq -r '.halt_step // empty | tostring' "$CAND")" = "7" ] || refuse not-a-finalise-halt
 DOD=$(newest_numbered "$DOC_DIR" dod -name '*.dod.*.md')    # finalise's newest-numbered.sh
 grep -q '^\*\*Final Status:\*\* ❌ GAPS' "$DOD"            || refuse dod-not-gaps
 GATE=$(bash qa-cycle.sh "$DOC_DIR" --path gate)             || refuse no-gate
 HEAD_OF_GATE=$(grep -E '^head:' "$GATE" | …)                # the qa-task Phase 0 parse
+# the FULL qa-task Phase 0 measure (review 1, I1): a head that is absent / not 40-hex / not a
+# commit / not an ancestor of HEAD counts as moved; otherwise commits since the head + uncommitted
+# + untracked, all outside $DOC_DIR
 CODE_MOVED=$(git rev-list --count "$HEAD_OF_GATE"..HEAD -- . ":(exclude)$DOC_DIR")
+git diff --quiet HEAD -- . ":(exclude)$DOC_DIR" || CODE_MOVED=$((CODE_MOVED + 1))
+[ -z "$(git ls-files --others --exclude-standard -- . ":(exclude)$DOC_DIR")" ] || CODE_MOVED=$((CODE_MOVED + 1))
 [ "$CODE_MOVED" -gt 0 ]                                     || refuse no-code-moved
 ```
 
@@ -42,12 +48,13 @@ Then: `advance-pipeline-lock.sh --restore "$DOC_DIR"`, and one `jq` over the res
 ```jq
 .current_step = 5
 | .qa_phase = "5a"
-| .qa_max_cycles = ($cycles + 5)        # reconstructed like grant-qa-cycles.sh; never lower an existing budget
+| .qa_max_cycles = ([(.qa_max_cycles // 0), ($cycles + 2)] | max)   # base as grant-qa-cycles.sh; never lower (review 1, I2)
 | .qa_reentry = { from_step: 7, reason: "dod-gaps-code-fix", at: $now, gate_head: $head }
 ```
 
 written through `mktemp` beside the lock and `mv`, temp removed on any failure (the
-`advance-pipeline-lock.sh` pattern — never `$LOCK.tmp`).
+`advance-pipeline-lock.sh` pattern — never `$LOCK.tmp`). A failed write after the restore keeps
+the restored step-7 lock: the snapshot is consumed, so the lock is the run's only state.
 
 ## Phase 2: Contract and step docs
 

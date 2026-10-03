@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A code fix after a `/finalise` DoD-gaps halt is gated before acceptance (task.170,
+  observation #235).** The documented resume of a Step 7 halt restored the lock at 7 and re-ran
+  `/finalise` over a head no QA gate had read, and the obvious backward move —
+  `advance-pipeline-lock.sh 5` on a step-7 lock — was a silent no-op. A new resume case in
+  `develop-pipeline-resume-contract.md` (**Re-entry after a finalise DoD-gaps halt**) and its one
+  writer, `reenter-qa-after-finalise.sh` (bundled into `develop-task` and `develop-story`), re-enter
+  the QA loop at step 5 / `qa_phase: 5a` when the newest DoD file reads `❌ GAPS` and code moved past
+  the newest gate's `head:` — measured with `qa-task` Phase 0's full measure, so uncommitted and
+  untracked changes count. A document-only fix is refused and resumes at 7 as before. The script
+  refuses before any write (seven named reasons, held equal to the contract's list by
+  `evals/shared/tests/reenter-qa-refusals-parity.test.mjs`), sets
+  `qa_max_cycles = max(existing, base + 2)`, and records `qa_reentry` on the lock — the one optional
+  new field. `advance-pipeline-lock.sh` stays monotonic. Both `SKILL.md` Phase 0b blocks offer
+  "Re-enter QA at 5a"; finalise's gap report and the step-7 halt message name the rule. No consumer
+  migration.
+
 - **`/review-pr` starts from the work item: a Jira key or URL, or a GitHub issue (task.176).**
   `target` now also accepts `RAPP-702`, a Jira `/browse/` URL, a board URL carrying
   `?selectedIssue=`, a Jira Cloud `…/issues/KEY` URL, a GitHub `/issues/N` URL and `#N`, and
