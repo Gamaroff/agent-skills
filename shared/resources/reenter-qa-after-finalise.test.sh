@@ -312,6 +312,16 @@ jq '.task_or_story_directory = "docs/notes"' "$S" > "$S.n" && mv "$S.n" "$S"
 (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" docs/notes "$DOC/report.md" >/dev/null 2>&1); RC2=$?
 [ "$RC" -eq 1 ] && [ "$RC2" -eq 1 ] && pass "a directory no DoD stem continues → refused (no-dod), never guessed" || fail "non-work-item dir" "rc=$RC rc2=$RC2"
 
+# ── bash 3.2 parse (task.170 finalise, DoD gap 1) ────────────────────────────
+# macOS ships /bin/bash 3.2, and `bash <script>` resolves to it on a stock shell. bash 3.2 cannot parse
+# an unparenthesised case pattern inside $(...); every other case here runs the PATH bash, so this is
+# the one that sees it. Skipped, and said so, where /bin/bash is not 3.x (Linux CI).
+if [ -x /bin/bash ] && [ "$(/bin/bash -c 'echo "${BASH_VERSINFO[0]}"' 2>/dev/null)" = "3" ]; then
+  if ERR=$(/bin/bash -n "$SCRIPT" 2>&1); then pass "parses under /bin/bash 3.x"; else fail "bash 3.2 parse" "$ERR"; fi
+else
+  echo "  SKIP  parse under /bin/bash 3.x — /bin/bash is not bash 3 on this host"
+fi
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

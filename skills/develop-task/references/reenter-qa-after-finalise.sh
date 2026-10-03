@@ -144,7 +144,9 @@ source "$NEWEST_SH" || { echo "reenter-qa: could not source newest-numbered.sh" 
 # (task.42.bug.3) is never one the parent's directory name continues. The longest such stem wins.
 STEM=$(find "$DOC_DIR" -maxdepth 1 -type f -name '*.dod.*.md' 2>/dev/null | while IFS= read -r f; do
   b=${f##*/}; p=${b%%.dod.*}
-  case "$(basename "$DOC_DIR")." in "$p".*) printf '%s\n' "$p" ;; esac
+  # The leading ( is load-bearing: bash 3.2 (macOS /bin/bash) cannot parse an unparenthesised
+  # case pattern inside $(...) and fails at ";;" (task.170 finalise, DoD gap 1).
+  case "$(basename "$DOC_DIR")." in ("$p".*) printf '%s\n' "$p" ;; esac
 done | awk '{ print length, $0 }' | sort -rn | head -1 | cut -d' ' -f2-)
 [ -n "$STEM" ] || refuse no-dod "no DoD file in '$DOC_DIR' whose stem the directory name continues (bug DoDs excluded) — a step-7 halt with no DoD file is not a DoD-gaps halt"
 DOD=$(newest_numbered "$DOC_DIR" dod -name "${STEM}.dod.*.md")
