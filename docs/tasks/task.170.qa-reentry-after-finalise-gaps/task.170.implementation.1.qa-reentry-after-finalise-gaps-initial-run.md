@@ -108,6 +108,7 @@ Add a sanctioned, recorded 7 → 5 QA re-entry (`reenter-qa-after-finalise.sh`) 
 - QA cycle 6 (2026-10-03): gate 6 PASS 100; route classifier → cosmetic-residue exit (route 2b), CR-1 (low) carried to `recommendations.future` and Deferred Work; gate + report committed `ecb1ce80` and pushed. Traceability matrix reused from cycle 1 (no new criteria).
 - Step 5c: `/review-pr --effort medium --comment` → **APPROVE** (4 low findings) — `task.170.pr-review.1.qa-reentry-after-finalise-gaps.md`; PR comment posted. `ready-for-merge`: stage-disabled.
 - PC-1 fixed before Step 7 (document-only): the task's Implementation Summary now names the eight shipped refusals, the committed-history measure and the current suite counts (52 / 5), so `/finalise` reads current evidence. CR-1 (parity-test and hooks-doc population), CR-2, CR-3 left as low follow-ups.
+- Operator decisions on the finalise DoD gaps (2026-10-04): gap 1 (bash 3.2 parse) fixed in `3008d0d7` — case pattern parenthesised, `/bin/bash -n` case added (suite 53/53 under bash 5 and bash-3.2-only PATH; mutation red); gap 2 (probe zero-guard) recorded by the operator as **"unverified by the engine"** (task.130 precedent), with task.181 (`shell-argv:` entry form, issue #564) filed to close the engine gap. The next `/finalise` records security as accepted with the probe unverified by the engine, citing this decision.
 
 ---
 

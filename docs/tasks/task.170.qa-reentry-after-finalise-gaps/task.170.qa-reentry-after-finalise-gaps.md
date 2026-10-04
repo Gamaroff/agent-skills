@@ -457,6 +457,12 @@ parity test.
 
 **Gap Report Generated:** 2026-10-03
 
+### Gap Resolution (2026-10-04)
+
+- **Gap 1 (bash 3.2 parse)** — fixed in `3008d0d7`: the case pattern is parenthesised, and the suite gains a `/bin/bash -n` case that runs where `/bin/bash` is 3.x (53/53 under bash 5 and with only bash 3.2 on PATH). A code fix, so the resume re-enters QA at 5a before `/finalise` re-runs.
+- **Gap 2 (probe zero-guard)** — **operator decision, 2026-10-04: record the probe as "unverified by the engine"**, as task.130 did. The engine has no form that reaches a two-argument shell script; the eight hostile `head:` cases in `reenter-qa-after-finalise.test.sh` are the executed evidence (they run per PR, but are not an engine count). Follow-up that closes the engine gap: task.181, a `shell-argv:` entry form ([#564](https://github.com/Gamaroff/agent-skills/issues/564)).
+
+
 **Detailed Verification Log:** See `task.170.dod.1.qa-reentry-after-finalise-gaps.md` for complete verification evidence and timestamps.
 
 <!-- change-log-start -->
