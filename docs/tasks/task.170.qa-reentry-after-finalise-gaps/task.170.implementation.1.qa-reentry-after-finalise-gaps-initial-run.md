@@ -36,8 +36,8 @@ Add a sanctioned, recorded 7 → 5 QA re-entry (`reenter-qa-after-finalise.sh`) 
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (iteration 1); audit 12/12, `ready-for-review` | `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #563: https://github.com/Gamaroff/agent-skills/pull/563 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.170.qa.{N}.*.md`; `task.170.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 7 cycles (re-entry +2 granted; QA re-entry after finalise gaps → cycle 7); gate 7 PASS 100; PR review CONCERNS — task.170.pr-review.2 | —                    |
-| 7. finalise                | ⏳ Pending | `task.170.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps (dod.1): security — bash 3.2 parse (low), probe zero-guard (medium); AC 14/14, docs PASS | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.170.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps (dod.1): security — bash 3.2 parse (low), probe zero-guard (medium); AC 14/14, docs PASS | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -113,6 +113,10 @@ Add a sanctioned, recorded 7 → 5 QA re-entry (`reenter-qa-after-finalise.sh`) 
 - QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=8 (base 6), gate_head=d0617e342e1fd0b7c1df2fc6d9389623da98515f (1 commit outside the directory since the gate's head).
 - QA cycle 7 (2026-10-04): gate 7 PASS 100, no open entry → 5c. Traceability matrix reused from cycle 1 (no new criteria). Scoped re-review (11 files since gate 6 head); reviewer 0 bugs, 1 advisory cleanup. The mutation proof ran while the reviewer was reading, and the reviewer saw one transient parse failure from it — recorded in qa.7's measurement note.
 - Step 5c (cycle 7): `/review-pr --effort medium --comment` → **CONCERNS** (2 medium, 3 low) — `task.170.pr-review.2.qa-reentry-after-finalise-gaps.md`; marker comment updated in place. Per §5c, CONCERNS records and does not block → Step 7. CR-1/CR-2 verified by the orchestrator (fail-safe: a less specific refusal message; documentation drift) and carried to the task's Deferred Work with PC-1 fixed there (doc-only). `ready-for-merge`: stage-disabled. ci:fast at `f4f2cf85`: 5264 pass / 0 fail, prettier clean (run with the `.agents/skills` symlink in place).
+- Step 7 (2026-10-04): `/finalise` DoD run 2 → **ACCEPTED** — `task.170.dod.2.qa-reentry-after-finalise-gaps.md`. AC 14/14, docs PASS, compliance N/A; security checks PASS with the probe **unverified by the engine** per the operator decision (zero-guard FAIL by rule, `probes_executed: 0`; task.130 precedent; follow-up task.181, #564). Registry: `ticked`. Acceptance commit pushed and asserted on `origin`.
+- CI reading 1: SUCCESS @ f22455b54f89 (5 checks); CI reading 2: SUCCESS @ a64142dbc02e (5 checks, after 120s; head's own CI — the docs-only engine was left out of the reading-2 poll because its local check run exceeded 5 min on reading 1 and was stopped once the head's own CI went green).
+- PR canonical summary posted (#issuecomment-5977374480); DoD body posted to PR (#issuecomment-5977377536). Issue #536: `done` comment posted, closed (state CLOSED verified directly — the poller subagent was not dispatched); board `done`: already. Document link: already durable / not matched. CHANGELOG cites task.170.
+- The DoD docs agent ran `npm run generate-catalog` despite read-only instructions; it changed nothing (tree clean, re-checked).
 
 ---
 
@@ -248,10 +252,14 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: 2026-10-03 (halted — finalise DoD gaps, after a granted QA re-entry: 6 cycles, gate 6 PASS, PR review APPROVE)
-**Final Status**: Halted — DoD gaps
+**Finished**: 2026-10-04T06:38:49Z
+**Final Status**: Completed
 **Branch**: feature/task.170.qa-reentry-after-finalise-gaps
 **PR**: https://github.com/Gamaroff/agent-skills/pull/563
-**QA Iterations**: 6 (5 to the loop limit; +2 granted on resume; exited at cycle 6 via route 2b → 5c APPROVE)
-**DoD Summary**: `task.170.dod.1.qa-reentry-after-finalise-gaps.md` — ❌ GAPS (2)
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 7 (5 to the loop limit; +2 granted on resume; cycle 6 exited via route 2b → 5c APPROVE; finalise DoD-gaps halt; cycle 7 via `reenter-qa-after-finalise.sh` → gate 7 PASS 100 → 5c CONCERNS)
+**DoD Summary**: `task.170.dod.2.qa-reentry-after-finalise-gaps.md` — ✅ ACCEPTED (run 1: `task.170.dod.1` ❌ GAPS)
+**Tracker debt**: none
+
+### Completion Summary
+
+Implemented a sanctioned, recorded 7 → 5 QA re-entry for a `/finalise` DoD-gaps halt fixed by a code change: `reenter-qa-after-finalise.sh` (eight refusals, each with its route), the resume contract's re-entry section and Second precedence, Phase 0b's "Re-enter QA at 5a" in both orchestrators, the parity test and the Stop-hook case. Seven QA cycles. The task dogfooded its own mechanism: its first `/finalise` halted on a bash 3.2 parse failure (fixed in `3008d0d7`) and the probe zero-guard; the resume re-entered QA through the new script (lock 7 → 5 / 5a, `qa_max_cycles=8`), cycle 7 gated the fix, and DoD run 2 accepted with the probe recorded as unverified by the engine (operator decision; follow-up task.181, #564). PR review 2's follow-ups (no-gate stderr, `qa_reentry` in the hooks doc and resume detector) are in the task's Deferred Work.
