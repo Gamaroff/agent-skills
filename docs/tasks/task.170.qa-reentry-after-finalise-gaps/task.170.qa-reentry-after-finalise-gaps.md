@@ -8,7 +8,7 @@ category: infrastructure
 status: ready-for-review
 priority: Medium
 created: 2026-09-30
-updated: 2026-10-03
+updated: 2026-10-04
 assignee:
 estimated_effort_hours: 8
 risk_level: medium
@@ -409,23 +409,23 @@ parity test.
 
 **QA Status**: PASS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-10-03
+**Testing Date**: 2026-10-04
 **Quality Score**: 100/100
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.170.qa.6.qa-reentry-after-finalise-gaps.md](./task.170.qa.6.qa-reentry-after-finalise-gaps.md)
-- **Gate File**: [task.170.gate.6.qa-reentry-after-finalise-gaps.yml](./task.170.gate.6.qa-reentry-after-finalise-gaps.yml)
+- **Full Report**: [task.170.qa.7.qa-reentry-after-finalise-gaps.md](./task.170.qa.7.qa-reentry-after-finalise-gaps.md)
+- **Gate File**: [task.170.gate.7.qa-reentry-after-finalise-gaps.yml](./task.170.gate.7.qa-reentry-after-finalise-gaps.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5327
+- **Tests Executed**: 53 (re-entry suite, under bash 5 and bash 3.2) + parity 5
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 5's fix verified and mutation-proven; [task.170.bug.5](./task.170.bug.5.reentry-precedence-clears-before-entry.md) closed.
-- CR-1 (low): the in-flight-gate sentence is false when the report runs ahead of the gates — fails safe (one extra cycle).
+- Cycle 7 (QA re-entry after the finalise DoD-gaps halt) gates DoD gap 1's fix (`3008d0d7`): parses under `/bin/bash` 3.2, suite 53/53 on both bashes, mutation-proven.
+- CR-1 (cleanup, advisory): the bash 3.x guard checks parse only.
 
 ### Deferred Work
 
@@ -462,15 +462,12 @@ parity test.
 - **Gap 1 (bash 3.2 parse)** — fixed in `3008d0d7`: the case pattern is parenthesised, and the suite gains a `/bin/bash -n` case that runs where `/bin/bash` is 3.x (53/53 under bash 5 and with only bash 3.2 on PATH). A code fix, so the resume re-enters QA at 5a before `/finalise` re-runs.
 - **Gap 2 (probe zero-guard)** — **operator decision, 2026-10-04: record the probe as "unverified by the engine"**, as task.130 did. The engine has no form that reaches a two-argument shell script; the eight hostile `head:` cases in `reenter-qa-after-finalise.test.sh` are the executed evidence (they run per PR, but are not an engine count). Follow-up that closes the engine gap: task.181, a `shell-argv:` entry form ([#564](https://github.com/Gamaroff/agent-skills/issues/564)).
 
-
 **Detailed Verification Log:** See `task.170.dod.1.qa-reentry-after-finalise-gaps.md` for complete verification evidence and timestamps.
-
 <!-- change-log-start -->
-
 ## Change Log
 
-| Date       | Version | Description                                   | Author      |
-| ---------- | ------- | --------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-30 | 1.0     | Initial draft — cut from observation #235     | create-task |
 | 2026-10-03 | 1.1     | Review 1 (8/10, 0 critical / 4 important): full qa-task CODE_MOVED measure (uncommitted, untracked, invalid head); budget max(existing, base + 2); refusals via --restore --which before any write, failed lowering keeps the lock; criteria for the parity and Stop-hook tests | review-task |
 | 2026-10-03 |         | Status → ready-for-development                | review-task |
@@ -482,7 +479,7 @@ parity test.
 | 2026-10-03 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 | 2026-10-03 |         | QA gate PASS (100/100) — 1 finding (1 low) | qa-task |
 | 2026-10-03 |         | DoD incomplete — 2 gaps identified (security: bash 3.2 parse, probe zero-guard) | finalise |
-
+| 2026-10-04 |  | QA gate PASS (100/100) — 0 findings (cycle 7, re-entry after finalise DoD gaps) | qa-task |
 <!-- change-log-end -->
 
 ---

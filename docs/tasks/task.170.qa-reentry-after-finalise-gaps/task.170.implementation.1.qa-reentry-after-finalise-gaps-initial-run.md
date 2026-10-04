@@ -35,8 +35,8 @@ Add a sanctioned, recorded 7 → 5 QA re-entry (`reenter-qa-after-finalise.sh`) 
 | 2. review-task             | ✅ Done    | `task.170.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 0 critical / 4 important applied; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (iteration 1); audit 12/12, `ready-for-review` | `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #563: https://github.com/Gamaroff/agent-skills/pull/563 | —                    |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.170.qa.{N}.*.md`; `task.170.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (re-entry +2 granted); gate 6 PASS 100 (route 2b); PR review APPROVE — task.170.pr-review.1 | —                    |
-| 7. finalise                | ❌ Failed  | `task.170.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps (dod.1): security — bash 3.2 parse (low), probe zero-guard (medium); AC 14/14, docs PASS | —                    |
+| 5–6. qa-task / qa-fix loop | ⏳ In Progress | `task.170.qa.{N}.*.md`; `task.170.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 7 cycles (re-entry +2 granted; QA re-entry after finalise gaps → cycle 7); gate 7 PASS 100; 5c pending | —                    |
+| 7. finalise                | ⏳ Pending | `task.170.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps (dod.1): security — bash 3.2 parse (low), probe zero-guard (medium); AC 14/14, docs PASS | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -109,6 +109,9 @@ Add a sanctioned, recorded 7 → 5 QA re-entry (`reenter-qa-after-finalise.sh`) 
 - Step 5c: `/review-pr --effort medium --comment` → **APPROVE** (4 low findings) — `task.170.pr-review.1.qa-reentry-after-finalise-gaps.md`; PR comment posted. `ready-for-merge`: stage-disabled.
 - PC-1 fixed before Step 7 (document-only): the task's Implementation Summary now names the eight shipped refusals, the committed-history measure and the current suite counts (52 / 5), so `/finalise` reads current evidence. CR-1 (parity-test and hooks-doc population), CR-2, CR-3 left as low follow-ups.
 - Operator decisions on the finalise DoD gaps (2026-10-04): gap 1 (bash 3.2 parse) fixed in `3008d0d7` — case pattern parenthesised, `/bin/bash -n` case added (suite 53/53 under bash 5 and bash-3.2-only PATH; mutation red); gap 2 (probe zero-guard) recorded by the operator as **"unverified by the engine"** (task.130 precedent), with task.181 (`shell-argv:` entry form, issue #564) filed to close the engine gap. The next `/finalise` records security as accepted with the probe unverified by the engine, citing this decision.
+- Resume 2026-10-04 (develop-next, autonomous): Phase 0b — halt snapshot `halt_step` 7, newest DoD `❌ GAPS`, gap 1 fixed by code → took **"Re-enter QA at 5a"** (the halt-specific Recommended option; the develop-next directive's "Resume from last completed step" would resume at 7 over an ungated head). Branch pushed (`f0cdb253`) first; clean tree, no lock.
+- QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=8 (base 6), gate_head=d0617e342e1fd0b7c1df2fc6d9389623da98515f (1 commit outside the directory since the gate's head).
+- QA cycle 7 (2026-10-04): gate 7 PASS 100, no open entry → 5c. Traceability matrix reused from cycle 1 (no new criteria). Scoped re-review (11 files since gate 6 head); reviewer 0 bugs, 1 advisory cleanup. The mutation proof ran while the reviewer was reading, and the reviewer saw one transient parse failure from it — recorded in qa.7's measurement note.
 
 ---
 
@@ -226,6 +229,19 @@ _Track each QA review/fix cycle._
 **Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 6 with HIGH 0 for cycles 5 and 6; all 1 open findings are LOW and are carried to the gate's recommendations.future by id (CR-1). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
 **Action**: Proceeding to 5c (PR conformance review)
 **Verification**: cycle-5 fix verified — suite 52/52, parity 11/11, ci:fast 5264 pass / 0 fail (symlink aside); raw-count mutation reds "report_entries behind". Bug 5 closed.
+
+---
+
+### QA Cycle 7 — 2026-10-04
+**Origin**: QA re-entry after the finalise DoD-gaps halt (`reenter-qa-after-finalise.sh`)
+**Gate Result**: PASS
+**Issues Found**: none (1 advisory cleanup — CR-1, the bash 3.x guard is parse-only)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: pending — 5c not yet run
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**Verification**: DoD gap 1 fix (`3008d0d7`) — suite 53/53 under bash 5.3.9 and with bash 3.2.57 first on PATH; parity 5/5; shellcheck clean; bundle:check 0; validate develop-task/develop-story pass; reverting the parenthesis reds `bash 3.2 parse` (52/53).
 
 ---
 
