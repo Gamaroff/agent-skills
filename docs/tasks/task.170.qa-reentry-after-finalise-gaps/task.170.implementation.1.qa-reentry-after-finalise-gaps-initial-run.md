@@ -35,7 +35,7 @@ Add a sanctioned, recorded 7 → 5 QA re-entry (`reenter-qa-after-finalise.sh`) 
 | 2. review-task             | ✅ Done    | `task.170.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 0 critical / 4 important applied; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (iteration 1); audit 12/12, `ready-for-review` | `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #563: https://github.com/Gamaroff/agent-skills/pull/563 | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ In Progress | `task.170.qa.{N}.*.md`; `task.170.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 7 cycles (re-entry +2 granted; QA re-entry after finalise gaps → cycle 7); gate 7 PASS 100; 5c pending | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.170.qa.{N}.*.md`; `task.170.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 7 cycles (re-entry +2 granted; QA re-entry after finalise gaps → cycle 7); gate 7 PASS 100; PR review CONCERNS — task.170.pr-review.2 | —                    |
 | 7. finalise                | ⏳ Pending | `task.170.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps (dod.1): security — bash 3.2 parse (low), probe zero-guard (medium); AC 14/14, docs PASS | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -112,6 +112,7 @@ Add a sanctioned, recorded 7 → 5 QA re-entry (`reenter-qa-after-finalise.sh`) 
 - Resume 2026-10-04 (develop-next, autonomous): Phase 0b — halt snapshot `halt_step` 7, newest DoD `❌ GAPS`, gap 1 fixed by code → took **"Re-enter QA at 5a"** (the halt-specific Recommended option; the develop-next directive's "Resume from last completed step" would resume at 7 over an ungated head). Branch pushed (`f0cdb253`) first; clean tree, no lock.
 - QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=8 (base 6), gate_head=d0617e342e1fd0b7c1df2fc6d9389623da98515f (1 commit outside the directory since the gate's head).
 - QA cycle 7 (2026-10-04): gate 7 PASS 100, no open entry → 5c. Traceability matrix reused from cycle 1 (no new criteria). Scoped re-review (11 files since gate 6 head); reviewer 0 bugs, 1 advisory cleanup. The mutation proof ran while the reviewer was reading, and the reviewer saw one transient parse failure from it — recorded in qa.7's measurement note.
+- Step 5c (cycle 7): `/review-pr --effort medium --comment` → **CONCERNS** (2 medium, 3 low) — `task.170.pr-review.2.qa-reentry-after-finalise-gaps.md`; marker comment updated in place. Per §5c, CONCERNS records and does not block → Step 7. CR-1/CR-2 verified by the orchestrator (fail-safe: a less specific refusal message; documentation drift) and carried to the task's Deferred Work with PC-1 fixed there (doc-only). `ready-for-merge`: stage-disabled. ci:fast at `f4f2cf85`: 5264 pass / 0 fail, prettier clean (run with the `.agents/skills` symlink in place).
 
 ---
 
@@ -238,7 +239,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: none (1 advisory cleanup — CR-1, the bash 3.x guard is parse-only)
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — 5c not yet run
+**PR Review**: CONCERNS — `task.170.pr-review.2.qa-reentry-after-finalise-gaps.md` (CR-1 medium/high: no-gate refusal drops qa-cycle.sh's stderr; CR-2 medium: qa_reentry missing from hooks doc and resume detector; CR-3, PC-1, PC-2 low)
 **Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review)
 **Verification**: DoD gap 1 fix (`3008d0d7`) — suite 53/53 under bash 5.3.9 and with bash 3.2.57 first on PATH; parity 5/5; shellcheck clean; bundle:check 0; validate develop-task/develop-story pass; reverting the parenthesis reds `bash 3.2 parse` (52/53).

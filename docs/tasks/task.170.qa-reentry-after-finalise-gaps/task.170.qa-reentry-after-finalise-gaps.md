@@ -403,7 +403,7 @@ parity test.
   `tests/test-clean-checkout.test.js`, which tripped its own LOAD-SENSITIVE timing budget (10500 ms
   vs 10000 ms) and passes alone (13/13). `npm run bundle:check` — 129 skills, 0 problems.
 
-**Deferred work**: none.
+**Deferred work**: see QA Testing Results › Deferred Work (gate 6/7 `recommendations.future` and PR review 2 follow-ups).
 
 ## QA Testing Results
 
@@ -430,6 +430,9 @@ parity test.
 ### Deferred Work
 
 - CR-1 (gate 6, low) — carried to the gate's `recommendations.future` by the cosmetic-residue exit (route 2b, cycle 6): scope the resume contract's in-flight-gate sentence to a report not ahead of the gates.
+- CR-2 / CR-3 (gate 6, advisory) — non-contiguous gate/heading numbering in the back-fill; stale test comment above the ahead/behind loop.
+- CR-1 (gate 7, cleanup) — the bash 3.x guard checks parse only; run the accept and refusal cases under `/bin/bash` 3.x as well.
+- PR review 2 (5c, cycle 7, CONCERNS) — CR-1 (medium): pass `qa-cycle.sh`'s stderr through in the `no-gate` refusal; CR-2 (medium): add `qa_reentry` to `develop-pipeline-hooks.md` and `pipeline-resume-detector-prompt.md`, and to the lock-fields parity test; CR-3 (low): fail closed when `git status` cannot run; PC-2 (low): list `set-qa-phase.sh` in the Files Summary. See [`task.170.pr-review.2`](./task.170.pr-review.2.qa-reentry-after-finalise-gaps.md).
 
 ## Definition of Done - Gaps Identified
 
