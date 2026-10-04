@@ -5,7 +5,7 @@ type: task
 description: "When a /finalise DoD-gaps HALT is fixed by changing code, the documented resume re-runs finalise at step 7 over a head no QA gate has read; give the resume contract a sanctioned, recorded 7 → 5 re-entry, the way grant-qa-cycles.sh sanctions re-entry after a loop-limit escalation (observation #235)."
 tags: [develop-task, develop-story, resume, pipeline-lock, qa-loop, observation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-30
 updated: 2026-10-04
@@ -13,11 +13,13 @@ assignee:
 estimated_effort_hours: 8
 risk_level: medium
 github_issue: 536
+completed_date: 2026-10-04
+pr_number: 563
 ---
 
 # Technical Task: QA re-entry after a finalise DoD-gaps halt fixed by a code change
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.170.review.1.qa-reentry-after-finalise-gaps.md` implemented 2026-10-03
 
@@ -434,9 +436,9 @@ parity test.
 - CR-1 (gate 7, cleanup) — the bash 3.x guard checks parse only; run the accept and refusal cases under `/bin/bash` 3.x as well.
 - PR review 2 (5c, cycle 7, CONCERNS) — CR-1 (medium): pass `qa-cycle.sh`'s stderr through in the `no-gate` refusal; CR-2 (medium): add `qa_reentry` to `develop-pipeline-hooks.md` and `pipeline-resume-detector-prompt.md`, and to the lock-fields parity test; CR-3 (low): fail closed when `git status` cannot run; PC-2 (low): list `set-qa-phase.sh` in the Files Summary. See [`task.170.pr-review.2`](./task.170.pr-review.2.qa-reentry-after-finalise-gaps.md).
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
 
-**Status:** IN PROGRESS
+**Status:** IN PROGRESS (run 1 — superseded; see Definition of Done - PASSED below)
 
 ### QA Gate Status
 
@@ -469,6 +471,30 @@ parity test.
 <!-- change-log-start -->
 ## Change Log
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.170.qa.7.qa-reentry-after-finalise-gaps.md`
+**Gate File**: `task.170.gate.7.qa-reentry-after-finalise-gaps.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Acceptance Criteria:** 14/14, each with a code citation and a test that runs per PR
+✅ **Tests & CI:** CI reading 1 SUCCESS @ `f22455b54f89` (5 checks); re-entry suite 53/53 under bash 5.3 and bash 3.2
+⚠️ **PR Review:** 5c PR review 2 CONCERNS (2 medium, 3 low) — non-blocking per §5c; follow-ups in QA Testing Results › Deferred Work
+✅ **Documentation:** CHANGELOG `[Unreleased]`, resume contract, step-7, pause schema, finalise Step 8, develop-task/develop-story Phase 0b
+⚠️ **Security Review:** checks PASS (no secrets, no unsafe patterns, hostile heads never execute, parses under bash 3.2); probe mode **unverified by the engine** — the script takes two positionals and `security-probe.mjs` has no entry form for that (`totals.executed: 0`). Accepted by the operator (2026-10-04, task.130 precedent) on the executed evidence: eight hostile `head:` cases in the suite, run per PR. Follow-up: task.181 (#564).
+⚠️ **Compliance Review:** NOT_APPLICABLE
+
+**Task marked as ACCEPTED on:** 2026-10-04
+
+**Detailed Verification Log:** See `task.170.dod.2.qa-reentry-after-finalise-gaps.md` for complete verification evidence and timestamps.
+
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-09-30 | 1.0     | Initial draft — cut from observation #235     | create-task |
@@ -483,6 +509,7 @@ parity test.
 | 2026-10-03 |         | QA gate PASS (100/100) — 1 finding (1 low) | qa-task |
 | 2026-10-03 |         | DoD incomplete — 2 gaps identified (security: bash 3.2 parse, probe zero-guard) | finalise |
 | 2026-10-04 |  | QA gate PASS (100/100) — 0 findings (cycle 7, re-entry after finalise DoD gaps) | qa-task |
+| 2026-10-04 | 1.2 | DoD passed — accepted (PR #563); security probe unverified by the engine (operator decision) | finalise |
 <!-- change-log-end -->
 
 ---
