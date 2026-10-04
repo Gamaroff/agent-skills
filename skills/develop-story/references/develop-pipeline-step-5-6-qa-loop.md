@@ -14,7 +14,7 @@ Loaded by `/develop-story` and `/develop-task` during Steps 5–6. Story/task va
 
 ## Loop Setup (shared)
 
-This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **`QA_MAX_CYCLES` complete cycles** — the lock's `qa_max_cycles` field when present, else **5**. The field is written only by a granted re-entry after a loop-limit halt (resume contract, **Re-entry after a QA loop escalation**; writer: `references/grant-qa-cycles.sh`), as `QA_CYCLE at resume + extra_cycles_granted` — relative to the count reconstructed from disk, never to 5, so a grant of `k` delivers `k` cycles whatever gates already exist:
+This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **`QA_MAX_CYCLES` complete cycles** — the lock's `qa_max_cycles` field when present, else **5**. The field is written by a re-entry: a granted re-entry after a loop-limit halt (resume contract, **Re-entry after a QA loop escalation**; writer: `references/grant-qa-cycles.sh`), as `QA_CYCLE at resume + extra_cycles_granted`, or a QA re-entry after a finalise DoD-gaps halt fixed by code (resume contract, **Re-entry after a finalise DoD-gaps halt**; writer: `reenter-qa-after-finalise.sh`), as `max(existing, base + 2)`. Both are relative to the count reconstructed from disk, never to 5, so a grant of `k` delivers `k` cycles whatever gates already exist:
 
 ```bash
 QA_MAX_CYCLES=$(jq -r '.qa_max_cycles // 5' .claude/state/develop-pipeline.lock 2>/dev/null || echo 5)

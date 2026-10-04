@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.170.qa-reentry-after-finalise-gaps'
+task_title: '[Task 170] QA re-entry after a finalise DoD-gaps halt fixed by a code change'
+gate: FAIL
+status_reason: 'Cycle 1 fixes verified (38/38, all mutation-covered), but the refute pass found that a resume after the re-entry reads the original run''s APPROVE and goes to Step 7 (high, verified against the contract), the cycle-1 stem regex misses parallel-story directories (medium), and an absent budget is read as 0 rather than the loop''s 5 (low).'
+reviewer: 'QA Engineer'
+head: 'cad6845b01fe79ebe8193c4844399d28978d974c'
+updated: '2026-10-03T19:18:57Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'After a re-entry the highest QA Cycle entry still reads PR Review APPROVE; the contract''s 5c sub-state table and the 5-6 artifact row send any resume in that window to Step 7, and nothing reads qa_reentry. Reviewer confidence medium; QA verified by reading the table (it keys on the PR Review row as source of truth). See task.170.bug.3.'
+    suggested_action: 'Precedence rule: a qa_reentry whose gate_head equals the newest gate head overrides a terminal PR Review — resume at 5a as cycle N+1; drop "No reader branches on it"; pin with a test.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/reenter-qa-after-finalise.sh'
+    finding: 'The stem regex misses hybrid-numbered parallel-story directories (story.305.1-1.*) — exit 2 for every parallel story. See task.170.bug.4.'
+    suggested_action: 'Accept an optional -N suffix; add a suite case.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'shared/resources/reenter-qa-after-finalise.sh'
+    finding: 'An absent qa_max_cycles is read as 0, so a re-entry with base 2 sets 4 — below the loop''s implicit default of 5, contrary to "never lowered".'
+    suggested_action: 'Read an absent budget as 5 (the loop''s // 5 default) before taking the max.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 89
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+  ci: 'not read — no cycle waits on CI'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'The eight hostile gate heads are now committed suite cases (QA-1 closed); the probe engine''s shell corpus still does not fit this script''s contract (see QA report 1). CR-5 (lock appearing mid-run) is advisory, low.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: FAIL
+    notes: 'CR-1: an interruption between the re-entry and cycle N+1 resumes at Step 7 over an ungated head.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-7: the contract''s no-dod line and "qa-task Phase 0''s, all of it" claim are stale after cycle 1.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (resume precedence), CR-2 (parallel-story stem), CR-4 (absent budget as 5).'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/reenter-qa-after-finalise.sh']
+  future:
+    - action: 'CR-3 (advisory): offer the re-entry for every halt_step-7 GAPS snapshot and let the script''s no-code-moved refusal decide, rather than the agent judging movement first.'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-5 (advisory): treat the restore as successful only when it reports "lock restored from".'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh']
+    - action: 'CR-6 (advisory, low confidence): the gate comes from qa-cycle.sh (directory-wide), the DoD from the stem — record why, since qa-cycle.sh is the one gate definition the QA loop uses.'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh']
+    - action: 'CR-7 (cleanup): contract no-dod line and the movement paragraph name the stem key and the .claude/state exclusion.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 2
+  fix_date: '2026-10-03'
+  total_iterations: 1
+  verification_method: 'Suite 38/38; directory-wide pattern / .claude/state / head-validation mutations each red'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR-1 fixed']

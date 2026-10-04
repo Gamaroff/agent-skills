@@ -5,19 +5,23 @@ type: task
 description: "When a /finalise DoD-gaps HALT is fixed by changing code, the documented resume re-runs finalise at step 7 over a head no QA gate has read; give the resume contract a sanctioned, recorded 7 → 5 re-entry, the way grant-qa-cycles.sh sanctions re-entry after a loop-limit escalation (observation #235)."
 tags: [develop-task, develop-story, resume, pipeline-lock, qa-loop, observation]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-04
 assignee:
 estimated_effort_hours: 8
 risk_level: medium
 github_issue: 536
+completed_date: 2026-10-04
+pr_number: 563
 ---
 
 # Technical Task: QA re-entry after a finalise DoD-gaps halt fixed by a code change
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.170.review.1.qa-reentry-after-finalise-gaps.md` implemented 2026-10-03
 
 **GitHub Issue**: [#536](https://github.com/Gamaroff/agent-skills/issues/536)
 
@@ -103,15 +107,29 @@ before acceptance, by a path the pipeline documents rather than one an operator 
 
 - A new resume case in the contract: a halt snapshot with `halt_step: 7` whose DoD file reads
   `GAPS IDENTIFIED`, **and** a tree that has moved past the newest gate's `head:` outside the work
-  item's own directory (the same `CODE_MOVED` measure `qa-task` Phase 0 uses) → **re-enter QA**.
+  item's own directory, measured as **committed history** — what the re-entered review reads
+  (commits since the head; a `head:` that is absent, not 40-hex, not a commit or not an ancestor of
+  `HEAD` counts as moved). Uncommitted tracked work is refused (`uncommitted-fix` — commit and
+  re-run), never sent to `/finalise`; untracked files are named on every outcome and never counted,
+  since nothing can tell Step 4's restored held-aside files from a new fix file (QA cycles 1–4
+  refined this from review 1's "the full qa-task Phase 0 measure": the re-entered cycle is always a
+  re-review, and qa-task Step 3b HALTs on an uncommitted tracked change) → **re-enter QA**.
   Otherwise the existing bullet applies (finalise re-runs at 7 — correct when only documents moved).
 - A new script, `shared/resources/reenter-qa-after-finalise.sh` (sibling of `grant-qa-cycles.sh`):
-  refuses unless the snapshot is a step-7 halt for this document and code moved past the gate head;
-  otherwise restores the lock at `current_step: 5`, `qa_phase: 5a`, and writes
+  refuses unless the snapshot is a step-7 halt for this document and code moved past the gate head.
+  **Every refusal runs before any write**: the candidate is read through
+  `advance-pipeline-lock.sh --restore --which <doc-dir>` (the selection `--restore` itself uses, as
+  `grant-qa-cycles.sh` does), so a refusal restores and consumes nothing. Otherwise it restores the
+  lock through `--restore` and lowers it to `current_step: 5`, `qa_phase: 5a`, and writes
   `qa_reentry: { from_step: 7, reason: "dod-gaps-code-fix", at, gate_head }`. It is the only writer
-  that may lower `current_step`, and only on this path.
-- The QA budget for the re-entered loop is reconstructed from disk exactly as the grant does, so a
-  re-entry does not reset the cycle count.
+  that may lower `current_step`, and only on this path. If the lowering write fails after the
+  restore, the restored step-7 lock is **kept** — `--restore` consumed the snapshot, so the lock is
+  the run's only state (the grant's `undo_restore` rule).
+- The QA budget for the re-entered loop is `qa_max_cycles = max(existing, base + 2)`, where `base`
+  is reconstructed from disk exactly as the grant does — max(highest gate via `qa-cycle.sh`,
+  `### QA Cycle` entries in the implementation report) — so a re-entry does not reset the cycle
+  count, and an existing higher budget is kept, never lowered. `2` is the grant prompt's recommended
+  `k` (review 1, I2).
 - `finalise` Step 8's gap report names the rule: a gap closed by a code change re-enters QA before
   finalise re-runs.
 
@@ -157,15 +175,19 @@ fields today (the halt snapshot is already a superset of the lock).
 
 **Risk Level**: Medium
 
-**Files**: `shared/resources/reenter-qa-after-finalise.sh`, `shared/resources/reenter-qa-after-finalise.test.sh`, `package.json` (test glob)
+**Files**: `shared/resources/reenter-qa-after-finalise.sh`, `shared/resources/reenter-qa-after-finalise.test.sh`, `package.json` (`test` chain)
 
 **Changes**:
 
-- [ ] Refuse (exit 1, named reason) unless: a halt snapshot exists for this document, `halt_step` is
+- [x] Refuse (exit 1, named reason) unless: a halt snapshot exists for this document, `halt_step` is
       7, the newest DoD file's Final Status is GAPS, and code moved past the newest gate's `head:`.
-- [ ] On pass: restore via `advance-pipeline-lock.sh --restore`, then lower `current_step` to 5, set
-      `qa_phase: 5a`, reconstruct `qa_max_cycles`, write `qa_reentry` — one atomic `mktemp` + `mv`.
-- [ ] Suite: each refusal reason; the happy path; that a document-only change is refused.
+- [x] Document match checked through `advance-pipeline-lock.sh --restore --which` **before** any write;
+      `halt_step` compared as a string (the HALT snippet writes it with `jq --arg`).
+- [x] On pass: restore via `advance-pipeline-lock.sh --restore`, then lower `current_step` to 5, set
+      `qa_phase: 5a`, set `qa_max_cycles = max(existing, base + 2)`, write `qa_reentry` — one atomic
+      `mktemp` + `mv`; on a failed write keep the restored lock.
+- [x] `bundle-dependency:` lines for `advance-pipeline-lock.sh`, `qa-cycle.sh` and `newest-numbered.sh`.
+- [x] Suite: each refusal reason; the happy path; that a document-only change is refused.
 
 **Dependencies**: none.
 
@@ -177,10 +199,10 @@ fields today (the halt snapshot is already a superset of the lock).
 
 **Changes**:
 
-- [ ] Add the case to § "Restore the lock (both resume paths)" as a third bullet, with the decision rule.
-- [ ] Step 7 doc "If DoD Gaps Are Found": name the re-entry for a code fix.
-- [ ] finalise Step 8 Next Steps: the same rule in one line.
-- [ ] `npm run bundle`.
+- [x] Add the case to § "Restore the lock (both resume paths)" as a third bullet, with the decision rule.
+- [x] Step 7 doc "If DoD Gaps Are Found": name the re-entry for a code fix.
+- [x] finalise Step 8 Next Steps: the same rule in one line.
+- [x] `npm run bundle`.
 
 **Dependencies**: Phase 1.
 
@@ -192,9 +214,9 @@ fields today (the halt snapshot is already a superset of the lock).
 
 **Changes**:
 
-- [ ] Parity test: the contract names the script, and the script's refusal reasons match the contract's list.
-- [ ] Stop-hook test: a lock carrying `qa_reentry` at step 5 / `qa_phase: 5a` re-prompts `/qa-task`.
-- [ ] CHANGELOG `[Unreleased]`.
+- [x] Parity test: the contract names the script, and the script's refusal reasons match the contract's list.
+- [x] Stop-hook test: a lock carrying `qa_reentry` at step 5 / `qa_phase: 5a` re-prompts `/qa-task`.
+- [x] CHANGELOG `[Unreleased]`.
 
 **Dependencies**: Phases 1–2.
 
@@ -213,16 +235,19 @@ fields today (the halt snapshot is already a superset of the lock).
 
 5. ✅ `shared/resources/reenter-qa-after-finalise.test.sh` — **new**.
 6. ✅ `shared/resources/develop-pipeline-on-stop.test.sh` — re-entered lock case.
-7. ✅ `evals/shared/tests/` — a parity test (name set during implementation).
+7. ✅ `evals/shared/tests/reenter-qa-refusals-parity.test.mjs` — **new**: contract refusal list ≡ script refusals; header documents each; both SKILL.md and the contract invoke the bundled path.
 
 ### Files to Modify (Dependencies)
 
-8. ✅ `package.json` — add the new `.test.sh` to `npm test`.
+8. ✅ `package.json` — append the new `.test.sh` to the explicit `test` `&&` chain (there is no glob).
 
 ### Files to Modify (Documentation)
 
 9. ✅ `CHANGELOG.md` — `[Unreleased]`.
-10. ✅ Bundled `references/` copies — regenerated by `npm run bundle`, never hand-edited.
+11. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md` — Phase 0b offers "Re-enter QA at 5a" and invokes the bundled script (added in development: the Phase 0b prompts live there, as the grant's does).
+12. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — `qa_max_cycles` names its second writer.
+13. ✅ `shared/resources/develop-pipeline-pause.md` — lock schema: `qa_max_cycles` writers, new `qa_reentry` row.
+10. ✅ Bundled `references/` copies — regenerated by `npm run bundle`, never hand-edited. New copies: `reenter-qa-after-finalise.sh` and its dependency `newest-numbered.sh` in `develop-task` and `develop-story` only (the contract cites the script by bare filename, so it does not fan out to every skill that bundles the contract).
 
 ### Files to Delete
 
@@ -239,9 +264,9 @@ gate files with `head:`, a git repo with and without code movement).
 
 **Actions**:
 
-- [ ] Refuses: no snapshot; snapshot for another document; `halt_step` ≠ 7; DoD not GAPS; no code moved.
-- [ ] Accepts: writes step 5, `qa_phase: 5a`, `qa_reentry`, and a reconstructed `qa_max_cycles`.
-- [ ] Never leaves a temp file behind on failure.
+- [x] Refuses: no snapshot; snapshot for another document; `halt_step` ≠ 7; DoD not GAPS; no code moved.
+- [x] Accepts: writes step 5, `qa_phase: 5a`, `qa_reentry`, and a reconstructed `qa_max_cycles`.
+- [x] Never leaves a temp file behind on failure.
 
 **Command**: `bash shared/resources/reenter-qa-after-finalise.test.sh`
 
@@ -265,25 +290,29 @@ gate files with `head:`, a git repo with and without code movement).
 
 ### Functional
 
-- [ ] A step-7 GAPS halt followed by a code change is re-entered at step 5 / `qa_phase: 5a` — held by the script's accept test.
-- [ ] A step-7 GAPS halt followed by a document-only change is refused, and finalise re-runs at 7 — held by the refuse test.
-- [ ] A snapshot for another document, or with `halt_step` ≠ 7, is refused — held by refusal tests.
-- [ ] The re-entered lock records `qa_reentry` with the gate head — held by the accept test.
+- [x] A step-7 GAPS halt followed by a code change is re-entered at step 5 / `qa_phase: 5a` — held by the script's accept test.
+- [x] A step-7 GAPS halt followed by a document-only change is refused — held by the refuse test; finalise then re-runs at 7 through the existing, unchanged `--restore` bullet.
+- [x] An uncommitted tracked change outside the work-item directory is refused (`uncommitted-fix`), never accepted and never routed to finalise — held by the two uncommitted refusal cases and the parity test's route check; untracked files are named and never counted — held by the untracked-only, document-only-plus-untracked and held-aside cases.
+- [x] A resume after the re-entry, before the re-entered cycle writes its `### QA Cycle` entry, re-enters at 5a rather than Step 7 — held by the contract's single-statement **Second precedence** (keyed on the heading count `qa_reentry.report_entries`), the suite's report_entries cases (report at, ahead of and behind the gates) and the parity test.
+- [x] A snapshot for another document, or with `halt_step` ≠ 7, is refused — held by refusal tests.
+- [x] The re-entered lock records `qa_reentry` with the gate head — held by the accept test.
+- [x] A lock at step 5 / `qa_phase: 5a` carrying `qa_reentry` makes the Stop hook name `/qa-task` — held by the new case in `develop-pipeline-on-stop.test.sh`.
+- [x] The contract's list of refusal reasons equals the script's — held by the Phase 3 parity test in `evals/shared/tests/`.
 
 ### Performance
 
-- [ ] The lock write is atomic (`mktemp` + `mv`) and leaves no temp file on failure — held by the failure-path test.
+- [x] The lock write is atomic (`mktemp` + `mv`) and leaves no temp file on failure — held by the failure-path test.
 
 ### Code Quality
 
-- [ ] ShellCheck clean at `--severity=warning`; Prettier clean; `npm test` green with `.claude/skills` and `.agents/skills` moved aside.
-- [ ] `npm run bundle:check` green.
-- [ ] Each refusal reason mutation-proven.
+- [x] ShellCheck clean at `--severity=warning`; Prettier clean; `npm test` green with `.claude/skills` and `.agents/skills` moved aside.
+- [x] `npm run bundle:check` green.
+- [x] Each refusal reason mutation-proven.
 
 ### Migration
 
-- [ ] `CHANGELOG.md` `[Unreleased]` records the new resume case.
-- [ ] No consumer migration — the lock gains one optional field.
+- [x] `CHANGELOG.md` `[Unreleased]` records the new resume case.
+- [x] No consumer migration — the lock gains one optional field.
 
 ---
 
@@ -339,14 +368,148 @@ None.
 
 ---
 
-<!-- change-log-start -->
+## Implementation Summary
 
+**Completed**: 2026-10-03 (develop-task run 1, invoked by `/develop-next`).
+
+**Approach**: `reenter-qa-after-finalise.sh` copies `grant-qa-cycles.sh`'s shape — refuse first, restore
+through the one `--restore` path, write atomically — and adds the one thing the grant never does:
+lower `current_step` 7 → 5. All eight refusals (`lock-present`, `no-snapshot`, `not-a-finalise-halt`,
+`no-dod`, `dod-not-gaps`, `no-gate`, `uncommitted-fix`, `no-code-moved`) run before any write; the
+document match uses `--restore --which`, the restore's own selection. The movement measure is
+**committed history** since the newest gate's `head:` (QA cycles 1–4 narrowed it from review 1's
+"`qa-task` Phase 0 in full"): uncommitted tracked work is refused as `uncommitted-fix`, and untracked
+files are named but never counted. `qa_reentry.report_entries` records the back-filled count,
+`max(highest gate, headings)` (QA cycle 5). The contract gains a third bullet in § "Restore the lock (both resume paths)" (inside the
+`who-restores` marker, so the single-statement test still holds) and a section, **Re-entry after a
+finalise DoD-gaps halt**, whose refusal list sits between `reenter-qa-refusals` markers for the
+parity test.
+
+**Testing results**:
+
+- `bash shared/resources/reenter-qa-after-finalise.test.sh` — 52 passed, 0 failed at QA cycle 6
+  (25 at first implementation; throwaway git repos per case; every refusal, document-only refusal,
+  committed / uncommitted / untracked / no-head / non-40-hex / non-ancestor movement, hostile gate
+  heads, budget rules, numeric and string `halt_step`, `report_entries` ahead/behind, failed write).
+- `bash shared/resources/develop-pipeline-on-stop.test.sh` — 49 passed (2 new `qa_reentry` cases).
+- `command node --test evals/shared/tests/reenter-qa-refusals-parity.test.mjs` — 5 passed at QA cycle 6 (3 at first
+  implementation).
+- Mutation proof (first implementation; each QA cycle mutation-proved its own fixes): each of the
+  seven then-existing refusals, the uncommitted / untracked / ancestor halves of the
+  measure, the never-lower rule and the keep-the-lock rule were removed one at a time — every one
+  turned the suite red (1–7 failures each). The Stop-hook case went red (2) with the 5a arm pointed
+  at `/finalise`; the parity test went red with a reason dropped from the contract (1) and renamed
+  in the script (2).
+- ShellCheck `--severity=warning` clean on both new `.sh` files; Prettier clean.
+- `npm run ci:fast` with `.agents/skills` and `.claude/skills` moved aside: everything green except
+  `tests/test-clean-checkout.test.js`, which tripped its own LOAD-SENSITIVE timing budget (10500 ms
+  vs 10000 ms) and passes alone (13/13). `npm run bundle:check` — 129 skills, 0 problems.
+
+**Deferred work**: see QA Testing Results › Deferred Work (gate 6/7 `recommendations.future` and PR review 2 follow-ups).
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-04
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.170.qa.7.qa-reentry-after-finalise-gaps.md](./task.170.qa.7.qa-reentry-after-finalise-gaps.md)
+- **Gate File**: [task.170.gate.7.qa-reentry-after-finalise-gaps.yml](./task.170.gate.7.qa-reentry-after-finalise-gaps.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 53 (re-entry suite, under bash 5 and bash 3.2) + parity 5
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- Cycle 7 (QA re-entry after the finalise DoD-gaps halt) gates DoD gap 1's fix (`3008d0d7`): parses under `/bin/bash` 3.2, suite 53/53 on both bashes, mutation-proven.
+- CR-1 (cleanup, advisory): the bash 3.x guard checks parse only.
+
+### Deferred Work
+
+- CR-1 (gate 6, low) — carried to the gate's `recommendations.future` by the cosmetic-residue exit (route 2b, cycle 6): scope the resume contract's in-flight-gate sentence to a report not ahead of the gates.
+- CR-2 / CR-3 (gate 6, advisory) — non-contiguous gate/heading numbering in the back-fill; stale test comment above the ahead/behind loop.
+- CR-1 (gate 7, cleanup) — the bash 3.x guard checks parse only; run the accept and refusal cases under `/bin/bash` 3.x as well.
+- PR review 2 (5c, cycle 7, CONCERNS) — CR-1 (medium): pass `qa-cycle.sh`'s stderr through in the `no-gate` refusal; CR-2 (medium): add `qa_reentry` to `develop-pipeline-hooks.md` and `pipeline-resume-detector-prompt.md`, and to the lock-fields parity test; CR-3 (low): fail closed when `git status` cannot run; PC-2 (low): list `set-qa-phase.sh` in the Files Summary. See [`task.170.pr-review.2`](./task.170.pr-review.2.qa-reentry-after-finalise-gaps.md).
+
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
+
+**Status:** IN PROGRESS (run 1 — superseded; see Definition of Done - PASSED below)
+
+### QA Gate Status
+
+**QA Report**: `task.170.qa.6.qa-reentry-after-finalise-gaps.md`
+**Gate File**: `task.170.gate.6.qa-reentry-after-finalise-gaps.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Security Review:**
+   - [ ] `shared/resources/reenter-qa-after-finalise.sh:146` does not parse under macOS `/bin/bash` 3.2 (an unparenthesised case pattern inside `$(...)`); the suite under `/bin/bash` 3.2.57 fails 42/52. Fails closed, but the re-entry is unusable on a stock macOS shell.
+   - [ ] Probe zero-guard: `probes_executed: 0` — the probe engine cannot reach a two-positional shell script.
+
+### Next Steps:
+
+- [ ] **BLOCKING**: change the case pattern to `("$p".*)`, re-bundle, and add a guard that parses the script with `/bin/bash -n` where that shell is 3.x; commit. The resume re-enters QA at 5a for this code fix.
+- [ ] **BLOCKING**: operator decision on the zero-guard — record it as "unverified by the engine" (task.130 precedent) or extend the engine to multi-argument shell entries.
+
+**Estimated Effort:** Small — one-line fix, a parse guard, one QA cycle, one decision.
+
+**Gap Report Generated:** 2026-10-03
+
+### Gap Resolution (2026-10-04)
+
+- **Gap 1 (bash 3.2 parse)** — fixed in `3008d0d7`: the case pattern is parenthesised, and the suite gains a `/bin/bash -n` case that runs where `/bin/bash` is 3.x (53/53 under bash 5 and with only bash 3.2 on PATH). A code fix, so the resume re-enters QA at 5a before `/finalise` re-runs.
+- **Gap 2 (probe zero-guard)** — **operator decision, 2026-10-04: record the probe as "unverified by the engine"**, as task.130 did. The engine has no form that reaches a two-argument shell script; the eight hostile `head:` cases in `reenter-qa-after-finalise.test.sh` are the executed evidence (they run per PR, but are not an engine count). Follow-up that closes the engine gap: task.181, a `shell-argv:` entry form ([#564](https://github.com/Gamaroff/agent-skills/issues/564)).
+
+**Detailed Verification Log:** See `task.170.dod.1.qa-reentry-after-finalise-gaps.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                   | Author      |
-| ---------- | ------- | --------------------------------------------- | ----------- |
-| 2026-09-30 | 1.0     | Initial draft — cut from observation #235     | create-task |
+## Definition of Done - PASSED ✅
 
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.170.qa.7.qa-reentry-after-finalise-gaps.md`
+**Gate File**: `task.170.gate.7.qa-reentry-after-finalise-gaps.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Acceptance Criteria:** 14/14, each with a code citation and a test that runs per PR
+✅ **Tests & CI:** CI reading 1 SUCCESS @ `f22455b54f89` (5 checks); re-entry suite 53/53 under bash 5.3 and bash 3.2
+⚠️ **PR Review:** 5c PR review 2 CONCERNS (2 medium, 3 low) — non-blocking per §5c; follow-ups in QA Testing Results › Deferred Work
+✅ **Documentation:** CHANGELOG `[Unreleased]`, resume contract, step-7, pause schema, finalise Step 8, develop-task/develop-story Phase 0b
+⚠️ **Security Review:** checks PASS (no secrets, no unsafe patterns, hostile heads never execute, parses under bash 3.2); probe mode **unverified by the engine** — the script takes two positionals and `security-probe.mjs` has no entry form for that (`totals.executed: 0`). Accepted by the operator (2026-10-04, task.130 precedent) on the executed evidence: eight hostile `head:` cases in the suite, run per PR. Follow-up: task.181 (#564).
+⚠️ **Compliance Review:** NOT_APPLICABLE
+
+**Task marked as ACCEPTED on:** 2026-10-04
+
+**Detailed Verification Log:** See `task.170.dod.2.qa-reentry-after-finalise-gaps.md` for complete verification evidence and timestamps.
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2026-09-30 | 1.0     | Initial draft — cut from observation #235     | create-task |
+| 2026-10-03 | 1.1     | Review 1 (8/10, 0 critical / 4 important): full qa-task CODE_MOVED measure (uncommitted, untracked, invalid head); budget max(existing, base + 2); refusals via --restore --which before any write, failed lowering keeps the lock; criteria for the parity and Stop-hook tests | review-task |
+| 2026-10-03 |         | Status → ready-for-development                | review-task |
+| 2026-10-03 |         | Implemented — 9 source files (2 new scripts, 1 new parity test), 30 new test cases | develop |
+| 2026-10-03 |         | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-10-03 |         | QA gate FAIL (70/100) — 3 findings (1 high, 1 medium, 1 low) | qa-task |
+| 2026-10-03 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
+| 2026-10-03 |         | QA gate CONCERNS (80/100) — 4 findings (2 medium, 2 low) | qa-task |
+| 2026-10-03 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
+| 2026-10-03 |         | QA gate PASS (100/100) — 1 finding (1 low) | qa-task |
+| 2026-10-03 |         | DoD incomplete — 2 gaps identified (security: bash 3.2 parse, probe zero-guard) | finalise |
+| 2026-10-04 |  | QA gate PASS (100/100) — 0 findings (cycle 7, re-entry after finalise DoD gaps) | qa-task |
+| 2026-10-04 | 1.2 | DoD passed — accepted (PR #563); security probe unverified by the engine (operator decision) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -355,21 +518,21 @@ None.
 
 ### Phase 1: The re-entry writer
 
-- [ ] Refusals
-- [ ] Atomic write
-- [ ] Suite
+- [x] Refusals
+- [x] Atomic write
+- [x] Suite
 
 ### Phase 2: The resume contract and the step docs
 
-- [ ] Contract case
-- [ ] Step 7 doc + finalise Step 8
-- [ ] Bundle
+- [x] Contract case
+- [x] Step 7 doc + finalise Step 8
+- [x] Bundle
 
 ### Phase 3: Guards
 
-- [ ] Parity test
-- [ ] Stop-hook test
-- [ ] CHANGELOG
+- [x] Parity test
+- [x] Stop-hook test
+- [x] CHANGELOG
 
 ---
 

@@ -1,0 +1,53 @@
+schema: 2
+task: 'task.170.qa-reentry-after-finalise-gaps'
+task_title: '[Task 170] QA re-entry after a finalise DoD-gaps halt fixed by a code change'
+gate: PASS
+status_reason: 'Re-entered cycle gates the DoD gap 1 fix (3008d0d7): the case pattern now parses under macOS /bin/bash 3.2, the suite is 53/53 under bash 5 and with bash 3.2 first on PATH, and reverting the parenthesis reds the new parse case. Every shell script on the branch parses under /bin/bash 3.2. One advisory cleanup: the new guard is parse-only.'
+reviewer: 'QA Engineer'
+head: 'f0cdb2533cc7bb75a0d5c157b22c0d7a694ad5e1'
+updated: '2026-10-04T06:19:28Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 53
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+  ci: 'not read — no cycle waits on CI'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Delta is a parse-compatibility change; the refusal predicate is unchanged. The eight hostile head: cases in the suite pass under both bashes. Engine probe recorded as unverified by the engine per the operator decision of 2026-10-04 (task.130 precedent; follow-up task.181, #564).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'The script now runs on the stock macOS bash the operator invokes it with; reentry dogfooded on this run (refused nothing, lowered the lock 7 -> 5 / 5a).'
+  maintainability:
+    status: PASS
+    notes: 'CR-1 (cleanup): the bash 3.x guard checks parse only; runtime cases run the PATH bash.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: CR-1
+      action: 'Let the suite run its accept and refusal cases under /bin/bash where it is 3.x (an overridable interpreter), not only bash -n, so a bash-4-only runtime construct cannot pass on macOS.'
+      refs: ['shared/resources/reenter-qa-after-finalise.test.sh']
+    - action: 'Carried from gate 6: CR-1 (report-ahead in-flight-gate sentence), CR-2 (non-contiguous numbering), CR-3 (stale test comment) remain low follow-ups.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/reenter-qa-after-finalise.sh', 'shared/resources/reenter-qa-after-finalise.test.sh']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
