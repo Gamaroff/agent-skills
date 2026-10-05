@@ -142,14 +142,21 @@ file), and an empty `.eval/gh-config/`.
   are served from the fixtures; `--json a,b` selects fields, `-q/--jq` is piped through the real
   `jq`. A known kind with a missing key answers as `gh` does (exit 1, `GraphQL: Could not resolve…`),
   logged `"notFound": true`.
-- **Writes** are **refused**: exit 1, logged `"refused": true`. "Never posts without asking" becomes
-  an assertion on the log. For `pr` and `issue` a write is a listed subcommand (`comment`, `review`,
-  `edit`, `merge`, `new`, …). For `api` the rule is an **allow-list**: a call is served only when
-  every flag is a known read flag (`-H`, `-i`, `--paginate`, `-q`, `--hostname`, …) and every method
-  given is `GET`. Anything else is refused, so an unmodelled spelling fails closed. Two real reads are
-  refused by design: `--method POST -X GET` and `-X GET` with a field flag.
-- **Anything else** is `"unhandled": true`, exit 1 — a gap in the fixtures fails loudly instead of
-  being guessed at.
+- **Everything that is not a served read is refused**: exit 1, logged `"refused": true`. "Never posts
+  without asking" becomes an assertion on the log. The rule is an **allow-list**, so an unmodelled
+  spelling fails closed instead of passing as a read:
+  - the kind must be one of the reads above. Any other command (`pr revert`, `label create`,
+    `release list`, …) is refused, and so is a listed write subcommand (`comment`, `merge`, `new`, …);
+  - only `-R`/`--repo` may come before the group. Outside `api`, the subcommand must directly
+    follow the group. Cobra strips flags before it picks the subcommand, so
+    `gh pr --edit-last view comment` is `pr comment`, not `pr view`;
+  - an `api` call is served only when every flag is a known read flag (`-H`, `-i`, `--paginate`,
+    `-q`, `--hostname`, …) and every method given is `GET`.
+
+  Some real reads are refused by design: `--method POST -X GET`, `-X GET` with a field flag, a flag
+  between the group and its subcommand, and read commands outside the served kinds.
+- **A served read kind with no fixture table** is `"unhandled": true`, exit 1. A gap in the fixtures
+  fails loudly instead of being guessed at.
 
 The fake only wins through `PATH`. Point `GH_CONFIG_DIR` at the empty `.eval/gh-config` and blank
 `GH_TOKEN`/`GITHUB_TOKEN` in the hook's env, so a real `gh` reached by absolute path is

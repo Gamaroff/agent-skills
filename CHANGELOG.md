@@ -17,7 +17,8 @@ All notable changes to this project will be documented in this file. Format foll
   prefixed), `cliArgs` for the claude-cli driver, `liveAssertions`, `EVAL_TIMEOUT_MS`, a
   `noFileMatching` assertion, a `git-sandbox` `dir` option, `evals/shared/repeat.mjs`, and a fake
   `gh` (`evals/shared/lib/fake-gh.mjs`) that serves reads from fixtures, logs every call, refuses
-  every write and reports a fixture gap as `unhandled` — so "never posts without asking" is an
+  everything that is not a served read (an allow-list, so an unmodelled write spelling fails
+  closed) and reports a fixture gap as `unhandled` — so "never posts without asking" is an
   assertion. The claude-cli driver's error now carries `claude`'s stdout, where `Credit balance is
   too low` was hiding behind an unrelated stderr warning. `repeat.mjs` owns the pass-rate exit status: 0 met, 1 below, 2 usage, and 3
   **could not run**. The verdict is positive: the runner reports a failed run with `EVAL_FAIL_EXIT`

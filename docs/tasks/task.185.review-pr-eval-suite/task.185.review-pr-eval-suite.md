@@ -305,7 +305,7 @@ gap test goes red.
 
 ### Functional
 
-- [x] `next-report-number.sh` returns `4` for a directory holding `.pr-review.1.` and `.pr-review.3.` (Phase 1 states the max + 1 branch), under bash and zsh.
+- [x] `next-report-number.sh` returns `4` for a directory holding `.pr-review.1.` and `.pr-review.3.` (Phase 1 states the max + 1 branch), under bash and zsh. *(Scope, 2026-10-05, operator decision: the bash arm is guarded per PR in CI; the zsh arm is verified locally, since `ubuntu-latest` has no zsh. This is the state task.176 was accepted in.)*
 - [x] `npm run eval:review-pr` passes 4/4 scenarios in replay mode.
 - [x] `npm run eval:review-pr:cli` with N=5: scenarios 02 and 03 pass 5/5; scenarios 01 and 04 pass ≥ 4/5. Recorded in the implementation report with the command.
 - [x] No live run logs a refused or unhandled `gh` call.
@@ -464,7 +464,7 @@ glued-flag gap was fixed in QA cycles 5–7 (gate 7 PASS 100).
      that the fake logs as `notFound`, which no assertion catches (medium, reproduced by the DoD
      security agent; 118 candidates executed).
 2. **Acceptance Criteria:**
-   - [ ] AC1's zsh half has no CI lane (`ubuntu-latest` has no zsh). It passes locally. task.176 was
+   - [x] AC1's zsh half has no CI lane (`ubuntu-latest` has no zsh). It passes locally. task.176 was
      accepted in the same state.
 
 Documentation passes, compliance is not applicable, and CI reads SUCCESS @ `22ee1609`.
@@ -474,7 +474,7 @@ Documentation passes, compliance is not applicable, and CI reads SUCCESS @ `22ee
 - [ ] **BLOCKING**: make `pr`/`issue` fail closed like `api`. Serve a read only when the
       subcommand follows the group directly and no positional names a write subcommand. Refuse
       every command whose kind is not a served read. Then re-enter QA at 5a.
-- [ ] Decide AC1: install zsh in CI, or record local zsh verification as accepted.
+- [x] Decide AC1: the operator accepted local zsh verification (2026-10-05). The criterion is annotated.
 
 **Estimated Effort:** Small
 
@@ -505,6 +505,7 @@ Documentation passes, compliance is not applicable, and CI reads SUCCESS @ `22ee
 | 2026-10-05 |  | QA findings fixed after escalation — fake gh api decided by read allow-list (bugs 6, 7); 6 iterations in total | qa-fix |
 | 2026-10-05 |  | QA gate PASS (100/100) — no open findings, 2 low advisory | qa-task |
 | 2026-10-05 |  | DoD incomplete — 2 gaps identified (run 2: fake gh pr/issue resolution; AC1 zsh lane) | finalise |
+| 2026-10-05 |  | DoD run 2 gaps fixed — fake gh serves pr/issue only in an unambiguous read shape; AC1 zsh scope recorded (operator decision) | develop |
 
 ---
 <!-- change-log-end -->

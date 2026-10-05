@@ -290,17 +290,51 @@ test("api is served only by the read allow-list: any other flag or method is ref
   assert.ok(log.slice(reads.length).every((c) => c.refused === true));
 });
 
-test("a command with no fixture kind is unhandled: exit 1, logged unhandled: true", () => {
+test("a served read kind with no fixture table is unhandled: exit 1, logged unhandled: true", () => {
   const { gh, calls } = sandbox();
-  for (const args of [
-    ["release", "list"],
-    ["api", "repos/eval/widgets/pulls/901"],
-  ]) {
-    const r = gh(...args);
-    assert.equal(r.status, 1);
-    assert.match(r.stderr, /unhandled command|no "api" fixture/);
-  }
+  const r = gh("api", "repos/eval/widgets/pulls/901");
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /no "api" fixture/);
   assert.ok(calls().every((c) => c.unhandled === true && !c.refused));
+});
+
+// Outside `api`, a command is served only as a read in a shape cobra cannot read another way: a
+// served read kind, nothing but -R/--repo before the group, the subcommand directly after it.
+// Cobra strips flags first and an unknown flag takes the next token, so `gh pr --edit-last view
+// comment` is `pr comment` — read by position it came back notFound (task.185 DoD run 2).
+test("pr/issue are served only in an unambiguous read shape; anything else is refused", () => {
+  const { gh, calls } = sandbox();
+  const reads = [
+    ["-R", "eval/widgets", "pr", "view", "901"],
+    ["--repo=eval/widgets", "pr", "view", "901", "--json", "number"],
+    ["issue", "view", "12"],
+    ["repo", "view", "--json", "name"],
+  ];
+  for (const args of reads) {
+    const r = gh(...args);
+    assert.equal(r.status, 0, args.join(" "));
+  }
+  const refusals = [
+    ["pr", "--edit-last", "view", "comment", "--body", "x"], // cobra: pr comment
+    ["pr", "-s", "view", "merge"], // cobra: pr merge
+    ["pr", "--squash", "901", "merge"],
+    ["issue", "--edit-last", "12", "comment", "--body", "x"],
+    ["--hostname", "h", "pr", "view", "901"], // only -R/--repo may precede the group
+    ["pr", "revert", "901"], // a write no list names
+    ["label", "create", "bug"],
+    ["release", "list"], // not a served read kind
+  ];
+  for (const args of refusals) {
+    const r = gh(...args);
+    assert.equal(r.status, 1, args.join(" "));
+    assert.match(r.stderr, /refused/, args.join(" "));
+  }
+  const log = calls();
+  assert.equal(log.length, reads.length + refusals.length);
+  assert.ok(
+    log.slice(0, reads.length).every((c) => !c.refused && !c.unhandled),
+  );
+  assert.ok(log.slice(reads.length).every((c) => c.refused === true));
 });
 
 test("the program refuses to run outside its launcher (no EVAL_GH_DIR)", () => {

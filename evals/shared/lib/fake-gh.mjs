@@ -19,8 +19,11 @@
  *     when every flag it carries is in API_READ_FLAGS and every method given is GET. Any other
  *     flag, spelling or method is refused, so a form the parser does not model fails closed.
  *     Exit 1, logged with "refused": true. "Never posts without asking" is then an assertion.
- *   - reports a read it has no fixture KIND for as "unhandled": true, exit 1 — a gap in the
- *     fixtures shows as a failure, never as a guess.
+ *   - REFUSES every command that is not a served read in an unambiguous shape: a kind outside
+ *     READS, a flag before the group other than -R/--repo, or (outside `api`) a flag between the
+ *     group and its subcommand — cobra would resolve those differently. Fail closed.
+ *   - reports a served read kind that the fixtures have no table for as "unhandled": true,
+ *     exit 1 — a gap in the fixtures shows as a failure, never as a guess.
  *   - answers a known kind with a missing key the way gh does (exit 1, GraphQL "Could not
  *     resolve" on stderr), logged with "notFound": true. That is a real outcome the skill
  *     branches on (a bare number that is an issue), not a fixture gap.
@@ -170,6 +173,7 @@ const VALUE_FLAGS = new Set([
 
 function parseArgs(args) {
   const pos = [];
+  const posAt = []; // the argv index of each positional — where cobra would see the group and subcommand
   const opts = {};
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -201,13 +205,16 @@ function parseArgs(args) {
       if (eq > 0) val = a.slice(eq + 1);
       else if (VALUE_FLAGS.has(name)) val = args[++i];
       (opts[name] ||= []).push(val);
-    } else pos.push(a);
+    } else {
+      pos.push(a);
+      posAt.push(i);
+    }
   }
   const get = (...names) => {
     for (const n of names) if (opts[n]) return opts[n][opts[n].length - 1];
     return undefined;
   };
-  return { pos, opts, get };
+  return { pos, posAt, opts, get };
 }
 
 function pick(value, fields) {
@@ -238,12 +245,31 @@ function notFound(kind, key) {
   return `GraphQL: Could not resolve to ${what} with the number of ${key}. (repository.${kind === "issue view" ? "issue" : "pullRequest"})\n`;
 }
 
+// Only `-R`/`--repo` (and its value) may precede the group; outside `api` the subcommand must be
+// the very next token after the group.
+function servedShape(argv, group, pos, posAt) {
+  if (pos.length === 0) return false;
+  let t = 0;
+  while (t < posAt[0]) {
+    const tok = argv[t];
+    if (tok === "-R" || tok === "--repo") t += 2;
+    else if (
+      tok.startsWith("--repo=") ||
+      (tok.startsWith("-R") && tok.length > 2)
+    )
+      t += 1;
+    else return false;
+  }
+  if (t !== posAt[0]) return false;
+  return group === "api" || pos.length < 2 || posAt[1] === posAt[0] + 1;
+}
+
 export function runFakeGh(argv, evalDir) {
   const fixturesPath = path.join(evalDir, "gh-fixtures.json");
   const fixtures = fs.existsSync(fixturesPath)
     ? JSON.parse(fs.readFileSync(fixturesPath, "utf-8"))
     : {};
-  const { pos, get, opts } = parseArgs(argv);
+  const { pos, posAt, get, opts } = parseArgs(argv);
   const [group, sub] = pos;
   const kind = group === "api" ? "api" : `${group || ""} ${sub || ""}`.trim();
   const entry = { argv };
@@ -271,9 +297,19 @@ export function runFakeGh(argv, evalDir) {
   }
   if (argv[0] === "--version" || argv[0] === "version")
     return done(0, "gh version 2.0.0-fake (fake-gh)\n");
-  if (!READS.has(kind)) {
-    entry.unhandled = true;
-    return done(1, "", `fake-gh: unhandled command: gh ${argv.join(" ")}\n`);
+  // Every other command is served only as a read in a shape cobra cannot read another way: a
+  // served read kind, nothing but `-R`/`--repo` before the group, and — outside `api` — the
+  // subcommand directly after the group. Cobra strips flags before it picks the subcommand, and
+  // an unknown flag takes the next token, so `gh pr --edit-last view comment` is `pr comment`:
+  // read by position it was a `pr view` that came back notFound (task.185 DoD run 2). Anything
+  // else is refused — fail closed, as `api` is — so a write the lists miss cannot pass as a read.
+  if (!READS.has(kind) || !servedShape(argv, group, pos, posAt)) {
+    entry.refused = true;
+    return done(
+      1,
+      "",
+      `fake-gh: refused — not a served read: gh ${argv.join(" ")}\n`,
+    );
   }
   if (kind === "auth status")
     return done(
