@@ -665,6 +665,31 @@ broken. A clean gate is a clean gate: it leaves through 5c on the ordinary `PASS
 configured it keeps today's behaviour exactly. That is the fail-safe direction expressed as the
 default rather than as an opt-out. See [`configuration.md`](../../docs/reference/configuration.md).
 
+#### Where the Deferred Work record goes
+
+Routes 2 and 2b both record the ids they carried on the work item. This is the one statement of
+where that record lives; both *On exit* lists point here and do not restate it (task 171).
+
+- **The heading is `## Deferred Work`, an H2.** It is never placed inside `## QA Testing Results`.
+  An H2 ends that section's span, so no QA Step 12 write can reach the record. A bold
+  `**Deferred Work**` label or a `### Deferred Work` written into the QA section is inside the span
+  a replace removes (task.155 REL-030).
+- **Absent → create it** immediately before the change-log block (before the `## Change Log`
+  heading when one sits directly above the marker block). With no change log, create it before
+  `## Progress Tracking` (task) or `## Dev Agent Record` (story); with neither, at the end of the
+  document.
+- **Present → append** the new ids as list items under the existing section. Never open a second one.
+- **A legacy `### Deferred Work` already inside the QA section stays where it is.** The QA engine
+  carries it through every replace. New ids go to the H2.
+
+The record, as the first exit writes it:
+
+```markdown
+## Deferred Work
+
+- **REL-7** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): a residual shape
+```
+
 #### On exit
 
 1. **Overwrite the cycle entry's routing rows first**: `**Action**: Proceeding to 5c (PR conformance
@@ -682,7 +707,7 @@ default rather than as an opt-out. See [`configuration.md`](../../docs/reference
    text and `suggested_action`, plus `carried_from: top_issues (route 2, cycle {N})`. Then stamp the
    `top_issues[]` entry `status: closed` with
    `resolution: carried to recommendations.future (route 2)`, which is route 2b's own stamp, and
-   record the same ids on the work item under **Deferred Work**. Commit the gate and QA report before 5c (path 1), because the gate was just edited.
+   record the same ids on the work item (see **Where the Deferred Work record goes**). Commit the gate and QA report before 5c (path 1), because the gate was just edited.
 
    > **Why the entries are closed, not left open.** `/develop-next` and `/develop-batch` merge only
    > a gate with no open entry (Step 3's matrix), and `/finalise` accepts before they run. An exit that
@@ -734,7 +759,7 @@ was expensive, and the expense bought nothing 5c would not have seen anyway.
    `carried_from: top_issues (route 2b, cycle {N})`. The `top_issues[]` entries themselves are stamped
    `status: closed` with `resolution: carried to recommendations.future (route 2b)`, so the gate
    still records what QA raised and a later reader can tell a carried LOW from a fixed one. Record the
-   same ids on the work item under **Deferred Work**.
+   same ids on the work item (see **Where the Deferred Work record goes**).
 4. **Hand to 5c**, exactly as a `PASS` gate with no open entry does. Commit the gate and QA report
    first (5b's **Where the gate and QA report get committed**, path 1) — the gate was just edited.
 5. Write `describeLoopRoute(r)` verbatim on this cycle's `**Loop exit**` row. The message begins

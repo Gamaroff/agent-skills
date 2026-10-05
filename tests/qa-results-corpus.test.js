@@ -22,6 +22,10 @@
  *      protected ranges — so an engine that silently under-counts (a heading regex
  *      that stopped matching, a protection bug that hides real headings) cannot
  *      certify its own blindness (task.155 QA cycle 1, CR-3).
+ *   4. The write survey (task 171): one probe write per document is never refused
+ *      (0 false refusals), never removes a change-log marker, a dated row outside
+ *      the section or an H1/H2 (0 deletions), and a second identical write changes
+ *      nothing (0 non-idempotent). The figures are the test's, not a document's.
  *
  * A failure names every offending file. The repair rule the engine's callers print
  * (and task.65 used): keep the copy whose Gate File link names the highest gate,
@@ -35,7 +39,10 @@ const path = require("path");
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { execFileSync } = require("child_process");
-const { findQaResults } = require("../shared/resources/qa-results.js");
+const {
+  findQaResults,
+  upsertQaResults,
+} = require("../shared/resources/qa-results.js");
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 // 154 documents carried a section when this guard landed (2026-09-30). The floor is
@@ -122,4 +129,53 @@ test("no tracked document stacks QA Testing Results sections or hides one in the
     [],
     `QA Testing Results corruption — keep the copy linking the highest gate, delete the rest:\n  ${offenders.join("\n  ")}`,
   );
+});
+
+// What a write may never take away, counted outside the QA section: change-log
+// markers, dated table rows and H1/H2 headings. Rows inside the section are the
+// section's own and a replace legitimately rewrites them.
+function structure(text) {
+  const { sections } = findQaResults(text);
+  const outside = sections.length
+    ? text.slice(0, sections[0].start) + text.slice(sections[0].end)
+    : text;
+  return {
+    markers: (outside.match(/change-log-(?:start|end) -->/g) || []).length,
+    rows: (outside.match(/^\| *\d{4}-\d\d-\d\d/gm) || []).length,
+    headings: (outside.match(/^#{1,2} /gm) || []).length,
+  };
+}
+
+test("the write survey: 0 false refusals, 0 deletions, 0 non-idempotent writes (task 171)", () => {
+  const probe = "## QA Testing Results\n\n**QA Status**: PASS\n\nprobe";
+  const refused = [];
+  const lost = [];
+  const unstable = [];
+  let surveyed = 0;
+  for (const rel of trackedDocs()) {
+    const text = fs.readFileSync(path.join(REPO_ROOT, rel), "utf8");
+    if (!findQaResults(text).sections.length) continue;
+    surveyed++;
+    const docType = rel.includes("/tasks/") ? "task" : "story";
+    const r = upsertQaResults(text, probe, { docType });
+    if (!["replaced", "relocated"].includes(r.reason)) {
+      refused.push(`${rel}: ${r.reason} (${r.detail})`);
+      continue;
+    }
+    const a = structure(text);
+    const b = structure(r.content);
+    for (const k of Object.keys(a)) {
+      if (b[k] < a[k]) lost.push(`${rel}: ${k} ${a[k]} → ${b[k]}`);
+    }
+    if (upsertQaResults(r.content, probe, { docType }).content !== r.content) {
+      unstable.push(rel);
+    }
+  }
+  assert.ok(
+    surveyed >= FLOOR_DOCS,
+    `scan-broken: only ${surveyed} documents surveyed (floor ${FLOOR_DOCS})`,
+  );
+  assert.deepEqual(refused, [], `false refusals:\n  ${refused.join("\n  ")}`);
+  assert.deepEqual(lost, [], `deletions:\n  ${lost.join("\n  ")}`);
+  assert.deepEqual(unstable, [], `non-idempotent:\n  ${unstable.join("\n  ")}`);
 });
