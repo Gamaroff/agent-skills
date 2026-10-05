@@ -35,7 +35,7 @@ Close task.171's five Deferred Work items in `shared/resources/qa-results.js` (C
 | 2. review-task             | ✅ Done    | `task.183.review.{N}.{name}.md` exists (or skip logged)                | review.1 — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; loop audit ready-for-review 16/16 | `.summaries/step-3-test-triage-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #571: https://github.com/Gamaroff/agent-skills/pull/571 | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.183.qa.{N}.*.md`; `task.183.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at cycle 3, re-entered (+2), escalated again at cycle 4 — HIGH 1, 1, 2, 2; see Issues Log | `.summaries/step-5-fast-gate-triage-1.json` |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.183.qa.{N}.*.md`; `task.183.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at cycle 3, re-entered (+2), escalated again at cycle 4, re-entered, loop limit at cycle 5 — HIGH 1, 1, 2, 2, 0; see Issues Log | `.summaries/step-5-fast-gate-triage-1.json` |
 | 7. finalise                | ⏳ Pending | `task.183.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -107,11 +107,53 @@ Close task.171's five Deferred Work items in `shared/resources/qa-results.js` (C
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop not converging
 
+### Re-entry after the second escalation — 2026-10-05
+
+- Operator ("go ahead") approved the recommendation: remove `blockContinuations` entirely (CR-7 deferred) and drop `Critical Issues` / `Issues Found` from `QA_LABELS`, then run the one cycle left in the granted budget.
+- Fix as the operator's change, commit `add0e4b1`: setext check is `origin/develop`'s with the narrower `notParagraph`; R2 refuses every shape that beat the inference and both CR-7 shapes; R4 carries a grouped bug list. Mutation proofs 13/13 held (the list/comment mutants retired with the code; M14 added for `QA_LABELS`). qa-results suites 105/105; fast gate 5301/5304 (the two LOAD-SENSITIVE budgets only, load 3.5).
+- task.183: `## Deferred Work` added (CR-7, CR2-3, CR4-4), placed immediately before the change-log block per the step-5-6 rule; § 1, § 3, § 5, Phase 2, § 9 amended with a Change Log row. CHANGELOG, plan and task.171's CR-7 note updated.
+- Lock restored with `advance-pipeline-lock.sh --restore` (budget already 5 from the first grant: cycle 5 is the last). No new grant.
+
+### QA Cycle 5 — 2026-10-05
+**Gate Result**: CONCERNS
+**Issues Found**: 3 — CR5-1 (MEDIUM, every remaining `QA_LABELS` name drops a bug list grouped under it; `origin/develop` keeps it), CR5-2 / CR5-3 (LOW, CHANGELOG / task.183 / task.171 still claim all five task.171 items closed). Cycle 4's CR4-1, CR4-2, CR4-3 FIXED. QA steps run from the qa-task instructions already loaded in cycle 4 (skill not re-invoked).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: Loop route: continue (medium-not-falling) — MEDIUM reads 0, 1, 1 over cycles 3–5 — route 2c needs it strictly falling, which is the evidence that one more gate would clear.
+**Action**: Escalating — loop limit reached
+
+#### qa-fix cycle 5 — 2026-10-05
+- Inline findings path (gate 5 written by this run). Step 2.6 repeat subject (`QA_LABELS`, edited in cycles 1 and 4) → scope the claim: no QA-label stop; CR2-4 deferred. R4 now carries a grouped bug list under each former label and a stale list exactly once. Mutation proofs 11/11 (M15 added). Docs: three of five closed, CR-7 and CR2-4 deferred. qa-fix Change Log row written (loop exit). Fast gate 5301/5304 (budgets only). Commit `e0ee01ba`, pushed once.
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+### QA Loop Limit Reached — 2026-10-05
+
+The pipeline completed 5 qa-task/qa-fix cycles (QA_MAX_CYCLES 5 = 3 + 2 granted) without a clean PASS.
+Cycle 5's fix (`e0ee01ba`) is committed and pushed but no gate has read it.
+
+**Final gate status**: CONCERNS (gate 5, 90/100, head `add0e4b1` — before cycle 5's fix)
+**HIGH findings per cycle**: 1, 1, 2, 2, 0 — HIGH cleared at cycle 5
+**Remaining issues** (from final gate file — all addressed by cycle 5's fix, ungated):
+- CR5-1 — MEDIUM — `shared/resources/qa-results.js` — every `QA_LABELS` name dropped a bug list grouped under it. Fix: the QA-label stop removed; CR2-4 deferred.
+- CR5-2 — LOW — `CHANGELOG.md` — "closes five items", and the refused log shape described as "above" the log. Fix: reworded.
+- CR5-3 — LOW — task.183 / task.171 — "all five closed". Fix: reworded to three closed, CR-7 and CR2-4 deferred.
+
+**What was attempted per cycle**:
+- Cycles 1–4: see the two QA Loop Not Converging entries below.
+- Cycle 5 (gate 5, HIGH 0, MEDIUM 1): `QA_LABELS` stop removed (Step 2.6 move: scope the claim); document claims corrected. Commit `e0ee01ba`. Mutation proofs 11/11 held; qa-results suites 105/105; fast gate 5301/5304 (the two LOAD-SENSITIVE budgets only).
+- Gate-the-last-fix half-cycle (route 2c) considered and declined by the engine: `Loop route: continue (medium-not-falling) — MEDIUM reads 0, 1, 1 over cycles 3–5 — route 2c needs it strictly falling, which is the evidence that one more gate would clear.`
+
+**Likely root cause**: not a stall. HIGH reached 0 at cycle 5 and the last medium was answered by removing the third and final inference (the QA-label stop). The budget ended on a fix, as the half-cycle rule anticipates, but the MEDIUM sequence only became non-zero again at cycle 4, so the engine's "strictly falling" evidence is not there.
+
+**Recommended next steps**:
+1. Grant 1 more cycle ("Resume at 5a with 1 more cycle") so a gate reads `e0ee01ba`. The engine now refuses nothing it did on `origin/develop` across every shape found in cycles 1–5, so a clean gate is the likely outcome; 5c then reviews the PR.
+2. Or accept gate 5 and run `/finalise` by hand: its only open entries are the three cycle 5 fixed.
 
 ### QA Loop Not Converging — 2026-10-05 (second escalation)
 
@@ -222,6 +264,6 @@ _Track each QA review/fix cycle._
 **Final Status**: Escalated
 **Branch**: `feature/task.183.qa-results-setext-and-carry-follow-ups`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/571
-**QA Iterations**: 4 (gates 1–4 FAIL; 2 fix cycles + 1 operator fix)
+**QA Iterations**: 5 (gates 1–4 FAIL, gate 5 CONCERNS; 3 fix cycles + 2 operator fixes)
 **DoD Summary**: not reached
 **Tracker debt**: none
