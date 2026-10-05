@@ -417,27 +417,27 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-05
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.171.qa.4.deferred-work-placement-and-qa-results-residuals.md](./task.171.qa.4.deferred-work-placement-and-qa-results-residuals.md)
-- **Gate File**: [task.171.gate.4.deferred-work-placement-and-qa-results-residuals.yml](./task.171.gate.4.deferred-work-placement-and-qa-results-residuals.yml)
+- **Full Report**: [task.171.qa.5.deferred-work-placement-and-qa-results-residuals.md](./task.171.qa.5.deferred-work-placement-and-qa-results-residuals.md)
+- **Gate File**: [task.171.gate.5.deferred-work-placement-and-qa-results-residuals.yml](./task.171.gate.5.deferred-work-placement-and-qa-results-residuals.yml)
 
 ### Test Coverage Summary
 
 - **Tests Executed**: 101
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0 open
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Cycle 3's fixes hold for their shapes. One medium: the per-range mis-pairing filter is beaten by a stray fence closing on a later plain opener, so a setext section is again deleted on replace (CR4-1). Third consecutive cycle on the setext fence exemption — a structural move is recommended.
+Five QA cycles closed 13 findings this branch introduced or exposed. The setext check ended fence-blind after three cycles of fence-exemption narrowing. One pre-existing HIGH (the setext paragraph test exempts some paragraph-text lines; identical on origin/develop, 0 corpus instances) is routed to a follow-up task with two lows.
 
 <!-- change-log-start -->
 
@@ -453,6 +453,8 @@ Cycle 3's fixes hold for their shapes. One medium: the per-range mis-pairing fil
 | 2026-10-05 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-10-05 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-05 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 4) | qa-task |
+| 2026-10-05 |         | QA gate PASS (100/100) — 0 open findings, 1 pre-existing routed to follow-up | qa-task |
+| 2026-10-05 |         | QA findings fixed — gate PASS (100/100), 4 iterations | qa-fix |
 
 <!-- change-log-end -->
 
