@@ -35,9 +35,9 @@ const FIXTURES = {
   },
 };
 
-function sandbox() {
+function sandbox(fixtures = FIXTURES) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-gh-"));
-  const { PATH } = installFakeGh(dir, FIXTURES);
+  const { PATH } = installFakeGh(dir, fixtures);
   fs.writeFileSync(
     path.join(dir, ".eval", "pr-901.diff"),
     "diff --git a/src/age.js b/src/age.js\n",
@@ -180,6 +180,38 @@ test("every write is refused, exits 1 and is logged refused: true", () => {
   const log = calls();
   assert.equal(log.length, writes.length);
   assert.ok(log.every((c) => c.refused === true));
+});
+
+// A glued short value flag is how gh's own parser accepts `-X POST` and `-f body=x` too. The path
+// here IS served, so a write the parser mis-read would come back exit 0 as a read — no `refused`,
+// no `unhandled`, and the scenario's "never posts" assertion would pass (task.185 finalise DoD).
+test("a glued short value flag is still a write, even on a path a fixture serves", () => {
+  const route = "repos/eval/widgets/issues/12/comments";
+  const { gh, calls } = sandbox({ ...FIXTURES, api: { [route]: [] } });
+  // The floor: the path is served, so a refusal below is the write rule, not a missing fixture.
+  for (const read of [
+    ["api", route],
+    ["api", "-XGET", route],
+  ]) {
+    const r = gh(...read);
+    assert.equal(r.status, 0, read.join(" "));
+    assert.equal(r.stdout.trim(), "[]");
+  }
+  const writes = [
+    ["api", "-XPOST", route],
+    ["api", "-X=PATCH", route],
+    ["api", route, "-fbody=x"],
+    ["api", route, "-Fbody=@x.md"],
+  ];
+  for (const args of writes) {
+    const r = gh(...args);
+    assert.equal(r.status, 1, args.join(" "));
+    assert.match(r.stderr, /refused write/, args.join(" "));
+  }
+  const log = calls();
+  assert.equal(log.length, 2 + writes.length);
+  assert.ok(log.slice(0, 2).every((c) => !c.refused && !c.unhandled));
+  assert.ok(log.slice(2).every((c) => c.refused === true));
 });
 
 test("a command with no fixture kind is unhandled: exit 1, logged unhandled: true", () => {

@@ -133,7 +133,14 @@ function parseArgs(args) {
   const opts = {};
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a.startsWith("-") && a !== "-") {
+    // A short value flag with its value glued on — `-XPOST`, `-fbody=x`, `-X=POST` — is read the
+    // way gh's flag parser (pflag) reads it: `-X POST`, `-f body=x`. Split on `=` first and
+    // `-fbody=x` is a boolean flag named `-fbody`, so a glued write was served as a read.
+    if (!a.startsWith("--") && a.length > 2 && VALUE_FLAGS.has(a.slice(0, 2))) {
+      const name = a.slice(0, 2);
+      const val = a[2] === "=" ? a.slice(3) : a.slice(2);
+      (opts[name] ||= []).push(val);
+    } else if (a.startsWith("-") && a !== "-") {
       const eq = a.indexOf("=");
       const name = eq > 0 ? a.slice(0, eq) : a;
       let val = true;
