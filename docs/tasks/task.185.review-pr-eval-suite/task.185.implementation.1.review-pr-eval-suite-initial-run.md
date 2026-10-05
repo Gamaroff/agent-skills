@@ -3,7 +3,7 @@
 **Task**: `task.185.review-pr-eval-suite.md`
 **Run Number**: 1
 **Started**: 2026-10-05 16:59
-**Status**: Escalated
+**Status**: In Progress
 
 ---
 
@@ -35,8 +35,8 @@ Run 1 of the develop-task pipeline for task 185: deterministic `/review-pr` repo
 | 2. review-task             | ✅ Done    | `task.185.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 9/10; Planned → Ready for Development; `task.185.review.1.review-pr-eval-suite.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 23/23 plan boxes; ci:fast 5339/0 fail; live N=5 20/20 | `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #574: https://github.com/Gamaroff/agent-skills/pull/574 | —                    |
-| 5–6. qa-task / qa-fix loop | ❌ Escalated | `task.185.qa.{N}.*.md`; `task.185.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 QA cycles (FAIL 70 → CONCERNS 80 → CONCERNS 90 → PASS 100 → FAIL 60 → FAIL 50); cycles 5–6 re-entered after the finalise DoD gap; Convergence check tripped (HIGH 1, 1); bugs 1–5 closed, 6–7 open | `.summaries/step-5-post-fix-tracker-3.json` |
-| 7. finalise                | ⏳ Pending | `task.185.dod.{N}.*.md`; task `status: accepted`                       | DoD run 1: gaps (security, fake gh); fixed into the QA loop, which escalated at cycle 6. `task.185.dod.1.review-pr-eval-suite.md` | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.185.qa.{N}.*.md`; `task.185.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 QA cycles (FAIL 70 → CONCERNS 80 → CONCERNS 90 → PASS 100 → FAIL 60 → FAIL 50); cycles 5–6 re-entered after the finalise DoD gap; Convergence check tripped (HIGH 1, 1); bugs 1–5 closed, 6–7 open | `.summaries/step-5-post-fix-tracker-3.json` |
+| 7. finalise                | ❌ Halted  | `task.185.dod.{N}.*.md`; task `status: accepted`                       | DoD run 2: gaps. Security FAIL (fake gh pr/issue subcommand resolution, medium, reproduced); AC PARTIAL (AC1 zsh lane); docs PASS; compliance N/A; CI reading 1 SUCCESS @ `22ee1609`. `task.185.dod.2.review-pr-eval-suite.md` | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -141,6 +141,8 @@ the parser.
 3. Alternative: scope the claim. Document that the fake `gh` refuses common write spellings, not
    every pflag form, and file the allow-list as a follow-up. This accepts a latent harness gap.
 
+- **`/finalise` run 2 found two gaps (2026-10-05).** (1) Security: the `api` read allow-list held. All 46 `api` write forms were refused and all 30 reads served. But `pr`/`issue` subcommands are resolved by position. Cobra strips flags first, and an unknown flag takes the next token, so `gh pr --edit-last view comment` is a write that the fake logs as `notFound` (medium, reproduced, 118 candidates). It is the same deny-list class as bugs 5 and 6, on the half the allow-list did not cover. (2) AC1: the zsh arm of the report-number test has no CI lane. Run 1 accepted it on the task.176 precedent, and run 2 applied the execution rule strictly. Step 8a was not taken (two sections short, medium finding). HALT for the operator's decision on AC1 and the `pr`/`issue` fix.
+
 _Problems encountered and how they were resolved or escalated._
 
 ---
@@ -209,6 +211,16 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — the Convergence check tripped (HIGH 1, 1 on cycles 5–6, cycle ≥ 3), and cycle 6 is the last granted cycle (`qa_max_cycles=6`)
 **Action**: Escalating — loop not converging
+
+### QA Cycle 7 — 2026-10-05
+**Re-entry**: after the cycle-6 escalation the user approved the allow-list remedy. `84506ed6`: the fake `gh` serves `api` only by read allow-list (bugs 6 and 7; 3 mutants red). `grant-qa-cycles.sh` restored the lock with 2 extra cycles (`qa_max_cycles=8`).
+**Gate Result**: PASS (100/100)
+**Issues Found**: none in the gate. 2 low advisory: C7-CR-1, write commands outside pr/issue log `unhandled`; C7-CR-2, `-R`/`--repo` allowed on `api`. Safety re-probe unscoped; 82 forms executed directly with no write served. Bugs 6 and 7 closed.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — `task.185.pr-review.2.review-pr-eval-suite.md` (PC-1 low/low: stale DoD-gaps section, which /finalise supersedes; CR-1 medium/medium: a never-settling setup/driver promise exits 0 and would count as a pass, latent and not reached by any shipped scenario; CR-2/CR-3 low). Non-blocking; loop exits.
+**Loop exit**: n/a — route 1 (PASS, no open entry); `classifyLoopRoute` → continue (route 2b needs two zero-HIGH gates)
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 

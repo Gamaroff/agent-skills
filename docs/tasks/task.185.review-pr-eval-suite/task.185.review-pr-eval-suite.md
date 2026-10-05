@@ -446,36 +446,40 @@ The fake `gh` decides `api` writes by a read allow-list, and no executed form se
 
 **Status:** IN PROGRESS
 
+Run 2 (`task.185.dod.2.review-pr-eval-suite.md`) supersedes run 1 (`task.185.dod.1`). Run 1's
+glued-flag gap was fixed in QA cycles 5–7 (gate 7 PASS 100).
+
 ### QA Gate Status
 
-**QA Report**: `task.185.qa.4.review-pr-eval-suite.md`
-**Gate File**: `task.185.gate.4.review-pr-eval-suite.yml`
+**QA Report**: `task.185.qa.7.review-pr-eval-suite.md`
+**Gate File**: `task.185.gate.7.review-pr-eval-suite.yml`
 **Gate Status**: ✅ PASS
 **Quality Score**: 100/100
 
 ### Missing Criteria:
 
 1. **Security Review:**
-   - [ ] `evals/shared/lib/fake-gh.mjs` serves a glued-shorthand `api` write as a read. `gh api -XPOST <path>`
-     and `gh api -fbody=x <path>` exit 0 with no `refused` flag when a fixture serves `<path>`, because
-     `parseArgs` reads `-XPOST` as a boolean flag where real `gh` reads `-X POST`. Reproduced by `/finalise`
-     (9 candidates; 2 served, 3 mislabelled `unhandled`). Latent in this suite: the review-pr scenarios serve no
-     `api` fixture, so the call is logged `unhandled` and still fails the scenario.
+   - [ ] The fake `gh` takes the `pr`/`issue` subcommand by position. Cobra strips flags first, and an
+     unknown flag takes the next token, so `gh pr --edit-last view comment` is a `pr comment` write
+     that the fake logs as `notFound`, which no assertion catches (medium, reproduced by the DoD
+     security agent; 118 candidates executed).
+2. **Acceptance Criteria:**
+   - [ ] AC1's zsh half has no CI lane (`ubuntu-latest` has no zsh). It passes locally. task.176 was
+     accepted in the same state.
 
-Acceptance criteria (13/13), documentation and CI (SUCCESS @ `21f77034`) all pass; compliance is not applicable.
+Documentation passes, compliance is not applicable, and CI reads SUCCESS @ `22ee1609`.
 
 ### Next Steps:
 
-- [ ] **BLOCKING**: split a glued short value flag in `parseArgs` the way pflag does, add the two served-path
-      cases to `fake-gh.test.mjs` "every write is refused", and mutation-prove them
-- [ ] Re-enter QA at 5a for the fix, then re-run `/finalise`
+- [ ] **BLOCKING**: make `pr`/`issue` fail closed like `api`. Serve a read only when the
+      subcommand follows the group directly and no positional names a write subcommand. Refuse
+      every command whose kind is not a served read. Then re-enter QA at 5a.
+- [ ] Decide AC1: install zsh in CI, or record local zsh verification as accepted.
 
-**Estimated Effort:** Small (about 1 hour)
+**Estimated Effort:** Small
 
 **Gap Report Generated:** 2026-10-05
-**QA Gate Reference**: See `task.185.gate.4.review-pr-eval-suite.yml` for full details
-
-**Detailed Verification Log:** See `task.185.dod.1.review-pr-eval-suite.md` for complete verification evidence and timestamps.
+**Detailed Verification Log:** See `task.185.dod.2.review-pr-eval-suite.md`.
 
 ---
 <!-- change-log-start -->
@@ -500,9 +504,10 @@ Acceptance criteria (13/13), documentation and CI (SUCCESS @ `21f77034`) all pas
 | 2026-10-05 |  | QA gate FAIL (50/100) — 1 high, 1 medium (fake gh -X/--method precedence; missing value flags) | qa-task |
 | 2026-10-05 |  | QA findings fixed after escalation — fake gh api decided by read allow-list (bugs 6, 7); 6 iterations in total | qa-fix |
 | 2026-10-05 |  | QA gate PASS (100/100) — no open findings, 2 low advisory | qa-task |
-<!-- change-log-end -->
+| 2026-10-05 |  | DoD incomplete — 2 gaps identified (run 2: fake gh pr/issue resolution; AC1 zsh lane) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
