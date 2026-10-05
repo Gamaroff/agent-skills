@@ -4,7 +4,7 @@
 **Bug ID**: TASK-185-BUG-5
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 5: direct boundary probes and code review CR-1, found independently)
 **Date Found**: 2026-10-05
 
@@ -108,3 +108,4 @@ matches real `gh`, rather than patching a second shape.
 | 2026-10-05 | New | qa-task | QA cycle 5 |
 | 2026-10-05 | In Progress | qa-fix | Investigation started |
 | 2026-10-05 | Ready for QA | qa-fix | Cluster walk implemented; mutation-proved |
+| 2026-10-05 | Closed | qa-task | QA cycle 6: 46 direct forms correct; cluster test mutation-proved |

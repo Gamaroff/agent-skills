@@ -5,7 +5,7 @@ type: task
 description: "Give /review-pr an end-to-end eval: four scenarios (happy path, re-review numbering gap, unanchored PR, planted bug) run against a hermetic sandbox — a local bare origin, a fake gh, and the skill installed at .agents/skills — in replay mode in CI and live mode on demand with a per-scenario pass rate. Also make the report number deterministic (obs #272) so the numbering scenario has a reachable pass."
 tags: [review-pr, evals, harness, follow-up]
 category: testing
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-10-05
 updated: 2026-10-05
@@ -16,7 +16,7 @@ github_issue: 573
 
 # Technical Task: review-pr eval suite
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.185.review.1.review-pr-eval-suite.md` implemented 2026-10-05
 
@@ -426,21 +426,21 @@ mutant, and both turn red.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-05
-**Quality Score**: 60/100
+**Quality Score**: 50/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.185.qa.5.review-pr-eval-suite.md](./task.185.qa.5.review-pr-eval-suite.md)
-- **Gate File**: [task.185.gate.5.review-pr-eval-suite.yml](./task.185.gate.5.review-pr-eval-suite.yml)
+- **Full Report**: [task.185.qa.6.review-pr-eval-suite.md](./task.185.qa.6.review-pr-eval-suite.md)
+- **Gate File**: [task.185.gate.6.review-pr-eval-suite.yml](./task.185.gate.6.review-pr-eval-suite.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 599 (evals/shared) + 31 direct boundary probes
+- **Tests Executed**: 5357 (ci:fast) + 83 direct boundary probes
 - **Phases Verified**: 4/4
 - **Critical Issues**: 1
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-The `/finalise` DoD fix holds for glued flags (`-XPOST`, `-fbody=x`). A shorthand cluster that starts with a boolean flag (`-iXPOST`) is still served as a read by the fake `gh` (TASK-185-C5-CR-1, [bug 5](./task.185.bug.5.fake-gh-shorthand-cluster-write.md)).
+The cluster fix holds (bug 5 closed). The fake `gh` reads `-X` and `--method` as two flags, so `gh api -X GET --method POST` is served as a read ([bug 6](./task.185.bug.6.fake-gh-method-spellings-last-wins.md)), and three `gh api` value flags are missing ([bug 7](./task.185.bug.7.fake-gh-api-value-flags-missing.md)). It is the third consecutive defect in the same argv deny-list, so the loop was escalated.
 
 ## Definition of Done - Gaps Identified
 
@@ -497,6 +497,7 @@ Acceptance criteria (13/13), documentation and CI (SUCCESS @ `21f77034`) all pas
 | 2026-10-05 |  | DoD incomplete — 1 gap identified (security: fake gh glued-shorthand write) | finalise |
 | 2026-10-05 |  | QA gate FAIL (60/100) — 1 high finding (fake gh shorthand cluster) | qa-task |
 | 2026-10-05 |  | QA findings fixed (cycle 5) — fake gh reads short-flag clusters as pflag does (bug 5); 5 iterations in total | qa-fix |
+| 2026-10-05 |  | QA gate FAIL (50/100) — 1 high, 1 medium (fake gh -X/--method precedence; missing value flags) | qa-task |
 <!-- change-log-end -->
 
 ---

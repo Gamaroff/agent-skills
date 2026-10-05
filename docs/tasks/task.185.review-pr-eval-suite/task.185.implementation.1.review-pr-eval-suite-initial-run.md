@@ -3,7 +3,7 @@
 **Task**: `task.185.review-pr-eval-suite.md`
 **Run Number**: 1
 **Started**: 2026-10-05 16:59
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -35,8 +35,8 @@ Run 1 of the develop-task pipeline for task 185: deterministic `/review-pr` repo
 | 2. review-task             | ✅ Done    | `task.185.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 9/10; Planned → Ready for Development; `task.185.review.1.review-pr-eval-suite.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 23/23 plan boxes; ci:fast 5339/0 fail; live N=5 20/20 | `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #574: https://github.com/Gamaroff/agent-skills/pull/574 | —                    |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.185.qa.{N}.*.md`; `task.185.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 QA cycles (FAIL 70 → CONCERNS 80 → CONCERNS 90 → PASS 100); 5c review-pr CONCERNS (non-blocking); 4 bugs closed | `.summaries/step-5-post-fix-tracker-3.json` |
-| 7. finalise                | ❌ Halted  | `task.185.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: 1. Security FAIL. The fake `gh` serves a glued-shorthand `api` write as a read (reproduced). AC 13/13, docs PASS, compliance N/A, CI reading 1 SUCCESS @ `21f77034`. `task.185.dod.1.review-pr-eval-suite.md` | —                    |
+| 5–6. qa-task / qa-fix loop | ❌ Escalated | `task.185.qa.{N}.*.md`; `task.185.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 QA cycles (FAIL 70 → CONCERNS 80 → CONCERNS 90 → PASS 100 → FAIL 60 → FAIL 50); cycles 5–6 re-entered after the finalise DoD gap; Convergence check tripped (HIGH 1, 1); bugs 1–5 closed, 6–7 open | `.summaries/step-5-post-fix-tracker-3.json` |
+| 7. finalise                | ⏳ Pending | `task.185.dod.{N}.*.md`; task `status: accepted`                       | DoD run 1: gaps (security, fake gh); fixed into the QA loop, which escalated at cycle 6. `task.185.dod.1.review-pr-eval-suite.md` | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -95,12 +95,51 @@ Run 1 of the develop-task pipeline for task 185: deterministic `/review-pr` repo
 - Security agent: `boundary: true` for `evals/shared/lib/fake-gh.mjs#runFakeGh`, with 0 probes executed (no engine form reaches it). It named glued short flags as the untested axis. `/finalise` ran 9 candidates directly. With a GET fixture on the path, `gh api -XPOST <path>` and `gh api -fbody=x <path>` are served as reads: exit 0, nothing flagged. Without a fixture they are logged `unhandled`, not `refused`. Latent in the review-pr suite, which serves no `api` fixture.
 - Fix-and-recheck (8a) not taken: the agent rated the finding medium, so `severity-low` cannot hold, and the finding was not re-graded to clear the gate. Decision: DoD gaps → HALT. The fix is a code change, so on resume it re-enters QA at 5a (`reenter-qa-after-finalise.sh`).
 - DoD gaps PR comment posted: https://github.com/Gamaroff/agent-skills/pull/574#issuecomment-5999321682. Task status unchanged (`ready-for-review`). Change Log gaps row written through `change-log.js`; append-only check `ok`.
+- Resume after the finalise gaps halt (user approved the fix): `9ee9f21a` makes `parseArgs` split a glued value flag (mutation-proved). `reenter-qa-after-finalise.sh` lowered the lock 7 → 5 / 5a with `qa_max_cycles=6`.
+- QA cycle 5 FAIL (`12720fae`). qa-fix cycle 5 (`61226c7c`): Step 2.6 consolidate move, so `parseArgs` reads shorthand clusters as pflag does. Two mutants were red; `ci:fast` 5357 pass / 0 fail. The earlier `ci:fast` red was `test-clean-checkout` LOAD-SENSITIVE (16.5 s against a 10 s budget, measured while the probes ran); alone it passes 13/13. Comments posted (PR, and #573 `qa-fix-5`: posted).
 
 ---
 
 ## Issues Log
 
 - **The compaction summary hid the PreCompact pause (2026-10-05T16:54:45Z).** The hook ran its pause flow between the QA cycle 4 commit (`e96f3ded`) and the 5c dispatch. It wrote the "Pipeline Paused" entry, committed and pushed it as `21f77034`, snapshotted the lock to `develop-pipeline.last-halt.json` and removed the lock. The context was then compacted. The summary described the pre-pause lock (step 5, `qa_phase` 5c) and did not mention the pause, so the resumed session did not run `--restore`. The 5c review ran with no lock, and its `set-waiting-on` calls were silent no-ops. (Corrected: this entry first said no compaction happened.) The lock's absence surfaced at the 5c → 7 advance. Recovery followed the Context Compression Recovery Step 0-lock: `advance-pipeline-lock.sh --restore docs/tasks/task.185.review-pr-eval-suite` restored it at step 5 / `qa_phase` 5c and consumed the snapshot. The run continued in place rather than re-running Step 5 as the pause entry says. Context was intact, the cycle-4 gate and report were on origin, and the 5c review's report and comment exist. The pause entry is kept as history.
+
+### QA Loop Not Converging — 2026-10-05
+
+The pipeline stopped after 6 qa-task/qa-fix cycles. The HIGH finding count failed to strictly
+decrease across two consecutive cycles (5 and 6), so the loop was no longer converging. The
+remaining findings are NOT accepted. They are handed over below.
+
+**Final gate status**: FAIL (`task.185.gate.6.review-pr-eval-suite.yml`, 50/100)
+**HIGH findings per cycle**: 1, 0, 0, 0, 1, 1 — flat from cycle 5 onward
+**Remaining issues** (from final gate file):
+- TASK-185-C6-CR-1 — high — `evals/shared/lib/fake-gh.mjs`: `-X` and `--method` are read as two flags, so `gh api -X GET --method POST <path>` is served as a read (bug 6)
+- TASK-185-C6-CR-2 — medium — `evals/shared/lib/fake-gh.mjs`: `gh api` value flags `-p`/`--preview`, `--hostname`, `--cache` missing, so real reads return `notFound` (bug 7)
+
+**What was attempted per cycle**:
+- Cycle 1: repeat.mjs counted a skipped run as a pass (bug 1); fixed with a distinct skip status. Lows fixed too.
+- Cycle 2: the npm loop collapsed could-not-run (bug 2) and min-pass did not scale (bug 3); repeat.mjs became the single owner of the exit status.
+- Cycle 3: a driver error counted as a failed run (bug 4); the runner's failed-run code became positive.
+- Cycle 4: PASS 100. 5c `/review-pr` CONCERNS (non-blocking). `/finalise` then found a DoD security gap: the fake `gh` served a glued `-XPOST` as a read. Fixed in `9ee9f21a` and re-entered QA (`reenter-qa-after-finalise.sh`, budget 6).
+- Cycle 5: FAIL. Short-flag clusters (`-iXPOST`) were still served as reads (bug 5). Fixed in `61226c7c` with pflag's cluster rule (Step 2.6 consolidate).
+- Cycle 6: FAIL. The safety re-probe found `-X GET --method POST` served as a read (bug 6), plus missing value flags (bug 7). Route 2c not considered: the Convergence check halts before 5b.
+
+**Likely root cause**: the fake `gh` decides what is a write by deny-listing write shapes, which
+means re-implementing `gh`'s flag parser (pflag) in full: glued values, clusters, aliases, last-wins.
+Every fix was correct, and each exposed the next spelling. The circled file is
+`evals/shared/lib/fake-gh.mjs` (`parseArgs` plus the write check). Patching it stopped working
+because a deny-list over a parser's input surface is only as complete as the re-implementation of
+the parser.
+
+**Recommended next steps**:
+1. Replace the mechanism, not the next spelling. Allow-list reads: serve an `api` call only when no
+   method, field or input flag appears in any spelling (`-X…`, `--method…`, any short cluster
+   containing `X`, `f` or `F`, `--field…`, `--raw-field…`, `--input…`), and refuse everything else.
+   That fails closed: an unrecognised spelling becomes a refusal, not a read. Fix bug 7 with it.
+2. Re-run `/develop-task` and choose "Resume at 5a with more cycles" (one or two are enough) to
+   gate that change. The review-pr scenarios themselves are unaffected (no `api` fixtures served).
+3. Alternative: scope the claim. Document that the fake `gh` refuses common write spellings, not
+   every pflag form, and file the allow-list as a follow-up. This accepts a latent harness gap.
 
 _Problems encountered and how they were resolved or escalated._
 
@@ -151,6 +190,25 @@ _Track each QA review/fix cycle._
 **PR Review**: CONCERNS — `task.185.pr-review.1.review-pr-eval-suite.md` (PC-1 low/low: pr_number not yet written, expected before /finalise; CR-1 medium/medium: four other skills keep count-style report numbering — the out-of-scope follow-up every gate records; CR-2/CR-3 low/low harness codes). Non-blocking; loop exits.
 **Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review)
+
+### QA Cycle 5 — 2026-10-05
+**Re-entry**: from the `/finalise` DoD-gaps halt (`task.185.dod.1`, security). The fix `9ee9f21a` (glued `-XPOST` / `-fbody=x` refused, mutation-proved) was committed, then `reenter-qa-after-finalise.sh` lowered the lock 7 → 5 / 5a with `qa_max_cycles=6`.
+**Gate Result**: FAIL (60/100)
+**Issues Found**: TASK-185-C5-CR-1 (high/high, bug 5). A shorthand cluster that starts with a boolean flag (`gh api -iXPOST <path>`, `-ifb=x`) is still served as a read on a fixture path. The direct probes found it (31 executed, 4 wrong) and so did the code review, independently.
+**HIGH findings**: 1
+**MEDIUM findings**: 0
+**PR Review**: n/a — 5c not reached this cycle
+**Loop exit**: n/a — `classifyLoopRoute` → continue (not-a-pass-gate; route 2 declined: high-findings-remain). Convergence check: not stalled (HIGH 1 after three cycles at 0).
+**Action**: Running qa-fix — `61226c7c`: parseArgs walks short-flag clusters as pflag does (Step 2.6 consolidate); 2 mutants red; ci:fast 5357/0
+
+### QA Cycle 6 — 2026-10-05
+**Gate Result**: FAIL (50/100)
+**Issues Found**: TASK-185-C6-CR-1 (high/high, bug 6): `-X` outranks `--method` in the fake `gh`, but pflag reads them as one flag where the last one wins, so `gh api -X GET --method POST` is served as a read. TASK-185-C6-CR-2 (medium, bug 7): `-p`/`--preview`, `--hostname`, `--cache` are missing from `VALUE_FLAGS`. C6-CR-3 (low): field-flag reads under `-X GET` are refused. C6-CR-4 (cleanup): write aliases log `unhandled`. Bug 5 verified and closed (46 direct forms correct). Safety re-probe, unscoped.
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — the Convergence check tripped (HIGH 1, 1 on cycles 5–6, cycle ≥ 3), and cycle 6 is the last granted cycle (`qa_max_cycles=6`)
+**Action**: Escalating — loop not converging
 
 ---
 
