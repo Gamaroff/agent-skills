@@ -5,7 +5,7 @@ type: task
 description: "Follow-up to task.171. Close the five items in task.171's `## Deferred Work` section, all in `shared/resources/qa-results.js`: the HIGH setext deletion path first (CR5-1), then a Version-first log lost on relocate, two bold-label block boundaries and two setext false refusals. Also make the corpus survey cheaper and its timing bound honest."
 tags: [qa-task, qa-story, engine, follow-up]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-10-05
 updated: 2026-10-05
@@ -16,7 +16,9 @@ github_issue: 569
 
 # Technical Task: qa-results setext and carry follow-ups
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.183.review.1.qa-results-setext-and-carry-follow-ups.md` implemented 2026-10-05
 
 **GitHub Issue**: [#569](https://github.com/Gamaroff/agent-skills/issues/569)
 
@@ -59,8 +61,9 @@ QA cycle 5 review reproduced, not just plain text.
    exempts lines CommonMark reads as paragraph text: `#538 Rollout Notes` (no space after `#`, so not
    ATX), an autolink `<https://…>`, inline `<b>…</b>`, a three-backtick code span, an ordered item
    that does not start at 1 (it cannot interrupt a paragraph), and an HTML type-7 line. Measured on
-   the merged engine with `command node -e` (the task.171 gate 5 probe): five of the six shapes return
-   `replaced` and delete the section's body; only plain `Rollout Notes` is refused (`unbounded`).
+   the merged engine with `command node -e` (the task.171 gate 5 probe, re-run at review 1): all six shapes return
+   `replaced` and delete the section's body, under both `-----` and `=====`; plain `Rollout Notes`, the
+   control shape, is refused (`unbounded`).
    `origin/develop` before task.171 deleted all six.
 2. **A Version-first change log loses its rows on relocate (5c CR-1).** Under a marker block, the
    `underLog` guard counts a row as a log row only when it starts with an ISO date (`isEntryRow`) or
@@ -124,11 +127,14 @@ QA cycle 5 review reproduced, not just plain text.
   candidate, so each CR5-1 shape is refused.
 - **CR-7 by context, not by exemption.** The two named false refusals are fixed by recognising their
   context: a line that continues a list item (indented under it, with no blank line between) and the
-  closing line of a multi-line HTML comment are not paragraph lines. Every CR5-1 shape stays refused,
+  closing line of a multi-line HTML comment are not paragraph lines. The comment context is bounded: it
+  exempts only a line that contains `-->` and closes a `<!--` opened on an earlier line, never the
+  lines after an unclosed `<!--` (review 1, I1). Every CR5-1 shape stays refused,
   and the CR5-1 tests are the guard for that.
 - **A log table is a table with a `Date` column.** Under `underLog`, a table whose header has a cell
-  reading `Date` in **any** position is a log table, and each of its data rows is a log row. A QA
-  table with no `Date` column is unaffected.
+  reading `Date` in **any** position is a log table, and each of its data rows is a log row. The
+  header row is excluded by the same Date-column test that starts the table, not by `RE_LOG_HEADER`
+  (review 1, I2). A QA table with no `Date` column is unaffected.
 - **Bold-label boundaries.** A bold-label block stops at a heading of level 3 or shallower, as a `###`
   heading block does, so `####` groups stay inside it. It also stops at a QA-owned bold label, named
   once in a `QA_LABELS` constant beside `RE_QA_FIELD`, whatever follows the label.
@@ -184,34 +190,36 @@ CHANGELOG states all of these.
 
 **Files**: `shared/resources/qa-results.js`, `shared/resources/tests/qa-results.test.mjs`
 
-- [ ] Replace `RE_NOT_PARAGRAPH` with a "certainly not paragraph text" test (ATX heading, valid fence
+- [x] Replace `RE_NOT_PARAGRAPH` with a "certainly not paragraph text" test (ATX heading, valid fence
       opener, interrupting list item, block quote, table row, HTML comment line)
-- [ ] A test refuses each of the six CR5-1 probe shapes with `structural-line:<line> / -----`, under
+- [x] A test refuses each of the six CR5-1 probe shapes with `structural-line:<line> / -----`, under
       both `-----` and `=====`, and keeps every byte of the document
-- [ ] Measure on the corpus before committing: 0 false refusals is the bar
+- [x] Measure on the corpus before committing: 0 false refusals is the bar
 
 ### Phase 2: two setext false refusals — CR-7 (Risk: Low)
 
 **Files**: `shared/resources/qa-results.js`, `shared/resources/tests/qa-results.test.mjs`
 
-- [ ] A list item's continuation line and a multi-line comment's closing `-->` are not paragraph lines
-- [ ] A test writes each CR-7 shape; Phase 1's CR5-1 test still refuses every one of its shapes
+- [x] A list item's continuation line and a multi-line comment's closing `-->` are not paragraph lines
+- [x] A test writes each CR-7 shape; Phase 1's CR5-1 test still refuses every one of its shapes
 
 ### Phase 3: a log table is a table with a Date column — 5c CR-1 (Risk: Low)
 
 **Files**: `shared/resources/qa-results.js`, `shared/resources/tests/qa-results.test.mjs`
 
-- [ ] Under `underLog`, a table whose header has a `Date` cell in any position is a log table
-- [ ] A test refuses a misplaced section above a `| Version | Date | … |` log with
+- [x] Under `underLog`, a table whose header has a `Date` cell in any position is a log table
+- [x] `logRow` excludes that header row by the same Date-column test, so the refusal names the first
+      data row, not the header
+- [x] A test refuses a misplaced section above a `| Version | Date | … |` log with
       `structural-line:<first data row>`, and a QA table with no `Date` column stays writable
 
 ### Phase 4: bold-label boundaries — 5c CR-2, CR2-4 (Risk: Low)
 
 **Files**: `shared/resources/qa-results.js`, `shared/resources/tests/qa-results.test.mjs`
 
-- [ ] A bold-label block stops at a heading of level 3 or shallower
-- [ ] `QA_LABELS` beside `RE_QA_FIELD`; a bold-label block stops at a QA-owned label whatever follows
-- [ ] Tests: a `####` group under `**Bug Reports**` survives three writes; a stale
+- [x] A bold-label block stops at a heading of level 3 or shallower
+- [x] `QA_LABELS` beside `RE_QA_FIELD`; a bold-label block stops at a QA-owned label whatever follows
+- [x] Tests: a `####` group under `**Bug Reports**` survives three writes; a stale
       `**Recommendations**:` list after a bold block is not carried
 
 ### Phase 5: survey pre-filter, timing and docs (Risk: Low)
@@ -219,12 +227,12 @@ CHANGELOG states all of these.
 **Files**: `tests/qa-results-corpus.test.js`, `CHANGELOG.md`,
 `docs/tasks/task.171.deferred-work-placement-and-qa-results-residuals/task.171.deferred-work-placement-and-qa-results-residuals.md`
 
-- [ ] The write survey skips documents that do not mention `QA Testing Results`
-- [ ] Record the timing with `uptime` beside `time`, in the implementation report
-- [ ] task.171's Deferred Work items marked resolved, with a link to this task
-- [ ] CHANGELOG `[Unreleased]` cites `(task 183)` and names the new refusals and the two shapes now
+- [x] The write survey skips documents that do not mention `QA Testing Results`
+- [x] Record the timing with `uptime` beside `time`, in the implementation report
+- [x] task.171's Deferred Work items marked resolved, with a link to this task
+- [x] CHANGELOG `[Unreleased]` cites `(task 183)` and names the new refusals and the two shapes now
       written
-- [ ] `npm run bundle`, `npm run bundle:check`, `npm run ci:fast`, `npm run validate` for qa-task and
+- [x] `npm run bundle`, `npm run bundle:check`, `npm run ci:fast`, `npm run validate` for qa-task and
       qa-story
 
 ---
@@ -372,6 +380,9 @@ None.
 | Date       | Version | Description                                      | Author      |
 | ---------- | ------- | ------------------------------------------------ | ----------- |
 | 2026-10-05 | 1.0     | Initial draft — follow-up to task.171 Deferred Work | create-task |
+| 2026-10-05 | 1.1     | Review passed (9/10) — bounded the HTML-comment context (I1), Phase 3 header exclusion (I2), corrected the CR5-1 probe figure | review-task |
+| 2026-10-05 |         | Status → ready-for-development | review-task |
+| 2026-10-05 |         | Implemented — 9 files (3 generated), 4 tests (R1–R4), 9 mutation proofs held | develop |
 
 <!-- change-log-end -->
 
@@ -379,11 +390,11 @@ None.
 
 ## Progress Tracking
 
-- [ ] Phase 1: setext leans toward refusal (CR5-1)
-- [ ] Phase 2: two setext false refusals (CR-7)
-- [ ] Phase 3: a log table is a table with a Date column (5c CR-1)
-- [ ] Phase 4: bold-label boundaries (5c CR-2, CR2-4)
-- [ ] Phase 5: survey pre-filter, timing and docs
+- [x] Phase 1: setext leans toward refusal (CR5-1)
+- [x] Phase 2: two setext false refusals (CR-7)
+- [x] Phase 3: a log table is a table with a Date column (5c CR-1)
+- [x] Phase 4: bold-label boundaries (5c CR-2, CR2-4)
+- [x] Phase 5: survey pre-filter, timing and docs
 
 ---
 

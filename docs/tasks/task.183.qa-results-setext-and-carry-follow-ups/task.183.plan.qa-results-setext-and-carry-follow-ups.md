@@ -64,8 +64,11 @@ deletions (`replaced`, `keep-me` gone).
 - **list continuation**: after a line matching an interrupting list item, a following non-blank line
   indented by at least the item's content offset, with no blank line between, is a continuation
   line, not a paragraph line;
-- **open HTML comment**: from a line containing `<!--` without a matching `-->` on it, through the
-  line containing `-->`, the lines are inside an HTML block, not paragraph text.
+- **closing HTML comment line**: a line containing `-->` that closes a `<!--` opened on an earlier
+  line (an opener with no `-->` on its own line) is not a paragraph line. Only that closing line is
+  exempt. The lines inside the comment stay heading candidates, and an unclosed `<!--` exempts
+  nothing — otherwise every line after it would be exempt and a real setext section below it could be
+  deleted (review 1, I1).
 
 The setext clause skips a line above the underline when either context holds. Test `R2`: each shape
 is written (`created` from `markerDoc()`, then `replaced`), and `R1`'s loop runs again unchanged as
@@ -83,7 +86,12 @@ const isLogHeader = (l) =>
 ```
 
 A header row is recognised as the first `|` line of a table (the previous line is not a `|` line);
-data rows are the `|` lines after its separator row. Keep `isEntryRow` as the second clause, so a
+data rows are the `|` lines after its separator row. Replace **both** uses of `RE_LOG_HEADER` in
+`removesStructure` with `isLogHeader`: the start condition and the header exclusion in `logRow`
+(`!RE_LOG_HEADER.test(l)`). Left on `RE_LOG_HEADER`, the exclusion misses a `| Version | Date | … |`
+header, which then counts as a log row and the refusal names the header instead of the first data row
+(review 1, I2). Do not `slice(1, -1)` blindly: a row with no trailing pipe would lose its last cell —
+drop a trailing empty cell instead (review 1, O2). Keep `isEntryRow` as the second clause, so a
 dated row outside a table header still counts. `RE_LOG_HEADER` (`:92`) is still used by
 `lastTableStart` and is left alone.
 
