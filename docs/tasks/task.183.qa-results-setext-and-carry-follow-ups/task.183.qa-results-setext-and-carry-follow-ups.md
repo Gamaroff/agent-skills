@@ -5,7 +5,7 @@ type: task
 description: "Follow-up to task.171. Close the five items in task.171's `## Deferred Work` section, all in `shared/resources/qa-results.js`: the HIGH setext deletion path first (CR5-1), then a Version-first log lost on relocate, two bold-label block boundaries and two setext false refusals. Also make the corpus survey cheaper and its timing bound honest."
 tags: [qa-task, qa-story, engine, follow-up]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: High
 created: 2026-10-05
 updated: 2026-10-05
@@ -16,7 +16,7 @@ github_issue: 569
 
 # Technical Task: qa-results setext and carry follow-ups
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.183.review.1.qa-results-setext-and-carry-follow-ups.md` implemented 2026-10-05
 
@@ -382,12 +382,12 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-05
-**Quality Score**: 60/100
+**Quality Score**: 50/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.183.qa.3.qa-results-setext-and-carry-follow-ups.md](./task.183.qa.3.qa-results-setext-and-carry-follow-ups.md)
-- **Gate File**: [task.183.gate.3.qa-results-setext-and-carry-follow-ups.yml](./task.183.gate.3.qa-results-setext-and-carry-follow-ups.yml)
+- **Full Report**: [task.183.qa.4.qa-results-setext-and-carry-follow-ups.md](./task.183.qa.4.qa-results-setext-and-carry-follow-ups.md)
+- **Gate File**: [task.183.gate.4.qa-results-setext-and-carry-follow-ups.yml](./task.183.gate.4.qa-results-setext-and-carry-follow-ups.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 85
@@ -396,7 +396,7 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
 
 ### Key Findings
-CR3-1 (HIGH): a one-line comment opener or an item-indented opener leaves the comment context open, deleting a setext section. CR3-2 (HIGH): a `| Reviewer | Date |` table above the section in a marker-less log makes the replace delete the log row. HIGH per cycle 1, 1, 2 — the QA loop is not converging and was escalated.
+CR3-1 and CR3-2 fixed. CR4-1 and CR4-2 (HIGH): the list-continuation exemption deletes a setext section when the item sits inside an HTML block or a tab follows the marker. CR4-3 (MEDIUM): `QA_LABELS` drops a bug list grouped under `**Critical Issues**`. HIGH per cycle 1, 1, 2, 2 — escalated a second time.
 
 <!-- change-log-start -->
 
@@ -412,6 +412,7 @@ CR3-1 (HIGH): a one-line comment opener or an item-indented opener leaves the co
 | 2026-10-05 |         | QA gate FAIL (70/100) — 2 findings (1 high), 2 advisory | qa-task |
 | 2026-10-05 |         | QA gate FAIL (60/100) — 2 findings (2 high); loop not converging, escalated | qa-task |
 | 2026-10-05 |         | Escalation resolved (operator): comment-closer exemption dropped (CR-7 list shape only); marker-less table-above check back to Date-first (CR3-2) — § 1, § 3, § 5, Phase 2, § 9 amended | develop |
+| 2026-10-05 |         | QA gate FAIL (50/100) — 3 findings (2 high); loop not converging, escalated again | qa-task |
 
 <!-- change-log-end -->
 
