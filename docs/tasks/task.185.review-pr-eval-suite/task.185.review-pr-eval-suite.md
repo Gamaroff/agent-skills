@@ -421,6 +421,27 @@ mutant, and both turn red.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-05
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.185.qa.1.review-pr-eval-suite.md](./task.185.qa.1.review-pr-eval-suite.md)
+- **Gate File**: [task.185.gate.1.review-pr-eval-suite.yml](./task.185.gate.1.review-pr-eval-suite.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5339
+- **Phases Verified**: 4/4
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+TASK-185-CR-1 (HIGH): `repeat.mjs` counts a skipped run (no `claude` binary) as a pass, so the live pass rate can read N/N with no agent run. Two LOW findings: `live.minPass` above `--runs` is a usage error (QA-2), and `next-report-number.sh` overflows on an `{n}` ≥ 2^63 (QA-1).
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -430,6 +451,8 @@ mutant, and both turn red.
 | 2026-10-05 | 1.1     | Review passed (9/10) — hardened fake-gh isolation (GH_CONFIG_DIR), empty call log at install, timed eval:all criterion, tech-stack.md doc sweep, no duplicate .claude/skills copy | review-task |
 | 2026-10-05 |         | Status → ready-for-development                                   | review-task |
 | 2026-10-05 |         | Implemented — 28 files, 37 new tests; live N=5: 20/20 runs pass | develop     |
+| 2026-10-05 |         | QA gate FAIL (70/100) — 1 high, 2 low findings                  | qa-task     |
+| 2026-10-05 |         | QA findings fixed — CR-1 (skip counted as pass), QA-1, QA-2, CR-2, CR-4; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

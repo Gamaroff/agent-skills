@@ -2412,6 +2412,22 @@ for (const shell of SHELLS) {
     });
   }
 
+  // task.185 QA cycle 1, QA-1: an {n} that would overflow shell arithmetic is refused, not wrapped.
+  test(`[${shell}] next-report-number refuses an {n} past 18 significant digits instead of wrapping`, () => {
+    const r = nextNumber(shell, [
+      "task.901.pr-review.9223372036854775807.widget-age-gate.md",
+    ]);
+    assert.notEqual(r.status, 0);
+    assert.doesNotMatch(r.stdout, /N=/);
+    assert.match(r.stderr, /refused \(overflow\)/);
+    const ok = nextNumber(shell, [
+      "task.901.pr-review.999999999999999999.widget-age-gate.md",
+      "task.901.pr-review.0000000000000000000009.widget-age-gate.md",
+    ]);
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.equal(ok.stdout.trim(), "N=1000000000000000000");
+  });
+
   test(`[${shell}] next-report-number refuses a missing directory with exit 2`, () => {
     for (const arg of [[], ["/no/such/dir"]]) {
       const r = spawnSync(shell, shArgv(shell, [NEXT_N, ...arg]), {

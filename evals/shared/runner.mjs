@@ -27,7 +27,10 @@
  *   liveAssertions — assertions run after `assertions`, only when the driver is not `replay`
  *                    (e.g. "the fake gh was called" — replay never calls it).
  *
- * Exit codes: 0 all assertions pass; 1 any failure or driver error.
+ * Exit codes: 0 all assertions pass (or the scenario was skipped); 1 any failure or driver error.
+ * A skip — the driver is unavailable, or a requiresLiveDriver scenario under replay — exits 0, which
+ * is right for eval:all. A caller that must tell a skip from a pass (repeat.mjs) sets EVAL_SKIP_EXIT
+ * to a code in 3–125 and a skip exits with that code instead (task.185 QA cycle 1, CR-1).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -56,6 +59,16 @@ function readJSONL(p) {
     .map((l) => l.trim())
     .filter(Boolean)
     .map((l) => JSON.parse(l));
+}
+
+// The exit status for a skip: 0 unless the caller asked for a distinct one. An EVAL_SKIP_EXIT outside
+// 3–125 is ignored rather than trusted — 1 and 2 already mean fail and usage, and a value above 125
+// collides with the shell's own codes.
+function skipExitCode() {
+  const raw = process.env.EVAL_SKIP_EXIT;
+  if (raw === undefined || !/^[0-9]+$/.test(raw)) return 0;
+  const n = Number(raw);
+  return n >= 3 && n <= 125 ? n : 0;
 }
 
 function makeSandbox(scenarioName) {
@@ -236,14 +249,14 @@ async function main() {
     process.stderr.write(
       `[${driverName}] skipped: scenario "${path.basename(absScenarioDir)}" requires a live driver (DRIVER=claude-sdk or claude-cli)\n`,
     );
-    process.exit(0);
+    process.exit(skipExitCode());
   }
 
   const avail = await driver.isAvailable();
   const scenarioName = path.basename(absScenarioDir);
   if (!avail.ok) {
     process.stderr.write(`[${driverName}] skipped: ${avail.reason}\n`);
-    process.exit(0); // skip ≠ fail
+    process.exit(skipExitCode()); // skip ≠ fail — and, when the caller asks, ≠ pass
   }
 
   const sandbox = makeSandbox(scenarioName);

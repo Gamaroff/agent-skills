@@ -175,3 +175,26 @@ test("a scenario with none of the new fields runs exactly as before", () => {
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stderr, /1\/1 assertions passed/);
 });
+
+// task.185 QA cycle 1, CR-1: a skip exits 0 by default (eval:all relies on it) and with the caller's
+// code when EVAL_SKIP_EXIT asks for one; a code that collides with fail/usage is ignored.
+test("a skip exits 0, or EVAL_SKIP_EXIT when it is a code in 3–125", () => {
+  const sc = scenario({ requiresLiveDriver: true, assertions: [] });
+  assert.equal(run(sc, { DRIVER: "replay" }).status, 0);
+  assert.equal(run(sc, { DRIVER: "replay", EVAL_SKIP_EXIT: "3" }).status, 3);
+  for (const ignored of ["1", "2", "0", "200", "x"]) {
+    assert.equal(
+      run(sc, { DRIVER: "replay", EVAL_SKIP_EXIT: ignored }).status,
+      0,
+      ignored,
+    );
+  }
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), "no-claude-"));
+  const r = run(scenario({ assertions: [] }), {
+    DRIVER: "claude-cli",
+    PATH: `${bin}:/usr/bin:/bin`,
+    EVAL_SKIP_EXIT: "3",
+  });
+  assert.equal(r.status, 3, r.stderr);
+  assert.match(r.stderr, /skipped: `claude` binary not found on PATH/);
+});

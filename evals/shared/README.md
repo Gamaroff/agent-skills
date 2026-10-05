@@ -52,7 +52,9 @@ Each is keyed on its own `scenario.json` field, so a scenario that sets none run
 | `setup` | Path (relative to the scenario dir) of a module exporting `setup({ sandbox, scenarioDir, repoRoot, scenario })`. Awaited after the sandbox exists and before the driver runs — for **every** driver, replay included, so replay and live assert against the same prepared tree. It may return `{ env }`, merged into the driver env; a `PATH` there is **prefixed** to the runner's `PATH`. A setup that throws (or does not resolve) fails the scenario with exit 1 and still removes the sandbox unless `KEEP_SANDBOX` is set. |
 | `cliArgs` | Array appended to the claude-cli driver's `claude` arguments — e.g. a scoped `--allowedTools` list, since `claude -p` with no permission flag cannot run `Bash`. |
 | `liveAssertions` | Assertions run after `assertions`, only when the driver is not `replay` — for facts only a live run can produce, such as "the fake `gh` was called". |
-| `live.minPass` | Read by `repeat.mjs` when `--min-pass` is not given. |
+| `live.minPass` | Read by `repeat.mjs` when `--min-pass` is not given; capped at `--runs`. |
+
+`EVAL_SKIP_EXIT` (a code in 3–125) makes the runner exit with that code instead of 0 on a skip; anything else is ignored. `repeat.mjs` sets it.
 
 `EVAL_TIMEOUT_MS` overrides the claude-cli driver's 5-minute timeout (set it in the shell or in `env.json`).
 
@@ -64,7 +66,14 @@ DRIVER=claude-cli node evals/shared/repeat.mjs <scenario-dir> [--runs N] [--min-
 
 One live run is one sample. `repeat.mjs` runs the real runner N times **sequentially** (live runs share
 `~/.claude` state), prints `run i/N: pass|fail` per run and `passed P/N (min K)`, and exits 0 iff
-P ≥ K. N defaults to `$EVAL_RUNS`, else 5; K defaults to `live.minPass`, else N. Usage errors exit 2.
+P ≥ K. N defaults to `$EVAL_RUNS` (empty reads as unset), else 5; K defaults to `live.minPass`,
+**capped at N** (the output says so), else N. K below 1 is refused, since it could never fail. Usage errors exit 2.
+
+**A skipped run is not a pass.** The runner exits 0 when it skips, because the driver is
+unavailable or a `requiresLiveDriver` scenario ran under replay, and `eval:all` relies on that.
+`repeat.mjs` sets `EVAL_SKIP_EXIT=3`, so a skip exits 3 instead. It then stops with exit 3,
+**could not run**, and prints no `passed` line. Before this, a machine without `claude` reported
+`passed 5/5` with no agent run (task.185 QA cycle 1).
 
 **Live runs use the shell's `claude` auth.** An `ANTHROPIC_API_KEY` in the environment takes
 precedence over a claude.ai login; if its account cannot pay, every run fails in seconds with

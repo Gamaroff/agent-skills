@@ -2,7 +2,7 @@
   "name": "03-unanchored",
   "skill": "review-pr",
   "setup": "../../setup.mjs",
-  "description": "PR #902 is a README tidy on chore/tidy: no branch stem, no pr_number, no gate URL, no issue in the body. No work item resolves, so /review-pr writes no file anywhere under docs/ and makes no refused or unhandled gh call.",
+  "description": "PR #902 is a README tidy on chore/tidy: no branch stem, no pr_number, no gate URL, no issue in the body. No work item resolves, so /review-pr writes no file anywhere under docs/ and makes no refused or unhandled gh call. A fileExists on the merged task.901 document is the non-vacuity floor: noFileMatching passes on a missing directory, so the scenario first proves docs/ was built.",
   "prompt": "/review-pr 902",
   "cliArgs": [
     "--allowedTools",
@@ -22,6 +22,12 @@
     "minPass": 5
   },
   "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/tasks/task.901.widget-age-gate/task.901.widget-age-gate.md"
+      ]
+    },
     {
       "fn": "noFileMatching",
       "args": [

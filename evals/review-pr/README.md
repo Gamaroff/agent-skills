@@ -43,7 +43,7 @@ the setup hook, the fixtures and the assertions fit together. Only the **live** 
 | --- | --- | --- | --- |
 | `01-happy` | A clean PR with a complete trail is approved, and the report lands where the standard puts it | `task.901.pr-review.1.…md` exists; `**Verdict:**` reads APPROVE; `## Machine-Readable Findings` present | 4/5 |
 | `02-renumber-gap` | The report number is highest + 1, never count + 1 (obs #272) | `.4.` exists beside `.1.` and `.3.`; `.2.` absent; both earlier reports keep their sentinel line | 5/5 |
-| `03-unanchored` | No work item → no file | no `.pr-review.` file anywhere under `docs/` | 5/5 |
+| `03-unanchored` | No work item → no file | the merged task.901 doc exists (non-vacuity floor: `noFileMatching` passes on a missing dir); no `.pr-review.` file anywhere under `docs/` | 5/5 |
 | `04-planted-bug` | An off-by-one the trail calls tested is caught | verdict is **not** APPROVE; a `CR-` finding cites `src/age.js` | 4/5 |
 
 Every scenario also asserts that `.eval/gh-calls.jsonl` has no `"refused":true` and no
@@ -57,6 +57,8 @@ floor **with a stated reason** — never a deleted assertion.
 
 ## Live runs
 
+- **A skip is not a pass.** With no `claude` on PATH, `eval:review-pr:cli` exits 3, "could not run". It never reports a pass rate for runs that did not happen.
+- **Fewer runs.** `EVAL_RUNS=3` caps each scenario's `live.minPass` at 3 and says so in the output.
 - **Auth.** `claude -p` uses the shell's auth, and `ANTHROPIC_API_KEY` beats a claude.ai login. If
   that key's account cannot pay, every run fails in seconds with `Credit balance is too low`; unset
   it for the run (`env -u ANTHROPIC_API_KEY …`).
