@@ -5,10 +5,12 @@ type: task
 description: "Give /review-pr an end-to-end eval: four scenarios (happy path, re-review numbering gap, unanchored PR, planted bug) run against a hermetic sandbox — a local bare origin, a fake gh, and the skill installed at .agents/skills — in replay mode in CI and live mode on demand with a per-scenario pass rate. Also make the report number deterministic (obs #272) so the numbering scenario has a reachable pass."
 tags: [review-pr, evals, harness, follow-up]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-05
 updated: 2026-10-05
+completed_date: 2026-10-05
+pr_number: 574
 assignee:
 estimated_effort_hours: 16
 github_issue: 573
@@ -16,7 +18,7 @@ github_issue: 573
 
 # Technical Task: review-pr eval suite
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.185.review.1.review-pr-eval-suite.md` implemented 2026-10-05
 
@@ -442,7 +444,32 @@ mutant, and both turn red.
 ### Key Findings
 The fake `gh` refuses every command that is not a served read in an unambiguous shape, and no executed form served a write. Every review-pr read is served. Three low advisory items remain for a harness follow-up.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.185.qa.8.review-pr-eval-suite.md`
+**Gate File**: `task.185.gate.8.review-pr-eval-suite.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified (run 3):
+
+✅ **Acceptance Criteria:** 13/13. AC1's zsh arm is verified locally under the operator scope annotation.
+✅ **Tests & CI:** CI SUCCESS on `59739d20` (5 checks). The live recheck passed all four scenarios on the current fake `gh`.
+✅ **Documentation:** CHANGELOG, both eval READMEs, the `fake-gh.mjs` header, `tech-stack.md` and `evals/reference.md`
+✅ **Security Review:** the fake `gh`'s fail-closed allow-list held across 236 executed candidates (195 write forms refused, every review-pr read served)
+⚠️ **Compliance Review:** not applicable (internal eval tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-05
+
+**Detailed Verification Log:** See `task.185.dod.3.review-pr-eval-suite.md` for complete verification evidence and timestamps. Runs 1 and 2 (`task.185.dod.1`, `task.185.dod.2`) record the gaps that re-entered QA.
+
+---
+
+## Definition of Done - Gaps Identified — run 2 (historical, superseded by run 3)
 
 **Status:** IN PROGRESS
 
@@ -507,6 +534,7 @@ Documentation passes, compliance is not applicable, and CI reads SUCCESS @ `22ee
 | 2026-10-05 |  | DoD incomplete — 2 gaps identified (run 2: fake gh pr/issue resolution; AC1 zsh lane) | finalise |
 | 2026-10-05 |  | DoD run 2 gaps fixed — fake gh serves pr/issue only in an unambiguous read shape; AC1 zsh scope recorded (operator decision) | develop |
 | 2026-10-05 |  | QA gate PASS (100/100) — no open findings, 3 low advisory | qa-task |
+| 2026-10-05 | 1.2 | DoD passed — accepted (PR #574) | finalise |
 
 ---
 <!-- change-log-end -->
