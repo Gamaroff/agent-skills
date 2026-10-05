@@ -382,24 +382,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-05
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.183.qa.5.qa-results-setext-and-carry-follow-ups.md](./task.183.qa.5.qa-results-setext-and-carry-follow-ups.md)
-- **Gate File**: [task.183.gate.5.qa-results-setext-and-carry-follow-ups.yml](./task.183.gate.5.qa-results-setext-and-carry-follow-ups.yml)
+- **Full Report**: [task.183.qa.6.qa-results-setext-and-carry-follow-ups.md](./task.183.qa.6.qa-results-setext-and-carry-follow-ups.md)
+- **Gate File**: [task.183.gate.6.qa-results-setext-and-carry-follow-ups.yml](./task.183.gate.6.qa-results-setext-and-carry-follow-ups.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 85
+- **Tests Executed**: 98
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No setext or log deletion remains. CR5-1 (MEDIUM): each `QA_LABELS` name drops a bug list grouped under it. CR5-2/CR5-3 (LOW): documents still claim all five task.171 items are closed.
+Cycle 5's fix holds: CR5-1, CR5-2 and CR5-3 are fixed, and no gating finding remains. Three advisory lows: the "any sub-label" claim over-reaches a pre-existing paragraph-first shape (CR6-1), the Change Log rows are out of order (CR6-2), and § 3 says two `collectBlocks` clauses changed where one did (CR6-3).
 
 ## Deferred Work
 
@@ -441,6 +441,7 @@ gates 2–4 `recommendations.future`. All four are gaps in `shared/resources/qa-
 | 2026-10-05 |         | QA gate CONCERNS (90/100) — 3 findings (0 high) | qa-task |
 | 2026-10-05 |         | QA findings fixed — 5 cycles, 3 fix rounds (2 operator escalation fixes); CR-7 and CR2-4 deferred | qa-fix |
 | 2026-10-05 |         | QA gate FAIL (50/100) — 3 findings (2 high); loop not converging, escalated again | qa-task |
+| 2026-10-05 |         | QA gate PASS (100/100) — 0 findings (3 advisory lows) | qa-task |
 
 <!-- change-log-end -->
 
