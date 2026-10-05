@@ -2328,3 +2328,112 @@ for (const shell of SHELLS) {
     assert.match(r.stdout, /HALT: pr_number 7 matches 2 documents/);
   });
 }
+
+// ---------------------------------------------------------------------------
+// task.185 — the report number is computed (obs #272): highest {n} + 1, never count + 1.
+// Step 7's own call line runs under every shell, re-pointed at this skill's script.
+// ---------------------------------------------------------------------------
+const NEXT_N = path.join(ROOT, "scripts", "next-report-number.sh");
+
+function step7CallLine() {
+  const blocks = bashBlocks(
+    section(
+      "### Step 7 — Write the review report",
+      "ALWAYS use this exact template structure",
+    ),
+  );
+  const line = blocks
+    .flatMap((b) => b.split("\n"))
+    .find((l) => l.includes("next-report-number.sh"));
+  assert.ok(line, "Step 7 calls next-report-number.sh");
+  return line;
+}
+
+function nextNumber(shell, files) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-n-"));
+  const dir = path.join(root, "task.901.widget-age-gate");
+  fs.mkdirSync(dir);
+  for (const f of files) {
+    const p = path.join(dir, f);
+    if (f.endsWith("/")) fs.mkdirSync(p, { recursive: true });
+    else fs.writeFileSync(p, "x\n");
+  }
+  const script =
+    step7CallLine()
+      .replace(".agents/skills/review-pr/scripts/next-report-number.sh", NEXT_N)
+      .replace("{work-item-dir}", dir) + '\necho "N=$N"';
+  const r = runScript(shell, script);
+  fs.rmSync(root, { recursive: true, force: true });
+  return r;
+}
+
+const NEXT_N_CASES = [
+  ["an empty directory", [], 1],
+  ["one report", ["task.901.pr-review.1.widget-age-gate.md"], 2],
+  [
+    "a gap — .1. and .3.",
+    [
+      "task.901.pr-review.1.widget-age-gate.md",
+      "task.901.pr-review.3.widget-age-gate.md",
+    ],
+    4,
+  ],
+  [
+    ".9. and .10. — numeric, not lexical",
+    [
+      "task.901.pr-review.9.widget-age-gate.md",
+      "task.901.pr-review.10.widget-age-gate.md",
+    ],
+    11,
+  ],
+  [
+    "a leading zero — .09. is 9, not octal",
+    ["task.901.pr-review.09.widget-age-gate.md"],
+    10,
+  ],
+  [
+    "other artifact kinds and a nested work item are ignored",
+    [
+      "task.901.review.5.widget-age-gate.md",
+      "task.901.dod.7.widget-age-gate.md",
+      "task.902.other/",
+      "task.902.other/task.902.pr-review.8.other.md",
+    ],
+    1,
+  ],
+];
+
+for (const shell of SHELLS) {
+  for (const [name, files, expected] of NEXT_N_CASES) {
+    test(`[${shell}] next-report-number: ${name} → ${expected}`, () => {
+      const r = nextNumber(shell, files);
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(r.stdout.trim(), `N=${expected}`);
+    });
+  }
+
+  test(`[${shell}] next-report-number refuses a missing directory with exit 2`, () => {
+    for (const arg of [[], ["/no/such/dir"]]) {
+      const r = spawnSync(shell, shArgv(shell, [NEXT_N, ...arg]), {
+        encoding: "utf8",
+      });
+      assert.equal(r.status, 2);
+      assert.equal(r.stdout, "");
+      assert.match(r.stderr, /^next-report-number: refused \(usage\)/);
+    }
+  });
+}
+
+test("next-report-number.sh is executable and Step 7 states highest + 1, never count + 1", () => {
+  assert.ok(
+    fs.statSync(NEXT_N).mode & 0o111,
+    "next-report-number.sh is executable",
+  );
+  const s7 = section(
+    "### Step 7 — Write the review report",
+    "ALWAYS use this exact template structure",
+  );
+  assert.match(s7, /highest existing `\{n\}` plus 1/);
+  assert.match(s7, /never the\s+number of reports plus 1/);
+  assert.doesNotMatch(s7, /starts at 1 and increments on re-review/);
+});
