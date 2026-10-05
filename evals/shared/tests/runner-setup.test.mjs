@@ -219,3 +219,34 @@ test("a driver error exits 1, or EVAL_DRIVER_ERROR_EXIT when it is a code in 3â€
     "2 collides with usage",
   );
 });
+
+// task.185 QA cycle 3: EVAL_FAIL_EXIT is used ONLY when assertions ran and failed. A setup error
+// keeps exit 1, so a caller asking for the fail code can read every other exit as "did not run".
+test("EVAL_FAIL_EXIT marks failed assertions and nothing else", () => {
+  const failing = scenario({
+    assertions: [{ fn: "fileExists", args: ["$SANDBOX/never.txt"] }],
+  });
+  assert.equal(run(failing, { DRIVER: "replay" }).status, 1);
+  assert.equal(
+    run(failing, { DRIVER: "replay", EVAL_FAIL_EXIT: "5" }).status,
+    5,
+  );
+  const passing = scenario({ assertions: [] });
+  assert.equal(
+    run(passing, { DRIVER: "replay", EVAL_FAIL_EXIT: "5" }).status,
+    0,
+  );
+  const brokenSetup = scenario({
+    setup: "../../setup.mjs",
+    fixture: { throw: true },
+    assertions: [],
+  });
+  assert.equal(
+    run(brokenSetup, { DRIVER: "replay", EVAL_FAIL_EXIT: "5" }).status,
+    1,
+  );
+  assert.equal(
+    run(passing, { DRIVER: "no-such-driver", EVAL_FAIL_EXIT: "5" }).status,
+    1,
+  );
+});

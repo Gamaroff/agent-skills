@@ -426,21 +426,21 @@ mutant, and both turn red.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-05
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.185.qa.2.review-pr-eval-suite.md](./task.185.qa.2.review-pr-eval-suite.md)
-- **Gate File**: [task.185.gate.2.review-pr-eval-suite.yml](./task.185.gate.2.review-pr-eval-suite.yml)
+- **Full Report**: [task.185.qa.3.review-pr-eval-suite.md](./task.185.qa.3.review-pr-eval-suite.md)
+- **Gate File**: [task.185.gate.3.review-pr-eval-suite.yml](./task.185.gate.3.review-pr-eval-suite.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5346
+- **Tests Executed**: 5352
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's high finding (a skip counted as a pass) is fixed and BUG-1 is closed. The refute pass found three medium edge cases in the pass-rate tool. The npm script collapses could-not-run to 1 (BUG-2). `live.minPass` is not scaled above 5 runs (BUG-3). A driver error is counted as a failed run (BUG-4). There are also two low argument-handling findings.
+BUG-1 to BUG-4 are closed. One medium remains (C3-CR-1). Runner exits that are not a verdict, such as a setup error or an unknown `DRIVER`, are still read as failed runs.
 
 ## Change Log
 
@@ -455,6 +455,8 @@ Cycle 1's high finding (a skip counted as a pass) is fixed and BUG-1 is closed. 
 | 2026-10-05 |         | QA findings fixed — CR-1 (skip counted as pass), QA-1, QA-2, CR-2, CR-4; 1 iteration | qa-fix |
 | 2026-10-05 |         | QA gate CONCERNS (80/100) — 3 medium, 2 low findings            | qa-task     |
 | 2026-10-05 |         | QA findings fixed (cycle 2) — driver error is could-not-run, one exit-status owner, scaled live.minPass, usage errors; 2 iterations in total | qa-fix |
+| 2026-10-05 |         | QA gate CONCERNS (90/100) — 1 medium finding                     | qa-task     |
+| 2026-10-05 |         | QA findings fixed (cycle 3) — positive verdict code: any non-verdict runner exit is could-not-run; 3 iterations in total | qa-fix |
 <!-- change-log-end -->
 
 ---

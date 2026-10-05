@@ -4,7 +4,7 @@
 **Bug ID**: TASK-185-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 2, refute pass CR-1)
 **Date Found**: 2026-10-05
 
@@ -42,3 +42,4 @@ Keep the strongest status in the loop and test the script with no `claude` on PA
 | --- | --- | --- | --- |
 | 2026-10-05 | New | QA Engineer | QA cycle 2 |
 | 2026-10-05 | Ready for QA | qa-fix | Fix + test, mutation-proven |
+| 2026-10-05 | Closed | QA Engineer | QA cycle 3: reproduction re-run behaves |

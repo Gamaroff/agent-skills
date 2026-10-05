@@ -140,7 +140,7 @@ test("a run the runner skips (live scenario under replay) stops repeat with exit
   assert.doesNotMatch(r.stdout, /passed /);
   assert.match(
     r.stderr,
-    /could not run repeat-skip-\S+ — the runner reported a skipped/,
+    /could not run repeat-skip-\S+ — the runner skipped the run/,
   );
 });
 
@@ -272,4 +272,38 @@ test("npm run eval:review-pr:cli's command exits 3 when claude is absent", () =>
   });
   assert.equal(r.status, 3, r.stdout + r.stderr);
   assert.match(r.stderr, /skipped: `claude` binary not found on PATH/);
+});
+
+// task.185 QA cycle 3, C3-CR-1: the verdict is positive. Anything the runner does instead of judging
+// — an unknown DRIVER, a setup that throws — is could-not-run (exit 3), never a failed run.
+test("an unknown DRIVER is could-not-run, never a failed run", () => {
+  const r = repeat([alternatingScenario(), "--runs", "2", "--min-pass", "1"], {
+    DRIVER: "claude-cl",
+  });
+  assert.equal(r.status, 3, r.stdout + r.stderr);
+  assert.match(r.stdout, /run 1\/2: not judged\n$/);
+  assert.doesNotMatch(r.stdout, /passed /);
+  assert.match(r.stderr, /exited 1 without judging the run/);
+});
+
+test("a setup that throws is could-not-run, never a failed run", () => {
+  const sc = fs.mkdtempSync(path.join(os.tmpdir(), "repeat-bad-setup-"));
+  fs.writeFileSync(
+    path.join(sc, "setup.mjs"),
+    'export function setup() { throw new Error("git is missing"); }\n',
+  );
+  fs.writeFileSync(
+    path.join(sc, "scenario.json"),
+    JSON.stringify({ name: "bad-setup", setup: "setup.mjs", assertions: [] }),
+  );
+  const r = repeat([sc, "--runs", "2", "--min-pass", "1"]);
+  assert.equal(r.status, 3, r.stdout + r.stderr);
+  assert.match(r.stderr, /git is missing/);
+  assert.doesNotMatch(r.stdout, /passed /);
+});
+
+test("a malformed EVAL_RUNS is named as $EVAL_RUNS, not --runs (C3-CR-5)", () => {
+  const r = repeat([alternatingScenario()], { EVAL_RUNS: "x" });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /^repeat: \$EVAL_RUNS must be a non-negative integer/);
 });

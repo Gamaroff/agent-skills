@@ -4,7 +4,7 @@
 **Bug ID**: TASK-185-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 2; raised as refute-pass CR-3)
 **Date Found**: 2026-10-05
 
@@ -38,3 +38,4 @@ An opt-in `EVAL_DRIVER_ERROR_EXIT` in the runner, set by `repeat.mjs`, with a te
 | --- | --- | --- | --- |
 | 2026-10-05 | New | QA Engineer | QA cycle 2 |
 | 2026-10-05 | Ready for QA | qa-fix | Fix + test, mutation-proven |
+| 2026-10-05 | Closed | QA Engineer | QA cycle 3: reproduction re-run behaves |

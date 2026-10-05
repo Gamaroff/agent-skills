@@ -19,13 +19,17 @@
  *   0  every scenario met its min-pass
  *   1  at least one scenario fell below its min-pass (and every run of every scenario ran)
  *   2  usage error — bad flag, missing value, missing or malformed scenario.json
- *   3  could not run — a run was SKIPPED (driver unavailable, or a live-only scenario under replay)
- *      or the driver ERRORED (claude -p exited non-zero: no credit, crash, timeout). It stops at
- *      the first such run: the rest would not run either, and no pass rate is printed for runs
- *      that did not happen.
+ *   3  could not run — any run that was not a verdict: SKIPPED (driver unavailable, or a live-only
+ *      scenario under replay), a DRIVER ERROR (claude -p exited non-zero: no credit, crash,
+ *      timeout), or anything else the runner did instead of judging (setup error, unknown DRIVER,
+ *      a crash, a signal, a spawn failure). It stops at the first such run: the rest would not run
+ *      either, and no pass rate is printed for runs that did not happen.
  *
- * The runner exits 0 on a skip and 1 on a driver error, which eval:all relies on; this program
- * asks for distinct codes through EVAL_SKIP_EXIT and EVAL_DRIVER_ERROR_EXIT.
+ * The verdict is POSITIVE: the runner exits EVAL_FAIL_EXIT only when assertions ran and failed,
+ * and 0 when they passed. Every other status is could-not-run — so a new way for the runner to fail
+ * cannot be misread as a failed run (task.185 QA cycle 3; cycles 1–2 enumerated non-verdict exits
+ * one at a time). EVAL_SKIP_EXIT is still requested because the runner's default for a skip is 0,
+ * which would otherwise read as a pass; EVAL_DRIVER_ERROR_EXIT only sharpens the message.
  *
  * Runs are SEQUENTIAL — live runs share ~/.claude state and must not interleave. The driver
  * comes from the environment exactly as for runner.mjs (DRIVER=claude-cli for live).
@@ -39,6 +43,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RUNNER = path.join(__dirname, "runner.mjs");
 const SKIP_EXIT = 3; // the runner's status for a skip, requested through EVAL_SKIP_EXIT
 const DRIVER_ERROR_EXIT = 4; // … and for a driver error, through EVAL_DRIVER_ERROR_EXIT
+const FAIL_EXIT = 5; // the runner's status when assertions RAN and failed, through EVAL_FAIL_EXIT
 const CALIBRATED_RUNS = 5; // live.minPass is a count out of this many runs
 const COULD_NOT_RUN = 3;
 
@@ -79,7 +84,9 @@ for (let i = 0; i < argv.length; i++) {
 if (scenarioDirs.length === 0) usage("missing <scenario-dir>");
 
 const runs =
-  intFlag("--runs", runsRaw ?? (process.env.EVAL_RUNS || undefined)) ?? 5;
+  runsRaw !== undefined
+    ? intFlag("--runs", runsRaw)
+    : (intFlag("$EVAL_RUNS", process.env.EVAL_RUNS || undefined) ?? 5);
 if (runs < 1) usage("--runs must be at least 1");
 const explicitMin = intFlag("--min-pass", minRaw);
 if (explicitMin !== undefined) {
@@ -121,7 +128,29 @@ const childEnv = {
   ...process.env,
   EVAL_SKIP_EXIT: String(SKIP_EXIT),
   EVAL_DRIVER_ERROR_EXIT: String(DRIVER_ERROR_EXIT),
+  EVAL_FAIL_EXIT: String(FAIL_EXIT),
 };
+
+// Why a run was not a verdict — a short label for the run line and a reason for the message; null
+// when it was one (0 or FAIL_EXIT).
+function notAVerdict(r) {
+  if (r.error)
+    return [
+      "not started",
+      `the runner could not be started (${r.error.message})`,
+    ];
+  if (r.status === null)
+    return ["killed", `the runner was killed by ${r.signal || "a signal"}`];
+  if (r.status === 0 || r.status === FAIL_EXIT) return null;
+  if (r.status === SKIP_EXIT) return ["skipped", "the runner skipped the run"];
+  if (r.status === DRIVER_ERROR_EXIT)
+    return ["driver error", "the driver errored"];
+  return [
+    "not judged",
+    `the runner exited ${r.status} without judging the run (setup error, unknown DRIVER, crash)`,
+  ];
+}
+
 let anyBelow = false;
 for (const plan of plans) {
   let passed = 0;
@@ -130,11 +159,11 @@ for (const plan of plans) {
       stdio: ["ignore", "inherit", "inherit"],
       env: childEnv,
     });
-    if (r.status === SKIP_EXIT || r.status === DRIVER_ERROR_EXIT) {
-      const what = r.status === SKIP_EXIT ? "skipped" : "driver error";
-      process.stdout.write(`run ${i}/${runs}: ${what}\n`);
+    const notRun = notAVerdict(r);
+    if (notRun) {
+      process.stdout.write(`run ${i}/${runs}: ${notRun[0]}\n`);
       process.stderr.write(
-        `repeat: could not run ${plan.name} — the runner reported a ${what} (see its line above); ` +
+        `repeat: could not run ${plan.name} — ${notRun[1]} (see its output above); ` +
           `no pass rate is reported for runs that did not happen\n`,
       );
       process.exit(COULD_NOT_RUN);

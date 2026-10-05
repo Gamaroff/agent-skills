@@ -4,7 +4,7 @@
 **Bug ID**: TASK-185-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 2, refute pass CR-2)
 **Date Found**: 2026-10-05
 
@@ -42,3 +42,4 @@ Treat `live.minPass` as a rate over 5 runs, in both directions, and say so in th
 | --- | --- | --- | --- |
 | 2026-10-05 | New | QA Engineer | QA cycle 2 |
 | 2026-10-05 | Ready for QA | qa-fix | Fix + test, mutation-proven |
+| 2026-10-05 | Closed | QA Engineer | QA cycle 3: reproduction re-run behaves |

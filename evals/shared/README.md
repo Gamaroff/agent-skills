@@ -54,7 +54,7 @@ Each is keyed on its own `scenario.json` field, so a scenario that sets none run
 | `liveAssertions` | Assertions run after `assertions`, only when the driver is not `replay` — for facts only a live run can produce, such as "the fake `gh` was called". |
 | `live.minPass` | Read by `repeat.mjs` when `--min-pass` is not given: a count out of 5 (1..5), scaled to `--runs`. |
 
-`EVAL_SKIP_EXIT` and `EVAL_DRIVER_ERROR_EXIT` (each a code in 3–125) make the runner exit with that code instead of 0 on a skip, or 1 on a driver error. Anything else is ignored. `repeat.mjs` sets both.
+`EVAL_SKIP_EXIT`, `EVAL_DRIVER_ERROR_EXIT` and `EVAL_FAIL_EXIT` are each a code in 3–125, and anything else is ignored. They make the runner exit with that code instead of 0 on a skip, 1 on a driver error, or 1 when assertions ran and failed. `repeat.mjs` sets all three.
 
 `EVAL_TIMEOUT_MS` overrides the claude-cli driver's 5-minute timeout (set it in the shell or in `env.json`).
 
@@ -79,11 +79,15 @@ script passes every scenario in one call for that reason. Its earlier shell loop
 | 0 | every scenario met its K |
 | 1 | at least one scenario fell below its K, and every run of every scenario ran |
 | 2 | usage: a bad or valueless flag, K outside 1..N, `live.minPass` outside 1..5, or a missing or malformed `scenario.json`. All are checked before any run starts |
-| 3 | **could not run** — a run was **skipped** (the driver is unavailable, or a `requiresLiveDriver` scenario ran under replay) or the **driver errored** (`claude -p` exited non-zero: no credit, a crash, or a timeout). It stops at the first such run and prints no pass rate for runs that did not happen |
+| 3 | **could not run** — any run that was not a verdict. It covers a **skip** (the driver is unavailable, or a `requiresLiveDriver` scenario ran under replay) and a **driver error** (`claude -p` exited non-zero: no credit, a crash, or a timeout). It also covers anything else the runner did instead of judging: a setup error, an unknown `DRIVER`, a crash, a signal or a spawn failure. It stops at the first such run and prints no pass rate for runs that did not happen |
 
-The runner exits 0 on a skip and 1 on a driver error, which `eval:all` relies on. `repeat.mjs` asks
-for distinct codes through `EVAL_SKIP_EXIT=3` and `EVAL_DRIVER_ERROR_EXIT=4`. Each must be a code in
-3–125; anything else is ignored. Before task.185's QA cycles, a machine without `claude` reported
+**The verdict is positive.** The runner exits `EVAL_FAIL_EXIT` (5, requested by `repeat.mjs`)
+**only** when assertions ran and failed, and 0 when they passed. `repeat.mjs` reads every other
+status as could-not-run, so a new way for the runner to fail cannot be misread as a failed run.
+QA cycles 1 and 2 had enumerated non-verdict exits one at a time, and cycle 3 found another.
+`EVAL_SKIP_EXIT=3` is still requested, because the runner's default for a skip is 0, which would
+read as a pass. `EVAL_DRIVER_ERROR_EXIT=4` only sharpens the message. Each must be a code in 3–125;
+anything else is ignored, and with none set the runner exits as `eval:all` expects. Before task.185's QA cycles, a machine without `claude` reported
 `passed 5/5`, and a key with no credit reported `passed 0/5` with a regression's exit code. A
 timeout counts as could-not-run: raise `EVAL_TIMEOUT_MS` if a scenario legitimately needs longer.
 

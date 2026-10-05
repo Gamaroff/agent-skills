@@ -31,7 +31,8 @@
  * A skip (the driver is unavailable, or a requiresLiveDriver scenario under replay) exits 0, and a
  * driver error exits 1. eval:all relies on both. A caller that must tell them from a pass or a
  * failed run (repeat.mjs) sets EVAL_SKIP_EXIT and/or EVAL_DRIVER_ERROR_EXIT to a code in 3–125, and
- * that code is used instead (task.185 QA cycles 1 and 2).
+ * that code is used instead (task.185 QA cycles 1 and 2). EVAL_FAIL_EXIT is the positive half:
+ * the code used ONLY when assertions ran and failed, so every other exit is "did not run" (cycle 3).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -406,7 +407,10 @@ async function main() {
 
   if (!process.env.KEEP_SANDBOX)
     fs.rmSync(sandbox, { recursive: true, force: true });
-  process.exit(agg.ok ? 0 : 1);
+  // EVAL_FAIL_EXIT marks the ONE outcome that is a failed run: assertions ran and at least one
+  // failed. Every other non-zero exit (setup error, unknown driver, crash) stays 1, so a caller that
+  // asks for this code can treat anything else as "the run did not happen" (task.185 QA cycle 3).
+  process.exit(agg.ok ? 0 : optInExit("EVAL_FAIL_EXIT", 1));
 }
 
 main().catch((e) => die(e.stack || e.message));
