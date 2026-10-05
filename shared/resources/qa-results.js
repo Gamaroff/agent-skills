@@ -289,30 +289,13 @@ const RE_NOT_PARAGRAPH =
 // belong to the log and which the section quotes cannot be told apart (task 171,
 // REL-007/008). A section placed elsewhere may quote dated rows and replace them.
 function removesStructure(removed, { underLog = false } = {}) {
-  const raw = removed.split("\n");
-  const lines = raw.map((l) => l.replace(/\r$/, ""));
-  // A setext underline is judged outside fences only: inside one, `status: done` over
-  // `---` is fenced YAML, not a heading (task 171 QA cycle 2, CR2-2). The ATX and marker
-  // checks stay fence-blind on purpose (see RE_STRUCTURAL).
-  // Only a fence that is plausibly paired counts: a range holding another opener with
-  // an info string (```yaml) inside it is a stray, unclosed fence that has swallowed
-  // the next block's closer — the mis-pairing the ATX check stays fence-blind to
-  // (REL-012/014). Trusting it hid a real setext section, which a replace then
-  // deleted (task 171 QA cycle 3, CR3-1).
-  const fences = fencedRanges(removed).filter(
-    ([s, e]) =>
-      !removed
-        .slice(s, e)
-        .split("\n")
-        .slice(1)
-        .some((l) => /^ {0,3}(?:`{3,}|~{3,})[^`~\s]/.test(l)),
-  );
-  const starts = [];
-  for (let i = 0, off = 0; i < lines.length; i++) {
-    starts.push(off);
-    off += raw[i].length + 1;
-  }
-  const fenced = (i) => insideProtected(fences, starts[i]);
+  // Fence-blind, like the ATX and marker checks (RE_STRUCTURAL): a setext underline is
+  // structure wherever it stands, so fenced YAML — `key: value` over `---` — is refused
+  // with a detail, the same accepted trade as a fenced `# comment` (task.155 REL-016).
+  // Three cycles tried to exempt "well-paired" fences and each was beaten by a fence
+  // mis-pairing that let a replace delete a real setext section (task 171 QA cycles
+  // 2–4: CR2-2, CR3-1, CR4-1). Refusing is the direction that cannot lose content.
+  const lines = removed.split("\n").map((l) => l.replace(/\r$/, ""));
   let logTable = false; // inside a table whose header's first cell is `Date`
   for (let i = 1; i < lines.length; i++) {
     const l = lines[i];
@@ -328,11 +311,7 @@ function removesStructure(removed, { underLog = false } = {}) {
         !/^[ \t]*\|[\s\-:|]+\|[ \t]*$/.test(l));
     if (
       RE_STRUCTURAL.some((re) => re.test(l)) ||
-      (RE_SETEXT.test(l) &&
-        i > 1 &&
-        !fenced(i) &&
-        !fenced(i - 1) &&
-        !RE_NOT_PARAGRAPH.test(lines[i - 1])) ||
+      (RE_SETEXT.test(l) && i > 1 && !RE_NOT_PARAGRAPH.test(lines[i - 1])) ||
       (underLog && logRow)
     ) {
       // A setext underline is reported with the text it makes a heading of.

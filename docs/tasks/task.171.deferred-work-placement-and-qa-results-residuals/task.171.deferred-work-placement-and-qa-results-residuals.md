@@ -123,7 +123,9 @@ content. Each one either writes correctly or refuses with a reason that names th
   engine never reaches it.
 - **Refuse what cannot be cut safely (REL-007/008).** `removesStructure` also treats a dated log row
   as structure (`isEntryRow`, imported, header-agnostic). It treats setext H1/H2 headings as
-  structure too, once task.118's accidental setext underline is repaired. A misplaced section
+  structure too, once task.118's accidental setext underline is repaired. *Amended in QA cycle 4:*
+  the setext check is fence-blind, like the H1/H2 check; three cycles of fence exemptions (CR2-2,
+  CR3-1, CR4-1) each let a mis-paired fence hide a setext section that a replace then deleted. A misplaced section
   whose span holds a dated row that is not part of the log is refused, so no row can be lost. REL-007
   is the same rule.
 - **Carry precisely.**
@@ -423,19 +425,19 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.171.qa.3.deferred-work-placement-and-qa-results-residuals.md](./task.171.qa.3.deferred-work-placement-and-qa-results-residuals.md)
-- **Gate File**: [task.171.gate.3.deferred-work-placement-and-qa-results-residuals.yml](./task.171.gate.3.deferred-work-placement-and-qa-results-residuals.yml)
+- **Full Report**: [task.171.qa.4.deferred-work-placement-and-qa-results-residuals.md](./task.171.qa.4.deferred-work-placement-and-qa-results-residuals.md)
+- **Gate File**: [task.171.gate.4.deferred-work-placement-and-qa-results-residuals.yml](./task.171.gate.4.deferred-work-placement-and-qa-results-residuals.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 100
+- **Tests Executed**: 101
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
 
-Cycle 2's fixes hold. One medium: the fence-aware setext check trusts fence pairing, so an unclosed info-string fence lets a replace delete a setext section after it (CR3-1). Two lows on create-bug-report Step 5 wording and the population scan.
+Cycle 3's fixes hold for their shapes. One medium: the per-range mis-pairing filter is beaten by a stray fence closing on a later plain opener, so a setext section is again deleted on replace (CR4-1). Third consecutive cycle on the setext fence exemption — a structural move is recommended.
 
 <!-- change-log-start -->
 
@@ -450,6 +452,7 @@ Cycle 2's fixes hold. One medium: the fence-aware setext check trusts fence pair
 | 2026-10-05 |         | QA gate CONCERNS (50/100) — 5 findings | qa-task |
 | 2026-10-05 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-10-05 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-05 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 4) | qa-task |
 
 <!-- change-log-end -->
 

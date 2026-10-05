@@ -1025,22 +1025,20 @@ test("P4 CR-4: a CRLF document keeps the separator and lead-in comment its LF tw
 // Q — task 171 QA cycle 2
 // ---------------------------------------------------------------------------
 
-test("Q1 CR2-2: fenced YAML is not a setext heading — written, then replaced", () => {
+test("Q1 setext is fence-blind, like ATX: fenced YAML is refused with its line, never written", () => {
+  // Cycles 2–4 exempted "well-paired" fences and each exemption was beaten by a
+  // mis-pairing that deleted a real setext section (CR2-2 → CR3-1 → CR4-1). Refusing
+  // fenced YAML is the REL-016 trade a fenced `# comment` already makes.
   const yaml = "```yaml\nstatus: done\n---\nother: x\n```";
   const r = QR.upsertQaResults(markerDoc(), `${section(1)}\n\n${yaml}`, {
     docType: "task",
   });
-  assert.equal(r.reason, "created");
-  const r2 = QR.upsertQaResults(r.content, section(2), { docType: "task" });
-  assert.equal(r2.reason, "replaced");
-  assert.doesNotMatch(r2.content, /status: done/);
-  // Outside a fence the same lines are still an underlined heading (O5).
+  assert.equal(r.reason, "bad-section");
+  assert.equal(r.detail, "structural-line:status: done / ---");
   const bare = QR.upsertQaResults(
     markerDoc(),
     `${section(1)}\n\nstatus: done\n---\n\nmore`,
-    {
-      docType: "task",
-    },
+    { docType: "task" },
   );
   assert.equal(bare.detail, "structural-line:status: done / ---");
 });
@@ -1069,21 +1067,20 @@ test("Q3 CR2-5: one stray CRLF line does not turn an LF document's section CRLF"
   assert.doesNotMatch(r.content.slice(s.start, s.end), /\r/);
 });
 
-test("Q4 CR3-1: a setext section behind a stray unclosed info-string fence is refused, not deleted", () => {
-  // An unclosed ```bash pairs with the bare closer of the later ```yaml block, so the
-  // setext heading between them looks fenced. It must not be exempted.
-  const doc = markerDoc(
-    `${section(1)}\n\n\`\`\`bash\necho hi\n\nRollout Notes\n-------------\n\nsteps\n\n\`\`\`yaml\nk: v\n\`\`\`\n\n`,
-  );
-  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
-  assert.notEqual(r.reason, "replaced");
-  assert.equal(r.content, doc);
-  // A well-paired fence holding the same lines is still exempt (Q1's shape).
-  const ok = markerDoc(
-    `${section(1)}\n\n\`\`\`text\nRollout Notes\n-------------\n\`\`\`\n\n`,
-  );
-  assert.equal(
-    QR.upsertQaResults(ok, section(2), { docType: "task" }).reason,
-    "replaced",
-  );
+test("Q4 CR3-1/CR4-1: a setext section behind any fence mis-pairing is refused, not deleted", () => {
+  const behind = (fences) =>
+    markerDoc(
+      `${section(1)}\n\n${fences[0]}\necho hi\n\nRollout Notes\n-------------\n\nsteps\n\n${fences[1]}\n\n`,
+    );
+  for (const pair of [
+    ["```bash", "```yaml\nk: v\n```"], // CR3-1: closes on an info-string block's closer
+    ["```bash", "```\nplain\n```\n\n```yaml\nk: v\n```"], // CR4-1: closes on a plain opener
+    ["~~~bash", "~~~\nplain\n~~~"], // CR4-1, tilde
+    ["```", "```\nplain\n```"], // CR4-1, bare stray
+  ]) {
+    const doc = behind(pair);
+    const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+    assert.notEqual(r.reason, "replaced", pair.join(" … "));
+    assert.equal(r.content, doc);
+  }
 });

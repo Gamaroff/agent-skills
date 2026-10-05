@@ -411,8 +411,8 @@ All notable changes to this project will be documented in this file. Format foll
   peels the same separators from a CRLF document as from its LF twin (CRLF), and relocates a
   section stranded between a `## Change Log` heading and its marker block (CR-5). **New refusals**,
   each returned with a `detail` naming the rule — both Step 12 halts print it: a section inside or
-  directly under a change log whose span holds a dated log row (REL-007/008), a setext H1/H2 in a span
-  or a render, and a render that ends in an HTML comment (`trailing-comment`, which closes REL-024). Under a change log, every data row of a Date-headed
+  directly under a change log whose span holds a dated log row (REL-007/008), a setext H1/H2 in a span or a render (fence-blind, as the H1/H2 check is — fenced YAML
+  over `---` is refused, the trade a fenced `# comment` already makes), and a render that ends in an HTML comment (`trailing-comment`, which closes REL-024). Under a change log, every data row of a Date-headed
   table counts, ISO-dated or not. `detail` is a new
   field; callers reading only `reason` are unaffected. task.118's accidental setext underline was
   repaired. A write survey in `tests/qa-results-corpus.test.js` holds the tracked corpus at 0 false
