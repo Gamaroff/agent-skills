@@ -5,7 +5,9 @@ type: task
 description: "Follow-up to task.155. Give the develop pipelines' loop-exit Deferred Work record its own `## Deferred Work` section outside the QA Testing Results section, which is the source fix for REL-030. Close the qa-results.js residuals task.155 recorded. Make create-bug-report's Bug Reports check match the heading it writes."
 tags: [qa-task, qa-story, develop-task, develop-story, create-bug-report, engine, follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
+completed_date: 2026-10-05
+pr_number: 568
 priority: Medium
 created: 2026-10-01
 updated: 2026-10-05
@@ -16,7 +18,7 @@ github_issue: 538
 
 # Technical Task: Deferred Work placement and qa-results engine residuals
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.171.review.1.deferred-work-placement-and-qa-results-residuals.md` implemented 2026-10-05
 
@@ -439,6 +441,31 @@ None.
 
 Five QA cycles closed 13 findings this branch introduced or exposed. The setext check ended fence-blind after three cycles of fence-exemption narrowing. One pre-existing HIGH (the setext paragraph test exempts some paragraph-text lines; identical on origin/develop, 0 corpus instances) is routed to a follow-up task with two lows.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.171.qa.5.deferred-work-placement-and-qa-results-residuals.md` (5 cycles)
+**Gate File**: `task.171.gate.5.deferred-work-placement-and-qa-results-residuals.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**Step 5c PR review**: ⚠️ CONCERNS (`task.171.pr-review.1.deferred-work-placement-and-qa-results-residuals.md`) — documentation findings acted on; code findings pre-existing or low, carried below
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11/11 — functional (one Deferred Work home, residuals write or refuse with a detail, halts print the detail, create-bug-report heading check), performance (measured, see the DoD summary's SC5 note), code quality (corpus 0/0/0, mutation-proved, ci:fast/bundle:check/validate), migration (CHANGELOG, task.155 links)
+✅ **Tests:** engine, wiring, corpus, placement and heading suites run per PR; CI `test` SUCCESS on `799b8f53`
+✅ **PR:** #568
+✅ **Documentation:** CHANGELOG `[Unreleased]`, step doc, three SKILL.md files, task.155 note
+✅ **Security Review:** PASS — `boundary: internal` with a valid reason; no secrets or unsafe sinks
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling
+
+**Task marked as ACCEPTED on:** 2026-10-05
+
+**Detailed Verification Log:** See `task.171.dod.1.deferred-work-placement-and-qa-results-residuals.md` for complete verification evidence and timestamps.
+
 ## Deferred Work
 
 Carried from QA gate 5 `recommendations.future` and the Step 5c PR review
@@ -459,13 +486,11 @@ All five are gaps in `shared/resources/qa-results.js`; a follow-up task is still
   comment closer.
 
 ---
-
 <!-- change-log-start -->
-
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-01 | 1.0     | Initial draft | create-task |
 | 2026-10-05 | 1.1     | Review passed (8/10) — named the corpus write-survey test, measured the performance bound, scoped the no-network criterion, added the worked-example extraction to Phase 1, added task.155 and the corpus test to Files Summary | review-task |
 | 2026-10-05 |         | Status → ready-for-development | review-task |
@@ -476,7 +501,7 @@ All five are gaps in `shared/resources/qa-results.js`; a follow-up task is still
 | 2026-10-05 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 4) | qa-task |
 | 2026-10-05 |         | QA gate PASS (100/100) — 0 open findings, 1 pre-existing routed to follow-up | qa-task |
 | 2026-10-05 |         | QA findings fixed — gate PASS (100/100), 4 iterations | qa-fix |
-
+| 2026-10-05 | 1.2 | DoD verified — accepted (PR #568) | finalise |
 <!-- change-log-end -->
 
 ---
