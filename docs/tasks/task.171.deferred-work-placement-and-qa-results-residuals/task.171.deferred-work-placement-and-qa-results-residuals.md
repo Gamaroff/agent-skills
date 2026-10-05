@@ -485,8 +485,8 @@ All five are gaps in `shared/resources/qa-results.js`. Follow-up: [task.183](../
   `**Bug Reports**` label is dropped on the next replace. ✅ Resolved in [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md): a bold-label block
   stops at a heading of level 3 or shallower.
 - **CR2-4** (low) — a bold Bug Reports block continues past QA's own `**Recommendations**:` when a
-  list follows it, carrying a stale list. ✅ Resolved in [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md): a bold-label block stops at a
-  QA-owned label (`QA_LABELS`).
+  list follows it, carrying a stale list. ⏭️ Deferred in [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md) (see its `## Deferred Work`): stopping at
+  QA-sounding labels deleted bug lists grouped under them.
 - **CR-7** (low, gate 1) — setext false refusals after a list continuation line or a multi-line
   comment closer. ⏭️ Deferred again in [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md) (see its `## Deferred Work`): inferring either
   context line by line deleted real setext sections through six shapes in four QA cycles.
@@ -508,7 +508,7 @@ All five are gaps in `shared/resources/qa-results.js`. Follow-up: [task.183](../
 | 2026-10-05 |         | QA gate PASS (100/100) — 0 open findings, 1 pre-existing routed to follow-up | qa-task |
 | 2026-10-05 |         | QA findings fixed — gate PASS (100/100), 4 iterations | qa-fix |
 | 2026-10-05 | 1.2 | DoD verified — accepted (PR #568) | finalise |
-| 2026-10-05 |         | Deferred Work: all five items marked resolved in task.183 | develop |
+| 2026-10-05 |         | Deferred Work: three items resolved in task.183, CR-7 and CR2-4 deferred there | develop |
 <!-- change-log-end -->
 
 ---

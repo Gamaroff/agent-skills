@@ -2,7 +2,7 @@
 id: task.183
 title: "[Task 183] qa-results setext and carry follow-ups"
 type: task
-description: "Follow-up to task.171. Close the five items in task.171's `## Deferred Work` section, all in `shared/resources/qa-results.js`: the HIGH setext deletion path first (CR5-1), then a Version-first log lost on relocate, two bold-label block boundaries and two setext false refusals. Also make the corpus survey cheaper and its timing bound honest."
+description: "Follow-up to task.171. Work the five items in task.171's `## Deferred Work` section, all in `shared/resources/qa-results.js`: closes the HIGH setext deletion path (CR5-1), a Version-first log lost on relocate and a bold-label `####` boundary; defers the two setext false refusals (CR-7) and the stale QA list carry (CR2-4) after QA showed fixing them deleted content. Also make the corpus survey cheaper and its timing bound honest."
 tags: [qa-task, qa-story, engine, follow-up]
 category: refactoring
 status: ready-for-review
@@ -29,7 +29,7 @@ github_issue: 569
 task.171 (PR #568, merged as `dd09f908`) closed task.155's recorded residuals in
 `shared/resources/qa-results.js`. Its QA loop and its Step 5c PR review left five items, all recorded
 under task.171's `## Deferred Work`. One is HIGH: a setext section headed by certain paragraph text
-is still deleted when the QA section above it is replaced. This task closes all five, HIGH first, and
+is still deleted when the QA section above it is replaced. This task closes three of the five, HIGH first, defers two (CR-7, CR2-4 — see `## Deferred Work`), and
 makes the corpus write survey cheaper so its timing bound stops depending on machine load.
 
 **Scope:** one task in five phases. The items share one engine and one test file, and none of them
@@ -43,7 +43,8 @@ is worth shipping alone, so they are not split (§ 1.2 splitting test).
    refusals stay refused, and the item moves to `## Deferred Work` below — it needs a real CommonMark
    parser, not line-by-line inference.
 3. A change log whose header has a `Date` column in any position keeps its rows on relocate (5c CR-1).
-4. A bold-label carried block keeps its `####` groups and stops at QA's own labels (5c CR-2, CR2-4).
+4. A bold-label carried block keeps its `####` groups (5c CR-2). CR2-4 is deferred (second QA
+   escalation follow-up, cycle 5): stopping at QA-sounding labels dropped grouped bug lists.
 5. The corpus write survey pre-filters documents, and the timing criterion records the load it was
    measured under and is re-measured at finalise.
 
@@ -138,8 +139,9 @@ QA cycle 5 review reproduced, not just plain text.
   header row is excluded by the same Date-column test that starts the table, not by `RE_LOG_HEADER`
   (review 1, I2). A QA table with no `Date` column is unaffected.
 - **Bold-label boundaries.** A bold-label block stops at a heading of level 3 or shallower, as a `###`
-  heading block does, so `####` groups stay inside it. It also stops at a QA-owned bold label, named
-  once in a `QA_LABELS` constant beside `RE_QA_FIELD`, whatever follows the label.
+  heading block does, so `####` groups stay inside it. **No QA-label stop** (amended at QA cycle 5):
+  a stale QA list after a carried block and a bug list grouped under a sub-label are the same shape,
+  and stopping at the label deleted the grouped list (CR4-3, CR5-1). CR2-4 is deferred.
 - **Survey pre-filter.** The write survey skips a document that does not mention
   `QA Testing Results` before calling `findQaResults`, as the stacking test already does.
 
@@ -148,9 +150,8 @@ QA cycle 5 review reproduced, not just plain text.
 - `removesStructure` is the only structural guard. This task **narrows** its setext exemption and
   **extends** its log-table recognition; it adds no second guard.
 - `collectBlocks`' `stops` is the only block-boundary rule. This task **changes** two of its clauses.
-- `RE_QA_FIELD` is the only list of QA-owned lines. `QA_LABELS` sits **beside** it, because
-  `RE_QA_FIELD` matches `**Label**: value` field lines, while a carried block must also stop at a
-  QA-owned label that stands alone.
+- `RE_QA_FIELD` is the only list of QA-owned lines. (A `QA_LABELS` list beside it was added and
+  then removed in QA — see CR2-4 in `## Deferred Work`.)
 
 ---
 
@@ -158,10 +159,11 @@ QA cycle 5 review reproduced, not just plain text.
 
 ### In Scope
 
-- ✅ The five items in task.171's `## Deferred Work` (CR5-1, 5c CR-1, 5c CR-2, CR2-4, CR-7)
+- ✅ The five items in task.171's `## Deferred Work` — CR5-1, 5c CR-1 and 5c CR-2 closed; CR-7 and
+  CR2-4 deferred to this task's `## Deferred Work` after QA
 - ✅ The write-survey pre-filter and the restated timing criterion
 - ✅ One unit test per item, each mutation-proved; bundled copies regenerated
-- ✅ task.171's `## Deferred Work` items marked resolved, with a link to this task
+- ✅ task.171's `## Deferred Work` items marked resolved or deferred, with a link to this task
 - ✅ CHANGELOG `[Unreleased]`
 
 ### Out of Scope
@@ -217,14 +219,15 @@ CHANGELOG states all of these.
 - [x] A test refuses a misplaced section above a `| Version | Date | … |` log with
       `structural-line:<first data row>`, and a QA table with no `Date` column stays writable
 
-### Phase 4: bold-label boundaries — 5c CR-2, CR2-4 (Risk: Low)
+### Phase 4: bold-label boundaries — 5c CR-2 (CR2-4 deferred at QA cycle 5)
 
 **Files**: `shared/resources/qa-results.js`, `shared/resources/tests/qa-results.test.mjs`
 
 - [x] A bold-label block stops at a heading of level 3 or shallower
-- [x] `QA_LABELS` beside `RE_QA_FIELD`; a bold-label block stops at a QA-owned label whatever follows
-- [x] Tests: a `####` group under `**Bug Reports**` survives three writes; a stale
-      `**Recommendations**:` list after a bold block is not carried
+- [x] ~~`QA_LABELS` beside `RE_QA_FIELD`~~ — added, then removed at QA cycle 5 (it dropped grouped
+      bug lists); CR2-4 deferred
+- [x] Tests: a `####` group under `**Bug Reports**` survives three writes; a bug list grouped under
+      any sub-label survives; a stale list is carried once, never doubled
 
 ### Phase 5: survey pre-filter, timing and docs (Risk: Low)
 
@@ -301,8 +304,8 @@ None.
       and every CR5-1 shape is still refused (Phase 2 test)
 - [ ] A misplaced section above a `| Version | Date | … |` log is refused, never relocated with row
       loss, and a section quoting a table without a `Date` column is still writable (Phase 3 test)
-- [ ] A `####` group under a bold `**Bug Reports**` label survives three writes, and a QA-owned bold
-      label ends the block (Phase 4 tests)
+- [ ] A `####` group under a bold `**Bug Reports**` label survives three writes, and a bug list
+      grouped under any sub-label is carried whole (Phase 4 tests; CR2-4 deferred)
 
 ### Performance
 
@@ -348,8 +351,7 @@ None.
 ### Low Risk Areas
 
 1. **CR-7 context reopens a CR5-1 shape.** Mitigation: Phase 2's test re-asserts every CR5-1 shape.
-2. **`QA_LABELS` misses a legacy QA label.** Impact: a stale list is carried (duplicates, never
-   deletes). Mitigation: the constant is the one place to add one.
+2. **A stale QA list is carried** (CR2-4, deferred). Impact: a duplicate, never a deletion.
 
 ---
 
@@ -380,29 +382,29 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-05
-**Quality Score**: 50/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.183.qa.4.qa-results-setext-and-carry-follow-ups.md](./task.183.qa.4.qa-results-setext-and-carry-follow-ups.md)
-- **Gate File**: [task.183.gate.4.qa-results-setext-and-carry-follow-ups.yml](./task.183.gate.4.qa-results-setext-and-carry-follow-ups.yml)
+- **Full Report**: [task.183.qa.5.qa-results-setext-and-carry-follow-ups.md](./task.183.qa.5.qa-results-setext-and-carry-follow-ups.md)
+- **Gate File**: [task.183.gate.5.qa-results-setext-and-carry-follow-ups.yml](./task.183.gate.5.qa-results-setext-and-carry-follow-ups.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 85
 - **Phases Verified**: 5/5
-- **Critical Issues**: 2
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-CR3-1 and CR3-2 fixed. CR4-1 and CR4-2 (HIGH): the list-continuation exemption deletes a setext section when the item sits inside an HTML block or a tab follows the marker. CR4-3 (MEDIUM): `QA_LABELS` drops a bug list grouped under `**Critical Issues**`. HIGH per cycle 1, 1, 2, 2 — escalated a second time.
+No setext or log deletion remains. CR5-1 (MEDIUM): each `QA_LABELS` name drops a bug list grouped under it. CR5-2/CR5-3 (LOW): documents still claim all five task.171 items are closed.
 
 ## Deferred Work
 
-Carried from the second QA escalation (gate 4, 2026-10-05, operator decision) and from gates 2–4
-`recommendations.future`. All three are gaps in `shared/resources/qa-results.js`.
+Carried from the second QA escalation (gate 4, 2026-10-05, operator decision), QA cycle 5's fix and
+gates 2–4 `recommendations.future`. All four are gaps in `shared/resources/qa-results.js`.
 
 - **CR-7** (low, from task.171 gate 1) — setext false refusals after a list continuation line or a
   multi-line comment closer. Not fixed here: inferring either context line by line deleted real
@@ -412,6 +414,11 @@ Carried from the second QA escalation (gate 4, 2026-10-05, operator decision) an
 - **CR2-3** (medium, pre-existing — identical on `origin/develop`, 0 corpus hits) — a carried bold
   label with the colon inside the bold (`**Deferred Work:**`) is not recognised as a carried block,
   so its items are deleted on replace.
+- **CR2-4** (low, from task.171 5c review) — a bold Bug Reports block carries a QA-owned
+  `**Recommendations**:` list that follows it, so a stale list repeats into later writes (a
+  duplicate, never a deletion). Not fixed here: a stale QA list and a bug list grouped under a
+  sub-label are the same shape, and stopping at QA-sounding labels deleted grouped bug lists in QA
+  cycles 4–5 (CR4-3, CR5-1). Needs a marker that tells QA-written text from a carried list.
 - **CR4-4** (low) — a QA-owned `####` heading after a carried bold-label block is carried as stale
   text (a duplicate, never a deletion). No QA render emits `####`; 0 of 235 tracked QA documents
   have the shape.
@@ -431,6 +438,8 @@ Carried from the second QA escalation (gate 4, 2026-10-05, operator decision) an
 | 2026-10-05 |         | QA gate FAIL (60/100) — 2 findings (2 high); loop not converging, escalated | qa-task |
 | 2026-10-05 |         | Escalation resolved (operator): comment-closer exemption dropped (CR-7 list shape only); marker-less table-above check back to Date-first (CR3-2) — § 1, § 3, § 5, Phase 2, § 9 amended | develop |
 | 2026-10-05 |         | Second escalation resolved (operator): list-continuation inference removed, CR-7 deferred to Deferred Work; Critical Issues / Issues Found dropped from QA_LABELS (CR4-3) — § 1, § 3, § 5, Phase 2, § 9 amended | develop |
+| 2026-10-05 |         | QA gate CONCERNS (90/100) — 3 findings (0 high) | qa-task |
+| 2026-10-05 |         | QA findings fixed — 5 cycles, 3 fix rounds (2 operator escalation fixes); CR-7 and CR2-4 deferred | qa-fix |
 | 2026-10-05 |         | QA gate FAIL (50/100) — 3 findings (2 high); loop not converging, escalated again | qa-task |
 
 <!-- change-log-end -->

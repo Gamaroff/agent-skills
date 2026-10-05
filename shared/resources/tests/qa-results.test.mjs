@@ -1231,18 +1231,33 @@ test("R3 5c CR-1: a misplaced section above a Version-first log is refused; a Da
   assert.doesNotMatch(w.content, /Phase 1 \| PASS/);
 });
 
-test("R4 5c CR-2 / CR2-4: a bold Bug Reports block keeps its #### groups and stops at QA's own label", () => {
+test("R4 5c CR-2: a bold Bug Reports block keeps its #### groups and every grouped bug list", () => {
   const grouped = "**Bug Reports**\n\n#### From cycle 2\n\n- [b](./b.md)";
   const out = replaceThrice(markerDoc(`${section(1)}\n\n${grouped}\n\n`));
   assert.equal(count(out, "(./b.md)"), 1);
   assert.equal(count(out, "#### From cycle 2"), 1);
-  // The colon may sit after the bold or inside it (QA cycle 1, CR-4).
-  for (const label of ["**Recommendations**:", "**Recommendations:**"]) {
-    const stale = `**Bug Reports**\n\n- [a](./a.md)\n\n${label}\n\n- stale`;
-    const out2 = replaceThrice(markerDoc(`${section(1)}\n\n${stale}\n\n`));
+  // A bug list grouped under any sub-label is carried whole, whatever the label reads and
+  // wherever its colon sits: stopping at QA-sounding labels dropped the grouped links
+  // (QA cycles 4–5, CR4-3, CR5-1). A stale QA list in the same position is carried too —
+  // once, never doubled — which is the accepted CR2-4 residue (task Deferred Work).
+  for (const label of [
+    "**Recommendations**:",
+    "**Recommendations:**",
+    "**Key Findings**",
+    "**Next Steps:**",
+    "**Code Review Findings:**",
+  ]) {
+    const grouped3 = `**Bug Reports**\n\n- [a](./a.md)\n\n${label}\n\n- [b2](./b2.md)`;
+    const out2 = replaceThrice(markerDoc(`${section(1)}\n\n${grouped3}\n\n`));
     assert.equal(count(out2, "(./a.md)"), 1, label);
-    assert.doesNotMatch(out2, /- stale/, label);
+    assert.equal(count(out2, "(./b2.md)"), 1, label);
   }
+  const stale =
+    "**Bug Reports**\n\n- [a](./a.md)\n\n**Recommendations**:\n\n- stale";
+  assert.equal(
+    count(replaceThrice(markerDoc(`${section(1)}\n\n${stale}\n\n`)), "- stale"),
+    1,
+  );
   // A bug list grouped under a sub-label that is not one a QA render emits is carried
   // whole (QA cycle 4, CR4-3: `**Critical Issues**` ended the block and dropped both).
   const grouped2 =

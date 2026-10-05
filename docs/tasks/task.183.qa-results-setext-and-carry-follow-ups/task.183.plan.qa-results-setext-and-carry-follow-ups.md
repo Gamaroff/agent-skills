@@ -104,6 +104,9 @@ rows (no Date column) still relocates.
 
 ### Phase 4: bold-label boundaries (5c CR-2, CR2-4)
 
+> **CR2-4 deferred at QA cycle 5 (2026-10-05).** The `QA_LABELS` stop below was implemented and
+> removed: it deleted bug lists grouped under QA-sounding labels. Kept for the record.
+
 In `collectBlocks`' `stops` (`:191`–`:198`), for a bold-label block (`level === 0`):
 
 - replace `/^#{1,6}[ \t]/.test(l)` with `/^#{1,3}[ \t]/.test(l)`;

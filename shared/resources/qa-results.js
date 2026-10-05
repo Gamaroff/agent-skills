@@ -142,9 +142,8 @@ const CARRIED_SUBSECTIONS = ["Bug Reports", "Deferred Work"];
 //     cannot carry QA's later `####` subsections (REL-025);
 //   - a bold label alone on its line, `**Bug Reports**` / `**Deferred Work**` (REL-027,
 //     and the legacy REL-030 record). It runs to the next heading of level 3 or
-//     shallower (task 183 — its `####` groups stay inside it), the next QA-owned label
-//     (`QA_LABELS`), or the next bold label alone on its line that does NOT introduce a
-//     list or table — a sub-label such as `**From cycle 2:**` over its items belongs to the
+//     shallower (task 183 — its `####` groups stay inside it), or the next bold label
+//     alone on its line that does NOT introduce a list or table — a sub-label such as `**From cycle 2:**` over its items belongs to the
 //     block; QA's own `**Recommendations**` over a paragraph does not (task 171 QA
 //     cycle 1, CR-2: stopping at every sub-label deleted the items under it).
 // Either form also stops at the first of QA's OWN template field lines
@@ -154,15 +153,11 @@ const CARRIED_SUBSECTIONS = ["Bug Reports", "Deferred Work"];
 // verdict along (task.155 QA cycle 8, REL-021).
 const RE_QA_FIELD =
   /^\*\*(?:QA Status|QA Engineer|Testing Date|Quality Score|Gate Decision)\*\*:/;
-// QA-owned bold labels standing alone on their line. A carried bold-label block ends at
-// one even when a list follows it, so a stale QA list is never carried into the next
-// write (task 183, CR2-4). RE_QA_FIELD matches `**Label**: value` field lines; this
-// matches the label alone, its colon inside the bold or after it (QA cycle 1, CR-4).
-// Only labels a QA render emits: `Critical Issues` and `Issues Found` also name bug-list
-// groupings, and stopping there dropped a grouped bug list (QA cycle 4, CR4-3).
-// The one place to add a legacy QA label.
-const QA_LABELS =
-  /^\*\*(?:Recommendations|Key Findings|Next Steps|Code Review Findings):?\*\*:?[ \t]*$/i;
+// There is deliberately no list of QA-owned bold labels that ends a carried block over a
+// list. A stale QA list after a carried block and a bug list grouped under a sub-label
+// are the same shape, and stopping at the label deleted the grouped list (task 183 QA
+// cycles 4–5, CR4-3, CR5-1). A stale list is carried instead — a duplicate, never a
+// deletion — and that residue (CR2-4) is recorded in task.183's Deferred Work.
 const RE_BOLD_LABEL = /^\*\*[^*\n]+\*\*:?[ \t]*$/;
 // `Bug Reports?` reads the singular too; each pattern maps back to its carried name.
 const CARRIED_PATTERN = {
@@ -201,9 +196,7 @@ function collectBlocks(text, name) {
       // stops at a heading of level 3 or shallower and keeps its `####` groups (task
       // 183, 5c CR-2: stopping at any heading carried the label and dropped the group).
       return (
-        /^#{1,3}[ \t]/.test(l) ||
-        QA_LABELS.test(l) ||
-        (RE_BOLD_LABEL.test(l) && !introducesList(i))
+        /^#{1,3}[ \t]/.test(l) || (RE_BOLD_LABEL.test(l) && !introducesList(i))
       );
     };
     let end = text.length;
