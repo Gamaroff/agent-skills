@@ -1135,9 +1135,13 @@ test("R2 CR-7: a list continuation or a comment's closing line over --- is writt
   }
   // The context is narrow: an unclosed comment exempts nothing after it (review I1),
   // and an item that cannot interrupt a paragraph opens no continuation.
+  // A thematic break matched the item pattern and exempted the line under it (QA
+  // cycle 1, CR-3): a break opens no continuation.
   for (const head of [
     "<!--\nnote\n\nRollout Notes",
     "Release\n2. Notes\n   more",
+    "* * *\n  Rollout Notes",
+    "- - -\n  Rollout Notes",
   ]) {
     const doc = markerDoc(`${section(1)}\n\n${head}\n-----\n\nkeep-me\n\n`);
     const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
@@ -1160,6 +1164,14 @@ test("R3 5c CR-1: a misplaced section above a Version-first log is refused; a Da
   const rb = QR.upsertQaResults(bare, section(2), { docType: "task" });
   assert.equal(rb.reason, "unbounded");
   assert.equal(rb.detail, "structural-line:| x | y | 1.1 | 2026-10-06 |");
+  // The log ABOVE the section is Version-first and the section quotes a Date-first table:
+  // the log must be seen as a log, so the section is not cut at the quoted table (which
+  // left the quoted row inside the log) but refused (QA cycle 1, CR-1).
+  const above = `${FM}## Body\n\ntext\n\n<!-- change-log-start -->\n\n## Change Log\n\n| Version | Date | Description | Author |\n| --- | --- | --- | --- |\n| 1.1 | 2026-10-06 | x | y |\n\n${section(1)}\n\n| Date | Note |\n| --- | --- |\n| 2026-01-01 | quoted |\n\n<!-- change-log-end -->\n`;
+  const ra = QR.upsertQaResults(above, section(2), { docType: "task" });
+  assert.equal(ra.reason, "unbounded");
+  assert.equal(ra.detail, "structural-line:| 2026-01-01 | quoted |");
+  assert.equal(ra.content, above);
   // A section quoting a table with no Date column stays writable.
   const phases = `${section(1)}\n\n| Phase | Status |\n| --- | --- |\n| Phase 1 | PASS |`;
   const ok = `${FM}## Body\n\ntext\n\n<!-- change-log-start -->\n\n## Change Log\n\n${phases}\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n\n<!-- change-log-end -->\n`;
@@ -1174,9 +1186,11 @@ test("R4 5c CR-2 / CR2-4: a bold Bug Reports block keeps its #### groups and sto
   const out = replaceThrice(markerDoc(`${section(1)}\n\n${grouped}\n\n`));
   assert.equal(count(out, "(./b.md)"), 1);
   assert.equal(count(out, "#### From cycle 2"), 1);
-  const stale =
-    "**Bug Reports**\n\n- [a](./a.md)\n\n**Recommendations**:\n\n- stale";
-  const out2 = replaceThrice(markerDoc(`${section(1)}\n\n${stale}\n\n`));
-  assert.equal(count(out2, "(./a.md)"), 1);
-  assert.doesNotMatch(out2, /- stale/);
+  // The colon may sit after the bold or inside it (QA cycle 1, CR-4).
+  for (const label of ["**Recommendations**:", "**Recommendations:**"]) {
+    const stale = `**Bug Reports**\n\n- [a](./a.md)\n\n${label}\n\n- stale`;
+    const out2 = replaceThrice(markerDoc(`${section(1)}\n\n${stale}\n\n`));
+    assert.equal(count(out2, "(./a.md)"), 1, label);
+    assert.doesNotMatch(out2, /- stale/, label);
+  }
 });

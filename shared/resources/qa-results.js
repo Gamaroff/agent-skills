@@ -85,11 +85,6 @@ const {
 const HEADING = "## QA Testing Results";
 const RE_QA = /^## QA Testing Results\b[^\n]*$/gm;
 const RE_H1_H2 = /^#{1,2}[ \t]/;
-// A change-log table's header row: first cell `Date`, whatever follows. The current
-// spec's `| Date | Version | … |` and the legacy sync logs' `| Date | Change |` both
-// match; only the header's first cell is fixed across every shape (task.155 QA
-// cycle 2, REL-005).
-const RE_LOG_HEADER = /^\|[ \t]*Date[ \t]*\|/i;
 // A thematic break line. Only counted as a separator when a blank line precedes it:
 // directly under a paragraph line, `---` is a setext H2 underline, not a break.
 const RE_BREAK =
@@ -162,9 +157,10 @@ const RE_QA_FIELD =
 // QA-owned bold labels standing alone on their line. A carried bold-label block ends at
 // one even when a list follows it, so a stale QA list is never carried into the next
 // write (task 183, CR2-4). RE_QA_FIELD matches `**Label**: value` field lines; this
-// matches the label alone. The one place to add a legacy QA label.
+// matches the label alone, its colon inside the bold or after it (QA cycle 1, CR-4).
+// The one place to add a legacy QA label.
 const QA_LABELS =
-  /^\*\*(?:Recommendations|Key Findings|Issues Found|Next Steps|Code Review Findings|Critical Issues)\*\*:?[ \t]*$/i;
+  /^\*\*(?:Recommendations|Key Findings|Issues Found|Next Steps|Code Review Findings|Critical Issues):?\*\*:?[ \t]*$/i;
 const RE_BOLD_LABEL = /^\*\*[^*\n]+\*\*:?[ \t]*$/;
 // `Bug Reports?` reads the singular too; each pattern maps back to its carried name.
 const CARRIED_PATTERN = {
@@ -313,6 +309,15 @@ function notParagraph(line) {
   );
 }
 
+// A change-log table's header row. The current spec's `| Date | Version | … |`, the
+// legacy sync logs' `| Date | Change |` (task.155 QA cycle 2, REL-005) and a Version-first
+// `| Version | Date | … |` log (task 183) all carry a `Date` cell; its position is not fixed.
+// Two questions use it with different reach (task 183 QA cycle 1, CR-1): whether a log
+// table EXISTS — any `Date` column, so a Version-first log is seen and the write refused
+// rather than cut — and where a section may be CUT, which only a Date-first header earns
+// (RE_LOG_HEADER). A cut is the risky direction: cutting at a table the section quotes
+// leaves its rows in the log (REL-006/007), and QA sections quote `| Cycle | Date | … |`.
+const RE_LOG_HEADER = /^\|[ \t]*Date[ \t]*\|/i;
 // Does a table row have a cell reading `Date`, in any position? The leading pipe opens the
 // row; a trailing pipe is optional, so only an empty last cell is dropped, never the last
 // real one (task 183 review, O2).
@@ -350,6 +355,12 @@ function blockContinuations(lines) {
     const open = /^ {0,3}<!--/.exec(l);
     if (open && !l.includes("-->", open[0].length)) {
       comment = true;
+      offset = 0;
+      continue;
+    }
+    // A thematic break (`* * *`, `- - -`) is not a list item, though the item pattern
+    // matches it, and it ends any item before it (task 183 QA cycle 1, CR-3).
+    if (RE_BREAK.test(l)) {
       offset = 0;
       continue;
     }
@@ -490,9 +501,11 @@ function markerBlocks(content, ranges) {
   return blocks.sort((a, b) => a.start - b.start);
 }
 
-// Offset of the LAST unprotected change-log table header in [from, to): a line
-// matching RE_LOG_HEADER whose previous line is not itself a table row.
-function lastTableStart(content, from, to, ranges) {
+// Offset of the LAST unprotected change-log table header in [from, to): a table row
+// `isHeader` accepts whose previous line is not itself a table row. The default,
+// `hasDateColumn`, answers whether a log table exists; the cut passes the Date-first
+// test (see RE_LOG_HEADER).
+function lastTableStart(content, from, to, ranges, isHeader = hasDateColumn) {
   let found = -1;
   let offset = from;
   let prevRow = false;
@@ -501,7 +514,7 @@ function lastTableStart(content, from, to, ranges) {
     if (
       isRow &&
       !prevRow &&
-      RE_LOG_HEADER.test(line) &&
+      isHeader(line) &&
       !insideProtected(ranges, offset)
     ) {
       found = offset;
@@ -600,6 +613,7 @@ function findQaResults(content) {
         bodyOffset,
         Math.min(...candidates),
         ranges,
+        (l) => RE_LOG_HEADER.test(l),
       );
       if (tbl !== -1) {
         candidates.push(tbl);

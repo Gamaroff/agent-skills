@@ -373,6 +373,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-05
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.183.qa.1.qa-results-setext-and-carry-follow-ups.md](./task.183.qa.1.qa-results-setext-and-carry-follow-ups.md)
+- **Gate File**: [task.183.gate.1.qa-results-setext-and-carry-follow-ups.yml](./task.183.gate.1.qa-results-setext-and-carry-follow-ups.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 85
+- **Phases Verified**: 5/5
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+
+### Key Findings
+CR-3 (HIGH): a thematic break (`* * *`, `- - -`) is read as a list item, so a setext section under the next line is deleted on replace. CR-1 (MEDIUM): `lastTableStart` keeps the Date-first log header. CR-4 (LOW): inner-colon QA label not matched.
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -383,6 +404,7 @@ None.
 | 2026-10-05 | 1.1     | Review passed (9/10) — bounded the HTML-comment context (I1), Phase 3 header exclusion (I2), corrected the CR5-1 probe figure | review-task |
 | 2026-10-05 |         | Status → ready-for-development | review-task |
 | 2026-10-05 |         | Implemented — 9 files (3 generated), 4 tests (R1–R4), 9 mutation proofs held | develop |
+| 2026-10-05 |         | QA gate FAIL (70/100) — 3 findings (1 high) | qa-task |
 
 <!-- change-log-end -->
 
