@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-04
-**Next Available Task Number:** **183**
+**Next Available Task Number:** **184**
 
 ## How to use
 
@@ -223,6 +223,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 180 | [security-probe: a fence: entry form for a fenced bash block in a step doc](task.180.probe-engine-fence-entry-form/task.180.probe-engine-fence-entry-form.md) | planned | infrastructure | Medium | 2026-10-03 | [#560](https://github.com/Gamaroff/agent-skills/issues/560) | — cut from obs #261: `fence:<doc>#<heading>` + `--slot` + optional per-case `fixture`, so a fenced-block boundary is probed by the engine instead of a hand-written wrapper (task.159, task.167) |
 | 181 | [security-probe: a shell-argv: entry form for a shell script that takes several arguments](task.181.probe-engine-shell-argv-entry-form/task.181.probe-engine-shell-argv-entry-form.md) | planned | infrastructure | Medium | 2026-10-04 | [#564](https://github.com/Gamaroff/agent-skills/issues/564) | task.170 (Phase 3 proof only) — cut from obs #189 and task.170's DoD gap 2: `shell-argv:<path>` + `--argv` + optional `--fixture-setup`, so a multi-argument shell boundary is probed by the engine instead of accepted as unverified (task.130, task.147, task.170) |
 | 182 | [reenter-qa: name why no-gate refused, fail closed on git, carry qa_reentry to every lock-field reader](task.182.reenter-qa-refusal-diagnostics-and-qa-reentry-population/task.182.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md) | planned | infrastructure | Medium | 2026-10-04 | [#565](https://github.com/Gamaroff/agent-skills/issues/565) | — task.170 PR review 2 follow-ups (CR-1, CR-2, CR-3) |
+| 183 | [qa-results setext and carry follow-ups](task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md) | planned | refactoring | High | 2026-10-05 | [#569](https://github.com/Gamaroff/agent-skills/issues/569) | task.171 · its five `## Deferred Work` items in `qa-results.js`: CR5-1 (HIGH, setext headed by paragraph text deleted on replace), 5c CR-1 (Version-first log rows), 5c CR-2 and CR2-4 (bold-label block boundaries), CR-7 (setext false refusals); plus the corpus-survey pre-filter and a load-recorded timing bound (obs #267, #268) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 

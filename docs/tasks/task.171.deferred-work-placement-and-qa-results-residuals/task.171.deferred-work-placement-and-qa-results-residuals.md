@@ -470,7 +470,7 @@ All Definition of Done criteria have been verified:
 
 Carried from QA gate 5 `recommendations.future` and the Step 5c PR review
 ([`task.171.pr-review.1`](./task.171.pr-review.1.deferred-work-placement-and-qa-results-residuals.md)).
-All five are gaps in `shared/resources/qa-results.js`; a follow-up task is still to be filed.
+All five are gaps in `shared/resources/qa-results.js`. Follow-up: [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md) ([#569](https://github.com/Gamaroff/agent-skills/issues/569)).
 
 - **CR5-1** (HIGH, pre-existing — identical on `origin/develop`, 0 corpus instances) — the setext
   paragraph test exempts lines CommonMark reads as paragraph text (`#538 …`, an autolink, inline
