@@ -4,7 +4,7 @@
 **Bug ID**: TASK-185-BUG-7
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 6, code review CR-2)
 **Date Found**: 2026-10-05
 
@@ -58,3 +58,4 @@ and `--cache 1h` reads. These were `notFound` before; reproduced in QA cycle 6.
 |---|---|---|---|
 | 2026-10-05 | New | qa-task | QA cycle 6 |
 | 2026-10-05 | Ready for QA | qa-fix | Fixed after escalation (user-approved allow-list) |
+| 2026-10-05 | Closed | qa-task | QA cycle 7: 82 direct forms executed, no write served; reads served |

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-185-BUG-6
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 6, safety re-probe, code review CR-1)
 **Date Found**: 2026-10-05
 
@@ -95,3 +95,4 @@ consecutive spellings leaked (glued, clustered, `-X`/`--method` last-wins).
 |---|---|---|---|
 | 2026-10-05 | New | qa-task | QA cycle 6 |
 | 2026-10-05 | Ready for QA | qa-fix | Fixed after escalation (user-approved allow-list) |
+| 2026-10-05 | Closed | qa-task | QA cycle 7: 82 direct forms executed, no write served; reads served |
