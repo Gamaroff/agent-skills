@@ -189,12 +189,33 @@ test("a skip exits 0, or EVAL_SKIP_EXIT when it is a code in 3–125", () => {
       ignored,
     );
   }
+  // An empty PATH: neither `which` nor `claude` resolves (QA cycle 2, CR-6).
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), "no-claude-"));
   const r = run(scenario({ assertions: [] }), {
     DRIVER: "claude-cli",
-    PATH: `${bin}:/usr/bin:/bin`,
+    PATH: bin,
     EVAL_SKIP_EXIT: "3",
   });
   assert.equal(r.status, 3, r.stderr);
   assert.match(r.stderr, /skipped: `claude` binary not found on PATH/);
+});
+
+// task.185 QA cycle 2, QA-3: a driver error exits 1 by default and EVAL_DRIVER_ERROR_EXIT on request.
+test("a driver error exits 1, or EVAL_DRIVER_ERROR_EXIT when it is a code in 3–125", () => {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), "bad-claude-"));
+  fs.writeFileSync(path.join(bin, "claude"), "#!/bin/sh\nexit 1\n", {
+    mode: 0o755,
+  });
+  const sc = scenario({ assertions: [] });
+  const env = {
+    DRIVER: "claude-cli",
+    PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+  };
+  assert.equal(run(sc, env).status, 1);
+  assert.equal(run(sc, { ...env, EVAL_DRIVER_ERROR_EXIT: "4" }).status, 4);
+  assert.equal(
+    run(sc, { ...env, EVAL_DRIVER_ERROR_EXIT: "2" }).status,
+    1,
+    "2 collides with usage",
+  );
 });

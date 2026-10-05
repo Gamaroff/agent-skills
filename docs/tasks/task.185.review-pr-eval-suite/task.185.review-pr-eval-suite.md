@@ -423,24 +423,24 @@ mutant, and both turn red.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-05
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.185.qa.1.review-pr-eval-suite.md](./task.185.qa.1.review-pr-eval-suite.md)
-- **Gate File**: [task.185.gate.1.review-pr-eval-suite.yml](./task.185.gate.1.review-pr-eval-suite.yml)
+- **Full Report**: [task.185.qa.2.review-pr-eval-suite.md](./task.185.qa.2.review-pr-eval-suite.md)
+- **Gate File**: [task.185.gate.2.review-pr-eval-suite.yml](./task.185.gate.2.review-pr-eval-suite.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5339
+- **Tests Executed**: 5346
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-TASK-185-CR-1 (HIGH): `repeat.mjs` counts a skipped run (no `claude` binary) as a pass, so the live pass rate can read N/N with no agent run. Two LOW findings: `live.minPass` above `--runs` is a usage error (QA-2), and `next-report-number.sh` overflows on an `{n}` ≥ 2^63 (QA-1).
+Cycle 1's high finding (a skip counted as a pass) is fixed and BUG-1 is closed. The refute pass found three medium edge cases in the pass-rate tool. The npm script collapses could-not-run to 1 (BUG-2). `live.minPass` is not scaled above 5 runs (BUG-3). A driver error is counted as a failed run (BUG-4). There are also two low argument-handling findings.
 
 ## Change Log
 
@@ -453,6 +453,8 @@ TASK-185-CR-1 (HIGH): `repeat.mjs` counts a skipped run (no `claude` binary) as 
 | 2026-10-05 |         | Implemented — 28 files, 37 new tests; live N=5: 20/20 runs pass | develop     |
 | 2026-10-05 |         | QA gate FAIL (70/100) — 1 high, 2 low findings                  | qa-task     |
 | 2026-10-05 |         | QA findings fixed — CR-1 (skip counted as pass), QA-1, QA-2, CR-2, CR-4; 1 iteration | qa-fix |
+| 2026-10-05 |         | QA gate CONCERNS (80/100) — 3 medium, 2 low findings            | qa-task     |
+| 2026-10-05 |         | QA findings fixed (cycle 2) — driver error is could-not-run, one exit-status owner, scaled live.minPass, usage errors; 2 iterations in total | qa-fix |
 <!-- change-log-end -->
 
 ---

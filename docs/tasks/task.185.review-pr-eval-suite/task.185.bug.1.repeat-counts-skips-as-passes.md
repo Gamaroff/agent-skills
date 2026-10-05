@@ -4,7 +4,7 @@
 **Bug ID**: TASK-185-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-1)
 **Date Found**: 2026-10-05
 
@@ -91,3 +91,4 @@ unavailable-driver path turns 1 red.
 | 2026-10-05 | New | QA Engineer | QA cycle 1, CR-1 |
 | 2026-10-05 | In Progress | qa-fix | Investigation |
 | 2026-10-05 | Ready for QA | qa-fix | Fix + regression tests, mutation-proven |
+| 2026-10-05 | Closed | QA Engineer | QA cycle 2: reproduction re-run → `run 1/2: skipped`, exit 3 |

@@ -57,8 +57,8 @@ floor **with a stated reason** — never a deleted assertion.
 
 ## Live runs
 
-- **A skip is not a pass.** With no `claude` on PATH, `eval:review-pr:cli` exits 3, "could not run". It never reports a pass rate for runs that did not happen.
-- **Fewer runs.** `EVAL_RUNS=3` caps each scenario's `live.minPass` at 3 and says so in the output.
+- **Could not run is not a result.** With no `claude` on PATH, or a driver error such as no credit, `eval:review-pr:cli` exits 3 ("could not run") and prints no pass rate. The full exit-status table is in [`evals/shared/README.md`](../shared/README.md) § Repeat runner.
+- **Other run counts.** `live.minPass` is a count out of 5, scaled to `EVAL_RUNS`: with `EVAL_RUNS=10`, 4/5 becomes 8/10. The output names the scaling.
 - **Auth.** `claude -p` uses the shell's auth, and `ANTHROPIC_API_KEY` beats a claude.ai login. If
   that key's account cannot pay, every run fails in seconds with `Credit balance is too low`; unset
   it for the run (`env -u ANTHROPIC_API_KEY …`).

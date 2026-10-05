@@ -28,9 +28,10 @@
  *                    (e.g. "the fake gh was called" — replay never calls it).
  *
  * Exit codes: 0 all assertions pass (or the scenario was skipped); 1 any failure or driver error.
- * A skip — the driver is unavailable, or a requiresLiveDriver scenario under replay — exits 0, which
- * is right for eval:all. A caller that must tell a skip from a pass (repeat.mjs) sets EVAL_SKIP_EXIT
- * to a code in 3–125 and a skip exits with that code instead (task.185 QA cycle 1, CR-1).
+ * A skip (the driver is unavailable, or a requiresLiveDriver scenario under replay) exits 0, and a
+ * driver error exits 1. eval:all relies on both. A caller that must tell them from a pass or a
+ * failed run (repeat.mjs) sets EVAL_SKIP_EXIT and/or EVAL_DRIVER_ERROR_EXIT to a code in 3–125, and
+ * that code is used instead (task.185 QA cycles 1 and 2).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -61,15 +62,16 @@ function readJSONL(p) {
     .map((l) => JSON.parse(l));
 }
 
-// The exit status for a skip: 0 unless the caller asked for a distinct one. An EVAL_SKIP_EXIT outside
-// 3–125 is ignored rather than trusted — 1 and 2 already mean fail and usage, and a value above 125
-// collides with the shell's own codes.
-function skipExitCode() {
-  const raw = process.env.EVAL_SKIP_EXIT;
-  if (raw === undefined || !/^[0-9]+$/.test(raw)) return 0;
+// A caller-requested exit status (EVAL_SKIP_EXIT, EVAL_DRIVER_ERROR_EXIT), else the default. A value
+// outside 3–125 is ignored rather than trusted: 1 and 2 already mean fail and usage, and a value
+// above 125 collides with the shell's own codes.
+function optInExit(envName, fallback) {
+  const raw = process.env[envName];
+  if (raw === undefined || !/^[0-9]+$/.test(raw)) return fallback;
   const n = Number(raw);
-  return n >= 3 && n <= 125 ? n : 0;
+  return n >= 3 && n <= 125 ? n : fallback;
 }
+const skipExitCode = () => optInExit("EVAL_SKIP_EXIT", 0);
 
 function makeSandbox(scenarioName) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `eval-${scenarioName}-`));
@@ -362,7 +364,7 @@ async function main() {
     process.stderr.write(`[${driverName}] driver error: ${e.message}\n`);
     if (!process.env.KEEP_SANDBOX)
       fs.rmSync(sandbox, { recursive: true, force: true });
-    process.exit(1);
+    process.exit(optInExit("EVAL_DRIVER_ERROR_EXIT", 1));
   }
 
   // Resolve $EVENTS_COMBINED token in assertions

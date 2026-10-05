@@ -19,7 +19,9 @@ All notable changes to this project will be documented in this file. Format foll
   `gh` (`evals/shared/lib/fake-gh.mjs`) that serves reads from fixtures, logs every call, refuses
   every write and reports a fixture gap as `unhandled` — so "never posts without asking" is an
   assertion. The claude-cli driver's error now carries `claude`'s stdout, where `Credit balance is
-  too low` was hiding behind an unrelated stderr warning.
+  too low` was hiding behind an unrelated stderr warning. `repeat.mjs` owns the pass-rate exit status: 0 met, 1 below, 2 usage, and 3
+  **could not run**. A skipped run (no `claude`) or a driver error (no credit, a crash) is never
+  counted as a pass or as a failed run. `live.minPass` is a count out of 5, scaled to the run count.
 
 - **A code fix after a `/finalise` DoD-gaps halt is gated before acceptance (task.170,
   observation #235).** The documented resume of a Step 7 halt restored the lock at 7 and re-ran
