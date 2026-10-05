@@ -1900,9 +1900,10 @@ After review:
      const r = QR.upsertQaResults(fs.readFileSync(file, "utf8"),
                                   fs.readFileSync(sectionFile, "utf8"), { docType });
      if (!["replaced", "relocated", "created"].includes(r.reason)) {
-       console.error(`HALT qa-results: ${r.reason}${r.count ? ` (${r.count} sections)` : ""} — ${file} not written.` +
+       console.error(`HALT qa-results: ${r.reason}${r.detail ? ` (${r.detail})` : ""} — ${file} not written.` +
          (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." :
-       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 or a Change Log heading (a fenced `# comment` counts). Fix that section by hand, re-run." :
+       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 (setext included), a Change Log heading (a fenced `# comment` counts) or, under a change log, a dated log row. The detail names the line. Fix that section by hand, re-run." :
+       r.reason === "bad-section" ? " The rendered section was refused; the detail names the rule. Fix the render (one section, no own Bug Reports or Deferred Work block, no trailing HTML comment), re-run." :
        r.reason === "unplaceable" ? " The write would not read back as exactly one section (an unclosed fence near the insertion point?). Fix by hand, re-run." : ""));
        process.exit(1);
      }

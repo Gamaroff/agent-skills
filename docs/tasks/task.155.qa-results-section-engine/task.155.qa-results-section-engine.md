@@ -480,6 +480,8 @@ All applicable Definition of Done criteria have been verified:
 
 ## Deferred Work
 
+> **Resolved by [task.171](../task.171.deferred-work-placement-and-qa-results-residuals/task.171.deferred-work-placement-and-qa-results-residuals.md) (2026-10-05):** REL-007, REL-008, REL-024, REL-025, REL-027, REL-028, REL-019 (the `bad-section` halt now prints its detail and a repair hint), REL-030 (fixed at its source — the loop-exit record now has its own `## Deferred Work` H2), setext H1/H2 as structure (plain-text headings only — task.171's `## Deferred Work` records the shapes still open, CR5-1), CRLF seams, CR-4, CR-5, PR review 5 CR-1/CR-2/CR-3, and `create-bug-report`'s H2-check/H3-write mismatch (obs #240). Still open below: PC-1 (the `upsertChangeLog` seam), REL-009 (whitespace) and REL-029.
+
 Carried from QA gates 3, 4 and 7 (route 2b cosmetic-residue exits) to each gate's `recommendations.future` and closed in `top_issues[]`, plus the PR-review items deferred at 5c. One follow-up task should take REL-007…011 and PC-1 together — they are all in the same span-bounding code:
 
 - **REL-007** (LOW) — a misplaced section that itself quotes a Date-headed table can be cut at its own table (inside a marker block after the log rows, or under a table-less marker-less log). 0 of 155 tracked sections quote such a table.

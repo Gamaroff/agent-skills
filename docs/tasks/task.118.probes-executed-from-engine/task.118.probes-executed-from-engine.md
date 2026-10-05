@@ -220,6 +220,7 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 
 ### Key Findings
 No critical issues identified. Ten cycles, never a HIGH: 45 findings closed, each fixed and mutation-proven in its cycle; the merged-file lock of cycles 2–5 was replaced in cycle 6 by one atomic entry file per control, and cycles 7–10 closed that layout's edges. One advisory cleanup remains (a stranded JSDoc).
+
 ---
 
 ## Definition of Done - PASSED ✅

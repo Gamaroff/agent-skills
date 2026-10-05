@@ -12,6 +12,8 @@
 //   E — span bounds.    a suffixed heading counts (task.65's copies); a section placed
 //                       before the block never swallows its start marker (review C2);
 //                       a `---` separator survives a replace.
+//   O — task 171.       task.155's recorded residuals: each shape either writes
+//                       correctly or refuses with a `detail` naming the rule that fired.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -356,13 +358,14 @@ test("G3 REL-005: a legacy | Date | Change | log under a marker-less heading kee
   assert.doesNotMatch(r.content, /cycle 1/);
 });
 
-test("G4 REL-006: a misplaced section that quotes a Date table leaves nothing of itself in the log", () => {
+test("G4 REL-006/REL-007: a misplaced section that quotes a dated table is refused, never cut (task 171)", () => {
+  // Under a log, the engine cannot tell the section's quoted rows from the log's own:
+  // task.155 cut at the last Date table and could leave either behind. Now refused.
   const doc = `${FM}## Body\n\ntext\n\n## Change Log\n\n${quoted}\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | Initial draft | create-task |\n`;
   const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
-  assert.equal(r.reason, "relocated");
-  const log = r.content.slice(r.content.indexOf("## Change Log"));
-  assert.doesNotMatch(log, /Stale tail line|quoted|QA Status/);
-  assert.match(log, /\| 2026-09-25 \| 1\.0 \| Initial draft/);
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.detail, "structural-line:| 2026-01-01 | 0.1 | quoted |");
+  assert.equal(r.content, doc);
 });
 
 test("G5 a marker-less log with prose but no table above the section is still the misplaced shape", () => {
@@ -697,10 +700,387 @@ test("N1 PC-1: a ### Deferred Work block inside the section survives every repla
   assert.equal(count(out, "### Deferred Work"), 1);
 });
 
-test("N2 both carried blocks survive together (appended in CARRIED_SUBSECTIONS order)", () => {
+test("N2 both carried blocks survive together, Bug Reports before Deferred Work", () => {
   const deferred = "### Deferred Work\n\n- REL-7 carried";
-  const doc = markerDoc(`${section(1)}\n\n${bugList}\n\n${deferred}\n\n`);
+  // Written in the opposite order, so the assertion pins the engine's order (CR-3).
+  const doc = markerDoc(`${section(1)}\n\n${deferred}\n\n${bugList}\n\n`);
   const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
   assert.equal(r.reason, "replaced");
   assert.ok(r.content.includes(bugList) && r.content.includes(deferred));
+  assert.ok(r.content.indexOf(bugList) < r.content.indexOf(deferred));
+});
+
+// ---------------------------------------------------------------------------
+// O — task 171: task.155's Deferred Work residuals
+// ---------------------------------------------------------------------------
+
+const replaceThrice = (doc) => {
+  let out = doc;
+  for (let n = 2; n <= 4; n++) {
+    const r = QR.upsertQaResults(out, section(n), { docType: "task" });
+    assert.equal(r.reason, "replaced", `write ${n}`);
+    out = r.content;
+  }
+  return out;
+};
+
+test("O1 REL-008: under a log whose header is not Date-first, the rows are refused, not lost", () => {
+  for (const header of ["| Date (UTC) | Change |", "| Change | Date |"]) {
+    const doc = `${FM}## Body\n\ntext\n\n## Change Log\n\n${section(1)}\n\n${header}\n| --- | --- |\n| 2026-01-02 | synced |\n`;
+    const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+    assert.equal(r.reason, "unbounded", header);
+    assert.equal(r.detail, "structural-line:| 2026-01-02 | synced |");
+    assert.equal(r.content, doc);
+  }
+});
+
+test("O2 REL-008: inside a marker block before a log holding two Date tables, refused", () => {
+  const two =
+    "<!-- change-log-start -->\n\n## Change Log\n\n" +
+    `${section(1)}\n\n` +
+    "| Date | Change |\n| --- | --- |\n| 2026-01-01 | first |\n\n" +
+    "| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-02-02 | 1.0 | second | x |\n\n<!-- change-log-end -->\n";
+  const doc = `${FM}## Body\n\ntext\n\n${two}`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.detail, "structural-line:| 2026-01-01 | first |");
+  assert.equal(r.content, doc);
+});
+
+test("O3 REL-007: a section after the block's own log rows that quotes a dated table is refused", () => {
+  const doc = markerDoc().replace(
+    "<!-- change-log-end -->",
+    `${quoted}\n\n<!-- change-log-end -->`,
+  );
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.detail, "structural-line:| 2026-01-01 | 0.1 | quoted |");
+  // Without a quoted dated row the same misplaced section still relocates whole.
+  const plain = markerDoc().replace(
+    "<!-- change-log-end -->",
+    `${section(1)}\n\n<!-- change-log-end -->`,
+  );
+  const r2 = QR.upsertQaResults(plain, section(2), { docType: "task" });
+  assert.equal(r2.reason, "relocated");
+  assert.equal(count(r2.content, "| 2026-09-25 | 1.0 | Initial draft"), 1);
+});
+
+test("O4 a correctly placed section may still quote dated rows and replace them", () => {
+  // The dated-row guard is scoped to sections under a log; G1/G2 stay replaceable.
+  const doc = `${FM}## Body\n\ntext\n\n${quoted}\n\n${LOG}`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "replaced");
+  assert.doesNotMatch(r.content, /quoted/);
+  // …and a render may carry a dated table of its own (a QA history, say).
+  const r2 = QR.upsertQaResults(markerDoc(), quoted, { docType: "task" });
+  assert.equal(r2.reason, "created");
+  assert.match(r2.content, /\| 2026-01-01 \| 0\.1 \| quoted \|/);
+});
+
+test("O5 setext: an underlined heading in a span or a render is refused, with the line", () => {
+  const doc = `${FM}## Body\n\ntext\n\n${section(1)}\n\nAccidental heading\n---\n\nmore\n\n${LOG}`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.detail, "structural-line:Accidental heading / ---");
+  const r2 = QR.upsertQaResults(
+    markerDoc(),
+    `${section(2)}\n\nTitle\n=====\n\nx`,
+    {
+      docType: "task",
+    },
+  );
+  assert.equal(r2.reason, "bad-section");
+  assert.equal(r2.detail, "structural-line:Title / =====");
+  // Not setext: a break after a blank line, and a table delimiter row.
+  const ok = `${section(1)}\n\npara\n\n---\n\n| a | b |\n|---|---|\n| 1 | 2 |`;
+  assert.equal(
+    QR.upsertQaResults(markerDoc(), ok, { docType: "task" }).reason,
+    "created",
+  );
+});
+
+test("O6 REL-024: a render that ends in a comment is refused; a legacy comment before a heading is kept", () => {
+  // The refusal closes REL-024 (a render's trailing comment gained a copy per write).
+  const r = QR.upsertQaResults(markerDoc(), `${section(2)}\n\n<!-- note -->`, {
+    docType: "task",
+  });
+  assert.equal(r.reason, "bad-section");
+  assert.equal(r.detail, "trailing-comment");
+  // A standalone comment between the section and the next heading is a separator, as
+  // task.155 had it — narrowing the peel deleted it (task 171 QA cycle 1, CR-6).
+  const doc = `${FM}## Body\n\ntext\n\n${section(1)}\n\n<!-- Progress Tracking: tick each phase -->\n\n## Progress Tracking\n\nx\n`;
+  const out = replaceThrice(doc);
+  assert.equal(count(out, "<!-- Progress Tracking: tick each phase -->"), 1);
+});
+
+test("O7 REL-025: a #### Bug Reports block stops at QA's next #### subsection", () => {
+  const block = "#### Bug Reports\n\n- [bug.1](./task.9.bug.1.a.md) - open";
+  const doc = markerDoc(
+    `${section(1)}\n\n${block}\n\n#### Recommendations\n\nStale advice.\n\n`,
+  );
+  const out = replaceThrice(doc);
+  assert.equal(count(out, block), 1);
+  assert.doesNotMatch(out, /Stale advice|#### Recommendations/);
+});
+
+test("O8 REL-027: a bold-label list and a singular heading are carried", () => {
+  const bold = "**Bug Reports**\n\n- [bug.2](./task.9.bug.2.b.md) - open";
+  const singular = "### Bug Report\n\n- [bug.3](./task.9.bug.3.c.md) - open";
+  for (const list of [bold, singular]) {
+    const out = replaceThrice(markerDoc(`${section(1)}\n\n${list}\n\n`));
+    assert.equal(count(out, list), 1, list.split("\n")[0]);
+  }
+  // A bold-label block ends at the next bold label: QA's own label is not carried.
+  const doc = markerDoc(
+    `${section(1)}\n\n${bold}\n\n**Recommendations**\n\nStale.\n\n`,
+  );
+  assert.doesNotMatch(replaceThrice(doc), /Stale\./);
+});
+
+test("O9 REL-030 legacy: a bold **Deferred Work** record inside the section is carried", () => {
+  const rec = "**Deferred Work**\n\n- REL-7 (LOW) — carried";
+  const out = replaceThrice(markerDoc(`${section(1)}\n\n${rec}\n\n`));
+  assert.equal(count(out, rec), 1);
+});
+
+test("O10 REL-028: a Deferred Work block nested in a Bug Reports block is carried once", () => {
+  const nested =
+    "### Bug Reports\n\n- [bug.4](./task.9.bug.4.d.md) - open\n\n#### Deferred Work\n\n- REL-9 carried";
+  const out = replaceThrice(markerDoc(`${section(1)}\n\n${nested}\n\n`));
+  assert.equal(count(out, nested), 1);
+  assert.equal(count(out, "- REL-9 carried"), 1);
+});
+
+test("O11 CR-4: a folded block keeps its heading text as a bold line", () => {
+  const first = "### Bug Reports\n\n- [bug.5](./task.9.bug.5.e.md) - open";
+  const second = "### Bug Reports (2)\n\n- [bug.6](./task.9.bug.6.f.md) - open";
+  const out = replaceThrice(
+    markerDoc(`${section(1)}\n\n${first}\n\n${second}\n\n`),
+  );
+  assert.match(
+    out,
+    /- \[bug\.5\][^\n]*\n\n\*\*Bug Reports \(2\)\*\*\n\n- \[bug\.6\]/,
+  );
+  assert.equal(count(out, "bug.6.f.md"), 1);
+});
+
+test("O12 CRLF: every seam a write makes uses the document's line ending", () => {
+  const crlf = (s) => s.replace(/\n/g, "\r\n");
+  const bare = (s) => (s.match(/(?<!\r)\n/g) || []).length;
+  const withList = markerDoc(`${section(1)}\n\n${bugList}\n\n`);
+  for (const [doc, want] of [
+    [crlf(markerDoc()), "created"],
+    [crlf(withList), "replaced"],
+    [
+      crlf(
+        LOG.replace("## Change Log\n\n", `## Change Log\n\n${section(1)}\n\n`),
+      ),
+      "relocated",
+    ],
+  ]) {
+    const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+    assert.equal(r.reason, want);
+    assert.equal(bare(r.content), 0, `${want}: no bare LF`);
+    assert.equal(
+      QR.upsertQaResults(r.content, section(2), { docType: "task" }).content,
+      r.content,
+      `${want}: idempotent`,
+    );
+  }
+});
+
+test("O13 CR-5: a section stranded between ## Change Log and its marker block moves above the heading", () => {
+  const stranded = `${FM}## Body\n\ntext\n\n## Change Log\n\n${section(1)}\n\n<!-- change-log-start -->\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n\n<!-- change-log-end -->\n`;
+  assert.equal(QR.findQaResults(stranded).sections[0].insideChangeLog, true);
+  const r = QR.upsertQaResults(stranded, section(2), { docType: "task" });
+  assert.equal(r.reason, "relocated");
+  assert.match(
+    r.content,
+    /None \(cycle 2\)\.\n\n## Change Log\n\n<!-- change-log-start -->/,
+  );
+  const r2 = QR.upsertQaResults(r.content, section(3), { docType: "task" });
+  assert.equal(r2.reason, "replaced");
+  assert.match(
+    r2.content,
+    /None \(cycle 3\)\.\n\n## Change Log\n\n<!-- change-log-start -->/,
+  );
+});
+
+test("O14 PR review 5 CR-1: every refusal names the rule that fired", () => {
+  const cases = [
+    [markerDoc(), "not a section", "bad-section", "not-a-section"],
+    [
+      markerDoc(),
+      `${section(1)}\n\n\`\`\`\nopen`,
+      "bad-section",
+      "unclosed-fence",
+    ],
+    [
+      markerDoc(),
+      `${section(1)}\n\n${bugList}`,
+      "bad-section",
+      "carried-block:Bug Reports",
+    ],
+    [
+      markerDoc(),
+      `${section(1)}\n\n## Other`,
+      "bad-section",
+      "structural-line:## Other",
+    ],
+    [
+      markerDoc(`${section(1)}\n\n${section(1)}\n\n`),
+      section(2),
+      "multiple",
+      "multiple:2",
+    ],
+    [
+      markerDoc(`${section(1)}\n\n\`\`\`\nopen\n\n`),
+      section(2),
+      "unbounded",
+      "unclosed-fence",
+    ],
+  ];
+  for (const [doc, render, reason, detail] of cases) {
+    const r = QR.upsertQaResults(doc, render, { docType: "task" });
+    assert.equal(r.reason, reason, detail);
+    assert.equal(r.detail, detail);
+    assert.equal(r.content, doc);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// P — task 171 QA cycle 1: the new rules' own loss paths
+// ---------------------------------------------------------------------------
+
+const links = (s) => (s.match(/\]\([^)]+\)/g) || []).sort();
+
+test("P1 CR-1: a folded block whose own heading would cut the first block survives every write", () => {
+  for (const [first, second] of [
+    [
+      "#### Bug Reports\n\n- [a](./task.9.bug.1.a.md)",
+      "### Bug Reports (2)\n\n#### Open\n\n- [c](./task.9.bug.3.c.md)",
+    ],
+    [
+      "**Bug Reports**\n\n- [a](./task.9.bug.1.a.md)",
+      "### Bug Reports (2)\n\n- [c](./task.9.bug.3.c.md)",
+    ],
+    [
+      "### Bug Reports\n\n- [a](./task.9.bug.1.a.md)",
+      "### Bug Reports (2)\n\n- [c](./task.9.bug.3.c.md)",
+    ],
+  ]) {
+    const doc = markerDoc(`${section(1)}\n\n${first}\n\n${second}\n\n`);
+    const out = replaceThrice(doc);
+    assert.deepEqual(
+      links(out).filter((l) => l.includes("bug")),
+      ["](./task.9.bug.1.a.md)", "](./task.9.bug.3.c.md)"],
+      first.split("\n")[0],
+    );
+    const again = QR.upsertQaResults(out, section(4), { docType: "task" });
+    assert.equal(again.content, out, "stable after the first write");
+  }
+});
+
+test("P2 CR-2: a bold-label list grouped under sub-labels keeps every item", () => {
+  const rec =
+    "**Deferred Work**\n\n**From cycle 2:**\n\n- REL-1 carried\n\n**From cycle 3:**\n\n- REL-2 carried";
+  const out = replaceThrice(markerDoc(`${section(1)}\n\n${rec}\n\n`));
+  assert.equal(count(out, rec), 1);
+  // Two labelled records, each carried once.
+  const two =
+    "**Bug Reports**\n\n- [b](./task.9.bug.2.b.md)\n\n**Deferred Work**\n\n- REL-3";
+  const out2 = replaceThrice(markerDoc(`${section(1)}\n\n${two}\n\n`));
+  assert.equal(count(out2, "**Deferred Work**"), 1);
+  assert.equal(count(out2, "- REL-3"), 1);
+});
+
+test("P3 CR-3: non-ISO rows of a Date table under a log are refused, never deleted", () => {
+  for (const row of [
+    "| 2026-01-02T10:00Z | synced |",
+    "| 03/01/2026 | synced |",
+  ]) {
+    const doc = markerDoc().replace(
+      "<!-- change-log-end -->",
+      `${section(1)}\n\n| Date | Change |\n| --- | --- |\n${row}\n\n<!-- change-log-end -->`,
+    );
+    const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+    assert.equal(r.reason, "unbounded", row);
+    assert.equal(r.detail, `structural-line:${row}`);
+    assert.equal(r.content, doc);
+  }
+});
+
+test("P4 CR-4: a CRLF document keeps the separator and lead-in comment its LF twin keeps", () => {
+  const lf = `${FM}## Body\n\ntext\n\n${section(1)}\n\n---\n<!-- lead-in for the log -->\n\n${LOG}`;
+  const crlf = (s) => s.replace(/\n/g, "\r\n");
+  const a = QR.upsertQaResults(lf, section(2), { docType: "task" });
+  const b = QR.upsertQaResults(crlf(lf), section(2), { docType: "task" });
+  assert.equal(a.reason, "replaced");
+  assert.equal(b.reason, "replaced");
+  assert.equal(b.content, crlf(a.content));
+  assert.match(a.content, /---\n<!-- lead-in for the log -->/);
+});
+
+// ---------------------------------------------------------------------------
+// Q — task 171 QA cycle 2
+// ---------------------------------------------------------------------------
+
+test("Q1 setext is fence-blind, like ATX: fenced YAML is refused with its line, never written", () => {
+  // Cycles 2–4 exempted "well-paired" fences and each exemption was beaten by a
+  // mis-pairing that deleted a real setext section (CR2-2 → CR3-1 → CR4-1). Refusing
+  // fenced YAML is the REL-016 trade a fenced `# comment` already makes.
+  const yaml = "```yaml\nstatus: done\n---\nother: x\n```";
+  const r = QR.upsertQaResults(markerDoc(), `${section(1)}\n\n${yaml}`, {
+    docType: "task",
+  });
+  assert.equal(r.reason, "bad-section");
+  assert.equal(r.detail, "structural-line:status: done / ---");
+  const bare = QR.upsertQaResults(
+    markerDoc(),
+    `${section(1)}\n\nstatus: done\n---\n\nmore`,
+    { docType: "task" },
+  );
+  assert.equal(bare.detail, "structural-line:status: done / ---");
+});
+
+test("Q2 CR2-3: a later block whose body is a substring of an earlier one is still carried", () => {
+  const first = "### Deferred Work\n\n- REL-12 (LOW) whitespace";
+  const second = "### Deferred Work (cycle 3)\n\n- REL-1";
+  const out = replaceThrice(
+    markerDoc(`${section(1)}\n\n${first}\n\n${second}\n\n`),
+  );
+  assert.match(out, /^- REL-1$/m);
+  assert.equal(count(out, "- REL-12 (LOW) whitespace"), 1);
+  // An exact duplicate body is still carried once.
+  const dup = "### Deferred Work (again)\n\n- REL-12 (LOW) whitespace";
+  const out2 = replaceThrice(
+    markerDoc(`${section(1)}\n\n${first}\n\n${dup}\n\n`),
+  );
+  assert.equal(count(out2, "- REL-12 (LOW) whitespace"), 1);
+});
+
+test("Q3 CR2-5: one stray CRLF line does not turn an LF document's section CRLF", () => {
+  const doc = markerDoc().replace("Revert.\n", "Revert.\r\n");
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "created");
+  const [s] = QR.findQaResults(r.content).sections;
+  assert.doesNotMatch(r.content.slice(s.start, s.end), /\r/);
+});
+
+test("Q4 CR3-1/CR4-1: a setext section behind any fence mis-pairing is refused, not deleted", () => {
+  const behind = (fences) =>
+    markerDoc(
+      `${section(1)}\n\n${fences[0]}\necho hi\n\nRollout Notes\n-------------\n\nsteps\n\n${fences[1]}\n\n`,
+    );
+  for (const pair of [
+    ["```bash", "```yaml\nk: v\n```"], // CR3-1: closes on an info-string block's closer
+    ["```bash", "```\nplain\n```\n\n```yaml\nk: v\n```"], // CR4-1: closes on a plain opener
+    ["~~~bash", "~~~\nplain\n~~~"], // CR4-1, tilde
+    ["```", "```\nplain\n```"], // CR4-1, bare stray
+  ]) {
+    const doc = behind(pair);
+    const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+    assert.notEqual(r.reason, "replaced", pair.join(" … "));
+    assert.equal(r.content, doc);
+  }
 });

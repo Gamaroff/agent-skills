@@ -5,10 +5,12 @@ type: task
 description: "Follow-up to task.155. Give the develop pipelines' loop-exit Deferred Work record its own `## Deferred Work` section outside the QA Testing Results section, which is the source fix for REL-030. Close the qa-results.js residuals task.155 recorded. Make create-bug-report's Bug Reports check match the heading it writes."
 tags: [qa-task, qa-story, develop-task, develop-story, create-bug-report, engine, follow-up]
 category: refactoring
-status: planned
+status: accepted
+completed_date: 2026-10-05
+pr_number: 568
 priority: Medium
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-05
 assignee:
 estimated_effort_hours: 16
 github_issue: 538
@@ -16,7 +18,9 @@ github_issue: 538
 
 # Technical Task: Deferred Work placement and qa-results engine residuals
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.171.review.1.deferred-work-placement-and-qa-results-residuals.md` implemented 2026-10-05
 
 **GitHub Issue**: [#538](https://github.com/Gamaroff/agent-skills/issues/538)
 
@@ -121,7 +125,9 @@ content. Each one either writes correctly or refuses with a reason that names th
   engine never reaches it.
 - **Refuse what cannot be cut safely (REL-007/008).** `removesStructure` also treats a dated log row
   as structure (`isEntryRow`, imported, header-agnostic). It treats setext H1/H2 headings as
-  structure too, once task.118's accidental setext underline is repaired. A misplaced section
+  structure too, once task.118's accidental setext underline is repaired. *Amended in QA cycle 4:*
+  the setext check is fence-blind, like the H1/H2 check; three cycles of fence exemptions (CR2-2,
+  CR3-1, CR4-1) each let a mis-paired fence hide a setext section that a replace then deleted. A misplaced section
   whose span holds a dated row that is not part of the log is refused, so no row can be lost. REL-007
   is the same rule.
 - **Carry precisely.**
@@ -133,7 +139,9 @@ content. Each one either writes correctly or refuses with a reason that names th
   - A folded block keeps its heading text as a bold line (CR-4).
 - **Peel only what is a separator (REL-024).** A trailing HTML comment is peeled only when the next
   thing after it is a change-log block or heading (the template lead-in). Otherwise it is section
-  content.
+  content. *Amended in QA cycle 1 (CR-6):* the narrowed peel deleted a legacy lead-in above a non-log
+  heading, so the peel is unchanged and REL-024 is closed by refusing a render that ends in a comment
+  (`trailing-comment`).
 - **CRLF:** every seam the engine writes uses the document's own line ending.
 - **CR-5:** a section stranded between a `## Change Log` heading and its marker block (written by an
   older engine) is treated as misplaced and relocated above the heading.
@@ -143,7 +151,8 @@ content. Each one either writes correctly or refuses with a reason that names th
   detail.
 - **Dead code removed (CR-2),** and test N2 pins the order (CR-3).
 - **create-bug-report** task mode checks for the `### Bug Reports` heading it writes. The engine
-  carries the bold-label and `####` forms, so the check accepts those too.
+  carries the bold-label and `####` forms, so the check accepts those too. *Amended in QA cycle 2
+  (CR2-1):* the older H2 `## Bug Reports` lists (18 tracked documents) count as existing as well.
 
 ### Same-class mechanism inventory (obs #103)
 
@@ -202,13 +211,16 @@ the operator's request.
 
 **Files**: `shared/resources/develop-pipeline-step-5-6-qa-loop.md` and its bundled copies (generated)
 
-- [ ] One statement of the record's heading (`## Deferred Work`) and position (immediately before the
+- [x] One statement of the record's heading (`## Deferred Work`) and position (immediately before the
       change-log block, otherwise before `## Progress Tracking` / `## Dev Agent Record`, never inside
       `## QA Testing Results`). The `:685` and `:737` paragraphs point at it instead of restating it
-- [ ] A test that executes the stated placement: it applies the documented write to a fixture that
+- [x] The statement carries one fenced `markdown` worked example of the record. The Phase 1 test
+      extracts that fence by the subsection's own heading, not by the shared token `Deferred Work`
+      (obs #135), so the test executes the documented shape rather than a copy of it
+- [x] A test that executes the stated placement: it applies the documented write to a fixture that
       has a QA section, then runs `upsertQaResults` three times, and asserts the record survives
       unchanged
-- [ ] `npm run bundle`, `npm run bundle:check`
+- [x] `npm run bundle`, `npm run bundle:check`
 
 ### Phase 2: engine residuals (Risk: Medium)
 
@@ -217,35 +229,40 @@ copies (generated), `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`,
 `docs/tasks/task.118.probes-executed-from-engine/task.118.probes-executed-from-engine.md` (one-line
 repair)
 
-- [ ] `removesStructure` adds dated log rows (`isEntryRow`, imported) and setext H1/H2. Before
+- [x] `removesStructure` adds dated log rows (`isEntryRow`, imported) and setext H1/H2. Before
       committing, measure both on the 155 tracked sections: 0 false refusals is the bar, after the
       task.118 repair (REL-007/008, setext)
-- [ ] Carry: cross-name nesting dedupe (REL-028), level-bounded `####` blocks (REL-025), bold-label
+- [x] Carry: cross-name nesting dedupe (REL-028), level-bounded `####` blocks (REL-025), bold-label
       and singular forms (REL-027, legacy REL-030), folded heading kept as a bold line (CR-4)
-- [ ] `trimSeparator` peels a trailing HTML comment only when a change-log block or heading follows
-      it (REL-024)
-- [ ] Write seams follow the document's line ending (CRLF)
-- [ ] A section stranded between a `## Change Log` heading and its marker block is treated as
+- [x] REL-024 closed: a render ending in an HTML comment is refused (`trailing-comment`); the
+      `trimSeparator` peel is unchanged (QA cycle 1, CR-6)
+- [x] Write seams follow the document's line ending (CRLF)
+- [x] A section stranded between a `## Change Log` heading and its marker block is treated as
       misplaced and relocated (CR-5)
-- [ ] Refusals return `detail`, and both Step 12 halts print it (PR review 5 CR-1)
-- [ ] Remove `linksIn` and the unused `end` field (CR-2). N2 asserts the order (CR-3)
-- [ ] One unit test per residual, each mutation-proved, with the results recorded in the
+- [x] Refusals return `detail`, and both Step 12 halts print it (PR review 5 CR-1). `multiple:<n>`
+      replaces the halt's current `(<n> sections)` suffix, so the count is printed once
+- [x] Remove `linksIn` and the unused `end` field (CR-2). N2 asserts the order (CR-3)
+- [x] One unit test per residual, each mutation-proved, with the results recorded in the
       implementation report
+- [x] `tests/qa-results-corpus.test.js` gains a write survey (the plan's measurement) asserting 0
+      false refusals, 0 deletions and 0 non-idempotent writes over the tracked tree, with a
+      non-vacuity floor
 
 ### Phase 3: create-bug-report heading check (Risk: Low)
 
 **Files**: `skills/create-bug-report/SKILL.md`, `tests/create-bug-report-bug-reports-heading.test.js`
 
-- [ ] Task-mode Step 5 checks for the heading it writes (`### Bug Reports`, or the `####` / bold forms
+- [x] Task-mode Step 5 checks for the heading it writes (`### Bug Reports`, or the `####` / bold forms
       the engine carries), so a second filing appends to the existing list (obs #240)
-- [ ] A test asserts that the heading Step 5 checks is the heading Step 5 writes
+- [x] A test asserts that the heading Step 5 checks is the heading Step 5 writes
 
 ### Phase 4: docs and validation (Risk: Low)
 
 **Files**: `CHANGELOG.md`
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 171)` and states the new refusals
-- [ ] `npm run ci:fast`, `npm run bundle:check`, and `npm run validate` for qa-task, qa-story,
+- [x] CHANGELOG `[Unreleased]` cites `(task 171)` and states the new refusals
+- [x] task.155's `## Deferred Work` items closed here are marked resolved with a link to this task
+- [x] `npm run ci:fast`, `npm run bundle:check`, and `npm run validate` for qa-task, qa-story,
       create-bug-report, develop-task and develop-story
 
 ---
@@ -262,15 +279,18 @@ repair)
 6. ✅ `docs/tasks/task.118.probes-executed-from-engine/task.118.probes-executed-from-engine.md`: the
    setext underline becomes a separator (one blank line)
 7. ✅ `CHANGELOG.md`
+8. ✅ `docs/tasks/task.155.qa-results-section-engine/task.155.qa-results-section-engine.md`: the
+   `## Deferred Work` items closed here link to this task
+9. ✅ `tests/qa-results-corpus.test.js`: the write survey (0 / 0 / 0)
 
 ### Files to Add
 
-8. ✅ `tests/create-bug-report-bug-reports-heading.test.js`
-9. ✅ `tests/deferred-work-placement.test.js`: the Phase 1 executed placement test
+10. ✅ `tests/create-bug-report-bug-reports-heading.test.js`
+11. ✅ `tests/deferred-work-placement.test.js`: the Phase 1 executed placement test
 
 ### Generated (`npm run bundle`, never edited by hand)
 
-10. `skills/develop-story/references/develop-pipeline-step-5-6-qa-loop.md`,
+12. `skills/develop-story/references/develop-pipeline-step-5-6-qa-loop.md`,
     `skills/develop-task/references/develop-pipeline-step-5-6-qa-loop.md`,
     `skills/qa-task/references/qa-results.js`, `skills/qa-story/references/qa-results.js`
 
@@ -294,8 +314,9 @@ None.
   `upsertQaResults` with a probe section, plus the six fault-injection shapes task.155's QA used.
   Count three things: refusals of an unmodified document (false refusals), dated rows, markers or
   H1/H2 lost (deletions), and documents changed by a second identical write (non-idempotent).
-- **Command**: the survey script in the plan file. The bar is 0 / 0 / 0. The test suite records the
-  numbers, and this document does not state them.
+- **Command**: the survey script in the plan file, landed as the write survey in
+  `tests/qa-results-corpus.test.js`. The bar is 0 / 0 / 0. The test records the numbers, and this
+  document does not state them.
 
 ### Behaviour tests
 
@@ -314,28 +335,32 @@ None.
 
 ### Functional
 
-- [ ] The step doc states one home for the loop-exit Deferred Work record. The executed placement
+- [x] The step doc states one home for the loop-exit Deferred Work record. The executed placement
       test shows it surviving three QA writes
-- [ ] Every residual in § 2 either writes correctly or refuses with a `detail`, and the unit tests
+- [x] Every residual in § 2 either writes correctly or refuses with a `detail`, and the unit tests
       show which
-- [ ] Both Step 12 halts print the refusal `detail`
-- [ ] create-bug-report task mode checks for the heading it writes
+- [x] Both Step 12 halts print the refusal `detail`
+- [x] create-bug-report task mode checks for the heading it writes
 
 ### Performance
 
-- [ ] The engine, wiring and corpus tests run in under two seconds combined
-- [ ] No network access
+- [x] The engine, wiring and corpus tests run in under two seconds combined. A wall-clock bound no
+      per-PR test can assert: measured by `time command node --test shared/resources/tests/qa-results.test.mjs tests/qa-results-corpus.test.js tests/qa-results-step12-wiring.test.js`,
+      with the figure recorded in the implementation report
+- [x] No network access. Not applicable as a separate test: `qa-results.js` requires only
+      `./change-log.js`, which is itself local and pure
 
 ### Code Quality
 
-- [ ] Corpus measurement: 0 false refusals, 0 deletions, 0 non-idempotent writes on the tracked tree
-- [ ] Every new assertion is mutation-proved, and each result is recorded
-- [ ] `npm run ci:fast`, `npm run bundle:check` and `npm run validate` are clean for the touched skills
+- [x] Corpus measurement: 0 false refusals, 0 deletions, 0 non-idempotent writes on the tracked tree,
+      held by the write survey in `tests/qa-results-corpus.test.js`
+- [x] Every new assertion is mutation-proved, and each result is recorded
+- [x] `npm run ci:fast`, `npm run bundle:check` and `npm run validate` are clean for the touched skills
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 171)` and names the new refusals
-- [ ] task.155's Deferred Work items closed here are marked resolved by a link to this task
+- [x] CHANGELOG `[Unreleased]` cites `(task 171)` and names the new refusals
+- [x] task.155's Deferred Work items closed here are marked resolved by a link to this task
 
 ---
 
@@ -392,24 +417,101 @@ None.
 
 ---
 
-<!-- change-log-start -->
+## QA Testing Results
 
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-05
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.171.qa.5.deferred-work-placement-and-qa-results-residuals.md](./task.171.qa.5.deferred-work-placement-and-qa-results-residuals.md)
+- **Gate File**: [task.171.gate.5.deferred-work-placement-and-qa-results-residuals.yml](./task.171.gate.5.deferred-work-placement-and-qa-results-residuals.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 101
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 open
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Five QA cycles closed 13 findings this branch introduced or exposed. The setext check ended fence-blind after three cycles of fence-exemption narrowing. One pre-existing HIGH (the setext paragraph test exempts some paragraph-text lines; identical on origin/develop, 0 corpus instances) is routed to a follow-up task with two lows.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.171.qa.5.deferred-work-placement-and-qa-results-residuals.md` (5 cycles)
+**Gate File**: `task.171.gate.5.deferred-work-placement-and-qa-results-residuals.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**Step 5c PR review**: ⚠️ CONCERNS (`task.171.pr-review.1.deferred-work-placement-and-qa-results-residuals.md`) — documentation findings acted on; code findings pre-existing or low, carried below
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11/11 — functional (one Deferred Work home, residuals write or refuse with a detail, halts print the detail, create-bug-report heading check), performance (measured, see the DoD summary's SC5 note), code quality (corpus 0/0/0, mutation-proved, ci:fast/bundle:check/validate), migration (CHANGELOG, task.155 links)
+✅ **Tests:** engine, wiring, corpus, placement and heading suites run per PR; CI `test` SUCCESS on `799b8f53`
+✅ **PR:** #568
+✅ **Documentation:** CHANGELOG `[Unreleased]`, step doc, three SKILL.md files, task.155 note
+✅ **Security Review:** PASS — `boundary: internal` with a valid reason; no secrets or unsafe sinks
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling
+
+**Task marked as ACCEPTED on:** 2026-10-05
+
+**Detailed Verification Log:** See `task.171.dod.1.deferred-work-placement-and-qa-results-residuals.md` for complete verification evidence and timestamps.
+
+## Deferred Work
+
+Carried from QA gate 5 `recommendations.future` and the Step 5c PR review
+([`task.171.pr-review.1`](./task.171.pr-review.1.deferred-work-placement-and-qa-results-residuals.md)).
+All five are gaps in `shared/resources/qa-results.js`; a follow-up task is still to be filed.
+
+- **CR5-1** (HIGH, pre-existing — identical on `origin/develop`, 0 corpus instances) — the setext
+  paragraph test exempts lines CommonMark reads as paragraph text (`#538 …`, an autolink, inline
+  HTML, an ordered item not starting at 1), so a setext section they head is deleted on replace. This
+  task closes the plain-text shape only.
+- **5c CR-1** (medium, pre-existing) — a Version-first log (`| Version | Date | … |`) under a marker
+  block loses its rows on relocate; count `isUnparsedRow` as a log row under `underLog`.
+- **5c CR-2** (low) — a bold-label carried block stops at any heading, so a `####` group under a bold
+  `**Bug Reports**` label is dropped on the next replace.
+- **CR2-4** (low) — a bold Bug Reports block continues past QA's own `**Recommendations**:` when a
+  list follows it, carrying a stale list.
+- **CR-7** (low, gate 1) — setext false refusals after a list continuation line or a multi-line
+  comment closer.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-01 | 1.0     | Initial draft | create-task |
-
+| 2026-10-05 | 1.1     | Review passed (8/10) — named the corpus write-survey test, measured the performance bound, scoped the no-network criterion, added the worked-example extraction to Phase 1, added task.155 and the corpus test to Files Summary | review-task |
+| 2026-10-05 |         | Status → ready-for-development | review-task |
+| 2026-10-05 |         | Implemented — 16 files, 20 new tests (14 engine, 4 placement, 2 heading), 4 wiring/corpus assertions | develop |
+| 2026-10-05 |         | QA gate CONCERNS (50/100) — 5 findings | qa-task |
+| 2026-10-05 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-10-05 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-05 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 4) | qa-task |
+| 2026-10-05 |         | QA gate PASS (100/100) — 0 open findings, 1 pre-existing routed to follow-up | qa-task |
+| 2026-10-05 |         | QA findings fixed — gate PASS (100/100), 4 iterations | qa-fix |
+| 2026-10-05 | 1.2 | DoD verified — accepted (PR #568) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Deferred Work has one home
-- [ ] Phase 2: engine residuals
-- [ ] Phase 3: create-bug-report heading check
-- [ ] Phase 4: docs and validation
+- [x] Phase 1: Deferred Work has one home
+- [x] Phase 2: engine residuals
+- [x] Phase 3: create-bug-report heading check
+- [x] Phase 4: docs and validation
 
 ---
 

@@ -27,7 +27,18 @@
 //              marker, an H1/H2 or a change-log heading      → NOTHING written
 //   unplaceable the write would not read back as exactly one section → NOTHING written
 //
-// The last two exist because an unclosed fence protects everything after it: every
+// Every refusal also carries a `detail` naming the rule that fired, so a halt can say
+// what to repair (task 171, task.155 PR review 5 CR-1):
+//
+//   not-a-section            the render does not start with the heading, or is not one section
+//   unclosed-fence           a fence opens and never closes
+//   structural-line:<line>   the line (trimmed, at most 60 chars) the structural guard caught
+//   carried-block:<name>     the render brings its own Bug Reports / Deferred Work block
+//   trailing-comment         the render ends in an HTML comment, which a read peels as a separator
+//   multiple:<n>             n sections found
+//   read-back:<n>            the write would read back as n sections, or an unbounded one
+//
+// The last two reasons exist because an unclosed fence protects everything after it: every
 // later heading and marker becomes "example text", the span runs to EOF, and a
 // replace deleted the Change Log and every later section while reporting
 // `replaced` (task.155 PR review 2, CR-1). A write is therefore checked twice —
@@ -68,6 +79,7 @@ const {
   insideProtected,
   bodyStart,
   findChangeLog,
+  isEntryRow,
   ANCHORS,
 } = require("./change-log.js");
 
@@ -95,10 +107,11 @@ const RE_LOG_HEADING = /^ {0,3}#{1,6}[ \t]+(?:\d+\.?[ \t]+)?Change Log\b/i;
 // change-log heading at any level. Fence-blind on purpose — every earlier bound was
 // protection-aware, so one stray fence in the section re-paired every fence after it
 // and the span widened over real headings and markers as "example text"
-// (task.155 PR review 2 CR-1; QA cycle 5 REL-012, REL-014). A setext underline is
-// deliberately NOT structural: this repository never authors setext headings, and
-// the one corpus instance is a `---` separator directly under a paragraph inside a
-// QA section, which refusing would turn into a false stop.
+// (task.155 PR review 2 CR-1; QA cycle 5 REL-012, REL-014). A setext H1/H2 is
+// structural too (task 171): its underline is checked against the line above it in
+// `removesStructure`. The one corpus instance task.155 found — task.118's `---` directly
+// under a paragraph inside its QA section — was an accidental heading, repaired in the
+// document when this rule landed.
 const RE_STRUCTURAL = [
   // Every marker change-log.js knows, from its own constants (gate 6 CR-7).
   new RegExp(
@@ -128,83 +141,189 @@ const RE_STRUCTURAL = [
 // section, and a replace deleted 52 lines of it (task.155 PR review 4, PC-1).
 const CARRIED_SUBSECTIONS = ["Bug Reports", "Deferred Work"];
 
-// A carried subsection: a `###`/`####` heading naming it (any case, any trailing text
-// such as ` (2)` — REL-023), then everything up to the next unprotected heading of
-// level <= 3, or the first of QA's OWN template field lines (`**QA Status**:` …),
-// whichever comes first. Real lists are richer than bullets — `####` groups, tables,
+// A carried subsection starts at one of two lines naming it (any case):
+//   - a `###`/`####` heading, with any trailing text such as ` (2)` (REL-023), the
+//     singular `Bug Report` included (REL-027). It runs to the next unprotected heading
+//     of its OWN level or shallower — a `####` block stops at the next `####`, so it
+//     cannot carry QA's later `####` subsections (REL-025);
+//   - a bold label alone on its line, `**Bug Reports**` / `**Deferred Work**` (REL-027,
+//     and the legacy REL-030 record). It runs to the next heading, or the next bold
+//     label alone on its line that does NOT introduce a list or
+//     table — a sub-label such as `**From cycle 2:**` over its items belongs to the
+//     block; QA's own `**Recommendations**` over a paragraph does not (task 171 QA
+//     cycle 1, CR-2: stopping at every sub-label deleted the items under it).
+// Either form also stops at the first of QA's OWN template field lines
+// (`**QA Status**:` …). Real lists are richer than bullets — `####` groups, tables,
 // bold labels (task.116, task.42, task.76, task.94) — so the block is carried whole;
 // QA's own fields are never carried, so a list written above them cannot drag a stale
 // verdict along (task.155 QA cycle 8, REL-021).
 const RE_QA_FIELD =
   /^\*\*(?:QA Status|QA Engineer|Testing Date|Quality Score|Gate Decision)\*\*:/;
+const RE_BOLD_LABEL = /^\*\*[^*\n]+\*\*:?[ \t]*$/;
+// `Bug Reports?` reads the singular too; each pattern maps back to its carried name.
+const CARRIED_PATTERN = {
+  "Bug Reports": "Bug Reports?",
+  "Deferred Work": "Deferred Work",
+};
 
 function collectBlocks(text, name) {
   const ranges = protectedRanges(text);
-  const re = new RegExp(`^#{3,4}[ \\t]+${name}\\b[^\\n]*$`, "gim");
+  const pat = CARRIED_PATTERN[name];
+  const re = new RegExp(
+    `^(?:(#{3,4})[ \\t]+(${pat}\\b[^\\n]*?)|\\*\\*(${pat})\\*\\*:?[ \\t]*)\\r?$`,
+    "gim",
+  );
   const blocks = [];
   for (const m of text.matchAll(re)) {
     if (insideProtected(ranges, m.index)) continue;
+    const level = m[1] ? m[1].length : 0; // 0 = a bold-label block
     const bodyAt = m.index + m[0].length + 1;
+    const lines = text.slice(bodyAt).split("\n");
+    const bare = (i) => (lines[i] ?? "").replace(/\r$/, "");
+    // Does the next non-blank line after line i open a list or a table?
+    const introducesList = (i) => {
+      let j = i + 1;
+      while (j < lines.length && /^[ \t]*$/.test(bare(j))) j++;
+      return (
+        j < lines.length &&
+        /^[ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|\|)/.test(bare(j))
+      );
+    };
+    const stops = (i) => {
+      const l = bare(i);
+      if (RE_QA_FIELD.test(l)) return true;
+      if (level) return new RegExp(`^#{1,${level}}[ \\t]`).test(l);
+      return (
+        /^#{1,6}[ \t]/.test(l) || (RE_BOLD_LABEL.test(l) && !introducesList(i))
+      );
+    };
     let end = text.length;
     let offset = bodyAt;
-    for (const line of text.slice(bodyAt).split("\n")) {
-      const bare = line.replace(/\r$/, "");
-      if (
-        !insideProtected(ranges, offset) &&
-        (/^#{1,3}[ \t]/.test(bare) || RE_QA_FIELD.test(bare))
-      ) {
+    for (let i = 0; i < lines.length; i++) {
+      if (!insideProtected(ranges, offset) && stops(i)) {
         end = offset;
         break;
       }
-      offset += line.length + 1;
+      offset += lines[i].length + 1;
     }
     const whole = text.slice(m.index, Math.min(end, text.length)).trimEnd();
     blocks.push({
+      name,
+      start: m.index,
       whole,
-      body: whole.slice(m[0].length).replace(/^\n+/, ""),
-      end: m.index + whole.length,
+      // A folded block keeps its heading's text as a bold line (CR-4); a bold-label
+      // block's first line already is one.
+      label: level
+        ? `**${m[2].replace(/\r$/, "").trim()}**`
+        : m[0].replace(/\r$/, ""),
+      body: whole.slice(m[0].length).replace(/^(?:\r?\n)+/, ""),
     });
   }
   return blocks;
 }
 
-// The link targets a block of text names — a bug entry's identity.
-const linksIn = (text) =>
-  new Set([...text.matchAll(/\]\(([^)\s]+)/g)].map((m) => m[1]));
+// Every carried block in `text`, across all names, outermost only: a block whose start
+// lies inside an earlier kept block is part of that block and is not carried again
+// (task 171, REL-028 — a `#### Deferred Work` nested in a Bug Reports block was carried
+// under both names and doubled on every write).
+function carriedBlocks(text) {
+  const all = CARRIED_SUBSECTIONS.flatMap((n) => collectBlocks(text, n)).sort(
+    (a, b) => a.start - b.start,
+  );
+  const kept = [];
+  for (const b of all) {
+    const outer = kept[kept.length - 1];
+    if (outer && b.start < outer.start + outer.whole.length) continue;
+    kept.push(b);
+  }
+  return kept;
+}
 
 // Merge every carried subsection found in `removed` into `body` (task.155 QA cycle 8,
-// REL-020/023): the first old block whole, later ones folded beneath it, so a second
+// REL-020/023): the first old block whole, later ones folded beneath it — but only when
+// the fold reads back as that one block. A later block whose own `####` heading or bold
+// label would end the first block on the next read is emitted whole under its own
+// heading instead: folded, it survived one write and was cut on the next (task 171 QA
+// cycle 1, CR-1). So a second
 // `### Bug Reports` (create-bug-report checks for an H2 but writes an H3, so it can
 // open one) is kept rather than dropped. A render never brings its own carried block —
 // `normaliseSection` refuses one — so the engine alone owns carrying and nothing has to
 // be reconciled line by line (PR review 4, REL-026: that reconciliation dropped every
 // line without a link).
-function mergeCarried(body, removed) {
+function mergeCarried(body, removed, eol = "\n") {
+  const gap = eol + eol;
+  const blocks = carriedBlocks(removed);
   let out = body;
   for (const name of CARRIED_SUBSECTIONS) {
-    const old = collectBlocks(removed, name);
+    const old = blocks.filter((b) => b.name === name);
     if (!old.length) continue;
-    // The first block is kept whole; later ones fold in beneath it, each body once.
-    // A later block's own heading line is dropped — its content is not.
+    // The first block is kept whole; later ones fold in beneath it, each body once,
+    // under their own heading text as a bold line (CR-4) — when the fold reads back.
     const parts = [old[0].whole];
+    const seen = new Set([old[0].body.trim()]);
     for (const b of old.slice(1)) {
-      if (b.body && !parts.some((p) => p.includes(b.body))) parts.push(b.body);
+      // A body already carried is skipped by EQUALITY: a substring test dropped `- REL-1`
+      // because an earlier block held `- REL-12` (task 171 QA cycle 2, CR2-3).
+      if (!b.body || seen.has(b.body.trim())) continue;
+      seen.add(b.body.trim());
+      const folded = `${parts[0]}${gap}${b.label}${gap}${b.body}`;
+      const [back] = collectBlocks(folded, name);
+      if (back && back.start === 0 && back.whole === folded.trimEnd())
+        parts[0] = folded;
+      else parts.push(b.whole);
     }
-    out = `${out}\n\n${parts.join("\n\n")}`;
+    out = `${out}${gap}${parts.join(gap)}`;
   }
   return out;
 }
 
-// Does the text a write would remove carry anything outside the section itself?
-// The first line is the section's own heading and is exempt.
-function removesStructure(removed) {
-  return removed
-    .split("\n")
-    .slice(1)
-    .some((line) => {
-      const l = line.replace(/\r$/, "");
-      return RE_STRUCTURAL.some((re) => re.test(l));
-    });
+// A setext H1/H2 underline, judged with the line above it: that line must be paragraph
+// text — non-blank, and not a table row, list item, quote, heading, fence or HTML line.
+// After a blank line a `---` is a thematic break, not a heading.
+const RE_SETEXT = /^ {0,3}(?:=+|-+)[ \t]*$/;
+const RE_NOT_PARAGRAPH =
+  /^[ \t]*(?:$|\||[-*+][ \t]|\d+[.)][ \t]|>|#|```|~~~|<)/;
+
+// The first line, past the section's own heading, that a write may not remove — or
+// null. `underLog` adds dated change-log rows (`isEntryRow`, header-agnostic): a section
+// sitting inside or directly under a change log must not span one, because which rows
+// belong to the log and which the section quotes cannot be told apart (task 171,
+// REL-007/008). A section placed elsewhere may quote dated rows and replace them.
+function removesStructure(removed, { underLog = false } = {}) {
+  // Fence-blind, like the ATX and marker checks (RE_STRUCTURAL): a setext underline is
+  // structure wherever it stands, so fenced YAML — `key: value` over `---` — is refused
+  // with a detail, the same accepted trade as a fenced `# comment` (task.155 REL-016).
+  // Three cycles tried to exempt "well-paired" fences and each was beaten by a fence
+  // mis-pairing that let a replace delete a real setext section (task 171 QA cycles
+  // 2–4: CR2-2, CR3-1, CR4-1). Refusing is the direction that cannot lose content.
+  const lines = removed.split("\n").map((l) => l.replace(/\r$/, ""));
+  let logTable = false; // inside a table whose header's first cell is `Date`
+  for (let i = 1; i < lines.length; i++) {
+    const l = lines[i];
+    // Every data row of a Date-headed table counts, not only an ISO-dated one: the
+    // log's writer keeps non-ISO rows (`| 03/01/2026 |`), and an ISO-only test let them
+    // be deleted on relocate (task 171 QA cycle 1, CR-3).
+    if (RE_LOG_HEADER.test(l)) logTable = true;
+    else if (!/^[ \t]*\|/.test(l)) logTable = false;
+    const logRow =
+      isEntryRow(l) ||
+      (logTable &&
+        !RE_LOG_HEADER.test(l) &&
+        !/^[ \t]*\|[\s\-:|]+\|[ \t]*$/.test(l));
+    if (
+      RE_STRUCTURAL.some((re) => re.test(l)) ||
+      (RE_SETEXT.test(l) && i > 1 && !RE_NOT_PARAGRAPH.test(lines[i - 1])) ||
+      (underLog && logRow)
+    ) {
+      // A setext underline is reported with the text it makes a heading of.
+      const shown =
+        RE_SETEXT.test(l) && !RE_STRUCTURAL.some((re) => re.test(l))
+          ? `${lines[i - 1].trim()} / ${l.trim()}`
+          : l.trim();
+      return shown.slice(0, 60);
+    }
+  }
+  return null;
 }
 
 const isBlank = (line) => /^[ \t]*\r?$/.test(line);
@@ -222,6 +341,11 @@ function trimSeparator(content, start, rawEnd) {
   // Peel separators off the tail until none is left: blank lines, one thematic break
   // with a blank line above it, and an HTML comment block standing on its own lines
   // (a template's lead-in comment for the block below — task.155 QA cycle 8, REL-022).
+  // A render that would END in a comment is refused (`trailing-comment`), which is what
+  // closes REL-024; narrowing this peel instead deleted a legacy lead-in above a non-log
+  // heading (task 171 QA cycle 1, CR-6). Every per-line test strips a trailing \r, so a
+  // CRLF document peels exactly what its LF twin does (CR-4).
+  const bare = (i) => lines[i].replace(/\r$/, "");
   for (;;) {
     popBlanks();
     const last = lines[lines.length - 1].replace(/\r$/, "");
@@ -235,8 +359,8 @@ function trimSeparator(content, start, rawEnd) {
     }
     if (/-->[ \t]*$/.test(last)) {
       let k = lines.length - 1;
-      while (k > 0 && !/^[ \t]{0,3}<!--/.test(lines[k])) k--;
-      if (k > 1 && (isBlank(lines[k - 1]) || RE_BREAK.test(lines[k - 1]))) {
+      while (k > 0 && !/^[ \t]{0,3}<!--/.test(bare(k))) k--;
+      if (k > 1 && (isBlank(lines[k - 1]) || RE_BREAK.test(bare(k - 1)))) {
         lines.length = k;
         continue;
       }
@@ -374,7 +498,13 @@ function findQaResults(content) {
       !changeLog.hasMarkers &&
       changeLog.end === start &&
       lastTableStart(content, changeLog.start, start, ranges) === -1;
-    if (block || underTablelessLog) {
+    // When the block's own log table already sits ABOVE the section, a Date table below
+    // it is not the log's — the section quotes it. Cutting there left the quoted rows in
+    // the log (REL-007); without the cut they are in the span, and the dated-row guard
+    // refuses the write instead.
+    const logAbove =
+      block && lastTableStart(content, block.start, start, ranges) !== -1;
+    if ((block && !logAbove) || underTablelessLog) {
       const tbl = lastTableStart(
         content,
         bodyOffset,
@@ -387,11 +517,28 @@ function findQaResults(content) {
       }
     }
     const rawEnd = Math.min(...candidates);
+    // CR-5: a section stranded between a Change Log heading and its marker block — the
+    // shape canonicalOffset wrote before REL-013 was fixed — belongs above the heading.
+    // Its span ends at the block, and the line above it is the log's heading.
+    const nextBlock = blocks.find((b) => b.start > start);
+    const above = content.slice(0, start).replace(/\s+$/, "");
+    const lineAbove = above.slice(above.lastIndexOf("\n") + 1);
+    if (
+      !block &&
+      nextBlock &&
+      nextBlock.start === rawEnd &&
+      (RE_LOG_HEADING.test(lineAbove) || RE_HEADING.test(lineAbove))
+    ) {
+      insideChangeLog = true;
+    }
 
     sections.push({
       start,
       end: trimSeparator(content, start, rawEnd),
       insideChangeLog,
+      // Inside a marker block, or directly under a change-log heading: dated rows in
+      // this span may be the log's own (REL-007/008).
+      underLog: !!block || !!underTablelessLog || insideChangeLog,
       unbounded: unclosedFence(content, start, rawEnd),
       heading: m[0].replace(/\r$/, ""),
     });
@@ -431,12 +578,13 @@ function canonicalOffset(content, docType) {
   return anchor === -1 ? content.length : anchor;
 }
 
-// Splice `body` in at `pos` with exactly one blank line on each side.
-function insertAt(content, pos, body) {
+// Splice `body` in at `pos` with exactly one blank line on each side, in the
+// document's own line ending.
+function insertAt(content, pos, body, eol = "\n") {
   const before = content.slice(0, pos).trimEnd();
   const after = content.slice(pos).trimStart();
-  const head = before ? `${before}\n\n` : "";
-  return after ? `${head}${body}\n\n${after}` : `${head}${body}\n`;
+  const head = before ? `${before}${eol}${eol}` : "";
+  return after ? `${head}${body}${eol}${eol}${after}` : `${head}${body}${eol}`;
 }
 
 // Normalise the caller's section: leading blank lines and trailing whitespace go;
@@ -444,8 +592,10 @@ function insertAt(content, pos, body) {
 // qa-story's `## QA Completion Summary` rendered into the same file, say — would sit
 // past the section's own span once written, so every later write left that copy and
 // added another (task.155 QA cycle 1, REL-001).
+// Returns { body } or { refuse: detail }.
 function normaliseSection(section) {
-  if (typeof section !== "string") return null;
+  const refuse = (detail) => ({ refuse: detail });
+  if (typeof section !== "string") return refuse("not-a-section");
   // A trailing thematic break is a separator, never section content: the span
   // excludes it on read, so keeping it here stacked one `---` per replace
   // (task.155 PR review 1, CR-2).
@@ -455,20 +605,24 @@ function normaliseSection(section) {
       /(?:\r?\n[ \t]{0,3}(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}))?\s*$/,
       "",
     );
-  if (!body.startsWith(HEADING)) return null;
+  if (!body.startsWith(HEADING)) return refuse("not-a-section");
   // An unbalanced fence would make the section unbounded the moment it is written.
-  if (unclosedFence(body, 0, body.length)) return null;
+  if (unclosedFence(body, 0, body.length)) return refuse("unclosed-fence");
   // Never write a section the next write would have to refuse: the structural guard
   // below is fence-blind, so a fenced `## Example` in the section is refused here too.
-  if (removesStructure(body)) return null;
+  const line = removesStructure(body);
+  if (line !== null) return refuse(`structural-line:${line}`);
   // A carried block belongs to another writer; the engine carries the document's own
   // copy through, so a render that brings one is refused rather than reconciled.
-  if (CARRIED_SUBSECTIONS.some((n) => collectBlocks(body, n).length))
-    return null;
+  const own = carriedBlocks(body);
+  if (own.length) return refuse(`carried-block:${own[0].name}`);
+  // A trailing HTML comment would be read back as the lead-in of a change-log block
+  // written below it, outside the span, and gain a copy per write (REL-024).
+  if (/-->[ \t]*$/.test(body)) return refuse("trailing-comment");
   // The heading must itself be a section heading (`## QA Testing Resultsx` is not).
   // A second H1/H2 in the body is already refused by removesStructure above.
-  if (findQaResults(body).sections.length !== 1) return null;
-  return body;
+  if (findQaResults(body).sections.length !== 1) return refuse("not-a-section");
+  return { body };
 }
 
 /**
@@ -478,37 +632,62 @@ function normaliseSection(section) {
  * @param {string} section            the rendered section, starting `## QA Testing Results`
  * @param {object} [opts]
  * @param {string} [opts.docType]     story | task | epic — picks the fallback anchor
- * @returns {{ content: string, reason: string, count?: number }}  reason is one of
- *   replaced | relocated | created (written) or multiple | bad-section | unbounded |
- *   unplaceable (content returned unchanged). Callers write only on the first three.
+ * @returns {{ content: string, reason: string, detail?: string, count?: number }}
+ *   reason is one of replaced | relocated | created (written) or multiple |
+ *   bad-section | unbounded | unplaceable (content returned unchanged, with a
+ *   `detail` naming the rule that fired). Callers write only on the first three.
  */
 function upsertQaResults(content, section, { docType = "" } = {}) {
-  const body = normaliseSection(section);
-  if (body === null) return { content, reason: "bad-section" };
+  const norm = normaliseSection(section);
+  if (norm.refuse) {
+    return { content, reason: "bad-section", detail: norm.refuse };
+  }
+  // Every seam this write makes uses the document's own line ending (task 171).
+  // By majority, so one stray CRLF line does not turn the whole section CRLF (CR2-5).
+  const crlf = (content.match(/\r\n/g) || []).length;
+  const eol = crlf * 2 > (content.match(/\n/g) || []).length ? "\r\n" : "\n";
+  const body = norm.body.replace(/\r?\n/g, eol);
 
   const { sections } = findQaResults(content);
   if (sections.length > 1) {
-    return { content, reason: "multiple", count: sections.length };
+    return {
+      content,
+      reason: "multiple",
+      count: sections.length,
+      detail: `multiple:${sections.length}`,
+    };
   }
-  if (
-    sections.some(
-      (s) => s.unbounded || removesStructure(content.slice(s.start, s.end)),
-    )
-  ) {
-    return { content, reason: "unbounded" };
+  for (const s of sections) {
+    if (s.unbounded) {
+      return { content, reason: "unbounded", detail: "unclosed-fence" };
+    }
+    const line = removesStructure(content.slice(s.start, s.end), {
+      underLog: s.underLog,
+    });
+    if (line !== null) {
+      return {
+        content,
+        reason: "unbounded",
+        detail: `structural-line:${line}`,
+      };
+    }
   }
   const checked = (out, reason) => {
     const post = findQaResults(out).sections;
     return post.length === 1 && !post[0].unbounded
       ? { content: out, reason }
-      : { content, reason: "unplaceable" };
+      : {
+          content,
+          reason: "unplaceable",
+          detail: `read-back:${post.length}${post.some((p) => p.unbounded) ? " unbounded" : ""}`,
+        };
   };
 
   if (sections.length === 1 && !sections[0].insideChangeLog) {
     const { start, end } = sections[0];
-    const written = mergeCarried(body, content.slice(start, end));
+    const written = mergeCarried(body, content.slice(start, end), eol);
     const rest = content.slice(end);
-    const sep = rest === "" ? "\n" : rest.startsWith("\n") ? "\n" : "\n\n";
+    const sep = rest === "" ? eol : /^\r?\n/.test(rest) ? eol : eol + eol;
     return checked(content.slice(0, start) + written + sep + rest, "replaced");
   }
 
@@ -519,17 +698,17 @@ function upsertQaResults(content, section, { docType = "" } = {}) {
     // Inside the block: cut it out, then insert at the canonical position computed
     // on the post-removal text (the block start, which the removal did not move).
     const { start, end } = sections[0];
-    written = mergeCarried(body, content.slice(start, end));
-    const before = content.slice(0, start).replace(/\n+$/, "\n");
-    const after = content.slice(end).replace(/^\n+/, "");
+    written = mergeCarried(body, content.slice(start, end), eol);
+    const before = content.slice(0, start).replace(/(?:\r?\n)+$/, eol);
+    const after = content.slice(end).replace(/^(?:\r?\n)+/, "");
     base =
-      before.endsWith("\n\n") || !after
+      before.endsWith(eol + eol) || !after
         ? before + after
-        : `${before}\n${after}`;
+        : `${before}${eol}${after}`;
     reason = "relocated";
   }
   return checked(
-    insertAt(base, canonicalOffset(base, docType), written),
+    insertAt(base, canonicalOffset(base, docType), written, eol),
     reason,
   );
 }

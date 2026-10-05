@@ -398,6 +398,29 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The QA loop's Deferred Work record has one home, and `qa-results.js` closes task.155's residuals
+  (task 171).** Routes 2 and 2b recorded carried finding ids "under **Deferred Work**" with no heading
+  or position, so a record could land inside `## QA Testing Results`, where the next Step 12 replace
+  deleted it (task.155 REL-030). `develop-pipeline-step-5-6-qa-loop.md` now states the home once — a
+  `## Deferred Work` H2 before the change-log block, never inside the QA section — with a worked
+  example `tests/deferred-work-placement.test.js` executes against three QA writes. The engine now
+  carries a `####` block only to its own level (REL-025), bold `**Bug Reports**` / `**Deferred Work**`
+  labels — a sub-label over a list stays in the block — and the singular `Bug Report` (REL-027), a
+  nested carried block once (REL-028), and a folded block's heading as a bold line, folding only when
+  the fold reads back as one block (CR-4); it writes every seam in the document's own line ending, and
+  peels the same separators from a CRLF document as from its LF twin (CRLF), and relocates a
+  section stranded between a `## Change Log` heading and its marker block (CR-5). **New refusals**,
+  each returned with a `detail` naming the rule — both Step 12 halts print it: a section inside or
+  directly under a change log whose span holds a dated log row (REL-007/008), a setext H1/H2 in a span or a render (fence-blind, as the H1/H2 check is — fenced YAML
+  over `---` is refused, the trade a fenced `# comment` already makes), and a render that ends in an HTML comment (`trailing-comment`, which closes REL-024). Under a change log, every data row of a Date-headed
+  table counts, ISO-dated or not. `detail` is a new
+  field; callers reading only `reason` are unaffected. task.118's accidental setext underline was
+  repaired. A write survey in `tests/qa-results-corpus.test.js` holds the tracked corpus at 0 false
+  refusals, 0 deletions and 0 non-idempotent writes, measuring deletions with its own line scan rather
+  than the engine's spans. `create-bug-report` task mode now checks for the
+  `### Bug Reports` heading it writes and appends to a list already open under any form a tracked
+  document carries — `##`, `###`, `####` or bold — instead of opening a second (obs #240).
+
 - **The QA loop's re-review trigger, cycle-3+ scope and safety carve-out fail toward review on
   malformed input (task.168).** Six follow-ups task.135 left advisory, each with an executed test
   under bash and zsh and a mutation proof:

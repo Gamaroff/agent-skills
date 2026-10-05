@@ -27,7 +27,8 @@ step 4) and again at `:737` (route 2b, step 3):
 > record the same ids on the work item under **Deferred Work**.
 
 Add one subsection, for example `#### Where the Deferred Work record goes`, directly before the
-route-2 *On exit* list, with this substance:
+route-2 *On exit* list, with this substance and one fenced `markdown` worked example of the record
+(the test extracts it by this subsection's heading):
 
 - The heading is `## Deferred Work` (an H2), and it is never placed inside `## QA Testing Results`.
   An H2 ends that section's span, so no QA write reaches the record.
@@ -58,9 +59,9 @@ const files=execFileSync("git",["ls-files","docs/**/*.md"],{encoding:"utf8"}).tr
 const sig=(t)=>[(t.match(/change-log-(start|end) -->/g)||[]).length,(t.match(/^\| \d{4}-\d\d-\d\d/gm)||[]).length,(t.match(/^#{1,2} /gm)||[]).length];
 const tally={};let lost=0,idem=0;
 for(const f of files){const s=fs.readFileSync(f,"utf8");if(!QR.findQaResults(s).sections.length)continue;
- const r=QR.upsertQaResults(s,"## QA Testing Results\n\nprobe",{docType:f.includes("/tasks/")?"task":"story"});tally[r.reason+(r.detail?":"+r.detail.split(":")[0]:"")]=(tally[r.reason]||0)+1;
+ const r=QR.upsertQaResults(s,"## QA Testing Results\n\nprobe",{docType:f.includes("/tasks/")?"task":"story"});const k=r.reason+(r.detail?":"+r.detail.split(":")[0]:"");tally[k]=(tally[k]||0)+1;
  const a=sig(s),b=sig(r.content);if(b.some((v,i)=>v<a[i]))lost++;
- if(QR.upsertQaResults(r.content,"## QA Testing Results\n\nprobe").content!==r.content)idem++}
+ if(r.content&&QR.upsertQaResults(r.content,"## QA Testing Results\n\nprobe",{docType:f.includes("/tasks/")?"task":"story"}).content!==r.content)idem++}
 console.log({tally,lost,idem})'
 ```
 
@@ -91,6 +92,12 @@ Return the offending line in the refusal detail: `structural-line:<the line, tri
 **3. `trimSeparator` (REL-024).** Peel a trailing HTML comment block only when the text at `rawEnd`
 is a change-log marker or a change-log heading (`RE_HEADING` or `RE_LOG_HEADING`). Otherwise the
 comment is section content.
+
+> *Amended in QA cycle 1:* the narrowed peel (CR-6) deleted a legacy lead-in above a non-log
+> heading; REL-024 is closed instead by refusing a render that ends in a comment. A bold-label block
+> ends at a bold label only when that label does not introduce a list or table (CR-2). A later
+> carried block folds into the first only when the fold reads back as one block; otherwise it is
+> emitted whole (CR-1).
 
 **4. CRLF.** Detect the document's line ending once:
 `const EOL = /\r\n/.test(content) ? "\r\n" : "\n"`. Use it in `insertAt`, in the replace seam and in
