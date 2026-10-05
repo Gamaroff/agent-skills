@@ -488,8 +488,8 @@ All five are gaps in `shared/resources/qa-results.js`. Follow-up: [task.183](../
   list follows it, carrying a stale list. ✅ Resolved in [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md): a bold-label block stops at a
   QA-owned label (`QA_LABELS`).
 - **CR-7** (low, gate 1) — setext false refusals after a list continuation line or a multi-line
-  comment closer. ✅ Resolved in [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md): both are written; the comment context covers only a
-  closing line.
+  comment closer. ✅ Resolved in [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md): the list shape is written; the comment-closer shape
+  stays refused (exempting it reopened deletions in three QA cycles).
 
 ---
 <!-- change-log-start -->

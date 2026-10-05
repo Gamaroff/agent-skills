@@ -1125,13 +1125,13 @@ test("R1 CR5-1: a setext section under paragraph text of any shape is refused, n
   assertCr51Refused();
 });
 
-test("R2 CR-7: a list continuation or a comment's closing line over --- is written; CR5-1 still refused", () => {
-  for (const head of ["- item\n  continued", "<!--\nnote\n-->"]) {
+test("R2 CR-7: a list continuation over --- is written; a comment closer and CR5-1 are refused", () => {
+  for (const head of ["- item\n  continued"]) {
     const doc = markerDoc(`${section(1)}\n\n${head}\n---\n\n`);
     const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
     assert.equal(r.reason, "replaced", head);
     assert.equal(qaCount(r.content), 1);
-    assert.doesNotMatch(r.content, /continued|note/);
+    assert.doesNotMatch(r.content, /continued/);
   }
   // The context is narrow: an unclosed comment exempts nothing after it (review I1),
   // and an item that cannot interrupt a paragraph opens no continuation.
@@ -1147,6 +1147,14 @@ test("R2 CR-7: a list continuation or a comment's closing line over --- is writt
     "```html\n<!-- x\n```\n\nRetest flow: login --> dashboard",
     "<!--\nnote -->",
     "```\n<!--\n```\n\n-->",
+    // A comment closer is not exempt at all (QA escalation, CR3-1): neither a plain
+    // closing line, nor one after a one-line opener or an item-indented opener.
+    "<!--\nnote\n-->",
+    "<!-->\nReal Section\n-->",
+    "<!--->\nReal Section\n-->",
+    "- item\n  <!--\n-->",
+    // An item inside a fence is code: its context ends at the fence (CR2-1).
+    "```\n- item\n  ```\n  Rollout Notes",
   ]) {
     const doc = markerDoc(`${section(1)}\n\n${head}\n-----\n\nkeep-me\n\n`);
     const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
@@ -1203,6 +1211,14 @@ test("R3 5c CR-1: a misplaced section above a Version-first log is refused; a Da
   const re = QR.upsertQaResults(eof, section(2), { docType: "task" });
   assert.equal(re.reason, "unbounded");
   assert.equal(re.content, eof);
+  // A marker-less log holding a non-Date-first Date table above the section is still
+  // table-less for the cut: the log's own Date-first table below is cut at, and its row
+  // kept (QA cycle 3, CR3-2 — any Date column made the replace delete it).
+  const reviewer = `${FM}## Body\n\ntext\n\n## Change Log\n\n| Reviewer | Date |\n| --- | --- |\n| A | 2026-01-01 |\n\n${section(1)}\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | log-row | y |\n`;
+  const rr = QR.upsertQaResults(reviewer, section(2), { docType: "task" });
+  assert.equal(rr.reason, "relocated");
+  assert.equal(count(rr.content, "| 2026-09-25 | 1.0 | log-row | y |"), 1);
+  assert.equal(count(rr.content, "| A | 2026-01-01 |"), 1);
   // A header-only Date-first log is still cut at and relocated, header kept.
   const dfLog = vlog(
     "| Date | Version | Description | Author |\n| --- | --- | --- | --- |",

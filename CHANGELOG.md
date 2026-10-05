@@ -405,9 +405,9 @@ All notable changes to this project will be documented in this file. Format foll
   type-7 line, a code span and an ordered item not starting at 1 are now **refused** with a
   `structural-line:` detail; before, each one's section was deleted on replace. Also **newly refused**:
   a misplaced section above a change log whose `Date` column is not first (`| Version | Date | … |`).
-  Before, a relocate deleted that log's rows. Two shapes are **now written** where they were refused:
-  a `---` after a list item's continuation line, and a `---` after the line that closes a multi-line
-  HTML comment. A bold `**Bug Reports**` / `**Deferred Work**` block now keeps its `####` groups and
+  Before, a relocate deleted that log's rows. One shape is **now written** where it was refused:
+  a `---` after a list item's continuation line (a `---` after an HTML comment's closing line stays
+  refused). A bold `**Bug Reports**` / `**Deferred Work**` block now keeps its `####` groups and
   stops at QA's own labels (`QA_LABELS`), so a stale `**Recommendations**:` list is no longer
   carried. The corpus write survey now skips documents that never name the section.
 

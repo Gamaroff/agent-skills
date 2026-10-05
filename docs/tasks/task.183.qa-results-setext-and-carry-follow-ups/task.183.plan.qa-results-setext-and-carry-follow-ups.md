@@ -64,11 +64,9 @@ deletions (`replaced`, `keep-me` gone).
 - **list continuation**: after a line matching an interrupting list item, a following non-blank line
   indented by at least the item's content offset, with no blank line between, is a continuation
   line, not a paragraph line;
-- **closing HTML comment line**: a line containing `-->` that closes a `<!--` opened on an earlier
-  line (an opener with no `-->` on its own line) is not a paragraph line. Only that closing line is
-  exempt. The lines inside the comment stay heading candidates, and an unclosed `<!--` exempts
-  nothing — otherwise every line after it would be exempt and a real setext section below it could be
-  deleted (review 1, I1).
+- **closing HTML comment line** — *dropped at the QA escalation (2026-10-05)*. Three QA cycles each
+  found a new way the inferred comment context deleted a setext section (CR2-1, CR3-1); the closer
+  over `---` stays refused, as on `origin/develop`.
 
 The setext clause skips a line above the underline when either context holds. Test `R2`: each shape
 is written (`created` from `markerDoc()`, then `replaced`), and `R1`'s loop runs again unchanged as

@@ -329,40 +329,25 @@ function hasDateColumn(row) {
 }
 
 // Lines that belong to a block CommonMark has already opened, so an underline below one
-// is not a setext heading (task 183, CR-7). Two contexts, each narrow on purpose:
-//   - a list item's continuation: a non-blank line indented to at least the item's
-//     content offset, with no blank line since the item (or since the previous
-//     continuation line). The item must be one that can interrupt a paragraph — a bullet
-//     or `1.` — because a `2.` line under paragraph text is paragraph text, and so is
-//     everything indented under it;
-//   - the line that closes an HTML comment block: a line that is `-->` alone, after a
-//     line that opened the block (`<!--` at its start, no `-->` after it). Only that
-//     line is exempt — the lines inside stay heading candidates, an unclosed `<!--`
-//     exempts nothing (task 183 review, I1), and a fence line ends the context (CR2-1).
+// is not a setext heading (task 183, CR-7). One context, narrow on purpose: a list
+// item's continuation — a non-blank line indented to at least the item's content offset,
+// with no blank line since the item (or since the previous continuation line). The item
+// must be one that can interrupt a paragraph — a bullet or `1.` — because a `2.` line
+// under paragraph text is paragraph text, and so is everything indented under it.
+// A comment-closing line (`-->`) is NOT exempt. Three QA cycles each found a new way
+// an inferred comment context exempted a paragraph line and deleted the setext section
+// under it (CR2-1 a fenced opener, CR3-1 a one-line or item-indented opener); a
+// `-->` over `---` is refused instead, the false refusal origin/develop already made
+// (task 183 QA escalation, operator decision 2026-10-05).
 // Returns one boolean per line.
 function blockContinuations(lines) {
   const out = lines.map(() => false);
   let offset = 0; // content offset of the list item being continued; 0 = none
-  let comment = false; // inside an HTML comment block opened on an earlier line
   for (let k = 0; k < lines.length; k++) {
     const l = lines[k];
-    // A fence line ends both contexts: a `<!--` or an item inside a fence is code, and
-    // a context carried out of it exempted a later paragraph line (QA cycle 2, CR2-1).
+    // A fence line ends the list context: an item inside a fence is code, and a context
+    // carried out of it exempted a later paragraph line (QA cycle 2, CR2-1).
     if (/^ {0,3}(?:`{3,}|~{3,})/.test(l)) {
-      comment = false;
-      offset = 0;
-      continue;
-    }
-    if (comment) {
-      // Only a line that is the closer alone is exempt. A paragraph line that merely
-      // contains `-->` is not trusted to close the block (QA cycle 2, CR2-1).
-      if (/^ {0,3}-->[ \t]*$/.test(l)) out[k] = true;
-      if (l.includes("-->")) comment = false;
-      continue;
-    }
-    const open = /^ {0,3}<!--/.exec(l);
-    if (open && !l.includes("-->", open[0].length)) {
-      comment = true;
       offset = 0;
       continue;
     }
@@ -528,10 +513,10 @@ function markerBlocks(content, ranges) {
 }
 
 // Offset of the LAST unprotected change-log table header in [from, to): a table row
-// with a `Date` column (`hasDateColumn`) whose previous line is not itself a table row.
-// The one lookup for "where is the log table"; whether a section may be CUT there is
-// asked of that same table (`dateFirstAt`, see RE_LOG_HEADER) — QA cycle 2, CR2-2.
-function lastTableStart(content, from, to, ranges) {
+// `isHeader` accepts (default: a `Date` column, `hasDateColumn`) whose previous line is
+// not itself a table row. Whether a section may be CUT at the table it finds is asked of
+// that same table (`dateFirstAt`, see RE_LOG_HEADER) — QA cycle 2, CR2-2.
+function lastTableStart(content, from, to, ranges, isHeader = hasDateColumn) {
   let found = -1;
   let offset = from;
   let prevRow = false;
@@ -540,7 +525,7 @@ function lastTableStart(content, from, to, ranges) {
     if (
       isRow &&
       !prevRow &&
-      hasDateColumn(line) &&
+      isHeader(line) &&
       !insideProtected(ranges, offset)
     ) {
       found = offset;
@@ -634,7 +619,13 @@ function findQaResults(content) {
       changeLog &&
       !changeLog.hasMarkers &&
       changeLog.end === start &&
-      lastTableStart(content, changeLog.start, start, ranges) === -1;
+      // Date-first only: here there is no marker block to guard the span, so a table
+      // above the section counts as the log's own only in the shape the log writers emit.
+      // Any Date column made a quoted `| Reviewer | Date |` read as the log, cleared
+      // underLog, and the replace deleted the real log row below (QA cycle 3, CR3-2).
+      lastTableStart(content, changeLog.start, start, ranges, (l) =>
+        RE_LOG_HEADER.test(l),
+      ) === -1;
     // When the block's own log table already sits ABOVE the section, a Date table below
     // it is not the log's — the section quotes it. Cutting there left the quoted rows in
     // the log (REL-007); without the cut they are in the span, and the dated-row guard
