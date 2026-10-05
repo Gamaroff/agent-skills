@@ -35,8 +35,8 @@ Run 1 of the develop-task pipeline for task 185: deterministic `/review-pr` repo
 | 2. review-task             | ✅ Done    | `task.185.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 9/10; Planned → Ready for Development; `task.185.review.1.review-pr-eval-suite.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 23/23 plan boxes; ci:fast 5339/0 fail; live N=5 20/20 | `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #574: https://github.com/Gamaroff/agent-skills/pull/574 | —                    |
-| 5–6. qa-task / qa-fix loop | 🔄 In Progress | `task.185.qa.{N}.*.md`; `task.185.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.185.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.185.qa.{N}.*.md`; `task.185.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 QA cycles (FAIL 70 → CONCERNS 80 → CONCERNS 90 → PASS 100); 5c review-pr CONCERNS (non-blocking); 4 bugs closed | `.summaries/step-5-post-fix-tracker-3.json` |
+| 7. finalise                | ❌ Halted  | `task.185.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: 1. Security FAIL. The fake `gh` serves a glued-shorthand `api` write as a read (reproduced). AC 13/13, docs PASS, compliance N/A, CI reading 1 SUCCESS @ `21f77034`. `task.185.dod.1.review-pr-eval-suite.md` | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -89,10 +89,18 @@ Run 1 of the develop-task pipeline for task 185: deterministic `/review-pr` repo
 - GitHub board: in-review → stage-disabled (correct for this board). PR-opened comment posted on #573 (`in-review` stage).
 - Step 5 setup: `qa_phase` 5a; board QA-start re-assert → stage-disabled. Traceability mapper skipped: §9 Success Criteria is a checklist, not a table (HAS_SUCCESS_CRITERIA_TABLE=false, derived inline at Phase 0).
 - QA Cycle 1 — changes-requested: stage-disabled.
+- QA cycles 2–3 — changes-requested: stage-disabled (each). QA loop exited via 5c on cycle 4: gate PASS (route 1), `/review-pr --effort medium --comment` → CONCERNS, report `task.185.pr-review.1.review-pr-eval-suite.md` (report number from this PR's own `next-report-number.sh`). PR review comment posted. GitHub board: ready-for-merge → stage-disabled.
+- Live recheck after the cycle-1–3 harness changes: `env -u ANTHROPIC_API_KEY DRIVER=claude-cli node evals/shared/repeat.mjs scenarios/03-unanchored scenarios/02-renumber-gap --runs 1` → both passed 1/1, rc 0.
+- Step 7 `/finalise` (DoD run 1): AC 13/13 PASS; docs PASS; compliance NOT_APPLICABLE; security FAIL. CI reading 1: SUCCESS @ `21f7703484fe` over 5 checks.
+- Security agent: `boundary: true` for `evals/shared/lib/fake-gh.mjs#runFakeGh`, with 0 probes executed (no engine form reaches it). It named glued short flags as the untested axis. `/finalise` ran 9 candidates directly. With a GET fixture on the path, `gh api -XPOST <path>` and `gh api -fbody=x <path>` are served as reads: exit 0, nothing flagged. Without a fixture they are logged `unhandled`, not `refused`. Latent in the review-pr suite, which serves no `api` fixture.
+- Fix-and-recheck (8a) not taken: the agent rated the finding medium, so `severity-low` cannot hold, and the finding was not re-graded to clear the gate. Decision: DoD gaps → HALT. The fix is a code change, so on resume it re-enters QA at 5a (`reenter-qa-after-finalise.sh`).
+- DoD gaps PR comment posted: https://github.com/Gamaroff/agent-skills/pull/574#issuecomment-5999321682. Task status unchanged (`ready-for-review`). Change Log gaps row written through `change-log.js`; append-only check `ok`.
 
 ---
 
 ## Issues Log
+
+- **The compaction summary hid the PreCompact pause (2026-10-05T16:54:45Z).** The hook ran its pause flow between the QA cycle 4 commit (`e96f3ded`) and the 5c dispatch. It wrote the "Pipeline Paused" entry, committed and pushed it as `21f77034`, snapshotted the lock to `develop-pipeline.last-halt.json` and removed the lock. The context was then compacted. The summary described the pre-pause lock (step 5, `qa_phase` 5c) and did not mention the pause, so the resumed session did not run `--restore`. The 5c review ran with no lock, and its `set-waiting-on` calls were silent no-ops. (Corrected: this entry first said no compaction happened.) The lock's absence surfaced at the 5c → 7 advance. Recovery followed the Context Compression Recovery Step 0-lock: `advance-pipeline-lock.sh --restore docs/tasks/task.185.review-pr-eval-suite` restored it at step 5 / `qa_phase` 5c and consumed the snapshot. The run continued in place rather than re-running Step 5 as the pause entry says. Context was intact, the cycle-4 gate and report were on origin, and the 5c review's report and comment exist. The pause entry is kept as history.
 
 _Problems encountered and how they were resolved or escalated._
 
@@ -140,7 +148,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: none in the gate. 4 advisory (C4-CR-1 fail code 5 collides with Node's fatal-V8 exit; C4-CR-2 no-assertion scenario passes under repeat; 2 cleanups). Live recheck through the final harness: 02 and 03 passed 1/1 each.
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — 5c not yet run
+**PR Review**: CONCERNS — `task.185.pr-review.1.review-pr-eval-suite.md` (PC-1 low/low: pr_number not yet written, expected before /finalise; CR-1 medium/medium: four other skills keep count-style report numbering — the out-of-scope follow-up every gate records; CR-2/CR-3 low/low harness codes). Non-blocking; loop exits.
 **Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review)
 

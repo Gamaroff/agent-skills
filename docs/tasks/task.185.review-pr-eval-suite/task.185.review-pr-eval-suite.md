@@ -442,11 +442,47 @@ mutant, and both turn red.
 ### Key Findings
 No critical issues identified. The cycle-3 structural fix makes the runner's failed-run code positive, and it holds. Four low advisory items are recorded for follow-up. A live recheck through the final harness passed.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.185.qa.4.review-pr-eval-suite.md`
+**Gate File**: `task.185.gate.4.review-pr-eval-suite.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Security Review:**
+   - [ ] `evals/shared/lib/fake-gh.mjs` serves a glued-shorthand `api` write as a read. `gh api -XPOST <path>`
+     and `gh api -fbody=x <path>` exit 0 with no `refused` flag when a fixture serves `<path>`, because
+     `parseArgs` reads `-XPOST` as a boolean flag where real `gh` reads `-X POST`. Reproduced by `/finalise`
+     (9 candidates; 2 served, 3 mislabelled `unhandled`). Latent in this suite: the review-pr scenarios serve no
+     `api` fixture, so the call is logged `unhandled` and still fails the scenario.
+
+Acceptance criteria (13/13), documentation and CI (SUCCESS @ `21f77034`) all pass; compliance is not applicable.
+
+### Next Steps:
+
+- [ ] **BLOCKING**: split a glued short value flag in `parseArgs` the way pflag does, add the two served-path
+      cases to `fake-gh.test.mjs` "every write is refused", and mutation-prove them
+- [ ] Re-enter QA at 5a for the fix, then re-run `/finalise`
+
+**Estimated Effort:** Small (about 1 hour)
+
+**Gap Report Generated:** 2026-10-05
+**QA Gate Reference**: See `task.185.gate.4.review-pr-eval-suite.yml` for full details
+
+**Detailed Verification Log:** See `task.185.dod.1.review-pr-eval-suite.md` for complete verification evidence and timestamps.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-| Date       | Version | Description                                                     | Author      |
-| ---------- | ------- | --------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-05 | 1.0     | Initial draft — review-pr eval suite, scenarios 1–4, obs #272 fix | create-task |
 | 2026-10-05 | 1.1     | Review passed (9/10) — hardened fake-gh isolation (GH_CONFIG_DIR), empty call log at install, timed eval:all criterion, tech-stack.md doc sweep, no duplicate .claude/skills copy | review-task |
 | 2026-10-05 |         | Status → ready-for-development                                   | review-task |
@@ -458,6 +494,7 @@ No critical issues identified. The cycle-3 structural fix makes the runner's fai
 | 2026-10-05 |         | QA gate CONCERNS (90/100) — 1 medium finding                     | qa-task     |
 | 2026-10-05 |         | QA findings fixed (cycle 3) — positive verdict code: any non-verdict runner exit is could-not-run; 3 iterations in total | qa-fix |
 | 2026-10-05 |         | QA gate PASS (100/100) — no open findings, 4 advisory             | qa-task     |
+| 2026-10-05 |  | DoD incomplete — 1 gap identified (security: fake gh glued-shorthand write) | finalise |
 <!-- change-log-end -->
 
 ---
