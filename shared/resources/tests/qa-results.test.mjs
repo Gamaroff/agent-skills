@@ -1125,36 +1125,29 @@ test("R1 CR5-1: a setext section under paragraph text of any shape is refused, n
   assertCr51Refused();
 });
 
-test("R2 CR-7: a list continuation over --- is written; a comment closer and CR5-1 are refused", () => {
-  for (const head of ["- item\n  continued"]) {
-    const doc = markerDoc(`${section(1)}\n\n${head}\n---\n\n`);
-    const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
-    assert.equal(r.reason, "replaced", head);
-    assert.equal(qaCount(r.content), 1);
-    assert.doesNotMatch(r.content, /continued/);
-  }
-  // The context is narrow: an unclosed comment exempts nothing after it (review I1),
-  // and an item that cannot interrupt a paragraph opens no continuation.
-  // A thematic break matched the item pattern and exempted the line under it (QA
-  // cycle 1, CR-3): a break opens no continuation.
+test("R2 CR-7 deferred: no block context is inferred — a paragraph line over an underline is refused", () => {
+  // Every shape below was once exempted by an inferred list or comment context, and each
+  // inference was beaten by a shape it did not anticipate — a break, a fence, an HTML
+  // block, a tab — deleting the setext section under it (QA cycles 1–4, CR-3, CR2-1,
+  // CR3-1, CR4-1, CR4-2). The context inference is gone; CR-7 moves to a follow-up that
+  // needs a real CommonMark parser. Each shape is now the false refusal origin/develop made.
   for (const head of [
+    "- item\n  continued", // CR-7 list shape: refused again (deferred)
+    "<!--\nnote\n-->", // CR-7 comment shape: refused again (deferred)
     "<!--\nnote\n\nRollout Notes",
     "Release\n2. Notes\n   more",
     "* * *\n  Rollout Notes",
     "- - -\n  Rollout Notes",
-    // A comment opened inside a fence is code, and only a line that is `-->` alone
-    // closes a comment block (QA cycle 2, CR2-1).
     "```html\n<!-- x\n```\n\nRetest flow: login --> dashboard",
     "<!--\nnote -->",
     "```\n<!--\n```\n\n-->",
-    // A comment closer is not exempt at all (QA escalation, CR3-1): neither a plain
-    // closing line, nor one after a one-line opener or an item-indented opener.
-    "<!--\nnote\n-->",
     "<!-->\nReal Section\n-->",
     "<!--->\nReal Section\n-->",
     "- item\n  <!--\n-->",
-    // An item inside a fence is code: its context ends at the fence (CR2-1).
     "```\n- item\n  ```\n  Rollout Notes",
+    "<!--\n- note -->\n  Real Section", // CR4-1
+    "<pre>\n- x </pre>\n  Real Section", // CR4-1
+    "-\t# Heading\n  Real Section", // CR4-2
   ]) {
     const doc = markerDoc(`${section(1)}\n\n${head}\n-----\n\nkeep-me\n\n`);
     const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
@@ -1250,4 +1243,11 @@ test("R4 5c CR-2 / CR2-4: a bold Bug Reports block keeps its #### groups and sto
     assert.equal(count(out2, "(./a.md)"), 1, label);
     assert.doesNotMatch(out2, /- stale/, label);
   }
+  // A bug list grouped under a sub-label that is not one a QA render emits is carried
+  // whole (QA cycle 4, CR4-3: `**Critical Issues**` ended the block and dropped both).
+  const grouped2 =
+    "**Bug Reports**\n\n**Critical Issues**\n- [g1](./g1.md)\n\n**Minor**\n- [g2](./g2.md)";
+  const out3 = replaceThrice(markerDoc(`${section(1)}\n\n${grouped2}\n\n`));
+  assert.equal(count(out3, "(./g1.md)"), 1);
+  assert.equal(count(out3, "(./g2.md)"), 1);
 });

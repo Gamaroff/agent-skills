@@ -57,7 +57,11 @@ and each underline `-----` / `=====`, build `markerDoc(section(1) + "\n\n" + hea
 the engine), and `content === doc`. The task.171 gate-5 probe reproduced the first six shapes as
 deletions (`replaced`, `keep-me` gone).
 
-### Phase 2: two false refusals by context (CR-7)
+### Phase 2: two false refusals by context (CR-7) — deferred
+
+> **Deferred at the second QA escalation (2026-10-05).** Both contexts below were implemented and
+> each was beaten by shapes it did not anticipate; the inference is removed and CR-7 is recorded in
+> the task's `## Deferred Work`. The text below is the original plan, kept for the record.
 
 `removesStructure` already walks the lines in order. Track two pieces of context:
 

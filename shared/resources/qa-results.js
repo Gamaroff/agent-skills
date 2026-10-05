@@ -158,9 +158,11 @@ const RE_QA_FIELD =
 // one even when a list follows it, so a stale QA list is never carried into the next
 // write (task 183, CR2-4). RE_QA_FIELD matches `**Label**: value` field lines; this
 // matches the label alone, its colon inside the bold or after it (QA cycle 1, CR-4).
+// Only labels a QA render emits: `Critical Issues` and `Issues Found` also name bug-list
+// groupings, and stopping there dropped a grouped bug list (QA cycle 4, CR4-3).
 // The one place to add a legacy QA label.
 const QA_LABELS =
-  /^\*\*(?:Recommendations|Key Findings|Issues Found|Next Steps|Code Review Findings|Critical Issues):?\*\*:?[ \t]*$/i;
+  /^\*\*(?:Recommendations|Key Findings|Next Steps|Code Review Findings):?\*\*:?[ \t]*$/i;
 const RE_BOLD_LABEL = /^\*\*[^*\n]+\*\*:?[ \t]*$/;
 // `Bug Reports?` reads the singular too; each pattern maps back to its carried name.
 const CARRIED_PATTERN = {
@@ -327,50 +329,6 @@ function hasDateColumn(row) {
   return cells.some((c) => /^\s*Date\s*$/i.test(c));
 }
 
-// Lines that belong to a block CommonMark has already opened, so an underline below one
-// is not a setext heading (task 183, CR-7). One context, narrow on purpose: a list
-// item's continuation — a non-blank line indented to at least the item's content offset,
-// with no blank line since the item (or since the previous continuation line). The item
-// must be one that can interrupt a paragraph — a bullet or `1.` — because a `2.` line
-// under paragraph text is paragraph text, and so is everything indented under it.
-// A comment-closing line (`-->`) is NOT exempt. Three QA cycles each found a new way
-// an inferred comment context exempted a paragraph line and deleted the setext section
-// under it (CR2-1 a fenced opener, CR3-1 a one-line or item-indented opener); a
-// `-->` over `---` is refused instead, the false refusal origin/develop already made
-// (task 183 QA escalation, operator decision 2026-10-05).
-// Returns one boolean per line.
-function blockContinuations(lines) {
-  const out = lines.map(() => false);
-  let offset = 0; // content offset of the list item being continued; 0 = none
-  for (let k = 0; k < lines.length; k++) {
-    const l = lines[k];
-    // A fence line ends the list context: an item inside a fence is code, and a context
-    // carried out of it exempted a later paragraph line (QA cycle 2, CR2-1).
-    if (/^ {0,3}(?:`{3,}|~{3,})/.test(l)) {
-      offset = 0;
-      continue;
-    }
-    // A thematic break (`* * *`, `- - -`) is not a list item, though the item pattern
-    // matches it, and it ends any item before it (task 183 QA cycle 1, CR-3).
-    if (RE_BREAK.test(l)) {
-      offset = 0;
-      continue;
-    }
-    const item = /^( {0,3})([-*+]|1[.)])([ \t]+)\S/.exec(l);
-    if (item) {
-      // Five or more spaces after the marker open indented code: the offset is then
-      // the marker plus one space (CommonMark list items, rule 2).
-      const gap = item[3].length >= 5 ? 1 : item[3].length;
-      offset = item[1].length + item[2].length + gap;
-      continue;
-    }
-    if (offset && /\S/.test(l) && l.match(/^ */)[0].length >= offset)
-      out[k] = true;
-    else offset = 0;
-  }
-  return out;
-}
-
 // The first line, past the section's own heading, that a write may not remove — or
 // null. `underLog` adds dated change-log rows (`isEntryRow`, header-agnostic): a section
 // sitting inside or directly under a change log must not span one, because which rows
@@ -384,7 +342,6 @@ function removesStructure(removed, { underLog = false } = {}) {
   // mis-pairing that let a replace delete a real setext section (task 171 QA cycles
   // 2–4: CR2-2, CR3-1, CR4-1). Refusing is the direction that cannot lose content.
   const lines = removed.split("\n").map((l) => l.replace(/\r$/, ""));
-  const block = blockContinuations(lines);
   let logTable = false; // inside a table whose header has a `Date` column
   // A log table with a header and no data rows is still a log: under a log, its header
   // is reported when the table ends, so a header-only log is refused rather than its
@@ -420,10 +377,7 @@ function removesStructure(removed, { underLog = false } = {}) {
     if (logTable && logRow) logData = true;
     if (
       RE_STRUCTURAL.some((re) => re.test(l)) ||
-      (RE_SETEXT.test(l) &&
-        i > 1 &&
-        !notParagraph(lines[i - 1]) &&
-        !block[i - 1]) ||
+      (RE_SETEXT.test(l) && i > 1 && !notParagraph(lines[i - 1])) ||
       (underLog && logRow)
     ) {
       // A setext underline is reported with the text it makes a heading of.

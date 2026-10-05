@@ -5,7 +5,7 @@ type: task
 description: "Follow-up to task.171. Close the five items in task.171's `## Deferred Work` section, all in `shared/resources/qa-results.js`: the HIGH setext deletion path first (CR5-1), then a Version-first log lost on relocate, two bold-label block boundaries and two setext false refusals. Also make the corpus survey cheaper and its timing bound honest."
 tags: [qa-task, qa-story, engine, follow-up]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: High
 created: 2026-10-05
 updated: 2026-10-05
@@ -16,7 +16,7 @@ github_issue: 569
 
 # Technical Task: qa-results setext and carry follow-ups
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.183.review.1.qa-results-setext-and-carry-follow-ups.md` implemented 2026-10-05
 
@@ -39,8 +39,9 @@ is worth shipping alone, so they are not split (§ 1.2 splitting test).
 
 1. The setext check leans toward refusal: a non-blank line over an `=`/`-` underline is a heading
    candidate unless it certainly is not paragraph text (CR5-1).
-2. The list-continuation setext false refusal stops refusing, without reopening any CR5-1 shape
-   (CR-7). The comment-closer shape stays refused (QA escalation, operator decision 2026-10-05).
+2. **CR-7 deferred** (second QA escalation, operator decision 2026-10-05): both setext false
+   refusals stay refused, and the item moves to `## Deferred Work` below — it needs a real CommonMark
+   parser, not line-by-line inference.
 3. A change log whose header has a `Date` column in any position keeps its rows on relocate (5c CR-1).
 4. A bold-label carried block keeps its `####` groups and stops at QA's own labels (5c CR-2, CR2-4).
 5. The corpus write survey pre-filters documents, and the timing criterion records the load it was
@@ -126,12 +127,12 @@ QA cycle 5 review reproduced, not just plain text.
   holds no backtick), a list item that can interrupt a paragraph (a bullet, or an ordered item
   starting at `1`), a block quote, a table row, or an HTML comment line. Everything else is a
   candidate, so each CR5-1 shape is refused.
-- **CR-7 by context, not by exemption.** The list false refusal is fixed by recognising its context:
-  a line that continues a list item (indented under it, with no blank line between) is not a
-  paragraph line. **The comment-closer shape is not exempted** (amended 2026-10-05, QA escalation):
-  three QA cycles each found a new way an inferred comment context exempted a paragraph line and
-  deleted the setext section under it, so a `-->` over `---` keeps the refusal `origin/develop`
-  already made. Every CR5-1 shape stays refused, and the CR5-1 tests are the guard for that.
+- **CR-7 is deferred, not fixed** (amended twice on 2026-10-05, QA escalations 1 and 2). Both
+  false refusals were first fixed by inferring their context line by line — a comment closer, then a
+  list continuation — and each inference was beaten by shapes it did not anticipate (a fence, a
+  one-line comment opener, a thematic break, an HTML block, a tab), each one deleting a setext
+  section `origin/develop` refused. Both shapes keep the safe false refusal; the setext check is
+  `origin/develop`'s check with the narrower `notParagraph` exemption. See `## Deferred Work`.
 - **A log table is a table with a `Date` column.** Under `underLog`, a table whose header has a cell
   reading `Date` in **any** position is a log table, and each of its data rows is a log row. The
   header row is excluded by the same Date-column test that starts the table, not by `RE_LOG_HEADER`
@@ -178,7 +179,7 @@ QA cycle 5 review reproduced, not just plain text.
 None to any public contract. More writes are refused, each with a `detail`: a section whose span
 holds a setext heading under any paragraph-text line, and a misplaced section spanning a data row
 of any table that has a `Date` column. These refuse rather than delete, which is the intended
-direction. The CR-7 list shape goes the other way and is now written where it was refused.
+direction. No shape that was refused is newly written: the CR-7 false refusals are deferred.
 CHANGELOG states all of these.
 
 ---
@@ -197,14 +198,14 @@ CHANGELOG states all of these.
       both `-----` and `=====`, and keeps every byte of the document
 - [x] Measure on the corpus before committing: 0 false refusals is the bar
 
-### Phase 2: two setext false refusals — CR-7 (Risk: Low)
+### Phase 2: two setext false refusals — CR-7 (deferred at the second QA escalation)
 
 **Files**: `shared/resources/qa-results.js`, `shared/resources/tests/qa-results.test.mjs`
 
-- [x] A list item's continuation line is not a paragraph line (the comment-closer exemption was
-      dropped at the QA escalation — the closer stays refused)
-- [x] A test writes the CR-7 list shape and refuses the comment shape; Phase 1's CR5-1 test still
-      refuses every one of its shapes
+- [x] The context inference (comment closer, list continuation) is removed after four QA cycles
+      found deletions through it; CR-7 moves to `## Deferred Work`
+- [x] A test refuses both CR-7 shapes and every shape that beat the inference; Phase 1's CR5-1 test
+      still refuses every one of its shapes
 
 ### Phase 3: a log table is a table with a Date column — 5c CR-1 (Risk: Low)
 
@@ -296,8 +297,8 @@ None.
 
 - [ ] Each of the six CR5-1 probe shapes is refused with a `detail` under both underlines, and the
       document is unchanged (Phase 1 test)
-- [ ] The CR-7 list shape is written, the comment-closer shape stays refused, and every CR5-1 shape
-      is still refused (Phase 2 test)
+- [ ] Both CR-7 shapes stay refused (deferred), as do the shapes that beat the removed inference,
+      and every CR5-1 shape is still refused (Phase 2 test)
 - [ ] A misplaced section above a `| Version | Date | … |` log is refused, never relocated with row
       loss, and a section quoting a table without a `Date` column is still writable (Phase 3 test)
 - [ ] A `####` group under a bold `**Bug Reports**` label survives three writes, and a QA-owned bold
@@ -398,6 +399,23 @@ None.
 ### Key Findings
 CR3-1 and CR3-2 fixed. CR4-1 and CR4-2 (HIGH): the list-continuation exemption deletes a setext section when the item sits inside an HTML block or a tab follows the marker. CR4-3 (MEDIUM): `QA_LABELS` drops a bug list grouped under `**Critical Issues**`. HIGH per cycle 1, 1, 2, 2 — escalated a second time.
 
+## Deferred Work
+
+Carried from the second QA escalation (gate 4, 2026-10-05, operator decision) and from gates 2–4
+`recommendations.future`. All three are gaps in `shared/resources/qa-results.js`.
+
+- **CR-7** (low, from task.171 gate 1) — setext false refusals after a list continuation line or a
+  multi-line comment closer. Not fixed here: inferring either context line by line deleted real
+  setext sections through six shapes across QA cycles 1–4 (a thematic break, a fence, one-line and
+  item-indented comment openers, an HTML block, a tab). Fix it with a real CommonMark parser, or
+  accept the false refusal.
+- **CR2-3** (medium, pre-existing — identical on `origin/develop`, 0 corpus hits) — a carried bold
+  label with the colon inside the bold (`**Deferred Work:**`) is not recognised as a carried block,
+  so its items are deleted on replace.
+- **CR4-4** (low) — a QA-owned `####` heading after a carried bold-label block is carried as stale
+  text (a duplicate, never a deletion). No QA render emits `####`; 0 of 235 tracked QA documents
+  have the shape.
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -412,6 +430,7 @@ CR3-1 and CR3-2 fixed. CR4-1 and CR4-2 (HIGH): the list-continuation exemption d
 | 2026-10-05 |         | QA gate FAIL (70/100) — 2 findings (1 high), 2 advisory | qa-task |
 | 2026-10-05 |         | QA gate FAIL (60/100) — 2 findings (2 high); loop not converging, escalated | qa-task |
 | 2026-10-05 |         | Escalation resolved (operator): comment-closer exemption dropped (CR-7 list shape only); marker-less table-above check back to Date-first (CR3-2) — § 1, § 3, § 5, Phase 2, § 9 amended | develop |
+| 2026-10-05 |         | Second escalation resolved (operator): list-continuation inference removed, CR-7 deferred to Deferred Work; Critical Issues / Issues Found dropped from QA_LABELS (CR4-3) — § 1, § 3, § 5, Phase 2, § 9 amended | develop |
 | 2026-10-05 |         | QA gate FAIL (50/100) — 3 findings (2 high); loop not converging, escalated again | qa-task |
 
 <!-- change-log-end -->
@@ -421,7 +440,7 @@ CR3-1 and CR3-2 fixed. CR4-1 and CR4-2 (HIGH): the list-continuation exemption d
 ## Progress Tracking
 
 - [x] Phase 1: setext leans toward refusal (CR5-1)
-- [x] Phase 2: two setext false refusals (CR-7)
+- [x] Phase 2: two setext false refusals (CR-7) — deferred
 - [x] Phase 3: a log table is a table with a Date column (5c CR-1)
 - [x] Phase 4: bold-label boundaries (5c CR-2, CR2-4)
 - [x] Phase 5: survey pre-filter, timing and docs
