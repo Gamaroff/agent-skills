@@ -57,15 +57,20 @@ and each underline `-----` / `=====`, build `markerDoc(section(1) + "\n\n" + hea
 the engine), and `content === doc`. The task.171 gate-5 probe reproduced the first six shapes as
 deletions (`replaced`, `keep-me` gone).
 
-### Phase 2: two false refusals by context (CR-7)
+### Phase 2: two false refusals by context (CR-7) — deferred
+
+> **Deferred at the second QA escalation (2026-10-05).** Both contexts below were implemented and
+> each was beaten by shapes it did not anticipate; the inference is removed and CR-7 is recorded in
+> the task's `## Deferred Work`. The text below is the original plan, kept for the record.
 
 `removesStructure` already walks the lines in order. Track two pieces of context:
 
 - **list continuation**: after a line matching an interrupting list item, a following non-blank line
   indented by at least the item's content offset, with no blank line between, is a continuation
   line, not a paragraph line;
-- **open HTML comment**: from a line containing `<!--` without a matching `-->` on it, through the
-  line containing `-->`, the lines are inside an HTML block, not paragraph text.
+- **closing HTML comment line** — *dropped at the QA escalation (2026-10-05)*. Three QA cycles each
+  found a new way the inferred comment context deleted a setext section (CR2-1, CR3-1); the closer
+  over `---` stays refused, as on `origin/develop`.
 
 The setext clause skips a line above the underline when either context holds. Test `R2`: each shape
 is written (`created` from `markerDoc()`, then `replaced`), and `R1`'s loop runs again unchanged as
@@ -83,7 +88,12 @@ const isLogHeader = (l) =>
 ```
 
 A header row is recognised as the first `|` line of a table (the previous line is not a `|` line);
-data rows are the `|` lines after its separator row. Keep `isEntryRow` as the second clause, so a
+data rows are the `|` lines after its separator row. Replace **both** uses of `RE_LOG_HEADER` in
+`removesStructure` with `isLogHeader`: the start condition and the header exclusion in `logRow`
+(`!RE_LOG_HEADER.test(l)`). Left on `RE_LOG_HEADER`, the exclusion misses a `| Version | Date | … |`
+header, which then counts as a log row and the refusal names the header instead of the first data row
+(review 1, I2). Do not `slice(1, -1)` blindly: a row with no trailing pipe would lose its last cell —
+drop a trailing empty cell instead (review 1, O2). Keep `isEntryRow` as the second clause, so a
 dated row outside a table header still counts. `RE_LOG_HEADER` (`:92`) is still used by
 `lastTableStart` and is left alone.
 
@@ -93,6 +103,9 @@ with `structural-line:| 1.1 | 2026-10-06 | x | y |`; a misplaced section quoting
 rows (no Date column) still relocates.
 
 ### Phase 4: bold-label boundaries (5c CR-2, CR2-4)
+
+> **CR2-4 deferred at QA cycle 5 (2026-10-05).** The `QA_LABELS` stop below was implemented and
+> removed: it deleted bug lists grouped under QA-sounding labels. Kept for the record.
 
 In `collectBlocks`' `stops` (`:191`–`:198`), for a bold-label block (`level === 0`):
 

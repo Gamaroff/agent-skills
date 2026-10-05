@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.183.qa-results-setext-and-carry-follow-ups'
+task_title: 'qa-results setext and carry follow-ups'
+gate: FAIL
+status_reason: 'All five phases delivered, R1–R4 green and 9/9 mutations held, but the diff review reproduced a new content-loss path: a `* * *` or `- - -` thematic break is read as a list item, so the line under it is exempted and a setext section is deleted on replace where origin/develop refused. Two smaller in-scope gaps (a second log-header definition, an inner-colon QA label) are open beside it.'
+reviewer: 'QA Engineer'
+head: '41070fcb292ed1ae8ffb05e67fe7ae6f4c0c36d3'
+updated: '2026-10-05T09:42:28Z'
+
+top_issues:
+  - id: CR-3
+    severity: high
+    file: 'shared/resources/qa-results.js'
+    finding: 'blockContinuations matches a thematic break (`* * *`, `- - -`) as a list item, so `* * *` / `  Rollout Notes` / `---` exempts the paragraph line and the setext section under it is deleted on replace (keep-me gone); origin/develop refuses the same document with structural-line:Rollout Notes / ---.'
+    suggested_action: 'Test a line against RE_BREAK before treating it as a list item, and reset the continuation offset on a break; add both break shapes to the R2 refusal loop.'
+    suggested_owner: dev
+    status: open
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'lastTableStart still recognises a log header by RE_LOG_HEADER (Date first) while removesStructure uses hasDateColumn, so with a `| Version | Date |` log above a misplaced section that quotes a Date-first table, logAbove reads false, the section is cut at the quoted table and its quoted row is left inside the change-log block (relocated; reproduced, identical on origin/develop).'
+    suggested_action: 'Make lastTableStart use hasDateColumn so there is one definition of a log header in the span logic; add a test that the R3-shaped document with a quoted Date table below the section is refused, not relocated.'
+    suggested_owner: dev
+    status: open
+  - id: CR-4
+    severity: low
+    file: 'shared/resources/qa-results.js'
+    finding: 'QA_LABELS accepts the colon only outside the bold (`**Recommendations**:`), so the inner-colon form `**Recommendations:**` over a list still carries the stale list (reproduced after two writes).'
+    suggested_action: 'Allow the colon on either side of the closing `**` in QA_LABELS and add the inner-colon shape to R4.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 85
+  phases_verified: 5/5
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — upsertQaResults decides whether a write to a work-item document is safe; its inputs are documents and a render this pipeline writes, and no corpus sink models a work-item section writer (task.171 precedent). No network, exec or path input.'
+  performance:
+    status: PASS
+    notes: 'Engine + corpus + wiring suites 1.73 s at load average 3.33 (/usr/bin/time -p); 1.95–2.10 s at load ~7/50 during develop. Bound is 2 s; re-measure at finalise.'
+  reliability:
+    status: FAIL
+    notes: 'CR-3 reopens the content-loss class this task closes (a setext section deleted on replace) through a new route; CR-1 leaves stale quoted rows in a change-log block.'
+  maintainability:
+    status: PASS
+    notes: 'Each rule commented with its finding id; one test block per item; 9/9 mutations held.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-3: a thematic break is not a list item in blockContinuations.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Fix CR-1: one log-header definition (hasDateColumn) in lastTableStart.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Fix CR-4: QA_LABELS accepts an inner colon.'
+      refs: ['shared/resources/qa-results.js']
+  future:
+    - action: 'CR-2 (advisory, low confidence): a bold-label block now carries every #### group, so a QA-owned #### subsection after a carried label would be carried. 0 of 235 tracked QA documents have the shape and the qa-task/qa-story render uses ### only; revisit if a render ever emits ####.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

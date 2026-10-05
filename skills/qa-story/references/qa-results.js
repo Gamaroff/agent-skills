@@ -86,11 +86,6 @@ const {
 const HEADING = "## QA Testing Results";
 const RE_QA = /^## QA Testing Results\b[^\n]*$/gm;
 const RE_H1_H2 = /^#{1,2}[ \t]/;
-// A change-log table's header row: first cell `Date`, whatever follows. The current
-// spec's `| Date | Version | … |` and the legacy sync logs' `| Date | Change |` both
-// match; only the header's first cell is fixed across every shape (task.155 QA
-// cycle 2, REL-005).
-const RE_LOG_HEADER = /^\|[ \t]*Date[ \t]*\|/i;
 // A thematic break line. Only counted as a separator when a blank line precedes it:
 // directly under a paragraph line, `---` is a setext H2 underline, not a break.
 const RE_BREAK =
@@ -147,9 +142,9 @@ const CARRIED_SUBSECTIONS = ["Bug Reports", "Deferred Work"];
 //     of its OWN level or shallower — a `####` block stops at the next `####`, so it
 //     cannot carry QA's later `####` subsections (REL-025);
 //   - a bold label alone on its line, `**Bug Reports**` / `**Deferred Work**` (REL-027,
-//     and the legacy REL-030 record). It runs to the next heading, or the next bold
-//     label alone on its line that does NOT introduce a list or
-//     table — a sub-label such as `**From cycle 2:**` over its items belongs to the
+//     and the legacy REL-030 record). It runs to the next heading of level 3 or
+//     shallower (task 183 — its `####` groups stay inside it), or the next bold label
+//     alone on its line that does NOT introduce a list or table — a sub-label such as `**From cycle 2:**` over its items belongs to the
 //     block; QA's own `**Recommendations**` over a paragraph does not (task 171 QA
 //     cycle 1, CR-2: stopping at every sub-label deleted the items under it).
 // Either form also stops at the first of QA's OWN template field lines
@@ -159,6 +154,11 @@ const CARRIED_SUBSECTIONS = ["Bug Reports", "Deferred Work"];
 // verdict along (task.155 QA cycle 8, REL-021).
 const RE_QA_FIELD =
   /^\*\*(?:QA Status|QA Engineer|Testing Date|Quality Score|Gate Decision)\*\*:/;
+// There is deliberately no list of QA-owned bold labels that ends a carried block over a
+// list. A stale QA list after a carried block and a bug list grouped under a sub-label
+// are the same shape, and stopping at the label deleted the grouped list (task 183 QA
+// cycles 4–5, CR4-3, CR5-1). A stale list is carried instead — a duplicate, never a
+// deletion — and that residue (CR2-4) is recorded in task.183's Deferred Work.
 const RE_BOLD_LABEL = /^\*\*[^*\n]+\*\*:?[ \t]*$/;
 // `Bug Reports?` reads the singular too; each pattern maps back to its carried name.
 const CARRIED_PATTERN = {
@@ -193,8 +193,11 @@ function collectBlocks(text, name) {
       const l = bare(i);
       if (RE_QA_FIELD.test(l)) return true;
       if (level) return new RegExp(`^#{1,${level}}[ \\t]`).test(l);
+      // A bold label sits at the level of a `###` subsection, so like a `###` block it
+      // stops at a heading of level 3 or shallower and keeps its `####` groups (task
+      // 183, 5c CR-2: stopping at any heading carried the label and dropped the group).
       return (
-        /^#{1,6}[ \t]/.test(l) || (RE_BOLD_LABEL.test(l) && !introducesList(i))
+        /^#{1,3}[ \t]/.test(l) || (RE_BOLD_LABEL.test(l) && !introducesList(i))
       );
     };
     let end = text.length;
@@ -277,12 +280,48 @@ function mergeCarried(body, removed, eol = "\n") {
   return out;
 }
 
-// A setext H1/H2 underline, judged with the line above it: that line must be paragraph
-// text — non-blank, and not a table row, list item, quote, heading, fence or HTML line.
-// After a blank line a `---` is a thematic break, not a heading.
+// A setext H1/H2 underline, judged with the line above it. After a blank line a `---` is
+// a thematic break, not a heading.
 const RE_SETEXT = /^ {0,3}(?:=+|-+)[ \t]*$/;
-const RE_NOT_PARAGRAPH =
-  /^[ \t]*(?:$|\||[-*+][ \t]|\d+[.)][ \t]|>|#|```|~~~|<)/;
+
+// A line that certainly is not paragraph text, so an underline below it is not a setext
+// heading. Everything else is a heading candidate: the check leans toward refusing
+// (task 183, CR5-1). The exemption it replaced matched any line opening with `#`, `<`,
+// "```" or a digit-dot, so six shapes CommonMark reads as paragraph text —
+// `#538 Notes`, an autolink, inline `<b>`, an HTML type-7 line, a code span, an ordered
+// item not starting at 1 — were exempted and their sections deleted on replace. Per CommonMark: an ATX
+// heading needs a space or end of line after its hashes; only a bullet or an ordered
+// item starting at 1 can interrupt a paragraph; a backtick fence opener's info string
+// holds no backtick.
+function notParagraph(line) {
+  return (
+    /^[ \t]*$/.test(line) ||
+    /^ {0,3}#{1,6}(?:[ \t]|$)/.test(line) || // ATX heading
+    /^ {0,3}(?:~{3,}|`{3,}(?!.*`))/.test(line) || // fence opener
+    /^ {0,3}(?:[-*+]|1[.)])[ \t]/.test(line) || // list item that can interrupt
+    /^ {0,3}>/.test(line) || // block quote
+    /^[ \t]*\|/.test(line) || // table row
+    /^ {0,3}<!--/.test(line) // HTML comment line
+  );
+}
+
+// A change-log table's header row. The current spec's `| Date | Version | … |`, the
+// legacy sync logs' `| Date | Change |` (task.155 QA cycle 2, REL-005) and a Version-first
+// `| Version | Date | … |` log (task 183) all carry a `Date` cell; its position is not fixed.
+// Two questions use it with different reach (task 183 QA cycle 1, CR-1): whether a log
+// table EXISTS — any `Date` column, so a Version-first log is seen and the write refused
+// rather than cut — and where a section may be CUT, which only a Date-first header earns
+// (RE_LOG_HEADER). A cut is the risky direction: cutting at a table the section quotes
+// leaves its rows in the log (REL-006/007), and QA sections quote `| Cycle | Date | … |`.
+const RE_LOG_HEADER = /^\|[ \t]*Date[ \t]*\|/i;
+// Does a table row have a cell reading `Date`, in any position? The leading pipe opens the
+// row; a trailing pipe is optional, so only an empty last cell is dropped, never the last
+// real one (task 183 review, O2).
+function hasDateColumn(row) {
+  const cells = row.trim().split("|").slice(1);
+  if (cells.length && cells[cells.length - 1].trim() === "") cells.pop();
+  return cells.some((c) => /^\s*Date\s*$/i.test(c));
+}
 
 // The first line, past the section's own heading, that a write may not remove — or
 // null. `underLog` adds dated change-log rows (`isEntryRow`, header-agnostic): a section
@@ -297,22 +336,42 @@ function removesStructure(removed, { underLog = false } = {}) {
   // mis-pairing that let a replace delete a real setext section (task 171 QA cycles
   // 2–4: CR2-2, CR3-1, CR4-1). Refusing is the direction that cannot lose content.
   const lines = removed.split("\n").map((l) => l.replace(/\r$/, ""));
-  let logTable = false; // inside a table whose header's first cell is `Date`
+  let logTable = false; // inside a table whose header has a `Date` column
+  // A log table with a header and no data rows is still a log: under a log, its header
+  // is reported when the table ends, so a header-only log is refused rather than its
+  // header removed (QA cycle 2, CR2-2).
+  let logHeader = null;
+  let logData = false;
+  const headerOnly = () =>
+    underLog && logTable && logHeader !== null && !logData
+      ? logHeader.trim().slice(0, 60)
+      : null;
   for (let i = 1; i < lines.length; i++) {
     const l = lines[i];
-    // Every data row of a Date-headed table counts, not only an ISO-dated one: the
-    // log's writer keeps non-ISO rows (`| 03/01/2026 |`), and an ISO-only test let them
-    // be deleted on relocate (task 171 QA cycle 1, CR-3).
-    if (RE_LOG_HEADER.test(l)) logTable = true;
-    else if (!/^[ \t]*\|/.test(l)) logTable = false;
+    const isRow = /^[ \t]*\|/.test(l);
+    // A table's header is its first `|` line. Every data row of a table with a `Date`
+    // column counts, not only an ISO-dated one: the log's writer keeps non-ISO rows
+    // (`| 03/01/2026 |`), and an ISO-only test let them be deleted on relocate (task 171
+    // QA cycle 1, CR-3). `Date` in any position, so a `| Version | Date | … |` log keeps
+    // its rows too (task 183, 5c CR-1); the header itself is excluded by the same test.
+    const header = isRow && !/^[ \t]*\|/.test(lines[i - 1]) && hasDateColumn(l);
+    if (header) {
+      logTable = true;
+      logHeader = l;
+      logData = false;
+    } else if (!isRow) {
+      const bare = headerOnly();
+      if (bare !== null) return bare;
+      logTable = false;
+      logHeader = null;
+    }
     const logRow =
       isEntryRow(l) ||
-      (logTable &&
-        !RE_LOG_HEADER.test(l) &&
-        !/^[ \t]*\|[\s\-:|]+\|[ \t]*$/.test(l));
+      (logTable && !header && !/^[ \t]*\|[\s\-:|]+\|[ \t]*$/.test(l));
+    if (logTable && logRow) logData = true;
     if (
       RE_STRUCTURAL.some((re) => re.test(l)) ||
-      (RE_SETEXT.test(l) && i > 1 && !RE_NOT_PARAGRAPH.test(lines[i - 1])) ||
+      (RE_SETEXT.test(l) && i > 1 && !notParagraph(lines[i - 1])) ||
       (underLog && logRow)
     ) {
       // A setext underline is reported with the text it makes a heading of.
@@ -323,7 +382,7 @@ function removesStructure(removed, { underLog = false } = {}) {
       return shown.slice(0, 60);
     }
   }
-  return null;
+  return headerOnly();
 }
 
 const isBlank = (line) => /^[ \t]*\r?$/.test(line);
@@ -400,9 +459,11 @@ function markerBlocks(content, ranges) {
   return blocks.sort((a, b) => a.start - b.start);
 }
 
-// Offset of the LAST unprotected change-log table header in [from, to): a line
-// matching RE_LOG_HEADER whose previous line is not itself a table row.
-function lastTableStart(content, from, to, ranges) {
+// Offset of the LAST unprotected change-log table header in [from, to): a table row
+// `isHeader` accepts (default: a `Date` column, `hasDateColumn`) whose previous line is
+// not itself a table row. Whether a section may be CUT at the table it finds is asked of
+// that same table (`dateFirstAt`, see RE_LOG_HEADER) — QA cycle 2, CR2-2.
+function lastTableStart(content, from, to, ranges, isHeader = hasDateColumn) {
   let found = -1;
   let offset = from;
   let prevRow = false;
@@ -411,7 +472,7 @@ function lastTableStart(content, from, to, ranges) {
     if (
       isRow &&
       !prevRow &&
-      RE_LOG_HEADER.test(line) &&
+      isHeader(line) &&
       !insideProtected(ranges, offset)
     ) {
       found = offset;
@@ -420,6 +481,14 @@ function lastTableStart(content, from, to, ranges) {
     offset += line.length + 1;
   }
   return found;
+}
+
+// Is the table header starting at `offset` Date-first — a shape the log writers emit?
+function dateFirstAt(content, offset) {
+  const end = content.indexOf("\n", offset);
+  return RE_LOG_HEADER.test(
+    content.slice(offset, end === -1 ? undefined : end),
+  );
 }
 
 // Does a fence that opens in [from, to) never close? A sentinel appended past the
@@ -497,7 +566,13 @@ function findQaResults(content) {
       changeLog &&
       !changeLog.hasMarkers &&
       changeLog.end === start &&
-      lastTableStart(content, changeLog.start, start, ranges) === -1;
+      // Date-first only: here there is no marker block to guard the span, so a table
+      // above the section counts as the log's own only in the shape the log writers emit.
+      // Any Date column made a quoted `| Reviewer | Date |` read as the log, cleared
+      // underLog, and the replace deleted the real log row below (QA cycle 3, CR3-2).
+      lastTableStart(content, changeLog.start, start, ranges, (l) =>
+        RE_LOG_HEADER.test(l),
+      ) === -1;
     // When the block's own log table already sits ABOVE the section, a Date table below
     // it is not the log's — the section quotes it. Cutting there left the quoted rows in
     // the log (REL-007); without the cut they are in the span, and the dated-row guard
@@ -505,13 +580,15 @@ function findQaResults(content) {
     const logAbove =
       block && lastTableStart(content, block.start, start, ranges) !== -1;
     if ((block && !logAbove) || underTablelessLog) {
+      // The last Date-column table is the log's own; cut there only when it is
+      // Date-first. Otherwise there is no cut: the span runs on and the guard refuses.
       const tbl = lastTableStart(
         content,
         bodyOffset,
         Math.min(...candidates),
         ranges,
       );
-      if (tbl !== -1) {
+      if (tbl !== -1 && dateFirstAt(content, tbl)) {
         candidates.push(tbl);
         insideChangeLog = true;
       }

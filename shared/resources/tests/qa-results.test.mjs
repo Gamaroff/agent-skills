@@ -1084,3 +1084,185 @@ test("Q4 CR3-1/CR4-1: a setext section behind any fence mis-pairing is refused, 
     assert.equal(r.content, doc);
   }
 });
+
+// ---------------------------------------------------------------------------
+// R — task 183: task.171's Deferred Work items
+// ---------------------------------------------------------------------------
+
+// The heads the task.171 gate-5 probe reproduced as deletions (`replaced`, the body
+// after the underline gone), plus plain text as the control that was already refused.
+// For a two-line head the line above the underline is the one the detail names.
+const CR5_1_HEADS = [
+  "#538 Rollout Notes", // no space after `#`: not ATX
+  "<https://example.com/rollout>", // autolink
+  "<b>Rollout</b> Notes", // inline HTML
+  "``` inline `code` span", // a backtick in the info string: not a fence opener
+  "Release\n2026. Notes", // an ordered item not starting at 1 cannot interrupt
+  "Release\n<b>2026</b>", // an HTML type-7 line cannot interrupt
+  "Rollout Notes", // control
+];
+
+const setextDoc = (head, underline) =>
+  markerDoc(`${section(1)}\n\n${head}\n${underline}\n\nkeep-me\n\n`);
+
+const assertCr51Refused = () => {
+  for (const underline of ["-----", "====="]) {
+    for (const head of CR5_1_HEADS) {
+      const doc = setextDoc(head, underline);
+      const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+      const above = head.split("\n").pop();
+      assert.equal(r.reason, "unbounded", `${head} / ${underline}`);
+      assert.equal(
+        r.detail,
+        `structural-line:${`${above} / ${underline}`.slice(0, 60)}`,
+      );
+      assert.equal(r.content, doc);
+    }
+  }
+};
+
+test("R1 CR5-1: a setext section under paragraph text of any shape is refused, never deleted", () => {
+  assertCr51Refused();
+});
+
+test("R2 CR-7 deferred: no block context is inferred — a paragraph line over an underline is refused", () => {
+  // Every shape below was once exempted by an inferred list or comment context, and each
+  // inference was beaten by a shape it did not anticipate — a break, a fence, an HTML
+  // block, a tab — deleting the setext section under it (QA cycles 1–4, CR-3, CR2-1,
+  // CR3-1, CR4-1, CR4-2). The context inference is gone; CR-7 moves to a follow-up that
+  // needs a real CommonMark parser. Each shape is now the false refusal origin/develop made.
+  for (const head of [
+    "- item\n  continued", // CR-7 list shape: refused again (deferred)
+    "<!--\nnote\n-->", // CR-7 comment shape: refused again (deferred)
+    "<!--\nnote\n\nRollout Notes",
+    "Release\n2. Notes\n   more",
+    "* * *\n  Rollout Notes",
+    "- - -\n  Rollout Notes",
+    "```html\n<!-- x\n```\n\nRetest flow: login --> dashboard",
+    "<!--\nnote -->",
+    "```\n<!--\n```\n\n-->",
+    "<!-->\nReal Section\n-->",
+    "<!--->\nReal Section\n-->",
+    "- item\n  <!--\n-->",
+    "```\n- item\n  ```\n  Rollout Notes",
+    "<!--\n- note -->\n  Real Section", // CR4-1
+    "<pre>\n- x </pre>\n  Real Section", // CR4-1
+    "-\t# Heading\n  Real Section", // CR4-2
+  ]) {
+    const doc = markerDoc(`${section(1)}\n\n${head}\n-----\n\nkeep-me\n\n`);
+    const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+    assert.equal(r.reason, "unbounded", head);
+    assert.equal(r.content, doc);
+  }
+  assertCr51Refused();
+});
+
+test("R3 5c CR-1: a misplaced section above a Version-first log is refused; a Date-less table relocates", () => {
+  const log = (header, row) =>
+    `<!-- change-log-start -->\n\n## Change Log\n\n${section(1)}\n\n${header}\n| --- | --- | --- | --- |\n${row}\n\n<!-- change-log-end -->\n`;
+  const doc = `${FM}## Body\n\ntext\n\n${log("| Version | Date | Description | Author |", "| 1.1 | 2026-10-06 | x | y |")}`;
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.detail, "structural-line:| 1.1 | 2026-10-06 | x | y |");
+  assert.equal(r.content, doc);
+  // No trailing pipe: the last cell is still read (review O2).
+  const bare = `${FM}## Body\n\ntext\n\n${log("| Description | Author | Version | Date", "| x | y | 1.1 | 2026-10-06 |")}`;
+  const rb = QR.upsertQaResults(bare, section(2), { docType: "task" });
+  assert.equal(rb.reason, "unbounded");
+  assert.equal(rb.detail, "structural-line:| x | y | 1.1 | 2026-10-06 |");
+  // The log ABOVE the section is Version-first and the section quotes a Date-first table:
+  // the log must be seen as a log, so the section is not cut at the quoted table (which
+  // left the quoted row inside the log) but refused (QA cycle 1, CR-1).
+  const above = `${FM}## Body\n\ntext\n\n<!-- change-log-start -->\n\n## Change Log\n\n| Version | Date | Description | Author |\n| --- | --- | --- | --- |\n| 1.1 | 2026-10-06 | x | y |\n\n${section(1)}\n\n| Date | Note |\n| --- | --- |\n| 2026-01-01 | quoted |\n\n<!-- change-log-end -->\n`;
+  const ra = QR.upsertQaResults(above, section(2), { docType: "task" });
+  assert.equal(ra.reason, "unbounded");
+  assert.equal(ra.detail, "structural-line:| 2026-01-01 | quoted |");
+  assert.equal(ra.content, above);
+  // The mirror shapes (QA cycle 2, CR2-2): the section quotes a Date-first table and the
+  // Version-first log sits BELOW it — no cut at the quoted table; and a header-only
+  // Version-first log is refused, not stripped of its header.
+  const vlog = (body) =>
+    `${FM}## Body\n\ntext\n\n<!-- change-log-start -->\n\n## Change Log\n\n${section(1)}\n\n${body}\n\n<!-- change-log-end -->\n`;
+  const below = vlog(
+    "| Date | Result |\n| --- | --- |\n| 2026-01-01 | quoted |\n\n| Version | Date | Description | Author |\n| --- | --- | --- | --- |\n| 1.1 | 2026-10-06 | x | y |",
+  );
+  const rbl = QR.upsertQaResults(below, section(2), { docType: "task" });
+  assert.equal(rbl.reason, "unbounded");
+  assert.equal(rbl.content, below);
+  const bareLog = vlog(
+    "| Version | Date | Description | Author |\n| --- | --- | --- | --- |",
+  );
+  const rh = QR.upsertQaResults(bareLog, section(2), { docType: "task" });
+  assert.equal(rh.reason, "unbounded");
+  assert.equal(
+    rh.detail,
+    "structural-line:| Version | Date | Description | Author |",
+  );
+  assert.equal(rh.content, bareLog);
+  // At end of file, with no newline after the separator, the header is still kept.
+  const eof = `${FM}## Body\n\ntext\n\n## Change Log\n\n${section(1)}\n\n| Version | Date | Description | Author |\n| --- | --- | --- | --- |`;
+  const re = QR.upsertQaResults(eof, section(2), { docType: "task" });
+  assert.equal(re.reason, "unbounded");
+  assert.equal(re.content, eof);
+  // A marker-less log holding a non-Date-first Date table above the section is still
+  // table-less for the cut: the log's own Date-first table below is cut at, and its row
+  // kept (QA cycle 3, CR3-2 — any Date column made the replace delete it).
+  const reviewer = `${FM}## Body\n\ntext\n\n## Change Log\n\n| Reviewer | Date |\n| --- | --- |\n| A | 2026-01-01 |\n\n${section(1)}\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | log-row | y |\n`;
+  const rr = QR.upsertQaResults(reviewer, section(2), { docType: "task" });
+  assert.equal(rr.reason, "relocated");
+  assert.equal(count(rr.content, "| 2026-09-25 | 1.0 | log-row | y |"), 1);
+  assert.equal(count(rr.content, "| A | 2026-01-01 |"), 1);
+  // A header-only Date-first log is still cut at and relocated, header kept.
+  const dfLog = vlog(
+    "| Date | Version | Description | Author |\n| --- | --- | --- | --- |",
+  );
+  const rd = QR.upsertQaResults(dfLog, section(2), { docType: "task" });
+  assert.equal(rd.reason, "relocated");
+  assert.match(
+    rd.content,
+    /## Change Log\n\n\| Date \| Version \| Description \| Author \|/,
+  );
+  // A section quoting a table with no Date column stays writable.
+  const phases = `${section(1)}\n\n| Phase | Status |\n| --- | --- |\n| Phase 1 | PASS |`;
+  const ok = `${FM}## Body\n\ntext\n\n<!-- change-log-start -->\n\n## Change Log\n\n${phases}\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n\n<!-- change-log-end -->\n`;
+  const w = QR.upsertQaResults(ok, section(2), { docType: "task" });
+  assert.equal(w.reason, "relocated");
+  assert.match(w.content, /\| 2026-09-25 \| 1\.0 \| x \| y \|/);
+  assert.doesNotMatch(w.content, /Phase 1 \| PASS/);
+});
+
+test("R4 5c CR-2: a bold Bug Reports block keeps its #### groups and every grouped bug list", () => {
+  const grouped = "**Bug Reports**\n\n#### From cycle 2\n\n- [b](./b.md)";
+  const out = replaceThrice(markerDoc(`${section(1)}\n\n${grouped}\n\n`));
+  assert.equal(count(out, "(./b.md)"), 1);
+  assert.equal(count(out, "#### From cycle 2"), 1);
+  // A bug list grouped under any sub-label is carried whole, whatever the label reads and
+  // wherever its colon sits: stopping at QA-sounding labels dropped the grouped links
+  // (QA cycles 4–5, CR4-3, CR5-1). A stale QA list in the same position is carried too —
+  // once, never doubled — which is the accepted CR2-4 residue (task Deferred Work).
+  for (const label of [
+    "**Recommendations**:",
+    "**Recommendations:**",
+    "**Key Findings**",
+    "**Next Steps:**",
+    "**Code Review Findings:**",
+  ]) {
+    const grouped3 = `**Bug Reports**\n\n- [a](./a.md)\n\n${label}\n\n- [b2](./b2.md)`;
+    const out2 = replaceThrice(markerDoc(`${section(1)}\n\n${grouped3}\n\n`));
+    assert.equal(count(out2, "(./a.md)"), 1, label);
+    assert.equal(count(out2, "(./b2.md)"), 1, label);
+  }
+  const stale =
+    "**Bug Reports**\n\n- [a](./a.md)\n\n**Recommendations**:\n\n- stale";
+  assert.equal(
+    count(replaceThrice(markerDoc(`${section(1)}\n\n${stale}\n\n`)), "- stale"),
+    1,
+  );
+  // A bug list grouped under a sub-label that is not one a QA render emits is carried
+  // whole (QA cycle 4, CR4-3: `**Critical Issues**` ended the block and dropped both).
+  const grouped2 =
+    "**Bug Reports**\n\n**Critical Issues**\n- [g1](./g1.md)\n\n**Minor**\n- [g2](./g2.md)";
+  const out3 = replaceThrice(markerDoc(`${section(1)}\n\n${grouped2}\n\n`));
+  assert.equal(count(out3, "(./g1.md)"), 1);
+  assert.equal(count(out3, "(./g2.md)"), 1);
+});

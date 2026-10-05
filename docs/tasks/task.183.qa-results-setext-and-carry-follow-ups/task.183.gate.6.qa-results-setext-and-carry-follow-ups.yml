@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.183.qa-results-setext-and-carry-follow-ups'
+task_title: 'qa-results setext and carry follow-ups'
+gate: PASS
+status_reason: 'Cycle 5s fix holds: the QA-label stop is gone, CR5-1/CR5-2/CR5-3 are fixed, and the diff review found no correctness bug. Three advisory lows remain (claim wording over a pre-existing shape, Change Log row order, a clause count); none gates.'
+reviewer: 'QA Engineer'
+head: 'fe971d2f7fc90ea357ce49d67bd4059b713f682a'
+updated: '2026-10-05T12:20:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 98
+  phases_verified: 5/5
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — shared/resources/qa-results.js#upsertQaResults judges a work-item document and a section this pipeline renders; markdown-structure models the implementation report, and the disqualified-entries table lists only report-lint.js#lintReport (task.171 precedent, unchanged since gate 1).'
+  performance:
+    status: PASS
+    notes: '1.45 s real for the three qa-results suites at load average 3.45 (16 cores); the criterion is 2 s.'
+  reliability:
+    status: PASS
+    notes: 'No setext or log deletion remains on any shape reproduced in cycles 1-6. The one reproduced link loss (CR6-1) is identical on origin/develop with 0 corpus files carrying the label: pre-existing.'
+  maintainability:
+    status: PASS
+    notes: 'The QA_LABELS constant and its clause are gone; a comment in their place says why no such list exists.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR6-1 (pre-existing, cleanup): a bug list under a bold sub-label is dropped on replace when a paragraph precedes the list (**Bug Reports** / - [a] / **Critical Issues** / Found in cycle 2: / - [b] loses [b]); identical on origin/develop, 0 tracked docs carry a bold Bug Reports label. Scope the R4 test name, CHANGELOG and task § 9 to a list directly under a sub-label, and file the paragraph-first shape as a follow-up.'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs', 'CHANGELOG.md']
+    - action: 'CR6-2 (cleanup): task.183 Change Log has the two cycle 5 rows above the older gate 4 FAIL row; reorder.'
+      refs: ['docs/tasks/task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md']
+    - action: 'CR6-3 (cleanup): task.183 § 3 says this task changes two collectBlocks stop clauses; against origin/develop it changes one (the heading stop).'
+      refs: ['docs/tasks/task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md']
+    - action: 'CR-7, CR2-3, CR4-4 and CR2-4 remain recorded under task.183 ## Deferred Work.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

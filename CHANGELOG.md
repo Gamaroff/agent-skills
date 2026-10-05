@@ -398,6 +398,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`qa-results.js` no longer deletes a setext section headed by paragraph text, and keeps
+  Version-first logs and grouped bug lists (task 183).** Closes three of task.171's five Deferred
+  Work items and defers two (CR-7, CR2-4).
+  The setext check now leans toward refusal: a line over an `=`/`-` underline is a heading candidate
+  unless it is certainly not paragraph text. So `#538 Notes`, an autolink, inline `<b>`, an HTML
+  type-7 line, a code span and an ordered item not starting at 1 are now **refused** with a
+  `structural-line:` detail; before, each one's section was deleted on replace. Also **newly refused**:
+  a misplaced section inside, or directly under the heading of, a change log whose `Date` column is
+  not first (`| Version | Date | … |`).
+  Before, a relocate deleted that log's rows. The two task.171 CR-7 false refusals (a `---` after a
+  list continuation line or an HTML comment's closing line) stay refused: inferring their context
+  line by line deleted real sections in QA, so CR-7 is deferred. A bold `**Bug Reports**` / `**Deferred Work**` block now keeps its `####` groups and
+  every bug list grouped under a sub-label; a stale QA list after it is still carried (a duplicate,
+  never a deletion — CR2-4 deferred). The corpus write survey now skips documents that never name the section.
+
 - **The QA loop's Deferred Work record has one home, and `qa-results.js` closes task.155's residuals
   (task 171).** Routes 2 and 2b recorded carried finding ids "under **Deferred Work**" with no heading
   or position, so a record could land inside `## QA Testing Results`, where the next Step 12 replace
