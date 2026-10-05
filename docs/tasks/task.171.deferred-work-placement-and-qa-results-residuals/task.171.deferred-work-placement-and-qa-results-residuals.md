@@ -439,6 +439,27 @@ None.
 
 Five QA cycles closed 13 findings this branch introduced or exposed. The setext check ended fence-blind after three cycles of fence-exemption narrowing. One pre-existing HIGH (the setext paragraph test exempts some paragraph-text lines; identical on origin/develop, 0 corpus instances) is routed to a follow-up task with two lows.
 
+## Deferred Work
+
+Carried from QA gate 5 `recommendations.future` and the Step 5c PR review
+([`task.171.pr-review.1`](./task.171.pr-review.1.deferred-work-placement-and-qa-results-residuals.md)).
+All five are gaps in `shared/resources/qa-results.js`; a follow-up task is still to be filed.
+
+- **CR5-1** (HIGH, pre-existing — identical on `origin/develop`, 0 corpus instances) — the setext
+  paragraph test exempts lines CommonMark reads as paragraph text (`#538 …`, an autolink, inline
+  HTML, an ordered item not starting at 1), so a setext section they head is deleted on replace. This
+  task closes the plain-text shape only.
+- **5c CR-1** (medium, pre-existing) — a Version-first log (`| Version | Date | … |`) under a marker
+  block loses its rows on relocate; count `isUnparsedRow` as a log row under `underLog`.
+- **5c CR-2** (low) — a bold-label carried block stops at any heading, so a `####` group under a bold
+  `**Bug Reports**` label is dropped on the next replace.
+- **CR2-4** (low) — a bold Bug Reports block continues past QA's own `**Recommendations**:` when a
+  list follows it, carrying a stale list.
+- **CR-7** (low, gate 1) — setext false refusals after a list continuation line or a multi-line
+  comment closer.
+
+---
+
 <!-- change-log-start -->
 
 ## Change Log
