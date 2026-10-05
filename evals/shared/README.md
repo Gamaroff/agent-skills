@@ -144,8 +144,9 @@ file), and an empty `.eval/gh-config/`.
   logged `"notFound": true`.
 - **Writes** (`pr comment|review|edit|merge|…`, `issue comment|…`, `api` with a non-GET method or a
   field flag) are **refused**: exit 1, logged `"refused": true`. "Never posts without asking" becomes
-  an assertion on the log. Flags are read the way `gh` reads them, so a glued short flag
-  (`-XPOST`, `-fbody=x`) is a write too, even on a path a fixture serves.
+  an assertion on the log. Short flags are read the way `gh` reads them, so a glued flag
+  (`-XPOST`, `-fbody=x`) or a cluster (`-iXPOST` is `-i -X POST`) is a write too, even on a path a
+  fixture serves.
 - **Anything else** is `"unhandled": true`, exit 1 — a gap in the fixtures fails loudly instead of
   being guessed at.
 

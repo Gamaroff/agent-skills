@@ -133,13 +133,27 @@ function parseArgs(args) {
   const opts = {};
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    // A short value flag with its value glued on — `-XPOST`, `-fbody=x`, `-X=POST` — is read the
-    // way gh's flag parser (pflag) reads it: `-X POST`, `-f body=x`. Split on `=` first and
-    // `-fbody=x` is a boolean flag named `-fbody`, so a glued write was served as a read.
-    if (!a.startsWith("--") && a.length > 2 && VALUE_FLAGS.has(a.slice(0, 2))) {
-      const name = a.slice(0, 2);
-      const val = a[2] === "=" ? a.slice(3) : a.slice(2);
-      (opts[name] ||= []).push(val);
+    // A single-dash token is a CLUSTER of short flags, read the way gh's flag parser (pflag) reads
+    // it: each character is a flag, and the first one that takes a value takes the rest of the
+    // token (minus a leading `=`), or the next argument when nothing is left. So `-XPOST` is
+    // `-X POST`, `-fbody=x` is `-f body=x`, and `-iXPOST` is `-i -X POST`. Read as one flag
+    // named `-iXPOST`, a write on a path a fixture serves was answered as a read (task.185).
+    if (a.length > 2 && a[0] === "-" && a[1] !== "-") {
+      for (let k = 1; k < a.length; k++) {
+        const name = `-${a[k]}`;
+        if (VALUE_FLAGS.has(name)) {
+          const rest = a.slice(k + 1);
+          const val = rest === "" ? args[++i] : rest.replace(/^=/, "");
+          (opts[name] ||= []).push(val);
+          break;
+        }
+        if (a[k + 1] === "=") {
+          // `-i=true`: a boolean shorthand given an explicit value ends the cluster.
+          (opts[name] ||= []).push(a.slice(k + 2));
+          break;
+        }
+        (opts[name] ||= []).push(true);
+      }
     } else if (a.startsWith("-") && a !== "-") {
       const eq = a.indexOf("=");
       const name = eq > 0 ? a.slice(0, eq) : a;

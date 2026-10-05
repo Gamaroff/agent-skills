@@ -423,24 +423,24 @@ mutant, and both turn red.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-05
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.185.qa.4.review-pr-eval-suite.md](./task.185.qa.4.review-pr-eval-suite.md)
-- **Gate File**: [task.185.gate.4.review-pr-eval-suite.yml](./task.185.gate.4.review-pr-eval-suite.yml)
+- **Full Report**: [task.185.qa.5.review-pr-eval-suite.md](./task.185.qa.5.review-pr-eval-suite.md)
+- **Gate File**: [task.185.gate.5.review-pr-eval-suite.yml](./task.185.gate.5.review-pr-eval-suite.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5356
+- **Tests Executed**: 599 (evals/shared) + 31 direct boundary probes
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 1
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No critical issues identified. The cycle-3 structural fix makes the runner's failed-run code positive, and it holds. Four low advisory items are recorded for follow-up. A live recheck through the final harness passed.
+The `/finalise` DoD fix holds for glued flags (`-XPOST`, `-fbody=x`). A shorthand cluster that starts with a boolean flag (`-iXPOST`) is still served as a read by the fake `gh` (TASK-185-C5-CR-1, [bug 5](./task.185.bug.5.fake-gh-shorthand-cluster-write.md)).
 
 ## Definition of Done - Gaps Identified
 
@@ -495,6 +495,8 @@ Acceptance criteria (13/13), documentation and CI (SUCCESS @ `21f77034`) all pas
 | 2026-10-05 |         | QA findings fixed (cycle 3) — positive verdict code: any non-verdict runner exit is could-not-run; 3 iterations in total | qa-fix |
 | 2026-10-05 |         | QA gate PASS (100/100) — no open findings, 4 advisory             | qa-task     |
 | 2026-10-05 |  | DoD incomplete — 1 gap identified (security: fake gh glued-shorthand write) | finalise |
+| 2026-10-05 |  | QA gate FAIL (60/100) — 1 high finding (fake gh shorthand cluster) | qa-task |
+| 2026-10-05 |  | QA findings fixed (cycle 5) — fake gh reads short-flag clusters as pflag does (bug 5); 5 iterations in total | qa-fix |
 <!-- change-log-end -->
 
 ---

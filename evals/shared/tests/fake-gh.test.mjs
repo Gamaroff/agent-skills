@@ -214,6 +214,41 @@ test("a glued short value flag is still a write, even on a path a fixture serves
   assert.ok(log.slice(2).every((c) => c.refused === true));
 });
 
+// pflag also reads a CLUSTER of short flags in one token: booleans first, then one value flag.
+// `gh api -iXPOST` is `-i -X POST` (`-i` is --include). Splitting only a token that STARTS with a
+// value flag left these served as reads (task.185 QA cycle 5, TASK-185-BUG-5).
+test("a short-flag cluster is read as gh reads it: a value flag inside it is still a write", () => {
+  const route = "repos/eval/widgets/issues/12/comments";
+  const { gh, calls } = sandbox({ ...FIXTURES, api: { [route]: [] } });
+  // The floor: clusters that only read are served.
+  const reads = [
+    ["api", "-i", route],
+    ["api", "-iXGET", route],
+  ];
+  for (const args of reads) {
+    const r = gh(...args);
+    assert.equal(r.status, 0, args.join(" "));
+    assert.equal(r.stdout.trim(), "[]");
+  }
+  const writes = [
+    ["api", "-iXPOST", route],
+    ["api", "-iX", "POST", route],
+    ["api", "-ifb=x", route],
+    ["api", "-if", "b=x", route],
+  ];
+  for (const args of writes) {
+    const r = gh(...args);
+    assert.equal(r.status, 1, args.join(" "));
+    assert.match(r.stderr, /refused write/, args.join(" "));
+  }
+  const log = calls();
+  assert.equal(log.length, reads.length + writes.length);
+  assert.ok(
+    log.slice(0, reads.length).every((c) => !c.refused && !c.unhandled),
+  );
+  assert.ok(log.slice(reads.length).every((c) => c.refused === true));
+});
+
 test("a command with no fixture kind is unhandled: exit 1, logged unhandled: true", () => {
   const { gh, calls } = sandbox();
   for (const args of [
