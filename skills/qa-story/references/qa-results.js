@@ -260,8 +260,12 @@ function mergeCarried(body, removed, eol = "\n") {
     // The first block is kept whole; later ones fold in beneath it, each body once,
     // under their own heading text as a bold line (CR-4) — when the fold reads back.
     const parts = [old[0].whole];
+    const seen = new Set([old[0].body.trim()]);
     for (const b of old.slice(1)) {
-      if (!b.body || parts.some((p) => p.includes(b.body))) continue;
+      // A body already carried is skipped by EQUALITY: a substring test dropped `- REL-1`
+      // because an earlier block held `- REL-12` (task 171 QA cycle 2, CR2-3).
+      if (!b.body || seen.has(b.body.trim())) continue;
+      seen.add(b.body.trim());
       const folded = `${parts[0]}${gap}${b.label}${gap}${b.body}`;
       const [back] = collectBlocks(folded, name);
       if (back && back.start === 0 && back.whole === folded.trimEnd())
@@ -286,7 +290,18 @@ const RE_NOT_PARAGRAPH =
 // belong to the log and which the section quotes cannot be told apart (task 171,
 // REL-007/008). A section placed elsewhere may quote dated rows and replace them.
 function removesStructure(removed, { underLog = false } = {}) {
-  const lines = removed.split("\n").map((l) => l.replace(/\r$/, ""));
+  const raw = removed.split("\n");
+  const lines = raw.map((l) => l.replace(/\r$/, ""));
+  // A setext underline is judged outside fences only: inside one, `status: done` over
+  // `---` is fenced YAML, not a heading (task 171 QA cycle 2, CR2-2). The ATX and marker
+  // checks stay fence-blind on purpose (see RE_STRUCTURAL).
+  const fences = fencedRanges(removed);
+  const starts = [];
+  for (let i = 0, off = 0; i < lines.length; i++) {
+    starts.push(off);
+    off += raw[i].length + 1;
+  }
+  const fenced = (i) => insideProtected(fences, starts[i]);
   let logTable = false; // inside a table whose header's first cell is `Date`
   for (let i = 1; i < lines.length; i++) {
     const l = lines[i];
@@ -302,7 +317,11 @@ function removesStructure(removed, { underLog = false } = {}) {
         !/^[ \t]*\|[\s\-:|]+\|[ \t]*$/.test(l));
     if (
       RE_STRUCTURAL.some((re) => re.test(l)) ||
-      (RE_SETEXT.test(l) && i > 1 && !RE_NOT_PARAGRAPH.test(lines[i - 1])) ||
+      (RE_SETEXT.test(l) &&
+        i > 1 &&
+        !fenced(i) &&
+        !fenced(i - 1) &&
+        !RE_NOT_PARAGRAPH.test(lines[i - 1])) ||
       (underLog && logRow)
     ) {
       // A setext underline is reported with the text it makes a heading of.
@@ -633,7 +652,9 @@ function upsertQaResults(content, section, { docType = "" } = {}) {
     return { content, reason: "bad-section", detail: norm.refuse };
   }
   // Every seam this write makes uses the document's own line ending (task 171).
-  const eol = /\r\n/.test(content) ? "\r\n" : "\n";
+  // By majority, so one stray CRLF line does not turn the whole section CRLF (CR2-5).
+  const crlf = (content.match(/\r\n/g) || []).length;
+  const eol = crlf * 2 > (content.match(/\n/g) || []).length ? "\r\n" : "\n";
   const body = norm.body.replace(/\r?\n/g, eol);
 
   const { sections } = findQaResults(content);

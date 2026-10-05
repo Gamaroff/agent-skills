@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.171.deferred-work-placement-and-qa-results-residuals'
+task_title: 'Deferred Work placement and qa-results engine residuals'
+gate: CONCERNS
+status_reason: 'Cycle 1 findings CR-1..CR-6 verified fixed and converging across repeated writes, CRLF switches and relocate-then-replace; the refute pass found two medium regressions introduced by this branch: create-bug-report no longer recognises an existing H2 Bug Reports list, and the setext rule refuses fenced YAML.'
+reviewer: 'QA Engineer'
+head: '00209423033074a305e71d950856281ff8955b39'
+updated: '2026-10-05T07:23:55Z'
+
+top_issues:
+  - id: CR2-1
+    severity: medium
+    file: 'skills/create-bug-report/SKILL.md'
+    finding: 'Step 5 now treats only ###, #### or bold Bug Reports as existing, so the 11 tracked task documents with an H2 ## Bug Reports list (task.124, task.99, task.128, task.130 …) no longer match and the next filing opens a second ### list inside the QA section. The heading test only checks checked == written, so it cannot see this.'
+    suggested_action: 'Count ## Bug Reports (levels 2-4, singular included, and the bold form) as existing and append to it; add an H2 case to the heading test.'
+    suggested_owner: dev
+    status: open
+  - id: CR2-2
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'The setext rule in removesStructure ignores code fences, so a render quoting fenced YAML (```yaml / status: done / --- / ```) is refused bad-section (structural-line:status: done / ---) and an existing section with it would be unbounded; origin/develop returned created.'
+    suggested_action: 'Apply the setext check only to lines outside fencedRanges (ATX/marker checks stay fence-blind); add the fenced-YAML case as a test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 96
+  phases_verified: 4/4
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    boundary: internal
+    internal_reason: 'Unchanged from gate 1: upsertQaResults decides whether a write to a work-item document is safe; no corpus sink models a work-item section writer (markdown-structure is scoped to implementation reports).'
+    notes: 'Pure string engine; no network, exec or path input.'
+  performance:
+    status: PASS
+    notes: 'Engine, corpus and wiring tests 1.62s combined (< 2s).'
+  reliability:
+    status: PASS
+    notes: 'Refute pass: repeated writes 1-4, LF/CRLF switches between writes, relocate-then-replace and the stranded case converged with nothing lost. The two open findings refuse or duplicate; neither deletes.'
+  maintainability:
+    status: PASS
+    notes: 'Survey instrument now independent of the engine; dead carried-label stop removed.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1 and CR2-2 with a regression test each (qa-fix cycle 2).'
+      refs: ['skills/create-bug-report/SKILL.md', 'shared/resources/qa-results.js']
+  future:
+    - action: 'CR2-3 (pre-existing, medium/high): the fold dedupe parts.some(p => p.includes(b.body)) matches substrings, so a later block whose body is a substring of an earlier block (- REL-1 inside - REL-12 …) is deleted. Identical on origin/develop (replaced, link lost); 0 corpus instances (independent survey). Compare whole bodies, not substrings.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'CR2-4 (low): a bold Bug Reports block continues past QA''s own **Recommendations**: when a list follows, so a stale recommendations list is carried. Continue only past labels that are not QA template labels.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'CR2-5 (low): one stray CRLF line makes the whole written section CRLF; choose the line ending by majority.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Gate 1 CR-7 (low): setext false refusals after a list continuation line or a multi-line comment closer.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR2-1 and CR2-2 fixed and re-reviewed']

@@ -1020,3 +1020,51 @@ test("P4 CR-4: a CRLF document keeps the separator and lead-in comment its LF tw
   assert.equal(b.content, crlf(a.content));
   assert.match(a.content, /---\n<!-- lead-in for the log -->/);
 });
+
+// ---------------------------------------------------------------------------
+// Q — task 171 QA cycle 2
+// ---------------------------------------------------------------------------
+
+test("Q1 CR2-2: fenced YAML is not a setext heading — written, then replaced", () => {
+  const yaml = "```yaml\nstatus: done\n---\nother: x\n```";
+  const r = QR.upsertQaResults(markerDoc(), `${section(1)}\n\n${yaml}`, {
+    docType: "task",
+  });
+  assert.equal(r.reason, "created");
+  const r2 = QR.upsertQaResults(r.content, section(2), { docType: "task" });
+  assert.equal(r2.reason, "replaced");
+  assert.doesNotMatch(r2.content, /status: done/);
+  // Outside a fence the same lines are still an underlined heading (O5).
+  const bare = QR.upsertQaResults(
+    markerDoc(),
+    `${section(1)}\n\nstatus: done\n---\n\nmore`,
+    {
+      docType: "task",
+    },
+  );
+  assert.equal(bare.detail, "structural-line:status: done / ---");
+});
+
+test("Q2 CR2-3: a later block whose body is a substring of an earlier one is still carried", () => {
+  const first = "### Deferred Work\n\n- REL-12 (LOW) whitespace";
+  const second = "### Deferred Work (cycle 3)\n\n- REL-1";
+  const out = replaceThrice(
+    markerDoc(`${section(1)}\n\n${first}\n\n${second}\n\n`),
+  );
+  assert.match(out, /^- REL-1$/m);
+  assert.equal(count(out, "- REL-12 (LOW) whitespace"), 1);
+  // An exact duplicate body is still carried once.
+  const dup = "### Deferred Work (again)\n\n- REL-12 (LOW) whitespace";
+  const out2 = replaceThrice(
+    markerDoc(`${section(1)}\n\n${first}\n\n${dup}\n\n`),
+  );
+  assert.equal(count(out2, "- REL-12 (LOW) whitespace"), 1);
+});
+
+test("Q3 CR2-5: one stray CRLF line does not turn an LF document's section CRLF", () => {
+  const doc = markerDoc().replace("Revert.\n", "Revert.\r\n");
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "created");
+  const [s] = QR.findQaResults(r.content).sections;
+  assert.doesNotMatch(r.content.slice(s.start, s.end), /\r/);
+});

@@ -147,7 +147,8 @@ content. Each one either writes correctly or refuses with a reason that names th
   detail.
 - **Dead code removed (CR-2),** and test N2 pins the order (CR-3).
 - **create-bug-report** task mode checks for the `### Bug Reports` heading it writes. The engine
-  carries the bold-label and `####` forms, so the check accepts those too.
+  carries the bold-label and `####` forms, so the check accepts those too. *Amended in QA cycle 2
+  (CR2-1):* the older H2 `## Bug Reports` lists (18 tracked documents) count as existing as well.
 
 ### Same-class mechanism inventory (obs #103)
 
@@ -417,24 +418,24 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-05
-**Quality Score**: 50/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.171.qa.1.deferred-work-placement-and-qa-results-residuals.md](./task.171.qa.1.deferred-work-placement-and-qa-results-residuals.md)
-- **Gate File**: [task.171.gate.1.deferred-work-placement-and-qa-results-residuals.yml](./task.171.gate.1.deferred-work-placement-and-qa-results-residuals.yml)
+- **Full Report**: [task.171.qa.2.deferred-work-placement-and-qa-results-residuals.md](./task.171.qa.2.deferred-work-placement-and-qa-results-residuals.md)
+- **Gate File**: [task.171.gate.2.deferred-work-placement-and-qa-results-residuals.yml](./task.171.gate.2.deferred-work-placement-and-qa-results-residuals.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 87
+- **Tests Executed**: 96
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Five medium content-loss defects reproduced in the new engine rules (CR-1 folded blocks, CR-2 sub-labelled bold lists, CR-3 non-ISO log rows, CR-4 CRLF separators) and a write survey that measures with the engine under test (CR-5). Two lows advisory (CR-6, CR-7).
+Cycle 1's six findings are fixed and converge under the refute pass. Two medium regressions remain: create-bug-report misses an existing H2 Bug Reports list (CR2-1), and setext detection refuses fenced YAML (CR2-2). One pre-existing substring-dedupe defect is routed to future (CR2-3).
 
 <!-- change-log-start -->
 
@@ -447,6 +448,7 @@ Five medium content-loss defects reproduced in the new engine rules (CR-1 folded
 | 2026-10-05 |         | Status → ready-for-development | review-task |
 | 2026-10-05 |         | Implemented — 16 files, 20 new tests (14 engine, 4 placement, 2 heading), 4 wiring/corpus assertions | develop |
 | 2026-10-05 |         | QA gate CONCERNS (50/100) — 5 findings | qa-task |
+| 2026-10-05 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 
 <!-- change-log-end -->
 

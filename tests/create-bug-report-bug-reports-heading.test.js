@@ -68,3 +68,38 @@ test("the written heading is one the QA engine carries", () => {
   assert.equal(r.reason, "replaced");
   assert.ok(r.content.includes(list), "the list survives a QA write");
 });
+
+test("every Bug Reports form a tracked document carries is one Step 5 counts as existing", () => {
+  // Population, not recall: the forms come from the tracked tree. Step 5 used to check
+  // only an H2; then only the H3 it writes — and missed the 18 H2 lists older filings
+  // opened (task 171 QA cycle 2, CR2-1).
+  const { execFileSync } = require("child_process");
+  const files = execFileSync("git", ["ls-files", "-z", "--", "docs"], {
+    cwd: path.resolve(__dirname, ".."),
+    encoding: "utf8",
+  })
+    .split("\0")
+    .filter((f) => f.endsWith(".md"));
+  const forms = new Set();
+  for (const f of files) {
+    const text = fs.readFileSync(path.resolve(__dirname, "..", f), "utf8");
+    for (const m of text.matchAll(
+      /^(#{2,4} Bug Reports|\*\*Bug Reports\*\*)/gm,
+    ))
+      forms.add(m[1]);
+  }
+  assert.ok(forms.size >= 2, `scan-broken: only ${forms.size} forms found`);
+  // Keyed on Step 5's own list line, not on the bare token: a history sentence that
+  // merely mentions a form must not satisfy this.
+  const list = /^Existing list forms[^:]*:(.*)$/m.exec(step5());
+  assert.ok(list, "Step 5 states its existing list forms");
+  const named = new Set([...list[1].matchAll(/`([^`]+)`/g)].map((m) => m[1]));
+  const written = /```markdown\n(#{2,4} [^\n]+)\n/.exec(step5())[1];
+  assert.ok(
+    named.has(written),
+    "the written heading is one of the existing forms",
+  );
+  for (const form of forms) {
+    assert.ok(named.has(form), `Step 5 does not count ${form} as existing`);
+  }
+});

@@ -418,7 +418,8 @@ All notable changes to this project will be documented in this file. Format foll
   repaired. A write survey in `tests/qa-results-corpus.test.js` holds the tracked corpus at 0 false
   refusals, 0 deletions and 0 non-idempotent writes, measuring deletions with its own line scan rather
   than the engine's spans. `create-bug-report` task mode now checks for the
-  `### Bug Reports` heading it writes, not an H2 (obs #240).
+  `### Bug Reports` heading it writes and appends to a list already open under any form a tracked
+  document carries — `##`, `###`, `####` or bold — instead of opening a second (obs #240).
 
 - **The QA loop's re-review trigger, cycle-3+ scope and safety carve-out fail toward review on
   malformed input (task.168).** Six follow-ups task.135 left advisory, each with an executed test
