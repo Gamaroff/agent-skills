@@ -1,0 +1,56 @@
+{
+  "name": "03-unanchored",
+  "skill": "review-pr",
+  "setup": "../../setup.mjs",
+  "description": "PR #902 is a README tidy on chore/tidy: no branch stem, no pr_number, no gate URL, no issue in the body. No work item resolves, so /review-pr writes no file anywhere under docs/ and makes no refused or unhandled gh call.",
+  "prompt": "/review-pr 902",
+  "cliArgs": [
+    "--allowedTools",
+    "Bash",
+    "Read",
+    "Grep",
+    "Glob",
+    "Write",
+    "Edit",
+    "Agent",
+    "Skill"
+  ],
+  "fixture": {
+    "variant": "unanchored"
+  },
+  "live": {
+    "minPass": 5
+  },
+  "assertions": [
+    {
+      "fn": "noFileMatching",
+      "args": [
+        "$SANDBOX/docs",
+        "\\.pr-review\\."
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"refused\":true"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"unhandled\":true"
+      ]
+    }
+  ],
+  "liveAssertions": [
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"argv\":\\[\"pr\",\"view\""
+      ]
+    }
+  ]
+}
