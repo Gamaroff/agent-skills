@@ -139,8 +139,8 @@ owns the sandbox).
 3. Branch `feature/task.901.widget-age-gate` (or `scenario.fixture.branch`), apply the scenario's change set (`fixture.files`), commit, push.
 4. Write the diff `git diff origin/develop...origin/<branch>` to the fixture file `gh pr diff` serves, so the fake and the git path agree byte for byte.
 5. `scenario.fixture.existingReports` — e.g. `{ "1": "…", "3": "SENTINEL-3" }` — written into the task dir and committed.
-6. Copy `skills/review-pr` (minus `tests/`) to `.agents/skills/review-pr` and `.claude/skills/review-pr`.
-7. `installFakeGh(sandbox, fixtures)`; return `{ env: { PATH: <bin>, GH_TOKEN: "", GITHUB_TOKEN: "" } }`.
+6. Copy `skills/review-pr` (minus `tests/`) to `.agents/skills/review-pr`. The `.claude/skills/review-pr` copy comes from the claude-cli driver (`scenario.skill: "review-pr"`), not from setup.
+7. `installFakeGh(sandbox, fixtures)` (creates an empty `.eval/gh-calls.jsonl`); return `{ env: { PATH: <bin>, GH_CONFIG_DIR: <sandbox>/.eval/gh-config, GH_TOKEN: "", GITHUB_TOKEN: "" } }` — the empty config dir is what makes a real `gh` reached by absolute path unauthenticated; the driver spreads `process.env`, so blanking the token alone leaves the keyring.
 
 `scenario.json` (live-relevant fields):
 
