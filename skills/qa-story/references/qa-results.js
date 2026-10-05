@@ -147,8 +147,11 @@ const CARRIED_SUBSECTIONS = ["Bug Reports", "Deferred Work"];
 //     of its OWN level or shallower — a `####` block stops at the next `####`, so it
 //     cannot carry QA's later `####` subsections (REL-025);
 //   - a bold label alone on its line, `**Bug Reports**` / `**Deferred Work**` (REL-027,
-//     and the legacy REL-030 record). It runs to the next heading, the next bold label
-//     alone on its line, or a QA field line.
+//     and the legacy REL-030 record). It runs to the next heading, or the next bold
+//     label alone on its line that does NOT introduce a list or
+//     table — a sub-label such as `**From cycle 2:**` over its items belongs to the
+//     block; QA's own `**Recommendations**` over a paragraph does not (task 171 QA
+//     cycle 1, CR-2: stopping at every sub-label deleted the items under it).
 // Either form also stops at the first of QA's OWN template field lines
 // (`**QA Status**:` …). Real lists are richer than bullets — `####` groups, tables,
 // bold labels (task.116, task.42, task.76, task.94) — so the block is carried whole;
@@ -174,20 +177,34 @@ function collectBlocks(text, name) {
   for (const m of text.matchAll(re)) {
     if (insideProtected(ranges, m.index)) continue;
     const level = m[1] ? m[1].length : 0; // 0 = a bold-label block
-    const stops = (bare) =>
-      RE_QA_FIELD.test(bare) ||
-      (level
-        ? new RegExp(`^#{1,${level}}[ \\t]`).test(bare)
-        : /^#{1,6}[ \t]/.test(bare) || RE_BOLD_LABEL.test(bare));
     const bodyAt = m.index + m[0].length + 1;
+    const lines = text.slice(bodyAt).split("\n");
+    const bare = (i) => (lines[i] ?? "").replace(/\r$/, "");
+    // Does the next non-blank line after line i open a list or a table?
+    const introducesList = (i) => {
+      let j = i + 1;
+      while (j < lines.length && /^[ \t]*$/.test(bare(j))) j++;
+      return (
+        j < lines.length &&
+        /^[ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|\|)/.test(bare(j))
+      );
+    };
+    const stops = (i) => {
+      const l = bare(i);
+      if (RE_QA_FIELD.test(l)) return true;
+      if (level) return new RegExp(`^#{1,${level}}[ \\t]`).test(l);
+      return (
+        /^#{1,6}[ \t]/.test(l) || (RE_BOLD_LABEL.test(l) && !introducesList(i))
+      );
+    };
     let end = text.length;
     let offset = bodyAt;
-    for (const line of text.slice(bodyAt).split("\n")) {
-      if (!insideProtected(ranges, offset) && stops(line.replace(/\r$/, ""))) {
+    for (let i = 0; i < lines.length; i++) {
+      if (!insideProtected(ranges, offset) && stops(i)) {
         end = offset;
         break;
       }
-      offset += line.length + 1;
+      offset += lines[i].length + 1;
     }
     const whole = text.slice(m.index, Math.min(end, text.length)).trimEnd();
     blocks.push({
@@ -223,7 +240,11 @@ function carriedBlocks(text) {
 }
 
 // Merge every carried subsection found in `removed` into `body` (task.155 QA cycle 8,
-// REL-020/023): the first old block whole, later ones folded beneath it, so a second
+// REL-020/023): the first old block whole, later ones folded beneath it — but only when
+// the fold reads back as that one block. A later block whose own `####` heading or bold
+// label would end the first block on the next read is emitted whole under its own
+// heading instead: folded, it survived one write and was cut on the next (task 171 QA
+// cycle 1, CR-1). So a second
 // `### Bug Reports` (create-bug-report checks for an H2 but writes an H3, so it can
 // open one) is kept rather than dropped. A render never brings its own carried block —
 // `normaliseSection` refuses one — so the engine alone owns carrying and nothing has to
@@ -237,11 +258,15 @@ function mergeCarried(body, removed, eol = "\n") {
     const old = blocks.filter((b) => b.name === name);
     if (!old.length) continue;
     // The first block is kept whole; later ones fold in beneath it, each body once,
-    // under their own heading text as a bold line (CR-4).
+    // under their own heading text as a bold line (CR-4) — when the fold reads back.
     const parts = [old[0].whole];
     for (const b of old.slice(1)) {
-      if (b.body && !parts.some((p) => p.includes(b.body)))
-        parts.push(`${b.label}${gap}${b.body}`);
+      if (!b.body || parts.some((p) => p.includes(b.body))) continue;
+      const folded = `${parts[0]}${gap}${b.label}${gap}${b.body}`;
+      const [back] = collectBlocks(folded, name);
+      if (back && back.start === 0 && back.whole === folded.trimEnd())
+        parts[0] = folded;
+      else parts.push(b.whole);
     }
     out = `${out}${gap}${parts.join(gap)}`;
   }
@@ -262,12 +287,23 @@ const RE_NOT_PARAGRAPH =
 // REL-007/008). A section placed elsewhere may quote dated rows and replace them.
 function removesStructure(removed, { underLog = false } = {}) {
   const lines = removed.split("\n").map((l) => l.replace(/\r$/, ""));
+  let logTable = false; // inside a table whose header's first cell is `Date`
   for (let i = 1; i < lines.length; i++) {
     const l = lines[i];
+    // Every data row of a Date-headed table counts, not only an ISO-dated one: the
+    // log's writer keeps non-ISO rows (`| 03/01/2026 |`), and an ISO-only test let them
+    // be deleted on relocate (task 171 QA cycle 1, CR-3).
+    if (RE_LOG_HEADER.test(l)) logTable = true;
+    else if (!/^[ \t]*\|/.test(l)) logTable = false;
+    const logRow =
+      isEntryRow(l) ||
+      (logTable &&
+        !RE_LOG_HEADER.test(l) &&
+        !/^[ \t]*\|[\s\-:|]+\|[ \t]*$/.test(l));
     if (
       RE_STRUCTURAL.some((re) => re.test(l)) ||
       (RE_SETEXT.test(l) && i > 1 && !RE_NOT_PARAGRAPH.test(lines[i - 1])) ||
-      (underLog && isEntryRow(l))
+      (underLog && logRow)
     ) {
       // A setext underline is reported with the text it makes a heading of.
       const shown =
@@ -293,21 +329,13 @@ function trimSeparator(content, start, rawEnd) {
     while (lines.length > 1 && isBlank(lines[lines.length - 1])) lines.pop();
   };
   // Peel separators off the tail until none is left: blank lines, one thematic break
-  // with a blank line above it, and an HTML comment block standing on its own lines —
-  // the comment only when a change-log block or heading follows the span, because that
-  // is what makes it a template's lead-in for the block below (task.155 QA cycle 8,
-  // REL-022). Anywhere else it is section content: peeling it there left a render's
-  // trailing comment outside the span, so each write added a copy (task 171, REL-024).
-  const next = content.slice(rawEnd);
-  const nextLine = next
-    .slice(0, next.indexOf("\n") + 1 || next.length)
-    .replace(/\r?\n$/, "");
-  const leadIn =
-    [CL_START, ...LEGACY_MARKER_PAIRS.map((p) => p.start)].some((m) =>
-      next.startsWith(m),
-    ) ||
-    RE_LOG_HEADING.test(nextLine) ||
-    RE_HEADING.test(nextLine);
+  // with a blank line above it, and an HTML comment block standing on its own lines
+  // (a template's lead-in comment for the block below — task.155 QA cycle 8, REL-022).
+  // A render that would END in a comment is refused (`trailing-comment`), which is what
+  // closes REL-024; narrowing this peel instead deleted a legacy lead-in above a non-log
+  // heading (task 171 QA cycle 1, CR-6). Every per-line test strips a trailing \r, so a
+  // CRLF document peels exactly what its LF twin does (CR-4).
+  const bare = (i) => lines[i].replace(/\r$/, "");
   for (;;) {
     popBlanks();
     const last = lines[lines.length - 1].replace(/\r$/, "");
@@ -319,10 +347,10 @@ function trimSeparator(content, start, rawEnd) {
       lines.pop();
       continue;
     }
-    if (leadIn && /-->[ \t]*$/.test(last)) {
+    if (/-->[ \t]*$/.test(last)) {
       let k = lines.length - 1;
-      while (k > 0 && !/^[ \t]{0,3}<!--/.test(lines[k])) k--;
-      if (k > 1 && (isBlank(lines[k - 1]) || RE_BREAK.test(lines[k - 1]))) {
+      while (k > 0 && !/^[ \t]{0,3}<!--/.test(bare(k))) k--;
+      if (k > 1 && (isBlank(lines[k - 1]) || RE_BREAK.test(bare(k - 1)))) {
         lines.length = k;
         continue;
       }

@@ -135,7 +135,9 @@ content. Each one either writes correctly or refuses with a reason that names th
   - A folded block keeps its heading text as a bold line (CR-4).
 - **Peel only what is a separator (REL-024).** A trailing HTML comment is peeled only when the next
   thing after it is a change-log block or heading (the template lead-in). Otherwise it is section
-  content.
+  content. *Amended in QA cycle 1 (CR-6):* the narrowed peel deleted a legacy lead-in above a non-log
+  heading, so the peel is unchanged and REL-024 is closed by refusing a render that ends in a comment
+  (`trailing-comment`).
 - **CRLF:** every seam the engine writes uses the document's own line ending.
 - **CR-5:** a section stranded between a `## Change Log` heading and its marker block (written by an
   older engine) is treated as misplaced and relocated above the heading.
@@ -227,8 +229,8 @@ repair)
       task.118 repair (REL-007/008, setext)
 - [x] Carry: cross-name nesting dedupe (REL-028), level-bounded `####` blocks (REL-025), bold-label
       and singular forms (REL-027, legacy REL-030), folded heading kept as a bold line (CR-4)
-- [x] `trimSeparator` peels a trailing HTML comment only when a change-log block or heading follows
-      it (REL-024)
+- [x] REL-024 closed: a render ending in an HTML comment is refused (`trailing-comment`); the
+      `trimSeparator` peel is unchanged (QA cycle 1, CR-6)
 - [x] Write seams follow the document's line ending (CRLF)
 - [x] A section stranded between a `## Change Log` heading and its marker block is treated as
       misplaced and relocated (CR-5)
@@ -410,6 +412,30 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-05
+**Quality Score**: 50/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.171.qa.1.deferred-work-placement-and-qa-results-residuals.md](./task.171.qa.1.deferred-work-placement-and-qa-results-residuals.md)
+- **Gate File**: [task.171.gate.1.deferred-work-placement-and-qa-results-residuals.yml](./task.171.gate.1.deferred-work-placement-and-qa-results-residuals.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 87
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+Five medium content-loss defects reproduced in the new engine rules (CR-1 folded blocks, CR-2 sub-labelled bold lists, CR-3 non-ISO log rows, CR-4 CRLF separators) and a write survey that measures with the engine under test (CR-5). Two lows advisory (CR-6, CR-7).
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -420,6 +446,7 @@ None.
 | 2026-10-05 | 1.1     | Review passed (8/10) — named the corpus write-survey test, measured the performance bound, scoped the no-network criterion, added the worked-example extraction to Phase 1, added task.155 and the corpus test to Files Summary | review-task |
 | 2026-10-05 |         | Status → ready-for-development | review-task |
 | 2026-10-05 |         | Implemented — 16 files, 20 new tests (14 engine, 4 placement, 2 heading), 4 wiring/corpus assertions | develop |
+| 2026-10-05 |         | QA gate CONCERNS (50/100) — 5 findings | qa-task |
 
 <!-- change-log-end -->
 

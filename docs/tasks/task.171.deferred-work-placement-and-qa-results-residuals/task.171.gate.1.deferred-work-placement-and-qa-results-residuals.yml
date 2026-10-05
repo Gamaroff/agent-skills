@@ -1,0 +1,91 @@
+schema: 2
+task: 'task.171.deferred-work-placement-and-qa-results-residuals'
+task_title: 'Deferred Work placement and qa-results engine residuals'
+gate: CONCERNS
+status_reason: 'All four phases delivered and every new assertion mutation-proved, but the diff review reproduced five medium content-loss defects in the new carry, CRLF and dated-row rules, plus a write survey that measures deletions with the engine under test.'
+reviewer: 'QA Engineer'
+head: '99e30ed34a2a7f0f49fd0691d76e5b9daa6bb53c'
+updated: '2026-10-05T07:03:50Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'A folded carried block (CR-4 fold) only survives one write: on the next write the first block stops at a #### heading or bold label inside the fold, deleting the folded links (e.g. #### Bug Reports then ### Bug Reports (2) / #### Open / - [c](c.md): write 2 drops c.md).'
+    suggested_action: 'Emit the fold so it reads back inside the first block (demote/fence sub-headings and labels below the stop level, or re-emit each block whole); add a three-write test with mixed-level and bold-first blocks asserting every link survives.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'A bold-label **Deferred Work** / **Bug Reports** block ends at the next standalone bold label, so a list grouped under sub-labels (**From cycle 2:** ...) is cut to the bare label and its items deleted on replace.'
+    suggested_action: 'End a bold-label block only at a heading, a QA field line, or a QA-template label; add a regression test for a sub-labelled bold-label list.'
+    suggested_owner: dev
+    status: open
+  - id: CR-3
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'With logAbove the table cut is removed, but the replacing dated-row guard uses isEntryRow (ISO dates only); non-ISO rows of a Date-headed table below the section (| 2026-01-02T10:00Z |, | 03/01/2026 |) are deleted on relocate, where origin/develop kept them.'
+    suggested_action: 'Under underLog also refuse on any data row of a Date-headed table in the span (isUnparsedRow or any non-separator, non-header row).'
+    suggested_owner: dev
+    status: open
+  - id: CR-4
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'trimSeparator tests RE_BREAK on lines[k - 1] with its trailing CR, so in a CRLF document a --- break plus lead-in comment before the change-log block is not peeled and both are deleted on replace; the LF document keeps them. O12 only checks for bare LFs.'
+    suggested_action: 'Strip CR before every per-line regex in trimSeparator; extend O12 to assert CRLF output equals the LF output converted to CRLF.'
+    suggested_owner: dev
+    status: open
+  - id: CR-5
+    severity: medium
+    file: 'tests/qa-results-corpus.test.js'
+    finding: 'The write survey measures what was lost outside the section with findQaResults spans, the engine under test, so a span that wrongly grows hides its own deletions; comments, --- separators and carried-block lines are never counted.'
+    suggested_action: 'Measure deletions independently of the engine, e.g. diff the multiset of lines outside the probe render and old QA field lines, including comments and carried-block bullets/links.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 87
+  phases_verified: 4/4
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    boundary: internal
+    internal_reason: 'upsertQaResults decides whether a write to a work-item document is safe; its inputs are task/story documents and a QA render the pipeline writes. No corpus sink models a work-item section writer (markdown-structure is scoped to implementation reports and would score legitimate work items overblocked). No network, no exec, no path input.'
+    notes: 'Pure string engine; refusal paths covered by unit tests and fault-injection shapes, not by the probe engine.'
+  performance:
+    status: PASS
+    notes: 'Engine, corpus and wiring tests 1.78s combined (< 2s bound); corpus survey 1.77s alone.'
+  reliability:
+    status: CONCERNS
+    notes: 'Five reproduced content-loss paths in the new carry/CRLF/dated-row rules (CR-1..CR-4) and a survey that cannot see them (CR-5).'
+  maintainability:
+    status: PASS
+    notes: 'One statement for the Deferred Work home; detail values documented in the engine header; dead code removed.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1..CR-5 with a regression test each (qa-fix cycle 1).'
+      refs: ['shared/resources/qa-results.js', 'tests/qa-results-corpus.test.js']
+  future:
+    - action: 'CR-6 (low): a standalone HTML comment before a non-log heading is now inside the span and deleted on replace in legacy documents; consider peeling it again now that trailing-comment refuses new renders.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'CR-7 (low): setext detection false-refuses a --- after a list continuation line, a multi-line comment closer, or fenced YAML; exclude those and consider skipping fences.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['CR-1..CR-5 fixed and re-reviewed']

@@ -799,22 +799,18 @@ test("O5 setext: an underlined heading in a span or a render is refused, with th
   );
 });
 
-test("O6 REL-024: a comment closing the section before a heading is content, not a separator", () => {
-  const doc = `${FM}## Body\n\ntext\n\n${section(1)}\n\n<!-- cycle note -->\n\n## Next\n\nx\n`;
-  const [s] = QR.findQaResults(doc).sections;
-  assert.match(doc.slice(s.start, s.end), /<!-- cycle note -->/);
-  const out = QR.upsertQaResults(doc, section(2), { docType: "task" }).content;
-  assert.equal(
-    count(out, "<!-- cycle note -->"),
-    0,
-    "replaced with the section",
-  );
-  // A render that ends in a comment is refused rather than stacked under a change log.
+test("O6 REL-024: a render that ends in a comment is refused; a legacy comment before a heading is kept", () => {
+  // The refusal closes REL-024 (a render's trailing comment gained a copy per write).
   const r = QR.upsertQaResults(markerDoc(), `${section(2)}\n\n<!-- note -->`, {
     docType: "task",
   });
   assert.equal(r.reason, "bad-section");
   assert.equal(r.detail, "trailing-comment");
+  // A standalone comment between the section and the next heading is a separator, as
+  // task.155 had it — narrowing the peel deleted it (task 171 QA cycle 1, CR-6).
+  const doc = `${FM}## Body\n\ntext\n\n${section(1)}\n\n<!-- Progress Tracking: tick each phase -->\n\n## Progress Tracking\n\nx\n`;
+  const out = replaceThrice(doc);
+  assert.equal(count(out, "<!-- Progress Tracking: tick each phase -->"), 1);
 });
 
 test("O7 REL-025: a #### Bug Reports block stops at QA's next #### subsection", () => {
@@ -950,4 +946,77 @@ test("O14 PR review 5 CR-1: every refusal names the rule that fired", () => {
     assert.equal(r.detail, detail);
     assert.equal(r.content, doc);
   }
+});
+
+// ---------------------------------------------------------------------------
+// P — task 171 QA cycle 1: the new rules' own loss paths
+// ---------------------------------------------------------------------------
+
+const links = (s) => (s.match(/\]\([^)]+\)/g) || []).sort();
+
+test("P1 CR-1: a folded block whose own heading would cut the first block survives every write", () => {
+  for (const [first, second] of [
+    [
+      "#### Bug Reports\n\n- [a](./task.9.bug.1.a.md)",
+      "### Bug Reports (2)\n\n#### Open\n\n- [c](./task.9.bug.3.c.md)",
+    ],
+    [
+      "**Bug Reports**\n\n- [a](./task.9.bug.1.a.md)",
+      "### Bug Reports (2)\n\n- [c](./task.9.bug.3.c.md)",
+    ],
+    [
+      "### Bug Reports\n\n- [a](./task.9.bug.1.a.md)",
+      "### Bug Reports (2)\n\n- [c](./task.9.bug.3.c.md)",
+    ],
+  ]) {
+    const doc = markerDoc(`${section(1)}\n\n${first}\n\n${second}\n\n`);
+    const out = replaceThrice(doc);
+    assert.deepEqual(
+      links(out).filter((l) => l.includes("bug")),
+      ["](./task.9.bug.1.a.md)", "](./task.9.bug.3.c.md)"],
+      first.split("\n")[0],
+    );
+    const again = QR.upsertQaResults(out, section(4), { docType: "task" });
+    assert.equal(again.content, out, "stable after the first write");
+  }
+});
+
+test("P2 CR-2: a bold-label list grouped under sub-labels keeps every item", () => {
+  const rec =
+    "**Deferred Work**\n\n**From cycle 2:**\n\n- REL-1 carried\n\n**From cycle 3:**\n\n- REL-2 carried";
+  const out = replaceThrice(markerDoc(`${section(1)}\n\n${rec}\n\n`));
+  assert.equal(count(out, rec), 1);
+  // Two labelled records, each carried once.
+  const two =
+    "**Bug Reports**\n\n- [b](./task.9.bug.2.b.md)\n\n**Deferred Work**\n\n- REL-3";
+  const out2 = replaceThrice(markerDoc(`${section(1)}\n\n${two}\n\n`));
+  assert.equal(count(out2, "**Deferred Work**"), 1);
+  assert.equal(count(out2, "- REL-3"), 1);
+});
+
+test("P3 CR-3: non-ISO rows of a Date table under a log are refused, never deleted", () => {
+  for (const row of [
+    "| 2026-01-02T10:00Z | synced |",
+    "| 03/01/2026 | synced |",
+  ]) {
+    const doc = markerDoc().replace(
+      "<!-- change-log-end -->",
+      `${section(1)}\n\n| Date | Change |\n| --- | --- |\n${row}\n\n<!-- change-log-end -->`,
+    );
+    const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+    assert.equal(r.reason, "unbounded", row);
+    assert.equal(r.detail, `structural-line:${row}`);
+    assert.equal(r.content, doc);
+  }
+});
+
+test("P4 CR-4: a CRLF document keeps the separator and lead-in comment its LF twin keeps", () => {
+  const lf = `${FM}## Body\n\ntext\n\n${section(1)}\n\n---\n<!-- lead-in for the log -->\n\n${LOG}`;
+  const crlf = (s) => s.replace(/\n/g, "\r\n");
+  const a = QR.upsertQaResults(lf, section(2), { docType: "task" });
+  const b = QR.upsertQaResults(crlf(lf), section(2), { docType: "task" });
+  assert.equal(a.reason, "replaced");
+  assert.equal(b.reason, "replaced");
+  assert.equal(b.content, crlf(a.content));
+  assert.match(a.content, /---\n<!-- lead-in for the log -->/);
 });

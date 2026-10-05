@@ -93,6 +93,12 @@ Return the offending line in the refusal detail: `structural-line:<the line, tri
 is a change-log marker or a change-log heading (`RE_HEADING` or `RE_LOG_HEADING`). Otherwise the
 comment is section content.
 
+> *Amended in QA cycle 1:* the narrowed peel (CR-6) deleted a legacy lead-in above a non-log
+> heading; REL-024 is closed instead by refusing a render that ends in a comment. A bold-label block
+> ends at a bold label only when that label does not introduce a list or table (CR-2). A later
+> carried block folds into the first only when the fold reads back as one block; otherwise it is
+> emitted whole (CR-1).
+
 **4. CRLF.** Detect the document's line ending once:
 `const EOL = /\r\n/.test(content) ? "\r\n" : "\n"`. Use it in `insertAt`, in the replace seam and in
 `mergeCarried`'s joins. Normalise the rendered section to the document's line ending before writing.

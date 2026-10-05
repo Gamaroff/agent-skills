@@ -131,19 +131,108 @@ test("no tracked document stacks QA Testing Results sections or hides one in the
   );
 });
 
-// What a write may never take away, counted outside the QA section: change-log
-// markers, dated table rows and H1/H2 headings. Rows inside the section are the
-// section's own and a replace legitimately rewrites them.
-function structure(text) {
-  const { sections } = findQaResults(text);
-  const outside = sections.length
-    ? text.slice(0, sections[0].start) + text.slice(sections[0].end)
-    : text;
-  return {
-    markers: (outside.match(/change-log-(?:start|end) -->/g) || []).length,
-    rows: (outside.match(/^\| *\d{4}-\d\d-\d\d/gm) || []).length,
-    headings: (outside.match(/^#{1,2} /gm) || []).length,
+// What a write may remove, measured WITHOUT the engine (task 171 QA cycle 1, CR-5).
+// The first survey counted losses outside `findQaResults` spans — the engine under
+// test — so a span that wrongly grew over real content counted that content as
+// "inside" both before and after, and passed on the very defect it existed to catch.
+// This allowance is an independent line scan, with its own fence toggle:
+//   - the region runs from the `## QA Testing Results` line to the first H1/H2, change-log
+//     marker, Change Log heading (any level) or Date-headed table header;
+//   - trailing blank lines, thematic breaks and HTML comment blocks are peeled off it —
+//     they are separators, and a write must keep them;
+//   - lines of a carried block (a `###`/`####` Bug Reports / Deferred Work heading or
+//     bold label, to the next non-carried heading of level <= 3 or QA field line) are
+//     protected — a write must carry them.
+// A write may remove only what is left: the region's own QA content.
+const RE_CARRIED_START =
+  /^(?:#{3,4}[ \t]+(?:Bug Reports?|Deferred Work)\b|\*\*(?:Bug Reports?|Deferred Work)\*\*:?[ \t]*$)/i;
+const RE_QA_FIELD_LINE =
+  /^\*\*(?:QA Status|QA Engineer|Testing Date|Quality Score|Gate Decision)\*\*:/;
+
+function allowance(text) {
+  const lines = text.split("\n").map((l) => l.replace(/\r$/, ""));
+  // The same CommonMark fence rule rawCount() uses: a backtick opener whose rest holds a
+  // backtick is inline code, and only a bare run as long as the opener closes it.
+  let fence = null;
+  let start = -1;
+  let end = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const f = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(l);
+    const opener = f && !(f[1][0] === "`" && f[2].includes("`"));
+    if (f && (fence || opener)) {
+      if (!fence) fence = f[1];
+      else if (
+        f[1][0] === fence[0] &&
+        f[1].length >= fence.length &&
+        f[2].trim() === ""
+      )
+        fence = null;
+      continue;
+    }
+    if (fence) continue;
+    if (start === -1) {
+      if (/^## QA Testing Results\b/.test(l)) start = i;
+      continue;
+    }
+    if (
+      /^#{1,2}[ \t]/.test(l) ||
+      /change-?log-(?:start|end)|sync-changelog-(?:start|end)/i.test(l) ||
+      /^ {0,3}#{1,6}[ \t]+.*Change Log\b/i.test(l) ||
+      /^\|[ \t]*Date[ \t]*\|/i.test(l)
+    ) {
+      end = i;
+      break;
+    }
+  }
+  if (start === -1) return new Map();
+  // Peel separators off the region's tail.
+  for (;;) {
+    const l = (lines[end - 1] ?? "").trim();
+    if (end - 1 <= start) break;
+    if (l === "" || /^(?:[-*_][ \t]*){3,}$/.test(l)) {
+      end--;
+      continue;
+    }
+    if (/-->$/.test(l)) {
+      let k = end - 1;
+      while (k > start && !/^<!--/.test(lines[k].trim())) k--;
+      if (k > start) {
+        end = k;
+        continue;
+      }
+    }
+    break;
+  }
+  const allowed = new Map();
+  let carried = false;
+  for (let i = start; i < end; i++) {
+    const l = lines[i];
+    if (RE_CARRIED_START.test(l)) carried = true;
+    else if (/^#{1,3}[ \t]/.test(l) || RE_QA_FIELD_LINE.test(l))
+      carried = false;
+    if (carried || !l.trim()) continue;
+    allowed.set(l, (allowed.get(l) || 0) + 1);
+  }
+  return allowed;
+}
+
+// Non-blank lines `before` holds more often than `after`, as a multiset.
+function removedLines(before, after) {
+  const count = (text) => {
+    const m = new Map();
+    for (const l of text.split("\n").map((x) => x.replace(/\r$/, ""))) {
+      if (l.trim()) m.set(l, (m.get(l) || 0) + 1);
+    }
+    return m;
   };
+  const a = count(before);
+  const b = count(after);
+  const out = [];
+  for (const [l, n] of a) {
+    for (let k = b.get(l) || 0; k < n; k++) out.push(l);
+  }
+  return out;
 }
 
 test("the write survey: 0 false refusals, 0 deletions, 0 non-idempotent writes (task 171)", () => {
@@ -162,10 +251,11 @@ test("the write survey: 0 false refusals, 0 deletions, 0 non-idempotent writes (
       refused.push(`${rel}: ${r.reason} (${r.detail})`);
       continue;
     }
-    const a = structure(text);
-    const b = structure(r.content);
-    for (const k of Object.keys(a)) {
-      if (b[k] < a[k]) lost.push(`${rel}: ${k} ${a[k]} → ${b[k]}`);
+    const allowed = allowance(text);
+    for (const l of removedLines(text, r.content)) {
+      const n = allowed.get(l) || 0;
+      if (n > 0) allowed.set(l, n - 1);
+      else lost.push(`${rel}: ${l.slice(0, 80)}`);
     }
     if (upsertQaResults(r.content, probe, { docType }).content !== r.content) {
       unstable.push(rel);
@@ -178,4 +268,21 @@ test("the write survey: 0 false refusals, 0 deletions, 0 non-idempotent writes (
   assert.deepEqual(refused, [], `false refusals:\n  ${refused.join("\n  ")}`);
   assert.deepEqual(lost, [], `deletions:\n  ${lost.join("\n  ")}`);
   assert.deepEqual(unstable, [], `non-idempotent:\n  ${unstable.join("\n  ")}`);
+});
+
+test("the survey's allowance is the engine-independent one: it protects separators and carried lines", () => {
+  const doc =
+    "# T\n\n## QA Testing Results\n\n**QA Status**: PASS\n\n### Bug Reports\n\n- [b](./b.md)\n\n### Key Findings\n\nold\n\n---\n\n<!-- lead -->\n\n## Next\n";
+  const allowed = allowance(doc);
+  assert.equal(allowed.get("old"), 1, "QA's own content may go");
+  assert.equal(allowed.get("**QA Status**: PASS"), 1);
+  for (const kept of [
+    "- [b](./b.md)",
+    "### Bug Reports",
+    "---",
+    "<!-- lead -->",
+    "## Next",
+  ]) {
+    assert.equal(allowed.has(kept), false, `${kept} must survive a write`);
+  }
 });
