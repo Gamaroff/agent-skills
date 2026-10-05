@@ -243,6 +243,10 @@ test("the write survey: 0 false refusals, 0 deletions, 0 non-idempotent writes (
   let surveyed = 0;
   for (const rel of trackedDocs()) {
     const text = fs.readFileSync(path.join(REPO_ROOT, rel), "utf8");
+    // Pre-filter as the stacking survey does: a document that never names the section
+    // cannot hold one, and parsing every tracked document made the bound load-sensitive
+    // (task 183, obs #268).
+    if (!text.includes("QA Testing Results")) continue;
     if (!findQaResults(text).sections.length) continue;
     surveyed++;
     const docType = rel.includes("/tasks/") ? "task" : "story";

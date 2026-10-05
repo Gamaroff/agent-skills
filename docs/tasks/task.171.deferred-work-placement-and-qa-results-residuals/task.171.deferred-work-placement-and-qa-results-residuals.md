@@ -475,15 +475,21 @@ All five are gaps in `shared/resources/qa-results.js`. Follow-up: [task.183](../
 - **CR5-1** (HIGH, pre-existing — identical on `origin/develop`, 0 corpus instances) — the setext
   paragraph test exempts lines CommonMark reads as paragraph text (`#538 …`, an autolink, inline
   HTML, an ordered item not starting at 1), so a setext section they head is deleted on replace. This
-  task closes the plain-text shape only.
+  task closes the plain-text shape only. ✅ Resolved in [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md): the setext check now leans toward
+  refusal, and every shape above is refused with a `detail`.
 - **5c CR-1** (medium, pre-existing) — a Version-first log (`| Version | Date | … |`) under a marker
-  block loses its rows on relocate; count `isUnparsedRow` as a log row under `underLog`.
+  block loses its rows on relocate; count `isUnparsedRow` as a log row under `underLog`. ✅ Resolved in
+  [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md) by a different rule (operator decision): a table with a `Date` column in any position is a
+  log table, so the relocate is refused.
 - **5c CR-2** (low) — a bold-label carried block stops at any heading, so a `####` group under a bold
-  `**Bug Reports**` label is dropped on the next replace.
+  `**Bug Reports**` label is dropped on the next replace. ✅ Resolved in [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md): a bold-label block
+  stops at a heading of level 3 or shallower.
 - **CR2-4** (low) — a bold Bug Reports block continues past QA's own `**Recommendations**:` when a
-  list follows it, carrying a stale list.
+  list follows it, carrying a stale list. ✅ Resolved in [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md): a bold-label block stops at a
+  QA-owned label (`QA_LABELS`).
 - **CR-7** (low, gate 1) — setext false refusals after a list continuation line or a multi-line
-  comment closer.
+  comment closer. ✅ Resolved in [task.183](../task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md): both are written; the comment context covers only a
+  closing line.
 
 ---
 <!-- change-log-start -->
@@ -502,6 +508,7 @@ All five are gaps in `shared/resources/qa-results.js`. Follow-up: [task.183](../
 | 2026-10-05 |         | QA gate PASS (100/100) — 0 open findings, 1 pre-existing routed to follow-up | qa-task |
 | 2026-10-05 |         | QA findings fixed — gate PASS (100/100), 4 iterations | qa-fix |
 | 2026-10-05 | 1.2 | DoD verified — accepted (PR #568) | finalise |
+| 2026-10-05 |         | Deferred Work: all five items marked resolved in task.183 | develop |
 <!-- change-log-end -->
 
 ---
