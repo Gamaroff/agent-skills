@@ -249,6 +249,47 @@ test("a short-flag cluster is read as gh reads it: a value flag inside it is sti
   assert.ok(log.slice(reads.length).every((c) => c.refused === true));
 });
 
+// `api` is decided by ALLOW-list (task.185 QA cycle 6, TASK-185-BUG-6): served only when every flag
+// is a known read flag and every method given is GET. Listing write spellings missed one per cycle —
+// glued, clustered, then `-X GET --method POST`, where pflag's last-wins made it a POST.
+test("api is served only by the read allow-list: any other flag or method is refused", () => {
+  const route = "repos/eval/widgets/issues/12/comments";
+  const { gh, calls } = sandbox({ ...FIXTURES, api: { [route]: [] } });
+  // Reads the allow-list must keep serving, including the value flags bug 7 found missing.
+  const reads = [
+    ["api", "--hostname", "github.com", route],
+    ["api", "-p", "corsair", route],
+    ["api", "--cache", "1h", route],
+    ["api", "-X", "GET", "--method", "get", route],
+    ["api", "-H", "Accept: x", "--paginate", route],
+  ];
+  for (const args of reads) {
+    const r = gh(...args);
+    assert.equal(r.status, 0, args.join(" "));
+    assert.equal(r.stdout.trim(), "[]", args.join(" "));
+  }
+  const writes = [
+    ["api", "-X", "GET", "--method", "POST", route], // pflag: the last one wins → POST
+    ["api", "-XGET", "--method=DELETE", route],
+    ["api", "--method", "POST", "-X", "GET", route], // a GET to gh, refused: any non-GET fails closed
+    ["api", "--unknown-flag", route],
+    ["api", "-z", route], // a cluster character the parser has no name for
+    ["pr", "new"],
+    ["issue", "new"],
+  ];
+  for (const args of writes) {
+    const r = gh(...args);
+    assert.equal(r.status, 1, args.join(" "));
+    assert.match(r.stderr, /refused write/, args.join(" "));
+  }
+  const log = calls();
+  assert.equal(log.length, reads.length + writes.length);
+  assert.ok(
+    log.slice(0, reads.length).every((c) => !c.refused && !c.unhandled),
+  );
+  assert.ok(log.slice(reads.length).every((c) => c.refused === true));
+});
+
 test("a command with no fixture kind is unhandled: exit 1, logged unhandled: true", () => {
   const { gh, calls } = sandbox();
   for (const args of [

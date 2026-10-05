@@ -4,7 +4,7 @@
 **Bug ID**: TASK-185-BUG-7
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: ✅ Ready for QA
 **Found By**: QA Engineer (QA cycle 6, code review CR-2)
 **Date Found**: 2026-10-05
 
@@ -37,8 +37,24 @@ that is the harness's, not the skill's.
 Add the three flags to `VALUE_FLAGS` and check the list against `gh api --help`. Under the
 allow-list rework recommended in bug 6, this list matters only for locating the path positional.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+#### Fix Implementation (New → Ready for QA)
+
+**Date**: 2026-10-05
+
+**Fix Description**: `-p`, `--preview`, `--hostname` and `--cache` are added to `VALUE_FLAGS`, so
+their value is no longer read as the path. They are also in `API_READ_FLAGS`, so a read carrying them
+is served.
+
+**Testing**: the allow-list test in `fake-gh.test.mjs` serves `--hostname github.com`, `-p corsair`
+and `--cache 1h` reads. These were `notFound` before; reproduced in QA cycle 6.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 |---|---|---|---|
 | 2026-10-05 | New | qa-task | QA cycle 6 |
+| 2026-10-05 | Ready for QA | qa-fix | Fixed after escalation (user-approved allow-list) |

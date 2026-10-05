@@ -5,7 +5,7 @@ type: task
 description: "Give /review-pr an end-to-end eval: four scenarios (happy path, re-review numbering gap, unanchored PR, planted bug) run against a hermetic sandbox — a local bare origin, a fake gh, and the skill installed at .agents/skills — in replay mode in CI and live mode on demand with a per-scenario pass rate. Also make the report number deterministic (obs #272) so the numbering scenario has a reachable pass."
 tags: [review-pr, evals, harness, follow-up]
 category: testing
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-05
 updated: 2026-10-05
@@ -16,7 +16,7 @@ github_issue: 573
 
 # Technical Task: review-pr eval suite
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.185.review.1.review-pr-eval-suite.md` implemented 2026-10-05
 
@@ -498,6 +498,7 @@ Acceptance criteria (13/13), documentation and CI (SUCCESS @ `21f77034`) all pas
 | 2026-10-05 |  | QA gate FAIL (60/100) — 1 high finding (fake gh shorthand cluster) | qa-task |
 | 2026-10-05 |  | QA findings fixed (cycle 5) — fake gh reads short-flag clusters as pflag does (bug 5); 5 iterations in total | qa-fix |
 | 2026-10-05 |  | QA gate FAIL (50/100) — 1 high, 1 medium (fake gh -X/--method precedence; missing value flags) | qa-task |
+| 2026-10-05 |  | QA findings fixed after escalation — fake gh api decided by read allow-list (bugs 6, 7); 6 iterations in total | qa-fix |
 <!-- change-log-end -->
 
 ---

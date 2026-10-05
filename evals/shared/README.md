@@ -142,11 +142,12 @@ file), and an empty `.eval/gh-config/`.
   are served from the fixtures; `--json a,b` selects fields, `-q/--jq` is piped through the real
   `jq`. A known kind with a missing key answers as `gh` does (exit 1, `GraphQL: Could not resolve…`),
   logged `"notFound": true`.
-- **Writes** (`pr comment|review|edit|merge|…`, `issue comment|…`, `api` with a non-GET method or a
-  field flag) are **refused**: exit 1, logged `"refused": true`. "Never posts without asking" becomes
-  an assertion on the log. Short flags are read the way `gh` reads them, so a glued flag
-  (`-XPOST`, `-fbody=x`) or a cluster (`-iXPOST` is `-i -X POST`) is a write too, even on a path a
-  fixture serves.
+- **Writes** are **refused**: exit 1, logged `"refused": true`. "Never posts without asking" becomes
+  an assertion on the log. For `pr` and `issue` a write is a listed subcommand (`comment`, `review`,
+  `edit`, `merge`, `new`, …). For `api` the rule is an **allow-list**: a call is served only when
+  every flag is a known read flag (`-H`, `-i`, `--paginate`, `-q`, `--hostname`, …) and every method
+  given is `GET`. Anything else is refused, so an unmodelled spelling fails closed. Two real reads are
+  refused by design: `--method POST -X GET` and `-X GET` with a field flag.
 - **Anything else** is `"unhandled": true`, exit 1 — a gap in the fixtures fails loudly instead of
   being guessed at.
 

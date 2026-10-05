@@ -14,9 +14,11 @@
  * When run as a program (the launcher's target) it serves read commands from the
  * fixtures, appends one JSON line per call to gh-calls.jsonl, and:
  *   - answers `gh --version` / `gh version` (a harmless probe agents run first);
- *   - REFUSES every write (pr comment|review|edit|merge|close|create|ready|reopen,
- *     issue comment|edit|close|create|reopen, api with a non-GET method or a field flag):
- *     exit 1, logged with "refused": true. "Never posts without asking" is then an assertion.
+ *   - REFUSES every write: the pr/issue subcommands in WRITES, and every `api` call that is not
+ *     a plain read. `api` is decided by ALLOW-list, not by listing write shapes: it is served only
+ *     when every flag it carries is in API_READ_FLAGS and every method given is GET. Any other
+ *     flag, spelling or method is refused, so a form the parser does not model fails closed.
+ *     Exit 1, logged with "refused": true. "Never posts without asking" is then an assertion.
  *   - reports a read it has no fixture KIND for as "unhandled": true, exit 1 — a gap in the
  *     fixtures shows as a failure, never as a guess.
  *   - answers a known kind with a missing key the way gh does (exit 1, GraphQL "Could not
@@ -51,6 +53,10 @@ const WRITES = {
     "create",
     "ready",
     "reopen",
+    "new",
+    "lock",
+    "unlock",
+    "update-branch",
   ]),
   issue: new Set([
     "comment",
@@ -60,8 +66,38 @@ const WRITES = {
     "reopen",
     "delete",
     "transfer",
+    "new",
+    "lock",
+    "unlock",
+    "pin",
+    "unpin",
+    "develop",
   ]),
 };
+// The only flags a served `api` read may carry (gh api --help). Everything else — a field or
+// input flag, an unknown flag, a cluster character the parser has no name for — is refused.
+const API_READ_FLAGS = new Set([
+  "-X",
+  "--method",
+  "-H",
+  "--header",
+  "-i",
+  "--include",
+  "--paginate",
+  "--slurp",
+  "-q",
+  "--jq",
+  "-t",
+  "--template",
+  "-p",
+  "--preview",
+  "--hostname",
+  "--cache",
+  "--silent",
+  "--verbose",
+  "-R",
+  "--repo",
+]);
 const READS = new Set([
   "pr view",
   "pr diff",
@@ -126,6 +162,10 @@ const VALUE_FLAGS = new Set([
   "--template",
   "-H",
   "--header",
+  "-p",
+  "--preview",
+  "--hostname",
+  "--cache",
 ]);
 
 function parseArgs(args) {
@@ -215,14 +255,16 @@ export function runFakeGh(argv, evalDir) {
     return { status, stdout, stderr, entry };
   };
 
-  // Writes first: a write is refused whatever the fixtures say.
-  const method = String(get("-X", "--method") || "GET").toUpperCase();
-  const apiHasFields = ["-f", "-F", "--field", "--raw-field", "--input"].some(
-    (f) => opts[f],
-  );
+  // Writes first: a write is refused whatever the fixtures say. `api` is a read only when it
+  // passes the allow-list; three cycles of listing write spellings each missed one (task.185).
+  const apiIsRead =
+    Object.keys(opts).every((f) => API_READ_FLAGS.has(f)) &&
+    [...(opts["-X"] || []), ...(opts["--method"] || [])].every(
+      (m) => String(m).toUpperCase() === "GET",
+    );
   if (
     (WRITES[group] && WRITES[group].has(sub)) ||
-    (group === "api" && (method !== "GET" || apiHasFields))
+    (group === "api" && !apiIsRead)
   ) {
     entry.refused = true;
     return done(1, "", `fake-gh: refused write: gh ${argv.join(" ")}\n`);
