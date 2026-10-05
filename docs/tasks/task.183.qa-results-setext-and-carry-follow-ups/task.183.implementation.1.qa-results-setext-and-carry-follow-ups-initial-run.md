@@ -3,7 +3,7 @@
 **Task**: `task.183.qa-results-setext-and-carry-follow-ups.md`
 **Run Number**: 1
 **Started**: 2026-10-05 11:10
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Close task.171's five Deferred Work items in `shared/resources/qa-results.js` (C
 | 2. review-task             | ✅ Done    | `task.183.review.{N}.{name}.md` exists (or skip logged)                | review.1 — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; loop audit ready-for-review 16/16 | `.summaries/step-3-test-triage-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #571: https://github.com/Gamaroff/agent-skills/pull/571 | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.183.qa.{N}.*.md`; `task.183.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at cycle 3, re-entered (+2), escalated again at cycle 4, re-entered, loop limit at cycle 5 — HIGH 1, 1, 2, 2, 0; see Issues Log | `.summaries/step-5-fast-gate-triage-1.json` |
-| 7. finalise                | ⏳ Pending | `task.183.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.183.qa.{N}.*.md`; `task.183.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at cycle 3, re-entered (+2), escalated again at cycle 4, re-entered, loop limit at cycle 5, re-entered (+1); gate 6 PASS 100; 5c CONCERNS (pr-review.1) — HIGH 1, 1, 2, 2, 0, 0 | `.summaries/step-5-fast-gate-triage-1.json` |
+| 7. finalise                | ✅ Done    | `task.183.dod.{N}.*.md`; task `status: accepted`                       | dod.1 ACCEPTED; acceptance commit `69b36a4a`; CI reading 2 SUCCESS; issue #569 closed | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -125,6 +125,42 @@ Close task.171's five Deferred Work items in `shared/resources/qa-results.js` (C
 
 #### qa-fix cycle 5 — 2026-10-05
 - Inline findings path (gate 5 written by this run). Step 2.6 repeat subject (`QA_LABELS`, edited in cycles 1 and 4) → scope the claim: no QA-label stop; CR2-4 deferred. R4 now carries a grouped bug list under each former label and a stale list exactly once. Mutation proofs 11/11 (M15 added). Docs: three of five closed, CR-7 and CR2-4 deferred. qa-fix Change Log row written (loop exit). Fast gate 5301/5304 (budgets only). Commit `e0ee01ba`, pushed once.
+
+### Re-entry after the loop limit — 2026-10-05
+
+- Operator approved the loop-limit entry's recommended option 1: "Resume at 5a with 1 more cycle" (k=1), so a gate reads `e0ee01ba`. Dispatched by `/develop-next` (AUTONOMOUS RUN); all existing HALT conditions remain HALTs.
+- QA loop re-entry: 1 extra cycle granted; 0 cycle(s) run outside the loop back-filled from disk. `grant-qa-cycles.sh`: lock restored from the halt snapshot, QA_CYCLE=5, `qa_max_cycles=6`, `qa_phase: 5a`.
+- Preconditions verified before the grant: clean tree, HEAD = origin = `fe971d2f`, halt snapshot `loop-limit` at step 5, no lock, develop-next run-state T183 dispatched/unmerged/unticked, PR #571 OPEN.
+- Cycle 6 is the last: any open entry on gate 6 escalates and HALTs. CR-7 and CR2-4 are deferred by operator decision (task § Deferred Work) and are not findings.
+- Traceability mapper skipped: § 9 Success Criteria is a checklist, not a table (HAS_SUCCESS_CRITERIA_TABLE=false).
+
+### QA Cycle 6 — 2026-10-05
+**Gate Result**: PASS
+**Issues Found**: none gating — CR5-1, CR5-2, CR5-3 FIXED by `e0ee01ba`. Three advisory cleanups in `recommendations.future`: CR6-1 ("any sub-label" claims over-reach a paragraph-first shape that drops a link — identical on `origin/develop`, 0 corpus files: pre-existing), CR6-2 (Change Log row order), CR6-3 (§ 3 says two `collectBlocks` clauses changed; one did).
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
+- Scope: files changed since gate 5 (head `add0e4b1`; 11 files). One Explore reviewer, 96.9 s: 0 bugs, 2 cleanups. Mutation proofs 4/4 covered (QA-label stop restored → R4; `Key Findings` only → R4; any-heading stop → R4; every-bold-label stop → P2 + R4).
+- qa-results suites 98/98, 1.45 s at load 3.45; shared/resources + related suites 2526/2526; `ci:fast` 5301/5304 — the two LOAD-SENSITIVE budgets only (10.19 s, 10.48 s), each green alone at load 5.22; `bundle:check` 0 problems; `validate` qa-task ✓ qa-story ✓.
+- PR comment posted (qa-gate-6); issue #569 comment `posted`.
+- Step 5c `/review-pr --effort medium --comment`: **CONCERNS** — report `task.183.pr-review.1.qa-results-setext-and-carry-follow-ups.md`; summary comment posted (issuecomment-5994417597). Findings: CR-1, CR-2 (bug, medium/medium — each reproduced by the orchestrator identically on `origin/develop`, 0 corpus instances: pre-existing `qa-results.js` shapes, not introduced by this PR); CR-3 (cleanup, low: R2 repeats R1 assertions); PC-1 (consistency, low: four task.183 passages still read as if CR-7/CR2-4 were fixed). Not blocking per the 5c verdict table; recorded for a follow-up. Lenses dispatched 12:21:56Z, cleared 12:25:52Z (code 184.8 s, conformance 56.5 s).
+- GitHub Issue #569 — ready-for-merge: stage-disabled.
+
+### Step 7 — finalise
+
+- `/finalise` invoked (not inlined). Four DoD agents in parallel: AC 11/11 PASS, security PASS (`boundary: internal`, valid reason), compliance NOT_APPLICABLE, docs PASS (narrative residue advisory). PR review decision: none on GitHub (single-maintainer repository; task.171 precedent).
+- Timing re-measured at finalise: 2.00 s (cold), 1.50 s, 1.52 s at load average 3.49 → 3.53.
+- DoD summary: docs/tasks/task.183.qa-results-setext-and-carry-follow-ups/task.183.dod.1.qa-results-setext-and-carry-follow-ups.md
+- CI reading 1: SUCCESS @ 3d6f027a840a (5/5 checks; local HEAD 8c83668e added only the 5c PR review report); CI reading 2: SUCCESS @ 69b36a4a1988 over 5 checks after 60s — the head's own runs (Test, Branch Policy, Docs link check, ShellCheck, Validate Skills all `completed success` on 69b36a4a), not tree-equivalence.
+- Acceptance commit `69b36a4a` (document `status: accepted` + Change Log 1.2, DoD, sprint review, registry ticked) pushed and asserted tracked and on origin before any side-effect. CHANGELOG cites `(task 183)`.
+- PR canonical summary posted: issuecomment-5994684438. DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/571#issuecomment-5994699448.
+- Tracker: Document link already on `develop`; issue #569 done comment `posted`; close `performed`.
+- GitHub Issue #569 — close: CLOSED ✅ (`gh issue view` state CLOSED).
+- GitHub Issue #569 — board: done → already.
+- Task completed.
 
 ---
 
@@ -260,10 +296,12 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: 2026-10-05 (halted — escalation)
-**Final Status**: Escalated
+**Finished**: 2026-10-05 14:45
+**Final Status**: Completed
 **Branch**: `feature/task.183.qa-results-setext-and-carry-follow-ups`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/571
-**QA Iterations**: 5 (gates 1–4 FAIL, gate 5 CONCERNS; 3 fix cycles + 2 operator fixes)
-**DoD Summary**: not reached
+**QA Iterations**: 6 (gates 1–4 FAIL, gate 5 CONCERNS, gate 6 PASS 100; 4 fix cycles incl. 2 operator escalation fixes; budget 3 + 2 + 1 granted)
+**DoD Summary**: docs/tasks/task.183.qa-results-setext-and-carry-follow-ups/task.183.dod.1.qa-results-setext-and-carry-follow-ups.md
 **Tracker debt**: none
+
+**Completion Summary**: Implemented task.183's `qa-results.js` follow-ups: the setext check leans toward refusal (`notParagraph()`, CR5-1 closed), a change log whose `Date` column is not first is recognised inside a marker block (5c CR-1), and a bold Bug Reports block keeps its `####` groups and grouped bug lists (5c CR-2); the corpus survey skips documents that never name the section. Six QA cycles: cycles 1–4 found HIGH deletions each time a fix inferred Markdown block structure line by line, and two operator escalations resolved them by removing each inference and deferring CR-7 and CR2-4; cycle 5 removed the last one (the QA-label stop); a granted sixth cycle gated that fix PASS 100/100. Step 5c returned CONCERNS on two pre-existing `qa-results.js` shapes (identical on `origin/develop`) — recorded for a follow-up task with gate 6's CR6-1.
