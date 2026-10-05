@@ -382,8 +382,8 @@ None.
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.183.qa.1.qa-results-setext-and-carry-follow-ups.md](./task.183.qa.1.qa-results-setext-and-carry-follow-ups.md)
-- **Gate File**: [task.183.gate.1.qa-results-setext-and-carry-follow-ups.yml](./task.183.gate.1.qa-results-setext-and-carry-follow-ups.yml)
+- **Full Report**: [task.183.qa.2.qa-results-setext-and-carry-follow-ups.md](./task.183.qa.2.qa-results-setext-and-carry-follow-ups.md)
+- **Gate File**: [task.183.gate.2.qa-results-setext-and-carry-follow-ups.yml](./task.183.gate.2.qa-results-setext-and-carry-follow-ups.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 85
@@ -392,7 +392,7 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
 
 ### Key Findings
-CR-3 (HIGH): a thematic break (`* * *`, `- - -`) is read as a list item, so a setext section under the next line is deleted on replace. CR-1 (MEDIUM): `lastTableStart` keeps the Date-first log header. CR-4 (LOW): inner-colon QA label not matched.
+Cycle 1 fixes hold. CR2-1 (HIGH): a `<!--` inside a fence keeps the comment context open, so a later line containing `-->` is exempted and a setext section is deleted. CR2-2 (MEDIUM): a Version-first log is still cut at a quoted table, or loses a header-only log.
 
 <!-- change-log-start -->
 
@@ -405,6 +405,7 @@ CR-3 (HIGH): a thematic break (`* * *`, `- - -`) is read as a list item, so a se
 | 2026-10-05 |         | Status → ready-for-development | review-task |
 | 2026-10-05 |         | Implemented — 9 files (3 generated), 4 tests (R1–R4), 9 mutation proofs held | develop |
 | 2026-10-05 |         | QA gate FAIL (70/100) — 3 findings (1 high) | qa-task |
+| 2026-10-05 |         | QA gate FAIL (70/100) — 2 findings (1 high), 2 advisory | qa-task |
 
 <!-- change-log-end -->
 

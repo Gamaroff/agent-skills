@@ -1142,6 +1142,11 @@ test("R2 CR-7: a list continuation or a comment's closing line over --- is writt
     "Release\n2. Notes\n   more",
     "* * *\n  Rollout Notes",
     "- - -\n  Rollout Notes",
+    // A comment opened inside a fence is code, and only a line that is `-->` alone
+    // closes a comment block (QA cycle 2, CR2-1).
+    "```html\n<!-- x\n```\n\nRetest flow: login --> dashboard",
+    "<!--\nnote -->",
+    "```\n<!--\n```\n\n-->",
   ]) {
     const doc = markerDoc(`${section(1)}\n\n${head}\n-----\n\nkeep-me\n\n`);
     const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
@@ -1172,6 +1177,42 @@ test("R3 5c CR-1: a misplaced section above a Version-first log is refused; a Da
   assert.equal(ra.reason, "unbounded");
   assert.equal(ra.detail, "structural-line:| 2026-01-01 | quoted |");
   assert.equal(ra.content, above);
+  // The mirror shapes (QA cycle 2, CR2-2): the section quotes a Date-first table and the
+  // Version-first log sits BELOW it — no cut at the quoted table; and a header-only
+  // Version-first log is refused, not stripped of its header.
+  const vlog = (body) =>
+    `${FM}## Body\n\ntext\n\n<!-- change-log-start -->\n\n## Change Log\n\n${section(1)}\n\n${body}\n\n<!-- change-log-end -->\n`;
+  const below = vlog(
+    "| Date | Result |\n| --- | --- |\n| 2026-01-01 | quoted |\n\n| Version | Date | Description | Author |\n| --- | --- | --- | --- |\n| 1.1 | 2026-10-06 | x | y |",
+  );
+  const rbl = QR.upsertQaResults(below, section(2), { docType: "task" });
+  assert.equal(rbl.reason, "unbounded");
+  assert.equal(rbl.content, below);
+  const bareLog = vlog(
+    "| Version | Date | Description | Author |\n| --- | --- | --- | --- |",
+  );
+  const rh = QR.upsertQaResults(bareLog, section(2), { docType: "task" });
+  assert.equal(rh.reason, "unbounded");
+  assert.equal(
+    rh.detail,
+    "structural-line:| Version | Date | Description | Author |",
+  );
+  assert.equal(rh.content, bareLog);
+  // At end of file, with no newline after the separator, the header is still kept.
+  const eof = `${FM}## Body\n\ntext\n\n## Change Log\n\n${section(1)}\n\n| Version | Date | Description | Author |\n| --- | --- | --- | --- |`;
+  const re = QR.upsertQaResults(eof, section(2), { docType: "task" });
+  assert.equal(re.reason, "unbounded");
+  assert.equal(re.content, eof);
+  // A header-only Date-first log is still cut at and relocated, header kept.
+  const dfLog = vlog(
+    "| Date | Version | Description | Author |\n| --- | --- | --- | --- |",
+  );
+  const rd = QR.upsertQaResults(dfLog, section(2), { docType: "task" });
+  assert.equal(rd.reason, "relocated");
+  assert.match(
+    rd.content,
+    /## Change Log\n\n\| Date \| Version \| Description \| Author \|/,
+  );
   // A section quoting a table with no Date column stays writable.
   const phases = `${section(1)}\n\n| Phase | Status |\n| --- | --- |\n| Phase 1 | PASS |`;
   const ok = `${FM}## Body\n\ntext\n\n<!-- change-log-start -->\n\n## Change Log\n\n${phases}\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | x | y |\n\n<!-- change-log-end -->\n`;

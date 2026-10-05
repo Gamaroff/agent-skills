@@ -334,10 +334,10 @@ function hasDateColumn(row) {
 //     continuation line). The item must be one that can interrupt a paragraph — a bullet
 //     or `1.` — because a `2.` line under paragraph text is paragraph text, and so is
 //     everything indented under it;
-//   - the line that closes an HTML comment block: one holding `-->` after a line that
-//     opened the block (`<!--` at its start, no `-->` after it). Only the closing line is
-//     exempt — the lines inside stay heading candidates, and an unclosed `<!--` exempts
-//     nothing, or every line after it would be exempt (task 183 review, I1).
+//   - the line that closes an HTML comment block: a line that is `-->` alone, after a
+//     line that opened the block (`<!--` at its start, no `-->` after it). Only that
+//     line is exempt — the lines inside stay heading candidates, an unclosed `<!--`
+//     exempts nothing (task 183 review, I1), and a fence line ends the context (CR2-1).
 // Returns one boolean per line.
 function blockContinuations(lines) {
   const out = lines.map(() => false);
@@ -345,11 +345,18 @@ function blockContinuations(lines) {
   let comment = false; // inside an HTML comment block opened on an earlier line
   for (let k = 0; k < lines.length; k++) {
     const l = lines[k];
+    // A fence line ends both contexts: a `<!--` or an item inside a fence is code, and
+    // a context carried out of it exempted a later paragraph line (QA cycle 2, CR2-1).
+    if (/^ {0,3}(?:`{3,}|~{3,})/.test(l)) {
+      comment = false;
+      offset = 0;
+      continue;
+    }
     if (comment) {
-      if (l.includes("-->")) {
-        out[k] = true;
-        comment = false;
-      }
+      // Only a line that is the closer alone is exempt. A paragraph line that merely
+      // contains `-->` is not trusted to close the block (QA cycle 2, CR2-1).
+      if (/^ {0,3}-->[ \t]*$/.test(l)) out[k] = true;
+      if (l.includes("-->")) comment = false;
       continue;
     }
     const open = /^ {0,3}<!--/.exec(l);
@@ -394,6 +401,15 @@ function removesStructure(removed, { underLog = false } = {}) {
   const lines = removed.split("\n").map((l) => l.replace(/\r$/, ""));
   const block = blockContinuations(lines);
   let logTable = false; // inside a table whose header has a `Date` column
+  // A log table with a header and no data rows is still a log: under a log, its header
+  // is reported when the table ends, so a header-only log is refused rather than its
+  // header removed (QA cycle 2, CR2-2).
+  let logHeader = null;
+  let logData = false;
+  const headerOnly = () =>
+    underLog && logTable && logHeader !== null && !logData
+      ? logHeader.trim().slice(0, 60)
+      : null;
   for (let i = 1; i < lines.length; i++) {
     const l = lines[i];
     const isRow = /^[ \t]*\|/.test(l);
@@ -403,11 +419,20 @@ function removesStructure(removed, { underLog = false } = {}) {
     // QA cycle 1, CR-3). `Date` in any position, so a `| Version | Date | … |` log keeps
     // its rows too (task 183, 5c CR-1); the header itself is excluded by the same test.
     const header = isRow && !/^[ \t]*\|/.test(lines[i - 1]) && hasDateColumn(l);
-    if (header) logTable = true;
-    else if (!isRow) logTable = false;
+    if (header) {
+      logTable = true;
+      logHeader = l;
+      logData = false;
+    } else if (!isRow) {
+      const bare = headerOnly();
+      if (bare !== null) return bare;
+      logTable = false;
+      logHeader = null;
+    }
     const logRow =
       isEntryRow(l) ||
       (logTable && !header && !/^[ \t]*\|[\s\-:|]+\|[ \t]*$/.test(l));
+    if (logTable && logRow) logData = true;
     if (
       RE_STRUCTURAL.some((re) => re.test(l)) ||
       (RE_SETEXT.test(l) &&
@@ -424,7 +449,7 @@ function removesStructure(removed, { underLog = false } = {}) {
       return shown.slice(0, 60);
     }
   }
-  return null;
+  return headerOnly();
 }
 
 const isBlank = (line) => /^[ \t]*\r?$/.test(line);
@@ -502,10 +527,10 @@ function markerBlocks(content, ranges) {
 }
 
 // Offset of the LAST unprotected change-log table header in [from, to): a table row
-// `isHeader` accepts whose previous line is not itself a table row. The default,
-// `hasDateColumn`, answers whether a log table exists; the cut passes the Date-first
-// test (see RE_LOG_HEADER).
-function lastTableStart(content, from, to, ranges, isHeader = hasDateColumn) {
+// with a `Date` column (`hasDateColumn`) whose previous line is not itself a table row.
+// The one lookup for "where is the log table"; whether a section may be CUT there is
+// asked of that same table (`dateFirstAt`, see RE_LOG_HEADER) — QA cycle 2, CR2-2.
+function lastTableStart(content, from, to, ranges) {
   let found = -1;
   let offset = from;
   let prevRow = false;
@@ -514,7 +539,7 @@ function lastTableStart(content, from, to, ranges, isHeader = hasDateColumn) {
     if (
       isRow &&
       !prevRow &&
-      isHeader(line) &&
+      hasDateColumn(line) &&
       !insideProtected(ranges, offset)
     ) {
       found = offset;
@@ -523,6 +548,14 @@ function lastTableStart(content, from, to, ranges, isHeader = hasDateColumn) {
     offset += line.length + 1;
   }
   return found;
+}
+
+// Is the table header starting at `offset` Date-first — a shape the log writers emit?
+function dateFirstAt(content, offset) {
+  const end = content.indexOf("\n", offset);
+  return RE_LOG_HEADER.test(
+    content.slice(offset, end === -1 ? undefined : end),
+  );
 }
 
 // Does a fence that opens in [from, to) never close? A sentinel appended past the
@@ -608,14 +641,15 @@ function findQaResults(content) {
     const logAbove =
       block && lastTableStart(content, block.start, start, ranges) !== -1;
     if ((block && !logAbove) || underTablelessLog) {
+      // The last Date-column table is the log's own; cut there only when it is
+      // Date-first. Otherwise there is no cut: the span runs on and the guard refuses.
       const tbl = lastTableStart(
         content,
         bodyOffset,
         Math.min(...candidates),
         ranges,
-        (l) => RE_LOG_HEADER.test(l),
       );
-      if (tbl !== -1) {
+      if (tbl !== -1 && dateFirstAt(content, tbl)) {
         candidates.push(tbl);
         insideChangeLog = true;
       }

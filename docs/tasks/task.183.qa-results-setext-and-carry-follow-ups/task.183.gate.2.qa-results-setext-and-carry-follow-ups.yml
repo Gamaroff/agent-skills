@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.183.qa-results-setext-and-carry-follow-ups'
+task_title: 'qa-results setext and carry follow-ups'
+gate: FAIL
+status_reason: 'Cycle 1 fixes hold (CR-3 break, CR-1 existence, CR-4 inner colon all verified closed), but the refute pass reproduced a new deletion: a <!-- inside a fence leaves the comment context open, so a later paragraph line containing --> is exempted and the setext section under it is deleted, where origin/develop refused. A Version-first log is also still cut at a quoted table or loses a header-only log, contrary to the comment that claims it is refused.'
+reviewer: 'QA Engineer'
+head: 'dd91fe76c796cb215c63e257ebf16035e6bc010b'
+updated: '2026-10-05T10:39:31Z'
+
+top_issues:
+  - id: CR2-1
+    severity: high
+    file: 'shared/resources/qa-results.js'
+    finding: 'blockContinuations keeps the HTML-comment context open across a fence: a <!-- inside a fenced block, then a later paragraph line containing --> (Retest flow: login --> dashboard) over ---, is exempted and the setext section is deleted on replace (keep-me gone); origin/develop refuses with structural-line:Retest flow: login --> dashboard / ---.'
+    suggested_action: 'Reset the comment and list contexts on any fence line, and exempt a closing line only when it ends with -->; add the fenced shape and a mid-line --> shape to the R2 refusal loop.'
+    suggested_owner: dev
+    status: open
+  - id: CR2-2
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'The cut still finds only a Date-first table, so a misplaced section above a Version-first log is cut at a Date-first table it quotes (the quoted row stays in the log) and, when the Version-first log is header-only, relocate deletes its header; both reproduced, identical on origin/develop, but this task scopes Version-first logs and the lastTableStart comment claims such a log is refused rather than cut.'
+    suggested_action: 'Find the last Date-column table (hasDateColumn) and cut only when that table is Date-first; under underLog report a Date-column header with no data rows as structural so a header-only log is refused, keeping existing details unchanged.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 85
+  phases_verified: 5/5
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — upsertQaResults decides whether a write to a work-item document is safe; inputs are documents and a render this pipeline writes; no corpus sink models a work-item section writer (task.171 precedent). No network, exec or path input.'
+  performance:
+    status: PASS
+    notes: 'Unchanged code paths for timing; cycle 1 measured 1.73 s at load 3.33. Re-measure at finalise.'
+  reliability:
+    status: FAIL
+    notes: 'CR2-1 deletes a setext section on a shape origin/develop refused.'
+  maintainability:
+    status: PASS
+    notes: 'Fixes commented with finding ids; 13/13 mutations held at cycle 1.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1: fences reset the comment/list contexts; a closing line must end with -->.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Fix CR2-2: cut only at a Date-first last Date-column table; a header-only Date-column log under underLog is structural.'
+      refs: ['shared/resources/qa-results.js']
+  future:
+    - action: 'CR2-3 (pre-existing, identical on origin/develop, 0 corpus hits): a carried bold label with the colon inside the bold (**Deferred Work:**) is not recognised as a carried block, so its items are deleted on replace. Follow-up: accept :? inside the bold in the collectBlocks start pattern, with the two colon positions tested as one pair.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'CR2-4 (repeat of cycle 1 CR-2, advisory): a QA-owned #### after a carried bold block is carried; 0 of 235 corpus documents, and the qa-task/qa-story render uses ### only.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []
