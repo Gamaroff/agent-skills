@@ -288,7 +288,8 @@ Shared Bug Report Template" (Related → task link; heading → **Success Criter
 
 ### Step 5: Update Task File Bug Reports Section
 
-If a `### Bug Reports` heading doesn't exist, add it in the QA & Quality Assurance section.
+If none of the existing list forms below is present, add a `### Bug Reports` heading in the QA &
+Quality Assurance section.
 
 Existing list forms (append the new bug to whichever is present): `## Bug Reports`, `### Bug Reports`, `#### Bug Reports`, `**Bug Reports**`.
 

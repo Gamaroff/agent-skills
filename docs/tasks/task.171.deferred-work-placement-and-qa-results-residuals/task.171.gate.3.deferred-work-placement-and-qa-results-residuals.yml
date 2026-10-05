@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.171.deferred-work-placement-and-qa-results-residuals'
+task_title: 'Deferred Work placement and qa-results engine residuals'
+gate: CONCERNS
+status_reason: 'Cycle 2 findings CR2-1, CR2-2, CR2-3 and CR2-5 verified fixed; the scoped review found that the fence-aware setext check reopens the fence mis-pairing the structural guard is fence-blind to prevent, so a stray unclosed info-string fence lets a replace delete a setext section.'
+reviewer: 'QA Engineer'
+head: '17032769f35cff2516ad7bbd57fb9549fe8c722d'
+updated: '2026-10-05T07:40:28Z'
+
+top_issues:
+  - id: CR3-1
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'The setext check skips fenced lines, so an unclosed ```bash in a QA section pairs with the bare closer of a later ```yaml block and hides a real setext section between them; the write returns replaced and deletes that heading and body, while the ATX twin is refused and the gate-2 engine refused this document (structural-line:Rollout Notes / -------------).'
+    suggested_action: 'Exempt a setext underline only inside a fence range with no sign of mis-pairing (no interior opener-with-info-string line), or exempt only on the render side; add the stray-```bash-then-```yaml document as a test that must refuse.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 100
+  phases_verified: 4/4
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    boundary: internal
+    internal_reason: 'Unchanged from gate 1: no corpus sink models a work-item section writer.'
+    notes: 'Pure string engine; no network, exec or path input.'
+  performance:
+    status: PASS
+    notes: 'Engine, corpus and wiring tests 1.62s combined (< 2s).'
+  reliability:
+    status: CONCERNS
+    notes: 'CR3-1 is a deletion path (gated on a malformed fence in the section).'
+  maintainability:
+    status: PASS
+    notes: 'Population test derives the Bug Reports forms from the tracked tree.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR3-1 with a regression test (qa-fix cycle 3).'
+      refs: ['shared/resources/qa-results.js']
+  future:
+    - action: 'CR3-2 (low): create-bug-report Step 5 still opens with an unconditional "If a ### Bug Reports heading does not exist, add it" before the existing-forms list; make the condition read the list.'
+      refs: ['skills/create-bug-report/SKILL.md']
+    - action: 'CR3-3 (low): the heading population scan is case-sensitive and plural-only; derive it from the engine grammar (case-insensitive, Bug Reports?).'
+      refs: ['tests/create-bug-report-bug-reports-heading.test.js']
+    - action: 'Carried from gate 2: CR2-4 (low) stale QA recommendations carried after a bold Bug Reports label; gate 1 CR-7 (low) setext false refusals after list continuations.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR3-1 fixed and re-reviewed']

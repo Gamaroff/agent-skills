@@ -294,7 +294,19 @@ function removesStructure(removed, { underLog = false } = {}) {
   // A setext underline is judged outside fences only: inside one, `status: done` over
   // `---` is fenced YAML, not a heading (task 171 QA cycle 2, CR2-2). The ATX and marker
   // checks stay fence-blind on purpose (see RE_STRUCTURAL).
-  const fences = fencedRanges(removed);
+  // Only a fence that is plausibly paired counts: a range holding another opener with
+  // an info string (```yaml) inside it is a stray, unclosed fence that has swallowed
+  // the next block's closer — the mis-pairing the ATX check stays fence-blind to
+  // (REL-012/014). Trusting it hid a real setext section, which a replace then
+  // deleted (task 171 QA cycle 3, CR3-1).
+  const fences = fencedRanges(removed).filter(
+    ([s, e]) =>
+      !removed
+        .slice(s, e)
+        .split("\n")
+        .slice(1)
+        .some((l) => /^ {0,3}(?:`{3,}|~{3,})[^`~\s]/.test(l)),
+  );
   const starts = [];
   for (let i = 0, off = 0; i < lines.length; i++) {
     starts.push(off);

@@ -418,24 +418,24 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-05
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.171.qa.2.deferred-work-placement-and-qa-results-residuals.md](./task.171.qa.2.deferred-work-placement-and-qa-results-residuals.md)
-- **Gate File**: [task.171.gate.2.deferred-work-placement-and-qa-results-residuals.yml](./task.171.gate.2.deferred-work-placement-and-qa-results-residuals.yml)
+- **Full Report**: [task.171.qa.3.deferred-work-placement-and-qa-results-residuals.md](./task.171.qa.3.deferred-work-placement-and-qa-results-residuals.md)
+- **Gate File**: [task.171.gate.3.deferred-work-placement-and-qa-results-residuals.yml](./task.171.gate.3.deferred-work-placement-and-qa-results-residuals.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 96
+- **Tests Executed**: 100
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-Cycle 1's six findings are fixed and converge under the refute pass. Two medium regressions remain: create-bug-report misses an existing H2 Bug Reports list (CR2-1), and setext detection refuses fenced YAML (CR2-2). One pre-existing substring-dedupe defect is routed to future (CR2-3).
+Cycle 2's fixes hold. One medium: the fence-aware setext check trusts fence pairing, so an unclosed info-string fence lets a replace delete a setext section after it (CR3-1). Two lows on create-bug-report Step 5 wording and the population scan.
 
 <!-- change-log-start -->
 
@@ -449,6 +449,7 @@ Cycle 1's six findings are fixed and converge under the refute pass. Two medium 
 | 2026-10-05 |         | Implemented — 16 files, 20 new tests (14 engine, 4 placement, 2 heading), 4 wiring/corpus assertions | develop |
 | 2026-10-05 |         | QA gate CONCERNS (50/100) — 5 findings | qa-task |
 | 2026-10-05 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-10-05 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 
 <!-- change-log-end -->
 

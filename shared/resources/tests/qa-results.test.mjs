@@ -1068,3 +1068,22 @@ test("Q3 CR2-5: one stray CRLF line does not turn an LF document's section CRLF"
   const [s] = QR.findQaResults(r.content).sections;
   assert.doesNotMatch(r.content.slice(s.start, s.end), /\r/);
 });
+
+test("Q4 CR3-1: a setext section behind a stray unclosed info-string fence is refused, not deleted", () => {
+  // An unclosed ```bash pairs with the bare closer of the later ```yaml block, so the
+  // setext heading between them looks fenced. It must not be exempted.
+  const doc = markerDoc(
+    `${section(1)}\n\n\`\`\`bash\necho hi\n\nRollout Notes\n-------------\n\nsteps\n\n\`\`\`yaml\nk: v\n\`\`\`\n\n`,
+  );
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.notEqual(r.reason, "replaced");
+  assert.equal(r.content, doc);
+  // A well-paired fence holding the same lines is still exempt (Q1's shape).
+  const ok = markerDoc(
+    `${section(1)}\n\n\`\`\`text\nRollout Notes\n-------------\n\`\`\`\n\n`,
+  );
+  assert.equal(
+    QR.upsertQaResults(ok, section(2), { docType: "task" }).reason,
+    "replaced",
+  );
+});

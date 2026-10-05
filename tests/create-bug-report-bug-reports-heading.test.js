@@ -38,18 +38,29 @@ function step5() {
   return out.join("\n");
 }
 
-test("Step 5's existence check names the heading Step 5 writes", () => {
+test("Step 5's existence check reads the list of forms, and the written heading is on it", () => {
   const body = step5();
-  const check = /If a `(#{2,4} [^`]+)` (?:heading|section) doesn't exist/.exec(
+  // The condition must be the list, not a single heading: an unconditional
+  // "if ### does not exist, add it" ahead of the list still opened a second list over
+  // an H2 one (task 171 QA cycle 3, CR3-2).
+  assert.match(
     body,
+    /^If none of the existing list forms below is present, add a `(#{2,4} [^`]+)`/m,
   );
-  assert.ok(check, "Step 5 states an existence check on a heading");
+  const added =
+    /^If none of the existing list forms below is present, add a `(#{2,4} [^`]+)`/m.exec(
+      body,
+    )[1];
   const fence = /```markdown\n(#{2,4} [^\n]+)\n/.exec(body);
   assert.ok(fence, "Step 5 writes a heading in a fenced markdown block");
   assert.equal(
-    check[1],
+    added,
     fence[1],
-    "the checked heading is the written heading",
+    "the heading the condition adds is the heading the fence writes",
+  );
+  assert.doesNotMatch(
+    body,
+    /^If a `#{2,4} [^`]+` (?:heading|section) doesn't exist/m,
   );
 });
 
@@ -84,7 +95,8 @@ test("every Bug Reports form a tracked document carries is one Step 5 counts as 
   for (const f of files) {
     const text = fs.readFileSync(path.resolve(__dirname, "..", f), "utf8");
     for (const m of text.matchAll(
-      /^(#{2,4} Bug Reports|\*\*Bug Reports\*\*)/gm,
+      // The engine's grammar: any case, singular too, a label alone on its line (CR3-3).
+      /^(#{2,4} Bug Reports?\b|\*\*Bug Reports?\*\*(?=:?[ \t]*$))/gim,
     ))
       forms.add(m[1]);
   }
