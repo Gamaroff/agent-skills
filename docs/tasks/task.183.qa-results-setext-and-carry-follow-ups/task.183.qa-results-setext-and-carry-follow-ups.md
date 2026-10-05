@@ -5,18 +5,20 @@ type: task
 description: "Follow-up to task.171. Work the five items in task.171's `## Deferred Work` section, all in `shared/resources/qa-results.js`: closes the HIGH setext deletion path (CR5-1), a Version-first log lost on relocate and a bold-label `####` boundary; defers the two setext false refusals (CR-7) and the stale QA list carry (CR2-4) after QA showed fixing them deleted content. Also make the corpus survey cheaper and its timing bound honest."
 tags: [qa-task, qa-story, engine, follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-10-05
 updated: 2026-10-05
 assignee:
 estimated_effort_hours: 8
 github_issue: 569
+completed_date: 2026-10-05
+pr_number: 571
 ---
 
 # Technical Task: qa-results setext and carry follow-ups
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.183.review.1.qa-results-setext-and-carry-follow-ups.md` implemented 2026-10-05
 
@@ -401,6 +403,31 @@ None.
 ### Key Findings
 Cycle 5's fix holds: CR5-1, CR5-2 and CR5-3 are fixed, and no gating finding remains. Three advisory lows: the "any sub-label" claim over-reaches a pre-existing paragraph-first shape (CR6-1), the Change Log rows are out of order (CR6-2), and § 3 says two `collectBlocks` clauses changed where one did (CR6-3).
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.183.qa.6.qa-results-setext-and-carry-follow-ups.md` (6 cycles)
+**Gate File**: `task.183.gate.6.qa-results-setext-and-carry-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**Step 5c PR review**: ⚠️ CONCERNS — `task.183.pr-review.1.qa-results-setext-and-carry-follow-ups.md` (two pre-existing mediums, two lows; advisory)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11/11 — functional (CR5-1 shapes refused; CR-7 stays refused, deferred; Version-first log refused; `####` groups and grouped bug lists carried, CR2-4 deferred), performance (1.50 s / 1.52 s warm at load 3.49, re-measured at finalise), code quality (corpus 0/0/0, mutation-proved, ci:fast / bundle:check / validate), migration (CHANGELOG, task.171 links)
+✅ **Tests:** engine, wiring and corpus suites run per PR; CI `test` SUCCESS on `3d6f027a`
+✅ **PR:** #571
+✅ **Documentation:** CHANGELOG `[Unreleased]`, task.171 Deferred Work, bundled qa-task / qa-story copies
+✅ **Security Review:** PASS — `boundary: internal` with a valid reason; no secrets or unsafe sinks
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling
+
+**Task marked as ACCEPTED on:** 2026-10-05
+
+**Detailed Verification Log:** See `task.183.dod.1.qa-results-setext-and-carry-follow-ups.md` for complete verification evidence and timestamps.
+
 ## Deferred Work
 
 Carried from the second QA escalation (gate 4, 2026-10-05, operator decision), QA cycle 5's fix and
@@ -422,13 +449,11 @@ gates 2–4 `recommendations.future`. All four are gaps in `shared/resources/qa-
 - **CR4-4** (low) — a QA-owned `####` heading after a carried bold-label block is carried as stale
   text (a duplicate, never a deletion). No QA render emits `####`; 0 of 235 tracked QA documents
   have the shape.
-
 <!-- change-log-start -->
-
 ## Change Log
 
-| Date       | Version | Description                                      | Author      |
-| ---------- | ------- | ------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-05 | 1.0     | Initial draft — follow-up to task.171 Deferred Work | create-task |
 | 2026-10-05 | 1.1     | Review passed (9/10) — bounded the HTML-comment context (I1), Phase 3 header exclusion (I2), corrected the CR5-1 probe figure | review-task |
 | 2026-10-05 |         | Status → ready-for-development | review-task |
@@ -442,7 +467,7 @@ gates 2–4 `recommendations.future`. All four are gaps in `shared/resources/qa-
 | 2026-10-05 |         | QA findings fixed — 5 cycles, 3 fix rounds (2 operator escalation fixes); CR-7 and CR2-4 deferred | qa-fix |
 | 2026-10-05 |         | QA gate FAIL (50/100) — 3 findings (2 high); loop not converging, escalated again | qa-task |
 | 2026-10-05 |         | QA gate PASS (100/100) — 0 findings (3 advisory lows) | qa-task |
-
+| 2026-10-05 | 1.2 | DoD passed — accepted (PR #571) | finalise |
 <!-- change-log-end -->
 
 ---
