@@ -1,6 +1,7 @@
 "use strict";
 /**
- * Git sandbox helper — creates a throwaway git repo in a tmpdir for eval use.
+ * Git sandbox helper — creates a throwaway git repo in a tmpdir for eval use, or in a
+ * caller-owned directory (`dir`) such as the eval runner's sandbox.
  *
  * Public API:
  *   createSandbox(options?) -> Promise<Sandbox>
@@ -20,14 +21,23 @@ const execAsync = promisify(execFile);
  * @param {Record<string,string>} [opts.fixtureFiles]  rel-path → content
  * @param {boolean}  [opts.initialCommit]  default true
  * @param {string}   [opts.branch]         default branch name, default "develop"
+ * @param {string}   [opts.dir]            initialise the repo HERE (created if absent) instead of
+ *                                         a new tmpdir. The caller owns it: cleanup() leaves it.
  * @returns {Promise<Sandbox>}
  */
 export async function createSandbox({
   fixtureFiles = {},
   initialCommit = true,
   branch = "develop",
+  dir,
 } = {}) {
-  const sandboxPath = await mkdtemp(join(tmpdir(), "agent-skills-eval-"));
+  let sandboxPath;
+  if (dir) {
+    await mkdir(dir, { recursive: true });
+    sandboxPath = dir;
+  } else {
+    sandboxPath = await mkdtemp(join(tmpdir(), "agent-skills-eval-"));
+  }
 
   const run = async (cmd, args = []) => {
     const { stdout, stderr } = await execAsync(cmd, args, { cwd: sandboxPath });
@@ -65,7 +75,10 @@ export async function createSandbox({
         .map((s) => s.replace(/^[* ]+/, "").trim())
         .filter(Boolean);
     },
-    /** Remove the sandbox directory unconditionally. */
-    cleanup: () => rm(sandboxPath, { recursive: true, force: true }),
+    /** Remove the sandbox directory — unless the caller owns it (`dir`), then a no-op. */
+    cleanup: () =>
+      dir
+        ? Promise.resolve()
+        : rm(sandboxPath, { recursive: true, force: true }),
   };
 }

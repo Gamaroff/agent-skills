@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { createSandbox } from "../lib/git-sandbox.mjs";
 
@@ -75,5 +76,28 @@ test("createSandbox: no initial commit when fixtureFiles empty", async () => {
     assert.ok(!hasCommit, "should have no commit when fixtureFiles is empty");
   } finally {
     await sb.cleanup();
+  }
+});
+
+test("createSandbox: dir initialises the repo in a caller-owned directory and cleanup leaves it (task.185)", async () => {
+  const owned = fs.mkdtempSync(
+    path.join(fs.realpathSync(os.tmpdir()), "owned-"),
+  );
+  const target = path.join(owned, "sandbox");
+  const sb = await createSandbox({
+    dir: target,
+    fixtureFiles: { "a.txt": "a" },
+  });
+  try {
+    assert.equal(sb.path, target);
+    const { stdout } = await sb.run("git", ["rev-parse", "--show-toplevel"]);
+    assert.equal(fs.realpathSync(stdout), fs.realpathSync(target));
+    await sb.cleanup();
+    assert.ok(
+      fs.existsSync(path.join(target, "a.txt")),
+      "a caller-owned dir survives cleanup",
+    );
+  } finally {
+    fs.rmSync(owned, { recursive: true, force: true });
   }
 });
