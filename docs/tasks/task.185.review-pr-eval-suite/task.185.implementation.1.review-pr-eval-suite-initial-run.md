@@ -3,7 +3,7 @@
 **Task**: `task.185.review-pr-eval-suite.md`
 **Run Number**: 1
 **Started**: 2026-10-05 16:59
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Run 1 of the develop-task pipeline for task 185: deterministic `/review-pr` repo
 | 2. review-task             | ✅ Done    | `task.185.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 9/10; Planned → Ready for Development; `task.185.review.1.review-pr-eval-suite.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 23/23 plan boxes; ci:fast 5339/0 fail; live N=5 20/20 | `.summaries/step-3-loop-audit-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #574: https://github.com/Gamaroff/agent-skills/pull/574 | —                    |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.185.qa.{N}.*.md`; `task.185.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 QA cycles (FAIL 70 → CONCERNS 80 → CONCERNS 90 → PASS 100 → FAIL 60 → FAIL 50); cycles 5–6 re-entered after the finalise DoD gap; Convergence check tripped (HIGH 1, 1); bugs 1–5 closed, 6–7 open | `.summaries/step-5-post-fix-tracker-3.json` |
-| 7. finalise                | ❌ Halted  | `task.185.dod.{N}.*.md`; task `status: accepted`                       | DoD run 2: gaps. Security FAIL (fake gh pr/issue subcommand resolution, medium, reproduced); AC PARTIAL (AC1 zsh lane); docs PASS; compliance N/A; CI reading 1 SUCCESS @ `22ee1609`. `task.185.dod.2.review-pr-eval-suite.md` | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.185.qa.{N}.*.md`; `task.185.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 8 QA cycles (FAIL 70 → CONCERNS 80 → CONCERNS 90 → PASS 100 → FAIL 60 → FAIL 50 → PASS 100 → PASS 100); two /finalise gap re-entries and one convergence escalation; 5c ×3 CONCERNS; bugs 1–7 closed; live recheck 4/4 on `59739d20` | `.summaries/step-5-post-fix-tracker-3.json` |
+| 7. finalise                | ✅ Done    | `task.185.dod.{N}.*.md`; task `status: accepted`                       | DoD run 3 ACCEPTED (runs 1–2 gaps re-entered QA). CI reading 1 SUCCESS @ `59739d20`; reading 2 SUCCESS (tree-equivalent to `59739d20`) @ `74b6b9a1`. Registry ticked; #573 closed; board already Done. `task.185.dod.3.review-pr-eval-suite.md` | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final report commit + push; lock completed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -95,6 +95,7 @@ Run 1 of the develop-task pipeline for task 185: deterministic `/review-pr` repo
 - Security agent: `boundary: true` for `evals/shared/lib/fake-gh.mjs#runFakeGh`, with 0 probes executed (no engine form reaches it). It named glued short flags as the untested axis. `/finalise` ran 9 candidates directly. With a GET fixture on the path, `gh api -XPOST <path>` and `gh api -fbody=x <path>` are served as reads: exit 0, nothing flagged. Without a fixture they are logged `unhandled`, not `refused`. Latent in the review-pr suite, which serves no `api` fixture.
 - Fix-and-recheck (8a) not taken: the agent rated the finding medium, so `severity-low` cannot hold, and the finding was not re-graded to clear the gate. Decision: DoD gaps → HALT. The fix is a code change, so on resume it re-enters QA at 5a (`reenter-qa-after-finalise.sh`).
 - DoD gaps PR comment posted: https://github.com/Gamaroff/agent-skills/pull/574#issuecomment-5999321682. Task status unchanged (`ready-for-review`). Change Log gaps row written through `change-log.js`; append-only check `ok`.
+- `/finalise` run 3: AC 13/13, security PASS (236 candidates, boundary held), docs PASS, compliance N/A. CI reading 1 SUCCESS @ `59739d20d5ab` over 5 checks. `link-check`, `shellcheck` and `test` were cancelled twice ("The job was not acquired by Runner of type hosted even after multiple attempts") and passed on attempt 3. CI reading 2: SUCCESS (tree-equivalent to `59739d20d5ab`) @ `74b6b9a19425` over 5 checks after 180 s. Acceptance commit `74b6b9a1`. Registry: ticked. Canonical PR comment posted. #573 `done` comment posted and closed (CLOSED). Board: `already`. CHANGELOG cites task 185.
 - Resume after the finalise gaps halt (user approved the fix): `9ee9f21a` makes `parseArgs` split a glued value flag (mutation-proved). `reenter-qa-after-finalise.sh` lowered the lock 7 → 5 / 5a with `qa_max_cycles=6`.
 - QA cycle 5 FAIL (`12720fae`). qa-fix cycle 5 (`61226c7c`): Step 2.6 consolidate move, so `parseArgs` reads shorthand clusters as pflag does. Two mutants were red; `ci:fast` 5357 pass / 0 fail. The earlier `ci:fast` red was `test-clean-checkout` LOAD-SENSITIVE (16.5 s against a 10 s budget, measured while the probes ran); alone it passes 13/13. Comments posted (PR, and #573 `qa-fix-5`: posted).
 
@@ -222,17 +223,29 @@ _Track each QA review/fix cycle._
 **Loop exit**: n/a — route 1 (PASS, no open entry); `classifyLoopRoute` → continue (route 2b needs two zero-HIGH gates)
 **Action**: Proceeding to 5c (PR conformance review)
 
+### QA Cycle 8 — 2026-10-05
+**Re-entry**: from the `/finalise` run-2 DoD-gaps halt. The operator chose the same fail-closed rule for `pr`/`issue`, and to accept AC1's zsh arm as verified locally (task.176 precedent; the criterion is annotated). `f728e459`: a command is served only as a read in an unambiguous shape (3 mutants red). `reenter-qa-after-finalise.sh` lowered the lock 7 → 5 / 5a with `qa_max_cycles=9`.
+**Gate Result**: PASS (100/100)
+**Issues Found**: none in the gate. 3 low advisory (C8-CR-1, the `--version` short-circuit; C8-CR-2, no refusal reason field; C8-CR-3, a log-line floor in the unhandled test). 96 forms executed directly, all correct. The first scoped diff was empty (zsh pathspec join) and was rebuilt before the dispatch.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — `task.185.pr-review.3.review-pr-eval-suite.md`. PC-1 (low): the live evidence predated the fake gh rewrite, so all four scenarios were re-run live on `59739d20`; all passed 1/1, with no refused or unhandled call. PC-2 (low): stale run-2 gaps section, superseded by `/finalise`. CR-1 (medium/medium): an unknown assertion fn is scored as a failed run; latent. CR-2 is a cleanup. Non-blocking; loop exits.
+**Loop exit**: n/a — route 1 (PASS, no open entry)
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-05 22:26
+**Final Status**: Completed
 **Branch**: feature/task.185.review-pr-eval-suite
 **PR**: https://github.com/Gamaroff/agent-skills/pull/574
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 8 QA cycles (7 qa-fix rounds incl. two post-finalise re-entries and one escalation); 3 × 5c review
+**DoD Summary**: `task.185.dod.3.review-pr-eval-suite.md` (runs 1–2: `dod.1`, `dod.2`)
+**Tracker debt**: none
+
+**Completion Summary**: Implemented deterministic `/review-pr` report numbering (`next-report-number.sh`, obs #272), the shared eval-harness extensions (setup hook, `cliArgs`, `liveAssertions`, `noFileMatching`, `EVAL_TIMEOUT_MS`, `repeat.mjs` with a positive verdict code, a fake `gh`) and four `/review-pr` eval scenarios. Replay runs in CI; live N=5 passed 20/20, and the rewritten fake `gh` rechecked 4/4. It took 8 QA cycles. Cycles 1–3 hardened how `repeat.mjs` reads a runner exit. Two `/finalise` runs found DoD security gaps in the fake `gh`'s write refusal, which led to cycles 5–8. A convergence escalation at cycle 6 led the operator to choose a fail-closed allow-list over further deny-list patches. The operator also accepted AC1's zsh arm as verified locally (task.176 precedent).
 
 ---
 
