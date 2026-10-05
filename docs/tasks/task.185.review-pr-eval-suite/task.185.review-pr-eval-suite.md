@@ -430,17 +430,17 @@ mutant, and both turn red.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.185.qa.7.review-pr-eval-suite.md](./task.185.qa.7.review-pr-eval-suite.md)
-- **Gate File**: [task.185.gate.7.review-pr-eval-suite.yml](./task.185.gate.7.review-pr-eval-suite.yml)
+- **Full Report**: [task.185.qa.8.review-pr-eval-suite.md](./task.185.qa.8.review-pr-eval-suite.md)
+- **Gate File**: [task.185.gate.8.review-pr-eval-suite.yml](./task.185.gate.8.review-pr-eval-suite.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5359 (ci:fast) + 82 direct boundary probes
+- **Tests Executed**: 5359 (ci:fast) + 96 direct boundary probes
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The fake `gh` decides `api` writes by a read allow-list, and no executed form served a write. Bugs 1–7 are closed. Two low advisory items are recorded for follow-up.
+The fake `gh` refuses every command that is not a served read in an unambiguous shape, and no executed form served a write. Every review-pr read is served. Three low advisory items remain for a harness follow-up.
 
 ## Definition of Done - Gaps Identified
 
@@ -506,6 +506,7 @@ Documentation passes, compliance is not applicable, and CI reads SUCCESS @ `22ee
 | 2026-10-05 |  | QA gate PASS (100/100) — no open findings, 2 low advisory | qa-task |
 | 2026-10-05 |  | DoD incomplete — 2 gaps identified (run 2: fake gh pr/issue resolution; AC1 zsh lane) | finalise |
 | 2026-10-05 |  | DoD run 2 gaps fixed — fake gh serves pr/issue only in an unambiguous read shape; AC1 zsh scope recorded (operator decision) | develop |
+| 2026-10-05 |  | QA gate PASS (100/100) — no open findings, 3 low advisory | qa-task |
 
 ---
 <!-- change-log-end -->
