@@ -3,7 +3,7 @@
 **Task**: `task.183.qa-results-setext-and-carry-follow-ups.md`
 **Run Number**: 1
 **Started**: 2026-10-05 11:10
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -34,8 +34,8 @@ Close task.171's five Deferred Work items in `shared/resources/qa-results.js` (C
 | 1. create-branch           | ✅ Done    | Branch `feature/task.183.*` exists in git                              | Branch created at `64b879c0` | —                    |
 | 2. review-task             | ✅ Done    | `task.183.review.{N}.{name}.md` exists (or skip logged)                | review.1 — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; loop audit ready-for-review 16/16 | `.summaries/step-3-test-triage-1.json` |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.183.qa.{N}.*.md`; `task.183.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #571: https://github.com/Gamaroff/agent-skills/pull/571 | —                    |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.183.qa.{N}.*.md`; `task.183.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Escalated at cycle 3 — QA loop not converging (HIGH 1, 1, 2); see Issues Log | `.summaries/step-5-fast-gate-triage-1.json` |
 | 7. finalise                | ⏳ Pending | `task.183.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -83,11 +83,44 @@ Close task.171's five Deferred Work items in `shared/resources/qa-results.js` (C
 - Loop audit iter 1: `ready-for-review`, 16/16, HEAD `64b879c0` (nothing committed yet — Step 4 commits). Change Log row written by the inline path (one row).
 - Development completion comment posted to github issue 569.
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS: work-item dir, CHANGELOG.md, task.171 dir, shared/resources, shared/resources/tests, skills/qa-story/references, skills/qa-task/references, tests. No out-of-scope untracked files to hold.
+- Commits (via /commit-changes, scoped): `1b8a5b35` fix(qa-results) — engine, tests, bundled copies, corpus pre-filter, CHANGELOG, task.171; `41070fcb` docs(task.183) — review 1, task status, implementation report. Pre-commit bundle: all skills in sync.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/571 (base `develop`, `Closes #569`). PR body written by the orchestrator from this report rather than the diff-summariser subagent — the report already holds the measured facts the body cites.
+- Leak check: none. Issue #569 in-review comment `posted`. GitHub board: in-review → stage-disabled. Post-PR state: OPEN (checked with `gh pr view` directly, not the poller subagent).
+- Lock `pr_url` set. A first post-PR command was refused by a Claude Code safety check (a `bash -c` script containing `rm`); nothing ran; re-issued without the wrapper and without the `rm` (its target, `step4-hold-dir.txt`, never existed).
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+### QA Loop Not Converging — 2026-10-05
+
+The pipeline stopped after 3 qa-task/qa-fix cycles: the HIGH finding count failed to strictly
+decrease across two consecutive cycles, so the loop was no longer converging. The remaining
+findings are NOT accepted — they are handed over below.
+
+**Final gate status**: FAIL (gate 3, 60/100, head `8df4559d`)
+**HIGH findings per cycle**: 1, 1, 2 — flat from cycle 1, rising at cycle 3
+**Remaining issues** (from final gate file):
+- CR3-1 — HIGH — `shared/resources/qa-results.js` — `blockContinuations` looks for `-->` only after the `<!--` opener, so `<!-->` / `<!--->` leave the comment context open, and an opener indented under a list item opens it although the item ends before a column-0 `-->`; a later lone `-->` is exempted and the setext section under it deleted. `origin/develop` refuses all three.
+- CR3-2 — HIGH — `shared/resources/qa-results.js` — `underTablelessLog` now asks `lastTableStart` (any Date column), so a marker-less Change Log with `| Reviewer | Date |` above the section reads as having its table, `underLog` is false, and the replace deletes the log row below. `origin/develop` relocated and kept it.
+- Carried to `recommendations.future`: CR2-3 (pre-existing inner-colon carried label), CR2-4 (advisory QA `####` carry).
+
+**What was attempted per cycle**:
+- Cycle 1 (gate 1, HIGH 1): CR-3 thematic break read as a list item → `RE_BREAK` reset; CR-1 two log-header definitions → split reach (existence any Date column, cut Date-first); CR-4 inner-colon QA label. Commit `dd91fe76`.
+- Cycle 2 (gate 2, HIGH 1): CR2-1 fenced `<!--` kept the comment context → fence reset + `-->`-alone closer (move: scope the claim); CR2-2 Version-first log cut at a quoted table / header-only log stripped → one `lastTableStart` predicate + `dateFirstAt` cut + header-only rule (move: consolidate). Commit `8df4559d`.
+- Cycle 3 (gate 3, HIGH 2): no fix — the convergence check tripped before 5b.
+
+**Likely root cause**: every HIGH has landed in two mechanisms in `shared/resources/qa-results.js` that this task added to *exempt* lines from the setext refusal or to *widen* what counts as a log: the CR-7 context inference (`blockContinuations`) and the Date-column reach (`hasDateColumn` / `lastTableStart`). Each fix narrowed or consolidated one and exposed another route, because both infer CommonMark block structure line by line without a parser — the approach task.171 QA cycles 2–4 abandoned for fences. The tracked corpus is unaffected (the cycle-3 reviewer compared old and new engines across all 168 tracked QA documents: no output changed); every finding is a constructed shape, but each one deletes content `origin/develop` protected.
+
+**Recommended next steps**:
+1. **Drop the comment-closer exemption** and keep only the list-continuation rule (with the break and fence resets). The CR-7 comment shape goes back to a safe false refusal, and the whole CR3-1 class goes with it. Amend task.183 § 9 Functional 2 to name the list shape only.
+2. **Return the table-above questions (`underTablelessLog`, `logAbove`) to the Date-first predicate.** Keep `hasDateColumn` only in the dated-row guard and the header-only rule in `removesStructure`. That closes CR3-2 and keeps the CR2-2 shapes refused; verify with R3 plus a CR3-2 regression case.
+3. Then re-run `/develop-task` and choose "Resume at 5a with 2 more cycles". If both exemptions are judged not worth their risk, revert Phases 2–3 to task.171's behaviour and move CR-7 and 5c CR-1 to a follow-up task instead.
 
 - **Step 3 — machine load.** Load average 50–244 during the run (16 cores; no single process accounts for it). Two LOAD-SENSITIVE per-file budgets fail in untouched files; the task's own 2 s timing criterion measured 1.95–2.10 s at load ~7/50. Both need re-measuring on a quieter machine — finalise must record the load beside its figure.
 
@@ -97,14 +130,55 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-05
+**Gate Result**: FAIL
+**Issues Found**: 3 — CR-3 (HIGH, a thematic break read as a list item deletes a setext section), CR-1 (MEDIUM, `lastTableStart` keeps the Date-first log header), CR-4 (LOW, inner-colon QA label); CR-2 advisory → recommendations.future
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+#### qa-fix cycle 1 — 2026-10-05
+- QA Cycle 1 — changes-requested: stage-disabled.
+- Findings ingester not dispatched: the findings were written by this run's own QA cycle 1 and were already in context (Step 1b inline path; no independence lost that the gate had).
+- CR-3 (HIGH) fixed: `blockContinuations` resets on `RE_BREAK` before the item test. CR-1 (MEDIUM) fixed by splitting reach: log *existence* uses `hasDateColumn` (default of `lastTableStart`), the *cut* keeps Date-first `RE_LOG_HEADER`. A one-definition variant was tried first: it relocated the R3 shape (rows kept) instead of refusing it, broke the task's criterion wording, and widened the cut to quoted `| Cycle | Date |` tables — rejected. CR-4 (LOW) fixed: `QA_LABELS` accepts an inner colon. CR-2 advisory, unchanged.
+- Tests: R2 +2, R3 +1 shape, R4 +inner colon. Mutation proofs 13/13 held (M5 break, M6 existence, M6b cut, M7 inner colon added).
+- Fast gate attempt 1: 5293/5304 at load average ~300 (16 cores) — 10 flaky (8 step-8-completion-checklist spawn timeouts of 126–365 s, 2 LOAD-SENSITIVE budgets); triage `.summaries/step-5-fast-gate-triage-1.json`. Attempt 2: 5301/5304, only the 2 LOAD-SENSITIVE budgets. Re-run alone at load 14: still over budget (14.9 s, 24.9 s); `bundle-missing-source` fails identically on an `origin/develop` worktree (20.4 s). Judged environmental and pre-existing → committed and pushed as green-equivalent rather than as a "fast gate red, not pushed" commit, because no failing file touches this branch.
+- Commit `dd91fe76` (fix + gate.1 + qa.1 + task status), pushed once.
+
+### QA Cycle 2 — 2026-10-05
+**Gate Result**: FAIL
+**Issues Found**: 2 gating — CR2-1 (HIGH, a `<!--` inside a fence keeps the comment context open and a later `-->` line is exempted, deleting a setext section), CR2-2 (MEDIUM, Version-first log still cut at a quoted table / header-only log loses its header); CR2-3 pre-existing and CR2-4 advisory → recommendations.future. Cycle 1: CR-3 and CR-4 FIXED, CR-1 PARTIAL.
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+#### qa-fix cycle 2 — 2026-10-05
+- QA Cycle 2 — changes-requested: stage-disabled. Inline findings path again (gate 2 written by this run).
+- Step 2.6 (repeat subject — both findings on code cycle 1 edited): CR2-1 → **scope the claim** (only a `-->`-alone line closes a comment block; a fence line drops both contexts). CR2-2 → **consolidate** (one `lastTableStart` predicate; the cut asks `dateFirstAt` of the same table; header-only Date-column log under a log is structural, mid-span and at EOF).
+- Tests: R2 +3 refusal shapes, R3 +4. Mutation proofs 17/17 held; first run had M8 (fence reset) and M11b (EOF header-only) surviving — each read as an untested branch, not dead code: M8 needed a fenced `<!--` then a bare `-->` line, M11b a log at EOF with no trailing newline (reproduced as a header deletion under the mutant). Both shapes added; both held. Stale mutants M2b/M6 refreshed to the new code.
+- Fast gate: 5301/5304 at load 18→11 — only the two LOAD-SENSITIVE budgets already shown to fail identically on `origin/develop`. Committed `8df4559d` (fix + gate.2 + qa.2 + task status), pushed once.
+
+### QA Cycle 3 — 2026-10-05
+**Gate Result**: FAIL
+**Issues Found**: 2 — CR3-1 (HIGH, `<!-->` / `<!--->` one-line openers and an item-indented opener leave the comment context open; a lone `-->` is then exempted and a setext section deleted), CR3-2 (HIGH, the consolidated `lastTableStart` makes a marker-less log holding `| Reviewer | Date |` look as if it has its table, so the replace deletes its log row). Cycle 2 fixes hold for their named shapes.
+**HIGH findings**: 2
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop not converging
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-05 (halted — escalation)
+**Final Status**: Escalated
 **Branch**: `feature/task.183.qa-results-setext-and-carry-follow-ups`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/571
+**QA Iterations**: 3 (gates 1–3 FAIL; 2 fix cycles)
+**DoD Summary**: not reached
+**Tracker debt**: none

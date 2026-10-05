@@ -5,7 +5,7 @@ type: task
 description: "Follow-up to task.171. Close the five items in task.171's `## Deferred Work` section, all in `shared/resources/qa-results.js`: the HIGH setext deletion path first (CR5-1), then a Version-first log lost on relocate, two bold-label block boundaries and two setext false refusals. Also make the corpus survey cheaper and its timing bound honest."
 tags: [qa-task, qa-story, engine, follow-up]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: High
 created: 2026-10-05
 updated: 2026-10-05
@@ -16,7 +16,7 @@ github_issue: 569
 
 # Technical Task: qa-results setext and carry follow-ups
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.183.review.1.qa-results-setext-and-carry-follow-ups.md` implemented 2026-10-05
 
@@ -378,21 +378,21 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-05
-**Quality Score**: 70/100
+**Quality Score**: 60/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.183.qa.2.qa-results-setext-and-carry-follow-ups.md](./task.183.qa.2.qa-results-setext-and-carry-follow-ups.md)
-- **Gate File**: [task.183.gate.2.qa-results-setext-and-carry-follow-ups.yml](./task.183.gate.2.qa-results-setext-and-carry-follow-ups.yml)
+- **Full Report**: [task.183.qa.3.qa-results-setext-and-carry-follow-ups.md](./task.183.qa.3.qa-results-setext-and-carry-follow-ups.md)
+- **Gate File**: [task.183.gate.3.qa-results-setext-and-carry-follow-ups.yml](./task.183.gate.3.qa-results-setext-and-carry-follow-ups.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 85
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Critical Issues**: 2
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 1 fixes hold. CR2-1 (HIGH): a `<!--` inside a fence keeps the comment context open, so a later line containing `-->` is exempted and a setext section is deleted. CR2-2 (MEDIUM): a Version-first log is still cut at a quoted table, or loses a header-only log.
+CR3-1 (HIGH): a one-line comment opener or an item-indented opener leaves the comment context open, deleting a setext section. CR3-2 (HIGH): a `| Reviewer | Date |` table above the section in a marker-less log makes the replace delete the log row. HIGH per cycle 1, 1, 2 — the QA loop is not converging and was escalated.
 
 <!-- change-log-start -->
 
@@ -406,6 +406,7 @@ Cycle 1 fixes hold. CR2-1 (HIGH): a `<!--` inside a fence keeps the comment cont
 | 2026-10-05 |         | Implemented — 9 files (3 generated), 4 tests (R1–R4), 9 mutation proofs held | develop |
 | 2026-10-05 |         | QA gate FAIL (70/100) — 3 findings (1 high) | qa-task |
 | 2026-10-05 |         | QA gate FAIL (70/100) — 2 findings (1 high), 2 advisory | qa-task |
+| 2026-10-05 |         | QA gate FAIL (60/100) — 2 findings (2 high); loop not converging, escalated | qa-task |
 
 <!-- change-log-end -->
 
