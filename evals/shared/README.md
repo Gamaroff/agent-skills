@@ -145,15 +145,19 @@ file), and an empty `.eval/gh-config/`. When `jq` is not on `PATH` it throws an 
 rather than letting every `-q/--jq` call fail it.
 
 - **Reads** (`pr view`, `pr diff`, `pr list`, `issue view`, `repo view`, `api` GET, `auth status`)
-  are served from the fixtures; `--json a,b` selects fields, `-q/--jq` is piped through the real
-  `jq`. A known kind with a missing key answers as `gh` does (exit 1, `GraphQL: Could not resolve…`),
+  are served from the fixtures (own keys only, so `pr diff constructor` is not a PR); `--json a,b`
+  selects fields, and a requested field the fixture lacks is `"unhandled": true`, named on stderr;
+  `-q/--jq` is piped through the real `jq`. A known kind with a missing key answers as `gh` does (exit 1, `GraphQL: Could not resolve…`),
   logged `"notFound": true`.
-- **Everything that is not a served read is refused**: exit 1, logged `"refused": true`. "Never posts
-  without asking" becomes an assertion on the log. The rule is an **allow-list**, so an unmodelled
+- **Everything that is not a served read is refused**: exit 1, logged `"refused": true` with a
+  `"refusal"` saying why — `"write"` (a listed write subcommand, or an `api` call outside the read
+  allow-list) or `"not-a-served-read"` (any other unmodelled shape). "Never posts without asking"
+  becomes an assertion on the log, and a failed one names its cause. The rule is an **allow-list**, so an unmodelled
   spelling fails closed instead of passing as a read:
   - the kind must be one of the reads above. Any other command (`pr revert`, `label create`,
     `release list`, …) is refused, and so is a listed write subcommand (`comment`, `merge`, `new`, …);
-  - only `-R`/`--repo` may come before the group. Outside `api`, the subcommand must directly
+  - `gh --version` / `gh version` are answered only as the whole command;
+  - only `-R`/`--repo` may come before the group, and never on `api`, which real `gh api` rejects. Outside `api`, the subcommand must directly
     follow the group. Cobra strips flags before it picks the subcommand, so
     `gh pr --edit-last view comment` is `pr comment`, not `pr view`;
   - an `api` call is served only when every flag is a known read flag (`-H`, `-i`, `--paginate`,

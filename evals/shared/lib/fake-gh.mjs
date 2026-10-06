@@ -13,15 +13,18 @@
  *
  * When run as a program (the launcher's target) it serves read commands from the
  * fixtures, appends one JSON line per call to gh-calls.jsonl, and:
- *   - answers `gh --version` / `gh version` (a harmless probe agents run first);
+ *   - answers `gh --version` / `gh version` as the WHOLE command only (a harmless probe agents run
+ *     first) — anything after it is not a version probe;
  *   - REFUSES every write: the pr/issue subcommands in WRITES, and every `api` call that is not
  *     a plain read. `api` is decided by ALLOW-list, not by listing write shapes: it is served only
  *     when every flag it carries is in API_READ_FLAGS and every method given is GET. Any other
  *     flag, spelling or method is refused, so a form the parser does not model fails closed.
- *     Exit 1, logged with "refused": true. "Never posts without asking" is then an assertion.
+ *     Exit 1, logged with "refused": true and "refusal": "write". "Never posts without asking" is
+ *     then an assertion.
  *   - REFUSES every command that is not a served read in an unambiguous shape: a kind outside
  *     READS, a flag before the group other than -R/--repo, or (outside `api`) a flag between the
- *     group and its subcommand — cobra would resolve those differently. Fail closed.
+ *     group and its subcommand — cobra would resolve those differently. Fail closed, logged with
+ *     "refusal": "not-a-served-read".
  *   - reports a served read kind that the fixtures have no table for as "unhandled": true,
  *     exit 1 — a gap in the fixtures shows as a failure, never as a guess.
  *   - answers a known kind with a missing key the way gh does (exit 1, GraphQL "Could not
@@ -35,8 +38,9 @@
  *     "issue view":{ "<number>": {…} },
  *     "repo view": {…},
  *     "api":       { "<path>": {…} } }    GET only
- * `--json a,b` selects fields; `-q/--jq` is piped through the real `jq` when present and
- * is "unhandled" when it is not — jq is not re-implemented here.
+ * `--json a,b` selects fields, and a requested field the fixture lacks is "unhandled" (named on
+ * stderr); `-q/--jq` is piped through the real `jq` when present and is "unhandled" when it is
+ * not — jq is not re-implemented here. Fixture lookup reads own keys only.
  */
 
 import fs from "node:fs";
@@ -98,8 +102,8 @@ const API_READ_FLAGS = new Set([
   "--cache",
   "--silent",
   "--verbose",
-  "-R",
-  "--repo",
+  // Not -R/--repo: real `gh api` rejects them (it addresses the repo through {owner}/{repo} in the
+  // path), so an `api` call carrying one is not a form gh would run (task.186).
 ]);
 const READS = new Set([
   "pr view",
@@ -224,17 +228,25 @@ function parseArgs(args) {
   return { pos, posAt, opts, get };
 }
 
+// `--json a,b` selects fields. A requested field the fixture lacks is a fixture GAP, returned in
+// `missing` so the caller reports it as unhandled: answering without it made a skill that branches
+// on the field see `undefined` and take a path real gh would not (task.186).
 function pick(value, fields) {
-  if (!fields) return value;
+  if (!fields) return { value, missing: [] };
   const keys = String(fields)
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const one = (o) =>
-    o && typeof o === "object"
-      ? Object.fromEntries(keys.filter((k) => k in o).map((k) => [k, o[k]]))
-      : o;
-  return Array.isArray(value) ? value.map(one) : one(value);
+  const missing = new Set();
+  const one = (o) => {
+    if (!o || typeof o !== "object") return o;
+    for (const k of keys) if (!Object.hasOwn(o, k)) missing.add(k);
+    return Object.fromEntries(
+      keys.filter((k) => Object.hasOwn(o, k)).map((k) => [k, o[k]]),
+    );
+  };
+  const picked = Array.isArray(value) ? value.map(one) : one(value);
+  return { value: picked, missing: [...missing] };
 }
 
 function format(value, jqExpr) {
@@ -300,9 +312,12 @@ export function runFakeGh(argv, evalDir) {
     (group === "api" && !apiIsRead)
   ) {
     entry.refused = true;
+    entry.refusal = "write";
     return done(1, "", `fake-gh: refused write: gh ${argv.join(" ")}\n`);
   }
-  if (argv[0] === "--version" || argv[0] === "version")
+  // Only the whole command: `gh version issue close 5` was answered as a version probe, exit 0 —
+  // a write that passed (task.186).
+  if (argv.length === 1 && (argv[0] === "--version" || argv[0] === "version"))
     return done(0, "gh version 2.0.0-fake (fake-gh)\n");
   // Every other command is served only as a read in a shape cobra cannot read another way: a
   // served read kind, nothing but `-R`/`--repo` before the group, and — outside `api` — the
@@ -312,6 +327,7 @@ export function runFakeGh(argv, evalDir) {
   // else is refused — fail closed, as `api` is — so a write the lists miss cannot pass as a read.
   if (!READS.has(kind) || !servedShape(argv, group, pos, posAt)) {
     entry.refused = true;
+    entry.refusal = "not-a-served-read";
     return done(
       1,
       "",
@@ -325,7 +341,8 @@ export function runFakeGh(argv, evalDir) {
       "github.com\n  ✓ Logged in to github.com as eval (fake-gh)\n",
     );
 
-  const table = fixtures[kind];
+  // Own keys only, here and below: `pr diff constructor` read Object.prototype.constructor (task.186).
+  const table = Object.hasOwn(fixtures, kind) ? fixtures[kind] : undefined;
   if (table === undefined) {
     entry.unhandled = true;
     return done(
@@ -349,9 +366,10 @@ export function runFakeGh(argv, evalDir) {
         : pos[2] === undefined || pos[2] === ""
           ? "*"
           : pos[2];
-    value = table[key];
+    const own = (k) => (Object.hasOwn(table, k) ? table[k] : undefined);
+    value = own(key);
     if (typeof value === "string" && value.startsWith("@same:"))
-      value = table[value.slice(6)];
+      value = own(value.slice(6));
     if (value === undefined) {
       entry.notFound = true;
       return done(1, "", notFound(kind, key));
@@ -365,7 +383,16 @@ export function runFakeGh(argv, evalDir) {
     return done(0, text);
   }
 
-  const f = format(pick(value, get("--json")), get("-q", "--jq"));
+  const picked = pick(value, get("--json"));
+  if (picked.missing.length) {
+    entry.unhandled = true;
+    return done(
+      1,
+      "",
+      `fake-gh: the "${kind}" fixture lacks requested --json field(s) ${picked.missing.join(", ")}: gh ${argv.join(" ")}\n`,
+    );
+  }
+  const f = format(picked.value, get("-q", "--jq"));
   if (f.unhandled) {
     entry.unhandled = true;
     return done(1, "", `fake-gh: ${f.unhandled}\n`);

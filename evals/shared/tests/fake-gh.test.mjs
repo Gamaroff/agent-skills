@@ -295,6 +295,8 @@ test("a served read kind with no fixture table is unhandled: exit 1, logged unha
   const r = gh("api", "repos/eval/widgets/pulls/901");
   assert.equal(r.status, 1);
   assert.match(r.stderr, /no "api" fixture/);
+  // A floor, or `every` passes over an empty log (C8-CR-3).
+  assert.equal(calls().length, 1);
   assert.ok(calls().every((c) => c.unhandled === true && !c.refused));
 });
 
@@ -357,4 +359,92 @@ test("gh --version and gh version answer without touching the fixtures", () => {
     assert.match(r.stdout, /^gh version .*fake-gh/);
   }
   assert.ok(calls().every((c) => !c.unhandled && !c.refused));
+});
+
+// task.186 B: a refusal says why, so a failed "never posts" assertion can tell a write attempt from
+// an unmodelled read.
+test("every refused entry carries refusal: write or not-a-served-read", () => {
+  const { gh, calls } = sandbox();
+  const writes = [
+    ["pr", "comment", "901", "--body", "b"],
+    ["api", "-X", "POST", "repos/eval/widgets/issues/12/comments"],
+  ];
+  const unserved = [
+    ["pr", "checks", "901"],
+    ["pr", "--edit-last", "view", "comment"],
+  ];
+  for (const args of [...writes, ...unserved])
+    assert.equal(gh(...args).status, 1, args.join(" "));
+  const log = calls();
+  assert.equal(log.length, writes.length + unserved.length);
+  assert.ok(
+    log.every((c) => c.refused === true),
+    "all refused",
+  );
+  assert.deepEqual(
+    log.map((c) => c.refusal),
+    [...writes.map(() => "write"), ...unserved.map(() => "not-a-served-read")],
+  );
+});
+
+// task.186 B: `version` is answered only as the whole command. `gh version issue close 5` exited 0
+// as a version probe — a write that passed — and `gh --version pr view 901` was a version too.
+test("--version / version are answered only as a one-element argv", () => {
+  const { gh, calls } = sandbox();
+  for (const args of [
+    ["version", "issue", "close", "5"],
+    ["--version", "pr", "view", "901"],
+    ["version", "--json", "x"],
+  ]) {
+    const r = gh(...args);
+    assert.equal(r.status, 1, args.join(" "));
+    assert.doesNotMatch(r.stdout, /gh version/, args.join(" "));
+  }
+  assert.equal(calls().length, 3);
+  assert.ok(calls().every((c) => c.refused === true));
+});
+
+// task.186 B: real `gh api` rejects -R/--repo, so the fake must not serve it as a read.
+test("api with -R/--repo is refused, wherever the flag sits", () => {
+  const route = "repos/eval/widgets/issues/12/comments";
+  const { gh, calls } = sandbox({ ...FIXTURES, api: { [route]: [] } });
+  for (const args of [
+    ["api", "-R", "eval/widgets", route],
+    ["api", "--repo=eval/widgets", route],
+    ["-R", "eval/widgets", "api", route],
+  ]) {
+    const r = gh(...args);
+    assert.equal(r.status, 1, args.join(" "));
+  }
+  assert.equal(calls().length, 3);
+  assert.ok(calls().every((c) => c.refused === true && c.refusal === "write"));
+  // -R stays a served shape for pr/issue.
+  assert.equal(gh("-R", "eval/widgets", "pr", "view", "901").status, 0);
+});
+
+// task.186 B: a requested --json field the fixture lacks is a fixture gap, not an answer without it.
+test("a --json field the fixture lacks is unhandled and named", () => {
+  const { gh, calls } = sandbox();
+  const r = gh("pr", "view", "901", "--json", "number,mergeable,title");
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stderr, /lacks requested --json field\(s\) mergeable:/);
+  const list = gh("pr", "list", "--json", "number,author");
+  assert.equal(list.status, 1, list.stdout);
+  assert.match(list.stderr, /field\(s\) author:/);
+  assert.equal(calls().length, 2);
+  assert.ok(calls().every((c) => c.unhandled === true && !c.refused));
+  // Every requested field present: served as before.
+  assert.equal(gh("pr", "view", "901", "--json", "number,title").status, 0);
+});
+
+// task.186 B: fixture lookup reads own keys only — `constructor` is not a PR.
+test("fixture lookup ignores prototype keys", () => {
+  const { gh, calls } = sandbox();
+  for (const key of ["constructor", "toString", "__proto__"]) {
+    const r = gh("pr", "diff", key);
+    assert.equal(r.status, 1, `${key}: ${r.stdout}`);
+    assert.match(r.stderr, /Could not resolve/, key);
+  }
+  assert.equal(calls().length, 3);
+  assert.ok(calls().every((c) => c.notFound === true));
 });
