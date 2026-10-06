@@ -54,6 +54,8 @@
 #        `--skill <name>` and `--complete` with no lock keep exit 0 — the
 #        self-advance runs standalone in nine sub-skills, and --complete must
 #        stay able to clear an absent lock.
+#        `--skill` with no lock but a halt snapshot or orphaned claim on disk
+#        still exits 0 and names --restore on stderr; silent without either (obs #280).
 #
 # Scenarios 8–11 run under BOTH bash and zsh. macOS logins are zsh and task 51
 # found a real bash/zsh divergence in a sibling shared resource, so the
@@ -739,6 +741,39 @@ run_no_lock_split() {
       fail "[$SH] $MODE with no lock → exit 0" "rc=$RC"
     fi
   done
+
+  # obs #280: --skill with no lock stays exit 0, but says so when a pause or HALT left a
+  # snapshot or a claim behind. Its own directory, so no earlier scenario's snapshot leaks in.
+  local D="$TMPDIR_TEST/split280-$SH" ERR
+  mkdir -p "$D"
+  L="$D/develop-pipeline.lock"
+  ERR=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --skill finalise 2>&1 >/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ -z "$ERR" ]; then
+    pass "[$SH] --skill with no lock, no snapshot, no claim → exit 0, silent (standalone)"
+  else
+    fail "[$SH] --skill standalone → exit 0, silent" "rc=$RC err=$ERR"
+  fi
+  echo '{"current_step":7,"halt_step":7,"task_or_story_directory":"docs/x"}' > "$D/develop-pipeline.last-halt.json"
+  ERR=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --skill finalise 2>&1 >/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ -f "$D/develop-pipeline.last-halt.json" ] && echo "$ERR" | grep -q -- "--restore"; then
+    pass "[$SH] --skill with no lock + halt snapshot → exit 0, stderr names --restore, snapshot kept"
+  else
+    fail "[$SH] --skill with no lock + halt snapshot → warns" "rc=$RC err=$ERR"
+  fi
+  ERR=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --complete 2>&1 >/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ -z "$ERR" ]; then
+    pass "[$SH] --complete with no lock + halt snapshot → exit 0, silent"
+  else
+    fail "[$SH] --complete with no lock + halt snapshot → silent" "rc=$RC err=$ERR"
+  fi
+  rm -f "$D/develop-pipeline.last-halt.json"
+  echo '{"current_step":7}' > "$L.pausing.12345"
+  ERR=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --skill finalise 2>&1 >/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && echo "$ERR" | grep -q -- "--restore"; then
+    pass "[$SH] --skill with no lock + orphaned claim → exit 0, stderr names --restore"
+  else
+    fail "[$SH] --skill with no lock + orphaned claim → warns" "rc=$RC err=$ERR"
+  fi
 }
 
 run_restore_scenarios bash

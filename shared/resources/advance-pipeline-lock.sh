@@ -128,7 +128,16 @@ USAGE
 if [ ! -f "$LOCK" ]; then
   case "$1" in
     --restore) ;;                       # the one mode that exists FOR a missing lock
-    --skill|--complete) exit 0 ;;       # standalone sub-skill runs; clearable lock
+    --skill)
+      # Exit 0 either way: a standalone sub-skill run has no lock and must not fail. But a
+      # halt snapshot or an orphaned claim on disk means a pipeline WAS running and a pause
+      # or HALT removed its lock, and a silent exit here left Steps 7–8 unguarded for a whole
+      # session with nothing said (task.186, obs #280). Say which case this is.
+      if [ -f "$SNAPSHOT" ] || [ -n "$(find "$(dirname "$LOCK")" -maxdepth 1 -name "$(basename "$LOCK").pausing.*" -type f 2>/dev/null)" ]; then
+        echo "advance-pipeline-lock: no lock at '$LOCK', but a halt snapshot or orphaned claim exists — a pipeline was paused or halted. If this sub-skill is a pipeline step, rebuild the lock first: advance-pipeline-lock.sh --restore <doc-dir>" >&2
+      fi
+      exit 0 ;;
+    --complete) exit 0 ;;               # clearable lock
     --help|-h) usage ;;
     *)
       echo "advance-pipeline-lock: no lock at '$LOCK' — nothing to advance to step '$1'. If this session is continuing after a PreCompact pause or a HALT, rebuild the lock first: advance-pipeline-lock.sh --restore <doc-dir>" >&2
