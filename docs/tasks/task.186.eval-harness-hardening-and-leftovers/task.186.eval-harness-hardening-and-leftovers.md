@@ -5,7 +5,7 @@ type: task
 description: "Close the advisory findings task.185 carried forward: make the eval runner and repeat.mjs never score a non-verdict as a verdict, finish the fake gh's fail-closed rule, fix pr-inline-comment.js sending a review-comment listing as a POST, and stop four skills numbering their reports by counting."
 tags: [evals, harness, fake-gh, review-pr, follow-up]
 category: testing
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-06
 updated: 2026-10-06
@@ -16,7 +16,9 @@ github_issue: 575
 
 # Technical Task: Eval harness hardening and task.185 leftovers
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.186.review.1.eval-harness-hardening-and-leftovers.md` implemented 2026-10-06
 
 **GitHub Issue**: [#575](https://github.com/Gamaroff/agent-skills/issues/575)
 
@@ -34,7 +36,7 @@ groups are four independent units, delivered as phases.
 - **A.** The eval runner and `repeat.mjs` never score a non-verdict as a verdict.
 - **B.** The fake `gh`'s remaining gaps.
 - **C.** `pr-inline-comment.js` lists PR review comments as a POST; it must use GET.
-- **D.** Four skills number their co-located reports by counting instead of highest + 1.
+- **D.** Five skills number their co-located reports by counting instead of highest + 1.
 
 **Key deliverables**: a runner whose pass and fail codes are verdicts only; a fake `gh` whose
 refusals say why; a GET-only inline-comment listing; one shared next-number helper for every
@@ -66,9 +68,10 @@ skill that numbers co-located reports.
    `gh` 2.94, `gh api --help` says: "The default HTTP request method is `GET` normally and `POST`
    if any parameters" are added. So the listing that finds existing inline comments is sent as a
    POST. `/review-pr --inline` and `/review-code` both bundle this file.
-5. **Four skills number reports by counting.** The obs #272 fix covered only `/review-pr`.
+5. **Five skills number reports by counting.** The obs #272 fix covered only `/review-pr`.
    Count-style prose remains at `skills/qa-planning/SKILL.md:649`, `skills/review-bug/SKILL.md:121`,
-   `skills/review-epic/SKILL.md:535` and `skills/review-task/SKILL.md:2130`. A directory holding
+   `skills/review-epic/SKILL.md:535`, `skills/review-task/SKILL.md:2130` and
+   `skills/finalise/SKILL.md:162` (the last found by the review-task probe, 2026-10-06). A directory holding
    `.1.` and `.3.` gets a second `.3.` that overwrites the first.
 
 ### Benefits
@@ -110,6 +113,10 @@ skill that numbers co-located reports.
 
 - The runner exits 0 **only** from the post-assertion line. Everything before it defaults to a
   non-verdict status, and unknown assertion names are refused before any driver runs.
+- The set of known assertion names lives in a module that both `runner.mjs` and `repeat.mjs`
+  import (e.g. exported from `evals/shared/assertions.mjs`), and the dispatcher reads the same set.
+  It cannot live in `runner.mjs`: that file calls `main()` on load (`runner.mjs:416`), so importing
+  it would start a run.
 - The opt-in codes move to a range Node and the shell do not use (64–113), and `repeat.mjs` and
   the README change together.
 - Fake `gh` refusals carry `refusal: "write" | "not-a-served-read"`. `--version` is answered only
@@ -117,7 +124,7 @@ skill that numbers co-located reports.
   requested field as `unhandled`. Fixture lookup uses own keys only.
 - `pr-inline-comment.js` passes `-X GET` with its `-f` parameters.
 - One shared next-number helper in `shared/resources/`, called by `/review-pr`, `qa-planning`,
-  `review-bug`, `review-epic` and `review-task`, bundled into each skill.
+  `review-bug`, `review-epic`, `review-task` and `finalise`, bundled into each skill.
 
 ---
 
@@ -127,12 +134,16 @@ skill that numbers co-located reports.
 
 - ✅ `evals/shared/runner.mjs`, `repeat.mjs`, `drivers/claude-cli.mjs`, `lib/fake-gh.mjs`, their tests, and `evals/shared/README.md`
 - ✅ `shared/resources/pr-inline-comment.js` and its test; the bundled copies via `npm run bundle`
-- ✅ A shared next-number helper. Step-prose changes in the four skills plus `/review-pr` Step 7.
+- ✅ A shared next-number helper. Step-prose changes in the five skills plus `/review-pr` Step 7.
 
 **Out of Scope:**
 
 - ❌ review-pr eval scenarios 5–7 (their own follow-up, named in task.185)
 - ❌ Any change to how `/review-pr` reviews: this task touches its numbering call only
+- ❌ Numbering sites that are not count-style (review-task probe, 2026-10-06): `create-bug-report`,
+  `review-prd` and the implementation report already use highest + 1; `code-smell-validator`
+  numbers by date, not a co-located series; `qa-story/SKILL.md:494` numbers from the prior QA
+  cycle inside the QA loop
 
 ---
 
@@ -155,32 +166,32 @@ No other breaking changes.
 
 ### Phase 1: Runner and repeat verdicts (A) — Risk: Medium
 
-- [ ] The runner sets a non-verdict `process.exitCode` at the top of `main()`, so only the post-assertion line can exit 0 (A1)
-- [ ] Validate every `assertions` / `liveAssertions` `fn` against the known set before the driver runs; refuse with a non-verdict status (A2)
-- [ ] Move `repeat.mjs`'s opt-in codes to 64–113 and update the README exit table (A3)
-- [ ] `repeat.mjs` refuses a scenario with no assertions as a usage error (A4)
-- [ ] A missing `jq` becomes could-not-run, not a failed run (A5)
-- [ ] `claude-cli.mjs` adds `res.error?.code` and `res.signal` to the error when `status` is null (A6)
+- [x] The runner sets a non-verdict `process.exitCode` at the top of `main()`, so only the post-assertion line can exit 0 (A1)
+- [x] Validate every `assertions` / `liveAssertions` `fn` against the known set before the driver runs; refuse with a non-verdict status (A2). The set lives in a module both files import, and `repeat.mjs` checks it in its pre-run validation loop as a usage error (exit 2)
+- [x] Move `repeat.mjs`'s opt-in codes to 64–113 and update the README exit table (A3)
+- [x] `repeat.mjs` refuses a scenario with no assertions as a usage error (A4)
+- [x] A missing `jq` becomes could-not-run, not a failed run (A5)
+- [x] `claude-cli.mjs` adds `res.error?.code` and `res.signal` to the error when `status` is null (A6)
 
 ### Phase 2: Fake gh residue (B) — Risk: Low
 
-- [ ] `refusal: "write" | "not-a-served-read"` on every refused entry
-- [ ] `--version` / `version` answered only when argv has one element
-- [ ] Drop `-R`/`--repo` from `API_READ_FLAGS`
-- [ ] `pick()` reports requested fields the fixture lacks as `unhandled`
-- [ ] Fixture lookup by own keys only (`Object.hasOwn`)
-- [ ] The unhandled test asserts a log line exists (C8-CR-3)
+- [x] `refusal: "write" | "not-a-served-read"` on every refused entry
+- [x] `--version` / `version` answered only when argv has one element
+- [x] Drop `-R`/`--repo` from `API_READ_FLAGS`
+- [x] `pick()` reports requested fields the fixture lacks as `unhandled`
+- [x] Fixture lookup by own keys only (`Object.hasOwn`)
+- [x] The unhandled test asserts a log line exists (C8-CR-3)
 
 ### Phase 3: Inline comments read with GET (C) — Risk: Low
 
-- [ ] Add `-X GET` to the `pr-inline-comment.js` comment listing; a test asserts the argv carries `-X GET` whenever it carries `-f`
-- [ ] `npm run bundle`; the bundled copies in `review-pr` and `review-code` match
+- [x] Add `-X GET` to the `pr-inline-comment.js` comment listing; a test asserts the argv carries `-X GET` whenever it carries `-f`
+- [x] `npm run bundle`; the bundled copies in `review-pr` and `review-code` match
 
 ### Phase 4: One next-number rule (D) — Risk: Medium
 
-- [ ] Decide: extend `newest-numbered.sh` with a next-number mode, or generalise `next-report-number.sh` into `shared/resources/` with a `<kind>` argument; record the decision
-- [ ] Point `/review-pr` Step 7, `qa-planning`, `review-bug`, `review-epic` and `review-task` at it
-- [ ] Tests run each skill's own call line under bash and zsh (the `review-pr.test.js` `step7CallLine` pattern)
+- [x] Decide: extend `newest-numbered.sh` with a next-number mode, or generalise `next-report-number.sh` into `shared/resources/` with a `<kind>` argument; record the decision — **Option 1**: `next_numbered` beside `newest_numbered`, `next-report-number.sh` removed (implementation report, Decisions Log)
+- [x] Point `/review-pr` Step 7, `qa-planning` (`risk`, `test-design`), `review-bug`, `review-epic`, `review-task` and `finalise` (`dod`) at it
+- [x] Tests run each skill's own call line under bash and zsh (the `review-pr.test.js` `step7CallLine` pattern)
 
 ---
 
@@ -193,14 +204,16 @@ No other breaking changes.
 3. ✅ `evals/shared/drivers/claude-cli.mjs`
 4. ✅ `evals/shared/lib/fake-gh.mjs`
 5. ✅ `shared/resources/pr-inline-comment.js`
-6. ✅ `shared/resources/newest-numbered.sh` or a new `shared/resources/next-report-number.sh` (Phase 4 decides)
-7. ✅ `skills/review-pr/SKILL.md`, `skills/qa-planning/SKILL.md`, `skills/review-bug/SKILL.md`, `skills/review-epic/SKILL.md`, `skills/review-task/SKILL.md`
+6. ✅ `shared/resources/newest-numbered.sh` — `next_numbered` added (Phase 4 chose Option 1)
+6a. ✅ `evals/shared/lib/assertion-dispatch.mjs` (new) — the one table of assertion names, imported by `runner.mjs` and `repeat.mjs`
+6b. ❌ `skills/review-pr/scripts/next-report-number.sh` — removed; `/review-pr` Step 7 uses `next_numbered`
+7. ✅ `skills/review-pr/SKILL.md`, `skills/qa-planning/SKILL.md`, `skills/review-bug/SKILL.md`, `skills/review-epic/SKILL.md`, `skills/review-task/SKILL.md`, `skills/finalise/SKILL.md`
 
 **Tests:**
 
 8. ✅ `evals/shared/tests/runner-setup.test.mjs`, `repeat.test.mjs`, `fake-gh.test.mjs`
 9. ✅ `shared/resources/tests/pr-inline-comment.test.mjs`
-10. ✅ The next-number helper's tests, plus each skill's call-line test
+10. ✅ `shared/resources/tests/next-numbered.test.mjs` (new) — the helper, and each of the six skills' own call line under bash and zsh; `skills/review-pr/tests/review-pr.test.js` — its script-specific numbering tests replaced by a Step 7 prose check
 
 **Documentation:**
 
@@ -208,7 +221,7 @@ No other breaking changes.
 
 **Generated:**
 
-12. ✅ `skills/*/references/` copies, via `npm run bundle`
+12. ✅ `skills/*/references/` copies, via `npm run bundle`: `pr-inline-comment.js` in `review-pr` and `review-code`; `newest-numbered.sh` updated in `develop-story`, `develop-task`, `finalise`, and new in `qa-planning`, `review-bug`, `review-epic`, `review-pr`, `review-task`
 
 ---
 
@@ -227,22 +240,22 @@ No other breaking changes.
 
 **Functional:**
 
-- [ ] A scenario whose setup hook never settles makes `repeat.mjs` exit 3 (could not run), not 0 (Phase 1, A1)
-- [ ] A scenario with an unknown assertion `fn` makes `repeat.mjs` exit 3 before any driver runs (Phase 1, A2)
-- [ ] `repeat.mjs` uses opt-in codes outside 0–5 and the README table matches the code (Phase 1, A3)
-- [ ] Every refused fake `gh` entry carries `refusal`; `gh --version pr comment 901` is refused (Phase 2)
-- [ ] `pr-inline-comment.js` never sends `-f` without `-X GET` (Phase 3)
-- [ ] A directory holding `.1.` and `.3.` of each of the five report kinds gets `.4.` under bash and zsh (Phase 4)
+- [x] A scenario whose setup hook never settles makes `repeat.mjs` exit 3 (could not run), not 0 (Phase 1, A1)
+- [x] A scenario with an unknown assertion `fn` makes `repeat.mjs` exit 2 (usage) before any run starts, and makes `runner.mjs` alone exit with a non-verdict status before the driver runs (Phase 1, A2)
+- [x] `repeat.mjs` uses opt-in codes outside 0–5 and the README table matches the code (Phase 1, A3)
+- [x] Every refused fake `gh` entry carries `refusal`; `gh version issue close 5` is refused (it exits 0 on `develop` today), and `gh --version pr view 901` is not answered as a version (Phase 2)
+- [x] `pr-inline-comment.js` never sends `-f` without `-X GET` (Phase 3)
+- [x] For each of the six call sites, a directory holding `.1.` and `.3.` of that site's kind(s) gets `.4.` under bash and zsh — kinds `pr-review`, `risk`, `test-design`, `review` (review-bug, review-epic, review-task) and `dod` (Phase 4)
 
 **Code Quality:**
 
-- [ ] `npm test`, `npm run eval:all`, `npm run bundle:check`, `npm run lint:shell` pass
-- [ ] `npm run validate -- skills/<skill>/` passes for each SKILL.md changed
+- [x] `npm test`, `npm run eval:all`, `npm run bundle:check`, `npm run lint:shell` pass
+- [x] `npm run validate -- skills/<skill>/` passes for each SKILL.md changed
 
 **Migration:**
 
-- [ ] CHANGELOG `[Unreleased]` cites task.186
-- [ ] `evals/shared/README.md` states the new exit codes and the `refusal` field
+- [x] CHANGELOG `[Unreleased]` cites task.186
+- [x] `evals/shared/README.md` states the new exit codes and the `refusal` field
 
 ---
 
@@ -252,7 +265,7 @@ No other breaking changes.
 
 1. **Exit-code move breaks an external caller of the runner.**
    - Mitigation: the runner still honours any opt-in value from 3 to 125. Grep `EVAL_*_EXIT` across the repo before changing defaults.
-2. **Phase 4 touches four skills' step prose.**
+2. **Phase 4 touches five skills' step prose.**
    - Mitigation: one helper and one call-line test per skill. Run Step 3.5's population probe for "starts at 1 and increments".
 
 **LOW:**
@@ -279,6 +292,9 @@ No other breaking changes.
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-06 | 1.0 | Initial draft — task.185 follow-ups: runner verdicts, fake gh residue, inline-comment GET, shared next-number rule | create-task |
+| 2026-10-06 | 1.1 | Review passed (8/10) — fixed two criteria that could not go red or named the wrong exit code, moved the A2 name set out of runner.mjs, added finalise as a sixth numbering site | review-task |
+| 2026-10-06 |  | Status → ready-for-development | review-task |
+| 2026-10-06 |  | Implemented — 4 phases, 32 files outside docs/tasks (2 new modules, 1 removed script, 9 bundled copies); 16 test cases added to existing suites and 37 in the new next-numbered.test.mjs | develop-task |
 <!-- change-log-end -->
 
 ---
@@ -286,16 +302,50 @@ No other breaking changes.
 ## Progress Tracking
 
 ### Phase 1: Runner and repeat verdicts
-- [ ] A1–A6
+- [x] A1–A6
 
 ### Phase 2: Fake gh residue
-- [ ] B items
+- [x] B items
 
 ### Phase 3: Inline comments read with GET
-- [ ] C
+- [x] C
 
 ### Phase 4: One next-number rule
-- [ ] D
+- [x] D
+
+---
+
+## Implementation Summary
+
+**Completion Date**: 2026-10-06 (develop-task run 1, inline implementation from the plan)
+
+**Approach**: four phases, each from a test that was red on `develop`, each mutation-proven
+(Phase 1 9/9 mutations killed, Phase 2 6/6, Phase 3 red-before/green-after, Phase 4 8/8).
+
+- **Phase 1 (A1–A6)**: the runner sets `process.exitCode = 1` first, so only its final line
+  exits 0. Assertion names live in one table, `evals/shared/lib/assertion-dispatch.mjs`; the
+  runner dispatches through it and refuses an unknown name before the sandbox (exit 1), and
+  `repeat.mjs` refuses it, and an empty scenario, as usage (exit 2). Opt-in codes are 73/74/75.
+  `installFakeGh` throws `evalSkip` without `jq`, which the runner reports as a skip. A killed
+  `claude` names `ETIMEDOUT` and the signal.
+- **Phase 2 (B)**: `refusal` on every refused entry, `--version` only as the whole argv,
+  `-R`/`--repo` out of `API_READ_FLAGS`, missing `--json` fields `unhandled`, own-key lookup,
+  and a log-line floor on the unhandled test.
+- **Phase 3 (C)**: `-X GET` on the inline-comment listing; a test holds every `gh api` argv with
+  a field parameter to `-X GET`.
+- **Phase 4 (D)**: Option 1 — `next_numbered` beside `newest_numbered`; six skills call it
+  (`review-pr`, `qa-planning`, `review-bug`, `review-epic`, `review-task`, `finalise`) and
+  `next-numbered.test.mjs` runs each one's own call line under bash and zsh, with a derived
+  population check.
+
+**Testing Results**: `npm run ci` (ci:fast, eval:all, validate:all, check:generated,
+bundle:check, lint:shell) exit 0 — 5395 tests pass, 0 fail; eval:all 43 scenarios green. Counts
+measured with `git status --porcelain --untracked-files=all` (files) and `git diff -U0 | grep -cE '^\+\s*test\('` (test cases).
+
+Live: `EVAL_RUNS=1 env -u ANTHROPIC_API_KEY npm run eval:review-pr:cli` — 4/4 scenarios passed
+(01-happy 6/6, 02-renumber-gap 7/7, 03-unanchored 5/5, 04-planted-bug 6/6 assertions), exit 0.
+
+**Deferred Work**: none. Review Optional O1 and O2 were both applied.
 
 ---
 
