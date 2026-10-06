@@ -313,6 +313,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`/wireloom` is now `/wireframe`.** The skill directory moved to `skills/wireframe/` and its
+  `name:` changed; `create-story` and `review-story` now invoke `wireframe`. The Wireloom DSL keeps
+  its name: the ```` ```wireloom ```` fence, the `wireloom` npm package, `WIRELOOM_MODULE` and the
+  renderer cache path are unchanged, so existing wireframes still check and render. The CLI is now
+  `scripts/wireframe.js` (was `scripts/wireloom.js`), with the same commands. Consumers re-install
+  the skill and use `/wireframe`; `.agents/skills/wireloom/` is not removed for them.
+
 - **A measured non-functional criterion has a defined path through review and finalise (task 166,
   obs #206, obs #222).** finalise's AC prompt let two kinds of criterion pass without a per-PR test,
   so a runtime, size or count bound failed by rule even when the measurement met it (task.164 AC7).

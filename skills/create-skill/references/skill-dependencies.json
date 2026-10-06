@@ -45,7 +45,7 @@
     "ensure-story-github-issue",
     "ensure-story-jira-issue",
     "mermaid-architect",
-    "wireloom"
+    "wireframe"
   ],
   "create-task": [
     "ensure-task-github-issue",
@@ -193,7 +193,7 @@
     "ensure-story-github-issue",
     "ensure-story-jira-issue",
     "mermaid-architect",
-    "wireloom"
+    "wireframe"
   ],
   "review-task": [
     "create-branch",
@@ -224,5 +224,5 @@
   "tracker-reconcile": [],
   "use-railway": [],
   "ux-expert": [],
-  "wireloom": []
+  "wireframe": []
 }

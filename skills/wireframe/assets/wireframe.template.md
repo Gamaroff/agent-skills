@@ -3,10 +3,10 @@ type: wireframe
 title: "{screen title, from the page's <title> or its main heading}"
 description: Low-fidelity wireframe of {screen title}.
 source: "{source file name, relative to this document}"
-source_sha256: "{sha256 printed by `wireloom.js status <source>`}"
+source_sha256: "{sha256 printed by `wireframe.js status <source>`}"
 profile: "{format profile name, or none}"
 viewport: "{width in px, from <meta name=\"viewport\">}"
-wireloom: "{renderer version printed by `wireloom.js check`}"
+wireloom: "{renderer version printed by `wireframe.js check`}"
 created: "{YYYY-MM-DD}"
 updated: "{YYYY-MM-DD}"
 ---
