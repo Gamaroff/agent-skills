@@ -418,6 +418,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`advance-pipeline-lock.sh --skill` says when a paused pipeline has lost its lock (obs #280).**
+  A PreCompact pause or a HALT snapshots the lock and removes it. A sub-skill that ran after that
+  (task.186: `/finalise`, resumed past a compaction) advanced nothing and exited 0 silently, the same
+  as a standalone run, so Steps 7–8 ran with no lock and the Stop hook guarded nothing. It still
+  exits 0, but when a halt snapshot or an orphaned `.pausing.*` claim is on disk it names
+  `--restore <doc-dir>` on stderr. A standalone run with neither stays silent, and `--complete` is
+  unchanged.
 - **The eval runner and `repeat.mjs` no longer score a run that judged nothing (task.186).** A
   `setup` hook or driver promise that never settled emptied the event loop and the runner exited 0
   — a pass. The runner now sets exit 1 first and reaches 0 only from its final line. An assertion
