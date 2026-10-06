@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **Phase 8 is open** (below) — a one-row override that puts task.186 ahead of
+chain, a human gate. **Phase 8 is fully ticked** (below; T186 merged 2026-10-06) — a one-row override that puts task.186 ahead of
 the registry fallback, which would otherwise select T173 and eight more planned tasks first. Archive
 Phase 8 when its row is ticked.
 
@@ -50,7 +50,7 @@ before this. task.186 goes first because its Phase 3 is a live defect in two shi
 POST (`/review-pr --inline`, `/review-code`). **Tick the row `[x]` the moment the task is accepted**
 — a phase row is matched on its checkbox, not the document.
 
-- [ ] **T186** Eval harness hardening and task.185 leftovers · deps: none · touches: review-skills~, bundles~, test-harness~ · /develop-task docs/tasks/task.186.eval-harness-hardening-and-leftovers/task.186.eval-harness-hardening-and-leftovers.md
+- [x] **T186** Eval harness hardening and task.185 leftovers · deps: none · touches: review-skills~, bundles~, test-harness~ · /develop-task docs/tasks/task.186.eval-harness-hardening-and-leftovers/task.186.eval-harness-hardening-and-leftovers.md — ✅ **accepted + merged** ([PR #576](https://github.com/Gamaroff/agent-skills/pull/576), DoD accepted on run 2 after an operator scope note on AC6, QA CONCERNS 90/100 over 3 cycles with no open entry, /review-pr CONCERNS, CI 5/5). The runner and `repeat.mjs` never score a non-verdict as a verdict (one assertion table; opt-in codes 73/74/75); the fake `gh` labels every refusal and fails closed on version argv, `-R` and missing `pick()` fields; `pr-inline-comment.js` lists comments with `-X GET`; six skills number reports highest + 1 through `next_numbered` (obs #272). Follow-ups in the task's Deferred Work
 
 ---
 
@@ -191,3 +191,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-09-29 | **T158 accepted + merged — PR #521 merged** (`d09c5056`). The QA read-back now requires this cycle's gate and report links; `qa-cycle.sh` is the one cycle-file definition for the QA skills, the develop-pipeline step docs and `grant-qa-cycles.sh` (whose private sed crashed on `gate.08`); on resume, gate files with no usable cycle number halt instead of restarting QA at cycle 1; one ESM and one CJS `isWithin`. 3 QA cycles (CONCERNS 90 → CONCERNS 90 → PASS 100), 5c APPROVE, `npm run ci` green |
 | 2026-10-06 | **Phase 8 opened** with one row, T186 (task.185 follow-ups, issue #575), as an override ahead of the registry fallback, which would otherwise select T173 first. Reason: T186 Phase 3 fixes a live defect in `/review-pr --inline` and `/review-code` (a comment listing sent as POST). |
 | 2026-10-06 | **Phases 6 and 7 archived** to `roadmap-history.md`. Both were fully ticked: Phase 6 (task.141 follow-ups, T143–T146) and Phase 7 (the 2026-09-24 observation review, T147–T154 and T158). 13 rows moved verbatim with their `touches:` tags and acceptance annotations, so a `deps:` naming any of them still resolves there. Phase 8 (T186) is now the only open phase. |
+| 2026-10-06 | **T186 accepted + merged — PR #576 merged** (`f1adccad`). Eval harness hardening and the task.185 leftovers, in four independent phases. (1) The runner and `repeat.mjs` share one assertion table (`assertion-dispatch.mjs`, `driver-name.mjs`): a never-settling setup is could-not-run, an unknown assertion `fn` is a usage error before any run, and a scenario with no assertion its driver runs is refused; the opt-in exit codes move to 73/74/75. (2) The fake `gh` gains a `refusal` field and closes the version, `-R` and `pick()` gaps. (3) `pr-inline-comment.js` sends `-X GET`. (4) `next_numbered` replaces counting at six skill sites. QA ran 3 cycles: CR-1 and CR-3 were fixed, then C2-CR-1, a regression from the first `jq` fix that skipped replay runs, was fixed; the loop left by the Diminishing-returns exit. 5c CONCERNS. **Two `/finalise` runs:** run 1 found AC6's zsh arm had no CI lane; the operator recorded a scope note (zsh verified locally, the task.185/176 precedent), and run 2 accepted (30 probes, 0 reproduced). Merge gate `npm run ci` green. Issue #575 closed. Phase 8 is fully ticked — archive it at the next housekeeping |
