@@ -425,6 +425,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **JSON is piped to `jq` with `printf '%s'`, and `create-pr` cannot open a duplicate Bitbucket PR
+  (obs #284).** Under zsh and dash (Ubuntu's `/bin/sh`), `echo` expands backslash escapes, so the
+  `\n` inside a JSON string becomes a raw newline and `jq` rejects the response. `create-pr` read
+  `PR_URL=$(echo "$PR_RESPONSE" | jq …)`, which under zsh came back empty for a PR that had been
+  created (rebirth-wallet PR #586), and its next instruction, "report and halt", invited a retry
+  that would open a second PR. All 48 `echo "$VAR" | jq` sites in executed Markdown (9 files:
+  `create-pr`, `create-issue`, `develop-next`, `qa-fix`, `qa-story`, `qa-task`, `review-task`,
+  and two shared step docs) now use `printf '%s'`. `create-pr` Step 6 treats an empty `PR_URL` as
+  an unknown outcome and looks for an open PR from the branch before reporting failure. New
+  `tests/json-echo-to-jq.test.js` shows the premise under zsh and dash and fails on the shape in
+  any fenced block; it goes red with one site reverted. Shell scripts are out of scope: they run
+  under `bash`, whose `echo` leaves backslashes alone.
+
 - **The pre-commit hook checks formatting (obs #283).** CI's first step is `npm run format:check`,
   and nothing local ran it, so a missed `prettier --write` cost a full CI round trip (PR #581, run
   37460534870). `.githooks/pre-commit` now checks the staged content of every staged file with

@@ -261,12 +261,12 @@ JIRA_RESPONSE=$(curl -s -X POST \
     }'
   )")
 
-issue_key=$(echo "$JIRA_RESPONSE" | jq -r '.key // empty')
+issue_key=$(printf '%s' "$JIRA_RESPONSE" | jq -r '.key // empty')
 issue_url="${JIRA_URL}/browse/${issue_key}"
 
 if [ -z "$issue_key" ]; then
   echo "ERROR: Jira issue creation failed:" >&2
-  echo "$JIRA_RESPONSE" | jq '.errors // .' >&2
+  printf '%s' "$JIRA_RESPONSE" | jq '.errors // .' >&2
   exit 1
 fi
 ```
@@ -359,12 +359,12 @@ ISSUE_RESPONSE=$(curl -s -X POST \
     }'
   )")
 
-issue_number=$(echo "$ISSUE_RESPONSE" | jq -r '.id // empty')
-issue_url=$(echo "$ISSUE_RESPONSE"   | jq -r '.links.html.href // empty')
+issue_number=$(printf '%s' "$ISSUE_RESPONSE" | jq -r '.id // empty')
+issue_url=$(printf '%s' "$ISSUE_RESPONSE"   | jq -r '.links.html.href // empty')
 
 if [ -z "$issue_number" ]; then
   echo "ERROR: Bitbucket issue creation failed:" >&2
-  echo "$ISSUE_RESPONSE" | jq '.error // .' >&2
+  printf '%s' "$ISSUE_RESPONSE" | jq '.error // .' >&2
   exit 1
 fi
 ```

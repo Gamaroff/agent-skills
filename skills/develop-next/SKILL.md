@@ -293,7 +293,7 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      rm -f /tmp/dn-merge.json
      # MERGED is the only success state; anything else (conflict, protection,
      # scope error) carries an `error.message` — surface it verbatim.
-     [ "$(echo "$MERGE_RESULT" | jq -r '.state')" = "MERGED" ] || HALT
+     [ "$(printf '%s' "$MERGE_RESULT" | jq -r '.state')" = "MERGED" ] || HALT
    else
      # Bind the head branch BEFORE the merge, and refuse an empty one: `git push origin --delete ""`
      # is not a thing to run by accident (obs #133: a block that reads a name must bind it).
