@@ -20,9 +20,9 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **Phase 6 is open** (below) — a two-row override that puts task.141's follow-ups
-ahead of the registry fallback; Phase 5 was such an override and is archived. Archive Phase 6 when
-both rows are ticked.
+chain, a human gate. **Phase 8 is open** (below) — a one-row override that puts task.186 ahead of
+the registry fallback, which would otherwise select T173 and eight more planned tasks first. Phases 6
+and 7 are complete; archive them with Phase 8 when its row is ticked.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -75,6 +75,18 @@ QA-skill sections that task.146 also touches, so the second merger rebases (all 
 
 ---
 
+## PHASE 8 — task.185 follow-ups (opened 2026-10-06)
+
+An **override**: without it the registry fallback selects T173, then 174, 175, 178–182 and 184
+before this. task.186 goes first because its Phase 3 is a live defect in two shipped skills:
+`pr-inline-comment.js` lists PR review comments with `-f` and no `-X GET`, which `gh` sends as a
+POST (`/review-pr --inline`, `/review-code`). **Tick the row `[x]` the moment the task is accepted**
+— a phase row is matched on its checkbox, not the document.
+
+- [ ] **T186** Eval harness hardening and task.185 leftovers · deps: none · touches: review-skills~, bundles~, test-harness~ · /develop-task docs/tasks/task.186.eval-harness-hardening-and-leftovers/task.186.eval-harness-hardening-and-leftovers.md
+
+---
+
 ## Legend — conflict footprint (`touches:` tags)
 
 Read only by `--batch`. Two rows conflict when they share a tag that **either** side marks `!`
@@ -117,7 +129,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; no phase is open
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6 and 7 complete, not yet archived; Phase 8 open (2026-10-06)
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -210,3 +222,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-09-29 | **T154 accepted + merged — PR #513 merged** (`4ce53445`). Bundler and snippet-test hygiene: an attributed, deduplicated `not found` warning with a live-tree reader and a scan-size line (obs #151); one consumer-root test helper, a clean-checkout runner that owns a `mktemp` directory per run, and a release gate on it (obs #149). QA ran 5 cycles to PASS 100; the runner was redesigned at cycle 3 after three cycles of shared-location findings. **Two `/finalise` runs.** Run 1 found 3 gaps: the base-location check was an inline predicate no probe form could reach, the release gate was untested, and the per-file time limit was not asserted. The fix (`78ab4858`) extracted `resolveBase` (probe: 17 executed, 0 reproduced), added a fake-npm release-gate test that also clears the runner's test hook, and gave each new test file a 10 s budget (the bundler's line collector became one pass, `--check` 5.8 s → 4.6 s). Post-merge: observations #149 and #151 set `actioned` |
 | 2026-09-29 | **T153 accepted + merged — PR #515 merged** (`bb65b266`). The release gate reads CI's verdict, and load-sensitive tests name themselves. `release.sh` step 1b refuses a release unless CI's recorded verdict for HEAD is green; `gh` failing or unreadable is *unverifiable* and refuses too. `loadSensitive()` marks seven files, and the guard checks them by spelling, by list and by clock source. QA ran 5 cycles. After the first acceptance `/develop-next`'s merge gate refused an open LOW (QA3-1) that the diminishing-returns exit had carried (obs #215). The operator chose to fix it: `940390b8` sized the CR-6 fixture to its schedule and cut `release.sh`'s verdict read to one spawn, because the extra spawns had pushed `test-clean-checkout` past its 10 s budget (the LOAD-SENSITIVE marker reported it). `dcda808f` closed a fail-open in the new parse. DoD run 2 re-verified the task on the final head (26 probes, 0 reproduced) |
 | 2026-09-29 | **T158 accepted + merged — PR #521 merged** (`d09c5056`). The QA read-back now requires this cycle's gate and report links; `qa-cycle.sh` is the one cycle-file definition for the QA skills, the develop-pipeline step docs and `grant-qa-cycles.sh` (whose private sed crashed on `gate.08`); on resume, gate files with no usable cycle number halt instead of restarting QA at cycle 1; one ESM and one CJS `isWithin`. 3 QA cycles (CONCERNS 90 → CONCERNS 90 → PASS 100), 5c APPROVE, `npm run ci` green |
+| 2026-10-06 | **Phase 8 opened** with one row, T186 (task.185 follow-ups, issue #575), as an override ahead of the registry fallback, which would otherwise select T173 first. Reason: T186 Phase 3 fixes a live defect in `/review-pr --inline` and `/review-code` (a comment listing sent as POST). |
