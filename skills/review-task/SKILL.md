@@ -1311,7 +1311,14 @@ questions:
 **Actions**:
 
 1. Generate complete review report following the structure below
-2. Save to file: `[task-directory]/task.{n}.review.{N}.{descriptive-name}.md`
+2. Save to file: `[task-directory]/task.{n}.review.{N}.{descriptive-name}.md`, with `{N}` computed — never counted by eye — from the repository root:
+
+   ```bash
+   source .agents/skills/review-task/references/newest-numbered.sh || exit 1
+   REVIEW_N=$(next_numbered "{task-directory}" review -name "task.{n}.review.*.md") || exit 1
+   ```
+
+   It is the highest existing `{N}` plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186).
 3. Display summary to user with file location
 
 **Report Structure**:
@@ -2127,7 +2134,7 @@ This skill uses:
 
 ## Notes
 
-- The review report (`task.{n}.review.{N}.{descriptive-name}.md`) is the primary output and is always saved separately. Use DOTS as structural separators and hyphens within the descriptive name. `{N}` starts at 1 and increments on re-reviews. Example: `task.29.review.1.subagent-triage.md`, `task.29.review.2.subagent-triage.md`.
+- The review report (`task.{n}.review.{N}.{descriptive-name}.md`) is the primary output and is always saved separately. Use DOTS as structural separators and hyphens within the descriptive name. `{N}` is the highest existing review number plus 1, computed in Step 8 Option A. Example: `task.29.review.1.subagent-triage.md`, `task.29.review.2.subagent-triage.md`.
 - Steps 8.5 and 9 may modify the task document (apply fixes; update `Status:` field) — both are gated on user consent (or pipeline auto-answer)
 - Can be used at any stage: planned, in progress, completed
 - Designed to find problems through collaborative user input

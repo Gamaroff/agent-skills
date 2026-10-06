@@ -532,8 +532,17 @@ If flagged: recommend splitting into sub-epics and suggest how to divide the sco
 Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].review.[n].[name].md`
 
 - `[N]` is the epic number; `[name]` is the parent epic file's own name slug (the hyphenated portion after `epic.[N].` in the epic filename) — NOT a free-form summary of the review focus.
-- `[n]` is a sequence number for multiple reviews of the same epic; it starts at 1 and increments on re-reviews (mirrors the QA `qa.{n}` and story `review.{n}` patterns). Use DOTS as structural separators and hyphens within the name slug.
+- `[n]` is a sequence number for multiple reviews of the same epic, computed below — never counted by eye (mirrors the QA `qa.{n}` and story `review.{n}` patterns). Use DOTS as structural separators and hyphens within the name slug.
 - Example: epic file `epic.1.mastra-runtime-foundation.md` → review file `epic.1.review.1.mastra-runtime-foundation.md`.
+
+Compute `[n]`, from the repository root:
+
+```bash
+source .agents/skills/review-epic/references/newest-numbered.sh || exit 1
+REVIEW_N=$(next_numbered "{epic-directory}" review -name "epic.{epic-number}.review.*.md") || exit 1
+```
+
+and use `$REVIEW_N` as `[n]`. It is the highest existing `[n]` plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186).
 
 **Report structure**:
 

@@ -159,10 +159,19 @@ Before starting any verification, also create a co-located running summary file 
    - Example: `${PRD_ROOT}/.../story.311.1.example-system/`
 
 2. **Create running summary file:**
-   - File name format (stories): `story.{epic}.{story}.dod.{num}.{story-name}.md` — `{num}` starts at 1, increment if re-running finalise
+   - File name format (stories): `story.{epic}.{story}.dod.{num}.{story-name}.md` — `{num}` is computed below, never counted by eye
    - File name format (tasks): `task.{id}.dod.{num}.{task-name}.md`
    - File name format (bugs): `{bug-prefix}.dod.{num}.{bug-name}.md` — the prefix is the bug id `bug-doc.js` reports (`bug.13`, `story.7.4.bug.4`, `task.67.bug.3`)
    - Full path: `{story-directory}/story.{epic}.{story}.dod.{num}.{story-name}.md`
+   - Compute `{num}`, from the repository root:
+
+     ```bash
+     STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"   # the work item's filename stem
+     source .agents/skills/finalise/references/newest-numbered.sh || exit 1
+     DOD_N=$(next_numbered "{document-directory}" dod -name "${STEM}.dod.*.md") || exit 1
+     ```
+
+     and use `$DOD_N` as `{num}`. It is the highest existing `{num}` plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186).
    - Initialize with header and timestamp
 
 3. **Write initial content:**

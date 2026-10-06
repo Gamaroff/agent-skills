@@ -633,12 +633,14 @@ docs/tasks/task.65.registry-aware-selection/task.65.pr-review.1.registry-aware-s
 `{n}` is computed, never counted by eye — run, from the repository root:
 
 ```bash
-N=$(bash .agents/skills/review-pr/scripts/next-report-number.sh "{work-item-dir}") || exit 1
+source .agents/skills/review-pr/references/newest-numbered.sh || exit 1
+N=$(next_numbered "{work-item-dir}" pr-review -name "*.pr-review.*.md") || exit 1
 ```
 
 and use `$N` as `{n}`. It is the highest existing `{n}` plus 1 (1 when there is none), never the
 number of reports plus 1: a directory holding `.pr-review.1.` and `.pr-review.3.` gets `.4.`, where
-a count would overwrite `.3.`. The script's header states the full rule (obs #272).
+a count would overwrite `.3.`. `next_numbered`'s header in `references/newest-numbered.sh` states the
+full rule (obs #272, task.186).
 
 **No work item resolved → write no file.** Render the code findings to the terminal and say plainly that the review is unanchored. Report artifacts are co-located with the work item that led to the PR; with nothing to co-locate against there is no sanctioned location, and inventing one would add a directory no standard names.
 
