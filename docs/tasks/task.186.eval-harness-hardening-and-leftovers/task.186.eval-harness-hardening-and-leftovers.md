@@ -5,7 +5,9 @@ type: task
 description: "Close the advisory findings task.185 carried forward: make the eval runner and repeat.mjs never score a non-verdict as a verdict, finish the fake gh's fail-closed rule, fix pr-inline-comment.js sending a review-comment listing as a POST, and stop four skills numbering their reports by counting."
 tags: [evals, harness, fake-gh, review-pr, follow-up]
 category: testing
-status: ready-for-review
+status: accepted
+completed_date: 2026-10-06
+pr_number: 576
 priority: Medium
 created: 2026-10-06
 updated: 2026-10-06
@@ -16,7 +18,7 @@ github_issue: 575
 
 # Technical Task: Eval harness hardening and task.185 leftovers
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.186.review.1.eval-harness-hardening-and-leftovers.md` implemented 2026-10-06
 
@@ -309,9 +311,11 @@ No other breaking changes.
 - Gate 2's C2-CR-1 is fixed: replay runs are judged without jq; live runs skip.
 - C3-CR-1 (test machinery) was carried by the Diminishing-returns exit; no open entry remains.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+> Superseded by run 2 (`task.186.dod.2.eval-harness-hardening-and-leftovers.md`): the AC6 gap was closed by the operator scope annotation (`eb4c884`). Kept as history, not evidence.
+
+**Status:** IN PROGRESS (run 1)
 
 ### QA Gate Status
 
@@ -336,6 +340,29 @@ No other breaking changes.
 
 **Detailed Verification Log:** See `task.186.dod.1.eval-harness-hardening-and-leftovers.md` for complete verification evidence and timestamps.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.186.qa.3.eval-harness-hardening-and-leftovers.md`
+**Gate File**: `task.186.gate.3.eval-harness-hardening-and-leftovers.yml`
+**Gate Status**: ⚠️ CONCERNS — no open entry (Diminishing-returns exit, cycle 3)
+**Quality Score**: 90/100
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Acceptance Criteria:** 10/10 — AC6 under the operator scope annotation (bash arm per PR, zsh arm verified locally)
+✅ **Tests & Review:** 394 targeted tests; 3 QA cycles; Step 5c `/review-pr` CONCERNS with no high finding; CI green on `6723c20` (5 checks)
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task.186 four times; `evals/shared/README.md` states the exit codes and the `refusal` field
+✅ **Security Review:** PASS — `next_numbered` probed 30/30, 0 reproduced; fake gh classifier 33/33; no secrets, unsafe execution or new dependencies
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling only
+
+**Task marked as ACCEPTED on:** 2026-10-06
+
+**Detailed Verification Log:** See `task.186.dod.2.eval-harness-hardening-and-leftovers.md` for complete verification evidence and timestamps.
+
 ## Deferred Work
 
 - **C3-CR-1** (MEDIUM, test machinery) — carried to gate 3 `recommendations.future` (route 2, cycle 3): the no-jq meta-test in `evals/shared/tests/fake-gh.test.mjs` asserts `skipped >= 1`, which its own self-skip always satisfies, and has no pass floor
@@ -346,7 +373,6 @@ No other breaking changes.
 - **C2-CR-3, C2-CR-4** (gate 2, LOW) — a `requiresLiveDriver` live-only scenario under replay reads usage (2), not 3; `env.json` values are coerced differently by runner and `repeat.mjs`
 - **C3-CR-2, C3-CR-3** (gate 3, cleanup) — stale A5 comment in `runner-setup.test.mjs`; `jqTest` name
 - **5c CR-2** (PR review, cleanup) — `evals/shared/README.md` says the runner exits 0 only from its final line; a skip still exits 0 unless `EVAL_SKIP_EXIT` is set
-
 <!-- change-log-start -->
 ## Change Log
 
@@ -362,6 +388,7 @@ No other breaking changes.
 | 2026-10-06 |  | QA gate CONCERNS (90/100) — 1 finding, carried by the Diminishing-returns exit; no open entry | qa-task |
 | 2026-10-06 |  | DoD incomplete — 1 gap identified (AC6 zsh arm has no CI lane) | finalise |
 | 2026-10-06 |  | Scope annotation on the six-call-site criterion: zsh arm verified locally (operator decision, task.185/176 precedent) | operator |
+| 2026-10-06 | 1.2 | DoD passed — accepted (PR #576) | finalise |
 <!-- change-log-end -->
 
 ---
