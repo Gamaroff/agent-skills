@@ -50,6 +50,8 @@ Two behaviours are worth knowing, both there to keep a commit's bundled copies m
 - **Pre-existing bundle changes are left alone**, and reported. If `references/` was already dirty before you committed — say you ran `npm run bundle` yourself, or you are splitting one batch of work into several commits — those files are not swept into a commit that happens to touch an unrelated `SKILL.md`. Stage them yourself if they belong in it.
 - **The hook refuses to commit bundles built from unstaged source.** `npm run bundle` reads `shared/resources/` from the working tree, but your commit carries the index. If bundling changes `references/` while a shared source has unstaged edits, the bundled copies would embed source the commit does not include — so the hook fails and asks you to stage or stash that source first.
 
+The hook also runs on **every** commit, before the bundling step: it checks the staged content of each staged file with Prettier, using the same `.gitignore` and `.prettierignore` the CLI reads, and refuses the commit if `npm run format:check` would fail on it. It names each file and prints the `prettier --write` command that fixes it. It checks the index, not the working tree, so formatting a file on disk is not enough: `git add` it again. With no Prettier installed (a fresh clone before `npm install`), it warns and lets the commit through; CI still runs the check.
+
 ## Zip Distribution
 
 ```bash
