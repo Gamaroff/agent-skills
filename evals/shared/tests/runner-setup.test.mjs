@@ -319,7 +319,10 @@ test("every exported assertion is dispatchable, and only those names (A2)", asyn
 
 // task.186 A5: the fake gh needs jq for -q/--jq. Without it a scenario cannot be judged, so the
 // install refuses as a skip — could-not-run under repeat — rather than letting the run fail.
-test("a missing jq makes a fake-gh scenario a skip, not a failed run (A5)", () => {
+// task.186 A5, scoped by QA cycle 2 (C2-CR-1): the fake gh needs jq only when the agent can call
+// it. A replay run never calls gh, so it installs and is JUDGED without jq; a live run without jq
+// cannot be judged, so the install refuses as a skip — could-not-run under repeat.
+function noJqScenario() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runner-nojq-"));
   const fakeGh = new URL("../lib/fake-gh.mjs", import.meta.url).href;
   fs.writeFileSync(
@@ -338,19 +341,39 @@ export function setup({ sandbox }) { return { env: installFakeGh(sandbox, {}) };
       assertions: [{ fn: "fileAbsent", args: ["$SANDBOX/never.txt"] }],
     }),
   );
+  return sc;
+}
+
+test("a replay run without jq installs the fake gh and is judged (A5, C2-CR-1)", () => {
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), "runner-empty-path-"));
-  const r = run(sc, { DRIVER: "replay", PATH: empty, EVAL_SKIP_EXIT: "73" });
+  const r = run(noJqScenario(), {
+    DRIVER: "replay",
+    PATH: empty,
+    EVAL_SKIP_EXIT: "73",
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stderr, /1\/1 assertions passed/);
+  assert.doesNotMatch(r.stderr, /skipped/);
+});
+
+test("a live run without jq is a skip naming jq, not a failed run (A5)", () => {
+  // A PATH holding a fake `claude` and `which` (the driver's availability probe) and no jq.
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), "runner-live-nojq-"));
+  fs.writeFileSync(path.join(bin, "claude"), "#!/bin/sh\nexit 0\n", {
+    mode: 0o755,
+  });
+  const which = spawnSync("/bin/sh", ["-c", "command -v which"], {
+    encoding: "utf8",
+  }).stdout.trim();
+  fs.symlinkSync(which, path.join(bin, "which"));
+  const r = run(noJqScenario(), {
+    DRIVER: "claude-cli",
+    PATH: bin,
+    EVAL_SKIP_EXIT: "73",
+  });
   assert.equal(r.status, 73, r.stderr);
   assert.match(r.stderr, /skipped: .*jq/);
   assert.equal(fs.existsSync(r.sandbox), false, "sandbox removed");
-  // With jq on PATH the same scenario runs and passes. Without jq the run is the skip above, which
-  // also exits 0, so this half asserts the run was JUDGED — and is skipped on a host without jq
-  // rather than passing vacuously (QA cycle 1, CR-3).
-  if (spawnSync("jq", ["--version"]).status !== 0) return;
-  const judged = run(sc, { DRIVER: "replay" });
-  assert.equal(judged.status, 0, judged.stderr);
-  assert.match(judged.stderr, /1\/1 assertions passed/);
-  assert.doesNotMatch(judged.stderr, /skipped/);
 });
 
 // task.186 A6: a killed `claude` has status null; the error must say why (ETIMEDOUT, SIGTERM).

@@ -78,8 +78,8 @@ script passes every scenario in one call for that reason. Its earlier shell loop
 | --- | --- |
 | 0 | every scenario met its K |
 | 1 | at least one scenario fell below its K, and every run of every scenario ran |
-| 2 | usage: a bad or valueless flag, K outside 1..N, `live.minPass` outside 1..5, a missing or malformed `scenario.json`, an assertion `fn` the runner does not know, or a scenario with no `assertions` or `liveAssertions` at all. All are checked before any run starts |
-| 3 | **could not run** — any run that was not a verdict. It covers a **skip** (the driver is unavailable, or a `requiresLiveDriver` scenario ran under replay) and a **driver error** (`claude -p` exited non-zero: no credit, a crash, or a timeout). It also covers anything else the runner did instead of judging: a setup error, a setup that never settles, a missing dependency (the fake `gh` without `jq`), an unknown `DRIVER`, a crash, a signal or a spawn failure. It stops at the first such run and prints no pass rate for runs that did not happen |
+| 2 | usage: a bad or valueless flag, K outside 1..N, `live.minPass` outside 1..5, a missing or malformed `scenario.json`, an assertion `fn` the runner does not know, or a scenario with no assertion the chosen driver runs (`liveAssertions` count only under a live driver — the driver comes from `DRIVER`/`MODE` and the scenario's `env.json`, as the runner reads it). All are checked before any run starts |
+| 3 | **could not run** — any run that was not a verdict. It covers a **skip** (the driver is unavailable, or a `requiresLiveDriver` scenario ran under replay) and a **driver error** (`claude -p` exited non-zero: no credit, a crash, or a timeout). It also covers anything else the runner did instead of judging: a setup error, a setup that never settles, a missing dependency (the fake `gh` without `jq`, under a live driver), an unknown `DRIVER`, a crash, a signal or a spawn failure. It stops at the first such run and prints no pass rate for runs that did not happen |
 
 **The verdict is positive.** The runner exits `EVAL_FAIL_EXIT` (requested by `repeat.mjs` as
 `EVAL_FAIL_EXIT=75`) **only** when assertions ran and failed, and 0 **only** from its final line,
@@ -140,9 +140,10 @@ Use for any scenario that needs a real git repo without touching the working tre
 `{ PATH }` for a `setup` hook to hand back. It also writes the fixtures to
 `.eval/gh-fixtures.json`, creates an **empty** `.eval/gh-calls.jsonl` (so a "no refused call"
 assertion is well-defined in a run that makes no `gh` call — `fileDoesNotMatch` fails on a missing
-file), and an empty `.eval/gh-config/`. When `jq` is not on `PATH` it throws an error carrying
-`evalSkip: true`, and the runner reports the scenario as skipped (could-not-run under `repeat.mjs`)
-rather than letting every `-q/--jq` call fail it.
+file), and an empty `.eval/gh-config/`. When `jq` is not on `PATH` **and the driver is live** it
+throws an error carrying `evalSkip: true`, and the runner reports the scenario as skipped
+(could-not-run under `repeat.mjs`) rather than letting every `-q/--jq` call fail it. A replay run
+never calls `gh`, so it installs without `jq` and is judged.
 
 - **Reads** (`pr view`, `pr diff`, `pr list`, `issue view`, `repo view`, `api` GET, `auth status`)
   are served from the fixtures (own keys only, so `pr diff constructor` is not a PR); `--json a,b`

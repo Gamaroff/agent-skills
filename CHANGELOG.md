@@ -427,7 +427,7 @@ All notable changes to this project will be documented in this file. Format foll
   dispatches through. `repeat.mjs`'s opt-in codes moved from 3/4/5 to
   `EVAL_SKIP_EXIT=73`, `EVAL_DRIVER_ERROR_EXIT=74` and `EVAL_FAIL_EXIT=75`, out of the range
   Node uses for its own fatal errors (5 is a fatal V8 error); a caller that sets them itself is
-  unaffected. The fake `gh` without `jq` now skips the scenario (could-not-run under
+  unaffected. Under a live driver the fake `gh` without `jq` now skips the scenario (could-not-run under
   `repeat.mjs`) instead of failing it, and a timed-out `claude` names `ETIMEDOUT` and the signal.
 - **The fake `gh` closes its remaining gaps (task.186).** Every refusal is logged with
   `refusal: "write"` or `"not-a-served-read"`; `--version` / `version` are answered only as the

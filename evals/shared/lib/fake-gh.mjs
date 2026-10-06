@@ -47,6 +47,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { driverNameFrom } from "./driver-name.mjs";
 
 const SELF = fileURLToPath(import.meta.url);
 
@@ -120,10 +121,18 @@ function nodeBin() {
   return process.execPath;
 }
 
+/** Whether `jq` runs — the one check the install and the unit tests share (QA cycle 2, C2-CR-6). */
+export function jqAvailable() {
+  return spawnSync("jq", ["--version"], { encoding: "utf-8" }).status === 0;
+}
+
 export function installFakeGh(sandbox, fixtures = {}) {
-  // jq answers -q/--jq. Without it a scenario that reads gh output cannot be judged, so the install
-  // refuses as a skip (the runner reads `evalSkip`) rather than letting every run fail (task.186 A5).
-  if (spawnSync("jq", ["--version"], { encoding: "utf-8" }).error)
+  // jq answers -q/--jq. Without it a LIVE run, whose agent calls gh, cannot be judged, so the
+  // install refuses as a skip (the runner reads `evalSkip`) rather than letting every run fail
+  // (task.186 A5). A replay run never calls gh, so it installs without jq and is judged: refusing
+  // it too made eval:all skip judged scenarios on a host without jq (QA cycle 2, C2-CR-1). The
+  // driver is read from the environment the runner resolved it from, env.json included.
+  if (driverNameFrom(process.env) !== "replay" && !jqAvailable())
     throw Object.assign(
       new Error("jq not available on PATH — the fake gh needs it for -q/--jq"),
       { evalSkip: true },

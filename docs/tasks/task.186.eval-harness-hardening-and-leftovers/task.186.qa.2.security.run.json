@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "shell:.claude/state/t186-nn-probe.sh",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 30,
+      "passed": 30,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "ran_at": "2026-10-06T06:01:56.937Z"
+    }
+  ],
+  "totals": {
+    "executed": 30,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-06T06:01:56.937Z"
+}

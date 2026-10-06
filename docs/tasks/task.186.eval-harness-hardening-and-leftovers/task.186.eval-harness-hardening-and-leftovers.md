@@ -295,18 +295,18 @@ No other breaking changes.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.186.qa.1.eval-harness-hardening-and-leftovers.md](./task.186.qa.1.eval-harness-hardening-and-leftovers.md)
-- **Gate File**: [task.186.gate.1.eval-harness-hardening-and-leftovers.yml](./task.186.gate.1.eval-harness-hardening-and-leftovers.yml)
+- **Full Report**: [task.186.qa.2.eval-harness-hardening-and-leftovers.md](./task.186.qa.2.eval-harness-hardening-and-leftovers.md)
+- **Gate File**: [task.186.gate.2.eval-harness-hardening-and-leftovers.yml](./task.186.gate.2.eval-harness-hardening-and-leftovers.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 392
+- **Tests Executed**: 393
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR-1 (medium): `repeat.mjs` counts `liveAssertions` under replay, so a live-only scenario still scores a vacuous 0/0 pass.
-- CR-3 (low): the fake gh's jq probe errors every fake-gh unit test on a host without jq.
+- Cycle 1's CR-1 and CR-3 are fixed and mutation-proven.
+- C2-CR-1 (medium): the jq refusal fires under replay too, so review-pr replay scenarios skip (exit 0) on a host without jq.
 
 <!-- change-log-start -->
 ## Change Log
@@ -318,7 +318,8 @@ No other breaking changes.
 | 2026-10-06 |  | Status → ready-for-development | review-task |
 | 2026-10-06 |  | Implemented — 4 phases, 32 files outside docs/tasks (2 new modules, 1 removed script, 9 bundled copies); 16 test cases added to existing suites and 37 in the new next-numbered.test.mjs | develop-task |
 | 2026-10-06 |  | QA gate CONCERNS (90/100) — 2 findings (CR-1 medium, CR-3 low) | qa-task |
-| 2026-10-06 |  | QA findings fixed — CR-1 (driver-aware assertion floor, one shared definition) and CR-3 (jq-gated fake-gh tests), 1 iteration | qa-fix |
+| 2026-10-06 |  | QA gate CONCERNS (90/100) — 1 finding (C2-CR-1 medium) | qa-task |
+| 2026-10-06 |  | QA findings fixed — CR-1 (driver-aware assertion floor), CR-3 (fake-gh tests without jq), C2-CR-1 (jq refusal scoped to live drivers), 2 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---

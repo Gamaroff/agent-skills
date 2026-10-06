@@ -11,6 +11,9 @@
  */
 import * as A from "../assertions.mjs";
 
+// Re-exported so runner.mjs and repeat.mjs import both from here; defined in driver-name.mjs.
+export { driverNameFrom } from "./driver-name.mjs";
+
 const DISPATCH = Object.freeze({
   fileExists: (args) => A.fileExists(...args),
   fileAbsent: (args) => A.fileAbsent(...args),
@@ -46,21 +49,12 @@ export function dispatchAssertion(fn, args, ctx) {
 }
 
 /**
- * The driver a run uses, from an environment: DRIVER wins, then the deprecated MODE=live
- * (claude-sdk) / MODE=replay, else replay. The runner and repeat.mjs both read it here, so the
- * driver repeat.mjs plans for is the one the runner runs (task.186 QA cycle 1, CR-1).
- */
-export function driverNameFrom(env) {
-  if (env.DRIVER) return env.DRIVER;
-  if (env.MODE === "live") return "claude-sdk";
-  return "replay";
-}
-
-/**
  * The assertions a run under `driverName` judges: `assertions`, plus `liveAssertions` when the
  * driver is not replay — replay never calls the agent, so a live-only check has nothing to read.
- * The ONE definition: the runner judges this list and repeat.mjs refuses a scenario for which it
- * is empty, so "nothing to judge" cannot mean one thing to each (task.186 QA cycle 1, CR-1).
+ * The ONE definition of the list: the runner judges it and repeat.mjs refuses a scenario for which
+ * it is empty (task.186 QA cycle 1, CR-1). Only repeat.mjs refuses: the runner run directly still
+ * scores an empty list as 0/0 — eval:all relies on scenarios carrying assertions, and every one does
+ * (QA cycle 2, C2-CR-2).
  */
 export function assertionsFor(scenario, driverName) {
   const list = (key) => (Array.isArray(scenario[key]) ? scenario[key] : []);

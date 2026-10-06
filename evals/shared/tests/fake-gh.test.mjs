@@ -8,7 +8,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { installFakeGh } from "../lib/fake-gh.mjs";
+import { fileURLToPath } from "node:url";
+import { installFakeGh, jqAvailable } from "../lib/fake-gh.mjs";
+import { driverNameFrom } from "../lib/driver-name.mjs";
 
 const FIXTURES = {
   "pr view": {
@@ -59,14 +61,20 @@ function sandbox(fixtures = FIXTURES) {
   return { dir, gh, calls };
 }
 
-const hasJq = spawnSync("jq", ["--version"]).status === 0;
-// installFakeGh refuses without jq (task.186 A5), so a test that installs the fake skips on a host
-// without it rather than erroring (QA cycle 1, CR-3). The launcher-refusal test installs nothing
-// and runs everywhere.
+// The installer's own check, so the tests and the install cannot disagree about jq (C2-CR-6).
+const hasJq = jqAvailable();
+// installFakeGh refuses without jq only under a live driver (task.186 A5, scoped by QA cycle 2,
+// C2-CR-1), so a test that installs the fake skips only then (QA cycle 1, CR-3). The unit tests run
+// as replay, where they install and run without jq; only the -q/--jq test needs jq itself.
+const installRefuses = !hasJq && driverNameFrom(process.env) !== "replay";
 const jqTest = (name, fn) =>
   test(
     name,
-    { skip: !hasJq && "jq not installed — installFakeGh refuses without it" },
+    {
+      skip:
+        installRefuses &&
+        "jq not installed — installFakeGh refuses without it under a live driver",
+    },
     fn,
   );
 
@@ -502,22 +510,23 @@ test(
   () => {
     const bin = fs.mkdtempSync(path.join(os.tmpdir(), "fake-gh-nojq-"));
     fs.symlinkSync(process.execPath, path.join(bin, "node"));
-    const self = new URL(import.meta.url).pathname;
+    const self = fileURLToPath(import.meta.url);
     // NODE_TEST_CONTEXT is removed: inherited from this runner, it makes the child report to a
     // parent instead of printing, and its stdout comes back empty.
+    // DRIVER and MODE are removed too: the unit tests run as replay, where the fake installs
+    // without jq and only the -q/--jq test needs it.
     const env = { ...process.env, PATH: bin, FAKE_GH_SUITE_NO_JQ: "1" };
     delete env.NODE_TEST_CONTEXT;
+    delete env.DRIVER;
+    delete env.MODE;
     const r = spawnSync(
       process.execPath,
       ["--test", "--test-reporter=tap", self],
       { encoding: "utf8", env },
     );
+    fs.rmSync(bin, { recursive: true, force: true });
     assert.equal(r.status, 0, r.stdout.slice(-2000));
     assert.match(r.stdout, /^# fail 0$/m);
-    assert.match(
-      r.stdout,
-      /^# skipped [1-9]/m,
-      "the jq-dependent tests were skipped",
-    );
+    assert.match(r.stdout, /^# skipped [1-9]/m, "the -q/--jq test was skipped");
   },
 );
