@@ -206,6 +206,7 @@ No other breaking changes.
 5. ✅ `shared/resources/pr-inline-comment.js`
 6. ✅ `shared/resources/newest-numbered.sh` — `next_numbered` added (Phase 4 chose Option 1)
 6a. ✅ `evals/shared/lib/assertion-dispatch.mjs` (new) — the one table of assertion names, imported by `runner.mjs` and `repeat.mjs`
+6c. ✅ `evals/shared/lib/driver-name.mjs` (new, QA cycle 2 C2-CR-1) — `driverNameFrom`, the one driver resolution; import-free so the `gh` launcher stays light
 6b. ❌ `skills/review-pr/scripts/next-report-number.sh` — removed; `/review-pr` Step 7 uses `next_numbered`
 7. ✅ `skills/review-pr/SKILL.md`, `skills/qa-planning/SKILL.md`, `skills/review-bug/SKILL.md`, `skills/review-epic/SKILL.md`, `skills/review-task/SKILL.md`, `skills/finalise/SKILL.md`
 
@@ -311,6 +312,13 @@ No other breaking changes.
 ## Deferred Work
 
 - **C3-CR-1** (MEDIUM, test machinery) — carried to gate 3 `recommendations.future` (route 2, cycle 3): the no-jq meta-test in `evals/shared/tests/fake-gh.test.mjs` asserts `skipped >= 1`, which its own self-skip always satisfies, and has no pass floor
+- **CR-2** (gate 1, MEDIUM, advisory) — `skills/review-story/SKILL.md` numbers `story.{epic}.{story}.review.{n}.` with no rule, and `next-numbered.test.mjs` derives its population from skills already calling `next_numbered`; build the population from report-name templates (follow-up task)
+- **CR-4** (gate 1, LOW) — `refusal: "write"` also covers an `api` GET refused for an off-list flag
+- **CR-5** (gate 1, LOW) and **5c CR-1** (PR review, MEDIUM/medium) — `next_numbered` reads an unsubstituted `{placeholder}` in `-name`, a missing predicate, or a failed `find` as an empty series and prints 1; every shipped call site passes a tested `-name`
+- **CR-6** (gate 1, LOW) — a setup that never settles leaves its sandbox behind
+- **C2-CR-3, C2-CR-4** (gate 2, LOW) — a `requiresLiveDriver` live-only scenario under replay reads usage (2), not 3; `env.json` values are coerced differently by runner and `repeat.mjs`
+- **C3-CR-2, C3-CR-3** (gate 3, cleanup) — stale A5 comment in `runner-setup.test.mjs`; `jqTest` name
+- **5c CR-2** (PR review, cleanup) — `evals/shared/README.md` says the runner exits 0 only from its final line; a skip still exits 0 unless `EVAL_SKIP_EXIT` is set
 
 <!-- change-log-start -->
 ## Change Log
@@ -375,7 +383,7 @@ measured with `git status --porcelain --untracked-files=all` (files) and `git di
 Live: `EVAL_RUNS=1 env -u ANTHROPIC_API_KEY npm run eval:review-pr:cli` — 4/4 scenarios passed
 (01-happy 6/6, 02-renumber-gap 7/7, 03-unanchored 5/5, 04-planted-bug 6/6 assertions), exit 0.
 
-**Deferred Work**: none. Review Optional O1 and O2 were both applied.
+**Deferred Work**: see `## Deferred Work` — the advisory findings the QA gates and the PR review carried, none blocking. Review Optional O1 and O2 were both applied.
 
 ---
 
