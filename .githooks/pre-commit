@@ -101,7 +101,11 @@ trap 'rm -f "$PRE_FILE" "$POST_FILE"' EXIT
 dirty_refs >"$PRE_FILE"
 
 echo "▶ Bundling shared resources into skills/*/references/ ..."
-npm run bundle --silent
+# Captured, not left to `set -e`: a failed bundle must still reach `revert_new`
+# below, or the copies this run DID write stay on disk, untracked, and the retry
+# counts them as pre-existing and refuses (task.126 QA-2, CR-1).
+BUNDLE_STATUS=0
+npm run bundle --silent || BUNDLE_STATUS=$?
 dirty_refs >"$POST_FILE"
 
 NEW="$(comm -13 "$PRE_FILE" "$POST_FILE")"
@@ -125,6 +129,19 @@ revert_new() {
     fi
   done
 }
+# The bundler fails when it leaves a copy alone that bundle:check will fail —
+# a stale headerless (`.json`) copy, an authored file at a shared name, a
+# symlink (observation #199). Its ❌ lines above name each copy and the remedy.
+if [ "$BUNDLE_STATUS" -ne 0 ]; then
+  {
+    echo ""
+    echo "✗ \`npm run bundle\` failed (exit $BUNDLE_STATUS) — bundle:check would fail in CI."
+    echo "  Fix what its ❌ lines name, then retry."
+  } >&2
+  revert_new
+  exit 1
+fi
+
 # Pre-existing drift is left alone, but never silently: an unmentioned dirty
 # bundle is how source and its bundled copies drift apart in the first place.
 LEFT="$(comm -12 "$PRE_FILE" "$POST_FILE")"
