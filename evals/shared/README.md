@@ -78,15 +78,19 @@ script passes every scenario in one call for that reason. Its earlier shell loop
 | --- | --- |
 | 0 | every scenario met its K |
 | 1 | at least one scenario fell below its K, and every run of every scenario ran |
-| 2 | usage: a bad or valueless flag, K outside 1..N, `live.minPass` outside 1..5, or a missing or malformed `scenario.json`. All are checked before any run starts |
-| 3 | **could not run** — any run that was not a verdict. It covers a **skip** (the driver is unavailable, or a `requiresLiveDriver` scenario ran under replay) and a **driver error** (`claude -p` exited non-zero: no credit, a crash, or a timeout). It also covers anything else the runner did instead of judging: a setup error, an unknown `DRIVER`, a crash, a signal or a spawn failure. It stops at the first such run and prints no pass rate for runs that did not happen |
+| 2 | usage: a bad or valueless flag, K outside 1..N, `live.minPass` outside 1..5, a missing or malformed `scenario.json`, an assertion `fn` the runner does not know, or a scenario with no `assertions` or `liveAssertions` at all. All are checked before any run starts |
+| 3 | **could not run** — any run that was not a verdict. It covers a **skip** (the driver is unavailable, or a `requiresLiveDriver` scenario ran under replay) and a **driver error** (`claude -p` exited non-zero: no credit, a crash, or a timeout). It also covers anything else the runner did instead of judging: a setup error, a setup that never settles, a missing dependency (the fake `gh` without `jq`), an unknown `DRIVER`, a crash, a signal or a spawn failure. It stops at the first such run and prints no pass rate for runs that did not happen |
 
-**The verdict is positive.** The runner exits `EVAL_FAIL_EXIT` (5, requested by `repeat.mjs`)
-**only** when assertions ran and failed, and 0 when they passed. `repeat.mjs` reads every other
+**The verdict is positive.** The runner exits `EVAL_FAIL_EXIT` (requested by `repeat.mjs` as
+`EVAL_FAIL_EXIT=75`) **only** when assertions ran and failed, and 0 **only** from its final line,
+after they passed. Everything before that line exits 1: a setup or driver promise that never settles
+ends the process with exit 1, where it used to end with 0 and read as a pass (task.186). `repeat.mjs` reads every other
 status as could-not-run, so a new way for the runner to fail cannot be misread as a failed run.
 QA cycles 1 and 2 had enumerated non-verdict exits one at a time, and cycle 3 found another.
-`EVAL_SKIP_EXIT=3` is still requested, because the runner's default for a skip is 0, which would
-read as a pass. `EVAL_DRIVER_ERROR_EXIT=4` only sharpens the message. Each must be a code in 3–125;
+`EVAL_SKIP_EXIT=73` is still requested, because the runner's default for a skip is 0, which would
+read as a pass. `EVAL_DRIVER_ERROR_EXIT=74` only sharpens the message. The three sit in 64–113 because
+Node exits 1–13 on its own fatal errors — 5 is a fatal V8 error — so the earlier 3, 4 and 5 let a
+crashed runner read as a skip, a driver error or a failed run. Each must be a code in 3–125;
 anything else is ignored, and with none set the runner exits as `eval:all` expects. Before task.185's QA cycles, a machine without `claude` reported
 `passed 5/5`, and a key with no credit reported `passed 0/5` with a regression's exit code. A
 timeout counts as could-not-run: raise `EVAL_TIMEOUT_MS` if a scenario legitimately needs longer.
@@ -136,7 +140,9 @@ Use for any scenario that needs a real git repo without touching the working tre
 `{ PATH }` for a `setup` hook to hand back. It also writes the fixtures to
 `.eval/gh-fixtures.json`, creates an **empty** `.eval/gh-calls.jsonl` (so a "no refused call"
 assertion is well-defined in a run that makes no `gh` call — `fileDoesNotMatch` fails on a missing
-file), and an empty `.eval/gh-config/`.
+file), and an empty `.eval/gh-config/`. When `jq` is not on `PATH` it throws an error carrying
+`evalSkip: true`, and the runner reports the scenario as skipped (could-not-run under `repeat.mjs`)
+rather than letting every `-q/--jq` call fail it.
 
 - **Reads** (`pr view`, `pr diff`, `pr list`, `issue view`, `repo view`, `api` GET, `auth status`)
   are served from the fixtures; `--json a,b` selects fields, `-q/--jq` is piped through the real

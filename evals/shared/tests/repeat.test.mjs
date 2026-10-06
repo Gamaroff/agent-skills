@@ -12,6 +12,9 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const REPEAT = fileURLToPath(new URL("../repeat.mjs", import.meta.url));
+// One assertion that always passes. repeat.mjs refuses a scenario with nothing to judge (task.186
+// A4), so a fixture whose point is elsewhere still carries one.
+const ANY = [{ fn: "fileAbsent", args: ["$SANDBOX/never.txt"] }];
 
 function alternatingScenario(extra = {}) {
   const sc = fs.mkdtempSync(path.join(os.tmpdir(), "repeat-"));
@@ -126,7 +129,7 @@ function skippingScenario(extra = {}) {
     JSON.stringify({
       name: "skip",
       requiresLiveDriver: true,
-      assertions: [],
+      assertions: ANY,
       ...extra,
     }),
   );
@@ -148,7 +151,7 @@ test("a run with no claude binary (driver unavailable) stops repeat with exit 3,
   const sc = fs.mkdtempSync(path.join(os.tmpdir(), "repeat-nocli-"));
   fs.writeFileSync(
     path.join(sc, "scenario.json"),
-    JSON.stringify({ name: "nocli", assertions: [] }),
+    JSON.stringify({ name: "nocli", assertions: ANY }),
   );
   // A PATH that is one empty directory: neither `which` nor `claude` resolves, so the absence of
   // `claude` is set up here rather than assumed of /usr/bin (task.185 QA cycle 2, CR-6).
@@ -209,7 +212,7 @@ test("several scenarios: every summary is printed and one failing scenario makes
   const ok = fs.mkdtempSync(path.join(os.tmpdir(), "repeat-ok-"));
   fs.writeFileSync(
     path.join(ok, "scenario.json"),
-    JSON.stringify({ name: "ok", assertions: [] }),
+    JSON.stringify({ name: "ok", assertions: ANY }),
   );
   const r = repeat([ok, alternatingScenario(), "--runs", "2"]);
   assert.equal(r.status, 1, r.stdout);
@@ -221,7 +224,7 @@ test("a scenario that cannot run stops the whole call with exit 3, whatever ran 
   const ok = fs.mkdtempSync(path.join(os.tmpdir(), "repeat-ok-"));
   fs.writeFileSync(
     path.join(ok, "scenario.json"),
-    JSON.stringify({ name: "ok", assertions: [] }),
+    JSON.stringify({ name: "ok", assertions: ANY }),
   );
   const r = repeat([ok, skippingScenario(), "--runs", "1"]);
   assert.equal(r.status, 3, r.stdout + r.stderr);
@@ -241,7 +244,7 @@ test("a driver error stops repeat with exit 3, never a failed run", () => {
   const sc = fs.mkdtempSync(path.join(os.tmpdir(), "repeat-drv-"));
   fs.writeFileSync(
     path.join(sc, "scenario.json"),
-    JSON.stringify({ name: "drv", assertions: [] }),
+    JSON.stringify({ name: "drv", assertions: ANY }),
   );
   const r = repeat([sc, "--runs", "3", "--min-pass", "1"], {
     DRIVER: "claude-cli",
@@ -294,7 +297,7 @@ test("a setup that throws is could-not-run, never a failed run", () => {
   );
   fs.writeFileSync(
     path.join(sc, "scenario.json"),
-    JSON.stringify({ name: "bad-setup", setup: "setup.mjs", assertions: [] }),
+    JSON.stringify({ name: "bad-setup", setup: "setup.mjs", assertions: ANY }),
   );
   const r = repeat([sc, "--runs", "2", "--min-pass", "1"]);
   assert.equal(r.status, 3, r.stdout + r.stderr);
@@ -306,4 +309,104 @@ test("a malformed EVAL_RUNS is named as $EVAL_RUNS, not --runs (C3-CR-5)", () =>
   const r = repeat([alternatingScenario()], { EVAL_RUNS: "x" });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /^repeat: \$EVAL_RUNS must be a non-negative integer/);
+});
+
+// task.186 A1: a setup that never settles empties the event loop, and Node exits 0 without the
+// runner reaching its assertions. That is not a pass: repeat must stop with could-not-run.
+test("a setup that never settles is could-not-run, never a pass (A1)", () => {
+  const sc = fs.mkdtempSync(path.join(os.tmpdir(), "repeat-hang-"));
+  fs.writeFileSync(
+    path.join(sc, "setup.mjs"),
+    "export function setup() { return new Promise(() => {}); }\n",
+  );
+  fs.writeFileSync(
+    path.join(sc, "scenario.json"),
+    JSON.stringify({ name: "hang", setup: "setup.mjs", assertions: ANY }),
+  );
+  const r = repeat([sc, "--runs", "2", "--min-pass", "1"]);
+  assert.equal(r.status, 3, r.stdout + r.stderr);
+  assert.match(r.stdout, /run 1\/2: not judged\n$/);
+  assert.doesNotMatch(r.stdout, /passed /);
+});
+
+// task.186 A2: an unknown assertion name is refused before any run, as a usage error — a typo in
+// liveAssertions used to surface as paid live runs that looked like agent failures.
+test("an unknown assertion fn is a usage error before any run (A2)", () => {
+  for (const key of ["assertions", "liveAssertions"]) {
+    const sc = alternatingScenario({
+      [key]: [{ fn: "fileExsts", args: ["$SANDBOX/pass.txt"] }],
+    });
+    const r = repeat([sc, "--runs", "2", "--min-pass", "1"]);
+    assert.equal(r.status, 2, `${key}: ${r.stdout}${r.stderr}`);
+    assert.match(
+      r.stderr,
+      new RegExp(`${key}\\[0\\]: unknown assertion fn "fileExsts"`),
+    );
+    assert.equal(
+      fs.existsSync(path.join(sc, "count")),
+      false,
+      `${key}: no run started`,
+    );
+  }
+});
+
+// task.186 A4: a scenario with nothing to judge passes vacuously, so it is refused.
+test("a scenario with no assertions is a usage error before any run (A4)", () => {
+  for (const extra of [
+    { assertions: [] },
+    { assertions: [], liveAssertions: [] },
+  ]) {
+    const sc = alternatingScenario(extra);
+    const r = repeat([sc, "--runs", "2", "--min-pass", "1"]);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /no assertions/);
+    assert.equal(
+      fs.existsSync(path.join(sc, "count")),
+      false,
+      "no run started",
+    );
+  }
+  // liveAssertions alone are something to judge.
+  const live = alternatingScenario({
+    assertions: [],
+    liveAssertions: [{ fn: "fileExists", args: ["$SANDBOX/pass.txt"] }],
+  });
+  assert.equal(repeat([live, "--runs", "1", "--min-pass", "1"]).status, 0);
+});
+
+// task.186 A3: the opt-in codes repeat asks the runner for sit in 64–113, which neither Node (1–13
+// for its own fatal errors, 5 for a fatal V8 error) nor the shell (126+) uses, and the README table
+// states the same three values.
+test("repeat's opt-in exit codes are outside Node's range and match the README (A3)", () => {
+  const sc = fs.mkdtempSync(path.join(os.tmpdir(), "repeat-codes-"));
+  fs.writeFileSync(
+    path.join(sc, "setup.mjs"),
+    `import fs from "node:fs";
+import path from "node:path";
+export function setup({ scenarioDir }) {
+  const pick = ["EVAL_SKIP_EXIT", "EVAL_DRIVER_ERROR_EXIT", "EVAL_FAIL_EXIT"];
+  fs.writeFileSync(path.join(scenarioDir, "codes.json"),
+    JSON.stringify(Object.fromEntries(pick.map((k) => [k, process.env[k]]))));
+}
+`,
+  );
+  fs.writeFileSync(
+    path.join(sc, "scenario.json"),
+    JSON.stringify({ name: "codes", setup: "setup.mjs", assertions: ANY }),
+  );
+  const r = repeat([sc, "--runs", "1", "--min-pass", "1"]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const codes = JSON.parse(
+    fs.readFileSync(path.join(sc, "codes.json"), "utf8"),
+  );
+  const values = Object.values(codes).map(Number);
+  assert.equal(new Set(values).size, 3, "three distinct codes");
+  const readme = fs.readFileSync(
+    fileURLToPath(new URL("../README.md", import.meta.url)),
+    "utf8",
+  );
+  for (const [k, v] of Object.entries(codes)) {
+    assert.ok(Number(v) >= 64 && Number(v) <= 113, `${k}=${v} is in 64–113`);
+    assert.ok(readme.includes(`\`${k}=${v}\``), `README states ${k}=${v}`);
+  }
 });

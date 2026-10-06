@@ -117,6 +117,13 @@ function nodeBin() {
 }
 
 export function installFakeGh(sandbox, fixtures = {}) {
+  // jq answers -q/--jq. Without it a scenario that reads gh output cannot be judged, so the install
+  // refuses as a skip (the runner reads `evalSkip`) rather than letting every run fail (task.186 A5).
+  if (spawnSync("jq", ["--version"], { encoding: "utf-8" }).error)
+    throw Object.assign(
+      new Error("jq not available on PATH — the fake gh needs it for -q/--jq"),
+      { evalSkip: true },
+    );
   const evalDir = path.join(sandbox, ".eval");
   const bin = path.join(evalDir, "bin");
   fs.mkdirSync(bin, { recursive: true });

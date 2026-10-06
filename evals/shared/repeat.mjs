@@ -18,7 +18,8 @@
  * evals/shared/README.md § "Repeat runner — live pass rates":
  *   0  every scenario met its min-pass
  *   1  at least one scenario fell below its min-pass (and every run of every scenario ran)
- *   2  usage error — bad flag, missing value, missing or malformed scenario.json
+ *   2  usage error — bad flag, missing value, missing or malformed scenario.json, an unknown
+ *      assertion fn, or a scenario with no assertions at all
  *   3  could not run — any run that was not a verdict: SKIPPED (driver unavailable, or a live-only
  *      scenario under replay), a DRIVER ERROR (claude -p exited non-zero: no credit, crash,
  *      timeout), or anything else the runner did instead of judging (setup error, unknown DRIVER,
@@ -38,12 +39,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { assertionListProblems } from "./lib/assertion-dispatch.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RUNNER = path.join(__dirname, "runner.mjs");
-const SKIP_EXIT = 3; // the runner's status for a skip, requested through EVAL_SKIP_EXIT
-const DRIVER_ERROR_EXIT = 4; // … and for a driver error, through EVAL_DRIVER_ERROR_EXIT
-const FAIL_EXIT = 5; // the runner's status when assertions RAN and failed, through EVAL_FAIL_EXIT
+// The codes repeat asks the runner for. They sit in 64–113, which neither Node nor the shell uses:
+// Node exits 1–13 on its own fatal errors (5 is a fatal V8 error), so 3–5 let a crashed runner read
+// as a skip, a driver error or a failed run (task.186 A3). The runner accepts any value in 3–125.
+const SKIP_EXIT = 73; // the runner's status for a skip, requested through EVAL_SKIP_EXIT
+const DRIVER_ERROR_EXIT = 74; // … and for a driver error, through EVAL_DRIVER_ERROR_EXIT
+const FAIL_EXIT = 75; // the runner's status when assertions RAN and failed, through EVAL_FAIL_EXIT
 const CALIBRATED_RUNS = 5; // live.minPass is a count out of this many runs
 const COULD_NOT_RUN = 3;
 
@@ -107,6 +112,19 @@ const plans = scenarioDirs.map((dir) => {
   } catch (e) {
     usage(`${file} is not valid JSON: ${e.message}`);
   }
+  // A typo in an assertion name, or a scenario with nothing to judge, is a usage error found here,
+  // before any run spends a live call (task.186 A2, A4). An empty list would pass every run.
+  const listProblems = assertionListProblems(scenario);
+  if (listProblems.length) usage(`${file}: ${listProblems.join("; ")}`);
+  const judged =
+    (Array.isArray(scenario.assertions) ? scenario.assertions.length : 0) +
+    (Array.isArray(scenario.liveAssertions)
+      ? scenario.liveAssertions.length
+      : 0);
+  if (judged === 0)
+    usage(
+      `${file}: no assertions — a run with nothing to judge cannot pass or fail`,
+    );
   const name = path.basename(path.resolve(dir));
   if (explicitMin !== undefined)
     return { dir, name, minPass: explicitMin, note: "" };

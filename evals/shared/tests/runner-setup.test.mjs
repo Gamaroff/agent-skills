@@ -250,3 +250,116 @@ test("EVAL_FAIL_EXIT marks failed assertions and nothing else", () => {
     1,
   );
 });
+
+// task.186 A1: a setup whose promise never settles leaves Node with an empty event loop, and it
+// exits with process.exitCode. That used to be 0 — a pass for a run that judged nothing.
+test("a setup that never settles is not a pass: the runner exits non-zero (A1)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runner-hang-"));
+  fs.writeFileSync(
+    path.join(dir, "hang.mjs"),
+    "export function setup() { return new Promise(() => {}); }\n",
+  );
+  const sc = path.join(dir, "sc");
+  fs.mkdirSync(sc);
+  fs.writeFileSync(
+    path.join(sc, "scenario.json"),
+    JSON.stringify({
+      name: "hang",
+      setup: "../hang.mjs",
+      assertions: [{ fn: "fileAbsent", args: ["$SANDBOX/never.txt"] }],
+    }),
+  );
+  const r = run(sc, { DRIVER: "replay" });
+  assert.notEqual(r.status, 0, r.stderr);
+  assert.doesNotMatch(r.stderr, /assertions passed/);
+  // Not the fail code either: nothing was judged.
+  assert.notEqual(
+    run(sc, { DRIVER: "replay", EVAL_FAIL_EXIT: "75" }).status,
+    75,
+  );
+});
+
+// task.186 A2: unknown assertion names are refused before the sandbox, the setup or the driver.
+test("an unknown assertion fn is refused before any setup or driver runs (A2)", () => {
+  for (const key of ["assertions", "liveAssertions"]) {
+    const sc = scenario({
+      setup: "../../setup.mjs",
+      [key]: [{ fn: "fileExsts", args: ["$SANDBOX/x"] }],
+    });
+    const r = run(sc, { DRIVER: "replay", EVAL_FAIL_EXIT: "75" });
+    assert.equal(r.status, 1, `${key}: ${r.stderr}`);
+    assert.match(
+      r.stderr,
+      new RegExp(`${key}\\[0\\]: unknown assertion fn "fileExsts"`),
+    );
+    assert.equal(r.sandbox, undefined, `${key}: no sandbox was made`);
+  }
+});
+
+// task.186 A2: the dispatch table is the one list of names. Every assertion assertions.mjs exports
+// (aggregate is the combiner, not an assertion) must be in it, so a new assertion cannot be added
+// without becoming dispatchable — and a name in the table must dispatch.
+test("every exported assertion is dispatchable, and only those names (A2)", async () => {
+  const A = await import("../assertions.mjs");
+  const { ASSERTION_FNS, dispatchAssertion } =
+    await import("../lib/assertion-dispatch.mjs");
+  const exported = Object.keys(A)
+    .filter((k) => typeof A[k] === "function" && k !== "aggregate")
+    .sort();
+  assert.ok(
+    exported.length >= 17,
+    `non-vacuous: ${exported.length} assertions`,
+  );
+  assert.deepEqual([...ASSERTION_FNS].sort(), exported);
+  assert.match(
+    dispatchAssertion("constructor", [], {}).reason,
+    /unknown assertion fn/,
+  );
+});
+
+// task.186 A5: the fake gh needs jq for -q/--jq. Without it a scenario cannot be judged, so the
+// install refuses as a skip — could-not-run under repeat — rather than letting the run fail.
+test("a missing jq makes a fake-gh scenario a skip, not a failed run (A5)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runner-nojq-"));
+  const fakeGh = new URL("../lib/fake-gh.mjs", import.meta.url).href;
+  fs.writeFileSync(
+    path.join(dir, "gh-setup.mjs"),
+    `import { installFakeGh } from ${JSON.stringify(fakeGh)};
+export function setup({ sandbox }) { return { env: installFakeGh(sandbox, {}) }; }
+`,
+  );
+  const sc = path.join(dir, "sc");
+  fs.mkdirSync(sc);
+  fs.writeFileSync(
+    path.join(sc, "scenario.json"),
+    JSON.stringify({
+      name: "nojq",
+      setup: "../gh-setup.mjs",
+      assertions: [{ fn: "fileAbsent", args: ["$SANDBOX/never.txt"] }],
+    }),
+  );
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), "runner-empty-path-"));
+  const r = run(sc, { DRIVER: "replay", PATH: empty, EVAL_SKIP_EXIT: "73" });
+  assert.equal(r.status, 73, r.stderr);
+  assert.match(r.stderr, /skipped: .*jq/);
+  assert.equal(fs.existsSync(r.sandbox), false, "sandbox removed");
+  // With jq on PATH the same scenario runs and passes.
+  assert.equal(run(sc, { DRIVER: "replay" }).status, 0);
+});
+
+// task.186 A6: a killed `claude` has status null; the error must say why (ETIMEDOUT, SIGTERM).
+test("a driver killed by its timeout names the error code and the signal (A6)", () => {
+  const sc = scenario({ assertions: [] });
+  const bin = fakeClaudeBin();
+  const r = run(sc, {
+    DRIVER: "claude-cli",
+    PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+    EVAL_TIMEOUT_MS: "300",
+    FAKE_CLAUDE_SLEEP: "5",
+  });
+  assert.equal(r.status, 1);
+  assert.match(
+    r.stderr,
+    /driver error: claude-cli exited null \(ETIMEDOUT, SIGTERM\)/,
+  );
+});
