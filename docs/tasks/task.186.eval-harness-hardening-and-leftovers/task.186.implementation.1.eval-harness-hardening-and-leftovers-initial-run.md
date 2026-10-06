@@ -3,7 +3,7 @@
 **Task**: `task.186.eval-harness-hardening-and-leftovers.md`
 **Run Number**: 1
 **Started**: 2026-10-06 04:46
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ First autonomous run (develop-next T186) of the four task.185 follow-up phases: 
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 4/4 phases; 5 commits e1c0aca..1848e8c; npm run ci exit 0; live 4/4 | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #576: https://github.com/Gamaroff/agent-skills/pull/576 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.186.qa.{N}.*.md`; `task.186.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: gate 1 CONCERNS → fix 3c7b6b8; gate 2 CONCERNS → fix 583983f; gate 3 CONCERNS, Diminishing-returns exit (route 2); 5c PR review CONCERNS | —                    |
-| 7. finalise                | ❌ Failed  | `task.186.dod.{N}.*.md`; task `status: accepted`                      | DoD gaps: AC6 zsh arm has no CI lane — operator decision needed; `task.186.dod.1…` | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.186.dod.{N}.*.md`; task `status: accepted`                      | Run 1 GAPS (AC6 zsh lane); operator annotation `eb4c884`; run 2 ACCEPTED — `task.186.dod.2…`, acceptance commit `966a977` | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -109,13 +109,24 @@ First autonomous run (develop-next T186) of the four task.185 follow-up phases: 
 - `reenter-qa-after-finalise.sh` refused `no-code-moved` (document-only fix) → resume at Step 7
 - Lock restored from halt_snapshot via `--restore` at step 7
 
+### Step 7 — finalise (run 2)
+
+- DoD file `task.186.dod.2.eval-harness-hardening-and-leftovers.md` (`next_numbered` → 2); four agents re-run from scratch: AC ✅ PASS 10/10 (AC6 under the annotation); Security ✅ PASS (30 probes, 0 reproduced; fake gh 33/33); Compliance ⚠️ NOT_APPLICABLE; Docs ✅ PASS
+- CI reading 1: SUCCESS @ 6723c207fd55 (over 5 checks); CI reading 2: SUCCESS (tree-equivalent to 4ee8a80c9ef3) @ 966a977c6ecb (over 5 checks, 30s)
+- Accepted: `status: accepted`, `completed_date`, `pr_number: 576`, Change Log 1.2; run-1 gap section retitled historical/superseded; registry row ticked (`planned` → `accepted`); sprint review summary; acceptance commit `966a977` pushed; 6b assertions passed; 6d CHANGELOG cites task.186
+- The PreCompact pause had removed the lock; restored via `--restore` before the finalise lock advance (step 7 → 8)
+- The run-1 CI poll script in `.claude/state` was a simplified copy with no check-count floor; replaced with the canonical poll before reading 2
+- PR canonical summary comment posted (https://github.com/Gamaroff/agent-skills/pull/576#issuecomment-6011319158); DoD body posted to PR (https://github.com/Gamaroff/agent-skills/pull/576#issuecomment-6011333682)
+- Tracker: done comment `posted` (orchestrator re-post `already`); issue #575 closed, state read back `CLOSED`; board `done` → `already`; Document link already durable
+- Task completed
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
 
-- **Step 7 HALT — DoD gaps (1):** AC6 — the six call-site tests run under bash per PR, but the zsh arm of `shared/resources/tests/next-numbered.test.mjs` has no CI lane (`ubuntu-latest` has no zsh). Verified locally under zsh. Resolution is an operator decision: annotate the criterion (document-only → resume at 7) or install zsh in `.github/workflows/test.yml` (code → resume re-enters QA at 5a)
+- **Step 7 HALT — DoD gaps (1), resolved by the operator annotation (`eb4c884`) and accepted in DoD run 2:** AC6 — the six call-site tests run under bash per PR, but the zsh arm of `shared/resources/tests/next-numbered.test.mjs` has no CI lane (`ubuntu-latest` has no zsh). Verified locally under zsh. Resolution is an operator decision: annotate the criterion (document-only → resume at 7) or install zsh in `.github/workflows/test.yml` (code → resume re-enters QA at 5a)
 
 - Step 3: `npm run ci:fast` first run red on prettier (8 files) and on a bundle `MISSING` caused by a test comment naming a `shared/resources/` path (a bundling instruction). Both fixed; `test-clean-checkout.test.js` failed once on its own 10 s load budget and passed alone (it labels itself LOAD-SENSITIVE)
 - Note, not fixed (out of scope): the fake `gh` refuses `api -X GET -f …` by design (README: "`-X GET` with a field flag" is refused), so the corrected inline-comment listing is still not servable by the fake. No eval drives `--inline` through it today
@@ -159,13 +170,15 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated — DoD gaps at Step 7 (operator decision on AC6)
+**Finished**: 2026-10-06 07:15 UTC
+**Final Status**: Completed
 **Branch**: feature/task.186.eval-harness-hardening-and-leftovers
 **PR**: https://github.com/Gamaroff/agent-skills/pull/576
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 3
+**DoD Summary**: `task.186.dod.2.eval-harness-hardening-and-leftovers.md` (run 1: `task.186.dod.1…`, GAPS)
+**Tracker debt**: none
+
+**Completion Summary**: Implemented the four task.185 follow-up phases. (1) The runner and `repeat.mjs` never score a non-verdict as a verdict, sharing one assertion table, with the opt-in exit codes moved to 73/74/75. (2) The fake `gh` labels every refusal and fails closed on version argv, `-R` and missing `pick()` fields. (3) `pr-inline-comment.js` lists comments with `-X GET`. (4) Six skills number reports highest + 1 through `next_numbered`. Three QA cycles fixed CR-1, CR-3 and the C2-CR-1 regression (the jq refusal under replay), then exited by the Diminishing-returns route. DoD run 1 stopped on AC6's zsh lane; it was accepted in run 2 after the operator scope annotation. Follow-ups are in the task's Deferred Work.
 
 ---
 
