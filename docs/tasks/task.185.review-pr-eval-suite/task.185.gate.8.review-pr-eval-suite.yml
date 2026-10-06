@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.185.review-pr-eval-suite'
+task_title: 'review-pr eval suite'
+gate: PASS
+status_reason: 'The finalise run-2 security gap is closed (f728e459): the fake gh serves pr/issue only in an unambiguous read shape and refuses every command that is not a served read. 96 directly executed forms and the reviewer''s 22 found no write served and every review-pr read served. Three low advisory findings.'
+reviewer: 'QA Engineer'
+head: 'f728e459676c63e4942cca6f3d853c38061d5cc5'
+updated: '2026-10-05T19:29:46Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5359
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+  boundary_probes: '96 argv forms executed directly at f728e459 (the DoD run-2 security agent''s 11 reproduced writes, the review-pr and tracker-comment reads, and the earlier 74-form sets): all correct. The reviewer executed 22 more.'
+  regression: 'ci:fast 5359 pass / 0 fail; eval:all 43 scenarios; evals/shared 602/602'
+  ci: 'not read — CI is gated at /finalise'
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 0
+  fix_date: '2026-10-05'
+  total_iterations: 8
+  verification_method: 'finalise run-2 gap: shape test mutation-proved (3 mutants red) and 96 direct probe forms'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 96
+    notes: 'Every command that is not a served read in an unambiguous shape is refused; no executed form served a write. The engine has no sink for gh argv, so the probes ran directly.'
+  performance:
+    status: PASS
+    notes: 'eval:all unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Every read the review-pr skill and tracker-comment.js make is served. Deliberate over-blocks are documented in evals/shared/README.md.'
+  maintainability:
+    status: PASS
+    notes: 'One fail-closed rule for all groups, stated in the header and both READMEs.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'C8-CR-1 (low/low): `--version` is answered whenever it is argv[0], whatever follows; answer it only when argv has one element. C8-CR-2 (cleanup): record a refusal reason (write vs not-a-served-read). C8-CR-3 (cleanup): the unhandled test should assert a log line exists.'
+      refs: ['evals/shared/lib/fake-gh.mjs', 'evals/shared/tests/fake-gh.test.mjs']
+    - action: 'Carried: 5c-2 CR-1 (a never-settling promise exits 0 and counts as a pass), C7-CR-2 (-R/--repo allowed on api), C6-CR-3 (documented over-blocks), C4-CR-1..4, C3-CR-2/4, cycle-1 CR-3 (other skills count-style report numbers), CR-5, 5c CR-2 (missing jq scored as a failed run).'
+      refs: ['evals/shared/runner.mjs', 'evals/shared/repeat.mjs', 'evals/shared/lib/fake-gh.mjs', 'skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

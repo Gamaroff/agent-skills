@@ -39,6 +39,7 @@ Four-layer eval suite — described in `docs/contributing/evals/README.md` and `
 - **Unit:** per-skill `tests/*.test.js` under `node --test`. Hermetic, run in CI.
 - **Fixture/protocol:** `evals/<skill>/protocol/*.test.mjs` and `evals/<skill>/scenarios/<n>-<name>/` step-isolation runs via `node evals/shared/runner.mjs <scenario>`. Hermetic in default mode.
 - **Live driver modes:** opt-in. `DRIVER=claude-cli` uses the local Claude Code CLI; `DRIVER=claude-sdk` uses `@anthropic-ai/claude-agent-sdk`. Both are slower and not run in CI.
+- **Sandboxed skills that need a remote:** a scenario's `setup` hook (`scenario.json` → `setup`) prepares the sandbox before any driver runs — `evals/review-pr/setup.mjs` builds a git repo with a local bare origin and installs a fake `gh` (`evals/shared/lib/fake-gh.mjs`) that serves reads from fixtures and refuses every write. Live verdicts are measured as a pass rate with `evals/shared/repeat.mjs` (`npm run eval:review-pr:cli`).
 
 Common commands:
 
@@ -47,6 +48,7 @@ npm test                              # unit + platform tests + protocol tests
 npm run eval:create-task              # one create-task scenario, hermetic
 npm run eval:develop-story:smoke      # end-to-end develop-story dry run
 npm run eval:all                      # all scenarios across skills
+npm run eval:review-pr:cli            # review-pr live, N runs per scenario, pass rate
 ```
 
 ## Infrastructure and CI

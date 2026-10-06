@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.185.review-pr-eval-suite'
+task_title: 'review-pr eval suite'
+gate: FAIL
+status_reason: 'One high-confidence correctness bug: repeat.mjs counts a skipped runner exit (no claude binary) as a pass, so the live pass rate can read 5/5 with no agent run. Everything else verified: 5339 tests pass, replay 4/4, live N=5 20/20.'
+reviewer: 'QA Engineer'
+head: '59630a7c36085e7966ab6e0f81e6b5183bc6d9fb'
+updated: '2026-10-05T16:00:31Z'
+
+top_issues:
+  - id: 'TASK-185-CR-1'
+    severity: high
+    file: 'evals/shared/repeat.mjs'
+    finding: 'repeat.mjs treats every runner exit 0 as a pass, but the runner also exits 0 when it skips (claude not on PATH, or requiresLiveDriver under replay), so eval:review-pr:cli reports passed N/N with no agent run. Reproduced: PATH without claude, --runs 2 --min-pass 2 -> passed 2/2, exit 0.'
+    suggested_action: 'Give a skip its own runner exit status when repeat.mjs asks for it (or a marker repeat reads), and have repeat.mjs refuse to count a skipped run as a pass — fail the run as could-not-run.'
+    suggested_owner: dev
+    bug_ref: 'task.185.bug.1.repeat-counts-skips-as-passes.md'
+    status: open
+  - id: 'TASK-185-QA-2'
+    severity: low
+    file: 'evals/shared/repeat.mjs'
+    finding: 'A scenario live.minPass above --runs is a usage error (exit 2), so EVAL_RUNS=3 npm run eval:review-pr:cli cannot run 02 or 03 (minPass 5); the default min-pass is calibrated for 5 runs only.'
+    suggested_action: 'When the min-pass comes from live.minPass (not --min-pass), cap it at --runs and say so in the output, or express it as a fraction of runs.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-185-QA-1'
+    severity: low
+    file: 'skills/review-pr/scripts/next-report-number.sh'
+    finding: 'An {n} at or above 2^63 overflows bash arithmetic: a .pr-review.9223372036854775807. file makes the script print -9223372036854775808 with exit 0. No real directory reaches this, but the script prints a wrong number rather than refusing.'
+    suggested_action: 'Refuse (exit 2) an {n} longer than 18 digits instead of computing with it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 5339
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+  ci: 'not read — CI is gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 28
+    notes: 'security-probe filename sink ran 28 cases against next-report-number.sh (verdict absent: the corpus models .gate.{N}. selection, a contract this script does not have). Ad-hoc hostile .pr-review. names under bash and zsh — command substitution, newline, ;rm, leading dash — injected nothing (no PWNED file). fake gh refuses every write; a real gh in the sandbox is unauthenticated (GH_CONFIG_DIR verified).'
+  performance:
+    status: PASS
+    notes: 'eval:all 4.77 s -> 7.59/7.92 s (+2.8-3.2 s, bound 10 s); live runs 92-177 s, inside the 5-minute default.'
+  reliability:
+    status: CONCERNS
+    notes: 'The pass-rate tool can report a skip as a pass (TASK-185-CR-1).'
+  maintainability:
+    status: PASS
+    notes: 'Each harness addition opt-in, documented in evals/shared/README.md, tested, and mutation-proven.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-185-CR-1: a skipped live run must not count as a pass.'
+      refs: ['evals/shared/repeat.mjs', 'evals/shared/runner.mjs']
+  future:
+    - action: 'CR-3: qa-planning, review-epic and review-task still number their co-located artifacts with count-style prose; route them through a shared next-number script (out of scope for task.185, which kept the script review-pr-only).'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-epic/SKILL.md', 'skills/qa-planning/SKILL.md']
+    - action: 'CR-2: give 03-unanchored a non-vacuity floor (assert docs/ exists) so noFileMatching cannot pass on a missing directory.'
+      refs: ['evals/review-pr/scenarios/03-unanchored/scenario.json']
+    - action: 'CR-4: reject --min-pass 0; CR-5: report a --json field missing from a fixture as unhandled.'
+      refs: ['evals/shared/repeat.mjs', 'evals/shared/lib/fake-gh.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

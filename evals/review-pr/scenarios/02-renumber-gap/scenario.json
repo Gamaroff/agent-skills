@@ -1,0 +1,79 @@
+{
+  "name": "02-renumber-gap",
+  "skill": "review-pr",
+  "setup": "../../setup.mjs",
+  "description": "The task dir already holds .pr-review.1. and .pr-review.3. (a gap). The new report is .pr-review.4. — highest + 1, never count + 1 — and neither earlier report is overwritten (obs #272).",
+  "prompt": "/review-pr 901",
+  "cliArgs": [
+    "--allowedTools",
+    "Bash",
+    "Read",
+    "Grep",
+    "Glob",
+    "Write",
+    "Edit",
+    "Agent",
+    "Skill"
+  ],
+  "fixture": {
+    "variant": "happy",
+    "existingReports": {
+      "1": "# PR Review Report: PR #901 — [Task 901] Widget age gate\n\n**Reviewed:** 2026-10-01\n**PR:** [#901](https://github.com/eval/widgets/pull/901) — `feature/task.901.widget-age-gate` → `develop` (OPEN)\n**Verdict:** ⚠️ CONCERNS\n\nSENTINEL-1 — the first review, kept verbatim.\n\n## Machine-Readable Findings\n\n```yaml\nfindings: []\ntruncated_count: 0\n```\n",
+      "3": "# PR Review Report: PR #901 — [Task 901] Widget age gate\n\n**Reviewed:** 2026-10-03\n**PR:** [#901](https://github.com/eval/widgets/pull/901) — `feature/task.901.widget-age-gate` → `develop` (OPEN)\n**Verdict:** ✅ APPROVE\n\nSENTINEL-3 — the third review, kept verbatim.\n\n## Machine-Readable Findings\n\n```yaml\nfindings: []\ntruncated_count: 0\n```\n"
+    }
+  },
+  "live": {
+    "minPass": 5
+  },
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/tasks/task.901.widget-age-gate/task.901.pr-review.4.widget-age-gate.md"
+      ]
+    },
+    {
+      "fn": "fileAbsent",
+      "args": [
+        "$SANDBOX/docs/tasks/task.901.widget-age-gate/task.901.pr-review.2.widget-age-gate.md"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.901.widget-age-gate/task.901.pr-review.3.widget-age-gate.md",
+        "SENTINEL-3"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.901.widget-age-gate/task.901.pr-review.1.widget-age-gate.md",
+        "SENTINEL-1"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"refused\":true"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"unhandled\":true"
+      ]
+    }
+  ],
+  "liveAssertions": [
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"argv\":\\[\"pr\",\"view\""
+      ]
+    }
+  ]
+}

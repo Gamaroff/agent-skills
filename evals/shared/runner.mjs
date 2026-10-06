@@ -16,7 +16,23 @@
  *
  * Legacy MODE=replay|live still works (deprecated): MODE=live → claude-sdk.
  *
- * Exit codes: 0 all assertions pass; 1 any failure or driver error.
+ * Optional scenario.json fields (each opt-in; a scenario without them runs as before):
+ *   setup          — path, relative to the scenario dir, of a module exporting
+ *                    `setup({ sandbox, scenarioDir, repoRoot, scenario })`. Awaited after the
+ *                    sandbox exists and before the driver runs, for every driver (replay too).
+ *                    It may return `{ env }`, merged into the driver env; a `PATH` there is
+ *                    PREFIXED to the runner's PATH. A setup that throws fails the scenario
+ *                    (exit 1) and still removes the sandbox (unless KEEP_SANDBOX).
+ *   cliArgs        — array appended to the claude-cli driver's `claude` arguments.
+ *   liveAssertions — assertions run after `assertions`, only when the driver is not `replay`
+ *                    (e.g. "the fake gh was called" — replay never calls it).
+ *
+ * Exit codes: 0 all assertions pass (or the scenario was skipped); 1 any failure or driver error.
+ * A skip (the driver is unavailable, or a requiresLiveDriver scenario under replay) exits 0, and a
+ * driver error exits 1. eval:all relies on both. A caller that must tell them from a pass or a
+ * failed run (repeat.mjs) sets EVAL_SKIP_EXIT and/or EVAL_DRIVER_ERROR_EXIT to a code in 3–125, and
+ * that code is used instead (task.185 QA cycles 1 and 2). EVAL_FAIL_EXIT is the positive half:
+ * the code used ONLY when assertions ran and failed, so every other exit is "did not run" (cycle 3).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -46,6 +62,17 @@ function readJSONL(p) {
     .filter(Boolean)
     .map((l) => JSON.parse(l));
 }
+
+// A caller-requested exit status (EVAL_SKIP_EXIT, EVAL_DRIVER_ERROR_EXIT), else the default. A value
+// outside 3–125 is ignored rather than trusted: 1 and 2 already mean fail and usage, and a value
+// above 125 collides with the shell's own codes.
+function optInExit(envName, fallback) {
+  const raw = process.env[envName];
+  if (raw === undefined || !/^[0-9]+$/.test(raw)) return fallback;
+  const n = Number(raw);
+  return n >= 3 && n <= 125 ? n : fallback;
+}
+const skipExitCode = () => optInExit("EVAL_SKIP_EXIT", 0);
 
 function makeSandbox(scenarioName) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `eval-${scenarioName}-`));
@@ -99,6 +126,9 @@ function runAssertions(assertions, ctx, pathResolver) {
         break;
       case "fileMatches":
         results.push(A.fileMatches(args[0], new RegExp(args[1])));
+        break;
+      case "noFileMatching":
+        results.push(A.noFileMatching(args[0], new RegExp(args[1])));
         break;
       case "fileDoesNotMatch":
         results.push(A.fileDoesNotMatch(args[0], new RegExp(args[1])));
@@ -222,14 +252,14 @@ async function main() {
     process.stderr.write(
       `[${driverName}] skipped: scenario "${path.basename(absScenarioDir)}" requires a live driver (DRIVER=claude-sdk or claude-cli)\n`,
     );
-    process.exit(0);
+    process.exit(skipExitCode());
   }
 
   const avail = await driver.isAvailable();
   const scenarioName = path.basename(absScenarioDir);
   if (!avail.ok) {
     process.stderr.write(`[${driverName}] skipped: ${avail.reason}\n`);
-    process.exit(0); // skip ≠ fail
+    process.exit(skipExitCode()); // skip ≠ fail — and, when the caller asks, ≠ pass
   }
 
   const sandbox = makeSandbox(scenarioName);
@@ -237,8 +267,34 @@ async function main() {
     `[${driverName}] ${scenarioName} → sandbox: ${sandbox}\n`,
   );
 
+  let setupEnv = {};
+  if (scenario.setup) {
+    try {
+      const setupPath = path.resolve(absScenarioDir, scenario.setup);
+      const mod = await import(pathToFileURL(setupPath).href);
+      const out =
+        (await mod.setup({
+          sandbox,
+          scenarioDir: absScenarioDir,
+          repoRoot: REPO_ROOT,
+          scenario,
+        })) || {};
+      setupEnv = { ...(out.env || {}) };
+      if (setupEnv.PATH)
+        setupEnv.PATH = `${setupEnv.PATH}${path.delimiter}${process.env.PATH || ""}`;
+    } catch (e) {
+      process.stderr.write(
+        `[${driverName}] setup error: ${e && e.stack ? e.stack : e}\n`,
+      );
+      if (!process.env.KEEP_SANDBOX)
+        fs.rmSync(sandbox, { recursive: true, force: true });
+      process.exit(1);
+    }
+  }
+
   const driverEnv = {
     ...envFromFile,
+    ...setupEnv,
     SCENARIO_DIR: absScenarioDir,
   };
   const skillRoot = scenario.skill
@@ -251,6 +307,7 @@ async function main() {
     skillRoot,
     answers: readJSONL(path.join(absScenarioDir, "answers.jsonl")),
     env: driverEnv,
+    cliArgs: Array.isArray(scenario.cliArgs) ? scenario.cliArgs : [],
   };
 
   let driverResult;
@@ -308,7 +365,7 @@ async function main() {
     process.stderr.write(`[${driverName}] driver error: ${e.message}\n`);
     if (!process.env.KEEP_SANDBOX)
       fs.rmSync(sandbox, { recursive: true, force: true });
-    process.exit(1);
+    process.exit(optInExit("EVAL_DRIVER_ERROR_EXIT", 1));
   }
 
   // Resolve $EVENTS_COMBINED token in assertions
@@ -323,11 +380,11 @@ async function main() {
     sandbox,
     remainingAnswers: driverResult.remainingAnswers || [],
   };
-  const results = runAssertions(
-    scenario.assertions || [],
-    ctx,
-    resolvePathExtended,
-  );
+  const assertionList = [
+    ...(scenario.assertions || []),
+    ...(driverName !== "replay" ? scenario.liveAssertions || [] : []),
+  ];
+  const results = runAssertions(assertionList, ctx, resolvePathExtended);
   const agg = A.aggregate(results);
 
   for (const f of agg.failures) process.stderr.write(`  ✗ ${f.reason}\n`);
@@ -350,7 +407,10 @@ async function main() {
 
   if (!process.env.KEEP_SANDBOX)
     fs.rmSync(sandbox, { recursive: true, force: true });
-  process.exit(agg.ok ? 0 : 1);
+  // EVAL_FAIL_EXIT marks the ONE outcome that is a failed run: assertions ran and at least one
+  // failed. Every other non-zero exit (setup error, unknown driver, crash) stays 1, so a caller that
+  // asks for this code can treat anything else as "the run did not happen" (task.185 QA cycle 3).
+  process.exit(agg.ok ? 0 : optInExit("EVAL_FAIL_EXIT", 1));
 }
 
 main().catch((e) => die(e.stack || e.message));

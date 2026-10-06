@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.185.review-pr-eval-suite'
+task_title: 'review-pr eval suite'
+gate: FAIL
+status_reason: 'The /finalise DoD fix (9ee9f21a) splits a glued short value flag only when it leads the token. A combined shorthand cluster such as -iXPOST (-i -X POST to gh) is still served as a read on a fixture path. Direct probes and the code review found it independently.'
+reviewer: 'QA Engineer'
+head: '9ee9f21a704b52cab7961b5f8e4d656ab87463a2'
+updated: '2026-10-05T17:45:14Z'
+
+top_issues:
+  - id: 'TASK-185-C5-CR-1'
+    severity: high
+    file: 'evals/shared/lib/fake-gh.mjs'
+    finding: 'parseArgs reads a shorthand cluster that starts with a boolean flag (-iXPOST, -ifb=x) as one boolean flag, so a gh api write on a served path is answered as a read (exit 0) and logged neither refused nor unhandled; -iX POST and -if b=x come back notFound. Bug report: task.185.bug.5.fake-gh-shorthand-cluster-write.md.'
+    suggested_action: 'Walk a single-dash token longer than two characters as pflag does: each character is a short flag, and the first value flag takes the rest of the token (minus a leading =) or the next argument; add the four forms to fake-gh.test.mjs and mutation-prove them.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 599
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+  boundary_probes: '31 argv forms executed directly against runFakeGh with a served api fixture; 27 correct, 4 wrong (the shorthand clusters). The probe engine cannot reach this entry: no corpus sink models gh read/write argv classification, and runFakeGh returns no ok field.'
+  ci: 'not read — CI is gated at /finalise'
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 1
+  fix_date: '2026-10-05'
+  total_iterations: 4
+  verification_method: 'finalise DoD gap (glued -XPOST / -fbody=x) fixed in 9ee9f21a and mutation-proved (fake-gh.test.mjs: 8 pass / 1 fail with the split disabled, 9/9 restored); the cluster form is open as BUG-5'
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    notes: 'The fake gh write refusal is a boundary on agent-chosen argv. 4 of 31 executed forms bypass it (combined shorthand clusters). Executed directly, not through security-probe.mjs, which has no sink for this input.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged since gate 4.'
+  maintainability:
+    status: PASS
+    notes: 'The fix is a small parseArgs branch with a committed, mutation-proved test.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-185-C5-CR-1 (BUG-5): parse shorthand clusters as pflag does.'
+      refs: ['evals/shared/lib/fake-gh.mjs', 'evals/shared/tests/fake-gh.test.mjs']
+  future:
+    - action: 'Carried from gate 4: C4-CR-1 (opt-in exit codes 3/4/5 coincide with Node exit codes), C4-CR-2 (an assertion-free scenario passes under repeat), C4-CR-3/4, C3-CR-2, C3-CR-4, cycle-1 CR-3 (other skills count-style report numbers; also 5c CR-1) and CR-5 (fake gh missing --json field). 5c CR-2: a missing jq is scored as a failed run, not could-not-run.'
+      refs: ['evals/shared/repeat.mjs', 'evals/shared/lib/fake-gh.mjs', 'skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

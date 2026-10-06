@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.185.review-pr-eval-suite'
+task_title: 'review-pr eval suite'
+gate: FAIL
+status_reason: 'Safety re-probe after the gate 5 security FAIL. The cycle-5 cluster fix holds (46 direct forms correct), but -X and --method are read as two flags where pflag reads one, so `gh api -X GET --method POST` is served as a read. Third consecutive defect in the fake gh argv deny-list.'
+reviewer: 'QA Engineer'
+head: '61226c7c2a0334dceb10f62f93d20abf7f659bc4'
+updated: '2026-10-05T18:01:57Z'
+
+top_issues:
+  - id: 'TASK-185-C6-CR-1'
+    severity: high
+    file: 'evals/shared/lib/fake-gh.mjs'
+    finding: 'The method is read with get("-X", "--method"), so the last -X outranks any --method; pflag treats them as one flag where the last occurrence wins. `gh api -X GET --method POST <path>` and `-XGET --method=DELETE` are served as reads (exit 0) on a fixture path, logged neither refused nor unhandled. Bug report: task.185.bug.6.fake-gh-method-spellings-last-wins.md.'
+    suggested_action: 'Stop deny-listing writes by re-implementing pflag: allow-list api reads (no method, field or input flag in any spelling) and refuse the rest.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-185-C6-CR-2'
+    severity: medium
+    file: 'evals/shared/lib/fake-gh.mjs'
+    finding: 'VALUE_FLAGS omits gh api value flags -p/--preview, --hostname and --cache, so their value is taken as the path and a real read returns notFound. Bug report: task.185.bug.7.fake-gh-api-value-flags-missing.md.'
+    suggested_action: 'Add the three flags to VALUE_FLAGS, checked against gh api --help, with a read case for each.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 5357
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+  boundary_probes: '46 direct forms (cycle-5 sets) all correct at 61226c7c; the reviewer executed 37 more in memory and found the -X/--method precedence write, reproduced here.'
+  regression: 'ci:fast 5357 pass / 0 fail (1 skipped); eval:all 43 scenarios pass; evals/shared 600/600'
+  ci: 'not read — CI is gated at /finalise'
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 2
+  fix_date: '2026-10-05'
+  total_iterations: 5
+  verification_method: 'bug 5 (short-flag clusters) verified closed: 46 direct forms correct and the cluster test mutation-proved'
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 83
+    notes: 'The fake gh write refusal still has a bypass through flag aliases (-X / --method). 46 forms executed directly, 37 by the reviewer; the engine has no sink for gh argv.'
+  performance:
+    status: PASS
+    notes: 'eval:all unchanged in shape; ci:fast green.'
+  reliability:
+    status: CONCERNS
+    notes: 'Real reads with --hostname / -p come back notFound (bug 7); field-flag reads with -X GET are refused (CR-3, low).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Three cycles have patched one argv deny-list; each fix exposed the next spelling. The mechanism, not the patches, is the problem.'
+
+recommendations:
+  immediate:
+    - action: 'Replace the fake gh write deny-list with a read allow-list (TASK-185-C6-CR-1, bug 6), then add the missing value flags (bug 7).'
+      refs: ['evals/shared/lib/fake-gh.mjs', 'evals/shared/tests/fake-gh.test.mjs']
+  future:
+    - action: 'C6-CR-3 (low): field flags with an explicit -X GET, and graphql query documents, are real reads the fake refuses. C6-CR-4 (cleanup): pr/issue write aliases (pr new, issue new, pr lock, pr update-branch, issue pin, issue develop) log unhandled, not refused.'
+      refs: ['evals/shared/lib/fake-gh.mjs']
+    - action: 'Carried from gate 5: C4-CR-1..4, C3-CR-2/4, cycle-1 CR-3 (other skills count-style report numbers; 5c CR-1), CR-5, 5c CR-2 (missing jq scored as a failed run).'
+      refs: ['evals/shared/repeat.mjs', 'evals/shared/lib/fake-gh.mjs', 'skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

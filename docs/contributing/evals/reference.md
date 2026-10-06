@@ -12,7 +12,7 @@ Architecture and contracts for the eval suite. For recipes see [recipes](./recip
 | **L1 Unit** | `skills/*/tests/*.test.js` | Pure helpers — filename regex, id allocators, sprint-status merges, template-section detection | `npm test` |
 | **L2 Golden fixture** | embedded in L1 | Template substitution + sprint-status merge against known inputs | `npm test` |
 | **L3 Protocol checker** | `tests/skill-protocol.test.js`, `evals/develop-task/protocol/` | SKILL.md ↔ template ↔ sub-skill drift; HALT/STOP terminator presence; mandatory-section counts; pipeline shape and step contracts | `npm test` |
-| **L4 End-to-end** | `evals/create-task/`, `evals/create-story/`, `evals/develop-task/step-isolation/` | End-to-end artefact shape; pipeline step contracts; branch/lock/PR/QA artefact assertions | `npm run eval:all` + `npm run eval:develop-task` |
+| **L4 End-to-end** | `evals/create-task/`, `evals/create-story/`, `evals/develop-task/step-isolation/`, `evals/review-pr/` | End-to-end artefact shape; pipeline step contracts; branch/lock/PR/QA artefact assertions; `/review-pr` against a local origin + fake `gh` (replay in CI, pass rate live) | `npm run eval:all` + `npm run eval:develop-task`; live `npm run eval:review-pr:cli` |
 | **L5 Smoke** | `evals/develop-task/smoke/` | Full pipeline live run against real git sandbox; GH PR optional | `npm run eval:develop-task:smoke` |
 
 L1–L4 replay run on every push. Live drivers (`claude-sdk`, `claude-cli`), the live-tracker scenario, and the smoke test are `workflow_dispatch` only.
@@ -57,8 +57,12 @@ Add a driver: drop `evals/shared/drivers/<name>.mjs` implementing the contract i
 | `08-commit-changes` | develop-story | `evals/develop-story/step-isolation/08-commit-changes/` | No lock files left, implementation report present |
 | `01-end-to-end-dry` | develop-story | `evals/develop-story/smoke/01-end-to-end-dry/` | **Live** full pipeline; epic branch + PR-base assertions |
 | `02-resume-mid-loop` | develop-story | `evals/develop-story/smoke/02-resume-mid-loop/` | **Live** pipeline killed mid qa-fix, resumed; verifies `resumeRehydrated` |
+| `01-happy` | review-pr | `evals/review-pr/scenarios/01-happy/` | Clean PR + complete trail → `.pr-review.1.` report, APPROVE, machine-readable block, no refused `gh` call |
+| `02-renumber-gap` | review-pr | `evals/review-pr/scenarios/02-renumber-gap/` | `.1.` and `.3.` exist → new report is `.4.`, earlier reports untouched (obs #272) |
+| `03-unanchored` | review-pr | `evals/review-pr/scenarios/03-unanchored/` | No work item resolves → no `.pr-review.` file anywhere under `docs/` |
+| `04-planted-bug` | review-pr | `evals/review-pr/scenarios/04-planted-bug/` | Off-by-one the trail calls tested → verdict not APPROVE, a `CR-` finding cites the file |
 
-Each scenario is `scenario.json` + `answers.jsonl` + `env.json` + `replay/`.
+Each scenario is `scenario.json` + `answers.jsonl` + `env.json` + `replay/`. The review-pr scenarios instead share one `setup` hook (`evals/review-pr/setup.mjs`) that builds a git repo, a local bare origin and a fake `gh` in the sandbox — see `evals/shared/README.md` § Opt-in scenario fields.
 
 ### Scripts
 
@@ -79,13 +83,16 @@ npm run eval:develop-task:smoke   # L5: develop-task full smoke (needs ANTHROPIC
 npm run eval:develop-story        # L3+L4: develop-story protocol tests + step-isolation scenarios, replay
 npm run eval:develop-story:smoke  # L5: develop-story full smoke (needs ANTHROPIC_API_KEY)
 npm run eval:develop-story:resume # L5: develop-story resume-mid-loop (needs ANTHROPIC_API_KEY + EVAL_MODE=1)
+npm run eval:review-pr           # L4: the four review-pr scenarios, replay (also in eval:all)
+npm run eval:review-pr:cli       # L4 live: each review-pr scenario $EVAL_RUNS times (default 5) via repeat.mjs, pass rate vs live.minPass
 ```
 
 ### Canonical sources
 
 This doc navigates. Authoritative details live next to the code:
 
-- `evals/shared/README.md` — runner contract, driver-adding guide, sabotage-verify workflow, new lib helpers (git-sandbox, gh-sandbox, pipeline-recorder)
+- `evals/shared/README.md` — runner contract (incl. the opt-in `setup` / `cliArgs` / `liveAssertions` fields), repeat runner, driver-adding guide, sabotage-verify workflow, lib helpers (git-sandbox, gh-sandbox, fake-gh, pipeline-recorder)
+- `evals/review-pr/README.md` — review-pr scenarios, the sandbox the setup hook builds, live-run auth and permissions
 - `evals/create-task/README.md` — create-task scenario coverage and how to run
 - `evals/create-story/README.md` — create-story scenario coverage and how to run
 - `evals/develop-task/README.md` — develop-task eval layers, smoke test usage, adding new scenarios

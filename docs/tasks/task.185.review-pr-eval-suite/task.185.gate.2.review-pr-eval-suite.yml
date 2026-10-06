@@ -1,0 +1,97 @@
+schema: 2
+task: 'task.185.review-pr-eval-suite'
+task_title: 'review-pr eval suite'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes verified (a skip now exits 3). The refute pass found the fix incomplete at its edges: the npm script collapses exit 3 to 1, live.minPass is absolute above 5 runs, and a driver error still reads as a failed run. No high findings.'
+reviewer: 'QA Engineer'
+head: 'b02186959f670674095d112f93fd5bb1851ceb7d'
+updated: '2026-10-05T16:21:31Z'
+
+top_issues:
+  - id: 'TASK-185-C2-CR-1'
+    severity: medium
+    file: 'package.json'
+    finding: 'eval:review-pr:cli maps every non-zero repeat.mjs exit to rc=1, so could-not-run (3) reaches the caller as 1, the same as a pass rate below min; evals/review-pr/README.md says it exits 3.'
+    suggested_action: 'Keep the strongest status across scenarios (3 if any scenario could not run, else 1 on a failure) and test the script with no claude on PATH.'
+    suggested_owner: dev
+    bug_ref: 'task.185.bug.2.cli-script-collapses-could-not-run.md'
+    status: open
+  - id: 'TASK-185-C2-CR-2'
+    severity: medium
+    file: 'evals/shared/repeat.mjs'
+    finding: 'live.minPass stays an absolute count when --runs exceeds 5: --runs 10 with minPass 4 passes at 4/10 (reproduced: passed 10/10 (min 4)), and the must-pass-every-run scenarios 02/03 pass at 5/10.'
+    suggested_action: 'Scale live.minPass as a rate calibrated for 5 runs (ceil(k * runs / 5)) and say so in the output.'
+    suggested_owner: dev
+    bug_ref: 'task.185.bug.3.min-pass-not-scaled-above-five-runs.md'
+    status: open
+  - id: 'TASK-185-QA-3'
+    severity: medium
+    file: 'evals/shared/runner.mjs'
+    finding: 'A driver error (claude -p exits non-zero: credit balance, crash, timeout) makes the runner exit 1, which repeat.mjs counts as a run that executed and failed, so an infrastructure failure reports passed 0/N with the exit code of a real regression, against the README promise that no pass rate is reported for runs that did not happen.'
+    suggested_action: 'Give a driver error its own opt-in exit code (EVAL_DRIVER_ERROR_EXIT, set by repeat.mjs as it sets EVAL_SKIP_EXIT) and have repeat.mjs stop with could-not-run on it.'
+    suggested_owner: dev
+    bug_ref: 'task.185.bug.4.driver-error-counted-as-failed-run.md'
+    status: open
+  - id: 'TASK-185-C2-CR-4'
+    severity: low
+    file: 'evals/shared/repeat.mjs'
+    finding: 'A malformed scenario.json throws out of JSON.parse and exits 1 (reproduced), the pass-rate-below-min code, not the documented usage exit 2.'
+    suggested_action: 'Catch the parse error and report it through usage().'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-185-C2-CR-5'
+    severity: low
+    file: 'evals/shared/repeat.mjs'
+    finding: 'A trailing --runs or --min-pass with no value is silently ignored and falls back to EVAL_RUNS / live.minPass / N (reproduced: --runs as last arg ran EVAL_RUNS=1, exit 0).'
+    suggested_action: 'Refuse a value flag with no value as a usage error.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 5346
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 4]
+  ci: 'not read — CI is gated at /finalise'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-10-05'
+  total_iterations: 1
+  verification_method: 'BUG-1 reproduction re-run: run 1/2: skipped, exit 3; 5 mutants red'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 28
+    notes: 'Probe re-run on the changed next-report-number.sh (record task.185.qa.2.security.run.json): 28 executed, verdict absent for the same sink-mismatch reason as cycle 1. No new attack surface in the cycle-1 fix.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1.'
+  reliability:
+    status: CONCERNS
+    notes: 'The pass-rate tool still conflates states at its edges: could-not-run collapses to 1 in the npm script, and a driver error reads as a failed run.'
+  maintainability:
+    status: PASS
+    notes: 'Fixes documented and tested.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-6 (low confidence, platform variance): make the no-claude tests set up the absence themselves (a PATH holding only an empty dir) instead of assuming /usr/bin has no claude.'
+      refs: ['evals/shared/tests/repeat.test.mjs', 'evals/shared/tests/runner-setup.test.mjs']
+    - action: 'Cycle-1 carry-overs: CR-3 follow-up task (other skills count-style artifact numbers); CR-5 (fake gh drops a missing --json field).'
+      refs: ['skills/review-task/SKILL.md', 'evals/shared/lib/fake-gh.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix the three medium findings in the pass-rate tool']

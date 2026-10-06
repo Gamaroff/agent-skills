@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.185.review-pr-eval-suite'
+task_title: 'review-pr eval suite'
+gate: PASS
+status_reason: 'The fake gh now decides api writes by read allow-list (84506ed6). The safety re-probe and 82 directly executed argv forms found no write served; bugs 6 and 7 are closed. Two low advisory findings remain (an incomplete write-alias label list; -R/--repo allowed on api).'
+reviewer: 'QA Engineer'
+head: '84506ed6eed34a7b77ee30738c5a491775198e42'
+updated: '2026-10-05T19:05:01Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5359
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+  boundary_probes: '82 argv forms executed directly against runFakeGh at 84506ed6: separators, global flags before the group, positional confusion, graphql mutations, method case, glued and clustered forms, and review-pr real reads. No write served; the only refused reads are the two documented over-blocks.'
+  regression: 'ci:fast 5358 pass / 1 fail (test-clean-checkout LOAD-SENSITIVE, load average 86; 13/13 alone); eval:all 43 scenarios pass; evals/shared 601/601'
+  ci: 'not read — CI is gated at /finalise'
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 0
+  fix_date: '2026-10-05'
+  total_iterations: 6
+  verification_method: 'bug 6 and 7: allow-list test mutation-proved (3 mutants red) and 82 direct probe forms'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 82
+    notes: 'api writes fail closed under the allow-list; no executed form served a write. The engine has no sink for gh argv, so the probes ran directly.'
+  performance:
+    status: PASS
+    notes: 'eval:all unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Real reads with --hostname / -p / --cache are served. Two real reads are refused by design (documented in evals/shared/README.md).'
+  maintainability:
+    status: PASS
+    notes: 'One allow-list replaces three deny-list patches; the rule is stated in the header and the README.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'C7-CR-1 (low/medium): commands outside pr/issue that write (release create, repo edit, workflow run, …) log unhandled, not refused; refuse every command not in READS so the label does not depend on a hand list.'
+      refs: ['evals/shared/lib/fake-gh.mjs']
+    - action: 'C7-CR-2 (low/medium): API_READ_FLAGS allows -R/--repo, which real gh api rejects; drop them so a read broken on real gh fails in the fake too.'
+      refs: ['evals/shared/lib/fake-gh.mjs']
+    - action: 'Carried: C6-CR-3 (two documented over-blocks), C4-CR-1..4, C3-CR-2/4, cycle-1 CR-3 (other skills count-style report numbers; 5c CR-1), CR-5, 5c CR-2 (missing jq scored as a failed run).'
+      refs: ['evals/shared/repeat.mjs', 'evals/shared/lib/fake-gh.mjs', 'skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

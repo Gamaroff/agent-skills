@@ -6,6 +6,26 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/review-pr` has an end-to-end eval suite (task.185).** Four scenarios under
+  `evals/review-pr/` run the skill against a hermetic sandbox and check what it writes: a clean PR
+  is approved and its report lands at `task.901.pr-review.1.…md`; a directory holding `.1.` and
+  `.3.` gets `.4.`; an unanchored PR writes no file; and an off-by-one the trail calls tested is not
+  approved. `npm run eval:review-pr` (replay, now part of `eval:all`) proves the plumbing on every
+  push; `npm run eval:review-pr:cli` runs each scenario N times live and reports a pass rate. The
+  shared harness gains what a GitHub-facing skill needs, each opt-in by a new `scenario.json` field
+  so existing scenarios run unchanged: a `setup` hook run before any driver (its returned `PATH` is
+  prefixed), `cliArgs` for the claude-cli driver, `liveAssertions`, `EVAL_TIMEOUT_MS`, a
+  `noFileMatching` assertion, a `git-sandbox` `dir` option, `evals/shared/repeat.mjs`, and a fake
+  `gh` (`evals/shared/lib/fake-gh.mjs`) that serves reads from fixtures, logs every call, refuses
+  everything that is not a served read (an allow-list, so an unmodelled write spelling fails
+  closed) and reports a fixture gap as `unhandled` — so "never posts without asking" is an
+  assertion. The claude-cli driver's error now carries `claude`'s stdout, where `Credit balance is
+  too low` was hiding behind an unrelated stderr warning. `repeat.mjs` owns the pass-rate exit status: 0 met, 1 below, 2 usage, and 3
+  **could not run**. The verdict is positive: the runner reports a failed run with `EVAL_FAIL_EXIT`
+  only when assertions ran and failed. Anything else is could-not-run and is never counted as a pass
+  or a failed run: a skip (no `claude`), a driver error (no credit, a crash), a setup error or an
+  unknown `DRIVER`. `live.minPass` is a count out of 5, scaled to the run count.
+
 - **A code fix after a `/finalise` DoD-gaps halt is gated before acceptance (task.170,
   observation #235).** The documented resume of a Step 7 halt restored the lock at 7 and re-ran
   `/finalise` over a head no QA gate had read, and the obvious backward move —
@@ -397,6 +417,13 @@ All notable changes to this project will be documented in this file. Format foll
   `qa-execute-snippets.mjs`.
 
 ### Fixed
+
+- **`/review-pr`'s report number is computed, not counted (task.185, observation #272).** Step 7
+  said `{n}` "starts at 1 and increments on re-review" — neither max + 1 nor count + 1 — and no code
+  computed it, so a directory holding `.pr-review.1.` and `.pr-review.3.` let a count overwrite
+  `.3.`. Step 7 now runs `skills/review-pr/scripts/next-report-number.sh`, which prints the highest
+  existing `{n}` plus 1 (base 10, depth 1, other artifact kinds ignored); its tests run Step 7's own
+  call line under bash and zsh, and a count + 1 mutant turns six of them red.
 
 - **`qa-results.js` no longer deletes a setext section headed by paragraph text, and keeps
   Version-first logs and grouped bug lists (task 183).** Closes three of task.171's five Deferred

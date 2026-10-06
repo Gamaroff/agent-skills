@@ -5,10 +5,12 @@ type: task
 description: "Give /review-pr an end-to-end eval: four scenarios (happy path, re-review numbering gap, unanchored PR, planted bug) run against a hermetic sandbox — a local bare origin, a fake gh, and the skill installed at .agents/skills — in replay mode in CI and live mode on demand with a per-scenario pass rate. Also make the report number deterministic (obs #272) so the numbering scenario has a reachable pass."
 tags: [review-pr, evals, harness, follow-up]
 category: testing
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-05
 updated: 2026-10-05
+completed_date: 2026-10-05
+pr_number: 574
 assignee:
 estimated_effort_hours: 16
 github_issue: 573
@@ -16,7 +18,9 @@ github_issue: 573
 
 # Technical Task: review-pr eval suite
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.185.review.1.review-pr-eval-suite.md` implemented 2026-10-05
 
 **GitHub Issue**: [#573](https://github.com/Gamaroff/agent-skills/issues/573)
 
@@ -141,7 +145,10 @@ flowchart LR
   serves `pr view`, `pr diff`, `pr list`, `repo view` and `issue view` from the scenario's
   `gh-fixtures.json`, logs every call as one JSON line to `.eval/gh-calls.jsonl`, and refuses every
   write (`pr comment`, `pr review`, `pr edit`, `pr merge`, `api` with `-X`/`--method` other than GET,
-  `issue comment`) with exit 1 and a `"refused": true` log line.
+  `issue comment`) with exit 1 and a `"refused": true` log line. Installing it creates an empty
+  `.eval/gh-calls.jsonl`, so "no refused call" is well-defined in a run that makes no `gh` call: the
+  `fileDoesNotMatch` assertion fails on a missing file (`assertions.mjs:48`), and in replay no agent
+  runs to create the log.
 - **git-sandbox** gains an optional `dir` argument: when given, it initialises the repo there instead
   of in a new tmpdir. Existing callers are unchanged.
 - **claude-cli driver** reads `scenario.cliArgs` (array, appended to the `claude` arguments) and
@@ -198,10 +205,10 @@ derived changes, and it agrees with the prose rule on every contiguous directory
 **Risk:** Low · **Files:** `skills/review-pr/scripts/next-report-number.sh`, `skills/review-pr/SKILL.md`
 (Step 7), `skills/review-pr/tests/review-pr.test.js` · **Depends on:** none
 
-- [ ] Add `next-report-number.sh <dir>`: numeric max + 1 over `*.pr-review.{n}.*.md` at depth 1; `1` when none; exit 2 on a missing or non-directory argument.
-- [ ] Step 7 runs it and uses its output as `{n}`; the prose names the rule (highest + 1, never count + 1) and why (a gap).
-- [ ] Tests under bash and zsh: empty dir → 1; `.1.` → 2; `.1.`+`.3.` → 4; `.9.`+`.10.` → 11; `.09.` → 10; a `.review.` file and another work item's sibling dir are ignored.
-- [ ] Measure against the tree: for every tracked work-item dir with reports, the script returns the existing max + 1 (`git ls-files | grep '\.pr-review\.'`).
+- [x] Add `next-report-number.sh <dir>`: numeric max + 1 over `*.pr-review.{n}.*.md` at depth 1; `1` when none; exit 2 on a missing or non-directory argument.
+- [x] Step 7 runs it and uses its output as `{n}`; the prose names the rule (highest + 1, never count + 1) and why (a gap).
+- [x] Tests under bash and zsh: empty dir → 1; `.1.` → 2; `.1.`+`.3.` → 4; `.9.`+`.10.` → 11; `.09.` → 10; a `.review.` file and another work item's sibling dir are ignored.
+- [x] Measure against the tree: for every tracked work-item dir with reports, the script returns the existing max + 1 (`git ls-files | grep '\.pr-review\.'`).
 
 ### Phase 2: harness extensions
 
@@ -209,35 +216,35 @@ derived changes, and it agrees with the prose rule on every contiguous directory
 `evals/shared/lib/git-sandbox.mjs`, `evals/shared/drivers/claude-cli.mjs`, `evals/shared/assertions.mjs`,
 `evals/shared/repeat.mjs`, `evals/shared/tests/*` · **Depends on:** none
 
-- [ ] Runner: optional `setup` hook before the driver; merge returned `env`, prefix `PATH`; a hook that throws fails the scenario (exit 1) and still removes the sandbox.
-- [ ] `fake-gh.mjs`: read commands from `gh-fixtures.json`, log every call, refuse writes; unknown read command → exit 1 with `"unhandled": true` logged (so a gap shows as a failure, not a guess).
-- [ ] `git-sandbox`: optional `dir`.
-- [ ] claude-cli: `scenario.cliArgs` appended; `EVAL_TIMEOUT_MS` honoured. The runner passes `cliArgs` on the context.
-- [ ] `noFileMatching` assertion, registered in the runner's switch.
-- [ ] `liveAssertions`: run only when the driver is not `replay`, so a live run can assert the fake `gh` was called.
-- [ ] `repeat.mjs`: `--runs`, `--min-pass`; reports `passed P/N`; exit 0 iff P ≥ K.
-- [ ] Tests for each, in `evals/shared/tests/`.
+- [x] Runner: optional `setup` hook before the driver; merge returned `env`, prefix `PATH`; a hook that throws fails the scenario (exit 1) and still removes the sandbox.
+- [x] `fake-gh.mjs`: read commands from `gh-fixtures.json`, log every call, refuse writes; unknown read command → exit 1 with `"unhandled": true` logged (so a gap shows as a failure, not a guess). Install creates an empty `.eval/gh-calls.jsonl`.
+- [x] `git-sandbox`: optional `dir`.
+- [x] claude-cli: `scenario.cliArgs` appended; `EVAL_TIMEOUT_MS` honoured. The runner passes `cliArgs` on the context.
+- [x] `noFileMatching` assertion, registered in the runner's switch.
+- [x] `liveAssertions`: run only when the driver is not `replay`, so a live run can assert the fake `gh` was called.
+- [x] `repeat.mjs`: `--runs`, `--min-pass`; reports `passed P/N`; exit 0 iff P ≥ K.
+- [x] Tests for each, in `evals/shared/tests/`.
 
 ### Phase 3: the four scenarios
 
 **Risk:** Medium (live verdicts vary) · **Files:** `evals/review-pr/**` · **Depends on:** Phases 1 and 2
 
-- [ ] `setup.mjs`: bare `origin.git` + working clone with `develop` and `feature/task.901.widget-age-gate`; the work item at `docs/tasks/task.901.widget-age-gate/` with a complete trail; the skill copied to `.agents/skills/review-pr` (and `.claude/skills/review-pr` for discovery); fake `gh` installed; per-scenario variations from `scenario.json` `fixture`.
-- [ ] **01-happy** — PR delivers every criterion, trail complete. Assert report `task.901.pr-review.1.widget-age-gate.md` exists in the task dir, `**Verdict:**` reads APPROVE, the Machine-Readable Findings block is present, no refused call in `gh-calls.jsonl`.
-- [ ] **02-renumber-gap** — the dir already holds `.pr-review.1.` and `.pr-review.3.` (with a sentinel line). Assert `.pr-review.4.` is written and `.3.` still holds its sentinel.
-- [ ] **03-unanchored** — the PR branch is `chore/tidy` and no document names the PR. Assert `noFileMatching(docs, \.pr-review\.)`, and no refused call.
-- [ ] **04-planted-bug** — the diff implements "18 and over is an adult" as `age > 18` with no test at 18. Assert the verdict is **not** APPROVE and a `CR-` finding cites the changed file.
-- [ ] Replay golden output for each, so `eval:review-pr` passes in CI with no model.
-- [ ] Live verification: `eval:review-pr:cli` at N=5 — record P/N per scenario in the implementation report.
+- [x] `setup.mjs`: bare `origin.git` + working clone with `develop` and `feature/task.901.widget-age-gate`; the work item at `docs/tasks/task.901.widget-age-gate/` with a complete trail; the skill copied to `.agents/skills/review-pr` (the path its snippets address); `scenario.skill: "review-pr"` so the claude-cli driver installs the `.claude/skills/review-pr` copy it needs for discovery (`claude-cli.mjs:48`) — setup does not duplicate it; fake `gh` installed; the hook returns `GH_CONFIG_DIR` pointing at an empty `.eval/gh-config` and blank `GH_TOKEN` / `GITHUB_TOKEN`; per-scenario variations from `scenario.json` `fixture`.
+- [x] **01-happy** — PR delivers every criterion, trail complete. Assert report `task.901.pr-review.1.widget-age-gate.md` exists in the task dir, `**Verdict:**` reads APPROVE, the Machine-Readable Findings block is present, no refused call in `gh-calls.jsonl`.
+- [x] **02-renumber-gap** — the dir already holds `.pr-review.1.` and `.pr-review.3.` (with a sentinel line). Assert `.pr-review.4.` is written and `.3.` still holds its sentinel.
+- [x] **03-unanchored** — the PR branch is `chore/tidy` and no document names the PR. Assert `noFileMatching(docs, \.pr-review\.)`, and no refused call.
+- [x] **04-planted-bug** — the diff implements "18 and over is an adult" as `age > 18` with no test at 18. Assert the verdict is **not** APPROVE and a `CR-` finding cites the changed file.
+- [x] Replay golden output for each, so `eval:review-pr` passes in CI with no model.
+- [x] Live verification: `eval:review-pr:cli` at N=5 — record P/N per scenario in the implementation report.
 
 ### Phase 4: wiring and docs
 
 **Risk:** Low · **Depends on:** Phases 1–3
 
-- [ ] `package.json`: `eval:review-pr` (replay loop), `eval:review-pr:cli` (repeat runner, `DRIVER=claude-cli`), `evals/review-pr/scenarios/*/` added to `eval:all`, `evals/review-pr/unit/*.test.mjs` added to `npm test` if any unit test lands there.
-- [ ] `.gitignore`: re-include `evals/**/fixture/**` beside the `replay` negation, if a fixture tree is committed.
-- [ ] `evals/review-pr/README.md`, `evals/shared/README.md` (setup hook, fake `gh`, repeat runner), `docs/contributing/evals/README.md` layer table.
-- [ ] CHANGELOG `[Unreleased]`.
+- [x] `package.json`: `eval:review-pr` (replay loop), `eval:review-pr:cli` (repeat runner, `DRIVER=claude-cli`), `evals/review-pr/scenarios/*/` added to `eval:all`, `evals/review-pr/unit/*.test.mjs` added to `npm test` if any unit test lands there.
+- [x] `.gitignore`: re-include `evals/**/fixture/**` beside the `replay` negation, if a fixture tree is committed. — not needed: no `fixture/` tree is committed; `setup.mjs` builds the fixtures at run time.
+- [x] `evals/review-pr/README.md`, `evals/shared/README.md` (setup hook, fake `gh`, repeat runner), `docs/contributing/evals/README.md` layer table, and the "Test and eval harness" section of `docs/architecture/concepts/tech-stack.md`.
+- [x] CHANGELOG `[Unreleased]`.
 
 ---
 
@@ -263,7 +270,7 @@ derived changes, and it agrees with the prose rule on every contiguous directory
 **Config / docs**
 
 12. ✅ `package.json`, `.gitignore`
-13. ✅ `evals/review-pr/README.md`, `evals/shared/README.md`, `docs/contributing/evals/README.md`
+13. ✅ `evals/review-pr/README.md`, `evals/shared/README.md`, `docs/contributing/evals/reference.md` (the layer, scenario and script tables live there, not in the evals README), `docs/architecture/concepts/tech-stack.md`
 14. ✅ `CHANGELOG.md`
 
 ---
@@ -300,28 +307,28 @@ gap test goes red.
 
 ### Functional
 
-- [ ] `next-report-number.sh` returns `4` for a directory holding `.pr-review.1.` and `.pr-review.3.` (Phase 1 states the max + 1 branch), under bash and zsh.
-- [ ] `npm run eval:review-pr` passes 4/4 scenarios in replay mode.
-- [ ] `npm run eval:review-pr:cli` with N=5: scenarios 02 and 03 pass 5/5; scenarios 01 and 04 pass ≥ 4/5. Recorded in the implementation report with the command.
-- [ ] No live run logs a refused or unhandled `gh` call.
+- [x] `next-report-number.sh` returns `4` for a directory holding `.pr-review.1.` and `.pr-review.3.` (Phase 1 states the max + 1 branch), under bash and zsh. *(Scope, 2026-10-05, operator decision: the bash arm is guarded per PR in CI; the zsh arm is verified locally, since `ubuntu-latest` has no zsh. This is the state task.176 was accepted in.)*
+- [x] `npm run eval:review-pr` passes 4/4 scenarios in replay mode.
+- [x] `npm run eval:review-pr:cli` with N=5: scenarios 02 and 03 pass 5/5; scenarios 01 and 04 pass ≥ 4/5. Recorded in the implementation report with the command.
+- [x] No live run logs a refused or unhandled `gh` call.
 
 ### Performance
 
-- [ ] A live scenario finishes inside the default `EVAL_TIMEOUT_MS`, or the scenario sets a higher one and the README says why.
-- [ ] `eval:all` wall time grows by under 10 s for the four replay scenarios (measured before and after).
+- [x] A live scenario finishes inside the default `EVAL_TIMEOUT_MS`, or the scenario sets a higher one and the README says why.
+- [x] `eval:all` wall time grows by under 10 s for the four replay scenarios — measured with `time npm run eval:all` on `develop` and on the branch, both figures recorded in the implementation report.
 
 ### Code Quality
 
-- [ ] `npm test` passes, including the new tests.
-- [ ] `python skills/create-skill/scripts/quick_validate.py skills/review-pr` passes.
-- [ ] `npm run lint:shell` passes on `next-report-number.sh`.
-- [ ] `npm run bundle:check` passes.
+- [x] `npm test` passes, including the new tests.
+- [x] `python skills/create-skill/scripts/quick_validate.py skills/review-pr` passes.
+- [x] `npm run lint:shell` passes on `next-report-number.sh`.
+- [x] `npm run bundle:check` passes.
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry.
-- [ ] `evals/shared/README.md` documents the setup hook, fake `gh` and repeat runner.
-- [ ] Existing scenarios run unchanged (no `setup`, no `cliArgs`).
+- [x] CHANGELOG `[Unreleased]` entry.
+- [x] `evals/shared/README.md` documents the setup hook, fake `gh` and repeat runner.
+- [x] Existing scenarios run unchanged (no `setup`, no `cliArgs`).
 
 ---
 
@@ -339,7 +346,11 @@ None.
    all permissions is not the default.
 2. **The real `gh` is still reachable by absolute path.** The fake only wins through `PATH`.
    *Mitigation:* the skill calls bare `gh`, and a `liveAssertions` entry requires a `pr view` line in
-   `gh-calls.jsonl`, so a run that bypassed the fake fails. No `GH_TOKEN` is set in the sandbox env.
+   `gh-calls.jsonl`, so a run that bypassed the fake fails. Blanking `GH_TOKEN` alone is not enough:
+   the claude-cli driver spreads `process.env` into the child (`claude-cli.mjs:76-81`), and a real `gh`
+   also authenticates from its config dir and keyring. The setup hook therefore also sets
+   `GH_CONFIG_DIR` to an empty `.eval/gh-config`, so a real `gh` reached by absolute path is
+   unauthenticated.
 3. **Verdict scenarios are noisy.** *Mitigation:* pass rate, not single runs; the planted bug is
    unambiguous (boundary off by one, stated in the criterion, no test).
 4. **Runner change touches every scenario.** *Mitigation:* the hook is opt-in; full `eval:all` before
@@ -373,22 +384,167 @@ None.
 
 ---
 
-## Change Log
+## Implementation Summary
 
-<!-- change-log-start -->
-| Date       | Version | Description                                                     | Author      |
-| ---------- | ------- | --------------------------------------------------------------- | ----------- |
-| 2026-10-05 | 1.0     | Initial draft — review-pr eval suite, scenarios 1–4, obs #272 fix | create-task |
-<!-- change-log-end -->
+**Completed:** 2026-10-05 · **Implementation report:** `task.185.implementation.1.review-pr-eval-suite-initial-run.md`
+
+**Approach.** Phase 1 moved the report number into `next-report-number.sh` and made Step 7 call it.
+Phase 2 added the opt-in harness pieces, each with a test and a mutant that turns it red. Phase 3
+built one shared `setup.mjs`: a local bare origin, the `task.901` work item with its full trail, the
+skill at `.agents/skills/review-pr`, and the fake `gh`. Four scenarios run on top of it. Phase 4 wired
+the scripts and updated the docs. The first live run showed the happy fixture was not clean: its test
+script ran no tests, and the reviewer was right to reject it. The fixture was fixed rather than the
+assertion relaxed.
+
+**Testing results.**
+
+| Check | Result |
+| --- | --- |
+| `next-report-number.sh` tests (bash + zsh) | 15 pass; count + 1 mutant → 6 red |
+| `evals/shared/tests` | 583 pass; six harness mutants each red |
+| `npm run eval:review-pr` (replay) | 4/4 scenarios; four scenario-assertion mutants each red |
+| `eval:review-pr:cli`, N=5 | 01 5/5 · 02 5/5 · 03 5/5 · 04 5/5 — no refused or unhandled `gh` call |
+| Live run time | 92–177 s per run, inside the default 5-minute timeout |
+| `eval:all` wall time | 4.77 s → 7.59 / 7.92 s (+2.8–3.2 s); 43 scenarios pass |
+| `npm run ci:fast` | 5339 tests, 0 fail; same suites green with `.agents/skills` moved aside |
+| `quick_validate`, `bundle:check`, `lint:shell`, `check:generated` | pass |
+
+**Deviation from the Testing Strategy.** Reverting Step 7 to the old prose did **not** make scenario
+02 fail live: 3 of 3 runs still wrote `.4.`. The model applies highest + 1 on its own today, so the
+scenario checks the outcome and cannot tell the two mechanisms apart. The script's mutation proof is
+its unit tests. The "fake `gh` accepts `pr comment`" proof also cannot work as worded, because an
+accepting fake logs no refusal. It was split into a fake-gh unit mutant and a posting-run scenario
+mutant, and both turn red.
+
+**Deferred work.**
+
+- Scenarios 5–7 (scope creep, trail gap, pre-existing defect / obs #271), as planned. They reuse this harness.
+- Live runs need `env -u ANTHROPIC_API_KEY` on a machine whose API key cannot pay. This is documented, not automated, because a developer whose key can pay wants it used.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-05
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.185.qa.8.review-pr-eval-suite.md](./task.185.qa.8.review-pr-eval-suite.md)
+- **Gate File**: [task.185.gate.8.review-pr-eval-suite.yml](./task.185.gate.8.review-pr-eval-suite.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5359 (ci:fast) + 96 direct boundary probes
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+The fake `gh` refuses every command that is not a served read in an unambiguous shape, and no executed form served a write. Every review-pr read is served. Three low advisory items remain for a harness follow-up.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.185.qa.8.review-pr-eval-suite.md`
+**Gate File**: `task.185.gate.8.review-pr-eval-suite.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified (run 3):
+
+✅ **Acceptance Criteria:** 13/13. AC1's zsh arm is verified locally under the operator scope annotation.
+✅ **Tests & CI:** CI SUCCESS on `59739d20` (5 checks). The live recheck passed all four scenarios on the current fake `gh`.
+✅ **Documentation:** CHANGELOG, both eval READMEs, the `fake-gh.mjs` header, `tech-stack.md` and `evals/reference.md`
+✅ **Security Review:** the fake `gh`'s fail-closed allow-list held across 236 executed candidates (195 write forms refused, every review-pr read served)
+⚠️ **Compliance Review:** not applicable (internal eval tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-05
+
+**Detailed Verification Log:** See `task.185.dod.3.review-pr-eval-suite.md` for complete verification evidence and timestamps. Runs 1 and 2 (`task.185.dod.1`, `task.185.dod.2`) record the gaps that re-entered QA.
+
+---
+
+## Definition of Done - Gaps Identified — run 2 (historical, superseded by run 3)
+
+**Status:** IN PROGRESS
+
+Run 2 (`task.185.dod.2.review-pr-eval-suite.md`) supersedes run 1 (`task.185.dod.1`). Run 1's
+glued-flag gap was fixed in QA cycles 5–7 (gate 7 PASS 100).
+
+### QA Gate Status
+
+**QA Report**: `task.185.qa.7.review-pr-eval-suite.md`
+**Gate File**: `task.185.gate.7.review-pr-eval-suite.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Security Review:**
+   - [ ] The fake `gh` takes the `pr`/`issue` subcommand by position. Cobra strips flags first, and an
+     unknown flag takes the next token, so `gh pr --edit-last view comment` is a `pr comment` write
+     that the fake logs as `notFound`, which no assertion catches (medium, reproduced by the DoD
+     security agent; 118 candidates executed).
+2. **Acceptance Criteria:**
+   - [x] AC1's zsh half has no CI lane (`ubuntu-latest` has no zsh). It passes locally. task.176 was
+     accepted in the same state.
+
+Documentation passes, compliance is not applicable, and CI reads SUCCESS @ `22ee1609`.
+
+### Next Steps:
+
+- [ ] **BLOCKING**: make `pr`/`issue` fail closed like `api`. Serve a read only when the
+      subcommand follows the group directly and no positional names a write subcommand. Refuse
+      every command whose kind is not a served read. Then re-enter QA at 5a.
+- [x] Decide AC1: the operator accepted local zsh verification (2026-10-05). The criterion is annotated.
+
+**Estimated Effort:** Small
+
+**Gap Report Generated:** 2026-10-05
+**Detailed Verification Log:** See `task.185.dod.2.review-pr-eval-suite.md`.
+
+---
+<!-- change-log-start -->
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2026-10-05 | 1.0     | Initial draft — review-pr eval suite, scenarios 1–4, obs #272 fix | create-task |
+| 2026-10-05 | 1.1     | Review passed (9/10) — hardened fake-gh isolation (GH_CONFIG_DIR), empty call log at install, timed eval:all criterion, tech-stack.md doc sweep, no duplicate .claude/skills copy | review-task |
+| 2026-10-05 |         | Status → ready-for-development                                   | review-task |
+| 2026-10-05 |         | Implemented — 28 files, 37 new tests; live N=5: 20/20 runs pass | develop     |
+| 2026-10-05 |         | QA gate FAIL (70/100) — 1 high, 2 low findings                  | qa-task     |
+| 2026-10-05 |         | QA findings fixed — CR-1 (skip counted as pass), QA-1, QA-2, CR-2, CR-4; 1 iteration | qa-fix |
+| 2026-10-05 |         | QA gate CONCERNS (80/100) — 3 medium, 2 low findings            | qa-task     |
+| 2026-10-05 |         | QA findings fixed (cycle 2) — driver error is could-not-run, one exit-status owner, scaled live.minPass, usage errors; 2 iterations in total | qa-fix |
+| 2026-10-05 |         | QA gate CONCERNS (90/100) — 1 medium finding                     | qa-task     |
+| 2026-10-05 |         | QA findings fixed (cycle 3) — positive verdict code: any non-verdict runner exit is could-not-run; 3 iterations in total | qa-fix |
+| 2026-10-05 |         | QA gate PASS (100/100) — no open findings, 4 advisory             | qa-task     |
+| 2026-10-05 |  | DoD incomplete — 1 gap identified (security: fake gh glued-shorthand write) | finalise |
+| 2026-10-05 |  | QA gate FAIL (60/100) — 1 high finding (fake gh shorthand cluster) | qa-task |
+| 2026-10-05 |  | QA findings fixed (cycle 5) — fake gh reads short-flag clusters as pflag does (bug 5); 5 iterations in total | qa-fix |
+| 2026-10-05 |  | QA gate FAIL (50/100) — 1 high, 1 medium (fake gh -X/--method precedence; missing value flags) | qa-task |
+| 2026-10-05 |  | QA findings fixed after escalation — fake gh api decided by read allow-list (bugs 6, 7); 6 iterations in total | qa-fix |
+| 2026-10-05 |  | QA gate PASS (100/100) — no open findings, 2 low advisory | qa-task |
+| 2026-10-05 |  | DoD incomplete — 2 gaps identified (run 2: fake gh pr/issue resolution; AC1 zsh lane) | finalise |
+| 2026-10-05 |  | DoD run 2 gaps fixed — fake gh serves pr/issue only in an unambiguous read shape; AC1 zsh scope recorded (operator decision) | develop |
+| 2026-10-05 |  | QA gate PASS (100/100) — no open findings, 3 low advisory | qa-task |
+| 2026-10-05 | 1.2 | DoD passed — accepted (PR #574) | finalise |
+
+---
+<!-- change-log-end -->
+
 ## Progress Tracking
 
-- [ ] Phase 1: deterministic report number (obs #272)
-- [ ] Phase 2: harness extensions
-- [ ] Phase 3: the four scenarios
-- [ ] Phase 4: wiring and docs
+- [x] Phase 1: deterministic report number (obs #272)
+- [x] Phase 2: harness extensions
+- [x] Phase 3: the four scenarios
+- [x] Phase 4: wiring and docs
 
 ---
 

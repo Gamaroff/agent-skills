@@ -82,3 +82,24 @@ test("aggregate — counts failures", () => {
   assert.equal(r.failed, 1);
   assert.equal(r.ok, false);
 });
+
+test("noFileMatching — a nested match fails, no match passes, a missing dir passes (task.185)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "asrt-nfm-"));
+  fs.mkdirSync(path.join(dir, "tasks", "task.901.x"), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "tasks", "task.901.x", "task.901.review.1.x.md"),
+    "r",
+  );
+  assert.equal(A.noFileMatching(dir, /\.pr-review\./).ok, true);
+  const hit = path.join(
+    dir,
+    "tasks",
+    "task.901.x",
+    "task.901.pr-review.1.x.md",
+  );
+  fs.writeFileSync(hit, "r");
+  const r = A.noFileMatching(dir, /\.pr-review\./);
+  assert.equal(r.ok, false);
+  assert.ok(r.reason.includes(hit), r.reason);
+  assert.equal(A.noFileMatching(path.join(dir, "absent"), /x/).ok, true);
+});
