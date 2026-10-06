@@ -617,7 +617,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
              }
            }'
          )")
-       task_key=$(echo "$JIRA_RESPONSE" | jq -r '.key // empty')
+       task_key=$(printf '%s' "$JIRA_RESPONSE" | jq -r '.key // empty')
        task_url="${JIRA_URL}/browse/${task_key}"
        ```
      - On success: write `jira_key: {task_key}` and `jira_url: {task_url}` into frontmatter

@@ -127,10 +127,10 @@ if [ $EXIT_CODE -ne 0 ]; then
   exit 1
 fi
 
-PR_URL=$(echo "$PR_JSON" | jq -r '.url')
-PR_STATE=$(echo "$PR_JSON" | jq -r '.state')
-PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
-PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
+PR_URL=$(printf '%s' "$PR_JSON" | jq -r '.url')
+PR_STATE=$(printf '%s' "$PR_JSON" | jq -r '.state')
+PR_NUMBER=$(printf '%s' "$PR_JSON" | jq -r '.number')
+PR_TITLE=$(printf '%s' "$PR_JSON" | jq -r '.title')
 ```
 
 **Handle PR state:**

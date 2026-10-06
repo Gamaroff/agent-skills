@@ -243,16 +243,16 @@ Before starting fixes:
        echo "Once PR is created, re-run /qa-fix"
        exit 1
      fi
-     PR_URL=$(echo "$PR_JSON" | jq -r '.url')
-     PR_STATE=$(echo "$PR_JSON" | jq -r '.state')
-     PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
-     PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
+     PR_URL=$(printf '%s' "$PR_JSON" | jq -r '.url')
+     PR_STATE=$(printf '%s' "$PR_JSON" | jq -r '.state')
+     PR_NUMBER=$(printf '%s' "$PR_JSON" | jq -r '.number')
+     PR_TITLE=$(printf '%s' "$PR_JSON" | jq -r '.title')
 
    elif [ "$PLATFORM" = "bitbucket" ]; then
      ENCODED_BRANCH=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$BRANCH" 2>/dev/null || echo "$BRANCH")
      BB_PR_JSON=$(curl -sf "${BB_CURL_AUTH[@]}" \
        "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests?q=source.branch.name%3D%22${ENCODED_BRANCH}%22+AND+state%3D%22OPEN%22")
-     if [ $? -ne 0 ] || [ "$(echo "$BB_PR_JSON" | jq '.values | length')" -eq 0 ]; then
+     if [ $? -ne 0 ] || [ "$(printf '%s' "$BB_PR_JSON" | jq '.values | length')" -eq 0 ]; then
        echo "⚠️ No open Bitbucket PR found for branch ${BRANCH}"
        echo ""
        echo "Fix QA requires a pull request to post results."
@@ -264,10 +264,10 @@ Before starting fixes:
        echo "Once PR is created, re-run /qa-fix"
        exit 1
      fi
-     PR_NUMBER=$(echo "$BB_PR_JSON" | jq -r '.values[0].id')
-     PR_URL=$(echo "$BB_PR_JSON" | jq -r '.values[0].links.html.href')
-     PR_STATE=$(echo "$BB_PR_JSON" | jq -r '.values[0].state')
-     PR_TITLE=$(echo "$BB_PR_JSON" | jq -r '.values[0].title')
+     PR_NUMBER=$(printf '%s' "$BB_PR_JSON" | jq -r '.values[0].id')
+     PR_URL=$(printf '%s' "$BB_PR_JSON" | jq -r '.values[0].links.html.href')
+     PR_STATE=$(printf '%s' "$BB_PR_JSON" | jq -r '.values[0].state')
+     PR_TITLE=$(printf '%s' "$BB_PR_JSON" | jq -r '.values[0].title')
    fi
    ```
 

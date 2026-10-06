@@ -353,11 +353,29 @@ PR_RESPONSE=$(curl -s -X POST \
 rm -f "$PR_BODY_FILE"
 rm -f "$DIFF_FILE"
 
-PR_URL=$(echo "$PR_RESPONSE" | jq -r '.links.html.href // empty')
-PR_ID=$(echo "$PR_RESPONSE"  | jq -r '.id // empty')
+PR_URL=$(printf '%s' "$PR_RESPONSE" | jq -r '.links.html.href // empty')
+PR_ID=$(printf '%s' "$PR_RESPONSE"  | jq -r '.id // empty')
 ```
 
-**CRITICAL / BLOCKING**: If `PR_URL` is empty, inspect `PR_RESPONSE` for an error message, report it to the user, and halt.
+**CRITICAL / BLOCKING**: If `PR_URL` is empty, the POST's outcome is **unknown**, not failed: the
+PR may exist and only the response failed to parse. Before reporting anything, and before any
+retry, ask Bitbucket for an open PR from this branch:
+
+```bash
+if [ -z "$PR_URL" ]; then
+  PR_URL=$(curl -s "${BB_CURL_AUTH[@]}" \
+    "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests?q=source.branch.name%3D%22${CURRENT_BRANCH}%22%20AND%20state%3D%22OPEN%22" \
+    | jq -r '.values[0].links.html.href // empty')
+fi
+```
+
+If that finds one, it is the PR this run created: carry on with it. Only if it finds none, report
+the error in `PR_RESPONSE` and halt. Never re-send the POST without this check: a retry after a
+parse failure opens a duplicate PR.
+
+> **Pipe JSON to `jq` with `printf '%s'`, never `echo`.** zsh's `echo` expands backslash escapes, so
+> the `\n` inside a description becomes a raw newline and `jq` rejects the whole response. Under
+> zsh, `echo "$PR_RESPONSE" | jq` returns an empty `PR_URL` for a PR that was created (obs #284).
 
 ---
 

@@ -525,11 +525,11 @@ This is a **separate concern** that merely used to share a GraphQL response with
     }
   }')
 
-  ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
-  PROJECT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
-  PRIORITY_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .id // empty')
-  CURRENT_PRIORITY=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].fieldValueByName.name // empty')
-  P2_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name | startswith("P2")) | .id // empty')
+  ITEM_ID=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
+  PROJECT_ID=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
+  PRIORITY_FIELD_ID=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .id // empty')
+  CURRENT_PRIORITY=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].fieldValueByName.name // empty')
+  P2_OPTION_ID=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name | startswith("P2")) | .id // empty')
 
   # Only when the field exists and is currently unset — never overwrite a human's choice.
   #
