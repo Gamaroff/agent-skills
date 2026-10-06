@@ -36,7 +36,7 @@ under `apps/rebirth-app-ux/hifi/rbt-theme/{parent,teen}/`. The pages share one s
 | `.s5-actions` | `footer:`. Keep the page's button order |
 | `nav.s5-nav` | `tabbar:`. One `tabitem` per `<span>`, label from the `<em>`, `is-on` → `selected` |
 | `.s5-sheetOverlay[hidden]` | A second block: the full base screen again, plus `sheet title="<s5-sheetEyebrow>":`. The sheet's `<h2>` becomes `text … bold`, its `<p>` plain `text`, its `.s5-approveActions` a `row justify=end:` of buttons |
-| `.s5-tabs` + `.s5-pane` | `segmented:` with one `segment` per `.s5-tab` (`is-active` → `selected`), then the visible pane's content. Draw each `hidden` pane as its own block only when the user asks for it |
+| `.s5-tabs` + `.s5-pane` | `segmented:` with one `segment` per `.s5-tab` (`is-active` → `selected`), then the visible pane's content. Each `hidden` pane is a further block: the full base screen again, with that pane's `segment` selected and its content in place of the default pane's |
 
 ## Content
 
@@ -48,6 +48,9 @@ under `apps/rebirth-app-ux/hifi/rbt-theme/{parent,teen}/`. The pages share one s
 | `p.s5-noteCard` | `panel:` holding the copy as `text` lines |
 | `.s5-glassCard`, `.s5-formCard` | `panel:` |
 | `label.s5-field` (`s5-fieldLabel` + `s5-fieldValue`) | `kv "<label>" "<value>"` |
+| `.s5-mobileRow` (`s5-cc` + `s5-fieldValue`) inside a field | One `kv` value: the country code, a space, then the number (`kv "Teen mobile" "+43 660 000 000"`) |
+| `p.s5-meta` on its own (not inside a row) | `text "<copy>" muted` |
+| `.s5-qrPanel` (`s5-qrFrame` + `s5-meta`) | `image label="<aria-label>" width=160 height=160`, then the caption as `text "<copy>" muted`. The frame is `aria-hidden`, but it is the QR code itself, so it stays as a placeholder |
 | `.s5-members` > `.s5-member` | `list:` of `slot "<s5-name>" chevron:` holding a `row:` of `avatar "<initial>" size=small` and `text "<s5-role>" muted`. Add `chevron` only when the row has an `s5-chev`; a trailing `s5-pill` replaces the chevron with a [status](#pills) |
 | `.s5-eduRow`, `.s5-glassRow` | `text "<strong>" bold`, then `text "<s5-meta>" muted`. With a trailing pill, wrap them as a `row:` of a `col:` holding the two lines, then the [pill](#pills) |
 | `.s5-list` > `.s5-listItem` | `list:` of `item "<copy>"` |
@@ -57,7 +60,8 @@ under `apps/rebirth-app-ux/hifi/rbt-theme/{parent,teen}/`. The pages share one s
 | `.s5-slider` > `.s5-slide` | The first slide only, as `slot "<h3>":` holding `text "<caps> · <p>" muted`, then `text "1 of <n>" muted` |
 | `.s5-appRow`, `.s5-bandRow` | `row:` of `image label="<alt>" width=48 height=48`, a `col:` (`text "<s5-appName>" bold`, `text "<s5-appMeta>" muted`), `spacer`, then the pill or action |
 | `.s5-bandBar` (`--pct:N%`) | `progress value=<N> max=100 label="<s5-bandLeft>"` |
-| `button.s5-cta` | `button "<copy>" primary` |
+| `button.s5-cta` | `button "<copy>" primary`. A variant (`s5-cta--orange`) is a colour, not a role: still `primary` |
+| `button.s5-cta` as a direct child of `div.screen`, outside `.s5-onbBody` | `footer:` holding the button: it is the screen's bottom action, with no `.s5-actions` wrapper |
 | `button.s5-ghost` | `button "<copy>"` |
 | `button.s5-platAct` | `button "<copy>"`, `s5-platAct--on` → `primary` |
 | `img.s5-avatar` (a photo) | `avatar "<first letter of the name>" size=small` |
@@ -248,4 +252,59 @@ window:
     row justify=end:
       button "Back"
       button "Approve" primary
+```
+
+## Worked example: `parent/add-your-teen.html`, with a hidden tab pane
+
+The page has two `.s5-tab`s, and the "QR or code" pane is `hidden`, so it gives two blocks: the
+screen as it loads, then the same screen with the second segment selected and its pane in place of
+the first. The phone field's value is the `s5-cc` country code and the number, joined. The lone
+`s5-cta` sits outside `.s5-onbBody`, so it becomes the `footer`.
+
+```wireloom
+window:
+  navbar:
+    leading:
+      backbutton "Back"
+      text "Add your teen" bold
+  text "Add your teen" bold size=large
+  text "Their details, then how they get in —" muted
+  text "one screen, one send." muted
+  panel:
+    kv "Teen name" "Sophie"
+    kv "Date of birth" "18 / 03 / 2012"
+  section "How Sophie joins":
+    segmented:
+      segment "Mobile" selected
+      segment "QR or code"
+    panel:
+      kv "Teen mobile" "+43 660 000 000"
+    text "A link that opens on her phone." muted
+    text "Good for 30 days, one use." muted
+  footer:
+    button "Send to Sophie" primary
+```
+
+```wireloom
+window:
+  navbar:
+    leading:
+      backbutton "Back"
+      text "Add your teen" bold
+  text "Add your teen" bold size=large
+  text "Their details, then how they get in —" muted
+  text "one screen, one send." muted
+  panel:
+    kv "Teen name" "Sophie"
+    kv "Date of birth" "18 / 03 / 2012"
+  section "How Sophie joins":
+    segmented:
+      segment "Mobile"
+      segment "QR or code" selected
+    image label="Invite QR code" width=160 height=160
+    text "Teen scans this code to open the invite" muted
+    text "Scan it, or read her the 6-digit code —" muted
+    text "both last ten minutes." muted
+  footer:
+    button "Send to Sophie" primary
 ```

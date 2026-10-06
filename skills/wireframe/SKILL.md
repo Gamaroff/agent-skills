@@ -78,6 +78,11 @@ file against each profile's detection markers and load the one that fits before 
 |---|---|---|
 | Rebirth hi-fi phone screens | `<body class="phone rbt-theme …">` and `s5-*` classes | [`references/html-formats/rbt-hifi.md`](references/html-formats/rbt-hifi.md) |
 
+A profile decides **how** markup maps to Wireloom. The rules below decide **what** gets drawn,
+including which states get a block of their own. A profile fills the gaps those rules leave and
+never overrides one. If a profile row contradicts a rule here, the rule wins, and the row is a
+defect to fix.
+
 If no profile matches, use the rules below on their own, and say in the hand-over that no profile
 matched. A format you will convert more than once deserves its own profile: copy the shape of an
 existing one into `references/html-formats/` and add a row here.
