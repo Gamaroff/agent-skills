@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-05
-**Next Available Task Number:** **186**
+**Next Available Task Number:** **187**
 
 ## How to use
 
@@ -226,6 +226,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 183 | [qa-results setext and carry follow-ups](task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md) | accepted | refactoring | High | 2026-10-05 | [#569](https://github.com/Gamaroff/agent-skills/issues/569) | task.171 · its five `## Deferred Work` items in `qa-results.js`: CR5-1 (HIGH, setext headed by paragraph text deleted on replace), 5c CR-1 (Version-first log rows), 5c CR-2 and CR2-4 (bold-label block boundaries), CR-7 (setext false refusals); plus the corpus-survey pre-filter and a load-recorded timing bound (obs #267, #268) · PR #571 merged |
 | 184 | [qa-results carried-block and log residuals](task.184.qa-results-carried-block-and-log-residuals/task.184.qa-results-carried-block-and-log-residuals.md) | planned | refactoring | Medium | 2026-10-05 | [#572](https://github.com/Gamaroff/agent-skills/issues/572) | task.183 · three content-loss shapes in `qa-results.js` that predate it (5c CR-1 nested block tail, 5c CR-2 marker-less Version-first log, gate 6 CR6-1 list behind a label and a paragraph); task.183 wording, CHANGELOG and R2/R4 hygiene |
 | 185 | [review-pr eval suite](task.185.review-pr-eval-suite/task.185.review-pr-eval-suite.md) | accepted | testing | Medium | 2026-10-05 | [#573](https://github.com/Gamaroff/agent-skills/issues/573) | — Four `/review-pr` eval scenarios (happy path, renumber gap, unanchored, planted bug) on a hermetic sandbox (local origin, fake `gh`), replay in CI + live pass rate; shared harness gains a setup hook, `liveAssertions`, `noFileMatching`, a repeat runner; `next-report-number.sh` makes the report `{n}` deterministic (obs #272). Scenarios 5–7 are a follow-up |
+| 186 | [Eval harness hardening and task.185 leftovers](task.186.eval-harness-hardening-and-leftovers/task.186.eval-harness-hardening-and-leftovers.md) | planned | testing | Medium | 2026-10-06 | [#575](https://github.com/Gamaroff/agent-skills/issues/575) | task.185 · four independent phases: runner/repeat never score a non-verdict as a verdict (never-settling promise exit 0, unknown assertion fn, exit codes 3–5 vs Node, empty assertions, missing jq, timeout text); fake gh residue (refusal reason, `--version`, `-R` on api, `pick()` gaps, own-key lookup); `pr-inline-comment.js` lists comments with `-f` and no `-X GET` (sent as POST); one shared next-number rule for qa-planning, review-bug, review-epic, review-task (obs #272) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
