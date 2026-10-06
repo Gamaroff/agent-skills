@@ -99,7 +99,11 @@ test("fixture: a commit spawns no background git maintenance, so teardown cannot
   try {
     const events = readFileSync(trace, "utf8");
     // Non-vacuity: the trace saw the commit itself, so an empty match below means something.
-    assert.match(events, /"argv":\[[^\]]*"commit"/, "the trace recorded no commit");
+    assert.match(
+      events,
+      /"argv":\[[^\]]*"commit"/,
+      "the trace recorded no commit",
+    );
     assert.doesNotMatch(events, /"argv":\[[^\]]*"(maintenance|gc)"/);
   } finally {
     cleanup(dir);
@@ -512,7 +516,6 @@ function greenThenDocs(n, { config } = {}) {
     commit(dir, { [`docs/n${i}.md`]: `# ${i}\n` }, `docs ${i}`);
   return { dir, green };
 }
-
 
 test("CLI: two markdown commits over a green ancestor are tree-equivalent, exit 0, clean JSON", async () => {
   const { dir, green } = greenThenDocs(2);
