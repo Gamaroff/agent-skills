@@ -33,6 +33,7 @@ for (const rel of list.split("\\n").filter(Boolean)) {
   fs.mkdirSync(path.dirname(rel), { recursive: true });
   fs.writeFileSync(rel, "generated\\n");
 }
+if (fs.existsSync("bundle-fails.txt")) process.exit(1);
 `;
 
 function repo(t) {
@@ -52,7 +53,10 @@ function repo(t) {
     JSON.stringify({ name: "fixture", scripts: { bundle: "node stub.js" } }),
   );
   fs.writeFileSync(path.join(root, "stub.js"), STUB);
-  fs.writeFileSync(path.join(root, ".gitignore"), "bundle-creates.txt\n");
+  fs.writeFileSync(
+    path.join(root, ".gitignore"),
+    "bundle-creates.txt\nbundle-fails.txt\n",
+  );
   const write = (rel, content = "x\n") => {
     fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
     fs.writeFileSync(path.join(root, rel), content);
@@ -204,6 +208,28 @@ test("the unstaged-source refusal's own remedy — stage the source, retry — g
   const retry = r.commit();
   assert.equal(retry.status, 0, retry.stdout + retry.stderr);
   assert.match(r.git("ls-files"), /skills\/fx\/references\/fresh\.md/);
+});
+
+test("a failing bundle refuses the commit and removes the copies its run wrote", (t) => {
+  // `npm run bundle` fails when it leaves a copy alone that bundle:check will
+  // fail (observation #199). Under `set -e` the hook used to die on that exit
+  // before `revert_new`, leaving the run's other copies on disk, untracked —
+  // which the retry then counts as pre-existing and refuses (task.126 QA-2, CR-1).
+  const r = repo(t);
+  r.write("bundle-creates.txt", "skills/fx/references/fresh.md\n");
+  r.write("bundle-fails.txt", "");
+  r.touchSkill();
+  const res = r.commit();
+  assert.notEqual(res.status, 0, res.stdout + res.stderr);
+  assert.match(res.stderr, /npm run bundle.*failed/);
+  assert.ok(
+    !fs.existsSync(path.join(r.root, "skills/fx/references/fresh.md")),
+    "the refused run removed the copy it wrote",
+  );
+  assert.deepEqual(
+    r.git("diff", "--cached", "--name-only").trim().split("\n"),
+    ["skills/fx/SKILL.md"],
+  );
 });
 
 // ── Formatting (obs #283) ─────────────────────────────────────────────────

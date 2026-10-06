@@ -15,7 +15,8 @@ Usage:
     python bundle_skill.py <path/to/skill-folder>
     python bundle_skill.py --all                  # bundle every skill under skills/
 
-Exit codes: 0 success; 1 a skill failed to bundle; 2 usage error.
+Exit codes: 0 success; 1 a skill failed to bundle — including a copy the write
+gate left alone, which `--check` would fail; 2 usage error.
 """
 
 import functools
@@ -120,8 +121,9 @@ EXCLUDE_DIRS = {'__pycache__', '.git', 'node_modules', '.DS_Store'}
 # absence of a banner is not evidence about these. It is NOT a licence to write —
 # an early `return True` here made an authored `.json` silently destroyable, and
 # Evidence 2 (byte-equality with the rewritten source) is available for these
-# suffixes precisely because no header is injected, so every genuine copy still
-# passes.
+# suffixes precisely because no header is injected, so every FRESH copy passes;
+# evidence 3 (equal to an earlier committed version of the source) is what lets
+# a stale one be refreshed (observation #199). See `_looks_bundled`.
 HEADERLESS_SUFFIXES = {'.json'}
 AUTOGEN_MARKER = "AUTO-GENERATED — DO NOT EDIT"
 
@@ -787,17 +789,23 @@ def _looks_bundled(dst, src, name):
     identical to what the bundler would have written.
 
     Suffixes that never get a header (`.json`, and anything else `autogen_header`
-    returns "" for) are accepted on the name match alone and return early — they
-    cannot supply evidence 1, and requiring evidence 2 would make a legitimately
-    edited-then-regenerated JSON permanently unreconcilable. That is the
-    pre-existing behaviour for those suffixes, kept deliberately.
+    returns "" for) cannot supply evidence 1, and evidence 2 fails for them the
+    instant the source changes — so every edit to a `.json` source used to strand
+    every copy of it (observation #199). For those suffixes only, a third piece of
+    evidence counts:
+
+    3. It is byte-identical to the rewritten source at an EARLIER committed
+       version of that source (`_historical_rewrites`). The bundler wrote it
+       then; the source has moved on since.
+
+    Like evidence 2, this cannot tell a copy from an authored file that happens
+    to equal some past version of the source byte for byte — and the consequence
+    is bounded the same way: that content existed in the repository, and is
+    still in its history. An authored file that never matched any version stays
+    protected. Banner suffixes do not need evidence 3: every copy bundled since
+    header injection carries evidence 1.
     """
     suffix = Path(name).suffix
-    if not autogen_header(name, suffix):
-        # An unknown suffix cannot carry a banner, so evidence 1 is unavailable —
-        # but that is a gap in our knowledge, not a licence to overwrite. Fall
-        # through to evidence 2 (identical to the rewritten source).
-        pass
     try:
         text = dst.read_text()
     except UnicodeDecodeError:
@@ -807,9 +815,44 @@ def _looks_bundled(dst, src, name):
     if declared_source(text, name) is not None:
         return True
     try:
-        return text == rewrite_text(src.read_text(), suffix)
+        if text == rewrite_text(src.read_text(), suffix):
+            return True
     except (UnicodeDecodeError, OSError):
         return False
+    if autogen_header(name, suffix):
+        return False
+    return text in _historical_rewrites(str(src.resolve()), suffix)
+
+
+@functools.lru_cache(maxsize=None)
+def _historical_rewrites(src, suffix):
+    """Every committed version of `src`, rewritten as the bundler would write it.
+
+    Evidence 3 for headerless suffixes (see `_looks_bundled`). Keyed on the
+    resolved path and cached, so `--all` asks git once per source however many
+    skills carry a copy. Empty when git cannot answer — not a repository, git
+    missing, the source never committed — which leaves the copy to the
+    fail-loudly path in `bundle_skill` rather than adopting it on no evidence.
+    """
+    import subprocess
+    src = Path(src)
+    def git(*args):
+        return subprocess.run(['git', '-C', str(src.parent), *args],
+                              capture_output=True, check=True).stdout
+    try:
+        shas = git('log', '--format=%H', '--', src.name).decode().split()
+    except (OSError, subprocess.CalledProcessError):
+        return frozenset()
+    versions = set()
+    for sha in shas:
+        try:
+            # `<rev>:./<name>` is relative to -C's directory, so no repo-root
+            # arithmetic is needed. A commit that deleted the file has no blob.
+            blob = git('show', f'{sha}:./{src.name}').decode()
+        except (OSError, subprocess.CalledProcessError, UnicodeDecodeError):
+            continue
+        versions.add(rewrite_text(blob, suffix))
+    return frozenset(versions)
 
 
 def writable_copy(dst, src, name):
@@ -834,6 +877,17 @@ def _skip_reason(dst, name):
     if _symlinked_component(dst, name) is not None:
         return "under a symlinked directory"
     return "not bundler output"
+
+
+def _skip_remedy(dst, name):
+    """What to do about a copy `writable_copy` refused — the same advice
+    `--check` gives for the class it will report, so the author reads it at
+    bundle time instead of in CI (observation #199)."""
+    if dst.is_symlink() or _symlinked_component(dst, name) is not None:
+        return REMEDIES['SYMLINK']
+    if not autogen_header(name, Path(name).suffix):
+        return _ambiguity_detail(name)
+    return REMEDIES['AMBIGUOUS']
 
 
 def write_if_changed(dst, src, name, new_bytes):
@@ -1446,7 +1500,8 @@ def bundle_skill(skill_path):
         if not writable_copy(dst, src, name):
             protected += 1
             why = _skip_reason(refs_dir / name, name)
-            print(f"  SKIPPED references/{name} — {why}, left alone")
+            print(f"  ❌ SKIPPED references/{name} — {why}, left alone: "
+                  f"{_skip_remedy(dst, name)}")
             continue
         if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names, needed)):
             bundled += 1
@@ -1465,7 +1520,8 @@ def bundle_skill(skill_path):
         if not writable_copy(dst, src, name):
             protected += 1
             why = _skip_reason(refs_dir / name, name)
-            print(f"  SKIPPED references/{name} — {why}, left alone")
+            print(f"  ❌ SKIPPED references/{name} — {why}, left alone: "
+                  f"{_skip_remedy(dst, name)}")
             continue
         if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names, needed)):
             reconciled += 1
@@ -1513,8 +1569,13 @@ def bundle_skill(skill_path):
     # `in sync` is now an assertion about every source-backed copy on disk, not
     # only about the ones discovery happened to reach.
     status = ", ".join(parts) if parts else "in sync"
-    if unlanded or scan_broken:
+    # A copy left alone is a copy `--check` will fail (AMBIGUOUS or SYMLINK), so
+    # the run fails too. It used to print ✅ over a SKIPPED line and exit 0, and a
+    # stale `.json` copy reached CI that way twice (observation #199).
+    if unlanded or scan_broken or protected:
         detail = []
+        if protected:
+            detail.append(f"{protected} copy/copies left alone that bundle:check will fail")
         if unlanded:
             detail.append(f"{len(unlanded)} sourced sibling(s) not bundled")
         if scan_broken:

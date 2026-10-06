@@ -425,6 +425,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`npm run bundle` refreshes a stale `.json` copy, and fails when it leaves a copy alone
+  (obs #199).** A `.json` copy carries no provenance banner, so the write gate accepted it only
+  when it equalled the *current* source; the moment the source changed, every copy of it was
+  refused as "not bundler output", and the run printed a buried `SKIPPED` line under a ✅ and
+  exited 0. Only `bundle:check` failed, a CI round later (task.152, and again on 2026-10-06). The
+  gate now also accepts a headerless copy equal to any earlier committed version of its source
+  (read from git history), so the next bundle refreshes it. A copy the gate still refuses (an
+  authored file at a shared name, a symlink, a `.json` that matches no version) now fails the run
+  with ❌ and names the remedy `--check` would give. The pre-commit hook no longer dies on that
+  exit before undoing the copies its own run wrote. Four new tests, each red with its half of the
+  fix reverted.
+
 - **JSON is piped to `jq` with `printf '%s'`, and `create-pr` cannot open a duplicate Bitbucket PR
   (obs #284).** Under zsh and dash (Ubuntu's `/bin/sh`), `echo` expands backslash escapes, so the
   `\n` inside a JSON string becomes a raw newline and `jq` rejects the response. `create-pr` read
