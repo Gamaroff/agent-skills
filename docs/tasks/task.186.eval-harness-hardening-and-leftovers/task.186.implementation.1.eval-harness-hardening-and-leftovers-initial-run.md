@@ -34,9 +34,9 @@ First autonomous run (develop-next T186) of the four task.185 follow-up phases: 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.186.*` exists in git                             | Branch created at `709e91ab`; pushed with upstream | —                    |
 | 2. review-task             | ✅ Done    | `task.186.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10; 0 Critical, 4 Important (applied), 2 Optional; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 4/4 phases; 5 commits e1c0aca..1848e8c; npm run ci exit 0; live 4/4 | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.186.qa.{N}.*.md`; `task.186.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.186.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #576: https://github.com/Gamaroff/agent-skills/pull/576 | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.186.qa.{N}.*.md`; `task.186.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: gate 1 CONCERNS → fix 3c7b6b8; gate 2 CONCERNS → fix 583983f; gate 3 CONCERNS, Diminishing-returns exit (route 2); 5c PR review CONCERNS | —                    |
+| 7. finalise                | ❌ Failed  | `task.186.dod.{N}.*.md`; task `status: accepted`                      | DoD gaps: AC6 zsh arm has no CI lane — operator decision needed; `task.186.dod.1…` | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -86,11 +86,30 @@ First autonomous run (develop-next T186) of the four task.185 follow-up phases: 
 - Tracker comment develop-complete: posted
 - Population probes: `EVAL_*_EXIT` has no caller outside `evals/shared` (exit-code risk closed); `gh api` with `-f` and no method exists only in `pr-inline-comment.js` (the rest are GraphQL or explicit POST); the review-pr live fixtures carry every `--json` field the skill requests, so `pick()` failing closed changes no live scenario
 
+### Step 4 — create-pr
+
+- `/create-pr --base develop --issue 575 --scope docs/tasks/task.186.eval-harness-hardening-and-leftovers`; base pre-supplied (no prompt)
+- SCOPE_PATHS: the work-item dir plus every directory the branch changed (26 entries, in `.claude/state/step4-scope-paths.txt`); no out-of-scope untracked file to hold
+- Implementation report first committed here (`f3c54e7`); leak check: OK (the commit holds the report only)
+- PR body written from the five commits rather than by the summariser subagent: every hunk was authored in this run
+- PR created: https://github.com/Gamaroff/agent-skills/pull/576 — post-PR state OPEN at head `f3c54e79` (read directly with `gh pr view`, not via the poller subagent)
+- Tracker comment in-review: posted. GitHub board: in-review → stage-disabled
+
+### Step 7 — finalise
+
+- `/finalise` ran in task mode; DoD file `task.186.dod.1.eval-harness-hardening-and-leftovers.md` (numbered with `next_numbered`)
+- Four DoD agents in parallel: AC ⚠️ PARTIAL 9/10 (AC6 FAIL, execution rule); Security ✅ PASS (boundary true, 30 probes executed, 0 reproduced); Compliance ⚠️ NOT_APPLICABLE; Docs ✅ PASS
+- CI reading 1: SUCCESS @ 07da88ccb6ad (over 5 checks) — not the blocker
+- Decision: GAPS. AC6 needs an operator scope decision (task.185 dod.3 / task.176 precedent: annotate "zsh verified locally"), or zsh installed in `test.yml`. Fix-and-recheck (8a) not taken: the CI edit is outside the Files Summary, and an annotation is not a fix this run can make
+- Gaps Change Log row, gap report section in the task body, gaps PR comment posted; status left at ready-for-review
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+- **Step 7 HALT — DoD gaps (1):** AC6 — the six call-site tests run under bash per PR, but the zsh arm of `shared/resources/tests/next-numbered.test.mjs` has no CI lane (`ubuntu-latest` has no zsh). Verified locally under zsh. Resolution is an operator decision: annotate the criterion (document-only → resume at 7) or install zsh in `.github/workflows/test.yml` (code → resume re-enters QA at 5a)
 
 - Step 3: `npm run ci:fast` first run red on prettier (8 files) and on a bundle `MISSING` caused by a test comment naming a `shared/resources/` path (a bundling instruction). Both fixed; `test-clean-checkout.test.js` failed once on its own 10 s load budget and passed alone (it labels itself LOAD-SENSITIVE)
 - Note, not fixed (out of scope): the fake `gh` refuses `api -X GET -f …` by design (README: "`-X GET` with a field flag" is refused), so the corrected inline-comment listing is still not servable by the fake. No eval drives `--inline` through it today
@@ -101,14 +120,43 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-06
+**Gate Result**: CONCERNS
+**Issues Found**: 2 — CR-1 (medium): repeat.mjs counts liveAssertions under replay, live-only scenario passes 0/0; CR-3 (low): jq probe errors fake-gh unit tests without jq. Advisory: CR-2, CR-4–CR-7
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fix (5b)**: commit `3c7b6b8`, pushed. CR-1: `assertionsFor` / `driverNameFrom` in assertion-dispatch.mjs, used by runner and repeat (reads env.json). CR-3: jq-gated fake-gh tests + a no-jq meta-test. Fast gate `npm run ci:fast` exit 0 (5396 pass). Mutations: CR-1 3/3 killed, CR-3 1/1 killed (+1 `absorbed`: a redundant assertion). changes-requested: stage-disabled. Findings ingested inline (gate written this run), not by the ingester subagent
+
+### QA Cycle 2 — 2026-10-06
+**Gate Result**: CONCERNS
+**Issues Found**: 1 — C2-CR-1 (medium, promoted after reproduction): the jq refusal fires under replay, so review-pr replay scenarios skip (exit 0) on a jq-less host. Advisory: C2-CR-2..7. Cycle 1 CR-1 and CR-3 FIXED
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fix (5b)**: commit `583983f`, pushed. C2-CR-1: jq refusal scoped to live drivers (`driverNameFrom` in new import-free `driver-name.mjs`); advisory C2-CR-2/3/5/6/7 fixed alongside. Narrowing residue (repeat subject: the jq probe) → move: scope the claim. Probe population 0 (rule lives only in evals README/CHANGELOG, both updated). Fast gate: first run red on the load-sensitive clean-checkout budget (10035 ms; passed alone), re-run exit 0 (5397 pass). Mutations 3/3 killed
+
+### QA Cycle 3 — 2026-10-06
+**Gate Result**: CONCERNS
+**Issues Found**: 1 — C3-CR-1 (medium, test machinery): the no-jq meta-test self-satisfies its skipped check and has no pass floor; carried to recommendations.future. Advisory C3-CR-2/3. Gate 2 C2-CR-1 FIXED
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: CONCERNS — `task.186.pr-review.1.eval-harness-hardening-and-leftovers.md`: PC-1 (trail, medium/medium: Deferred Work under-recorded — fixed in the work item), PC-2 (scope, low: driver-name.mjs missing from Files Summary — fixed), CR-1 (bug, medium/medium: next_numbered reads a failed find as an empty series — deferred), CR-2 (cleanup: README runner-exit sentence — deferred). No high/high finding; does not block. ready-for-merge: stage-disabled
+**Loop exit**: Diminishing-returns exit taken — HIGH is 0 for cycles 2 and 3, and all 1 remaining findings are in test machinery — the loop has finished working rather than stopped working. This is a CLEAN exit, not a stall: nothing was blocked and nothing is being accepted over. The residue is recorded in the gate's `recommendations.future`.
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Final Status**: Escalated — DoD gaps at Step 7 (operator decision on AC6)
 **Branch**: feature/task.186.eval-harness-hardening-and-leftovers
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/576
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}

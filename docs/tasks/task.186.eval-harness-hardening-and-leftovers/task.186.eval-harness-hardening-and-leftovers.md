@@ -309,6 +309,33 @@ No other breaking changes.
 - Gate 2's C2-CR-1 is fixed: replay runs are judged without jq; live runs skip.
 - C3-CR-1 (test machinery) was carried by the Diminishing-returns exit; no open entry remains.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.186.qa.3.eval-harness-hardening-and-leftovers.md`
+**Gate File**: `task.186.gate.3.eval-harness-hardening-and-leftovers.yml`
+**Gate Status**: ⚠️ CONCERNS — no open entry (Diminishing-returns exit)
+**Quality Score**: 90/100
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+- [ ] AC6 — the six call sites are tested under bash per PR, but the zsh arm of `shared/resources/tests/next-numbered.test.mjs` runs only where zsh is installed, and CI's `ubuntu-latest` has none (`.github/workflows/test.yml` installs none). Verified locally under zsh.
+
+### Next Steps:
+
+- [ ] Operator decision on AC6: install zsh in `.github/workflows/test.yml` (a code change — the resume re-enters QA at 5a), or annotate the criterion "zsh verified locally", as task.185 (dod.3) and task.176 were accepted (a document-only change — the resume re-runs `/finalise`)
+
+**Estimated Effort:** Small — one CI line, or one scope annotation.
+
+**Gap Report Generated:** 2026-10-06
+**QA Gate Reference**: See `task.186.gate.3.eval-harness-hardening-and-leftovers.yml` for full details
+
+**Detailed Verification Log:** See `task.186.dod.1.eval-harness-hardening-and-leftovers.md` for complete verification evidence and timestamps.
+
 ## Deferred Work
 
 - **C3-CR-1** (MEDIUM, test machinery) — carried to gate 3 `recommendations.future` (route 2, cycle 3): the no-jq meta-test in `evals/shared/tests/fake-gh.test.mjs` asserts `skipped >= 1`, which its own self-skip always satisfies, and has no pass floor
@@ -333,6 +360,7 @@ No other breaking changes.
 | 2026-10-06 |  | QA gate CONCERNS (90/100) — 1 finding (C2-CR-1 medium) | qa-task |
 | 2026-10-06 |  | QA findings fixed — CR-1 (driver-aware assertion floor), CR-3 (fake-gh tests without jq), C2-CR-1 (jq refusal scoped to live drivers), 2 iterations | qa-fix |
 | 2026-10-06 |  | QA gate CONCERNS (90/100) — 1 finding, carried by the Diminishing-returns exit; no open entry | qa-task |
+| 2026-10-06 |  | DoD incomplete — 1 gap identified (AC6 zsh arm has no CI lane) | finalise |
 <!-- change-log-end -->
 
 ---
