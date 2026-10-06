@@ -425,6 +425,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/wireframe` draws a hidden tab pane, and says which rule wins (obs #281).** `SKILL.md` said an
+  inactive tab pane is a further block; the Rebirth hi-fi profile said to draw one only when asked.
+  Both came in the same commit, so the same page could give two different documents. The profile
+  now draws each hidden `.s5-pane` as its own block, like a sheet. `SKILL.md` § "Working from an
+  existing UI" now states the precedence: a profile decides how markup maps to Wireloom, the
+  general rules decide what gets drawn, and a profile row that contradicts a rule is a defect. The
+  profile gains rows for `.s5-mobileRow`, a standalone `p.s5-meta`, `.s5-qrPanel`, `s5-cta`
+  variants and a lone `s5-cta` outside `.s5-onbBody`, plus a third worked example
+  (`parent/add-your-teen.html`, with its tab pane).
+
 - **`advance-pipeline-lock.sh --skill` says when a paused pipeline has lost its lock (obs #280).**
   A PreCompact pause or a HALT snapshots the lock and removes it. A sub-skill that ran after that
   (task.186: `/finalise`, resumed past a compaction) advanced nothing and exited 0 silently, the same
