@@ -343,8 +343,14 @@ export function setup({ sandbox }) { return { env: installFakeGh(sandbox, {}) };
   assert.equal(r.status, 73, r.stderr);
   assert.match(r.stderr, /skipped: .*jq/);
   assert.equal(fs.existsSync(r.sandbox), false, "sandbox removed");
-  // With jq on PATH the same scenario runs and passes.
-  assert.equal(run(sc, { DRIVER: "replay" }).status, 0);
+  // With jq on PATH the same scenario runs and passes. Without jq the run is the skip above, which
+  // also exits 0, so this half asserts the run was JUDGED — and is skipped on a host without jq
+  // rather than passing vacuously (QA cycle 1, CR-3).
+  if (spawnSync("jq", ["--version"]).status !== 0) return;
+  const judged = run(sc, { DRIVER: "replay" });
+  assert.equal(judged.status, 0, judged.stderr);
+  assert.match(judged.stderr, /1\/1 assertions passed/);
+  assert.doesNotMatch(judged.stderr, /skipped/);
 });
 
 // task.186 A6: a killed `claude` has status null; the error must say why (ETIMEDOUT, SIGTERM).

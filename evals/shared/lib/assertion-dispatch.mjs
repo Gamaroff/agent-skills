@@ -46,6 +46,31 @@ export function dispatchAssertion(fn, args, ctx) {
 }
 
 /**
+ * The driver a run uses, from an environment: DRIVER wins, then the deprecated MODE=live
+ * (claude-sdk) / MODE=replay, else replay. The runner and repeat.mjs both read it here, so the
+ * driver repeat.mjs plans for is the one the runner runs (task.186 QA cycle 1, CR-1).
+ */
+export function driverNameFrom(env) {
+  if (env.DRIVER) return env.DRIVER;
+  if (env.MODE === "live") return "claude-sdk";
+  return "replay";
+}
+
+/**
+ * The assertions a run under `driverName` judges: `assertions`, plus `liveAssertions` when the
+ * driver is not replay — replay never calls the agent, so a live-only check has nothing to read.
+ * The ONE definition: the runner judges this list and repeat.mjs refuses a scenario for which it
+ * is empty, so "nothing to judge" cannot mean one thing to each (task.186 QA cycle 1, CR-1).
+ */
+export function assertionsFor(scenario, driverName) {
+  const list = (key) => (Array.isArray(scenario[key]) ? scenario[key] : []);
+  return [
+    ...list("assertions"),
+    ...(driverName !== "replay" ? list("liveAssertions") : []),
+  ];
+}
+
+/**
  * Every problem with a scenario's assertion lists, as human-readable strings; empty when they are
  * well-formed. Checks `assertions` and `liveAssertions` both, whatever driver will run, so a typo in
  * a live-only list is caught by a replay run too.

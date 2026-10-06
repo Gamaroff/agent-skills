@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.186.eval-harness-hardening-and-leftovers'
+task_title: 'Eval harness hardening and task.185 leftovers'
+gate: CONCERNS
+status_reason: 'All four phases verified, npm run ci and the live eval green, every fix mutation-proven. The diff review found that repeat.mjs counts liveAssertions under replay, so a live-only scenario still scores 0/0 as a pass (CR-1, medium), and that the jq probe makes every fake-gh unit test error on a host without jq (CR-3, low).'
+reviewer: 'QA Engineer'
+head: 'f3c54e796f7a7488891ba78a360d83f9e76dea2d'
+updated: '2026-10-06T05:46:33Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'evals/shared/repeat.mjs'
+    finding: 'The no-assertions floor counts liveAssertions whatever the driver; under DRIVER=replay the runner never runs them, so a scenario with assertions: [] and only liveAssertions runs 0 assertions and passes (reproduced: 0/0, run 1/1 pass, exit 0), and repeat.test.mjs asserts that empty pass as correct.'
+    suggested_action: 'Count only the assertions the resolved driver will run (liveAssertions only when the driver is not replay), refuse the rest as usage, and change the test to expect exit 2 under replay.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'evals/shared/lib/fake-gh.mjs'
+    finding: 'installFakeGh now throws without jq, and fake-gh.test.mjs sandbox() calls it in every test, so on a host without jq every fake-gh unit test errors and the skip on the -q test can never fire; the A5 runner test half that expects a pass also needs jq with no skip.'
+    suggested_action: 'Gate the jq-dependent tests on hasJq (or give the unit-test sandbox a way to install without the probe), and skip the with-jq half of the A5 test when jq is absent.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 392
+  phases_verified: 4/4
+  ci: 'pass @ f3c54e796f7a (test, validate, link-check, shellcheck)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 30
+    notes: 'next_numbered probed with the filename corpus held to its own contract (one expectation corrected, one overflow case added): engages, 30/30, record task.186.qa.1.security.run.json. The fake gh classifier was probed separately with 33 argv forms, 0 mismatches.'
+  performance:
+    status: PASS
+    notes: 'No hot path changed; npm run ci within its normal time.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a live-only scenario still scores a vacuous pass under replay. CR-6 (advisory): a never-settling setup leaves its sandbox behind.'
+  maintainability:
+    status: PASS
+    notes: 'One dispatch table, one numbering helper, call sites tested by a derived population.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (driver-aware assertion floor in repeat.mjs) and CR-3 (jq-gated fake-gh tests).'
+      refs: ['evals/shared/repeat.mjs', 'evals/shared/lib/fake-gh.mjs', 'evals/shared/tests/fake-gh.test.mjs']
+  future:
+    - action: 'CR-2: build the numbering population from report-name templates; review-story numbers story.{epic}.{story}.review.{n} with no rule (follow-up task).'
+      refs: ['skills/review-story/SKILL.md', 'shared/resources/tests/next-numbered.test.mjs']
+    - action: 'CR-4: give refusal "write" only to listed writes and non-GET methods; an api GET refused for an off-list flag is not-a-served-read.'
+      refs: ['evals/shared/lib/fake-gh.mjs']
+    - action: 'CR-5: refuse a -name pattern that still holds a {placeholder}.'
+      refs: ['shared/resources/newest-numbered.sh']
+    - action: 'CR-6: remove the sandbox on a run that never settles (beforeExit handler).'
+      refs: ['evals/shared/runner.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-3 fixed']

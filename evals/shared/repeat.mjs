@@ -39,7 +39,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { assertionListProblems } from "./lib/assertion-dispatch.mjs";
+import {
+  assertionListProblems,
+  assertionsFor,
+  driverNameFrom,
+} from "./lib/assertion-dispatch.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RUNNER = path.join(__dirname, "runner.mjs");
@@ -116,14 +120,22 @@ const plans = scenarioDirs.map((dir) => {
   // before any run spends a live call (task.186 A2, A4). An empty list would pass every run.
   const listProblems = assertionListProblems(scenario);
   if (listProblems.length) usage(`${file}: ${listProblems.join("; ")}`);
-  const judged =
-    (Array.isArray(scenario.assertions) ? scenario.assertions.length : 0) +
-    (Array.isArray(scenario.liveAssertions)
-      ? scenario.liveAssertions.length
-      : 0);
-  if (judged === 0)
+  // Counted for the driver the run will use — the runner skips liveAssertions under replay, so a
+  // live-only scenario judges nothing there (CR-1). A scenario's env.json is merged into the
+  // runner's environment before it picks the driver, so it is read here too.
+  const envFile = path.join(dir, "env.json");
+  let fileEnv = {};
+  if (fs.existsSync(envFile)) {
+    try {
+      fileEnv = JSON.parse(fs.readFileSync(envFile, "utf-8"));
+    } catch (e) {
+      usage(`${envFile} is not valid JSON: ${e.message}`);
+    }
+  }
+  const driver = driverNameFrom({ ...process.env, ...fileEnv });
+  if (assertionsFor(scenario, driver).length === 0)
     usage(
-      `${file}: no assertions — a run with nothing to judge cannot pass or fail`,
+      `${file}: no assertions the ${driver} driver runs — a run with nothing to judge cannot pass or fail`,
     );
   const name = path.basename(path.resolve(dir));
   if (explicitMin !== undefined)

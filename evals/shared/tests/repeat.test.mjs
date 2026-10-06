@@ -366,12 +366,42 @@ test("a scenario with no assertions is a usage error before any run (A4)", () =>
       "no run started",
     );
   }
-  // liveAssertions alone are something to judge.
+  // liveAssertions alone are something to judge — but only by a driver that runs them. Under
+  // replay the runner skips liveAssertions, so a live-only scenario judges nothing there: usage,
+  // not a 0/0 pass (task.186 QA cycle 1, CR-1).
   const live = alternatingScenario({
     assertions: [],
     liveAssertions: [{ fn: "fileExists", args: ["$SANDBOX/pass.txt"] }],
   });
-  assert.equal(repeat([live, "--runs", "1", "--min-pass", "1"]).status, 0);
+  const replay = repeat([live, "--runs", "1", "--min-pass", "1"]);
+  assert.equal(replay.status, 2, replay.stdout + replay.stderr);
+  assert.match(replay.stderr, /no assertions the replay driver runs/);
+  assert.equal(
+    fs.existsSync(path.join(live, "count")),
+    false,
+    "no run started",
+  );
+  // The driver a scenario's env.json names is the one the runner uses, so the floor reads it too.
+  fs.writeFileSync(
+    path.join(live, "env.json"),
+    JSON.stringify({ DRIVER: "replay" }),
+  );
+  assert.equal(
+    repeat([live, "--runs", "1", "--min-pass", "1"], { DRIVER: "claude-cli" })
+      .status,
+    2,
+    "env.json DRIVER=replay overrides the shell's DRIVER",
+  );
+  fs.rmSync(path.join(live, "env.json"));
+  // Under a live driver the same scenario passes the floor: with no claude on PATH the run is then
+  // a skip (exit 3), which proves the floor let it through rather than refusing it.
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), "repeat-live-floor-"));
+  const cli = repeat([live, "--runs", "1", "--min-pass", "1"], {
+    DRIVER: "claude-cli",
+    PATH: empty,
+  });
+  assert.equal(cli.status, 3, cli.stdout + cli.stderr);
+  assert.doesNotMatch(cli.stderr, /no assertions/);
 });
 
 // task.186 A3: the opt-in codes repeat asks the runner for sit in 64–113, which neither Node (1–13

@@ -45,6 +45,8 @@ import * as A from "./assertions.mjs";
 import {
   dispatchAssertion,
   assertionListProblems,
+  assertionsFor,
+  driverNameFrom,
 } from "./lib/assertion-dispatch.mjs";
 import { cleanupFromReceipt } from "./lib/tracker-cleanup.mjs";
 
@@ -90,15 +92,11 @@ function resolvePath(p, sandbox) {
 }
 
 function resolveDriverName() {
-  if (process.env.DRIVER) return process.env.DRIVER;
-  if (process.env.MODE === "live") {
+  if (!process.env.DRIVER && process.env.MODE === "live")
     process.stderr.write(
       "runner: MODE=live is deprecated — use DRIVER=claude-sdk\n",
     );
-    return "claude-sdk";
-  }
-  if (process.env.MODE === "replay") return "replay";
-  return "replay";
+  return driverNameFrom(process.env);
 }
 
 async function loadDriver(name) {
@@ -339,10 +337,7 @@ async function main() {
     sandbox,
     remainingAnswers: driverResult.remainingAnswers || [],
   };
-  const assertionList = [
-    ...(scenario.assertions || []),
-    ...(driverName !== "replay" ? scenario.liveAssertions || [] : []),
-  ];
+  const assertionList = assertionsFor(scenario, driverName);
   const results = runAssertions(assertionList, ctx, resolvePathExtended);
   const agg = A.aggregate(results);
 
