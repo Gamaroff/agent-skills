@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 7 are complete and archived** to
+**Phases 1 through 8 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -20,9 +20,8 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **Phase 8 is fully ticked** (below; T186 merged 2026-10-06) — a one-row override that puts task.186 ahead of
-the registry fallback, which would otherwise select T173 and eight more planned tasks first. Archive
-Phase 8 when its row is ticked.
+chain, a human gate. **No phase is open**: Phase 8 (T186) closed 2026-10-06, and selection now falls
+through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -41,18 +40,6 @@ node .agents/skills/develop-next/scripts/select-next.mjs --batch     # what N ag
 ```
 
 Marker vocabulary and the full algorithm: `skills/develop-next/references/roadmap-selection.md`.
-
-## PHASE 8 — task.185 follow-ups (opened 2026-10-06)
-
-An **override**: without it the registry fallback selects T173, then 174, 175, 178–182 and 184
-before this. task.186 goes first because its Phase 3 is a live defect in two shipped skills:
-`pr-inline-comment.js` lists PR review comments with `-f` and no `-X GET`, which `gh` sends as a
-POST (`/review-pr --inline`, `/review-code`). **Tick the row `[x]` the moment the task is accepted**
-— a phase row is matched on its checkbox, not the document.
-
-- [x] **T186** Eval harness hardening and task.185 leftovers · deps: none · touches: review-skills~, bundles~, test-harness~ · /develop-task docs/tasks/task.186.eval-harness-hardening-and-leftovers/task.186.eval-harness-hardening-and-leftovers.md — ✅ **accepted + merged** ([PR #576](https://github.com/Gamaroff/agent-skills/pull/576), DoD accepted on run 2 after an operator scope note on AC6, QA CONCERNS 90/100 over 3 cycles with no open entry, /review-pr CONCERNS, CI 5/5). The runner and `repeat.mjs` never score a non-verdict as a verdict (one assertion table; opt-in codes 73/74/75); the fake `gh` labels every refusal and fails closed on version argv, `-R` and missing `pick()` fields; `pr-inline-comment.js` lists comments with `-X GET`; six skills number reports highest + 1 through `next_numbered` (obs #272). Follow-ups in the task's Deferred Work
-
----
 
 ## Legend — conflict footprint (`touches:` tags)
 
@@ -96,7 +83,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6 and 7 archived 2026-10-06; Phase 8 open (2026-10-06)
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -192,3 +179,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-06 | **Phase 8 opened** with one row, T186 (task.185 follow-ups, issue #575), as an override ahead of the registry fallback, which would otherwise select T173 first. Reason: T186 Phase 3 fixes a live defect in `/review-pr --inline` and `/review-code` (a comment listing sent as POST). |
 | 2026-10-06 | **Phases 6 and 7 archived** to `roadmap-history.md`. Both were fully ticked: Phase 6 (task.141 follow-ups, T143–T146) and Phase 7 (the 2026-09-24 observation review, T147–T154 and T158). 13 rows moved verbatim with their `touches:` tags and acceptance annotations, so a `deps:` naming any of them still resolves there. Phase 8 (T186) is now the only open phase. |
 | 2026-10-06 | **T186 accepted + merged — PR #576 merged** (`f1adccad`). Eval harness hardening and the task.185 leftovers, in four independent phases. (1) The runner and `repeat.mjs` share one assertion table (`assertion-dispatch.mjs`, `driver-name.mjs`): a never-settling setup is could-not-run, an unknown assertion `fn` is a usage error before any run, and a scenario with no assertion its driver runs is refused; the opt-in exit codes move to 73/74/75. (2) The fake `gh` gains a `refusal` field and closes the version, `-R` and `pick()` gaps. (3) `pr-inline-comment.js` sends `-X GET`. (4) `next_numbered` replaces counting at six skill sites. QA ran 3 cycles: CR-1 and CR-3 were fixed, then C2-CR-1, a regression from the first `jq` fix that skipped replay runs, was fixed; the loop left by the Diminishing-returns exit. 5c CONCERNS. **Two `/finalise` runs:** run 1 found AC6's zsh arm had no CI lane; the operator recorded a scope note (zsh verified locally, the task.185/176 precedent), and run 2 accepted (30 probes, 0 reproduced). Merge gate `npm run ci` green. Issue #575 closed. Phase 8 is fully ticked — archive it at the next housekeeping |
+| 2026-10-06 | **Phase 8 archived** to `roadmap-history.md`. Its one row, T186, moved verbatim with its `touches:` tags and acceptance annotation, so a `deps:` naming it still resolves there. No phase is open: `/develop-next` selects from the registries (next: T173). |
