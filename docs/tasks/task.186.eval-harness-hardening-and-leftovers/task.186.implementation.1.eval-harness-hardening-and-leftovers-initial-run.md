@@ -103,6 +103,12 @@ First autonomous run (develop-next T186) of the four task.185 follow-up phases: 
 - Decision: GAPS. AC6 needs an operator scope decision (task.185 dod.3 / task.176 precedent: annotate "zsh verified locally"), or zsh installed in `test.yml`. Fix-and-recheck (8a) not taken: the CI edit is outside the Files Summary, and an annotation is not a fix this run can make
 - Gaps Change Log row, gap report section in the task body, gaps PR comment posted; status left at ready-for-review
 
+### Resume — 2026-10-06
+
+- Operator decision on AC6 (option 1): criterion annotated "zsh arm verified locally" (`eb4c884`), the task.185/176 precedent
+- `reenter-qa-after-finalise.sh` refused `no-code-moved` (document-only fix) → resume at Step 7
+- Lock restored from halt_snapshot via `--restore` at step 7
+
 ---
 
 ## Issues Log
@@ -160,3 +166,22 @@ _Track each QA review/fix cycle._
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+
+---
+
+## Pipeline Paused — 2026-10-06T07:01:20Z
+
+⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
+
+**State at pause**:
+
+- Skill: `/develop-task`
+- Branch: `feature/task.186.eval-harness-hardening-and-leftovers`
+- Last step boundary: Step 7
+- PR: https://github.com/Gamaroff/agent-skills/pull/576
+- Tracker: github #575
+
+**Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 7.
+
+**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+
