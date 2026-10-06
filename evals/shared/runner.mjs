@@ -22,7 +22,8 @@
  *                    sandbox exists and before the driver runs, for every driver (replay too).
  *                    It may return `{ env }`, merged into the driver env; a `PATH` there is
  *                    PREFIXED to the runner's PATH. A setup that throws fails the scenario
- *                    (exit 1) and still removes the sandbox (unless KEEP_SANDBOX).
+ *                    (exit 1) and still removes the sandbox (unless KEEP_SANDBOX); one that throws
+ *                    an error with `evalSkip: true` (a missing dependency) is a skip instead.
  *   cliArgs        — array appended to the claude-cli driver's `claude` arguments.
  *   liveAssertions — assertions run after `assertions`, only when the driver is not `replay`
  *                    (e.g. "the fake gh was called" — replay never calls it).
@@ -33,12 +34,20 @@
  * failed run (repeat.mjs) sets EVAL_SKIP_EXIT and/or EVAL_DRIVER_ERROR_EXIT to a code in 3–125, and
  * that code is used instead (task.185 QA cycles 1 and 2). EVAL_FAIL_EXIT is the positive half:
  * the code used ONLY when assertions ran and failed, so every other exit is "did not run" (cycle 3).
+ * An assertion `fn` not in lib/assertion-dispatch.mjs is refused (exit 1) before anything runs, and
+ * a run that ends without reaching the final line — a promise that never settles — exits 1, never 0.
  */
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as A from "./assertions.mjs";
+import {
+  dispatchAssertion,
+  assertionListProblems,
+  assertionsFor,
+  driverNameFrom,
+} from "./lib/assertion-dispatch.mjs";
 import { cleanupFromReceipt } from "./lib/tracker-cleanup.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -83,15 +92,11 @@ function resolvePath(p, sandbox) {
 }
 
 function resolveDriverName() {
-  if (process.env.DRIVER) return process.env.DRIVER;
-  if (process.env.MODE === "live") {
+  if (!process.env.DRIVER && process.env.MODE === "live")
     process.stderr.write(
       "runner: MODE=live is deprecated — use DRIVER=claude-sdk\n",
     );
-    return "claude-sdk";
-  }
-  if (process.env.MODE === "replay") return "replay";
-  return "replay";
+  return driverNameFrom(process.env);
 }
 
 async function loadDriver(name) {
@@ -117,70 +122,7 @@ function runAssertions(assertions, ctx, pathResolver) {
     const args = (a.args || []).map((v) =>
       typeof v === "string" ? resolve(v, ctx.sandbox) : v,
     );
-    switch (a.fn) {
-      case "fileExists":
-        results.push(A.fileExists(...args));
-        break;
-      case "fileAbsent":
-        results.push(A.fileAbsent(...args));
-        break;
-      case "fileMatches":
-        results.push(A.fileMatches(args[0], new RegExp(args[1])));
-        break;
-      case "noFileMatching":
-        results.push(A.noFileMatching(args[0], new RegExp(args[1])));
-        break;
-      case "fileDoesNotMatch":
-        results.push(A.fileDoesNotMatch(args[0], new RegExp(args[1])));
-        break;
-      case "frontmatterHas":
-        results.push(A.frontmatterHas(...args));
-        break;
-      case "frontmatterEquals":
-        results.push(A.frontmatterEquals(...args));
-        break;
-      case "hasAtLeastNSourceCitations":
-        results.push(A.hasAtLeastNSourceCitations(...args));
-        break;
-      case "trackerPayloadMatches":
-        results.push(A.trackerPayloadMatches(...args));
-        break;
-      case "answerQueueDrained":
-        results.push(A.answerQueueDrained(ctx.remainingAnswers));
-        break;
-      // develop-task pipeline assertions
-      case "branchExists":
-        results.push(A.branchExists(...args));
-        break;
-      case "pipelineStepsRan":
-        results.push(A.pipelineStepsRan(args[0], args[1]));
-        break;
-      case "loopBoundedAt":
-        results.push(A.loopBoundedAt(args[0], args[1], args[2]));
-        break;
-      case "prCreated":
-        results.push(
-          A.prCreated(args[0], typeof args[1] === "object" ? args[1] : {}),
-        );
-        break;
-      case "noLockFilesLeft":
-        results.push(A.noLockFilesLeft(...args));
-        break;
-      // develop-story pipeline assertions
-      case "prTargetsBranch":
-        results.push(A.prTargetsBranch(args[0], args[1]));
-        break;
-      case "resumeRehydrated":
-        results.push(
-          A.resumeRehydrated(
-            args[0],
-            typeof args[1] === "object" ? args[1] : {},
-          ),
-        );
-        break;
-      default:
-        results.push({ ok: false, reason: `unknown assertion fn: ${a.fn}` });
-    }
+    results.push(dispatchAssertion(a.fn, args, ctx));
   }
   return results;
 }
@@ -234,12 +176,21 @@ async function runStage(driver, ctx, stage = {}) {
 }
 
 async function main() {
+  // Not judged until the post-assertion line says otherwise. A setup hook or driver promise that
+  // never settles empties the event loop and Node exits with this code — it used to be 0, a pass
+  // for a run that never reached its assertions (task.186 A1). 1 is never EVAL_FAIL_EXIT (3–125),
+  // so a caller that asked for the fail code reads it as "not judged".
+  process.exitCode = 1;
   const scenarioDir = process.argv[2];
   if (!scenarioDir) die("usage: runner.mjs <scenario-dir>");
   if (!fs.existsSync(scenarioDir)) die(`no such scenario: ${scenarioDir}`);
   const absScenarioDir = path.resolve(scenarioDir);
 
   const scenario = readJSON(path.join(absScenarioDir, "scenario.json"));
+  // Refuse an unknown assertion name before the sandbox, the setup or the driver: a typo used to
+  // become a failed result after a paid live run (task.186 A2).
+  const listProblems = assertionListProblems(scenario);
+  if (listProblems.length) die(listProblems.join("; "));
   const envFromFile = fs.existsSync(path.join(absScenarioDir, "env.json"))
     ? readJSON(path.join(absScenarioDir, "env.json"))
     : {};
@@ -283,11 +234,17 @@ async function main() {
       if (setupEnv.PATH)
         setupEnv.PATH = `${setupEnv.PATH}${path.delimiter}${process.env.PATH || ""}`;
     } catch (e) {
+      if (!process.env.KEEP_SANDBOX)
+        fs.rmSync(sandbox, { recursive: true, force: true });
+      // A setup that finds a dependency missing (the fake gh without jq) throws with `evalSkip`:
+      // the run cannot be judged, so it is a skip, exactly like an unavailable driver (task.186 A5).
+      if (e && e.evalSkip) {
+        process.stderr.write(`[${driverName}] skipped: ${e.message}\n`);
+        process.exit(skipExitCode());
+      }
       process.stderr.write(
         `[${driverName}] setup error: ${e && e.stack ? e.stack : e}\n`,
       );
-      if (!process.env.KEEP_SANDBOX)
-        fs.rmSync(sandbox, { recursive: true, force: true });
       process.exit(1);
     }
   }
@@ -380,10 +337,7 @@ async function main() {
     sandbox,
     remainingAnswers: driverResult.remainingAnswers || [],
   };
-  const assertionList = [
-    ...(scenario.assertions || []),
-    ...(driverName !== "replay" ? scenario.liveAssertions || [] : []),
-  ];
+  const assertionList = assertionsFor(scenario, driverName);
   const results = runAssertions(assertionList, ctx, resolvePathExtended);
   const agg = A.aggregate(results);
 

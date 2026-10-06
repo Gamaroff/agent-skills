@@ -96,8 +96,14 @@ const driver = {
     if (res.status !== 0) {
       // stdout too: `claude -p` prints some fatal errors there ("Credit balance is too
       // low"), leaving only an unrelated warning on stderr.
+      // A null status means the process was killed (the timeout, or a signal): say why, or the
+      // message reads "exited null" with nothing to act on (task.186 A6).
+      const why =
+        res.status === null
+          ? ` (${[res.error && res.error.code, res.signal].filter(Boolean).join(", ") || "no exit status"})`
+          : "";
       throw new Error(
-        `claude-cli exited ${res.status}: ${(res.stderr || "").slice(0, 500)}` +
+        `claude-cli exited ${res.status}${why}: ${(res.stderr || "").slice(0, 500)}` +
           `${res.stdout ? ` | stdout: ${res.stdout.slice(-500)}` : ""}`,
       );
     }

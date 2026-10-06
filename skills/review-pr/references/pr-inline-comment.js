@@ -453,8 +453,13 @@ function ghExistingMarkers(execImpl, slug, pr) {
   // degrades to `unverifiable`, and the module silently becomes the summary-only
   // behaviour it was written to replace — on exactly the busiest PRs.
   // `--slurp` wraps the pages in an outer array, so flatten one level.
+  // `-X GET` is REQUIRED too: `gh api` sends POST once any `-f` parameter is
+  // added (`gh api --help`, gh 2.94), so without it this listing was a POST to
+  // the create-comment endpoint (task.186).
   const pages = ghJson(execImpl, [
     "api",
+    "-X",
+    "GET",
     "--paginate",
     "--slurp",
     "-f",

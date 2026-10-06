@@ -418,6 +418,32 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The eval runner and `repeat.mjs` no longer score a run that judged nothing (task.186).** A
+  `setup` hook or driver promise that never settled emptied the event loop and the runner exited 0
+  — a pass. The runner now sets exit 1 first and reaches 0 only from its final line. An assertion
+  `fn` it does not know is refused before the sandbox, the setup or the driver, and `repeat.mjs`
+  refuses it, and a scenario with no assertions at all, as a usage error (2) before any run; the
+  known names live in one table, `evals/shared/lib/assertion-dispatch.mjs`, which the runner
+  dispatches through. `repeat.mjs`'s opt-in codes moved from 3/4/5 to
+  `EVAL_SKIP_EXIT=73`, `EVAL_DRIVER_ERROR_EXIT=74` and `EVAL_FAIL_EXIT=75`, out of the range
+  Node uses for its own fatal errors (5 is a fatal V8 error); a caller that sets them itself is
+  unaffected. Under a live driver the fake `gh` without `jq` now skips the scenario (could-not-run under
+  `repeat.mjs`) instead of failing it, and a timed-out `claude` names `ETIMEDOUT` and the signal.
+- **The fake `gh` closes its remaining gaps (task.186).** Every refusal is logged with
+  `refusal: "write"` or `"not-a-served-read"`; `--version` / `version` are answered only as the
+  whole command (`gh version issue close 5` exited 0); `api` with `-R`/`--repo` is refused, as
+  real `gh api` rejects it; a requested `--json` field the fixture lacks is `unhandled` and
+  named; fixture lookup reads own keys only (`pr diff constructor` served `Object`).
+- **`/review-pr --inline` and `/review-code` list existing inline comments with GET (task.186).**
+  `pr-inline-comment.js` passed `-f per_page=100` to `gh api` without a method, and `gh api`
+  sends POST once any parameter is added. The listing now passes `-X GET`.
+- **Six skills number co-located reports highest + 1, through one helper (task.186, obs #272).**
+  `qa-planning` (`risk`, `test-design`), `review-bug`, `review-epic`, `review-task` and
+  `finalise` (`dod`) said `{n}` "starts at 1 and increments", which a directory holding `.1.`
+  and `.3.` reads as a second `.3.`. Each now runs `next_numbered`, added to
+  `shared/resources/newest-numbered.sh` beside `newest_numbered`, and `/review-pr` Step 7 moved
+  to it from `skills/review-pr/scripts/next-report-number.sh`, which is removed.
+
 - **`/review-pr`'s report number is computed, not counted (task.185, observation #272).** Step 7
   said `{n}` "starts at 1 and increments on re-review" — neither max + 1 nor count + 1 — and no code
   computed it, so a directory holding `.pr-review.1.` and `.pr-review.3.` let a count overwrite
