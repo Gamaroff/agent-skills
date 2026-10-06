@@ -246,7 +246,7 @@ No other breaking changes.
 - [x] `repeat.mjs` uses opt-in codes outside 0–5 and the README table matches the code (Phase 1, A3)
 - [x] Every refused fake `gh` entry carries `refusal`; `gh version issue close 5` is refused (it exits 0 on `develop` today), and `gh --version pr view 901` is not answered as a version (Phase 2)
 - [x] `pr-inline-comment.js` never sends `-f` without `-X GET` (Phase 3)
-- [x] For each of the six call sites, a directory holding `.1.` and `.3.` of that site's kind(s) gets `.4.` under bash and zsh — kinds `pr-review`, `risk`, `test-design`, `review` (review-bug, review-epic, review-task) and `dod` (Phase 4)
+- [x] For each of the six call sites, a directory holding `.1.` and `.3.` of that site's kind(s) gets `.4.` under bash and zsh — kinds `pr-review`, `risk`, `test-design`, `review` (review-bug, review-epic, review-task) and `dod` (Phase 4) *(Scope, 2026-10-06, operator decision: the bash arm is guarded per PR in CI; the zsh arm is verified locally, since `ubuntu-latest` has no zsh — the state task.185 and task.176 were accepted in.)*
 
 **Code Quality:**
 
@@ -361,6 +361,7 @@ No other breaking changes.
 | 2026-10-06 |  | QA findings fixed — CR-1 (driver-aware assertion floor), CR-3 (fake-gh tests without jq), C2-CR-1 (jq refusal scoped to live drivers), 2 iterations | qa-fix |
 | 2026-10-06 |  | QA gate CONCERNS (90/100) — 1 finding, carried by the Diminishing-returns exit; no open entry | qa-task |
 | 2026-10-06 |  | DoD incomplete — 1 gap identified (AC6 zsh arm has no CI lane) | finalise |
+| 2026-10-06 |  | Scope annotation on the six-call-site criterion: zsh arm verified locally (operator decision, task.185/176 precedent) | operator |
 <!-- change-log-end -->
 
 ---
