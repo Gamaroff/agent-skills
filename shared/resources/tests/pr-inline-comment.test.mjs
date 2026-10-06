@@ -1458,3 +1458,45 @@ test("§10 the inline-body construction in source is marker + body and nothing e
     `expected the inline-body template in at least 4 places, found ${bare.length}`,
   );
 });
+
+// task.186 C: `gh api` sends POST once any -f/-F parameter is added ("The default HTTP request
+// method is GET normally and POST if any parameters were added" — `gh api --help`, gh 2.94). The
+// listing of existing review comments passes `-f per_page=100`, so it must say GET.
+test("§4 every gh api call that carries a field parameter says -X GET", async () => {
+  const dir = withRepo();
+  const marker = cli.markerHtml(cli.findingId(FINDINGS[0]));
+  const { execImpl, calls } = stubGh({
+    existing: [
+      { id: 999, body: `${marker}\nold text`, path: "src/a.ts", line: 12 },
+    ],
+  });
+  await cli.run({
+    argv: [
+      "node",
+      "cli",
+      "--pr",
+      "5",
+      "--findings-file",
+      findingsFile(dir),
+      "--json",
+    ],
+    execImpl,
+    repoRoot: dir,
+    env: { VCS: "github", ACCESS_TRACKER: "full" },
+  });
+  const FIELD = new Set(["-f", "-F", "--field", "--raw-field"]);
+  const withFields = calls.filter(
+    (c) => c.argv[0] === "api" && c.argv.some((a) => FIELD.has(a)),
+  );
+  assert.ok(
+    withFields.length >= 1,
+    "non-vacuous: the comment listing carries -f",
+  );
+  for (const c of withFields) {
+    const i = c.argv.indexOf("-X");
+    assert.ok(
+      i >= 0 && c.argv[i + 1] === "GET",
+      `-X GET missing: gh ${c.argv.join(" ")}`,
+    );
+  }
+});
