@@ -295,18 +295,22 @@ No other breaking changes.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.186.qa.2.eval-harness-hardening-and-leftovers.md](./task.186.qa.2.eval-harness-hardening-and-leftovers.md)
-- **Gate File**: [task.186.gate.2.eval-harness-hardening-and-leftovers.yml](./task.186.gate.2.eval-harness-hardening-and-leftovers.yml)
+- **Full Report**: [task.186.qa.3.eval-harness-hardening-and-leftovers.md](./task.186.qa.3.eval-harness-hardening-and-leftovers.md)
+- **Gate File**: [task.186.gate.3.eval-harness-hardening-and-leftovers.yml](./task.186.gate.3.eval-harness-hardening-and-leftovers.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 393
+- **Tests Executed**: 394
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 1's CR-1 and CR-3 are fixed and mutation-proven.
-- C2-CR-1 (medium): the jq refusal fires under replay too, so review-pr replay scenarios skip (exit 0) on a host without jq.
+- Gate 2's C2-CR-1 is fixed: replay runs are judged without jq; live runs skip.
+- C3-CR-1 (test machinery) was carried by the Diminishing-returns exit; no open entry remains.
+
+## Deferred Work
+
+- **C3-CR-1** (MEDIUM, test machinery) — carried to gate 3 `recommendations.future` (route 2, cycle 3): the no-jq meta-test in `evals/shared/tests/fake-gh.test.mjs` asserts `skipped >= 1`, which its own self-skip always satisfies, and has no pass floor
 
 <!-- change-log-start -->
 ## Change Log
@@ -320,6 +324,7 @@ No other breaking changes.
 | 2026-10-06 |  | QA gate CONCERNS (90/100) — 2 findings (CR-1 medium, CR-3 low) | qa-task |
 | 2026-10-06 |  | QA gate CONCERNS (90/100) — 1 finding (C2-CR-1 medium) | qa-task |
 | 2026-10-06 |  | QA findings fixed — CR-1 (driver-aware assertion floor), CR-3 (fake-gh tests without jq), C2-CR-1 (jq refusal scoped to live drivers), 2 iterations | qa-fix |
+| 2026-10-06 |  | QA gate CONCERNS (90/100) — 1 finding, carried by the Diminishing-returns exit; no open entry | qa-task |
 <!-- change-log-end -->
 
 ---
