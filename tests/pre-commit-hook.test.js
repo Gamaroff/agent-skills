@@ -205,3 +205,88 @@ test("the unstaged-source refusal's own remedy — stage the source, retry — g
   assert.equal(retry.status, 0, retry.stdout + retry.stderr);
   assert.match(r.git("ls-files"), /skills\/fx\/references\/fresh\.md/);
 });
+
+// ── Formatting (obs #283) ─────────────────────────────────────────────────
+// CI's first step is `npm run format:check`. The hook checks the STAGED content
+// of each staged file, so these tests link this repository's node_modules into
+// the fixture to give the hook a real prettier.
+
+const UGLY_JS = "const a = {b:1,\n c:2}\n";
+const PRETTY_JS = "const a = { b: 1, c: 2 };\n";
+
+function withPrettier(r) {
+  fs.symlinkSync(
+    path.resolve(__dirname, "..", "node_modules"),
+    path.join(r.root, "node_modules"),
+  );
+  fs.appendFileSync(path.join(r.root, ".gitignore"), "node_modules\n");
+  r.write(".prettierignore", "*.md\n");
+  r.git("add", ".gitignore", ".prettierignore");
+  return r;
+}
+
+test("format: a staged file Prettier would rewrite refuses the commit, naming it and the fix", (t) => {
+  const r = withPrettier(repo(t));
+  r.write("src/a.js", UGLY_JS);
+  r.git("add", "src/a.js");
+  const res = r.commit();
+  assert.notEqual(res.status, 0, res.stdout + res.stderr);
+  assert.match(res.stderr, /not Prettier-formatted/);
+  assert.match(res.stderr, /src\/a\.js/);
+  assert.match(res.stderr, /prettier --write src\/a\.js/);
+  assert.throws(
+    () => r.git("rev-parse", "--verify", "-q", "HEAD~1"),
+    "no commit was made",
+  );
+});
+
+test("format: a formatted staged file goes through", (t) => {
+  const r = withPrettier(repo(t));
+  r.write("src/a.js", PRETTY_JS);
+  r.git("add", "src/a.js");
+  const res = r.commit();
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+});
+
+test("format: the INDEX is checked, not the working tree", (t) => {
+  // Formatting the file on disk without re-staging it does not fix the commit,
+  // and an unformatted working copy over a formatted staged one does not block it.
+  const staged = withPrettier(repo(t));
+  staged.write("src/a.js", UGLY_JS);
+  staged.git("add", "src/a.js");
+  staged.write("src/a.js", PRETTY_JS); // fixed on disk only
+  const refused = staged.commit();
+  assert.notEqual(refused.status, 0, refused.stdout + refused.stderr);
+  assert.match(refused.stderr, /src\/a\.js/);
+
+  staged.git("add", "src/a.js"); // now the index is formatted
+  staged.write("src/a.js", UGLY_JS); // and the working copy is not
+  const passed = staged.commit();
+  assert.equal(passed.status, 0, passed.stdout + passed.stderr);
+});
+
+test("format: a file .prettierignore excludes is not checked", (t) => {
+  const r = withPrettier(repo(t));
+  r.write("notes.md", "*  hand   wrapped\n");
+  r.git("add", "notes.md");
+  const res = r.commit();
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+});
+
+test("format: a file Prettier cannot parse is refused by name", (t) => {
+  const r = withPrettier(repo(t));
+  r.write("src/broken.js", "const = ;\n");
+  r.git("add", "src/broken.js");
+  const res = r.commit();
+  assert.notEqual(res.status, 0, res.stdout + res.stderr);
+  assert.match(res.stderr, /src\/broken\.js/);
+});
+
+test("format: with no prettier installed the commit proceeds and says it was not checked", (t) => {
+  const r = repo(t); // no node_modules in the fixture
+  r.write("src/a.js", UGLY_JS);
+  r.git("add", "src/a.js");
+  const res = r.commit();
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.match(res.stderr, /prettier is not installed/);
+});

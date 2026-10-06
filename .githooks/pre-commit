@@ -16,6 +16,64 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+# ── Formatting (obs #283) ──────────────────────────────────────────────────
+# CI's first step is `npm run format:check`; nothing local ran it, so a missed
+# `prettier --write` cost a full CI round trip. Check the STAGED content of each
+# staged file — the index, not the working tree, because the index is what the
+# commit carries — with the same ignore files the CLI reads. Runs before the
+# bundling gate below, because that gate exits early for most commits.
+# No prettier installed (a fresh clone before `npm install`) is a warning, not a
+# refusal: CI still runs the check.
+if ! node - <<'JS'
+const { execFileSync } = require("child_process");
+const path = require("path");
+const root = process.cwd();
+(async () => {
+  let prettier;
+  try {
+    prettier = require(require.resolve("prettier", { paths: [root] }));
+  } catch {
+    console.error("⚠ prettier is not installed — staged files were not format-checked (CI will check them).");
+    return;
+  }
+  const staged = execFileSync(
+    "git", ["diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"],
+    { encoding: "utf8" },
+  ).split("\0").filter(Boolean);
+  const ignorePath = [".gitignore", ".prettierignore"].map((f) => path.join(root, f));
+  const bad = [];
+  for (const rel of staged) {
+    const abs = path.join(root, rel);
+    const info = await prettier.getFileInfo(abs, { ignorePath, resolveConfig: true });
+    if (info.ignored || !info.inferredParser) continue;
+    const source = execFileSync("git", ["show", `:${rel}`], { encoding: "utf8" });
+    const options = (await prettier.resolveConfig(abs)) || {};
+    try {
+      if (!(await prettier.check(source, { ...options, filepath: abs }))) bad.push(rel);
+    } catch (err) {
+      // A parse error fails `prettier --check` in CI too: name the file.
+      console.error(`✗ ${rel}: ${String(err.message).split("\n")[0]}`);
+      bad.push(rel);
+    }
+  }
+  if (bad.length) {
+    console.error("");
+    console.error("✗ Staged files are not Prettier-formatted — CI's format:check would fail:");
+    for (const rel of bad) console.error(`      ${rel}`);
+    console.error("");
+    console.error(`  Fix: ./node_modules/.bin/prettier --write ${bad.join(" ")}`);
+    console.error("  then git add them and retry.");
+    process.exitCode = 1;
+  }
+})().catch((err) => {
+  console.error(`✗ The format check could not run: ${err.message}`);
+  process.exitCode = 1;
+});
+JS
+then
+  exit 1
+fi
+
 git diff --cached --name-only \
   | grep -qE '^(shared/resources/|skills/[^/]+/SKILL\.md)' || exit 0
 

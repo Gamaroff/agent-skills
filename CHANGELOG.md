@@ -425,6 +425,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The pre-commit hook checks formatting (obs #283).** CI's first step is `npm run format:check`,
+  and nothing local ran it, so a missed `prettier --write` cost a full CI round trip (PR #581, run
+  37460534870). `.githooks/pre-commit` now checks the staged content of every staged file with
+  Prettier, using the same `.gitignore` and `.prettierignore` as the CLI, and refuses the commit
+  naming each file and the `prettier --write` that fixes it. It reads the index, not the working
+  tree, because the index is what the commit carries. It runs before the bundling gate, which exits
+  early for most commits. With no Prettier installed it warns and lets the commit through. Six new
+  cases in `tests/pre-commit-hook.test.js`; four go red with the check removed.
+
 - **`ci-tree-equivalence` tests no longer flake on teardown (obs #282).** Every `git commit` in a
   test fixture spawned a detached `git maintenance run --auto`. CR3-7's 4000-file commit sits right
   at the `gc.auto` estimate (27 objects in `objects/17` against a threshold of 27), so on some runs
