@@ -47,9 +47,21 @@ const GIT = [
   "user.email=t@t",
   "-c",
   "commit.gpgsign=false",
+  // No background maintenance. By default every `git commit` spawns
+  // `git maintenance run --auto --detach`, and once the loose-object estimate
+  // crosses gc.auto it repacks into .git while the test is deleting the
+  // fixture: rmSync then fails with ENOTEMPTY (obs #282, CR3-7 on CI).
+  "-c",
+  "maintenance.auto=false",
+  "-c",
+  "gc.auto=0",
 ];
 const git = (cwd, ...args) =>
   execFileSync("git", [...GIT, ...args], { cwd, encoding: "utf8" }).trim();
+
+/** Teardown must not be able to fail a test, so it retries a transient ENOTEMPTY/EBUSY. */
+const cleanup = (dir) =>
+  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 
 function mkRepo({ config } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "ci-tree-eq-"));
@@ -69,6 +81,35 @@ function commit(dir, files, msg = "c", { rm = [] } = {}) {
   git(dir, "commit", "-q", "--allow-empty", "-m", msg);
   return git(dir, "rev-parse", "HEAD");
 }
+
+test("fixture: a commit spawns no background git maintenance, so teardown cannot race a repack (obs #282)", () => {
+  // Without maintenance.auto=false every commit spawns a detached
+  // `git maintenance run --auto`; CR3-7 failed on CI when one repacked .git
+  // while rmSync was deleting it. Trace the commit and look for the child.
+  const dir = mkRepo();
+  const trace = join(dir, "..", `${dir.split("/").pop()}.trace.json`);
+  const before = process.env.GIT_TRACE2_EVENT;
+  process.env.GIT_TRACE2_EVENT = trace;
+  try {
+    commit(dir, { "a.txt": "1\n" }, "traced");
+  } finally {
+    if (before === undefined) delete process.env.GIT_TRACE2_EVENT;
+    else process.env.GIT_TRACE2_EVENT = before;
+  }
+  try {
+    const events = readFileSync(trace, "utf8");
+    // Non-vacuity: the trace saw the commit itself, so an empty match below means something.
+    assert.match(
+      events,
+      /"argv":\[[^\]]*"commit"/,
+      "the trace recorded no commit",
+    );
+    assert.doesNotMatch(events, /"argv":\[[^\]]*"(maintenance|gc)"/);
+  } finally {
+    cleanup(dir);
+    rmSync(trace, { force: true });
+  }
+});
 
 // Timestamps matter: an ancestor whose newest check is younger than ci.docsOnly.settleSeconds (default
 // 300 s) is still PENDING, and one with no timestamp cannot be shown to have settled (CR3-1). A long-ago
@@ -426,7 +467,7 @@ test("readConfig: no file or no block gives the defaults", () => {
     );
     assert.deepEqual(eng.readConfig(dir).patterns, [...eng.DEFAULT_PATTERNS]);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    cleanup(dir);
   }
 });
 
@@ -444,7 +485,7 @@ test("readConfig: a block list, enabled and checkCommand are read", () => {
       settleSeconds: eng.DEFAULT_SETTLE_SECONDS,
     });
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    cleanup(dir);
   }
 });
 
@@ -460,7 +501,7 @@ test("readConfig: a wrong-typed value is a usage error naming the key, never the
     try {
       assert.throws(() => eng.readConfig(dir), key, config);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   }
 });
@@ -475,8 +516,6 @@ function greenThenDocs(n, { config } = {}) {
     commit(dir, { [`docs/n${i}.md`]: `# ${i}\n` }, `docs ${i}`);
   return { dir, green };
 }
-
-const cleanup = (dir) => rmSync(dir, { recursive: true, force: true });
 
 test("CLI: two markdown commits over a green ancestor are tree-equivalent, exit 0, clean JSON", async () => {
   const { dir, green } = greenThenDocs(2);

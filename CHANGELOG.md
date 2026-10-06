@@ -425,6 +425,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`ci-tree-equivalence` tests no longer flake on teardown (obs #282).** Every `git commit` in a
+  test fixture spawned a detached `git maintenance run --auto`. CR3-7's 4000-file commit sits right
+  at the `gc.auto` estimate (27 objects in `objects/17` against a threshold of 27), so on some runs
+  the child repacked `.git` while `rmSync` was deleting it, and the test failed with `ENOTEMPTY`
+  after every assertion had passed (CI run 37456203403; reproduced locally with a trace). The
+  fixture's git calls now pass `maintenance.auto=false` and `gc.auto=0`, `cleanup` retries a
+  transient failure, and a new test traces a fixture commit and fails if any maintenance or gc
+  child starts. That test goes red with the two settings removed.
+
 - **`/wireframe` draws a hidden tab pane, and says which rule wins (obs #281).** `SKILL.md` said an
   inactive tab pane is a further block; the Rebirth hi-fi profile said to draw one only when asked.
   Both came in the same commit, so the same page could give two different documents. The profile
