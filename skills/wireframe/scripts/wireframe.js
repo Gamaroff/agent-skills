@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * wireloom — check and render Wireloom wireframe sources.
+ * wireframe — check and render Wireloom wireframe sources.
  *
  * The `wireloom` npm package (MIT, StardockCorp) is a library with no CLI, and
  * GitHub does not render a ```wireloom fence. This script is the CLI: it pulls
@@ -8,11 +8,11 @@
  * one SVG per block so a document can embed the picture beside its source.
  *
  * Usage:
- *   wireloom.js check  <file|->                         [--json] [--no-install]
- *   wireloom.js render <file|-> --out <file.svg|dir/>   [--json] [--no-install]
+ *   wireframe.js check  <file|->                         [--json] [--no-install]
+ *   wireframe.js render <file|-> --out <file.svg|dir/>   [--json] [--no-install]
  *                      [--theme default|dark] [--block N]
- *   wireloom.js ensure                                  [--json] [--no-install]
- *   wireloom.js status <source.html>                    [--json]
+ *   wireframe.js ensure                                  [--json] [--no-install]
+ *   wireframe.js status <source.html>                    [--json]
  *
  * Input: a Markdown file holding one or more ```wireloom (or ~~~wireloom)
  * fences, or a raw Wireloom source whose first significant line is `window`.

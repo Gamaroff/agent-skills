@@ -120,9 +120,9 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 
 | Say something like… | Activates |
 |---|---|
-| "Create a low-fidelity mobile wireframe for this layout" / "Design a monochrome outline of this screen" | `wireloom` |
-| "Mock up this settings dialog" / "Sketch the layout of this screen" / "What would this look like?" | `wireloom` |
-| "Wireframe this screen with callouts pointing at each control" | `wireloom` |
+| "Create a low-fidelity mobile wireframe for this layout" / "Design a monochrome outline of this screen" | `wireframe` |
+| "Mock up this settings dialog" / "Sketch the layout of this screen" / "What would this look like?" | `wireframe` |
+| "Wireframe this screen with callouts pointing at each control" | `wireframe` |
 
 ## Tips for reliable activation
 

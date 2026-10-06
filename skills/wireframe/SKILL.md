@@ -1,15 +1,15 @@
 ---
-name: wireloom
+name: wireframe
 description: 'Author low-fidelity UI wireframes in the Wireloom DSL and render them to SVG. Use when the user asks to mock up, wireframe, sketch or draw the layout of a screen, dialog, settings page, form, dashboard, toolbar, split view or mobile list/detail flow, wants a low-fidelity or monochrome outline of a layout or a mobile prototype from a brief, wants an existing HTML screen or hi-fi mockup turned into a wireframe, asks "what would this look like?", or wants a mockup with callouts pointing at its parts. Also the wireframe step create-story and review-story call for UI stories. Writes a ```wireloom source block, checks it with the bundled renderer, and embeds a co-located SVG beside it so the picture shows on GitHub. Adapted from StardockCorp/Wireloom (MIT). Not for flowcharts, sequence, state or ER diagrams (mermaid-architect), or anything the user needs to click (write the real component).'
 ---
 
-# Wireloom
+# Wireframe
 
 > **Adapted from [StardockCorp/Wireloom](https://github.com/StardockCorp/Wireloom)**
 > (`.claude/skills/wireloom.md` and `AGENTS.md`), © 2026 Brad Wardell, MIT License — full text in
 > [`references/LICENSE-wireloom.txt`](references/LICENSE-wireloom.txt). **Changes were made**:
 > the grammar is bundled here and brought up to v0.7.0, and the skill renders and validates
-> through `scripts/wireloom.js` rather than leaving the block unrendered. The links are for the human
+> through `scripts/wireframe.js` rather than leaving the block unrendered. The links are for the human
 > reader; running this skill never requires fetching them.
 
 Wireloom is a small indented text language for **static** UI wireframes. The `wireloom` npm package
@@ -59,7 +59,7 @@ it: nothing is derived, everything is transcribed.
 the script whether it exists and was made from the page as it is now:
 
 ```bash
-command node .agents/skills/wireloom/scripts/wireloom.js status path/to/screen.html
+command node .agents/skills/wireframe/scripts/wireframe.js status path/to/screen.html
 ```
 
 | `reason` | Do this |
@@ -160,7 +160,7 @@ error.
 **3. Check it.** From the repository root:
 
 ```bash
-command node .agents/skills/wireloom/scripts/wireloom.js check docs/path/to/doc.md
+command node .agents/skills/wireframe/scripts/wireframe.js check docs/path/to/doc.md
 ```
 
 `check` parses every ```` ```wireloom ```` block in the file and reports each error at the
@@ -171,7 +171,7 @@ stdin. Fix each error and re-run until it reports `ok`. Never hand over a block 
 README or design doc), render an SVG next to that document:
 
 ```bash
-command node .agents/skills/wireloom/scripts/wireloom.js render docs/path/to/doc.md --out docs/path/to/doc.wireframe.svg
+command node .agents/skills/wireframe/scripts/wireframe.js render docs/path/to/doc.md --out docs/path/to/doc.wireframe.svg
 ```
 
 A file with several blocks gets one SVG per block: `doc.wireframe.1.svg`, `doc.wireframe.2.svg`,
@@ -203,7 +203,7 @@ window "Settings":
 
 ## The renderer: `npm install wireloom`
 
-The `wireloom` package has no CLI; `scripts/wireloom.js` is the CLI. It finds the package in this
+The `wireloom` package has no CLI; `scripts/wireframe.js` is the CLI. It finds the package in this
 order, and the first match wins:
 
 1. `WIRELOOM_MODULE`: a path to a package directory or entry file.
@@ -216,7 +216,7 @@ It **never** changes the project's `package.json` or lockfile. The first run on 
 network access. To install up front, or to see which copy will be used:
 
 ```bash
-command node .agents/skills/wireloom/scripts/wireloom.js ensure
+command node .agents/skills/wireframe/scripts/wireframe.js ensure
 ```
 
 `--no-install` (or `WIRELOOM_NO_INSTALL=1`) turns step 4 off. When the project pins a different
@@ -242,6 +242,6 @@ failure: `new`, `fresh`, `stale` and `unrecorded`. What each one means is in
 Agents fall back to prose or ASCII art unless told otherwise. When a subagent is to sketch a UI, say
 so explicitly:
 
-> "Emit a ```` ```wireloom ```` fenced block following `.agents/skills/wireloom/references/grammar.md`,
-> and run it through `.agents/skills/wireloom/scripts/wireloom.js check` until it reports `ok`.
+> "Emit a ```` ```wireloom ```` fenced block following `.agents/skills/wireframe/references/grammar.md`,
+> and run it through `.agents/skills/wireframe/scripts/wireframe.js check` until it reports `ok`.
 > Do not describe the layout in prose, draw it in ASCII art, or use Mermaid for it."

@@ -1,7 +1,7 @@
 "use strict";
 /**
- * wireloom skill — CLI behaviour and grammar-reference integrity.
- * Run: node --test 'skills/wireloom/tests/*.test.js'
+ * wireframe skill — CLI behaviour and grammar-reference integrity.
+ * Run: node --test 'skills/wireframe/tests/*.test.js'
  *
  * Hermetic: the real renderer comes from this repository's `wireloom`
  * devDependency through WIRELOOM_MODULE, every run uses a temp cwd and a temp
@@ -19,7 +19,7 @@ const { spawnSync } = require("child_process");
 
 const SKILL_DIR = path.join(__dirname, "..");
 const REPO_ROOT = path.join(SKILL_DIR, "..", "..");
-const SCRIPT = path.join(SKILL_DIR, "scripts", "wireloom.js");
+const SCRIPT = path.join(SKILL_DIR, "scripts", "wireframe.js");
 const GRAMMAR = path.join(SKILL_DIR, "references", "grammar.md");
 const { extractBlocks, PINNED_VERSION } = require(SCRIPT);
 // The package exports no ./package.json subpath, so address its directory directly.

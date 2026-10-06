@@ -214,7 +214,7 @@ Full categorised index below.
 | `browser-use` | Automates browser interactions for web testing, form filling, screenshots, and data extraction. Use when the user needs to navigate websites, interact with web pages, fill… |
 | `building-components` | Guide for building modern, accessible, and composable UI components. Use when building new components, implementing accessibility, creating composable APIs, setting up design tokens, publishing to… |
 | `ux-expert` | UX Expert (Sally) specializing in user experience design and intuitive interfaces. Use for UI/UX design, wireframes, prototypes, front-end specifications, AI-powered UI generation prompts, and user… |
-| `wireloom` | Author low-fidelity UI wireframes in the Wireloom DSL and render them to SVG. Use when the user asks to mock up, wireframe, sketch or draw… |
+| `wireframe` | Author low-fidelity UI wireframes in the Wireloom DSL and render them to SVG. Use when the user asks to mock up, wireframe, sketch or draw… |
 
 ## Utilities & Misc
 

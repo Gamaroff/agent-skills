@@ -5,18 +5,18 @@
 > License — full text in [`LICENSE-wireloom.txt`](LICENSE-wireloom.txt). **Changes were made**:
 > the 0.6.0 and 0.7.0 additions are folded in from the package's `CHANGELOG.md` (upstream's
 > `AGENTS.md` stops at v0.5.2); the [0.7.0 section](#v070-edge-anchoring-on-both-axes) is new; the
-> rendering notes point at this skill's `scripts/wireloom.js` instead of upstream's integration
+> rendering notes point at this skill's `scripts/wireframe.js` instead of upstream's integration
 > guide; four upstream examples that do not parse under 0.7.0 are fixed — two mobile patterns
 > combined `navbar` with `header`, which the parser rejects, and two `row:` fragments carried the
 > `wireloom` tag without a `window` root. Every ```wireloom block here parses, and
-> `tests/wireloom.test.js` keeps it that way. This file documents the version
-> `scripts/wireloom.js` pins; bump both together.
+> `tests/wireframe.test.js` keeps it that way. This file documents the version
+> `scripts/wireframe.js` pins; bump both together.
 
 ## What is Wireloom?
 
 Wireloom is a small indentation-based text language for UI wireframe mockups. You write a layout as indented plain text inside a ```wireloom fenced code block, and the Wireloom renderer turns it into an SVG wireframe. Output is monochrome, sketch-style — it reads as a mockup, not a finished UI.
 
-The renderer is the `wireloom` npm package, which has no CLI. This skill's `scripts/wireloom.js` is the CLI: `check` parses every ```wireloom block in a file and reports errors at the file's own line numbers; `render` writes one SVG per block. A fenced block on its own renders only where a tool bundles the renderer — **GitHub does not** — so a document embeds the rendered SVG beside the source.
+The renderer is the `wireloom` npm package, which has no CLI. This skill's `scripts/wireframe.js` is the CLI: `check` parses every ```wireloom block in a file and reports errors at the file's own line numbers; `render` writes one SVG per block. A fenced block on its own renders only where a tool bundles the renderer — **GitHub does not** — so a document embeds the rendered SVG beside the source.
 
 ## When to Use Wireloom
 
@@ -959,7 +959,7 @@ Wireloom outputs plain SVG, so any Markdown consumer that supports inline SVG ca
 - **Static site generators** — Docusaurus, Astro, Hugo, MkDocs, Next.js MDX
 - **Integrations** — tools that bundle the Wireloom renderer turn fenced ```wireloom blocks into inline SVG at view time (no SVG in the source file needed)
 
-On GitHub the SVG must exist as a file: render it with `scripts/wireloom.js render` and embed it as an image beside the source block (see `SKILL.md`).
+On GitHub the SVG must exist as a file: render it with `scripts/wireframe.js render` and embed it as an image beside the source block (see `SKILL.md`).
 
 ## Prompting Tips for Orchestrating Agents
 
