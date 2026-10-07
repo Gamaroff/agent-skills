@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.194.code-review-anchors-name-source-lines'
+task_title: 'Code-review findings anchor to source lines'
+gate: CONCERNS
+status_reason: 'All four phases verified and every success criterion holds, but the checker reports an unresolvable --rev as no-such-file on every finding (could-not-look reads as reviewer-wrong), and without --rev it follows a symlink out of the root (measured, 1 of 8 hostile path cases accepted).'
+reviewer: 'QA Engineer'
+head: 'fa1b967620cf3b897654772ad67ab29a24c7f58b'
+updated: '2026-10-07T10:19:52Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/finding-anchors.js'
+    finding: 'makeReader returns null for every git show failure, so an unknown or unfetched --rev reports every finding as no-such-file and exits 1 malformed-anchors; "could not look" and "the reviewer named a missing file" reach one verdict (reproduced: --rev no-such-rev gives 3 x no-such-file, exit 1).'
+    suggested_action: 'Verify the rev once before reading (git rev-parse --verify --quiet <rev>^{commit}) and exit 2 with a named reason when it does not resolve; return null only when the path is absent at a resolving rev.'
+    suggested_owner: dev
+    status: open
+  - id: 'SEC-1'
+    severity: medium
+    file: 'shared/resources/finding-anchors.js'
+    finding: 'Without --rev the working-tree reader follows a symlink inside --root to a file outside it (security-probe path sink: symlink-escape accepted, 1 of 8 hostile cases); a text-mismatch then prints that outside line in `actual`.'
+    suggested_action: 'Compare realpathSync of the resolved file against realpathSync of the root and refuse (null) when it escapes; add the symlink case to the unit tests.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 61
+  phases_verified: 4/4
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 11
+    notes: 'makeReader containment probed with the path corpus through a scratch ESM wrapper (run record task.194.qa.1.security.run.json): 7 of 8 hostile cases rejected, symlink-escape accepted (SEC-1); 3 of 3 legitimate accepted. The --rev route is unaffected (git show returns link text).'
+  performance:
+    status: PASS
+    notes: 'SC-7 held by the counting-readFile unit test (3 findings, 2 paths, 2 reads).'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: an unresolvable --rev degrades to a false malformed verdict instead of a usage error.'
+  maintainability:
+    status: PASS
+    notes: 'One engine, four callers, population guard derived from the tree; all four skills validate.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and SEC-1 in finding-anchors.js with tests; re-bundle.'
+      refs: ['shared/resources/finding-anchors.js', 'shared/resources/tests/finding-anchors.test.mjs']
+  future:
+    - action: 'CR-2 (advisory, medium confidence): the --inline jq blocks read $FINDINGS_JSON unbound and silently drop un-annotated findings; bind it to the Step 6 placeholder and refuse un-annotated input.'
+      refs: ['skills/review-pr/SKILL.md', 'skills/review-code/SKILL.md']
+    - action: 'CR-3 (advisory, low): the API-diff head fetch uses GitHub-only pull/<n>/head; Bitbucket needs its own route.'
+      refs: ['skills/review-pr/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and SEC-1 fixed']

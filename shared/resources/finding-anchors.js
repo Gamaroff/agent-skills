@@ -65,7 +65,9 @@
  *
  * Exit codes: 0 every anchor is ok / unchecked-text / no-line (`reason: ok`);
  * 1 any is malformed (`reason: malformed-anchors`) — a caller marks and continues,
- * it does not halt; 2 usage (`reason: usage`).
+ * it does not halt; 2 the call is wrong — usage (`reason: usage`), or a `--rev` that does
+ * not name a commit in this checkout (`reason: bad-rev`: could not look, which is not the
+ * reviewer's fault and must never read as `no-such-file`).
  */
 "use strict";
 
@@ -122,8 +124,40 @@ function findingsOf(doc) {
   return [...(Array.isArray(cr) ? cr : []), ...(Array.isArray(pc) ? pc : [])];
 }
 
+/**
+ * The commit `rev` names, or null when it does not resolve. Called once, before any file is read:
+ * a rev that does not resolve is "could not look", and reading through it would report every
+ * finding `no-such-file` — the reviewer blamed for the caller's unfetched head (task.194 QA
+ * cycle 1, CR-1).
+ */
+function resolveRev(root, rev, exec = execFileSync) {
+  try {
+    const sha = exec(
+      "git",
+      ["rev-parse", "--verify", "--quiet", `${rev}^{commit}`],
+      {
+        cwd: path.resolve(root),
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    ).trim();
+    return sha || null;
+  } catch {
+    return null;
+  }
+}
+
 function makeReader({ root, rev, exec = execFileSync }) {
   const absRoot = path.resolve(root);
+  // Containment is judged on REAL paths in the working tree: a lexical check alone passes a
+  // symlink inside the root whose target is outside it (task.194 QA cycle 1, SEC-1). With --rev,
+  // `git show` returns a symlink's link text, never its target, so the lexical check suffices.
+  let realRoot = null;
+  try {
+    realRoot = fs.realpathSync(absRoot);
+  } catch {
+    realRoot = null;
+  }
   return (p) => {
     const abs = path.resolve(absRoot, p);
     // A reviewer path that climbs out of the root names no file in the tree under review.
@@ -142,7 +176,14 @@ function makeReader({ root, rev, exec = execFileSync }) {
       }
     }
     try {
-      return fs.readFileSync(abs, "utf8");
+      const real = fs.realpathSync(abs);
+      if (
+        !realRoot ||
+        (real !== realRoot && !real.startsWith(realRoot + path.sep))
+      ) {
+        return null;
+      }
+      return fs.readFileSync(real, "utf8");
     } catch {
       return null;
     }
@@ -223,9 +264,21 @@ function run(argv, deps = {}) {
       "--findings-file holds no findings array (code_review.findings, pr_conformance.findings, or a bare array)",
     );
   }
+  let rev = null;
+  if (opts.rev) {
+    rev = resolveRev(opts.root, opts.rev, deps.exec);
+    if (!rev) {
+      return emit(opts, {
+        reason: "bad-rev",
+        message: `--rev '${opts.rev}' does not name a commit in ${path.resolve(opts.root)} — fetch it, or pass the revision that was reviewed; no anchor was checked`,
+        rev: opts.rev,
+        exitCode: 2,
+      });
+    }
+  }
   const readFile = makeReader({
     root: opts.root,
-    rev: opts.rev,
+    rev,
     exec: deps.exec,
   });
   const results = checkAnchors(findings, { readFile });
@@ -258,6 +311,7 @@ module.exports = {
   parseArgs,
   run,
   MALFORMED,
+  resolveRev,
 };
 
 if (require.main === module) {

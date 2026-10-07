@@ -18,6 +18,7 @@ import {
   readFileSync,
   rmSync,
   mkdirSync,
+  symlinkSync,
 } from "node:fs";
 import { spawnSync, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -27,7 +28,9 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENGINE = path.join(__dirname, "..", "finding-anchors.js");
-const { checkAnchors, anchorOf } = createRequire(import.meta.url)(ENGINE);
+const { checkAnchors, anchorOf, makeReader } = createRequire(import.meta.url)(
+  ENGINE,
+);
 
 // The PR #594 fixture file: 11 lines, the real line of the defect is 8.
 const SLUGIFY =
@@ -395,11 +398,76 @@ test("--rev reads the committed file through git show, not the working tree", ()
         ["--findings-file", f, "--root", dir, "--rev", "no-such-rev", "--json"],
         dir,
       );
-      assert.equal(noRev.json().results[0].verdict, "no-such-file");
+      // An unresolvable rev is "could not look": exit 2, reason bad-rev, no verdicts —
+      // never no-such-file on every finding (task.194 QA cycle 1, CR-1).
+      assert.equal(noRev.code, 2);
+      assert.equal(noRev.json().reason, "bad-rev");
+      assert.equal(noRev.json().results, undefined);
+      const annotated = cli(
+        [
+          "--findings-file",
+          f,
+          "--root",
+          dir,
+          "--rev",
+          "no-such-rev",
+          "--annotate",
+          f,
+          "--json",
+        ],
+        dir,
+      );
+      assert.equal(annotated.code, 2);
+      assert.equal(
+        JSON.parse(readFileSync(f, "utf8"))[0].anchor_check,
+        undefined,
+        "a bad rev must not annotate findings with verdicts it could not reach",
+      );
     } finally {
       rmSync(f, { force: true });
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.194 QA cycle 1, SEC-1: the working-tree reader judged containment on the lexical path and
+// then followed a symlink, so `uploads/link-to-etc/passwd` read /etc/passwd. Both directions:
+// a link that escapes is refused; a link that stays inside the root still reads.
+test("the working-tree reader refuses a symlink that escapes --root and keeps one that stays inside", () => {
+  const base = mkdtempSync(path.join(os.tmpdir(), "finding-anchors-link-"));
+  try {
+    const root = path.join(base, "root");
+    const outside = path.join(base, "outside");
+    mkdirSync(path.join(root, "src"), { recursive: true });
+    mkdirSync(outside);
+    writeFileSync(path.join(outside, "secret.txt"), "TOP SECRET\n");
+    writeFileSync(path.join(root, "src", "real.js"), "const a = 1;\n");
+    symlinkSync(outside, path.join(root, "escape"));
+    symlinkSync(path.join(root, "src"), path.join(root, "inside"));
+    const read = makeReader({ root });
+    assert.equal(
+      read("escape/secret.txt"),
+      null,
+      "a link out of the root must not be read",
+    );
+    assert.equal(
+      read("inside/real.js"),
+      "const a = 1;\n",
+      "a link within the root still reads",
+    );
+    assert.equal(read("src/real.js"), "const a = 1;\n");
+    const [r] = checkAnchors(
+      [{ file_line: "escape/secret.txt:1", line_text: "nope" }],
+      { readFile: read },
+    );
+    assert.equal(r.verdict, "no-such-file");
+    assert.equal(
+      r.actual,
+      undefined,
+      "nothing from outside the root reaches the output",
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
   }
 });

@@ -136,7 +136,8 @@ that dispatch the code reviewer: `/review-pr`, `/review-code`, `/qa-task` and `/
     back to `<out-file>` with each finding carrying `anchor_check: <verdict>`, so a caller's jq can
     filter on the verdict without joining two files. The exit codes follow the repository
     convention: 0 when every anchor is `ok`, `unchecked-text` or `no-line`; 1 when any is malformed;
-    2 on a usage error. `reason` is `ok` or `malformed-anchors`. `--json` lists the verdict for each
+    2 on a usage error or a `--rev` that names no commit. `reason` is `ok`, `malformed-anchors`, `usage` or
+    `bad-rev`. `--json` lists the verdict for each
     finding.
   - **The verdict key is `anchor_check`, everywhere.** `/review-pr`'s `--inline` jq already uses
     `anchor` as a temporary key holding the `path:line` (`skills/review-pr/SKILL.md:835`). A verdict
@@ -414,6 +415,29 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-07
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.194.qa.1.code-review-anchors-name-source-lines.md](./task.194.qa.1.code-review-anchors-name-source-lines.md)
+- **Gate File**: [task.194.gate.1.code-review-anchors-name-source-lines.yml](./task.194.gate.1.code-review-anchors-name-source-lines.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 61
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 (2 medium: CR-1, SEC-1)
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- CR-1 — an unresolvable `--rev` reports every finding `no-such-file` (exit 1) instead of a usage error: [task.194.bug.1.bad-rev-reads-as-no-such-file.md](./task.194.bug.1.bad-rev-reads-as-no-such-file.md)
+- SEC-1 — the working-tree reader follows a symlink out of `--root` (measured, 11 probes): [task.194.bug.2.reader-follows-symlink-out-of-root.md](./task.194.bug.2.reader-follows-symlink-out-of-root.md)
+- The PR #594 replay marks all six patch-line anchors `out-of-range` and posts only the corrected control inline.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -423,6 +447,8 @@ None.
 | 2026-10-07 | 1.1     | Review 1 (6/10 → 9/10): anchor pattern `^(\S+):` (compound ref was parsed as a path); `--annotate` + `anchor_check` key; `--rev` per caller; bare-filename population; SC-5/SC-6 re-scoped, SC-7 test named | review-task |
 | 2026-10-07 |         | Status → ready-for-development | review-task |
 | 2026-10-07 |         | Implemented — 1 engine + 1 test file, 2 prompts, 4 dispatcher skills, 3 test files extended/added (28 new cases); status → ready-for-review | develop |
+| 2026-10-07 |         | QA gate CONCERNS (80/100) — 2 findings (CR-1 bad --rev, SEC-1 symlink escape) | qa-task |
+| 2026-10-07 |         | QA findings fixed — CR-1 (`--rev` resolved once, exit 2 `bad-rev`) and SEC-1 (real-path containment); 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
