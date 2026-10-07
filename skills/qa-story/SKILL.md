@@ -1085,6 +1085,35 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    Why both, rather than one flag: refuting the fixes and re-probing the surface have different
    targets. Collapsing them would make cycle 3+ lose the refute, or cycle 2 lose the re-probe.
 
+   **Check every anchor before the findings go anywhere** (task.194). A reviewer's `file_line` is a
+   claim, not a fact: on PR #594 the shared reviewer reported every finding at a patch-file line
+   number, and the number was rendered as if it were real. Right after the `code_review:` block is
+   read, write it to a JSON file and run the shared checker, from the repository root:
+
+   ```bash
+   # The parsed code_review: block as JSON — {"code_review":{…}}. Items 5 and 6 read this same file.
+   FINDINGS_JSON=$(mktemp "${TMPDIR:-/tmp}/qa-findings.XXXXXX")
+   # A quoted heredoc: line_text quotes source, and source carries ' and $.
+   cat > "$FINDINGS_JSON" <<'JSON'
+{findings-json}
+JSON
+   # --rev HEAD: the diff under review is $BASE...HEAD, so uncommitted edits are not what was reviewed.
+   command node .agents/skills/qa-story/references/finding-anchors.js \
+     --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
+     --rev HEAD --annotate "$FINDINGS_JSON" --json
+   # exit 1 = malformed anchors exist. NOT a halt: every finding now carries anchor_check — mark, continue.
+   # exit 2 = the call is wrong: usage (the findings file), bad-root (--root is not a directory), or bad-rev
+   #   (--rev names no commit here — fetch it).
+   #   Fix the call; never treat unchecked anchors as verified.
+   ```
+
+   Every finding now carries `anchor_check`. `ok`, `unchecked-text` and `no-line` are clean;
+   `no-such-file`, `out-of-range` and `text-mismatch` mean the reviewer named a line that is not the
+   one it meant. **A malformed anchor is never dropped**: it renders in `## Code Review` with
+   `⚠️ unverified anchor` (item 5), and item 6 never maps it to `top_issues[]` with a location it
+   does not have. The checker reports and never repairs — guessing the intended line would hide the
+   reviewer defect this exists to show.
+
 3. **Apply the boundary rule — execute, do not only read.** When the reviewer has returned, apply
    `references/probe-boundary-rule.md`: decide whether the change set delivers a **boundary** — a
    function whose purpose is to accept or reject (a classifier, validator, parser, sanitiser, or
@@ -1158,7 +1187,7 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    assume the reviewing host is the CI host. The same rule is a mandatory check in
    `references/code-review-prompt.md`, so the reviewer reports the candidate and this step runs it.
 
-5. **Record — always (advisory):** every finding (bugs + cleanups, with `file:line`) goes into the QA report `## Code Review` section and the PR comment.
+5. **Record — always (advisory):** every finding (bugs + cleanups, with `file:line`) goes into the QA report `## Code Review` section and the PR comment. A finding with a malformed `anchor_check` is recorded too, with `⚠️ unverified anchor ({anchor_check})` after its `file:line`.
 
 5b. **Provenance — is a reproduced finding new to this change?** For every `category: bug` finding
    this step reproduced, run the same input against the PR **base** before it can enter the gate:
@@ -1192,7 +1221,7 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    else CR_BLOCKING=false; fi
    ```
 
-   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries; the existing **Gate Decision Criteria** then apply unchanged. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries; the existing **Gate Decision Criteria** then apply unchanged. **A finding whose `anchor_check` is `no-such-file`, `out-of-range` or `text-mismatch` still maps when it qualifies** — a high-confidence bug is still a bug — but its `finding` gains `(location unverified: {file_line})`, and its `file` is `null` when the verdict is `no-such-file`, so `/qa-fix` is never sent to a line as though it were verified. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
 
    **Re-rating a promoted finding.** QA may lower a promoted finding's severity only with a measured
    plausibility check: a corpus count, and whether any writer or template in the repository can
@@ -1590,7 +1619,7 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 **Correctness bugs ([count]):**
 [for each bug finding:]
 
-- [[severity]/[confidence]] `[file_line]` — [finding] → [suggested_action]
+- [[severity]/[confidence]] `[file_line]`[ ⚠️ unverified anchor ([anchor_check]) — only when malformed] — [finding] → [suggested_action]
 
 **Cleanups ([count]):**
 [for each cleanup finding (reuse / simplification / efficiency):]

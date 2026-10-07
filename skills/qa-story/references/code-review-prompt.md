@@ -112,6 +112,7 @@ code_review:
       severity: high           # low | medium | high   (bugs: rate real impact; cleanups: usually low)
       confidence: high         # low | medium | high   (only bug + high gates, and only when opted in)
       file_line: "src/x/y.ts:42"
+      line_text: "if (user.id = target.id) {"   # the trimmed source text of that line
       finding: "<one sentence: what is wrong>"
       suggested_action: "<one sentence: the fix approach — not a file path>"
       suggested_owner: dev
@@ -120,7 +121,12 @@ code_review:
 Rules:
 - Sort findings: bugs before cleanups; within each, high → medium → low severity.
 - `id` is CR-{n}; `suggested_owner` is always `dev`.
-- `finding`/`suggested_action` are single sentences. `file_line` is `path:line` from the diff.
+- `finding`/`suggested_action` are single sentences.
+- `file_line` is `path:line` where line is the line number IN THE PR-HEAD VERSION OF THE FILE — the
+  `+` side of the hunk header (`@@ -a,b +c,d @@` counts from `c`). It is NEVER a line number in the
+  patch file at <DIFF_FILE>. Read the file at that line before you report it.
+- `line_text` is that line's source text, trimmed. The caller checks it against the file; a finding
+  whose text does not match is shown to the user as an unverified location.
 - Output ONLY the YAML block above — no prose, no markdown table, no fences around it.
 - Empty review → `code_review: { reviewed: "...", findings: [], truncated_count: 0 }`.
 ```

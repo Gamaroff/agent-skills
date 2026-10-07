@@ -1,0 +1,80 @@
+schema: 2
+task: 'task.194.code-review-anchors-name-source-lines'
+task_title: 'Code-review findings anchor to source lines'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes verified (bad-rev exits 2; symlink escape refused, probe engages), but the refute pass found three more medium defects of the same class: --rev reads from the repo top level instead of --root, an unresolvable --root still blames every finding, and review-pr prose still describes the pre-fix bad-rev behaviour.'
+reviewer: 'QA Engineer'
+head: 'e9b8535fe778fc708a59a53f4d880d8ad6e8b5b5'
+updated: '2026-10-07T10:28:42Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: medium
+    file: 'shared/resources/finding-anchors.js'
+    finding: 'On the --rev route `git show <rev>:<rel>` resolves from the repository top level, not --root: with --root shared/resources, `shared/resources/finding-anchors.js:1` reads unchecked-text and `finding-anchors.js:1` reads no-such-file — the reverse of the working-tree route.'
+    suggested_action: 'Read `<rev>:./<rel>` with cwd at --root so git resolves the path relative to the root; add a subdirectory-root test on the --rev route.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-2'
+    severity: medium
+    file: 'shared/resources/finding-anchors.js'
+    finding: 'An unresolvable or non-directory --root leaves realRoot null, so every path:line finding reads no-such-file and the CLI exits 1 malformed-anchors — "could not look" blames the reviewer, the class CR-1 just closed for --rev (reproduced: --root /nonexistent/x).'
+    suggested_action: 'Check --root once (exists, is a directory) and exit 2 with reason bad-root before reading any anchor; add a test.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-3'
+    severity: medium
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'Step 6 prose still says an unavailable head commit makes "every anchor read no-such-file — the findings still render, marked", but since cycle 1 an unfetched head exits 2 bad-rev and annotates nothing; the cycle-1 documentation probe searched the exit-2 comment phrase and missed this sentence.'
+    suggested_action: 'Rewrite the sentence to match the block: bad-rev means fetch the head and re-run; findings are never rendered as checked. Re-run the documentation population probe on the behaviour phrase ("no-such-file", "head commit is not available").'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-4'
+    severity: low
+    file: 'shared/resources/finding-anchors.js'
+    finding: '`git show <rev>:<dir>` returns a tree listing, so on the --rev route a directory anchor (`shared:1`) reads unchecked-text while the working-tree route reads no-such-file.'
+    suggested_action: 'Read blobs with `git cat-file blob <rev>:<path>`, which fails on a tree (and skips textconv).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 62
+  phases_verified: 4/4
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    notes: 'Cycle 1 SEC-1 fix verified: path-sink probe against makeReader engages, 0 of 8 hostile accepted, 3 of 3 legitimate accepted (run record task.194.qa.2.security.run.json). CR2-1 is a correctness defect on the --rev route, not an escape: git cannot read outside the repository.'
+  performance:
+    status: PASS
+    notes: 'SC-7 unchanged; one rev resolution per run added.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-2: an unresolvable --root reads as reviewer-wrong. CR2-1/CR2-4: the two read routes disagree on subdirectory roots and directory anchors.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR2-3: stale prose in review-pr Step 6 after the cycle-1 behaviour change.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1..CR2-4 in finding-anchors.js and review-pr Step 6; tests for each engine change.'
+      refs: ['shared/resources/finding-anchors.js', 'skills/review-pr/SKILL.md']
+  future:
+    - action: 'Cycle 1 advisory CR-2 (--inline block binding) and CR-3 (Bitbucket head fetch) remain open follow-ups.'
+      refs: ['skills/review-pr/SKILL.md', 'skills/review-code/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR2-1, CR2-2, CR2-3 fixed']

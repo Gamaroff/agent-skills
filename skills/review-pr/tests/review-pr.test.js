@@ -640,6 +640,7 @@ const FINDINGS_FIXTURE = JSON.stringify({
         severity: "high",
         confidence: "high",
         file_line: "src/x.ts:42",
+        anchor_check: "ok",
         finding: "null deref on `x`",
         suggested_action: "guard it",
       },
@@ -653,6 +654,7 @@ const FINDINGS_FIXTURE = JSON.stringify({
         severity: "medium",
         confidence: "medium",
         file_line: "src/y.ts:10-24",
+        anchor_check: "no-line",
         finding: "a range, not a line",
         suggested_action: "n/a",
       },
@@ -662,6 +664,7 @@ const FINDINGS_FIXTURE = JSON.stringify({
         severity: "low",
         confidence: "low",
         file_line: "src/z.ts",
+        anchor_check: "no-line",
         finding: "no line at all",
         suggested_action: "n/a",
       },
@@ -672,7 +675,31 @@ const FINDINGS_FIXTURE = JSON.stringify({
         severity: "low",
         confidence: "low",
         file_line: "src/w.ts:3",
+        anchor_check: "unchecked-text",
         finding: "no suggested action",
+      },
+      // task.194: a well-formed path:line the checker found wrong (a patch-file line,
+      // PR #594). Its shape passes test(); only anchor_check can keep it off the line.
+      {
+        id: "CR-5",
+        category: "bug",
+        severity: "high",
+        confidence: "high",
+        file_line: "src/v.ts:77",
+        line_text: "return x;",
+        anchor_check: "text-mismatch",
+        finding: "mislocated finding",
+        suggested_action: "n/a",
+      },
+      // The checker never ran on this one: no verdict means no inline post.
+      {
+        id: "CR-6",
+        category: "bug",
+        severity: "medium",
+        confidence: "high",
+        file_line: "src/u.ts:5",
+        finding: "unchecked by the anchor checker",
+        suggested_action: "n/a",
       },
     ],
     truncated_count: 0,
@@ -688,6 +715,7 @@ const FINDINGS_FIXTURE = JSON.stringify({
         id: "PC-1",
         severity: "medium",
         ref: "AC-3",
+        anchor_check: "no-line",
         finding: "criterion not evidenced",
         suggested_action: "cite it",
       },
@@ -695,7 +723,16 @@ const FINDINGS_FIXTURE = JSON.stringify({
         id: "PC-2",
         severity: "low",
         ref: "docs/a.md:3",
+        anchor_check: "ok",
         finding: "claim unsupported",
+        suggested_action: "cite it",
+      },
+      {
+        id: "PC-3",
+        severity: "low",
+        ref: "docs/b.md:99",
+        anchor_check: "out-of-range",
+        finding: "points past the end of the file",
         suggested_action: "cite it",
       },
     ],
@@ -743,6 +780,20 @@ test("the inline-comment jq snippet executes against a schema-shaped fixture", (
     !out.some((f) => String(f.path).includes("y.ts")),
     "a range file_line has no single line to anchor to — exclude it, never guess",
   );
+  // task.194 SC-6a: only a verified anchor posts inline. A malformed one would land
+  // on the wrong line (or none) and report `posted`; it goes to the summary instead.
+  assert.ok(
+    !out.some((f) => f.path === "src/v.ts"),
+    "a text-mismatch anchor must not post inline — it reaches the PR via the summary",
+  );
+  assert.ok(
+    !out.some((f) => f.path === "src/u.ts"),
+    "a finding with no anchor_check was never verified — it must not post inline",
+  );
+  assert.ok(
+    out.some((f) => f.path === "src/w.ts" && f.line === 3),
+    "an unchecked-text anchor (range verified, no line_text) still posts inline",
+  );
   // The conformance lens must be REACHABLE. Selecting on `file_line` dropped
   // every PC finding silently, making `.pr_conformance.findings[]?` dead code
   // that nothing reported.
@@ -753,6 +804,10 @@ test("the inline-comment jq snippet executes against a schema-shaped fixture", (
   assert.ok(
     !out.some((f) => String(f.path) === "AC-3"),
     "a `ref` that is a criterion id is not anchorable — it belongs in the summary",
+  );
+  assert.ok(
+    !out.some((f) => f.path === "docs/b.md"),
+    "an out-of-range conformance ref must not post inline",
   );
   for (const f of out) {
     assert.ok(f.path && typeof f.path === "string", "each record needs a path");

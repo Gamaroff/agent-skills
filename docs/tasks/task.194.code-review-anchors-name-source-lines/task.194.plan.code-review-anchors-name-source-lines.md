@@ -59,7 +59,7 @@ bundling instruction (AGENTS.md § Shared Resources).
 // Pure core: no fs, no git. Callers inject readFile(path) -> string | null.
 function anchorOf(f) {           // code_review uses file_line; pr_conformance uses ref
   const raw = f.file_line ?? f.ref ?? "";
-  const m = /^(.+?):(-?\d+)$/.exec(String(raw).trim());
+  const m = /^(\S+):(-?\d+)$/.exec(String(raw).trim());   // a path never contains whitespace
   return m ? { path: m[1], line: Number(m[2]) } : null;
 }
 const norm = (s) => String(s).replace(/\s+/g, " ").trim();
@@ -87,13 +87,15 @@ function checkAnchors(findings, { readFile }) {
 ```
 
 `ref` values such as `"AC-3 / scripts/smoke/slugify.js:8"` (what the conformance lens actually
-emitted on PR #594) do not match the anchored regex and become `no-line`. That is deliberate: a
-compound ref is not an anchor. Assert it in a test so the behaviour is chosen, not accidental.
+emitted on PR #594) do not match `^(\S+):` and become `no-line`. That is deliberate: a compound ref
+is not an anchor. Assert it in a test so the behaviour is chosen, not accidental. (Review 1 found
+that the first draft, `^(.+?):`, parsed it as the path `AC-3 / scripts/smoke/slugify.js` and gave
+`no-such-file`.) A range (`x.ts:42-58`) is `no-line` too; pin it in a test.
 
 CLI:
 
 ```
-node finding-anchors.js --findings-file <json> [--root <dir>] [--rev <git-rev>] [--json]
+node finding-anchors.js --findings-file <json> [--root <dir>] [--rev <git-rev>] [--annotate <out>] [--json]
 ```
 
 - The input JSON is either `{code_review:{findings:[…]}}`, `{pr_conformance:{findings:[…]}}`, both
@@ -101,6 +103,10 @@ node finding-anchors.js --findings-file <json> [--root <dir>] [--rev <git-rev>] 
 - `readFile`: with `--rev`, use `execFileSync("git", ["show", `${rev}:${path}`], {cwd: root})` and
   return `null` on a non-zero exit. Without it, use `fs.readFileSync(path.join(root, p))` and return
   `null` on `ENOENT`. Refuse a `path` that resolves outside `root` (`..`) as `no-such-file`.
+- `--annotate <out>`: write the input JSON back to `<out>`, same shape, with each finding gaining
+  `anchor_check: <verdict>`. Callers' jq filters on that key, so no join between two files is needed.
+  The key is `anchor_check`, not `anchor`: `/review-pr`'s `--inline` jq already uses `anchor` for
+  the `path:line`.
 - Output `{ reason: "ok" | "malformed-anchors", results: [...], exitCode }`. Exit 1 iff any result is
   `no-such-file`, `out-of-range` or `text-mismatch`. A usage error exits 2 with `reason: "usage"`.
 
@@ -114,7 +120,7 @@ block** as the variables it reads (code-review-prompt check E: every block is it
 ```bash
 command node .agents/skills/review-pr/references/finding-anchors.js \
   --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
-  --rev "origin/$HEAD_BRANCH" --json > "$ANCHORS_JSON"
+  --rev "origin/$HEAD_BRANCH" --annotate "$FINDINGS_JSON" --json > "$ANCHORS_JSON"
 # exit 1 = malformed anchors exist: NOT a halt. Read results[], mark, continue.
 ```
 
@@ -124,9 +130,11 @@ from `gh pr view --json headRefOid` instead.
 
 - Rendering: after `— {ref}`, append ` ⚠️ unverified anchor ({verdict})` for the three malformed
   verdicts.
-- Machine-readable block: add `anchor: {verdict}` to each entry. Update the template, and update the
+- Machine-readable block: add `anchor_check: {verdict}` to each entry. Update the template, and update the
   "four rules" paragraph so it names the new key.
-- `--inline` jq: add `select(.anchor == "ok" or .anchor == "unchecked-text")` before the shape filter.
+- `--inline` jq: it reads the annotated `$FINDINGS_JSON`. Add
+  `select(.anchor_check == "ok" or .anchor_check == "unchecked-text")` before the shape filter (inside
+  each lens's branch, before `. + {anchor: …}` reuses the name `anchor` for the `path:line`).
   Malformed findings fall through to the summary comment, which is already posted regardless.
 
 **`skills/review-code/SKILL.md`**: the same check before the render step. The `--inline` jq at the
@@ -135,7 +143,10 @@ malformed finding and list it as "skipped — unverified anchor". Editing a line
 mislocated is the one outcome worse than not fixing it.
 
 **`skills/qa-task/SKILL.md` Step 3b and `skills/qa-story/SKILL.md` Phase 1.6**: the check comes right
-after the subagent returns and before the "Gate mapping" item. A malformed finding still renders in
+after the subagent returns and before the "Gate mapping" item. Write the parsed `code_review:` block
+as JSON to `$(mktemp)` in the same fenced block as the call, and pass `--rev HEAD`: the diff is
+`$BASE...HEAD`, so uncommitted edits are not what was reviewed. `/review-code` passes no `--rev` for a
+working-tree target and the PR head for a PR target. A malformed finding still renders in
 `## Code Review`, with the marker. In the `top_issues[]` mapping, its `finding` text gains
 `(location unverified: {file_line})`, so `/qa-fix` is not sent to a line as though it were verified.
 The gate rules are not otherwise changed: a high-confidence bug is still a bug.
@@ -148,21 +159,21 @@ Then run `npm run bundle` and `npm run bundle:check`. Each of the four skills ga
 **`evals/shared/tests/finding-anchors-callers.test.mjs`**:
 
 ```js
-// Population: every skills/*/SKILL.md whose text dispatches the code reviewer.
-// Key on a compound pattern, not the bare filename: `code-review-prompt.md` alone
-// also appears in skills that only cite it (obs #135, shared-token keys).
-// Real spellings (2026-10-07): qa-task:559 / qa-story:1026 "with the prompt from `references/…`",
-// review-code:73 "with the prompt from [`references/…`](…)" (a link), review-pr:571
-// "pass the **Prompt Template** from [`references/…`](…)".
-const DISPATCH = /(prompt|Prompt Template\*\*) from \[?`references\/code-review-prompt\.md`/;
+// Population: every skills/*/SKILL.md that mentions the code reviewer's prompt.
+// Keyed on the bare filename, the superset, so a fifth dispatcher phrased differently
+// ("run the reviewer in references/code-review-prompt.md") is still caught (obs #135:
+// a compound dispatch regex passes over a token-free restatement). A SKILL.md that only
+// cites the prompt goes in CITE_ONLY with a reason; the list is empty on 2026-10-07.
+const POPULATION_KEY = "code-review-prompt.md";
+const CITE_ONLY = new Map(); // file -> reason
 ```
 
-Measured on 2026-10-07:
-`git grep -nE '(prompt|Prompt Template\*\*) from \[?`references/code-review-prompt\.md`' -- 'skills/*/SKILL.md'`
-returns exactly `qa-story/SKILL.md:1026`, `qa-task/SKILL.md:559`, `review-code/SKILL.md:73` and
-`review-pr/SKILL.md:571`. A first draft without the `\[?` missed review-code, which spells the
-reference as a link. Re-measure before freezing the regex. Then assert each file contains
-`finding-anchors.js`, and assert `population.length >= 4` (the non-vacuity floor).
+Measured on 2026-10-07: `git grep -ln "code-review-prompt.md" -- 'skills/*/SKILL.md'` returns
+exactly qa-story, qa-task, review-code and review-pr, the same four the compound dispatch regex
+`(prompt|Prompt Template\*\*) from \[?…` finds. Assert each member contains `finding-anchors.js` and
+`⚠️ unverified anchor`; assert review-code states the `--fix` skip and qa-task / qa-story state the
+`(location unverified: …)` `top_issues[]` wording; assert `population.length >= 4` (the non-vacuity
+floor).
 
 Mutation proof (SC-11): delete the call from `skills/qa-story/SKILL.md` and run the test (it must go
 red); restore it. Delete the `includes(norm(f.line_text))` comparison and run the unit tests (the

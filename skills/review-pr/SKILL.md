@@ -578,6 +578,39 @@ The caller resolves the work item and artifact list **before** dispatching and p
 
 ### Step 6 — Render findings and compute the verdict
 
+**Check every anchor before rendering anything.** A reviewer's `path:line` is a claim, not a fact:
+on PR #594 the code lens reported all six findings at patch-file line numbers (`slugify.js:77` for
+an 11-line file), and this skill copied them into the report and the machine-readable block as if
+they were real (task.194). Write both parsed blocks into one JSON file and run the shared checker on
+it, from the repository root:
+
+```bash
+# {findings-json}: a scratch path (mktemp) holding {"code_review":{…},"pr_conformance":{…}} as parsed
+# in Step 5. Steps 7 and 8 read the same file, so write it once, here.
+FINDINGS_JSON="{findings-json}"
+# The PR head, never the checked-out tree: origin/$HEAD_BRANCH on Step 4's git route. On the
+# API-diff route (merged or cross-fork PR) fetch the head first — GitHub keeps it at
+# pull/<n>/head: `git fetch -q origin "pull/{pr-number}/head"` and use FETCH_HEAD.
+HEAD_REV="{origin/<head-branch> | FETCH_HEAD}"
+command node .agents/skills/review-pr/references/finding-anchors.js \
+  --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
+  --rev "$HEAD_REV" --annotate "$FINDINGS_JSON" --json
+# exit 1 = malformed anchors exist. NOT a halt: every finding now carries anchor_check — mark, continue.
+# exit 2 = the call is wrong: usage (the findings file), bad-root (--root is not a directory), or bad-rev
+#   (--rev names no commit here — fetch it).
+#   Fix the call; never render unchecked anchors as verified.
+```
+
+Every finding now carries `anchor_check`: `ok`, `unchecked-text` and `no-line` are clean;
+`no-such-file`, `out-of-range` and `text-mismatch` mean the reviewer named a line that is not the
+line it meant. **A malformed anchor is never dropped.** It renders with `⚠️ unverified anchor`
+after its `ref`, keeps the reviewer's value in the machine-readable block with its `anchor_check`
+beside it, and is left out of `--inline` (Step 8), so it reaches the PR only through the summary
+comment. The checker reports and never repairs: guessing the intended line would hide the reviewer
+defect this exists to show. If the head commit is not available locally the checker exits 2
+`bad-rev` and annotates nothing: fetch the head (on the API-diff route, `pull/<n>/head` as above)
+and re-run. Never render the findings as checked without a run that exited 0 or 1.
+
 The two schemas are deliberately parallel (`id` / `category` / `severity` / `confidence` / `finding` / `suggested_action`), so one rendering path serves both:
 
 ```
@@ -586,6 +619,10 @@ The two schemas are deliberately parallel (`id` / `category` / `severity` / `con
   → suggested action
 
 [CR-1] bug · high · confidence: high — src/x/y.ts:42
+  what is wrong
+  → suggested action
+
+[CR-2] bug · medium · confidence: high — src/x/y.ts:77 ⚠️ unverified anchor (out-of-range)
   what is wrong
   → suggested action
 ```
@@ -684,6 +721,8 @@ ALWAYS use this exact template structure:
 
 {rendered CR-* findings, or "None."}
 
+**Anchors:** {n} checked against `{HEAD_REV}` — {m} unverified ({verdict counts}), or "all verified"
+
 ## Machine-Readable Findings
 
 ```yaml
@@ -694,6 +733,7 @@ findings:
     severity: {low|medium|high}
     confidence: {low|medium|high}
     ref: {the same ref rendered after the em-dash, quoted}
+    anchor_check: {ok|unchecked-text|no-line|no-such-file|out-of-range|text-mismatch}
     finding: {one sentence: what is wrong}
     suggested_action: {one sentence: the fix approach}
 truncated_count: {integer — the two lenses' counts summed}
@@ -705,7 +745,7 @@ truncated_count: {integer — the two lenses' counts summed}
 ````
 
 **About the machine-readable block.** It is what `/qa-fix`'s findings ingester reads; the rendered
-sections above it are for humans. Four rules, each of which has a way of going wrong:
+sections above it are for humans. Five rules, each of which has a way of going wrong:
 
 - **One block, both lenses**, conformance entries first then code entries — the same order as the
   rendered sections, so a human diffing the two sees them line up. One block means the ingester has
@@ -714,6 +754,9 @@ sections above it are for humans. Four rules, each of which has a way of going w
   would be indistinguishable from them.
 - **`ref` for both lenses**, per the normalisation rule in Step 6. A `CR-*` entry's `ref` is its
   subagent `file_line` verbatim.
+- **`anchor_check` beside every `ref`**, the checker's verdict from Step 6. The `ref` keeps the
+  reviewer's value even when it is wrong, so `anchor_check` is what tells `/qa-fix` a verified
+  location from an unverified one.
 - **Always emit the section, even with nothing to report** — as `findings: []` with
   `truncated_count: 0`. If a findings-free report omitted it, an absent section would mean both
   "report written before this existed" and "no findings", and the ingester's legacy fallback would
@@ -815,8 +858,8 @@ Commenting never gates. Never post over an `unverifiable` reason.
 #### `--inline` — findings beside the lines they are about
 
 The summary comment above stays the default and is always posted. `--inline` adds a second delivery:
-each finding that carries a `file_line` is also posted as an inline comment anchored to that line, via
-the shared primitive. It resolves `$VCS` itself, so this step does not branch:
+each finding whose anchor Step 6 verified (`anchor_check` `ok` or `unchecked-text`) is also posted as an
+inline comment anchored to that line, via the shared primitive. It resolves `$VCS` itself, so this step does not branch:
 
 ```bash
 # Findings from both lenses, reshaped into the CLI's input contract.
@@ -832,8 +875,13 @@ the shared primitive. It resolves `$VCS` itself, so this step does not branch:
 # inside `[ … ]`: one malformed entry would otherwise empty the file and drop
 # every finding. Conformance findings that cannot anchor stay in the summary
 # comment, which is posted regardless.
-jq '[ (.code_review.findings[]? | . + {anchor: .file_line}),
-      (.pr_conformance.findings[]? | . + {anchor: .ref})
+# `anchor_check` is Step 6's verdict (finding-anchors.js --annotate). Only a verified
+# anchor posts inline: a malformed one would land on the wrong line, or on none, and
+# report `posted` — it reaches the PR through the summary comment instead.
+jq '[ (.code_review.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
+       | . + {anchor: .file_line}),
+      (.pr_conformance.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
+       | . + {anchor: .ref})
       | select((.anchor? // "") | test("^.+:[0-9]+$"))
       | {path: (.anchor | split(":")[0]),
          line: (.anchor | split(":")[1] | tonumber),
