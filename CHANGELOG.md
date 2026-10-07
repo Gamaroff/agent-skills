@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The develop-* Step 8 push check works on a Bitbucket remote.** Two Step 8 reads went through
+  `gh` only. On Bitbucket, `verify-push-state.sh --pr N` failed check 5 with "could not read PR
+  head" on a correct, fully pushed run, and the `BASE_BRANCH` bind halted on "no PR on this branch"
+  for a branch that had one. Both now read the PR through the new `shared/resources/pr-read.sh`,
+  which branches on `VCS`. GitHub still uses `gh`. Bitbucket uses the REST API: `source.commit.hash`
+  is compared by prefix, because it is 12 characters in some responses, and the base comes from
+  `destination.branch.name`. Bodies are parsed with `json.loads(strict=False)`, because PR
+  descriptions can contain raw control characters. On Bitbucket a missing credential, or an HTTP
+  401, 403 or 404, is a named failure that includes the HTTP status, never a skip. Bitbucket
+  answers an unauthenticated read of a private repository with 404, so a skip would pass silently.
+  With no `--pr`, Step 8 finds the branch's one open PR. If there is none, or more than one, it
+  fails and says how many it found. Step 8 now also binds `PR_NUMBER` from the same read, so
+  check 5 compares the PR head on both forges instead of being skipped when the caller left it
+  unbound.
+- **Step 8 passes `--pr` correctly under zsh.** The block passed `${PR_NUMBER:+--pr "$PR_NUMBER"}`
+  to `verify-push-state.sh`. zsh does not split that into words, so the script received one
+  argument, `--pr 7`, and exited 2 with "unknown argument" on any zsh run that set `PR_NUMBER`. It
+  now passes an argument array. The Step 8 checklist tests now run check 5 under both bash and zsh.
+
 ## [v0.54.0] - 2026-10-07
 
 ### Changed

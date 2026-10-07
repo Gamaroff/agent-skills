@@ -231,10 +231,27 @@ UNFINISHED=$(printf '%s\n' "$PROGRESS_ROWS" | awk -F'|' '
 #    has a PR, and this is the first source the resume contract's probe reads too. It was read
 #    unbound (`${BASE_BRANCH:?}`) through five green cycles because every host ran a feature
 #    branch off develop (obs #133, task.132); a block that reads a name must bind it.
+#    The read goes through pr-read.sh, which branches on VCS: `gh` on GitHub, the Bitbucket REST
+#    API on Bitbucket (`.destination.branch.name`). It used to be `gh` only, so on Bitbucket this
+#    halted on "no PR on this branch" for a branch that had one. The failure message is the
+#    read's own — which read failed, and the HTTP status on Bitbucket — never a guess at why.
+#    PR_NUMBER, when the caller did not bind it, is taken from the same read, so check 5 below
+#    compares the PR head on both forges instead of silently skipping it.
 #    The scope is the work item PLUS the caller's {extra-scope-paths} (the table above): a write
 #    this pipeline made outside its work item is its own unfinished work, not another session's.
-BASE_BRANCH=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)
-[ -n "$BASE_BRANCH" ] || { echo "❌ Step 8 incomplete: cannot bind BASE_BRANCH — no PR on this branch (gh pr view --json baseRefName)"; exit 1; }
+source .agents/skills/{develop-story|develop-task|develop-bug}/references/pr-read.sh \
+  || { echo "❌ Step 8 incomplete: pr-read.sh not found — re-run the bundler"; exit 1; }
+# An array, never `${PR_NUMBER:+--pr "$PR_NUMBER"}`: zsh does not word-split that expansion, so the
+# callee received ONE argument, "--pr 7", and verify-push-state exited 2 on "unknown argument".
+PR_ARGS=()
+[ -z "${PR_NUMBER:-}" ] || PR_ARGS=(--pr "$PR_NUMBER")
+pr_read "${PR_ARGS[@]}"
+PR_READ_RC=$?
+BASE_BRANCH="$PR_READ_BASE"
+{ [ "$PR_READ_RC" -eq 0 ] && [ -n "$BASE_BRANCH" ]; } \
+  || { echo "❌ Step 8 incomplete: cannot bind BASE_BRANCH — $PR_READ_ERROR"; exit 1; }
+PR_NUMBER="${PR_NUMBER:-$PR_READ_NUMBER}"
+PR_ARGS=(--pr "$PR_NUMBER")
 EXTRA_SCOPES=({extra-scope-paths})
 SCOPE_ARGS=(--scope "{work-item-dir}")
 for s in "${EXTRA_SCOPES[@]}"; do SCOPE_ARGS+=(--scope "$s"); done
@@ -258,7 +275,7 @@ HOLD_REC_DIR=$(cat .claude/state/step4-hold-dir.txt 2>/dev/null)
 if [ -n "$HOLD_REC_DIR" ] && [ -n "$(ls -A "$HOLD_REC_DIR" 2>/dev/null)" ]; then
   echo "❌ Step 8 incomplete: Step 4 held files were never restored — run the Restore Held Files block (they are in $HOLD_REC_DIR)"; exit 1
 fi
-bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" "${SCOPE_ARGS[@]}" ${PR_NUMBER:+--pr "$PR_NUMBER"}
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" "${SCOPE_ARGS[@]}" "${PR_ARGS[@]}"
 VERIFY_EXIT=$?
 [ "$VERIFY_EXIT" -eq 0 ] || { echo "❌ Step 8 incomplete: verify-push-state failed (exit $VERIFY_EXIT)"; exit 1; }
 
