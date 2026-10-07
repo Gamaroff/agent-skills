@@ -35,7 +35,7 @@ Add six plan-shape checks to review-task Step 3 (and their review-story twins), 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.187.*` exists in git                             | Branch created at `5b617f00` | —                    |
 | 2. review-task             | ✅ Done    | `task.187.review.{N}.{name}.md` exists (or skip logged)               | `task.187.review.1.review-plan-shape-checks.md` — 6/10 → 9/10 after fixes; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 5/5 phases; 1 iteration | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #593: https://github.com/Gamaroff/agent-skills/pull/593 | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.187.qa.{N}.*.md`; `task.187.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.187.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -82,6 +82,18 @@ Add six plan-shape checks to review-task Step 3 (and their review-story twins), 
 - Mutation proofs: presence test red on deleted checks 17/13 (4 cases) and on a count of kinds in check 4; unmutated copy green; reach test carries in-file control and mutation cases
 - Development completion comment posted to github issue 586 (stage develop-complete)
 
+### Step 4 — create-pr — 2026-10-07
+
+- SCOPE_PATHS: docs/tasks/task.187.review-plan-shape-checks, CHANGELOG.md, skills/review-story/references, skills/review-story, skills/review-task, tests (tests added by hand: the two new suites were untracked in a directory with no tracked change)
+- Pre-flight guard: 0 out-of-scope untracked files held
+- Commits via /commit-changes (scope mode): 9c38cb9d docs(task.187) — review, fixes and implementation report; 54cb8737 feat(review) — plan-shape checks. The bundled `skills/review-story/references/finalise-dod-ac-prompt.md` rode in the docs commit (staged earlier to clear the untracked-link finding); same PR, no effect
+- Leak check: OK (both commits)
+- PR body written from the diff directly rather than via the Explore summariser (the author holds the full change set; independence not material for a PR description)
+- PR #593 opened against develop: https://github.com/Gamaroff/agent-skills/pull/593; lock pr_url set
+- Post-PR state check: PR #593 state = OPEN. errors = 0 (gh pr view, inline)
+- Tracker comment: in-review → posted (#586)
+- GitHub board: in-review → stage-disabled (this repo's tracker-workflow leaves in-review off)
+
 ---
 
 ## Issues Log
@@ -103,7 +115,26 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.187.review-plan-shape-checks`
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/593
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+
+---
+
+## Pipeline Paused — 2026-10-07T06:15:48Z
+
+⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
+
+**State at pause**:
+
+- Skill: `/develop-task`
+- Branch: `feature/task.187.review-plan-shape-checks`
+- Last step boundary: Step 5
+- PR: https://github.com/Gamaroff/agent-skills/pull/593
+- Tracker: github #586
+
+**Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 5.
+
+**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+
