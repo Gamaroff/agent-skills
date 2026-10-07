@@ -4,7 +4,7 @@
 **Bug ID**: TASK-194-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 1, security probe SEC-1)
 **Date Found**: 2026-10-07
 
@@ -65,3 +65,4 @@ it escapes; add a symlink case to `finding-anchors.test.mjs`.
 | ---------- | ------------ | ---------- | -------------------------------- |
 | 2026-10-07 | New          | qa-task    | Found in QA cycle 1              |
 | 2026-10-07 | Ready for QA | qa-fix     | Fixed in cycle 1 fix             |
+| 2026-10-07 | Closed       | qa-task    | Verified in QA cycle 2 (gate 2)  |

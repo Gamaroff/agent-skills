@@ -490,8 +490,9 @@ All notable changes to this project will be documented in this file. Format foll
   adds `line_text` (that line's trimmed text); `pr-conformance-prompt.md` states the same rule for a
   `path:line` `ref`. A new engine, `shared/resources/finding-anchors.js`, classifies each anchor as
   `ok`, `unchecked-text`, `no-line`, `no-such-file`, `out-of-range` or `text-mismatch` (exit 1 on
-  any of the last three; `--rev` reads the reviewed tree through `git show`, and a rev that names no
-  commit exits 2 `bad-rev` rather than blaming every finding; the working-tree reader refuses a
+  any of the last three; `--rev` reads the reviewed tree through git, relative to `--root`, and a rev that names no commit
+  exits 2 `bad-rev` — as a `--root` that is not a directory exits 2 `bad-root` — rather than blaming
+  every finding; the working-tree reader refuses a
   symlink that leaves the root; `--annotate` writes `anchor_check` onto each finding). `/review-pr`, `/review-code`, `/qa-task` and `/qa-story` run it
   before rendering: a malformed anchor renders with `⚠️ unverified anchor` and is never dropped, never
   posted inline, never edited by `/review-code --fix`, and enters `top_issues[]` only as

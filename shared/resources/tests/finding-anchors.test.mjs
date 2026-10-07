@@ -365,7 +365,7 @@ test("--annotate writes the input back with anchor_check on every finding", () =
   }
 });
 
-test("--rev reads the committed file through git show, not the working tree", () => {
+test("--rev reads the committed file through git, not the working tree", () => {
   const dir = scratch();
   try {
     const git = (...a) => execFileSync("git", a, { cwd: dir, stdio: "ignore" });
@@ -469,5 +469,116 @@ test("the working-tree reader refuses a symlink that escapes --root and keeps on
     );
   } finally {
     rmSync(base, { recursive: true, force: true });
+  }
+});
+
+// task.194 QA cycle 2. Three defects of one shape — the two read routes did not agree on what a
+// path means, and "could not look" still blamed the reviewer for --root (CR2-1, CR2-2, CR2-4).
+function gitRepo() {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "finding-anchors-tree-"));
+  mkdirSync(path.join(dir, "pkg", "sub"), { recursive: true });
+  writeFileSync(path.join(dir, "pkg", "sub", "a.js"), "first\nsecond\n");
+  writeFileSync(path.join(dir, "top.js"), "top\n");
+  const git = (...a) =>
+    execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...a], {
+      cwd: dir,
+      stdio: "ignore",
+    });
+  git("init", "-q");
+  git("add", ".");
+  git("commit", "-q", "-m", "c");
+  return dir;
+}
+
+test("both routes resolve an anchor against --root, including a --root below the top level", () => {
+  const dir = gitRepo();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify([
+        { id: "in", file_line: "sub/a.js:2", line_text: "second" },
+        { id: "top-relative", file_line: "pkg/sub/a.js:2" },
+      ]),
+    );
+    const root = path.join(dir, "pkg");
+    for (const extra of [[], ["--rev", "HEAD"]]) {
+      const r = cli(
+        ["--findings-file", f, "--root", root, ...extra, "--json"],
+        dir,
+      );
+      const v = Object.fromEntries(
+        r.json().results.map((x) => [x.id, x.verdict]),
+      );
+      const route = extra.length ? "--rev" : "working tree";
+      assert.equal(v.in, "ok", `${route}: a path relative to --root reads`);
+      assert.equal(
+        v["top-relative"],
+        "no-such-file",
+        `${route}: a top-level path is not under --root`,
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a directory anchor is no-such-file on both routes, never a listing read as text", () => {
+  const dir = gitRepo();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify([
+        { id: "d", file_line: "pkg:1" },
+        { id: "d2", file_line: "pkg/sub:1", line_text: "a.js" },
+      ]),
+    );
+    for (const extra of [[], ["--rev", "HEAD"]]) {
+      const r = cli(
+        ["--findings-file", f, "--root", dir, ...extra, "--json"],
+        dir,
+      );
+      assert.deepEqual(
+        r.json().results.map((x) => x.verdict),
+        ["no-such-file", "no-such-file"],
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a --root that is not a directory exits 2 bad-root and annotates nothing, before --rev is read", () => {
+  const dir = gitRepo();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(f, JSON.stringify([{ id: "x", file_line: "top.js:1" }]));
+    for (const root of [path.join(dir, "missing"), path.join(dir, "top.js")]) {
+      for (const extra of [[], ["--rev", "HEAD"], ["--rev", "no-such-rev"]]) {
+        const r = cli(
+          [
+            "--findings-file",
+            f,
+            "--root",
+            root,
+            ...extra,
+            "--annotate",
+            f,
+            "--json",
+          ],
+          dir,
+        );
+        assert.equal(r.code, 2, `${root} ${extra.join(" ")}`);
+        assert.equal(r.json().reason, "bad-root");
+        assert.equal(r.json().results, undefined);
+      }
+    }
+    assert.equal(
+      JSON.parse(readFileSync(f, "utf8"))[0].anchor_check,
+      undefined,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

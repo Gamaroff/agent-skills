@@ -131,7 +131,7 @@ that dispatch the code reviewer: `/review-pr`, `/review-code`, `/qa-task` and `/
     | `text-mismatch` | the line exists but its text is not `line_text` |
 
   - A CLI: `--findings-file <json> --root <dir> [--rev <git-rev>] [--annotate <out-file>] --json`.
-    With `--rev`, it reads the file with `git show <rev>:<path>`, so a merged PR or a different
+    With `--rev`, it reads the file with `git cat-file blob <rev>:./<path>` from `--root`, so a merged PR or a different
     checked-out branch is checked against the right tree. With `--annotate`, it writes the input JSON
     back to `<out-file>` with each finding carrying `anchor_check: <verdict>`, so a caller's jq can
     filter on the verdict without joining two files. The exit codes follow the repository
@@ -301,7 +301,7 @@ None.
     collapsed and trimmed); a `line_text` that is a substring of the line matches.
   - **SC-7:** a counting injected `readFile`; three findings on two paths give exactly two reads.
   - CLI: exit 0 when every finding is clean, 1 on any malformed anchor, 2 on a missing
-    `--findings-file`; `--json` gives one verdict per finding; `--rev` reads through `git show`;
+    `--findings-file`; `--json` gives one verdict per finding; `--rev` reads through git, relative to `--root`;
     `--annotate` writes the input back with `anchor_check` on every finding.
 - **`--inline` filter (SC-6):** the existing tests that extract and run the `--inline` jq program from
   `skills/review-pr/SKILL.md` and `skills/review-code/SKILL.md` gain an annotated fixture. A
@@ -420,23 +420,25 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-07
-**Quality Score**: 80/100
+**Quality Score**: 70/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.194.qa.1.code-review-anchors-name-source-lines.md](./task.194.qa.1.code-review-anchors-name-source-lines.md)
-- **Gate File**: [task.194.gate.1.code-review-anchors-name-source-lines.yml](./task.194.gate.1.code-review-anchors-name-source-lines.yml)
+- **Full Report**: [task.194.qa.2.code-review-anchors-name-source-lines.md](./task.194.qa.2.code-review-anchors-name-source-lines.md)
+- **Gate File**: [task.194.gate.2.code-review-anchors-name-source-lines.yml](./task.194.gate.2.code-review-anchors-name-source-lines.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 61
+- **Tests Executed**: 62
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (2 medium: CR-1, SEC-1)
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 (3 medium, 1 low)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-- CR-1 — an unresolvable `--rev` reports every finding `no-such-file` (exit 1) instead of a usage error: [task.194.bug.1.bad-rev-reads-as-no-such-file.md](./task.194.bug.1.bad-rev-reads-as-no-such-file.md)
-- SEC-1 — the working-tree reader follows a symlink out of `--root` (measured, 11 probes): [task.194.bug.2.reader-follows-symlink-out-of-root.md](./task.194.bug.2.reader-follows-symlink-out-of-root.md)
-- The PR #594 replay marks all six patch-line anchors `out-of-range` and posts only the corrected control inline.
+- Cycle 1's CR-1 and SEC-1 verified fixed (bugs 1 and 2 closed); the path-sink probe engages.
+- CR2-1 — the `--rev` route ignores `--root`: [task.194.bug.3.rev-route-ignores-root.md](./task.194.bug.3.rev-route-ignores-root.md)
+- CR2-2 — an unresolvable `--root` reads as reviewer-wrong: [task.194.bug.4.bad-root-reads-as-no-such-file.md](./task.194.bug.4.bad-root-reads-as-no-such-file.md)
+- CR2-3 — stale bad-rev prose in review-pr Step 6: [task.194.bug.5.review-pr-stale-bad-rev-prose.md](./task.194.bug.5.review-pr-stale-bad-rev-prose.md)
+- CR2-4 (low) — a directory anchor reads `unchecked-text` on the `--rev` route.
 
 <!-- change-log-start -->
 ## Change Log
@@ -449,6 +451,8 @@ None.
 | 2026-10-07 |         | Implemented — 1 engine + 1 test file, 2 prompts, 4 dispatcher skills, 3 test files extended/added (28 new cases); status → ready-for-review | develop |
 | 2026-10-07 |         | QA gate CONCERNS (80/100) — 2 findings (CR-1 bad --rev, SEC-1 symlink escape) | qa-task |
 | 2026-10-07 |         | QA findings fixed — CR-1 (`--rev` resolved once, exit 2 `bad-rev`) and SEC-1 (real-path containment); 1 iteration | qa-fix |
+| 2026-10-07 |         | QA gate CONCERNS (70/100) — 4 findings (CR2-1 --rev ignores --root, CR2-2 bad --root, CR2-3 stale prose, CR2-4 dir anchor); cycle 1 fixes verified | qa-task |
+| 2026-10-07 |         | QA findings fixed — CR2-1..CR2-4: one `checkTree()` preflight (bad-root, bad-rev) and root-relative `cat-file blob` reads; stale review-pr prose; 2 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -487,7 +491,7 @@ checker that already ran.
   its sibling by bare filename.
 - **Phase 2**: `shared/resources/finding-anchors.js` (CommonJS, `require.main` guard): pure
   `checkAnchors` with a per-run read cache, the anchor pattern `^(\S+):(-?\d+)$`, collapse-and-substring
-  text matching, and a CLI with `--findings-file`, `--root`, `--rev` (`git show`, path confined to
+  text matching, and a CLI with `--findings-file`, `--root`, `--rev` (`git cat-file blob`, path relative to and confined to
   the root), `--annotate` (writes `anchor_check` on each finding) and `--json`; exit 0/1/2.
 - **Phase 3**: `/review-pr` Step 6 runs the checker against the PR head (`origin/<head>`, or
   `FETCH_HEAD` after `git fetch origin pull/<n>/head` on the API route) before rendering, marks

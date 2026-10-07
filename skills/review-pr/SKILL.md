@@ -596,7 +596,8 @@ command node .agents/skills/review-pr/references/finding-anchors.js \
   --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
   --rev "$HEAD_REV" --annotate "$FINDINGS_JSON" --json
 # exit 1 = malformed anchors exist. NOT a halt: every finding now carries anchor_check — mark, continue.
-# exit 2 = the call is wrong: usage (the findings file), or bad-rev (--rev names no commit here — fetch it).
+# exit 2 = the call is wrong: usage (the findings file), bad-root (--root is not a directory), or bad-rev
+#   (--rev names no commit here — fetch it).
 #   Fix the call; never render unchecked anchors as verified.
 ```
 
@@ -606,8 +607,9 @@ line it meant. **A malformed anchor is never dropped.** It renders with `⚠️ 
 after its `ref`, keeps the reviewer's value in the machine-readable block with its `anchor_check`
 beside it, and is left out of `--inline` (Step 8), so it reaches the PR only through the summary
 comment. The checker reports and never repairs: guessing the intended line would hide the reviewer
-defect this exists to show. If the head commit is not available locally every anchor reads
-`no-such-file` — the findings still render, marked; say so in the report.
+defect this exists to show. If the head commit is not available locally the checker exits 2
+`bad-rev` and annotates nothing: fetch the head (on the API-diff route, `pull/<n>/head` as above)
+and re-run. Never render the findings as checked without a run that exited 0 or 1.
 
 The two schemas are deliberately parallel (`id` / `category` / `severity` / `confidence` / `finding` / `suggested_action`), so one rendering path serves both:
 

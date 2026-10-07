@@ -47,9 +47,10 @@
  *
  * ## Which tree
  *
- * `--rev <rev>` reads each file with `git show <rev>:<path>`, so a merged PR, a
- * fork, or a branch other than the one checked out is checked against the tree
- * that was reviewed. Without `--rev` it reads the working tree under `--root`.
+ * `--rev <rev>` reads each file with `git cat-file blob <rev>:./<path>` from `--root`, so a
+ * merged PR, a fork, or a branch other than the one checked out is checked against the tree
+ * that was reviewed. Without `--rev` it reads the working tree under `--root`. Either way the
+ * path is relative to `--root`.
  * Callers pick (task.194 § Callers): `/review-pr` the PR head, `/qa-*` `HEAD`,
  * `/review-code` nothing for a working-tree review.
  *
@@ -65,9 +66,10 @@
  *
  * Exit codes: 0 every anchor is ok / unchecked-text / no-line (`reason: ok`);
  * 1 any is malformed (`reason: malformed-anchors`) — a caller marks and continues,
- * it does not halt; 2 the call is wrong — usage (`reason: usage`), or a `--rev` that does
- * not name a commit in this checkout (`reason: bad-rev`: could not look, which is not the
- * reviewer's fault and must never read as `no-such-file`).
+ * it does not halt; 2 the call is wrong — usage (`reason: usage`), a `--root` that is not a
+ * directory (`reason: bad-root`), or a `--rev` that does not name a commit in it
+ * (`reason: bad-rev`). The last two are "could not look", which is not the reviewer's fault
+ * and must never read as `no-such-file` (`checkTree()`).
  */
 "use strict";
 
@@ -147,11 +149,46 @@ function resolveRev(root, rev, exec = execFileSync) {
   }
 }
 
+/**
+ * The one preflight for "could not look" (task.194 QA cycles 1–2). Before any anchor is read, the
+ * tree under review must exist: --root an existing directory, and --rev (when given) a commit in it.
+ * Either failure is the CALLER's, never the reviewer's, so it exits 2 with its own reason instead of
+ * reading every finding as `no-such-file` — cycle 1 closed that for --rev (CR-1) and cycle 2 found
+ * it again for --root (CR2-2), which is why both now pass through this one function.
+ * Returns { ok: true, rev } with `rev` the resolved SHA (or null), or { ok: false, reason, message }.
+ */
+function checkTree({ root, rev }, exec = execFileSync) {
+  const absRoot = path.resolve(root);
+  let isDir = false;
+  try {
+    isDir = fs.statSync(absRoot).isDirectory();
+  } catch {
+    isDir = false;
+  }
+  if (!isDir) {
+    return {
+      ok: false,
+      reason: "bad-root",
+      message: `--root '${root}' is not a directory — pass the root of the tree that was reviewed; no anchor was checked`,
+    };
+  }
+  if (!rev) return { ok: true, rev: null };
+  const sha = resolveRev(absRoot, rev, exec);
+  if (!sha) {
+    return {
+      ok: false,
+      reason: "bad-rev",
+      message: `--rev '${rev}' does not name a commit in ${absRoot} — fetch it, or pass the revision that was reviewed; no anchor was checked`,
+    };
+  }
+  return { ok: true, rev: sha };
+}
+
 function makeReader({ root, rev, exec = execFileSync }) {
   const absRoot = path.resolve(root);
   // Containment is judged on REAL paths in the working tree: a lexical check alone passes a
   // symlink inside the root whose target is outside it (task.194 QA cycle 1, SEC-1). With --rev,
-  // `git show` returns a symlink's link text, never its target, so the lexical check suffices.
+  // git returns a symlink's link text, never its target, so the lexical check suffices.
   let realRoot = null;
   try {
     realRoot = fs.realpathSync(absRoot);
@@ -163,9 +200,13 @@ function makeReader({ root, rev, exec = execFileSync }) {
     // A reviewer path that climbs out of the root names no file in the tree under review.
     if (abs !== absRoot && !abs.startsWith(absRoot + path.sep)) return null;
     if (rev) {
+      // Both routes resolve a path against --root. `<rev>:./<rel>` is relative to the cwd, which is
+      // the root; a bare `<rev>:<rel>` is relative to the repository top level, which silently
+      // ignored a --root below it (QA cycle 2, CR2-1). `cat-file blob` refuses a tree, where
+      // `git show` printed a directory listing that read as a file (CR2-4).
       try {
         const rel = path.relative(absRoot, abs).split(path.sep).join("/");
-        return exec("git", ["show", `${rev}:${rel}`], {
+        return exec("git", ["cat-file", "blob", `${rev}:./${rel}`], {
           cwd: absRoot,
           encoding: "utf8",
           stdio: ["ignore", "pipe", "ignore"],
@@ -264,21 +305,19 @@ function run(argv, deps = {}) {
       "--findings-file holds no findings array (code_review.findings, pr_conformance.findings, or a bare array)",
     );
   }
-  let rev = null;
-  if (opts.rev) {
-    rev = resolveRev(opts.root, opts.rev, deps.exec);
-    if (!rev) {
-      return emit(opts, {
-        reason: "bad-rev",
-        message: `--rev '${opts.rev}' does not name a commit in ${path.resolve(opts.root)} — fetch it, or pass the revision that was reviewed; no anchor was checked`,
-        rev: opts.rev,
-        exitCode: 2,
-      });
-    }
+  const tree = checkTree({ root: opts.root, rev: opts.rev }, deps.exec);
+  if (!tree.ok) {
+    return emit(opts, {
+      reason: tree.reason,
+      message: tree.message,
+      root: opts.root,
+      rev: opts.rev ?? null,
+      exitCode: 2,
+    });
   }
   const readFile = makeReader({
     root: opts.root,
-    rev,
+    rev: tree.rev,
     exec: deps.exec,
   });
   const results = checkAnchors(findings, { readFile });
@@ -312,6 +351,7 @@ module.exports = {
   run,
   MALFORMED,
   resolveRev,
+  checkTree,
 };
 
 if (require.main === module) {

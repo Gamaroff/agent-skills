@@ -91,7 +91,8 @@ command node .agents/skills/review-code/references/finding-anchors.js \
   --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
   --annotate "$FINDINGS_JSON" --json      # add: --rev HEAD   for a range or PR target
 # exit 1 = malformed anchors exist. NOT a halt: every finding now carries anchor_check — mark, continue.
-# exit 2 = the call is wrong: usage (the findings file), or bad-rev (--rev names no commit here — fetch it).
+# exit 2 = the call is wrong: usage (the findings file), bad-root (--root is not a directory), or bad-rev
+#   (--rev names no commit here — fetch it).
 #   Fix the call; never treat unchecked anchors as verified.
 ```
 

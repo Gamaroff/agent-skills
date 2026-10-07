@@ -4,7 +4,7 @@
 **Bug ID**: TASK-194-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 1, code review CR-1)
 **Date Found**: 2026-10-07
 
@@ -67,3 +67,4 @@ exit 2 with a named reason when it fails; update the unit test to expect exit 2.
 | ---------- | ------------ | ---------- | -------------------------------- |
 | 2026-10-07 | New          | qa-task    | Found in QA cycle 1              |
 | 2026-10-07 | Ready for QA | qa-fix     | Fixed in cycle 1 fix             |
+| 2026-10-07 | Closed       | qa-task    | Verified in QA cycle 2 (gate 2)  |
