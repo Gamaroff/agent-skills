@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-07
-**Next Available Task Number:** **193**
+**Next Available Task Number:** **194**
 
 ## How to use
 
@@ -234,6 +234,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 190 | [Probe engine refuses what it cannot score](task.190.probe-engine-refuses-what-it-cannot-score/task.190.probe-engine-refuses-what-it-cannot-score.md) | planned | refactoring | Medium | 2026-10-07 | [#589](https://github.com/Gamaroff/agent-skills/issues/589) | — security-probe.mjs refuses unknown case direction/sink and a missing entry before running or recording, defaults its repo root to the git checkout from a bundled copy, and records declined-case reasons (obs #201, #207, #211) |
 | 191 | [Snippet engine runs pipeline blocks](task.191.snippet-engine-runs-pipeline-blocks/task.191.snippet-engine-runs-pipeline-blocks.md) | planned | refactoring | Medium | 2026-10-07 | [#590](https://github.com/Gamaroff/agent-skills/issues/590) | — qa-execute-snippets.mjs: --slot fills template slots, helper calls run when the helper itself classifies runnable (helper-mode syntax), --diff-base reports changed blocks apart (obs #186, #219, #278) |
 | 192 | [Read-back checks this cycle's verdict](task.192.read-back-checks-this-cycles-verdict/task.192.read-back-checks-this-cycles-verdict.md) | planned | refactoring | Medium | 2026-10-07 | [#591](https://github.com/Gamaroff/agent-skills/issues/591) | — qa-read-back.js refuses a Gate Decision or newest QA Change Log row that disagrees with this cycle's gate, and retries a transient .git/index.lock before reporting it (obs #205, #216) |
+| 193 | [Scripts reach only the skills that run them](task.193.scripts-reach-only-skills-that-run-them/task.193.scripts-reach-only-skills-that-run-them.md) | planned | refactoring | Medium | 2026-10-07 | [#592](https://github.com/Gamaroff/agent-skills/issues/592) | — classify the 34 prose script literals in shared/resources/*.md, switch unneeded ones to bare filenames and remove unreached copies, guard new ones with a reasoned allowlist, pin the create-skill rule sentence (obs #263, #289) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
