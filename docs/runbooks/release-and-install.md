@@ -19,14 +19,9 @@ Ensure `CHANGELOG.md` has entries under `## [Unreleased]`.
 
 ### 2. Advance `main`
 
-**Direct fast-forward** (solo / no branch protection):
-
-```bash
-git checkout main && git pull --rebase
-git merge --ff-only develop && git push
-```
-
-**PR-based** (teams with branch protection):
+Promote through a release-prep PR. This is the only supported path: `main`'s required check runs on
+`pull_request` only, so a direct push is refused (the old "direct fast-forward" option was removed on
+2026-09-22 — [why](../contributing/releases.md)).
 
 ```bash
 # Preview the next version first

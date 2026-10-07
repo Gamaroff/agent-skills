@@ -22,12 +22,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/s
 |---|---|
 | GitHub | `gh auth status` — re-run `gh auth login` if expired |
 | Jira | `curl -u "$JIRA_USER_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/api/3/myself"` — should return your user JSON, not a 401 |
-| Bitbucket | `source shared/resources/bitbucket-auth.sh && curl "${BB_CURL_AUTH[@]}" "https://api.bitbucket.org/2.0/user"` — the helper picks Bearer or Basic; `echo $BB_AUTH_SCHEME` says which |
+| Bitbucket | `source .agents/skills/develop-task/references/bitbucket-auth.sh && curl "${BB_CURL_AUTH[@]}" "https://api.bitbucket.org/2.0/user"` — the helper picks Bearer or Basic; `echo $BB_AUTH_SCHEME` says which |
 
 **Bitbucket answers a bad credential with 404, not 401** — it hides private repositories from anonymous callers, so a missing token, an unscoped one, or the *wrong scheme* (Bearer sent where Basic was expected, or the reverse) all read as an *empty result* rather than an auth error, and are indistinguishable from each other. **Read the status code, never the length of the list.** Probe the repo root before believing an empty listing:
 
 ```bash
-source shared/resources/bitbucket-auth.sh || echo "no credential resolved"
+source .agents/skills/develop-task/references/bitbucket-auth.sh || echo "no credential resolved"
 echo "scheme: $BB_AUTH_SCHEME"
 curl -s -o /dev/null -w '%{http_code}\n' \
   "${BB_CURL_AUTH[@]}" \
@@ -93,7 +93,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/s
 
 ```bash
 # What's the configured PRD root?
-source shared/resources/resolve-paths.sh
+source .agents/skills/develop-task/references/resolve-paths.sh
 echo "PRD_ROOT=$PRD_ROOT ARCH_ROOT=$ARCH_ROOT"
 
 # Does it exist?
@@ -405,7 +405,7 @@ a key the reader consumes. See
 
 ```bash
 # See exactly what the reader objects to, and on which line:
-SKILLS_CONFIG_FILE=skills-config.yaml bash -c 'source shared/resources/resolve-platform.sh'
+SKILLS_CONFIG_FILE=skills-config.yaml bash -c 'source .agents/skills/develop-task/references/resolve-platform.sh'
 
 python3 -m pip install pyyaml     # or: rewrite the offending line in the subset
 ```

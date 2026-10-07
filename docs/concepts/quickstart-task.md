@@ -87,11 +87,10 @@ You will be prompted by Phase 0 for:
 
 | Prompt | Recommended answer |
 |---|---|
-| Base branch | `main` (default) |
-| PR target | `main` |
-| Epic branch | No (single-task work) |
+| Base branch | `develop` (Recommended) |
+| PR target | `develop` (Recommended) |
 
-The agent then chains: **review-task → create-branch → develop → create-pr → qa-task → qa-fix → review-pr → finalise**. You don't need to drive it — sit back.
+The agent then chains: **create-branch → review-task → develop → create-pr → qa-task → qa-fix → review-pr → finalise**. You don't need to drive it — sit back.
 
 If QA fails, the chain loops back into `qa-fix` (max 5 iterations). A PASS gate then hands to `review-pr` (Step 5c), which checks the PR against the task; `REQUEST CHANGES` re-enters `qa-fix` on the same 5-iteration budget. For a one-line README footnote, expect zero iterations.
 
@@ -131,8 +130,8 @@ Leave the branch as-is. Mark the registry row `CANCELLED` in `docs/tasks/task-re
 **B. You want a perfectly clean repo.**
 
 ```bash
-git checkout main
-git branch -D task/task.{N}.readme-contributor-footnote
+git checkout develop
+git branch -D feature/task.{N}.readme-contributor-footnote
 ```
 
 Then revert the registry commit (or amend it out if you haven't pushed). Note: task numbers still don't recycle — if you re-run the quickstart, you'll get `{N+1}`.
