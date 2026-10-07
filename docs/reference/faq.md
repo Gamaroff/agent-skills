@@ -36,11 +36,13 @@ One deliberate exception in shape, not in spirit: under a restricted `access.tra
 
 If you genuinely need to skip Step 7, bypass `develop-*` entirely.
 
-### Why is the develop-story branch model two levels deep (epic → story)?
+### Why do story branches come straight off `develop`, and when does an epic get its own branch?
 
-Because stories within an epic often share infrastructure changes that aren't shippable on their own. The epic branch is a long-lived integration point that collects sibling stories. Each story PR is small (epic → story diff), the epic PR to `develop` is the big merge that ships the whole feature.
+By default the model is one level deep: each story branch is cut from `develop` and its PR targets `develop`, so every accepted story ships on its own. An epic has no branch of its own.
 
-Tasks don't have this structure because tasks are standalone — no parent that collects siblings.
+Opt in to an epic integration branch when the epic's stories are not shippable one at a time — for example, they share infrastructure that only makes sense once all of them land. Set `branch_model: epic-integration` in the epic's frontmatter (optionally `integration_branch:` to name it; otherwise `epic/{n}.{slug}`). `/develop-story` then recommends that branch as both base and PR target, creates it on demand, and the epic ships with one `epic/…` → `develop` PR. The keys are configurable under `branching.epicIntegration.*` in [configuration.md](configuration.md).
+
+Tasks don't have this option because tasks are standalone — no parent that collects siblings.
 
 ### Why epic numbers globally unique, not unique-per-PRD?
 

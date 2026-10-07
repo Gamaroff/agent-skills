@@ -82,7 +82,7 @@ python3 skills/create-skill/scripts/quick_validate.py skills/<skill-name>
 npm run generate-catalog
 
 # Package a single skill into a distributable zip
-npm run package:skill -- skills/<skill-name>
+npm run package:skill -- ../../<skill-name> ../../<skill-name>   # the script runs from skills/create-skill/scripts
 # or directly:
 python3 skills/create-skill/scripts/package_skill.py skills/<skill-name>
 

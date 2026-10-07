@@ -35,9 +35,8 @@ board; it is never a prerequisite.
 
 > **Status**: **Both trackers read this file.** Jira (task.38) resolves every moment's target from the
 > ladder and walks the rungs between; GitHub (task.39) resolves the target the same way and sets the
-> Projects v2 Status field, with no walking — see below for why. **Step-file wiring is task.40**, so on
-> a GitHub board you can author, validate and probe the file today, and `gh-stage.js` will move a card
-> when you call it directly, but the pipeline steps still use their own inline GraphQL.
+> Projects v2 Status field, with no walking — see below for why. On GitHub the pipeline steps move
+> cards through `gh-stage.js` (task.40), so the file drives the board on both trackers.
 > See [Jira execution semantics](#jira-execution-semantics) and
 > [GitHub execution semantics](#github-execution-semantics) for what each path does with it.
 
