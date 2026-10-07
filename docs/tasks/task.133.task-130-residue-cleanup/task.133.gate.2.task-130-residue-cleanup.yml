@@ -1,0 +1,98 @@
+schema: 1
+task: 'task.133.task-130-residue-cleanup'
+task_title: "Residue of task.130's seven QA cycles — eleven advisory findings, grouped by file"
+gate: CONCERNS
+status_reason: 'Cycle 1 fixed TASK-133-QA-1 (verified, mutation-proven). The cycle-2 refute pass found three MEDIUMs in the original change: the append-only check cannot see rows the writer keeps; the conditional Step 0-lock restore cites a condition the in-place path cannot evaluate; a legacy-only candidate set is reported as a fresh start. HIGH 0.'
+reviewer: 'QA Engineer'
+updated: '2026-09-30T09:12:32Z'
+
+top_issues:
+  - id: TASK-133-QA-3
+    severity: medium
+    file: 'shared/resources/change-log.js'
+    finding: 'rowsDropped reads only extractEntries rows, while the writer preserves unparsed rows (Version-first logs, merged legacy blocks). A dropped such row, or a base log with no parseable rows, reports ok (refute CR-1; reproduced).'
+    suggested_action: 'Compare every data row the writer carries; give a base log with data rows but none parseable its own reason; test and mutation-prove.'
+    suggested_owner: dev
+    bug_ref: 'task.133.bug.2.append-only-check-blind-to-rows-extractentries-skips.md'
+    status: open
+  - id: TASK-133-QA-4
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The Step 0-lock restore is now conditional on § Restore the lock, whose condition is phrased around the detector source and the Resume prompt. On the in-place continuation path neither exists, so a literal reading skips the restore (refute CR-2).'
+    suggested_action: 'State in § Restore the lock that the in-place path evaluates the same halt_reason/pause_reason bullets from the snapshot on disk; pin it with a test.'
+    suggested_owner: dev
+    bug_ref: 'task.133.bug.3.restore-condition-unevaluable-on-in-place-path.md'
+    status: open
+  - id: TASK-133-QA-5
+    severity: medium
+    file: 'shared/resources/pipeline-resume-detector-prompt.md'
+    finding: 'With legacy candidates now dropped, a legacy-only set reaches the no-candidate rule, which says source none and "treat this as a fresh start". SKILL.md says a legacy snapshot is never a fresh start (refute CR-3).'
+    suggested_action: 'Give a legacy-only set its own blocking issue naming --restore --accept-legacy or delete; pin it at a marker.'
+    suggested_owner: dev
+    bug_ref: 'task.133.bug.4.detector-legacy-only-reads-as-fresh-start.md'
+    status: open
+  - id: TASK-133-QA-6
+    severity: low
+    file: 'shared/resources/change-log.js'
+    finding: 'platform-variance: new-document is decided by matching English git stderr, so under a non-English locale an absent-at-rev document is usage exit 2 (refute CR-5).'
+    suggested_action: 'Run git with LC_ALL=C in the execFileSync env, or use `git cat-file -e <rev>:<path>` after `git rev-parse --verify`.'
+    suggested_owner: dev
+    status: open
+  - id: TASK-133-QA-7
+    severity: low
+    file: 'shared/resources/tests/report-lint-call-sites.test.mjs'
+    finding: 'The nonLiteral regex also matches the declaration `function usage(msg)`, so the template-cause assertion runs unconditionally and cannot tell whether a non-literal usage( call exists (refute CR-6).'
+    suggested_action: 'Exclude the declaration (require a non-`function` prefix, for example `return usage(`).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 4626
+  phases_verified: 5/5
+  ci: 'not read this cycle (informational)'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 4, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged from gate 1: choose_candidate() decision logic is unchanged, and it has no probe-engine entry form (flag-moded executable); its hostile cases execute in its suite on both shells. rowsDropped reports a diff, boundary false. Cycle 1 added only a usage guard.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA-3 and QA-5: two states still reach one answer (a log with no parseable rows reads ok; legacy-only reads as fresh start). QA-1 is fixed.'
+  maintainability:
+    status: PASS
+    notes: 'QA-7 is a vacuous sub-assertion in a new test (LOW).'
+
+recommendations:
+  immediate:
+    - action: 'TASK-133-QA-3, QA-4, QA-5 (MEDIUM).'
+      refs: ['shared/resources/change-log.js', 'shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/pipeline-resume-detector-prompt.md']
+  future:
+    - action: 'refute CR-4: PreCompact lint site (3) treats rc 2 as "failed lint"; give it an rc split or list it in the step-8 statement as the known exception.'
+      refs: ['shared/resources/develop-pipeline-on-precompact.sh']
+    - action: 'Cycle 1 follow-ups carried: quote every fenced *-directory placeholder (CR-2 population); new-document vs rename (CR-3); merge-base-only lens misses in-branch rewrites (obs #183).'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/change-log.js']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 3
+  fix_date: '2026-09-30'
+  total_iterations: 1
+  verification_method: 'Reproduction re-run (empty, space, tab, unresolvable merge-base → rc 2; HEAD → ok); J4; mutation spot check'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['TASK-133-QA-3, QA-4, QA-5 fixed']

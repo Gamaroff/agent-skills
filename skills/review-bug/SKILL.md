@@ -118,7 +118,16 @@ A likely-already-fixed Critical also matches the NEEDS DETAIL row's "any Critica
 
 Score breakdown: Completeness /10, Reproducibility /10, Classification /10, Linkage /10 (report the average, rounded).
 
-**Interactive — Comprehensive report**: write `{BUG_DIR}/{BUG_PREFIX}.review.{N}.{descriptive-name}.md` (N starts at 1, increments on re-review) with: Executive Summary (score, recommendation, issue counts), User Decisions, per-dimension findings (Critical/Important/Optional + recommendations), Pre-pass results (duplicate + stale), and Next Steps. Display a summary + the file path.
+**Interactive — Comprehensive report**: write `{BUG_DIR}/{BUG_PREFIX}.review.{N}.{descriptive-name}.md` (`{N}` computed as below) with: Executive Summary (score, recommendation, issue counts), User Decisions, per-dimension findings (Critical/Important/Optional + recommendations), Pre-pass results (duplicate + stale), and Next Steps. Display a summary + the file path.
+
+`{N}` is computed, never counted by eye — run, from the repository root:
+
+```bash
+source .agents/skills/review-bug/references/newest-numbered.sh || exit 1
+N=$(next_numbered "{BUG_DIR}" review -name "{BUG_PREFIX}.review.*.md") || exit 1
+```
+
+It is the highest existing `{N}` for this bug plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186). The `-name` pattern carries `{BUG_PREFIX}`, so a story's own reviews in the same directory are another series.
 
 **Interactive — Action plan only**: display a prioritized Critical/Important/Optional list; save no file.
 

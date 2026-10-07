@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.157.context-pressure-handoff-trigger'
+task_title: '[Task 157] Context-pressure trigger: recommend a continuation handoff before the context fills'
+gate: CONCERNS
+status_reason: 'Gate 2 findings fixed and mutation-proven. The scoped re-review found that the anchored wrap regex no longer recognises the installer''s own output for a wrapper path containing an apostrophe (medium), and that the .bak is deleted before its replacement is copied (low).'
+reviewer: 'QA Engineer'
+head: '6c051d5424f5f05e05f524b270809c61b9405251'
+updated: '2026-10-02T08:15:57Z'
+
+top_issues:
+  - id: 'TASK-157-QA3-CR-1'
+    severity: medium
+    file: 'shared/resources/context-pressure.mjs'
+    finding: 'WRAP_RE does not match wrapCommand output when the wrapper path contains an apostrophe (shq writes the quote as an escape sequence), so re-install wraps twice and uninstall leaves the wrap in place.'
+    suggested_action: 'Recognise the wrap from a parse of the command into shell words rather than a regex, so every form shq writes round-trips; test install twice then uninstall with an apostrophe path.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-157-QA3-CR-3'
+    severity: low
+    file: 'shared/resources/context-pressure-install.sh'
+    finding: 'rm -f of the old .bak before cp -p means a failed copy leaves no backup at all, contradicting the comment.'
+    suggested_action: 'Copy into a temp file and mv it over the .bak.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: 16/16
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    notes: 'validSessionId re-probed: engages, 20 executed, 0 reproduced.'
+  performance:
+    status: PASS
+    notes: 'No hot-path change this cycle.'
+  reliability:
+    status: PASS
+    notes: 'Installer outcomes now distinguish needs-manual; open findings are identity and backup edge cases.'
+  maintainability:
+    status: PASS
+    notes: 'QA3-CR-4 stray regex statement and QA3-CR-5 dead replace are cleanups.'
+
+bug_resolution:
+  closed_from_gate_2: ['TASK-157-QA2-CR-1', 'TASK-157-QA2-CR-2', 'TASK-157-QA2-CR-3']
+  fix_commit: '6c051d54'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA3-CR-1 and QA3-CR-3 with tests.'
+      refs: ['shared/resources/context-pressure.mjs', 'shared/resources/context-pressure-install.sh']
+  future:
+    - action: 'QA3-CR-2: path-qualified shell and backslash separators in the identity rules; QA3-CR-4 stray regex line; QA3-CR-5 dead replace.'
+      refs: ['shared/resources/context-pressure.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-157-QA3-CR-1 fixed']

@@ -144,3 +144,86 @@ test('C — no canonical source carries the old `|| { echo "HALT: report failed 
     );
   }
 });
+
+// D — the `2)` arm is stated ONCE, in step-8, and cited by every arm (task.130 gate 5 CR-6;
+// task.133). The statement must name every cause `report-lint.js` exits 2 for — read from the
+// engine's own `usage(` calls, never restated here — so a new usage path with no line in the
+// statement turns this red. A literal message contributes its longest fixed run (the text between
+// `${…}` interpolations); a non-literal `usage(e.message)` is the template load.
+const LINT_JS = "shared/resources/report-lint.js";
+const STATEMENT_ANCHOR = "**report-lint usage error (rc 2).**";
+const CITE =
+  /2\)\s*echo "[^"]*causes: develop-pipeline-step-8-commit\.md § report-lint usage error/;
+
+function usageCauses() {
+  const src = read(LINT_JS);
+  const calls = [...src.matchAll(/\busage\(\s*([`"'])((?:(?!\1).)*)\1/g)].map(
+    (m) => m[2],
+  );
+  // A CALL, never the declaration: `function usage(msg)` has the same shape, and counting it made
+  // this number >= 1 on every source, so the template-cause assertion ran unconditionally and could
+  // not see a non-literal call disappear (TASK-133-QA-7).
+  const nonLiteral = (
+    src.match(/(?<!function\s+)\busage\(\s*[A-Za-z_$][\w$.]*\s*\)/g) || []
+  ).length;
+  const fixed = calls.map(
+    (c) =>
+      c
+        .split(/\$\{[^}]*\}/)
+        .map((p) => p.replace(/^['\s:]+|['\s:]+$/g, ""))
+        .sort((a, b) => b.length - a.length)[0],
+  );
+  return { fixed, nonLiteral };
+}
+
+test("D — step-8 states the exit-2 causes once; every 2) arm cites it", () => {
+  const step8 = read(STEP8);
+  assert.equal(
+    step8.split(STATEMENT_ANCHOR).length - 1,
+    1,
+    `${STEP8}: expected the '${STATEMENT_ANCHOR}' statement exactly once`,
+  );
+  const at = step8.indexOf(STATEMENT_ANCHOR);
+  const statement = step8.slice(at, step8.indexOf("\n\n", at));
+  const { fixed, nonLiteral } = usageCauses();
+  assert.ok(
+    fixed.length >= 5,
+    `found only ${fixed.length} literal usage( calls — the reader broke`,
+  );
+  for (const cause of fixed)
+    assert.ok(
+      statement.includes(cause),
+      `${STEP8}: the exit-2 statement omits the usage( cause '${cause}'`,
+    );
+  assert.equal(
+    nonLiteral,
+    (read(LINT_JS).match(/\busage\(e\.message\)/g) || []).length,
+    "the non-literal count is not the number of usage(<variable>) CALLS",
+  );
+  if (nonLiteral > 0)
+    assert.match(
+      statement,
+      /template/,
+      `${STEP8}: the exit-2 statement omits the template-load cause`,
+    );
+  // Every arm — fenced site (1) ×3, one-line site (2) ×3, fenced site (4) — cites it.
+  let arms = 0;
+  for (const rel of [...SKILLS, STEP8]) {
+    const lines = read(rel)
+      .split(/\r?\n/)
+      .filter((l) => /report-lint/.test(l) && /\b2\)\s*echo/.test(l));
+    for (const l of lines) {
+      arms += 1;
+      assert.match(
+        l,
+        CITE,
+        `${rel}: a 2) arm does not cite the step-8 statement:\n  ${l.trim().slice(0, 160)}`,
+      );
+    }
+  }
+  assert.equal(
+    arms,
+    7,
+    `expected seven 2) arms (three SKILL.md × sites 1 and 2, plus step-8), found ${arms}`,
+  );
+});

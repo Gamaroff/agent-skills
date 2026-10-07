@@ -202,9 +202,11 @@ Pattern below, which runs on every pass.
 FAST_GATE_COMMAND="<fastGateCommand>"
 
 # `npm run` with no arguments lists the scripts the project actually defines,
-# one per line, indented by two spaces.
+# one per line, indented by two spaces. npm prints that listing as log output, so
+# `loglevel=silent` (an .npmrc, or `npm run -s` upstream) hides it; the flag pins
+# the level so a defined script is never reported missing (task 167, obs #213).
 GATE_SCRIPT=$(printf '%s' "$FAST_GATE_COMMAND" | sed -nE 's/^npm run ([A-Za-z0-9:_-]+).*/\1/p')
-if [ -n "$GATE_SCRIPT" ] && ! npm run 2>/dev/null | grep -qE "^[[:space:]]+${GATE_SCRIPT}$"; then
+if [ -n "$GATE_SCRIPT" ] && ! npm run --loglevel=notice 2>/dev/null | grep -qE "^[[:space:]]+${GATE_SCRIPT}$"; then
   echo "HALT: develop.fastGateCommand runs '${GATE_SCRIPT}', which this project does not define."
   echo "      Set develop.fastGateCommand in skills-config.yaml to this project's cheap CI-equivalent."
   exit 1
@@ -245,6 +247,14 @@ TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
 <fastGateCommand> > "$TEST_LOG" 2>&1
 TEST_EXIT=$?
 ```
+
+**When the gate can outlive the tool timeout, start it with `run_in_background`** and let the log
+carry the exit code: `<fastGateCommand> > "$TEST_LOG" 2>&1; echo "TEST_EXIT=$?" >> "$TEST_LOG"`.
+Mark the wait before yielding —
+`bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "step-3 fast gate iter $ITER" --kind task --budget-minutes {M}`
+(`develop-pipeline-hooks.md` §"waiting_on") — and on the notification `--clear` it and read the
+`TEST_EXIT=` line (`grep '^TEST_EXIT=' "$TEST_LOG"`). A foreground call killed at the timeout loses
+its exit code, and can leave a moved `.agents/skills` unrestored.
 
 ### On Test Failure (TEST_EXIT != 0)
 

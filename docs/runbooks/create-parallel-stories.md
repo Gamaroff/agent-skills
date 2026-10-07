@@ -38,7 +38,7 @@ flowchart TD
     A[create-parallel-stories] --> B[Epic coordination matrix]
     B --> C[Worktree per story]
     C --> D[develop-story per worktree<br/>in parallel]
-    D --> E[Merge in any order to epic branch]
+    D --> E[Merge in any order to the PR target<br/>develop, or the epic branch if opted in]
     E --> F[Sequential stories follow]
 ```
 
@@ -50,7 +50,8 @@ flowchart TD
    git worktree add ../{repo}-story-{E}.{S} feature/story.{E}.{S}.{name}
    cd ../{repo}-story-{E}.{S}
    /develop-story <story-path>
-3. Merge each story PR to the epic branch as it lands (any order).
+3. Merge each story PR to its target as it lands (any order): `develop` by default, or the epic
+   integration branch when the epic opted in.
 4. After all parallel stories merge, sequential stories proceed normally.
 ```
 
@@ -58,7 +59,7 @@ flowchart TD
 
 - **Don't share dirty worktrees across agent sessions** — each session needs an isolated checkout.
 - **File-boundary discipline is on you.** `create-parallel-stories` produces a coordination matrix; respect it. If a story's diff touches files claimed by a sibling, abort and re-sequence.
-- **PRs target the epic branch**, not `develop`. Same convention as serial development.
+- **Each PR targets the base chosen at `/develop-story` Phase 0 Q2** — `develop` by default, or the epic integration branch when the epic opted in with `branch_model: epic-integration`. Same convention as serial development.
 - **Worktree cleanup:** after merge, remove the worktree (`git worktree remove ../{repo}-story-…`) to free disk space.
 
 ## See also

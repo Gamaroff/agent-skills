@@ -87,6 +87,11 @@ after(() => rmSync(CONSUMER_ROOT, { recursive: true, force: true }));
 const REFS = join(CONSUMER_ROOT, ".agents/skills/develop-task/references");
 mkdirSync(REFS, { recursive: true });
 copyFileSync(join(repoRoot, ENGINE), join(REFS, "qa-diminishing-returns.js"));
+// The engine requires its sibling matcher (task.172); a consumer install carries both, bundled.
+copyFileSync(
+  join(repoRoot, "shared/resources/glob-match.js"),
+  join(REFS, "glob-match.js"),
+);
 
 // A cwd with NO engine in it — the "engine did not run" case (CR-2).
 const EMPTY_ROOT = mkdtempSync(join(tmpdir(), "qa-narrowing-offer-empty-"));

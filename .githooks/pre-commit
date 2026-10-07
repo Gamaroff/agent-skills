@@ -16,6 +16,64 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+# ── Formatting (obs #283) ──────────────────────────────────────────────────
+# CI's first step is `npm run format:check`; nothing local ran it, so a missed
+# `prettier --write` cost a full CI round trip. Check the STAGED content of each
+# staged file — the index, not the working tree, because the index is what the
+# commit carries — with the same ignore files the CLI reads. Runs before the
+# bundling gate below, because that gate exits early for most commits.
+# No prettier installed (a fresh clone before `npm install`) is a warning, not a
+# refusal: CI still runs the check.
+if ! node - <<'JS'
+const { execFileSync } = require("child_process");
+const path = require("path");
+const root = process.cwd();
+(async () => {
+  let prettier;
+  try {
+    prettier = require(require.resolve("prettier", { paths: [root] }));
+  } catch {
+    console.error("⚠ prettier is not installed — staged files were not format-checked (CI will check them).");
+    return;
+  }
+  const staged = execFileSync(
+    "git", ["diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"],
+    { encoding: "utf8" },
+  ).split("\0").filter(Boolean);
+  const ignorePath = [".gitignore", ".prettierignore"].map((f) => path.join(root, f));
+  const bad = [];
+  for (const rel of staged) {
+    const abs = path.join(root, rel);
+    const info = await prettier.getFileInfo(abs, { ignorePath, resolveConfig: true });
+    if (info.ignored || !info.inferredParser) continue;
+    const source = execFileSync("git", ["show", `:${rel}`], { encoding: "utf8" });
+    const options = (await prettier.resolveConfig(abs)) || {};
+    try {
+      if (!(await prettier.check(source, { ...options, filepath: abs }))) bad.push(rel);
+    } catch (err) {
+      // A parse error fails `prettier --check` in CI too: name the file.
+      console.error(`✗ ${rel}: ${String(err.message).split("\n")[0]}`);
+      bad.push(rel);
+    }
+  }
+  if (bad.length) {
+    console.error("");
+    console.error("✗ Staged files are not Prettier-formatted — CI's format:check would fail:");
+    for (const rel of bad) console.error(`      ${rel}`);
+    console.error("");
+    console.error(`  Fix: ./node_modules/.bin/prettier --write ${bad.join(" ")}`);
+    console.error("  then git add them and retry.");
+    process.exitCode = 1;
+  }
+})().catch((err) => {
+  console.error(`✗ The format check could not run: ${err.message}`);
+  process.exitCode = 1;
+});
+JS
+then
+  exit 1
+fi
+
 git diff --cached --name-only \
   | grep -qE '^(shared/resources/|skills/[^/]+/SKILL\.md)' || exit 0
 
@@ -43,10 +101,93 @@ trap 'rm -f "$PRE_FILE" "$POST_FILE"' EXIT
 dirty_refs >"$PRE_FILE"
 
 echo "▶ Bundling shared resources into skills/*/references/ ..."
-npm run bundle --silent
+# Captured, not left to `set -e`: a failed bundle must still reach `revert_new`
+# below, or the copies this run DID write stay on disk, untracked, and the retry
+# counts them as pre-existing and refuses (task.126 QA-2, CR-1).
+BUNDLE_STATUS=0
+npm run bundle --silent || BUNDLE_STATUS=$?
 dirty_refs >"$POST_FILE"
 
 NEW="$(comm -13 "$PRE_FILE" "$POST_FILE")"
+
+# Undo what THIS run's bundle wrote, before any refusal exits. A refused commit
+# must leave the tree as the author left it: copies the run created and did not
+# stage would otherwise sit on disk, untracked, and the retry that follows the
+# printed remedy would find them in PRE and POST alike, count them as
+# pre-existing, and refuse again, naming files the author never made
+# (task.126 QA-2, CR-1). Every NEW path was clean before the run (it is not in
+# PRE), so a tracked one is restored from the index and an untracked one is
+# removed; the next run regenerates both.
+revert_new() {
+  [ -n "$NEW" ] || return 0
+  printf '%s\n' "$NEW" | while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    if git ls-files --error-unmatch -- "$p" >/dev/null 2>&1; then
+      git checkout -q -- "$p"
+    else
+      rm -f -- "$p"
+    fi
+  done
+}
+# The bundler fails when it leaves a copy alone that bundle:check will fail —
+# a stale headerless (`.json`) copy, an authored file at a shared name, a
+# symlink (observation #199). Its ❌ lines above name each copy and the remedy.
+if [ "$BUNDLE_STATUS" -ne 0 ]; then
+  {
+    echo ""
+    echo "✗ \`npm run bundle\` failed (exit $BUNDLE_STATUS) — bundle:check would fail in CI."
+    echo "  Fix what its ❌ lines name, then retry."
+  } >&2
+  revert_new
+  exit 1
+fi
+
+# Pre-existing drift is left alone, but never silently: an unmentioned dirty
+# bundle is how source and its bundled copies drift apart in the first place.
+LEFT="$(comm -12 "$PRE_FILE" "$POST_FILE")"
+
+# An UNTRACKED GENERATED copy in that pre-existing set is refused, not warned
+# about (task.126, observation #114). It is what a manual `npm run bundle` before
+# the commit leaves behind: the copy is on disk, so every local check passes, and
+# it is absent from the commit, so `bundle:check` fails in CI a push later
+# (task.99 paid one QA cycle for it). "Generated" means it has a source:
+# `skills/<skill>/references/<rel>` with `shared/resources/<rel>` present. A
+# skill-native references/ file (89 of them are tracked) has none, bundle:check
+# does not judge it, and it stays a warning — refusing it would block an author
+# over a file the bundler never owned (task.126 QA-1, CR-1). A modified tracked
+# copy stays a warning too: the committed tree is still consistent without it.
+# The pathspec keeps its trailing `*` (see REFS_PATHSPEC above): without it the
+# listing is empty and this refusal would never fire.
+#
+# This runs BEFORE the NEW copies are staged below, so a refused commit leaves
+# the index exactly as it found it (task.126 QA-1, CR-3).
+UNTRACKED_LEFT="$(comm -12 \
+  <(printf '%s\n' "$LEFT" | sed '/^$/d' | sort) \
+  <(git ls-files --others --exclude-standard -- "$REFS_PATHSPEC" | sort) \
+  | while IFS= read -r p; do
+      # An `if`, not `[ -f … ] && printf`: under `set -euo pipefail` a last path
+      # with no source leaves the loop's status at 1, the substitution fails,
+      # and `set -e` ends the hook with exit 1 and no message at all.
+      if [ -f "shared/resources/${p#skills/*/references/}" ]; then printf '%s\n' "$p"; fi
+    done)"
+if [ -n "$UNTRACKED_LEFT" ]; then
+  {
+    echo ""
+    echo "✗ Untracked generated copies in skills/*/references/ — bundle:check will fail in CI:"
+    printf '%s\n' "$UNTRACKED_LEFT" | sed 's/^/      /'
+    echo ""
+    echo "  For each one: git add it if the skill still reaches it; delete it if"
+    echo "  \`npm run bundle:check\` reports it UNREACHED (the bundler never deletes a copy,"
+    echo "  and committing an unreached one fails CI the same way). A document you only"
+    echo "  point at can be cited instead: create-skill § Cite or depend."
+  } >&2
+  if [ "${BUNDLE_PRECOMMIT_WARN:-0}" != "1" ]; then
+    echo "  BUNDLE_PRECOMMIT_WARN=1 downgrades this to a warning." >&2
+    revert_new
+    exit 1
+  fi
+  echo "  BUNDLE_PRECOMMIT_WARN=1 is set — proceeding." >&2
+fi
 
 if [ -n "$NEW" ]; then
   # Bundling changed references/, so it read shared/resources from the working
@@ -63,6 +204,7 @@ if [ -n "$NEW" ]; then
       echo "  The bundled copies would embed source this commit does not carry."
       echo "  Stage them (git add shared/resources/...), or stash them, then retry."
     } >&2
+    revert_new
     exit 1
   fi
 
@@ -70,9 +212,6 @@ if [ -n "$NEW" ]; then
   echo "✓ Staged $(printf '%s\n' "$NEW" | wc -l | tr -d ' ') bundled file(s) produced by this run."
 fi
 
-# Pre-existing drift is left alone, but never silently: an unmentioned dirty
-# bundle is how source and its bundled copies drift apart in the first place.
-LEFT="$(comm -12 "$PRE_FILE" "$POST_FILE")"
 if [ -n "$LEFT" ]; then
   echo "⚠ $(printf '%s\n' "$LEFT" | wc -l | tr -d ' ') pre-existing bundle change(s) left unstaged:"
   printf '%s\n' "$LEFT" | head -5 | sed 's/^/      /'

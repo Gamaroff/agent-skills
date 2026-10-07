@@ -1,0 +1,72 @@
+schema: 1
+task: 'task.129.review-call-site-population-check'
+task_title: "A call-site list in a task document is the author's recall, not a measurement"
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes hold (all six mutation-proved, populations 24/12 unchanged), but the refute pass found two high-confidence medium defects in them: the no-roots marker accepts any consumer scripts/ directory, and exit 1 also means a crash.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T20:55:00Z'
+
+top_issues:
+  - id: 'TASK-129-C2-CR-1'
+    severity: medium
+    file: 'shared/resources/call-sites.js'
+    finding: 'hasRoots() accepts a bare top-level scripts/ directory, so a consumer install with its own scripts/ answers `empty` (exit 0) instead of `no-roots` (reproduced: a tree with scripts/build.sh and .agents/skills/ → reason empty), and a review there turns a correct document count into a false count-mismatch finding.'
+    suggested_action: 'Base hasRoots on a marker only the source tree has: shared/resources/ present and at least one skills/*/SKILL.md.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-129-C2-CR-2'
+    severity: medium
+    file: 'shared/resources/call-sites.js'
+    finding: 'Exit 1 is documented as no-roots, but a crash also exits 1 with nothing on stdout: `--engine toString` resolves through the prototype chain and throws a TypeError (reproduced), and a read error mid-walk throws uncaught.'
+    suggested_action: 'Look engines up with Object.hasOwn; catch read errors and report them under their own reason so exit 1 can only mean no-roots.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: 2/2
+  ci: 'not read this cycle (gated once at /finalise)'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1]
+
+bug_resolution:
+  cycle_1: 'TASK-129-CR-1 and TASK-129-CR-2 fixed in a7f2342a and verified this cycle (explicit --root measured as given; setup-consumer.sh:614 counted for gh-stage and jira-stage, :1213 excluded).'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false (unchanged from cycle 1): a measurement whose result gates no action. Candidates re-checked after cycle 1: hasRoots (decides whether a number is reported, gates nothing), viaVariable/engineVarsByLine (decide what is counted). The --engine prototype lookup is a robustness defect (C2-CR-2), not an authorisation one.'
+  performance:
+    status: PASS
+    notes: 'CLI 0.2 s on the live tree.'
+  reliability:
+    status: CONCERNS
+    notes: 'C2-CR-1 and C2-CR-2 each make the documented exit/reason contract say something false; C2-CR-5 (unreadable root reads as empty) is the same class at low severity.'
+  maintainability:
+    status: PASS
+    notes: 'Each fix carries a named test; C2-CR-3 notes a comment that does not match the rule applied.'
+
+recommendations:
+  immediate:
+    - action: 'Fix C2-CR-1 and C2-CR-2.'
+      refs: ['shared/resources/call-sites.js']
+  future:
+    - action: 'C2-CR-3/C2-CR-4: the variable rule is a best-effort derivation — state its limits (reassignment within a function; a global used in a later function), reset at fence boundaries in .md, correct the comment.'
+      refs: ['shared/resources/call-sites.js']
+    - action: 'C2-CR-5: an unreadable root directory is a distinct failure, not an empty one.'
+      refs: ['shared/resources/call-sites.js']
+    - action: 'C2-CR-6: CHANGELOG contract summary lacks no-roots.'
+      refs: ['CHANGELOG.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['C2-CR-1 and C2-CR-2 fixed']

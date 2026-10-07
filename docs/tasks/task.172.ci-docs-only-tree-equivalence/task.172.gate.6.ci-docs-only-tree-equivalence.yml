@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.172.ci-docs-only-tree-equivalence'
+task_title: 'One docs-only CI rule at every pipeline CI wait'
+gate: CONCERNS
+status_reason: 'Cycle 6 scoped review of the cycle 5 fix commit: the three cycle 5 findings are fixed and mutation-proven (re-run by this cycle); no HIGH. Two reproduced MEDIUM findings, both in the completeness check that fix added: its row count over-counts every list-of-maps element, so a valid documented configuration is refused (a regression), and the same over-count lets a dropped row pass when it offsets one.'
+reviewer: 'QA Engineer'
+head: '8dbbac1e77c94b8adba97669edcf127a48a33c6f'
+updated: '2026-10-01T13:32:52Z'
+
+top_issues:
+  - id: 'CR6-1'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'consumedRows counts one row per list element plus every key of a map element, but a map element is one source row per key (the dash shares the first key row), so every list of maps over-counts by one per element and parseConfig refuses the file with exit 2. Reproduced on the documented developBatch.resources (17 rows, parse accounts for 19) and retrospective.identities (6 vs 7) shapes, and on the minimum (7 vs 8); the cycle 4 engine accepted all of them. Fails closed (the three callers read any non-zero exit as not tree-equivalent), so the loss is the shortcut for every consumer that configures those documented keys. A regression introduced by cycle 5.'
+    suggested_action: 'Do not compare counts over the whole file: check completeness only for the rows of the ci block (mappings and lists of scalars, which count exactly), or count a map element as its keys only; test the documented developBatch.resources and retrospective.identities shapes parse to the defaults.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR6-2'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'The completeness check is an equality, so a row the parse dropped is hidden by any row it counted twice. With a list of maps elsewhere in the file a duplicated opt-out under ci.docsOnly is accepted (reproduced: enabled true then enabled false parses to enabled false; the reverse order silently turns the rule on against the first line). Without the list of maps the same duplicate is refused, which is the case cycle 5 tested. Same root cause as CR6-1.'
+    suggested_action: 'Fix with CR6-1: a count that is exact for the rows it covers cannot be offset by rows elsewhere; test the offset shape in both orders.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 75
+
+evidence:
+  tests_reviewed: 90
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Scoped re-review of the cycle 5 fix; QA reproduced both findings by executing the exported parseConfig. CR6-2 is an owner opt-out the engine can ignore (fail-open on the configuration), reachable only in a file that also holds a list of maps. No corpus sink models this predicate.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: bounded at 20 ancestors; one git ls-tree per run.'
+  reliability:
+    status: PASS
+    notes: 'CR6-1 fails closed (full CI wait), no wrong green. The 6c poll does not latch an exit 2, so a persistent configuration error is re-run every 30 s; cheap.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Sixth cycle on one mechanism, reading skills-config.yaml through a lenient YAML subset. Cycle 5 replaced per-spelling guards with a total row count; the count is itself an approximation (CR6-1, CR6-2, and a marker with a trailing comment, CR6-3). The exact form is a completeness check scoped to the ci block, or the parser reporting the rows it skipped.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR6-1 and CR6-2 together: check completeness for the ci block only (or count exactly), with a test that is red on revert for each of the documented list-of-maps shapes and for the offset shape in both orders.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'shared/resources/tests/ci-tree-equivalence.test.mjs']
+  future:
+    - action: 'Review CR-3 (low, reproduced): significantLines treats only an exact --- or ... line as a document marker, while the subset strips comments first, so a marker with a trailing comment (--- # c) is counted as a row the parse never consumes and the file is refused. Strip the comment before the test, or reuse the subset''s own tokenizer. Falls away if the check is scoped to the ci block.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+    - action: 'Review CR-4 (cleanup, low): significantLines re-implements row tokenizing that yaml-subset.js already does, and the two disagree on markers and comments. Export the tokenizer or have the subset report unconsumed rows.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'shared/resources/yaml-subset.js']
+    - action: 'Carried from gate 5 (cleanup, low): a CANCELLED nearer ancestor is re-asked for the whole 6c poll; treat it as final or keep the documented residual.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR6-1 and CR6-2 fixed']

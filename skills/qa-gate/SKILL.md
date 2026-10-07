@@ -82,12 +82,13 @@ For tasks: gate is co-located in the task directory at `docs/tasks/task.<id>.<na
 **Use this when creating simple gates:**
 
 ```yaml
-schema: 1
+schema: 2
 story: "1.3"
 gate: PASS # PASS|CONCERNS|FAIL|WAIVED
 status_reason: "1-2 sentence explanation of gate decision"
 reviewer: "QA Engineer"
-updated: "2025-01-12T10:15:00Z" # ISO-8601 timestamp
+head: "4f1c2e8b9a0d3c7e6b5a4f3e2d1c0b9a8f7e6d5c" # the commit reviewed (git rev-parse HEAD)
+updated: "2025-01-12T10:15:00Z" # ISO-8601, UTC, from `date -u` — never typed
 top_issues: [] # Empty array if no issues
 waiver: { active: false } # Only set active: true if WAIVED
 ```
@@ -97,11 +98,12 @@ waiver: { active: false } # Only set active: true if WAIVED
 **Use this when issues are found:**
 
 ```yaml
-schema: 1
+schema: 2
 story: "1.3"
 gate: CONCERNS
 status_reason: "Missing rate limiting on auth endpoints poses security risk."
 reviewer: "QA Engineer"
+head: "4f1c2e8b9a0d3c7e6b5a4f3e2d1c0b9a8f7e6d5c"
 updated: "2025-01-12T10:15:00Z"
 top_issues:
   - id: "SEC-001"
@@ -124,11 +126,12 @@ waiver: { active: false }
 **Use this when issues are acknowledged but waived:**
 
 ```yaml
-schema: 1
+schema: 2
 story: "1.3"
 gate: WAIVED
 status_reason: "Known issues accepted for MVP release."
 reviewer: "QA Engineer"
+head: "4f1c2e8b9a0d3c7e6b5a4f3e2d1c0b9a8f7e6d5c"
 updated: "2025-01-12T10:15:00Z"
 top_issues:
   - id: "PERF-001"
@@ -147,12 +150,13 @@ waiver:
 **Use this for comprehensive gates with full traceability:**
 
 ```yaml
-schema: 1
+schema: 2
 story: "1.3"
 story_title: "Implement user authentication"
 gate: CONCERNS
 status_reason: "Security gaps identified - rate limiting and enhanced testing needed."
 reviewer: "QA Engineer"
+head: "4f1c2e8b9a0d3c7e6b5a4f3e2d1c0b9a8f7e6d5c"
 updated: "2025-01-12T10:15:00Z"
 
 top_issues:
@@ -377,7 +381,17 @@ quality_weights:
 2. **Keep status_reason** to 1-2 sentences maximum
 3. **Use severity values exactly**: `low`, `medium`, or `high` (no variations)
 4. **Mirror PRD structure**: Gate file directory matches story file location
-5. **Include timestamp**: ISO-8601 format (e.g., `2025-01-12T10:15:00Z`)
+5. **Bind `head:` and `updated:` from git and the clock** — never type either:
+
+   ```bash
+   GATE_HEAD=$(git rev-parse HEAD)                  # the commit this review judged
+   GATE_UPDATED=$(date -u +%Y-%m-%dT%H:%M:%SZ)      # UTC, e.g. 2025-01-12T10:15:00Z
+   ```
+
+   `head:` is what the next QA cycle scopes from (`git diff --name-only <head>..HEAD`); a gate
+   without one (schema 1) makes that cycle run unscoped. A typed `updated:` is the defect task.135
+   removed — four task.130 gates carried local time labelled `Z`. Full rule:
+   [`references/qa-re-review-scope.md`](references/qa-re-review-scope.md#the-cycle-3-scope-comes-from-the-gates-head-not-its-updated).
 
 ### Validation Checklist
 
@@ -387,7 +401,7 @@ Before finalizing gate file, verify:
 - [ ] Severity values are `low`, `medium`, or `high` only
 - [ ] Issue IDs use standard prefixes (SEC-, PERF-, etc.)
 - [ ] Status reason is 1-2 sentences
-- [ ] Timestamp is ISO-8601 format
+- [ ] `head:` is the 40-hex commit reviewed and `updated:` came from `date -u` (neither typed)
 - [ ] Waiver includes reason and approver if active
 - [ ] File saved to correct mirrored directory structure
 
@@ -472,12 +486,13 @@ Gate files are co-located alongside their story or task — not under `docs/qa/g
 ### Minimal Template
 
 ```yaml
-schema: 1
+schema: 2
 story: "{epic}.{story}"
 gate: PASS|CONCERNS|FAIL|WAIVED
 status_reason: "{1-2 sentence explanation}"
 reviewer: "QA Engineer"
-updated: "{ISO-8601 timestamp}"
+head: "{GATE_HEAD}" # git rev-parse HEAD when the review was performed
+updated: "{GATE_UPDATED}" # date -u +%Y-%m-%dT%H:%M:%SZ — never typed
 top_issues: []
 waiver: { active: false }
 ```
@@ -485,13 +500,14 @@ waiver: { active: false }
 ### Comprehensive Template
 
 ```yaml
-schema: 1
+schema: 2
 story: "{epic}.{story}"
 story_title: "{story title}"
 gate: PASS|CONCERNS|FAIL|WAIVED
 status_reason: "{1-2 sentence explanation}"
 reviewer: "QA Engineer"
-updated: "{ISO-8601 timestamp}"
+head: "{GATE_HEAD}" # git rev-parse HEAD when the review was performed
+updated: "{GATE_UPDATED}" # date -u +%Y-%m-%dT%H:%M:%SZ — never typed
 
 top_issues:
   - id: "{PREFIX-###}"

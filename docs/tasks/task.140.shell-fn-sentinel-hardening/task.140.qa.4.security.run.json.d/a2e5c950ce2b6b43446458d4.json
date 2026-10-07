@@ -1,0 +1,22 @@
+{
+  "sink": "filename",
+  "entry": "shell:shared/resources/qa-cycle.sh",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 28,
+  "passed": 28,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "ran_at": "2026-09-30T07:18:25.759Z"
+}

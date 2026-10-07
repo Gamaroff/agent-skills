@@ -51,6 +51,31 @@ export function fileDoesNotMatch(p, re) {
   return { ok, reason: ok ? "" : `${p} unexpectedly matches ${re}` };
 }
 
+/**
+ * No file anywhere under `dir` (recursive) has a basename matching `re`. A missing `dir`
+ * passes: nothing under it can match. Use it to pin "writes no file of this kind" — e.g. an
+ * unanchored /review-pr run must leave no `.pr-review.` report anywhere under docs/.
+ */
+export function noFileMatching(dir, re) {
+  if (!fs.existsSync(dir)) return { ok: true, reason: "" };
+  const hits = [];
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (re.test(e.name)) hits.push(full);
+    }
+  };
+  walk(dir);
+  return {
+    ok: hits.length === 0,
+    reason:
+      hits.length === 0
+        ? ""
+        : `${dir} holds ${hits.length} file(s) matching ${re}: ${hits.join(", ")}`,
+  };
+}
+
 export function frontmatterHas(p, expectedKeys) {
   if (!fs.existsSync(p)) return { ok: false, reason: `missing file: ${p}` };
   const content = fs.readFileSync(p, "utf-8");

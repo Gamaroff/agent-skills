@@ -35,6 +35,8 @@ This task adds one bullet and edits two sentences in the finalise AC prompt, add
    >     is named. `FAIL` when the criterion states no bound ("no measurable change", "fast enough"),
    >     when the measurement is uncited or uncommitted, or when it misses the bound.
 
+3a. Execution rule (§ Step 5): "The two `NOT_APPLICABLE` kinds in Step 3 carry `null` here and are judged by their own rules." becomes "The `NOT_APPLICABLE` kinds in Step 3 carry `null` here and are judged by their own rules." The heading sentence is then the file's only count of the kinds (review 1: a second count would drift from the first).
+
 3. Closing sentence: "`test_runs_per_pr` is `null` on both kinds: the execution rule reads a test lane, and neither has a test in one. **A behaviour criterion never takes either path.**" becomes "`test_runs_per_pr` is `null` on all three kinds: the execution rule reads a test lane, and none has a test in one. **A behaviour criterion never takes any of these paths**, and a bound a per-PR test could assert is a behaviour criterion." Keep the rest of the paragraph.
 
 4. `npm run bundle` refreshes `skills/finalise/references/finalise-dod-ac-prompt.md`.
@@ -52,6 +54,24 @@ This task adds one bullet and edits two sentences in the finalise AC prompt, add
 >   AC7, "No measurable change beyond the new 4b test's three runs", which states no bound.
 
 In the Step 6 **Issues to Flag** list, add under **Important**: "a non-functional criterion with no numeric bound or no stated measurement".
+
+#### Folded in 2026-09-30: observation #222
+
+Add two more rules to the same check 4, each at **Important**, reusing finalise's kind vocabulary so
+review and acceptance classify a criterion the same way:
+
+- **Behaviour criterion with no planned test.** A criterion that requires code to *do* something when
+  run (finalise's own test: it cannot be stated as "file F says S"), and whose text or phase names no
+  test that will hold it. Remedy: "name the test that pins it, or re-scope the criterion". Worked
+  example: task.142's "no process spawn, no network call" and "SKILL.md reads memoised" — true by
+  inspection, failed at finalise for want of a test, then pinned by two spy-based tests.
+- **A criterion met only after merge.** Closing an observation, a tracker item or a registry row "on
+  merge", or anything else whose evidence cannot exist before the PR merges. Finalise runs before
+  merge, so it fails by construction. Remedy: "move it to Deferred Work or Notes". Worked example:
+  task.142's "observation #159 marked actioned once this merges" (and this task's own former
+  "observation #206 set to actioned on merge", moved to Notes on 2026-09-30).
+
+The review-task pin in Phase 3 asserts all three rules and their severity.
 
 ### Phase 3: Pin both rules
 
@@ -79,6 +99,9 @@ test("the AC prompt's test-free kinds are counted, defined and each carries its 
     assert.ok(measured.includes(w), `${SRC}: the measured kind's bar lacks "${w}"`);
   assert.match(doc, /on all three kinds/);
   assert.match(doc, /never takes any of these paths/);
+  // One count of the kinds per file: no other sentence restates it (review 1 — the Execution rule did).
+  const counts = [...doc.matchAll(/\b(two|three|four|five) `NOT_APPLICABLE` kinds/gi)];
+  assert.equal(counts.length, 0, `${SRC}: a second count of the kinds: ${counts.map((m) => m[0])}`);
 });
 
 test("the bundled AC prompt matches its source", () => {
@@ -89,7 +112,7 @@ test("the bundled AC prompt matches its source", () => {
 
 Adjust the bundled-copy comparison to the bundler's exact header handling. If `bundle:check` already asserts equality, keep the test and say in a comment that it duplicates `bundle:check` on purpose, so a local `node --test` run shows the drift.
 
-**`tests/review-task-measured-criterion.test.js`** (new): read `skills/review-task/SKILL.md`, slice check 4 (from `4. **Success Criteria Measurability**` to the next `5. **`), and assert it contains "numeric bound", "the command that measures it" and "**Important**". Assert the Step 6 Issues to Flag list names the finding.
+**`tests/review-task-measured-criterion.test.js`** (new): read `skills/review-task/SKILL.md`, slice check 4 (from `4. **Success Criteria Measurability**` to the next `5. **`), and assert three rules, each on its own bullet carrying `**Important**`: the bound rule ("numeric bound", "the command that measures it"), the behaviour-without-test rule (a marker such as "no planned test"), and the post-merge rule (a marker such as "after merge"). Slice each rule's bullet and check its severity there, so moving one rule to Optional is red while the other two still say Important. Assert the Step 6 Issues to Flag list names all three findings.
 
 ### Phase 4: Proof and gates
 
@@ -100,7 +123,10 @@ Adjust the bundled-copy comparison to the bundler's exact header handling. If `b
 | "bound" removed from the measured `PASS` bar | AC pin red |
 | The closing sentence reverted to "both kinds" / "either path" | AC pin red |
 | The documentation kind's `"NOT_APPLICABLE: documentation criterion"` removed | AC pin red |
-| review-task's rule deleted, or `**Important**` changed to `**Optional**` | review-task pin red |
+| review-task's bound rule deleted, or its `**Important**` changed to `**Optional**` | review-task pin red |
+| The behaviour-without-test rule deleted, or its severity changed | review-task pin red |
+| The post-merge rule deleted, or its severity changed | review-task pin red |
+| "The two `NOT_APPLICABLE` kinds" restored in the Execution rule | AC pin red |
 
 Then run `npm run bundle`, `npm run ci:fast` (with `.agents/skills` moved aside), `npm run bundle:check` and `npm run validate -- skills/finalise/ skills/review-task/`. Add a CHANGELOG `[Unreleased]` › Changed entry citing (task 166). On merge:
 

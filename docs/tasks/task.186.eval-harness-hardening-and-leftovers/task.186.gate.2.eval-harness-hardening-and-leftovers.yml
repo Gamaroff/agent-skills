@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.186.eval-harness-hardening-and-leftovers'
+task_title: 'Eval harness hardening and task.185 leftovers'
+gate: CONCERNS
+status_reason: 'Cycle 1 findings CR-1 and CR-3 are fixed and mutation-proven. The cycle-2 refute pass found that the A5 jq refusal fires under every driver, so on a host without jq the review-pr replay scenarios in eval:all now skip with exit 0 instead of being judged (reproduced) — a regression this branch introduced.'
+reviewer: 'QA Engineer'
+head: '3c7b6b8748e399e13c14f40dc8ecbc8efa445513'
+updated: '2026-10-06T06:09:03Z'
+
+top_issues:
+  - id: 'C2-CR-1'
+    severity: medium
+    file: 'evals/shared/lib/fake-gh.mjs'
+    finding: 'installFakeGh refuses without jq under every driver, including replay, which never calls gh; reproduced with PATH holding only node and git: DRIVER=replay runner on evals/review-pr/scenarios/01-happy prints "skipped: jq not available" and exits 0, so eval:all reports a pass for a run that was judged on develop. Promoted to the gate although the reviewer rated confidence medium: the reproduction removes the uncertainty.'
+    suggested_action: 'Refuse only when the run can call gh: decide from the driver the runner resolved (driverNameFrom(process.env), which already carries env.json) and install without the probe under replay.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 393
+  phases_verified: 4/4
+  ci: 'pending @ 3c7b6b8748e3 (test pending; link-check, shellcheck, validate pass)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+bug_resolution:
+  fixed_this_cycle: ['CR-1 (gate 1)', 'CR-3 (gate 1)']
+  fix_commit: '3c7b6b8'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 30
+    notes: 'next_numbered re-probed on this head: engages, 30/30 (task.186.qa.2.security.run.json). Fake gh classifier 33/33.'
+  performance:
+    status: PASS
+    notes: 'No hot path changed.'
+  reliability:
+    status: CONCERNS
+    notes: 'C2-CR-1: eval:all silently skips review-pr replay scenarios on a jq-less host. Advisory C2-CR-2: the runner itself still passes a 0/0 run; only repeat.mjs refuses it, while the assertionsFor docstring claims both do.'
+  maintainability:
+    status: PASS
+    notes: 'One table for assertion names and one for the driver-specific list.'
+
+recommendations:
+  immediate:
+    - action: 'Fix C2-CR-1: the jq refusal applies only under a live driver.'
+      refs: ['evals/shared/lib/fake-gh.mjs']
+  future:
+    - action: 'C2-CR-2: correct the assertionsFor docstring (the floor is in repeat.mjs only), or add the floor to the runner.'
+      refs: ['evals/shared/lib/assertion-dispatch.mjs', 'evals/shared/runner.mjs']
+    - action: 'C2-CR-3: a requiresLiveDriver scenario with only liveAssertions under replay reads usage (2) rather than could-not-run (3); README exit-2 row should say "no assertions the chosen driver runs".'
+      refs: ['evals/shared/repeat.mjs', 'evals/shared/README.md']
+    - action: 'C2-CR-4: coerce env.json values the same way in runner and repeat.'
+      refs: ['evals/shared/repeat.mjs']
+    - action: 'C2-CR-5..7: split the with-jq half of the A5 test into a skippable test; one exported jq check; fileURLToPath and temp-dir cleanup in the no-jq meta-test.'
+      refs: ['evals/shared/tests/runner-setup.test.mjs', 'evals/shared/tests/fake-gh.test.mjs']
+    - action: 'Gate 1 advisories still open: CR-2 (review-story numbering, follow-up task), CR-4, CR-5, CR-6, CR-7.'
+      refs: ['skills/review-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['C2-CR-1 fixed']

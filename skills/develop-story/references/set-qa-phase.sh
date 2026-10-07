@@ -7,7 +7,10 @@
 # conformance review) — and a separate `qa_phase` field names the sub-step. The
 # lock helper is monotonic by design and the loop's 5b → 5a re-entry is a
 # backward move, so a step number cannot express it; a label can. This script is
-# the ONLY writer of `qa_phase`, and it never touches `current_step`.
+# the loop's writer of `qa_phase`, and it never touches `current_step`. Two re-entry
+# writers also set `qa_phase: 5a` in the same atomic write as their other fields, so a Stop
+# between two writes cannot name the wrong sub-step: grant-qa-cycles.sh (task.123) and
+# reenter-qa-after-finalise.sh (task.170).
 #
 # It is a script rather than a shell function because every orchestrator Bash
 # call is a fresh shell: a function defined in one fenced block of the step doc

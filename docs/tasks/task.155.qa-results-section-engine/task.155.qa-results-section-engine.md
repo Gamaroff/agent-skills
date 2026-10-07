@@ -5,18 +5,22 @@ type: task
 description: "Give the work item's `## QA Testing Results` section a write engine beside change-log.js. It replaces the section whole, places it in one canonical position outside the change-log block, and refuses a document that already carries more than one. Wire qa-task and qa-story Step 12 to it, repair the one corrupted document in the corpus, and hold the invariant with a corpus test."
 tags: [qa-task, qa-story, change-log, engine, observation]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-10-01
 assignee:
 estimated_effort_hours: 16
 github_issue: 486
+pr_number: 537
+completed_date: 2026-10-01
 ---
 
 # Technical Task: QA Testing Results section — one write engine, one placement, refused when duplicated
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.155.review.1.qa-results-section-engine.md` implemented 2026-09-30
 
 **GitHub Issue**: [#486](https://github.com/Gamaroff/agent-skills/issues/486)
 
@@ -109,9 +113,18 @@ appears.
 - **`shared/resources/qa-results.js`** (new, CommonJS, pure, no I/O). It requires `./change-log.js`
   for `protectedRanges`, `insideProtected`, `bodyStart`, `findChangeLog` and `ANCHORS`.
   - `findQaResults(content)` → `{ sections: [{ start, end, insideChangeLog }] }`. It finds every
-    `## QA Testing Results` heading that is not inside a fence or an inline code span. Each span ends
-    at the next unprotected heading of level ≤ 2, or at the change-log end marker when the section
-    sits inside the block.
+    H2 heading whose text **begins** `QA Testing Results` (`/^## QA Testing Results\b[^\n]*$/gm`, so
+    `## QA Testing Results — Cycle 2 (re-review)` counts) that is not inside a fence or an inline
+    code span. An H3 `### QA Testing Results` is a subsection and does not count. Each span ends at
+    the **earliest** of: the next unprotected heading of level ≤ 2; the change-log block's start,
+    when the block starts after the section; the change-log end marker, when the section sits
+    inside the block. Without the block-start bound a section placed directly before the block runs
+    to `## Change Log` and a replace deletes `<!-- change-log-start -->` (review C2: 5 corpus
+    documents have that shape today, and every document the engine writes will).
+  - **Separators are not part of a span.** Trailing blank lines and one `---` thematic break
+    immediately before the terminator stay where they are on every write. The written section is
+    separated by one blank line on each side, with runs of three or more newlines at the seam
+    collapsed (the `trimSeam` rule, re-implemented; it is private to `change-log.js`).
   - `upsertQaResults(content, section, { docType })` → `{ content, reason }`, where `reason` is one
     of these:
 
@@ -121,14 +134,19 @@ appears.
     | `relocated` | exactly one section, inside the change-log block | removed from the block and inserted at the canonical position |
     | `created` | none | inserted at the canonical position |
     | `multiple` | more than one | **none**: `content` is returned unchanged |
-    | `bad-section` | `section` does not start with `## QA Testing Results` | **none** |
+    | `bad-section` | `section` does not start with `## QA Testing Results`, or carries an unclosed fence, a structural line (change-log marker, H1/H2, Change Log heading — scanned ignoring fences) or a carried block (`### Bug Reports`, `### Deferred Work`) | **none** |
+    | `unbounded` | the existing section cannot be bounded safely — it opens an unclosed fence, or the text a write would remove carries a structural line | **none** |
+    | `unplaceable` | the write would not read back as exactly one bounded section | **none** |
+
+    *Added during QA (cycles 5–9, PR reviews 2–4): the last three rows, and carry-through — a `### Bug Reports` or `### Deferred Work` block another writer put inside the section is carried whole through every replace and relocate.*
 
   - **Canonical position**: immediately before the change-log block when the document has one (the
     marker block, or else a hand-written `## Change Log` heading, as `findChangeLog` reports it).
     Otherwise immediately before `ANCHORS[docType]`. Otherwise at the end of the document.
 - **Step 12** in both QA skills: render the section from the gate as today, then write it with one
   `node -e` call to the engine. Stop and surface the `reason` on `multiple` or `bad-section`; never
-  fall back to a hand edit.
+  fall back to a hand edit. The QA section is written **before** the Change Log row, so the
+  change-log write sees a relocated section already outside its block.
 - **Corpus guard**: a test over every tracked `docs/**/*.md` that carries the heading. Each document
   must have at most one `## QA Testing Results` and none inside the change-log markers. There is a
   non-vacuity floor on the number of documents scanned.
@@ -154,7 +172,8 @@ appears.
 
 - ✅ `shared/resources/qa-results.js` and `shared/resources/tests/qa-results.test.mjs`
 - ✅ `qa-task` Step 12 and `qa-story` Step 12 write through the engine; bundle refresh
-- ✅ `tests/qa-results-corpus.test.js`, plus the repair of task.65
+- ✅ `tests/qa-results-corpus.test.js`, plus the repair of task.65 (stacked copies)
+- ✅ `tests/qa-results-step12-wiring.test.js`: the executed Step 12 call
 - ✅ CHANGELOG `[Unreleased]`
 
 ### Out of Scope
@@ -186,33 +205,35 @@ section found inside the change-log block moves to the canonical position on its
 
 **Files**: `shared/resources/qa-results.js`, `shared/resources/tests/qa-results.test.mjs`
 
-- [ ] `findQaResults`: every unprotected `## QA Testing Results` heading, its span, and whether it sits inside the change-log marker block
-- [ ] `upsertQaResults`: the five reasons in § 3's table, and the canonical position order (change-log block → `ANCHORS[docType]` → end)
-- [ ] Reuse `change-log.js` exports for fences, inline code, frontmatter and the change-log block. Define no second fence scanner
-- [ ] Unit tests for each reason, plus: a fenced example heading is ignored; a hand-written `## Change Log` with no markers; a document with neither; the task.145 corruption shape (heading inside the markers) → `relocated`, then `replaced` on the next write
+- [x] `findQaResults`: every unprotected `## QA Testing Results` heading, its span, and whether it sits inside the change-log marker block
+- [x] `upsertQaResults`: the five reasons in § 3's table, and the canonical position order (change-log block → `ANCHORS[docType]` → end)
+- [x] Heading match is prefix-based on H2 (`/^## QA Testing Results\b[^\n]*$/gm`); the span end is bounded by the change-log block start; trailing separators stay outside the span
+- [x] Reuse `change-log.js` exports for fences, inline code, frontmatter and the change-log block. Define no second fence scanner
+- [x] Unit tests for each reason, plus: a fenced example heading is ignored; a hand-written `## Change Log` with no markers; a document with neither; the task.145 corruption shape (heading inside the markers) → `relocated`, then `replaced` on the next write; create → replace on a marker document leaves exactly one start and one end marker; a suffixed heading (`## QA Testing Results — Cycle 2`) is found; a `---` separator survives a replace
 
 ### Phase 2: wire the QA skills (Risk: Medium)
 
 **Files**: `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, and their bundled `references/` (generated)
 
-- [ ] qa-task Step 12: after rendering, write through `upsertQaResults` with one `node -e` call. On `multiple` / `bad-section`, halt and print the `reason`. Never hand-edit as a fallback. Cite obs #178
-- [ ] qa-story Step 12 item 3: the same, with `docType` story / task as the document is
-- [ ] `npm run bundle`; confirm both skills ship `references/qa-results.js` with `npm run bundle:check`, and that no copy is `UNREACHED`
+- [x] qa-task Step 12: after rendering, write through `upsertQaResults` with one `node -e` call. On `multiple` / `bad-section`, halt and print the `reason`. Never hand-edit as a fallback. Cite obs #178
+- [x] qa-story Step 12 item 3: the same, with `docType` story / task as the document is
+- [x] `tests/qa-results-step12-wiring.test.js`: extract each skill's Step 12 `node -e` block, run it from a consumer-shaped cwd against a fixture, assert one section
+- [x] `npm run bundle`; confirm both skills ship `references/qa-results.js` with `npm run bundle:check`, and that no copy is `UNREACHED`
 
 ### Phase 3: corpus guard and repair (Risk: Low)
 
 **Files**: `tests/qa-results-corpus.test.js`, `docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md`
 
-- [ ] Corpus test over tracked `docs/**/*.md` carrying the heading: at most one section, and none inside the change-log markers. There is a floor on documents scanned
-- [ ] Repair task.65: keep the copy whose **Gate File** link names the highest-numbered gate and remove the others. Record the removed copies' gate numbers in the implementation report
-- [ ] Mutation-prove: re-add a copy to task.65 → the corpus test goes red, naming the file
+- [x] Corpus test over tracked `docs/**/*.md` carrying the heading: at most one section, and none inside the change-log markers. There is a floor on documents scanned
+- [x] Repair task.65: keep the copy whose **Gate File** link names the highest-numbered gate and remove the others. Record the removed copies' gate numbers in the implementation report
+- [x] Mutation-prove: re-add a copy to task.65 → the corpus test goes red, naming the file
 
 ### Phase 4: docs and validation (Risk: Low)
 
 **Files**: `CHANGELOG.md`
 
-- [ ] CHANGELOG `[Unreleased]` › Changed cites `(task 155)`
-- [ ] `npm run ci:fast`, `npm run bundle:check`, `npm run validate` for qa-task and qa-story
+- [x] CHANGELOG `[Unreleased]` › Changed cites `(task 155)`
+- [x] `npm run ci:fast`, `npm run bundle:check`, `npm run validate` for qa-task and qa-story
 
 ---
 
@@ -223,17 +244,18 @@ section found inside the change-log block moves to the canonical position on its
 1. ✅ `shared/resources/qa-results.js`: the engine
 2. ✅ `shared/resources/tests/qa-results.test.mjs`: engine unit tests
 3. ✅ `tests/qa-results-corpus.test.js`: corpus guard (inside the `tests/*.test.js` glob in `package.json`)
+4. ✅ `tests/qa-results-step12-wiring.test.js`: executes each QA skill's Step 12 call against a fixture
 
 ### Files to Modify
 
-4. ✅ `skills/qa-task/SKILL.md`: Step 12 writes through the engine
-5. ✅ `skills/qa-story/SKILL.md`: Step 12 item 3 writes through the engine
-6. ✅ `docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md`: two stacked copies removed
-7. ✅ `CHANGELOG.md`
+5. ✅ `skills/qa-task/SKILL.md`: Step 12 writes through the engine
+6. ✅ `skills/qa-story/SKILL.md`: Step 12 item 3 writes through the engine
+7. ✅ `docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md`: two stacked copies removed
+8. ✅ `CHANGELOG.md`
 
 ### Generated (never edited by hand; `npm run bundle`)
 
-8. `skills/qa-task/references/qa-results.js`, `skills/qa-story/references/qa-results.js`
+9. `skills/qa-task/references/qa-results.js`, `skills/qa-story/references/qa-results.js`
 
 ### Files to Delete
 
@@ -257,9 +279,10 @@ None.
 
 ### Corpus survey (the figure the guard re-measures, obs #117)
 
-- **Definition**: tracked files (`git ls-files 'docs/**/*.md'`) whose text has a line exactly
-  `## QA Testing Results`. For each, count the headings and record whether the first one falls
-  between the change-log markers.
+- **Definition**: tracked files (`git ls-files 'docs/**/*.md'`) whose text has an unprotected H2
+  heading beginning `QA Testing Results` (the engine's own match — suffixed headings such as
+  `## QA Testing Results — Cycle 2 (re-review)` count). For each, count the headings and record
+  whether any falls between the change-log markers.
 - **Command**: the survey script in the plan file (§ Phase 3). The corpus test records the numbers;
   this document does not state them, because they change with every QA run.
 
@@ -280,25 +303,25 @@ None.
 
 ### Functional
 
-- [ ] `upsertQaResults` returns each of `replaced`, `relocated`, `created`, `multiple`, `bad-section` in the case § 3 names, and writes nothing on the last two
-- [ ] A fenced or inline-code `## QA Testing Results` is never found and never replaced
-- [ ] qa-task and qa-story Step 12 write through the engine; the extracted Step 12 call, run against a fixture, leaves exactly one section
-- [ ] The corpus guard passes on the tree after the task.65 repair and fails, naming the file, when a second copy is re-added
+- [x] `upsertQaResults` returns each of `replaced`, `relocated`, `created`, `multiple`, `bad-section` (and, since QA, `unbounded`, `unplaceable`) in the case § 3 names, and writes nothing on any refusal
+- [x] A fenced or inline-code `## QA Testing Results` is never found and never replaced
+- [x] qa-task and qa-story Step 12 write through the engine; the extracted Step 12 call, run against a fixture, leaves exactly one section
+- [x] The corpus guard passes on the tree after the task.65 repair and fails, naming the file, when a second copy is re-added
 
 ### Performance
 
-- [ ] The engine and corpus tests run in under two seconds combined
-- [ ] No network access
+- [x] The engine and corpus tests run in under two seconds combined
+- [x] No network access
 
 ### Code Quality
 
-- [ ] No second fence scanner: `qa-results.js` imports its protection primitives from `change-log.js`
-- [ ] Every new assertion is mutation-proved, and the implementation report records each result
-- [ ] `npm run ci:fast`, `npm run bundle:check` and `npm run validate` are clean
+- [x] No second fence scanner: `qa-results.js` imports its protection primitives from `change-log.js`
+- [x] Every new assertion is mutation-proved, and the implementation report records each result
+- [x] `npm run ci:fast`, `npm run bundle:check` and `npm run validate` are clean
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 155)`
+- [x] CHANGELOG `[Unreleased]` cites `(task 155)`
 - [ ] Observation #178 is set to `actioned` when this task's PR merges
 
 ---
@@ -357,24 +380,84 @@ None.
 
 ---
 
-<!-- change-log-start -->
+## QA Testing Results
 
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-01
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.155.qa.10.qa-results-section-engine.md](./task.155.qa.10.qa-results-section-engine.md)
+- **Gate File**: [task.155.gate.10.qa-results-section-engine.yml](./task.155.gate.10.qa-results-section-engine.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 68 engine, wiring and corpus tests (68/68). Full `ci:fast` ran 4,784 tests: 4,782 pass, 1 skipped, and 1 load-sensitive timing failure (test-clean-checkout) that passed 13/13 when re-run alone. A 4-write corpus run over 1,992 documents lost 0 lines outside the section and was idempotent. All 12 tracked carried blocks were kept verbatim, including task.141's Deferred Work, which the gate-9 engine deleted. The fault-injection figures are identical to gate 9.
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+PR review 4's PC-1 (Deferred Work carried) and REL-026 (a render with its own carried block is refused, and the line merge is gone) are verified and mutation-proven. Both Step 12 templates are accepted. The new code brings four low findings, none with a tracked instance on its trigger path:
+- REL-028 (low, duplicates): a `#### Deferred Work` nested in a Bug Reports block doubles on every write.
+- REL-029 (low, refuses): the refusal also catches QA-owned headings such as `### Bug Reports filed this cycle`, and the halt gives no hint.
+- REL-030 (low, deletes): a bold `**Deferred Work**` label inside the section is not carried.
+- REL-031 (low, cosmetic): two task.141 sentences in this document are stale, the qa-story indentation is off, and test N2 is misnamed.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.155.qa.10.qa-results-section-engine.md`
+**Gate File**: `task.155.gate.10.qa-results-section-engine.yml`
+**Gate Status**: ⚠️ CONCERNS — 90/100, no open entry (waivers and one explicit operator acceptance recorded under `## Deferred Work`)
+**QA Cycles**: 10 (budget 5 + operator grants 2, 1, 1, 1); 5 PR conformance reviews, final CONCERNS
+
+All applicable Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10/11 met; AC11 (observation #178 → actioned) happens at merge by design
+✅ **Tests:** 68 engine, wiring and corpus tests, every assertion mutation-proved; PR checks green on `149407c8`
+✅ **PR Review:** PR #537 — five independent conformance reviews, the last with no new deletion path
+✅ **Documentation:** CHANGELOG `[Unreleased]` (task 155); Step 12 in qa-task and qa-story
+✅ **Security Review:** PASS — internal boundary with a valid reason; fault injection and corpus runs lose nothing outside the section
+⚠️ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-01
+
+**Detailed Verification Log:** See `task.155.dod.1.qa-results-section-engine.md` for the complete verification evidence.
+
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-25 | 1.0     | Initial draft | create-task |
-
+| 2026-09-30 | 1.1     | Review NEEDS REVISION (6/10) → fixed: prefix heading match (task.65's suffixed copies), span bounded by the change-log start, separators preserved, Step 12 wiring test file named | review-task |
+| 2026-09-30 |         | Status → ready-for-development | review-task |
+| 2026-09-30 |         | Implemented — 11 files (1 engine + 2 bundled copies, 3 test files, 2 skills, task.65 repair, CHANGELOG), 31 tests | develop |
+| 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-09-30 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low); cycle 2 | qa-task |
+| 2026-09-30 |  | QA gate PASS (100/100) — 2 low findings (REL-007, REL-008); cycle 3 | qa-task |
+| 2026-09-30 |  | QA gate PASS (100/100) — 3 low findings (REL-009, REL-010, REL-011); cycle 4 | qa-task |
+| 2026-09-30 |  | QA gate FAIL (60/100) — 3 findings (1 high REL-012, 1 medium REL-013, 1 low REL-014); cycle 5 | qa-task |
+| 2026-09-30 |  | QA gate CONCERNS (80/100) — 3 findings (1 medium, 2 low), cycle 6 | qa-task |
+| 2026-09-30 |  | QA gate PASS (100/100) — 2 low findings (REL-018, REL-019); cycle 7 | qa-task |
+| 2026-10-01 |  | QA gate CONCERNS (80/100) cycle 8 — 1 MEDIUM (REL-020: a second Bug Reports list is dropped by the carry), 3 LOW | qa-task |
+| 2026-10-01 |  | QA gate CONCERNS (90/100) cycle 9 — 4 LOW (REL-024..REL-027); REL-020/021/022 closed, REL-023 partial | qa-task |
+| 2026-10-01 |  | QA gate CONCERNS (90/100) cycle 10 — 4 LOW (REL-028..REL-031); PC-1 and REL-026 verified fixed | qa-task |
+| 2026-10-01 | 1.2 | DoD verified — accepted (PR #537) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: the engine
-- [ ] Phase 2: wire the QA skills
-- [ ] Phase 3: corpus guard and repair
-- [ ] Phase 4: docs and validation
+- [x] Phase 1: the engine
+- [x] Phase 2: wire the QA skills
+- [x] Phase 3: corpus guard and repair
+- [x] Phase 4: docs and validation
 
 ---
 
@@ -394,3 +477,32 @@ None.
 - QA artifacts land in this directory: `task.155.qa.{N}.qa-results-section-engine.md`,
   `task.155.gate.{N}.qa-results-section-engine.yml`, bug reports `task.155.bug.{N}.{name}.md`.
 - Once the engine exists, this task's own QA cycles write their section through it (Phase 2 onward).
+
+## Deferred Work
+
+> **Resolved by [task.171](../task.171.deferred-work-placement-and-qa-results-residuals/task.171.deferred-work-placement-and-qa-results-residuals.md) (2026-10-05):** REL-007, REL-008, REL-024, REL-025, REL-027, REL-028, REL-019 (the `bad-section` halt now prints its detail and a repair hint), REL-030 (fixed at its source — the loop-exit record now has its own `## Deferred Work` H2), setext H1/H2 as structure (plain-text headings only — task.171's `## Deferred Work` records the shapes still open, CR5-1), CRLF seams, CR-4, CR-5, PR review 5 CR-1/CR-2/CR-3, and `create-bug-report`'s H2-check/H3-write mismatch (obs #240). Still open below: PC-1 (the `upsertChangeLog` seam), REL-009 (whitespace) and REL-029.
+
+Carried from QA gates 3, 4 and 7 (route 2b cosmetic-residue exits) to each gate's `recommendations.future` and closed in `top_issues[]`, plus the PR-review items deferred at 5c. One follow-up task should take REL-007…011 and PC-1 together — they are all in the same span-bounding code:
+
+- **REL-007** (LOW) — a misplaced section that itself quotes a Date-headed table can be cut at its own table (inside a marker block after the log rows, or under a table-less marker-less log). 0 of 155 tracked sections quote such a table.
+- **REL-008** (LOW) — **can delete Change Log rows**, but only under a section that is already misplaced inside a log: before a log holding two Date-headed tables the first table's rows are lost, and under a log whose header is not Date-first (`| Date (UTC) |`, `| Change | Date |`, none) the rows are lost too. 0 corpus logs have either shape, and 0 misplaced sections remain after the task.65 repair.
+- CRLF seam preservation and small cleanups (gate 3 and gate 4 `recommendations.future`, including gate 4's CR-3).
+- **PC-1** (LOW, PR review 1) — the Change Log write that follows Step 12 collapses the blank line before `<!-- change-log-start -->`, so § 3's "one blank line on each side" holds after the engine's write but not after the Change Log write that follows it. That seam belongs to `change-log.js`'s `upsertChangeLog`, not this engine; the follow-up task above should decide whether `upsertChangeLog` preserves it.
+- **REL-009** (LOW, gate 4) — the CR-2 trailing-break strip leaves the blank line before the break, so a replace can add one blank line; the following Change Log write absorbs it. Whitespace only.
+- **REL-010** (LOW, gate 4, regression from `182367ee`) — a section carrying its own `### Change Log` subheading was taken for the log in a marker-less document, so each replace kept the old tail. **Closed by `3056978c`**: the structural guard refuses such a section on write (`bad-section`), so the engine can no longer create the shape; a hand-edited document that already has it is refused (`unbounded`), never grown.
+- **REL-011** (LOW, gate 4) — an unclosed fence running to the end of a document made `created` append the section inside the fence, invisible to the next read, so copies stacked without `multiple`. **Fixed at PR review 2**: a write that does not read back as one section is now refused (`unplaceable`).
+- **REL-012 / REL-013 / REL-014** (QA gate 5) — **fixed in cycle 5's fix**, not deferred: a fence-blind structural guard refuses any replace or relocate whose removed text carries a change-log marker, an H1/H2 (column 0 or indented) or a Change Log heading, and a section is refused on write if the guard would refuse to replace it; a `## Change Log` heading directly above the marker block now stays with its block. **Deferred:** a setext H1/H2 after the section is not treated as structural — this repository never authors setext headings, and the one corpus instance (task.118) is a `---` separator under a paragraph inside a QA section, where refusing would be a false stop.
+- **REL-015** (QA gate 6) — **fixed in cycle 6's fix**: the guard and the REL-013 placement now also test `change-log.js`'s own `RE_HEADING` (numbered forms such as `### 1.5 Change Log`, `## 12) Change Log`), imported rather than restated.
+- **REL-016** (LOW, gate 6) — **accepted trade, refuses and never deletes**: the structural guard is fence-blind, so *any* fenced line that reads as an ATX H1/H2 — a fenced `## Example`, and also a bash or YAML `# comment` inside a fenced block — makes a new section `bad-section` and an existing one `unbounded`; Step 12 halts with the reason and nothing is written. 0 of 155 tracked sections contain a fence, and neither Step 12 template renders one.
+- **REL-018** (LOW, gate 7) — **refuses, never deletes**: with an H3 log heading directly above the marker block, a section placed above that heading spans it; if the next Change Log row is then added by hand rather than through `upsertChangeLog`, the following write is refused `unbounded`. Engine-written rows (the Step 12 path) give `created → replaced → replaced`.
+- **REL-019** (LOW, gate 7) — the `bad-section` halt carries no repair hint, and neither SKILL.md defines the reason (it is what a rendered section with a fenced `# comment` gets — the REL-016 trade).
+- **Gate 6/7 advisories** — CR-5 (heal a section already stranded between a Change Log heading and its marker block by an older write; new writes no longer create the shape) is deferred. CR-6 (two checks in `normaliseSection` that `removesStructure` made unreachable) and CR-7 (the marker pattern hard-coded names instead of `change-log.js`'s constants) were fixed in the PR-review-3 cycle.
+- **`checked()` counts sections, not surroundings** — the post-write read-back confirms exactly one bounded section; it does not compare the text around it. What protects the surroundings is the structural guard on the removed text, which QA's fault injection and corpus runs exercise.
+- **PR review 3 CR-1 — fixed, not deferred**: a `### Bug Reports` list (`create-bug-report` Step 5 writes it inside this section; 11 tracked tasks carry one) is carried through every replace and relocate; a render may not include its own list — it is refused (`bad-section`, since PR review 4), so the engine alone carries the document's copy. task.141's `### Deferred Work` inside its QA section was later found to be written by the pipeline's loop exit, not QA — it is carried since PR review 4.
+- **Gate 8 — REL-020…023, fixed in cycle 8's fix:** every `###`/`####` Bug Reports block (any case, any suffix) is carried whole — `####` groups, tables and bold labels included — up to the next `###`-or-higher heading or the first of QA's own template field lines; several blocks fold into one; a render that brings its own list is refused (`bad-section`, since PR review 4 — REL-026); a trailing HTML comment block before the next section is a separator, not section content (task.117's template lead-in). Measured on the corpus: all 11 tracked bug lists keep every link, 0 comments lost, idempotent. **Residual (deferred):** a bold `**Bug Reports**` label with no heading is not recognised — 0 corpus instances; `create-bug-report` writes a heading.
+- **Gate 9 — waived under the operator's acceptance rule (2026-10-01)** and carried to gate 9 `recommendations.future`: **REL-024** (duplicates — any trailing HTML comment is peeled as a separator, so a render ending in one gains a copy per cycle), **REL-025** (duplicates — a `#### Bug Reports` block carries QA's later `####` subsections), both 0 corpus instances; **REL-026** (deletes link-less structure lines — `####` groups, `- None`, table headers — but only when a render brings its own Bug Reports list, which no Step 12 template does; no bug link is ever lost), **REL-027** (deletes a list under a non-standard label — `**Bug Reports**`, `### Bugs`, singular — which no writer produces; `create-bug-report` writes the exact heading), both 0 plausible instances. task.141's `### Deferred Work` inside its QA section is carried since PR review 4 (PC-1).
+- **Operator acceptance rule for gate 9 (AskUserQuestion, 2026-10-01; recorded here so the waivers cite a committed source — PR review 4, PC-3):** a finding with no instance in the tracked corpus whose effect is to refuse or duplicate (never delete) is carried to Deferred Work; a finding that deletes content in a plausible document blocks; any HIGH blocks. Applied: REL-024, REL-025 waived (duplicate, 0 instances). REL-026 — **fixed** (a render that brings a carried block is refused). REL-027 — **deferred by a separate, explicit operator decision** after PR review 4, because it deletes (a list under a non-standard label no writer produces; 0 instances); the rule itself did not cover it, and the first waiver of it overreached.
+- **PR review 4** — PC-1 **fixed**: the develop pipelines' route-2/2b exit records carried ids "on the work item under Deferred Work"; a `### Deferred Work` block inside the QA section (task.141) is now carried like Bug Reports. CR-4 (a second carried block folds in without its own heading line; its content is kept) and CR-2/CR-3 (= REL-024, duplicates only) are recorded here, not fixed.
+- **Gate 10** — **REL-028** (duplicates: a `#### Deferred Work` nested inside a Bug Reports block is carried under both names and doubles each write; 0 instances) and **REL-029** (refuses: a QA-owned heading that merely starts with a carried name, e.g. `### Bug Reports filed this cycle`; 0 instances) — waived under the operator rule. **REL-030** (deletes: a bold `**Deferred Work**` label inside the QA section is not carried; 0 instances, plausible because the loop-exit step names no heading or position) — **accepted by explicit operator decision (2026-10-01)**, with the fix moved to its source. REL-031 (doc drift, qa-story indentation, a misnamed test) fixed.
+- **Follow-up task (operator decision, 2026-10-01):** pin the develop pipelines' route-2/2b Deferred Work record to its own `## Deferred Work` H2, outside the QA section (the source of REL-030), and fold in the engine residuals recorded above: REL-028 nesting, REL-024/025 duplicate peels, REL-027 non-standard labels, REL-007/008, setext headings, CRLF seams, CR-4/CR-5, and `create-bug-report`'s H2-check/H3-write mismatch (obs #240).
+

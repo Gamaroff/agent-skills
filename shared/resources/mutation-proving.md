@@ -55,7 +55,13 @@ For each invariant a test claims to hold:
    Never a silent fallback on the edit — `|| true`, `2>/dev/null ||` — because a
    fallback that swallows "pattern not found" turns a no-op into a green.
 5. **Re-run the suite** — the exact command the matrix uses, from the same
-   directory.
+   directory. **Prove the run happened.** Keep the runner's summary line
+   (`ℹ tests N`, with N > 0) in what you read, and never filter the output so
+   that it prints nothing on a pass: a `grep 'ℹ fail'` that prints nothing reads
+   the same whether the suite passed or never started. A run that printed nothing
+   is `not-run` (row 9), never a survivor. Before wrapping the command, check the
+   wrapper exists with `command -v` — `timeout` is GNU-only and absent on macOS,
+   where `command not found` on stderr ran nothing.
 6. **Read the outcome against the table below.** Not "did something go red" —
    *which* test went red, and does it match step 2.
 7. **Restore from the snapshot.** `cp /tmp/pre-mutation.ts path/to/source.ts`.
@@ -75,7 +81,10 @@ output is shaped exactly like a reading about the code.
    absence, which reds a superset of what any single mutant reds. Four proofs were
    recorded this way: two were false positives and the two genuine ones reported
    inflated counts. `git status` reading `clean` is not the check — a clean tree is
-   exactly what a destroyed uncommitted fix looks like.
+   exactly what a destroyed uncommitted fix looks like. `git stash` has a second
+   hazard: `pop` is not tied to its own `push`. When the push fails (a held
+   `.git/index.lock`) or stashes nothing, `pop` applies whatever stash is on top —
+   in a long-lived repository, another branch's work.
 2. **Baseline green between mutations, with the exact matrix command.** Before the
    first mutation and after every restore. This is what converts rule 1's failure
    from forty minutes of silent wrong numbers into an immediate loud one, and it is
@@ -196,6 +205,12 @@ have just answered that. It is *what is not tested at all?*, and that takes a
 different instrument: adversarial input generation against the real subject, not
 more proofs. And it is *what input classes does the corpus never instantiate?* —
 row 7, which no mutation can answer either.
+
+Nor does a held proof reach past what its assertion reads. A `covered` proof of a
+count assertion — the named token appears once after three writes — does not
+establish that a writer is idempotent: a residue of the same class can still grow
+on every write while the count stays at one. Idempotency needs write N and write
+N+1 compared byte for byte.
 
 > A held proof is evidence about a test. It is not evidence about coverage.
 
@@ -381,6 +396,7 @@ error in the other direction.
 | Reviewing someone else's test | The one or two it would hurt most to have wrong |
 | A fix to a boundary — validator, classifier, allow/deny-list, authorisation check | **Both directions**: that the refusal fires, *and* that legitimate input still passes |
 | A check that reads live repository data | With a synthetic fixture, or the proof has an expiry date (row 11) |
+| A fix that replaces agent-interpreted prose with code | At unit level: mutate the code, and a hermetic test goes red. A live outcome eval run with the prose restored is evidence about the model, not proof of the mechanism — a model that already does the right thing unaided stays green |
 
 Not every assertion needs this. The ones that do are the ones whose absence would
 be **silent** — where the wrong behaviour reports success.
@@ -394,7 +410,7 @@ there: an arithmetic placeholder `0` was read as a command name, and splitting o
 caught either. A separately maintained set of legitimate patterns did — and
 nothing above asks you to keep one.
 
-## The seven shapes vacuity takes
+## The eight shapes vacuity takes
 
 Each of the first four was found in one task's test suite, and every one was caught
 by reverting rather than by reading. The fifth was found in another, and is the one
@@ -402,6 +418,8 @@ that costs whole cycles rather than single tests. The sixth is the one with a li
 it recurred six times in a single task before anyone named the class. The seventh
 is the one **no mutation can reveal**: the first six are a test that observes
 wrongly; the seventh is a test that observes correctly and is never shown the input.
+The eighth is about time: the test observes after a wait, and the wait has already
+produced the absence it asserts.
 
 **1. Asserting the wrong channel.** A CLI's contract was that stdout carries the
 value a caller binds with `$( )`. The test passed `--json` and asserted the
@@ -484,7 +502,7 @@ Do not read the lint as coverage of shape 6, let alone of the class. It models t
 instances that happened; an instance in a spelling none of its rules models will
 pass, and shape 5's warning applies to the lint itself — counting the spellings it
 closes tells you nothing about the ones it does not. And it checks shape 6 only:
-nothing mechanical checks the other six, and nothing can check the seventh.
+nothing mechanical checks the others, and nothing can check the seventh.
 
 **7. No fixture instantiates the input class.** A rule case-folded every captured
 field, including `file:`, which is a filesystem path — so any consumer whose glob
@@ -501,6 +519,21 @@ no-op suite-wide. Mutating the `.toLowerCase()` changed nothing observable.
 > the corpus holds one. It almost never does by accident: fixtures are written by
 > the person who wrote the code, from the same mental model, which is the same set
 > of inputs the code most often gets wrong.
+
+**8. An absence asserted after a wait the target does not outlast.** A test
+asserted that a timeout killed a whole process group: it waited for the runner to
+return, then checked the grandchild was gone. The fixture's child held a ref'd
+handle to the grandchild, so it lived until the grandchild ended on its own, and
+the runner returned only when the child released its pipes. By then every process
+had exited naturally, and "not alive" read as "killed". The mutation that killed
+only the group leader left the test green; it had been vacuous since it was
+written.
+
+> An absence is evidence only if the thing could still be present when you look.
+> When a test asserts something was killed, removed or never happened after a
+> wait, run the kill-only-X mutation — remove the cause and nothing else — and
+> check the fixture keeps the target alive past every point the test waits on:
+> no ref'd child handle, no inherited pipe the wait blocks on.
 
 ## Recording it
 

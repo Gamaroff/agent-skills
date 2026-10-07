@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.172.ci-docs-only-tree-equivalence'
+task_title: 'One docs-only CI rule at every pipeline CI wait'
+gate: PASS
+status_reason: 'Cycle 7 scoped review of the cycle 6 fix commit (7074282a): both cycle 6 findings are fixed and mutation-proven (re-run by this cycle), 93 engine tests pass under both temp values, no HIGH and no MEDIUM. One reproduced LOW regression remains: a configuration whose ci key is quoted or whose top-level keys are uniformly indented was honoured by the cycle 5 engine and is now refused (exit 2, fails closed, misleading message). Two residuals that are not attributable to this diff are recorded for the owner.'
+reviewer: 'QA Engineer'
+head: '2991a820c5a54e16e1fc17b854b7849bad696428'
+updated: '2026-10-01T14:05:49Z'
+
+top_issues:
+  - id: 'CR7-1'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'ciBlockRows recognises only an unquoted ci: row at column 0, so a valid configuration whose top-level keys are uniformly indented, or whose key is quoted ("ci": or ci in single quotes), is refused with "has 0 row(s) under ci but the parse accounts for 3". The cycle 5 engine accepted and honoured the same files. Reproduced for all four shapes, with an opt-out in each. Fails closed (the callers read exit 2 as not tree-equivalent), the shapes are rare, and the message does not say why.'
+    suggested_action: 'Find the ci block from the parser own indent and key rules (the base indent of the first row, quoted keys allowed), or refuse with a message that says ci must be an unquoted key at column 0.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 93
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Scoped re-review of the cycle 6 fix; QA reproduced the reviewer findings by executing the exported parseConfig. The shapes that previously dropped an opt-out silently (BOM, duplicated or dedented rows inside ci, a list of maps elsewhere) are all refused or read. What remains is a ci block nested under another key, or a row dedented to column 0: both are valid YAML that mean something else, so no reader can tell them from the owner intent (recorded in recommendations.future). No corpus sink models this predicate, so no probe was run.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: bounded at 20 ancestors; one git ls-tree per run; ciBlockRows is one pass over the file.'
+  reliability:
+    status: PASS
+    notes: 'CR7-1 fails closed: the three callers read any non-zero exit as not tree-equivalent, so a refused configuration costs a full CI wait, never a wrong green.'
+  maintainability:
+    status: PASS
+    notes: 'The completeness check is now scoped to the block the engine reads and is small and held by tests that go red on revert. The remaining tokenizer duplication (review CR-3, advisory) and the fact that seven cycles were spent on one lenient reader are recorded in recommendations.future.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR7-1 (low): ciBlockRows recognises only an unquoted ci: row at column 0, so a valid configuration whose top-level keys are uniformly indented, or whose key is quoted, is refused with exit 2 and a message that does not say why (the cycle 5 engine honoured them). Suggested action: find the ci block from the parser indent and key rules (the base indent of the first row, quoted keys allowed), or refuse with a message that says ci must be an unquoted key at column 0.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'Residual, pre-existing and identical in the cycle 5 engine (review CR-2, reproduced): a ci block nested under another key (x: then an indented ci:) and a ci block whose docsOnly children are dedented to column 0 are valid YAML that mean something other than an opt-out, so the engine reads them as configured by defaults. Say so in configuration.md, or refuse an empty docsOnly: that has a sibling row.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'docs/reference/configuration.md']
+    - action: 'Cleanup (review CR-3, low; supersedes gate 6 CR-4): significantLines keeps a second comment-stripping rule beside yaml-subset.js, which ignores quotes and requires whitespace before the hash. No input was found where the row decision differs. Export the parser own row reader from yaml-subset.js so the check and the parse cannot diverge.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'shared/resources/yaml-subset.js']
+    - action: 'Carried from gate 5 (cleanup, low): a CANCELLED nearer ancestor is re-asked for the whole 6c poll; treat it as final or keep the documented residual.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

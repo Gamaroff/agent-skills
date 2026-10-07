@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "reader.mjs#read",
+      "name": "finding-anchors-makeReader",
+      "call_site": "shared/resources/finding-anchors.js:198",
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 11,
+      "passed": 11,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "ran_at": "2026-10-07T10:49:31.670Z"
+    }
+  ],
+  "totals": {
+    "executed": 11,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-07T10:49:31.670Z"
+}

@@ -1,0 +1,77 @@
+schema: 1
+task: 'task.140.shell-fn-sentinel-hardening'
+task_title: 'Harden the shell-fn: sentinels and the fake-gh coverage'
+gate: CONCERNS
+status_reason: 'All 4 phases verified and every success-criterion shape declines as specified, but the diff review found a regression (own EXIT trap + errexit now scores instead of declining on bash 5 / zsh) and a containment site left lexical after entry containment moved to real paths.'
+reviewer: 'QA Engineer'
+updated: '2026-09-30T06:15:33Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'Shadowing exit does not cover errexit: a library that installs its own trap … EXIT and then fails a top-level command under set -e ends the harness with 1 and is scored absent; for f(){…}; trap true EXIT; set -e; false this regressed 97 → 1 on bash 5.3 and zsh 5.9 (TASK-140-BUG-1).'
+    suggested_action: 'Shadow trap for the duration of the source so EXIT/0 installations cannot displace the harness trap; unset -f trap before the harness trap - EXIT; add rows for both orderings.'
+    suggested_owner: dev
+    bug_ref: 'task.140.bug.1.library-trap-plus-errexit-scored.md'
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The --fake-gh containment is still lexical while entry containment is now real-path, and its comment says they are the same; a symlinked fake-gh dir pointing outside the root is accepted and recorded (TASK-140-BUG-2; behaviour identical at base, attributed because the diff broke the stated invariant).'
+    suggested_action: 'realpathSafe both sides at the fake-gh check, realpath root inside namesGh (CR-6), and add a symlinked fake-gh row expecting bad-fake-gh.'
+    suggested_owner: dev
+    bug_ref: 'task.140.bug.2.fake-gh-containment-still-lexical.md'
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The detector misses a quoted or backslashed gh ("gh" api, a single-quoted gh, \gh) because quote and backslash are not in the prefix class, and the new SOURCE_LINE follows only a line-initial source, not [ -f x ] && source x or set -e; source x.'
+    suggested_action: 'Add the quote and backslash characters to the GH_COMMAND_WORD prefix class and let SOURCE_LINE match after &&, || or ;, with a row per shape.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 121
+  phases_verified: '4/4'
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 21
+    notes: 'resolveEntry probed through a wrapper over the path corpus (21 cases, real uploads/link-to-etc symlink present during the run): symlink-escape now refused (reproduced at base); only encoded-traversal reproduced, identical at base and a literal %2f filename rather than a traversal (pre-existing). CONCERNS for CR-2: the fake-gh containment still accepts a symlinked directory pointing outside the root.'
+  performance:
+    status: PASS
+    notes: 'security-probe.test.mjs 63.1 s vs 63.0 s at the branch point; one extra readFileSync per sourced path at gate time.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a library that replaces the EXIT trap and fails under set -e is scored, a regression for one ordering on bash 5 / zsh.'
+  maintainability:
+    status: PASS
+    notes: 'Rule §5 and engine header updated in step with the code; twin lint lanes held by a parity test; every change mutation-proved (QA re-ran M2 and M6: covered).'
+
+recommendations:
+  immediate:
+    - action: 'CR-1 / TASK-140-BUG-1: shadow trap during the source; rows for own-trap + errexit in both orderings'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+    - action: 'CR-2 / TASK-140-BUG-2: real-path containment at the fake-gh check and inside namesGh'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-4 (medium confidence, advisory): .githooks/pre-commit is a tracked extensionless bash script neither ShellCheck lane lints — widen the shared block or name it as an exclusion'
+      refs: ['scripts/lint-shell.sh', '.github/workflows/shellcheck.yml']
+    - action: 'CR-5 (low confidence, advisory): the symlink row assumes os.tmpdir() is outside REPO_ROOT; assert it or fall back to a sibling of the root'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'encoded-traversal (pre-existing, identical at base): a literal %2f filename inside the root is accepted; not a traversal on any filesystem this engine runs on'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed and re-reviewed']

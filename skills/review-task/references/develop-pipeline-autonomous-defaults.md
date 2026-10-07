@@ -32,9 +32,9 @@ The rows below apply to both `develop-story` and `develop-task`. Where the two s
 | qa-fix with no file changes | HALT — do not increment cycle; log as unfixable and surface to user |
 | Step 5c `/review-pr` — post the summary PR comment? | Pass `--comment` explicitly. `/review-pr` otherwise asks before posting and the pipeline cannot prompt. Already-authorised ground: Steps 5–6 and 7 both comment on the PR. |
 | Step 5c `/review-pr` verdict | `REQUEST CHANGES` → return to 5b. **The counter is incremented once, by 5b step 7, on exit — never at 5c.** Incrementing here as well burns two of the five cycles per review-driven fix and desynchronises resume, which reconstructs the count from `### QA Cycle` headings the extra increment never writes. `CONCERNS` → record findings, do not block, exit to Step 7. `APPROVE` → exit to Step 7. The full routing lives in the Steps 5–6 QA loop step file, §5c — not linked by path here, because this file is bundled into `develop-bug` too and a path reference would drag the story/task QA loop into a skill that runs its own verify loop. |
-| Resume state validation | Per-step artifact verification AND branch + PR cross-check before skipping any ✅ step — full contract in `references/develop-pipeline-resume-contract.md` |
+| Resume state validation | Per-step artifact verification AND branch + PR cross-check before skipping any ✅ step — full contract in `https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/develop-pipeline-resume-contract.md` |
 | Completion status (story or task) | `accepted` (lowercase, matches finalise canonical YAML schema). Note: document `Status:` fields use Title Case (`Draft`, `Planned`, `In Progress`, `Ready for Review`) — `accepted` is the YAML frontmatter value only. |
-| Pipeline mode (lite vs standard) | See `references/develop-pipeline-lite-mode.md` for trigger conditions and behaviour. Default to `standard` if any condition fails. |
+| Pipeline mode (lite vs standard) | See `https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/develop-pipeline-lite-mode.md` for trigger conditions and behaviour. Default to `standard` if any condition fails. |
 | qa-story / qa-task invocation in lite mode | Prepend the lite-mode directive (see lite-mode contract) to the invocation context |
 | Final commit push (Step 8) | Always push after Step 8 commit so PR reflects completed report |
 | Tracker mutation retry policy | 3× exponential backoff (1s, 2s, 4s). Shell calls (`gh`) wrap with `tracker_call_with_retry` from `references/resolve-platform.sh`. Atlassian MCP calls retry inline with the same schedule. All tracker mutations are non-blocking — final failure logs a warning in Issues Log and continues. |
@@ -57,7 +57,24 @@ does not come back the way it expected. Three states, and they are not the same 
 `source references/read-config.sh && read_nested_config_key subagents wallClockMinutes`, and
 treat an empty result as `10`); the QA diff reviewer's Step 3b post-condition and the pre-develop
 surface map both wait against this number. Start the clock at dispatch and record it in the
-Decisions Log with the outcome: `dispatched HH:MM → returned HH:MM` or `→ killed at N minutes`.
+Decisions Log with the outcome: `dispatched HH:MMZ → returned HH:MMZ` or `→ killed at N minutes`.
+
+**Arm the deadline at dispatch.** Beside the dispatch, start a background `sleep $((BUDGET*60))`;
+its completion notification is the deadline event. When it fires and the agent has not returned,
+stop the agent and do the pass inline then — not at the next unrelated notification. Nothing else
+checks the budget at its deadline: on task.156 four agents ran two to three times over theirs,
+because each overrun was noticed only when some later event arrived (obs #250).
+
+**Every time in that record is measured, never recalled.** Read `date -u +%H:%MZ` in a tool call at
+dispatch and again when the completion notification arrives; when the notification reports the
+agent's own duration (`duration_ms`), that number is the duration — write it, do not subtract two
+remembered clock readings. `N` in `killed at N minutes` is the difference between two measured
+readings. A time with no tool call behind it is not written at all: `dispatched — (not measured)`
+is a true record, and a composed one is not. On task.133 two QA reports carried `dispatched at 12:24
+… returned ~12:26` for reviewers that ran around 08:50Z — local time labelled as if it were a clock
+reading, composed rather than read (obs #230). The same session's gate timestamps were composed the
+same way and emptied the next cycle's scope; a reviewer time feeds no program today, but a report
+that states times nobody measured teaches the reader to trust the ones that do.
 
 **Output-file size is not a liveness signal.** A subagent's output file is a transcript that grows in
 bursts; a small file is consistent with an agent that is reading, thinking, or blocked on a tool, and

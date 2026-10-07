@@ -1,0 +1,88 @@
+schema: 1
+task: 'task.131.markdown-structure-sink-internal-validator-class'
+task_title: 'A markdown-structure sink and an internal-artefact decision for the security probe'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes verified (BUG-1, BUG-2, CR-4 fixed). The cycle-2 refute pass found three medium gaps around the new internal decision: its precondition is not enforced (any non-empty reason passes), and two consumers the enumeration missed — the bug-mode DoD template and the /review-security sink table. lintReport probe still engages 15/15.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T22:52:41Z'
+
+top_issues:
+  - id: 'TASK-131-CR-2-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Nothing enforces the internal precondition (no sink models the shape): an agent can return boundary: internal for report-lint.js#lintReport with any non-empty reason — even the schema placeholder text — skip the zero-guard and report overall PASS; anti-patterns.md claims it cannot become a way around the guard.'
+    suggested_action: 'Require internal_reason to name the entry (path#export); in Step 3c force SEC_OVERALL = FAIL when the named entry is one a sink is documented to fit (the disqualification list in the prompt, today lintReport) or the reason is the schema placeholder; make the anti-patterns claim match what is enforced.'
+    suggested_owner: dev
+    bug_ref: 'task.131.bug.3.internal-precondition-not-enforced.md'
+    status: open
+  - id: 'TASK-131-QA-2'
+    severity: medium
+    file: 'skills/finalise/assets/bug-dod-template.md'
+    finding: 'The bug-mode DoD template offers only boundary: true | false in its Step 3 placeholder; the internal shape and its reason-less FAIL line are absent, and the enumeration test scans neither skills/*/assets/ nor this wording (refute review CR-2, verified).'
+    suggested_action: 'Add the internal shape to the template placeholder; extend the enumeration test roots to skills/*/assets/*.md with a key that matches this site.'
+    suggested_owner: dev
+    bug_ref: 'task.131.bug.4.bug-dod-template-lacks-internal.md'
+    status: open
+  - id: 'TASK-131-QA-3'
+    severity: medium
+    file: 'shared/resources/security-review-prompt.md'
+    finding: 'The /review-security prompt lists five sinks (no markdown-structure) and says "No sink fits → report unverifiable", with no mention of --args-json, so /review-security on lintReport still records the task.124 outcome this change says it ends (refute review CR-3, verified).'
+    suggested_action: 'Add markdown-structure (and filename) to the sink table and document --args-json for (input, opts) exports under choosing the entry point.'
+    suggested_owner: dev
+    bug_ref: 'task.131.bug.5.review-security-sink-table.md'
+    status: open
+  - id: 'TASK-131-QA-4'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 3c forces FAIL on "no internal_reason" while the Step 3d render treats "absent or empty" as FAIL, so an empty or whitespace reason renders the ❌ line while SEC_OVERALL keeps PASS (refute review CR-4, verified).'
+    suggested_action: 'Word Step 3c and 3d the same: absent, empty or whitespace-only forces SEC_OVERALL = FAIL.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 4593
+  phases_verified: 3/3
+  ci: 'not read — gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    notes: 'lintReport through markdown-structure with --args-json → engages, 15 executed, 0 reproduced; record task.131.qa.2.security.run.json. The internal-precondition gap (CR-2-1) is a process-rule enforcement gap, not a reproduced input defect.'
+  performance:
+    status: PASS
+    notes: 'Probe run 1.6 s.'
+  reliability:
+    status: PASS
+    notes: 'No change to runtime error handling this cycle.'
+  maintainability:
+    status: PASS
+    notes: 'bundle:check 0 problems; validate passes.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-131-CR-2-1, QA-2, QA-3 (and QA-4, low).'
+      refs: ['skills/finalise/SKILL.md', 'skills/finalise/assets/bug-dod-template.md', 'shared/resources/security-review-prompt.md']
+  future:
+    - action: 'Refute CR-5: args is not part of the JS control key, so two differently configured probes of one export collapse into one record entry; key JS controls on --name or report a replacement when args differ.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Refute CR-6 (cleanup): the ok===false rule comment says "plain non-array object" but the code accepts any non-array object; align the wording or add a prototype check.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/probe-boundary-rule.md']
+    - action: 'Refute CR-7 (cleanup): the corpus doc "Document sinks." paragraph restates the markdown-structure SINK_BLURB.'
+      refs: ['shared/resources/security-input-corpus.md']
+    - action: 'Carried from gate 1: CRLF fence detection in jira-sync.js makeFenceTracker and doc-links.js (pre-existing on develop).'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/doc-links.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-131-CR-2-1, QA-2 and QA-3 fixed']

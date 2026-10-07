@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.177.review-pr-resolution-edge-cases'
+task_title: '/review-pr resolution edge cases'
+gate: PASS
+status_reason: 'Gate 2 findings fixed and mutation-proven; the scheme-less arm now re-parses known platform hosts only. The one bug found this cycle is pre-existing (identical on base) and the rest are cleanups.'
+reviewer: 'QA Engineer'
+head: 'd57ae1aabef816f6b393791a6a9975167ebf2a9f'
+updated: '2026-10-03T07:04:11Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 247
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 44
+    notes: 'shell-fn probe of parse_target, 22 contract cases × bash/zsh: engages, 0 reproduced, 0 overblocked. A first run reproduced 2 on the cycle-1 lookalike case, whose expectation (a reported foreign host) predates the known-host rule; it is now a plain branch, which is stricter. Case corrected.'
+  performance:
+    status: PASS
+    notes: 'No network call added.'
+  reliability:
+    status: PASS
+    notes: 'Gate 2 fixes verified under bash and zsh.'
+  maintainability:
+    status: PASS
+    notes: '247 tests; every fix mutation-proven.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR3-1 (pre-existing, identical on base): `JIRA_URL= # prod` yields `# prod`, so the run warns "differs" instead of "not set". Allow leading space in the comment strip `(^|[[:space:]]+)#.*$`.'
+      refs: ['skills/review-pr/SKILL.md']
+    - action: 'CR3-2: three PARSER_CASES comments still cite the dropped TLD / dotted-first-segment rules; reword to the known-host rule.'
+      refs: ['skills/review-pr/tests/review-pr.test.js']
+    - action: 'CR3-3: §0a KEY_FIELD contract (comment, :? message) lists only jira_key / github_issue; add pr_number (shared source).'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'CR3-4: the "hands over to §0a" docs-guard test checks only the guard output; rename or chain lookupBlock().'
+      refs: ['skills/review-pr/tests/review-pr.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

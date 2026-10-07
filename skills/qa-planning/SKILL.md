@@ -646,7 +646,15 @@ All qa-planning outputs are co-located in the story (or task) directory followin
 **Risk Reports** (tasks): `task.{id}.risk.{num}.{task-name}.md`
 **Test Design** (tasks): `task.{id}.test-design.{num}.{task-name}.md`
 
-`{num}` starts at 1 and increments if qa-planning is re-run for the same story.
+`{num}` is computed per series, never counted by eye — run, from the repository root:
+
+```bash
+source .agents/skills/qa-planning/references/newest-numbered.sh || exit 1
+RISK_N=$(next_numbered "{document-directory}" risk -name "{stem}.risk.*.md") || exit 1
+TEST_DESIGN_N=$(next_numbered "{document-directory}" test-design -name "{stem}.test-design.*.md") || exit 1
+```
+
+`{stem}` is `story.{epic}.{story}` or `task.{id}`; use `$RISK_N` and `$TEST_DESIGN_N` as `{num}`. Each is the highest existing `{num}` of its series plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186).
 
 ### Directory Structure
 

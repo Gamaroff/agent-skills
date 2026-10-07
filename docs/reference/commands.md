@@ -43,6 +43,7 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/create-bug-report` | Record a structured bug — story, task, or general (cross-cutting, numbered from the global bug registry) | [Bug Fix Runbook](../runbooks/bug-fix.md), [Bug documents](../standards/bug-documents.md) |
 | `/create-issue` | Create a tracker issue + matching local work-item doc (GitHub / Bitbucket / Jira, auto-detected) | [`create-issue`](../../skills/create-issue/SKILL.md) |
 | `/create-architecture-doc` | Author a project architecture doc | [`create-architecture-doc`](../../skills/create-architecture-doc/SKILL.md) |
+| `/wireframe` | Mock up a UI as a ```` ```wireloom ```` block, check it, and embed a rendered SVG beside it (the renderer auto-installs into a user cache, never the project) | [`wireframe`](../../skills/wireframe/SKILL.md), [grammar](../../skills/wireframe/references/grammar.md) |
 
 ## Review
 
@@ -140,7 +141,7 @@ family that reads `assignee`.
 | `/observe-work` | Watch the session for skill-improvement signals and write each to the observation log | [`observe-work`](../../skills/observe-work/SKILL.md) |
 | `/observe-work --review` | Work the observation backlog and stage skill updates for you to install | [Review cycle](../../skills/observe-work/references/review-cycle.md) |
 | `/session-handoff` | Write `.agents/handoff.md` in the fixed section order — every state figure carries the command that produced it; §5 Traps is a pointer to `docs/contributing/traps.md`, never content | [`session-handoff`](../../skills/session-handoff/SKILL.md) |
-| `/session-handoff --read` (`command node .agents/skills/session-handoff/scripts/handoff-verify.mjs [path] [--json] [--timeout <s>]`) | Re-measure the handoff before trusting it: re-run each figure's command through a read-only whitelist and report every line as `confirmed` / `stale` (with the new value) / `unverifiable` (with why). Never writes | [`session-handoff`](../../skills/session-handoff/SKILL.md) |
+| `/session-handoff` in read mode — ask by intent ("is the handoff still accurate?"), or run `command node .agents/skills/session-handoff/scripts/handoff-verify.mjs [path] [--json] [--timeout <s>]` directly | Re-measure the handoff before trusting it: re-run each figure's command through a read-only whitelist and report every line as `confirmed` / `stale` (with the new value) / `unverifiable` (with why). Never writes | [`session-handoff`](../../skills/session-handoff/SKILL.md) |
 
 ## Checklists
 

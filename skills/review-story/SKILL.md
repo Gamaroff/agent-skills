@@ -1,7 +1,7 @@
 ---
 name: review-story
 description: 'Story review with two modes. Interactive mode (default): asks clarifying questions to resolve ambiguities, conflicts, and missing information — use when story has unclear requirements or you need user input. Validate mode (--validate flag or "is this story ready?"): automated non-interactive GO/NO-GO gate with 1–10 readiness score — use for pre-implementation gates, batch validation across multiple stories, CI pipelines, or quick sanity checks without user interaction.'
-invokes: [create-branch, ensure-epic-github-issue, ensure-epic-jira-issue, ensure-story-github-issue, ensure-story-jira-issue, mermaid-architect]
+invokes: [create-branch, ensure-epic-github-issue, ensure-epic-jira-issue, ensure-story-github-issue, ensure-story-jira-issue, mermaid-architect, wireframe]
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
@@ -383,7 +383,7 @@ Before formulating questions in any step, consult the pre-pass summaries from St
 
 - **PREPASS_A** (epic alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` during the epic alignment review (Step 3) and carry them to the Unified Question Point.
 - **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` during the technical accuracy review (Step 4) and carry them to the Unified Question Point. If `alignment` is `aligned`, record its `axes_checked` (and the `prepass-axes.js` `source`) in one line of the report's Technical Accuracy section.
-- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings during the completeness review (Step 5) and carry them to the Unified Question Point — ask whether the story should be scoped down or closed.
+- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings during the completeness review (Step 5) and carry them to the Unified Question Point — ask whether the story should be scoped down or closed. If it returned a non-empty `population_diff`, each entry is a Step 4 check 10 finding — confirm it against the collector and report it there.
 
 Severity `low` findings from any summary: add to the review report findings list but do not elevate to a user question unless they cluster with other issues.
 
@@ -517,7 +517,7 @@ Actions:
 
      Substitute your `${ARCH_ROOT}` for `docs/architecture`. `{arch_domains}` is `domains` joined with `, `; `{arch_axes}` is `axes` joined with `; `. Record `source` (`architecture` / `partial` / `fallback`) beside PREPASS_B; exit 1 means a file exists but could not be read — treat Agent B as failed rather than dispatch it with empty slots. **Validate `axes_checked`**: an `alignment: aligned` with `axes_checked` missing or empty is a failed agent (step 5 below) — an `aligned` that names nothing it was measured against is not a result.
    - Subagent 4 (Codebase Scan): Analyze current branch implementation status. Return a compact YAML summary (PREPASS_C).
-5. Handle Failures Gracefully: If any alignment/scan subagents fail or return an unknown status, log a specific warning (e.g., "⚠️ Pre-pass Agent A failed - proceeding via in-line discovery") and fall back to native validation checks in Steps 2-6. Subagent **unavailable** (no dispatch in this session), **failed**, or **slow** past its wall-clock budget: follow the three-row table in `references/develop-pipeline-autonomous-defaults.md` §Subagents — perform the pass inline, record the independence loss, write `killed at N minutes` never `stalled`, and remember that **output-file size is not a liveness signal**.
+5. Handle Failures Gracefully: If any alignment/scan subagents fail or return an unknown status, log a specific warning (e.g., "⚠️ Pre-pass Agent A failed - proceeding via in-line discovery") and fall back to native validation checks in Steps 2-6. Subagent **unavailable** (no dispatch in this session), **failed**, or **slow** past its wall-clock budget: follow the three-row table in `references/develop-pipeline-autonomous-defaults.md#subagents--unavailable-failed-slow` (§Subagents — cited, not depended on: the skill reads that one table) — perform the pass inline, record the independence loss, write `killed at N minutes` never `stalled`, and remember that **output-file size is not a liveness signal**.
    Output: Up to 3 verified YAML summaries stored in active context; target file paths fully resolved for immediate step execution.
 
 ---
@@ -1004,6 +1004,123 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      its QA finding named; the released shape at `v0.51.0` also lacked `targeted`, `bug` and
      `filedBug`
 
+10. **Call-site population** (obs #120):
+   - Trigger: the document enumerates invocations of one of this repository's engines — it lists
+     call sites, gives a count of them, or scopes itself as "all call sites of" `tracker-comment.js`,
+     `stakeholder-summary-cli.js`, `gh-stage.js`, `jira-stage.js` or `tracker-issue.js`. A document
+     that touches one call and says so is not asked to count the world
+   - Measure the population with `call-sites.js`, the collector the guard tests import, from the
+     repository root:
+
+     ```bash
+     command node .agents/skills/review-story/references/call-sites.js --engine "{engine}" --json
+     ```
+
+     `reason: empty` is a claim about the instrument before it is one about the tree: check the
+     root before believing a zero. A document written against an earlier tree is measured against
+     that tree: export it with `git archive <rev> | tar -x -C <dir>` and pass `--root <dir>`,
+     which is measured as given. `reason: no-roots` (exit 1) means the root is not a skills
+     source tree (no `shared/resources/` beside a `skills/*/SKILL.md`) — a consumer install keeps
+     skills only as bundled copies — so there is no population to diff: record the check as not
+     applicable, never as a zero. Any other non-zero exit (`unreadable`, `internal-error`,
+     `output-closed`) means the population is unknown: record that, and diff nothing. A site
+     reached only through a shell variable (`node "$VAR"`) is found on a best-effort rule the
+     collector's header states, so it may be missed or over-counted: confirm any such site by
+     reading the script before reporting it, and name any the rule misses by hand
+   - Diff the collector's `file:line` list against the document's. Every collector site the
+     document does not name → **Important**, worded as a choice for the author: "in scope — add it"
+     or "an exclusion — state why". A stated exclusion is not a finding. A count in the document
+     that disagrees with the collector's → **Important**
+   - A list confirmed name by name is the author's recall, not a measurement: pre-pass Agent C's
+     grep for the symbols a document names cannot see a site the document does not name
+   - Worked example: task.121 named three `tracker-comment.js` sites and one orchestrator
+     duplicate, and the pre-pass confirmed each. The collector found a second orchestrator
+     duplicate and a live `develop-bug` consumer that one of its success criteria would have
+     forbidden — both in scope, both found only because the reviewer happened to run it
+
+11. **Removed-literal test sweep** (obs #203):
+    - Trigger: the plan removes or inverts a behaviour — deletes a command, renames a path, changes
+      a message, flips a default
+    - Search every test file the project tracks for the **literal** being removed (the command
+      string, the path, the message), not for the feature's name — for example
+      `git grep -n '<literal>' -- '*.test.*'`, plus the project's test fixture directories. A test
+      that locates a block by that literal breaks the moment the literal goes, and its error names
+      the missing literal, not the behaviour change
+    - List every hit in the plan as a test to update
+    - Not applicable when the project tracks no test files: record that, never a zero
+    - Worked example: task.161 stopped deleting the pipeline lock at Step 8. The plan named one test
+      and the review found two more by feature name ("step 8", "commit-changes"). A fourth,
+      `halt-snippet-glob-safe.test.mjs`, located its block by the regex
+      `rm -f \.claude/state/develop-pipeline\.lock` and surfaced only when `ci:fast` ran: 8 of 9
+      failures
+    - Flag as **Important** when the plan removes a literal and lists no literal search
+
+12. **Other writers in a replaced region** (obs #242):
+    - Trigger: the plan replaces, rewrites or deletes a whole region of a document — a section, a
+      block, a table — rather than editing lines inside it
+    - Search the project's skill and resource sources, every file type (an engine writes into a
+      region as surely as a prose step does), for writers that put content inside that region
+    - Require the document to name each writer as **carried** (the replacement keeps its content),
+      **refused** (the engine stops with a message) or **owned** (the region is this plan's alone,
+      and the other writer moves out)
+    - Not applicable when the region is new, or the project has no other sources that write
+      documents: say which
+    - Worked example: task.155 built an engine that replaces `## QA Testing Results` whole. Its plan,
+      review and first QA cycles measured text lost *outside* the section; none asked who writes
+      *inside* it. `create-bug-report` Step 5 (`### Bug Reports`) and the develop pipelines'
+      Deferred Work exit both did, and each was found by a later PR review at the cost of a
+      granted QA cycle
+    - Flag as **Important** when a writer is unnamed
+
+13. **Identity over a shell command string** (obs #252):
+    - Trigger: an identity, dedupe or uninstall key is read out of a shell command string — a
+      settings.json hook command, a status-line wrapper, a cron line
+    - Require the key to be specified as a **parse into shell words that inverts the writer's own
+      quoting**, never a substring or a regex over the raw string
+    - Worked example: task.157 keyed its installer's own hook on "the command contains
+      `context-pressure.mjs check`". Five QA cycles followed on that one rule: a substring match, a
+      sibling tool's `my-context-pressure.mjs`, an anchored regex that missed the installer's own
+      quoting of an apostrophe path, hand-written `#` comments and `$'…'`. The loop converged only
+      once a POSIX shell-word parser replaced the regexes
+    - Flag as **Important** when the key is a pattern
+
+14. **Test file reached by the runner** (obs #255):
+    - Trigger: the plan adds a test file or a test directory
+    - Confirm the project's test runner configuration reaches it — the file matches a glob in the
+      test command or the CI workflow, or is listed by name — or that the plan's Files Summary
+      lists the runner edit. A suite the runner never reaches passes by not running, and a success
+      criterion it holds passes vacuously
+    - Not applicable when the project has no test runner configuration in the tree: record that
+    - Worked example: task.176 planned `skills/review-pr/tests/parse-target.test.sh` in a repository
+      whose `package.json` `test` script lists every `.test.sh` by hand. The suite would have run
+      nowhere. In this repository `tests/test-runner-reach.test.js` is the mechanical backstop
+    - Flag as **Important** when neither the reach nor the runner edit is shown
+
+15. **Reconstruction states for a resume rule** (obs #264):
+    - Trigger: the plan adds or changes a resume, lock or reconstruction rule — anything that
+      rebuilds a run's position from what is on disk
+    - Require the document to list the **states the rule must hold in**: the report at, ahead of or
+      behind the gates; a gate written with no entry for it; a back-filled entry; an in-place
+      continuation against a fresh re-invocation. Same shape as check 9's released-shape diff,
+      applied to the resume state machine. In this repository the states live in the resume
+      contract, `develop-pipeline-resume-contract.md`
+    - Worked example: task.170's QA loop spent cycles 2–5 on how a resume tells the halted run's
+      APPROVE from a re-entered cycle's. Each refute pass found one more state — the gate written
+      before the entry, a report ahead of or behind the gates, back-filled entries — and the loop
+      hit its limit. Review had passed the plan at 8/10
+    - Flag as **Important** when the states are not listed
+
+16. **A site list carries its grep** (obs #129):
+    - Trigger: the document enumerates sites by hand — "every X site", "all Y snippets", locations
+      in parentheses — outside check 10's five engines, which the collector measures
+    - Require the document to record the **search that defines X** beside the list, and re-run it.
+      A list without its search is the author's recall
+    - Worked example: task.124 named "every step doc that dispatches (5, 5c, 7)" and "the HALT
+      snippets in the step docs". A grep for `subagent_type=` found Step 3 ×3, Step 5 ×2, 5c and
+      Step 7 ×4; all three one-argv `rm` HALT sites were in orchestrator `SKILL.md` files, none in
+      the step docs
+    - Flag as **Important** when the list and the search disagree, or the search is missing
+
 **Common Hallucination Patterns to Detect**:
 
 - ❌ "Uses the standard React patterns" (vague, no source)
@@ -1016,14 +1133,27 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ An outcome no current or planned branch of the named function returns for the stated input. Report it as **Important** under check 7, not as a Critical hallucination
 - ❌ A property of an existing function asserted for new inputs, and never run on them (check 8)
 - ❌ Legacy or compatibility handling scoped from a finding, not diffed against the released shape (check 9)
+- ❌ A list of an engine's call sites taken from the author's recall, never diffed against the collector (check 10)
+- ❌ A removed behaviour whose literal is still pinned by a test the plan never lists (check 11)
+- ❌ A region replaced whole while another writer still puts content inside it (check 12)
+- ❌ An identity key over a shell command string specified as a substring or regex, not a shell-word parse (check 13)
+- ❌ A new test file the project's test runner never reaches (check 14)
+- ❌ A resume or reconstruction rule changed with no list of the states it must hold in (check 15)
+- ❌ A hand-written site list with no search recorded beside it (check 16)
 
 **Issues to Flag**:
 
 - **Critical**: Invented libraries/APIs, incorrect schema/endpoints, a falsified invariant (check 8)
-- **Important**: Missing source references, unverified technical claims
+- **Important**: Missing source references, unverified technical claims, and the plan shapes of checks 11–16 (an unsearched removed literal, an unnamed writer in a replaced region, a pattern identity key, an unreached test file, unlisted reconstruction states, a site list without its search)
 - **Optional**: Vague references, could be more specific
 
 **Output**: Technical accuracy report with hallucinations identified
+
+**Questions to Collect** (for batch asking):
+
+- When a replaced region has another writer (check 12): is it carried, refused or owned?
+- When an identity key is a pattern (check 13): what parse inverts the writer's quoting?
+- When a resume rule changes (check 15): which reconstruction states must it hold in?
 
 ---
 
@@ -1071,6 +1201,15 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      - Key test scenarios
      - Coverage requirements
    - Should not just say "write tests"
+   - **Behavioural evidence that re-runs its own example needs a control case** (obs #176, #285). The
+     rule is create-task's (§ Section 8, "Behavioural evidence needs a control case"); a story whose
+     evidence re-runs only the incident it quotes → **Important**
+   - **A behaviour fix in prose lands in an executable block** (obs #258): a fix that lands in a skill
+     document must sit in a fenced block a test extracts and runs, not in a table cell, blockquote or
+     sentence → **Important**
+   - **A test runs on CI's platform** (obs #279): an acceptance criterion that needs a shell or OS the
+     project's CI lacks is scoped to the CI shell plus "verified locally", or the story adds the lane
+     → **Important**
 
 4a. **Manual Testing Steps** (UI/navigation stories only):
 
@@ -1111,10 +1250,26 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - **Present**: recompute the rubric in `references/effort-estimation-rubric.md` against the current document state. If `abs(frontmatter - rubric) / max(frontmatter, rubric) > 0.5` (>2× divergence), flag as **Optional** (LOW severity): "Frontmatter `estimated_effort_hours: {X}` diverges from rubric estimate of **{Y}h** (AC: {n}, tasks: {m}, risk: {r}). Confirm or adjust."
    - Non-blocking — does **not** affect gate decision or readiness score. In Interactive mode, may offer a single prompt to accept the rubric's number; in Validate mode, observe silently.
 
+10. **Acceptance Criteria Classification** (obs #224, #285):
+    - Classify each acceptance criterion the way finalise will, by the rules
+      [review-task check 4](../review-task/SKILL.md#step-6-consistency-and-completeness-review) states
+      and [finalise's AC agent, Step 3](references/finalise-dod-ac-prompt.md#step-3-check-each-acceptance-criterion)
+      lists. Neither is restated here
+    - An acceptance criterion that fits none of finalise's kinds fails at acceptance by
+      construction: a behaviour criterion with no planned test, a measured bound with no command,
+      or one that can only be met after merge → **Important**
+
+11. **Guard exemptions** (obs #269):
+    - An exemption to a refuse-by-default guard, or a widening of what a guard treats as safe, is at
+      least Medium risk, and the story must name a **differential oracle**: shapes the exemption must
+      still refuse, compared head against base, not only the shapes it admits. review-story has no
+      risk step, so the rule sits here
+    - Missing oracle → **Important**
+
 **Issues to Flag**:
 
 - **Critical**: ACs with no tasks, missing essential Dev Notes categories, no testing guidance
-- **Important**: Vague file locations, missing error handling, incomplete testing specs
+- **Important**: Vague file locations, missing error handling, incomplete testing specs, an acceptance criterion finalise cannot classify (check 10), a guard exemption with no differential oracle (check 11)
 - **Optional**: Could add more detail, nice-to-have context, missing `estimated_effort_hours`
 
 **Output**: Gap analysis report with missing information categorized
@@ -1218,7 +1373,7 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 
 ---
 
-### Step 6.6: Wireframe Verification (via `markdown-wireframe`)
+### Step 6.6: Wireframe Verification (via `wireframe`)
 
 **Purpose**: Check if the story document describes a user interface (UI) or visual components that could be drawn up in a wireframe. If so, verify if a wireframe is already embedded directly in the story document. If not, recommend adding one.
 
@@ -1232,6 +1387,7 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 2. **Verify Existing Wireframes**:
    - Check if there is an existing wireframe section embedded directly in the story document (e.g. under a `## Visual Layout / Wireframe` subheading in Dev Notes).
    - Check if the story's Dev Notes or tasks reference this embedded wireframe.
+   - If an embedded ```` ```wireloom ```` block exists, run `wireframe`'s `check` on the story file. A block that fails to parse is an **Important** finding, since its SVG cannot be re-rendered. A legacy text/YAML outline counts as present; offer to redraw it in Wireloom but do not flag it.
 
 3. **Determine Wireframe Opportunity**:
    - If UI is detected but no embedded wireframe is present, flag this as an **Optional** issue (or **Important** if the UI is complex/bespoke).
@@ -1393,11 +1549,11 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
 
 ```yaml
 questions:
-  - question: "This story describes a user interface (UI) or visual components, but does not have a wireframe embedded. Would you like to embed a wireframe directly in this story using the `markdown-wireframe` skill?"
+  - question: "This story describes a user interface (UI) or visual components, but does not have a wireframe embedded. Would you like to embed a wireframe directly in this story using the `wireframe` skill?"
     header: "UI Wireframe"
     options:
       - label: "Yes — Add wireframe (Recommended)"
-        description: "Invoke the markdown-wireframe skill to generate a text/YAML wireframe, embed it directly in the story's Dev Notes section, and add a task to Stitch it."
+        description: "Invoke the wireframe skill to draw the wireframe, embed the rendered SVG and its source in the story's Dev Notes, and add a task to implement the UI it shows."
       - label: "No — Skip wireframe"
         description: "Proceed without wireframes."
 
@@ -2086,8 +2242,8 @@ Before executing any tool calls to apply changes to the story file or review mar
 4. Clean Exit: Wipe the backup file, skip all automatic text adjustments, log the specific error, and surface a graceful recovery prompt: "⚠️ Automated edit failed at fix [issue title] due to a patch conflict. Rolling back all partial edits. Please resolve this section manually."
 
    - Work through each issue in priority order (critical first, then important if selected)
-   - **UI Wireframe Insertion**: If the user selected to add a wireframe during the Unified Question Point, generate the wireframe using the `markdown-wireframe` skill instructions, embed it directly into the story's Dev Notes under a `## Visual Layout / Wireframe` subheading, and append the Stitch task:
-     `- [ ] Stitch and implement low-fidelity wireframe using Stitch (see Dev Notes visual layout)` to the Tasks / Subtasks section.
+   - **UI Wireframe Insertion**: If the user selected to add a wireframe during the Unified Question Point, draw it with the `wireframe` skill (its **Working from a brief** section, with the story's acceptance criteria as the brief), embed the rendered SVG and its source in the story's Dev Notes under a `## Visual Layout / Wireframe` subheading, and append the implementation task:
+     `- [ ] Implement the UI to match the wireframe (see Dev Notes › Visual Layout / Wireframe)` to the Tasks / Subtasks section.
    - For each fix: use the Edit tool to apply the change to the story document
    - After each fix, briefly state what was changed: `✅ Fixed: [issue title]`
    - If a fix requires information the agent doesn't have (e.g., user must decide the value), skip it and note: `⏭ Skipped: [issue title] — requires your input`
@@ -2531,7 +2687,7 @@ EOF
 **Calls**:
 
 - `mermaid-architect` — validates any embedded Mermaid diagrams (Step 6.5) and recommends a diagram if absent
-- `markdown-wireframe` — checks for UI/wireframe opportunities (Step 6.6) and generates wireframes for UI-focused stories
+- `wireframe` — checks for UI/wireframe opportunities (Step 6.6), validates embedded wireframes, and draws wireframes for UI-focused stories
 
 **Outputs used by**:
 
@@ -2607,6 +2763,13 @@ This skill implements rigorous safeguards to DETECT hallucinations:
 4. **Vague Source Detection**: Flag generic sources without specific references
 5. **Assumption Verification**: Check explicit assumptions against reality
 6. **Invariant Verification**: A property claimed of an existing function under new inputs MUST be executed on those inputs — an existence check and a behaviour check are different instruments, and passing the first is not evidence for the second (Step 4 check 8)
+7. **Population Verification**: A document's list of an engine's call sites MUST be diffed against the collector's (`call-sites.js`) — a list confirmed name by name is the author's recall, not a measurement (Step 4 check 10)
+8. **Removed-Literal Verification**: A plan that removes a literal MUST list every test that pins it, found by searching for the literal, not the feature name (Step 4 check 11)
+9. **Region-Writer Verification**: A plan that replaces a region whole MUST name every other writer into it as carried, refused or owned (Step 4 check 12)
+10. **Identity-Parse Verification**: An identity key read from a shell command string MUST be a shell-word parse that inverts the writer's quoting (Step 4 check 13)
+11. **Test-Reach Verification**: A new test file MUST be reached by the project's test runner configuration, or the plan MUST list the runner edit (Step 4 check 14)
+12. **Reconstruction-State Verification**: A changed resume or reconstruction rule MUST list the states it must hold in (Step 4 check 15)
+13. **Site-List Verification**: A hand-written site list MUST carry the search that defines it (Step 4 check 16)
 
 ### Reporting Hallucinations
 

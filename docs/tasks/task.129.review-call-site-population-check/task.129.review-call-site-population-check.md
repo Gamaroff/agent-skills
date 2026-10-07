@@ -2,14 +2,16 @@
 id: task.129
 title: "[Task 129] A call-site list in a task document is the author's recall, not a measurement: review-task and review-story enumerate the population with the repository's own collector and diff it against the list"
 type: task
-description: "review-task Step 3 check 6 inventories same-class functions; nothing inventories call sites. When a task's scope is 'these N invocations of engine X', the review verifies the N it names and never counts the population — on task.121 the document listed three tracker-comment.js sites and one orchestrator duplicate, and the collector the task's own guard reuses (collectCallSites() in comment-slot-coverage.test.mjs, ~1 s) found two more in scope: a second orchestrator duplicate and a live develop-bug consumer that a success criterion would have forbidden. Both became Important findings the pre-pass grep for named symbols could not see. Add check 9 to review-task Step 3 and review-story Step 4: when a document enumerates invocations of a shared engine, run the collector for that engine (or the documented grep shape across shared/resources, skills/*/SKILL.md, un-bannered references/, tracked .sh), diff against the list, and flag every unnamed site as in-scope or as an exclusion the document must state. Ship a small `call-sites.js` so the reviewer, the guard tests and create-task run one collector. Observation #120."
+description: "review-task Step 3 check 6 inventories same-class functions; nothing inventories call sites. When a task's scope is 'these N invocations of engine X', the review verifies the N it names and never counts the population — on task.121 the document listed three tracker-comment.js sites and one orchestrator duplicate, and the collector the task's own guard reuses (collectCallSites() in comment-slot-coverage.test.mjs, sub-second) found two more in scope: a second orchestrator duplicate and a live develop-bug consumer that a success criterion would have forbidden. Both became Important findings the pre-pass grep for named symbols could not see. Add a call-site population check to review-task Step 3 (check 14) and review-story Step 4 (check 10): when a document enumerates invocations of a shared engine, run the collector for that engine (or the documented grep shape across shared/resources, skills/*/SKILL.md, un-bannered references/, tracked shell), diff against the list, and flag every unnamed site as in-scope or as an exclusion the document must state. Ship a small `call-sites.js` so the reviewer, the guard tests and create-task run one collector. Observation #120."
 tags: [review-task, review-story, create-task, call-sites, tracker-comment]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-18
-updated: 2026-09-18
+updated: 2026-09-29
+completed_date: 2026-09-29
+pr_number: 525
 assignee:
 estimated_effort_hours: 5
 github_issue: 432
@@ -17,7 +19,8 @@ github_issue: 432
 
 # Technical Task: A call-site list in a task document is the author's recall, not a measurement
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.129.review.1.review-call-site-population-check.md` implemented 2026-09-29
 **GitHub Issue**: [#432](https://github.com/Gamaroff/agent-skills/issues/432)
 
 ---
@@ -26,18 +29,18 @@ github_issue: 432
 
 A task that scopes itself as "the N call sites of engine X" makes a claim about a population, and the review checks the N sites and never the population. On task.121 (2026-09-18) the document named three `tracker-comment.js` sites and one orchestrator duplicate; the review's pre-pass Agent C grepped for the *named* symbols and confirmed them; the collector the task's own guard reuses found two unnamed sites in scope, one of which a success criterion would have forbidden. Both were found only because the reviewer happened to run the collector — and the guard the task shipped would otherwise have found the boundary drawn short on its first green.
 
-This task makes the count a review step. `review-task` Step 3 and `review-story` Step 4 gain a **call-site population** check: identify the engine the document enumerates, run the repository's collector for it, diff the result against the document's list, and turn every difference into a finding. A small pure `shared/resources/call-sites.js` gives the reviewer, the guard tests and `create-task`'s §7 authoring the same collector, so the population is measured once and the same way.
+This task makes the count a review step. `review-task` Step 3 (as **check 14**) and `review-story` Step 4 (as **check 10**) gain a **call-site population** check: identify the engine the document enumerates, run the repository's collector for it, diff the result against the document's list, and turn every difference into a finding. A small pure `shared/resources/call-sites.js` gives the reviewer, the guard tests and `create-task`'s authoring pass (3.5) the same collector, so the population is measured once and the same way.
 
-**Scope**: `skills/review-task/SKILL.md` Step 3, `skills/review-story/SKILL.md` Step 4, `shared/resources/call-sites.js` + test, `comment-slot-coverage.test.mjs` (consume the shared collector), `create-task` §7 note.
+**Scope**: `skills/review-task/SKILL.md` Step 3 + Detection Rules, `skills/review-story/SKILL.md` Step 4 + Detection Rules, both pre-pass prompt files, `shared/resources/call-sites.js` + test, `comment-slot-coverage.test.mjs` (consume the shared collector), `create-task` 3.5 twin + Section 7 pointer, a presence test.
 
 ## 2. Motivation
 
 ### Current Problems
 
 1. **The pre-pass confirms names, not populations.** Agent C greps for the symbols the document names; a site the document does not name is invisible by construction.
-2. **The collector exists and is not run.** `collectCallSites()` scans `shared/resources/*.md`, `skills/*/SKILL.md`, un-bannered `skills/*/references/*.md` and tracked `.sh` for a `--stage` invocation shape in ~1 s. It lives inside one test file and no review step names it.
+2. **The collector exists and is not run.** `collectCallSites(engineRe, engine)` scans `shared/resources/*.{md,sh}`, `skills/*/SKILL.md` and un-bannered `skills/*/references/*.md` for an engine's invocation shape; the whole guard file runs in ~0.3 s (`node --test shared/resources/tests/comment-slot-coverage.test.mjs`, 320 ms on 2026-09-29). It lives inside one test file and no review step names it.
 3. **The guard finds the gap last.** A task that ships a guard over "all sites" discovers the unnamed sites when the guard first runs — after develop, at QA — when the fix is a scope change rather than a document edit.
-4. **Each engine's collector is private.** `comment-slot-coverage.test.mjs` has one for `tracker-comment.js`; `transition-protocol-parity.test.mjs` has another shape for `--stage`; nothing collects `gh-stage.js` / `jira-stage.js` / `stakeholder-summary-cli.js` sites at all.
+4. **Each engine's collector is private.** `comment-slot-coverage.test.mjs` runs its parameterised collector twice — `SITES` (`tracker-comment.js`, 24 sites on `develop` @ `01c8701f`) and `PR_SITES` (`stakeholder-summary-cli.js`, 12 sites); `transition-protocol-parity.test.mjs` has another shape for `--stage` literals; nothing collects `gh-stage.js` / `jira-stage.js` / `tracker-issue.js` sites at all. (Counts: a `console.log(SITES.length, PR_SITES.length)` appended to a throwaway copy of the guard file.)
 
 ### Benefits
 
@@ -50,29 +53,35 @@ This task makes the count a review step. `review-task` Step 3 and `review-story`
 ### Current Architecture
 
 ```
-review-task Step 3     checks 1–8; check 6 inventories same-class FUNCTIONS
-review-story Step 4    the same list
+review-task Step 3     checks 1–13; check 6 inventories same-class FUNCTIONS
+review-story Step 4    checks 1–9 (a subset; no function inventory)
 pre-pass Agent C       grep for named symbols → confirms/denies each
-collectCallSites()     private to comment-slot-coverage.test.mjs; tracker-comment.js only
+collectCallSites()     private to comment-slot-coverage.test.mjs; tracker-comment.js + stakeholder-summary-cli.js
 ```
 
 ### Target Architecture
 
 ```
-shared/resources/call-sites.js   collect({ engine, roots }) → [{ file, line, stage?, form }]
+shared/resources/call-sites.js   collect({ engine, root }) → [{ file, line, engine, stage, kind, slots }]
                                  engines: tracker-comment | gh-stage | jira-stage | stakeholder-summary-cli | tracker-issue
-                                 CLI: call-sites.js --engine tracker-comment --json
-review-task Step 3 check 9       document enumerates invocations of an engine → run the CLI → diff
-                                 unnamed site → Important: "in scope: add it" | "exclusion: state why"
+                                 stage: the --stage value (null when absent); kind: tracker-issue's --kind (else null)
+                                 CLI: call-sites.js --engine tracker-comment [--root <dir>] --json
+                                 root default: `git rev-parse --show-toplevel`, else cwd — never __dirname
+review-task Step 3 check 14      document enumerates invocations of an engine → run the CLI → diff
+review-story Step 4 check 10     unnamed site → Important: "in scope: add it" | "exclusion: state why"
                                  count mismatch → Important
-review-story Step 4              the same check, same wording
-comment-slot-coverage.test.mjs   imports collect() from call-sites.js (non-vacuity floor unchanged)
-create-task §7                   "a call-site list is a claim about a population — run call-sites.js and paste its count"
+                                 same wording in both; both Detection Rules lists gain the rule
+pre-pass Agent C (both files)    when the document enumerates, run the CLI; return population_diff
+comment-slot-coverage.test.mjs   imports collect() from call-sites.js (every floor unchanged)
+create-task 3.5 + Section 7      "a call-site list is a claim about a population — run call-sites.js and paste its count"
 ```
 
 ### Important Clarifications
 
-- **The collector is the source; the test consumes it.** Moving `collectCallSites()` out of the test into a shared module must keep the test's floor and its mutation proofs green before and after — the move is a refactor with a test on both sides.
+- **The collector is the source; the test consumes it.** Moving `collectCallSites()` out of the test into a shared module must keep the test's floors (`SITES ≥ 20`, `PR_SITES ≥ 9`, suffixed `≥ 4` each) and its mutation proofs green before and after — the move is a refactor with a test on both sides. Baseline: `SITES` 24, `PR_SITES` 12.
+- **Roots: today's three, plus tracked shell.** The lift keeps `shared/resources/*.{md,sh}`, `skills/*/SKILL.md` and un-bannered `skills/*/references/*.md`, and adds `skills/*/scripts/*.sh` and `scripts/*.sh` — the shell roots `tests/mutation-call-site-coverage.test.js` already scans. `git grep -l 'tracker-comment\.js' -- 'skills/*/scripts/*.sh' 'scripts/*.sh'` is empty today, so the guard's population must not move; the count assertion proves it.
+- **The general shape admits the two wrappers shipped prose puts before `node`** — `tracker_call_with_retry node … tracker-issue.js` (finalise step doc) and `[ -n "$X" ] && node … tracker-issue.js` (sync-github-bug). Found by the develop surface map; the two lifted shapes are unchanged, so the guard's population is not.
+- **Bundled, the CLI must find the repository by git, not by its own path.** Copied into `.agents/skills/review-task/references/call-sites.js`, a `__dirname`-relative root points inside the skill. Inside `shared/resources/`, siblings are cited by bare filename (AGENTS.md); SKILL.md cites the script as `.agents/skills/<skill>/references/call-sites.js` so the bundler copies it.
 - **"Un-bannered references/" is a real scan target.** A bundled copy headed `AUTO-GENERATED` is excluded; a hand-authored reference is a call site like any other (bug 14's PreCompact discovery).
 - **The check is scoped to documents that enumerate.** A task that touches one engine call and says so is not asked to count the world; the trigger is a list, a count, or "all call sites of".
 
@@ -80,10 +89,11 @@ create-task §7                   "a call-site list is a claim about a populatio
 
 ### In Scope
 
-✅ `shared/resources/call-sites.js` (pure + thin CLI) and its test, with the tracker-comment shape lifted from `comment-slot-coverage.test.mjs`.
-✅ `review-task` Step 3 check 9; `review-story` Step 4 equivalent; the pre-pass prompt names the CLI.
+✅ `shared/resources/call-sites.js` (pure + thin CLI) and its test, with the tracker-comment and stakeholder-summary-cli shapes lifted from `comment-slot-coverage.test.mjs`.
+✅ `review-task` Step 3 check 14 and `review-story` Step 4 check 10, plus a rule in each Detection Rules list; both pre-pass prompt files name the CLI.
 ✅ `comment-slot-coverage.test.mjs` consumes the shared collector.
-✅ `create-task` §7 authoring note.
+✅ `create-task` 3.5 authoring twin and a one-sentence pointer in the Section 7 (Files Summary) prompt.
+✅ A presence test (`tests/review-call-site-population-check.test.js`) in the shape of `tests/review-property-checks.test.js`.
 ✅ `npm run bundle`.
 
 ### Out of Scope
@@ -106,9 +116,9 @@ None. The test keeps its floor; the review gains a check.
 **Files**: `shared/resources/call-sites.js`, `shared/resources/tests/call-sites.test.mjs`, `comment-slot-coverage.test.mjs`
 
 **Changes**:
-- [ ] Lift `collectCallSites()`; add engine shapes for `gh-stage`, `jira-stage`, `stakeholder-summary-cli`, `tracker-issue`.
-- [ ] CLI `--engine <name> [--json]`; exit 2 on an unknown engine; the same `reason` contract as the other engines.
-- [ ] Test: fixture tree with one site per root class; the live tree's tracker-comment count equals the test's floor-checked count.
+- [x] Lift `collectCallSites()` with both of its shapes (`tracker-comment`, `stakeholder-summary-cli`) unchanged; add engine shapes for `gh-stage`, `jira-stage`, `tracker-issue`; add the two shell roots.
+- [x] CLI `--engine <name> [--root <dir>] [--json]` → `{ reason, engine, root, count, sites }`; `reason` `ok` (exit 0) or `empty` (exit 0, zero sites — a claim about the instrument, reported rather than hidden); `no-roots` (exit 1) when the root is not a skills source tree — no `shared/resources/` beside a `skills/*/SKILL.md` (QA cycles 1–2); `unreadable` (exit 3), `internal-error` (exit 4) and `output-closed` (exit 5, EPIPE), every outcome defined once in the `REASONS` table and every row driven by a test (QA cycles 2–3); exit 2 with `reason: usage` on an unknown engine or bad flag. An explicit `--root` is measured as given (CR-1); `node "$VAR"` is a site when VAR may hold the engine's path in that shell function (CR-2).
+- [x] Test: fixture tree with one site per root class and one bannered decoy; the live tree's counts equal the guard's (24 / 12 at `01c8701f`).
 
 **Dependencies**: none.
 
@@ -116,12 +126,13 @@ None. The test keeps its floor; the review gains a check.
 
 **Risk Level**: Low
 
-**Files**: `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`, the pre-pass Agent C prompt, `skills/create-task/SKILL.md` §7
+**Files**: `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`, `shared/resources/review-task-prepass-prompts.md`, `shared/resources/review-story-prepass-prompts.md`, `skills/create-task/SKILL.md` (3.5 + Section 7), `tests/review-call-site-population-check.test.js`
 
 **Changes**:
-- [ ] Check 9 with trigger, command, diff rule, severities; the task.121 case as the worked example.
-- [ ] Agent C prompt: when the document enumerates, run the CLI and return the diff.
-- [ ] create-task §7 note.
+- [x] review-task check 14 / review-story check 10 with trigger, command, diff rule, severities; the task.121 case as the worked example; a matching Detection Rules entry in each.
+- [x] Agent C prompt (both files — they carry a sibling rule): when the document enumerates, run the CLI and return `population_diff`.
+- [x] create-task 3.5 twin + Section 7 pointer.
+- [x] Presence test: section-scoped, asserted on the check's own list item, at all five sites.
 
 **Dependencies**: Phase 1.
 
@@ -130,7 +141,7 @@ None. The test keeps its floor; the review gains a check.
 ### Files to Modify (Core Implementation)
 
 1. ✅ `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`, `skills/create-task/SKILL.md`
-2. ✅ `shared/resources/review-prepass-*.md` (Agent C prompt)
+2. ✅ `shared/resources/review-task-prepass-prompts.md`, `shared/resources/review-story-prepass-prompts.md` (Agent C prompt)
 
 ### Files to Create
 
@@ -139,10 +150,11 @@ None. The test keeps its floor; the review gains a check.
 ### Files to Modify (Tests)
 
 4. ✅ `shared/resources/tests/comment-slot-coverage.test.mjs`
+5. ✅ `tests/review-call-site-population-check.test.js` (new presence test)
 
 ### Files to Modify (Documentation)
 
-5. ✅ `CHANGELOG.md`; `skills/*/references/` regenerated
+6. ✅ `CHANGELOG.md`; `skills/*/references/` regenerated
 
 ### Files to Delete
 
@@ -151,19 +163,20 @@ None.
 ## 8. Testing Strategy
 
 ### Unit Tests
-- [ ] Collector: each root class, the banner exclusion, each engine shape; unknown engine → exit 2.
-- [ ] `comment-slot-coverage.test.mjs` green before and after the lift, with its floor and mutation proofs intact.
+- [x] Collector: each root class (including both shell roots), the banner exclusion, each engine shape, `kind` for tracker-issue; unknown engine → exit 2; empty root → `empty`.
+- [x] `comment-slot-coverage.test.mjs` green before and after the lift, with its floor and mutation proofs intact.
 
-**Command**: `npm test`
+**Command**: `npm test` (per phase: `npm run ci:fast`)
 
 ### Integration Tests
-- [ ] `review-task` on the task.121 document as of its review (`git show c69f5115:…`): check 9 reports two unnamed sites.
+- [x] Committed test (`call-sites.test.mjs` "AC2: at c69f5115^ …"): `git archive c69f5115^` → `call-sites.js --engine tracker-comment --root <export>` returns the two sites the task.121 review found unnamed, and the document as reviewed does not name the develop-bug one. CI checks out full history (`test.yml` `fetch-depth: 0`); a shallow clone skips the test and says why. Added after DoD run 1 flagged it (the first run's hand-run-only claim was the gap). (`c69f5115` is the commit that widened task.121 after review; the document as reviewed is `c69f5115^`.)
+- [x] Hand run, recorded in the implementation report: check 14 applied to `git show c69f5115^:docs/tasks/task.121.cycle-scoped-qa-tracker-comments/task.121.cycle-scoped-qa-tracker-comments.md` reports those two sites as Important.
 
 ### Contract Tests
-- [ ] The review-task and review-story wording of check 9 is identical (families audit shared rule).
+- [x] `tests/review-call-site-population-check.test.js`: the check is present, with its trigger, command and verdicts, at review-task Step 3, review-story Step 4, both Detection Rules lists and create-task 3.5. (No family in `skill-families.md` covers the review skills, so the families audit cannot hold this.)
 
 ### Performance Tests
-- [ ] CLI ≤ 2 s on the live tree.
+- [x] CLI ≤ 2 s on the live tree — asserted by `call-sites.test.mjs` "AC4: …" (added after DoD run 1).
 
 ### Consumer Tests
 - [ ] Next task that scopes "all call sites of X" carries a collector count in §7 and the review confirms it.
@@ -171,19 +184,19 @@ None.
 ## 9. Success Criteria
 
 ### Functional
-- [ ] `call-sites.js --engine tracker-comment --json` returns the same sites the guard test scans.
-- [ ] review-task and review-story flag an unnamed in-scope site as Important on the task.121 fixture.
-- [ ] The guard test's floor and proofs are unchanged after consuming the shared collector.
+- [x] `call-sites.js --engine tracker-comment --json` returns the same sites the guard test scans (24 at `01c8701f`), and `--engine stakeholder-summary-cli` the same as `PR_SITES` (12).
+- [x] On the task.121 fixture (`c69f5115^`), the collector returns the two unnamed sites and the hand-run check reports them as Important.
+- [x] The guard test's floor and proofs are unchanged after consuming the shared collector.
 
 ### Performance
-- [ ] No measurable change to review wall-clock (one ~1 s command).
+- [x] No measurable change to review wall-clock (one sub-second command; CLI ≤ 2 s on the live tree).
 
 ### Code Quality
-- [ ] One collector, three consumers; no restated engine shape.
-- [ ] Mutation proof: remove a root class from the collector → the fixture test names it.
+- [x] One collector, three consumers; no restated engine shape — `comment-slot-coverage.test.mjs` defines no call-site shape of its own, asserted by `call-sites.test.mjs` "AC5: …" (added after DoD run 1).
+- [x] Mutation proof: remove a root class from the collector → the fixture test names it.
 
 ### Migration
-- [ ] Observation #120 closes naming the PR.
+- [x] Observation #120 closes naming the PR — closed `actioned` 2026-09-29, resolution names PR #525.
 
 ## 10. Risk Assessment
 
@@ -214,20 +227,107 @@ None.
 - **Critical**: the guard scanning fewer sites than before.
 - **Non-critical**: check wording.
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-29
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.129.qa.4.review-call-site-population-check.md](./task.129.qa.4.review-call-site-population-check.md)
+- **Gate File**: [task.129.gate.4.review-call-site-population-check.yml](./task.129.gate.4.review-call-site-population-check.yml)
+- **Previous cycles**: [qa.1](./task.129.qa.1.review-call-site-population-check.md), [qa.2](./task.129.qa.2.review-call-site-population-check.md), [qa.3](./task.129.qa.3.review-call-site-population-check.md)
+
+### Test Coverage Summary
+- **Tests Executed**: 43 (collector + guard suites); `npm run ci:fast` 4,576 pass
+- **Phases Verified**: 2/2
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No blocking issues. Three advisory findings (C4-CR-1..3) are recorded in the gate's `recommendations.future`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.129.qa.4.review-call-site-population-check.md`
+**Gate File**: `task.129.gate.4.review-call-site-population-check.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (4 cycles; HIGH 0 throughout)
+**PR Review (5c)**: CONCERNS — `task.129.pr-review.1.review-call-site-population-check.md`; PC-1..PC-3 corrected, CR-1 a follow-up
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Acceptance Criteria:** 7/7, each with committed code and a per-PR test (AC7 a documentation criterion — obs #120 closed naming PR #525)
+✅ **Tests:** `call-sites.test.mjs` (32 tests incl. the `c69f5115^` fixture, the 2 s bound and the no-restated-shape guard), `tests/review-call-site-population-check.test.js` (10), guard `comment-slot-coverage.test.mjs` unchanged populations (24 / 12); `npm run ci:fast` green
+✅ **PR:** #525 — CI reading 1 SUCCESS @ `cf6426853772` over 5 checks
+✅ **Documentation:** CHANGELOG `[Unreleased]`; review-task check 14, review-story check 10, both Agent C prompts, create-task 3.5
+✅ **Security Review:** PASS — not a boundary (a measurement that gates no action); no secrets or unsafe patterns
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal review tooling
+
+**Task marked as ACCEPTED on:** 2026-09-29
+
+**Detailed Verification Log:** See `task.129.dod.2.review-call-site-population-check.md` for complete verification evidence and timestamps (run 1: `task.129.dod.1.review-call-site-population-check.md`, gaps identified, superseded).
+
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
+
+**Status:** IN PROGRESS (run 1) — all four gaps fixed before run 2: AC2, AC4, AC5 tests added to `call-sites.test.mjs` (each mutation-proved); obs #120 closed naming PR #525.
+
+### QA Gate Status
+
+**QA Report**: `task.129.qa.4.review-call-site-population-check.md`
+**Gate File**: `task.129.gate.4.review-call-site-population-check.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] AC2 — commit the task.121 `c69f5115^` fixture as a test (CI checks out with full history)
+   - [ ] AC4 — assert the CLI completes within 2 s on the live tree
+   - [ ] AC5 — assert the guard test restates no call-site shape
+   - [ ] AC7 — close observation #120 naming PR #525
+
+### Next Steps:
+
+- [ ] Add the three tests to `shared/resources/tests/call-sites.test.mjs` / `comment-slot-coverage.test.mjs`
+- [ ] Close obs #120 with `observation-log.js set-status … --resolution "PR #525"`
+- [ ] Re-run `/finalise`
+
+**Estimated Effort:** Small (≈1 hour)
+
+**Gap Report Generated:** 2026-09-29
+
+**Detailed Verification Log:** See `task.129.dod.1.review-call-site-population-check.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-09-18 | 1.0 | Initial draft — observation review 2026-09-18 (obs #120) | create-task |
+| 2026-09-29 | 1.1 | Review passed (8/10) — renumbered to review-task check 14 / review-story check 10; corrected the collector's roots and existing engines (24 / 12 baseline); named both pre-pass files; presence test replaces the families audit; fixture at `c69f5115^` with `--root`; site schema defined | review-task |
+| 2026-09-29 |  | Status → ready-for-development | review-task |
+| 2026-09-29 |  | Implemented — `call-sites.js` (5 engines, `--root`), guard lifted (24 / 12 unchanged), review-task check 14 / review-story check 10, both Agent C prompts, create-task 3.5 twin; 3 new/changed test files, 17 + 10 new tests | develop-task (inline) |
+| 2026-09-29 |  | QA gate CONCERNS (80/100) — 2 medium findings (CR-1 root override, CR-2 node "$VAR" invisible) | qa-task |
+| 2026-09-29 |  | QA gate CONCERNS (80/100) — cycle 2, 2 medium findings (no-roots marker too weak, exit 1 ambiguous with a crash) | qa-task |
+| 2026-09-29 |  | QA gate CONCERNS (80/100) — cycle 3, 2 medium findings (EPIPE bypasses the exit contract; every-row test covers 4 of 6 rows) | qa-task |
+| 2026-09-29 |  | QA gate PASS (100/100) — cycle 4, 0 blocking findings, 3 advisory | qa-task |
+| 2026-09-29 |  | DoD incomplete — 4 gaps identified (AC2, AC4, AC5, AC7) | finalise |
+| 2026-09-29 |  | DoD gaps fixed — 3 tests (AC2 c69f5115^ fixture, AC4 ≤ 2 s, AC5 no restated shape), each mutation-proved; obs #120 closed naming PR #525 | develop |
+| 2026-09-29 | 1.2 | DoD run 2 passed — accepted (PR #525) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: call-sites.js
-- [ ] Phase 2: review check
-- [ ] QA: `task.129.qa.[N].review-call-site-population-check.md`
-- [ ] Gate: `task.129.gate.[N].review-call-site-population-check.yml`
+- [x] Phase 1: call-sites.js
+- [x] Phase 2: review check
+- [x] QA: `task.129.qa.[N].review-call-site-population-check.md` — cycles 1–4; latest qa.4
+- [x] Gate: `task.129.gate.[N].review-call-site-population-check.yml` — gate.4 PASS (100)
 
 ## References
 

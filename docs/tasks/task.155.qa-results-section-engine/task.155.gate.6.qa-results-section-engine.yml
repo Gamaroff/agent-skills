@@ -1,0 +1,90 @@
+schema: 2
+task: 'task.155.qa-results-section-engine'
+task_title: 'QA Testing Results section: one write engine, one placement, refused when duplicated'
+gate: CONCERNS
+status_reason: 'The fence-blind guard closes REL-012/013/014, and fault injection plus a 4-write corpus run lose nothing. One medium residue remains: the guard''s Change Log heading pattern is narrower than change-log.js RE_HEADING, so a dotted-numbered log heading can still be deleted in a synthetic shape no QA-written document carries (REL-015).'
+reviewer: 'QA Engineer'
+head: '3056978c7cf78cdd4971824e08cc635701f43312'
+updated: '2026-09-30T21:14:30Z'
+
+top_issues:
+  - id: 'REL-015'
+    severity: medium
+    status: open
+    file: 'shared/resources/qa-results.js'
+    finding: 'RE_LOG_HEADING accepts only \d+\.? numbering, while change-log.js RE_HEADING accepts \d+(?:\.\d+)*[.)]? (### 1.5 Change Log, ### 2) Change Log). Deletion (code-review CR-1): a section with a hand-written stray fence, closed by a later ```bash block, above a marker-less ### 1.5 Change Log with no H2 between returns replaced and deletes the heading and its rows. Placement (CR-2): with ### 1.5 or ## 12) Change Log directly above the markers, created still lands between heading and marker (the REL-013 stranding). 0 tracked task/story/epic documents have a dotted- or paren-numbered log heading (only the onboarding PRD, which QA never writes), and the first Step 12 upsertChangeLog wraps a marker-less log in markers, which the guard catches. The reviewer rated CR-1 high/high; QA re-rated the merged finding medium on these measurements.'
+    suggested_action: 'Build the log-heading check from change-log.js RE_HEADING numbering grammar at every heading level and use that one predicate in both removesStructure and canonicalOffset; add J-tests with ### 1.5 Change Log for the deletion and placement cases.'
+    suggested_owner: dev
+  - id: 'REL-016'
+    severity: low
+    status: open
+    file: 'shared/resources/qa-results.js'
+    finding: 'False refusal (code-review CR-3): because the guard ignores fences, a fenced "# comment" line (bash or yaml) in a new section is bad-section, and an existing section with one makes every later write unbounded, so Step 12 halts. Nothing is deleted. 0 of 155 tracked sections contain a fence, and neither Step 12 template renders one. The Deferred Work and CHANGELOG describe the trade as a fenced "## Example", which understates it.'
+    suggested_action: 'Name fenced # comment lines in the Deferred Work trade and in the Step 12 templates (no fenced blocks in the section), or exempt # lines inside a fence the section itself opens and closes.'
+    suggested_owner: dev
+  - id: 'REL-017'
+    severity: low
+    status: open
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Stale prose (code-review CR-4): qa-task SKILL.md:1365 and qa-story SKILL.md:1887 still say unbounded means an unclosed fence. Since 3056978c it also means the text a write would remove carries a change-log marker, an H1/H2 or a log heading, and the halt message carries no detail, so an operator is pointed at the wrong repair.'
+    suggested_action: 'Update both Step 12 descriptions, and return the offending line or a sub-reason with unbounded and bad-section so the halt message can name it.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 45
+  phases_verified: 4/4
+  ci: 'ci:fast locally @ 3056978c7cf7: format check passed; 4771 tests, 4768 pass, 1 skipped, 2 load-timing failures (bundle-missing-source 10.9 s and test-clean-checkout 11.5 s over a 10 s budget), both pass alone (7/7, 13/13). bundle:check 129 skills, 0 problems; validate qa-task and qa-story pass. PR CI not awaited (gated at /finalise).'
+  fault_injection: 'Stray fence after each of the 155 tracked section headings gives 155 unbounded and 0 deletions (gate 5: 153/2). Variants at the section end, ~~~, 4-backtick, indented ```js, an HTML comment and an inline tick: 0 deletions. A stray fence plus a closing ```bash block at each of 16,804 later positions gives 4,988 replaced (balanced inside the section) and 11,816 unbounded, 0 deletions.'
+  corpus_run: '1,986 tracked docs/**/*.md written 4 times, each followed by an upsertChangeLog row: 1,829 created then replaced x3, 155 replaced x4, 2 unplaceable (former REL-011 plan and bug documents). 0 lines lost outside the section, 0 rows dropped, always one section, never inside the log. The 155 existing sections re-rendered as the new section: 155 accepted.'
+  repros: 'Gate 5 REL-012 shapes (marker doc, marker-less ## and ### logs, section inside the log, legacy jira pair): all unbounded, nothing lost. REL-014: indented ## and # are unbounded. REL-013: ## / ### / ## 12. Change Log above the markers give 1 heading after 3 real Step 12 cycles. Residue: ### 1.5 Change Log gives replaced with the log deleted (REL-015).'
+  step_4b: 'Not applicable: no SKILL.md or shared/resources/*.md changed since gate 5.'
+  mutation_proofs: 'On an isolated copy: guard removed from replace/relocate -> J1,J3,J5,J6,J7 red; guard removed from normaliseSection -> F1,J5 red; indented H1/H2 pattern removed -> J3 red; marker pattern disabled -> J6 red; RE_LOG_HEADING removed from RE_STRUCTURAL -> J7 red; REL-013 placement removed -> J4 red. All covered; baseline 45/45 before and after; live file byte-identical.'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+bug_resolution:
+  previous_gate: 'task.155.gate.5.qa-results-section-engine.yml (FAIL 60)'
+  verified_fixed: ['REL-012 (high)', 'REL-013 (medium; residue for numbered headings is REL-015)', 'REL-014 (low; by refusal; setext deliberately deferred)']
+  deferred: ['REL-007', 'REL-008', 'REL-009', 'REL-010', 'PC-1', 'CRLF seam preservation', 'setext H1/H2']
+  fix_commit: '3056978c7cf78cdd4971824e08cc635701f43312'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'A pure string transform with no network access and no shell. boundary: internal (unchanged): the inputs are a pipeline-written work item and a pipeline-rendered section, and no corpus sink models this section.'
+  performance:
+    status: PASS
+    notes: '45 engine tests run in about 0.2 s; the 1,986-document, 4-write corpus run takes seconds.'
+  reliability:
+    status: CONCERNS
+    notes: 'Every write that would remove a marker, an H1/H2 or a recognised log heading is refused. One synthetic deletion path remains (REL-015), and the checked() read-back still counts only sections.'
+  maintainability:
+    status: PASS
+    notes: 'One predicate with a clear rationale; the generated copies are fresh. Advisory cleanups: CR-6 (two checks in normaliseSection can no longer fire after removesStructure) and CR-7 (the marker regex hard-codes names instead of using the imported constants).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'REL-015: share one Change Log heading predicate with change-log.js RE_HEADING, and add ### 1.5 Change Log tests'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+    - action: 'REL-017: update the unbounded / bad-section prose in both skills and name the offending line in the halt'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'REL-016: document fenced # comment lines in the trade, or exempt them inside a balanced fence'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Advisory: CR-5 (heal a section already stranded under a heading above the markers), CR-6, CR-7'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Carried: REL-007..010, PC-1, CRLF seams, setext (see the task Deferred Work)'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/change-log.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['REL-015 fixed, or explicitly deferred with its measurements, before /finalise']

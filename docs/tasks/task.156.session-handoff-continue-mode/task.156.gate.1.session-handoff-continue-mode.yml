@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.156.session-handoff-continue-mode'
+task_title: 'session-handoff continue mode: a continuation file a fresh context resumes from'
+gate: CONCERNS
+status_reason: 'All phases and success criteria verified; one medium high-confidence code-review bug (CR-1): the Continue procedure hard-codes repo-local .agents/skills paths, which do not exist in the repositories the mode is documented as most useful in.'
+reviewer: 'QA Engineer'
+head: '0999081e4d3bf151d63d3396d177b448cc255609'
+updated: '2026-10-01T19:37:57Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'skills/session-handoff/SKILL.md'
+    finding: 'Continue steps 1 and 4 run command node .agents/skills/session-handoff/scripts/{continuation,handoff-verify}.mjs from the repo root, but the section says Continue is most useful in repositories that do not ship the skill and tells users to install it under ~/.agents or ~/.claude; there the relative path does not exist and step 1 fails before the verifier resolution runs.'
+    suggested_action: 'Have step 1 name the user-level install paths as the alternative invocation, and have step 4 run the verifier value step 1 returned in its JSON instead of a hard-coded path.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 14
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+  ci: 'not read — gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 22
+    notes: 'isWorkItemDocument (changed boundary) probed: engages, 22 executed (18 task.139 cases + 4 handoff cases), 0 reproduced, 0 over-blocked. continuation.mjs writes nothing; slug and branch cannot steer the path out of its directory (tested).'
+  performance:
+    status: PASS
+    notes: 'continuation.mjs 0.11 s on this repository; handoff-verify.mjs unchanged.'
+  reliability:
+    status: PASS
+    notes: 'No-verifier path keeps the manual-verify step; non-git directory falls back to detached handling; piped --json drains (tested).'
+  maintainability:
+    status: PASS
+    notes: 'Header contract mirrors handoff-verify.mjs; 13 behavioural tests + §6 guard, mutation-proved.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1: Continue procedure invocations must work from a user-level install.'
+      refs: ['skills/session-handoff/SKILL.md']
+  future:
+    - action: 'CR-2 (pre-existing, identical on origin/develop): tracker-reconcile workItemDocFor and file-naming.md omit qa-planning risk/test-design artifacts; drive §6 off the standard plus WORK_ITEM_ARTIFACT_RE.'
+      refs: ['skills/tracker-reconcile/scripts/tracker-reconcile.js', 'docs/standards/file-naming.md']
+    - action: 'CR-3 (advisory): distinguish an unresolved work-item branch from a non-work-item branch in continuation.mjs output.'
+      refs: ['skills/session-handoff/scripts/continuation.mjs']
+    - action: 'CR-4 (cleanup): import WORK_ITEM_ARTIFACT_RE in work-item-artifact-naming.test.js instead of a third copy.'
+      refs: ['tests/work-item-artifact-naming.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

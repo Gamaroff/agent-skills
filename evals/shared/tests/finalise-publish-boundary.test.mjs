@@ -158,12 +158,14 @@ test("both CI readings carry a head, and the second is the pushed acceptance hea
   );
   assert.match(
     step7,
-    /\*\*CI reading 1\*\*: \$\{CI_ROLLUP\} @/,
+    // task.172: a docs-only reading appends `(tree-equivalent to <sha>)` between the state and the head — REQUIRED on both
+    // readings (QA cycle 1, CR-3: an optional group let reading 2 drop it without a test going red).
+    /\*\*CI reading 1\*\*: \$\{CI_ROLLUP\}\$\{CI_TREE_EQ:\+ \(tree-equivalent to \$\{CI_TREE_EQ\}\)\} @/,
     "the PR canonical comment carries reading 1 with its head",
   );
   assert.match(
     step7,
-    /\*\*CI reading 2\*\*: \$\{CI_ROLLUP_2\} @/,
+    /\*\*CI reading 2\*\*: \$\{CI_ROLLUP_2\}\$\{CI_TREE_EQ_2:\+ \(tree-equivalent to \$\{CI_TREE_EQ_2\}\)\} @/,
     "the PR canonical comment carries reading 2 with its head",
   );
   // The PR head must be compared to the pushed head before reading CI on it — never gate one commit and read another.
@@ -493,7 +495,8 @@ test("6c head-binds the second reading: the poll records the sampled PR head and
   );
   assert.match(
     sixC,
-    /"\$\(sampled_head\)" "\$CHECKS" "\$WAITED" > "\$RESULT"/,
+    // task.172: a fifth field, TREE_EQ=<sha12 or empty>, names the commit a docs-only SUCCESS rests on.
+    /"\$\(sampled_head\)" "\$CHECKS" "\$WAITED" "\$TREE_EQ" > "\$RESULT"/,
     "the result line carries the sampled head AND the check count it was green over (obs #87)",
   );
   // The stop condition, not the sample, decides (obs #87, #108): never at 0s, never on a
@@ -510,8 +513,8 @@ test("6c head-binds the second reading: the poll records the sampled PR head and
   );
   assert.match(
     sixC,
-    /read -r CI_ROLLUP_2 CI_HEAD_READ CI_CHECKS_2 WAITED < "\$RESULT"/,
-    "the later turn reads the four-field line",
+    /read -r CI_ROLLUP_2 CI_HEAD_READ CI_CHECKS_2 WAITED CI_TREE_EQ_FIELD < "\$RESULT"/,
+    "the later turn reads the five-field line (four names would let WAITED absorb TREE_EQ=…)",
   );
   assert.ok(
     codeLines(sixC).some((l) =>

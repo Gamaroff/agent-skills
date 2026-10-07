@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.177.review-pr-resolution-edge-cases'
+task_title: '/review-pr resolution edge cases'
+gate: CONCERNS
+status_reason: 'All four fixes land and are mutation-proven, but the .env parse regresses a value with a leading space (its trailing spaces and comment survive), and the scheme-less arm misreads two branch shapes the task promised would stay branches.'
+reviewer: 'QA Engineer'
+head: '1d636202fcb7d2b0b71d26657ba70182786dcd5e'
+updated: '2026-10-03T06:33:02Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'Step 0b .env parse: the leading-whitespace `s///` sets sed''s `t` flag, so the first `-e t` branches to the end even when no quote matched. `JIRA_URL= https://acme.atlassian.net   ` keeps its trailing spaces (base trimmed them, so this is a regression) and `JIRA_URL= https://acme.atlassian.net # prod` keeps its comment; both still warn falsely.'
+    suggested_action: 'Reset the t flag after the leading trim (`-e ''t a'' -e '':a''` straight after it, or move the leading strip into the extracting sed), and add Step 0b tests with a space after `=`.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'skills/review-pr/scripts/parse-target.sh'
+    finding: 'A dotted first segment is taken for a host even when it is a version: `v2.0/browse/x` is now refused as url-no-target and `5.x/fix/issues/12` parses as kind=github-issue, where base parsed both as branches. The `*.*/browse/*` marker needs no extra segment, so the task''s "every marker needs host/x/…" claim does not hold for it. The task names "a branch target resolving as a URL" as a Critical rollback trigger. Reviewer confidence medium; reproduced by QA under bash and zsh.'
+    suggested_action: 'Require the first segment''s last label to be two or more letters (a TLD shape), so v2.0, 5.x and v1.2 stay branches; add `v2.0/browse/x` and `5.x/fix/issues/12` as branch cases.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: low
+    file: 'skills/review-pr/scripts/parse-target.sh'
+    finding: 'The known-host arm `*.atlassian.net/*` lets `*` cross `/`, so the branch `feature/foo.atlassian.net/x` becomes `https://feature/foo.atlassian.net/x` and is refused; the arm does not apply the first-segment rule its own comment states.'
+    suggested_action: 'Test `${TARGET%%/*}` against `*.atlassian.net` in a nested case, as the marker arm does; add the branch as a test case.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 227
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 22
+    notes: 'shell-fn probe of parse_target with 11 scheme-less cases × bash/zsh: engages, 0 reproduced, 0 overblocked. Command substitution in a scheme-less target stays inert text.'
+  performance:
+    status: PASS
+    notes: 'No network call added; the parser arm is one case statement.'
+  reliability:
+    status: PASS
+    notes: 'Docs guard and rung 2 behave as specified; the .env regression is carried as CR-1.'
+  maintainability:
+    status: PASS
+    notes: '19 new executed tests under bash and zsh; every fix mutation-proven red.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (.env t-flag) and CR-3 (version-shaped first segment)'
+      refs: ['skills/review-pr/SKILL.md', 'skills/review-pr/scripts/parse-target.sh']
+  future:
+    - action: 'CR-6: list pr_number among KEY_FIELD values in §0a''s comment and :? message (shared source)'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'CR-5: docs guard prints DOC_FILE= on the present branch from an inherited value; bind it in both branches'
+      refs: ['skills/review-pr/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-3 fixed']

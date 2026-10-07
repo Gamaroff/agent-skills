@@ -76,7 +76,8 @@ What this prompt adds is the *subject*: the corpus says what to send, this says 
 ### Choosing the sink
 
 `SINKS` (`shared/resources/security-input-corpus.mjs`) are `url-authority`, `sql-orm`, `shell-exec`,
-`path`, `template-render`. Pick by what the control *decides*, not by what the module is called:
+`path`, `template-render`, `filename`, `markdown-structure`. Pick by what the control *decides*, not by
+what the module is called:
 
 | The control decides… | Sink |
 | --- | --- |
@@ -85,6 +86,8 @@ What this prompt adds is the *subject*: the corpus says what to send, this says 
 | what reaches a shell or a spawned process | `shell-exec` |
 | what filesystem location is read or written | `path` |
 | what is interpolated into rendered output | `template-render` |
+| which directory entry counts, and what value a name yields (a script run against a directory) | `filename` |
+| whether an implementation report is whole — a validator of the pipeline's report document | `markdown-structure` |
 
 No sink fits → report `unverifiable` for that control and say which inputs would have been needed.
 Do not force a control into the nearest sink; a probe run with the wrong corpus produces a confident
@@ -107,10 +110,14 @@ answer to a question nobody asked.
   non-zero rejected; a case carrying `expected` is compared instead), a crash is `errored`, and each
   guarded flag is its own control, named with `--name`. A script or CLI that reads stdin, a shell script that takes two
   positionals, or anything that needs the network is what remains declined — say which.
-- **Called with exactly one argument** — for the JS form. The child runner calls
-  `await fn(input)`. An export needing more configuration than that is not probeable as an export;
-  if a Node CLI calls it, probe the CLI with `cli:` (the argv is the real interface), otherwise
-  report `unverifiable` rather than inventing a wrapper, and say what shape would be.
+- **Called with the case as its first argument** — for the JS form. The child runner calls
+  `await fn(input, ...args)`, where `args` is the JSON array given with `--args-json` (empty without
+  it). An export whose further arguments are plain configuration is probed by stating them —
+  `report-lint.js#lintReport` takes `--args-json '[{"sections": <its loadTemplate() result>}]'`
+  (task.131). A validator answering `{ ok: false, … }` is read as refusing. An export that needs a
+  live object (a repository, a connection) as an argument is not probeable as an export; if a Node
+  CLI calls it, probe the CLI with `cli:` (the argv is the real interface), otherwise report
+  `unverifiable` rather than inventing a wrapper, and say what shape would be.
 - **The nearest thing to the real call site you can reach.** Cite the `file:line` of the **call
   site**, not of the helper. See §6 — this is the residual limit of the whole method.
 

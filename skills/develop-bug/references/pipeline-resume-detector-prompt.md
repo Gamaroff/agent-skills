@@ -85,6 +85,10 @@ find .claude/state -maxdepth 1 \( -name "develop-pipeline.last-halt.json" -o -na
 Every note any step of this prompt files in `deltas_since_pause` is a delta **object** — the shape is stated once, in § Output Schema's `deltas_since_pause` object fields, and governs every site below.
 
 1. Read every candidate listed. Drop any whose `task_or_story_directory` is not the directory of the document being resumed — and **report each one dropped** in `deltas_since_pause` as `{ "path": "<that snapshot>", "concern": "stale snapshot for <other dir> ignored" }`; a leftover for another task is itself worth the operator's attention.
+
+   <!-- candidate-rule: legacy --> A candidate with **no `task_or_story_directory`** is a pre-task.123 snapshot. It can belong to any document, and `--restore` refuses it without `--accept-legacy`. Drop it too — never treat an absent directory as a match — and file it as `{ "path": "<that snapshot>", "concern": "legacy snapshot (no task_or_story_directory) — restore deliberately with --restore --accept-legacy, or delete" }`.
+
+   <!-- candidate-rule: provenance --> A candidate matched **by its directory** outranks one that is not, regardless of mtime. The ranking is `advance-pipeline-lock.sh` `choose_candidate()`, and that function is the authority, not this list. A newer legacy file never wins over an older matched claim. If the two disagree, run `advance-pipeline-lock.sh --restore --which <doc-dir>` (read-only; it prints the path `--restore` would consume) and report what it names.
 2. **Stale snapshot after merge (task.124, obs #88).** For a `last-halt.json` that *is* for this document, check whether the run it records has already **finished**: the snapshot's `pr_url` is set and `gh pr view <pr_url> --json state --jq .state` returns `MERGED`. If so, the snapshot outlived its run — a completed run deletes its own snapshot at Step 8 since task.124, so one that survives is a leftover from before that, or from a run that completed outside the pipeline. Report it in `deltas_since_pause` as an ordinary delta object — `{ "path": "<snapshot path>", "concern": "stale-snapshot: PR merged" }`, the object's existing fields (§ `deltas_since_pause` object fields) — **with that exact `concern` string: it is the only label the orchestrator acts on** (resume contract § Consume Output matches it by equality, never by prefix, because the two skip notes below share the `stale-snapshot` prefix and must never be deleted on — task.130 QA cycle 2, bug 3) — drop it from the candidates, and **do not delete it**: this prompt is read-only, and the delete is the orchestrator's, verified on disk (resume contract § Consume Output; task.130, PR #436 review CR-3). A subagent that reports a delete it may not have performed is worse than one that reports nothing — the orchestrator would trust the report over the directory. Never offer a resume of merged work.
 
    **This check is `gh`-only, and a failed read is never evidence of MERGED.** Branch on the URL
@@ -97,7 +101,7 @@ Every note any step of this prompt files in `deltas_since_pause` is a delta **ob
    same-document deletion covers the completed-run case on every platform.
 
    **`status: accepted` is not finished, and must not fire this rule** (task.124 QA cycle 2, CR-1). `/finalise` writes `accepted` at its Step 7 action 6a — *before* its second CI reading, whose `ci-not-green-on-acceptance-head` HALT is a documented outcome, and before Step 8 runs. A snapshot for an accepted document is therefore the most likely shape of a **live** post-acceptance halt or pause, and deleting it destroys exactly the resume record the halt wrote. An accepted document with an OPEN (or unknown, or no) PR is an ordinary candidate.
-3. Of the candidates that remain, take the **newest by mtime** (the `ls -t` order above).
+3. Of the candidates that remain, all matched by directory, take the **newest by mtime** (the `ls -t` order above). This is `choose_candidate()`'s rule within one provenance.
 4. `source` is `"halt_snapshot"` when the winner is `last-halt.json`, `"orphaned_claim"` when it is a `.pausing.*` file.
 
 Extract from the winner (or from the lock, when present):
@@ -112,6 +116,7 @@ Snapshot-specific fields (when the winner is `last-halt.json`):
 QA-loop fields (lock or snapshot, both optional — absent on a run that predates task.123):
 - `qa_phase` (`5a|5b|5c`) → the loop's sub-position when the run stopped; report it in `deltas_since_pause` as `{ "path": null, "concern": "lock qa_phase: 5b" }` when `LOCK_STEP` is 5
 - `extra_cycles_granted` / `qa_max_cycles` (integers) → a grant recorded by a previous re-entry and the absolute budget it set; report both in `deltas_since_pause` as `{ "path": null, "concern": "extra_cycles_granted: {k}; qa_max_cycles: {n}" }` so the operator sees the budget the run will resume under. When `halt_reason` matches `loop-limit|not-converging`, also report the highest `gate.{N}` on disk against the count of `### QA Cycle` entries in the implementation report — a difference is a cycle the operator ran outside the loop, and the resume contract's **Re-entry after a QA loop escalation** back-fills it
+- **Count, do not read.** Any cycle number or entry count you report comes from a command, never from the report's prose: the cycle from `bash .agents/skills/{develop-story|develop-task}/references/qa-cycle.sh "{DOC_DIR}"`, the entry count from `grep -c '^### QA Cycle' "{report_path}"` (task.172: a count read from prose said 5 where both commands said 4)
 
 > A snapshot tagged `pause_reason: "precompact"` was left by the PreCompact hook before it removed the lock — surface it to the user as "resume from the compaction pause at step X?" rather than a hard terminal halt.
 
@@ -120,6 +125,8 @@ An orphaned claim carries no `halt_step`, `pause_reason` or `paused_at` — trea
 Set an output field `source: "lock" | "halt_snapshot" | "orphaned_claim" | "none"` so the orchestrator can prompt the user appropriately ("resume the active pipeline?" vs. "resume from the prior halt at step X?" vs. "resume from the interrupted pause at step X?").
 
 If no lock is present and no candidate survives step 1 (none exist, or every one belongs to another document): set `blocking_issues: ["No active lock, no halt snapshot and no orphaned claim for this document — cannot determine resume step"]`, `recommended_step: 1`, `source: "none"`. The orchestrator should treat this as a fresh start — and still surface any dropped candidates.
+
+<!-- candidate-rule: legacy-only --> **Unless a candidate was dropped only for being legacy.** When no candidate survives and at least one was dropped under the legacy rule in item 1, this is not a fresh start. It is a snapshot the helper refuses to guess about. Set `blocking_issues: ["Only a legacy snapshot (no task_or_story_directory) is on disk — restore it deliberately with advance-pipeline-lock.sh --restore --accept-legacy <doc-dir> if it is this document's, or delete it; not a fresh start"]`, `recommended_step: 1`, `source: "none"`. The blocking issue makes the orchestrator HALT for the operator, as the SKILL.md Step 0-lock paragraphs require. A fresh run would otherwise reach Step 8, which deletes a sole legacy snapshot, and the recovery window would close with nobody having decided (task.133 QA-5).
 
 If the file is present but invalid JSON: add `"Lock/snapshot file unreadable — cannot determine resume step"` to `blocking_issues`.
 
@@ -161,6 +168,9 @@ Build `EXPECTED` = the set of `(step, path)` pairs the table names. Then:
   - **A record at step 8 recommends 8, never 9.** There is no step 9. A lock, snapshot or claim at
     step 8 means Step 8 has not passed its Completion Checklist — the checklist's own `--complete`
     is the lock's one terminal remover (task 161) — so recommend 8: re-run Step 8
+  - **A record at step 5 recommends 5, never 6.** Steps 5 and 6 are one lock step: the lock reads
+    `current_step: 5` for the whole QA loop and advances `5 → 7`, so no lock is ever at 6. Recommend
+    5 and report the lock's `qa_phase` as the sub-position (Step 1, QA-loop fields)
 - **An expected summary for `LOCK_STEP` is missing**: `recommended_step = LOCK_STEP` (re-execute)
   - Rationale: lock was updated but step may not have fully completed (interrupted mid-step)
 - **An expected summary for an earlier step is missing**: add to `blocking_issues`:
@@ -208,10 +218,10 @@ Emit the result object with all fields. Do NOT emit any other text.
 | Condition | `recommended_step` |
 |-----------|-------------------|
 | Lock absent / unreadable | 1 |
-| Every summary the report's `Subagent summary ref` column names is present and valid (a `—` cell expects nothing) | LOCK_STEP + 1, or 8 when LOCK_STEP is 8 |
+| Every summary the report's `Subagent summary ref` column names is present and valid (a `—` cell expects nothing) | LOCK_STEP + 1 (5 when LOCK_STEP is 5, with its `qa_phase`), or 8 when LOCK_STEP is 8 |
 | The report names a summary for LOCK_STEP and it is absent | LOCK_STEP (re-execute) |
 | The report names a summary for an earlier step and it is absent | LOCK_STEP (conservative) + blocking_issue |
-| Report without the `Subagent summary ref` column | LOCK_STEP + 1, or 8 when LOCK_STEP is 8 (nothing expected) + a `deltas_since_pause` note |
+| Report without the `Subagent summary ref` column | LOCK_STEP + 1 (5 when LOCK_STEP is 5, with its `qa_phase`), or 8 when LOCK_STEP is 8 (nothing expected) + a `deltas_since_pause` note |
 | Report missing or unreadable | LOCK_STEP (conservative) + blocking_issue |
 | Branch missing | Same as above + blocking_issue |
 | A `last-halt.json` for this document whose PR is `MERGED` | not a candidate — reported as `stale-snapshot`; the orchestrator deletes |

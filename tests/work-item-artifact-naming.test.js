@@ -245,7 +245,7 @@ test("§4 no allowlisted artifact belongs to a task that is still in flight", ()
 function collectDocumentsWithFrontmatter() {
   const out = [];
   const skip =
-    /\.(qa|gate|bug|implementation|review|dod|plan|handover|pr-review)\./;
+    /\.(qa|gate|bug|implementation|review|dod|plan|handover|handoff|pr-review)\./;
   (function walk(dir) {
     let entries;
     try {
@@ -356,5 +356,81 @@ test("§5 no Change Log row is dated after its document's frontmatter `updated:`
       "`document-change-log.md`: every entry bumps `updated:` in the same " +
       "edit. Use `bumpUpdated()` in change-log.js rather than editing by " +
       `hand.\n  ${offenders.join("\n  ")}`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// §6 Every registered artifact segment is excluded wherever code picks "the
+// work-item document" out of its directory (task.156).
+//
+// Registering a segment in the standard (§1 reads it from there) does not teach
+// the code that hard-codes its own list. `handoff` was added for continuation
+// files; without this guard a committed `task.N.handoff.1.x.md` would read as a
+// work-item document to finalise's 8a boundary (`isWorkItemDocument`), and
+// tracker-reconcile's `workItemDocFor` — which takes the FIRST non-artifact
+// `.md` in readdir order — could append its Change Log row to the continuation
+// file instead of the task. That second list also lacked `pr-review`, which this
+// guard found. Behaviour, not source text: each reader is called on a path
+// shaped like the registered artifact.
+// ---------------------------------------------------------------------------
+
+test("§6 registered artifact segments are never read as the work-item document", async (t) => {
+  const segments = [...registeredSegments("task")].sort();
+  assert.ok(segments.includes("handoff"), "the standard registers `handoff`");
+  assert.ok(segments.length >= 8, `parsed only ${segments.length} segments`);
+
+  const { isWorkItemDocument } = await import(
+    require("url").pathToFileURL(
+      path.join(
+        REPO_ROOT,
+        "shared",
+        "resources",
+        "finalise-fix-and-recheck.mjs",
+      ),
+    ).href
+  );
+  const { workItemDocFor } = require(
+    path.join(
+      REPO_ROOT,
+      "skills",
+      "tracker-reconcile",
+      "scripts",
+      "tracker-reconcile.js",
+    ),
+  );
+
+  const dirName = "task.1.zz-work";
+  const os = require("os");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-seg-"));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+  const offenders = [];
+  for (const seg of segments) {
+    // `a-` sorts before every slug, so a reader taking the first readdir entry
+    // would pick the artifact if its filter missed the segment.
+    const artifact = `task.1.${seg}.1.a-artifact.md`;
+    if (isWorkItemDocument(`docs/tasks/${dirName}/${artifact}`)) {
+      offenders.push(`finalise isWorkItemDocument accepts ${artifact}`);
+    }
+    const dir = path.join(tmp, seg, dirName);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, artifact), "x\n");
+    fs.writeFileSync(path.join(dir, `${dirName}.md`), "x\n");
+    const picked = workItemDocFor(path.join(dir, "task.1.handover.1.x.json"));
+    if (path.basename(picked ?? "") !== `${dirName}.md`) {
+      offenders.push(
+        `tracker-reconcile workItemDocFor picks ${path.basename(picked ?? "null")}`,
+      );
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    "a registered artifact segment is missing from a hard-coded list",
+  );
+  assert.equal(
+    isWorkItemDocument(`docs/tasks/${dirName}/${dirName}.md`),
+    true,
+    "non-vacuity: the document itself is accepted",
   );
 });

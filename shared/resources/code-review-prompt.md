@@ -111,6 +111,7 @@ code_review:
       severity: high           # low | medium | high   (bugs: rate real impact; cleanups: usually low)
       confidence: high         # low | medium | high   (only bug + high gates, and only when opted in)
       file_line: "src/x/y.ts:42"
+      line_text: "if (user.id = target.id) {"   # the trimmed source text of that line
       finding: "<one sentence: what is wrong>"
       suggested_action: "<one sentence: the fix approach — not a file path>"
       suggested_owner: dev
@@ -119,7 +120,12 @@ code_review:
 Rules:
 - Sort findings: bugs before cleanups; within each, high → medium → low severity.
 - `id` is CR-{n}; `suggested_owner` is always `dev`.
-- `finding`/`suggested_action` are single sentences. `file_line` is `path:line` from the diff.
+- `finding`/`suggested_action` are single sentences.
+- `file_line` is `path:line` where line is the line number IN THE PR-HEAD VERSION OF THE FILE — the
+  `+` side of the hunk header (`@@ -a,b +c,d @@` counts from `c`). It is NEVER a line number in the
+  patch file at <DIFF_FILE>. Read the file at that line before you report it.
+- `line_text` is that line's source text, trimmed. The caller checks it against the file; a finding
+  whose text does not match is shown to the user as an unverified location.
 - Output ONLY the YAML block above — no prose, no markdown table, no fences around it.
 - Empty review → `code_review: { reviewed: "...", findings: [], truncated_count: 0 }`.
 ```
@@ -211,7 +217,7 @@ the other behaviour-driving keys the QA skills already read (`status`, `github_i
 **QA (`/qa-story`, `/qa-task`) — bounded across the up-to-5-cycle QA loop:**
 - First review: `git diff <base>...HEAD > <DIFF_FILE>` (base = the resolved target branch, default `develop`).
 - Re-review (QA cycle ≥ 3): scope to files changed since the last gate — reuse the skill's existing
-  `git log --since="{gate_date}" --name-only` set, diff only those paths, so each cycle re-reviews
+  `git diff --name-only "{gate_head}"..HEAD` set (the commit the last gate judged, from its `head:`), diff only those paths, so each cycle re-reviews
   only what changed. **One carve-out overrides this**: when the prior gate failed on a safety axis,
   the re-review runs unscoped at *any* cycle and the prompt gains a SAFETY RE-PROBE directive. The
   trigger and its non-triggers are stated once in
@@ -239,6 +245,10 @@ So on **cycle 2 only** (exactly one prior gate exists):
 - For every change to a dedupe, cache or record key, a normaliser or an equality predicate, find
   **one pair that must be the same and one that must differ** — a key changed to fix one direction
   has usually broken the other (the identity-rule table in `qa-fix` Step 3.5, obs #169).
+- For every change that runs a configured command, compiles a caller-supplied pattern or loops over
+  input it does not bound, probe the **resource bounds**: a timeout kills the whole process tree, a
+  matcher stays linear on a repeated pattern, and the command does not run against a working tree it
+  did not expect (obs #249).
 
 Cycles 3+ keep the narrowed scope. This is affordable because the pipeline's convergence check ends
 the loop shortly after cycle 3 when it is not converging: the trade is **two deep cycles instead of

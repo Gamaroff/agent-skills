@@ -71,7 +71,15 @@ const driver = {
     // -p prints the prompt and runs non-interactively. --add-dir scopes the
     // agent to the sandbox. We pass the skill root as a hint via env so the
     // user can wire skill discovery in their own ~/.claude config.
-    const args = ["-p", ctx.prompt, "--add-dir", ctx.sandbox];
+    // ctx.cliArgs: per-scenario extra arguments (scenario.json `cliArgs`), e.g. a scoped
+    // --allowedTools list — `claude -p` with no permission flag cannot run Bash.
+    const args = [
+      "-p",
+      ctx.prompt,
+      "--add-dir",
+      ctx.sandbox,
+      ...(ctx.cliArgs || []),
+    ];
     const res = spawnSync("claude", args, {
       cwd: ctx.sandbox,
       input: stdin,
@@ -82,11 +90,21 @@ const driver = {
         EVAL_SKILL_ROOT: ctx.skillRoot,
       },
       encoding: "utf-8",
-      timeout: 5 * 60 * 1000,
+      // EVAL_TIMEOUT_MS overrides the 5-minute default (a scenario can set it in env.json).
+      timeout: Number(process.env.EVAL_TIMEOUT_MS) || 5 * 60 * 1000,
     });
     if (res.status !== 0) {
+      // stdout too: `claude -p` prints some fatal errors there ("Credit balance is too
+      // low"), leaving only an unrelated warning on stderr.
+      // A null status means the process was killed (the timeout, or a signal): say why, or the
+      // message reads "exited null" with nothing to act on (task.186 A6).
+      const why =
+        res.status === null
+          ? ` (${[res.error && res.error.code, res.signal].filter(Boolean).join(", ") || "no exit status"})`
+          : "";
       throw new Error(
-        `claude-cli exited ${res.status}: ${(res.stderr || "").slice(0, 500)}`,
+        `claude-cli exited ${res.status}${why}: ${(res.stderr || "").slice(0, 500)}` +
+          `${res.stdout ? ` | stdout: ${res.stdout.slice(-500)}` : ""}`,
       );
     }
     // We can't tell which scripted answers were actually consumed without a

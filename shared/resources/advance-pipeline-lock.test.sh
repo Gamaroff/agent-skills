@@ -46,12 +46,16 @@
 #        same-document snapshot is consumed with it); a string halt_step is
 #        stored as a number; a GNU-shaped `stat` (shimmed) still picks the newest
 #        candidate, and a non-numeric mtime read degrades to 0 with a warning; a
-#        snapshot's `waiting_on` is dropped by the restore.
+#        snapshot's `waiting_on` is dropped by the restore; a directory holding a
+#        control character (NUL, a trailing newline, U+001F, U+007F) is refused by
+#        name and never chosen or consumed — the shell read of it is lossy (bug.17).
 #   14.  No-lock split (task.124): `<n>` with no lock → exit 1 naming --restore
 #        (the silent exit 0 hid an inert Stop hook for a whole session, obs #123);
 #        `--skill <name>` and `--complete` with no lock keep exit 0 — the
 #        self-advance runs standalone in nine sub-skills, and --complete must
 #        stay able to clear an absent lock.
+#        `--skill` with no lock but a halt snapshot or orphaned claim on disk
+#        still exits 0 and names --restore on stderr; silent without either (obs #280).
 #
 # Scenarios 8–11 run under BOTH bash and zsh. macOS logins are zsh and task 51
 # found a real bash/zsh divergence in a sibling shared resource, so the
@@ -502,13 +506,40 @@ run_restore_scenarios() {
   fi
   rm -f "$L" "$S"
   # A candidate that already names a directory keeps its own under the flag — the stamp
-  # fills an absence, it never overwrites.
-  printf '{"task_or_story_directory":"%s","current_step":4}\n' "$R/doc" > "$S"
-  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --accept-legacy "$R/doc" >/dev/null 2>&1
-  if [ "$(jq -r '.task_or_story_directory' "$L")" = "$R/doc" ] && [ "$(jq -r '.current_step' "$L")" = "4" ]; then
-    pass "[$SH] --restore --accept-legacy: a matched candidate keeps its own directory"
+  # fills an absence, it never overwrites. The candidate's spelling (`./doc/`, read from $R)
+  # is canon-equal to the `$R/doc` passed but textually different, so an unconditional
+  # `.task_or_story_directory = $dir` turns this red; seeding `$R/doc` itself could not tell
+  # the fill from the overwrite (task.130 gate 7 QA-14; task.133).
+  ( cd "$R" && printf '{"task_or_story_directory":"./doc/","current_step":4}\n' > "$S" \
+      && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --accept-legacy "$R/doc" >/dev/null 2>&1 )
+  if [ -f "$L" ] && [ "$(jq -r '.task_or_story_directory' "$L")" = "./doc/" ] && [ "$(jq -r '.current_step' "$L")" = "4" ]; then
+    pass "[$SH] --restore --accept-legacy: a matched candidate keeps its own directory spelling"
   else
-    fail "[$SH] --restore --accept-legacy: no overwrite" "lock=$(jq -c . "$L")"
+    fail "[$SH] --restore --accept-legacy: no overwrite" "lock=$([ -f "$L" ] && jq -c . "$L" || echo absent)"
+  fi
+  rm -f "$L" "$S"
+
+  # A bystander legacy snapshot beside a matched claim: the restore succeeds from the claim, so
+  # the --accept-legacy advice is noise — it prints only when NOTHING restores (task.130 5c CR-2).
+  # The legacy snapshot is the NEWER file, so mtime alone would have preferred it.
+  printf '{"task_or_story_directory":"%s","current_step":6}\n' "$R/doc" > "$L.pausing.5151"
+  touch -t 202601010000 "$L.pausing.5151"
+  printf '{"current_step":2,"halt_step":2}\n' > "$S"
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r '.current_step' "$L")" = "6" ] && [ -f "$S" ] \
+      && ! printf '%s' "$OUT" | grep -q -- '--accept-legacy'; then
+    pass "[$SH] --restore: matched claim + bystander legacy snapshot → restored from the claim, no --accept-legacy advice, legacy kept"
+  else
+    fail "[$SH] --restore: quiet bystander advice" "rc=$RC lock=$([ -f "$L" ] && jq -c . "$L" || echo absent) snap=$([ -f "$S" ] && echo kept || echo gone) out=$OUT"
+  fi
+  rm -f "$L" "$S" "$L.pausing.5151"
+  # …and a legacy-only candidate set still names the flag, once, on the refusal.
+  printf '{"current_step":2,"halt_step":2}\n' > "$S"
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC=$?
+  if [ "$RC" -eq 1 ] && [ ! -f "$L" ] && [ "$(printf '%s\n' "$OUT" | grep -c -- '--accept-legacy')" -eq 1 ]; then
+    pass "[$SH] --restore: legacy-only → exit 1 and the --accept-legacy advice exactly once"
+  else
+    fail "[$SH] --restore: legacy-only advice" "rc=$RC out=$OUT"
   fi
   rm -f "$L" "$S"
 
@@ -595,6 +626,39 @@ run_restore_scenarios() {
   fi
   rm -f "$L" "$S"
 
+  # A directory holding a control character is refused before the compare (bug.17). The shell
+  # read of the directory is not a faithful copy of the JSON string: zsh keeps an embedded NUL
+  # and `cd` in canon() truncates at it, and BOTH shells strip a trailing newline in command
+  # substitution — so `<doc>\u0000x` (zsh) and `<doc>\n` (bash and zsh) each read back as `<doc>`
+  # and passed the provenance check for a string the candidate does not hold.
+  local CTRL
+  for CTRL in '\\u0000x' '\\n' '\\u001f' '\\u007f'; do
+    # shellcheck disable=SC2059 # CTRL is a literal JSON escape spliced into the format on purpose
+    printf "{\"task_or_story_directory\":\"%s${CTRL}\",\"current_step\":6}\n" "$R/doc" > "$L.pausing.6161"
+    WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --which "$R/doc" 2>/dev/null); RC=$?
+    OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" 2>&1); RC2=$?
+    if [ "$RC" -eq 1 ] && [ -z "$WHICH" ] && [ "$RC2" -eq 1 ] && [ ! -f "$L" ] && [ -f "$L.pausing.6161" ] \
+        && printf '%s' "$OUT" | grep -q "control character"; then
+      pass "[$SH] --restore: a directory with a control character (${CTRL#\\}) is refused by name — never chosen, nothing written, claim kept"
+    else
+      fail "[$SH] --restore: control-character directory (${CTRL#\\}) refused" "which rc=$RC stdout='$WHICH' restore rc=$RC2 lock=$([ -f "$L" ] && echo CREATED || echo absent) claim=$([ -f "$L.pausing.6161" ] && echo kept || echo CONSUMED) out=$OUT"
+    fi
+    rm -f "$L" "$L.pausing.6161"
+  done
+  # …and beside a genuine same-document snapshot, the NEWER control-character claim neither wins
+  # nor is consumed as a loser: it was never this document's candidate.
+  printf '{"task_or_story_directory":"%s","halt_step":4}\n' "$R/doc" > "$S"
+  touch -t 202601010000 "$S"
+  printf '{"task_or_story_directory":"%s\\u0000x","current_step":6}\n' "$R/doc" > "$L.pausing.6262"
+  WHICH=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore --which "$R/doc" 2>/dev/null); RC=$?
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC2=$?
+  if [ "$RC" -eq 0 ] && [ "$WHICH" = "$S" ] && [ "$RC2" -eq 0 ] && [ "$(jq -r '.current_step' "$L")" = "4" ] && [ -f "$L.pausing.6262" ]; then
+    pass "[$SH] --restore: a newer NUL-directory claim loses to a matched snapshot and is not consumed"
+  else
+    fail "[$SH] --restore: NUL claim beside a matched snapshot" "which rc=$RC which='$WHICH' restore rc=$RC2 step=$(jq -r '.current_step' "$L" 2>/dev/null) claim=$([ -f "$L.pausing.6262" ] && echo kept || echo CONSUMED)"
+  fi
+  rm -f "$L" "$S" "$L".pausing.*
+
   # an orphaned .pausing.<pid> claim is a candidate; the newest candidate wins, and the
   # losing same-document snapshot is consumed with it (QA cycle 1, CR-8)
   printf '{"task_or_story_directory":"%s","halt_step":4}\n' "$R/doc" > "$S"
@@ -677,6 +741,39 @@ run_no_lock_split() {
       fail "[$SH] $MODE with no lock → exit 0" "rc=$RC"
     fi
   done
+
+  # obs #280: --skill with no lock stays exit 0, but says so when a pause or HALT left a
+  # snapshot or a claim behind. Its own directory, so no earlier scenario's snapshot leaks in.
+  local D="$TMPDIR_TEST/split280-$SH" ERR
+  mkdir -p "$D"
+  L="$D/develop-pipeline.lock"
+  ERR=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --skill finalise 2>&1 >/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ -z "$ERR" ]; then
+    pass "[$SH] --skill with no lock, no snapshot, no claim → exit 0, silent (standalone)"
+  else
+    fail "[$SH] --skill standalone → exit 0, silent" "rc=$RC err=$ERR"
+  fi
+  echo '{"current_step":7,"halt_step":7,"task_or_story_directory":"docs/x"}' > "$D/develop-pipeline.last-halt.json"
+  ERR=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --skill finalise 2>&1 >/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ -f "$D/develop-pipeline.last-halt.json" ] && echo "$ERR" | grep -q -- "--restore"; then
+    pass "[$SH] --skill with no lock + halt snapshot → exit 0, stderr names --restore, snapshot kept"
+  else
+    fail "[$SH] --skill with no lock + halt snapshot → warns" "rc=$RC err=$ERR"
+  fi
+  ERR=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --complete 2>&1 >/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ -z "$ERR" ]; then
+    pass "[$SH] --complete with no lock + halt snapshot → exit 0, silent"
+  else
+    fail "[$SH] --complete with no lock + halt snapshot → silent" "rc=$RC err=$ERR"
+  fi
+  rm -f "$D/develop-pipeline.last-halt.json"
+  echo '{"current_step":7}' > "$L.pausing.12345"
+  ERR=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --skill finalise 2>&1 >/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && echo "$ERR" | grep -q -- "--restore"; then
+    pass "[$SH] --skill with no lock + orphaned claim → exit 0, stderr names --restore"
+  else
+    fail "[$SH] --skill with no lock + orphaned claim → warns" "rc=$RC err=$ERR"
+  fi
 }
 
 run_restore_scenarios bash

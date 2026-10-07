@@ -76,7 +76,14 @@ Then HALT:
 ```
 ⚠️ Finalise identified Definition of Done gaps.
 Review the implementation report at {path} and address the gaps before re-running /finalise.
+A gap closed by changing code re-enters QA at 5a before /finalise re-runs — the resume offers it.
 ```
+
+**A gap closed by a code change is gated before acceptance.** On the resume, a halt at 7 whose fix
+changed code outside the work item's directory re-enters the QA loop at 5a through
+`reenter-qa-after-finalise.sh` rather than re-running `/finalise` over a head no gate has read; a
+document-only fix (a re-scoped criterion) resumes at 7. The rule and the script's refusals are the
+resume contract's **Re-entry after a finalise DoD-gaps halt** (task.170).
 
 ---
 
@@ -343,8 +350,14 @@ If `TRACKER_ISSUE` is set, post the completion comment and confirm the Done tran
 
    ```bash
    DOD_PATH=$(find {story-or-task-directory} -maxdepth 1 -name "*.dod.*.md" 2>/dev/null | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-)
-   FINAL_GATE=$(find {story-or-task-directory} -maxdepth 1 -name "*.gate.*.yml" 2>/dev/null | sed -E 's/^(.*\.gate\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2- \
-     | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
+   # The gate file from the one definition the QA skills use (task.158). This comment is
+   # non-blocking and post-finalise, so a refusal (no gate, or two files claiming the cycle)
+   # renders N/A with the helper's warning on stderr rather than dropping the comment.
+   FINAL_GATE_FILE=$(bash .agents/skills/{develop-story|develop-task|develop-bug}/references/qa-cycle.sh "{story-or-task-directory}" --path gate); rc=$?
+   [ "$rc" -le 1 ] || echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — QA Gate renders N/A" >&2
+   FINAL_GATE=""
+   [ -n "$FINAL_GATE_FILE" ] && FINAL_GATE=$(grep '^gate:' "$FINAL_GATE_FILE" 2>/dev/null | awk '{print $2}')
+   FINAL_GATE=${FINAL_GATE:-N/A}
 
    mkdir -p .claude/state
    # Terminator at COLUMN 0 — an indented terminator does not close an

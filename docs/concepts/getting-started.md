@@ -266,11 +266,11 @@ Skills install into your project under `.agents/skills/`. Two contexts:
 
 ```bash
 # In your target project root — download and install the latest release
+mkdir -p /tmp/agent-skills-install
 curl -fsSL https://github.com/Gamaroff/agent-skills/archive/refs/tags/$(
   curl -fsSL https://api.github.com/repos/Gamaroff/agent-skills/releases/latest \
     | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/'
-).tar.gz | tar -xz --strip-components=1 -C /tmp/agent-skills-install \
-  --wildcards 'agent-skills-*/skills/*'
+).tar.gz | tar -xz --strip-components=1 -C /tmp/agent-skills-install
 mkdir -p .agents/skills
 for d in /tmp/agent-skills-install/skills/*/; do
   [ -f "${d}SKILL.md" ] && cp -r "$d" ".agents/skills/$(basename $d)"
@@ -343,7 +343,7 @@ If you can't download from GitHub at install time, package skills manually and c
 
 ```bash
 # In this repo:
-python3 skills/create-skill/scripts/package_skill.py skills/develop-story
+python3 skills/create-skill/scripts/package_skill.py skills/develop-story skills/develop-story   # 2nd arg = output dir
 
 # In your target project:
 mkdir -p .agents/skills

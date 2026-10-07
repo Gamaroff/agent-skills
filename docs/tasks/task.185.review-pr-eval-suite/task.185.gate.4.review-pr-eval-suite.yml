@@ -1,0 +1,62 @@
+schema: 2
+task: 'task.185.review-pr-eval-suite'
+task_title: 'review-pr eval suite'
+gate: PASS
+status_reason: 'C3-CR-1 fixed: the runner reports a failed run only through EVAL_FAIL_EXIT, and repeat.mjs reads every other status as could-not-run (unknown DRIVER, throwing setup, signal). The cycle-4 review found only low-confidence and cleanup items. Live recheck through the final harness passed (02 and 03, 1/1 each).'
+reviewer: 'QA Engineer'
+head: '2064ee43a793d0d8153904603b42abc6850bb67a'
+updated: '2026-10-05T16:53:47Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5356
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+  live_recheck: 'env -u ANTHROPIC_API_KEY DRIVER=claude-cli node evals/shared/repeat.mjs scenarios/03-unanchored scenarios/02-renumber-gap --runs 1 -> both passed 1/1, rc 0'
+  ci: 'not read — CI is gated at /finalise'
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-10-05'
+  total_iterations: 3
+  verification_method: 'C3-CR-1 reproduction (DRIVER=claude-cl) -> run 1/2: not judged, rc 3; 3 mutants red at the fix'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 28
+    notes: 'No boundary code changed since gate 2; record task.185.qa.2.security.run.json stands.'
+  performance:
+    status: PASS
+    notes: 'Unchanged; live runs 92-177 s.'
+  reliability:
+    status: PASS
+    notes: 'The pass-rate tool reads a verdict positively; every non-verdict outcome is could-not-run.'
+  maintainability:
+    status: PASS
+    notes: 'One exit-status contract, stated once in evals/shared/README.md.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'C4-CR-1 (low/low): EVAL_FAIL_EXIT=5 is also Node exit for a fatal V8 error; a code at 64+ would be unambiguous.'
+      refs: ['evals/shared/repeat.mjs']
+    - action: 'C4-CR-2 (low/low): a scenario with no assertions counts as a pass under repeat; refuse an empty assertion list there.'
+      refs: ['evals/shared/repeat.mjs']
+    - action: 'C4-CR-3/4 (cleanup): EVAL_RUNS=0 message names --runs; add tests for the killed / not-started branches. Carried: C3-CR-2 timeout as could-not-run (documented), C3-CR-4 replay under repeat, cycle-1 CR-3 (other skills count-style artifact numbers) and CR-5 (fake gh missing --json field).'
+      refs: ['evals/shared/repeat.mjs', 'evals/shared/lib/fake-gh.mjs', 'skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

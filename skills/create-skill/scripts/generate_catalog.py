@@ -104,7 +104,7 @@ CATEGORIES = [
         "execute-checklist", "generate-ui-prompt", "observe-work", "session-handoff",
     ]),
     ("User Experience", [
-        "ux-expert", "building-components", "browser-use", "markdown-wireframe",
+        "ux-expert", "building-components", "browser-use", "wireframe",
     ]),
     ("Email", [
         "email-best-practices", "resend",

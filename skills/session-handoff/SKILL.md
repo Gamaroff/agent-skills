@@ -1,6 +1,6 @@
 ---
 name: session-handoff
-description: Write and re-read the project's session handoff — the "read this first if you are picking up work here" file at .agents/handoff.md. Write mode records project state in a fixed section order where every figure carries the command that produced it, keeping fast-decaying state apart from durable traps. Read mode RE-MEASURES every figure by re-running its command through a read-only whitelist and reports each line as confirmed / stale / unverifiable, so a reader never has to trust the date at the top. Use when starting work in a repo that has a handoff, when ending a session that should hand off, or when the user says "write a handoff", "refresh the handoff", "is the handoff still accurate?", or "what should I pick up".
+description: Three modes over measured handoff files. Write records project state in .agents/handoff.md, every figure with the command that produced it. Read RE-MEASURES a handoff through a read-only whitelist and reports each line confirmed / stale / unverifiable. Continue hands one piece of in-flight work to a fresh context — a continuation file beside the work item (next step, decisions, approaches ruled out) plus a paste-ready resume prompt that verifies it first. Use for "write a handoff", "is the handoff still accurate?", "what should I pick up", "hand off to a fresh session", "context is filling up", "continue this in a new context".
 ---
 
 # Session Handoff
@@ -26,6 +26,14 @@ exactly that job three times, and every failure was structural rather than autho
 
 Two ends fix this, and **the read end is what makes the write end worth doing**: a handoff whose
 figures are re-measured on arrival cannot mislead about the frontier, the tip, or the counters.
+
+## Modes
+
+| Mode | Writes | For |
+| --- | --- | --- |
+| [Read](#read--re-measure-before-trusting) | nothing | re-measuring any file in this format before trusting it |
+| [Write](#write--the-fixed-section-order) | `.agents/handoff.md` | **project** state, for whoever picks up the repo next |
+| [Continue](#continue--hand-in-flight-work-to-a-fresh-context) | one continuation file per handoff | **one piece of in-flight work**, for a fresh context to resume |
 
 ## Read — re-measure before trusting
 
@@ -184,6 +192,145 @@ the verifier never writes. Steps:
 5. **Prove it before committing**: run read mode on the file you just wrote. Every table row should
    be `confirmed`; `unverifiable` rows should each have a reason you accept (`timeout` on the full
    suite is fine — the reader can run it).
+
+## Continue — hand in-flight work to a fresh context
+
+Use it when the context is filling up, or a session is about to end mid-task. As a window fills,
+output degrades, and auto-compaction then replaces the detail with a summary the agent did not
+choose. What a summariser drops first — the approaches already ruled out and why each decision was
+taken — is what a restart most needs. Continue writes that down **deliberately, while the context
+is still good enough to choose well**, in the same measured format Read re-checks.
+
+It is not Write: `.agents/handoff.md` stays the one project-level file. A continuation file is state
+for **one** work item. Durable lessons go to `docs/contributing/traps.md` or the observation log,
+not here.
+
+1. **Resolve the path and the prompt — one call, never by hand:**
+
+   ```bash
+   # From the repository root. The skill may be installed in the repository or at user level —
+   # Continue is most useful where it is not in the repository — so take the first that exists.
+   CONT=""
+   for d in .agents/skills ~/.agents/skills ~/.claude/skills; do
+     [ -f "$d/session-handoff/scripts/continuation.mjs" ] && { CONT="$d/session-handoff/scripts/continuation.mjs"; break; }
+   done
+   [ -n "$CONT" ] || { echo "session-handoff is not installed in .agents/skills, ~/.agents/skills or ~/.claude/skills"; exit 1; }
+   command node "$CONT" --json
+   ```
+
+   Use `path`, `verifier` and `resumePrompt` exactly as given. The script writes nothing. On a
+   `feature/task.N.slug` branch whose `docs/tasks/task.N.slug/` exists the file goes there as
+   `task.N.handoff.{k}.slug.md`; on `feature/story.E.S.slug` it goes beside the story
+   (`story.E.S.handoff.{k}.slug.md`, the story found under the PRD root); anything else goes to
+   `.agents/handoffs/{YYYY-MM-DD}-{slug}.md` (`--slug` names it; create the directory if absent).
+   `reason: no-verifier` means no `handoff-verify.mjs` was found — the prompt then tells the reader
+   to re-measure by hand, and that step is never dropped.
+2. **Check for a develop pipeline.** If `.claude/state/develop-pipeline.lock` or
+   `.claude/state/develop-pipeline.last-halt.json` exists, keep the template's **Pipeline pointer**
+   section and name the file. Do **not** restate pipeline step state — it lives in the lock and the
+   implementation report, and a copy goes stale the moment the pipeline moves. Otherwise delete the
+   section.
+3. **Measure, then fill** [`assets/continuation.template.md`](assets/continuation.template.md) in
+   its order: goal and work item, the state table, then §1 Next step (**one** action and how to tell
+   it is done), §2 Done this session (short SHAs), §3 Decisions taken, §4 **Ruled out**, §5 Files that
+   matter (paths, never contents), §6 **Open questions**. §4 and §6 are never omitted — write `none`.
+   The template's comment gives the figure forms the verifier accepts; use them, do not invent
+   others. If a figure cannot be written in a form the verifier reads, drop the row — never change
+   the verifier to fit it.
+4. **Prove it with Read** on the new file:
+
+   ```bash
+   # {verifier} and {path} are the two values step 1's JSON returned — the verifier is resolved
+   # there, never assumed to be under .agents/skills.
+   command node "{verifier}" "{path}" --json
+   ```
+
+   When step 1 answered `reason: no-verifier` there is no verifier to run: re-run each command in
+   the state table by hand and compare it with its figure. Fix or re-measure every `stale` row. Accept an `unverifiable` row only with a reason you would
+   give the reader (`timeout` on a targeted test in a large repo is one).
+5. **Hand over.** Print `resumePrompt` verbatim and say that the file is **not committed**. Committing
+   it is the caller's call — a mid-task file may belong in the work item's next commit — and it has
+   one consequence: committing moves HEAD, so the **Branch tip** row then reads `stale` by that
+   commit. A caller who commits re-measures the tip and re-runs step 4 afterwards.
+
+The next session pastes the prompt. It runs Read first, treats every `stale` or `unverifiable`
+figure as unknown, reads §4 before trying anything, and starts at §1.
+
+### Installing for every repository
+
+Continue is most useful in repositories that do not ship this skill. Install it at user level —
+copy or symlink the skill directory to `~/.agents/skills/session-handoff/` (agent-agnostic) or
+`~/.claude/skills/session-handoff/` (Claude Code). The verifier's path is **resolved**, not
+hard-coded, for that reason: `continuation.mjs` tries its own sibling `handoff-verify.mjs` first,
+then `<repo>/.agents/skills/…`, `~/.agents/skills/…` and `~/.claude/skills/…`, and emits a path
+inside the repository relative and any other absolute — so the prompt names a verifier that exists
+for the session that reads it.
+
+## Context-pressure trigger (Claude Code)
+
+The model cannot see how full its context is, so "hand off when the context is getting full" asks
+for a self-assessment — and a self-assessment is least reliable exactly when the context is under
+load. This trigger makes the recommendation **mechanical**: Claude Code's status line already
+receives `context_window.used_percentage`, a recorder saves it per session, and a
+`UserPromptSubmit` hook reads it on every prompt. Past about **60%** the agent is told to recommend
+Continue mode in its closing next steps at the next natural boundary; past about **75%** it is told
+to recommend it firmly, now, before starting any new phase. The hook only changes what the agent
+recommends — it never blocks a prompt and never forces a handoff.
+
+Three files, one per job:
+
+| File | Job |
+| --- | --- |
+| `references/context-pressure.mjs` | the engine: `record`, `check`, and the installer's `settings` edits; the only code that reads or writes the state |
+| `references/context-pressure-statusline.sh` | status-line wrapper: records, then runs your own status line with the same stdin — its output and exit code are unchanged |
+| `references/context-pressure-install.sh` | user-level installer and uninstaller |
+
+**Install** (user level, so it works in every repository; `--settings <file>` targets another file):
+
+```bash
+sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh --dry-run   # review the diff
+sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh
+```
+
+It adds the hook (`timeout` 5s) and wraps the existing `statusLine.command` as
+`sh '<dir>/context-pressure-statusline.sh' -- sh -c '<your original>'`, touching nothing else:
+`padding` and other `statusLine` keys stay, and so does the file's mode. Your original then runs
+under `sh -c`, so one written in bash-only syntax should call its script
+(`bash ~/.claude/statusline.sh`) rather than inline it. With no status line it adds the recorder
+alone, which prints nothing. A second run changes nothing; a run from a different directory
+re-points the hook and the wrap at itself. It writes atomically and keeps a `.bak`. Anything it will
+not touch — a wrap it did not write, a `statusLine` with no command — is printed as
+`ACTION NEEDED` and the installer exits 1, so "nothing to do" and "needs you" never look alike. The paths it
+writes are the directory the installer ran from: run it from the installed skill, not from a
+repository checkout, or the hook dies with the checkout. Restart the Claude Code session afterwards.
+
+**Uninstall** removes the hook and unwraps to the exact original command:
+
+```bash
+sh ~/.agents/skills/session-handoff/references/context-pressure-install.sh --uninstall
+```
+
+**Knobs** (environment, read by the hook; an invalid value falls back to the default):
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `CONTEXT_PRESSURE_SOFT` | 60 | percent at which the soft note fires, once, on entering the band |
+| `CONTEXT_PRESSURE_FIRM` | 75 | percent at which the firm note fires (raised to `SOFT` if set below it) |
+| `CONTEXT_PRESSURE_REPEAT` | 5 | in the firm band, repeat the note every N prompts |
+| `CONTEXT_PRESSURE_MAX_AGE_MIN` | 15 | a reading older than this is ignored |
+| `CONTEXT_PRESSURE_STATE_DIR` | `${XDG_STATE_HOME:-~/.local/state}/agent-skills/context-pressure` | one small file per session, pruned after 7 days |
+
+**Silence is the failure mode, on purpose.** No note means one of: below the threshold, a stale
+reading, no reading yet, or a broken install — and these are indistinguishable from inside the
+session, by design: a wrong number is worse than none, and a broken hook must cost a missed
+reminder, never a blocked prompt. To check an install, start a session with
+`CONTEXT_PRESSURE_SOFT=1` and send **two** prompts: no reading exists until the first response has
+refreshed the status line, so the note appears on the second. A file named after the session id in
+the state directory is the other sign that recording works.
+
+**Claude Code only.** Other agents have no status-line feed; Continue mode still works by hand
+there. The status line's refresh cadence is undocumented, so a reading can lag a turn — the
+freshness window bounds how old an acted-on figure can be.
 
 ## Discoverability
 

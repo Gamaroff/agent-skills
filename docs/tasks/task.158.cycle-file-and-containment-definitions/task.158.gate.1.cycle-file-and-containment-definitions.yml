@@ -1,0 +1,62 @@
+schema: 1
+task: 'task.158.cycle-file-and-containment-definitions'
+task_title: "QA read-back requires this cycle's links; one definition each for the cycle's gate file and for path containment"
+gate: CONCERNS
+status_reason: 'All three mechanisms land and hold under test and mutation, but grant-qa-cycles.sh — called by the same resume procedure this branch moved onto qa-cycle.sh — keeps a second cycle definition that crashes on a zero-padded gate, so the new "only definition" claim is false (CR-1, medium, high confidence).'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T13:40:32Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: 'grant-qa-cycles.sh reconstructs the cycle with its own sed loop (no leading-zero strip, no regular-file check); on gate.08 it dies with "value too great for base" while qa-cycle.sh reads 8, so the resume procedure holds two definitions and the qa-cycle.sh header claim is false.'
+    suggested_action: 'Take the base cycle from the sibling qa-cycle.sh, add a zero-padded-gate test, and widen the tests/qa-cycle.test.js population to the shell helpers that read a gate number.'
+    suggested_owner: dev
+    bug_ref: 'task.158.bug.1.grant-qa-cycles-second-cycle-definition.md'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 289
+  phases_verified: 4/4
+  ci: 'not read (CI is gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 22
+    notes: 'Two probe runs (path sink, 11 cases each): the security-probe --entry containment (entryAccepted) and the CJS isWithin (cjsWithin). Every mismatch is attributed in the QA report — encoded-traversal is a literal in-root filename (import of the literal file verified), symlink-escape is the documented pre-import limit, and the cjsWithin absolute/empty/null-byte rows are adapter artifacts of path.join; the parity table tests isWithin on absolute children directly.'
+  performance:
+    status: PASS
+    notes: 'One qa-cycle.sh call per changed block; guard and parity tests read files only.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: the loop-limit re-entry path (grant-qa-cycles.sh) crashes on a zero-padded gate that the rest of the resume procedure now reads correctly.'
+  maintainability:
+    status: PASS
+    notes: 'One CJS and one ESM isWithin held by a parity test; GATE_SELECTION guard with shipped-shape fixtures; bundled helper test widened.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1: grant-qa-cycles.sh asks qa-cycle.sh for its base cycle; test with gate.08.'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+  future:
+    - action: 'CR-2 (low): resume contract suppresses qa-cycle.sh stderr, so a mis-substituted {doc-directory} reads as a fresh start — check the directory or keep stderr.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-3 (cleanup): qa-cycle.sh cycle mode counts a directory/symlink named like a gate; align the step-5-6 prose or add the regular-file check to cycle mode.'
+      refs: ['shared/resources/qa-cycle.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR-4 (cleanup): the --fake-gh ..name test writes a directory at the live repo root; use a disposable repoRoot.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

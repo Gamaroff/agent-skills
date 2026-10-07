@@ -269,6 +269,38 @@ test("D — variant-undetected when there is no header block and no frontmatter 
   assert.equal(r.variant, null);
 });
 
+test("B — CRLF: a fenced quoted report is still an example, and a heading only inside a fence is still missing", () => {
+  // task.131's markdown-structure probe found both directions failing on CRLF:
+  // fencedRanges never matched a `\r`-terminated fence, so the quoted report
+  // read as a second H1 + header block (a valid report refused) and a section
+  // present only in a fence read as present (a missing section accepted).
+  const crlf = (s) => s.replace(/\n/g, "\r\n");
+  const quoted = minimalReport("task", {
+    extraBody:
+      "\n```markdown\n# Implementation Report: quoted\n\n**Task**: `task.1.x.md`\n\n## Summary\n```\n",
+  });
+  assert.deepEqual(codes(lintReport(quoted, { sections: SECTIONS })), []);
+  assert.deepEqual(
+    codes(lintReport(crlf(quoted), { sections: SECTIONS })),
+    [],
+    "the CRLF copy of a clean report is clean",
+  );
+  const fencedOnly = minimalReport("task").replace(
+    "## Issues Log\n",
+    "```\n## Issues Log\n```\n",
+  );
+  assert.notEqual(
+    fencedOnly,
+    minimalReport("task"),
+    "the fixture edit applied",
+  );
+  for (const text of [fencedOnly, crlf(fencedOnly)]) {
+    assert.deepEqual(codes(lintReport(text, { sections: SECTIONS })), [
+      "section-missing",
+    ]);
+  }
+});
+
 test("E — one definition: the template names both variants with the optional marker, and step-0 inlines no template", () => {
   const tpl = read(DEFAULT_TEMPLATE);
   const parsed = parseTemplate(tpl);

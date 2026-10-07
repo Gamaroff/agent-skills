@@ -1,0 +1,21 @@
+{
+  "sink": "path",
+  "entry": "shared/resources/glob-match.js#globMatch",
+  "name": "globMatch-pathological-globs",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 17,
+  "passed": 17,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac"
+  ],
+  "ran_at": "2026-10-01T15:47:20.876Z"
+}

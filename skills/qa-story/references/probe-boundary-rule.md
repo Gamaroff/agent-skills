@@ -78,8 +78,19 @@ is the machine-readable half of the same statement:
   **over-blocking**.
 
 A control "rejects" by throwing, or by returning `null` / `undefined` / `false` —
-the non-throwing rejection shape a validator commonly uses. Treating a `false`
-return as acceptance would score a working control as absent.
+the non-throwing rejection shape a validator commonly uses — or by returning a
+**result object whose own `ok` is `false`** (`{ ok: false, problems }`, the shape
+`report-lint.js#lintReport` answers with; task.131). Treating any of these as
+acceptance would score a working control as absent: before the result-object rule,
+every report `lintReport` refused scored `accepted`. The rule is narrow — own
+property, strictly `false`, a plain non-array object — so no other return value
+changes meaning.
+
+A JS export whose second argument is plain configuration — `lintReport(text,
+{ sections })` — is probed with `--args-json '[…]'`: a JSON array the caller states,
+appended after every case's input. The engine never guesses an argument; without
+the flag such an export throws on every case, which scores `rejects-every-input`,
+not a verdict.
 
 The verdict branches, in the order they are checked:
 
@@ -139,6 +150,38 @@ Declining conditions, each reported with its reason:
 | `unknown-sink` | No corpus for that sink. `corpusFor` throws rather than returning `[]`, deliberately. |
 | `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). |
 | `case-errored` | One case timed out or its child never ran. |
+| `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` entry, which cannot append an argument to a call. |
+
+### `boundary: internal` is a decision, not a verdict
+
+`declined` and `executed: 0` describe a probe. `boundary: internal` describes the
+**decision not to run one**, and it is recorded as a third value of the Step 1b
+`boundary:` field (`true | false | internal`), never folded into either of the
+others. It is available only when **both** hold:
+
+- the predicate's only input is an artefact this repository's own pipeline writes —
+  an implementation report, a DoD summary, a gate file; **and**
+- no corpus sink's legitimate cases are documents that predicate is meant to accept.
+
+It requires an `internal_reason` that begins with the entry (`path#export`) and names the artefact
+and why no sink fits; an entry the prompt's *Entries disqualified from `internal`* table lists is
+probed, never recorded `internal`, and `/finalise` Step 3c forces FAIL on it; an
+`internal` without one is a FAIL (the `internal boundary recorded without a reason` check, and `/finalise` forces
+the security result to FAIL on that shape — `finalise-dod-security-prompt.md` states it). **A sink disqualifies it for the shape it
+models**: `markdown-structure` models the implementation report, so
+`report-lint.js#lintReport` is `boundary: true` and probed. A validator of any
+other document is not disqualified by that sink — probing it there would score
+the sink's legitimate reports `overblocked` for being the wrong document, which
+says nothing about the validator. A validator of **external** input is never
+`internal`.
+
+The class exists because the zero-guard had two outcomes and met a third shape:
+on task.124 the finalise agent classed `lintReport` a boundary, found no sink and
+no way to pass its second argument, and returned the zero-guard FAIL —
+a verdict the operator then overruled by hand. A rule that ends in "a human
+decides" on a recurring shape is a rule with a missing branch; `internal` is that
+branch, and the sink plus `--args-json` are why `lintReport` itself no longer
+takes it.
 
 ## 5. Containment, and what it does not cover
 
@@ -148,7 +191,12 @@ Declining conditions, each reported with its reason:
   **before importing**. `import()` runs the module's top level, so a post-hoc
   check would fire after arbitrary code had already executed. The check is on the
   *resolved* path, so `a/../../etc/x` is caught and a legitimate relative path
-  containing `..` is not refused for looking suspicious.
+  containing `..` is not refused for looking suspicious — and on the **real**
+  path, both sides: an existing entry and the root are passed through
+  `realpathSync` before the comparison, so a symlink inside the tree that points
+  out of it is refused `outside-repo-root` before anything imports or spawns it,
+  and a root reached through a symlink still contains its own files (task.140 —
+  the limit carried since task.128 gate 1, closed).
 - Runs each case in **its own child process**, so a hang, a throw or a
   `process.exit` is contained and attributable to one case rather than killing
   the run.
@@ -165,9 +213,12 @@ Declining conditions, each reported with its reason:
 - **There is no OS-level sandbox.** The module under probe runs with full Node
   privileges — exactly as `qa-runnable-prose-detection.md` §3aa already says of
   the snippet path. The containment contains *the harness*, not the repository.
-- **A symlink that points out of the tree resolves at import time**, after the
-  path check. Node offers no cheap pre-import realpath guarantee for a path that
-  may not yet exist. This is a limit, not a defence.
+- **A path that does not exist yet is contained by its deepest existing
+  ancestor**, realpath'd, with the missing segments re-joined — so a missing leaf
+  under a symlinked intermediate is refused where the link really points, and a
+  missing file under a symlinked root stays inside it. The residual is a symlink
+  that appears between the containment check and the readable-file check, a race
+  nothing here defends against.
 - **The engine reaches four entry forms, and "not importable" is not a decline.**
   `path#export` imports a JS module; `shell:path` runs a **shell script that
   takes one positional argument** — `bash <script> <fixture-dir>` per case, under
@@ -200,15 +251,50 @@ Declining conditions, each reported with its reason:
     prints `12`. Name a cases file with `--cases-file <path>` whose `expected`
     is the function's own contract (`tests/fixtures/shell-fn/gh-labels.cases.json`
     is the one for `gh_labels_filter`); keep `--sink filename` — it selects the
-    materialised fixture directory the runner runs in.
-  - **A function whose body names `gh` is answered by a fixture, not the
-    network:** add `--fake-gh <dir>`, a directory holding an executable `gh`
+    materialised fixture directory the runner runs in. **A cases file carried
+    from an earlier cycle is re-checked before a reproduced case is reported:**
+    compare the case's `expected` with the committed suite's own cases and with
+    what the latest fix changed. A stale expectation is a cases-file edit, not a
+    finding (task.177 reported two at QA cycles 2 and 3). Prefer re-deriving the
+    cases each cycle (obs #259).
+  - **A function or script whose body names `gh` is answered by a fixture, not
+    the network:** add `--fake-gh <dir>`, a directory holding an executable `gh`
     (this repository's is `tests/fixtures/fake-gh`; a consumer supplies its
     own). The engine prepends it to `PATH` with `FAKE_GH=1` in the env — the
     fixture refuses to run without that variable — validates it before anything
-    spawns (`bad-fake-gh` otherwise), and records it as `fake_gh` on the run.
-    **A library whose text names `gh` and was given no `--fake-gh` is declined
-    `needs-fake-gh`, not scored**: run bare, the real `gh` fails from the
+    spawns (`bad-fake-gh` otherwise, decided on real paths like an entry's, so a
+    symlink inside the root that points out of it is refused), and records it as
+    `fake_gh` on the run.
+    **A library or script whose text — or the text of a file it `source`s at top
+    level — names `gh`, and was given no `--fake-gh`, is declined
+    `needs-fake-gh`, not scored**, under **both** shell forms (task.140; the
+    `shell:` form ran the host `gh` before it). "Names" means `gh` as a command
+    word — after whitespace, `;`, `|`, `&`, `(`, a backtick, `$`, a quote or a
+    backslash, and followed by whitespace, `;`, `|`, `&`, `)`, `>`, a quote or end of
+    line — or a variable named `GH` (`"$GH" api`); a `source` / `.` is followed at
+    the start of a line or after `;`, `&&`, `||`, `then` or `do`, its path tried
+    against the library's directory, then the root, one level deep, and is not followed when
+    it holds a `$` or lies outside the root. A mention in a comment matches too;
+    that is a decline the caller answers by passing the fixture. **That text
+    check is only the fast path; the guarantee is at run time.** With no
+    `--fake-gh`, a **trip-wire `gh`** is first on `PATH`: it records the call and
+    exits 127, so the host `gh` never runs, and a run that reached it is declined
+    `needs-fake-gh` with nothing scored — whatever the spelling (`${GH_BIN:-gh}`,
+    `GH_CLI=gh; "$GH_CLI"`, a wrapper however it sources `gh-labels.sh`), and
+    under `env -i PATH="$PATH"` too: the stub carries its marker path in its own
+    text, not in the environment. The decline still reports what the runs
+    observed — `escapes`, `cases`, `shells` — as `entry-not-probeable` does: an
+    unscored run's side effect is still a side effect (task.140 QA cycle 3). A
+    library that mentions `gh` but never calls it is scored. **The limits** — each
+    reaches a real `gh` with nothing recorded, and the run is scored: an
+    **absolute path** to a real `gh` (it bypasses `PATH`); a library that puts
+    another directory **ahead of the trip-wire on `PATH`** (`export
+    PATH="/usr/local/bin:$PATH"`) — with `--fake-gh` given this bypasses the
+    fixture too, and the record still names the fixture; and a `gh` call
+    **backgrounded past the spawn**, which runs after the sandbox and its
+    trip-wire are gone. Rows pin the absolute path and the `PATH` prepend
+    (task.140 QA cycles 2 and 4). All three behave the same before task.140;
+    closing them is follow-up work. Otherwise: run bare, the real `gh` fails from the
     sandbox cwd, the function takes its read-failed passthrough, and the verdict
     would land on `absent` / `present-but-inert` — the values a missing control
     produces — with nothing but `fake_gh: null` to say "could not look". The
@@ -216,10 +302,24 @@ Declining conditions, each reported with its reason:
 
   Exit 97 is reserved for "the source itself failed" and 98 for "the function
   is not defined after sourcing"; both fold into one `entry-not-probeable`
-  decline that names the library, never into a scored `absent`. An EXIT trap
-  is armed around the `source`, so a **top-level `exit` inside the library**
-  (a `|| exit 1` guard, say) is the same named decline rather than a scored
-  `absent` behind a full count. The function itself runs in a **subshell** with
+  decline that names the library, never into a scored `absent`. During the
+  `source` an EXIT trap is armed **and `exit` is shadowed by a function** that
+  calls `builtin exit 97`, so a **top-level `exit` inside the library** (a
+  `|| exit 1` guard, say) is the same named decline even when the library has
+  installed its own `trap … EXIT` first. **The decision, though, is a positive
+  marker, not an exit code**: once the source has returned 0 the body writes a
+  per-spawn marker under the work dir, and the runner declines whenever it is
+  absent — so every way the shell can die during the source reads the same: an
+  explicit exit, errexit, a replaced EXIT trap however it was installed (`trap …
+  exit`, `builtin trap`, `command trap`, zsh's `TRAPEXIT`), `exec`. Filtering how a
+  library installs a trap is an enumeration over shell syntax with no last entry
+  (task.140 QA cycle 2). `exit` is unset before the function under probe runs,
+  and a `TRAPEXIT` the library defined is unset too; a library that defines its
+  own `exit` loses it (none here does). The source's status is taken as a **simple command**, not on
+  the left of `||` — where both shells suspend errexit for everything the
+  library runs at top level — so a `set -e` library whose top-level command
+  fails is declined, as a consumer's own `source` would have aborted, rather
+  than sourced to completion and scored (task.140). The function itself runs in a **subshell** with
   the library's own errexit setting restored inside it, so a function that
   calls `exit` cannot end the harness, `set -e` in the library cannot skip the
   status capture — and its own 97 or 98 is re-mapped to 99 and *scored* as a
@@ -313,6 +413,14 @@ Declining conditions, each reported with its reason:
   the engine can reach it, and §5.1 is how it is tested.
 - **No probe opens a network connection.** Both motivating defects are pure
   composers; if a target needs the network, that is a decline.
+- **A probe sees one input, not the population behind it.** When the
+  boundary's output is an identity — an id, key or path another command later
+  resolves — build the fixture through the producer the real path uses (the
+  engine's own scan, say), in a population that holds a colliding sibling
+  (same key, different record), and assert where the downstream resolver
+  lands, not only whether the boundary accepted the input. One entry per
+  fixture cannot see a coercion upstream or a first-match resolve downstream;
+  task.150 spent three QA cycles finding them one layer at a time (obs #209).
 
 The precondition — a pure-ish predicate, composer, single-argument script or
 argv-driven Node CLI — is what the boundary rule selects for anyway. If it turns

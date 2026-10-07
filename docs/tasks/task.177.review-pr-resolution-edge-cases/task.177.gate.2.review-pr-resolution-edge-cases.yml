@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.177.review-pr-resolution-edge-cases'
+task_title: '/review-pr resolution edge cases'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes hold (CR-1 .env, CR-2/CR-3 version-shaped hosts, CR-5), but the refute pass shows the dotted-host heuristic still turns user-namespaced branches (jane.doe/fix/issues/123) into issue and PR targets, and the known-host match does not strip a port.'
+reviewer: 'QA Engineer'
+head: 'a9820e67c4f70205de6a350b9ccc7016996b1227'
+updated: '2026-10-03T06:49:23Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: medium
+    file: 'skills/review-pr/scripts/parse-target.sh'
+    finding: 'The TLD-shape guard cannot tell a host from a user-namespaced branch prefix: `jane.doe/fix/issues/123` → kind=github-issue, `user.name/wip/pull/3` → kind=pr with no repo, `jane.doe/fix/issues/42-login-crash` → refused (exit 2). All were kind=branch on base. The CHANGELOG says only version-shaped segments were at risk.'
+    suggested_action: 'Stop guessing at unknown hosts: re-parse a scheme-less target only when its first segment is a known platform host, and require the scheme for self-hosted ones. Add first.last/... branch cases.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-2'
+    severity: low
+    file: 'skills/review-pr/scripts/parse-target.sh'
+    finding: 'The known-host list is matched against the host with its port still attached, so `acme.atlassian.net:443/…?selectedIssue=AB-2` stays a branch while the same URL without `:443` parses as jira AB-2.'
+    suggested_action: 'Match the known-host list against the port-stripped host.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 237
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 36
+    notes: 'shell-fn probe of parse_target, 18 contract cases × bash/zsh: engages, 0 reproduced, 0 overblocked. A first run reproduced 2 on a cycle-1 case whose expectation predated the TLD rule (a.b now stays an inert branch, as on base); the case was corrected and both forms are now cases.'
+  performance:
+    status: PASS
+    notes: 'No network call added.'
+  reliability:
+    status: PASS
+    notes: 'Cycle 1 fixes verified; CR2-1 carried as a functional finding.'
+  maintainability:
+    status: PASS
+    notes: '237 tests under bash and zsh; every cycle-1 fix mutation-proven.'
+
+recommendations:
+  immediate:
+    - action: 'CR2-1: restrict scheme-less re-parse to known platform hosts; CR2-2: strip the port before matching'
+      refs: ['skills/review-pr/scripts/parse-target.sh']
+  future:
+    - action: 'CR2-3: docs guard tests $ROOT/docs while §0a tests a cwd-relative docs; say §0a runs from the root the guard prints'
+      refs: ['skills/review-pr/SKILL.md']
+    - action: 'CR2-5: the Step 0b comment says quoted values are trimmed; they are taken verbatim'
+      refs: ['skills/review-pr/SKILL.md']
+    - action: 'CR2-4 (repeat of cycle 1 CR-4): co-located bug reports carrying pr_number are not rung-2 work items; none exist today'
+      refs: ['skills/review-pr/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR2-1 fixed']

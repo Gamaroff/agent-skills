@@ -713,3 +713,52 @@ test("state (TASK-149 CR3-1): a symlinked link target is untracked only when it 
     );
   });
 });
+
+// task.158 — checkDocument returns every link's resolved path (resolved and
+// broken alike), so qa-read-back can ask "does this document link X?" with the
+// one resolution rule rather than a second one. Fragments are stripped and `./`
+// is normalised away; a pure-anchor link resolves to nothing and is not listed.
+test("resolver: `resolved[]` lists every link's repository-relative path, resolved and broken alike (task.158)", () => {
+  withNonRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "docs", "t"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "docs", "t", "g.yml"), "x\n");
+    fs.writeFileSync(
+      path.join(dir, "docs", "t", "t.md"),
+      "[g](./g.yml) [q](q.md#part) [up](../u.md) [a](#only)\n",
+    );
+    const r = checkDocument("docs/t/t.md", { root: dir });
+    assert.deepEqual(r.resolved, ["docs/t/g.yml", "docs/t/q.md", "docs/u.md"]);
+    assert.deepEqual(
+      r.broken.map((b) => b.resolved),
+      ["docs/t/q.md", "docs/u.md"],
+      "the broken ones are listed in resolved[] too",
+    );
+  });
+});
+
+// task.158 — one containment predicate per module system: the ESM isWithin in
+// qa-execute-snippets.mjs and the CJS isWithin in doc-links.js, held to one case
+// table. A third hand copy (security-probe's bare startsWith("..")) is what
+// drifted; `..name` is the case that separates the right test from the wrong one.
+test("isWithin parity: the ESM and the CJS definitions agree on one case table (task.158)", async () => {
+  const { isWithin: esm } = await import("../qa-execute-snippets.mjs");
+  const { isWithin: cjs } = require(ENGINE);
+  const CASES = [
+    ["/a/b", "/a/b", true],
+    ["/a/b", "/a/b/c", true],
+    ["/a/b", "/a/b/..c", true],
+    ["/a/b", "/a/b/..c/d", true],
+    ["/a/b", "/a/b/c/../d", true],
+    ["/a/b", "/a", false],
+    ["/a/b", "/a/bc", false],
+    ["/a/b", "/a/..b/c", false],
+    ["/a/b", "/a/b/../x", false],
+    ["/a/b", "/a/b/c/../../../x", false],
+    ["/", "/var/x", true],
+    ["/a/b", "/x/y", false],
+  ];
+  for (const [p, c, want] of CASES) {
+    assert.equal(esm(p, c), want, `esm(${p}, ${c})`);
+    assert.equal(cjs(p, c), want, `cjs(${p}, ${c})`);
+  }
+});

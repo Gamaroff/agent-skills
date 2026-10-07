@@ -29,8 +29,9 @@ functions exported for tests, and a thin `main()` that sets `process.exitCode` a
 export function resolveContinuation({
   repoRoot,          // absolute, from `git rev-parse --show-toplevel`
   branch,            // from `git rev-parse --abbrev-ref HEAD`; "HEAD" when detached
-  prdRoot,           // from resolve-paths (default "docs/prd"), relative to repoRoot
+  prdRoot,           // --prd-root, else skills-config.yaml prd.prdShardedLocation, else "docs/prd"; relative to repoRoot
   home,              // os.homedir()
+  selfDir,           // absolute dir of continuation.mjs — its sibling handoff-verify.mjs is tried first
   today,             // "YYYY-MM-DD"
   slug,              // optional override
   exists,            // (absPath) => boolean       — injected
@@ -50,8 +51,14 @@ export function kebab(s)                 // lower, [^a-z0-9]+ → "-", trim "-",
 | `feature/story.(\d+).(\d+).(.+)` | `findStory(E,S)` returns a dir | `<dir>/story.E.S.handoff.{k}.slug.md` |
 | anything else | — | `.agents/handoffs/{today}-{kebab(slug ?? branch)}.md`, suffixed `-2`, `-3`… if taken |
 
-**Verifier order**: `<repoRoot>/.agents/skills/session-handoff/scripts/handoff-verify.mjs` (emit
-repo-relative), then `<home>/.agents/skills/…` and `<home>/.claude/skills/…` (emit absolute).
+**Verifier order**: the sibling `handoff-verify.mjs` in `continuation.mjs`'s own directory
+(`selfDir`, from `import.meta.url` in the CLI), then
+`<repoRoot>/.agents/skills/session-handoff/scripts/handoff-verify.mjs`, then
+`<home>/.agents/skills/…` and `<home>/.claude/skills/…`. A path under `repoRoot` is emitted
+repo-relative; any other absolute.
+
+**PRD root (CLI)**: `--prd-root` → `prd.prdShardedLocation` from `<repoRoot>/skills-config.yaml`
+(line scan, as `shared/resources/generate-prd-epic-index.mjs` does) → `docs/prd`.
 
 **Resume prompt** (exact text lives in the script as one template string; the SKILL does not
 restate it):
@@ -85,8 +92,9 @@ figure rules are the same comment block, shortened:
 | Check | Command | Result |
 | --- | --- | --- |
 | Branch tip | `git rev-parse --short HEAD` | **{sha}** |
-| Uncommitted files | `git status --porcelain` | {**clean** or the files} |
-| Targeted tests | `command node --test --test-name-pattern={pattern}` | **exit 0** |
+| Uncommitted files | `git status --porcelain` | {**file-a** **file-b** — each dirty file, bold} |
+| Tracked tree clean | `git diff --quiet HEAD` | **exit 0** (use this row instead when nothing is dirty) |
+| Targeted tests | `command node --test --test-name-pattern={pattern}` | **pass {N}** |
 
 ## 1. Next step
 ## 2. Done this session
@@ -96,6 +104,12 @@ figure rules are the same comment block, shortened:
 ## 6. Open questions
 ## Resume prompt
 ```
+
+**Figure forms — settled at review.1 by running the unchanged verifier** (temp repo): a
+`**pass N**` test figure reads `stale` when the pattern matches nothing, where `**exit 0**`
+confirmed; `git status --porcelain` against `**clean**` reads `stale` on a clean tree, an empty
+Result cell reads `unverifiable: no figure`, and `git diff --quiet HEAD` → `**exit 0**` confirms;
+bold dirty-file names confirm against `git status --porcelain`. The original guidance follows.
 
 Check the dirty-file row against the verifier's whitelist and comparison rules **before** fixing
 its form. The targeted-test row must use `--test-name-pattern=`: the verifier refuses any positional after `node --test` (SKILL § whitelist, `node` row; gate 8 / bug.11), so `node --test {file}` would always read `unverifiable`. `git status --porcelain` prints nothing when clean, so a `**clean**` figure would read

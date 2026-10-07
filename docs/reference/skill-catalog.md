@@ -205,7 +205,7 @@ Full categorised index below.
 | `find-skills` | Helps users discover and install agent skills when they ask questions like "how do I do X", "find a skill for X", "is there a… |
 | `generate-ui-prompt` | Generate masterful, comprehensive prompts for AI-driven frontend development tools (v0, Lovable, etc.). Use when creating UI generation prompts that need to be optimized for code… |
 | `observe-work` | Observes the working session for skill-improvement signals — corrections you make, gaps no skill covers, rules the agent violates — and writes each one as… |
-| `session-handoff` | Write and re-read the project's session handoff — the "read this first if you are picking up work here" file at .agents/handoff.md. Write mode records… |
+| `session-handoff` | Three modes over measured handoff files. Write records project state in .agents/handoff.md, every figure with the command that produced it. Read RE-MEASURES a handoff through… |
 
 ## User Experience
 
@@ -213,8 +213,8 @@ Full categorised index below.
 | ----- | ----------- |
 | `browser-use` | Automates browser interactions for web testing, form filling, screenshots, and data extraction. Use when the user needs to navigate websites, interact with web pages, fill… |
 | `building-components` | Guide for building modern, accessible, and composable UI components. Use when building new components, implementing accessibility, creating composable APIs, setting up design tokens, publishing to… |
-| `markdown-wireframe` | Create low-fidelity, mobile-focused outline wireframes to visualize bespoke user interfaces based strictly on the provided brief. Use Stitch to generate fully functional, monochrome, outline-based components… |
 | `ux-expert` | UX Expert (Sally) specializing in user experience design and intuitive interfaces. Use for UI/UX design, wireframes, prototypes, front-end specifications, AI-powered UI generation prompts, and user… |
+| `wireframe` | Author low-fidelity UI wireframes in the Wireloom DSL and render them to SVG. Use when the user asks to mock up, wireframe, sketch or draw… |
 
 ## Utilities & Misc
 

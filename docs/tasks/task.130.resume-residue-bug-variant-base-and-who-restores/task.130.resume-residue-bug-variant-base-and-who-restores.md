@@ -8,7 +8,7 @@ category: refactoring
 status: accepted
 priority: High
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-30
 assignee:
 estimated_effort_hours: 16
 risk_level: medium
@@ -403,6 +403,7 @@ Not applicable — one additional `sed` per resume.
 | 2026-09-20 |  | Step 5c review-pr CONCERNS (PC-2 six Change Log rows restored; PC-3 task.131/132 docs accepted; CR-1 --accept-legacy stamp → bug 13); QA findings fixed — bug 13, cycle 7; +3 scenarios, mutation-proven | qa-fix |
 | 2026-09-20 |  | QA gate 7 PASS (92/100) — last granted cycle; bug 13 verified fixed; 0 HIGH, 0 MEDIUM, 1 LOW carried (route 2b); Deferred Work recorded; handed to 5c | qa-task |
 | 2026-09-20 | 1.2 | DoD passed — accepted (PR #441); security probe recorded as unverified-by-engine (shell boundary), accepted on QA-executed evidence | finalise |
+| 2026-09-30 |  | Deferred Work annotated — each item routed to task.133 (phases 1–5) or closed; the detector-listing item was already fixed by task.137 | develop |
 <!-- change-log-end -->
 
 ## Definition of Done - PASSED ✅
@@ -499,14 +500,14 @@ Cycle 7 (last granted; scoped to the Step 5c fix): bug 13 FIXED — an `--accept
 
 Carried out of the QA loop by the Cosmetic-residue exit (route 2b, gate 7) and the Step 5c review — none gates; one follow-up task should take them together:
 
-- **TASK-130-QA-14** (LOW, gate 7) — `advance-pipeline-lock.test.sh` "keeps its own directory" scenario is vacuous; seed a canon-equal, textually different spelling.
-- Gate-7 CR-2 — `--restore` header contract, `develop-pipeline-pause.md:80`, `grant-qa-cycles.sh:52-54` do not mention the directory stamp.
-- Gate-6 CR-1 — test D's negative regex is a word-list heuristic; the exact-label match is the floor.
-- Gate-5 CR-2 (conditional main clause at the four `--restore` citation sites), CR-3 (detector prompt Step 1 candidate selection vs `choose_candidate()`), CR-5 (silent skip of an unrecognised `stale-snapshot`-prefixed label), CR-6 (one rc=2 message for the four lint sites), CR-7 (quote `{doc-directory}`).
-- Detector prompt `:80` — `ls … .pausing.*` never runs under zsh `nomatch` (pre-existing on develop).
-- 5c CR-2 — `advance-pipeline-lock.sh:202` prints the `--accept-legacy` advice for a bystander legacy snapshot even when the restore succeeds from a matched claim; 5c CR-3 — the contract delete block's Pass 2 reports an unparsable snapshot and a directory-less object with the same `'absent'` HALT text.
-- 5c PC-2 root cause — the `change-log.js` repair at `fdba78d9` dropped six rows; check the upsert's handling of a corrupted block.
-- 5c PC-3 — task.131/132 planning documents ride in PR #441 (accepted).
+- **TASK-130-QA-14** (LOW, gate 7) — `advance-pipeline-lock.test.sh` "keeps its own directory" scenario is vacuous; seed a canon-equal, textually different spelling. → **task.133 Phase 1**
+- Gate-7 CR-2 — `--restore` header contract, `develop-pipeline-pause.md:80`, `grant-qa-cycles.sh:52-54` do not mention the directory stamp. → **task.133 Phase 1**
+- Gate-6 CR-1 — test D's negative regex is a word-list heuristic; the exact-label match is the floor. → **task.133 Phase 4**
+- Gate-5 CR-2 (conditional main clause at the four `--restore` citation sites), CR-3 (detector prompt Step 1 candidate selection vs `choose_candidate()`), CR-5 (silent skip of an unrecognised `stale-snapshot`-prefixed label), CR-6 (one rc=2 message for the four lint sites), CR-7 (quote `{doc-directory}`). → **task.133**: CR-2/CR-6 Phase 4, CR-3 Phase 3, CR-5/CR-7 Phase 2
+- Detector prompt `:80` — `ls … .pausing.*` never runs under zsh `nomatch` (pre-existing on develop). → fixed by task.137 (`12def84e`); **task.133 Phase 3** pins it with a test
+- 5c CR-2 — `advance-pipeline-lock.sh:202` prints the `--accept-legacy` advice for a bystander legacy snapshot even when the restore succeeds from a matched claim; 5c CR-3 — the contract delete block's Pass 2 reports an unparsable snapshot and a directory-less object with the same `'absent'` HALT text. → **task.133**: CR-2 Phase 1, CR-3 Phase 2
+- 5c PC-2 root cause — the `change-log.js` repair at `fdba78d9` dropped six rows; check the upsert's handling of a corrupted block. → **task.133 Phase 5**: the upsert keeps all six rows on that shape (the loss was a hand edit); a cross-revision append-only check now reports it
+- 5c PC-3 — task.131/132 planning documents ride in PR #441 (accepted). → no action (accepted at 5c)
 
 - QA artifacts land beside this file: `task.130.qa.[N].*.md`, `task.130.bug.[N].*.md`, `task.130.gate.[N].*.yml`.
 - Independent of tasks 128 and 129 (both `planned`); shares no file with 129, and touches `probe-boundary-rule.md` not at all.

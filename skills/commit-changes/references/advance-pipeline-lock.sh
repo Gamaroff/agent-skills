@@ -69,8 +69,8 @@
 #   • lock present                    → exit 0, noop ("lock present — nothing to restore")
 #   • no candidate at either path     → exit 1, names both paths
 #   • every candidate is for another document (its task_or_story_directory, canonicalised,
-#     is not <doc-dir>, canonicalised; an ABSENT directory is the pre-task.123 shape and
-#     matches)                        → exit 1, nothing written, the candidate is left alone
+#     is not <doc-dir>, canonicalised; an ABSENT directory is not a match — it is refused,
+#     see the legacy bullet below)    → exit 1, nothing written, the candidate is left alone
 #   • otherwise → of the candidates for this document, the NEWEST by mtime wins (the
 #     detector's rule, task.120 bug.5); the lock is rebuilt from it with current_step =
 #     halt_step (fallback: its own current_step), the five halt/pause fields AND any
@@ -85,7 +85,12 @@
 #   • a candidate with NO task_or_story_directory (the pre-task.123 shape) is REFUSED with
 #     "legacy-snapshot" unless --accept-legacy is passed: it can belong to any document, and
 #     a match by absence is the guess this mode exists to remove (task.130, PR #436 review
-#     CR-5). Step 8 deletes such a snapshot when it is the sole candidate on disk.
+#     CR-5). Under the flag the rebuilt lock is STAMPED with <doc-dir> as passed, so every
+#     snapshot derived from it is a matched candidate and the flag is needed once; a present
+#     task_or_story_directory is never overwritten (task.130 5c CR-1). A directory-matched
+#     candidate outranks a legacy one whatever their mtimes, and the --accept-legacy advice
+#     prints only when nothing restores. Step 8 deletes such a snapshot when it is the sole
+#     candidate on disk.
 #   • --restore --which <doc-dir>: print the path --restore WOULD consume and exit 0, with
 #     no writes and nothing consumed; exit 1 (same stderr) when nothing is usable. This is
 #     the same selection function, not a re-derivation — grant-qa-cycles.sh reads its
@@ -124,7 +129,16 @@ USAGE
 if [ ! -f "$LOCK" ]; then
   case "$1" in
     --restore) ;;                       # the one mode that exists FOR a missing lock
-    --skill|--complete) exit 0 ;;       # standalone sub-skill runs; clearable lock
+    --skill)
+      # Exit 0 either way: a standalone sub-skill run has no lock and must not fail. But a
+      # halt snapshot or an orphaned claim on disk means a pipeline WAS running and a pause
+      # or HALT removed its lock, and a silent exit here left Steps 7–8 unguarded for a whole
+      # session with nothing said (task.186, obs #280). Say which case this is.
+      if [ -f "$SNAPSHOT" ] || [ -n "$(find "$(dirname "$LOCK")" -maxdepth 1 -name "$(basename "$LOCK").pausing.*" -type f 2>/dev/null)" ]; then
+        echo "advance-pipeline-lock: no lock at '$LOCK', but a halt snapshot or orphaned claim exists — a pipeline was paused or halted. If this sub-skill is a pipeline step, rebuild the lock first: advance-pipeline-lock.sh --restore <doc-dir>" >&2
+      fi
+      exit 0 ;;
+    --complete) exit 0 ;;               # clearable lock
     --help|-h) usage ;;
     *)
       echo "advance-pipeline-lock: no lock at '$LOCK' — nothing to advance to step '$1'. If this session is continuing after a PreCompact pause or a HALT, rebuild the lock first: advance-pipeline-lock.sh --restore <doc-dir>" >&2
@@ -204,7 +218,7 @@ mtime_of() {
 ACCEPT_LEGACY=0
 CHOSEN=""; MINE=()
 choose_candidate() {
-  local doc_dir="$1" want candidates=() c c_dir m legacy=0
+  local doc_dir="$1" want candidates=() c c_dir m legacy_paths=()
   [ -d "$doc_dir" ] || { echo "advance-pipeline-lock: --restore needs an existing <doc-dir>, got '$doc_dir'" >&2; exit 1; }
   want=$(canon "$doc_dir")
   [ -f "$SNAPSHOT" ] && candidates+=("$SNAPSHOT")
@@ -225,12 +239,24 @@ choose_candidate() {
   local matched_newest=-1 legacy_newest=-1 legacy_chosen=""
   for c in "${candidates[@]}"; do
     jq -e 'type == "object"' "$c" >/dev/null 2>&1 || { echo "advance-pipeline-lock: '$c' is not a JSON object — skipped" >&2; continue; }
+    # Refuse a directory holding a control character BEFORE the shell reads it (bug.17). The
+    # `$(jq -r …)` below is not a faithful copy of the JSON string: zsh keeps an embedded NUL and
+    # canon()'s `cd` truncates at it, and both shells strip a trailing newline — so `<doc>\u0000x`
+    # and `<doc>\n` each read back as `<doc>` and passed the compare for a string the candidate
+    # does not hold. The test runs in jq, on the JSON value, where no shell has touched it.
+    if jq -e '(.task_or_story_directory // "") | type == "string" and (explode | any(. < 32 or . == 127))' "$c" >/dev/null 2>&1; then
+      echo "advance-pipeline-lock: '$c' has a task_or_story_directory containing a control character — refusing to restore from it" >&2
+      continue
+    fi
     c_dir=$(jq -r '.task_or_story_directory // ""' "$c")
     if [ -z "$c_dir" ] && [ "$ACCEPT_LEGACY" != "1" ]; then
       # A snapshot with no directory predates task.123 and can belong to ANY document; a match
-      # by absence is a guess. Refuse it by name so the operator decides (task.130).
-      echo "advance-pipeline-lock: legacy-snapshot: '$c' carries no task_or_story_directory — refusing to restore from it; pass --accept-legacy to restore it for '$doc_dir', or delete it (Step 8 removes a sole legacy snapshot)" >&2
-      legacy=1
+      # by absence is a guess. Refuse it by name so the operator decides (task.130). The
+      # recovery advice is NOT printed here: a matched candidate later in the loop may still
+      # restore, and advice for a restore that then succeeds is noise (task.130 5c CR-2). It
+      # prints once, below, only when nothing is chosen.
+      echo "advance-pipeline-lock: legacy-snapshot: '$c' carries no task_or_story_directory — skipped" >&2
+      legacy_paths+=("$c")
       continue
     fi
     if [ -n "$c_dir" ] && [ "$(canon "$c_dir")" != "$want" ]; then
@@ -248,8 +274,8 @@ choose_candidate() {
   # A legacy candidate is chosen only when no directory-matched candidate exists.
   [ -n "$CHOSEN" ] || CHOSEN="$legacy_chosen"
   if [ -z "$CHOSEN" ]; then
-    if [ "$legacy" -eq 1 ]; then
-      echo "advance-pipeline-lock: no candidate for '$doc_dir' — the only one(s) found are legacy snapshots (see above)" >&2
+    if [ ${#legacy_paths[@]} -gt 0 ]; then
+      echo "advance-pipeline-lock: no candidate for '$doc_dir' — the only one(s) found are legacy snapshots (see above); pass --accept-legacy to restore one for '$doc_dir', or delete it (Step 8 removes a sole legacy snapshot)" >&2
     else
       echo "advance-pipeline-lock: no halt snapshot or orphaned claim is for '$doc_dir' — nothing restored" >&2
     fi

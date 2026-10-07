@@ -40,7 +40,7 @@ Use when the change is large enough to need product framing: it lives under a PR
   ```
   PRD and architecture roots are configurable (defaults shown). Nested layout under `${PRD_ROOT}` is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions). QA artifacts are co-located with the story — no `qa.qaLocation` config is needed.
 - The repo has an **epic registry** at `docs/development/epic-registry.md`. Epic numbers are globally unique — `create-epic` and `epic-registry-manager` enforce this.
-- Branch hygiene: `develop` exists (story PRs target an epic branch cut from `develop`).
+- Branch hygiene: `develop` exists. Story PRs target `develop` by default, or the epic's `epic/{N}.{slug}` integration branch when the epic opts in with `branch_model: epic-integration` (see [Branch model](#branch-model--you-choose-per-story)).
 - Platform detection (GitHub vs Bitbucket vs Jira) is automatic — see [`../../shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md).
 
 ## Pipeline diagram
@@ -322,7 +322,7 @@ source shared/resources/bitbucket-auth.sh && curl "${BB_CURL_AUTH[@]}" \
   "https://api.bitbucket.org/2.0/repositories/{workspace}/{repo}/pullrequests/{id}"
 ```
 
-Once you're satisfied, merge the PR (manual gate). When all stories under an epic are accepted, merge the epic branch to `develop`.
+Once you're satisfied, merge the PR (manual gate). If the epic used an integration branch, raise the `epic/{N}.{slug}` → `develop` PR once all its stories are accepted.
 
 ---
 

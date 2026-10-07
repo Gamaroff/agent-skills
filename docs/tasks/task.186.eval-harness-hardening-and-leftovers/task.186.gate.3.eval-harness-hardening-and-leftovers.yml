@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.186.eval-harness-hardening-and-leftovers'
+task_title: 'Eval harness hardening and task.185 leftovers'
+gate: CONCERNS
+status_reason: 'Gate 2 finding C2-CR-1 is fixed: a review-pr replay run on a jq-less host is judged again (5/5), and the scoped refusal is mutation-proven. The cycle-3 review found one test-strength defect: the no-jq meta-test checks "skipped >= 1", which the child always satisfies by skipping the meta-test itself, so it cannot see the regression it guards.'
+reviewer: 'QA Engineer'
+head: '583983fcf7292abaf23e42cf83594a64b709addc'
+updated: '2026-10-06T06:31:29Z'
+
+top_issues:
+  - id: 'C3-CR-1'
+    severity: medium
+    file: 'evals/shared/tests/fake-gh.test.mjs'
+    finding: 'The no-jq meta-test asserts /^# skipped [1-9]/ on the child run, which always holds because the child skips the meta-test itself (FAKE_GH_SUITE_NO_JQ=1), and it has no pass floor, so a regression that skipped every install test under replay (the C2-CR-1 shape) would still pass it.'
+    suggested_action: 'Assert the -q/--jq test by name is reported as a SKIP and require the child to pass at least the number of install tests.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2)
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 394
+  phases_verified: 4/4
+  ci: 'pending @ 583983fcf729 (test pending; link-check, shellcheck, validate pass)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+bug_resolution:
+  fixed_this_cycle: ['C2-CR-1 (gate 2)']
+  fix_commit: '583983f'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 30
+    notes: 'next_numbered unchanged since gate 2 (record task.186.qa.2.security.run.json, engages 30/30); fake gh classifier re-probed on this head, 33/33.'
+  performance:
+    status: PASS
+    notes: 'The gh launcher now imports driver-name.mjs only (no assertion library).'
+  reliability:
+    status: PASS
+    notes: 'Replay runs are judged without jq; live runs without jq skip. review-pr replay evals 4/4 on this head.'
+  maintainability:
+    status: PASS
+    notes: 'C3-CR-1 is a test-strength defect in the meta-test; C3-CR-2/3 are naming and a stale comment.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'C3-CR-1: the no-jq meta-test asserts skipped >= 1, which the child always satisfies by skipping the meta-test itself, and has no pass floor. Assert the -q/--jq test by name is a SKIP and require the child to pass at least the number of install tests.'
+      refs: ['evals/shared/tests/fake-gh.test.mjs']
+      carried_from: 'top_issues (route 2, cycle 3)'
+    - action: 'C3-CR-2: delete the stale A5 comment above the scoped tests; C3-CR-3: rename jqTest to match installRefuses.'
+      refs: ['evals/shared/tests/runner-setup.test.mjs', 'evals/shared/tests/fake-gh.test.mjs']
+    - action: 'Earlier advisories still open: gate 1 CR-2 (review-story numbering, follow-up), CR-4, CR-5, CR-6; gate 2 C2-CR-3 (requiresLiveDriver live-only reads 2), C2-CR-4 (env.json coercion).'
+      refs: ['skills/review-story/SKILL.md', 'evals/shared/repeat.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

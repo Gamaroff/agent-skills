@@ -1,17 +1,19 @@
 ---
 type: bug
-status: new # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-09-23'
-updated: '2026-09-23'
+updated: '2026-09-29'
 related: 'none — cross-cutting (six CLI entry-point guards across five skills and shared/resources)'
 description: "Six scripts guard their CLI entry point with resolve(process.argv[1]) === fileURLToPath(import.meta.url). resolve() does not follow symlinks and import.meta.url is fully resolved, so invoking any of them through a symlinked path — which includes every macOS mktemp -d copy, since /var is a symlink to /private/var — makes the whole CLI a silent no-op: exit 0, no output, no writes, indistinguishable from a clean run."
+github_issue: 522
 ---
 
 **Bug ID**: bug.16
 **Related**: none — cross-cutting
-**Status**: 🆕 New
+**GitHub**: [#522](https://github.com/Gamaroff/agent-skills/issues/522)
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-09-23
@@ -103,3 +105,24 @@ Found during task.141's QA cycle 6, by a dispatched reviewer that had itself bee
 Filed separately from that task's PR because it is **pre-existing** — it reproduces identically on
 `origin/develop` and is untouched by that branch — and because its scope is six files across five
 skills, not the one the task happened to be editing.
+
+## Resolution Summary
+
+**Final Status**: Closed — Already fixed (no code change in this bug's branch)
+**Total Iterations**: 0
+**Time to Resolution**: 6 days (filed 2026-09-23, fixed on `develop` 2026-09-24, closed 2026-09-29)
+**Review**: `bug.16.main-guard-silent-noop-under-symlink.review.1.main-guard-silent-noop-under-symlink.md` — 🚨 STALE (already fixed)
+
+**Final Fix Details**: Commit `39e595f9` (2026-09-24, obs #126) changed `skills/qa-next/scripts/uat-status.mjs` and `shared/resources/security-probe.mjs` to the `isInvokedDirectly()` helper, which compares `realpathSync` on both sides. The same commit added `shared/resources/tests/entrypoint-guard-realpath.test.mjs`, which runs two kinds of check. A structural check covers every ESM engine in `shared/resources/`, `skills/*/scripts/` and `skills/*/references/`, with a floor of 9. A behavioural check runs `uat-status.mjs` and `security-probe.mjs` through a symlinked directory. That test is the population test this report asked for. It passes 3/3 on `develop` `93a67bca`. This report's own reproduction exits 0 with no output on `39e595f9^`; on HEAD, `main` runs.
+
+**Lessons Learned**:
+
+1. **Five of the six listed files were never defective.** `finalise-fix-and-recheck.mjs`, `qa-execute-snippets.mjs`, `run-loop.mjs`, `select-next.mjs` and `schedule.mjs` already compared real paths when this bug was filed. The enumeration grep matched the `resolve(...)` line that survives as their `catch` fallback. A population grep must match the defective primary branch, not a line that correct files also carry.
+2. **The fix landed through an observation, not through this bug.** Nothing linked obs #126's commit back to bug.16, so the bug stayed `new` and `/develop-next` later dispatched it. That created issue #522 and a branch before `review-bug` could find it stale (obs #220).
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-09-29 | New | ensure-bug-github-issue | GitHub issue created (#522) |
+| 2026-09-29 | Closed | develop-next (operator-approved) | Closed as already fixed — 39e595f9 (obs #126); review-bug STALE |

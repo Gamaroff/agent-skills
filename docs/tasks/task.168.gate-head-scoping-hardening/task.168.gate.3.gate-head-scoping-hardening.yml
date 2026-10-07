@@ -1,0 +1,88 @@
+schema: 2
+task: 'task.168.gate-head-scoping-hardening'
+task_title: "[Task 168] Harden task.135's gate-head scoping"
+gate: PASS
+status_reason: 'All cycle-2 findings fixed and mutation-proven; the scoped cycle-3 review found only three LOW items (two enumeration gaps, one test-fidelity cleanup). No medium or high finding; every NFR PASS.'
+reviewer: 'QA Engineer'
+head: '297bf27205884a95de150b1e22c184ad5e7c4851'        # git rev-parse HEAD when the review was performed
+updated: '2026-10-03T16:03:06Z'
+
+top_issues:
+  - id: 'T168-QA3-CR-1'
+    severity: low
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Phase 0 step 3 trigger still counts a tracked .claude/state change as movement while Step 3b now excludes it, so in a consumer that tracks .claude/ a clean PASS gate can never take the skip branch — undocumented, unlike the untracked case.'
+    suggested_action: 'Apply the same .claude/state exclusion to the trigger diff/ls-files lines, or document that it fails toward re-review there.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'T168-QA3-CR-2'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The red-exit path is a second zero-push cycle, but the push-budget statements (exactly one push per cycle, the step 3/step 5 skipped-push notes, the route 2c precondition that cycle N committed and pushed its fix) name only the 5c REQUEST CHANGES case.'
+    suggested_action: 'Name the bounded-retry red exit as a second zero-push case at each push-budget statement.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'T168-QA3-CR-3'
+    severity: low
+    file: 'shared/resources/tests/qa-scope-from-head.test.mjs'
+    finding: 'L15 has no remote-tracking ref for the feature branch, so it passes the same way for a pushed commit and does not show the scope reads local HEAD rather than the pushed branch.'
+    suggested_action: 'Give L15 a remote-tracking ref at the gate head so it fails if the scope ever diffed against the pushed branch, or rename it to the property it checks.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 176
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+  ci: 'not read this cycle — gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — qa-safety-clause1.sh reads only a pipeline-written gate file; no corpus sink models gate YAML (unchanged).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'The red-fast-gate path now commits before the next review; the HALT and the loop agree (L11, L15, loop-doc pin).'
+  maintainability:
+    status: PASS
+    notes: 'Three LOW enumeration/test-fidelity items.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'T168-QA3-CR-1 — apply the .claude/state exclusion to the Phase 0 trigger diff/ls-files lines, or document that it fails toward re-review there'
+      refs: ['skills/qa-task/SKILL.md']
+      carried_from: 'top_issues (route 2b, cycle 3)'
+    - action: 'T168-QA3-CR-2 — name the bounded-retry red exit as a second zero-push case at each push-budget statement (one-push rule, step 3/step 5 notes, route 2c precondition)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+      carried_from: 'top_issues (route 2b, cycle 3)'
+    - action: 'T168-QA3-CR-3 — give L15 a remote-tracking ref at the gate head, or rename it to the property it checks'
+      refs: ['shared/resources/tests/qa-scope-from-head.test.mjs']
+      carried_from: 'top_issues (route 2b, cycle 3)'
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-10-03'
+  total_iterations: 2
+  verification_method: 'L5 (tracked .claude/state), L15, loop-doc pin; mutation proofs red for CR-1 and CR-2'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

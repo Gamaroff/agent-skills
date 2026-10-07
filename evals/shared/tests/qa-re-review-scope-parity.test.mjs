@@ -182,9 +182,11 @@ for (const [name, text] of skillText) {
  * ------------------------------------------------------------------------- */
 
 // The guard, verbatim. `SAFETY_REPROBE` must appear ON the existing
-// `PRIOR_GATES` condition — not as a separate `if` ahead of it.
+// `PRIOR_GATES` condition — not as a separate `if` ahead of it. Since task.135 the guard no longer
+// requires a prior-gate date: the scope comes from the gate's `head:`, and a gate without one runs
+// unscoped INSIDE this branch, so the executed proof lives in qa-scope-from-head.test.mjs.
 const GUARD =
-  'if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ] && [ "$SAFETY_REPROBE" != "true" ]; then';
+  'if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then';
 
 for (const [name, text] of skillText) {
   test(`${name} extends the existing PRIOR_GATES guard with SAFETY_REPROBE`, () => {
@@ -195,15 +197,19 @@ for (const [name, text] of skillText) {
   });
 
   test(`${name} assigns DIFF_FILE in exactly one conditional`, () => {
-    // Counting the guard keyword is the cheap proxy for "one block, not two".
     // A second full-diff block inserted ahead of this one would need its own
-    // PRIOR_GATES test to know which cycle it is on.
-    const guards = text.split('if [ "$PRIOR_GATES"').length - 1;
+    // PRIOR_GATES test to know which cycle it is on. Count the PRIOR_GATES
+    // conditionals whose body WRITES $DIFF_FILE — not every PRIOR_GATES `if`:
+    // task.168's re-review guard (`-ge 1`, the uncommitted-fix HALT) branches on
+    // the cycle and writes no patch, and a keyword count read it as a second
+    // assigning block. A body runs from its `if` to the next PRIOR_GATES `if`.
+    const parts = text.split('if [ "$PRIOR_GATES"').slice(1);
+    const assigning = parts.filter((p) => /> "\$DIFF_FILE"/.test(p)).length;
     assert.equal(
-      guards,
+      assigning,
       1,
-      `${name} has ${guards} PRIOR_GATES conditionals; a second block assigning DIFF_FILE ` +
-        `would silently override the first`,
+      `${name} has ${assigning} PRIOR_GATES conditionals that write DIFF_FILE; a second ` +
+        `block assigning DIFF_FILE would silently override the first`,
     );
   });
 
@@ -237,7 +243,7 @@ for (const [name, text] of skillText) {
     assert.ok(
       text.includes(
         "Re-review scope: unscoped (prior gate failed on security)",
-      ) && text.includes("Re-review scope: since"),
+      ) && text.includes("Re-review scope: files changed since gate"),
       `${name} must record both scope outcomes in the QA report's Review Methodology`,
     );
   });
@@ -377,6 +383,41 @@ function clause1() {
 }
 
 /**
+ * Clause 1's ONE definition since task.168 (CR3-4): the awk probe left this fenced block for a
+ * bundled script, so Step 3b can recompute it from its own shell. The block above now only CALLS
+ * the script, by the invocation spelling the bundler follows into qa-task and qa-story.
+ *
+ * The text tests below (transit constraints, the empty-vs-absent branches, the stdin guard) read
+ * the SCRIPT, which is where the program lives. The replay tests execute the BLOCK, with its
+ * invocation path pointed at the shared source — so they exercise the call and the probe together,
+ * and a block that stopped calling the script (or called it wrongly) fails them.
+ */
+const SCRIPT_PATH = join(
+  repoRoot,
+  "shared",
+  "resources",
+  "qa-safety-clause1.sh",
+);
+const SCRIPT_CALL =
+  ".agents/skills/{qa-task|qa-story}/references/qa-safety-clause1.sh";
+function scriptText() {
+  assert.ok(
+    existsSync(SCRIPT_PATH),
+    "shared/resources/qa-safety-clause1.sh must exist",
+  );
+  return readFileSync(SCRIPT_PATH, "utf-8");
+}
+function runnable() {
+  const block = clause1();
+  assert.equal(
+    block.split(SCRIPT_CALL).length - 1,
+    1,
+    `the shared clause-1 block must call the script exactly once as ${SCRIPT_CALL}`,
+  );
+  return block.split(SCRIPT_CALL).join(`"${SCRIPT_PATH}"`);
+}
+
+/**
  * Compare on content, not layout. The skills nest the block inside a numbered
  * list so every line carries three extra spaces; the shared rule has it at
  * column 0. Comments around the probe are also allowed to differ — each site
@@ -391,15 +432,17 @@ function normalise(text) {
     .join("\n");
 }
 
-test("both skills carry the clause-1 probe verbatim from the shared rule", () => {
+test("both skills carry the clause-1 call verbatim from the shared rule", () => {
   const body = normalise(clause1());
   assert.ok(
     normalise(ruleText()).includes(body),
     "shared rule must hold the canonical probe",
   );
   for (const [name, text] of skillText) {
+    // Each skill calls its OWN bundled copy; otherwise the call is the shared rule's, verbatim.
+    const own = body.split("{qa-task|qa-story}").join(name);
     assert.ok(
-      normalise(text).includes(body),
+      normalise(text).includes(own),
       `${name} must carry the canonical clause-1 probe verbatim — a paraphrase is where ` +
         `the two copies start disagreeing again`,
     );
@@ -408,7 +451,7 @@ test("both skills carry the clause-1 probe verbatim from the shared rule", () =>
 
 test("the clause-1 probe uses no GNU-only regex escapes", () => {
   assert.ok(
-    !/\\s|\\d|\\w/.test(clause1()),
+    !/\\s|\\d|\\w/.test(scriptText()),
     "the probe must use POSIX classes only — \\s fails closed and silently on BSD awk/mawk",
   );
 });
@@ -442,7 +485,7 @@ function runClause1WithGatePath(path) {
     "bash",
     [
       "-c",
-      `exec 0< <(sleep ${HOLD_STDIN_SECONDS} 2>/dev/null)\n${clause1()}\nprintf '%s' "$SAFETY_REPROBE"`,
+      `exec 0< <(sleep ${HOLD_STDIN_SECONDS} 2>/dev/null)\n${runnable()}\nprintf '%s' "$SAFETY_REPROBE"`,
     ],
     {
       env: { ...process.env, LATEST_GATE: path },
@@ -459,7 +502,7 @@ function runClause1(yaml) {
   try {
     return execFileSync(
       "bash",
-      ["-c", `${clause1()}\nprintf '%s' "$SAFETY_REPROBE"`],
+      ["-c", `${runnable()}\nprintf '%s' "$SAFETY_REPROBE"`],
       {
         env: { ...process.env, LATEST_GATE: file },
         encoding: "utf-8",
@@ -609,8 +652,13 @@ test("clause-1 guards the read before invoking awk", () => {
     /\[ -n "\$LATEST_GATE" \] && \[ -r "\$LATEST_GATE" \]/,
     "the probe must test that LATEST_GATE is set and readable before running awk",
   );
+  assert.match(
+    scriptText(),
+    /\[ -n "\$LATEST_GATE" \] && \[ -f "\$LATEST_GATE" \] && \[ -r "\$LATEST_GATE" \]/,
+    "the script must test that its gate is set, a file and readable before running awk",
+  );
   assert.ok(
-    clause1().includes("</dev/null"),
+    scriptText().includes("</dev/null"),
     "the probe must close stdin so awk's read-stdin fallback is unreachable even " +
       "if the guard is later removed",
   );
@@ -1066,14 +1114,16 @@ test("readSecurityEvidence ignores the gate's TOP-LEVEL evidence: block", () => 
 });
 
 /* ---------------------------------------------------------------------------
- * 10. The probe ships as PROSE AN AGENT COPIES AND RUNS, and two characters can
+ * 10. The probe shipped as PROSE AN AGENT COPIES AND RUNS, and two characters can
  * corrupt it in transit. Both of these were real defects in the task.82 change
- * set, found during QA, and both fail silently rather than loudly.
+ * set, found during QA, and both fail silently rather than loudly. Since task.168
+ * the program lives in qa-safety-clause1.sh, moved byte-for-byte; these tests read
+ * the script, and its program still honours every transit constraint.
  * ------------------------------------------------------------------------- */
 
 /** The awk program only — between `awk '` and the closing quote before the file arg. */
 function awkProgram() {
-  const m = /awk '\n([\s\S]*?)\n\s*' "\$LATEST_GATE"/.exec(clause1());
+  const m = /awk '\n([\s\S]*?)\n\s*' "\$LATEST_GATE"/.exec(scriptText());
   assert.ok(
     m,
     "clause 1 must invoke awk with a single-quoted multi-line program",
@@ -1114,21 +1164,52 @@ test("the awk program contains no apostrophe", () => {
   );
 });
 
-test("both skills carry the same two properties", () => {
-  // The verbatim-mirroring test above compares the probe body, but it strips
-  // comments before comparing — so a comment-only corruption in one skill would
-  // not surface there. Check each skill's own text directly.
+test("both skills call the clause-1 script and carry no copy of its probe", () => {
+  // Before task.168 each skill carried the awk program itself, and this test checked each copy for
+  // the two transit hazards. One definition now lives in the script (read by the tests above); what
+  // must hold in each skill is that it CALLS its bundled copy — in Phase 0 step 5 and again in the
+  // Step 3b preamble — and that no second copy of the program survives to drift from it. The call
+  // is asserted INSIDE each fence, not anywhere in the file: a path named in prose or a comment
+  // would satisfy a whole-file count with the call itself removed (QA cycle 1, CR-4).
+  const fences = (text) =>
+    [...text.matchAll(/```bash\n([\s\S]*?)```/g)].map((m) => m[1]);
   for (const [name, text] of skillText) {
-    const m = /awk '\n([\s\S]*?)\n\s*' "\$LATEST_GATE"/.exec(text);
-    assert.ok(m, `${name} must carry the single-quoted awk program`);
-    assert.equal(
-      [...m[1].matchAll(/\$0/g)].length,
-      0,
-      `${name}: the awk program names the whole-record variable`,
+    const call = `bash .agents/skills/${name}/references/qa-safety-clause1.sh "$LATEST_GATE"`;
+    const step5 = fences(text).filter((f) =>
+      /^\s*SAFETY_REPROBE=false$/m.test(f),
+    );
+    const step3b = fences(text).filter((f) =>
+      /^\s*LAST_GATE_HEAD=\$\(grep -E '\^head:'/m.test(f),
+    );
+    assert.equal(step5.length, 1, `${name}: exactly one Phase 0 step 5 fence`);
+    assert.equal(step3b.length, 1, `${name}: exactly one Step 3b fence`);
+    for (const [where, fence] of [
+      ["Phase 0 step 5", step5[0]],
+      ["Step 3b", step3b[0]],
+    ]) {
+      const live = fence
+        .split("\n")
+        .filter((l) => !/^\s*#/.test(l))
+        .join("\n");
+      assert.ok(
+        live.includes(call),
+        `${name}: the ${where} fence must call ${call} on a non-comment line`,
+      );
+    }
+    assert.ok(
+      !/SECURITY_AXIS=\$\(awk/.test(text),
+      `${name} still carries an inline copy of the clause-1 awk probe — the script is its one definition`,
+    );
+    const bundled = join(
+      repoRoot,
+      "skills",
+      name,
+      "references",
+      "qa-safety-clause1.sh",
     );
     assert.ok(
-      !m[1].includes("'"),
-      `${name}: the awk program contains an apostrophe`,
+      existsSync(bundled),
+      `${name} must bundle qa-safety-clause1.sh (npm run bundle)`,
     );
   }
 });
@@ -1158,7 +1239,7 @@ function runClause1WithBrokenAwk(yaml) {
   try {
     return execFileSync(
       "bash",
-      ["-c", `${clause1()}\nprintf '%s' "$SAFETY_REPROBE"`],
+      ["-c", `${runnable()}\nprintf '%s' "$SAFETY_REPROBE"`],
       {
         env: {
           ...process.env,
@@ -1229,7 +1310,7 @@ test("a broken reader fires even on a gate that would otherwise be clean", () =>
 
 test("`absent` and an empty reading are distinct branches in the case", () => {
   // Structural, so the distinction cannot be tidied away into one wildcard.
-  const probe = clause1();
+  const probe = scriptText();
   assert.match(
     probe,
     /absent\)\s*:\s*;;/,
@@ -1239,5 +1320,31 @@ test("`absent` and an empty reading are distinct branches in the case", () => {
     probe,
     /\*\)\s*SAFETY_REPROBE=true\s*;;/,
     "the catch-all must set the trigger, not fall through silently",
+  );
+});
+
+test("the QA loop's red-fast-gate exit commits its attempt — the next review HALTs on an uncommitted one (task.168 QA cycle 2, CR-1)", () => {
+  // Step 3b's uncommitted-fix HALT (every re-review arm) and the loop's bounded fast-gate retry are
+  // two contracts that must agree: a retry exit that left qa-fix's edits in the working tree made
+  // the next review HALT instead of writing the gate the convergence check counts. The executed
+  // half — an unpushed commit is reviewed, an uncommitted edit HALTs — is L15 and L11 in
+  // qa-scope-from-head.test.mjs; this pins the instruction an agent reads.
+  const doc = readFileSync(
+    join(
+      repoRoot,
+      "shared",
+      "resources",
+      "develop-pipeline-step-5-6-qa-loop.md",
+    ),
+    "utf-8",
+  );
+  const at = doc.indexOf("**Bound this retry at 2 attempts.**");
+  assert.ok(at !== -1, "the bounded-retry paragraph must exist");
+  const para = doc.slice(at, doc.indexOf("\n\n", at));
+  assert.match(para, /commit the attempt without pushing/i);
+  assert.doesNotMatch(
+    para,
+    /commit nothing/i,
+    "a retry exit that commits nothing strands the next review on Step 3b's uncommitted-fix HALT",
   );
 });

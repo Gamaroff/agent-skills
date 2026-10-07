@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.135.gate-scoping-from-recorded-head'
+task_title: 'Gate scoping from a recorded head, not a typed timestamp'
+gate: FAIL
+status_reason: 'One high-confidence HIGH (the corpus freshness test goes red once any gated branch is rebased or squash-merged) and two MEDIUM correctness bugs in the new scope and trigger blocks; all three promoted under code_review_blocking.'
+reviewer: 'QA Engineer'
+head: '79ba80e793cd2e2c528bcda6622bd206824cfb7c'        # git rev-parse HEAD when the review was performed
+updated: '2026-09-30T12:45:39Z'  # date -u at write time
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'shared/resources/tests/gate-head-freshness.test.mjs'
+    finding: 'Existence and ancestry are asserted for every schema-2 gate in docs/, but develop-batch rebases items before merge and mergeStrategy allows squash/rebase, so a rewritten branch leaves gates naming unreachable heads and the test is red on develop for good. qa-re-review-scope.md also says the pipeline never rebases.'
+    suggested_action: 'Judge existence/ancestry/author-time only for gates changed vs the merge-base with the base branch (plus uncommitted ones); keep format checks for all; correct the never-rebases sentence. Bug: task.135.bug.1.'
+    suggested_owner: dev
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'The Step 3b scope block reads $LATEST_GATE, which only the Phase 0 block binds; in its own shell it is empty, so the block prints "prior gate carries no head: (schema 1)" and runs unscoped. Reproduced under bash and zsh. Same block in skills/qa-task and skills/qa-story Step 3b.'
+    suggested_action: 'Bind LATEST_GATE in each Step 3b preamble via qa-cycle.sh --path gate; HALT on cycle 3+ when the gate is not a readable file. Bug: task.135.bug.2.'
+    suggested_owner: dev
+  - id: 'CR-3'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Phase 0 CODE_MOVED counts commits only under apps packages shared skills evals, so scripts/, tests/, package.json or a consumer src/ change reads as no movement and a clean PASS gate skips re-review.'
+    suggested_action: 'Count every path except docs/ (-- . :(exclude)docs) and treat uncommitted tracked changes outside docs/ as movement. Bug: task.135.bug.3.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 79
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2, 3]
+  ci: 'not read — CI is gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — the change adds no function that accepts or rejects external input. Candidates considered: checkGate (test-only helper, not shipped), the Step 3b HALT guards (decide on local git state, not hostile input).'
+  performance:
+    status: PASS
+    notes: 'Two git reads per cycle.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-2 (scope block cannot see the gate) and CR-4 (uncommitted document edits invisible to the trigger) — both fail toward re-review, but the first records a false cause.'
+  maintainability:
+    status: PASS
+    notes: 'One scope block, byte-identical in three places and pinned by test E.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2, CR-3 (bugs 1–3).'
+      refs: ['shared/resources/tests/gate-head-freshness.test.mjs', 'shared/resources/qa-re-review-scope.md', 'skills/qa-task/SKILL.md']
+  future:
+    - action: 'CR-4 (bug 4) is advisory at medium confidence but cheap — fix alongside. CR-5/CR-6 low: document the same-commit requirement for the skip; distinguish a legitimately empty scoped patch. CR-7/CR-8 cleanups: t.after() temp-dir cleanup; independent enumeration for the schema-2 count.'
+      refs: ['skills/qa-task/SKILL.md', 'shared/resources/tests/qa-scope-from-head.test.mjs', 'shared/resources/tests/gate-head-freshness.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

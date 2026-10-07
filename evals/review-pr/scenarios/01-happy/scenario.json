@@ -1,0 +1,69 @@
+{
+  "name": "01-happy",
+  "skill": "review-pr",
+  "setup": "../../setup.mjs",
+  "description": "PR #901 delivers every criterion of task.901 and the trail is complete. /review-pr writes task.901.pr-review.1.widget-age-gate.md in the task dir with an APPROVE verdict and a Machine-Readable Findings block, and makes no refused or unhandled gh call.",
+  "prompt": "/review-pr 901",
+  "cliArgs": [
+    "--allowedTools",
+    "Bash",
+    "Read",
+    "Grep",
+    "Glob",
+    "Write",
+    "Edit",
+    "Agent",
+    "Skill"
+  ],
+  "fixture": {
+    "variant": "happy"
+  },
+  "live": {
+    "minPass": 4
+  },
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/tasks/task.901.widget-age-gate/task.901.pr-review.1.widget-age-gate.md"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.901.widget-age-gate/task.901.pr-review.1.widget-age-gate.md",
+        "\\*\\*Verdict:\\*\\*[^\\n]*APPROVE"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.901.widget-age-gate/task.901.pr-review.1.widget-age-gate.md",
+        "## Machine-Readable Findings"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"refused\":true"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"unhandled\":true"
+      ]
+    }
+  ],
+  "liveAssertions": [
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"argv\":\\[\"pr\",\"view\""
+      ]
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+schema: 1
+task: 'task.158.cycle-file-and-containment-definitions'
+task_title: "QA read-back requires this cycle's links; one definition each for the cycle's gate file and for path containment"
+gate: PASS
+status_reason: 'QA2-CR-1 is fixed and executed under bash and zsh (unnumbered gates halt on resume; the grant reports the helper reason); every suite, probe and validator is green. The cycle-3 review returned six medium-confidence or cleanup findings — none promoted; the one medium is pre-existing at its un-fixed sites and is routed to future work.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T14:12:38Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 294
+  phases_verified: 4/4
+  ci: 'not read (CI is gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-29'
+  total_iterations: 2
+  verification_method: 'QA2-CR-1: four-state resume-block test (bash+zsh), grant unnumbered case; mutations M14/M15 red'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 22
+    notes: 'Probe runs repeated on the path sink (11 + 11), identical outcomes to cycles 1–2; no containment code changed since cycle 1.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'QA2-CR-1 fixed: gate files with no usable number halt the resume block instead of resuming at cycle 1.'
+  maintainability:
+    status: PASS
+    notes: 'Shell-helper guard line numbers fixed; resume block executed whole by the eval.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'QA3-CR-1 (medium/medium, pre-existing at Phase 0): qa-cycle.sh rc 1 means "no gate" and "gates without a usable number" at every caller; qa-task/qa-story Phase 0 read both as a first review (identical on develop). Give the helper a distinct exit code for the second state and a test that every caller handles it — the structural fix the two patched sites approximate.'
+      refs: ['shared/resources/qa-cycle.sh', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'QA3-CR-2 (low): resume contract counts gate files with find (matches dotfiles) while grant-qa-cycles.sh parses the helper stderr — one question, two methods; resolved by the exit code above.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/grant-qa-cycles.sh']
+    - action: 'QA3-CR-3 (low): if mktemp fails in grant-qa-cycles.sh the helper never runs and the refusal reads as "no gate"; capture with 2>&1 instead of a temp file.'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+    - action: 'QA3-CR-4 (low): GATE_SELECTION exempts a line when wc -l or qa-cycle.sh appears anywhere after find; tie the exemption to the pipe stage.'
+      refs: ['tests/qa-cycle.test.js']
+    - action: 'QA3-CR-5 (low): the blocks > 50 floor is shared by SKILLS and STEP_DOCS; add a per-step-doc floor.'
+      refs: ['tests/qa-cycle.test.js']
+    - action: 'QA3-CR-6 (low): the THIS_GATE eval rows derive QA_CYCLE in pre instead of slicing the doc own writer line.'
+      refs: ['evals/shared/tests/optional-file-lookups.test.mjs']
+    - action: 'QA2-CR-2 (advisory, recorded in the task Known Issues): develop-next merge-gate prose lookup onto qa-cycle.sh --path gate.'
+      refs: ['skills/develop-next/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

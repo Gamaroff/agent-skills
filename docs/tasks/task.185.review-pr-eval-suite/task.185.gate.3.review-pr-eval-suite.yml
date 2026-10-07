@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.185.review-pr-eval-suite'
+task_title: 'review-pr eval suite'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes verified (BUG-2..4 reproductions now behave). One medium: runner exits that are neither a verdict nor a skip/driver error (setup error, unknown DRIVER, die) still read as failed runs. No high findings for the second consecutive cycle.'
+reviewer: 'QA Engineer'
+head: '7420c379bac095c35fb6551201516c8b9c2f6117'
+updated: '2026-10-05T16:37:46Z'
+
+top_issues:
+  - id: 'TASK-185-C3-CR-1'
+    severity: medium
+    category: bug
+    file: 'evals/shared/repeat.mjs'
+    finding: 'The runner exits 1 both for failed assertions and for runs that never ran (setup.mjs throws, unknown DRIVER via die(), unreadable scenario), and repeat.mjs counts every status other than 3/4 as a failed run; reproduced: DRIVER=claude-cl -> passed 0/2, exit 1, against the README rule that exit 1 means every run ran.'
+    suggested_action: 'Make the verdict positive: the runner exits a caller-requested code only when assertions actually ran and failed, and repeat.mjs treats every status other than 0 and that code as could-not-run.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5352
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+  ci: 'not read — CI is gated at /finalise'
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-10-05'
+  total_iterations: 2
+  verification_method: 'BUG-2 npm script with node-only PATH -> rc 3; BUG-3 --runs 10 -> min 8; BUG-4 fake claude no credit -> run 1/2 driver error, rc 3; C2-CR-4/5 -> rc 2'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 28
+    notes: 'No boundary code changed since gate 2 (next-report-number.sh untouched); probe record task.185.qa.2.security.run.json stands.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'One remaining class of could-not-run exits (harness errors) still reads as a failed run.'
+  maintainability:
+    status: PASS
+    notes: 'Exit-status contract stated once.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'C3-CR-2 (medium, low confidence): a claude-cli timeout is could-not-run by design (documented); a separate timeout status could score a hang as a failure.'
+      refs: ['evals/shared/runner.mjs']
+    - action: 'C3-CR-3: a signal or spawn error in the runner child counts as a failed run. C3-CR-4: repeat.mjs with DRIVER unset produces a replay pass rate. C3-CR-5: an EVAL_RUNS parse error names --runs.'
+      refs: ['evals/shared/repeat.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['C3-CR-1 fixed or deferred with a follow-up']

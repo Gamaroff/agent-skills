@@ -1,0 +1,70 @@
+schema: 1
+task: 'task.133.task-130-residue-cleanup'
+task_title: "Residue of task.130's seven QA cycles — eleven advisory findings, grouped by file"
+gate: FAIL
+status_reason: 'All five phases verified and every suite is green, but the diff review reproduced one high-confidence HIGH: --check-append-only --against "" reads the index and reports a clean log (exit 0). An unresolvable merge-base therefore makes the new 5c TRAIL check fail open.'
+reviewer: 'QA Engineer'
+updated: '2026-09-30T08:50:17Z'
+
+top_issues:
+  - id: TASK-133-QA-1
+    severity: high
+    file: 'shared/resources/change-log.js'
+    finding: 'An empty --against operand is accepted, so `git show :./<file>` reads the index, and --check-append-only reports ok/exit 0 when the base cannot be resolved (code review CR-1; reproduced).'
+    suggested_action: 'Refuse an empty or whitespace --against as usage (exit 2) before contentAt; add J4 cases for "" and "  "; mutation-prove.'
+    suggested_owner: dev
+    bug_ref: 'task.133.bug.1.check-append-only-empty-against-reads-index.md'
+    status: open
+  - id: TASK-133-QA-2
+    severity: low
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The bind-block comment says "Every {doc-directory} substitution is QUOTED", but the contract still has unquoted substitutions outside § Consume Output (the --restore fence and the grant call). The task scoped those out, so the claim is wider than the change (code review CR-2).'
+    suggested_action: 'Narrow the comment to the two § Consume Output blocks and name the out-of-scope sites; leave quoting them to a follow-up.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 4629
+  phases_verified: 5/5
+  ci: 'SUCCESS 5/5 @ PR #528 head (informational)'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'One boundary touched: advance-pipeline-lock.sh choose_candidate(). Only its message placement changed; the accept/refuse logic is unchanged. It has no probe-engine entry form: it is a flag-moded executable, neither a single-positional nor a sourceable library. Its hostile cases (legacy, foreign directory, relative spelling, unparsable, newer legacy beside an older claim) execute in its own suite (99/99, both shells) and in detector-candidate-rule B. rowsDropped reports a diff, and its result does not prevent any action, so boundary: false.'
+  performance:
+    status: PASS
+    notes: 'One jq -e per stale delta; the append-only check is one git show per document, run only by the 5c lens.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-133-QA-1: the new check fails open on an unresolvable base.'
+  maintainability:
+    status: PASS
+    notes: 'Each rule is stated once and cited; 5 suites extended, 1 new suite; 15 develop-time mutation proofs, 2 re-run independently by QA.'
+
+recommendations:
+  immediate:
+    - action: 'Refuse an empty or whitespace --against (TASK-133-QA-1).'
+      refs: ['shared/resources/change-log.js', 'shared/resources/tests/change-log.test.mjs']
+  future:
+    - action: 'CR-2 population: quote every fenced {doc-directory} and its *-directory siblings across shared/resources and skills/*/SKILL.md (contract --restore fence, grant call, step-0 §0b), with a test over bash fences.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'CR-3: new-document covers a renamed or moved document too; consider rename detection against <rev>.'
+      refs: ['shared/resources/change-log.js']
+    - action: 'The 5c lens compares against the merge-base only; a row added and then rewritten on the branch is invisible to it (obs #183).'
+      refs: ['shared/resources/pr-conformance-prompt.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['TASK-133-QA-1 fixed']

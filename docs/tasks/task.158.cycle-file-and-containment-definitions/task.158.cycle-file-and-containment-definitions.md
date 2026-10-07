@@ -5,18 +5,22 @@ type: task
 description: "Three residues carried out of task.149. From cycle 2 on, qa-read-back.js passes a document whose links still point at the previous cycle. The QA skills and pipeline step docs find the current gate with a second `find -name` grammar that disagrees with qa-cycle.sh. And security-probe.mjs refuses a legitimate `..name` path with a bare `startsWith(\"..\")` containment test."
 tags: [qa-task, qa-story, qa-read-back, qa-cycle, security-probe, doc-links, follow-up]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-26
-updated: 2026-09-26
+updated: 2026-09-29
 assignee:
 estimated_effort_hours: 8
 github_issue: 494
+completed_date: 2026-09-29
+pr_number: 521
 ---
 
 # Technical Task: QA read-back requires this cycle's links; one definition each for the cycle's gate file and for path containment
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.158.review.1.cycle-file-and-containment-definitions.md` implemented 2026-09-29
 
 **GitHub Issue**: [#494](https://github.com/Gamaroff/agent-skills/issues/494)
 
@@ -151,15 +155,26 @@ reproduces, and each one turns a named test red when its fix is reverted.
   file list gains the three shared step docs, and its pattern also catches a `find … gate` selection
   that is not a count. Its fixtures carry each old shape as a positive case, so it cannot pass
   vacuously. `qa-cycle.sh`'s header then says "the only definition".
-- **Containment**:
-  - `security-probe.mjs` imports `isWithin` from `./qa-execute-snippets.mjs`, the import it already
-    has. **Caution: the semantics differ.** `security-probe` refuses `entry === root`
-    (`rel === ""`), but `isWithin(root, root)` is `true`. The replacement is
-    `const escapes = entryPath === root || !isWithin(root, entryPath);`, and the same at `--fake-gh`.
-  - `doc-links.js` exports `isWithin`, and both `linkState` and `qa-read-back.js` use it. That leaves
-    one CJS definition and one ESM definition.
-  - A parity test runs one case table through both: `..`, `../x`, `..name`, `a/../../x`, an absolute
-    child, the `/` root, a sibling sharing a prefix, and equal paths.
+- **Ambiguity is a stop, not an empty file.** Two files can claim the current cycle. Cycle mode then
+  exits 0 and `--path gate` exits 1 (run: `task.9.gate.2.x.yml` + `task.9.gate.2.y.yml` → cycle `2`,
+  `--path` refuses). Each block therefore reads the cycle first. When the cycle is non-empty and
+  `--path` refuses, the block stops with the helper's stderr line. It never proceeds with an empty
+  `LATEST_GATE`, which would take the first-review branch, or an empty `THIS_GATE`, which would post
+  `BLOCKING_COUNT=0`. Only an empty cycle (rc 1 from cycle mode) means "no gate yet".
+- **The helper must be bundled where it is called.** `qa-cycle.sh` is bundled today into `qa-task`,
+  `qa-story` and `qa-fix` only. `develop-pipeline-step-5-6-qa-loop.md` ships in `develop-story` and
+  `develop-task`; the resume contract and `develop-pipeline-step-7-finalise.md` ship in nine skills. Each
+  call is addressed as `.agents/skills/{develop-story|develop-task|develop-bug}/references/qa-cycle.sh`
+  (`{develop-story|develop-task}` in the step-5-6 doc) — the placeholder these docs already use for
+  every helper they call — and the bundler follows that invocation path into each named skill that
+  bundles the doc, so `develop-story`, `develop-task` and `develop-bug` gain a copy. No
+  `shared/resources/qa-cycle.sh` literal is added to the step docs. `grant-qa-cycles.sh`, which the
+  resume contract's re-entry calls, now takes its base cycle from the same helper (QA cycle 1,
+  CR-1) and declares it as a `bundle-dependency`, so every skill that bundles the grant script —
+  `review-pr`/`review-story`/`review-task` included — carries it too. The existing "helper is bundled into every skill whose prose calls it" test widens to every
+  bundled copy of the three docs whose invocation names its own skill. The one non-blocking site,
+  Step 7's post-finalise completion comment, reports the refusal and renders `N/A` rather than
+  dropping the comment.
 
 ### Same-class mechanism inventory (obs #103)
 
@@ -222,12 +237,12 @@ reproduces, and each one turns a named test red when its fix is reverted.
 **Files**: `shared/resources/doc-links.js`, `shared/resources/qa-read-back.js`,
 `shared/resources/tests/doc-links.test.mjs`, `shared/resources/tests/qa-read-back.test.mjs`
 
-- [ ] `doc-links.js` `checkDocument` returns an additive `resolved[]`: every link's resolved path, fragment stripped, computed by the existing loop; a doc-links test pins it (resolved and broken links both listed)
-- [ ] After the second `readLinks()`, check that the resolved link set contains the `--path` gate and the `--path` report; each absent link is a named problem, exit 1
-- [ ] Test: cycle-2 fixture (gate.1/qa.1 linked and committed, gate.2/qa.2 on disk, document not re-edited) HALTs naming both, for the task and the story shape
-- [ ] Test: the same fixture with the document re-linked to gate.2/qa.2 reads clean
-- [ ] Mutation: remove the check → the cycle-2 test goes red
-- [ ] qa-task Step 12b and qa-story item 3e text names the new check (one clause each; no restated list)
+- [x] `doc-links.js` `checkDocument` returns an additive `resolved[]`: every link's resolved path, fragment stripped, computed by the existing loop; a doc-links test pins it (resolved and broken links both listed)
+- [x] After the second `readLinks()`, check that the resolved link set contains the `--path` gate and the `--path` report; each absent link is a named problem, exit 1
+- [x] Test: cycle-2 fixture (gate.1/qa.1 linked and committed, gate.2/qa.2 on disk, document not re-edited) HALTs naming both, for the task and the story shape
+- [x] Test: the same fixture with the document re-linked to gate.2/qa.2 reads clean
+- [x] Mutation: remove the check → the cycle-2 test goes red
+- [x] qa-task Step 12b and qa-story item 3e text names the new check (one clause each; no restated list)
 
 ### Phase 2: One definition for the cycle's gate file (Risk: Medium)
 
@@ -235,30 +250,33 @@ reproduces, and each one turns a named test red when its fix is reverted.
 `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `shared/resources/develop-pipeline-resume-contract.md`,
 `shared/resources/develop-pipeline-step-7-finalise.md`, `shared/resources/qa-cycle.sh` (header), `tests/qa-cycle.test.js`
 
-- [ ] Each site in § 3's list calls `qa-cycle.sh` (cycle) or `qa-cycle.sh --path gate` (file), rc-checked, repository-root addressed
-- [ ] Resume contract: `QA_CYCLE` from `qa-cycle.sh`, rc 1 → 0 (no gate yet), other rc → HALT
-- [ ] Extend the `tests/qa-cycle.test.js` guard to the three shared step docs and to `find … gate` selections; fixtures prove each old shape is caught
-- [ ] `qa-cycle.sh` header: "the only definition", naming finalise's stem-keyed lookup as the one deliberate exception
-- [ ] Executed-prose check: each changed block runs under bash and zsh against a fixture holding a zero-padded gate (qa-task / qa-story Step 4b rules apply to this change set)
-- [ ] `npm run bundle`
+- [x] Each site in § 3's list calls `qa-cycle.sh` (cycle) or `qa-cycle.sh --path gate` (file), rc-checked, repository-root addressed
+- [x] Resume contract: `QA_CYCLE` from `qa-cycle.sh`, rc 1 → 0 (no gate yet), other rc → HALT
+- [x] Every `--path gate` site: cycle non-empty + `--path` rc 1 (ambiguous) → stop with the helper's message; never an empty file (review I-2)
+- [x] The step docs call the helper at `.agents/skills/{develop-story|develop-task|develop-bug}/references/qa-cycle.sh`, which the bundler follows into those skills; the bundled-helper test covers every bundled copy of the three docs (review I-1)
+- [x] `step-5-6` § Finding the Latest Gate File: note that the stem-keyed (`story.{epic}.{story}.gate.*`) form becomes the directory-wide helper; the stem filter is the recorded follow-up (review O-1)
+- [x] Extend the `tests/qa-cycle.test.js` guard to the three shared step docs and to `find … gate` selections; fixtures prove each old shape is caught
+- [x] `qa-cycle.sh` header: "the only definition", naming finalise's stem-keyed lookup as the one deliberate exception
+- [x] Executed-prose check: each changed block runs under bash and zsh against a fixture holding a zero-padded gate (qa-task / qa-story Step 4b rules apply to this change set)
+- [x] `npm run bundle`
 
 ### Phase 3: One containment predicate per module system (Risk: Low)
 
 **Files**: `shared/resources/security-probe.mjs`, `shared/resources/doc-links.js`, `shared/resources/qa-read-back.js`,
 `shared/resources/tests/security-probe.test.mjs`, `shared/resources/tests/doc-links.test.mjs`
 
-- [ ] `security-probe.mjs` imports `isWithin` from `./qa-execute-snippets.mjs`; `--entry` and `--fake-gh` use `x === root || !isWithin(root, x)`
-- [ ] Test: an `--entry` under a `..name` directory inside the repo is probed; `entry === root` and `../x` are still refused
-- [ ] `doc-links.js` exports `isWithin`; `linkState` and `qa-read-back.js` use it; the private copy is deleted
-- [ ] Parity test: one case table through the ESM and the CJS `isWithin`, deep-equal
-- [ ] Mutation: revert either `security-probe` site to `startsWith("..")` → its test goes red
+- [x] `security-probe.mjs` imports `isWithin` from `./qa-execute-snippets.mjs`; `--entry` and `--fake-gh` use `x === root || !isWithin(root, x)`
+- [x] Test: an `--entry` under a `..name` directory inside the repo is probed; `entry === root` and `../x` are still refused
+- [x] `doc-links.js` exports `isWithin`; `linkState` and `qa-read-back.js` use it; the private copy is deleted
+- [x] Parity test: one case table through the ESM and the CJS `isWithin`, deep-equal
+- [x] Mutation: revert either `security-probe` site to `startsWith("..")` → its test goes red
 
 ### Phase 4: Docs and bundle (Risk: Low)
 
 **Files**: `CHANGELOG.md`, bundled `references/` (generated)
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 158)`
-- [ ] `npm run bundle`; `npm run ci` clean
+- [x] CHANGELOG `[Unreleased]` cites `(task 158)`
+- [x] `npm run bundle`; `npm run ci` clean
 
 ---
 
@@ -282,11 +300,12 @@ reproduces, and each one turns a named test red when its fix is reverted.
 11. `tests/qa-cycle.test.js` — extended guard
 12. `shared/resources/tests/security-probe.test.mjs`
 13. `shared/resources/tests/doc-links.test.mjs` — `resolved[]`; parity case table
+14a. `evals/shared/tests/optional-file-lookups.test.mjs` — the rows that execute the moved lookups, re-pointed at the `qa-cycle.sh` blocks (found by the fast gate: the rows slice the live text)
 
 ### Files to Modify (Documentation / Generated)
 
 14. `CHANGELOG.md`
-15. `skills/*/references/*` — regenerated by `npm run bundle`, never hand-edited
+15. `skills/*/references/*` — regenerated by `npm run bundle`, never hand-edited. New: `qa-cycle.sh` in `develop-story`, `develop-task` and `develop-bug` (review I-1) and, through `grant-qa-cycles.sh`'s `bundle-dependency`, in `review-pr`, `review-story` and `review-task` (QA cycle 1, CR-1)
 
 ### Files to Delete
 
@@ -329,28 +348,28 @@ Not applicable. The read-back gains one set lookup, and each changed block trade
 
 ### Functional
 
-- [ ] A cycle-2 document that still links `gate.1` / `qa.1` makes `qa-read-back.js` exit 1, naming both missing links (task and story shapes). The same document re-linked to `gate.2` / `qa.2` exits 0 (Phase 1 adds the branch)
-- [ ] With `task.9.gate.02.x.yml` carrying one HIGH entry, qa-task Step 13b's `THIS_GATE` names that file and `BLOCKING_COUNT` reads 1. The same holds for qa-story
-- [ ] The resume-contract block reconstructs `QA_CYCLE=2` from a zero-padded `gate.02`, and reconstructs 0 from an empty directory
-- [ ] `security-probe.mjs --entry` accepts an entry under a `..name` directory inside the repository, and still refuses `entry === root`, `../x` and an absolute path outside it
+- [x] A cycle-2 document that still links `gate.1` / `qa.1` makes `qa-read-back.js` exit 1, naming both missing links (task and story shapes). The same document re-linked to `gate.2` / `qa.2` exits 0 (Phase 1 adds the branch)
+- [x] With `task.9.gate.02.x.yml` carrying one HIGH entry, qa-task Step 13b's `THIS_GATE` names that file and `BLOCKING_COUNT` reads 1. The same holds for qa-story
+- [x] The resume-contract block reconstructs `QA_CYCLE=2` from a zero-padded `gate.02`, and reconstructs 0 from an empty directory
+- [x] `security-probe.mjs --entry` accepts an entry under a `..name` directory inside the repository, and still refuses `entry === root`, `../x` and an absolute path outside it
 
 ### Performance
 
-- [ ] The `tests/qa-cycle.test.js` guard and the parity test each run in under one second, with file reads only
-- [ ] No new process spawn per QA cycle beyond one `qa-cycle.sh` call per changed block
+- [x] The `tests/qa-cycle.test.js` guard and the parity test each run in under one second, with file reads only
+- [x] No new process spawn per QA cycle beyond one `qa-cycle.sh` call per changed block
 
 ### Code Quality
 
-- [ ] The extended guard reports zero hits on the shipped files and at least one hit per old shape in its fixtures
-- [ ] One ESM `isWithin` and one CJS `isWithin`, held deep-equal by the parity test over one case table. The copies in `qa-read-back.js` and `linkState` are removed
-- [ ] Every new assertion is mutation-proved, with the runs recorded in the implementation report
-- [ ] `npm run ci` is clean. That covers ci:fast, eval:all, validate:all, check:generated, bundle:check and lint:shell
-- [ ] `npm run validate -- skills/qa-task/` and `npm run validate -- skills/qa-story/` are clean
+- [x] The extended guard reports zero hits on the shipped files and at least one hit per old shape in its fixtures
+- [x] One ESM `isWithin` and one CJS `isWithin`, held deep-equal by the parity test over one case table. The copies in `qa-read-back.js` and `linkState` are removed
+- [x] Every new assertion is mutation-proved, with the runs recorded in the implementation report
+- [x] `npm run ci` is clean. That covers ci:fast, eval:all, validate:all, check:generated, bundle:check and lint:shell (2026-09-29, before `/finalise`: exit 0, 4512 pass / 0 fail, bundle freshness 129/0)
+- [x] `npm run validate -- skills/qa-task/` and `npm run validate -- skills/qa-story/` are clean
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 158)`
-- [ ] The `qa-cycle.sh` header says "the only definition" and names finalise's stem-keyed exception
+- [x] CHANGELOG `[Unreleased]` cites `(task 158)`
+- [x] The `qa-cycle.sh` header says "the only definition" and names finalise's stem-keyed exception
 
 ---
 
@@ -419,12 +438,71 @@ None.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.158.qa.3.cycle-file-and-containment-definitions.md`
+**Gate File**: `task.158.gate.3.cycle-file-and-containment-definitions.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (3 QA cycles; 5c `/review-pr` APPROVE)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 13/13 success criteria met, with code and per-PR test citations
+✅ **Tests & PR:**
+- PR #521 CI green on `1a9d4bb7` (test, validate, link-check, shellcheck).
+- Local `npm run ci` exit 0.
+- Every new assertion is mutation-proved.
+✅ **Documentation:** CHANGELOG (task 158), QA skills, step docs and the `qa-cycle.sh` header
+✅ **Security Review:** PASS. Measured with 22 probe executions, and every reproduction is attributed.
+⚠️ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-09-29
+
+**Detailed Verification Log:** See `task.158.dod.1.cycle-file-and-containment-definitions.md` for the complete verification evidence and timestamps.
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-29
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.158.qa.3.cycle-file-and-containment-definitions.md](./task.158.qa.3.cycle-file-and-containment-definitions.md)
+- **Gate File**: [task.158.gate.3.cycle-file-and-containment-definitions.yml](./task.158.gate.3.cycle-file-and-containment-definitions.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 294
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- Cycle 1 CR-1 and cycle 2 QA2-CR-1 fixed and verified under execution — [bug report](./task.158.bug.1.grant-qa-cycles-second-cycle-definition.md) closed
+- Future work: a distinct `qa-cycle.sh` exit code for gate files with no usable number (QA3-CR-1, pre-existing at Phase 0); five low cleanups in the gate's `recommendations.future`
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-26 | 1.0     | Initial draft — cut from task.149's carried follow-ups (5c CR-1; gate 8 and gate 7 `recommendations.future`) | create-task |
+| 2026-09-29 | 1.1     | Review passed (8/10) — added the ambiguous-cycle stop and the `qa-cycle.sh` bundling requirement for the step docs | review-task |
+| 2026-09-29 |         | Status → ready-for-development | review-task |
+| 2026-09-29 |         | Implemented — 16 files (+3 bundled `qa-cycle.sh` copies), 12 new tests; status → ready-for-review | develop |
+| 2026-09-29 |         | QA gate CONCERNS (90/100) — 1 medium finding (CR-1), 3 low | qa-task |
+| 2026-09-29 |         | QA gate CONCERNS (90/100) — cycle 2: CR-1 verified fixed; 1 medium (QA2-CR-1), 1 advisory medium, 2 low | qa-task |
+| 2026-09-29 |         | QA gate PASS (100/100) — cycle 3: QA2-CR-1 verified fixed; 0 gating findings, 1 pre-existing medium and 5 low routed to future | qa-task |
+| 2026-09-29 |         | QA findings fixed — gate PASS (100/100), 2 iterations (CR-1 grant cycle definition; QA2-CR-1 unnumbered gates on resume) | qa-fix |
+| 2026-09-29 | 1.2 | DoD passed — accepted (PR #521) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -432,22 +510,22 @@ None.
 ## Progress Tracking
 
 ### Phase 1: Read-back requires this cycle's links
-- [ ] Link-membership check
-- [ ] Cycle-2 tests (task, story), re-linked clean test
-- [ ] Mutation proof
+- [x] Link-membership check
+- [x] Cycle-2 tests (task, story), re-linked clean test
+- [x] Mutation proof
 
 ### Phase 2: One definition for the cycle's gate file
-- [ ] Six sites moved onto `qa-cycle.sh`
-- [ ] Guard extended, non-vacuity fixtures
-- [ ] Header wording; executed-prose runs under bash and zsh
+- [x] Six sites moved onto `qa-cycle.sh`
+- [x] Guard extended, non-vacuity fixtures
+- [x] Header wording; executed-prose runs under bash and zsh
 
 ### Phase 3: One containment predicate per module system
-- [ ] `security-probe` sites
-- [ ] `doc-links` export; copies removed
-- [ ] Parity test; mutation proofs
+- [x] `security-probe` sites
+- [x] `doc-links` export; copies removed
+- [x] Parity test; mutation proofs
 
 ### Phase 4: Docs and bundle
-- [ ] CHANGELOG; bundle; `npm run ci`
+- [x] CHANGELOG; bundle; `npm run ci`
 
 ---
 
@@ -471,8 +549,33 @@ None.
 - Every changed fenced block is runnable prose, so the qa-task Step 4b / qa-story Phase 1.7 execution
   rules apply to this change set.
 
+### Implementation Summary
+
+**Completed**: 2026-09-29 (develop-task pipeline, Step 3, inline from the plan).
+
+**Approach.** Phase 1 added `resolved[]` to `checkDocument` (collected in the loop that already
+computed it) and a membership check after the read-back's second link pass. Phase 2 moved six gate
+lookups onto `qa-cycle.sh` (cycle first, then `--path gate`; a refusal with a cycle present stops
+the block, except Step 7's non-blocking comment, which renders `N/A`) and extended the guard with a
+`GATE_SELECTION` pattern over the QA skills and a `STEP_DOCS` list. The helper reaches
+`develop-story`, `develop-task` and `develop-bug` through the `{develop-…}` invocation path the
+bundler already follows. After QA cycle 1 (CR-1) `grant-qa-cycles.sh` asks the same helper and
+declares it as a `bundle-dependency`, so the `review-*` skills that bundle the grant script carry it
+too; a shell-helper guard now fails on a gate-number derivation in any other `.sh`. Phase 3 moved `security-probe.mjs` onto the ESM `isWithin` with an explicit
+`=== root` refusal, and made `doc-links.js` the one CommonJS definition.
+
+**Testing results.** 12 new tests: 6 in `qa-read-back.test.mjs`, 2 in `doc-links.test.mjs`, 2 in
+`security-probe.test.mjs`, 2 in `tests/qa-cycle.test.js`. The existing bundled-helper and
+inline-derivation tests are extended. Eleven mutations, each reverted and each red, are recorded in
+the implementation report. Every changed prose block was run under bash and zsh against
+`task.9.gate.02.x.yml` with a HIGH entry: cycle 2, `BLOCKING_COUNT` 1. An ambiguous pair stops the
+block, and an empty directory reads as the first review, with resume reconstructing 0.
+
+**Deferred work.** None added. The two Known Issues below are unchanged.
+
 ### Known Issues
 
 **Open** (non-blocking, out of scope):
 - ⚠️ `qa-cycle.sh --path` counts a co-located bug's gate in the parent directory (task.149 gate 8 CR-2)
 - ⚠️ obs #196: 5c routes LOW documentation findings to Step 7, where finalise's Docs section blocks on the same items
+- ⚠️ `develop-next` SKILL.md's merge gate reads "the newest `*.gate.{N}.*.yml`" by its own prose rule (QA cycle 2, QA2-CR-2). It is outside this task's six named sites and is prose, not a fenced lookup, so neither guard sees it; moving it onto `qa-cycle.sh --path gate` needs the helper bundled into `develop-next` — a follow-up

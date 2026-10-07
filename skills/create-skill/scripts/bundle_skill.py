@@ -15,7 +15,8 @@ Usage:
     python bundle_skill.py <path/to/skill-folder>
     python bundle_skill.py --all                  # bundle every skill under skills/
 
-Exit codes: 0 success; 1 a skill failed to bundle; 2 usage error.
+Exit codes: 0 success; 1 a skill failed to bundle — including a copy the write
+gate left alone, which `--check` would fail; 2 usage error.
 """
 
 import functools
@@ -24,7 +25,16 @@ import re
 import sys
 from pathlib import Path
 
-from quick_validate import find_repo_root
+from quick_validate import (
+    CITE,
+    DEP,
+    cite_comment_spans,
+    find_repo_root,
+    in_spans,
+    parse_shared_refs,
+    ref_kind,
+    split_fragment,
+)
 
 # `(?<![\w-]/)` — never match inside an absolute URL: the link pass below writes
 # `https://…/blob/develop/shared/resources/x.md` into bundled copies for targets
@@ -111,8 +121,9 @@ EXCLUDE_DIRS = {'__pycache__', '.git', 'node_modules', '.DS_Store'}
 # absence of a banner is not evidence about these. It is NOT a licence to write —
 # an early `return True` here made an authored `.json` silently destroyable, and
 # Evidence 2 (byte-equality with the rewritten source) is available for these
-# suffixes precisely because no header is injected, so every genuine copy still
-# passes.
+# suffixes precisely because no header is injected, so every FRESH copy passes;
+# evidence 3 (equal to an earlier committed version of the source) is what lets
+# a stale one be refreshed (observation #199). See `_looks_bundled`.
 HEADERLESS_SUFFIXES = {'.json'}
 AUTOGEN_MARKER = "AUTO-GENERATED — DO NOT EDIT"
 
@@ -140,32 +151,26 @@ def comment_only_refs(text):
         if not COMMENT_LINE_RE.match(line) or BUNDLE_DECL_RE.search(line):
             continue
         for m in SHARED_REF_RE.finditer(line):
-            target = m.group(1).rstrip('.,;:')
+            target, _ = split_fragment(m.group(1))
             if target:
                 out.append((i, target))
     return out
 
 
-SHARED_REF_LINE_RE = re.compile(r'(?<![\w-]/)shared/resources/([^\s`\'")\]*]+)')
+def refs_refs_with_kind(text):
+    """Return [(name, kind)] for every `references/<name>` spelling in `text`.
 
-
-def shared_refs_with_lines(text):
-    """Return [(line_no, name)] for every shared/resources/<name> citation in
-    `text` — the same match and punctuation strip as
-    quick_validate.collect_shared_refs, plus the line, so a missing source can be
-    reported against the file and line that cited it. Pure.
-
-    One pass over the whole text, not one per line: the name class excludes
-    whitespace, so no match spans a newline and the matches are the same. The
-    per-line loop cost 1.9 s of a 7.2 s `--check` (task 154 DoD, AC6)."""
+    This is the spelling every skill file carries once the bundler has rewritten
+    `shared/resources/X` in place, so a citation must be recognisable here too —
+    otherwise converting a skill's pointer to the citation form changes nothing
+    (task.126 review, C1). `REFS_REF_RE`'s name group ends at the extension, so a
+    fragment is the character that follows it."""
+    spans = cite_comment_spans(text)
     out = []
-    line, pos = 1, 0
-    for m in SHARED_REF_LINE_RE.finditer(text):
-        line += text.count('\n', pos, m.start())
-        pos = m.start()
-        name = m.group(1).rstrip('.,;:')
-        if name:
-            out.append((line, name))
+    for m in REFS_REF_RE.finditer(text):
+        name = m.group(1)
+        has_fragment = text[m.end(1):m.end(1) + 1] == '#'
+        out.append((name, ref_kind(name, has_fragment, in_spans(m.start(1), spans))))
     return out
 
 
@@ -264,16 +269,30 @@ def inject_header(content, filename, suffix):
     return header + content
 
 
-def rewrite_text(content, suffix):
+def rewrite_text(content, suffix, unshipped=None):
     """Rewrite `shared/resources/X` references to their bundled `references/X` form.
 
     Module-level rather than nested inside `bundle_skill()` because the freshness
     write path and the ambiguity gate must agree on it exactly: a bundled copy is
     the source PLUS a banner PLUS this rewrite, so a naive checksum can never
     match. One definition, two callers.
+
+    `unshipped(name)` — optional, `.md` only — says a mention names a real shared
+    file this skill does NOT ship. Such a mention becomes its upstream URL instead
+    of a `references/X` that would point a reader at nothing: the task.108 rule
+    for links, applied to the prose mention. Before task.126 the case could not
+    arise, because every mention in a bundled document was followed and so
+    shipped; a CITED document is copied without its closure, so its mentions of
+    that closure are exactly this case. The URL form is not rediscovered by any
+    scanner (`SHARED_REF_RE`'s lookbehind refuses it), so it never bundles.
     """
     if suffix == '.md':
-        return SHARED_REF_RE.sub(lambda m: f"references/{m.group(1)}", content)
+        def md(m):
+            name, _ = split_fragment(m.group(1))
+            if unshipped is not None and name and unshipped(name):
+                return f"{UPSTREAM_BASE}shared/resources/{m.group(1)}"
+            return f"references/{m.group(1)}"
+        return SHARED_REF_RE.sub(md, content)
     if suffix in ('.js', '.mjs'):
         # Both forms are applied to both suffixes: a `.js` file may be ESM in a
         # consumer whose package.json says so, and a `.mjs` file may still use
@@ -419,7 +438,7 @@ def _relocate_target(target, src_dir, dst_dir, skill_dir, bundled_names):
     return f"{new}{trailing}{sep}{fragment}"
 
 
-def expected_bytes(src, name, refs_dir, bundled_names):
+def expected_bytes(src, name, refs_dir, bundled_names, reached=None):
     """The exact bytes `<skill>/references/<name>` must hold for source `src`.
 
     This is the single definition of "in sync". Undecodable sources bypass all
@@ -432,18 +451,38 @@ def expected_bytes(src, name, refs_dir, bundled_names):
     and the checker cannot disagree about what "in sync" means.
     """
     suffix = Path(name).suffix
+    located = _skill_dirs(str(refs_dir)) if suffix == '.md' else None
+    unshipped = None
+    shipped = None
+    if located is not None:
+        shared_root = Path(located[0]) / 'shared' / 'resources'
+        # What a prose mention may point at locally is what discovery REACHES
+        # (`reached` — the bundler's `needed`), not what happens to sit on disk:
+        # a source-backed copy nothing reaches is UNREACHED and owed a `git rm`,
+        # and a copy's bytes must not change the moment that removal lands, or a
+        # commit carrying only the removal leaves this copy STALE in CI
+        # (task.126 QA-1, CR-2). Callers with no discovery pass (the packager,
+        # which ships what is on disk) fall back to `bundled_names`.
+        shipped = set(reached) if reached is not None else set(bundled_names)
+        unshipped = lambda n: n not in shipped and (shared_root / n).is_file()
     try:
-        content = rewrite_text(src.read_text(), suffix)
+        content = rewrite_text(src.read_text(), suffix, unshipped)
     except UnicodeDecodeError:
         return src.read_bytes()
     if suffix == '.md':
-        located = _skill_dirs(str(refs_dir))
         if located is not None:
             repo_root, skill_dir = located
             src_dir = src.parent.resolve().relative_to(repo_root).as_posix()
             dst_dir = (refs_dir.resolve() / name).parent.relative_to(repo_root).as_posix()
+            # Links relocate on the SAME set the prose mentions do — what the
+            # skill reaches when a discovery pass supplied it — so one copy
+            # cannot send a target upstream in prose and keep it local in a link,
+            # and its bytes do not move when an UNREACHED copy is removed
+            # (task.126 QA-2, CR-2). The packager passes no `reached` and keeps
+            # the on-disk set, because its zip ships what is on disk.
             content = rewrite_md_links(
-                content, src_dir, dst_dir, skill_dir, set(bundled_names)
+                content, src_dir, dst_dir, skill_dir,
+                shipped if shipped is not None else set(bundled_names),
             )
     return inject_header(content, name, suffix).encode('utf-8')
 
@@ -559,8 +598,10 @@ def discover_needed(skill_path, shared_dir, refs_dir):
     ]
 
     needed = {}           # filename -> source Path
-    pending = []          # (name, origin) from shared/resources/X — warn if missing
-    pending_quiet = []    # candidates from references/X — many are skill-native, silent
+    # Every queue entry carries its edge kind (task.126): a CITE copies the file
+    # alone, a DEP copies the file and everything it reaches.
+    pending = []          # (name, origin, kind) from shared/resources/X — warn if missing
+    pending_quiet = []    # (name, kind) from references/X — many are skill-native, silent
     for f in skill_files:
         try:
             text = f.read_text()
@@ -571,22 +612,27 @@ def discover_needed(skill_path, shared_dir, refs_dir):
             # claiming it was the only unguarded read, which left the crash live.
             continue
         rel_f = _rel(f, repo_root)
-        pending.extend((n, (rel_f, ln)) for ln, n in shared_refs_with_lines(text))
+        pending.extend((n, (rel_f, ln), k) for ln, n, k in parse_shared_refs(text))
         warn_comment_only_refs(f, text, repo_root)
-        for m in REFS_REF_RE.finditer(text):
-            pending_quiet.append(m.group(1))
+        pending_quiet.extend(refs_refs_with_kind(text))
 
-    seen = set()
+    # name -> the strongest kind it has been processed as. A name first reached
+    # as a CITE and later as a DEP is processed again, as a DEP, so its closure
+    # is followed: a file reached both ways is bundled once, with its closure.
+    seen = {}
     while pending or pending_quiet:
         if pending:
-            name, origin = pending.pop()
+            name, origin, kind = pending.pop()
             quiet = False
         else:
-            name, origin = pending_quiet.pop(), None
+            (name, kind), origin = pending_quiet.pop(), None
             quiet = True
-        if name in seen:
+        prev = seen.get(name)
+        if prev == DEP or (prev is not None and (kind == CITE or name not in needed)):
+            # Already processed at least this strongly — or processed once and
+            # refused (out of tree, no source), which a stronger edge cannot fix.
             continue
-        seen.add(name)
+        seen[name] = kind
         # `name` is an unsanitised regex capture whose class permits `.` and `/`,
         # so `shared/resources/../../OUTSIDE.md` escaped both refs_dir and the
         # skill: the bundler printed `bundled references/../../OUTSIDE.md` and
@@ -606,20 +652,24 @@ def discover_needed(skill_path, shared_dir, refs_dir):
                 warn_missing_source(name, origin)
             continue
         needed[name] = src
+        if kind == CITE:
+            # A citation is a leaf: the cited document is copied, and nothing it
+            # names — shared, sibling or invocation — is followed from here.
+            continue
         try:
             text = src.read_text()
         except (UnicodeDecodeError, OSError):
             continue
         rel_src = _rel(src, repo_root)
-        pending.extend((n, (rel_src, ln)) for ln, n in shared_refs_with_lines(text))
+        pending.extend((n, (rel_src, ln), k) for ln, n, k in parse_shared_refs(text))
         warn_comment_only_refs(src, text, repo_root)
         # Sibling edges carry the citing file but no line: the regexes match
         # across the whole text, and the file is what a reader needs to act.
         if src.suffix in ('.js', '.mjs'):
-            pending.extend((m.group(1), (rel_src, None)) for m in JS_SIBLING_RE.finditer(text))
-            pending.extend((m.group(1), (rel_src, None)) for m in JS_ESM_SIBLING_RE.finditer(text))
+            pending.extend((m.group(1), (rel_src, None), DEP) for m in JS_SIBLING_RE.finditer(text))
+            pending.extend((m.group(1), (rel_src, None), DEP) for m in JS_ESM_SIBLING_RE.finditer(text))
         if src.suffix == '.sh':
-            pending.extend((m.group(1), (rel_src, None)) for m in SH_SIBLING_RE.finditer(text))
+            pending.extend((m.group(1), (rel_src, None), DEP) for m in SH_SIBLING_RE.finditer(text))
         if src.suffix in ('.md', '.sh'):
             # `pending_quiet`, not `pending`: a missing source here is not an
             # authoring error worth a warning — it is a skill-native script that
@@ -628,7 +678,7 @@ def discover_needed(skill_path, shared_dir, refs_dir):
                 who, invoked = m.group(1), m.group(2)
                 names = who.strip('{}').split('|') if who.startswith('{') else [who]
                 if skill_path.name in names:
-                    pending_quiet.append(invoked)
+                    pending_quiet.append((invoked, DEP))
 
     return needed, skill_files
 
@@ -739,17 +789,23 @@ def _looks_bundled(dst, src, name):
     identical to what the bundler would have written.
 
     Suffixes that never get a header (`.json`, and anything else `autogen_header`
-    returns "" for) are accepted on the name match alone and return early — they
-    cannot supply evidence 1, and requiring evidence 2 would make a legitimately
-    edited-then-regenerated JSON permanently unreconcilable. That is the
-    pre-existing behaviour for those suffixes, kept deliberately.
+    returns "" for) cannot supply evidence 1, and evidence 2 fails for them the
+    instant the source changes — so every edit to a `.json` source used to strand
+    every copy of it (observation #199). For those suffixes only, a third piece of
+    evidence counts:
+
+    3. It is byte-identical to the rewritten source at an EARLIER committed
+       version of that source (`_historical_rewrites`). The bundler wrote it
+       then; the source has moved on since.
+
+    Like evidence 2, this cannot tell a copy from an authored file that happens
+    to equal some past version of the source byte for byte — and the consequence
+    is bounded the same way: that content existed in the repository, and is
+    still in its history. An authored file that never matched any version stays
+    protected. Banner suffixes do not need evidence 3: every copy bundled since
+    header injection carries evidence 1.
     """
     suffix = Path(name).suffix
-    if not autogen_header(name, suffix):
-        # An unknown suffix cannot carry a banner, so evidence 1 is unavailable —
-        # but that is a gap in our knowledge, not a licence to overwrite. Fall
-        # through to evidence 2 (identical to the rewritten source).
-        pass
     try:
         text = dst.read_text()
     except UnicodeDecodeError:
@@ -759,9 +815,44 @@ def _looks_bundled(dst, src, name):
     if declared_source(text, name) is not None:
         return True
     try:
-        return text == rewrite_text(src.read_text(), suffix)
+        if text == rewrite_text(src.read_text(), suffix):
+            return True
     except (UnicodeDecodeError, OSError):
         return False
+    if autogen_header(name, suffix):
+        return False
+    return text in _historical_rewrites(str(src.resolve()), suffix)
+
+
+@functools.lru_cache(maxsize=None)
+def _historical_rewrites(src, suffix):
+    """Every committed version of `src`, rewritten as the bundler would write it.
+
+    Evidence 3 for headerless suffixes (see `_looks_bundled`). Keyed on the
+    resolved path and cached, so `--all` asks git once per source however many
+    skills carry a copy. Empty when git cannot answer — not a repository, git
+    missing, the source never committed — which leaves the copy to the
+    fail-loudly path in `bundle_skill` rather than adopting it on no evidence.
+    """
+    import subprocess
+    src = Path(src)
+    def git(*args):
+        return subprocess.run(['git', '-C', str(src.parent), *args],
+                              capture_output=True, check=True).stdout
+    try:
+        shas = git('log', '--format=%H', '--', src.name).decode().split()
+    except (OSError, subprocess.CalledProcessError):
+        return frozenset()
+    versions = set()
+    for sha in shas:
+        try:
+            # `<rev>:./<name>` is relative to -C's directory, so no repo-root
+            # arithmetic is needed. A commit that deleted the file has no blob.
+            blob = git('show', f'{sha}:./{src.name}').decode()
+        except (OSError, subprocess.CalledProcessError, UnicodeDecodeError):
+            continue
+        versions.add(rewrite_text(blob, suffix))
+    return frozenset(versions)
 
 
 def writable_copy(dst, src, name):
@@ -786,6 +877,17 @@ def _skip_reason(dst, name):
     if _symlinked_component(dst, name) is not None:
         return "under a symlinked directory"
     return "not bundler output"
+
+
+def _skip_remedy(dst, name):
+    """What to do about a copy `writable_copy` refused — the same advice
+    `--check` gives for the class it will report, so the author reads it at
+    bundle time instead of in CI (observation #199)."""
+    if dst.is_symlink() or _symlinked_component(dst, name) is not None:
+        return REMEDIES['SYMLINK']
+    if not autogen_header(name, Path(name).suffix):
+        return _ambiguity_detail(name)
+    return REMEDIES['AMBIGUOUS']
 
 
 def write_if_changed(dst, src, name, new_bytes):
@@ -1151,7 +1253,7 @@ def check_skill(skill_path):
             report(rel, 'AMBIGUOUS', f'unreadable: {exc.__class__.__name__}')
             continue
 
-        if actual != expected_bytes(src, rel, refs_dir, bundled_names):
+        if actual != expected_bytes(src, rel, refs_dir, bundled_names, needed):
             report(rel, 'STALE', 'content differs from the rewritten source')
             continue
 
@@ -1307,6 +1409,59 @@ def check_all(targets):
     return 1
 
 
+@functools.lru_cache(maxsize=None)
+def _tracked_refs(repo_root):
+    """Every COMMITTED `skills/*/references/*` path, repo-relative — read from
+    HEAD, not the index, so "vs committed" means what it says after a staged
+    `git rm` and inside the pre-commit hook's own run (task.126 QA-1, CR-5). ONE
+    git call per run, however many skills `--all` bundles. An empty set in a
+    repository with no commit yet; None when git cannot answer (not a
+    repository, git missing): the status line then omits the comparison rather
+    than inventing one."""
+    import subprocess
+    def git(*args):
+        return subprocess.run(['git', '-C', str(repo_root), *args],
+                              capture_output=True, text=True, check=True).stdout
+    try:
+        out = git('ls-tree', '-r', '--name-only', 'HEAD', '--', 'skills')
+    except OSError:
+        return None
+    except subprocess.CalledProcessError:
+        try:
+            git('rev-parse', '--git-dir')
+        except (OSError, subprocess.CalledProcessError):
+            return None
+        return frozenset()          # a repository, but nothing committed yet
+    return frozenset(
+        line for line in out.splitlines()
+        if line.startswith('skills/') and '/references/' in line
+    )
+
+
+def closure_note(skill_path, shared_dir, needed):
+    """` · closure M (±K vs committed)` for the status line (task.126).
+
+    M is what discovery reaches — `len(needed)`. The comparison is against the
+    COMMITTED source-backed copies: tracked `references/` files that have a
+    shared source. `±K` is the NET difference: a closure that grew prints
+    `+K`, one that shrank prints `-K`, and a skill that gained N copies while
+    stranding N others prints `+0`, exactly like one in sync. So it says the
+    closure MOVED, not which copies are owed a `git rm`: that list is
+    `--check`'s UNREACHED report, because the bundler never deletes a copy
+    (task.126 QA-2, CR-4)."""
+    note = f" · closure {len(needed)}"
+    repo_root = shared_dir.parent.parent
+    tracked = _tracked_refs(repo_root)
+    if tracked is None:
+        return note
+    prefix = f"skills/{skill_path.name}/references/"
+    committed = sum(
+        1 for p in tracked
+        if p.startswith(prefix) and (shared_dir / p[len(prefix):]).is_file()
+    )
+    return f"{note} ({len(needed) - committed:+d} vs committed)"
+
+
 def bundle_skill(skill_path):
     resolved = resolve_paths(skill_path)
     if resolved is None:
@@ -1345,9 +1500,10 @@ def bundle_skill(skill_path):
         if not writable_copy(dst, src, name):
             protected += 1
             why = _skip_reason(refs_dir / name, name)
-            print(f"  SKIPPED references/{name} — {why}, left alone")
+            print(f"  ❌ SKIPPED references/{name} — {why}, left alone: "
+                  f"{_skip_remedy(dst, name)}")
             continue
-        if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names)):
+        if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names, needed)):
             bundled += 1
             print(f"  bundled references/{name}")
 
@@ -1364,9 +1520,10 @@ def bundle_skill(skill_path):
         if not writable_copy(dst, src, name):
             protected += 1
             why = _skip_reason(refs_dir / name, name)
-            print(f"  SKIPPED references/{name} — {why}, left alone")
+            print(f"  ❌ SKIPPED references/{name} — {why}, left alone: "
+                  f"{_skip_remedy(dst, name)}")
             continue
-        if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names)):
+        if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names, needed)):
             reconciled += 1
             print(f"  reconciled references/{name} (not reached by discovery)")
 
@@ -1412,15 +1569,21 @@ def bundle_skill(skill_path):
     # `in sync` is now an assertion about every source-backed copy on disk, not
     # only about the ones discovery happened to reach.
     status = ", ".join(parts) if parts else "in sync"
-    if unlanded or scan_broken:
+    # A copy left alone is a copy `--check` will fail (AMBIGUOUS or SYMLINK), so
+    # the run fails too. It used to print ✅ over a SKIPPED line and exit 0, and a
+    # stale `.json` copy reached CI that way twice (observation #199).
+    if unlanded or scan_broken or protected:
         detail = []
+        if protected:
+            detail.append(f"{protected} copy/copies left alone that bundle:check will fail")
         if unlanded:
             detail.append(f"{len(unlanded)} sourced sibling(s) not bundled")
         if scan_broken:
             detail.append(f"{len(scan_broken)} file(s) the sibling scan could not read")
-        print(f"❌ {skill_path.name}: {status}, " + ", ".join(detail))
+        print(f"❌ {skill_path.name}: {status}, " + ", ".join(detail)
+              + closure_note(skill_path, shared_dir, needed))
         return False
-    print(f"✅ {skill_path.name}: {status}")
+    print(f"✅ {skill_path.name}: {status}" + closure_note(skill_path, shared_dir, needed))
     return True
 
 

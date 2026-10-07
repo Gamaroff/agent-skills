@@ -1,0 +1,122 @@
+[
+ {
+  "id": "sid.uuid",
+  "input": "3f2c9a1e-0b7d-4c55-9e3a-1d2f3a4b5c6d",
+  "direction": "legitimate",
+  "why": "a Claude Code session id shape the state file must accept"
+ },
+ {
+  "id": "sid.alnum",
+  "input": "abc123",
+  "direction": "legitimate",
+  "why": "a Claude Code session id shape the state file must accept"
+ },
+ {
+  "id": "sid.underscore-dash",
+  "input": "a_B-9",
+  "direction": "legitimate",
+  "why": "a Claude Code session id shape the state file must accept"
+ },
+ {
+  "id": "sid.max-len",
+  "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "direction": "legitimate",
+  "why": "a Claude Code session id shape the state file must accept"
+ },
+ {
+  "id": "sid.dotdot-slash",
+  "input": "../x",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.abs",
+  "input": "/etc/passwd",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.slash",
+  "input": "a/b",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.backslash",
+  "input": "a\\b",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.dotdot",
+  "input": "...",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.dot",
+  "input": ".",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.empty",
+  "input": "",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.too-long",
+  "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.nul",
+  "input": "a\u0000b",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.newline",
+  "input": "a\nb",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.trailing-newline",
+  "input": "abc\n",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.space",
+  "input": "a b",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.unicode-slash",
+  "input": "a\u2215b",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.percent-enc",
+  "input": "..%2Fx",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.tilde",
+  "input": "~root",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ },
+ {
+  "id": "sid.dollar",
+  "input": "$(id)",
+  "direction": "hostile",
+  "why": "would let record write outside the state dir or under a name that is not one file"
+ }
+]

@@ -300,7 +300,7 @@ options:
 Before formulating questions in any step, consult the pre-pass summaries from Phase 1.5:
 
 - **PREPASS_B** (architecture alignment): if `alignment` is `drift` or `conflict`, surface findings with `severity: medium|high` as a question in the technical accuracy phase (Step 3). If `alignment` is `aligned`, record its `axes_checked` (and the `prepass-axes.js` `source`) in one line under the report's Technical Accuracy section, so an `aligned` measured against the wrong axes is visible in the report rather than silent.
-- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings as a question during completeness review (Step 6) — ask whether the task should be scoped down or closed.
+- **PREPASS_C** (codebase scan): if `implementation_status` is `partial` or `fully-implemented`, surface the relevant findings as a question during completeness review (Step 6) — ask whether the task should be scoped down or closed. If it returned a non-empty `population_diff`, each entry is a Step 3 check 14 finding — confirm it against the collector and report it there.
 
 If a pre-pass summary is absent (agent failed or returned `alignment: unknown` / `implementation_status: unknown`): treat that axis as unreviewed and rely on in-line discovery for that phase.
 
@@ -424,7 +424,7 @@ options:
 
 4. **Store summaries** as `PREPASS_B`, `PREPASS_C` in active context for use by the Q&A phase.
 
-**Failure handling**: if both agents fail, log a warning and proceed to Step 2 without pre-pass summaries — the Q&A phase handles all finding detection as a fallback. Subagent **unavailable** (no dispatch in this session), **failed**, or **slow** past its wall-clock budget: follow the three-row table in `references/develop-pipeline-autonomous-defaults.md` §Subagents — perform the pass inline, record the independence loss, write `killed at N minutes` never `stalled`, and remember that **output-file size is not a liveness signal**.
+**Failure handling**: if both agents fail, log a warning and proceed to Step 2 without pre-pass summaries — the Q&A phase handles all finding detection as a fallback. Subagent **unavailable** (no dispatch in this session), **failed**, or **slow** past its wall-clock budget: follow the three-row table in `references/develop-pipeline-autonomous-defaults.md#subagents--unavailable-failed-slow` (§Subagents — cited, not depended on: the skill reads that one table) — perform the pass inline, record the independence loss, write `killed at N minutes` never `stalled`, and remember that **output-file size is not a liveness signal**.
 
 **Output**: up to 2 YAML summaries (architecture alignment, implementation status) available for Steps 2–8
 
@@ -617,7 +617,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
              }
            }'
          )")
-       task_key=$(echo "$JIRA_RESPONSE" | jq -r '.key // empty')
+       task_key=$(printf '%s' "$JIRA_RESPONSE" | jq -r '.key // empty')
        task_url="${JIRA_URL}/browse/${task_key}"
        ```
      - On success: write `jira_key: {task_key}` and `jira_url: {task_url}` into frontmatter
@@ -930,6 +930,123 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       token-free restatement that caused task.124 bug 13
     - Flag as **Important** when the key is shared or no token-free restatement is addressed
 
+14. **Call-site population** (obs #120):
+    - Trigger: the document enumerates invocations of one of this repository's engines — it lists
+      call sites, gives a count of them, or scopes itself as "all call sites of" `tracker-comment.js`,
+      `stakeholder-summary-cli.js`, `gh-stage.js`, `jira-stage.js` or `tracker-issue.js`. A document
+      that touches one call and says so is not asked to count the world
+    - Measure the population with `call-sites.js`, the collector the guard tests import, from the
+      repository root:
+
+      ```bash
+      command node .agents/skills/review-task/references/call-sites.js --engine "{engine}" --json
+      ```
+
+      `reason: empty` is a claim about the instrument before it is one about the tree: check the
+      root before believing a zero. A document written against an earlier tree is measured against
+      that tree: export it with `git archive <rev> | tar -x -C <dir>` and pass `--root <dir>`,
+      which is measured as given. `reason: no-roots` (exit 1) means the root is not a skills
+      source tree (no `shared/resources/` beside a `skills/*/SKILL.md`) — a consumer install keeps
+      skills only as bundled copies — so there is no population to diff: record the check as not
+      applicable, never as a zero. Any other non-zero exit (`unreadable`, `internal-error`,
+      `output-closed`) means the population is unknown: record that, and diff nothing. A site
+      reached only through a shell variable (`node "$VAR"`) is found on a best-effort rule the
+      collector's header states, so it may be missed or over-counted: confirm any such site by
+      reading the script before reporting it, and name any the rule misses by hand
+    - Diff the collector's `file:line` list against the document's. Every collector site the
+      document does not name → **Important**, worded as a choice for the author: "in scope — add it"
+      or "an exclusion — state why". A stated exclusion is not a finding. A count in the document
+      that disagrees with the collector's → **Important**
+    - A list confirmed name by name is the author's recall, not a measurement: pre-pass Agent C's
+      grep for the symbols a document names cannot see a site the document does not name
+    - Worked example: task.121 named three `tracker-comment.js` sites and one orchestrator
+      duplicate, and the pre-pass confirmed each. The collector found a second orchestrator
+      duplicate and a live `develop-bug` consumer that one of its success criteria would have
+      forbidden — both in scope, both found only because the reviewer happened to run it
+
+15. **Removed-literal test sweep** (obs #203):
+    - Trigger: the plan removes or inverts a behaviour — deletes a command, renames a path, changes
+      a message, flips a default
+    - Search every test file the project tracks for the **literal** being removed (the command
+      string, the path, the message), not for the feature's name — for example
+      `git grep -n '<literal>' -- '*.test.*'`, plus the project's test fixture directories. A test
+      that locates a block by that literal breaks the moment the literal goes, and its error names
+      the missing literal, not the behaviour change
+    - List every hit in the plan as a test to update
+    - Not applicable when the project tracks no test files: record that, never a zero
+    - Worked example: task.161 stopped deleting the pipeline lock at Step 8. The plan named one test
+      and the review found two more by feature name ("step 8", "commit-changes"). A fourth,
+      `halt-snippet-glob-safe.test.mjs`, located its block by the regex
+      `rm -f \.claude/state/develop-pipeline\.lock` and surfaced only when `ci:fast` ran: 8 of 9
+      failures
+    - Flag as **Important** when the plan removes a literal and lists no literal search
+
+16. **Other writers in a replaced region** (obs #242):
+    - Trigger: the plan replaces, rewrites or deletes a whole region of a document — a section, a
+      block, a table — rather than editing lines inside it
+    - Search the project's skill and resource sources, every file type (an engine writes into a
+      region as surely as a prose step does), for writers that put content inside that region
+    - Require the document to name each writer as **carried** (the replacement keeps its content),
+      **refused** (the engine stops with a message) or **owned** (the region is this plan's alone,
+      and the other writer moves out)
+    - Not applicable when the region is new, or the project has no other sources that write
+      documents: say which
+    - Worked example: task.155 built an engine that replaces `## QA Testing Results` whole. Its plan,
+      review and first QA cycles measured text lost *outside* the section; none asked who writes
+      *inside* it. `create-bug-report` Step 5 (`### Bug Reports`) and the develop pipelines'
+      Deferred Work exit both did, and each was found by a later PR review at the cost of a
+      granted QA cycle
+    - Flag as **Important** when a writer is unnamed
+
+17. **Identity over a shell command string** (obs #252):
+    - Trigger: an identity, dedupe or uninstall key is read out of a shell command string — a
+      settings.json hook command, a status-line wrapper, a cron line
+    - Require the key to be specified as a **parse into shell words that inverts the writer's own
+      quoting**, never a substring or a regex over the raw string
+    - Worked example: task.157 keyed its installer's own hook on "the command contains
+      `context-pressure.mjs check`". Five QA cycles followed on that one rule: a substring match, a
+      sibling tool's `my-context-pressure.mjs`, an anchored regex that missed the installer's own
+      quoting of an apostrophe path, hand-written `#` comments and `$'…'`. The loop converged only
+      once a POSIX shell-word parser replaced the regexes
+    - Flag as **Important** when the key is a pattern
+
+18. **Test file reached by the runner** (obs #255):
+    - Trigger: the plan adds a test file or a test directory
+    - Confirm the project's test runner configuration reaches it — the file matches a glob in the
+      test command or the CI workflow, or is listed by name — or that the plan's Files Summary
+      lists the runner edit. A suite the runner never reaches passes by not running, and a success
+      criterion it holds passes vacuously
+    - Not applicable when the project has no test runner configuration in the tree: record that
+    - Worked example: task.176 planned `skills/review-pr/tests/parse-target.test.sh` in a repository
+      whose `package.json` `test` script lists every `.test.sh` by hand. The suite would have run
+      nowhere. In this repository `tests/test-runner-reach.test.js` is the mechanical backstop
+    - Flag as **Important** when neither the reach nor the runner edit is shown
+
+19. **Reconstruction states for a resume rule** (obs #264):
+    - Trigger: the plan adds or changes a resume, lock or reconstruction rule — anything that
+      rebuilds a run's position from what is on disk
+    - Require the document to list the **states the rule must hold in**: the report at, ahead of or
+      behind the gates; a gate written with no entry for it; a back-filled entry; an in-place
+      continuation against a fresh re-invocation. Same shape as check 12's released-shape diff,
+      applied to the resume state machine. In this repository the states live in the resume
+      contract, `develop-pipeline-resume-contract.md`
+    - Worked example: task.170's QA loop spent cycles 2–5 on how a resume tells the halted run's
+      APPROVE from a re-entered cycle's. Each refute pass found one more state — the gate written
+      before the entry, a report ahead of or behind the gates, back-filled entries — and the loop
+      hit its limit. Review had passed the plan at 8/10
+    - Flag as **Important** when the states are not listed
+
+20. **A site list carries its grep** (obs #129):
+    - Trigger: the document enumerates sites by hand — "every X site", "all Y snippets", locations
+      in parentheses — outside check 14's five engines, which the collector measures
+    - Require the document to record the **search that defines X** beside the list, and re-run it.
+      A list without its search is the author's recall
+    - Worked example: task.124 named "every step doc that dispatches (5, 5c, 7)" and "the HALT
+      snippets in the step docs". A grep for `subagent_type=` found Step 3 ×3, Step 5 ×2, 5c and
+      Step 7 ×4; all three one-argv `rm` HALT sites were in orchestrator `SKILL.md` files, none in
+      the step docs
+    - Flag as **Important** when the list and the search disagree, or the search is missing
+
 **Common Hallucination Patterns to Detect**:
 
 - ❌ Libraries not in package.json or tech stack
@@ -942,11 +1059,18 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ A property of an existing function asserted for new inputs, and never run on them (check 11)
 - ❌ Legacy or compatibility handling scoped from the finding that prompted it, not diffed against the released shape (check 12)
 - ❌ A test key that another rule's sites also match (check 13)
+- ❌ A list of an engine's call sites taken from the author's recall, never diffed against the collector (check 14)
+- ❌ A removed behaviour whose literal is still pinned by a test the plan never lists (check 15)
+- ❌ A region replaced whole while another writer still puts content inside it (check 16)
+- ❌ An identity key over a shell command string specified as a substring or regex, not a shell-word parse (check 17)
+- ❌ A new test file the project's test runner never reaches (check 18)
+- ❌ A resume or reconstruction rule changed with no list of the states it must hold in (check 19)
+- ❌ A hand-written site list with no search recorded beside it (check 20)
 
 **Issues to Flag**:
 
 - **Critical**: Invented libraries/APIs, incorrect paths, wrong patterns, a falsified invariant (check 11)
-- **Important**: Unverified technical claims, inconsistent approaches
+- **Important**: Unverified technical claims, inconsistent approaches, and the plan shapes of checks 15–20 (an unsearched removed literal, an unnamed writer in a replaced region, a pattern identity key, an unreached test file, unlisted reconstruction states, a site list without its search)
 - **Optional**: Could be more specific or cite sources
 
 **Output**: Technical accuracy report with hallucinations identified
@@ -956,6 +1080,9 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - When hallucinations found: What should be used instead?
 - When paths unclear: Which file location is correct?
 - When patterns conflict: Which approach to follow?
+- When a replaced region has another writer (check 16): is it carried, refused or owned?
+- When an identity key is a pattern (check 17): what parse inverts the writer's quoting?
+- When a resume rule changes (check 19): which reconstruction states must it hold in?
 
 ---
 
@@ -1064,6 +1191,11 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - Integration tests for workflows
    - Contract tests for API changes
    - Performance tests if optimization claimed
+   - **Behavioural evidence that re-runs its own example needs a control case** (obs #176, #285).
+     The rule is create-task's (§ Section 8, "Behavioural evidence needs a control case"): a plan
+     whose evidence for a new check, rule or prompt re-runs only the incident the change quotes,
+     with no unquoted instance of the same defect class and no correct instance the rule must leave
+     alone, → **Important**
 
 3. **Rollback Completeness**:
    - Rollback plan should cover all phases
@@ -1074,6 +1206,61 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - Each criterion should be verifiable
    - Should cover functional, performance, quality aspects
    - Should align with stated benefits
+   - **Classify each criterion the way finalise will.** Finalise's AC agent
+     ([`references/finalise-dod-ac-prompt.md`](references/finalise-dod-ac-prompt.md#step-3-check-each-acceptance-criterion)
+     Step 3) sorts every criterion into a behaviour criterion, which needs a per-PR test, or one of
+     the test-free kinds that Step 3 lists: "no unit tests applicable", a documentation criterion
+     ("file F says S"), or a measured criterion (a stated bound, met by a committed, cited
+     measurement). Step 3 owns that list and its count; this check names the kinds and never counts
+     them. A criterion
+     that fits no kind fails at acceptance by construction, two steps after the one edit that would
+     have fixed it. Three shapes reach that point, and each is **Important** here:
+   - **A non-functional criterion is held by a planned test or by a measured bound** (obs #206). A
+     criterion in the Performance subsection, or any criterion that bounds a time, size, count or
+     rate, is held one of two ways, and which way depends on its bound:
+     - **A bound a per-PR test could assert** is held only by **that planned per-PR test**.
+       Finalise treats it as a behaviour criterion and fails it without one — a measuring command
+       does not hold it.
+     - **A bound no per-PR test could assert** (wall-clock runtime, CI duration) is held by a
+       **measured bound**: a **numeric bound** with **the command that measures it**, which finalise
+       passes as a measured criterion on its committed measurement. For a wall-clock bound the
+       command records the load it ran under (`uptime` beside `time`), and finalise fails a figure
+       not taken on the PR's head commit (obs #268). Prefer a bound a test can assert (an operation
+       count, per-document work) over seconds.
+     - **A criterion that states no numeric bound** is held by its planned per-PR test: finalise
+       sends it down the behaviour path and passes it on that test.
+
+     A criterion held neither way → **Important**: "name the test that pins it, or — for a bound no
+     per-PR test could assert — state the bound and the command". An explicit "not applicable" line
+     the AC agent can cite is finalise's "no unit tests applicable" kind, not a criterion this rule
+     flags. The behaviour rule below does not also judge a non-functional criterion; the post-merge
+     rule still does. Worked example:
+     task.164's AC7, "No measurable change beyond the new 4b test's three runs", which states no
+     bound.
+   - **A behaviour criterion names the test that holds it** (obs #222). A criterion — other than a
+     non-functional one, which the rule above judges — that needs code to *do* something when run — it cannot be stated as "file F says S" — and whose text or phase
+     names no test planned to hold it has **no planned test**. → **Important**: "name the test that
+     pins it, or re-scope the criterion". Worked example: task.142's "no process spawn, no network
+     call" and "SKILL.md reads memoised", true by inspection and failed at finalise for want of a
+     test.
+   - **A criterion can be met before merge** (obs #222). Closing an observation, a tracker item or a
+     registry row "on merge", or anything else whose evidence cannot exist until the PR merges, can
+     only be satisfied **after merge** — and finalise runs before merge. → **Important**: "move it to
+     Deferred Work or Notes". Worked example: task.142's "observation #159 marked actioned once this
+     merges".
+
+   Two more shapes fail later than review, and each is **Important** too:
+   - **A behaviour fix in prose lands in an executable block** (obs #258). When the fix a behaviour
+     criterion holds lands in a skill document (a `SKILL.md` or a shared reference), the plan must put
+     it in a fenced block a test helper extracts and runs. A table cell, a blockquote or a sentence is
+     prose no test can execute, so the named test passes with the fix reverted. → **Important**:
+     "move the fix into a fenced block, or reuse an existing extractable block". Worked example:
+     task.177 held two criteria with tests while planning each fix as a table cell and a blockquote.
+   - **A criterion's test runs on CI's platform** (obs #279). A criterion that needs a shell or OS
+     the project's CI lanes do not provide (zsh, macOS) cannot be held per PR. → **Important**, with
+     the two resolutions finalise would otherwise ask a human for: scope the criterion to the CI
+     shell plus "verified locally", or add the lane. Worked example: task.185 and task.186 both
+     halted at finalise on a zsh arm that CI's `ubuntu-latest` skips.
 
 5. **Scope and Complexity Analysis**:
    - Count total implementation phases (>8 phases may indicate oversized task)
@@ -1088,7 +1275,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 **Issues to Flag**:
 
 - **Critical**: Major inconsistencies, missing critical tests, task too large (recommend splitting)
-- **Important**: Incomplete rollback plan, vague success criteria, task complexity high
+- **Important**: Incomplete rollback plan, vague success criteria, task complexity high; a non-functional criterion held neither way the bound rule names; a behaviour criterion with no planned test; a criterion that can only be met after merge; a behaviour fix in prose no test executes; a criterion that needs a platform CI lacks (check 4); behavioural evidence with no control case (check 2)
 - **Optional**: Additional helpful tests or criteria, potential optimization for parallel development
 
 **Output**: Consistency and completeness report
@@ -1141,6 +1328,11 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - Breaking API changes = High/Medium risk
    - New dependencies = Medium risk
    - Refactoring = Medium/Low risk
+   - An exemption to a refuse-by-default guard, or a widening of what a guard treats as safe = at
+     least Medium risk, and the plan must name a **differential oracle**: shapes the exemption must
+     still refuse, compared head against base, not only the shapes it admits (obs #269). Worked
+     example: task.183 rated two exemptions to a setext guard Low; QA then ran three cycles of HIGH
+     findings, every one a deletion the base branch refused
 
 2. **Mitigation Quality**:
    - Each high risk should have mitigation
@@ -1156,7 +1348,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 **Issues to Flag**:
 
 - **Critical**: Missing risk assessment for dangerous changes
-- **Important**: Inadequate mitigation, no rollback plan
+- **Important**: Inadequate mitigation, no rollback plan, a guard exemption with no differential oracle
 - **Optional**: Additional risks to consider
 
 **Output**: Risk and rollback assessment report
@@ -1237,7 +1429,14 @@ questions:
 **Actions**:
 
 1. Generate complete review report following the structure below
-2. Save to file: `[task-directory]/task.{n}.review.{N}.{descriptive-name}.md`
+2. Save to file: `[task-directory]/task.{n}.review.{N}.{descriptive-name}.md`, with `{N}` computed — never counted by eye — from the repository root:
+
+   ```bash
+   source .agents/skills/review-task/references/newest-numbered.sh || exit 1
+   REVIEW_N=$(next_numbered "{task-directory}" review -name "task.{n}.review.*.md") || exit 1
+   ```
+
+   It is the highest existing `{N}` plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186).
 3. Display summary to user with file location
 
 **Report Structure**:
@@ -1992,6 +2191,13 @@ This skill implements rigorous safeguards to DETECT hallucinations:
 5. **Schema Verification**: Database fields MUST exist in Prisma schema
 6. **Config Key Verification**: Every config key, env var or flag MUST have a reader in the tree
 7. **Invariant Verification**: A property claimed of an existing function under new inputs MUST be executed on those inputs — an existence check and a behaviour check are different instruments, and passing the first is not evidence for the second (Step 3 check 11)
+8. **Population Verification**: A document's list of an engine's call sites MUST be diffed against the collector's (`call-sites.js`) — a list confirmed name by name is the author's recall, not a measurement (Step 3 check 14)
+9. **Removed-Literal Verification**: A plan that removes a literal MUST list every test that pins it, found by searching for the literal, not the feature name (Step 3 check 15)
+10. **Region-Writer Verification**: A plan that replaces a region whole MUST name every other writer into it as carried, refused or owned (Step 3 check 16)
+11. **Identity-Parse Verification**: An identity key read from a shell command string MUST be a shell-word parse that inverts the writer's quoting (Step 3 check 17)
+12. **Test-Reach Verification**: A new test file MUST be reached by the project's test runner configuration, or the plan MUST list the runner edit (Step 3 check 18)
+13. **Reconstruction-State Verification**: A changed resume or reconstruction rule MUST list the states it must hold in (Step 3 check 19)
+14. **Site-List Verification**: A hand-written site list MUST carry the search that defines it (Step 3 check 20)
 
 ### Reporting Hallucinations
 
@@ -2052,7 +2258,7 @@ This skill uses:
 
 ## Notes
 
-- The review report (`task.{n}.review.{N}.{descriptive-name}.md`) is the primary output and is always saved separately. Use DOTS as structural separators and hyphens within the descriptive name. `{N}` starts at 1 and increments on re-reviews. Example: `task.29.review.1.subagent-triage.md`, `task.29.review.2.subagent-triage.md`.
+- The review report (`task.{n}.review.{N}.{descriptive-name}.md`) is the primary output and is always saved separately. Use DOTS as structural separators and hyphens within the descriptive name. `{N}` is the highest existing review number plus 1, computed in Step 8 Option A. Example: `task.29.review.1.subagent-triage.md`, `task.29.review.2.subagent-triage.md`.
 - Steps 8.5 and 9 may modify the task document (apply fixes; update `Status:` field) — both are gated on user consent (or pipeline auto-answer)
 - Can be used at any stage: planned, in progress, completed
 - Designed to find problems through collaborative user input

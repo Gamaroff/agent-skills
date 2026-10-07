@@ -214,6 +214,12 @@ const PROMPT_MAY_MENTION = Object.freeze([
   // one suppression was covering the one genuine paraphrase in the file: the
   // exemption list papering over exactly what it warns about. The example was
   // changed instead, and the exemption removed.
+  //
+  // "###" (task.131): a markdown heading marker. The markdown-structure sink's
+  // inputs are whole reports, so their whitespace tokens include heading
+  // markers — and every prompt in this repository is markdown with `###`
+  // headings. It is syntax the two share, not a quoted input.
+  "###",
 ]);
 
 /**
@@ -561,7 +567,10 @@ test("the probe render branches on boundary, not on list emptiness", () => {
 
 test("an absent boundary renders as unverified, never as 'not a boundary'", () => {
   assert.ok(
-    has(skill(), "{if security_result.boundary is absent or not a boolean:}"),
+    has(
+      skill(),
+      '{if security_result.boundary is absent, or is neither a boolean nor "internal":}',
+    ),
     "skills/finalise/SKILL.md: a missing `boundary` falls into the `false` branch, so an agent that " +
       "never answered the question is reported as having answered 'not a boundary'. That moves the " +
       "conflation up a level rather than removing it.",
@@ -574,6 +583,142 @@ test("an absent boundary renders as unverified, never as 'not a boundary'", () =
     has(source(), "A missing `boundary` is not `false`"),
     `${PROMPT}: the prompt no longer states that omitting boundary is not a way to answer it`,
   );
+});
+
+test("task.131: boundary: internal renders as an explicit skip, and without internal_reason as a FAIL", () => {
+  assert.ok(
+    has(skill(), '{else if security_result.boundary == "internal":}'),
+    "skills/finalise/SKILL.md: `boundary: internal` has no render branch of its own — it falls into " +
+      "the unverified branch, or worse the zero-guard, which is the task.124 FAIL it exists to replace",
+  );
+  assert.ok(
+    has(
+      skill(),
+      "{if security_result.internal_reason is absent, whitespace-only, does not begin with a path#export entry, or names an entry the prompt disqualifies:}",
+    ),
+    "skills/finalise/SKILL.md: an `internal` with no reason must render as a FAIL, not as a skip",
+  );
+  assert.ok(has(skill(), "Internal artefact recorded without a valid reason"));
+  assert.ok(has(skill(), "Internal artefact — not probeable by the engine"));
+  // The internal branch must sit BEFORE the bare {else:} that opens the
+  // boundary: true render — otherwise the zero-guard fires on an internal.
+  const block = skill();
+  const internalAt = block.indexOf(
+    '{else if security_result.boundary == "internal":}',
+  );
+  const zeroAt = block.indexOf(
+    "{if security_result.probes_executed is absent or == 0:}",
+  );
+  assert.ok(internalAt !== -1 && zeroAt !== -1 && internalAt < zeroAt);
+  assert.ok(
+    has(source(), "boundary: true | false | internal"),
+    `${PROMPT}: the output schema does not offer \`internal\``,
+  );
+  assert.ok(
+    has(source(), "A `boundary: internal` with no `internal_reason` is a FAIL"),
+    `${PROMPT}: the prompt no longer states that internal needs a reason`,
+  );
+  assert.ok(
+    has(source(), "named `internal boundary recorded without a reason`"),
+    `${PROMPT}: an internal with no reason names no FAIL check — the agent's overall can still read PASS`,
+  );
+  // BUG-3: the precondition is checked where it can be — the reason names
+  // its entry, and a disqualified entry (a sink models it) forces FAIL.
+  assert.ok(
+    has(skill(), "begins with the entry as `path#export`"),
+    "skills/finalise/SKILL.md Step 3c: an internal whose reason names no entry must force FAIL",
+  );
+  assert.ok(
+    has(skill(), "Entries disqualified from `internal`"),
+    "skills/finalise/SKILL.md Step 3c: the override must check the reason's entry against the disqualified table",
+  );
+  // The row must END after its second cell: a paragraph joined onto it
+  // renders as an extra cell (task.131 QA cycle 3, CR-3).
+  assert.ok(
+    /^\| `report-lint\.js#lintReport` \| `markdown-structure` \|$/m.test(
+      source(),
+    ),
+    `${PROMPT}: lintReport must be listed as disqualified from internal — a sink models it`,
+  );
+  // BUG-7: an entry matches a row on basename + export, stated in both places.
+  assert.ok(
+    has(
+      source(),
+      "matches a row when its file's basename and its export both equal the row's",
+    ),
+    `${PROMPT}: the disqualified-entries table states no matching rule — a full path would not match a basename row`,
+  );
+  assert.ok(has(skill(), "matched on file basename plus export"));
+  // QA-6: the prompt asks for the FAIL check on every shape Step 3c forces.
+  assert.ok(
+    has(source(), "the same three shapes `/finalise` Step 3c forces to FAIL"),
+  );
+  // QA-4: Step 3c and the Step 3d render must agree on an empty reason.
+  assert.ok(has(skill(), "not whitespace-only"));
+  assert.ok(
+    has(
+      skill(),
+      "is absent, whitespace-only, does not begin with a path#export entry",
+    ),
+  );
+  assert.ok(
+    has(skill(), "forces `SEC_OVERALL = FAIL`"),
+    "skills/finalise/SKILL.md Step 3c: a reason-less internal must force SEC_OVERALL — Step 6 decides " +
+      "on SEC_OVERALL, and the rendered ❌ line alone cannot fail the DoD (TASK-131-BUG-2)",
+  );
+  assert.ok(
+    has(source(), "The guard applies to `boundary: true` only"),
+    `${PROMPT}: the zero-guard no longer says which boundary value it keys on`,
+  );
+});
+
+test("task.131: every canonical source that renders or states the boundary schema names `internal`", () => {
+  // Keyed on COMPOUND literals, never bare `boundary:` — that matches 16 files,
+  // most of them prose about some other boundary (loop-supervisor, the
+  // PreCompact hook's "Last step boundary:", report fixtures), so a test keyed
+  // on it would be red at the wrong sites (review-task check 13).
+  // The third key is the qa-task/qa-story Step 3b sentence, which states the
+  // decision without the schema literal (task.131 QA cycle 1, CR-4).
+  const KEYS = [
+    "boundary: true | false",
+    "security_result.boundary",
+    "`boundary: false` is the common case",
+    "the boundary decision: `boundary: true`",
+  ];
+  // skills/<d>/assets/ too: the bug-mode DoD template states the decision
+  // there, and a root list without it missed the site (task.131 QA cycle 2).
+  const roots = [
+    join(repoRoot, "shared", "resources"),
+    ...readdirSync(join(repoRoot, "skills")).flatMap((d) => [
+      join(repoRoot, "skills", d),
+      join(repoRoot, "skills", d, "assets"),
+    ]),
+  ];
+  const hits = [];
+  for (const dir of roots) {
+    if (!existsSync(dir) || !statSync(dir).isDirectory()) continue;
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith(".md")) continue;
+      const text = readFileSync(join(dir, f), "utf-8");
+      if (KEYS.some((k) => text.includes(k))) hits.push([join(dir, f), text]);
+    }
+  }
+  // Floor 5: the prompt, finalise, qa-task, qa-story and the bug-mode DoD
+  // template. Fewer means a key stopped matching a site, which reads exactly
+  // like a clean population.
+  assert.ok(
+    hits.length >= 5,
+    `population floor: found ${hits.map(([p]) => p).join(", ")}`,
+  );
+  for (const [path, text] of hits) {
+    // A COMPOUND literal: bare "internal" was already in finalise/SKILL.md on
+    // develop ("internally"), so that half of the check passed vacuously.
+    assert.ok(
+      text.includes("boundary: internal") ||
+        text.includes("true | false | internal"),
+      `${path} states or renders the boundary schema and never names \`internal\``,
+    );
+  }
 });
 
 test("an absent probes_executed counts as zero, not as a pass", () => {

@@ -1,0 +1,87 @@
+schema: 2
+task: 'task.166.measured-non-functional-criteria'
+task_title: 'Give measured non-functional criteria a defined path through review and finalise'
+gate: CONCERNS
+status_reason: 'The consolidated bound rule holds at every site, but cycle 4 dropped the clause that a criterion with no numeric bound is held by its planned per-PR test, so review flags a criterion finalise passes (CR5-1, a regression of cycle-1 CR-2). HIGH 0 for the fifth consecutive gate; MEDIUM 3, 2, 1 over cycles 3–5.'
+reviewer: 'QA Engineer'
+head: '2b9c16ed937c45f6821db856f2c3d12d25adc63f'
+updated: '2026-10-02T12:27:14Z'
+
+top_issues:
+  - id: 'TASK-166-CR5-1'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The bound rule splits only by bound type, so a non-functional criterion that states no numeric bound but has a planned per-PR test fits neither bullet and reads as "held neither way" (Important); finalise sends it down the behaviour path and passes it on that test. Cycle 4 deleted "a tested criterion needs no bound and no command" and its pin.'
+    suggested_action: 'Say a criterion with no numeric bound is held by its planned per-PR test, as finalise''s behaviour path holds it; pin the phrase.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR5-2'
+    severity: low
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The N/A exemption requires a line "that gives its reason"; finalise''s "no unit tests applicable" kind needs only an explicit statement.'
+    suggested_action: 'Match finalise''s condition: an explicit line the AC agent can cite.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR5-3'
+    severity: low
+    file: 'tests/lib/count-of-kinds.js'
+    finding: 'The shared pattern misses wrapped emphasis, quoted qualifiers and a quote-led underscore; over-matches "kinds of evidence per criterion" (fails loudly).'
+    suggested_action: 'Collapse whitespace before stripping emphasis, allow quotes, tighten the lookahead noun; add fixtures.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR5-4'
+    severity: low
+    file: 'tests/lib/count-of-kinds.js'
+    finding: 'prose() is a second normaliser beside markdown-section asProse; the review-task pin uses both.'
+    suggested_action: 'Share one emphasis-stripping implementation, keeping the identifier-safe underscore rule.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR5-5'
+    severity: low
+    file: 'CHANGELOG.md'
+    finding: 'The CHANGELOG and the test header restate the trigger without the check-4 citation, while the qa-fix row claims the rule is cited everywhere else.'
+    suggested_action: 'Add the citation at both sites.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 11
+  phases_verified: 4/4
+  ci: 'Test success @ 9c657e07 (hosted); pending @ 2b9c16ed937c — informational'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'Pins run in well under 1s each.'
+  reliability:
+    status: PASS
+    notes: 'Pins fail closed; the cross-tree createRequire resolves from any cwd (run from / and /tmp).'
+  maintainability:
+    status: PASS
+    notes: 'The rule is stated once and cited elsewhere; bundle:check clean.'
+
+bug_resolution:
+  previous_gate: 'gate.4 (CONCERNS 80)'
+  fixed: ['TASK-166-CR4-1', 'TASK-166-CR4-2', 'TASK-166-CR4-3', 'TASK-166-CR4-4', 'TASK-166-CR4-5', 'TASK-166-CR4-6', 'TASK-166-CR4-8']
+  partial: ['TASK-166-CR4-7']
+
+recommendations:
+  immediate:
+    - action: 'Restore the unbounded-but-tested clause in the bound rule, pinned.'
+      refs: ['skills/review-task/SKILL.md', 'tests/review-task-measured-criterion.test.js']
+  future:
+    - action: 'Gate 1 CR-3: make "whether a per-PR test could assert that bound" concrete.'
+      refs: ['shared/resources/finalise-dod-ac-prompt.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR5-1 resolved']

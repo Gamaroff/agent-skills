@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.183.qa-results-setext-and-carry-follow-ups'
+task_title: 'qa-results setext and carry follow-ups'
+gate: FAIL
+status_reason: 'The escalation fix closed CR3-1 and CR3-2, but the remaining list-continuation exemption reproduced two more deletions (an item line inside an HTML block, and a tab after the list marker), and QA_LABELS now drops a bug list grouped under a Critical Issues sub-label. HIGH counts 1, 1, 2, 2 — the loop is still not converging.'
+reviewer: 'QA Engineer'
+head: '59cd6d95ba23a3bbff70c8fa95b75a18015f23c4'
+updated: '2026-10-05T11:29:05Z'
+
+top_issues:
+  - id: CR4-1
+    severity: high
+    file: 'shared/resources/qa-results.js'
+    finding: 'blockContinuations opens a list context on an item line inside an HTML block (types 1–5) that also closes it — <!-- / - note --> / "  Real Section" / --- and <pre> / - x </pre> / ... — so the indented paragraph line is exempted and the setext section under it is deleted; origin/develop refuses with structural-line:Real Section / ---.'
+    suggested_action: 'Remove the list-continuation exemption (CR-7 to a follow-up), or open no list context while an HTML block is open.'
+    suggested_owner: dev
+    status: open
+  - id: CR4-2
+    severity: high
+    file: 'shared/resources/qa-results.js'
+    finding: 'The list content offset counts a tab after the marker as one column (CommonMark expands it to the next tab stop), so -<TAB># Heading / "  Real Section" / --- exempts a top-level paragraph line and the setext section is deleted; origin/develop refuses.'
+    suggested_action: 'Remove the list-continuation exemption, or open no list context when the marker gap holds a tab.'
+    suggested_owner: dev
+    status: open
+  - id: CR4-3
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'QA_LABELS ends a bold carried block at **Critical Issues** / **Issues Found** even when a list follows, so a bug list grouped under such a sub-label (**Bug Reports** / **Critical Issues** / - bug-1 / **Minor** / - bug-2) loses both links on replace; origin/develop carried them.'
+    suggested_action: 'Drop Critical Issues and Issues Found from QA_LABELS (they are not labels the qa-task/qa-story render emits), keeping Recommendations and the other render-owned labels; add the grouped shape to R4.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 85
+  phases_verified: 5/5
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — upsertQaResults judges documents and a render this pipeline writes; no corpus sink models a work-item section writer (task.171 precedent).'
+  performance:
+    status: PASS
+    notes: 'No timing-relevant change; cycle 1 measured 1.73 s at load 3.33. Re-measure at finalise.'
+  reliability:
+    status: FAIL
+    notes: 'CR4-1 and CR4-2 delete content origin/develop refused; CR4-3 loses carried bug links.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The list-continuation inference has now produced four deletion routes across cycles (CR-3 break, CR2-1 fence, CR4-1 HTML block, CR4-2 tab) — the same class the comment exemption was removed for.'
+
+recommendations:
+  immediate:
+    - action: 'Escalate (QA loop not converging, second time). Recommended: remove blockContinuations entirely so the setext check is base behaviour plus notParagraph (CR5-1 closed; CR-7 list shape returns to a safe false refusal and moves to a follow-up), and drop Critical Issues / Issues Found from QA_LABELS.'
+      refs: ['shared/resources/qa-results.js']
+  future:
+    - action: 'CR4-4 (low, reproduced): a QA-owned #### after a carried bold block is carried as stale text (duplicate, not deletion) — repeat of CR2-4.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'CR4-5 (cleanup): CHANGELOG / task.171 / task.183 § 5 claims about which comment shapes are written are over-narrow while the list context exists.'
+      refs: ['CHANGELOG.md']
+    - action: 'CR2-3 (pre-existing): **Deferred Work:** inner-colon carried label not recognised.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

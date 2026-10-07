@@ -1,0 +1,68 @@
+schema: 1
+task: 'task.158.cycle-file-and-containment-definitions'
+task_title: "QA read-back requires this cycle's links; one definition each for the cycle's gate file and for path containment"
+gate: CONCERNS
+status_reason: 'Cycle 1 CR-1 is fixed (gate.08 → qa_max_cycles 10) and every suite, probe and validator is green, but the refute pass found that the resume contract now reads a directory holding only unnumbered gates as a fresh start (QA_CYCLE=0) where develop failed loudly — reproduced, medium.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T13:57:56Z'
+
+top_issues:
+  - id: QA2-CR-1
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The resume block reads qa-cycle.sh rc 1 as "no gate" with stderr suppressed, so a directory whose gate files carry no usable cycle number (unnumbered, gate.0, >9 digits) resumes at NEXT_CYCLE=1; on develop the same directory produced a non-numeric QA_CYCLE and failed loudly. grant-qa-cycles.sh reports "no *.gate.{N}.*.yml" over the same directory.'
+    suggested_action: 'On rc 1, distinguish "no gate file at all" from "gate files, none numbered" (e.g. check for any *.gate.*.yml, or keep the helper stderr and match its "carry no cycle number" line) and HALT on the second; give grant-qa-cycles.sh the same distinction; cover both with a test.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 291
+  phases_verified: 4/4
+  ci: 'not read (CI is gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-29'
+  total_iterations: 1
+  verification_method: 'CR-1 reproduction re-run (gate.08 → qa_max_cycles 10, rc 0); grant-qa-cycles.test.sh 45/45'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 22
+    notes: 'Probe runs repeated this cycle on the path sink (11 + 11), identical outcomes to cycle 1; mismatches attributed in the QA report (literal in-root name, documented symlink limit, adapter join artifacts). No containment code changed in cycle 1.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA2-CR-1: a directory of unnumbered gates now reads as a fresh start on resume instead of failing.'
+  maintainability:
+    status: PASS
+    notes: 'Shell-helper guard added; bundling footprint documented.'
+
+recommendations:
+  immediate:
+    - action: 'QA2-CR-1: separate "no gate" from "gates without a usable number" in the resume block and grant-qa-cycles.sh; HALT on the second.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/grant-qa-cycles.sh']
+  future:
+    - action: 'QA2-CR-2 (medium/medium, advisory): develop-next SKILL.md merge gate reads "the newest *.gate.{N}.*.yml" by its own rule; move it onto qa-cycle.sh --path gate or name it as a stated exception, and scope the CHANGELOG claim accordingly. The guard population is a fixed list and cannot see it.'
+      refs: ['skills/develop-next/SKILL.md', 'tests/qa-cycle.test.js', 'CHANGELOG.md']
+    - action: 'QA2-CR-3 (low): no test runs the resume [ -d "{doc-directory}" ] HALT — start the optional-file-lookups row at that line and add a missing-directory case.'
+      refs: ['evals/shared/tests/optional-file-lookups.test.mjs']
+    - action: 'QA2-CR-4 (low): shellHelperLines joins continuations before splitting, so reported line numbers drift after the first continuation.'
+      refs: ['tests/qa-cycle.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA2-CR-1 fixed']

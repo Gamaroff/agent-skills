@@ -19,17 +19,21 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 import {
   ARGV_SLOTS,
@@ -43,6 +47,7 @@ import {
   expectedProblem,
   isLaunchFailure,
   main,
+  namesGh,
   parseArgvTemplate,
   probeShells,
   readRecord,
@@ -1705,6 +1710,566 @@ test("shell-fn entry: a library that names gh without --fake-gh is declined need
   assert.equal(e.reason, "no-hostile-case-was-rejected");
 });
 
+// ── task.140: the sentinel and the fake-gh gate reach every library shape ───
+//
+// Seven limits task.136's QA cycle 3, PR review and finalise recorded as verified
+// and not fixed there. Each row below was red against the task.136 engine; each
+// change is mutation-proved by its own row (task.140 implementation report).
+
+/** Write each named library into a fresh temp dir inside the repo; returns the dir. */
+function t140Libs(tag, libs) {
+  const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, `.t140-${tag}-`));
+  for (const [name, text] of Object.entries(libs)) {
+    writeFileSync(join(dir, name), text, { mode: 0o644 });
+  }
+  return dir;
+}
+
+test("shell-fn entry: a library that installs its own EXIT trap before a guard is still a named decline (task.140, c3-CR-1)", () => {
+  // The library's trap REPLACES the harness's; the guard's `exit 1` then ends
+  // the harness with 1, every case mismatches, and the verdict was a scored
+  // absent. Shadowing `exit` intercepts the call before any trap fires.
+  const dir = t140Libs("own-trap", {
+    "own-trap.sh":
+      '#!/usr/bin/env bash\ntrap "true" EXIT\nf() { printf \'hi\\n\'; }\n[ -n "$NOPE" ] || exit 1\n',
+  });
+  try {
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, join(dir, "own-trap.sh"))}#f`,
+      cases: LABEL_CASES,
+      fakeGh: FAKE_GH,
+    });
+    assert.equal(r.verdict, "unverifiable", JSON.stringify(r.declined));
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(
+      r.executed,
+      0,
+      "a displaced guard is a source failure, not executions",
+    );
+    assert.match(r.declined[0].detail, /source .* failed \(exit 97\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: a set -e library whose top-level command fails is declined, not sourced to completion (task.140, PR-review CR-1)", () => {
+  // On the left of `||` both shells suspend errexit for everything the library
+  // runs at top level, so `set -e; false` was sourced to completion and SCORED —
+  // where a consumer's own `source` would have aborted.
+  const dir = t140Libs("errexit-src", {
+    "errexit-src.sh":
+      "#!/usr/bin/env bash\nset -e\nfalse\nf() { printf 'reached\\n'; }\n",
+  });
+  try {
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, join(dir, "errexit-src.sh"))}#f`,
+      cases: LABEL_CASES,
+      fakeGh: FAKE_GH,
+    });
+    assert.equal(r.verdict, "unverifiable", JSON.stringify(r.declined));
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.executed, 0);
+    assert.match(r.declined[0].detail, /source .* failed \(exit 97\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell entry: a script whose body names gh without --fake-gh is needs-fake-gh, same as the shell-fn form (task.140, c3-CR-2)", () => {
+  const dir = t140Libs("shell-gh", {
+    "names-gh.sh":
+      '#!/usr/bin/env bash\ngh label list >/dev/null 2>&1\nprintf "%s\\n" "$1"\n',
+  });
+  try {
+    const entry = `shell:${relative(REPO_ROOT, join(dir, "names-gh.sh"))}`;
+    const r = runProbeSpec({ sink: "filename", entry, cases: LABEL_CASES });
+    assert.equal(r.verdict, "unverifiable");
+    assert.equal(r.reason, "needs-fake-gh");
+    assert.equal(r.executed, 0, "the host gh must never run");
+    assert.match(r.declined[0].detail, /names `gh`.*--fake-gh/);
+    // Given the fixture, the same script runs and is scored.
+    const e = runProbeSpec({
+      sink: "filename",
+      entry,
+      cases: LABEL_CASES,
+      fakeGh: FAKE_GH,
+    });
+    assert.notEqual(e.reason, "needs-fake-gh");
+    assert.equal(e.executed, LABEL_CASES.length * probeShells().length);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('shell-fn entry: gh reached as gh;, gh>, (gh), "$GH" or through a one-level source is detected (task.140, c3-CR-3)', () => {
+  const dir = t140Libs("gh-shapes", {
+    "semi.sh": "#!/usr/bin/env bash\nf() { gh; printf '%s\\n' \"$1\"; }\n",
+    "redir.sh":
+      "#!/usr/bin/env bash\nf() { gh>/dev/null 2>&1; printf '%s\\n' \"$1\"; }\n",
+    "paren.sh":
+      "#!/usr/bin/env bash\nf() { (gh) || true; printf '%s\\n' \"$1\"; }\n",
+    "var.sh":
+      '#!/usr/bin/env bash\nGH=gh\nf() { "$GH" api x >/dev/null 2>&1; printf \'%s\\n\' "$1"; }\n',
+    // Resolved against the LIBRARY's directory (tests/fixtures/shell-fn/.t140-…/).
+    "src-rel.sh":
+      "#!/usr/bin/env bash\n# shellcheck source=/dev/null\nsource ../../../../shared/resources/gh-labels.sh\nf() { printf '%s\\n' \"$1\"; }\n",
+    // Resolved against the ROOT — the repository's own idiom is cwd-relative
+    // (`source references/gh-labels.sh`).
+    "src-root.sh":
+      "#!/usr/bin/env bash\n# shellcheck source=/dev/null\n. shared/resources/gh-labels.sh\nf() { printf '%s\\n' \"$1\"; }\n",
+  });
+  try {
+    for (const lib of [
+      "semi.sh",
+      "redir.sh",
+      "paren.sh",
+      "var.sh",
+      "src-rel.sh",
+      "src-root.sh",
+    ]) {
+      const r = runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(dir, lib))}#f`,
+        cases: LABEL_CASES,
+      });
+      assert.equal(r.reason, "needs-fake-gh", lib);
+      assert.equal(r.executed, 0, lib);
+    }
+    // Not over-matched: a variable that merely starts with GH, a word that
+    // merely contains gh, and a sourced file outside the root do not decline.
+    const clean = t140Libs("gh-clean", {
+      "clean.sh":
+        '#!/usr/bin/env bash\n# shellcheck source=/dev/null\nsource /etc/profile.does-not-exist\nf() { : "$GH_TOKEN" high; printf \'%s\\n\' "$1"; }\n',
+    });
+    try {
+      const r = runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(clean, "clean.sh"))}#f`,
+        cases: LABEL_CASES,
+      });
+      assert.notEqual(r.reason, "needs-fake-gh", JSON.stringify(r.declined));
+    } finally {
+      rmSync(clean, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("resolveEntry: a symlink inside the root that points outside it is refused outside-repo-root (task.140 — the task.128 limit closed)", () => {
+  const outside = mkdtempSync(join(tmpdir(), "t140-outside-"));
+  const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, ".t140-symlink-"));
+  try {
+    // The row proves nothing if TMPDIR lies inside the repo (QA cycle 1, CR-5).
+    assert.ok(
+      !(realpathSync(outside) + sep).startsWith(realpathSync(REPO_ROOT) + sep),
+      `${outside} must be outside ${REPO_ROOT} for this row to test anything — set TMPDIR elsewhere`,
+    );
+    writeFileSync(join(outside, "f.sh"), "f() { :; }\n", { mode: 0o644 });
+    symlinkSync(outside, join(dir, "link"));
+    const rel = relative(REPO_ROOT, join(dir, "link", "f.sh"));
+    for (const e of [`shell-fn:${rel}#f`, `shell:${rel}`, `${rel}#f`]) {
+      const r = resolveEntry(e, REPO_ROOT);
+      assert.equal(r.ok, false, e);
+      assert.equal(r.reason, "outside-repo-root", e);
+    }
+    // Symmetric: a root reached THROUGH a symlink still contains its own files,
+    // and an in-tree symlink to an in-tree file still resolves.
+    const viaLink = join(outside, "root-link");
+    symlinkSync(REPO_ROOT, viaLink);
+    const ok = resolveEntry(FN_ENTRY, viaLink);
+    assert.equal(ok.ok, true, JSON.stringify(ok));
+    symlinkSync(join(REPO_ROOT, FN_LIB), join(dir, "lib-link.sh"));
+    const inTree = resolveEntry(
+      `shell-fn:${relative(REPO_ROOT, join(dir, "lib-link.sh"))}#gh_labels_filter`,
+      REPO_ROOT,
+    );
+    assert.equal(inTree.ok, true, JSON.stringify(inTree));
+    assert.equal(inTree.entryPath, join(REPO_ROOT, FN_LIB));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: a library that replaces the EXIT trap and then fails under set -e is declined, in both orderings (task.140 QA cycle 1, CR-1 / TASK-140-BUG-1)", () => {
+  // errexit ends the shell WITHOUT calling the shadowed exit, so the EXIT trap
+  // decides the status — and the library had replaced it. The second ordering
+  // was declined (97) by the task.136 body and scored (1) by task.140's first
+  // body on bash 5 and zsh: a regression this row pins.
+  const dir = t140Libs("trap-errexit", {
+    "before.sh":
+      "#!/usr/bin/env bash\ntrap true EXIT\nset -e\nfalse\nf() { printf 'hi\\n'; }\n",
+    "after.sh":
+      "#!/usr/bin/env bash\nf() { printf 'hi\\n'; }\ntrap true EXIT\nset -e\nfalse\n",
+  });
+  try {
+    for (const lib of ["before.sh", "after.sh"]) {
+      const r = runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(dir, lib))}#f`,
+        cases: LABEL_CASES,
+        fakeGh: FAKE_GH,
+      });
+      assert.equal(
+        r.reason,
+        "entry-not-probeable",
+        `${lib}: ${JSON.stringify(r.declined)}`,
+      );
+      assert.equal(r.executed, 0, lib);
+      assert.match(r.declined[0].detail, /source .* failed \(exit \d+\)/, lib);
+    }
+    // A library's NON-EXIT trap still installs: only EXIT is the harness's.
+    const intTrap = t140Libs("int-trap", {
+      "int.sh":
+        "#!/usr/bin/env bash\ntrap 'printf int' INT\nf() { printf '%s\\n' \"$1\"; }\n",
+    });
+    try {
+      const r = runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(intTrap, "int.sh"))}#f`,
+        cases: LABEL_CASES,
+        fakeGh: FAKE_GH,
+      });
+      assert.equal(r.declined.length, 0, JSON.stringify(r.declined));
+      assert.equal(r.executed, LABEL_CASES.length * probeShells().length);
+    } finally {
+      rmSync(intTrap, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: --fake-gh containment is decided on real paths, like an entry's (task.140 QA cycle 1, CR-2 / TASK-140-BUG-2)", () => {
+  const outside = mkdtempSync(join(tmpdir(), "t140-fake-outside-"));
+  const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, ".t140-fakegh-"));
+  try {
+    assert.ok(
+      !(realpathSync(outside) + sep).startsWith(realpathSync(REPO_ROOT) + sep),
+    );
+    cpSync(join(REPO_ROOT, FAKE_GH, "gh"), join(outside, "gh"));
+    symlinkSync(outside, join(dir, "fake"));
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: FN_ENTRY,
+      cases: LABEL_CASES,
+      fakeGh: relative(REPO_ROOT, join(dir, "fake")),
+    });
+    assert.equal(r.reason, "bad-fake-gh", JSON.stringify(r.declined));
+    assert.equal(r.executed, 0);
+    assert.equal(r.cases.length, 0, "nothing may spawn");
+    // An in-tree symlink to the in-tree fixture is still a fixture.
+    symlinkSync(join(REPO_ROOT, FAKE_GH), join(dir, "in-tree"));
+    const ok = runProbeSpec({
+      sink: "filename",
+      entry: FN_ENTRY,
+      cases: LABEL_CASES,
+      fakeGh: relative(REPO_ROOT, join(dir, "in-tree")),
+    });
+    assert.equal(ok.verdict, "engages", JSON.stringify(ok.declined));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("namesGh: quoted or backslashed gh, a non-line-initial source, and a root reached through a symlink (task.140 QA cycle 1, CR-3 / CR-6)", () => {
+  const dir = t140Libs("gh-more", {
+    "dq.sh": 'f() { "gh" api x; }\n',
+    "sq.sh": "f() { 'gh' api x; }\n",
+    "bs.sh": "f() { \\gh api x; }\n",
+    "and.sh":
+      "[ -f shared/resources/gh-labels.sh ] && source shared/resources/gh-labels.sh\nf() { :; }\n",
+    "semi.sh": "set -e; . shared/resources/gh-labels.sh\nf() { :; }\n",
+    "then.sh":
+      "if true; then source shared/resources/gh-labels.sh; fi\nf() { :; }\n",
+    "clean.sh":
+      "f() { printf 'high ghost %s\\n' \"$1\"; }  # ends in gh-less words\n",
+  });
+  const viaLink = mkdtempSync(join(tmpdir(), "t140-rootlink-"));
+  try {
+    for (const lib of [
+      "dq.sh",
+      "sq.sh",
+      "bs.sh",
+      "and.sh",
+      "semi.sh",
+      "then.sh",
+    ]) {
+      assert.equal(namesGh(join(dir, lib), REPO_ROOT), true, lib);
+    }
+    assert.equal(namesGh(join(dir, "clean.sh"), REPO_ROOT), false, "clean.sh");
+    // CR-6: the export realpaths its own root, so a lexical root through a
+    // symlink still follows an in-tree source.
+    const link = join(viaLink, "root");
+    symlinkSync(REPO_ROOT, link);
+    assert.equal(
+      namesGh(realpathSync(join(dir, "semi.sh")), link),
+      true,
+      "root via symlink",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(viaLink, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: any way the shell dies during the source is declined — no trap-install shape escapes (task.140 QA cycle 2, CR-1 / TASK-140-BUG-3)", () => {
+  // The decline keys on a POSITIVE marker the body writes once the source has
+  // returned, not on filtering how a library installs a trap: each of these
+  // replaced the harness's EXIT trap past the cycle-1 shadow.
+  const dir = t140Libs("trap-shapes", {
+    "lower.sh":
+      "#!/usr/bin/env bash\ntrap true exit\nset -e\nfalse\nf() { :; }\n",
+    "builtin.sh":
+      "#!/usr/bin/env bash\nbuiltin trap true EXIT\nset -e\nfalse\nf() { :; }\n",
+    "command.sh":
+      "#!/usr/bin/env bash\ncommand trap true EXIT\nset -e\nfalse\nf() { :; }\n",
+    "trapexit.sh": "TRAPEXIT() { return 0; }\nset -e\nfalse\nf() { :; }\n",
+    "exec.sh": "f() { :; }\nexec true\n",
+  });
+  try {
+    for (const lib of [
+      "lower.sh",
+      "builtin.sh",
+      "command.sh",
+      "trapexit.sh",
+      "exec.sh",
+    ]) {
+      const r = runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(dir, lib))}#f`,
+        cases: LABEL_CASES,
+        fakeGh: FAKE_GH,
+      });
+      assert.equal(
+        r.reason,
+        "entry-not-probeable",
+        `${lib}: ${JSON.stringify(r.declined)}`,
+      );
+      assert.equal(r.executed, 0, lib);
+      assert.match(r.declined[0].detail, /source .* failed \(exit \d+\)/, lib);
+      assert.deepEqual(
+        r.escapes,
+        [],
+        `${lib}: the harness marker is not an escape`,
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell entry forms: gh reached at RUN time without --fake-gh trips the wire and is declined, however it is spelled (task.140 QA cycle 2, CR-2 / CR-3 / TASK-140-BUG-4)", () => {
+  // The static detector cannot read these; the trip-wire gh first on PATH can.
+  const dir = t140Libs("gh-runtime", {
+    "default.sh":
+      '#!/usr/bin/env bash\nf() { "${GH_BIN:-gh}" api x >/dev/null 2>&1; printf \'%s\\n\' "$1"; }\n',
+    "assign.sh":
+      '#!/usr/bin/env bash\nGH_CLI=gh\nf() { "$GH_CLI" api x >/dev/null 2>&1; printf \'%s\\n\' "$1"; }\n',
+    // Absolute: at run time cwd is the fixture dir, where a root-relative source
+    // would fail before gh was ever reached.
+    "if-source.sh": `#!/usr/bin/env bash\nif source ${JSON.stringify(join(REPO_ROOT, FN_LIB))}; then :; fi\nf() { gh_labels_filter "$1"; }\n`,
+    "script.sh":
+      '#!/usr/bin/env bash\nX=gh\n"$X" label list >/dev/null 2>&1\nprintf \'%s\\n\' "$1"\n',
+  });
+  try {
+    for (const [lib, form] of [
+      ["default.sh", "shell-fn"],
+      ["assign.sh", "shell-fn"],
+      ["if-source.sh", "shell-fn"],
+      ["script.sh", "shell"],
+    ]) {
+      const rel = relative(REPO_ROOT, join(dir, lib));
+      const entry = form === "shell" ? `shell:${rel}` : `shell-fn:${rel}#f`;
+      const r = runProbeSpec({ sink: "filename", entry, cases: LABEL_CASES });
+      assert.equal(
+        r.reason,
+        "needs-fake-gh",
+        `${lib}: ${JSON.stringify(r.declined)}`,
+      );
+      assert.equal(r.executed, 0, lib);
+      assert.match(r.declined[0].detail, /invoked .gh. at run time/, lib);
+      assert.deepEqual(r.escapes, [], `${lib}: the trip-wire is not an escape`);
+    }
+    // A library that sources gh-labels but never CALLS gh runs and is scored:
+    // the guarantee is that the host gh never runs, not that a mention declines.
+    const quiet = t140Libs("gh-quiet", {
+      "quiet.sh": `#!/usr/bin/env bash\nif source ${JSON.stringify(join(REPO_ROOT, FN_LIB))}; then :; else exit 3; fi\nf() { printf '%s\\n' "$1"; }\n`,
+    });
+    try {
+      const r = runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(quiet, "quiet.sh"))}#f`,
+        cases: LABEL_CASES,
+      });
+      assert.notEqual(r.reason, "needs-fake-gh", JSON.stringify(r.declined));
+      assert.equal(r.executed, LABEL_CASES.length * probeShells().length);
+    } finally {
+      rmSync(quiet, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell entry forms: the trip-wire decline keeps what the runs observed — escapes, cases, shells (task.140 QA cycle 3, TASK-140-BUG-5)", () => {
+  // Writes $HOME (an escape: HOME is inside the sandbox root, outside the work
+  // dir) AND reaches gh. The decline must not replace the escapes with [].
+  const dir = t140Libs("gh-escape", {
+    "both.sh":
+      '#!/usr/bin/env bash\nf() { : > "$HOME/escaped"; X=gh; "$X" api x >/dev/null 2>&1; printf \'%s\\n\' "$1"; }\n',
+    "home-only.sh":
+      '#!/usr/bin/env bash\nf() { : > "$HOME/escaped"; printf \'%s\\n\' "$1"; }\n',
+  });
+  try {
+    const run = (lib) =>
+      runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${relative(REPO_ROOT, join(dir, lib))}#f`,
+        cases: LABEL_CASES,
+      });
+    const both = run("both.sh");
+    const homeOnly = run("home-only.sh");
+    assert.equal(both.reason, "needs-fake-gh", JSON.stringify(both.declined));
+    assert.equal(both.executed, 0, "nothing is scored");
+    assert.ok(
+      homeOnly.escapes.length > 0,
+      "control: the HOME write is an escape",
+    );
+    assert.equal(
+      both.escapes.length,
+      homeOnly.escapes.length,
+      "the decline reports the same escapes the unscored run observed",
+    );
+    assert.deepEqual(both.shells, probeShells());
+    assert.equal(both.cases.length, LABEL_CASES.length * probeShells().length);
+    assert.equal(both.fakeGh, null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell entry forms: gh called under env -i still trips the wire — the marker path is in the stub, not the environment (task.140 QA cycle 3, TASK-140-BUG-6)", () => {
+  const dir = t140Libs("gh-env-i", {
+    "envi.sh":
+      '#!/usr/bin/env bash\nf() { X=gh; env -i PATH="$PATH" "$X" api x >/dev/null 2>&1; printf \'%s\\n\' "$1"; }\n',
+    "envi-script.sh":
+      '#!/usr/bin/env bash\nX=gh\nenv -i PATH="$PATH" "$X" label list >/dev/null 2>&1\nprintf \'%s\\n\' "$1"\n',
+  });
+  try {
+    for (const [lib, form] of [
+      ["envi.sh", "shell-fn"],
+      ["envi-script.sh", "shell"],
+    ]) {
+      const rel = relative(REPO_ROOT, join(dir, lib));
+      const entry = form === "shell" ? `shell:${rel}` : `shell-fn:${rel}#f`;
+      const r = runProbeSpec({ sink: "filename", entry, cases: LABEL_CASES });
+      assert.equal(
+        r.reason,
+        "needs-fake-gh",
+        `${lib}: ${JSON.stringify(r.declined)}`,
+      );
+      assert.equal(r.executed, 0, lib);
+      // The RUN-TIME decline, not the static detector's: the trip-wire fired.
+      assert.match(r.declined[0].detail, /invoked .gh. at run time/, lib);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell entry forms: an ABSOLUTE path to a gh binary bypasses the trip-wire — a stated limit this row pins (task.140 QA cycle 2, probe-boundary-rule.md §5)", () => {
+  const outside = mkdtempSync(join(tmpdir(), "t140-abs-gh-"));
+  const dir = t140Libs("gh-abs", {});
+  try {
+    const bin = join(outside, "gh");
+    const mark = join(outside, "ran");
+    writeFileSync(bin, `#!/bin/sh\n: > ${JSON.stringify(mark)}\n`, {
+      mode: 0o755,
+    });
+    writeFileSync(
+      join(dir, "abs.sh"),
+      `#!/usr/bin/env bash\nf() { ${JSON.stringify(bin)} api x; printf '%s\\n' "$1"; }\n`,
+      { mode: 0o644 },
+    );
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, join(dir, "abs.sh"))}#f`,
+      cases: LABEL_CASES,
+    });
+    assert.notEqual(
+      r.reason,
+      "needs-fake-gh",
+      "the limit: an absolute path is not on PATH",
+    );
+    assert.ok(existsSync(mark), "the absolute-path binary did run");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("shell entry forms: a library that puts another directory ahead of the trip-wire on PATH reaches it — a stated limit this row pins (task.140 QA cycle 4, TASK-140-BUG-7)", () => {
+  const outside = mkdtempSync(join(tmpdir(), "t140-prepend-gh-"));
+  const dir = t140Libs("gh-prepend", {});
+  try {
+    mkdirSync(join(outside, "bin"));
+    const mark = join(outside, "ran");
+    writeFileSync(
+      join(outside, "bin", "gh"),
+      `#!/bin/sh\n: > ${JSON.stringify(mark)}\n`,
+      {
+        mode: 0o755,
+      },
+    );
+    writeFileSync(
+      join(dir, "prepend.sh"),
+      `#!/usr/bin/env bash\nf() { export PATH=${JSON.stringify(join(outside, "bin"))}:"$PATH"; X=gh; "$X" api x; printf '%s\\n' "$1"; }\n`,
+      { mode: 0o644 },
+    );
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: `shell-fn:${relative(REPO_ROOT, join(dir, "prepend.sh"))}#f`,
+      cases: LABEL_CASES,
+    });
+    assert.notEqual(
+      r.reason,
+      "needs-fake-gh",
+      "the limit: a gh ahead of the trip-wire on PATH answers instead",
+    );
+    assert.ok(existsSync(mark), "the prepended gh did run");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("resolveEntry: a missing path is contained by its deepest existing ancestor (task.140 QA cycle 2, CR-5)", () => {
+  const outside = mkdtempSync(join(tmpdir(), "t140-missing-"));
+  const dir = mkdtempSync(join(REPO_ROOT, FN_FIXTURES, ".t140-missing-"));
+  try {
+    symlinkSync(outside, join(dir, "link"));
+    // A symlinked intermediate with a missing leaf is an escape, not an entry.
+    const esc = resolveEntry(
+      `shell-fn:${relative(REPO_ROOT, join(dir, "link", "nope.sh"))}#f`,
+      REPO_ROOT,
+    );
+    assert.equal(esc.reason, "outside-repo-root", JSON.stringify(esc));
+    // A missing file under a root reached through a symlink is inside.
+    const via = join(outside, "root");
+    symlinkSync(REPO_ROOT, via);
+    const ok = resolveEntry(`shell-fn:${join(via, "tests", "nope.sh")}#f`, via);
+    assert.equal(ok.ok, true, JSON.stringify(ok));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 test("shell-fn entry: expected.absent may name the case's own input — no per-case file is created for this form (CR-4)", () => {
   const cases = [
     {
@@ -2631,6 +3196,311 @@ test("cli entry: a named cli: control is keyed on its name even when the result 
     const rec = readRecord(record);
     assert.equal(rec.controls.length, 1);
     assert.equal(rec.controls[0].verdict, "engages");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.158 (TASK-149 gate 7 CR-2) — both containment sites use isWithin, so a
+// directory whose name BEGINS with two dots is inside the root, not an escape.
+// A bare startsWith("..") refused it. The root itself stays refused: isWithin(root,
+// root) is true, so that refusal is a separate `=== root` test at each site.
+test("resolveEntry: an entry under a `..name` directory inside the root is accepted; the root itself, `../x` and an outside absolute path are still refused (task.158)", () => {
+  const root = mkdtempSync(join(tmpdir(), "probe-dotdot-"));
+  try {
+    const inside = resolveEntry("..fixtures/control.mjs#f", root);
+    assert.equal(inside.ok, true, JSON.stringify(inside));
+    assert.equal(inside.exportName, "f");
+    const deep = resolveEntry("shell:..fixtures/sub/c.sh", root);
+    assert.equal(deep.ok, true, JSON.stringify(deep));
+    for (const bad of [
+      ".#f",
+      "../x.mjs#f",
+      "..fixtures/../../x.mjs#f",
+      "/etc/passwd#x",
+      "shell:../x.sh",
+    ]) {
+      const r = resolveEntry(bad, root);
+      assert.equal(r.ok, false, bad);
+      assert.equal(r.reason, "outside-repo-root", bad);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-fn entry: a --fake-gh directory named `..name` inside the repo root is accepted, and the repo root itself is still bad-fake-gh (task.158)", () => {
+  // The name must begin with `..` at the FIRST segment below the root — that is
+  // the only place a bare startsWith("..") misfires. A disposable root holds the
+  // library under probe and the `..name` fake-gh directory, so nothing is ever
+  // written into the live repository (task.158 QA cycle 1, CR-4).
+  const root = mkdtempSync(join(tmpdir(), "probe-dotdot-gh-"));
+  const dotdot = join(root, "..fake-gh");
+  try {
+    mkdirSync(join(root, dirname(FN_LIB)), { recursive: true });
+    cpSync(join(REPO_ROOT, FN_LIB), join(root, FN_LIB));
+    cpSync(join(REPO_ROOT, FAKE_GH), dotdot, { recursive: true });
+    const ok = runProbeSpec({
+      sink: "filename",
+      entry: FN_ENTRY,
+      cases: LABEL_CASES,
+      fakeGh: basename(dotdot),
+      repoRoot: root,
+    });
+    assert.notEqual(ok.reason, "bad-fake-gh", JSON.stringify(ok.reason));
+    assert.ok(ok.executed > 0, `the probe ran: ${JSON.stringify(ok.reason)}`);
+    const atRoot = runProbeSpec({
+      sink: "filename",
+      entry: FN_ENTRY,
+      cases: LABEL_CASES,
+      fakeGh: ".",
+      repoRoot: root,
+    });
+    assert.equal(atRoot.reason, "bad-fake-gh");
+    // Refused by CONTAINMENT, not by the later "no gh in it" check — the root
+    // holds no gh either, so the reason alone cannot tell the two apart.
+    assert.match(atRoot.declined[0].detail, /is outside/);
+    assert.equal(atRoot.executed, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── task.131: --args-json, the { ok: false } rule, and markdown-structure ────
+
+const requireCjs = createRequire(import.meta.url);
+const { loadTemplate } = requireCjs("../report-lint.js");
+const LINT_ENTRY = "shared/resources/report-lint.js#lintReport";
+const LINT_ARGS = () => [{ sections: loadTemplate() }];
+
+test("task.131: a returned { ok: false } is a rejection and { ok: true } an acceptance", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: `${FIXTURES}/result-object-control.mjs#validateHost`,
+    cases: CASES,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.deepEqual(r.reproduced, []);
+  assert.deepEqual(r.overblocked, []);
+  assert.equal(r.executed, CASES.length);
+});
+
+test("task.131: an INHERITED ok is not read — the rule is own-property only", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: `${FIXTURES}/result-object-control.mjs#inheritedOk`,
+    cases: CASES,
+  });
+  assert.equal(
+    r.verdict,
+    "absent",
+    "every answer is a truthy object → accepted",
+  );
+  assert.equal(r.reproduced.length, hostileOnly.length);
+});
+
+test("task.131: without --args-json a two-argument control rejects everything; with it, it engages", () => {
+  const argsEntry = `${FIXTURES}/args-control.mjs#validateHost`;
+  const bare = runProbeSpec({
+    sink: "url-authority",
+    entry: argsEntry,
+    cases: CASES,
+  });
+  assert.equal(bare.verdict, "unverifiable");
+  assert.equal(bare.reason, "rejects-every-input");
+  assert.equal(bare.args, null);
+
+  const args = [{ allow: legitimateOnly.map((c) => c.input) }];
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: argsEntry,
+    cases: CASES,
+    args,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.deepEqual(r.args, args, "the result states how the export was called");
+  assert.deepEqual(toRecordEntry(r).args, args, "and so does the record");
+});
+
+test("task.131: args is declined bad-args on a non-JS form or when it is not an array", () => {
+  const notArray = runProbeSpec({
+    sink: "url-authority",
+    entry: `${FIXTURES}/args-control.mjs#validateHost`,
+    cases: CASES,
+    args: { allow: [] },
+  });
+  assert.equal(notArray.verdict, "unverifiable");
+  assert.equal(notArray.reason, "bad-args");
+  const shell = runProbeSpec({
+    sink: "filename",
+    entry: `shell:${FIXTURES}/runs-names.sh`,
+    args: [1],
+  });
+  assert.equal(shell.reason, "bad-args");
+  assert.equal(shell.executed, 0);
+});
+
+test("task.131: --args-json on the CLI — a JS entry runs; a non-array, non-JSON or shell entry exits 2", () => {
+  const casesDir = mkdtempSync(join(tmpdir(), "probe-args-"));
+  try {
+    const casesFile = join(casesDir, "cases.json");
+    writeFileSync(casesFile, JSON.stringify(CASES));
+    const ok = runMain([
+      "--sink",
+      "url-authority",
+      "--entry",
+      `${FIXTURES}/args-control.mjs#validateHost`,
+      "--args-json",
+      JSON.stringify([{ allow: ["db.internal", "db.internal:5432"] }]),
+      "--cases-file",
+      casesFile,
+      "--json",
+    ]);
+    assert.equal(ok.rc, 0, ok.err);
+    assert.equal(JSON.parse(ok.out).verdict, "engages");
+  } finally {
+    rmSync(casesDir, { recursive: true, force: true });
+  }
+  for (const [label, argv] of Object.entries({
+    "not JSON": ["--entry", entry("engaging-control"), "--args-json", "[oops"],
+    "not an array": ["--entry", entry("engaging-control"), "--args-json", "{}"],
+    "shell entry": [
+      "--entry",
+      `shell:${FIXTURES}/runs-names.sh`,
+      "--args-json",
+      "[1]",
+    ],
+    "cli entry": [
+      "--entry",
+      `cli:${FIXTURES}/cli-refuser.mjs`,
+      "--argv",
+      '["{input}"]',
+      "--args-json",
+      "[1]",
+    ],
+  })) {
+    const r = runMain(["--sink", "url-authority", ...argv]);
+    assert.equal(r.rc, 2, `${label}: ${r.err}`);
+    assert.match(r.err, /bad-args/, label);
+  }
+});
+
+test("task.131: lintReport through the markdown-structure sink engages — every hostile refused, every legitimate accepted", () => {
+  const cases = corpusFor("markdown-structure");
+  const r = runProbeSpec({
+    sink: "markdown-structure",
+    entry: LINT_ENTRY,
+    args: LINT_ARGS(),
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, cases.length);
+  assert.deepEqual(r.reproduced, []);
+  assert.deepEqual(r.overblocked, []);
+  assert.deepEqual(r.declined, []);
+});
+
+test("task.131: each markdown-structure hostile case trips exactly the code(s) it is named for", () => {
+  // The isolation property is what makes the mutant below catchable: a case
+  // tripping several codes still refuses when one check is dropped.
+  const { lintReport } = requireCjs("../report-lint.js");
+  const EXPECTED = {
+    "duplicated-header-block": ["header-block-duplicated"],
+    "second-h1": ["multiple-h1"],
+    "trailing-duplicate-body": [
+      "section-duplicated",
+      "trailing-duplicate-body",
+    ],
+    "section-out-of-order": ["section-out-of-order"],
+    "section-duplicated": ["section-duplicated"],
+    "heading-only-inside-fence": ["section-missing"],
+    "heading-only-inside-fence-crlf": ["section-missing"],
+    "qa-cycle-duplicated": ["qa-cycle-duplicated"],
+    "empty-document": ["variant-undetected"],
+  };
+  const hostile = corpusFor("markdown-structure").filter(
+    (c) => c.direction === "hostile",
+  );
+  assert.deepEqual(
+    hostile.map((c) => c.id.replace("markdown-structure.", "")).sort(),
+    Object.keys(EXPECTED).sort(),
+    "every hostile case has an expectation, and no expectation is orphaned",
+  );
+  for (const c of hostile) {
+    const r = lintReport(c.input, { sections: loadTemplate() });
+    const codes = [...new Set(r.problems.map((p) => p.code))].sort();
+    assert.deepEqual(
+      codes,
+      EXPECTED[c.id.replace("markdown-structure.", "")],
+      c.id,
+    );
+  }
+});
+
+test("task.131: the real report-lint fixtures score the same way through the runner — corrupt refused, green accepted", () => {
+  const FIX = join(REPO_ROOT, "shared/resources/tests/fixtures/report-lint");
+  const green = readdirSync(join(FIX, "green")).filter((f) =>
+    f.endsWith(".md"),
+  );
+  assert.ok(green.length >= 5, "the five green fixtures are present");
+  const cases = [
+    {
+      id: "fixture.corrupt-task117",
+      sink: "markdown-structure",
+      input: readFileSync(join(FIX, "corrupt-task117.md"), "utf8"),
+      why: "task.117's doubled HALT commit",
+      correct: "refused",
+      direction: "hostile",
+    },
+    ...green.map((f) => ({
+      id: `fixture.green.${f}`,
+      sink: "markdown-structure",
+      input: readFileSync(join(FIX, "green", f), "utf8"),
+      why: "an accepted report",
+      correct: "accepted",
+      direction: "legitimate",
+    })),
+  ];
+  const r = runProbeSpec({
+    sink: "markdown-structure",
+    entry: LINT_ENTRY,
+    cases,
+    args: LINT_ARGS(),
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, cases.length);
+});
+
+test("task.131: a lintReport mutant without the header-block check is caught by the isolated case", () => {
+  // Copied, never edited in place: the mutant lives in a temp dir inside the
+  // repo root (the engine's containment) beside the two files it requires.
+  const dir = mkdtempSync(
+    join(REPO_ROOT, "shared/resources/tests/.t131-mutant-"),
+  );
+  try {
+    for (const f of [
+      "report-lint.js",
+      "change-log.js",
+      "implementation-report-template.md",
+    ]) {
+      cpSync(join(REPO_ROOT, "shared/resources", f), join(dir, f));
+    }
+    const src = readFileSync(join(dir, "report-lint.js"), "utf8");
+    const push =
+      /problems\.push\(\{\s*code: "header-block-duplicated",[\s\S]*?\}\);\n/;
+    assert.ok(
+      push.test(src),
+      "the header-block push is where the mutant expects it",
+    );
+    writeFileSync(join(dir, "report-lint.js"), src.replace(push, ""));
+    const r = runProbeSpec({
+      sink: "markdown-structure",
+      entry: `${relative(REPO_ROOT, dir)}/report-lint.js#lintReport`,
+      args: LINT_ARGS(),
+    });
+    assert.deepEqual(r.reproduced, [
+      "markdown-structure.duplicated-header-block",
+    ]);
+    assert.equal(r.verdict, "present-but-inert");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

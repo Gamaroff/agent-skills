@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.171.deferred-work-placement-and-qa-results-residuals'
+task_title: 'Deferred Work placement and qa-results engine residuals'
+gate: PASS
+status_reason: 'CR4-1 resolved by making the setext check fence-blind; the review found no way to delete a section the engine itself wrote and no false refusal of a real render or the corpus. One HIGH (setext paragraph test too permissive) reproduces identically on origin/develop with 0 corpus instances, so it is pre-existing and routed to a follow-up.'
+reviewer: 'QA Engineer'
+head: 'c469344240e93e70a4c500d39a0c9cc98519f677'
+updated: '2026-10-05T08:16:01Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 101
+  phases_verified: 4/4
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    boundary: internal
+    internal_reason: 'Unchanged from gate 1: no corpus sink models a work-item section writer.'
+    notes: 'Pure string engine; no network, exec or path input.'
+  performance:
+    status: PASS
+    notes: 'Task suites 101/101; engine, corpus and wiring under 2s.'
+  reliability:
+    status: PASS
+    notes: 'No deletion path introduced by this branch remains open. CR5-1 is pre-existing (base deletes the same shapes; 0 corpus instances) and is narrowed, not widened, by this branch.'
+  maintainability:
+    status: PASS
+    notes: 'The narrowing residue on the setext fence exemption ended with a structural move (fence-blind).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR5-1 (HIGH, pre-existing): the setext paragraph test RE_NOT_PARAGRAPH exempts lines CommonMark reads as paragraph text (#538 …, <https://…> autolinks, inline <b>…</b>, a code span opened by three backticks, an ordered item not starting at 1, an HTML type-7 line), so a setext section headed by one is deleted on replace. Provenance: origin/develop deletes all six probe shapes identically (it had no setext rule); this branch fixes the plain-text shape; 0 setext-shaped pairs in any tracked QA section. Follow-up task: lean the setext check toward refusal — exempt only an ATX heading, a valid fence opener, a list/quote line that can interrupt a paragraph, a table row and an HTML comment — and add the six shapes to Q4.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'CR2-4 (low): a bold Bug Reports block continues past QA''s own **Recommendations**: when a list follows it, carrying a stale list.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'CR-7 (low, gate 1): setext false refusals after a list continuation line or a multi-line comment closer.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

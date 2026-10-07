@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "cli:shared/resources/advance-pipeline-lock.sh",
+      "name": "restore --which (cli)",
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "entry-not-probeable",
+      "executed": 0,
+      "passed": 0,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 1,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--restore",
+        "--which",
+        "{input}"
+      ],
+      "args": null,
+      "ran_at": "2026-09-30T10:44:48.486Z"
+    },
+    {
+      "sink": "path",
+      "entry": "shell-fn:shared/resources/advance-pipeline-lock.sh#choose_candidate",
+      "name": "choose_candidate (shell-fn)",
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "entry-not-probeable",
+      "executed": 0,
+      "passed": 0,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 1,
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "ran_at": "2026-09-30T10:44:48.361Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shell-fn:shared/resources/advance-pipeline-lock.sh#choose_candidate",
+      "name": "choose_candidate (shell-fn)",
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "entry-not-probeable",
+      "executed": 0,
+      "passed": 0,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 1,
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "ran_at": "2026-09-30T10:44:55.762Z"
+    }
+  ],
+  "totals": {
+    "executed": 0,
+    "reproduced": 0
+  },
+  "updated_at": "2026-09-30T10:44:55.762Z"
+}

@@ -123,7 +123,7 @@ Act on the JSON `status`:
 
 Invoke the item's named command (`/develop-story <path>`, `/develop-task <path>` or `/develop-bug <path>`), prepending this directive to the invocation context (same mechanism as the lite-mode directive in `develop-pipeline-autonomous-defaults.md` — the pipeline's own reference files are AUTO-GENERATED and must not be edited). Mark `dispatched: true` in the run state.
 
-> **AUTONOMOUS RUN (develop-next):** For the Phase 0d Upfront Setup questions, take the auto-derived recommended option for **every** question without prompting — whatever that pipeline's question set is. For `/develop-story` and `/develop-task` that is Q1 = base branch, `develop` and Q2 = PR target, `develop`. For `/develop-bug` it is Q1 = branch model (**bugfix** unless the bug is explicitly a production regression), with Q2 base branch and Q3 PR target auto-derived from Q1 — do **not** re-map the story/task Q-numbers onto it. For the Phase 0b resume prompt, choose "Resume from last completed step". Record every auto-answer in the Decisions Log. All existing HALT conditions remain HALTs.
+> **AUTONOMOUS RUN (develop-next):** For the Phase 0d Upfront Setup questions, take the auto-derived recommended option for **every** question without prompting — whatever that pipeline's question set is. For `/develop-story` and `/develop-task` that is Q1 = base branch, `develop` and Q2 = PR target, `develop`. For `/develop-bug` it is Q1 = branch model (**bugfix** unless the bug is explicitly a production regression), with Q2 base branch and Q3 PR target auto-derived from Q1 — do **not** re-map the story/task Q-numbers onto it. For the Phase 0b resume prompt, take the option Phase 0b marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at 5a"; only when no option is marked, choose "Resume from last completed step". Record every auto-answer in the Decisions Log. All existing HALT conditions remain HALTs.
 
 If the pipeline HALTs (review NO-GO, develop stall, 5 QA cycles without PASS, qa-fix with no changes, DoD gaps, unexpected status): **STOP** — surface the pipeline's own HALT report verbatim, send a push notification, do not merge, do not tick. Leave the run-state file in place so the next invocation resumes here.
 
@@ -192,7 +192,7 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      rather than re-deriving it:
 
      ```bash
-     gh pr view "$PR_ID" --json statusCheckRollup \
+     CI_ROLLUP=$(gh pr view "$PR_ID" --json statusCheckRollup \
        -q '[ .statusCheckRollup[]
              | (.status // "") as $st
              | (if   $st == ""          then (.state // "")
@@ -205,8 +205,45 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
              elif any(. == "PENDING" or . == "EXPECTED" or . == "QUEUED"
                       or . == "IN_PROGRESS" or . == "WAITING") then "PENDING"
              elif any(. == "CANCELLED") then "CANCELLED"
-             else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN"
+             else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN")
+     # Print it: the docs-only block below is a separate fenced block (its own shell) and re-binds this value.
+     echo "CI rollup: $CI_ROLLUP"
      ```
+
+     **A pending head over a docs-only tail is satisfied, not waited on (task.172).** If `CI_ROLLUP`
+     is `PENDING` or `NONE` (Bitbucket: an `INPROGRESS` or an empty status list), ask the
+     tree-equivalence engine **before** backgrounding any wait. It exits **0 for `tree-equivalent`
+     and for nothing else** — every other answer, including a failed read, exits 1:
+
+     ```bash
+     # INPUTS, re-bound in THIS block (a fresh shell has none): the rollup read above, the PR head and the
+     # PR id. Unbound, the rule would be skipped silently, or `--head ""` would judge another commit.
+     : "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}" "${PR_HEAD:?bind PR_HEAD}" "${PR_ID:?bind PR_ID}"
+     CI_TREE_EQ=""
+     case "$CI_ROLLUP" in
+       PENDING|NONE)
+         if TE=$(command node .agents/skills/develop-next/references/ci-tree-equivalence.js \
+                   --head-rollup "$CI_ROLLUP" --head "$PR_HEAD" --pr "$PR_ID" --json); then
+           CI_TREE_EQ=$(printf '%s' "$TE" | jq -r '.greenSha[0:12] // empty')
+           [ -n "$CI_TREE_EQ" ] && CI_ROLLUP=SUCCESS    # an empty sha stays PENDING: fail closed
+         fi ;;
+     esac
+     ```
+
+     **The engine is not always a quick check.** With `ci.docsOnly.checkCommand` configured, it runs
+     that command inside the call, and a test suite there can outlive the tool timeout. So either
+     re-sample the head's rollup once first and call the engine only if the head is still pending, or
+     run the block backgrounded with its output in a file (`> .claude/state/ci-tree-eq.log 2>&1`),
+     ending it with `echo "CI_TREE_EQ=$CI_TREE_EQ"`, and read that line on the notification — never
+     as a foreground call (obs #270).
+
+     When `CI_TREE_EQ` is set, the PR head's own CI has **not** finished and the reading is satisfied
+     because every file changed since a green first-parent ancestor is documentation (per
+     `ci.docsOnly.patterns`, and `ci.docsOnly.checkCommand` passed when one is configured). **Record it
+     as `CI: SUCCESS (tree-equivalent to {CI_TREE_EQ})` in the run report — never as plain `SUCCESS`**, so
+     the record names the commit CI actually verified. On any other answer the existing handling below
+     applies unchanged. `ci.docsOnly.enabled: false` restores a full wait
+     ([`docs/reference/configuration.md`](../../docs/reference/configuration.md)).
 
      If a genuine wait is needed, **background it** — a poll loop written to a file, checked on a
      later turn. Never a foreground call that can outlive the tool timeout.
@@ -263,7 +300,7 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      rm -f /tmp/dn-merge.json
      # MERGED is the only success state; anything else (conflict, protection,
      # scope error) carries an `error.message` — surface it verbatim.
-     [ "$(echo "$MERGE_RESULT" | jq -r '.state')" = "MERGED" ] || HALT
+     [ "$(printf '%s' "$MERGE_RESULT" | jq -r '.state')" = "MERGED" ] || HALT
    else
      # Bind the head branch BEFORE the merge, and refuse an empty one: `git push origin --delete ""`
      # is not a thing to run by accident (obs #133: a block that reads a name must bind it).

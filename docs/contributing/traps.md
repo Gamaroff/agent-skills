@@ -40,10 +40,21 @@ which runs `npm test` in a clone of HEAD that has no ignored paths. `scripts/rel
 
 ### Never edit `skills/*/references/` — it is generated
 
-`shared/resources/` is the single source of truth. `.git/hooks/pre-commit` runs `npm run bundle`
-whenever `shared/resources/` or any `SKILL.md` is staged and **re-stages the result** — so a fix
-applied only to a bundled copy is silently reverted. Edit the source, then bundle. A second
-`npm run bundle` must be a clean no-op (it is, as of 2026-09-10).
+`shared/resources/` is the single source of truth. `.githooks/pre-commit` (the repo's
+`core.hooksPath`) runs `npm run bundle` whenever `shared/resources/` or any `SKILL.md` is staged and
+**re-stages the result** — so a fix applied only to a bundled copy is silently reverted. Edit the
+source, then bundle. A second `npm run bundle` must be a clean no-op (it is, as of 2026-09-10).
+
+**An untracked generated copy refuses the commit** (task.126). A copy the hook's own bundle run
+creates is staged for you. A copy that was *already* untracked when you committed — what a manual
+`npm run bundle` leaves behind — used to get a one-line warning while the commit went ahead without
+it. Every local check then passed, because the file is on disk, and `bundle:check` failed in CI a
+push later. The hook now exits 1 and names the paths. "Generated" means the copy has a source (`shared/resources/<path>`); a hand-written `references/` file has none, and stays a warning. Either `git add` them, or remove the
+`shared/resources/` mention that produced them. A document you only point a reader at can be *cited*
+(`references/X.md#section`) and then costs one file, not its closure: `create-skill` § Cite or depend.
+`BUNDLE_PRECOMMIT_WARN=1` downgrades the refusal to the old warning. The bundler never deletes a
+copy, so one a change stops reaching is yours to `git rm`; `bundle:check` reports it `UNREACHED`
+until you do.
 
 ### CI check counts differ per PR — legitimately
 
@@ -122,6 +133,8 @@ The marker is built by `loadSensitive()` in the shared `spawn-budget.mjs` (task 
 
 - `evals/shared/tests/consumer-root.test.mjs`
 - `shared/resources/tests/access-config-parity.test.mjs`
+- `shared/resources/tests/call-sites.test.mjs`
+- `shared/resources/tests/ci-tree-equivalence.test.mjs`
 - `shared/resources/tests/qa-diminishing-returns.test.mjs`
 - `shared/resources/tests/qa-execute-snippets.test.mjs`
 - `skills/session-handoff/tests/handoff-verify.test.js`
@@ -134,6 +147,16 @@ test file reads a high-resolution clock (`process.hrtime`, `performance.now`) wi
 
 The **stdout-drain premise test is not load-sensitive any more** (fixed 2026-09-04; the payload is
 now sized from the pipe buffer). A failure there is real. Do not re-run it away.
+
+### A nested `node --test` must drop `NODE_TEST_CONTEXT`
+
+A `node --test` spawned from inside a `node --test` run inherits the parent's
+`NODE_TEST_CONTEXT`. The child then reports to the (absent) parent runner instead of printing, so its
+`ℹ pass N` summary and its stdout come back empty. On task.156 the same `pass 2` figure read `stale`
+in the test and `confirmed` at a terminal. Delete the variable from the child's env:
+`skills/session-handoff/tests/continuation.test.js` (`verifyRows`) and
+`evals/shared/tests/fake-gh.test.mjs` both do. Do not "fix" the figure or the assertion instead —
+the tool is right, the child's environment is not a terminal's (obs #251).
 
 ### zsh `nomatch` aborts a command with an unmatched glob — before it runs
 

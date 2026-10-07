@@ -56,9 +56,9 @@ After the subagent returns, parse its text output as JSON:
 
 ```
 POLL=$(Agent subagent result text)
-PR_STATE=$(echo "$POLL" | jq -r '.pr.state // "unknown"')
-ISSUE_STATE=$(echo "$POLL" | jq -r '.issue.state // "unknown"')
-ERRORS=$(echo "$POLL" | jq -r '.errors | length')
+PR_STATE=$(printf '%s' "$POLL" | jq -r '.pr.state // "unknown"')
+ISSUE_STATE=$(printf '%s' "$POLL" | jq -r '.issue.state // "unknown"')
+ERRORS=$(printf '%s' "$POLL" | jq -r '.errors | length')
 ```
 
 Always check `errors` before trusting the state fields:
@@ -109,11 +109,11 @@ except Exception:
 
 ```bash
 PR_JSON=$(gh pr view {PR_NUMBER} --json url,state,reviewDecision,reviews 2>&1)
-if echo "$PR_JSON" | jq -e '.url' >/dev/null 2>&1; then
-  PR_URL=$(echo "$PR_JSON" | jq -r '.url')
-  PR_STATE=$(echo "$PR_JSON" | jq -r '.state')                      # OPEN|MERGED|CLOSED
-  PR_REVIEWS=$(echo "$PR_JSON" | jq -r '.reviews | length')
-  PR_APPROVED=$(echo "$PR_JSON" | jq -r '.reviewDecision == "APPROVED"')
+if printf '%s' "$PR_JSON" | jq -e '.url' >/dev/null 2>&1; then
+  PR_URL=$(printf '%s' "$PR_JSON" | jq -r '.url')
+  PR_STATE=$(printf '%s' "$PR_JSON" | jq -r '.state')                      # OPEN|MERGED|CLOSED
+  PR_REVIEWS=$(printf '%s' "$PR_JSON" | jq -r '.reviews | length')
+  PR_APPROVED=$(printf '%s' "$PR_JSON" | jq -r '.reviewDecision == "APPROVED"')
 else
   PR_STATE="unknown"; PR_URL=""; PR_REVIEWS=0; PR_APPROVED=false
   ERRORS+=("gh pr view {PR_NUMBER}: $PR_JSON")
@@ -134,13 +134,13 @@ if ! source references/bitbucket-auth.sh; then
 else
   BB_RESP=$(curl -s "${BB_CURL_AUTH[@]}" \
     "https://api.bitbucket.org/2.0/repositories/{WORKSPACE}/{REPO_SLUG}/pullrequests/{PR_NUMBER}" 2>&1)
-  if echo "$BB_RESP" | jq -e '.id' >/dev/null 2>&1; then
-    PR_URL=$(echo "$BB_RESP" | jq -r '.links.html.href')
-    PR_STATE=$(echo "$BB_RESP" | jq -r '.state')                    # OPEN|MERGED|DECLINED
+  if printf '%s' "$BB_RESP" | jq -e '.id' >/dev/null 2>&1; then
+    PR_URL=$(printf '%s' "$BB_RESP" | jq -r '.links.html.href')
+    PR_STATE=$(printf '%s' "$BB_RESP" | jq -r '.state')                    # OPEN|MERGED|DECLINED
     PR_REVIEWS=0; PR_APPROVED=false                                 # Bitbucket approval via participants
   else
     PR_STATE="unknown"; PR_URL=""; PR_REVIEWS=0; PR_APPROVED=false
-    ERRORS+=("Bitbucket PR {PR_NUMBER}: $(echo "$BB_RESP" | jq -r '.error.message // "unknown error"' 2>/dev/null)")
+    ERRORS+=("Bitbucket PR {PR_NUMBER}: $(printf '%s' "$BB_RESP" | jq -r '.error.message // "unknown error"' 2>/dev/null)")
   fi
 fi
 ```
@@ -151,11 +151,11 @@ fi
 
 ```bash
 ISSUE_JSON=$(gh issue view {ISSUE_KEY} --json number,state,labels,projectItems 2>&1)
-if echo "$ISSUE_JSON" | jq -e '.number' >/dev/null 2>&1; then
-  ISSUE_KEY_OUT=$(echo "$ISSUE_JSON" | jq -r '.number | tostring')
-  ISSUE_STATE=$(echo "$ISSUE_JSON" | jq -r '.state')                # OPEN|CLOSED
-  ISSUE_LABELS=$(echo "$ISSUE_JSON" | jq -c '[.labels[].name]')
-  ISSUE_COLUMN=$(echo "$ISSUE_JSON" | jq -r '.projectItems[0].status.name // null')
+if printf '%s' "$ISSUE_JSON" | jq -e '.number' >/dev/null 2>&1; then
+  ISSUE_KEY_OUT=$(printf '%s' "$ISSUE_JSON" | jq -r '.number | tostring')
+  ISSUE_STATE=$(printf '%s' "$ISSUE_JSON" | jq -r '.state')                # OPEN|CLOSED
+  ISSUE_LABELS=$(printf '%s' "$ISSUE_JSON" | jq -c '[.labels[].name]')
+  ISSUE_COLUMN=$(printf '%s' "$ISSUE_JSON" | jq -r '.projectItems[0].status.name // null')
   ISSUE_COMMENTS=$(gh issue view {ISSUE_KEY} --json comments --jq '.comments | length' 2>/dev/null || echo 0)
 else
   ISSUE_STATE="unknown"; ISSUE_LABELS="[]"; ISSUE_COLUMN=null; ISSUE_COMMENTS=0

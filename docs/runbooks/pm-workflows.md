@@ -19,7 +19,7 @@ flowchart TD
     B -- no --> C{Size?}
     C -- Large<br/>4+ stories --> D[Brownfield PRD chain]
     C -- Medium<br/>1-3 stories --> E[Epic-only chain]
-    C -- Small<br/>single session --> F[Brownfield story]
+    C -- Small<br/>single session --> F[Small change]
 ```
 
 ## Chain 1 — Greenfield product development
@@ -53,13 +53,14 @@ Skip the PRD when the enhancement fits inside a single epic.
 3. → Story Development Runbook  (Phase C onwards)
 ```
 
-## Chain 4 — Brownfield story (small, single session)
+## Chain 4 — Small change (single session)
 
-For work that fits in one story and doesn't need an epic.
+For work that fits in one session. There is no standalone-story skill (`/brownfield-story` was
+removed): every story belongs to an epic.
 
 ```
-1. /brownfield-story            → single-story scoping
-2. → Story Development Runbook  (Phase C onwards, with the story in hand)
+User-facing:     Chain 3 with a one-story epic (/create-epic → /review-epic → Story Development Runbook)
+Not user-facing: /create-task → Task Development Runbook
 ```
 
 ## Change management

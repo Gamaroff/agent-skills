@@ -14,7 +14,7 @@ Loaded by `/develop-story` and `/develop-task` during Steps 5–6. Story/task va
 
 ## Loop Setup (shared)
 
-This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **`QA_MAX_CYCLES` complete cycles** — the lock's `qa_max_cycles` field when present, else **5**. The field is written only by a granted re-entry after a loop-limit halt (resume contract, **Re-entry after a QA loop escalation**; writer: `references/grant-qa-cycles.sh`), as `QA_CYCLE at resume + extra_cycles_granted` — relative to the count reconstructed from disk, never to 5, so a grant of `k` delivers `k` cycles whatever gates already exist:
+This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **`QA_MAX_CYCLES` complete cycles** — the lock's `qa_max_cycles` field when present, else **5**. The field is written by a re-entry: a granted re-entry after a loop-limit halt (resume contract, **Re-entry after a QA loop escalation**; writer: `references/grant-qa-cycles.sh`), as `QA_CYCLE at resume + extra_cycles_granted`, or a QA re-entry after a finalise DoD-gaps halt fixed by code (resume contract, **Re-entry after a finalise DoD-gaps halt**; writer: `reenter-qa-after-finalise.sh`), as `max(existing, base + 2)`. Both are relative to the count reconstructed from disk, never to 5, so a grant of `k` delivers `k` cycles whatever gates already exist:
 
 ```bash
 QA_MAX_CYCLES=$(jq -r '.qa_max_cycles // 5' .claude/state/develop-pipeline.lock 2>/dev/null || echo 5)
@@ -135,25 +135,30 @@ Log in Decisions Log: "GitHub board: QA-start re-assert → {landed / already / 
 
 ## Finding the Latest Gate File
 
-Use a format-agnostic regex to extract the numeric `{N}` from each filename, sort numerically, and pick the highest. Robust to story/task names that contain dots.
-
-#### develop-story
-
-```bash
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.gate.*.yml" 2>/dev/null \
-  | awk -F'gate\\.' '{ split($2, a, "."); printf "%d\t%s\n", a[1], $0 }' \
-  | sort -k1,1 -n | tail -1 | cut -f2-
-```
-
-#### develop-task
+The latest gate is the one file `qa-cycle.sh` names: the highest-numbered cycle, zero-padding
+normalised (`gate.02` is cycle 2), a dotfile never a candidate, the file named only when it is a
+regular one (a directory named like a gate can raise the cycle, and then `--path` refuses it), and two
+files claiming one cycle **refused** rather than picked. The helper is `qa-cycle.sh`, bundled beside this document
+(the invocation path below is what the bundler follows); the QA skills ask the same helper, so the loop and the QA run cannot disagree about
+which gate is current (task.158 — this section used to carry its own `find | awk | sort` grammar).
 
 ```bash
-find {task-directory} -maxdepth 1 -name "task.{id}.gate.*.yml" 2>/dev/null \
-  | awk -F'gate\\.' '{ split($2, a, "."); printf "%d\t%s\n", a[1], $0 }' \
-  | sort -k1,1 -n | tail -1 | cut -f2-
+QA_CYCLE=$(bash .agents/skills/{develop-story|develop-task}/references/qa-cycle.sh "{story-or-task-directory}"); rc=$?
+# rc 1 = the helper REFUSED (no numbered gate yet) → empty. Anything else is a broken invocation.
+[ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
+LATEST_GATE=""
+if [ -n "$QA_CYCLE" ]; then
+  LATEST_GATE=$(bash .agents/skills/{develop-story|develop-task}/references/qa-cycle.sh "{story-or-task-directory}" --path gate); rc=$?
+  # A cycle that no ONE regular file carries (two claim it) is a stop, never "no gate".
+  [ "$rc" -eq 0 ] || { echo "⚠️  qa-cycle.sh --path gate refused cycle $QA_CYCLE (rc=$rc) — resolve the gate files named above" >&2; exit 1; }
+fi
 ```
 
-The gate file pattern is `…gate.{N}.{name}.yml` — the awk splits on `gate.`, takes the first `.`-delimited token from the right side as `{N}`. Names containing dots (e.g. `auth.v2`) no longer affect ordering.
+An empty `QA_CYCLE` (and so an empty `LATEST_GATE`) means no QA run has written a gate yet.
+
+> The helper reads every `*.gate.*.yml` in the directory. The story form this replaced was keyed on
+> the story's own stem (`story.{epic}.{story}.gate.*`); no co-located bug writes a gate today, and a
+> stem filter for the helper is a recorded follow-up (task.149 gate 8 CR-2).
 
 **Note (tasks only)**: The legacy path `docs/qa/gates/tasks/` is deprecated. qa-task v2.0 co-locates gate files in the task directory alongside the task document.
 
@@ -286,13 +291,15 @@ contract; the skills perform the writes. Canonical format:
 | Writer     | When                          | Row                                                     |
 | ---------- | ----------------------------- | ------------------------------------------------------- |
 | `qa-story` / `qa-task` | each QA cycle, alongside its QA Results section | `\| 2026-05-14 \|  \| QA gate CONCERNS (6/10) — 2 findings \| qa-story \|` |
-| `qa-fix`   | on **exiting** the fix loop   | `\| 2026-05-14 \|  \| QA findings fixed — gate PASS (9/10), 2 iterations \| qa-fix \|` |
+| `qa-fix`   | each fix cycle, after that cycle's gate row | `\| 2026-05-14 \|  \| QA findings fixed — cycle 2, 3 findings \| qa-fix \|` |
 
 Three rules make this loop's history readable rather than a churn log:
 
 - **`Version` stays blank.** Only `/finalise` bumps it, at acceptance.
-- **`qa-fix` writes once per loop exit, not once per finding or per cycle.** Put the iteration
-  count in the Description. The per-cycle detail already lives in the QA Iteration History section
+- **`qa-fix` writes once per fix cycle, not once per finding.** Append the row after the gate row
+  it answers and never rewrite an earlier one: `qa-fix` cannot see the loop's exit, and a rewritten
+  row reads as a dropped row to `change-log.js --check-append-only`. Put the cycle number in the
+  Description. The per-cycle detail already lives in the QA Iteration History section
   of the implementation report, which is its proper home.
 - **`qa-gate` writes nothing to the document — ever.** It owns the `.yml` and only the `.yml`.
   The verdict row is written by `qa-story` / `qa-task`, which already own document sections. See
@@ -377,6 +384,21 @@ to run (task.123 QA cycle 2, CR-4). The row's value set is exactly `{Proceeding 
 **On any gate that reaches 5c**, commit this cycle's gate `.yml` and QA report `.md` and push once
 before invoking `/review-pr` — there is no `fix(...)` commit on this path to carry them, and 5c reads
 the artifact trail off the branch. See **Where the gate and QA report get committed** in 5b.
+
+**That commit is conditional on the QA skill's read-back** (Step 12b, `qa-read-back.js`, exit 0).
+If you re-run the read-back here, run it in the same fenced block as the commit, with its output in a
+file, so a HALT stops the commit rather than scrolling past it:
+
+```bash
+RB_LOG=".claude/state/qa-read-back-${QA_CYCLE}.log"
+command node .agents/skills/{qa-task|qa-story}/references/qa-read-back.js --doc "{work item file}" \
+  > "$RB_LOG" 2>&1 || { cat "$RB_LOG"; exit 1; }
+git commit -m "{the path-1 message}"
+```
+
+Never pipe a gating check into `tail` or `head`: the exit status becomes `tail`'s, and a truncated
+HALT cannot be diagnosed after the fact (obs #260 — task.177 committed over a read-back HALT whose
+problem line `tail -1` had dropped).
 
 > **A clean gate no longer exits the loop on its own.** It hands to **5c**, which runs
 > `/review-pr` over the open PR and is the only thing that can exit to Step 7. The
@@ -528,10 +550,11 @@ the pipeline noticed.
    and deliberately does not count HIGH: the HIGH count stays the awk's (engine property 2), so the
    two guards can never disagree about it.
 
-3. **From cycle 3 onward, if `HIGH_N > 0` AND `HIGH_N >= HIGH_{N-1}` AND `HIGH_{N-1} >= HIGH_{N-2}`
-   — i.e. HIGH findings *remain* and the count has failed to strictly decrease across two
-   consecutive cycles — the loop is not converging. Stop and escalate.** Do not run 5b. Go to
-   **Loop Escalation** below and use the *QA Loop Not Converging* variant.
+3. **From cycle 3 onward, if `HIGH_N > 0` AND `HIGH_{N-2} > 0` AND `HIGH_N >= HIGH_{N-1}` AND
+   `HIGH_{N-1} >= HIGH_{N-2}` — i.e. HIGH findings were present at all three readings and the
+   count has failed to strictly decrease across two consecutive cycles — the loop is not
+   converging. Stop and escalate.** Do not run 5b. Go to **Loop Escalation** below and use the
+   *QA Loop Not Converging* variant.
 
    **`HIGH_N > 0` is a precondition, not a refinement.** The check exists to catch a loop that
    *fails to reduce* HIGH findings; a sequence with none has nothing to reduce. Without the
@@ -540,6 +563,11 @@ the pipeline noticed.
    exactly the sequence task.110 produced at cycle 3 (obs #71, #77), and the prose two paragraphs
    up already excluded it; the formula did not. State the precondition in the check itself so a
    reader implementing the formula cannot drop it.
+
+   **`HIGH_{N-2} > 0` is the same precondition, two readings back.** "Remain and stop falling"
+   needs a HIGH at every reading. A HIGH first raised at cycle N — `0, 0, 1` — has had no cycle to
+   be reduced: it is a defect in the last fix, not a loop that stopped working, and it routes to 5b
+   like any open queue (obs #227; task.140 escalated on exactly this sequence).
 
    Cycles 1 and 2 never trip it: the rule needs three readings to see a flat line, and a single
    flat cycle is normal.
@@ -552,6 +580,8 @@ the pipeline noticed.
    | `0, 0, 0` | **no** | `HIGH_N = 0`: nothing to reduce; the loop routes on the open queue (medium/low) instead |
    | `3, 0, 0` | no | `HIGH_N = 0` |
    | `2, 2, 1` | no | `1 >= 2` is false — the count fell |
+   | `0, 0, 1` | **no** | `HIGH_{N-2} = 0`: a first-time HIGH has had no cycle to be reduced; route to 5b |
+   | `0, 1, 1` | no, not yet | `HIGH_{N-2} = 0`; if the next gate reads `1` again, `1, 1, 1` trips |
 
    On the observed `7, 7, 7, 7, 4` sequence this trips at the end of cycle 3 — `7 >= 7` and
    `7 >= 7` — cutting three futile cycles.
@@ -661,6 +691,31 @@ broken. A clean gate is a clean gate: it leaves through 5c on the ordinary `PASS
 configured it keeps today's behaviour exactly. That is the fail-safe direction expressed as the
 default rather than as an opt-out. See [`configuration.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/reference/configuration.md).
 
+#### Where the Deferred Work record goes
+
+Routes 2 and 2b both record the ids they carried on the work item. This is the one statement of
+where that record lives; both *On exit* lists point here and do not restate it (task 171).
+
+- **The heading is `## Deferred Work`, an H2.** It is never placed inside `## QA Testing Results`.
+  An H2 ends that section's span, so no QA Step 12 write can reach the record. A bold
+  `**Deferred Work**` label or a `### Deferred Work` written into the QA section is inside the span
+  a replace removes (task.155 REL-030).
+- **Absent → create it** immediately before the change-log block (before the `## Change Log`
+  heading when one sits directly above the marker block). With no change log, create it before
+  `## Progress Tracking` (task) or `## Dev Agent Record` (story); with neither, at the end of the
+  document.
+- **Present → append** the new ids as list items under the existing section. Never open a second one.
+- **A legacy `### Deferred Work` already inside the QA section stays where it is.** The QA engine
+  carries it through every replace. New ids go to the H2.
+
+The record, as the first exit writes it:
+
+```markdown
+## Deferred Work
+
+- **REL-7** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): a residual shape
+```
+
 #### On exit
 
 1. **Overwrite the cycle entry's routing rows first**: `**Action**: Proceeding to 5c (PR conformance
@@ -678,7 +733,7 @@ default rather than as an opt-out. See [`configuration.md`](https://github.com/G
    text and `suggested_action`, plus `carried_from: top_issues (route 2, cycle {N})`. Then stamp the
    `top_issues[]` entry `status: closed` with
    `resolution: carried to recommendations.future (route 2)`, which is route 2b's own stamp, and
-   record the same ids on the work item under **Deferred Work**. Commit the gate and QA report before 5c (path 1), because the gate was just edited.
+   record the same ids on the work item (see **Where the Deferred Work record goes**). Commit the gate and QA report before 5c (path 1), because the gate was just edited.
 
    > **Why the entries are closed, not left open.** `/develop-next` and `/develop-batch` merge only
    > a gate with no open entry (Step 3's matrix), and `/finalise` accepts before they run. An exit that
@@ -730,7 +785,7 @@ was expensive, and the expense bought nothing 5c would not have seen anyway.
    `carried_from: top_issues (route 2b, cycle {N})`. The `top_issues[]` entries themselves are stamped
    `status: closed` with `resolution: carried to recommendations.future (route 2b)`, so the gate
    still records what QA raised and a later reader can tell a carried LOW from a fixed one. Record the
-   same ids on the work item under **Deferred Work**.
+   same ids on the work item (see **Where the Deferred Work record goes**).
 4. **Hand to 5c**, exactly as a `PASS` gate with no open entry does. Commit the gate and QA report
    first (5b's **Where the gate and QA report get committed**, path 1) — the gate was just edited.
 5. Write `describeLoopRoute(r)` verbatim on this cycle's `**Loop exit**` row. The message begins
@@ -1043,19 +1098,24 @@ After fixes are applied:
    this cycle's gate and QA report, which are still untracked. Gating before they are staged reports
    both links dead, and spends one of step 0a's two bounded attempts on the cycle's own evidence
    (obs #171; task.143 cycles 1 and 6: "attempt 1 red … gate.1/qa.1 were not yet staged, attempt 2
-   green after staging them"). Staging them here makes the gate measure the tree the `fix(...)`
-   commit will carry:
+   green after staging them"). The same holds for any bug report the cycle filed: the work item
+   links to it, and it is untracked too (task.146 cycle 1: gate.1, qa.1, bug.1 and bug.2 all read
+   dead). Staging them here makes the gate measure the tree the `fix(...)` commit will carry:
 
    ```bash
-   # Stage-before-gate: this cycle's gate and QA report, and nothing else.
+   # Stage-before-gate: this cycle's gate, QA report and bug reports, and nothing else.
    GATE_FILE="{the latest gate file — resolved per §Finding the Latest Gate File}"
    QA_FILE="{this cycle's QA report — the .qa. file carrying the gate's cycle number}"
    git add -- "$GATE_FILE" "$QA_FILE"
+   # This cycle's bug reports: the untracked *.bug.<n>.* files beside the QA report
+   # (earlier cycles' are already committed).
+   git ls-files --others --exclude-standard -- "$(dirname "$QA_FILE")" \
+     | grep '\.bug\.[0-9]' | while IFS= read -r BUG_FILE; do git add -- "$BUG_FILE"; done
    ```
 
    **After step 0, never before it.** A staged new file shows in `git diff --stat HEAD`, so staging
    first would make step 0's no-change HALT unreachable. Step 1 unstages only the implementation
-   report, so these two stay staged into the commit. On a cycle that reached 5b through a 5c
+   report, so these stay staged into the commit. On a cycle that reached 5b through a 5c
    `REQUEST CHANGES` verdict both files are already committed (path 1), and this `git add` is a
    no-op.
 
@@ -1069,6 +1129,14 @@ After fixes are applied:
    GATE_EXIT=$?
    ```
 
+   **When the gate can outlive the tool timeout, start it with `run_in_background`** and let the log
+   carry the exit code: `<fastGateCommand> > "$FIX_LOG" 2>&1; echo "GATE_EXIT=$?" >> "$FIX_LOG"`.
+   Mark the wait before yielding —
+   `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "5b fast gate cycle {N}" --kind task --budget-minutes {M}`
+   (`develop-pipeline-hooks.md` §"waiting_on") — and on the notification `--clear` it and read the
+   `GATE_EXIT=` line (`grep '^GATE_EXIT=' "$FIX_LOG"`). A foreground
+   call killed at the timeout loses its exit code, and can leave a moved `.agents/skills` unrestored.
+
    `<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml` — the same fast tier
    the develop loop runs (see
    [`develop-pipeline-step-3-develop-loop.md`](develop-pipeline-step-3-develop-loop.md) §"What the
@@ -1077,13 +1145,20 @@ After fixes are applied:
    cycle runs the key has already been proven to name a real script. The slow tier stays out of this
    cycle by design; it runs once at `develop-next`'s merge gate.
 
-   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit — a
+   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit yet — a
    red tree is exactly what the cycle machinery is for. Triage per the step-3 pattern, feed the
    finding back into this cycle's fixes, and re-run the gate.
 
    **Bound this retry at 2 attempts.** After a second red gate in the same cycle, stop retrying:
-   commit nothing, record the failing output in the QA Iteration History, and let the cycle end so
-   the next QA review writes a gate. That is what actually reaches the convergence check and
+   **commit the attempt without pushing** — `fix(task.{id}): qa-fix cycle {N} — fast gate red, not
+   pushed` (or `fix(story.{epic}.{story}): …`), carrying this cycle's gate and QA report as step
+   0-stage staged them, with the implementation report still excluded per step 1 — record the
+   failing output in the QA Iteration History, and let the cycle end so the next QA review writes a
+   gate. Skip step 3's push: the next push — the next cycle's, or the one before its 5c — carries
+   this commit after the next review has read it and its fix cycle has run. **Commit it; do not leave it in the
+   working tree.** The next review's Step 3b reads committed history and HALTs on an uncommitted
+   tracked change outside the work item (task.168 QA cycle 2, CR-1), so a red attempt left
+   uncommitted is a review that never writes its gate. That is what actually reaches the convergence check and
    MAX_ITER — both of which count *cycles*, so an unbounded inner re-run would never reach either.
    An earlier revision of this block claimed "the MAX_ITER cap still bounds the loop"; it does not
    bound this retry, and a stated guarantee that is not real is worse than an unstated one.

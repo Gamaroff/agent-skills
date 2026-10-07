@@ -25,9 +25,9 @@ Accept any of:
 - **Issue hash notation**: `#297`
 - **Bare issue number**: `297`
 
-Jira key inline resolution: search `LOCAL_PATH=$(grep -rl "jira_key: ${JIRA_KEY}" docs/ 2>/dev/null | grep -v '\.implementation\.' | grep -v '\.review\.' | grep -v '\.gate\.' | head -1)`. Not found → HALT: "No local document found for Jira issue ${JIRA_KEY}. Run `/create-story` first to link it, or provide the file path directly."
+Jira key inline resolution: run [§ Key → document lookup](#key--document-lookup) with `KEY_FIELD=jira_key`, `KEY_VALUE=${JIRA_KEY}`. Not found → HALT: "No local document found for Jira issue ${JIRA_KEY}. Run `/create-story` first to link it, or provide the file path directly."
 
-GitHub issue inline resolution: extract `ISSUE_NUM`, fetch body, parse `DOC_URL`. Not found → fall back to `grep -rl "github_issue: {N}" docs/`. Still not found → HALT: "No local document found for issue #{N}. Run `/create-story` first, or provide the file path directly."
+GitHub issue inline resolution: extract `ISSUE_NUM`, fetch body, parse `DOC_URL`. Not found → fall back to [§ Key → document lookup](#key--document-lookup) with `KEY_FIELD=github_issue`, `KEY_VALUE=${ISSUE_NUM}`. Still not found → HALT: "No local document found for issue #{N}. Run `/create-story` first, or provide the file path directly."
 
 Explore subagent (file/directory/bare-filename inputs): find file matching `story.{epic}.{story}.*.md` that does NOT contain `.qa.`, `.gate.`, `.bug.`, or `.implementation.` in its name. Return absolute file path and story directory path.
 
@@ -68,9 +68,9 @@ Accept any of:
 - **Issue hash notation**: `#297`
 - **Bare issue number**: `297`
 
-Jira key inline resolution: search `LOCAL_PATH=$(grep -rl "jira_key: ${JIRA_KEY}" docs/ 2>/dev/null | grep -v '\.implementation\.' | grep -v '\.review\.' | grep -v '\.gate\.' | head -1)`. Not found → HALT: "No local document found for Jira issue ${JIRA_KEY}. Run `/create-task` first to link it, or provide the file path directly."
+Jira key inline resolution: run [§ Key → document lookup](#key--document-lookup) with `KEY_FIELD=jira_key`, `KEY_VALUE=${JIRA_KEY}`. Not found → HALT: "No local document found for Jira issue ${JIRA_KEY}. Run `/create-task` first to link it, or provide the file path directly."
 
-GitHub issue inline resolution: extract `ISSUE_NUM`, fetch body, parse `DOC_URL`. Not found → fall back to `grep -rl "github_issue: {N}" docs/`. Still not found → HALT: "No local document found for issue #{N}. Run `/create-task` first, or provide the file path directly."
+GitHub issue inline resolution: extract `ISSUE_NUM`, fetch body, parse `DOC_URL`. Not found → fall back to [§ Key → document lookup](#key--document-lookup) with `KEY_FIELD=github_issue`, `KEY_VALUE=${ISSUE_NUM}`. Still not found → HALT: "No local document found for issue #{N}. Run `/create-task` first, or provide the file path directly."
 
 Explore subagent (file/directory/bare-filename inputs): find file matching `task.{id}.*.md` that does NOT contain `.qa.`, `.gate.`, `.bug.`, or `.implementation.` in its name. Return absolute file path and task directory path.
 
@@ -88,7 +88,8 @@ JIRA_KEY=$(echo "$INPUT" | grep -oE '[A-Z]+-[0-9]+' | tail -1)
 
 ```bash
 # Direct issue URL:
-ISSUE_NUM=$(echo "$INPUT" | grep -oE '(?<=/issues/)[0-9]+')
+# (`grep -E` has no lookbehind — `(?<=/issues/)` is a PCRE-only construct and matched nothing.)
+ISSUE_NUM=$(printf '%s\n' "$INPUT" | sed -nE 's|.*/issues/([0-9]+).*|\1|p')
 # Project board URL / hash notation / bare number — generic fallback:
 [ -z "$ISSUE_NUM" ] && ISSUE_NUM=$(echo "$INPUT" | grep -oE '[0-9]+' | tail -1)
 
@@ -96,6 +97,53 @@ ISSUE_BODY=$(gh issue view {N} --json body -q '.body')
 DOC_URL=$(echo "$ISSUE_BODY" | grep -o 'https://github\.com/[^)]*\.md' | head -1)
 LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*/||')
 ```
+
+### Key → document lookup
+
+The one lookup from a tracker key to its work-item document. `develop-story`, `develop-task` and
+`/review-pr` all run it from here; do not restate the grep at a call site.
+
+```bash
+# KEY_FIELD: jira_key | github_issue.  KEY_VALUE: the Jira key or the issue number.
+# Anchored at both ends, so RAPP-70 does not match RAPP-702 and issue 5 does not match 55.
+# Quote-tolerant: jira_key is written quoted ('RAPP-702' or "RAPP-702") in most consumer docs.
+# Recursive grep, not a docs/**/ glob — ** needs globstar in bash and matches one level without it.
+# Which file is the work item: one named after its own directory ({stem}/{stem}.md) is kept
+# whatever its slug says (task.5.request/task.5.request.md); any other file whose BASENAME carries
+# an artifact kind segment — numbered, dated or slug-form (task.12.review.2026-05-06.md) — or is
+# finalise's sprint-review summary is dropped, because artifacts copy the item's key. Only the
+# basename is read, so a directory such as epic.4.qa.tools/ excludes nothing.
+# An empty KEY_VALUE would match every blank key field, so both inputs must be bound.
+: "${KEY_FIELD:?bind KEY_FIELD (jira_key or github_issue)}" "${KEY_VALUE:?bind KEY_VALUE (the key or issue number)}"
+# A missing or unreadable docs/ (the wrong cwd) is its own HALT, never "no document has this key".
+[ -d docs ] && [ -r docs ] || { DOC_STATUS=unreadable; echo "HALT: docs/ not found or unreadable in $(pwd) — run from the repository root"; exit 1; }
+DOC_MATCHES=$(grep -rlE "^${KEY_FIELD}:[[:space:]]*['\"]?${KEY_VALUE}['\"]?[[:space:]]*$" docs/ 2>/dev/null \
+  | while IFS= read -r f; do
+      b=${f##*/}; d=${f%/*}; d=${d##*/}
+      [ "$b" = "$d.md" ] && { printf '%s\n' "$f"; continue; }
+      case "$b" in
+        *.qa.*|*.gate.*|*.bug.*|*.implementation.*|*.review.*|*.pr-review.*|*.dod.*|*.plan.*|*.handover.*|*.request.*|*sprint-review-summary.md) ;;
+        *) printf '%s\n' "$f" ;;
+      esac
+    done \
+  | sort)
+DOC_COUNT=$(printf '%s' "$DOC_MATCHES" | grep -c .)
+case "$DOC_COUNT" in
+  0) LOCAL_PATH=""; DOC_STATUS=none ;;              # not found — the caller HALTs or falls back
+  1) LOCAL_PATH="$DOC_MATCHES"; DOC_STATUS=found ;;
+  *) LOCAL_PATH=""; DOC_STATUS=ambiguous
+     echo "HALT: ${KEY_FIELD} ${KEY_VALUE} matches ${DOC_COUNT} documents:"; echo "$DOC_MATCHES"
+     exit 1 ;;                                         # never the not-found value: callers branch on it
+esac
+```
+
+**Several matches is a HALT, never `head -1` — and it exits 1.** It must not share "not found"'s
+`LOCAL_PATH=""`: a caller that branches on an empty path would print the wrong HALT, or fall through
+to its next route as if the key named nothing. Two work items carrying one key is a data error a
+human must settle; picking the first anchors the whole run on whichever file `grep` happened to list
+first. The previous form of this lookup was a bare `grep -rl "jira_key: ${JIRA_KEY}"` — a prefix
+match that resolved `RAPP-70` to `RAPP-702`'s document, matched no quoted key at all, and excluded
+only three artifact kinds, so a `.request.` file carrying the same key could win (task.176).
 
 If the Explore subagent cannot find the file, HALT and ask the user to confirm the path.
 
@@ -251,7 +299,7 @@ find {task-directory} -maxdepth 1 -name "task.{id}.implementation.*.md" 2>/dev/n
 
 If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. **Except the Step 8 row:** when the resume record (lock, halt snapshot or orphaned claim) is at step 8, that row is not evidence; follow the step-8 rule in `references/develop-pipeline-resume-contract.md` Phase 0b. Skip upfront questions already recorded in the Decisions Log.
 
-**Restore the lock before anything advances it (task.124 QA cycle 2, CR-2).** A resume skips Step 1, which is the lock's only ordinary writer, and every terminal HALT and PreCompact pause removed the lock and left a superset of it behind. When the resume detector's `source` is `halt_snapshot` or `orphaned_claim` and the operator chooses **Resume**, run — before Phase 0b verification, before any step banner — the command below (which snapshots restore here and which wait for the grant: who restores, and when: resume contract § Restore the lock (both resume paths); that section is the rule's one statement and this paragraph carries no copy of it — task.130):
+**Restore the lock before anything advances it (task.124 QA cycle 2, CR-2).** A resume skips Step 1, which is the lock's only ordinary writer, and every terminal HALT and PreCompact pause removed the lock and left a superset of it behind. When the resume detector's `source` is `halt_snapshot` or `orphaned_claim`, the operator chooses **Resume**, **and** resume contract § Restore the lock (both resume paths) says the restore runs here — and only then — run the command below, before Phase 0b verification and before any step banner. Which snapshots restore here and which wait for the grant is that section's to say; it is the rule's one statement, and this paragraph carries no copy of it (task.130):
 
 ```bash
 bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --restore {doc-directory}
@@ -478,11 +526,11 @@ This is a **separate concern** that merely used to share a GraphQL response with
     }
   }')
 
-  ITEM_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
-  PROJECT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
-  PRIORITY_FIELD_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .id // empty')
-  CURRENT_PRIORITY=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].fieldValueByName.name // empty')
-  P2_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name | startswith("P2")) | .id // empty')
+  ITEM_ID=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].id // empty')
+  PROJECT_ID=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.id // empty')
+  PRIORITY_FIELD_ID=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .id // empty')
+  CURRENT_PRIORITY=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].fieldValueByName.name // empty')
+  P2_OPTION_ID=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name | startswith("P2")) | .id // empty')
 
   # Only when the field exists and is currently unset — never overwrite a human's choice.
   #

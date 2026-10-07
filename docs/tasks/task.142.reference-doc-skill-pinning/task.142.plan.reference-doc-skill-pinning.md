@@ -5,7 +5,7 @@ type: plan
 description: "Code-level guide for task 142: the two extractors, the three assertion groups and their measured floors, the mutation proofs, and the header comment that states what the guard cannot see."
 task-ref: task.142.reference-doc-skill-pinning.md
 created: 2026-09-22
-updated: 2026-09-22
+updated: 2026-09-30
 ---
 
 # Implementation Plan: Pin the hand-written reference docs to the skills they describe
@@ -20,7 +20,9 @@ like the rest of `tests/`. It is already covered by the `tests/*.test.js` glob i
 nothing else changes. Two pure extractors, three assertion groups, three floors, and a header comment
 that is part of the deliverable rather than decoration.
 
-The numbers below were measured against `develop` at `993578a3` on 2026-09-22. Re-measure before
+The numbers below were measured against `develop` at `993578a3` on 2026-09-22 and re-measured at
+`80f460bc` on 2026-09-30 by `task.142.review.1`, which also corrected two defects in the code below
+(ES-module syntax in a CommonJS package; a resolver that picked up path segments). Re-measure before
 setting the floors — do not copy them forward on trust.
 
 ---
@@ -50,12 +52,15 @@ setting the floors — do not copy them forward on trust.
 // sweep lives in skills/create-skill/SKILL.md § "A skill's behaviour is restated in
 // docs/reference/, and nothing reaches it". Do not retire it because this file is green.
 
-import { test, describe } from "node:test";
-import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+"use strict";
+// CommonJS, like every neighbour: package.json is "type": "commonjs", so ESM syntax here throws at
+// load — which node --test reports as a failed FILE, not a failing assertion.
+const { test, describe } = require("node:test");
+const assert = require("node:assert/strict");
+const { readFileSync, existsSync } = require("node:fs");
+const { join } = require("node:path");
 
-const ROOT = new URL("..", import.meta.url).pathname;
+const ROOT = join(__dirname, "..");
 const COMMANDS = join(ROOT, "docs/reference/commands.md");
 const PHRASES = join(ROOT, "docs/reference/activation-phrases.md");
 
@@ -68,35 +73,42 @@ const NON_SKILL_ROWS = new Set([
   "`run-loop.mjs watch`",
 ]);
 
-export function extractCommandRows(md) {
+// Split on UNESCAPED pipes: `/review-pr [PR\|branch]` is one cell, not two.
+const cells = (line) => line.split(/(?<!\\)\|/);
+
+function extractCommandRows(md) {
   const out = [];
   md.split("\n").forEach((line, i) => {
     if (!line.startsWith("| `")) return;
-    const cell = line.split("|")[1].trim();
-    // The LAST /token wins: `/loop /develop-next` is the /loop built-in wrapping a skill, and the
-    // skill is what the row is about.
-    const names = [...cell.matchAll(/\/([a-z0-9-]+)/g)].map((m) => m[1]);
+    const cell = cells(line)[1].trim();
+    // The LAST word-start /token wins: `/loop /develop-next` is the /loop built-in wrapping a
+    // skill, and the skill is what the row is about. Word-start only (start, space, backtick, "("):
+    // row 143 quotes .agents/skills/session-handoff/scripts/handoff-verify.mjs after the command,
+    // and a bare /([a-z0-9-]+)/ resolves that row to "handoff-verify" (measured in review).
+    const names = [...cell.matchAll(/(?:^|[\s`(])\/([a-z0-9][a-z0-9-]*)/g)].map((m) => m[1]);
     out.push({
       line: i + 1,
       cell,
       skill: names.length ? names[names.length - 1] : null,
-      flags: [...new Set(cell.match(/--[a-z][a-z-]*/g) ?? [])],
+      flags: [...new Set(cell.match(/--[a-z][a-z0-9-]*/g) ?? [])],
     });
   });
   return out;
 }
 
-export function extractActivationSkills(md) {
+function extractActivationSkills(md) {
   const out = [];
   md.split("\n").forEach((line, i) => {
-    if (!line.startsWith("|") || line.split("|").length < 4) return;
-    const cells = line.split("|").slice(1, -1).map((c) => c.trim());
-    const tokens = [...new Set((cells.at(-1).match(/`([^`]+)`/g) ?? []).map((t) => t.slice(1, -1)))];
+    if (!line.startsWith("|") || cells(line).length < 4) return;
+    const row = cells(line).slice(1, -1).map((c) => c.trim());
+    const tokens = [...new Set((row.at(-1).match(/`([^`]+)`/g) ?? []).map((t) => t.slice(1, -1)))];
     for (const t of tokens) {
       const [skill, ...flags] = t.split(/\s+/);
       // Must not START with "-": the cells backtick the skill and the flag SEPARATELY
       // (`review-bug` … `--validate`), and [a-z0-9-]+ happily matches "--validate".
-      if (!/^[a-z0-9][a-z0-9-]*$/.test(skill)) continue; // a flag, a header row, or prose
+      // Also rejects `/develop-story`, the built-in `/security-review` and `handoff-verify.mjs`,
+      // which the cells mention as non-skill spans.
+      if (!/^[a-z0-9][a-z0-9-]*$/.test(skill)) continue; // a flag, a slash command, a script name
       out.push({ line: i + 1, skill, flags: flags.filter((f) => f.startsWith("--")) });
     }
   });
@@ -107,7 +119,10 @@ export function extractActivationSkills(md) {
 Two traps this shape avoids, both found while measuring:
 
 - A naive "first `/token`" resolves `` `/loop /develop-next` `` to `loop`, which is a Claude Code
-  built-in and has no `skills/loop/`. Last-token-wins is the fix, and it needs a fixture case.
+  built-in and has no `skills/loop/`. Last-token-wins is the fix, and it needs a fixture case — but
+  only over **word-start** tokens, or a quoted script path's last segment wins instead (row 143).
+- A plain `split("|")` truncates `` `/review-pr [PR\|branch]` `` (line 60) and the
+  `/tracker-reconcile` row (line 116, whose three flags it drops). Split on unescaped pipes.
 - `activation-phrases.md` backticks the skill and the flag as **two separate spans** in the same
   cell — `` `review-bug` (the second phrasing picks `--validate`) `` — so the extractor sees
   `--validate` as its own token. `[a-z0-9-]+` matches it, because `-` is in the class; the head
@@ -126,7 +141,7 @@ Two traps this shape avoids, both found while measuring:
 
 ```js
 const skillMd = (() => {
-  const cache = new Map();                       // memoised: 64 skills, 79 rows
+  const cache = new Map();                       // memoised: 63 skills, 80 rows
   return (name) => {
     if (!cache.has(name)) {
       const p = join(ROOT, "skills", name, "SKILL.md");
@@ -169,12 +184,12 @@ describe("commands.md names commands that exist", () => {
         );
       }
     }
-    // 14 on 2026-09-22. A floor, not an equality: rows get added.
-    assert.ok(checked >= 12, `only ${checked} flag assertions ran — the extractor is probably broken`);
+    // 20 at 80f460bc (2026-09-30). A floor, not an equality: rows get added.
+    assert.ok(checked >= 16, `only ${checked} flag assertions ran — the extractor is probably broken`);
   });
 
   test("the extractor still finds the corpus", () => {
-    // 75 slash rows of 79 total on 2026-09-22.
+    // 76 slash rows of 80 total at 80f460bc (2026-09-30).
     assert.ok(rows.length >= 70, `only ${rows.length} command rows extracted — check the row regex`);
   });
 });
@@ -218,10 +233,12 @@ byte-identical from the caller's side.
 
 **Exact changes:**
 
-1. Run it. Measured in advance against `993578a3`: **0** flag failures over 14 assertions, **0**
-   unresolvable skills once the `/loop` wrapper is handled, **0** unexpected non-skill rows beyond
-   the four `run-loop.mjs` ones. So a red first run means the extractor is wrong — fix the extractor,
-   do not edit the corpus to make it green.
+1. Run it. Measured during review against `80f460bc`, with the corrected rule: **0** unresolvable
+   skills, **0** unexpected non-skill rows beyond the four `run-loop.mjs` ones, and **exactly one**
+   flag failure over 20 assertions — `commands.md:143` advertises `/session-handoff --read`, which
+   `skills/session-handoff/SKILL.md` never mentions. That one is a real defect: fix the **row** to
+   describe read mode without a flag. Any other red means the extractor is wrong — fix the
+   extractor, do not edit the corpus to make it green.
 2. Mutation-prove all three groups. Each of these must turn exactly one test red:
 
    | Mutation | Expected red |
@@ -261,8 +278,8 @@ npm test                                                            # the suite
 command npx prettier --check tests/reference-doc-skill-pinning.test.js
 ```
 
-Move the gitignored `.claude/skills → ../skills` symlink aside before believing a local green — it
-has masked CI failures in this repo before.
+Move the gitignored `.claude/skills → ../skills` and `.agents/skills → ../skills` symlinks aside
+before believing a local green — they have masked CI failures in this repo before.
 
 Re-measure the three counts before committing the floors:
 
@@ -271,6 +288,7 @@ command python3 - <<'PY'
 import re, os
 rows = [l for l in open("docs/reference/commands.md").read().split("\n") if l.startswith("| `")]
 print("command rows:", len(rows))
-print("flag mentions:", sum(len(set(re.findall(r"--[a-z][a-z-]*", l.split("|")[1]))) for l in rows))
+first = lambda l: re.split(r"(?<!\\)\|", l)[1]
+print("flag mentions:", sum(len(set(re.findall(r"--[a-z][a-z0-9-]*", first(l)))) for l in rows))
 PY
 ```

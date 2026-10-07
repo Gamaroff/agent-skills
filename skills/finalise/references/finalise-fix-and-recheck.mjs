@@ -75,7 +75,7 @@ const WORK_ITEM_DOC_RE =
 // document" and "what 8a may admit" cannot drift apart (task.152 QA-1 — they had:
 // `sprint-review-summary` was in the guard and not here).
 export const WORK_ITEM_ARTIFACT_RE =
-  /\.(qa|gate|bug|implementation|review|dod|plan|handover|pr-review|risk|test-design|sprint-review-summary)\./;
+  /\.(qa|gate|bug|implementation|review|dod|plan|handover|handoff|pr-review|risk|test-design|sprint-review-summary)\./;
 export const isWorkItemDocument = (p) =>
   typeof p === "string" &&
   WORK_ITEM_DOC_RE.test(p) &&

@@ -1,0 +1,57 @@
+schema: 2
+task: 'task.157.context-pressure-handoff-trigger'
+task_title: '[Task 157] Context-pressure trigger: recommend a continuation handoff before the context fills'
+gate: PASS
+status_reason: 'Gate 4 findings fixed and mutation-proven. The cycle-5 review fuzzed 200k shq round-trips and differentially against bash 5.3 with no failures; it raised one low, medium-confidence advisory ($''…'' byte escapes) and one test cleanup, neither gating. All NFRs pass.'
+reviewer: 'QA Engineer'
+head: '642c62e5c2fe8a3b7f378780931948d6dc98e9e4'
+updated: '2026-10-02T08:55:46Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 51
+  phases_verified: 16/16
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    notes: 'validSessionId re-probed: engages, 20 executed, 0 reproduced.'
+  performance:
+    status: PASS
+    notes: 'check p95 113 ms, wrapper +16-21 ms (cycle 1 measurement; no hot-path change since).'
+  reliability:
+    status: PASS
+    notes: 'Every installer-written form round-trips (200k-case fuzz); hand-written forms parse per POSIX sh or are refused, never guessed.'
+  maintainability:
+    status: PASS
+    notes: '51 tests; every QA fix mutation-proven across five cycles.'
+
+bug_resolution:
+  closed_from_gate_4: ['TASK-157-QA4-CR-1', 'TASK-157-QA4-CR-2', 'TASK-157-QA4-CR-3']
+  fix_commit: '642c62e5'
+  total_iterations: 4
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'QA5-CR-1 (low, medium confidence): decode $''…'' \xHH / octal escapes as UTF-8 bytes and return null for \u, \U, \c so a hand-written wrap with them reads needs-manual instead of being restored wrongly.'
+      refs: ['shared/resources/context-pressure.mjs']
+    - action: 'QA5-CR-2: make the $''…'' hand-written hook test depend on decoding (e.g. context-pressure\x2emjs).'
+      refs: ['shared/resources/tests/context-pressure-install.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

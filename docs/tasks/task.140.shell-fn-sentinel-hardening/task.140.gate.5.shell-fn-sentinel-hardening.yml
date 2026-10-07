@@ -1,0 +1,84 @@
+schema: 1
+task: 'task.140.shell-fn-sentinel-hardening'
+task_title: 'Harden the shell-fn: sentinels and the fake-gh coverage'
+gate: PASS
+status_reason: 'BUG-7 is fixed: rule §5 now states the three further trip-wire limits, with a pinning row. The scoped review left two LOW precision points in the same text and one test cleanup; no HIGH or MEDIUM.'
+reviewer: 'QA Engineer'
+updated: '2026-09-30T07:58:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: low
+    file: 'shared/resources/probe-boundary-rule.md'
+    finding: 'Beside the new limits, §5 still says "the guarantee is at run time" and "the host gh never runs … whatever the spelling"; CHANGELOG.md:104 and the runShellCase comment (security-probe.mjs:1671) say the same, and the PATH-prepend limit contradicts them.'
+    suggested_action: 'Add the condition the runProbeSpec comment already has (while the stub stays first on PATH and the call happens inside the spawn), or drop "never" and "guarantee".'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'CR-2'
+    severity: low
+    file: 'shared/resources/probe-boundary-rule.md'
+    finding: 'The limits text says each shape is scored, but the namesGh text check declines a library that spells the call as a literal `gh` before anything spawns; the PATH-prepend and backgrounded limits apply only to spellings the text check misses (e.g. X=gh; "$X"), which is why the pin row uses that spelling.'
+    suggested_action: 'Say the PATH-prepend and backgrounded limits apply only when the call is also spelled so the text check misses it; a literal gh is still declined pre-spawn.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 115
+  phases_verified: '4/4'
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 69
+    notes: 'Run record totals.executed 69: resolveEntry wrapper 21 (present-but-inert; the pre-existing encoded-traversal only), gh_labels_filter + fake gh engages 20, shell:qa-cycle.sh engages 28. The containment bypasses are pre-existing (gate 4 provenance) and are now stated as limits; the two LOW precision points do not change what the engine does.'
+  performance:
+    status: PASS
+    notes: 'TMPDIR=/tmp shell rows 56/56.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged since gate 4.'
+  maintainability:
+    status: PASS
+    notes: 'Fix is prose + one pin row.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (low): §5:273-275, CHANGELOG.md:104 and security-probe.mjs:1671 still say the host gh never runs; add the stub-first / in-spawn condition or drop never and guarantee'
+      refs: ['shared/resources/probe-boundary-rule.md', 'CHANGELOG.md', 'shared/resources/security-probe.mjs']
+      carried_from: 'top_issues (route 2b, cycle 5)'
+    - action: 'CR-2 (low): say the PATH-prepend and backgrounded limits apply only to spellings the namesGh text check misses; a literal gh is declined pre-spawn'
+      refs: ['shared/resources/probe-boundary-rule.md']
+      carried_from: 'top_issues (route 2b, cycle 5)'
+    - action: 'CR-3 (cleanup, medium confidence): the PATH-prepend pin row would also go red if namesGh were widened to match X=gh; assert namesGh() is false for the fixture and that the verdict is scored; move the outside mkdtemp inside try (the absolute-path row shares the shape)'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'Close the gh containment bypasses (pre-existing at base): post-source gh function shadow + harness bin re-prepended; fixture-answered marker for --fake-gh; process-group kill before marker check and teardown. File as a follow-up task.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-4 (gate 4, low confidence): noexec TMPDIR skips the stub; self-test the stub and decline harness-unavailable'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried from gate 3: --fake-gh gh-symlink to host binary; zshexit hooks; prompt recipes silent on --fake-gh for shell:; .githooks/pre-commit unlinted; encoded-traversal literal filename'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/security-review-prompt.md', 'scripts/lint-shell.sh']
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 0
+  fix_date: '2026-09-30'
+  total_iterations: 4
+  verification_method: 'Pin row green; probes 69 executed; TMPDIR=/tmp 56/56; scoped review of 3233686e'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

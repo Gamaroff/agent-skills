@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.183.qa-results-setext-and-carry-follow-ups'
+task_title: 'qa-results setext and carry follow-ups'
+gate: FAIL
+status_reason: 'Cycle 2 fixes hold for the shapes they named, but the scoped review reproduced two more deletions introduced by the change: a one-line comment opener (<!-->, <!--->) or an opener indented under a list item leaves the comment context open, and a non-Date-first Date table above a section in a marker-less log makes the engine replace over the log row. HIGH counts 1, 1, 2 across three gates — the loop is not converging.'
+reviewer: 'QA Engineer'
+head: '8df4559db5e0be8ec3ff520072d8780aa8bbeef3'
+updated: '2026-10-05T11:04:52Z'
+
+top_issues:
+  - id: CR3-1
+    severity: high
+    file: 'shared/resources/qa-results.js'
+    finding: 'blockContinuations searches for --> only after the <!-- opener, so <!--> and <!---> (one-line HTML blocks in CommonMark) leave the comment context open, and an opener indented under a list item opens it although the item ends before a column-0 -->; in each case a later lone --> line is exempted and the setext section under it is deleted (replaced, content gone); origin/develop refuses all three with structural-line:--> / ---.'
+    suggested_action: 'Search for --> from the opener'"'"'s own dashes, and open no comment context for an opener that continues a list item.'
+    suggested_owner: dev
+    status: open
+  - id: CR3-2
+    severity: high
+    file: 'shared/resources/qa-results.js'
+    finding: 'underTablelessLog now asks lastTableStart, which reports any Date-column table, so a marker-less Change Log whose body holds | Reviewer | Date | above the section is no longer table-less, underLog is false, and the replace deletes the log row below the section; origin/develop relocated the same document and kept the row.'
+    suggested_action: 'Keep the table-above question on the Date-first predicate, or set underLog whenever any Date-column table sits above so the dated-row guard refuses; add the shape as a regression case.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 85
+  phases_verified: 5/5
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — upsertQaResults judges documents and a render this pipeline writes; no corpus sink models a work-item section writer (task.171 precedent).'
+  performance:
+    status: PASS
+    notes: 'No timing-relevant change; cycle 1 measured 1.73 s at load 3.33. Re-measure at finalise.'
+  reliability:
+    status: FAIL
+    notes: 'CR3-1 and CR3-2 each delete content on a shape origin/develop refused or relocated intact.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Each cycle has narrowed the comment/list context and the log-table reach and each has exposed another route; the context-inference mechanism is the recurring subject (third consecutive HIGH on this file).'
+
+recommendations:
+  immediate:
+    - action: 'Escalate (QA loop not converging). Options for the person: (a) replace the comment/list context inference in blockContinuations with no exemption for comment closers (accept the CR-7 comment shape as a false refusal), keeping only the list-continuation rule; (b) revert underTablelessLog/logAbove to the Date-first predicate and keep hasDateColumn only inside removesStructure.'
+      refs: ['shared/resources/qa-results.js']
+  future:
+    - action: 'CR2-3 (pre-existing): **Deferred Work:** inner-colon carried label not recognised.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'CR2-4 (advisory): QA-owned #### after a carried bold block is carried.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

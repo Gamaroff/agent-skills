@@ -1,0 +1,70 @@
+schema: 1
+task: 'task.126.bundler-citation-form'
+task_title: 'Bundler citation form, per-skill closure count, pre-commit refusal'
+gate: CONCERNS
+status_reason: 'Cycle 1''s five findings are all fixed and each holds under test. The cycle-2 refute pass found two medium, high-confidence defects in the cycle-1 fixes themselves. A refused commit leaves the hook''s own new copies on disk, so the retry is refused again: reproduced. The CR-2 "reached, not on disk" rule was applied to prose mentions but not to Markdown links.'
+reviewer: 'QA Engineer'
+updated: '2026-09-29T17:54:52Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: '.githooks/pre-commit'
+    finding: 'Since the cycle-1 CR-3 fix, a refused commit leaves the copies its own bundle run just wrote untracked on disk. On the retry they sit in both PRE and POST, count as LEFT, and are refused, naming files the user never made. The UNSTAGED_SHARED refusal''s "stage them, then retry" now always fails its own retry. Reproduced: refused on stray.md; git add stray.md; retry refused on fresh.md, exit 1.'
+    suggested_action: 'On any refusal, revert what this run changed (NEW): delete an untracked NEW copy, and restore a tracked one from the index. The retry then starts from the state the user left. Add a test that follows the printed remedy and retries.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: 'expected_bytes decides "unshipped" on the reached set for prose mentions, but rewrite_md_links still uses bundled_names (needed ∪ on-disk copies). A cited document with a sibling Markdown link therefore still changes bytes when an UNREACHED copy is removed, which is the STALE-in-CI case cycle 1 claimed to close. One copy can also send the same target upstream in prose and keep it local in a link.'
+    suggested_action: 'Pass the reached set to rewrite_md_links as well (the packager keeps the on-disk fallback). Extend test M with a sibling Markdown link in the cited hub.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 23
+  phases_verified: 3/3
+  head: 'fc83a5d0'
+  ci: 'not read — CI is gated once, at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false, as in cycle 1: the candidates (ref_kind/parse_shared_refs in Python; .githooks/pre-commit, which takes no caller-supplied input) are not modelled by the probe engine. Both are held by executed behavioural tests and mutations. No new input surface this cycle.'
+  performance:
+    status: PASS
+    notes: 'No change to discovery cost. _tracked_refs is still one git call per run (now ls-tree HEAD).'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: the refused-commit retry loops. CR-3 (advisory): an untracked, unreached leftover copy is refused with git add as the first remedy, which is the one remedy that makes CI fail.'
+  maintainability:
+    status: PASS
+    notes: 'Cleanups: CR-4 (the closure figure is a net delta, and the docs call it the git rm count), CR-5 (CHANGELOG says ls-files), CR-6 (shared_refs_with_lines has no production caller, so §1d compares two views of one parser).'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: revert the NEW copies on any refusal, and test the retry.'
+      refs: ['.githooks/pre-commit', 'tests/pre-commit-hook.test.js']
+    - action: 'CR-2: decide link relocation on the reached set too; extend test M with a Markdown link.'
+      refs: ['skills/create-skill/scripts/bundle_skill.py', 'tests/bundle-citation.test.js']
+  future:
+    - action: 'CR-3: make the refusal message name both remedies (git add a copy the skill reaches; delete one bundle:check reports UNREACHED).'
+      refs: ['.githooks/pre-commit']
+    - action: 'CR-4/CR-5/CR-6: describe the closure figure as a net delta; fix the CHANGELOG to say git ls-tree HEAD; retire shared_refs_with_lines and point §1d at parse_shared_refs.'
+      refs: ['CHANGELOG.md', 'skills/create-skill/SKILL.md', 'skills/create-skill/scripts/bundle_skill.py', 'tests/bundle-missing-source.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed']

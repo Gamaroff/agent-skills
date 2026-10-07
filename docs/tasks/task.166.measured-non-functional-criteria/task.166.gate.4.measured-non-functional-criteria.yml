@@ -1,0 +1,105 @@
+schema: 2
+task: 'task.166.measured-non-functional-criteria'
+task_title: 'Give measured non-functional criteria a defined path through review and finalise'
+gate: CONCERNS
+status_reason: 'The cycle-3 restriction (measured branch only for a bound no per-PR test could assert) is stated but never reaches the rule''s trigger phrase, which is restated verbatim at about ten sites, so review still passes a test-assertable bound with a command that finalise fails (CR4-1, CR4-2). HIGH 0 for the fourth consecutive gate.'
+reviewer: 'QA Engineer'
+head: '9c657e07ed31a17184dcf166d0b8b0fd1ab3fabb'
+updated: '2026-10-02T12:02:14Z'
+
+top_issues:
+  - id: 'TASK-166-CR4-1'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The Important trigger "held by neither a planned per-PR test nor a numeric bound with its measuring command" does not fire on a test-assertable bound that states a command and has no planned test (e.g. "bundle under 50KB, measured by wc -c"); finalise sends it to the behaviour path and fails it.'
+    suggested_action: 'Restrict the trigger to the measured branch, and offer the bound-and-command remedy only for a bound no per-PR test could assert; pin the restriction in the trigger.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR4-2'
+    severity: medium
+    file: 'docs/tasks/task.166.measured-non-functional-criteria/task.166.measured-non-functional-criteria.md'
+    finding: 'The unrestricted trigger phrase is restated in the task doc (description, Overview, deliverable 2, Target Architecture, Consumer Tests, SC 3), the CHANGELOG, the Issues to Flag line and both tests — every site would need the CR4-1 fix.'
+    suggested_action: 'Consolidate: state the rule once (check 4) with its pin; have the other sites cite it rather than restate it.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR4-3'
+    severity: low
+    file: 'shared/resources/tests/finalise-dod-ac-kinds.test.mjs'
+    finding: 'The lookahead "(?! of (?!criterion))" hides "three kinds of criteria" and "two kinds of test-free criterion".'
+    suggested_action: 'Accept criteria and up to two qualifiers before criterion/criteria; add a should-match fixture.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR4-4'
+    severity: low
+    file: 'skills/review-task/SKILL.md'
+    finding: '"This rule alone judges a non-functional criterion" also excludes the post-merge rule, so a measurement that only exists after merge draws no post-merge finding.'
+    suggested_action: 'Narrow the sentence to the behaviour rule; say the post-merge rule still applies.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR4-5'
+    severity: low
+    file: 'skills/review-task/SKILL.md'
+    finding: 'An explicit "Not applicable" line in the Performance subsection has no test and no bound, so check 4 flags it, while finalise passes it under its "no unit tests applicable" kind.'
+    suggested_action: 'Exempt an explicit not-applicable line, citing finalise''s kind.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR4-6'
+    severity: low
+    file: 'tests/review-task-measured-criterion.test.js'
+    finding: 'The two copies of the count pattern differ ("both" left out of the review-task copy), and the reason for leaving it out no longer holds now the lookahead refuses "kinds of evidence".'
+    suggested_action: 'Share one pattern between both tests.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR4-7'
+    severity: low
+    file: 'shared/resources/tests/finalise-dod-ac-kinds.test.mjs'
+    finding: 'The local asProse strips only ** and backticks; *two* and _two_ still hide a count; it duplicates tests/lib/markdown-section.js asProse.'
+    suggested_action: 'Strip * and _ emphasis too, in one shared helper.'
+    suggested_owner: dev
+  - id: 'TASK-166-CR4-8'
+    severity: low
+    file: 'docs/tasks/task.166.measured-non-functional-criteria/task.166.measured-non-functional-criteria.md'
+    finding: 'The single qa-fix Change Log row lists gate-3 fixes but sits above the gate-2 and gate-3 rows.'
+    suggested_action: 'Move the qa-fix row after the last gate row it answers.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 12
+  phases_verified: 4/4
+  ci: 'Test success @ 467351c0 (hosted); pending @ 9c657e07ed31 — informational'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'Pins run in well under 1s each.'
+  reliability:
+    status: PASS
+    notes: 'Pins fail closed on missing headings and sections.'
+  maintainability:
+    status: CONCERNS
+    notes: 'One rule restated verbatim at ~10 sites; four cycles have circled its wording.'
+
+bug_resolution:
+  previous_gate: 'gate.3 (CONCERNS 70)'
+  fixed: ['TASK-166-CR3-2', 'TASK-166-CR3-3', 'TASK-166-CR3-4', 'TASK-166-CR3-5', 'TASK-166-CR3-6', 'TASK-166-CR3-7']
+  partial: ['TASK-166-CR3-1']
+
+recommendations:
+  immediate:
+    - action: 'Restrict the trigger and consolidate: one statement in check 4, citations elsewhere.'
+      refs: ['skills/review-task/SKILL.md']
+  future:
+    - action: 'Gate 1 CR-3: make "whether a per-PR test could assert that bound" concrete.'
+      refs: ['shared/resources/finalise-dod-ac-prompt.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR4-1, CR4-2 resolved']

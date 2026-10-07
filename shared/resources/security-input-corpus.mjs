@@ -33,6 +33,7 @@ export const SINKS = Object.freeze([
   "path",
   "template-render",
   "filename",
+  "markdown-structure",
 ]);
 
 /** The two directions every sink must cover. */
@@ -859,6 +860,213 @@ const FILENAME = sinkCases("filename", [
   },
 ]);
 
+// ---------------------------------------------------------------------------
+// markdown-structure — a validator deciding whether a report is well-formed
+// ---------------------------------------------------------------------------
+// The document is the input. Its hostile cases are malformed implementation
+// reports — the shapes a spliced, doubled or hand-edited report takes — and a
+// report a pipeline decision then reads as if it were whole. Every case is a
+// minimal valid report with ONE defect, so each trips the one problem code it
+// is named for (`trailing-duplicate-body` also trips `section-duplicated`: a
+// section that reappears after the last one has, by construction, appeared
+// twice). One defect per case is what lets a mutant that drops ONE check
+// reproduce: the task.117 fixture trips five codes, and a validator missing
+// any one of them still refuses it.
+//
+// The legitimate cases are what a correct validator must still accept: fenced
+// examples, CRLF line endings, the optional section, and a section the
+// template does not name. This sink fits validators of THIS document shape —
+// the implementation report — and no other: probing a validator of a different
+// document through it would score these legitimate reports overblocked.
+//
+// Built by plain string concatenation (no template literals): the purity test
+// strips string content before it scans for calls, and a fence inside a
+// template literal would defeat that stripping.
+
+const MD_SECTIONS = Object.freeze([
+  "Summary",
+  "Pipeline Configuration",
+  "Pipeline Progress",
+  "Decisions Log",
+  "Issues Log",
+  "QA Iteration History",
+  "Completion",
+]);
+const mdSection = (name) => "## " + name + "\n\n" + name + " text.\n";
+const mdReport = (header, sections) =>
+  "# Implementation Report: Example\n\n" +
+  header +
+  "\n**Run Number**: 1\n\n---\n\n" +
+  sections.map(mdSection).join("\n");
+const MD_TASK_HEADER = "**Task**: `task.1.example.md`";
+const MD_TASK = mdReport(MD_TASK_HEADER, MD_SECTIONS);
+const MD_FENCED_QUOTE =
+  "\n```markdown\n# Implementation Report: quoted\n\n" +
+  MD_TASK_HEADER +
+  "\n\n## Summary\n```\n";
+const MD_FENCED_ISSUES = MD_TASK.replace(
+  "## Issues Log\n",
+  "```\n## Issues Log\n```\n",
+);
+const crlf = (text) => text.split("\n").join("\r\n");
+
+const MARKDOWN_STRUCTURE = sinkCases("markdown-structure", [
+  {
+    id: "duplicated-header-block",
+    input: MD_TASK.replace(
+      "Summary text.\n",
+      "Summary text.\n\n" + MD_TASK_HEADER + "\n",
+    ),
+    direction: "hostile",
+    why: "A second `**Task**:` header line is the spliced-copy signature: an Edit that doubled the report pasted its opening again. Every section can still be present and in order, so a check that only counts sections accepts it.",
+    correct:
+      "Refused as `header-block-duplicated` — the report is not whole, whatever its sections say.",
+  },
+  {
+    id: "second-h1",
+    input: MD_TASK.replace(
+      "Summary text.\n",
+      "Summary text.\n\n# Implementation Report: Example\n",
+    ),
+    direction: "hostile",
+    why: "A second top-level heading outside a fence means a second document has been spliced in. A reader that takes the first H1 as the title and scans on sees nothing wrong.",
+    correct: "Refused as `multiple-h1`.",
+  },
+  {
+    id: "trailing-duplicate-body",
+    input: MD_TASK + "\n## Completion\n\nSpliced copy.\n",
+    direction: "hostile",
+    why: "A section reappearing after the last one is the tail of a doubled report. A reader that stops at the first `## Completion` reads a clean report; one that reads the last reads the copy.",
+    correct:
+      "Refused as `trailing-duplicate-body` (and `section-duplicated`, which the shape implies).",
+  },
+  {
+    id: "section-out-of-order",
+    input: mdReport(MD_TASK_HEADER, [
+      "Summary",
+      "Pipeline Configuration",
+      "Pipeline Progress",
+      "Issues Log",
+      "Decisions Log",
+      "QA Iteration History",
+      "Completion",
+    ]),
+    direction: "hostile",
+    why: "Every section is present exactly once, so presence and duplicate checks both pass; only the order betrays a hand-reassembled report whose rows may now sit under the wrong heading.",
+    correct: "Refused as `section-out-of-order`.",
+  },
+  {
+    id: "section-duplicated",
+    input: mdReport(MD_TASK_HEADER, [
+      "Summary",
+      "Pipeline Configuration",
+      "Pipeline Progress",
+      "Decisions Log",
+      "Issues Log",
+      "Issues Log",
+      "QA Iteration History",
+      "Completion",
+    ]),
+    direction: "hostile",
+    why: "A section written twice in place: in order, and nothing after the last section. A reader takes one of the two and silently drops the other's rows.",
+    correct: "Refused as `section-duplicated`.",
+  },
+  {
+    id: "heading-only-inside-fence",
+    input: MD_FENCED_ISSUES,
+    direction: "hostile",
+    why: "The required `## Issues Log` exists only inside a fenced block — an example, not a section. A line-grep for the heading finds it and calls the report complete.",
+    correct:
+      "Refused as `section-missing`: a heading inside a fence is not a section.",
+  },
+  {
+    id: "heading-only-inside-fence-crlf",
+    input: crlf(MD_FENCED_ISSUES),
+    direction: "hostile",
+    why: "The same fenced-only section with CRLF line endings. A fence matcher anchored with `$` never sees a fence whose line still ends in `\\r`, so the fenced heading reads as real and the missing section passes — the defect this case found in `report-lint.js` (task.131).",
+    correct: "Refused as `section-missing`, exactly as with LF endings.",
+  },
+  {
+    id: "qa-cycle-duplicated",
+    input: MD_TASK.replace(
+      "QA Iteration History text.\n",
+      "QA Iteration History text.\n\n### QA Cycle 1\n\nFirst.\n\n### QA Cycle 1\n\nAgain.\n",
+    ),
+    direction: "hostile",
+    why: "The same QA cycle heading twice is a cycle recorded twice or a history spliced in; a count of cycles read off the headings is then wrong.",
+    correct: "Refused as `qa-cycle-duplicated`.",
+  },
+  {
+    id: "empty-document",
+    input: "",
+    direction: "hostile",
+    why: "An empty file has no problems to find, so a validator that only reports what it sees returns a clean result for a report that does not exist.",
+    correct:
+      "Refused as `variant-undetected` — nothing identifies it as a report, so nothing can pass it.",
+  },
+  {
+    id: "valid-task-report",
+    input: MD_TASK,
+    direction: "legitimate",
+    why: "The baseline: every required section once, in order. A validator that refuses it refuses every report.",
+    correct: "Accepted — no problems.",
+  },
+  {
+    id: "valid-story-report",
+    input: mdReport("**Story**: `story.1.2.example.md`", MD_SECTIONS),
+    direction: "legitimate",
+    why: "The story variant, told apart only by its header line. A validator hard-wired to `**Task**:` refuses every story report.",
+    correct: "Accepted — the story variant is detected and holds.",
+  },
+  {
+    id: "fenced-quoted-report",
+    input: MD_TASK.replace(
+      "Decisions Log text.\n",
+      "Decisions Log text.\n" + MD_FENCED_QUOTE,
+    ),
+    direction: "legitimate",
+    why: "A Decisions Log legitimately quotes a report — H1, header line, headings — inside a fence. A validator that does not skip fences reads it as a splice.",
+    correct: "Accepted — fenced lines are examples, not structure.",
+  },
+  {
+    id: "fenced-quoted-report-crlf",
+    input: crlf(
+      MD_TASK.replace(
+        "Decisions Log text.\n",
+        "Decisions Log text.\n" + MD_FENCED_QUOTE,
+      ),
+    ),
+    direction: "legitimate",
+    why: "The same quote with CRLF endings — what a Windows checkout with `core.autocrlf` hands the validator. A fence matcher that misses a `\\r`-terminated fence reads the quote as a second H1 and header block and refuses a clean report.",
+    correct: "Accepted, exactly as with LF endings.",
+  },
+  {
+    id: "optional-section-present",
+    input: mdReport(MD_TASK_HEADER, [
+      "Summary",
+      "Pipeline Configuration",
+      "Pipeline Progress",
+      "Decisions Log",
+      "Issues Log",
+      "Tracker Actions Required",
+      "QA Iteration History",
+      "Completion",
+    ]),
+    direction: "legitimate",
+    why: "`## Tracker Actions Required` is optional: present once in its place is valid. A validator that treats the template as a closed list refuses it.",
+    correct: "Accepted — an optional section, once, in order.",
+  },
+  {
+    id: "unnamed-section-after-completion",
+    input:
+      MD_TASK +
+      "\n## Pipeline Paused — 2026-09-30\n\nPaused before compaction.\n",
+    direction: "legitimate",
+    why: "The PreCompact hook appends `## Pipeline Paused — …` after Completion by design. A validator that refuses any heading after the last section refuses every paused run.",
+    correct: "Accepted — sections the template does not name are ignored.",
+  },
+]);
+
 const CORPUS = Object.freeze({
   "url-authority": URL_AUTHORITY,
   "sql-orm": SQL_ORM,
@@ -866,6 +1074,7 @@ const CORPUS = Object.freeze({
   path: PATH,
   "template-render": TEMPLATE_RENDER,
   filename: FILENAME,
+  "markdown-structure": MARKDOWN_STRUCTURE,
 });
 
 /**
@@ -963,6 +1172,8 @@ const SINK_BLURB = Object.freeze({
     "A renderer deciding **what markup a value becomes**. The escaping is not one function: element text, attribute value, URL and script context are four different ones, and choosing by position is the control.",
   filename:
     "A script deciding **which directory entry counts**, and what value it derives from a name. These cases are **materialised**: the engine writes each name into a fixture directory beside two control gates (`!.gate.3.control.yml`, `~.gate.12.control.yml`, which bracket every hostile name under `LC_ALL=C`) and runs the script under probe against the directory. A handled hostile name leaves `12` on stdout, exit 0, nothing on stderr and no side effect; a legitimate name is numbered above the controls and must be printed itself. The through-line: a name is data the shell is eager to re-read as a line, a word, an option, a glob or a command.",
+  "markdown-structure":
+    'A validator deciding **whether an implementation report is whole** — the document a pipeline decision then reads. Each hostile case is a minimal valid report with one defect, so each trips the one problem code it is named for (`trailing-duplicate-body` also trips `section-duplicated`, which the shape implies); that is what lets a probe catch a validator missing one check. Probe a `(text, opts)` validator with `--args-json`, e.g. `report-lint.js#lintReport` with `[{"sections": <loadTemplate()>}]`. The legitimate cases are reports a correct validator must still accept — fenced examples, CRLF endings, the optional section, a heading the template does not name — so refusing everything scores `overblocked`. This sink fits validators of the implementation-report shape only: a validator of another document would refuse these legitimate cases for being the wrong document, not for being malformed.',
 });
 
 /**

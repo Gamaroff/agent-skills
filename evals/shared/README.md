@@ -7,6 +7,7 @@ Shared harness used by all skill eval suites. Each skill's scenarios live under 
 ```
 evals/shared/
 ├── runner.mjs          # Generic scenario runner (works for any skill)
+├── repeat.mjs          # Runs one scenario N times and reports a pass rate
 ├── assertions.mjs      # Structural assertion functions (fileExists, frontmatterHas, …)
 ├── drivers/
 │   ├── types.mjs       # AgentDriver JSDoc contract
@@ -17,12 +18,16 @@ evals/shared/
 │   ├── tracker-cleanup.mjs   # Receipt-driven Jira/GitHub issue cleanup
 │   ├── git-sandbox.mjs       # Throwaway git repos for eval sandboxes
 │   ├── gh-sandbox.mjs        # Injectable GH PR creation helper (skips when GH_TOKEN absent)
+│   ├── fake-gh.mjs           # Fake `gh` for hermetic sandboxes — serves reads, refuses writes
 │   └── pipeline-recorder.mjs # Wraps a driver to record Skill tool-use events
 └── tests/
     ├── drivers.test.mjs
     ├── assertions.test.mjs
     ├── tracker-cleanup.test.mjs
     ├── git-sandbox.test.mjs
+    ├── fake-gh.test.mjs
+    ├── runner-setup.test.mjs
+    ├── repeat.test.mjs
     ├── gh-sandbox.test.mjs
     ├── pipeline-recorder.test.mjs
     └── develop-task-assertions.test.mjs
@@ -38,6 +43,64 @@ DRIVER=claude-sdk node evals/shared/runner.mjs evals/create-task/scenarios/01-ha
 
 The runner reads `<scenario-dir>/scenario.json` and dispatches to the selected driver. Exit 0 = all assertions passed (or scenario skipped). Exit 1 = failure.
 
+### Opt-in scenario fields
+
+Each is keyed on its own `scenario.json` field, so a scenario that sets none runs exactly as before.
+
+| Field | What it does |
+| --- | --- |
+| `setup` | Path (relative to the scenario dir) of a module exporting `setup({ sandbox, scenarioDir, repoRoot, scenario })`. Awaited after the sandbox exists and before the driver runs — for **every** driver, replay included, so replay and live assert against the same prepared tree. It may return `{ env }`, merged into the driver env; a `PATH` there is **prefixed** to the runner's `PATH`. A setup that throws (or does not resolve) fails the scenario with exit 1 and still removes the sandbox unless `KEEP_SANDBOX` is set. |
+| `cliArgs` | Array appended to the claude-cli driver's `claude` arguments — e.g. a scoped `--allowedTools` list, since `claude -p` with no permission flag cannot run `Bash`. |
+| `liveAssertions` | Assertions run after `assertions`, only when the driver is not `replay` — for facts only a live run can produce, such as "the fake `gh` was called". |
+| `live.minPass` | Read by `repeat.mjs` when `--min-pass` is not given: a count out of 5 (1..5), scaled to `--runs`. |
+
+`EVAL_SKIP_EXIT`, `EVAL_DRIVER_ERROR_EXIT` and `EVAL_FAIL_EXIT` are each a code in 3–125, and anything else is ignored. They make the runner exit with that code instead of 0 on a skip, 1 on a driver error, or 1 when assertions ran and failed. `repeat.mjs` sets all three.
+
+`EVAL_TIMEOUT_MS` overrides the claude-cli driver's 5-minute timeout (set it in the shell or in `env.json`).
+
+### Repeat runner — live pass rates
+
+```bash
+DRIVER=claude-cli node evals/shared/repeat.mjs <scenario-dir>... [--runs N] [--min-pass K]
+```
+
+One live run is one sample. `repeat.mjs` runs the real runner N times per scenario,
+**sequentially**, because live runs share `~/.claude` state. It prints `run i/N: pass|fail` per run
+and `<scenario>: passed P/N (min K)` per scenario. N defaults to `$EVAL_RUNS` (empty reads as
+unset), else 5. K is `--min-pass` when given (1..N). Otherwise K is the scenario's `live.minPass`, a
+count out of **5** that is **scaled** to N as `ceil(minPass × N / 5)`: 4/5 becomes 8/10 or 3/3, and
+the output names the scaling. Without `live.minPass`, K is N.
+
+**Exit status — the one contract.** `repeat.mjs` owns it, so a caller never re-maps it. The npm
+script passes every scenario in one call for that reason. Its earlier shell loop collapsed 3 to 1.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | every scenario met its K |
+| 1 | at least one scenario fell below its K, and every run of every scenario ran |
+| 2 | usage: a bad or valueless flag, K outside 1..N, `live.minPass` outside 1..5, a missing or malformed `scenario.json`, an assertion `fn` the runner does not know, or a scenario with no assertion the chosen driver runs (`liveAssertions` count only under a live driver — the driver comes from `DRIVER`/`MODE` and the scenario's `env.json`, as the runner reads it). All are checked before any run starts |
+| 3 | **could not run** — any run that was not a verdict. It covers a **skip** (the driver is unavailable, or a `requiresLiveDriver` scenario ran under replay) and a **driver error** (`claude -p` exited non-zero: no credit, a crash, or a timeout). It also covers anything else the runner did instead of judging: a setup error, a setup that never settles, a missing dependency (the fake `gh` without `jq`, under a live driver), an unknown `DRIVER`, a crash, a signal or a spawn failure. It stops at the first such run and prints no pass rate for runs that did not happen |
+
+**The verdict is positive.** The runner exits `EVAL_FAIL_EXIT` (requested by `repeat.mjs` as
+`EVAL_FAIL_EXIT=75`) **only** when assertions ran and failed, and 0 **only** from its final line,
+after they passed. Everything before that line exits 1: a setup or driver promise that never settles
+ends the process with exit 1, where it used to end with 0 and read as a pass (task.186). `repeat.mjs` reads every other
+status as could-not-run, so a new way for the runner to fail cannot be misread as a failed run.
+QA cycles 1 and 2 had enumerated non-verdict exits one at a time, and cycle 3 found another.
+`EVAL_SKIP_EXIT=73` is still requested, because the runner's default for a skip is 0, which would
+read as a pass. `EVAL_DRIVER_ERROR_EXIT=74` only sharpens the message. The three sit in 64–113 because
+Node exits 1–13 on its own fatal errors — 5 is a fatal V8 error — so the earlier 3, 4 and 5 let a
+crashed runner read as a skip, a driver error or a failed run. Each must be a code in 3–125;
+anything else is ignored, and with none set the runner exits as `eval:all` expects. Before task.185's QA cycles, a machine without `claude` reported
+`passed 5/5`, and a key with no credit reported `passed 0/5` with a regression's exit code. A
+timeout counts as could-not-run: raise `EVAL_TIMEOUT_MS` if a scenario legitimately needs longer.
+
+**Live runs use the shell's `claude` auth.** An `ANTHROPIC_API_KEY` in the environment takes
+precedence over a claude.ai login; if its account cannot pay, every run fails in seconds with
+`Credit balance is too low` (the driver's error now carries `claude`'s stdout, where that line
+appears). Unset the key for the run — `env -u ANTHROPIC_API_KEY npm run eval:review-pr:cli` — to use
+the login instead.
+
 ## Adding a driver for another agent
 
 1. Drop `evals/shared/drivers/<name>.mjs` implementing the `AgentDriver` contract in `drivers/types.mjs`
@@ -46,6 +109,9 @@ The runner reads `<scenario-dir>/scenario.json` and dispatches to the selected d
 4. Add a smoke test in `evals/shared/tests/drivers.test.mjs`
 
 ## Adding a structural assertion
+
+`noFileMatching(dir, regex)` passes when no file under `dir` (recursive) has a basename matching
+`regex`; a missing `dir` passes. It pins "writes no file of this kind anywhere".
 
 1. Export a new function from `evals/shared/assertions.mjs`
 2. Register it in the `runner.mjs` assertion dispatcher
@@ -62,7 +128,51 @@ The runner reads `<scenario-dir>/scenario.json` and dispatches to the selected d
 - `branchList()` — returns array of local branch names
 - `cleanup()` — removes the tmpdir (noop on failure)
 
+Pass `dir` to initialise the repo in a caller-owned directory instead of a new tmpdir — a `setup`
+hook building a repo inside the runner's sandbox does this. `cleanup()` then leaves the directory
+alone: the runner owns it.
+
 Use for any scenario that needs a real git repo without touching the working tree.
+
+### fake-gh
+
+`installFakeGh(sandbox, fixtures)` — writes a `gh` launcher to `<sandbox>/.eval/bin/` and returns
+`{ PATH }` for a `setup` hook to hand back. It also writes the fixtures to
+`.eval/gh-fixtures.json`, creates an **empty** `.eval/gh-calls.jsonl` (so a "no refused call"
+assertion is well-defined in a run that makes no `gh` call — `fileDoesNotMatch` fails on a missing
+file), and an empty `.eval/gh-config/`. When `jq` is not on `PATH` **and the driver is live** it
+throws an error carrying `evalSkip: true`, and the runner reports the scenario as skipped
+(could-not-run under `repeat.mjs`) rather than letting every `-q/--jq` call fail it. A replay run
+never calls `gh`, so it installs without `jq` and is judged.
+
+- **Reads** (`pr view`, `pr diff`, `pr list`, `issue view`, `repo view`, `api` GET, `auth status`)
+  are served from the fixtures (own keys only, so `pr diff constructor` is not a PR); `--json a,b`
+  selects fields, and a requested field the fixture lacks is `"unhandled": true`, named on stderr;
+  `-q/--jq` is piped through the real `jq`. A known kind with a missing key answers as `gh` does (exit 1, `GraphQL: Could not resolve…`),
+  logged `"notFound": true`.
+- **Everything that is not a served read is refused**: exit 1, logged `"refused": true` with a
+  `"refusal"` saying why — `"write"` (a listed write subcommand, or an `api` call outside the read
+  allow-list) or `"not-a-served-read"` (any other unmodelled shape). "Never posts without asking"
+  becomes an assertion on the log, and a failed one names its cause. The rule is an **allow-list**, so an unmodelled
+  spelling fails closed instead of passing as a read:
+  - the kind must be one of the reads above. Any other command (`pr revert`, `label create`,
+    `release list`, …) is refused, and so is a listed write subcommand (`comment`, `merge`, `new`, …);
+  - `gh --version` / `gh version` are answered only as the whole command;
+  - only `-R`/`--repo` may come before the group, and never on `api`, which real `gh api` rejects. Outside `api`, the subcommand must directly
+    follow the group. Cobra strips flags before it picks the subcommand, so
+    `gh pr --edit-last view comment` is `pr comment`, not `pr view`;
+  - an `api` call is served only when every flag is a known read flag (`-H`, `-i`, `--paginate`,
+    `-q`, `--hostname`, …) and every method given is `GET`.
+
+  Some real reads are refused by design: `--method POST -X GET`, `-X GET` with a field flag, a flag
+  between the group and its subcommand, and read commands outside the served kinds.
+- **A served read kind with no fixture table** is `"unhandled": true`, exit 1. A gap in the fixtures
+  fails loudly instead of being guessed at.
+
+The fake only wins through `PATH`. Point `GH_CONFIG_DIR` at the empty `.eval/gh-config` and blank
+`GH_TOKEN`/`GITHUB_TOKEN` in the hook's env, so a real `gh` reached by absolute path is
+unauthenticated — the claude-cli driver spreads `process.env` into the agent, so blanking the token
+alone leaves the keyring.
 
 ### gh-sandbox
 

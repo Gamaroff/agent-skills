@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.155.qa-results-section-engine'
+task_title: 'QA Testing Results section: one write engine, one placement, refused when duplicated'
+gate: CONCERNS
+status_reason: 'All success criteria met and ci:fast green, but executing the engine on edge shapes found two medium correctness defects: a section carrying a second H2 stacks it on every write, and a section under a marker-less Change Log heading is replaced by deleting the log table.'
+reviewer: 'QA Engineer'
+head: '6d6c166dc6b7cccc256e093a15e05f1bbf902c8c'
+updated: '2026-09-30T19:02:13Z'
+
+top_issues:
+  - id: 'REL-001'
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'normaliseSection accepts a rendered section that also carries another H1/H2 (e.g. qa-story''s ## QA Completion Summary); the next write replaces only up to that H2, so it stacks one more copy per cycle (CR-1, reproduced).'
+    suggested_action: 'Return bad-section unless the section span in the normalised body reaches the end of the body (no unprotected H1/H2 or change-log marker after its heading); add a unit test.'
+    suggested_owner: dev
+  - id: 'REL-002'
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'insideChangeLog requires markers, so a section written between a marker-less ## Change Log heading and its table counts as outside the log, its span swallows the table, and replaced deletes every Change Log row (CR-2, reproduced by QA).'
+    suggested_action: 'Treat a section directly under a marker-less change-log heading as inside the log (relocate it) or apply the log-header cutoff to every span; add the marker-less twin of unit test D1.'
+    suggested_owner: dev
+  - id: 'REL-003'
+    severity: low
+    file: 'shared/resources/qa-results.js'
+    finding: 'insideChangeLog is judged against the earliest change-log marker block only, so a section inside a later block (legacy pair plus current pair) is replaced past that block''s end marker, deleting <!-- change-log-end -->.'
+    suggested_action: 'Test containment against every unprotected marker block, not only the one findChangeLog returns.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 29
+  phases_verified: 4/4
+  ci: 'ci:fast exit 0 locally @ 6d6c166dc6b7 (4744 tests, 4743 pass, 0 fail, 1 skipped)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Pure module, no network; Step 12 passes paths as argv to node -e, never into script text. boundary: internal (inputs are a work-item document and a pipeline-rendered section; no corpus sink models them).'
+  performance:
+    status: PASS
+    notes: 'Engine, corpus and wiring tests (29) run in ~1.1 s, under the 2 s criterion.'
+  reliability:
+    status: CONCERNS
+    notes: 'Refusals write nothing (verified); REL-001 re-creates stacking and REL-002 deletes Change Log rows while reporting replaced.'
+  maintainability:
+    status: PASS
+    notes: 'Reuses change-log.js primitives, no second fence scanner; bundles fresh; every reason unit-tested.'
+
+recommendations:
+  immediate:
+    - action: 'Fix REL-001 (bad-section on an extra H1/H2) with a unit test'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+    - action: 'Fix REL-002 (marker-less change-log heading) with the marker-less twin of D1'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+  future:
+    - action: 'REL-003: containment against every marker block'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'CR-3: give the corpus guard an independent raw heading count that must agree with findQaResults'
+      refs: ['tests/qa-results-corpus.test.js']
+    - action: 'CR-4: delete .claude/state/qa-results-section.md after a successful write'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'Preserve CRLF line endings at the write seams'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'REL-001 and REL-002 fixed and re-reviewed'

@@ -1,0 +1,69 @@
+{
+  "name": "04-planted-bug",
+  "skill": "review-pr",
+  "setup": "../../setup.mjs",
+  "description": "task.901 says 18 and over is an adult; the diff implements age > 18 and tests only 17 and 30, while the trail claims a boundary test. The verdict must not be APPROVE, and a CR- finding must cite src/age.js.",
+  "prompt": "/review-pr 901",
+  "cliArgs": [
+    "--allowedTools",
+    "Bash",
+    "Read",
+    "Grep",
+    "Glob",
+    "Write",
+    "Edit",
+    "Agent",
+    "Skill"
+  ],
+  "fixture": {
+    "variant": "planted-bug"
+  },
+  "live": {
+    "minPass": 4
+  },
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/tasks/task.901.widget-age-gate/task.901.pr-review.1.widget-age-gate.md"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/tasks/task.901.widget-age-gate/task.901.pr-review.1.widget-age-gate.md",
+        "\\*\\*Verdict:\\*\\*[^\\n]*APPROVE"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.901.widget-age-gate/task.901.pr-review.1.widget-age-gate.md",
+        "CR-\\d+[^\\n]*src/age\\.js"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"refused\":true"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"unhandled\":true"
+      ]
+    }
+  ],
+  "liveAssertions": [
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.eval/gh-calls.jsonl",
+        "\"argv\":\\[\"pr\",\"view\""
+      ]
+    }
+  ]
+}

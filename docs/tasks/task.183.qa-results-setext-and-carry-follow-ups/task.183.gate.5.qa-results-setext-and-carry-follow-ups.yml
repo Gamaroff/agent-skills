@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.183.qa-results-setext-and-carry-follow-ups'
+task_title: 'qa-results setext and carry follow-ups'
+gate: CONCERNS
+status_reason: 'The second escalation fix holds: no setext deletion remains, and CR4-1/CR4-2/CR4-3 are closed. One medium remains: every QA_LABELS name drops a bug list grouped under it, because a stale QA list and a grouped bug list are the same shape. Four documents still claim all five task.171 items are closed, and the CHANGELOG mis-describes one refused shape.'
+reviewer: 'QA Engineer'
+head: 'add0e4b14abc191ca304d3d0460cb865ff3b5c3d'
+updated: '2026-10-05T11:49:38Z'
+
+top_issues:
+  - id: CR5-1
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'Each remaining QA_LABELS name (Recommendations, Key Findings, Next Steps, Code Review Findings) ends a bold carried block even when a bug list follows, so **Bug Reports** / - [bug.1] / **Code Review Findings:** / - [bug.2] loses bug.2 on replace; origin/develop kept it. No QA render emits these as standalone bold labels (both renders use ### headings), and a stale QA list after a carried block is the same shape as a grouped bug list.'
+    suggested_action: 'Drop the QA_LABELS stop (CR2-4 returns to carrying a stale list — a duplicate, never a deletion, as task § 10 already accepts) and defer CR2-4; keep the R4 grouped-bug-list case for every former label.'
+    suggested_owner: dev
+    status: open
+  - id: CR5-2
+    severity: low
+    file: 'CHANGELOG.md'
+    finding: 'The entry says it closes task.171s five Deferred Work items, but CR-7 is deferred; the entry also names the newly refused log shape as a section above the log, while it is a section inside or directly under a change log whose Date column is not first.'
+    suggested_action: 'Say four of five items are closed and CR-7 is deferred, and describe the refused shape correctly.'
+    suggested_owner: dev
+    status: open
+  - id: CR5-3
+    severity: low
+    file: 'docs/tasks/task.183.qa-results-setext-and-carry-follow-ups/task.183.qa-results-setext-and-carry-follow-ups.md'
+    finding: 'task.183 frontmatter description, overview and In Scope list, and task.171s Change Log row, still say all five items are closed or resolved.'
+    suggested_action: 'Amend each to show CR-7 deferred.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 85
+  phases_verified: 5/5
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — upsertQaResults judges documents and a render this pipeline writes; no corpus sink models a work-item section writer (task.171 precedent).'
+  performance:
+    status: PASS
+    notes: 'No timing-relevant change; cycle 1 measured 1.73 s at load 3.33. Re-measure at finalise.'
+  reliability:
+    status: PASS
+    notes: 'No setext or log deletion remains on any shape reproduced in cycles 1–5; CR5-1 is a carried-link loss scored as the medium above.'
+  maintainability:
+    status: PASS
+    notes: 'The context-inference code is gone; the engine is smaller than in cycles 1–4.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR5-1 by dropping the QA_LABELS stop (defer CR2-4); fix the document claims (CR5-2, CR5-3).'
+      refs: ['shared/resources/qa-results.js', 'CHANGELOG.md']
+  future:
+    - action: 'CR5-4/CR5-5 (cleanup): the same five-items wording in task.183 § 1 and the CHANGELOG refused-shape wording — folded into CR5-2/CR5-3.'
+      refs: ['CHANGELOG.md']
+    - action: 'CR-7, CR2-3, CR4-4 remain recorded under task.183 ## Deferred Work.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR5-1 fixed']

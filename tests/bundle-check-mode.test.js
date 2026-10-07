@@ -168,13 +168,52 @@ function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }, t) {
     };
   };
 
+  /**
+   * The fixture as a git repository. Evidence 3 (a headerless copy equal to an
+   * EARLIER version of its source) is read from git history, so a test of it
+   * needs commits; every other test runs without one, which is itself the
+   * "git cannot answer" case.
+   */
+  const git = (...args) =>
+    execFileSync("git", ["-C", root, ...args], {
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: "fixture",
+        GIT_AUTHOR_EMAIL: "fixture@example.invalid",
+        GIT_COMMITTER_NAME: "fixture",
+        GIT_COMMITTER_EMAIL: "fixture@example.invalid",
+      },
+    });
+
   return {
     root,
     skillDir,
     check,
     addSkill,
+    git,
+    commitAll: (msg) => {
+      if (!fs.existsSync(path.join(root, ".git"))) git("init", "-q");
+      git("add", "-A");
+      git("commit", "-q", "--no-gpg-sign", "-m", msg);
+    },
     bundle: () =>
       execFileSync("python3", [BUNDLER, skillDir], { encoding: "utf-8" }),
+    bundleRaw: () => runRaw([skillDir]),
+    /**
+     * Bundle a skill holding a copy the write gate must refuse. The refusal is
+     * a failed run (observation #199): a copy left alone is one --check fails,
+     * so the bundler must not print ✅ over it and exit 0.
+     */
+    bundleProtected: () => {
+      const res = runRaw([skillDir]);
+      assert.equal(
+        res.status,
+        1,
+        `a left-alone copy must fail the run:\n${res.stdout}`,
+      );
+      return res.stdout;
+    },
     refPath: (name) => path.join(skillDir, "references", name),
     readRef: (name) =>
       fs.readFileSync(path.join(skillDir, "references", name), "utf-8"),
@@ -333,7 +372,7 @@ test("AMBIGUOUS: an authored file sharing a name with a shared resource is repor
   assert.deepEqual(res.relsFound, ["contract.md"]);
 
   // The success criterion is two-part: reported AND never rewritten.
-  fx.bundle();
+  fx.bundleProtected();
   assert.equal(
     fx.readRef("contract.md"),
     authored,
@@ -539,7 +578,9 @@ test("no class called non-regenerable is cleared by a bundle run", (t) => {
       [klass],
       `${klass}: fixture is dirty`,
     );
-    fx.bundle();
+    // Exit status is not the question here (a left-alone copy fails the run,
+    // observation #199); whether the run CLEARED the class is.
+    fx.bundleRaw();
     assert.deepEqual(
       fx.check().classesFound,
       [klass],
@@ -864,7 +905,7 @@ test("an IN-TREE symlinked intermediate directory reports SYMLINK, never MISSING
   });
   fs.symlinkSync("real", path.join(fx.skillDir, "references", "sub"));
 
-  const stdout = fx.bundle();
+  const stdout = fx.bundleProtected();
   assert.match(
     stdout,
     /SKIPPED references\/sub\/s\.md — under a symlinked directory/,
@@ -1203,6 +1244,85 @@ test("a stale headerless copy names the headerless case, not `rename the authore
     /delete it and re-bundle$/,
     "and must point at the action that actually fixes the common case",
   );
+});
+
+// ---------------------------------------------------------------------------
+// Observation #199: `npm run bundle` left a stale `.json` copy behind its
+// source, printed a buried SKIPPED line under a green ✅, and exited 0 — only
+// `bundle:check` failed, a CI round later. A `.json` cannot carry a banner
+// (evidence 1), and evidence 2 (equal to the CURRENT rewritten source) fails
+// the instant the source changes, so every edit to a `.json` source stranded
+// every copy of it. Two fixes, each with a test that is red without it:
+// evidence 3 (equal to an EARLIER committed version of the source) refreshes
+// the common case, and a copy no evidence covers fails the run loudly.
+// ---------------------------------------------------------------------------
+
+const jsonFixture = (t, refsFiles = {}) =>
+  makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee [data](shared/resources/data.json).\n`,
+      },
+      sharedFiles: { "data.json": '{"a": 1}\n' },
+      refsFiles,
+    },
+    t,
+  );
+
+test("a .json copy equal to an earlier committed version of its source is refreshed by the next bundle", (t) => {
+  const fx = jsonFixture(t);
+  fx.bundle();
+  fx.commitAll("v1 and its bundled copy");
+  // Two source versions past the copy, the second uncommitted — the shape of a
+  // pre-commit run: the copy matches neither HEAD's source nor the working
+  // tree's, only an older commit's.
+  fx.writeShared("data.json", '{"a": 2}\n');
+  fx.commitAll("v2, copy not re-bundled");
+  fx.writeShared("data.json", '{"a": 3}\n');
+
+  const res = fx.bundleRaw();
+  assert.equal(res.status, 0, res.stdout);
+  assert.equal(fx.readRef("data.json"), '{"a": 3}\n', res.stdout);
+  assert.doesNotMatch(res.stdout, /SKIPPED/);
+  assert.deepEqual(fx.check().classesFound, []);
+});
+
+test("a .json copy that matches no version of its source fails the bundle loudly and is left untouched", (t) => {
+  // Evidence 3 must not become a licence to overwrite: an authored file that
+  // was never equal to any version of the source stays protected — and the
+  // run now says so with ❌ and a non-zero exit, not a ✅ over a SKIPPED line.
+  const authored = '{"mine": true}\n';
+  const fx = jsonFixture(t, { "data.json": authored });
+  fx.commitAll("source and an authored file sharing its name");
+
+  const res = fx.bundleRaw();
+  assert.equal(
+    fx.readRef("data.json"),
+    authored,
+    "authored content must survive",
+  );
+  assert.notEqual(res.status, 0, res.stdout);
+  assert.match(res.stdout, /^❌ fixture-skill: .*1 left alone/m);
+  assert.doesNotMatch(res.stdout, /^✅/m);
+  assert.match(
+    res.stdout,
+    /references\/data\.json .*delete it and re-bundle/,
+    "the run names the remedy for the headerless case at bundle time",
+  );
+});
+
+test("with no git history to consult, a stale .json copy still fails the bundle rather than passing it", (t) => {
+  // Evidence 3 is unavailable outside a repository (and for a source never
+  // committed). That is a gap in the evidence, not a clean result: the run
+  // must fail, never print ✅ over a copy it left stale.
+  const fx = jsonFixture(t);
+  fx.bundle();
+  fx.writeShared("data.json", '{"a": 2}\n');
+
+  const res = fx.bundleRaw();
+  assert.notEqual(res.status, 0, res.stdout);
+  assert.doesNotMatch(res.stdout, /^✅/m);
+  assert.equal(fx.readRef("data.json"), '{"a": 1}\n');
 });
 
 test("a .md AMBIGUOUS keeps the generic detail — the per-suffix branch is not a blanket rewrite", (t) => {

@@ -1,0 +1,54 @@
+schema: 2
+task: 'task.194.code-review-anchors-name-source-lines'
+task_title: 'Code-review findings anchor to source lines'
+gate: CONCERNS
+status_reason: 'All cycle 2 fixes verified (bad-root, root-relative reads on both routes, directory anchors, review-pr prose); no gated finding remains. Two reproduced medium-confidence reviewer findings stay advisory and hold the reliability NFR at CONCERNS.'
+reviewer: 'QA Engineer'
+head: 'a73d84e0c0a24bb96c090779e45673b42d39c230'
+updated: '2026-10-07T10:40:04Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3238
+  phases_verified: 4/4
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    notes: 'Path-sink probe against makeReader engages, 0 of 8 hostile accepted (run record task.194.qa.3.security.run.json).'
+  performance:
+    status: PASS
+    notes: 'One stat and at most one rev-parse per run added.'
+  reliability:
+    status: CONCERNS
+    notes: 'Advisory, reproduced: (1) the four dispatcher blocks read exit 1 as malformed-anchors, but node also exits 1 when the script cannot load (reproduced from a non-root cwd), so un-annotated findings would be rendered as checked; (2) a --root present on disk but absent from the --rev tree passes checkTree and reads no-such-file (reproduced). Both reviewer confidence medium, so not gated.'
+  maintainability:
+    status: PASS
+    notes: 'checkTree() is the one could-not-look preflight; both read routes share one path rule.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Dispatcher blocks: treat exit 1 as malformed only when --json stdout parses with reason malformed-anchors; otherwise halt as checker-not-runnable (cycle 3 CR-1, advisory).'
+      refs: ['skills/review-pr/SKILL.md', 'skills/review-code/SKILL.md', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'checkTree: with --rev, also require `git cat-file -e <sha>:./` from --root, else bad-root (cycle 3 CR-2, advisory).'
+      refs: ['shared/resources/finding-anchors.js']
+    - action: 'Cycle 1 advisory CR-2 (--inline block binding) and CR-3 (Bitbucket head fetch on the API-diff route).'
+      refs: ['skills/review-pr/SKILL.md', 'skills/review-code/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['advisory reliability items tracked as follow-ups']

@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.135.gate-scoping-from-recorded-head'
+task_title: 'Gate scoping from a recorded head, not a typed timestamp'
+gate: CONCERNS
+status_reason: 'Safety re-probe found no HIGH and nothing at high confidence; cycle 3 fixes hold. One advisory MEDIUM (the Phase 0 trigger trusts a malformed head: such as HEAD) and one LOW keep reliability at CONCERNS; both are carried to future.'
+reviewer: 'QA Engineer'
+head: 'bbd7d2ba0ef669848e9a69bc77dc776990299bba'        # git rev-parse HEAD when the review was performed
+updated: '2026-09-30T13:52:06Z'  # date -u at write time
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 118
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+  ci: 'informational — not read this cycle'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — the blocks decide on local git state and agent-bound paths; the reviewer probed the trigger and scope block read-only under /bin/bash 3.2, bash 5.3 and zsh and found no safety defect. The carve-out guard, input guards and the step-5 binding hold.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR4-1 (advisory, medium/medium): qa-task Phase 0 counts commits from GATE_HEAD without checking it is a 40-hex SHA that resolves and is an ancestor — a typed head: HEAD reads CODE_MOVED=0. The write block binds head: from git rev-parse, so this needs a hand-typed head. CR4-2 (low): FILES entries are pathspecs, so a changed file named with a leading colon is read as pathspec magic.'
+  maintainability:
+    status: PASS
+    notes: 'One pinned block; input validation applied as one rule.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR4-1: validate GATE_HEAD (40-hex, resolves, ancestor) before counting in qa-task Phase 0, else CODE_MOVED=1.'
+      refs: ['skills/qa-task/SKILL.md']
+    - action: 'CR4-2: run the scoped diff with --literal-pathspecs (all three copies of the block).'
+      refs: ['shared/resources/qa-re-review-scope.md']
+    - action: 'CR3-4: recompute clause 1 inside the scope block rather than trusting the bound SAFETY_REPROBE; CR3-7: scope reads committed history only.'
+      refs: ['shared/resources/qa-re-review-scope.md']
+    - action: 'Pre-existing, not this branch: Step 3b mktemp template with a .diff suffix returns empty on BSD after first use (observation #181). test-clean-checkout 10 s budget fails under full-suite load (observation #234).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'tests/test-clean-checkout.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['5c PR review']

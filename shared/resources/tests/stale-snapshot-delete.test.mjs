@@ -15,7 +15,8 @@
 //       PR MERGED → deleted, exit 0                                    (drop `rm -f` → red)
 //   B — a delta whose concern is not the exact verdict label is left in place (widen select → red)
 //   C — a path that survives the rm is a HALT with exit 1                 (drop the re-read → red)
-//   D — no orchestrator SKILL.md carries a copy of the loop; each cites the section
+//   D — no orchestrator SKILL.md carries a copy of the loop; each cites the section, and names no
+//       backticked stale-snapshot token but the exact label or a skip note  (`stale-snapshot*` → red)
 //   E — no persisted detector file HALTs                                     (drop the -s guard → red)
 //   F — a delta with no `concern` is a non-match, kept, exit 0               (drop `// ""` → red)
 //   G — a non-array deltas_since_pause / unparsable JSON HALTs with exit 1   (drop the `||` → red)
@@ -31,6 +32,12 @@
 //   P — bind block and delete block in TWO processes → deleted        (read the variable again → red)
 //   N2 — a snapshot with no pr_url is KEPT before any gh call          (drop the guard → red)
 //   Q — the detector prompt files no bare-string note                  (restore a string site → red)
+//   R — Pass 2 names three evidence failures apart: an unparsable snapshot, a parsed object with
+//       no directory, another document's directory — each a HALT, each kept  (drop the
+//       `type == "object"` arm → the unparsable case reads as 'no directory' → red; task.133)
+//   S — a `stale-snapshot`-prefixed concern that is neither the verdict nor a skip note is
+//       reported `unrecognised … kept`, never silently skipped      (drop the pass → red; task.133)
+//   P — also run with a {doc-directory} holding a SPACE: every substitution is quoted (task.133)
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -239,65 +246,66 @@ for (const sh of SHELLS) {
     assert.equal(r.exists, true);
   });
 
-  test(`P [${sh}] — TWO SHELLS: bind block in one process, delete block in another → deleted (bug 9)`, () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "two-shell-"));
-    const state = path.join(dir, ".claude", "state");
-    fs.mkdirSync(state, { recursive: true });
-    const docDir = path.join(dir, "docs", "tasks", "task.1.x");
-    fs.mkdirSync(docDir, { recursive: true });
-    const bin = path.join(dir, "bin");
-    fs.mkdirSync(bin);
-    fs.writeFileSync(path.join(bin, "gh"), GH_STUB.merged, { mode: 0o755 });
-    const snap = path.join(state, "develop-pipeline.last-halt.json");
-    fs.writeFileSync(
-      snap,
-      JSON.stringify({
-        task_or_story_directory: docDir,
-        pr_url: "https://github.com/x/y/pull/1",
-      }) + "\n",
-    );
-    const json = JSON.stringify({
-      schema_version: 1,
-      recommended_step: 1,
-      blocking_issues: [],
-      deltas_since_pause: [
-        { path: snap, concern: "stale-snapshot: PR merged" },
-      ],
-    });
-    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
-    const bind = bindBlock()
-      .replace(/\{doc-directory\}/g, docDir)
-      .replace(
-        /\{the JSON object the detector returned, pasted verbatim\}/,
-        json,
+  for (const leaf of ["task.1.x", "task.1 with space"])
+    test(`P [${sh}] — TWO SHELLS: bind block in one process, delete block in another → deleted (bug 9) — doc dir '${leaf}'`, () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "two-shell-"));
+      const state = path.join(dir, ".claude", "state");
+      fs.mkdirSync(state, { recursive: true });
+      const docDir = path.join(dir, "docs", "tasks", leaf);
+      fs.mkdirSync(docDir, { recursive: true });
+      const bin = path.join(dir, "bin");
+      fs.mkdirSync(bin);
+      fs.writeFileSync(path.join(bin, "gh"), GH_STUB.merged, { mode: 0o755 });
+      const snap = path.join(state, "develop-pipeline.last-halt.json");
+      fs.writeFileSync(
+        snap,
+        JSON.stringify({
+          task_or_story_directory: docDir,
+          pr_url: "https://github.com/x/y/pull/1",
+        }) + "\n",
       );
-    const r1 = spawnSync(sh, argvFor(sh, bind), {
-      cwd: dir,
-      encoding: "utf8",
-      env,
+      const json = JSON.stringify({
+        schema_version: 1,
+        recommended_step: 1,
+        blocking_issues: [],
+        deltas_since_pause: [
+          { path: snap, concern: "stale-snapshot: PR merged" },
+        ],
+      });
+      const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+      const bind = bindBlock()
+        .replace(/\{doc-directory\}/g, docDir)
+        .replace(
+          /\{the JSON object the detector returned, pasted verbatim\}/,
+          json,
+        );
+      const r1 = spawnSync(sh, argvFor(sh, bind), {
+        cwd: dir,
+        encoding: "utf8",
+        env,
+      });
+      assert.equal(r1.status, 0, `bind block: ${r1.stderr}`);
+      const del =
+        deleteBlock().replace(/\{doc-directory\}/g, docDir) +
+        '\necho "BLOCK_DONE"\n';
+      const r2 = spawnSync(sh, argvFor(sh, del), {
+        cwd: dir,
+        encoding: "utf8",
+        env,
+      });
+      assert.equal(
+        r2.status,
+        0,
+        `delete block (fresh shell): stdout ${r2.stdout} stderr ${r2.stderr}`,
+      );
+      assert.match(r2.stdout, /removed \(PR .* is MERGED; directory matches\)/);
+      assert.equal(
+        fs.existsSync(snap),
+        false,
+        "snapshot still on disk after a two-shell run",
+      );
+      fs.rmSync(dir, { recursive: true, force: true });
     });
-    assert.equal(r1.status, 0, `bind block: ${r1.stderr}`);
-    const del =
-      deleteBlock().replace(/\{doc-directory\}/g, docDir) +
-      '\necho "BLOCK_DONE"\n';
-    const r2 = spawnSync(sh, argvFor(sh, del), {
-      cwd: dir,
-      encoding: "utf8",
-      env,
-    });
-    assert.equal(
-      r2.status,
-      0,
-      `delete block (fresh shell): stdout ${r2.stdout} stderr ${r2.stderr}`,
-    );
-    assert.match(r2.stdout, /removed \(PR .* is MERGED; directory matches\)/);
-    assert.equal(
-      fs.existsSync(snap),
-      false,
-      "snapshot still on disk after a two-shell run",
-    );
-    fs.rmSync(dir, { recursive: true, force: true });
-  });
 
   test(`F [${sh}] — a delta with no concern is a non-match, not a jq abort; exit 0, snapshot kept`, () => {
     const r = run(sh, {
@@ -456,6 +464,75 @@ for (const sh of SHELLS) {
     assert.equal(r.exists, true, "a mislabelled live snapshot was deleted");
   });
 
+  test(`R [${sh}] — Pass 2: unparsable, directory-less and foreign snapshots are three named HALTs; all kept`, () => {
+    const cases = [
+      [
+        { snapshotRaw: "{not json\n" },
+        /HALT: .* is not a JSON object — its evidence cannot be read/,
+      ],
+      [
+        {
+          snapshotRaw:
+            JSON.stringify({ pr_url: "https://github.com/x/y/pull/1" }) + "\n",
+        },
+        /HALT: .* carries no task_or_story_directory — /,
+      ],
+      [
+        { snapshotDir: "docs/tasks/task.2.other" },
+        /HALT: .* is not a snapshot for .* \(task_or_story_directory: 'docs\/tasks\/task\.2\.other'\)/,
+      ],
+    ];
+    const seen = new Set();
+    for (const [opts, re] of cases) {
+      const r = run(sh, { concern: "stale-snapshot: PR merged", ...opts });
+      assert.equal(r.status, 1, `${re}: stdout ${r.stdout} stderr ${r.stderr}`);
+      assert.match(r.stdout, re);
+      assert.match(r.stdout, /nothing deleted/);
+      assert.equal(r.exists, true, `${re}: snapshot deleted`);
+      seen.add(
+        r.stdout
+          .split("\n")
+          .find((l) => l.startsWith("HALT:"))
+          .replace(/'[^']*'/g, ""),
+      );
+    }
+    assert.equal(
+      seen.size,
+      3,
+      `three outcomes share a message: ${[...seen].join(" | ")}`,
+    );
+  });
+
+  test(`S [${sh}] — an unrecognised stale-snapshot-prefixed label is reported and kept, not silently skipped`, () => {
+    for (const concern of [
+      "stale-snapshot: PR merged ", // trailing space — not the verdict
+      "stale-snapshot: /x/last-halt.json — PR merged; deleted", // the pre-task.130 label
+    ]) {
+      const r = run(sh, { concern });
+      assert.equal(
+        r.status,
+        0,
+        `[${concern}] stdout ${r.stdout} stderr ${r.stderr}`,
+      );
+      assert.equal(r.exists, true, `[${concern}] snapshot deleted`);
+      assert.ok(
+        r.stdout.includes(
+          `unrecognised stale-snapshot label — kept: '${concern}'`,
+        ),
+        `[${concern}] no 'unrecognised … kept' line; stdout: ${r.stdout}`,
+      );
+    }
+    // …and the verdict and both skip notes stay silent on this line.
+    for (const concern of ["stale-snapshot: PR merged", ...SKIP_NOTES]) {
+      const r = run(sh, { concern, prState: "open" });
+      assert.doesNotMatch(
+        r.stdout,
+        /unrecognised stale-snapshot label/,
+        `[${concern}] reported as unrecognised`,
+      );
+    }
+  });
+
   test(`N [${sh}] — PR re-check OPEN or gh failure → snapshot KEPT, exit 0, reason named`, () => {
     for (const prState of ["open", "fail"]) {
       const r = run(sh, { concern: "stale-snapshot: PR merged", prState });
@@ -577,10 +654,21 @@ test("D — no orchestrator SKILL.md copies the loop; each cites § Consume Outp
     // selector exact equality; the three citations kept the original prefix wording for three more
     // cycles because this test read only for the citation, not for what it said (cycle 5, bug 12).
     // A description wider than the selector promises a delete the block refuses.
-    assert.doesNotMatch(
-      citation[0],
-      /(starts|start with|starting with|prefix|startswith)[^\n]*stale-snapshot/i,
-      `${rel} describes the delete label as a PREFIX; the selector is exact equality`,
+    //
+    // The floor is a property of the backticked TOKENS the citation names, not of its verbs: a
+    // word list ("starts", "prefix", …) missed "begins with" and rejected the accurate "the two
+    // skip notes share the prefix" (task.130 gate 6 CR-1; task.133). Every backticked
+    // `stale-snapshot…` token must be the exact verdict label or a quoted skip note.
+    const tokens = [...citation[0].matchAll(/`(stale-snapshot[^`]*)`/g)].map(
+      (m) => m[1],
+    );
+    const allowed = (t) =>
+      t === "stale-snapshot: PR merged" ||
+      t.startsWith("stale-snapshot check skipped");
+    assert.deepEqual(
+      tokens.filter((t) => !allowed(t)),
+      [],
+      `${rel} names a stale-snapshot token other than the exact label or a skip note`,
     );
     assert.match(
       citation[0],

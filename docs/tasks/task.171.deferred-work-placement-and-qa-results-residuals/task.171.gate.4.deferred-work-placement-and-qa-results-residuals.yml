@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.171.deferred-work-placement-and-qa-results-residuals'
+task_title: 'Deferred Work placement and qa-results engine residuals'
+gate: CONCERNS
+status_reason: 'Cycle 3 fixes verified for the shapes they named, but the per-range mis-pairing filter is still beaten when a stray fence closes on a later plain opener, so a setext section can again be deleted on replace; third consecutive cycle on the setext fence exemption.'
+reviewer: 'QA Engineer'
+head: 'a10c5662cd7416f6c9dc11621a5062398d074847'
+updated: '2026-10-05T07:53:25Z'
+
+top_issues:
+  - id: CR4-1
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'The mis-pairing filter checks each fence range on its own: a stray unclosed ```bash (or ~~~bash, or a bare ```) that closes on the bare OPENER of a later plain block leaves the range hiding the setext section with no interior info-string line, so it stays trusted; upsertQaResults returns replaced and the Rollout Notes setext section is deleted, while the ATX twin is refused.'
+    suggested_action: 'Treat mis-pairing as a property of the whole span, or stop exempting fenced lines from the setext check on the replace side; add the bash-then-bare-then-yaml, tilde and bare-stray documents as must-refuse tests.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 101
+  phases_verified: 4/4
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    boundary: internal
+    internal_reason: 'Unchanged from gate 1: no corpus sink models a work-item section writer.'
+    notes: 'Pure string engine.'
+  performance:
+    status: PASS
+    notes: 'Unchanged (< 2s).'
+  reliability:
+    status: CONCERNS
+    notes: 'CR4-1 deletes a setext section behind a malformed fence pair.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Three consecutive cycles have each narrowed the setext fence exemption and exposed the next mis-pairing (CR2-2, CR3-1, CR4-1): a narrowing residue on one mechanism.'
+
+recommendations:
+  immediate:
+    - action: 'CR4-1 — take a structural move on the setext fence exemption rather than a fourth narrowing (qa-fix Step 2.6).'
+      refs: ['shared/resources/qa-results.js']
+  future:
+    - action: 'CR4-2 (low): the filter distrusts correct nesting (````markdown outer fence quoting ```yaml), over-refusing with a detail.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Carried: CR2-4 (low) stale QA recommendations carried after a bold Bug Reports label; gate 1 CR-7 (low) setext false refusals after list continuations.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR4-1 resolved and re-reviewed']

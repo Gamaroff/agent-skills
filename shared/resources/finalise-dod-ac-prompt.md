@@ -35,21 +35,27 @@ For each AC item extracted in Step 1:
 3. Also search for a test file (`.spec.ts`, `.test.ts`, `.spec.js`) that covers the AC — grep for the same key terms.
 4. **Citation rule**: A `PASS` requires BOTH a non-null `code_citation` AND a non-null `test_citation`. Missing either → `FAIL`. No exceptions.
 5. **Execution rule**: the cited test must actually run in a lane that gates this change. A test that exists but never executes on the PR is not evidence — it is a citation. Determine the lane from the test's path and the project's CI config (e.g. a `paths-ignore`d job, a suite excluded by the runner's default scope, a directory the per-PR job does not select). If the cited test does not run per-PR, set `status: FAIL` and name the lane in `note`, even though the file exists.
+6. **Quantifier rule**: a criterion over a set ("each test", "every file", "all call sites") is checked member by member. List the members from `<DIFF_FILE>`, map each one to its evidence, and put every unmapped member in `note`. `PASS` only when that list is empty. Evidence that some members are covered proves "at least one", not "each".
 
 ⚠️ **A ticked AC checkbox is a claim, not evidence.** Verify against the diff and the test lane; never treat the story's own checkbox as satisfying either rule. Both failure modes below have occurred and neither was caught by the checkbox:
 
 - An AC ticked complete with **no test written at all**. When the assertion was finally written it went **red immediately**, having concealed a live defect for the whole period it was assumed present.
 - A test written and cited, but placed in a **smoke/e2e directory excluded from the per-PR job** — so it would never have guarded the PR it was authored for.
 
-**Two kinds of criterion may carry `test_citation: "NOT_APPLICABLE: …"`, and only these two:**
+**Three kinds of criterion may carry `test_citation: "NOT_APPLICABLE: …"`, and only these three:**
 
 - **"No unit tests applicable."** A task that says so explicitly (cite that line). Mark `PASS` with a note.
 - **A documentation criterion.** Its whole deliverable is what a document says — a CHANGELOG entry cites the work item, a reference doc is updated, a doc agrees with the code — not what code does. Classify by what the criterion *requires*, not how it is worded: if it can be stated as "file F says S", it is a documentation criterion; if meeting it needs code to do something when run, it is not. For a documentation criterion:
   - `code_citation` is the document line that meets it (e.g. `CHANGELOG.md:309`). **Read that text.** `note` says in one clause what the cited text states and why that meets the criterion. A citation you did not read is a `FAIL`.
   - `test_citation` is a test that pins that document when one exists — for a CHANGELOG citation, the repository's changelog corpus guard if it has one; name it, and say in `note` when it runs (a post-merge guard is still a guard). Otherwise `"NOT_APPLICABLE: documentation criterion"`.
   - `PASS` when the cited text is present and says what the criterion requires. `FAIL` when it is absent or says something else.
+- **A measured criterion.** A non-functional bound (a runtime, size, count or rate the criterion states as a number) whose natural evidence is a measurement, not a per-PR test. Classify it by what it bounds **and** by whether a per-PR test could assert that bound: if one could, it is a behaviour criterion and takes the normal path. For a measured criterion:
+  - `code_citation` is the line of a **committed** artifact that records the measurement and the command that produced it (typically the implementation report or a QA report). **Read that line.** `note` states the bound, the measured value and the command.
+  - `test_citation` is `"NOT_APPLICABLE: measured criterion"`.
+  - `PASS` when the criterion states a bound, the cited measurement meets it, and the command is named. `FAIL` when the measurement is uncited or uncommitted, or when it misses the bound. A criterion that states no numeric bound ("no measurable change", "fast enough") is not a measured criterion: it takes the behaviour path, and fails there without a test.
+  - A wall-clock bound decays with every later commit and every change in machine load. Its cited measurement must record the load it ran under (`uptime` beside `time`) and be taken on the PR's head commit. A figure from an earlier commit, or with no load recorded, is `FAIL` with `note: "re-measure"`.
 
-`test_runs_per_pr` is `null` on both kinds: the execution rule reads a test lane, and neither has a test in one. **A behaviour criterion never takes either path.** "Hard to test" is not "no unit tests applicable", and describing a behaviour in a document does not make it a documentation criterion. Before this rule existed, every run failed its CHANGELOG criterion for having no test and the orchestrator overrode it by hand; a check that is overridden on every run is not a check.
+`test_runs_per_pr` is `null` on all three kinds: the execution rule reads a test lane, and none has a test in one. **A behaviour criterion never takes any of these paths**, and a bound a per-PR test could assert is a behaviour criterion. "Hard to test" is not "no unit tests applicable", and describing a behaviour in a document does not make it a documentation criterion. Before this rule existed, every run failed its CHANGELOG criterion for having no test and the orchestrator overrode it by hand; a check that is overridden on every run is not a check.
 
 ### Step 4: Check documentation updates
 
@@ -92,4 +98,4 @@ ac_traceability:
 
 **Citation rule**: `status: PASS` requires a non-null citation. Null citation → `status: FAIL`. `NOT_APPLICABLE` must have a `note`.
 
-**Execution rule**: for acceptance criteria with a test citation, `status: PASS` additionally requires `test_runs_per_pr: true`. A cited test in a lane the PR does not run is a citation, not evidence → `status: FAIL` with the lane named in `note`. The two `NOT_APPLICABLE` kinds in Step 3 carry `null` here and are judged by their own rules.
+**Execution rule**: for acceptance criteria with a test citation, `status: PASS` additionally requires `test_runs_per_pr: true`. A cited test in a lane the PR does not run is a citation, not evidence → `status: FAIL` with the lane named in `note`. The `NOT_APPLICABLE` kinds in Step 3 carry `null` here and are judged by their own rules.

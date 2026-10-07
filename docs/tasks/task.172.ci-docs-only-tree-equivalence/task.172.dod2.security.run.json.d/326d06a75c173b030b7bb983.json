@@ -1,0 +1,24 @@
+{
+  "sink": "path",
+  "entry": "shared/resources/glob-match.js#matchesAnyGlob",
+  "name": "matchesAnyGlob-default-patterns",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 21,
+  "passed": 21,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    [
+      "**/*.md",
+      "docs/**"
+    ]
+  ],
+  "ran_at": "2026-10-01T15:47:35.784Z"
+}

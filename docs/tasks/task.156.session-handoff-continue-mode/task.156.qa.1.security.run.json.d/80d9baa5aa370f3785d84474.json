@@ -1,0 +1,19 @@
+{
+  "sink": null,
+  "entry": "shared/resources/finalise-fix-and-recheck.mjs#isWorkItemDocument",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 22,
+  "passed": 22,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "ran_at": "2026-10-01T19:37:00.800Z"
+}

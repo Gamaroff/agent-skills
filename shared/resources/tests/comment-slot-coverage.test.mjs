@@ -89,91 +89,20 @@ function baseStage(stage) {
 }
 
 /**
- * Shipped source only. `skills/*​/references/` is `npm run bundle` output — the
- * same sources copied ~30×, which would turn one finding into thirty echoes of
- * itself. `docs/` is excluded because a task document quoting a call is showing
- * the BEFORE side of a diff, not shipping a call.
+ * The collector is `call-sites.js`, IMPORTED, never restated (task.129). The
+ * review skills run the same CLI over a task document's claimed call-site list,
+ * so a second copy of the shapes here would let the review and this guard
+ * disagree about what a call site is — two enumerations of one population,
+ * which drift silently and in the worst direction. Its header states the roots
+ * (shipped source only: `docs/` and bundled `references/` copies excluded) and
+ * why a multi-line shell invocation is reassembled before its flags are read.
  */
-function shippedDocs() {
-  const out = [];
-  const shared = path.join(REPO_ROOT, "shared", "resources");
-  for (const f of fs.readdirSync(shared)) {
-    if (f.endsWith(".md") || f.endsWith(".sh")) out.push(path.join(shared, f));
-  }
-  const skills = path.join(REPO_ROOT, "skills");
-  for (const skill of fs.readdirSync(skills)) {
-    const md = path.join(skills, skill, "SKILL.md");
-    if (fs.existsSync(md)) out.push(md);
-    // develop-bug's step docs are SOURCES — no AUTO-GENERATED banner, no
-    // shared/resources counterpart. Every other skills/*/references/ file is
-    // generated, so the directory is walked only for the un-bannered ones.
-    const refs = path.join(skills, skill, "references");
-    if (!fs.existsSync(refs)) continue;
-    for (const f of fs.readdirSync(refs)) {
-      if (!f.endsWith(".md")) continue;
-      const abs = path.join(refs, f);
-      // The banner sits on line 5, AFTER the frontmatter — and a `description:`
-      // field routinely runs past 400 characters on its own, so a short window
-      // reads a generated file as a source and reports ~30 echoes of every
-      // finding. Take the first 20 lines, which is a structural bound rather
-      // than a guessed byte count.
-      const head = fs
-        .readFileSync(abs, "utf8")
-        .split("\n")
-        .slice(0, 20)
-        .join("\n");
-      if (!head.includes("AUTO-GENERATED")) out.push(abs);
-    }
-  }
-  return out;
-}
+const { collect, shippedSources } = require(
+  path.join(REPO_ROOT, "shared", "resources", "call-sites.js"),
+);
+const shippedDocs = () => shippedSources(REPO_ROOT);
 
-/**
- * Collect every `tracker-comment.js` invocation with its stage and slot names.
- * A shell invocation continues across `\`-terminated lines, so the whole
- * command is reassembled before parsing — reading only the first line would
- * report every multi-line call as slotless.
- */
-// `command node` as well as bare `node`, and a `VAR=$(…)` capture before it: the
-// PreCompact hook is shell, not prose, and writes both engine calls that way —
-// a regex anchored on a bare `node` never saw them (bug.14 / cycle-2 CR-2).
-function collectCallSites(
-  engineRe = /^\s*(?:[A-Za-z_][A-Za-z0-9_]*=)?\$?\(?\s*(?:command\s+)?node\s+.*tracker-comment\.js/,
-  engine = "tracker-comment.js",
-) {
-  const sites = [];
-  for (const file of shippedDocs()) {
-    const rel = path.relative(REPO_ROOT, file);
-    const lines = fs.readFileSync(file, "utf8").split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      if (!engineRe.test(lines[i])) continue;
-      let inv = lines[i];
-      let j = i;
-      while (inv.trimEnd().endsWith("\\") && j + 1 < lines.length) {
-        j += 1;
-        inv += "\n" + lines[j];
-      }
-      // Stop at a non-identifier character. `[^\s\\]+` absorbed shell
-      // punctuation: a single-line call written `$(node … --stage done)` — the
-      // shape 4 of the 11 pull-request sites use — captured `done)`, which is
-      // not a catalogue key, so the two content guards below `continue`d past it
-      // and validated nothing. The non-vacuity floor still passed, because the
-      // site was FOUND; it was just never CHECKED. Found by adversarial review,
-      // not by the guard itself.
-      // An optional opening quote: a shell site writes --stage "pipeline-paused-${N}",
-      // and the match stops at the dollar sign — leaving the base stage with its
-      // trailing hyphen, which baseStage strips.
-      const stage = /--stage\s+"?([A-Za-z0-9_-]+)/.exec(inv)?.[1] ?? null;
-      const slots = [
-        ...inv.matchAll(/--slot\s+([A-Za-z_][A-Za-z0-9_]*)=/g),
-      ].map((m) => m[1]);
-      sites.push({ file: rel, line: i + 1, stage, slots, text: inv, engine });
-    }
-  }
-  return sites;
-}
-
-const SITES = collectCallSites();
+const SITES = collect({ engine: "tracker-comment", root: REPO_ROOT });
 
 /**
  * Pull-request call sites, which reach the same catalogue through a different
@@ -189,10 +118,10 @@ const SITES = collectCallSites();
  * unrecognised key reaches a template that never reads it, and the comment
  * posts reading exactly as it would have with no slot at all.
  */
-const PR_SITES = collectCallSites(
-  /^\s*(?:[A-Za-z_][A-Za-z0-9_]*=)?\$\(\s*(?:command\s+)?node\s+.*stakeholder-summary-cli\.js|^\s*(?:command\s+)?node\s+.*stakeholder-summary-cli\.js/,
-  "stakeholder-summary-cli.js",
-);
+const PR_SITES = collect({
+  engine: "stakeholder-summary-cli",
+  root: REPO_ROOT,
+});
 
 /**
  * Sites that legitimately pass no slot, each with the reason. An entry is a

@@ -71,6 +71,9 @@ npm run ci:fast                       # format:check + npm test (L1 unit + L2 fi
 npm run format                        # CI fails on unformatted JavaScript — this fixes it
 ```
 
+The pre-commit hook refuses a commit whose staged files Prettier would rewrite, so this usually
+surfaces at commit time rather than in CI.
+
 The sections below say which extra lane each kind of change needs; `npm run ci` runs all of them.
 
 **If you touched `shared/resources/` or any `SKILL.md`**, the pre-commit hook re-bundles for you, but

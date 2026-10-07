@@ -73,8 +73,26 @@ C. TRAIL (category: trail) — the evidence is missing, stale, or contradicts it
      (status absent or `open`) that no active waiver covers, is the trail defect
    - the document says status: accepted but no DoD file exists
    - QA report count does not match gate count
+   - a gate whose `updated:` is earlier than the author time of the commit its `head:` names
+     (`git log -1 --format=%aI <head>`) — the gate claims to predate the tree it judged (task.130
+     re-check PC-2; task.135). Compare as instants, not strings: `%aI` carries an offset and
+     `updated:` a `Z`. A gate with no `head:` (`schema: 1`) is not a finding — it predates the field
+   - a `schema: 2` gate whose `head:` does not resolve in this checkout (`git cat-file -e <head>^{commit}`)
+     or is not an ancestor of the PR head (`git merge-base --is-ancestor <head> HEAD`) — the gate names
+     a commit this branch never contained. This lens runs inside the QA loop, before any
+     `develop-batch` rebase or squash merge rewrites the branch; the repository's gate-head freshness
+     test cannot check this, because after a rewrite a legitimate head is unreachable too (task.135
+     QA cycle 2, CR2-2)
    - a handover file exists with outstanding (unticked) actions
    - a co-located bug report that is still open
+   - the work item's Change Log lost rows since the PR's base. The log is append-only, and a row that
+     disappears is a loss whatever removed it. Two QA cycles once read past six rows a hand repair
+     dropped, and only a diff against an earlier commit found them (obs #137). Run, from the
+     repository root, `command node .agents/skills/review-pr/references/change-log.js
+     --check-append-only --file <doc> --against "$(git merge-base HEAD origin/<base>)" --json`
+     (read-only). A `rows-dropped` result lists the rows: each one is a trail defect, and `ref`
+     quotes it. `new-document` is not a finding. A usage exit (2) means the base could not be read:
+     say so, and never report it as a clean log (the check is `change-log.js` `rowsDropped`)
 
 D. CONSISTENCY (category: consistency) — the three views of the same work disagree:
    - document status: vs PR state vs tracker issue/card state
@@ -128,6 +146,10 @@ pr_conformance:
 Rules:
 - Sort findings: coverage, then trail, then consistency, then scope; within each, high → medium → low.
 - `id` is PC-{n}. `finding`/`suggested_action` are single sentences.
+- When `ref` is `path:line`, line is the line number IN THE PR-HEAD VERSION OF THE FILE (the `+` side
+  of the hunk header), NEVER a line number in the patch file — the same definition as `file_line` in
+  code-review-prompt.md. An optional `line_text` (that line's source text, trimmed) may accompany it;
+  the caller checks both against the file.
 - Output ONLY the YAML block above — no prose, no markdown table, no fences around it.
 - Empty review → `pr_conformance: { work_item: "", resolved_via: none, artifacts: {...}, findings: [], truncated_count: 0 }`.
 ```

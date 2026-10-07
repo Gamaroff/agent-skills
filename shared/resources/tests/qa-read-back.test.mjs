@@ -434,3 +434,75 @@ test("two regular files claiming the cycle's gate halt, naming both, and neither
     w.done();
   }
 });
+
+// task.158 (task.149 5c CR-1) — existence is not the claim. From cycle 2 on the
+// document must link THIS cycle's gate and report; before this check a document
+// left linking gate.1 / qa.1 read clean because every link still resolved.
+function cycleTwo({ root, dir, stem }, relink) {
+  execFileSync(
+    "git",
+    ["-c", "user.email=a@b", "-c", "user.name=a", "add", "-A"],
+    { cwd: root },
+  );
+  execFileSync(
+    "git",
+    ["-c", "user.email=a@b", "-c", "user.name=a", "commit", "-qm", "cycle 1"],
+    { cwd: root },
+  );
+  fs.writeFileSync(path.join(dir, `${stem}.gate.2.x.yml`), "gate: PASS\n");
+  fs.writeFileSync(path.join(dir, `${stem}.qa.2.x.md`), "# r2\n");
+  if (relink) relink();
+}
+
+for (const shape of Object.keys(SHAPES)) {
+  test(`${shape}: a cycle-2 document still linking cycle 1's gate and report halts, naming both`, () => {
+    const r = verdict(shape, (w) => cycleTwo(w));
+    assert.equal(r.exitCode, 1, JSON.stringify(r));
+    assert.equal(r.cycle, "2");
+    const p = r.problems.join("\n");
+    const { stem } = SHAPES[shape];
+    assert.match(
+      p,
+      new RegExp(
+        `does not link this cycle's gate ${stem}\\.gate\\.2\\.x\\.yml`,
+      ),
+    );
+    assert.match(
+      p,
+      new RegExp(
+        `does not link this cycle's QA report ${stem}\\.qa\\.2\\.x\\.md`,
+      ),
+    );
+  });
+
+  test(`${shape}: the same cycle-2 document re-linked to gate.2 / qa.2 reads clean`, () => {
+    const r = verdict(shape, (w) =>
+      cycleTwo(w, () => {
+        edit(w.doc, `./${w.stem}.qa.1.x.md`, `./${w.stem}.qa.2.x.md`);
+        edit(w.doc, `./${w.stem}.gate.1.x.yml`, `./${w.stem}.gate.2.x.yml`);
+      }),
+    );
+    assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+    assert.equal(r.cycle, "2");
+  });
+}
+
+test("a bare (no ./) link to this cycle's gate and report counts as linked", () => {
+  const r = verdict("task", (w) =>
+    cycleTwo(w, () => {
+      edit(w.doc, `./${w.stem}.qa.1.x.md`, `${w.stem}.qa.2.x.md`);
+      edit(w.doc, `./${w.stem}.gate.1.x.yml`, `${w.stem}.gate.2.x.yml`);
+    }),
+  );
+  assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+});
+
+test("a link with a #fragment to this cycle's gate counts as linked", () => {
+  const r = verdict("task", (w) =>
+    cycleTwo(w, () => {
+      edit(w.doc, `./${w.stem}.qa.1.x.md`, `./${w.stem}.qa.2.x.md#findings`);
+      edit(w.doc, `./${w.stem}.gate.1.x.yml`, `./${w.stem}.gate.2.x.yml`);
+    }),
+  );
+  assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+});

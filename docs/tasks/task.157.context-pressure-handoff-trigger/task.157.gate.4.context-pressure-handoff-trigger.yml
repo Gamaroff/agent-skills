@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.157.context-pressure-handoff-trigger'
+task_title: '[Task 157] Context-pressure trigger: recommend a continuation handoff before the context fills'
+gate: CONCERNS
+status_reason: 'Gate 3 findings fixed; the shell-word parse round-trips every form the installer writes (reviewer probed newline, tab, NBSP, U+2028, apostrophe, backslash). Remaining gated findings are hand-written forms the tokenizer does not model: a # comment or a bash dollar-quoted string (medium), and a .bak that is a directory (low).'
+reviewer: 'QA Engineer'
+head: 'e5adecc731e915021bab1a86db3fb9e8f01d1f26'
+updated: '2026-10-02T08:32:39Z'
+
+top_issues:
+  - id: 'TASK-157-QA4-CR-1'
+    severity: medium
+    file: 'shared/resources/context-pressure.mjs'
+    finding: 'shellWords returns null for valid sh with an apostrophe inside a # comment or a bash dollar-quoted string, so a hand-written hook such as node /x/context-pressure.mjs check # do not remove is not recognised: install adds a second hook and uninstall leaves it.'
+    suggested_action: 'End the words at an unquoted # that starts a word, read dollar-quoted strings, and add the pair to the identity test.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-157-QA4-CR-2'
+    severity: low
+    file: 'shared/resources/context-pressure.mjs'
+    finding: 'A valid status line with an apostrophe in a comment that mentions the wrapper name returns null words and is reported as an unparseable wrap (needs-manual) instead of being wrapped.'
+    suggested_action: 'Resolved by comment handling; add the case to the must-differ list.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-157-QA4-CR-3'
+    severity: low
+    file: 'shared/resources/context-pressure-install.sh'
+    finding: 'When settings.json.bak is a directory, mv moves the temp backup into it and the installer still reports the .bak as saved.'
+    suggested_action: 'Fail when the .bak path exists and is not a regular file.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 48
+  phases_verified: 16/16
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    notes: 'validSessionId re-probed: engages, 20 executed, 0 reproduced.'
+  performance:
+    status: PASS
+    notes: 'No hot-path change.'
+  reliability:
+    status: PASS
+    notes: 'Every installer-written form round-trips; open findings are hand-written edge forms.'
+  maintainability:
+    status: PASS
+    notes: 'QA4-CR-4 (unshq now test-only) and QA4-CR-5 (Unicode whitespace, backslash-newline) are cleanups.'
+
+bug_resolution:
+  closed_from_gate_3: ['TASK-157-QA3-CR-1', 'TASK-157-QA3-CR-3']
+  fix_commit: 'e5adecc7'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA4-CR-1, CR-2, CR-3 with tests.'
+      refs: ['shared/resources/context-pressure.mjs', 'shared/resources/context-pressure-install.sh']
+  future:
+    - action: 'QA4-CR-4 remove unshq; QA4-CR-5 split on POSIX whitespace and drop backslash-newline.'
+      refs: ['shared/resources/context-pressure.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-157-QA4-CR-1 fixed']

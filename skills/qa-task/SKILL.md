@@ -127,10 +127,10 @@ if [ $EXIT_CODE -ne 0 ]; then
   exit 1
 fi
 
-PR_URL=$(echo "$PR_JSON" | jq -r '.url')
-PR_STATE=$(echo "$PR_JSON" | jq -r '.state')
-PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
-PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
+PR_URL=$(printf '%s' "$PR_JSON" | jq -r '.url')
+PR_STATE=$(printf '%s' "$PR_JSON" | jq -r '.state')
+PR_NUMBER=$(printf '%s' "$PR_JSON" | jq -r '.number')
+PR_TITLE=$(printf '%s' "$PR_JSON" | jq -r '.title')
 ```
 
 **Handle PR state:**
@@ -153,17 +153,46 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    TASK_DIR=$(dirname "$TASK_FILE")
    # The current gate is the HIGHEST-numbered one, and the number has ONE definition — the bundled
    # qa-cycle.sh (task.121). It refuses (rc 1, empty) when no numbered gate exists, which is the
-   # first-review case. The path is then a quoted find on that number: an unmatched bare glob
-   # aborts the whole command under zsh, and `ls -t` ties on a fresh checkout (obs #144/#145).
+   # first-review case. The FILE comes from the same helper's --path mode (task.158): the
+   # name-glob lookup it replaced missed a zero-padded gate.02, and took the first of two
+   # files silently. A cycle that no ONE regular file carries is refused, never read as "no gate".
    PRIOR_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" 2>/dev/null); rc=$?
    [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
    LATEST_GATE=""
-   [ -n "$PRIOR_CYCLE" ] && LATEST_GATE=$(find "$TASK_DIR" -maxdepth 1 -name "task.*.gate.${PRIOR_CYCLE}.*.yml" 2>/dev/null | head -1)
+   if [ -n "$PRIOR_CYCLE" ]; then
+     LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate); rc=$?
+     [ "$rc" -eq 0 ] || { echo "⚠️  qa-cycle.sh --path gate refused cycle $PRIOR_CYCLE (rc=$rc) — resolve the gate files named above, then re-run" >&2; exit 1; }
+   fi
    ```
 
 2. **If gate file exists, read and analyze:**
 
    ```bash
+   # Bound in THIS shell: the step-1 block that resolved it is another shell, and an unbound read
+   # here silently takes the no-gate branch (task.135 QA cycle 2 probe).
+   # Validate the input before deriving from it: unbound, dirname "" is ".", no gate is found, and
+   # every signal below silently reads "no prior gate" (task.135 QA cycle 3, CR3-1).
+   [ -f "$TASK_FILE" ] || { echo "HALT: TASK_FILE ('$TASK_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
+   TASK_DIR=$(dirname "$TASK_FILE")
+   # The two-call pattern step 1 uses (task.168, 5c CR-1). qa-cycle.sh exits 1 for "no gate file",
+   # for "gate files with no cycle number" and, under --path, for "two files claim one cycle"; only
+   # the first is a first review. Its own reason tells them apart, so it is read rather than dropped:
+   # the one refusal that means "first review" is let through, every other refusal is a HALT that
+   # prints the helper's line (QA cycle 1, CR-3). The selection itself stays the helper's — no glob
+   # here duplicates it (task.158).
+   if [ -z "${LATEST_GATE:-}" ]; then
+     GATE_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" 2>&1); rc=$?
+     [ "$rc" -le 1 ] || { echo "HALT: qa-cycle.sh not runnable (rc=$rc) — check the bundled path"; exit 1; }
+     if [ "$rc" -eq 0 ]; then
+       LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate); rc=$?
+       [ "$rc" -eq 0 ] || { echo "HALT: qa-cycle.sh refused cycle $GATE_CYCLE (see its line above) — resolve the gate files, then re-run"; exit 1; }
+     else
+       case "$GATE_CYCLE" in
+         *"no gate file in"*) : ;;   # a first review — nothing to bind
+         *) printf '%s\n' "$GATE_CYCLE"; echo "HALT: qa-cycle.sh could not derive the QA cycle (see its line above) — resolve the gate files, then re-run"; exit 1 ;;
+       esac
+     fi
+   fi
    if [ -n "$LATEST_GATE" ]; then
      GATE_STATUS=$(grep '^gate:' "$LATEST_GATE" | awk '{print $(2)}')
      HAS_ISSUES=$(grep -c '^  - issue:' "$LATEST_GATE" 2>/dev/null || echo 0)
@@ -178,19 +207,67 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    branch can apply, establish that neither has moved since. Gather both freshness signals:
 
    ```bash
-   GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
-   DOC_DATE=$(grep -E '^updated:' "$TASK_FILE"  | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
+   # $TASK_FILE is this skill's input. $LATEST_GATE and $TASK_DIR are computed, and the step 1 block
+   # that computed them is another shell — bind both here (task.135 QA cycle 2, CR2-3). qa-cycle.sh
+   # refuses with no numbered gate: then GATE_HEAD is empty and both signals below read 1.
+   # Validate the input before deriving from it: unbound, dirname "" is ".", no gate is found, and
+   # every signal below silently reads "no prior gate" (task.135 QA cycle 3, CR3-1).
+   [ -f "$TASK_FILE" ] || { echo "HALT: TASK_FILE ('$TASK_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
+   TASK_DIR=$(dirname "$TASK_FILE")
+   [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate)
+   # ":(exclude)$TASK_DIR" below must exclude the task's directory, not the tree: a task file at the
+   # repository root would make it ":(exclude)." and CODE_MOVED always 0 (task.135 QA cycle 3, CR3-2).
+   [ -n "$(git -C "$TASK_DIR" rev-parse --show-prefix 2>/dev/null)" ] || { echo "HALT: the task directory ('$TASK_DIR') is the repository root — the trigger cannot tell the task's own files from the code"; exit 1; }
+   # The commit the gate judged (its `head:`), never its typed `updated:` — a timestamp in the
+   # future made `git log --since` hide every later commit from this check (task.135).
+   GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
    DOC_STATUS=$(grep -E '^status:' "$TASK_FILE" | head -1 | awk '{print $(2)}')
-   # Any commit touching source since the gate was written?
-   CODE_MOVED=$(git log --since="$GATE_DATE" --name-only --format="" -- \
-     apps packages 2>/dev/null | sort -u | head -1)
+   # A head the trigger cannot vouch for fails toward re-review, never toward "nothing moved": a
+   # hand-typed `head: HEAD` counted 0 commits on every run, and an off-branch head counted only what
+   # it happened not to share, so a PASS gate skipped review whatever landed after it (task.168
+   # CR4-1). Step 3b HALTs on the same heads; here the safe answer is to re-review.
+   if [ -n "$GATE_HEAD" ] && ! { printf '%s' "$GATE_HEAD" | grep -qE '^[0-9a-f]{40}$' \
+        && git cat-file -e "${GATE_HEAD}^{commit}" 2>/dev/null \
+        && git merge-base --is-ancestor "$GATE_HEAD" HEAD 2>/dev/null; }; then
+     echo "trigger: gate head '$GATE_HEAD' is not a 40-hex commit on this branch — re-reviewing"
+     CODE_MOVED=1; DOC_MOVED=1
+   elif [ -n "$GATE_HEAD" ]; then
+     # Commits since the commit the gate judged, on EVERY path except this task's own directory —
+     # the gate, the QA report, the task document and the implementation report live there and move
+     # on every cycle. A fixed list of source directories missed scripts/, tests/ and a consumer's
+     # src/ (task.135 CR-3); excluding all of docs/ hid a documentation deliverable (CR2-4).
+     # `|| echo 1` fails toward re-review when git cannot answer (a head this checkout lacks).
+     CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- . ":(exclude)$TASK_DIR" 2>/dev/null || echo 1)
+     # Uncommitted and untracked changes outside the task directory are movement too: the gate
+     # never read them (CR2-5). An untracked file counts here even though Step 3b only WARNS on one
+     # (a held file the develop pipeline restored is the normal state of a healthy branch): the
+     # trigger cannot tell a restored file from a new fix file, so it fails toward re-review and the
+     # cost is one cycle (task.168 QA cycle 2, CR-3).
+     git diff --quiet HEAD -- . ":(exclude)$TASK_DIR" 2>/dev/null || CODE_MOVED=$((CODE_MOVED + 1))
+     [ -z "$(git ls-files --others --exclude-standard -- . ":(exclude)$TASK_DIR" 2>/dev/null)" ] || CODE_MOVED=$((CODE_MOVED + 1))
+     # The document is compared from the commit that last wrote the GATE, not from the head: a QA
+     # cycle edits the task document itself (QA Results, Change Log) after the head it records, and
+     # those edits land beside the gate. Measured from the head, every gate would read "document
+     # moved" and the skip branch below could never fire. This relies on the QA loop committing
+     # the document edits WITH the gate; a split commit reads as "moved" and costs one re-review.
+     # The comparison is commit-to-WORKING-TREE, so an uncommitted edit to the document counts
+     # (task.135 CR-4).
+     GATE_COMMIT=$(git log -1 --format=%H -- "$LATEST_GATE" 2>/dev/null)
+     if [ -n "$GATE_COMMIT" ]; then
+       git diff --quiet "$GATE_COMMIT" -- "$TASK_FILE" 2>/dev/null && DOC_MOVED=0 || DOC_MOVED=1
+     else
+       DOC_MOVED=1                   # gate not committed yet — nothing to measure from
+     fi
+   else
+     CODE_MOVED=1; DOC_MOVED=1       # a gate with no head (schema 1) cannot vouch for the present tree
+   fi
    ```
 
    **Skip re-review (exit with success message) ONLY when ALL of:**
    - Gate status is `PASS`
    - AND `top_issues` list is empty
-   - AND `CODE_MOVED` is empty — no source commit since the gate
-   - AND `DOC_DATE` is not newer than `GATE_DATE` — the task document has not been edited since
+   - AND `CODE_MOVED` is `0` — nothing outside the task's own directory changed since the commit the gate judged: no commit, no uncommitted edit, no untracked file
+   - AND `DOC_MOVED` is `0` — the task document has not been edited since the gate was committed
    - AND `DOC_STATUS` is not one of `in-progress` / `ready-for-development` / `planned` — a status
      that moved *backwards* from `accepted` means the work was reopened
    - Message: "Task already has clean PASS gate with no concerns, and neither the code nor the
@@ -200,8 +277,9 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    - Gate status is `CONCERNS`, `FAIL`, or `WAIVED`
    - OR `top_issues` has items (even if gate is PASS)
    - OR no gate file exists (first review)
-   - OR **source changed since the gate** (`CODE_MOVED` non-empty)
-   - OR **the document changed since the gate** (`DOC_DATE` > `GATE_DATE`)
+   - OR **anything outside the task's directory changed since the gate's head** — committed, uncommitted or untracked (`CODE_MOVED` > 0)
+   - OR **the document changed since the gate was committed** (`DOC_MOVED` = 1)
+   - OR **the gate carries no `head:`** (schema 1) — both of the above read `1`
    - OR **the document was reopened** (status moved backwards from `accepted`)
    - Message: "Performing QA re-review (previous gate: {status} with {count} issues; {reason})"
 
@@ -234,73 +312,54 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    Evaluate `SAFETY_REPROBE` from the prior gate **now**, before Step 3b needs it:
 
    ```bash
-   # $LATEST_GATE is the prior gate file resolved above. Trigger clause 1, per the shared rule.
-   # POSIX character classes only: `\s` is a GNU extension that BSD/mawk silently never match,
-   # which fails the trigger CLOSED — the carve-out would never fire and nothing would say so.
-   # LATEST_GATE is EMPTY on a first review. `awk 'prog' ""` passes no filename, falls back to
-   # reading stdin, and hangs indefinitely — a hang, not an error. Guard it, and close stdin so the
-   # fallback is unreachable even if the guard is ever removed.
-   # Clause 1 has TWO halves and they fail in opposite directions: the status half
-   # fails CLOSED (an unreadable gate is not evidence of a failure), the evidence half
-   # fails OPEN (a missing `evidence:` key reads as `unverified` and FIRES). See the
-   # shared rule — writing the second half closed makes every pre-existing gate silent.
+   # Bound in THIS shell: the step-1 block that resolved it is another shell, and an unbound read
+   # here reads as "no gate" and leaves SAFETY_REPROBE=false — the carve-out could never fire (task.135 QA cycle 2 probe).
+   # Validate the input before deriving from it: unbound, dirname "" is ".", no gate is found, and
+   # every signal below silently reads "no prior gate" (task.135 QA cycle 3, CR3-1).
+   [ -f "$TASK_FILE" ] || { echo "HALT: TASK_FILE ('$TASK_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
+   TASK_DIR=$(dirname "$TASK_FILE")
+   # The two-call pattern step 1 uses (task.168, 5c CR-1). qa-cycle.sh exits 1 for "no gate file",
+   # for "gate files with no cycle number" and, under --path, for "two files claim one cycle"; only
+   # the first is a first review. Its own reason tells them apart, so it is read rather than dropped:
+   # the one refusal that means "first review" is let through, every other refusal is a HALT that
+   # prints the helper's line (QA cycle 1, CR-3). The selection itself stays the helper's — no glob
+   # here duplicates it (task.158).
+   if [ -z "${LATEST_GATE:-}" ]; then
+     GATE_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" 2>&1); rc=$?
+     [ "$rc" -le 1 ] || { echo "HALT: qa-cycle.sh not runnable (rc=$rc) — check the bundled path"; exit 1; }
+     if [ "$rc" -eq 0 ]; then
+       LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate); rc=$?
+       [ "$rc" -eq 0 ] || { echo "HALT: qa-cycle.sh refused cycle $GATE_CYCLE (see its line above) — resolve the gate files, then re-run"; exit 1; }
+     else
+       case "$GATE_CYCLE" in
+         *"no gate file in"*) : ;;   # a first review — nothing to bind
+         *) printf '%s\n' "$GATE_CYCLE"; echo "HALT: qa-cycle.sh could not derive the QA cycle (see its line above) — resolve the gate files, then re-run"; exit 1 ;;
+       esac
+     fi
+   fi
+   # $LATEST_GATE is the prior gate file. Trigger clause 1, per the shared rule — whose one
+   # definition is the bundled qa-safety-clause1.sh (task.168 CR3-4). It prints true or false; an
+   # empty or unreadable gate is false (the status half fails CLOSED), a security block with no
+   # evidence: key is true (the evidence half fails OPEN). Step 3b recomputes it from its own shell.
    SAFETY_REPROBE=false
    if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
-     SECURITY_AXIS=$(awk '
-       # Three transit constraints govern every line below — no whole-record
-       # variable, no apostrophe, no GNU-only escape. See "Transit constraints"
-       # in the shared rule for why each one fails silently. Each has a test.
-       !f && /^[[:space:]]*security:[[:space:]]*$/ {
-         n = length; sub(/^[[:space:]]*/, ""); ind = n - length; f = 1; next
-       }
-       f {
-         # A key at or left of the indent of security: ends the block, so keys
-         # belonging to a later NFR axis can never be read as this one.
-         n = length; sub(/^[[:space:]]*/, ""); lead = n - length
-         if (length > 0 && lead <= ind) exit
-         if (st == "" && /^status:/) {
-           st = (/[[:space:]]FAIL[[:space:]]*$/) ? "FAIL" : "OK"
-         }
-         if (ev == "" && /^evidence:/) {
-           ev = "unverified"
-           if (/evidence:[^[:alpha:]]*measured/) ev = "measured"
-           else if (/evidence:[^[:alpha:]]*reasoned/) ev = "reasoned"
-         }
-       }
-       END {
-         if (!f) { print "absent"; exit }
-         printf "%s %s\n", (st == "" ? "OK" : st), (ev == "" ? "unverified" : ev)
-       }
-     ' "$LATEST_GATE" </dev/null)
-     case "$SECURITY_AXIS" in
-       absent)                     : ;;
-       *FAIL*)                     SAFETY_REPROBE=true ;;
-       *unverified*)               SAFETY_REPROBE=true ;;
-       "OK measured"|"OK reasoned") : ;;
-       # The branches above are EXHAUSTIVE over what the program can emit, so
-       # reaching here means the reader produced something it cannot produce —
-       # in practice the EMPTY string, from an awk that died, is missing, or had
-       # its program corrupted in transit. That is a claim about the instrument,
-       # not about the gate, so it fires: nothing has established the axis is
-       # fine. `absent` is a deliberate answer; empty is not an answer at all.
-       #
-       # The clean readings must be listed BEFORE this. Leaving them to the
-       # catch-all makes every passing gate fire — which is what happened when
-       # this branch was first added.
-       *)                          SAFETY_REPROBE=true ;;
-     esac
+     SAFETY_REPROBE=$(bash .agents/skills/qa-task/references/qa-safety-clause1.sh "$LATEST_GATE") || exit 1
    fi
+   echo "SAFETY_REPROBE=$SAFETY_REPROBE (clause 1; clauses 2–3 by judgement below)"
    ```
 
    Clause 1 is mechanical and shown above. Clauses 2 and 3 are judgement calls made against the
    gate's `top_issues[]` and the task's own Success Criteria — read the shared rule and set
    `SAFETY_REPROBE=true` if either holds.
 
-   Default scoping (when `SAFETY_REPROBE` is false) narrows to files changed since the last gate:
+   Default scoping (when `SAFETY_REPROBE` is false) narrows to files changed since the commit the
+   last gate judged — its `head:`:
 
    ```bash
-   git log --since="{gate_date}" --name-only --format="" | sort -u
+   git diff --name-only "{gate_head}"..HEAD
    ```
+
+   A gate with no `head:` (schema 1) runs unscoped and says so; Step 3b holds the whole rule.
 
    Include a **Re-Review Context** section at the top of the new QA report listing each previous
    issue and its current status (FIXED / PARTIAL / NOT FIXED), and a **New Findings This Cycle**
@@ -374,34 +433,116 @@ For each phase in the implementation plan:
 
 Adversarially review the change set's **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the document-anchored checks above do not provide. Governed by the **Adaptive Review Strategy**: run a single light pass in lite/small/re-review; a full pass otherwise; skip entirely when the diff touches no reviewable code. **One exception, and it overrides the strategy: cycle 2 is always a full refute pass** (step 1 below). A re-review that gets shallower each cycle is how a loop runs five times and learns nothing after the first.
 
-1. **Scope the diff** to this cycle's changes and write it to a patch file (keeps diff bytes out of main context). First review → the whole branch diff. **Cycle 2 (exactly one prior gate) → the whole branch diff again, reviewed to refute** (see the refute directive under step 2). Cycle 3+ → files changed since the last gate's `updated:` date:
+1. **Scope the diff** to this cycle's changes and write it to a patch file (keeps diff bytes out of main context). First review → the whole branch diff. **Cycle 2 (exactly one prior gate) → the whole branch diff again, reviewed to refute** (see the refute directive under step 2). Cycle 3+ → files changed since the commit the last gate judged — its `head:`, never its `updated:` (task.135):
 
    ```bash
    BASE_REF=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)   # standalone tasks usually target develop
    BASE="origin/${BASE_REF:-develop}"
-   DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
+   # X's LAST: BSD mktemp (macOS) randomises only a trailing run of X's. With a suffix after them it
+   # creates the literal name once and fails on every later run, leaving DIFF_FILE empty (obs #181).
+   # GNU reads a trailing suffix as implied --suffix, so Linux CI never saw it.
+   DIFF_FILE=$(mktemp "${TMPDIR:-/tmp}/qa-code-review.XXXXXX")
    # How many gates already exist? 0 = first review, 1 = cycle 2, 2+ = cycle 3 and later.
+   # $TASK_DIR is an input bound by the agent in this shell; unbound, find reads nothing, PRIOR_GATES is
+   # 0 and every cycle silently takes the first-review branch (task.135 QA cycle 3, CR3-3).
+   [ -d "$TASK_DIR" ] || { echo "HALT: TASK_DIR ('$TASK_DIR') is not a directory — bind the work item's directory in this shell"; exit 1; }
    PRIOR_GATES=$(find "$TASK_DIR" -maxdepth 1 -name "task.*.gate.*.yml" 2>/dev/null | wc -l | tr -d ' ')   # "0" with no gate — an `ls` glob left this EMPTY under zsh and the -ge below errored (obs #145)
-   # Re-review only: derive the prior gate's date from its `updated:` field ($LATEST_GATE set in Phase 0).
-   LAST_GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
+   # The latest gate, bound in THIS shell — Phase 0 binds $LATEST_GATE in its own block, which is
+   # another shell, so reading it here unbound made every cycle 3+ run unscoped (task.135 CR-2).
+   # Empty on a first review (qa-cycle.sh refuses with no numbered gate); the block below HALTs
+   # when two or more gates exist and none could be bound. stderr is kept: qa-cycle.sh names why
+   # it refused (two files claiming one cycle), which the HALT below cannot know (CR2-8).
+   [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate)
+   # The work item's own directory, which the shared block's uncommitted-fix HALT excludes: the
+   # implementation report's updates sit uncommitted there until Step 8 (task.168 CR3-7; QA cycle 2, CR-4).
+   WORK_ITEM_DIR="$TASK_DIR"
+   # Clause 1 is mechanical: recompute it from the gate bound above rather than trust the value bound
+   # for it (task.168 CR3-4). A computed true overrides a bound false; a bound true (clauses 2–3,
+   # judgement) still stands, and an unbound value still HALTs below unless this sets it.
+   # A script that cannot run is a HALT, not a quiet "false": that would trust the bound value again.
+   if [ -n "${LATEST_GATE:-}" ]; then
+     CLAUSE_1=$(bash .agents/skills/qa-task/references/qa-safety-clause1.sh "$LATEST_GATE") \
+       || { echo "HALT: qa-safety-clause1.sh did not run — check the bundled path"; exit 1; }
+     [ "$CLAUSE_1" = true ] && SAFETY_REPROBE=true
+   fi
+   # The commit the prior gate judged, read from its `head:` field ($LATEST_GATE set in Phase 0) —
+   # never from its `updated:`. A typed timestamp in the future made `git log --since` match nothing,
+   # one in the past widened the scope, and neither shows in the output (task.135). A schema-1 gate
+   # has no head, and reads as empty here. $LATEST_GATE is bound by the caller's own preamble in THIS
+   # shell — Phase 0 binds it too, but in another shell (task.135 QA cycle 1, CR-2).
+   LAST_GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
    # $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
    # guard, not a second block in front of it — two places assigning $DIFF_FILE is how one of them
    # silently stops mattering.
-   if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since last gate
+   # It is an INPUT to this block, bound by the agent in THIS shell — Phase 0's block is another shell,
+   # and clauses 2–3 are judgement calls no block can recompute. Unset, the guard below would read it as
+   # "not true" and narrow after a security FAIL, the exact case the carve-out exists for (task.135
+   # QA cycle 2, CR2-1). So cycle 3+ refuses to run without it.
+   [ "$PRIOR_GATES" -lt 2 ] || case "${SAFETY_REPROBE:-}" in
+     true|false) ;;
+     *) echo "HALT: SAFETY_REPROBE is '${SAFETY_REPROBE:-}' — bind it in this shell to the true|false Phase 0 step 5 resolved (clause 1 from the gate, clauses 2–3 by judgement)"; exit 1 ;;
+   esac
+   # Every re-review arm reads committed history — the scoped arm's file list from <head>..HEAD, and
+   # every arm's patch from BASE...HEAD — while Phase 0's trigger counts an uncommitted change as
+   # movement. A fix still in the working tree would trigger this re-review and then be reviewed as
+   # absent, on cycle 2, on the safety re-probe and on a schema-1 gate as much as on the scoped arm
+   # (task.168 CR3-7; QA cycle 1, CR-2). $WORK_ITEM_DIR is bound by the caller's preamble and is
+   # excluded because the pipeline's own bookkeeping sits uncommitted there when this block runs: the
+   # implementation report's updates, deferred to Step 8 (QA cycle 2, CR-4). Unbound, or the
+   # repository root, the exclusion below would exclude nothing or everything — refuse both.
+   if [ "$PRIOR_GATES" -ge 1 ]; then
+     [ -n "${WORK_ITEM_DIR:-}" ] && [ -n "$(git -C "$WORK_ITEM_DIR" rev-parse --show-prefix 2>/dev/null)" ] \
+       || { echo "HALT: WORK_ITEM_DIR ('${WORK_ITEM_DIR:-}') is not a work-item directory below the repository root — bind it in this shell"; exit 1; }
+     # TRACKED changes HALT. Untracked files only warn: the develop pipeline's Step 4 holds out-of-scope
+     # untracked files aside for the PR commit and restores them into the tree for the whole QA loop,
+     # so an untracked file outside the work item is the normal state of a healthy branch, not a fix
+     # left uncommitted (QA cycle 1, CR-1). .claude/state is the pipeline's own scratch — excluded from
+     # both lists: a consumer that tracks .claude/ has the lock rewritten by set-qa-phase.sh just before
+     # this block runs, and that is not a fix (QA cycle 2, CR-2).
+     DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
+     [ -z "$DIRTY" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):"; printf '%s\n' "$DIRTY"; exit 1; }
+     UNTRACKED=$(git ls-files --others --exclude-standard -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
+     [ -z "$UNTRACKED" ] || { echo "warning: untracked files outside the work item are not in this review — commit any that belong to the fix:"; printf '%s\n' "$UNTRACKED" | sed 's/^/  /'; }
+   fi
+   if [ "$PRIOR_GATES" -ge 2 ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since the last gate's head
      REFUTE_PASS=false
-     # An ARRAY, read line by line, and expanded as "${FILES[@]}". A scalar $FILES expanded bare
-     # word-splits under bash and does NOT under zsh: there the whole newline-joined list is one
-     # pathspec that matches nothing, git diff writes an empty patch, and the reviewer reviews
-     # nothing while reporting clean (obs #76, #110 — task.110 cycle 3). The array form splits
-     # the same way in both shells.
-     FILES=()
-     while IFS= read -r f; do [ -n "$f" ] && FILES+=("$f"); done \
-       < <(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
-     [ "${#FILES[@]}" -gt 0 ] && git diff "$BASE...HEAD" -- "${FILES[@]}" > "$DIFF_FILE"
-     # Non-vacuity: files changed but the scoped patch is empty ⇒ the scoping is wrong, not the
-     # code clean. Refuse to dispatch on nothing.
-     if [ "${#FILES[@]}" -gt 0 ] && [ ! -s "$DIFF_FILE" ]; then
-       echo "HALT: ${#FILES[@]} files changed since $LAST_GATE_DATE but the scoped diff is empty — check the pathspec expansion"; exit 1
+     if [ ! -f "$LATEST_GATE" ] || [ ! -r "$LATEST_GATE" ]; then
+       # Two or more gates exist, so an empty or unreadable $LATEST_GATE is a binding failure, not a
+       # schema-1 gate. Saying "schema 1" here would record a false cause on every cycle 3+.
+       echo "HALT: $PRIOR_GATES gates exist but LATEST_GATE ('$LATEST_GATE') is not a readable file — bind it with qa-cycle.sh --path gate in this shell"; exit 1
+     elif [ -z "$LAST_GATE_HEAD" ]; then
+       # No head (a schema-1 gate): scoping needs the commit the gate judged, and a timestamp is not
+       # one. Run unscoped and say so — never fall back to `--since`.
+       echo "Re-review scope: unscoped — prior gate carries no head: (schema 1)"
+       git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
+     else
+       git cat-file -e "${LAST_GATE_HEAD}^{commit}" 2>/dev/null \
+         || { echo "HALT: gate $PRIOR_GATES names head $LAST_GATE_HEAD, which this checkout does not have — fetch it, or run this cycle unscoped deliberately"; exit 1; }
+       git merge-base --is-ancestor "$LAST_GATE_HEAD" HEAD \
+         || { echo "HALT: the head of gate $PRIOR_GATES ($LAST_GATE_HEAD) is not an ancestor of HEAD — the branch was rewritten; re-record the gate's head: or run this cycle unscoped deliberately"; exit 1; }
+       # An ARRAY, read line by line, and expanded as "${FILES[@]}". A scalar $FILES expanded bare
+       # word-splits under bash and does NOT under zsh: there the whole newline-joined list is one
+       # pathspec that matches nothing, git diff writes an empty patch, and the reviewer reviews
+       # nothing while reporting clean (obs #76, #110 — task.110 cycle 3). The array form splits
+       # the same way in both shells. NUL-delimited, not line-delimited: without -z git C-quotes a
+       # non-ASCII, quote or backslash path ("sk\303\251.sh"), and the quoted name then matches
+       # nothing as a pathspec — the file silently leaves the scope (task.135 QA cycle 3, CR3-6).
+       FILES=()
+       while IFS= read -r -d '' f; do [ -n "$f" ] && FILES+=("$f"); done \
+         < <(git -c core.quotePath=false diff --name-only -z "$LAST_GATE_HEAD"..HEAD)
+       if [ "${#FILES[@]}" -eq 0 ]; then
+         echo "HALT: nothing changed since the head of gate $PRIOR_GATES (${LAST_GATE_HEAD:0:12}) — there is no fix to review; check the cycle order"; exit 1
+       fi
+       # --literal-pathspecs: FILES are file names, not pathspecs. Without it a name beginning with
+       # `:` is pathspec magic (`:README.md` matches README.md, `:!x` excludes x) and the file silently
+       # leaves the scope (task.168 CR4-2) — the pathspec half of what -z fixed for quoting above.
+       git --literal-pathspecs diff "$BASE...HEAD" -- "${FILES[@]}" > "$DIFF_FILE"
+       # Non-vacuity: files changed but the scoped patch is empty ⇒ the scoping is wrong, not the
+       # code clean. Refuse to dispatch on nothing.
+       if [ ! -s "$DIFF_FILE" ]; then
+         echo "HALT: ${#FILES[@]} files changed since ${LAST_GATE_HEAD:0:12} but the scoped diff is empty — the pathspec matched nothing, or every one of those files is back to its base content; check before reviewing nothing"; exit 1
+       fi
+       echo "Re-review scope: files changed since gate $PRIOR_GATES (head ${LAST_GATE_HEAD:0:12}; ${#FILES[@]} files) — default"
      fi
    else                                                             # first review, cycle 2, or safety re-probe — whole branch diff
      [ "$PRIOR_GATES" = "1" ] && REFUTE_PASS=true || REFUTE_PASS=false
@@ -445,6 +586,12 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    predicate, whether or not it touches a lifecycle: find one pair that must be the same and one
    that must differ. A key changed to fix one direction has usually broken the other.
 
+   Resource bounds — for every change that runs a configured command, compiles a caller-supplied
+   pattern, or loops over input it does not bound: a timeout must kill the whole process tree, not
+   only the `sh -c` it spawned; a matcher must stay linear on a repeated pattern (time it at growing
+   N); and the command must not run against a working tree it did not expect. No later cycle
+   re-reads code it did not change, so these bounds are probed here or not at all.
+
    Review the COMBINATION, not only each change: at least one real lifecycle defect of the shape
    above was caused by two earlier fixes that were each correct alone.
    ```
@@ -470,6 +617,35 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
 
    Why both, rather than one flag: refuting the fixes and re-probing the surface have different
    targets. Collapsing them would make cycle 3+ lose the refute, or cycle 2 lose the re-probe.
+
+   **Check every anchor before the findings go anywhere** (task.194). A reviewer's `file_line` is a
+   claim, not a fact: on PR #594 the shared reviewer reported every finding at a patch-file line
+   number, and the number was rendered as if it were real. Right after the `code_review:` block is
+   read, write it to a JSON file and run the shared checker, from the repository root:
+
+   ```bash
+   # The parsed code_review: block as JSON — {"code_review":{…}}. Items 5 and 6 read this same file.
+   FINDINGS_JSON=$(mktemp "${TMPDIR:-/tmp}/qa-findings.XXXXXX")
+   # A quoted heredoc: line_text quotes source, and source carries ' and $.
+   cat > "$FINDINGS_JSON" <<'JSON'
+{findings-json}
+JSON
+   # --rev HEAD: the diff under review is $BASE...HEAD, so uncommitted edits are not what was reviewed.
+   command node .agents/skills/qa-task/references/finding-anchors.js \
+     --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
+     --rev HEAD --annotate "$FINDINGS_JSON" --json
+   # exit 1 = malformed anchors exist. NOT a halt: every finding now carries anchor_check — mark, continue.
+   # exit 2 = the call is wrong: usage (the findings file), bad-root (--root is not a directory), or bad-rev
+   #   (--rev names no commit here — fetch it).
+   #   Fix the call; never treat unchecked anchors as verified.
+   ```
+
+   Every finding now carries `anchor_check`. `ok`, `unchecked-text` and `no-line` are clean;
+   `no-such-file`, `out-of-range` and `text-mismatch` mean the reviewer named a line that is not the
+   one it meant. **A malformed anchor is never dropped**: it renders in `## Code Review` with
+   `⚠️ unverified anchor` (item 5), and item 6 never maps it to `top_issues[]` with a location it
+   does not have. The checker reports and never repairs — guessing the intended line would hide the
+   reviewer defect this exists to show.
 
 3. **Apply the boundary rule — execute, do not only read.** When the reviewer has returned, apply
    `references/probe-boundary-rule.md`: decide whether the change set delivers a **boundary** — a
@@ -508,10 +684,19 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    wrote — equal to `executed` in the engine's JSON), never counted by hand; the gate's
    `nfr_validation.security.evidence` may read `measured` only when that total is positive. An empty
    findings list with `probes_executed: 0` is a review that read the boundary and did not test it,
-   which is the defect this item closes. `boundary: false` is the common case and a legitimate skip — record it in the QA
+   which is the defect this item closes. So when `boundary: true` and the run record's
+   `totals.executed` is 0, that is a QA finding, not a `reasoned` pass: name the remedy in it — make
+   the entry reachable (an export, an entry form that fits), or record that the DoD will need an
+   override — because finalise's zero-guard fails the same record. By-hand probes never count toward
+   `probes_executed` (obs #212, #231). `boundary: false` is the common case and a legitimate skip — record it in the QA
    report's `## Code Review` section rather than leaving `probes_executed` absent. The record names
    each predicate-shaped function the diff adds and the signal it lacks — a `boundary: false` with no
-   candidates named is not a decision (obs #156). A boundary that is
+   candidates named is not a decision (obs #156). The field is three-valued — `true | false | internal`:
+   `boundary: internal` is for a validator whose only input is an artefact this pipeline writes and
+   that no corpus sink models, recorded with its `internal_reason` in the same section; it is not
+   available once a sink fits (`markdown-structure` fits the implementation report, so
+   `report-lint.js#lintReport` is probed with `--args-json`, never `internal`). The rule:
+   `references/probe-boundary-rule.md` § "`boundary: internal` is a decision, not a verdict". A boundary that is
    read at QA and executed only at the Step 7 DoD probe lands its defect after the gate that should
    have covered it: a 14-star glob compiled to `[^/]*` × 14 passed five green cycles and was found at
    finalise (obs #20).
@@ -535,13 +720,17 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    assume the reviewing host is the CI host. The same rule is a mandatory check in
    `references/code-review-prompt.md`, so the reviewer reports the candidate and this step runs it.
 
-5. **Record — always (advisory):** put every finding (bugs + cleanups, with `file:line`) into the QA report `## Code Review` section (Step 11) and the PR comment (Step 13).
+5. **Record — always (advisory):** put every finding (bugs + cleanups, with `file:line`) into the QA report `## Code Review` section (Step 11) and the PR comment (Step 13). A finding with a malformed `anchor_check` is recorded too, with `⚠️ unverified anchor ({anchor_check})` after its `file:line`.
 
 5b. **Provenance — is a reproduced finding new to this change?** For every `category: bug` finding
    this step reproduced, run the same input against the PR **base** before it can enter the gate:
    `git show "origin/${BASE}:${file}"` into a scratch copy and execute the reproduction there, and
-   where a fixture corpus exists, scan it for the shape. **Identical output on base and zero corpus
-   hits ⇒ `pre-existing`**: record both measurements beside the finding, keep its severity and
+   where a fixture corpus exists, scan it for the shape. **Check scope before classifying.** When the
+   task names this defect class as in scope (its Overview, Motivation or Success Criteria list the
+   shape, or it names the residual id), identical output on base means the task is unfinished, not
+   that the finding is someone else's: keep it in `top_issues[]`, or route it to the task's
+   `## Deferred Work` with the criterion amended (obs #267). Out of scope, **identical output on base
+   and zero corpus hits ⇒ `pre-existing`**: record both measurements beside the finding, keep its severity and
    confidence exactly as returned, do **not** enter it in `top_issues[]`, and route it to the gate's
    `recommendations.future` with a named follow-up. This is not a downgrade — nothing about the
    finding changes except its attribution, and both measurements are in the report for the next
@@ -569,7 +758,13 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    else CR_BLOCKING=false; fi
    ```
 
-   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries (Step 10's deterministic rules then decide). Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries (Step 10's deterministic rules then decide). **A finding whose `anchor_check` is `no-such-file`, `out-of-range` or `text-mismatch` still maps when it qualifies** — a high-confidence bug is still a bug — but its `finding` gains `(location unverified: {file_line})`, and its `file` is `null` when the verdict is `no-such-file`, so `/qa-fix` is never sent to a line as though it were verified. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+
+   **Re-rating a promoted finding.** QA may lower a promoted finding's severity only with a measured
+   plausibility check: a corpus count, and whether any writer or template in the repository can
+   produce the shape. Record the reviewer's original severity beside the new one, in the gate finding
+   and in the QA report. Confidence is never changed. Without the measurement, the returned severity
+   stands (obs #236).
 
 7. `rm -f "$DIFF_FILE"`.
 
@@ -584,6 +779,11 @@ A green suite says the tests ran, not that they can fail. Before crediting a tes
 as coverage for a defect this cycle fixed, **revert the behaviour it names and
 confirm that test goes red** — full procedure, the outcomes table, and the shapes
 vacuity takes: [`references/mutation-proving.md`](references/mutation-proving.md).
+
+**Mutate only a tree no other agent is reading.** A mutation makes the tree lie while it is applied.
+Run the proofs after the Step 3b diff reviewer has returned, or in a scratch worktree
+(`git worktree add --detach "$SCRATCH" HEAD`), never in the working tree a dispatched reviewer is
+still reading (obs #266).
 
 **A green suite is also evidence about the platform it ran on, and only that platform.** When the change set passes an environment-derived value (`os.tmpdir()`, `$TMPDIR`, `$HOME`) to a consumer that validates it, the platform-variance check in the diff-review step applies here too: run the affected tests once under the other value (`TMPDIR=/tmp node --test …`) before crediting them as coverage. A suite that is green on macOS and red on Linux CI is not a flake; it is the fixture path failing a containment check it never met locally (obs #17).
 
@@ -729,6 +929,18 @@ other `category: bug` finding. No new report or gate schema.
 
 For each success criterion, compare target vs actual:
 
+**Classify each success criterion the way finalise will, then verify it from evidence, never from its
+checkbox.** Finalise's AC agent (`finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill) sorts
+every criterion into a behaviour criterion, which needs a committed test that runs per PR, or one of
+the test-free kinds Step 3 lists; that step owns the list. A criterion a named test holds cites the
+test. A criterion no test holds is verified by reading the code it describes: cite the `file:line`
+that makes it true, not the developer's checkbox or the implementation report's say-so, or mark it
+**unverified** (a measured criterion cites its committed measurement and command, as Step 3 asks).
+Performance and structural criteria ("defined once", "one pass", "offline") are the usual case,
+because no test carries them (obs #210). A behaviour criterion whose only evidence is a hand run,
+with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
+rather than halting at finalise (obs #224).
+
 **Functional Criteria:**
 
 | Criterion                   | Target | Actual | Status   | Notes |
@@ -861,16 +1073,34 @@ Create gate file co-located with the task document:
 
 **Location**: `{task-directory}/task.{id}.gate.{number}.{descriptive-name}.yml`
 
+**Bind the head and the clock before writing the YAML** — both are read, never typed (task.135):
+
+```bash
+GATE_HEAD=$(git rev-parse HEAD)                  # the commit this review judged — the next cycle scopes from it
+GATE_UPDATED=$(date -u +%Y-%m-%dT%H:%M:%SZ)      # UTC, from the clock
+```
+
+This skill makes no commit between the review and this write, so `HEAD` here is the tree the review read.
+Substitute both values into the YAML. A gate whose `updated:` was typed rather than read from the
+clock is the defect task.135 removed: on task.130 four gates carried local time with a `Z` suffix,
+up to three hours in the future, and the next cycle's `git log --since` scope matched nothing.
+`head:` is the commit **reviewed**, not the commit the gate is committed in — the gate lands in a
+later commit. The repository's gate-head freshness test fails a `schema: 2` gate whose
+`head:` is not a full SHA, whose `updated:` is not a `date -u` timestamp, or whose `updated:`
+precedes the head's author time when the head resolves. Existence and ancestry are checked by the
+Step 3b scope block at the next cycle and by the 5c conformance lens, while the branch is intact.
+
 **Gate YAML Schema:**
 
 ```yaml
-schema: 1
+schema: 2
 task: 'task.{id}.{name}'
 task_title: '{task title}'
 gate: PASS|CONCERNS|FAIL|WAIVED
 status_reason: '1-2 sentence explanation of gate decision'
 reviewer: 'QA Engineer'
-updated: '{ISO-8601 timestamp}'
+head: '{GATE_HEAD}'        # 40-hex — git rev-parse HEAD when the review was performed
+updated: '{GATE_UPDATED}'  # date -u +%Y-%m-%dT%H:%M:%SZ at write time — never typed
 
 top_issues: [] # Empty if no issues; otherwise a list of entries shaped:
   # - id: '{PREFIX-###}'
@@ -955,7 +1185,7 @@ Create QA report co-located with the task document:
 
 **QA Report Structure:**
 
-```markdown
+````markdown
 # QA Report: Task {ID} - {Title}
 
 **Task**: [Link to task document](./task.{id}.{name}.md)
@@ -999,12 +1229,17 @@ Create QA report co-located with the task document:
 
 {Direct tools / parallel agents / hybrid — rationale}
 
+**A reviewer time written here is measured, not recalled** — dispatch and return from `date -u`, a
+duration from the completion notice's `duration_ms`, or `(not measured)`. The rule:
+[`references/develop-pipeline-autonomous-defaults.md`](references/develop-pipeline-autonomous-defaults.md#subagents--unavailable-failed-slow) §Subagents (obs #230).
+
 **Re-reviews only — record the scope decision as one line**, per
 [`references/qa-re-review-scope.md`](references/qa-re-review-scope.md):
 
 ```
 Re-review scope: unscoped (prior gate failed on security)
-Re-review scope: since {LAST_GATE_DATE} (default)
+Re-review scope: files changed since gate {N} (head {12-hex}; {k} files) — default
+Re-review scope: unscoped — prior gate carries no head: (schema 1)
 ```
 
 Naming the scope is what makes a quiet cycle auditable. Without it, "we found nothing" and "we did
@@ -1102,7 +1337,7 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 **Correctness bugs ({count}):**
 {for each bug finding:}
-- [{severity}/{confidence}] `{file_line}` — {finding} → {suggested_action}
+- [{severity}/{confidence}] `{file_line}`{ ⚠️ unverified anchor ({anchor_check}) — only when malformed} — {finding} → {suggested_action}
 
 **Cleanups ({count}):**
 {for each cleanup finding (reuse / simplification / efficiency):}
@@ -1157,7 +1392,7 @@ Statements: X% | Branches: Y% | Functions: Z% | Lines: W%
 **QA Report**: co-located at `task.{id}.qa.{number}.{name}.md`
 **Gate File**: co-located at `task.{id}.gate.{number}.{name}.yml`
 **Next Steps**: {fixes / deployment / follow-up}
-```
+````
 
 **Check the report's links before leaving this step.** CI's `docs-link-check` reads every changed
 `docs/**/*.md` — a QA report as much as the document beside it — and a quoted finding that contains a
@@ -1208,6 +1443,45 @@ Add (or replace) the QA Results section in the task document:
 {Brief summary, or "No critical issues identified"}
 ```
 
+**Write the section through the engine — one call, never a hand edit.** Save the rendered section
+to `.claude/state/qa-results-section.md`, then:
+
+```bash
+# QA Testing Results writer (task 155) — replaces, relocates or creates the one section.
+[ -f "$TASK_FILE" ] || { echo "HALT: TASK_FILE ('$TASK_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
+command node -e '
+  const fs = require("fs");
+  const QR = require("./.agents/skills/qa-task/references/qa-results.js");
+  const [file, sectionFile, docType] = process.argv.slice(1);
+  const r = QR.upsertQaResults(fs.readFileSync(file, "utf8"),
+                               fs.readFileSync(sectionFile, "utf8"), { docType });
+  if (!["replaced", "relocated", "created"].includes(r.reason)) {
+    console.error(`HALT qa-results: ${r.reason}${r.detail ? ` (${r.detail})` : ""} — ${file} not written.` +
+      (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." :
+       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 (setext included), a Change Log heading (a fenced `# comment` counts) or, under a change log, a dated log row. The detail names the line. Fix that section by hand, re-run." :
+       r.reason === "bad-section" ? " The rendered section was refused; the detail names the rule. Fix the render (one section, no own Bug Reports or Deferred Work block, no trailing HTML comment), re-run." :
+       r.reason === "unplaceable" ? " The write would not read back as exactly one section (an unclosed fence near the insertion point?). Fix by hand, re-run." : ""));
+    process.exit(1);
+  }
+  fs.writeFileSync(file, r.content);
+  fs.unlinkSync(sectionFile); // consumed: a stale copy must not feed the next cycle
+  console.log(`qa-results: ${r.reason}`);
+' "$TASK_FILE" .claude/state/qa-results-section.md task
+```
+
+The engine is `references/qa-results.js`. It places a new section immediately before the
+change-log block (else before `## Progress Tracking`, else at the end), moves one it finds
+**inside** the change-log block out of it (`relocated`), and **refuses** a document that already
+carries more than one (`multiple`) — it never guesses which copy is current. It also refuses a
+section it cannot bound (`unbounded`: an unclosed fence, or removed text that carries a change-log
+marker, an H1/H2 or a Change Log heading — scanned ignoring fences, so a fenced `# comment` counts) and a write that would not read back as one
+section (`unplaceable`). On any refusal the step halts; a hand edit is not a fallback. A `### Bug Reports`
+list (`create-bug-report`) or `### Deferred Work` block (the pipeline's loop exit) already inside the
+section is carried through the replace; the rendered section must not include either — a render
+that does is refused as `bad-section`. Write the section **before** the Change Log row below,
+so the change-log write sees a relocated section already outside its block. A hand-rolled
+`slice(indexOf(…), indexOf("## Change Log"))` stacked four copies on task.145 (obs #178).
+
 **Update task status based on gate decision** — the same rule `qa-story` states, and the only
 vocabulary the lifecycle admits:
 
@@ -1252,7 +1526,7 @@ Step 13**: a check that runs before the claim is written cannot check it.
 # From the repository root. {task-file} is the task document this QA run just edited — substitute it; the script
 # refuses an unsubstituted placeholder (exit 2), so a block run as delivered
 # cannot pass by reading nothing.
-node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}"
+command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}"
 ```
 
 `qa-read-back.js` is the read-back, defined once for both QA skills and tested directly
@@ -1261,8 +1535,9 @@ Step 12b HALT with each problem and its remedy printed, and exit 2 is "could not
 arguments, an unreadable document, a sibling engine that did not load). Exit 2 is never a pass. It
 checks four things:
 
-1. **The claims exist.** This cycle's gate and QA report are in the work item's directory, and the
-   document has a Change Log row. An absent one halts, named.
+1. **The claims exist.** This cycle's gate and QA report are in the work item's directory, the
+   document links **those two files** — not an earlier cycle's (task.158) — and it has a Change Log
+   row. An absent one halts, named.
 2. **What this run wrote is staged.** The link check reads the index, so the script stages the
    document, gate and report, plus every linked target that is **`untracked`** and a regular file
    under the work item's own directory. A `git add` that fails halts. An untracked target elsewhere
@@ -1318,6 +1593,9 @@ fi
 **Write the body to a file, then post it.** Always `--body-file`, never an inline `--body`: the body below carries backticks, `$(…)` and newlines, and an inline string invites the shell to evaluate them before `gh` ever sees them. The file is also what the Bitbucket arm reads.
 
 ```bash
+# Step 12b's rule, re-checked here: every block runs as its own shell, and a run that
+# batches 12b and 13 drops the prose between them (obs #226).
+command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
 mkdir -p .claude/state
 BODY_FILE=.claude/state/qa-comment-body.md
 cat > "$BODY_FILE" <<'EOF'
@@ -1493,7 +1771,14 @@ if [ -n "$QA_ISSUE" ]; then
   # cannot name different rounds. Re-resolve rather than reusing LATEST_GATE
   # from Step 2: that one names the PREVIOUS run's gate (read to decide whether
   # to re-review), and this run has written a newer one since.
-  THIS_GATE=$(find "$TASK_DIR" -maxdepth 1 -name "task.*.gate.${QA_CYCLE:-none}.*.yml" 2>/dev/null | head -1)
+  # The file from the same helper (task.158): the name-glob lookup it replaced missed a
+  # zero-padded gate.02 and read BLOCKING_COUNT 0 on a gate with a HIGH entry. A cycle no ONE
+  # file carries (two claim it) stops here — an empty THIS_GATE would post "nothing blocking".
+  THIS_GATE=""
+  if [ -n "$QA_CYCLE" ]; then
+    THIS_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate); rc=$?
+    [ "$rc" -eq 0 ] || { echo "⚠️  qa-cycle.sh --path gate refused cycle $QA_CYCLE (rc=$rc) — resolve the gate files named above" >&2; exit 1; }
+  fi
   # `|| true`, NOT `|| echo 0`. `grep -c` PRINTS "0" and EXITS 1 when it matches
   # nothing, so `|| echo 0` appends a second zero and the variable becomes the
   # two-line string "0\n0" — which the engine's numeric coercion then reads as
@@ -1600,7 +1885,7 @@ When bug fixes are applied after a CONCERNS or FAIL gate, determine the appropri
 3. **Gate YAML** (update in place — do not create a new file unless significant re-testing occurred):
    - Update `gate` field (e.g. CONCERNS → PASS)
    - Update `status_reason`
-   - Update `updated` timestamp
+   - Re-bind `head:` and `updated:` exactly as in Step 10 — the gate now vouches for the commit the fixes were verified on
    - Add `status: closed` and `fixed_date` to each resolved issue in `top_issues`
    - Update `quality_score`
    - Add `bug_resolution` section
@@ -1611,6 +1896,7 @@ When bug fixes are applied after a CONCERNS or FAIL gate, determine the appropri
 ```yaml
 gate: PASS  # Was: CONCERNS
 status_reason: 'Bugs #1 and #2 fixed. Tests passing, lint clean.'
+head: '9c41d0e2b7a85f3e6d1c0b9a8f7e6d5c4b3a2f1e'  # re-bound: the commit the fixes were verified on
 updated: '2026-03-20T14:30:00Z'
 
 top_issues:

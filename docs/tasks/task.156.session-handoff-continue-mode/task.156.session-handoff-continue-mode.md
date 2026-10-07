@@ -5,18 +5,22 @@ type: task
 description: "Add a `continue` write mode to session-handoff that writes a focused continuation file (goal, re-measurable state, next step, decisions, ruled-out approaches, file paths) co-located with the active work item, and prints a paste-ready resume prompt that runs the existing verifier first, so work can move to a fresh context without carrying the old one."
 tags: [session-handoff, context, handoff, continuation]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-10-02
 assignee:
 estimated_effort_hours: 16
 github_issue: 490
+completed_date: 2026-10-02
+pr_number: 548
 ---
 
 # Technical Task: session-handoff continue mode — a continuation file a fresh context resumes from
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.156.review.1.session-handoff-continue-mode.md` implemented 2026-10-01
 
 **GitHub Issue**: [#490](https://github.com/Gamaroff/agent-skills/issues/490)
 
@@ -129,7 +133,7 @@ Branch names follow `feature/task.<id>.<name>` and `feature/story.<epic>.<story>
   | Section | Rule |
   | --- | --- |
   | Header: goal + work item | 1–3 sentences. A link to the work item doc when there is one |
-  | State table `\| Check \| Command \| Result \|` | branch, HEAD, dirty-file count, the targeted test(s). Same verifier format, and **only commands on its whitelist**: a targeted test is named with `node --test --test-name-pattern=…`, since the whitelist refuses a positional after `--test` |
+  | State table `\| Check \| Command \| Result \|` | branch, HEAD, uncommitted files, the targeted test(s). Same verifier format, and **only commands on its whitelist**. Figure forms, each run through the unchanged verifier at review (review.1): **targeted test** — `node --test --test-name-pattern=…` (the whitelist refuses a positional after `--test`) with a `pass N` figure, never `exit 0`: a pattern that matches no test exits 0 and confirms, while `pass N` reads `stale`. **Uncommitted files** — dirty: `git status --porcelain` with each file name as a bold figure; clean: `git diff --quiet HEAD` with an `exit 0` figure (tracked files only). `git status --porcelain` against a `clean` figure reads `stale` on a clean tree, and an empty Result cell reads `unverifiable: no figure`. **Branch tip** — `git rev-parse --short HEAD`; committing the continuation file afterwards moves HEAD, so that row then reads `stale` (see Important Clarifications) |
   | 1. Next step | **one** concrete action, plus how to tell it is done |
   | 2. Done this session | commits by short SHA, not narrative |
   | 3. Decisions taken | decision, why, where recorded |
@@ -142,15 +146,24 @@ Branch names follow `feature/task.<id>.<name>` and `feature/story.<epic>.<story>
 - **`scripts/continuation.mjs`** (pure resolution plus a thin CLI; no writes of its own):
   - `--json` → `{ path, workItem, verifier, resumePrompt, reason }`.
   - **Path**: branch `feature/task.N.slug` → `docs/tasks/task.N.slug/task.N.handoff.{k}.slug.md`.
-    Branch `feature/story.E.S.slug` → the story's directory (located by searching `${PRD_ROOT}`
-    for `story.E.S.*.md`) → `story.E.S.handoff.{k}.slug.md`. Anything else (another branch,
+    Branch `feature/story.E.S.slug` → the story's directory (located by searching the PRD root
+    for `story.E.S.*.md`) → `story.E.S.handoff.{k}.slug.md`. The CLI resolves the PRD root as
+    `--prd-root <dir>` if given, else `prd.prdShardedLocation` from `skills-config.yaml` at the repo
+    root (the key `resolve-paths.sh` reads; a Node script cannot source shell), else `docs/prd`.
+    Read the key the way `shared/resources/generate-prd-epic-index.mjs` does (its
+    `prd.prdShardedLocation` reader, ~line 75): a small line scan, no YAML dependency, because the
+    script ships inside the skill and imports nothing from `shared/resources/`. Anything else (another branch,
     detached HEAD, no work-item dir on disk) → `.agents/handoffs/{YYYY-MM-DD}-{slug}.md`, where
     `slug` comes from `--slug` or the branch name. `{k}` = the highest existing index + 1, parsed
-    base 10.
-  - **Verifier**: the first that exists of `<repo>/.agents/skills/session-handoff/scripts/handoff-verify.mjs`,
+    base 10. A fallback path already taken gets `-2`, `-3`, … before `.md`.
+  - **Verifier**: the first that exists of: the sibling of `continuation.mjs` itself
+    (`handoff-verify.mjs` in the same `scripts/` directory — the two ship together, so it is
+    present in every install, including this source repository, where `.agents/skills` is a
+    gitignored symlink a fresh clone lacks), then `<repo>/.agents/skills/session-handoff/scripts/handoff-verify.mjs`,
     `~/.agents/skills/session-handoff/scripts/handoff-verify.mjs` and
-    `~/.claude/skills/session-handoff/scripts/handoff-verify.mjs`. A repo-local path is emitted
-    relative, a user-level one absolute. None found → `reason: no-verifier`, and the prompt tells
+    `~/.claude/skills/session-handoff/scripts/handoff-verify.mjs`. A path under the repo root is
+    emitted relative, any other absolute. The resolver takes the sibling directory as an injected
+    input (`selfDir`) so the order stays testable. None found → `reason: no-verifier`, and the prompt tells
     the reader to verify the state table by hand. It never silently omits the step.
   - **Resume prompt**: fixed text naming the file, the verifier command, and the instruction to
     treat `stale` and `unverifiable` lines as unknown and to start at §1.
@@ -177,7 +190,14 @@ flowchart TD
 - **This is not a replacement for Write.** `.agents/handoff.md` stays the project-level file.
   `continue` writes one file per handoff, per work item.
 - **It does not commit.** Committing the continuation file is the caller's decision, since a
-  mid-task file may belong in the task's next commit. The SKILL states this.
+  mid-task file may belong in the task's next commit. The SKILL states this, and states the
+  consequence: committing the file moves HEAD, so the **Branch tip** row then reads `stale` by that
+  one commit. A caller who commits re-measures the tip and re-runs Read afterwards (run at review:
+  committing the file in a temp repo turned a `confirmed` tip row `stale`).
+- **A targeted-test row is slow in a large repo.** `node --test` in pattern mode runs node's own
+  discovery, which loads every `*.test.*` file before filtering by name; in this repository that
+  can exceed the verifier's 60 s default and read `unverifiable: timeout`. That is an accepted
+  verdict (the reader can run the test), not a template defect.
 - **Agent-agnostic.** Nothing in this task depends on Claude Code. The Claude-Code-specific trigger
   is task.157.
 
@@ -233,11 +253,12 @@ untouched.
 - `skills/session-handoff/tests/continuation.test.js` (new)
 
 **Changes**:
-- [ ] Pure `resolveContinuation({ repoRoot, branch, prdRoot, home, today, slug, exists, list })`, with the filesystem injected so it can be tested without a real repo
-- [ ] Task, story and fallback path rules as in § 3, with `{k}` = highest existing index + 1 (base 10)
-- [ ] Verifier resolution order (repo `.agents` → `~/.agents` → `~/.claude`); `reason: no-verifier` when none is found
-- [ ] `resumePrompt` built from `path` + `verifier`
-- [ ] Thin CLI: `--json`, `--slug`, `--repo`; exit 0 for `ok` / `no-verifier`, exit 2 for a usage error; emit with `process.exitCode = n; return`, never `process.exit()`, the convention `handoff-verify.mjs` already states in its header, so a piped `--json` is never truncated
+- [x] Pure `resolveContinuation({ repoRoot, branch, prdRoot, home, selfDir, today, slug, exists, list, findStory })`, with the filesystem injected so it can be tested without a real repo
+- [x] Task, story and fallback path rules as in § 3, with `{k}` = highest existing index + 1 (base 10)
+- [x] Verifier resolution order (sibling `selfDir` → repo `.agents` → `~/.agents` → `~/.claude`); `reason: no-verifier` when none is found
+- [x] PRD root for the CLI: `--prd-root` → `skills-config.yaml` `prd.prdShardedLocation` → `docs/prd`
+- [x] `resumePrompt` built from `path` + `verifier`
+- [x] Thin CLI: `--json`, `--slug`, `--repo`, `--prd-root`; exit 0 for `ok` / `no-verifier`, exit 2 for a usage error; emit with `process.exitCode = n; return`, never `process.exit()`, the convention `handoff-verify.mjs` already states in its header, so a piped `--json` is never truncated
 
 **Dependencies**: none
 
@@ -252,10 +273,10 @@ untouched.
 - `skills/session-handoff/SKILL.md`
 
 **Changes**:
-- [ ] Template with the fixed section order in § 3, "Ruled out" and "Open questions" mandatory (`none` allowed), resume prompt in a fenced block
-- [ ] `## Continue` section: steps are (1) run `continuation.mjs --json`, (2) if a develop-pipeline lock or `last-halt.json` exists, add the pipeline pointer, (3) measure and fill, (4) run Read on the new file and fix every `stale` row, (5) print the resume prompt verbatim and state that the file is not committed
-- [ ] Update `description` (trigger phrases) and the mode summary at the top
-- [ ] User-level install note
+- [x] Template with the fixed section order in § 3, "Ruled out" and "Open questions" mandatory (`none` allowed), resume prompt in a fenced block
+- [x] `## Continue` section: steps are (1) run `continuation.mjs --json`, (2) if a develop-pipeline lock or `last-halt.json` exists, add the pipeline pointer, (3) measure and fill, (4) run Read on the new file and fix every `stale` row, (5) print the resume prompt verbatim and state that the file is not committed
+- [x] Update `description` (trigger phrases) and the mode summary at the top
+- [x] User-level install note
 
 **Dependencies**: Phase 1
 
@@ -271,9 +292,9 @@ untouched.
 - `CHANGELOG.md`
 
 **Changes**:
-- [ ] Add the task and story `handoff` rows
-- [ ] `npm run generate-catalog`
-- [ ] CHANGELOG `[Unreleased]` entry
+- [x] Add the task and story `handoff` rows
+- [x] `npm run generate-catalog`
+- [x] CHANGELOG `[Unreleased]` entry
 
 **Dependencies**: Phase 2
 
@@ -301,6 +322,15 @@ None.
 6. ✅ `docs/reference/skill-catalog.md` - regenerated
 7. ✅ `CHANGELOG.md` - `[Unreleased]` entry
 
+### Files Modified Beyond the Plan (Step 3 — same-class inventory)
+
+Registering `handoff` in `file-naming.md` does not reach the code that hard-codes its own artifact
+list, so three lists were updated and one guard added (Decisions Log, implementation report):
+
+8. ✅ `shared/resources/finalise-fix-and-recheck.mjs` (+ bundled `skills/finalise/references/` copy) - `WORK_ITEM_ARTIFACT_RE` excludes `handoff`
+9. ✅ `skills/tracker-reconcile/scripts/tracker-reconcile.js` - `workItemDocFor` excludes `handoff`, and `pr-review`, which the guard below found missing
+10. ✅ `tests/work-item-artifact-naming.test.js` - its frontmatter-corpus skip list excludes `handoff`; new §6 calls both readers with every segment the standard registers
+
 ---
 
 ## 8. Testing Strategy
@@ -310,13 +340,15 @@ None.
 **Scope**: `resolveContinuation` with an injected filesystem.
 
 **Actions**:
-- [ ] `feature/task.147.develop-pipeline-step-mechanics` with the dir present → `docs/tasks/task.147.…/task.147.handoff.1.develop-pipeline-step-mechanics.md`
-- [ ] Same with `handoff.1` and `handoff.9` already present → `handoff.10` (base-10 parse, not lexical)
-- [ ] Task branch whose dir is absent → fallback `.agents/handoffs/`
-- [ ] `feature/story.2.3.slug` with a story found under `prdRoot` → the story's dir; story not found → fallback
-- [ ] Detached HEAD / `develop` → fallback, slug from `--slug` or the branch
-- [ ] Verifier resolution: each of the three locations wins when it is the first present; none present → `reason: no-verifier` **and** the prompt contains the manual-verify instruction
-- [ ] A slug carrying `/`, `..` or spaces is normalised to kebab-case and cannot escape the target dir
+- [x] `feature/task.147.develop-pipeline-step-mechanics` with the dir present → `docs/tasks/task.147.…/task.147.handoff.1.develop-pipeline-step-mechanics.md`
+- [x] Same with `handoff.1` and `handoff.9` already present → `handoff.10` (base-10 parse, not lexical)
+- [x] Task branch whose dir is absent → fallback `.agents/handoffs/`
+- [x] `feature/story.2.3.slug` with a story found under `prdRoot` → the story's dir; story not found → fallback
+- [x] Detached HEAD / `develop` → fallback, slug from `--slug` or the branch
+- [x] Verifier resolution: each of the three locations wins when it is the first present; none present → `reason: no-verifier` **and** the prompt contains the manual-verify instruction
+- [x] A slug carrying `/`, `..` or spaces is normalised to kebab-case and cannot escape the target dir
+- [x] Verifier order: the sibling (`selfDir`) wins over the three install locations when present
+- [x] PRD root: `--prd-root` beats `skills-config.yaml`'s `prd.prdShardedLocation`, which beats `docs/prd`
 
 **Command**: `command node --test skills/session-handoff/tests/continuation.test.js`
 
@@ -327,9 +359,10 @@ None.
 **Scope**: the template is verifiable as written, which tests behaviour, not source text.
 
 **Actions**:
-- [ ] Fill the template into a temp git repo with real figures (`git rev-parse --short HEAD`, `git status --porcelain` count), run `handoff-verify.mjs <file> --json`, and assert that every state row is `confirmed`
-- [ ] Mutate one figure → that row reads `stale` (proves the file is actually measured, per the mutation-proof rule)
-- [ ] The CLI's `--json` output parses when piped (not only when redirected to a file)
+- [x] Fill the template into a temp git repo with real figures (`git rev-parse --short HEAD`, `git status --porcelain` count), run `handoff-verify.mjs <file> --json`, and assert that every state row is `confirmed`
+- [x] Mutate one figure → that row reads `stale` (proves the file is actually measured, per the mutation-proof rule)
+- [x] A targeted-test row whose pattern matches no test reads `stale` (the `pass N` figure form), not `confirmed`
+- [x] The CLI's `--json` output parses when piped (not only when redirected to a file)
 
 **Command**: `command node --test skills/session-handoff/tests/*.test.js`
 
@@ -340,8 +373,8 @@ None.
 **Scope**: nothing existing changes.
 
 **Actions**:
-- [ ] The existing `handoff-verify.test.js` passes unchanged
-- [ ] `quick_validate.py skills/session-handoff` passes
+- [x] The existing `handoff-verify.test.js` passes unchanged
+- [x] `quick_validate.py skills/session-handoff` passes
 
 ---
 
@@ -356,7 +389,7 @@ Not applicable. The helper does a handful of `stat`/`readdir` calls.
 **Scope**: installs that copy a skill directory verbatim.
 
 **Actions**:
-- [ ] `npm run bundle -- --check` reports 0 problems (the new script and asset live inside the skill; nothing new under `shared/resources/`)
+- [x] `npm run bundle -- --check` reports 0 problems (the new script and asset live inside the skill; nothing new under `shared/resources/`)
 
 ---
 
@@ -364,30 +397,30 @@ Not applicable. The helper does a handful of `stat`/`readdir` calls.
 
 ### Functional
 
-- [ ] `continuation.mjs --json` on a `feature/task.N.slug` branch whose dir exists returns `reason: "ok"` and a `path` inside that dir named `task.N.handoff.{k}.slug.md` (Phase 1)
-- [ ] On any branch without a matching work-item dir it returns a path under `.agents/handoffs/` (Phase 1)
-- [ ] With no verifier installed it returns `reason: "no-verifier"`, and `resumePrompt` contains the manual-verify instruction rather than a verifier command (Phase 1)
-- [ ] A continuation file filled from the template in a temp repo verifies all-`confirmed` with the **unchanged** `handoff-verify.mjs` (Phase 2)
-- [ ] `SKILL.md` `continue` procedure runs Read on the new file before printing the prompt, and says the file is not committed (Phase 2)
+- [x] `continuation.mjs --json` on a `feature/task.N.slug` branch whose dir exists returns `reason: "ok"` and a `path` inside that dir named `task.N.handoff.{k}.slug.md` (Phase 1)
+- [x] On any branch without a matching work-item dir it returns a path under `.agents/handoffs/` (Phase 1)
+- [x] With no verifier installed it returns `reason: "no-verifier"`, and `resumePrompt` contains the manual-verify instruction rather than a verifier command (Phase 1)
+- [x] A continuation file filled from the template in a temp repo verifies all-`confirmed` with the **unchanged** `handoff-verify.mjs` (Phase 2)
+- [x] `SKILL.md` `continue` procedure runs Read on the new file before printing the prompt, and says the file is not committed (Phase 2)
 
 ### Performance
 
-- [ ] `continuation.mjs` completes in under 1 s on this repo (measured with `time`, not asserted in CI)
-- [ ] No change to `handoff-verify.mjs` run time (it is not modified)
+- [x] `continuation.mjs` completes in under 1 s on this repo (measured with `time`, not asserted in CI)
+- [x] No change to `handoff-verify.mjs` run time (it is not modified)
 
 ### Code Quality
 
-- [ ] `command npm test` passes, with the new tests counted in the run
-- [ ] `npm run bundle -- --check`: 0 problems
-- [ ] `quick_validate.py skills/session-handoff` passes
-- [ ] Every new test mutation-proven: reverting the behaviour it covers turns it red
+- [x] `command npm test` passes, with the new tests counted in the run
+- [x] `npm run bundle -- --check`: 0 problems
+- [x] `quick_validate.py skills/session-handoff` passes
+- [x] Every new test mutation-proven: reverting the behaviour it covers turns it red
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry
-- [ ] `file-naming.md` carries both `handoff` rows
-- [ ] Skill catalog regenerated
-- [ ] User-level install note present in `SKILL.md`
+- [x] CHANGELOG `[Unreleased]` entry
+- [x] `file-naming.md` carries both `handoff` rows
+- [x] Skill catalog regenerated
+- [x] User-level install note present in `SKILL.md`
 
 ---
 
@@ -477,32 +510,117 @@ None identified. The change is additive and touches no existing mode.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-01
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.156.qa.2.session-handoff-continue-mode.md](./task.156.qa.2.session-handoff-continue-mode.md)
+- **Gate File**: [task.156.gate.2.session-handoff-continue-mode.yml](./task.156.gate.2.session-handoff-continue-mode.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 14 new (13 continuation + 1 artifact-segment guard); 51 in the session-handoff suite
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Gate 1's CR-1 is fixed and verified in three install layouts. The cycle-2 refute pass raised five advisory findings (none high-confidence), recorded in the gate's `recommendations.future`.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-25 | 1.0     | Initial draft | create-task |
+| 2026-10-01 | 1.1     | Review passed (8/10) — 5 Important fixes applied: PRD root source, `pass N` test figure, uncommitted-files forms, tip row stales on commit, sibling verifier first | review-task |
+| 2026-10-01 |         | Status → ready-for-development | review-task |
+| 2026-10-01 |         | Implemented — 3 new files, 7 modified; 14 tests (13 + 1 artifact-segment guard) | develop |
+| 2026-10-01 |  | QA gate CONCERNS (90/100) — 1 finding (CR-1) | qa-task |
+| 2026-10-01 |  | QA findings fixed — CR-1 (Continue runs from a user-level install), 1 iteration | qa-fix |
+| 2026-10-01 |  | QA gate PASS (100/100) — 0 gated findings, 5 advisory | qa-task |
+| 2026-10-02 | 1.2 | DoD verified — accepted (PR #548) | finalise |
 <!-- change-log-end -->
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.156.qa.2.session-handoff-continue-mode.md`
+**Gate File**: `task.156.gate.2.session-handoff-continue-mode.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (2 QA cycles; gate 1 CONCERNS 90 → fixed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 5/5 functional, plus performance (0.11 s), code quality and migration
+✅ **Tests:** 13 continuation tests + the §6 artifact-segment guard; `handoff-verify.test.js` 38/38 unchanged
+✅ **PR Review:** PR #548; Step 5c `/review-pr` CONCERNS (advisory medium/medium findings, routed to follow-up)
+✅ **Documentation:** SKILL.md Continue section, template, `file-naming.md` rows, catalog, CHANGELOG
+✅ **Security Review:** PASS — `isWorkItemDocument` probe engages, 22 executed, 0 reproduced
+✅ **Compliance Review:** not applicable (internal tooling)
+✅ **CI:** SUCCESS on `8e4ff546` (5 checks)
+
+**Task marked as ACCEPTED on:** 2026-10-02
+
+**Detailed Verification Log:** See `task.156.dod.1.session-handoff-continue-mode.md` for complete verification evidence and timestamps.
+---
+
+## Development Record
+
+**Implementation Summary**: `continue` mode added to `session-handoff`: `scripts/continuation.mjs`
+(path, verifier and prompt resolution; writes nothing), `assets/continuation.template.md`, the
+`## Continue` procedure and user-level install note in `SKILL.md`, a three-mode description, and the
+`handoff` naming rows. The three hard-coded artifact lists that pick "the work-item document" now
+exclude `handoff`, guarded by a test that calls each reader.
+
+**Approach**: inline from the co-located plan (Step 3 inline path). The verifier stayed fixed; every
+figure form in the template was chosen by running it through `handoff-verify.mjs`.
+
+**Testing Results**: `skills/session-handoff/tests/continuation.test.js` 13/13; `tests/work-item-artifact-naming.test.js` §6 1/1;
+`handoff-verify.test.js` unchanged and passing. Mutation-proved: a lexical `nextIndex` turns the
+index-10 case red; dropping the task-dir check turns the absent-dir case red; removing `handoff` from
+finalise's list, or `pr-review` from tracker-reconcile's, turns §6 red. `continuation.mjs` runs in
+0.11 s on this repository (`time`).
+
+**QA fix cycle 1 (CR-1)**: Continue step 1 now finds `continuation.mjs` in `.agents/skills`, then
+`~/.agents/skills`, then `~/.claude/skills`, and step 4 runs the `verifier` step 1 returned rather than
+a hard-coded path. Run under bash and zsh in three layouts: skill in the repository, user-level only
+(`HOME` pointed at a `~/.claude/skills` install, verifier emitted absolute), and not installed (exit 1
+with the three locations named).
+
+**Completion Date**: 2026-10-01
+
+**Deferred Work**: none. Noted, out of scope: several prose resolvers in the develop pipelines find
+"the task file" with `find task.{id}.*.md` minus `.qa.`/`.gate.`/`.bug.`/`.implementation.` only, so
+any co-located artifact (`.plan.`, `.dod.`, `.review.`, now `.handoff.`) can sort first — a
+pre-existing class, not introduced here.
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: `continuation.mjs`
-- [ ] Pure resolver + injected fs
-- [ ] CLI + stdout drain
-- [ ] Unit tests
+- [x] Pure resolver + injected fs
+- [x] CLI + stdout drain
+- [x] Unit tests
 
 ### Phase 2: Template and procedure
-- [ ] `continuation.template.md`
-- [ ] `## Continue` section + description + install note
-- [ ] Integration test through the unchanged verifier
+- [x] `continuation.template.md`
+- [x] `## Continue` section + description + install note
+- [x] Integration test through the unchanged verifier
 
 ### Phase 3: Naming, catalog, changelog
-- [ ] `file-naming.md` rows
-- [ ] Catalog regenerated
-- [ ] CHANGELOG
+- [x] `file-naming.md` rows
+- [x] Catalog regenerated
+- [x] CHANGELOG
 
 ---
 
@@ -537,7 +655,7 @@ None identified. The change is additive and touches no existing mode.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to the implementation plan (`/develop-task`)

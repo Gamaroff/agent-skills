@@ -65,6 +65,8 @@ For each extracted symbol or feature name, grep the codebase (excluding docs/, n
 
 Assess whether the task's core deliverable appears to already be implemented, partially implemented, or not yet present.
 
+If the task enumerates call sites of one of this repository's engines (tracker-comment.js, stakeholder-summary-cli.js, gh-stage.js, jira-stage.js, tracker-issue.js) — it lists them, counts them, or says "all call sites of" — do not confirm the names it gives one by one: a grep for a named site cannot see an unnamed one. Run, from the repository root, `command node .agents/skills/review-task/references/call-sites.js --engine <engine> --json` and list every site it returns that the task does not name. If it exits non-zero (`no-roots`, `unreadable`, `internal-error`, `output-closed`), the population is not known: omit population_diff and add a finding with symbol `call-sites`, found_at `not found`, note `<reason> — population not measured`.
+
 Return ONLY this YAML block (no other text):
 
 implementation_status: not-implemented | partial | fully-implemented
@@ -72,7 +74,10 @@ findings:
   - symbol: <name searched>
     found_at: <file path, or "not found">
     note: <one line, max 15 words>
+population_diff:
+  - <file>:<line> of a collector site the task does not name
 # cap: 5 findings maximum. If nothing is implemented, return implementation_status: not-implemented with an empty findings array.
+# population_diff: omit it when the task enumerates no call sites; an empty list means it names every site.
 ```
 
 **Fallback**: if grep tooling is unavailable, return:

@@ -129,6 +129,21 @@ function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }, t) {
     run,
     bundle: () =>
       execFileSync("python3", [BUNDLER, skillDir], { encoding: "utf-8" }),
+    /**
+     * Bundle a skill holding a copy the write gate must refuse. The refusal is
+     * a failed run (observation #199): a copy left alone is one bundle:check
+     * fails, so the bundler must not print ✅ over it and exit 0.
+     */
+    bundleProtected: () => {
+      const res = run([skillDir]);
+      assert.equal(
+        res.status,
+        1,
+        `a left-alone copy must fail the run:\n${res.stdout}`,
+      );
+      assert.match(res.stdout, /SKIPPED references\//);
+      return res.stdout;
+    },
     readRef: (name) =>
       fs.readFileSync(path.join(skillDir, "references", name), "utf-8"),
     refExists: (name) => fs.existsSync(path.join(skillDir, "references", name)),
@@ -350,7 +365,7 @@ for (const [label, skillBody] of [
       t,
     );
 
-    fx.bundle();
+    fx.bundleProtected();
 
     assert.equal(
       fx.readRef("guard.md"),
@@ -375,7 +390,7 @@ test("a file that merely QUOTES the banner is not treated as bundler output", (t
     t,
   );
 
-  fx.bundle();
+  fx.bundleProtected();
 
   assert.equal(
     fx.readRef("guide.md"),
@@ -425,7 +440,7 @@ test("a header-less suffix is not auto-accepted as bundler output", (t) => {
     t,
   );
 
-  fx.bundle();
+  fx.bundleProtected();
 
   assert.equal(
     fx.readRef("thing.ts"),
@@ -449,7 +464,7 @@ test("a symlinked reference is not written through", (t) => {
   const sourceBefore = fx.readShared("linked.md");
   fx.symlinkRef("linked.md", "../../../shared/resources/linked.md");
 
-  fx.bundle();
+  fx.bundleProtected();
 
   assert.equal(
     fx.readShared("linked.md"),
