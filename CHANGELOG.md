@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.55.0] - 2026-10-07
+
 ### Fixed
 
 - **The develop-* Step 8 push check works on a Bitbucket remote.** Two Step 8 reads went through
