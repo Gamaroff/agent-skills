@@ -15,13 +15,13 @@ Discover artifacts using the following globs under <dir>:
 Story mode (mode=<mode> where <mode>=story):
   Gate:       story.<epic>.<story>.gate.*.yml       (all matches — use highest number)
   QA Report:  story.<epic>.<story>.qa.*.md          (all matches — use highest number)
-  PR Review:  story.<epic>.<story>.pr-review.*.md   (all matches — use highest number)
+  PR Review:  <pr_review>                           (one path, or `none` — do NOT glob)
   Bug Reports: story.<epic>.<story>.bug.*.md        (all matches)
 
 Task mode (mode=<mode> where <mode>=task):
   Gate:       task.<id>.gate.*.yml                  (all matches — use highest number)
   QA Report:  task.<id>.qa.*.md                     (all matches — use highest number)
-  PR Review:  task.<id>.pr-review.*.md              (all matches — use highest number)
+  PR Review:  <pr_review>                           (one path, or `none` — do NOT glob)
   Bug Reports: task.<id>.bug.*.md                   (all matches)
 
 The **PR Review** report is written by Step 5c (`/review-pr`) and is the ONLY carrier of findings on
@@ -29,6 +29,13 @@ the review-driven path: 5c runs when the gate reached it (any of the QA loop's f
 verdict has no gate `top_issues[]` to travel in. Omitting this glob makes that path silently
 findings-free — qa-fix would change nothing and the loop would HALT reporting the issues as
 unfixable.
+
+**`<pr_review>` is chosen for you, and `none` means read no PR review report at all.** qa-fix
+selects it with `pr-review-current.js`: the newest `*.pr-review.*.md`, but only while no gate newer
+than the one it reviewed exists. Do not glob for another one. A superseded report — a
+`REQUEST CHANGES` whose findings an earlier fix pass already worked, followed by a fresh QA gate —
+was once re-read as open HIGH work on every later cycle; the fresh gate is the current word on the
+code, and the next 5c reviews the PR again before anything leaves the loop.
 
 ## What to Extract
 
@@ -187,5 +194,6 @@ Dispatch Explore subagent:
 - Substitute placeholders:
   - `<dir>`: absolute path to story/task directory
   - `<mode>`: `story` or `task`
+  - `<pr_review>`: the `report` path from `pr-review-current.js --dir <dir> --json`, or `none` when its `reason` is `superseded` or `none`
   - `<epic>`, `<story>` (story mode) OR `<id>` (task mode): from current context
 ```

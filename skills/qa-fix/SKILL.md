@@ -51,6 +51,13 @@ You can invoke this skill with either:
 
 **Pipeline Skill args** (optional, after the path):
 
+- `gate=<path>` — the latest gate file. The develop pipelines pass it in place of the positional
+  path; treat it as the path argument (its directory is the work-item directory).
+- `pr_review=<path>` — the PR review report Step 5c (`/review-pr`) just wrote, passed on a
+  `REQUEST CHANGES` verdict. It is a **cross-check, not a source**: Step 1a selects the report with
+  `references/pr-review-current.js`, and when that `report` is not this path, print
+  `⚠️ pr_review= names {path} but the current report is {report or none} ({reason})` and use the
+  selector's answer.
 - `fix_cycle=<N>` — the QA/verify cycle this fix answers, as a **positive integer**. Bind it in
   Step 0 as `FIX_CYCLE_ARG` (empty when absent or not a positive integer — never a guessed `1`).
   The two Step 7 blocks that key the cycle-scoped tracker stage (`qa-fix-${FIX_CYCLE}`) use it
@@ -347,10 +354,25 @@ The PRD root is configurable; the nested structure under it and QA-artifact co-l
 
 Dispatch a read-only Explore subagent to ingest all QA artifacts and return a compact, risk-sorted Findings Summary. This keeps raw artifact content out of main context.
 
+First select the PR review report the ingester may read — the newest one, but only while no gate
+newer than the one it reviewed exists:
+
+```bash
+command node .agents/skills/qa-fix/references/pr-review-current.js --dir "{work-item-dir}" --json
+# reason current | legacy  → PR_REVIEW = .report
+# reason superseded | none → PR_REVIEW = none (log `superseded`: a later QA gate re-reviewed the code)
+# exit 2 (usage)           → the directory is wrong; fix the call, never default to a glob
+```
+
+A superseded report is never ingested: its findings were the work of the fix pass that followed it,
+and a fresh gate has reviewed the code since. Without this, a `REQUEST CHANGES` report was re-read as
+open HIGH work on every later cycle (found in the 2026-10-07 review-pr audit).
+
 Load the prompt from `references/qa-findings-ingester-prompt.md`. Substitute placeholders before dispatching:
 
 - `<dir>`: substitute with absolute path to the story or task directory
 - `<mode>`: substitute with `story` or `task`
+- `<pr_review>`: substitute with `PR_REVIEW` — the selected report path, or `none`
 - `<epic>`, `<story>` (story mode) OR `<id>` (task mode): substitute with the relevant IDs from context
 
 Dispatch: `Agent(subagent_type="Explore", prompt=<loaded-prompt-with-substitutions>)`
@@ -379,6 +401,11 @@ Parse latest gate YAML for:
 - Trace coverage summary and gaps
 - `test_design.coverage_gaps[]`
 - `risk_summary.recommendations.must_fix[]`
+
+When `PR_REVIEW` (selected in Step 1a) is a path, read that report's `## Machine-Readable Findings`
+block — `id`, `severity`, `ref`, `finding`, `suggested_action` — and treat a `high` finding as a
+HIGH gate `top_issue`. On the `REQUEST CHANGES` path it is the only carrier of the work; the gate is
+clean. Read no other PR review report.
 
 Read assessment markdowns and extract:
 

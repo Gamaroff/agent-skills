@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`/qa-fix` no longer re-reads an old `REQUEST CHANGES` PR review as open work.** The findings
+  ingester took the highest-numbered `*.pr-review.*.md` on every call, so after Step 5c's review
+  had been fixed, every later QA cycle re-fed its HIGH findings. `/review-pr` now records the gate
+  it read as `reviewed_gate:` in its machine-readable block, and the new
+  `shared/resources/pr-review-current.js` (bundled into `qa-fix`) hands the ingester a report only
+  while no newer gate exists. Reports without the key are treated as before. qa-fix's Step 1b
+  fallback now reads the selected report too (it read none), and its `gate=` / `pr_review=`
+  pipeline args are documented.
+- **`/review-pr` Step 8 posts from a fresh shell.** The `--comment` block called
+  `tracker_call_with_retry` and read `$REPORT_FILE`, `$INLINE_FILE` and `BB_CURL_AUTH`, none of
+  which it loaded or bound, so run as written it printed "PR comment failed — non-blocking". Each
+  Step 8/9 block now sources and re-binds what it uses, and a test runs the summary block in a
+  fresh bash and zsh shell against a stub `gh` (obs #294).
+
 ## [v0.53.0] - 2026-10-07
 
 ### Added
