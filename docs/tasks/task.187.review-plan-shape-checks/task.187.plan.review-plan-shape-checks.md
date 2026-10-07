@@ -37,11 +37,17 @@ Content sources, one per check — read each observation's Improvement in full b
 
 | Check | Trigger | Action | Worked example (from the observation's Issue) |
 | --- | --- | --- | --- |
-| 15 | plan removes or inverts a behaviour | `grep -rn '<literal>' tests shared/resources/tests evals skills/*/tests`; list every hit as a test to update | obs #203's task |
-| 16 | plan replaces/rewrites/deletes a region of a document | grep `skills/*/SKILL.md`, `shared/resources/*.md` for writers that target the region; each named carried / refused / owned | task.171 (ruled it out of scope) |
+| 15 | plan removes or inverts a behaviour | search every tracked test file for the literal (e.g. `git grep -n '<literal>' -- '*.test.*'`, plus fixture directories); list every hit as a test to update | obs #203's task |
+| 16 | plan replaces/rewrites/deletes a region of a document | search the project's skill and resource sources, every file type, for writers that target the region; each named carried / refused / owned | task.155 (the incident; task.171 later ruled it out of its own scope) |
 | 17 | identity, dedupe or uninstall key read from a shell command string | require a shell-word parse that inverts the writer's quoting | task.157 `context-pressure.mjs check` substring |
-| 18 | plan names a new test file | the file matches a `package.json` `scripts.test` glob, or the plan lists the runner edit; cite `tests/test-runner-reach.test.js` as the backstop | obs #255's task |
-| 19 | plan adds/changes a resume, lock or reconstruction rule | the document lists the states the rule must hold in (report at / ahead of / behind the gates; gate written, entry not; back-filled entry; in-place vs re-invocation) — same shape as check 12's released-shape diff | obs #264's task |
+| 18 | plan names a new test file | the file is reached by the project's test runner configuration, or the plan lists the runner edit; this repository's `tests/test-runner-reach.test.js` appears in the worked example only | obs #255's task |
+| 19 | plan adds/changes a resume, lock or reconstruction rule | the document lists the states the rule must hold in (report at / ahead of / behind the gates; gate written, entry not; back-filled entry; in-place vs re-invocation) — same shape as check 12's released-shape diff. Name the resume contract by bare filename, never a path literal | obs #264's task |
+
+**Consumer-neutral wording.** review-task ships to other projects. Each check's rule names "the
+project's test files / test runner configuration / skill and resource sources"; this repository's
+paths appear only in the `Worked example:` line. Checks 15, 16 and 18 each end with a "not
+applicable" line for a project that has no such artefact, in the shape of check 14's `no-roots` rule.
+Each check carries a `Trigger:` line and a `Worked example:` line (the presence test asserts both).
 | 20 | document lists "every X site" or sites in parentheses, outside check 14's five engines | the document records the grep that defines X; the reviewer re-runs it and diffs | obs #129's task |
 
 Then, in the same file:
@@ -56,20 +62,22 @@ Then, in the same file:
 
 ## Phase 2: review-task Step 6 and Step 7
 
-- `2. **Testing Completeness**:` — append a bullet (wording from create-task § Section 8, which
-  already states the rule; cite it rather than restate the example):
+- `2. **Testing Completeness**:` — append a bullet that **cites** create-task § Section 8
+  (`skills/create-task/SKILL.md:894`, which states the control-case rule) and adds only the review
+  action:
 
   ```markdown
      - **Behavioural evidence that re-runs its own example needs a control case** (obs #176, #285):
-       when the evidence for a new check, rule or prompt re-runs the incident the change quotes,
-       require an instance of the same defect class the text never mentions, varied in every
-       dimension the rule depends on, plus one correct instance the rule must leave alone. Missing
-       → **Important**
+       the rule is create-task's (§ Section 8, "Behavioural evidence needs a control case"); a plan
+       whose evidence re-runs the quoted incident with no control → **Important**
   ```
 
-- `4. **Success Criteria Measurability**:` — append two items after the post-merge item, in its
-  `- **…** (obs #N).` shape. Do **not** write a count of kinds (`review-task-measured-criterion.test.js`
-  test "check 4 names every test-free kind the AC prompt lists, and counts none of them"):
+- `4. **Success Criteria Measurability**:` — after the post-merge item, add **one lead-in sentence**
+  (e.g. "Two more shapes fail later than review, each **Important** too:"), then the two items in
+  the `- **…** (obs #N).` shape. The existing "Three shapes reach that point" (`:1121`) stays true
+  because the new items sit under their own lead-in. Do **not** write a count of kinds anywhere in
+  check 4: `tests/lib/count-of-kinds.js` scans all of it (test "check 4 names every test-free kind
+  the AC prompt lists, and counts none of them"):
   - **A behaviour fix in prose lands in an executable block** (obs #258): when the fix for a
     behaviour criterion lands in `SKILL.md` or a shared reference, the plan puts it in a fenced
     block a test helper extracts and runs. A table cell, blockquote or sentence → Important; offer
@@ -89,15 +97,18 @@ Then, in the same file:
   where a story differs (a story's resume-rule change is rare; keep the trigger, shorten the
   example). Pattern lines read `(check 11)` … `(check 16)`.
 - **Step 5** (`### Step 5: Completeness and Gap Analysis`): after `9. **Effort Estimate**:` add
-  `10. **Success Criteria Classification** (obs #224, #285):` — one paragraph that cites, by
-  fragment link, review-task's check 4 rules and
-  `references/finalise-dod-ac-prompt.md#step-3-check-each-acceptance-criterion`; state that a story
-  AC fitting no kind is Important. No restated kinds list, no count.
+  `10. **Acceptance Criteria Classification** (obs #224, #285):` — one paragraph that cites
+  review-task check 4 as `[review-task check 4](../review-task/SKILL.md#step-6-consistency-and-completeness-review)`
+  and the AC prompt as `[finalise's AC agent, Step 3](references/finalise-dod-ac-prompt.md#step-3-check-each-acceptance-criterion)`
+  (non-path link text); state that a story AC fitting no kind is Important. No restated kinds list,
+  no count.
 - **Step 5** `4. **Testing Coverage**:` — append the control-case, prose-in-a-fence and CI-platform
   bullets (same wording as Phase 2, pointing at the Step 5 check 10 for the classification).
 - **Step 5** — add `11. **Guard exemptions** (obs #269):` with the Step 7 wording from Phase 2.
-- Run `npm run bundle`; the fragment link is a citation, so it bundles `finalise-dod-ac-prompt.md`
-  alone (CLAUDE.md "Cite or depend"). Confirm `bundle:check` clean and the new copy tracked.
+- Extend the Step 4 and Step 5 "Issues to Flag" Important lines with the new checks.
+- Run `npm run bundle`. `finalise-dod-ac-prompt.md` reaches no other shared file, so it bundles
+  alone either way (CLAUDE.md "Cite or depend"). Confirm the bundler prints closure ±0 for
+  review-task and +1 for review-story, `bundle:check` is clean, and the new copy is tracked.
 
 ## Phase 4: `tests/test-runner-reach.test.js`
 
@@ -139,8 +150,13 @@ step heading (`tests/lib/markdown-section`), then per check:
 - the numbered heading is present under the right step heading, with its obs id;
 - its `❌ … (check N)` line exists, and N equals the number of the heading it names (per file — this
   is the CR5-2 guard);
-- the check carries `**Important**`;
-- Step 6 / Step 5 items are found by their bold lead-in;
+- the check carries `**Important**`, a `Trigger:` line and a `Worked example:` line;
+- checks 15, 16 and 18 (and twins 11, 12, 14) carry their "not applicable" line;
+- Step 6 / Step 7 / Step 5 items are found by their bold lead-in, and review-task check 4's
+  "Three shapes reach that point" sentence is still present and no "N kinds" phrase appears
+  (`require("./lib/count-of-kinds")`);
+- each new check has a Detection Rules line, and checks 16, 17, 19 (twins 12, 13, 15) a Questions to
+  Collect line;
 - a non-vacuity floor: 6 checks found in each skill; a missing site is a red assertion, never a
   skip.
 
