@@ -1085,7 +1085,8 @@ After fixes are applied:
 
 0. **Check for actual changes**: Before committing, run `git diff --stat HEAD` to verify qa-fix actually modified files. If no files changed (qa-fix made no code edits), do NOT increment the cycle counter. Instead:
    - **First, if this cycle entered 5b from a 5c `REQUEST CHANGES` verdict**, confirm the PR review
-     report path was actually passed in the invocation. A no-change result on that path is far more
+     report path was actually passed in the invocation, and that qa-fix's selector returned it
+     (`reason` `current`, not `superseded` or `none` — a printed `pr_review=` mismatch warning says it did not). A no-change result on that path is far more
      likely to mean the findings never reached qa-fix than that they are unfixable — the gate it
      reads is the clean one. If the path was omitted, re-invoke once with it before treating this as
      a HALT, and log the re-invocation.
@@ -1411,10 +1412,12 @@ gate carry the review's findings. Pass the **PR review report** as well:
 Skill(qa-fix, args="gate={gate-file-path} pr_review={pr-review-report-path}")
 ```
 
-The findings ingester globs `*.pr-review.*.md` for exactly this reason (see
-`qa-findings-ingester-prompt.md`), and treats a finding whose rendered severity field reads
+qa-fix selects the newest `*.pr-review.*.md` for its findings ingester for exactly this reason (see
+`qa-findings-ingester-prompt.md`) — and only while no gate newer than the one the report reviewed
+exists, so once the next 5a writes a fresh gate the report is retired rather than re-read as open
+work on every later cycle. The ingester treats a finding whose rendered severity field reads
 `high` as equivalent to a HIGH gate `top_issue` — the report carries no `severity:` key, and the
-ingester warns by name against searching for one. Without both halves of this — the glob and the passed path — qa-fix reads a
+ingester warns by name against searching for one. Without both halves of this — the selection and the passed path — qa-fix reads a
 clean gate, finds nothing, changes nothing, and 5b step 0 HALTs reporting the issues as unfixable
 when in fact they were never delivered.
 

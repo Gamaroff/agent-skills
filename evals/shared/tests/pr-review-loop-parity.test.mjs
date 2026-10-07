@@ -909,8 +909,22 @@ test("the REQUEST CHANGES path can actually deliver its findings to qa-fix", () 
   const ingester = read("shared/resources/qa-findings-ingester-prompt.md");
   assert.match(
     ingester,
-    /pr-review\.\*\.md/,
-    "the findings ingester must glob the PR review report",
+    /PR Review:\s+<pr_review>/,
+    "the findings ingester must read the PR review report qa-fix selected",
+  );
+  // The selection, not a bare highest-number glob: a superseded REQUEST CHANGES report was re-read
+  // as open HIGH work on every later cycle. The selector's behaviour is pinned in
+  // shared/resources/tests/pr-review-current.test.mjs; this pins that qa-fix calls it and feeds it in.
+  const qaFix = read("skills/qa-fix/SKILL.md");
+  assert.match(
+    qaFix,
+    /pr-review-current\.js --dir/,
+    "qa-fix must select the report with the selector",
+  );
+  assert.match(
+    qaFix,
+    /`<pr_review>`: substitute with `PR_REVIEW`/,
+    "qa-fix must pass the selection to the ingester",
   );
   assert.match(
     section5c(),
@@ -1090,6 +1104,7 @@ test("the PR review report carries a machine-readable findings block", () => {
   const body = block[1];
 
   for (const key of [
+    "reviewed_gate:",
     "findings:",
     "id:",
     "category:",

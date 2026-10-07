@@ -1859,8 +1859,8 @@ test("every remote → owner/repo parse in SKILL.md uses one expression", () => 
   ].map((m) => m[1]);
   assert.equal(
     sites.length,
-    3,
-    "Step 0, Step 0b repo_of and the rungs 3–4 block",
+    4,
+    "Step 0, Step 0b repo_of, the rungs 3–4 block and Step 8",
   );
   assert.equal(
     new Set(sites).size,
@@ -2407,3 +2407,83 @@ test("Step 7 sources next_numbered and states highest + 1, never count + 1", () 
   assert.match(s7, /never the\s+number of reports plus 1/);
   assert.doesNotMatch(s7, /starts at 1 and increments on re-review/);
 });
+
+// ---------------------------------------------------------------------------
+// Step 8 runs in a fresh shell (obs #294). Every fenced block is its own shell, and the summary
+// block called `tracker_call_with_retry` — defined only by the resolver Step 0 sourced — so run as
+// written it printed "PR comment failed — non-blocking" and posted nothing. This RUNS the block in
+// a fresh shell with a stub `gh` and asserts the comment was actually sent.
+// ---------------------------------------------------------------------------
+function step8Sandbox() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-step8-"));
+  const bin = path.join(dir, "bin");
+  fs.mkdirSync(bin);
+  fs.mkdirSync(path.join(dir, ".agents", "skills"), { recursive: true });
+  fs.symlinkSync(ROOT, path.join(dir, ".agents", "skills", "review-pr"));
+  spawnSync("git", ["init", "-q"], { cwd: dir });
+  spawnSync(
+    "git",
+    ["remote", "add", "origin", "https://github.com/acme/widgets.git"],
+    { cwd: dir },
+  );
+  // A stub gh: logs its argv, finds no existing marker comment, and keeps the posted body.
+  fs.writeFileSync(
+    path.join(bin, "gh"),
+    [
+      "#!/bin/sh",
+      'printf "%s\\n" "$*" >> "$GH_LOG"',
+      'if [ "$1 $2" = "pr comment" ]; then',
+      '  while [ $# -gt 0 ]; do [ "$1" = "--body-file" ] && cp "$2" "$GH_BODY"; shift; done',
+      "fi",
+      "exit 0",
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  const report = path.join(dir, "report.md");
+  fs.writeFileSync(report, "# PR Review Report: PR #7 — x\n");
+  return { dir, bin, report };
+}
+
+for (const shell of SHELLS) {
+  test(`Step 8's summary block posts from a fresh ${shell} shell`, (t) => {
+    const block = bashBlocks(
+      section("### Step 8 — `--comment`", "#### `--inline`"),
+    )[0];
+    assert.ok(block, "Step 8 has a summary block");
+    const { dir, bin, report } = step8Sandbox();
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    const script = block
+      .replaceAll("{pr-url}", "https://github.com/acme/widgets/pull/7")
+      .replaceAll("{pr-number}", "7")
+      .replaceAll("{report-file}", report);
+    const env = {
+      PATH: `${bin}:${process.env.PATH}`,
+      HOME: process.env.HOME,
+      GH_LOG: path.join(dir, "gh.log"),
+      GH_BODY: path.join(dir, "posted.md"),
+    };
+    const r = runScript(shell, script, { cwd: dir, env });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.doesNotMatch(
+      r.stdout + r.stderr,
+      /command not found|PR comment failed/,
+    );
+    assert.match(r.stdout, /PR review comment posted/);
+    const body = fs.readFileSync(env.GH_BODY, "utf8");
+    assert.ok(
+      body.startsWith("<!-- agent-skills-pr-review -->"),
+      "the marker is the first line",
+    );
+    assert.match(
+      body,
+      /# PR Review Report: PR #7/,
+      "the report reached the posted body",
+    );
+    assert.match(
+      r.stdout,
+      /^BODY_FILE=\S+/m,
+      "the body path is printed for the next block",
+    );
+  });
+}

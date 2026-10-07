@@ -63,7 +63,7 @@ PLATFORM="$VCS"
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 if [ "$PLATFORM" = "bitbucket" ]; then
   # owner/repo = the remote's last two path segments — one expression, identical in Step 0,
-  # Step 0b's repo_of and the rungs 3–4 block (a test holds them equal). It reads an altssh
+  # Step 0b's repo_of, the rungs 3–4 block and Step 8 (a test holds them equal). It reads an altssh
   # remote (ssh://git@altssh.bitbucket.org:443/ws/repo.git) as ws/repo, not workspace 443.
   BB_PATH=$(printf '%s\n' "$REMOTE_URL" | sed -E 's#/+$##; s#\.git$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#')
   BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
@@ -492,7 +492,9 @@ find "$D" -maxdepth 1 -name '*.pr-review.*.md' 2>/dev/null
 
 **Glob on the artifact segment; never reconstruct an exact filename.** The trailing slug is free descriptive text — `task.53.implementation.1.jira-rest-interception-initial-run.md` does not repeat the work-item slug. The sprint-review file is unprefixed in task directories and prefixed in some story directories, so glob `*sprint-review-summary.md`.
 
-Read the **highest-numbered** gate for `gate:`, `quality_score`, `top_issues`, `waiver`; the DoD header block; and the implementation report's Pipeline Progress table. The same verification predicates the pipeline uses to confirm a completed run apply here: a gate
+Read the **highest-numbered** gate for `gate:`, `quality_score`, `top_issues`, `waiver`, and keep its
+basename as `REVIEWED_GATE` (`none` when there is no gate) — Step 7 records it, and `/qa-fix` uses it
+to tell whether a later QA cycle has superseded this report; the DoD header block; and the implementation report's Pipeline Progress table. The same verification predicates the pipeline uses to confirm a completed run apply here: a gate
 that reached 5c (the QA loop's §5c accepting-route set — read from the last QA cycle entry's `**Action**: Proceeding to 5c` row, not from the gate token), a DoD file present once the document says `accepted`. (In this
 repo they are written up in `docs/reference/pipeline-artifacts.md`; that is a repo document, not
 a bundled skill reference, so it is named rather than linked.)
@@ -726,6 +728,7 @@ ALWAYS use this exact template structure:
 ## Machine-Readable Findings
 
 ```yaml
+reviewed_gate: {REVIEWED_GATE from Step 3 — the gate file's basename, or none}
 findings:
   # one entry per rendered finding, conformance first then code
   - id: {PC-n or CR-n, matching the rendered finding}
@@ -745,7 +748,12 @@ truncated_count: {integer — the two lenses' counts summed}
 ````
 
 **About the machine-readable block.** It is what `/qa-fix`'s findings ingester reads; the rendered
-sections above it are for humans. Five rules, each of which has a way of going wrong:
+sections above it are for humans. Six rules, each of which has a way of going wrong:
+
+- **`reviewed_gate` names the gate Step 3 read**, never a guess. `/qa-fix` ingests this report only
+  while no higher-numbered gate exists (`pr-review-current.js`, bundled with `/qa-fix`, decides).
+  Without it, a `REQUEST CHANGES` report whose findings were already fixed was re-read as open HIGH
+  work on every later QA cycle. An absent key reads as a legacy report and is still ingested.
 
 - **One block, both lenses**, conformance entries first then code entries — the same order as the
   rendered sections, so a human diffing the two sees them line up. One block means the ingester has
@@ -785,69 +793,89 @@ stages — the pipeline commits these files next anyway, and staging is reversib
 
 **One** summary comment, idempotent via the marker `<!-- agent-skills-pr-review -->`, using the find-by-marker → edit-by-id → else-create recipe from `finalise` — the only dual-platform idempotent PR comment in this repo.
 
-First build the body file — every command below reads it, and none of them creates it:
+The block below builds the body file and posts it, on either platform. **It is self-contained**:
+every fenced block is its own shell (Step 0b), so a helper Step 0 sourced — `tracker_call_with_retry`,
+`BB_CURL_AUTH` — and a value Step 1b or Step 7 bound do not exist here unless this block loads and
+re-binds them. Run as written before this rule held, the GitHub arm called an undefined
+`tracker_call_with_retry` and printed "PR comment failed — non-blocking" (obs #294). Run it from the
+repository root.
 
 ```bash
+# VCS, plus tracker_call_with_retry — defined by the resolver, so it must be sourced in THIS shell.
+source .agents/skills/review-pr/references/resolve-platform.sh || exit 1
+PR_URL="{pr-url}"            # Step 1b
+PR_NUMBER="{pr-number}"      # Step 1b
+REPORT_FILE="{report-file}"  # Step 7's report; with no work item, a mktemp file holding the terminal rendering
+: "${PR_URL:?re-bind PR_URL from Step 1b}" "${PR_NUMBER:?re-bind PR_NUMBER from Step 1b}"
+[ -s "$REPORT_FILE" ] || { echo "HALT: REPORT_FILE ($REPORT_FILE) is missing or empty — nothing to post"; exit 1; }
+
 # The lead goes BELOW the marker — see the warning under this block. `in-review`
 # is the same stage the tracker comment for this moment uses; one vocabulary.
-LEAD=$(node references/stakeholder-summary-cli.js --stage in-review) || exit 1
+LEAD=$(command node .agents/skills/review-pr/references/stakeholder-summary-cli.js --stage in-review) || exit 1
 
 BODY_FILE="$(mktemp -t review-pr-comment.XXXXXX.md)"
 {
   printf '%s\n\n' '<!-- agent-skills-pr-review -->'
   printf '%s\n\n---\n\n' "$LEAD"
-  cat "$REPORT_FILE"            # or the rendered summary when no report was written
+  cat "$REPORT_FILE"
 } > "$BODY_FILE"
+
+if [ "$VCS" = "github" ]; then
+  EXISTING_COMMENT_ID=$(gh pr view "$PR_URL" --json comments \
+    -q '.comments[] | select(.body | startswith("<!-- agent-skills-pr-review -->")) | .url' \
+    2>/dev/null | head -1 | grep -oE '[0-9]+$')
+
+  if [ -n "$EXISTING_COMMENT_ID" ]; then
+    OWNER=$(gh repo view --json owner -q '.owner.login')
+    REPO_NAME=$(gh repo view --json name -q '.name')
+    tracker_call_with_retry gh api -X PATCH \
+      "/repos/${OWNER}/${REPO_NAME}/issues/comments/${EXISTING_COMMENT_ID}" \
+      -F "body=@${BODY_FILE}" >/dev/null \
+      && echo "✅ PR review comment updated" || echo "⚠️ PR comment edit failed — non-blocking"
+  else
+    tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$BODY_FILE" \
+      && echo "✅ PR review comment posted" || echo "⚠️ PR comment failed — non-blocking"
+  fi
+else
+  # Bitbucket: the same owner/repo expression as Step 0, and the credential re-resolved here.
+  REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+  BB_PATH=$(printf '%s\n' "$REMOTE_URL" | sed -E 's#/+$##; s#\.git$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#')
+  BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
+  BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
+  BB_API="https://api.bitbucket.org/2.0"
+  source .agents/skills/review-pr/references/bitbucket-auth.sh || exit 1
+
+  # pagelen=100 — Bitbucket pages comments, and scanning only the first page means a busy
+  # PR never finds the marker and posts a duplicate, defeating the idempotency this exists for.
+  EXISTING_COMMENT_ID=$(curl -sf "${BB_CURL_AUTH[@]}" \
+    "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments?pagelen=100" \
+    | jq -r '.values[] | select(.content.raw | startswith("<!-- agent-skills-pr-review -->")) | .id' | head -1)
+
+  BB_PAYLOAD=$(jq -n --arg raw "$(cat "$BODY_FILE")" '{content: {raw: $raw}}')
+  if [ -n "$EXISTING_COMMENT_ID" ]; then
+    curl -sf -X PUT "${BB_CURL_AUTH[@]}" -H "Content-Type: application/json" \
+      "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments/${EXISTING_COMMENT_ID}" \
+      -d "$BB_PAYLOAD" >/dev/null \
+      && echo "✅ PR review comment updated" || echo "⚠️ PR comment edit failed — non-blocking"
+  else
+    curl -sf -X POST "${BB_CURL_AUTH[@]}" -H "Content-Type: application/json" \
+      "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
+      -d "$BB_PAYLOAD" >/dev/null \
+      && echo "✅ PR review comment posted" || echo "⚠️ PR comment failed — non-blocking"
+  fi
+fi
+
+# Printed so `--inline` and Step 9 can re-bind it: the next block is a new shell.
+printf 'BODY_FILE=%s\n' "$BODY_FILE"
 ```
 
 > **The marker stays on the first line, and that is what keeps this comment idempotent.** Both arms
-> below find an existing comment with `startswith("<!-- agent-skills-pr-review -->")` and then edit
+> find an existing comment with `startswith("<!-- agent-skills-pr-review -->")` and then edit
 > it by id. A lead inserted *above* the marker makes that search miss, so a re-run posts a **new**
 > comment instead of updating the old one — visible as duplicate comments, which reads as a
 > formatting problem rather than a bug, and never fails. `$BODY_FILE` is built once here and read by
 > the GitHub PATCH path, the GitHub POST path and both Bitbucket paths, so the lead reaches the
 > **update** path as well as the create path. That is the half that is easy to miss.
-
-**GitHub:**
-
-```bash
-EXISTING_COMMENT_ID=$(gh pr view "$PR_URL" --json comments \
-  -q '.comments[] | select(.body | startswith("<!-- agent-skills-pr-review -->")) | .url' \
-  2>/dev/null | head -1 | grep -oE '[0-9]+$')
-
-if [ -n "$EXISTING_COMMENT_ID" ]; then
-  OWNER=$(gh repo view --json owner -q '.owner.login')
-  REPO_NAME=$(gh repo view --json name -q '.name')
-  tracker_call_with_retry gh api -X PATCH \
-    "/repos/${OWNER}/${REPO_NAME}/issues/comments/${EXISTING_COMMENT_ID}" \
-    -F "body=@${BODY_FILE}" >/dev/null \
-    && echo "✅ PR review comment updated" || echo "⚠️ PR comment edit failed — non-blocking"
-else
-  tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$BODY_FILE" \
-    && echo "✅ PR review comment posted" || echo "⚠️ PR comment failed — non-blocking"
-fi
-```
-
-**Bitbucket:**
-
-```bash
-# pagelen=100 — Bitbucket pages comments, and scanning only the first page means a busy
-# PR never finds the marker and posts a duplicate, defeating the idempotency this exists for.
-EXISTING_COMMENT_ID=$(curl -sf "${BB_CURL_AUTH[@]}" \
-  "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments?pagelen=100" \
-  | jq -r '.values[] | select(.content.raw | startswith("<!-- agent-skills-pr-review -->")) | .id' | head -1)
-
-BB_PAYLOAD=$(jq -n --arg raw "$(cat "$BODY_FILE")" '{content: {raw: $raw}}')
-if [ -n "$EXISTING_COMMENT_ID" ]; then
-  curl -sf -X PUT "${BB_CURL_AUTH[@]}" -H "Content-Type: application/json" \
-    "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments/${EXISTING_COMMENT_ID}" \
-    -d "$BB_PAYLOAD" >/dev/null
-else
-  curl -sf -X POST "${BB_CURL_AUTH[@]}" -H "Content-Type: application/json" \
-    "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
-    -d "$BB_PAYLOAD" >/dev/null
-fi
-```
 
 Always `--body-file` / a file-sourced payload, never an inline body: bodies carry backticks, `$(…)` and newlines.
 
@@ -859,9 +887,18 @@ Commenting never gates. Never post over an `unverifiable` reason.
 
 The summary comment above stays the default and is always posted. `--inline` adds a second delivery:
 each finding whose anchor Step 6 verified (`anchor_check` `ok` or `unchecked-text`) is also posted as an
-inline comment anchored to that line, via the shared primitive. It resolves `$VCS` itself, so this step does not branch:
+inline comment anchored to that line, via the shared primitive. It resolves `$VCS` itself, so this step does not branch.
+Like the block above, this one re-binds what it reads:
 
 ```bash
+FINDINGS_JSON="{findings-json}"   # Step 6 — the file finding-anchors.js annotated
+PR_NUMBER="{pr-number}"           # Step 1b
+BODY_FILE="{body-file}"           # the BODY_FILE= line the summary block printed
+[ -s "$FINDINGS_JSON" ] || { echo "HALT: FINDINGS_JSON ($FINDINGS_JSON) is missing or empty"; exit 1; }
+[ -s "$BODY_FILE" ] || { echo "HALT: BODY_FILE ($BODY_FILE) is missing — run the summary block first"; exit 1; }
+: "${PR_NUMBER:?re-bind PR_NUMBER from Step 1b}"
+INLINE_FILE="$(mktemp -t review-pr-inline.XXXXXX.json)"
+
 # Findings from both lenses, reshaped into the CLI's input contract.
 # `.code_review.findings[]`, NOT `.code_review[]` — the latter iterates the
 # WRAPPER's values (`reviewed`, the findings array, `truncated_count`), so
@@ -890,9 +927,10 @@ jq '[ (.code_review.findings[]? | select(.anchor_check == "ok" or .anchor_check 
    "$FINDINGS_JSON" > "$INLINE_FILE" || {
   echo "findings JSON did not match the schema — not posting inline"; exit 1; }
 
-node .agents/skills/review-pr/references/pr-inline-comment.js \
+command node .agents/skills/review-pr/references/pr-inline-comment.js \
   --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" \
   --summary-file "$BODY_FILE" --json
+rm -f "$INLINE_FILE"
 ```
 
 **Anchoring failure degrades; it never drops a finding.** A line outside the diff hunk is rejected —
@@ -906,9 +944,13 @@ Full contract, the `reason` vocabulary and the marker-plus-update-in-place re-ru
 
 ### Step 9 — Cleanup
 
+A new shell again, so re-bind the scratch paths Steps 4, 6 and 8 printed (leave one empty when its step did not run):
+
 ```bash
-rm -f "$DIFF_FILE" "$BODY_FILE"
+DIFF_FILE="{diff-file}" FINDINGS_JSON="{findings-json}" BODY_FILE="{body-file}"
+rm -f "$DIFF_FILE" "$BODY_FILE" "$FINDINGS_JSON"
 ```
+
 
 ## Customization
 
