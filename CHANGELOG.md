@@ -483,6 +483,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Load-sensitive file budgets no longer block a release.** Three test files each asserted a
+  hardcoded 10 s whole-file wall-clock budget. Inside `release.sh`'s full local run on a busy machine
+  two of them took 10–47 s (7–10 s alone) and stopped v0.53.0 four times while CI was green on the
+  same commit. `spawn-budget.mjs` gains `fileBudgetMs(prefix)` — default 20 s, tunable through
+  `{PREFIX}_FILE_BUDGET_MS` > `TEST_FILE_BUDGET_MS` — and all three files use it; a test now fails
+  on a reintroduced literal. When CI is certified green for the commit, `release.sh` runs its local
+  gate with `TEST_FILE_BUDGET_MS=600000`, since CI already enforced the budgets; `--skip-ci-check`
+  keeps the normal ones.
+
 - **Code-review findings anchor to source lines, and every anchor is checked (task.194).** On
   `/review-pr 594` the shared code reviewer reported all six findings at patch-file line numbers
   (`slugify.js:77` for an 11-line file), and nothing downstream noticed. `code-review-prompt.md` now
