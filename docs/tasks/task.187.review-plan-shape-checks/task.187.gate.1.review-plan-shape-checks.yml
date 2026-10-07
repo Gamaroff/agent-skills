@@ -1,0 +1,55 @@
+schema: 2
+task: 'task.187.review-plan-shape-checks'
+task_title: 'Review checks for plan shapes'
+gate: PASS
+status_reason: 'All five phases verified; the 35 new test cases pass and are mutation-proven; sibling presence suites unchanged. Seven code-review findings, all LOW and none high-confidence, are advisory and routed to future.'
+reviewer: 'QA Engineer'
+head: '50f6eb21c45a40889e3ecc95b2f237a290ac542f'
+updated: '2026-10-07T06:20:20Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 35
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — the change ships prose review checks; the only predicates are test-harness oracles (reach(), itemOf in tests/), which gate no action of a shipped skill.'
+  performance:
+    status: PASS
+    notes: 'Two test files, each under 50 ms; no runtime code path changed.'
+  reliability:
+    status: PASS
+    notes: 'Additive prose; no existing check renumbered; bundle closure +1 (review-story) / +0 (review-task) as planned.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory cleanups CR-4..CR-7 (test-helper reuse, glob edge cases) recorded for follow-up.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1/CR-3: shipped prose names this repository (test-runner-reach backstop, resume-contract location) and review-story links ../review-task/SKILL.md, which a single-skill install lacks — say "the agent-skills source repository", and rest review-story check 10 on the bundled AC prompt or an upstream URL'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md']
+    - action: 'CR-2: reach population from git ls-files --cached --others --exclude-standard so an uncommitted new suite is caught locally'
+      refs: ['tests/test-runner-reach.test.js']
+    - action: 'CR-4..CR-7: per-check keyword on pattern/detection lines; reuse citingItemOf; escape ? and refuse ** / brace globs; exclude references/ tests only when a shared source exists'
+      refs: ['tests/review-plan-shape-checks.test.js', 'tests/test-runner-reach.test.js']
+    - action: 'Step 4b zero-blocks-executed on both SKILL.md files is pre-existing (identical on origin/develop; the diff adds 0 fenced blocks) — task.191 (--slot / helper calls) is the follow-up'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
