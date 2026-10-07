@@ -5,18 +5,20 @@ type: task
 description: "review-task and review-story gain the checks for nine plan shapes that passed review and failed later — removed literals, other writers in a replaced region, shell identity rules, unreached test files, untestable prose fixes, resume-rule states, guard exemptions, CI-platform criteria and control cases — plus a guard that every tracked test file is reached by npm test."
 tags: [review-task, review-story, observation, review-checks, test-reach]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-07
 assignee:
 estimated_effort_hours: 16
 github_issue: 586
+completed_date: 2026-10-07
+pr_number: 593
 ---
 
 # Technical Task: Review checks for plan shapes
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.187.review.1.review-plan-shape-checks.md` implemented 2026-10-07
 **GitHub Issue**: [#586](https://github.com/Gamaroff/agent-skills/issues/586)
 
@@ -486,6 +488,34 @@ None.
 ### Key Findings
 No critical issues identified. The Step 3b review raised seven LOW findings, none of them high-confidence, so all are advisory: three bugs (CR-1 to CR-3, consumer-facing wording and links, and untracked suites in the reach guard) and four test-helper cleanups. They are routed to the gate's `recommendations.future`.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.187.qa.1.review-plan-shape-checks.md`
+**Gate File**: `task.187.gate.1.review-plan-shape-checks.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: `task.187.pr-review.1.review-plan-shape-checks.md` — APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 13/13. Each behaviour criterion cites code and a committed test that runs on every PR.
+✅ **Tests:** 35 new cases across two suites, mutation-proven; CI green on PR #593.
+✅ **PR Review:** /review-pr APPROVE. The repository requires no human reviewers.
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry; both SKILL.md files updated.
+✅ **Security Review:** PASS. No boundary deliverable; no secrets or unsafe patterns.
+⚠️ **Compliance Review:** Not applicable (prose and tests only).
+
+**Follow-up (non-blocking):** the LOW findings from QA (CR-1..CR-7) and the PR review (CR-1..CR-3), plus the security agent's note that the reach guard's `git ls-files` population drops C-quoted non-ASCII paths.
+
+**Task marked as ACCEPTED on:** 2026-10-07
+
+**Detailed Verification Log:** See `task.187.dod.1.review-plan-shape-checks.md` for full verification evidence and timestamps.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
@@ -496,6 +526,7 @@ No critical issues identified. The Step 3b review raised seven LOW findings, non
 | 2026-10-07 |  | Status → ready-for-development | review-task |
 | 2026-10-07 |  | Implemented — 6 files outside docs/tasks (2 skills, 2 new test files, 1 bundled copy, CHANGELOG); 35 test cases added | develop-task |
 | 2026-10-07 |  | QA gate PASS (100/100) — 0 blocking findings, 7 advisory | qa-task |
+| 2026-10-07 | 1.2 | DoD passed — accepted (PR #593) | finalise |
 <!-- change-log-end -->
 
 ---
