@@ -498,19 +498,24 @@ test("release.sh gates on the clean-checkout runner first, stops when it fails, 
     );
     const release = (extra, flags = ["--patch"]) => {
       fs.rmSync(log, { force: true });
+      const env = {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        NPM_LOG: log,
+        CLEAN_CHECKOUT_CMD: "echo hijacked",
+        ...extra,
+      };
+      // This file runs inside a certified release's own gate, which exports
+      // TEST_FILE_BUDGET_MS. Drop it, so the nested release.sh is judged on what it
+      // sets itself and not on what the outer run inherited.
+      delete env.TEST_FILE_BUDGET_MS;
       const r = spawnSync(
         "bash",
         [path.join(REPO_ROOT, "scripts", "release.sh"), ...flags],
         {
           cwd: fx.repo,
           encoding: "utf-8",
-          env: {
-            ...process.env,
-            PATH: `${bin}:${process.env.PATH}`,
-            NPM_LOG: log,
-            CLEAN_CHECKOUT_CMD: "echo hijacked",
-            ...extra,
-          },
+          env,
         },
       );
       const calls = fs.existsSync(log)
