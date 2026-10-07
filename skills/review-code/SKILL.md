@@ -74,6 +74,33 @@ Dispatch **one read-only Explore subagent** with the prompt from [`references/co
 
 The subagent returns a `code_review:` YAML findings block (schema defined in the prompt). Parse it; do not invent or augment findings.
 
+### Step 2b — Check every anchor (always)
+
+A reviewer's `file_line` is a claim, not a fact: on PR #594 the shared reviewer reported every
+finding at a patch-file line number, and nothing downstream noticed (task.194). Before rendering,
+posting or fixing anything, write the parsed block to a JSON file and run the shared checker on it,
+from the repository root:
+
+```bash
+# {findings-json}: a scratch path (mktemp) holding {"code_review":{…}} as parsed above.
+# Steps 3–5 read the same file, so write it once, here.
+FINDINGS_JSON="{findings-json}"
+# --rev names the tree that was reviewed. Working-tree and --staged targets: omit it (the files on
+# disk). A <base>...<head> range or a PR target diffs against HEAD: pass --rev HEAD.
+command node .agents/skills/review-code/references/finding-anchors.js \
+  --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
+  --annotate "$FINDINGS_JSON" --json      # add: --rev HEAD   for a range or PR target
+# exit 1 = malformed anchors exist. NOT a halt: every finding now carries anchor_check — mark, continue.
+# exit 2 = usage: the findings file is wrong. Fix the call; never treat unchecked anchors as verified.
+```
+
+Every finding now carries `anchor_check`. `ok`, `unchecked-text` and `no-line` are clean;
+`no-such-file`, `out-of-range` and `text-mismatch` mean the reviewer named a line that is not
+the one it meant. **A malformed anchor is never dropped**: Step 3 renders it with
+`⚠️ unverified anchor`, Step 4 keeps it out of the inline set (it goes in the summary), and Step 5
+never edits it. The checker reports and never repairs — guessing the intended line would hide the
+reviewer defect this exists to show.
+
 ### Step 3 — Render findings (always)
 
 Print findings to the user, sorted bugs-before-cleanups then by severity, each as:
@@ -82,9 +109,13 @@ Print findings to the user, sorted bugs-before-cleanups then by severity, each a
 [CR-1] bug · high · confidence: high — src/x/y.ts:42
   what is wrong
   → suggested action
+
+[CR-2] bug · medium · confidence: high — src/x/y.ts:77 ⚠️ unverified anchor (out-of-range)
+  what is wrong
+  → suggested action
 ```
 
-If `truncated_count > 0`, note that N additional lower-severity findings were omitted. If there are no findings, say so plainly.
+Append `⚠️ unverified anchor ({anchor_check})` to any finding whose `anchor_check` is `no-such-file`, `out-of-range` or `text-mismatch` (Step 2b). If `truncated_count > 0`, note that N additional lower-severity findings were omitted. If there are no findings, say so plainly.
 
 ### Step 4 — `--comment` (optional)
 
@@ -111,7 +142,10 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    # abort the WHOLE program, leave `$INLINE_FILE` empty, and drop every finding —
    # not degrade them, drop them. `suggested_action` is likewise made optional.
    # A finding excluded here has no line to anchor to; carry it in your summary.
+   # `anchor_check` is Step 2b's verdict: only a verified anchor posts inline. A
+   # malformed one would land on the wrong line, or on none, and report `posted`.
    jq '[ .code_review.findings[]?
+         | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
          | select((.file_line? // "") | test("^.+:[0-9]+$"))
          | {path: (.file_line | split(":")[0]),
             line: (.file_line | split(":")[1] | tonumber),
@@ -174,6 +208,7 @@ Wrap every remote call in `tracker_call_with_retry` (3× exponential backoff) �
 Only if `--fix` is set:
 
 1. Apply each finding's `suggested_action` to the working tree. **Do not commit** — leave changes for the user to review.
+   **Skip every finding whose `anchor_check` is `no-such-file`, `out-of-range` or `text-mismatch`** (Step 2b) and list it as "skipped — unverified anchor". Editing a line the reviewer mislocated is the one outcome worse than not fixing it.
 2. Apply **bugs** by default; apply **cleanups** only when the user explicitly opts in (e.g. `--fix=all`), since cleanups are quality-of-life and may be subjective.
 3. After applying, re-render which findings were applied vs. skipped (and why), so the user can audit the edits against the diff.
 

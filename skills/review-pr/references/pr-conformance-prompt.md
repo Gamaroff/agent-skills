@@ -146,6 +146,10 @@ pr_conformance:
 Rules:
 - Sort findings: coverage, then trail, then consistency, then scope; within each, high → medium → low.
 - `id` is PC-{n}. `finding`/`suggested_action` are single sentences.
+- When `ref` is `path:line`, line is the line number IN THE PR-HEAD VERSION OF THE FILE (the `+` side
+  of the hunk header), NEVER a line number in the patch file — the same definition as `file_line` in
+  code-review-prompt.md. An optional `line_text` (that line's source text, trimmed) may accompany it;
+  the caller checks both against the file.
 - Output ONLY the YAML block above — no prose, no markdown table, no fences around it.
 - Empty review → `pr_conformance: { work_item: "", resolved_via: none, artifacts: {...}, findings: [], truncated_count: 0 }`.
 ```
