@@ -419,6 +419,80 @@ test("no test file hardcodes a spawn timeout — the budget is the single source
   );
 });
 
+test("no test file hardcodes a whole-file time budget — fileBudgetMs() is the single source", () => {
+  const offenders = [];
+  for (const file of testFiles()) {
+    const hits = code(file).match(/\bFILE_BUDGET_MS\s*=\s*[0-9][0-9_]*/g);
+    if (hits)
+      offenders.push(
+        `${path.relative(path.join(__dirname, ".."), file)}: ${hits.join(", ")}`,
+      );
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    "hardcoded file budget(s) found: " +
+      offenders.join(" | ") +
+      ". Use fileBudgetMs() from the shared spawn-budget module — three files each carried a 10 s " +
+      "literal and blocked a release under load (2026-10-07).",
+  );
+});
+
+test("the file budget defaults to 20 s and honours the precedence ladder", async () => {
+  const { fileBudgetMs } = await import("../shared/resources/spawn-budget.mjs");
+  const withEnv = (env, fn) => {
+    const saved = {};
+    for (const [k, v] of Object.entries(env)) {
+      saved[k] = process.env[k];
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    try {
+      return fn();
+    } finally {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  };
+  const clean = { P_FILE_BUDGET_MS: undefined, TEST_FILE_BUDGET_MS: undefined };
+  assert.equal(
+    withEnv(clean, () => fileBudgetMs("P")),
+    20000,
+  );
+  assert.equal(
+    withEnv(clean, () => fileBudgetMs()),
+    20000,
+  );
+  // Global applies when the specific var is unset, empty or malformed.
+  assert.equal(
+    withEnv({ ...clean, TEST_FILE_BUDGET_MS: "45000" }, () =>
+      fileBudgetMs("P"),
+    ),
+    45000,
+  );
+  assert.equal(
+    withEnv(
+      { ...clean, P_FILE_BUDGET_MS: "", TEST_FILE_BUDGET_MS: "45000" },
+      () => fileBudgetMs("P"),
+    ),
+    45000,
+  );
+  // Specific wins when valid; 0 is not a budget and falls through.
+  assert.equal(
+    withEnv(
+      { ...clean, P_FILE_BUDGET_MS: "30000", TEST_FILE_BUDGET_MS: "45000" },
+      () => fileBudgetMs("P"),
+    ),
+    30000,
+  );
+  assert.equal(
+    withEnv({ ...clean, P_FILE_BUDGET_MS: "0" }, () => fileBudgetMs("P")),
+    20000,
+  );
+});
+
 /* ------------------------------------------------------------------------ *
  * Tests for the detector itself.
  *

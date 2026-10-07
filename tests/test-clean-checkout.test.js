@@ -36,18 +36,19 @@ const { spawn, spawnSync } = require("child_process");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-// Task 154 AC6: this file runs in under 10 s. Timed from module load, so every
-// test and fixture counts; a failing root after-hook fails the run.
-const FILE_BUDGET_MS = 10_000;
+// Task 154 AC6: a whole-file time budget. Timed from module load, so every
+// test and fixture counts; a failing root after-hook fails the run. The budget
+// is shared and env-tunable: fileBudgetMs() in spawn-budget.mjs.
 const FILE_STARTED = process.hrtime.bigint();
 test.after(async () => {
   const ms = Number(process.hrtime.bigint() - FILE_STARTED) / 1e6;
   // A whole-file wall-clock budget is load-sensitive (task 153): the failure says so.
-  const { loadSensitive } = await import(
+  const { loadSensitive, fileBudgetMs } = await import(
     require("url").pathToFileURL(
       path.join(__dirname, "..", "shared", "resources", "spawn-budget.mjs"),
     ).href
   );
+  const FILE_BUDGET_MS = fileBudgetMs("CLEAN_CHECKOUT");
   assert.ok(
     ms < FILE_BUDGET_MS,
     loadSensitive(
@@ -472,33 +473,34 @@ test("release.sh gates on the clean-checkout runner first, stops when it fails, 
     // release stops at the step after the gate.
     fs.writeFileSync(
       path.join(bin, "npm"),
-      '#!/bin/sh\nprintf \'%s|%s\\n\' "$*" "${CLEAN_CHECKOUT_CMD-<unset>}" >> "$NPM_LOG"\n' +
+      '#!/bin/sh\nprintf \'%s|%s|%s\\n\' "$*" "${CLEAN_CHECKOUT_CMD-<unset>}" "${TEST_FILE_BUDGET_MS-<unset>}" >> "$NPM_LOG"\n' +
         '[ -n "$NPM_GATE_OK" ] && [ "$*" = "run test:clean-checkout" ] && exit 0\nexit 1\n',
       { mode: 0o755 },
     );
     // CI is green for this fixture: release.sh reads CI's verdict before the gate
     // (task 153), and this test is about the gate, not the CI check — which
     // tests/release-ci-gate.test.js holds. A stub, so the run makes no network call.
+    // GH_RED makes CI red, for the --skip-ci-check case below.
+    const runs = (conclusion) =>
+      JSON.stringify(
+        ["Test", "ShellCheck"].map((workflowName, i) => ({
+          workflowName,
+          status: "completed",
+          conclusion,
+          event: "push",
+          databaseId: i + 1,
+        })),
+      );
     fs.writeFileSync(
       path.join(bin, "gh"),
-      "#!/bin/sh\necho '" +
-        JSON.stringify(
-          ["Test", "ShellCheck"].map((workflowName, i) => ({
-            workflowName,
-            status: "completed",
-            conclusion: "success",
-            event: "push",
-            databaseId: i + 1,
-          })),
-        ) +
-        "'\n",
+      `#!/bin/sh\nif [ -n "$GH_RED" ]; then echo '${runs("failure")}'; else echo '${runs("success")}'; fi\n`,
       { mode: 0o755 },
     );
-    const release = (extra) => {
+    const release = (extra, flags = ["--patch"]) => {
       fs.rmSync(log, { force: true });
       const r = spawnSync(
         "bash",
-        [path.join(REPO_ROOT, "scripts", "release.sh"), "--patch"],
+        [path.join(REPO_ROOT, "scripts", "release.sh"), ...flags],
         {
           cwd: fx.repo,
           encoding: "utf-8",
@@ -525,8 +527,8 @@ test("release.sh gates on the clean-checkout runner first, stops when it fails, 
     );
     assert.deepEqual(
       failing.calls,
-      ["run test:clean-checkout|<unset>"],
-      `the gate is the first npm call, runs without the test hook, and nothing runs after it fails:\n${failing.r.stdout}${failing.r.stderr}`,
+      ["run test:clean-checkout|<unset>|600000"],
+      `the gate is the first npm call, runs without the test hook (and, with CI certified green, with relaxed file budgets), and nothing runs after it fails:\n${failing.r.stdout}${failing.r.stderr}`,
     );
     assert.ok(
       !failing.r.stdout.includes("Tests passed"),
@@ -541,6 +543,22 @@ test("release.sh gates on the clean-checkout runner first, stops when it fails, 
       `${passing.r.stdout}${passing.r.stderr}`,
     );
     assert.ok(passing.r.stdout.includes("Tests passed"), passing.r.stdout);
+
+    // Uncertified (--skip-ci-check over a red CI): nothing enforced the file budgets, so the
+    // gate keeps the normal ones — TEST_FILE_BUDGET_MS is not set for it.
+    const uncertified = release({ GH_RED: "1" }, [
+      "--patch",
+      "--skip-ci-check",
+    ]);
+    assert.deepEqual(
+      uncertified.calls,
+      ["run test:clean-checkout|<unset>|<unset>"],
+      `${uncertified.r.stdout}${uncertified.r.stderr}`,
+    );
+    assert.ok(
+      uncertified.r.stdout.includes("UNVERIFIED"),
+      `premise: the run must take the --skip-ci-check path:\n${uncertified.r.stdout}`,
+    );
   } finally {
     fx.cleanup();
   }
