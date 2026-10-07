@@ -6,6 +6,24 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/review-task` and `/review-story` check the plan shapes that passed review and failed later
+  (task.187).** review-task Step 3 gains checks 15–20 and review-story Step 4 their twins 11–16:
+  a removed literal still pinned by a test (obs #203); another writer inside a region a plan
+  replaces whole (obs #242); an identity key over a shell command string specified as a pattern,
+  not a shell-word parse (obs #252); a new test file the project's runner never reaches (obs #255);
+  a changed resume rule with no list of the reconstruction states it must hold in (obs #264); a
+  hand-written site list with no search behind it (obs #129). Each check is worded for any
+  consumer project and records "not applicable" where its artefact does not exist. review-task
+  Step 6 check 2 asks for a control case when behavioural evidence re-runs its own example (obs
+  #176, #285); check 4 adds a behaviour fix that lands in prose no test executes (obs #258) and a
+  criterion whose test cannot run on CI's platform (obs #279), under their own lead-in; Step 7 rates
+  an exemption to a refuse-by-default guard at least Medium and asks for a differential oracle (obs
+  #269). review-story Step 5 gains the same testing items, check 10 "Acceptance Criteria
+  Classification" (citing review-task check 4 and finalise's AC prompt, which review-story now
+  bundles) and check 11 for guard exemptions. `tests/review-plan-shape-checks.test.js` holds every
+  rule's presence at both sites, and `tests/test-runner-reach.test.js` fails when a tracked test
+  file is reached by no `npm test` entry (bundled `references/` copies excluded).
+
 - **`/review-pr` has an end-to-end eval suite (task.185).** Four scenarios under
   `evals/review-pr/` run the skill against a hermetic sandbox and check what it writes: a clean PR
   is approved and its report lands at `task.901.pr-review.1.…md`; a directory holding `.1.` and
