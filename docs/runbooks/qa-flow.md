@@ -134,8 +134,11 @@ stopped finding blockers.
 The exit gate of the QA loop, and the only way out of it.
 
 ```bash
-/review-pr --effort medium --comment
+/review-pr --effort medium --comment --no-code
 ```
+
+`--no-code` because the QA step has already run the code reviewer over the same diff; 5c runs the
+conformance lens only.
 
 `qa-story` / `qa-task` validate the work against its acceptance or success criteria and dispatch the
 code reviewer. `review-pr` asks a different question: does the PR *deliver what the work item

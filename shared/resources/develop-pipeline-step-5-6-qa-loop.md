@@ -1084,7 +1084,8 @@ After fixes are applied:
 
 0. **Check for actual changes**: Before committing, run `git diff --stat HEAD` to verify qa-fix actually modified files. If no files changed (qa-fix made no code edits), do NOT increment the cycle counter. Instead:
    - **First, if this cycle entered 5b from a 5c `REQUEST CHANGES` verdict**, confirm the PR review
-     report path was actually passed in the invocation. A no-change result on that path is far more
+     report path was actually passed in the invocation, and that qa-fix's selector returned it
+     (`reason` `current`, not `superseded` or `none` — a printed `pr_review=` mismatch warning says it did not). A no-change result on that path is far more
      likely to mean the findings never reached qa-fix than that they are unfixable — the gate it
      reads is the clean one. If the path was omitted, re-invoke once with it before treating this as
      a HALT, and log the re-invocation.
@@ -1298,7 +1299,8 @@ gate**: 5a and 5b can cycle without it, but nothing leaves the loop except throu
 > is it.
 
 **Why this exists, and what is genuinely new.** `/qa-story` and `/qa-task` already dispatch the
-**code** reviewer every cycle, so 5c's code lens is duplication and is not the reason it runs. Its
+**code** reviewer every cycle, so 5c passes `--no-code` and runs without its code lens — a second
+code review of the same diff costs a subagent and adds nothing. Its
 **conformance** lens has no counterpart anywhere in the pipeline: does the diff *cover* what the
 work item promised, did it drift outside that *scope*, is the artifact *trail* complete and honest,
 is the work item *consistent* with what shipped. A run can otherwise reach `accepted` with a
@@ -1347,10 +1349,10 @@ done
 
 ```bash
 # standard mode
-/review-pr --effort medium --comment
+/review-pr --effort medium --comment --no-code
 
 # lite mode — degrades the review, never skips it
-/review-pr --effort low --comment
+/review-pr --effort low --comment --no-code
 ```
 
 > **Written as two concrete invocations, not one `{medium|low}` placeholder.** zsh parses a
@@ -1364,6 +1366,11 @@ done
   current branch.
 - **`--effort`**: `medium` in standard mode, `low` in lite mode. Lite **degrades** the review; it
   never skips it. See [`shared/resources/develop-pipeline-lite-mode.md`](develop-pipeline-lite-mode.md).
+- **`--no-code`**: always, in both modes. `/qa-story` and `/qa-task` already ran the code reviewer
+  over this diff in 5a, with `code_review_blocking=true`, so 5c runs the **conformance lens only**
+  and its verdict comes from conformance findings alone. A work item that opted out with
+  `code_review_blocking: false` stays opted out: a 5c code lens would hand its code findings a
+  `REQUEST CHANGES` path the opt-out exists to remove.
 - **`--comment` is passed explicitly and is not optional here.** `/review-pr` otherwise asks before
   posting, and the pipeline cannot prompt. Steps 5–6 and 7 already comment on the PR, so this is
   authorised ground rather than a new outward-facing capability.
@@ -1410,10 +1417,12 @@ gate carry the review's findings. Pass the **PR review report** as well:
 Skill(qa-fix, args="gate={gate-file-path} pr_review={pr-review-report-path}")
 ```
 
-The findings ingester globs `*.pr-review.*.md` for exactly this reason (see
-`qa-findings-ingester-prompt.md`), and treats a finding whose rendered severity field reads
+qa-fix selects the newest `*.pr-review.*.md` for its findings ingester for exactly this reason (see
+`qa-findings-ingester-prompt.md`) — and only while no gate newer than the one the report reviewed
+exists, so once the next 5a writes a fresh gate the report is retired rather than re-read as open
+work on every later cycle. The ingester treats a finding whose rendered severity field reads
 `high` as equivalent to a HIGH gate `top_issue` — the report carries no `severity:` key, and the
-ingester warns by name against searching for one. Without both halves of this — the glob and the passed path — qa-fix reads a
+ingester warns by name against searching for one. Without both halves of this — the selection and the passed path — qa-fix reads a
 clean gate, finds nothing, changes nothing, and 5b step 0 HALTs reporting the issues as unfixable
 when in fact they were never delivered.
 

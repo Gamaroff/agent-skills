@@ -311,7 +311,7 @@ sequenceDiagram
         alt gate == PASS / WAIVED
             H->>+CC: /commit-changes<br/>"docs(story.{epic}.{story}): QA cycle {N} gate + report"
             CC-->>-H: committed + pushed (cycle's one push)
-            H->>+PR: /review-pr --effort {medium|low} --comment<br/>Step 5c — the loop's exit gate
+            H->>+PR: /review-pr --effort {medium|low} --comment --no-code<br/>Step 5c — the loop's exit gate
             PR->>FS: write story.{epic}.{story}.pr-review.{n}.*.md
             PR-->>-H: verdict
             alt verdict == REQUEST CHANGES

@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Step 5c runs `/review-pr --no-code` — the conformance lens only.** `/qa-story` and `/qa-task`
+  already run the code reviewer over the same diff every cycle with `code_review_blocking=true`, so
+  5c's code lens was a second review of that diff costing a subagent per run. The develop-story and
+  develop-task 5c invocations now pass `--no-code` in standard and lite mode, and the verdict comes
+  from conformance findings alone. A work item that opted out with `code_review_blocking: false`
+  stays opted out, rather than having its code findings reach a `REQUEST CHANGES` path at 5c. The
+  report's Code Review Findings section reads "Skipped (`--no-code`)." rather than "None.".
+
+### Fixed
+
+- **`/review-pr` can audit a merged Bitbucket PR.** Step 6 checks finding anchors against the PR
+  head, and its only route to a head whose branch was deleted was GitHub's `pull/<n>/head` — Bitbucket
+  keeps no such ref, so the review stopped with `bad-rev`. The new `scripts/resolve-head-rev.sh` tries
+  `origin/<head-branch>`, `pull/<n>/head`, a Bitbucket fork's branch, the Bitbucket source commit
+  (reachable after a merge-commit merge), and for a squash merge the merge commit, which the report
+  names as a weaker check. With no route it exits 1 naming each one tried. Step 1b binds the
+  Bitbucket inputs (`SOURCE_HASH`, `MERGE_HASH`, `FORK_URL`), and Step 4 detects a Bitbucket
+  cross-fork PR. Tested against real repositories served over `file://`, under bash and zsh.
+- **`/qa-fix` no longer re-reads an old `REQUEST CHANGES` PR review as open work.** The findings
+  ingester took the highest-numbered `*.pr-review.*.md` on every call, so after Step 5c's review
+  had been fixed, every later QA cycle re-fed its HIGH findings. `/review-pr` now records the gate
+  it read as `reviewed_gate:` in its machine-readable block, and the new
+  `shared/resources/pr-review-current.js` (bundled into `qa-fix`) hands the ingester a report only
+  while no newer gate exists. Reports without the key are treated as before. qa-fix's Step 1b
+  fallback now reads the selected report too (it read none), and its `gate=` / `pr_review=`
+  pipeline args are documented.
+- **`/review-pr` Step 8 posts from a fresh shell.** The `--comment` block called
+  `tracker_call_with_retry` and read `$REPORT_FILE`, `$INLINE_FILE` and `BB_CURL_AUTH`, none of
+  which it loaded or bound, so run as written it printed "PR comment failed — non-blocking". Each
+  Step 8/9 block now sources and re-binds what it uses, and a test runs the summary block in a
+  fresh bash and zsh shell against a stub `gh` (obs #294).
+
 ## [v0.53.0] - 2026-10-07
 
 ### Added
