@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.53.0] - 2026-10-07
+
 ### Added
 
 - **`/review-task` and `/review-story` check the plan shapes that passed review and failed later
