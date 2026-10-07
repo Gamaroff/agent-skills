@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-07
-**Next Available Task Number:** **195**
+**Next Available Task Number:** **196**
 
 ## How to use
 
@@ -236,6 +236,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 192 | [Read-back checks this cycle's verdict](task.192.read-back-checks-this-cycles-verdict/task.192.read-back-checks-this-cycles-verdict.md) | planned | refactoring | Medium | 2026-10-07 | [#591](https://github.com/Gamaroff/agent-skills/issues/591) | — qa-read-back.js refuses a Gate Decision or newest QA Change Log row that disagrees with this cycle's gate, and retries a transient .git/index.lock before reporting it (obs #205, #216) |
 | 193 | [Scripts reach only the skills that run them](task.193.scripts-reach-only-skills-that-run-them/task.193.scripts-reach-only-skills-that-run-them.md) | planned | refactoring | Medium | 2026-10-07 | [#592](https://github.com/Gamaroff/agent-skills/issues/592) | — classify the 34 prose script literals in shared/resources/*.md, switch unneeded ones to bare filenames and remove unreached copies, guard new ones with a reasoned allowlist, pin the create-skill rule sentence (obs #263, #289) |
 | 194 | [Code-review findings anchor to source lines](task.194.code-review-anchors-name-source-lines/task.194.code-review-anchors-name-source-lines.md) | accepted | refactoring | Medium | 2026-10-07 | [#595](https://github.com/Gamaroff/agent-skills/issues/595) | — code-review-prompt defines file_line as the PR-head source line and adds line_text; new finding-anchors.js verifies every path:line anchor; review-pr, review-code, qa-task and qa-story run it before render, post or gate (obs #290) |
+| 195 | [Finding-anchors follow-ups](task.195.finding-anchors-follow-ups/task.195.finding-anchors-follow-ups.md) | planned | refactoring | Medium | 2026-10-07 | — | task.194 — closes its seven advisory findings: unparseable code file_line, root-in-rev, --index for staged reviews, dispatchers decide on reason, --inline refuses un-annotated input, review-pr head SHA on both platforms, population covers develop-bug |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
