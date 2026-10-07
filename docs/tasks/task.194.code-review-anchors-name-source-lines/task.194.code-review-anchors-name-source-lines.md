@@ -420,25 +420,22 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-07
-**Quality Score**: 70/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.194.qa.2.code-review-anchors-name-source-lines.md](./task.194.qa.2.code-review-anchors-name-source-lines.md)
-- **Gate File**: [task.194.gate.2.code-review-anchors-name-source-lines.yml](./task.194.gate.2.code-review-anchors-name-source-lines.yml)
+- **Full Report**: [task.194.qa.3.code-review-anchors-name-source-lines.md](./task.194.qa.3.code-review-anchors-name-source-lines.md)
+- **Gate File**: [task.194.gate.3.code-review-anchors-name-source-lines.yml](./task.194.gate.3.code-review-anchors-name-source-lines.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 62
+- **Tests Executed**: 3238
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (3 medium, 1 low)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0 (no gated finding; 2 advisory)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 1's CR-1 and SEC-1 verified fixed (bugs 1 and 2 closed); the path-sink probe engages.
-- CR2-1 — the `--rev` route ignores `--root`: [task.194.bug.3.rev-route-ignores-root.md](./task.194.bug.3.rev-route-ignores-root.md)
-- CR2-2 — an unresolvable `--root` reads as reviewer-wrong: [task.194.bug.4.bad-root-reads-as-no-such-file.md](./task.194.bug.4.bad-root-reads-as-no-such-file.md)
-- CR2-3 — stale bad-rev prose in review-pr Step 6: [task.194.bug.5.review-pr-stale-bad-rev-prose.md](./task.194.bug.5.review-pr-stale-bad-rev-prose.md)
-- CR2-4 (low) — a directory anchor reads `unchecked-text` on the `--rev` route.
+- All cycle 2 fixes verified; bugs 1–5 closed.
+- Advisory (reproduced, confidence medium): exit 1 conflates malformed anchors with an unloadable script at the four dispatcher blocks; a `--root` absent from the `--rev` tree passes the preflight. Both are recorded in the gate's `recommendations.future`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -453,6 +450,7 @@ None.
 | 2026-10-07 |         | QA findings fixed — CR-1 (`--rev` resolved once, exit 2 `bad-rev`) and SEC-1 (real-path containment); 1 iteration | qa-fix |
 | 2026-10-07 |         | QA gate CONCERNS (70/100) — 4 findings (CR2-1 --rev ignores --root, CR2-2 bad --root, CR2-3 stale prose, CR2-4 dir anchor); cycle 1 fixes verified | qa-task |
 | 2026-10-07 |         | QA findings fixed — CR2-1..CR2-4: one `checkTree()` preflight (bad-root, bad-rev) and root-relative `cat-file blob` reads; stale review-pr prose; 2 iterations | qa-fix |
+| 2026-10-07 |         | QA gate CONCERNS (90/100) — 0 gated findings, 2 advisory (reliability NFR); cycle 2 fixes verified, bugs 1–5 closed | qa-task |
 <!-- change-log-end -->
 
 ---

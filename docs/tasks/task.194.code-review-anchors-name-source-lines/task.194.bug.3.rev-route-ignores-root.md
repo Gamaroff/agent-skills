@@ -4,7 +4,7 @@
 **Bug ID**: TASK-194-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 2 refute pass, CR2-1)
 **Date Found**: 2026-10-07
 
@@ -46,3 +46,4 @@ Read `<rev>:./<rel>` with `cwd` at `--root`; add a subdirectory-root test on the
 | ---------- | ------------ | ---------- | -------------------- |
 | 2026-10-07 | New          | qa-task    | Found in QA cycle 2  |
 | 2026-10-07 | Ready for QA | qa-fix     | Fixed in cycle 2 fix |
+| 2026-10-07 | Closed       | qa-task    | Verified in QA cycle 3 (gate 3) |
