@@ -128,6 +128,9 @@ inline list, so nothing in the toolchain pushes you into the wrapped form — ve
 A failure whose message starts `LOAD-SENSITIVE` is a timing assertion that depends on machine load.
 Re-run that file alone (`command node --test <file>`) before believing it; a green alone means
 re-run the gate, not investigate. A failure **without** the marker is real — do not re-run it away.
+Whole-file time budgets come from `fileBudgetMs()` in the same module (default 20 s); on a slow or
+busy box raise them with `TEST_FILE_BUDGET_MS`, or one suite with `{PREFIX}_FILE_BUDGET_MS`, rather
+than editing a test.
 The marker is built by `loadSensitive()` in the shared `spawn-budget.mjs` (task 153), and
 `scripts/release.sh` prints this rule when its local test aborts. Every file that carries it:
 

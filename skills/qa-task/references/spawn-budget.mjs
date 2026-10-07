@@ -37,6 +37,10 @@
  */
 
 const DEFAULT_TIMEOUT_MS = 60_000;
+// Whole-file wall-clock budget (task 154 AC6). 10 s was the original literal in each file; on
+// 2026-10-07 two of those files took 7–8.5 s alone and 10.3–10.7 s inside a loaded full run, and
+// blocked a release three times. 20 s still catches a file that genuinely slows down.
+const DEFAULT_FILE_BUDGET_MS = 20_000;
 const DEFAULT_RETRIES = 2;
 
 /**
@@ -104,6 +108,30 @@ export function spawnBudget(prefix) {
       0,
     ),
   };
+}
+
+/**
+ * The whole-file wall-clock budget for one suite: the time a test file may take from module load
+ * to its root after-hook. Same ladder as `spawnBudget`, for the same reason — a loaded box must be
+ * adjustable without editing assertion logic, and one literal per file is how the number forks:
+ *
+ *   {PREFIX}_FILE_BUDGET_MS  >  TEST_FILE_BUDGET_MS  >  20000
+ *
+ * Pair the assertion with `loadSensitive()`: the budget is a load-sensitive check by nature.
+ *
+ * @param {string} [prefix] Suite-specific env prefix, e.g. "CLEAN_CHECKOUT".
+ * @returns {number}
+ */
+export function fileBudgetMs(prefix) {
+  const env = process.env;
+  return resolve(
+    [
+      prefix ? env[`${prefix}_FILE_BUDGET_MS`] : undefined,
+      env.TEST_FILE_BUDGET_MS,
+    ],
+    DEFAULT_FILE_BUDGET_MS,
+    1,
+  );
 }
 
 /**
