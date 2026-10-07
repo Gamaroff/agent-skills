@@ -11,11 +11,13 @@ created: 2026-10-07
 updated: 2026-10-07
 assignee:
 estimated_effort_hours: 8
+github_issue: 599
 ---
 
 # Technical Task: Pipeline docs: QA loop, resume and artifacts
 
 **Status:** Planned
+**GitHub Issue**: [#599](https://github.com/Gamaroff/agent-skills/issues/599)
 
 ---
 

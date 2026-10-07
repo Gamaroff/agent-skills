@@ -11,11 +11,13 @@ created: 2026-10-07
 updated: 2026-10-07
 assignee:
 estimated_effort_hours: 8
+github_issue: 600
 ---
 
 # Technical Task: Pipeline entry docs: Phase 0, lite mode and invocation
 
 **Status:** Planned
+**GitHub Issue**: [#600](https://github.com/Gamaroff/agent-skills/issues/600)
 
 ---
 
