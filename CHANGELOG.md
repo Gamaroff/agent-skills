@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.54.0] - 2026-10-07
+
 ### Changed
 
 - **Step 5c runs `/review-pr --no-code` — the conformance lens only.** `/qa-story` and `/qa-task`
