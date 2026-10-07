@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-07
-**Next Available Task Number:** **189**
+**Next Available Task Number:** **190**
 
 ## How to use
 
@@ -230,6 +230,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 186 | [Eval harness hardening and task.185 leftovers](task.186.eval-harness-hardening-and-leftovers/task.186.eval-harness-hardening-and-leftovers.md) | accepted | testing | Medium | 2026-10-06 | [#575](https://github.com/Gamaroff/agent-skills/issues/575) | task.185 · four independent phases: runner/repeat never score a non-verdict as a verdict (never-settling promise exit 0, unknown assertion fn, exit codes 3–5 vs Node, empty assertions, missing jq, timeout text); fake gh residue (refusal reason, `--version`, `-R` on api, `pick()` gaps, own-key lookup); `pr-inline-comment.js` lists comments with `-f` and no `-X GET` (sent as POST); one shared next-number rule for qa-planning, review-bug, review-epic, review-task (obs #272) |
 | 187 | [Review checks for plan shapes](task.187.review-plan-shape-checks/task.187.review-plan-shape-checks.md) | planned | refactoring | Medium | 2026-10-07 | [#586](https://github.com/Gamaroff/agent-skills/issues/586) | — review-task Step 3 checks 15–20, Step 6/7 rules, review-story parity, and a test-runner reach guard (obs #129, #203, #242, #252, #255, #258, #264, #269, #279, #285) |
 | 188 | [Resume from evidence, not flags](task.188.resume-from-evidence-not-flags/task.188.resume-from-evidence-not-flags.md) | planned | refactoring | Medium | 2026-10-07 | [#587](https://github.com/Gamaroff/agent-skills/issues/587) | — develop-next/develop-batch judge a merge by the PR state, record a pipeline HALT in run state, and reconcile merged/ticked before routing (obs #180, #197, #286) |
+| 189 | [Read-only agents never write](task.189.read-only-agents-never-write/task.189.read-only-agents-never-write.md) | planned | refactoring | Medium | 2026-10-07 | [#588](https://github.com/Gamaroff/agent-skills/issues/588) | — the QA traceability mapper returns its matrix and the step writes it; the DoD security agent returns a probe plan that finalise runs with --record; the DoD docs agent runs no generator; a guard test keeps Explore prompts write-free (obs #191, #218) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
